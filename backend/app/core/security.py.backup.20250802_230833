@@ -1,0 +1,332 @@
+"""
+セキュリティユーティリティ
+統一されたセキュリティ機能を提供
+"""
+
+import hashlib
+import secrets
+import time
+from typing import Dict, Optional, List
+from datetime import datetime, timedelta
+import redis
+from fastapi import Request, HTTPException, status
+from fastapi.security.utils import get_authorization_scheme_param
+from starlette.middleware.base import BaseHTTPMiddleware
+import logging
+
+from app.core.config import settings
+
+# セキュリティログ
+security_logger = logging.getLogger("security")
+
+class SecurityHeaders:
+    """セキュリティヘッダー定数"""
+    
+    SECURITY_HEADERS = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:; frame-ancestors 'none';",
+        "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
+    }
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """セキュリティヘッダーミドルウェア"""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # セキュリティヘッダーを追加
+        for header, value in SecurityHeaders.SECURITY_HEADERS.items():
+            response.headers[header] = value
+            
+        # サーバー情報を隠す
+        response.headers["Server"] = "TravelCanvas"
+        
+        return response
+
+class RateLimiter:
+    """レート制限機能"""
+    
+    def __init__(self, redis_client: Optional[redis.Redis] = None):
+        self.redis_client = redis_client or redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True
+        )
+    
+    def is_allowed(
+        self, 
+        key: str, 
+        limit: int, 
+        window: int = 3600,
+        request: Optional[Request] = None
+    ) -> bool:
+        """
+        レート制限チェック
+        
+        Args:
+            key: 制限キー（例: f"user:{user_id}" or f"ip:{client_ip}"）
+            limit: 制限回数
+            window: 時間窓（秒）
+            request: リクエストオブジェクト（ログ用）
+            
+        Returns:
+            bool: 許可されている場合True
+        """
+        try:
+            current_time = int(time.time())
+            window_start = current_time - window
+            
+            # 現在の時間窓内のリクエスト数を取得
+            pipe = self.redis_client.pipeline()
+            pipe.zremrangebyscore(key, 0, window_start)  # 古いエントリを削除
+            pipe.zcard(key)  # 現在のカウントを取得
+            pipe.zadd(key, {str(current_time): current_time})  # 現在のリクエストを追加
+            pipe.expire(key, window)  # TTLを設定
+            
+            results = pipe.execute()
+            current_count = results[1]
+            
+            if current_count >= limit:
+                # レート制限に引っかかった場合のログ
+                client_ip = self._get_client_ip(request) if request else "unknown"
+                security_logger.warning(
+                    f"Rate limit exceeded for key: {key}",
+                    extra={
+                        "key": key,
+                        "limit": limit,
+                        "current_count": current_count,
+                        "client_ip": client_ip,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+                return False
+                
+            return True
+            
+        except Exception as e:
+            # Redis接続エラーの場合は制限しない（フェイルオープン）
+            security_logger.error(f"Rate limiter error: {str(e)}")
+            return True
+    
+    def _get_client_ip(self, request: Request) -> str:
+        """クライアントIPアドレスを取得"""
+        # X-Forwarded-Forヘッダーをチェック（プロキシ経由の場合）
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        
+        # X-Real-IPヘッダーをチェック
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip
+        
+        # 直接接続の場合
+        return request.client.host if request.client else "unknown"
+
+class PasswordValidator:
+    """パスワード強度検証"""
+    
+    @staticmethod
+    def validate_password_strength(password: str) -> Dict[str, any]:
+        """
+        パスワード強度をチェック
+        
+        Args:
+            password: チェック対象のパスワード
+            
+        Returns:
+            Dict: 検証結果
+        """
+        result = {
+            "is_valid": True,
+            "errors": [],
+            "score": 0,
+            "feedback": []
+        }
+        
+        # 最小長チェック
+        if len(password) < 8:
+            result["errors"].append("パスワードは8文字以上である必要があります")
+            result["is_valid"] = False
+        else:
+            result["score"] += 1
+        
+        # 大文字チェック
+        if not any(c.isupper() for c in password):
+            result["errors"].append("大文字を含む必要があります")
+            result["is_valid"] = False
+        else:
+            result["score"] += 1
+        
+        # 小文字チェック
+        if not any(c.islower() for c in password):
+            result["errors"].append("小文字を含む必要があります")
+            result["is_valid"] = False
+        else:
+            result["score"] += 1
+        
+        # 数字チェック
+        if not any(c.isdigit() for c in password):
+            result["errors"].append("数字を含む必要があります")
+            result["is_valid"] = False
+        else:
+            result["score"] += 1
+        
+        # 特殊文字チェック
+        special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        if not any(c in special_chars for c in password):
+            result["feedback"].append("特殊文字を含むとより安全です")
+        else:
+            result["score"] += 1
+        
+        # 長さボーナス
+        if len(password) >= 12:
+            result["score"] += 1
+            result["feedback"].append("十分な長さです")
+        
+        # 強度判定
+        if result["score"] >= 5:
+            result["strength"] = "強い"
+        elif result["score"] >= 3:
+            result["strength"] = "普通"
+        else:
+            result["strength"] = "弱い"
+        
+        return result
+
+class TokenGenerator:
+    """セキュアなトークン生成"""
+    
+    @staticmethod
+    def generate_secure_token(length: int = 32) -> str:
+        """セキュアなランダムトークンを生成"""
+        return secrets.token_urlsafe(length)
+    
+    @staticmethod
+    def generate_guest_token() -> str:
+        """ゲストユーザー用トークンを生成"""
+        timestamp = str(int(time.time()))
+        random_part = secrets.token_urlsafe(16)
+        return f"guest_{timestamp}_{random_part}"
+    
+    @staticmethod
+    def generate_api_key() -> str:
+        """API キー生成"""
+        return f"tc_{secrets.token_urlsafe(32)}"
+
+class SecurityAuditor:
+    """セキュリティ監査ログ"""
+    
+    @staticmethod
+    def log_security_event(
+        event_type: str,
+        user_id: Optional[str] = None,
+        client_ip: Optional[str] = None,
+        details: Optional[Dict] = None,
+        severity: str = "INFO"
+    ):
+        """
+        セキュリティイベントをログに記録
+        
+        Args:
+            event_type: イベントタイプ（例: "LOGIN_SUCCESS", "LOGIN_FAILED"）
+            user_id: ユーザーID
+            client_ip: クライアントIP
+            details: 追加詳細情報
+            severity: ログレベル
+        """
+        log_data = {
+            "event_type": event_type,
+            "user_id": user_id,
+            "client_ip": client_ip,
+            "details": details or {},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        log_level = getattr(logging, severity.upper(), logging.INFO)
+        security_logger.log(
+            log_level,
+            f"Security Event: {event_type}",
+            extra=log_data
+        )
+    
+    @staticmethod
+    def log_authentication_attempt(
+        success: bool,
+        user_identifier: str,
+        client_ip: str,
+        user_agent: Optional[str] = None,
+        failure_reason: Optional[str] = None
+    ):
+        """認証試行をログに記録"""
+        event_type = "LOGIN_SUCCESS" if success else "LOGIN_FAILED"
+        severity = "INFO" if success else "WARNING"
+        
+        details = {
+            "user_identifier": user_identifier,
+            "user_agent": user_agent,
+            "failure_reason": failure_reason
+        }
+        
+        SecurityAuditor.log_security_event(
+            event_type=event_type,
+            client_ip=client_ip,
+            details=details,
+            severity=severity
+        )
+
+class RequestValidator:
+    """リクエスト検証"""
+    
+    @staticmethod
+    def validate_content_type(request: Request, allowed_types: List[str]) -> bool:
+        """Content-Type検証"""
+        content_type = request.headers.get("content-type", "").lower()
+        return any(allowed_type in content_type for allowed_type in allowed_types)
+    
+    @staticmethod
+    def sanitize_input(input_str: str, max_length: int = 1000) -> str:
+        """入力値のサニタイズ"""
+        if not input_str:
+            return ""
+        
+        # 長さ制限
+        sanitized = input_str[:max_length]
+        
+        # 危険な文字の除去（基本的なXSS対策）
+        dangerous_chars = ["<", ">", "\"", "'", "&"]
+        for char in dangerous_chars:
+            sanitized = sanitized.replace(char, "")
+        
+        return sanitized.strip()
+
+class IPWhitelist:
+    """IP ホワイトリスト機能"""
+    
+    def __init__(self, whitelist: Optional[List[str]] = None):
+        self.whitelist = set(whitelist or [])
+    
+    def is_allowed(self, ip: str) -> bool:
+        """IP がホワイトリストに含まれているかチェック"""
+        if not self.whitelist:
+            return True  # ホワイトリストが空の場合は全て許可
+        
+        return ip in self.whitelist
+    
+    def add_ip(self, ip: str):
+        """IP をホワイトリストに追加"""
+        self.whitelist.add(ip)
+    
+    def remove_ip(self, ip: str):
+        """IP をホワイトリストから削除"""
+        self.whitelist.discard(ip)
+
+# インスタンス化
+rate_limiter = RateLimiter()
+password_validator = PasswordValidator()
+token_generator = TokenGenerator()
+security_auditor = SecurityAuditor()
+request_validator = RequestValidator()

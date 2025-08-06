@@ -1,0 +1,87 @@
+"""
+TravelCanvas Backend - Security Module
+認証・認可・セキュリティ関連の統一実装
+"""
+from typing import Optional, Union, Any
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from app.core.config import settings
+from app.models.models import User
+import secrets
+import hashlib
+
+# パスワードハッシュ化設定
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# JWT設定
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """アクセストークン作成"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({"exp": expire, "type": "access"})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """リフレッシュトークン作成"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """パスワード検証"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    """パスワードハッシュ化"""
+    return pwd_context.hash(password)
+
+def verify_token(token: str) -> Optional[dict]:
+    """トークン検証"""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+    """ユーザー認証"""
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+def create_session_token() -> str:
+    """セッショントークン作成"""
+    return secrets.token_urlsafe(32)
+
+def hash_token(token: str) -> str:
+    """トークンハッシュ化"""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def generate_reset_token() -> str:
+    """パスワードリセットトークン生成"""
+    return secrets.token_urlsafe(32)
+
+def generate_verification_token() -> str:
+    """メール認証トークン生成"""
+    return secrets.token_urlsafe(32)

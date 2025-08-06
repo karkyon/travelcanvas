@@ -1,0 +1,66 @@
+{
+  "root_files": [
+    "alembic.ini",
+    "Dockerfile",
+    "requirements.txt",
+    "docker-compose.yml",
+    "requirements_new.txt",
+    "pyproject.toml",
+    "README.md",
+    "installed_packages.txt",
+    "project_structure_check.py",
+    "travelcanvas_api_spec.md"
+  ],
+  "directories": {
+    "logs": [
+      "error.log",
+      "app.log",
+      "security.log"
+    ],
+    "static": [
+      "js",
+      "images",
+      "css",
+      "README.md"
+    ],
+    "venv": [
+      "lib64",
+      "lib",
+      "include",
+      "bin",
+      "pyvenv.cfg"
+    ],
+    "alembic": [
+      "__pycache__",
+      "script.py.mako",
+      "versions",
+      "env.py",
+      "README"
+    ],
+    "tests": [
+      "unit",
+      "integration"
+    ],
+    "app": [
+      "__pycache__",
+      "__init__.py",
+      "services",
+      "main.py",
+      "schemas",
+      "models",
+      "crud",
+      "middleware",
+      "utils",
+      "core",
+      "api"
+    ]
+  },
+  "python_files": [
+    "project_structure_check.py"
+  ],
+  "config_files": [
+    "Dockerfile",
+    "requirements.txt",
+    "pyproject.toml"
+  ]
+}
