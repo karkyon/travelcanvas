@@ -1,0 +1,129 @@
+フォルダー パスの一覧:  ボリューム Google Drive
+ボリューム シリアル番号は 00000089 1983:1116 です
+G:\マイドライブ\WORK\自作アプリ\AI旅行計画ツール\PROJECT\ONREACT\V1\FRONTEND
+│  tailwind.config.2.js
+│  vite.config.2.ts
+│  playwright.config.ts
+│  vitest.config.ts
+│  postcss.config.js
+│  .prettierrc.js
+│  .eslintrc.js
+│  tsconfig.node.json
+│  tsconfig.json
+│  index.html
+│  vite.config.ts
+│  tailwind.config.js
+│  README.md
+│  .gitignore
+│  .env.example
+│  filelist.txt
+│  
+├─src
+│  │  App.tsx
+│  │  index.html
+│  │  tsconfig.app.json
+│  │  package.json
+│  │  vite-env.d.ts
+│  │  App.2.tsx
+│  │  main.tsx
+│  │  
+│  ├─hooks
+│  │      useAuth.tsx
+│  │      usePlan.tsx
+│  │      useSearch.tsx
+│  │      useDragDrop.tsx
+│  │      useOptimization.tsx
+│  │      useRealtime.tsx
+│  │      
+│  ├─pages
+│  │  │  PlannerPage.tsx
+│  │  │  DashboardPage.tsx
+│  │  │  RegisterPage.tsx
+│  │  │  LoginPage.tsx
+│  │  │  LandingPage.tsx
+│  │  │  SettingsPage.tsx
+│  │  │  SharePage.tsx
+│  │  │  OptimizationPage.tsx
+│  │  │  SearchPage.tsx
+│  │  │  NotFoundPage.tsx
+│  │  │  
+│  │  └─Admin
+│  │          AdminUsers.tsx
+│  │          AdminDashboard.tsx
+│  │          
+│  ├─components
+│  │  │  Input.tsx
+│  │  │  Button.tsx
+│  │  │  Card.tsx
+│  │  │  Modal.tsx
+│  │  │  Toast.tsx
+│  │  │  ImageSearch.tsx
+│  │  │  VoiceSearch.tsx
+│  │  │  SpotSearch.tsx
+│  │  │  DayView.tsx
+│  │  │  ShareModal.tsx
+│  │  │  PlanHeader.tsx
+│  │  │  Button.test.tsx
+│  │  │  
+│  │  ├─auth
+│  │  │      ProtectedRoute.tsx
+│  │  │      
+│  │  ├─planner
+│  │  │      TimeProgress.tsx
+│  │  │      OptimizationPanel.tsx
+│  │  │      DateNavigation.tsx
+│  │  │      ScheduleItem.tsx
+│  │  │      
+│  │  ├─common
+│  │  │      LoadingSpinner.tsx
+│  │  │      MapView.tsx
+│  │  │      ErrorBoundary.tsx
+│  │  │      
+│  │  └─layout
+│  │          Sidebar.tsx
+│  │          Header.tsx
+│  │          MainLayout.tsx
+│  │          
+│  ├─utils
+│  │      index.ts
+│  │      Storage.ts
+│  │      Validation.ts
+│  │      Format.ts
+│  │      
+│  ├─store
+│  │      planStore.ts
+│  │      authStore.ts
+│  │      uiStore.ts
+│  │      
+│  ├─services
+│  │      WebSocket.ts
+│  │      api.ts
+│  │      
+│  ├─types
+│  │      index.ts
+│  │      
+│  ├─config
+│  │      constants.ts
+│  │      env.ts
+│  │      
+│  ├─test
+│  │      setup.ts
+│  │      
+│  ├─styles
+│  │      index.tsx
+│  │      
+│  └─router
+│          index.tsx
+│          
+├─.husky
+│      commit-msg
+│      pre-commit
+│      
+└─public
+        offline.2.html
+        sw.2.js
+        manifest.2.json
+        offline.html
+        sw.js
+        manifest.json
+        

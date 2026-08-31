@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オフライン - TravelCanvas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .icon {
+            font-size: 80px;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #fff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .message {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #fbbf24;
+        }
+
+        .status-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .offline-features {
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .offline-features h3 {
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            background: #10b981;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .connection-status.offline {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .connection-status.online {
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            .title {
+                font-size: 2rem;
+            }
+
+            .message {
+                font-size: 1.1rem;
+            }
+
+            .buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        <span class="status-indicator pulse">●</span>
+        <span class="status-text">オフライン</span>
+    </div>
+
+    <div class="container">
+        <div class="icon">🛩️</div>
+        
+        <h1 class="title">オフラインモード</h1>
+        
+        <p class="message">
+            インターネット接続が利用できません。<br>
+            一部の機能は制限されますが、基本的な操作は継続できます。
+        </p>
+
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="retryConnection()">
+                🔄 再接続を試行
+            </button>
+            <button class="btn btn-secondary" onclick="goToCache()">
+                📱 保存済みプランを表示
+            </button>
+        </div>
+
+        <div class="status">
+            <div class="status-icon">⚠️</div>
+            ネットワーク接続を確認してください。接続が復旧すると自動的に同期されます。
+        </div>
+
+        <div class="offline-features">
+            <h3>🔒 オフラインで利用可能な機能</h3>
+            <ul class="feature-list">
+                <li>保存済みプランの閲覧</li>
+                <li>プランの編集（後で同期）</li>
+                <li>キャッシュされたスポット情報の確認</li>
+                <li>地図の表示（キャッシュ済みエリア）</li>
+                <li>スケジュール情報の印刷</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 接続状態の監視
+        function updateConnectionStatus() {
+            const statusElement = document.getElementById('connectionStatus');
+            const statusText = statusElement.querySelector('.status-text');
+            const statusIndicator = statusElement.querySelector('.status-indicator');
+
+            if (navigator.onLine) {
+                statusElement.className = 'connection-status online';
+                statusText.textContent = 'オンライン';
+                statusIndicator.classList.remove('pulse');
+                
+                // オンラインになったら自動的にホームページに遷移
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                statusElement.className = 'connection-status offline';
+                statusText.textContent = 'オフライン';
+                statusIndicator.classList.add('pulse');
+            }
+        }
+
+        // 再接続試行
+        function retryConnection() {
+            const button = event.target;
+            const originalText = button.textContent;
+            
+            button.textContent = '🔄 接続中...';
+            button.disabled = true;
+
+            // 簡単な接続テスト
+            fetch('/', { mode: 'no-cors' })
+                .then(() => {
+                    // 接続成功
+                    button.textContent = '✅ 接続成功';
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                })
+                .catch(() => {
+                    // 接続失敗
+                    button.textContent = '❌ 接続失敗';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+                });
+        }
+
+        // キャッシュされたプランを表示
+        function goToCache() {
+            // Service Workerのキャッシュからプランリストを取得
+            if ('caches' in window) {
+                caches.open('travelcanvas-runtime-v1').then(cache => {
+                    cache.match('/api/v1/travel/plans').then(response => {
+                        if (response) {
+                            // キャッシュされたプランがある場合
+                            window.location.href = '/dashboard?offline=true';
+                        } else {
+                            alert('保存済みプランが見つかりません。オンライン時にプランを作成してください。');
+                        }
+                    });
+                });
+            } else {
+                alert('お使いのブラウザではオフライン機能がサポートされていません。');
+            }
+        }
+
+        // イベントリスナーの設定
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        
+        // 初期状態の設定
+        updateConnectionStatus();
+
+        // 定期的な接続チェック
+        setInterval(() => {
+            if (!navigator.onLine) {
+                // 実際のネットワークテストを実行
+                fetch('/api/v1/health', { 
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                }).then(() => {
+                    if (!navigator.onLine) {
+                        // navigator.onLineが間違っている場合の修正
+                        updateConnectionStatus();
+                    }
+                }).catch(() => {
+                    // 実際にオフライン
+                });
+            }
+        }, 30000); // 30秒ごと
+
+        // PWA更新チェック
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // 新しいバージョンが利用可能
+                            if (confirm('新しいバージョンが利用可能です。更新しますか？')) {
+                                newWorker.postMessage({ action: 'skipWaiting' });
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            });
+        }
+    </script>
+</body>
+</html>
