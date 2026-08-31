@@ -173,3 +173,5 @@ dmypy.json
 *.backup_*
 *.bak_*
 *.old_*
+travelcanvas_phase_m*_*.py
+travelcanvas_phase_m*_report.*
