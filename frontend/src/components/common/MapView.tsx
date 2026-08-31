@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Navigation, Route, Zap, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { env } from '../../config/env';
 
 interface MapLocation {
   id: string;
@@ -109,7 +110,7 @@ const MapView: React.FC<MapViewProps> = ({
       // Google Maps API スクリプトを動的に読み込み
       if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=geometry,places`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${env.GOOGLE_MAPS_API_KEY}&libraries=geometry,places`;
         script.async = true;
         script.defer = true;
         script.onload = () => setIsGoogleMapsLoaded(true);
@@ -275,7 +276,7 @@ const MapView: React.FC<MapViewProps> = ({
   };
 
   // Google Maps が利用できない場合はダミーマップを表示
-  if (!isGoogleMapsLoaded || !process.env.REACT_APP_GOOGLE_MAPS_API_KEY) {
+  if (!isGoogleMapsLoaded || !env.GOOGLE_MAPS_API_KEY) {
     return (
       <div className={className}>
         <DummyMap 
