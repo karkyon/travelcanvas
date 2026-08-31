@@ -170,3 +170,6 @@ dmypy.json
 !.env.example
 *.backup.*
 *.old
+*.backup_*
+*.bak_*
+*.old_*
