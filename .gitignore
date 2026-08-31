@@ -175,3 +175,7 @@ dmypy.json
 *.old_*
 travelcanvas_phase_m*_*.py
 travelcanvas_phase_m*_report.*
+*.superseded
+*.original_from_repo
+*.before_fix
+travelcanvas_fix_requirements.py

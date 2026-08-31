@@ -1,21 +1,26 @@
-FROM node:18-alpine
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application code
 COPY . .
+RUN npx vite build
 
-# Build application
-RUN npm run build
+FROM node:24-alpine AS runtime
 
-# Expose port
-EXPOSE 3000
+WORKDIR /app
 
-# Run application (for production use nginx instead)
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0"]
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+
+USER node
+
+EXPOSE 4173
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
+    CMD wget -qO- http://localhost:4173 || exit 1
+
+CMD ["npm", "run", "preview"]

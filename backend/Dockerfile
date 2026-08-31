@@ -4,7 +4,7 @@
 # =================================
 # Base Image
 # =================================
-FROM python:3.11-slim as base
+FROM python:3.12-slim as base
 
 # 環境変数設定
 ENV PYTHONUNBUFFERED=1 \
