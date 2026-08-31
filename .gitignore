@@ -164,3 +164,9 @@ celerybeat.pid
 .dmypy.json
 dmypy.json
 .pyre/
+
+# --- TravelCanvas secret containment (auto-added, read-only rotation script) ---
+.env.*
+!.env.example
+*.backup.*
+*.old
