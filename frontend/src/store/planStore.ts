@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { TravelPlan, ScheduleItem, DaySchedule, Spot } from '@/types';
-import { apiService } from '@/services/api';
+import { api as apiService } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 interface PlanState {

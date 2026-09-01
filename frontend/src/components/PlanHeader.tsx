@@ -5,7 +5,7 @@ import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
 import Modal from './common/Modal';
-import type { TravelPlan } from '../../types';
+import type { TravelPlan } from '../types';
 
 interface PlanHeaderProps {
   plan: TravelPlan;

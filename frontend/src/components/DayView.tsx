@@ -5,8 +5,8 @@ import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
 import Modal from './common/Modal';
-import { ScheduleItem } from './planner/ScheduleItem';
-import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../../types';
+import ScheduleItem from './planner/ScheduleItem';
+import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 
 interface DayViewProps {
   day: DaySchedule;
