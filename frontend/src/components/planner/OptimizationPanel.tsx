@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Zap, Settings, TrendingUp, Clock, DollarSign, MapPin, 
-  Sparkles, AlertTriangle, CheckCircle, RefreshCw, 
-  Target, BarChart3, Route, Gauge
+  Zap, Settings, Clock, DollarSign, MapPin, 
+  Sparkles, CheckCircle, RefreshCw, 
+  Target, Route
 } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
-import { travelAPI } from '../../services/api';
-import type { OptimizationRequest, TravelPlan } from '../../types';
+import { optimizationAPI, type OptimizationRequest } from '../../services/api';
+import type { TravelPlan } from '../../types';
 
 interface OptimizationPanelProps {
   plan: TravelPlan;
@@ -63,9 +63,18 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({
   // プランの現在の統計を計算
   const currentStats = React.useMemo(() => {
     const totalEvents = plan.days.reduce((sum, day) => sum + day.events.length, 0);
-    const totalDuration = plan.days.reduce((sum, day) => sum + day.total_duration, 0);
-    const totalCost = plan.days.reduce((sum, day) => sum + day.total_cost, 0);
-    const totalDistance = plan.days.reduce((sum, day) => sum + day.total_distance, 0);
+    const totalDuration = plan.days.reduce(
+      (sum, day) => sum + day.events.reduce((s, e) => s + (e.duration ?? 0), 0),
+      0
+    );
+    const totalCost = plan.days.reduce(
+      (sum, day) => sum + day.events.reduce((s, e) => s + (e.cost ?? 0), 0),
+      0
+    );
+    const totalDistance = plan.days.reduce(
+      (sum, day) => sum + day.events.reduce((s, e) => s + (e.travel_time ?? 0), 0),
+      0
+    );
     
     return {
       totalEvents,
@@ -108,16 +117,6 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({
     }
   };
 
-  const getOptimizationTypeText = (type: string) => {
-    switch (type) {
-      case 'time_efficient': return '時間重視';
-      case 'cost_effective': return 'コスト重視';
-      case 'balanced': return 'バランス重視';
-      case 'eco_friendly': return '環境配慮';
-      default: return '最適化';
-    }
-  };
-
   const getEfficiencyColor = (score: number) => {
     if (score >= 80) return 'text-green-500';
     if (score >= 60) return 'text-yellow-500';
@@ -136,17 +135,20 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({
     setIsOptimizing(true);
     try {
       const optimizationRequest: OptimizationRequest = {
-        plan_id: plan.id,
-        optimization_type: settings.type,
+        preferences: {
+          transportation: settings.preferences.prefer_public_transport ? 'public_transport' : 'any',
+          budget_level: settings.constraints.budget_limit ? 'limited' : 'flexible',
+          pace: settings.preferences.activity_pace,
+        },
         constraints: settings.constraints,
-        preferences: settings.preferences
       };
 
-      const response = await travelAPI.optimizePlan(plan.id, optimizationRequest);
+      const response = await optimizationAPI.optimizePlan(plan.id, optimizationRequest);
       const jobId = response.data.job_id;
-      
-      setQuickOptimizationResult(response.data.quick_result);
+
+      setQuickOptimizationResult(response.data);
       onOptimizationStart?.(jobId);
+      onOptimizationComplete?.(response.data);
       
       // 結果ページに遷移
       setTimeout(() => {

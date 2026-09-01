@@ -235,6 +235,7 @@ export interface DropResult {
 
 // 最適化
 export interface OptimizationRequest {
+  plan_id?: string;
   optimization_type: 'time_efficient' | 'cost_efficient' | 'balanced' | string;
   constraints?: Record<string, unknown>;
   preferences?: Record<string, unknown>;
