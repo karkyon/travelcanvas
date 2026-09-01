@@ -181,3 +181,4 @@ travelcanvas_phase_m*_report.*
 travelcanvas_fix_requirements.py
 *.before_uuid_migration
 travelcanvas_migrate_uuid_*.py
+apply_gate_*.py
