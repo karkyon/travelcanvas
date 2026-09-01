@@ -2,7 +2,9 @@
 TravelCanvas Database Models - 最終完成版
 統一されたBaseクラスを使用、重複定義なし
 """
+import uuid
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -64,7 +66,7 @@ class User(Base):
     """ユーザーモデル - 唯一の定義"""
     __tablename__ = "users"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
@@ -87,8 +89,8 @@ class UserSession(Base):
     """ユーザーセッションモデル"""
     __tablename__ = "user_sessions"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     session_token = Column(String, unique=True, index=True, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     is_active = Column(Boolean, default=True)
@@ -104,7 +106,7 @@ class Travel(Base):
     """旅行モデル"""
     __tablename__ = "travels"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     title = Column(String, index=True)
     description = Column(Text)
     location = Column(String)
@@ -119,7 +121,7 @@ class Travel(Base):
     is_public = Column(Boolean, default=False)
     
     # 外部キー
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     
     # タイムスタンプ
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -133,8 +135,8 @@ class TravelPlan(Base):
     """旅行プランモデル"""
     __tablename__ = "travel_plans"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
     destination = Column(String)
@@ -154,8 +156,8 @@ class OptimizationResult(Base):
     """最適化結果モデル"""
     __tablename__ = "optimization_results"
     
-    id = Column(Integer, primary_key=True, index=True)
-    travel_id = Column(Integer, ForeignKey("travels.id"))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    travel_id = Column(UUID(as_uuid=True), ForeignKey("travels.id"))
     optimization_type = Column(String)
     original_data = Column(JSON)
     optimized_data = Column(JSON)
@@ -183,7 +185,7 @@ class Spot(Base):
     __tablename__ = "spots"
     
     # 基本情報
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     category = Column(String(50), nullable=False, default="other")
@@ -201,7 +203,7 @@ class Spot(Base):
     image_url = Column(String(500), nullable=True)
     
     # ユーザー関連
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     is_public = Column(Boolean, default=False)
     
     # 統計
@@ -218,9 +220,9 @@ class UserSpotFavorite(Base):
     """ユーザーお気に入りスポット - MVP版"""
     __tablename__ = "user_spot_favorites"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    spot_id = Column(Integer, ForeignKey("spots.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
     
     # 個人メモ
     personal_note = Column(Text, nullable=True)

@@ -1,6 +1,7 @@
 """
 TravelCanvas MVP スポットスキーマ
 """
+import uuid
 from pydantic import BaseModel, validator
 from typing import Optional
 from datetime import datetime
@@ -40,7 +41,7 @@ class SpotUpdate(BaseModel):
 
 class SpotResponse(SpotBase):
     """スポットレスポンススキーマ"""
-    id: int
+    id: uuid.UUID
     created_by: int
     is_public: bool
     visit_count: int

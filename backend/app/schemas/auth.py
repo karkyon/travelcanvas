@@ -1,6 +1,7 @@
 """
 Authentication schemas
 """
+import uuid
 
 from typing import Optional
 from pydantic import BaseModel, EmailStr, validator
@@ -25,7 +26,7 @@ class UserUpdate(BaseModel):
     preferences: Optional[dict] = None
 
 class UserResponse(UserBase):
-    id: int
+    id: uuid.UUID
     is_active: bool
     role: str
     created_at: datetime

@@ -1,6 +1,7 @@
 """
 TravelCanvas MVP スポットAPI
 """
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -73,7 +74,7 @@ async def get_spots(
 
 @router.get("/{spot_id}", response_model=SpotResponse)
 async def get_spot(
-    spot_id: int,
+    spot_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -97,7 +98,7 @@ async def get_spot(
 
 @router.put("/{spot_id}", response_model=SpotResponse)  
 async def update_spot(
-    spot_id: int,
+    spot_id: uuid.UUID,
     spot_data: SpotUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -135,7 +136,7 @@ async def update_spot(
 
 @router.delete("/{spot_id}")
 async def delete_spot(
-    spot_id: int,
+    spot_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

@@ -179,3 +179,5 @@ travelcanvas_phase_m*_report.*
 *.original_from_repo
 *.before_fix
 travelcanvas_fix_requirements.py
+*.before_uuid_migration
+travelcanvas_migrate_uuid_*.py
