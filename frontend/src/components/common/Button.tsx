@@ -10,22 +10,28 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /** leftIcon のショートハンド */
+  icon?: React.ReactNode;
   fullWidth?: boolean;
   children: React.ReactNode;
+  /** 指定すると <a> としてレンダリングする(ボタン風リンク) */
+  href?: string;
 }
 
-const Button: React.FC<ButtonProps> = ({
+const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonProps>(({
   variant = 'primary',
   size = 'md',
   loading = false,
   leftIcon,
   rightIcon,
+  icon,
   fullWidth = false,
   disabled,
   className = '',
   children,
+  href,
   ...props
-}) => {
+}, ref) => {
   const baseClasses = [
     'inline-flex items-center justify-center',
     'font-medium rounded-lg transition-all duration-200',
@@ -87,13 +93,10 @@ const Button: React.FC<ButtonProps> = ({
   ].filter(Boolean).join(' ');
 
   const iconClass = iconSizeClasses[size];
+  const resolvedLeftIcon = leftIcon ?? icon;
 
-  return (
-    <button
-      className={classes}
-      disabled={disabled || loading}
-      {...props}
-    >
+  const content = (
+    <>
       {loading && (
         <LoadingSpinner 
           size={size === 'sm' ? 16 : size === 'lg' ? 24 : size === 'xl' ? 28 : 20}
@@ -101,9 +104,9 @@ const Button: React.FC<ButtonProps> = ({
         />
       )}
       
-      {!loading && leftIcon && (
+      {!loading && resolvedLeftIcon && (
         <span className={`mr-2 ${iconClass} flex items-center justify-center`}>
-          {leftIcon}
+          {resolvedLeftIcon}
         </span>
       )}
       
@@ -116,8 +119,34 @@ const Button: React.FC<ButtonProps> = ({
           {rightIcon}
         </span>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={classes}
+        ref={ref as React.Ref<HTMLAnchorElement>}
+        {...(props as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      className={classes}
+      disabled={disabled || loading}
+      ref={ref as React.Ref<HTMLButtonElement>}
+      {...props}
+    >
+      {content}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
 
 export default Button;

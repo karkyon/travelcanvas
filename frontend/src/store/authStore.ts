@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-// API Base URLをハードコードで確実に設定
-const API_BASE_URL = 'http://192.168.1.248:8000/api/v1';
-
-// 環境変数の確認（デバッグ用）
-console.log('🔧 環境変数 VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('🔗 使用する API Base URL:', API_BASE_URL);
+// [2026-09-01 Gate #7d] api.ts と同じ環境変数解決方式に統一。
+// 旧実装は 'http://192.168.1.248:8000/api/v1'(旧サーバー、廃止済み)
+// をハードコードしており、omega-dev2上では認証系APIが常に
+// 到達不能なホストへ送信され、静かに失敗する状態だった。
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://192.168.1.248:8000/api/v1';
 
 interface User {
   id: number;
