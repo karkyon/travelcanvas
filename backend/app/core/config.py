@@ -9,10 +9,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 class Settings(BaseSettings):
     # データベース設定
-    DATABASE_URL: str = "postgresql://travelcanvas:KrKRmspjKOVAl5yXb9rGYHmAU@localhost:5432/travelcanvas_dev"
-    
+    # 注意: 以前はここに実際のDBパスワードを含む接続文字列がデフォルト値と
+    # してハードコードされていた(TravelCanvas_フェーズM1セキュリティ監査で
+    # 発見)。デフォルト値を持たせず必須項目とし、環境変数DATABASE_URLが
+    # 未設定なら起動時に明確なエラーで止まるようにする。
+    DATABASE_URL: str
+
     # JWT設定
-    JWT_SECRET_KEY: str = "your-secret-key-change-in-production-long-enough-key-here"
+    # 注意: 以前は "your-secret-key-change-in-production..." という
+    # プレースホルダがデフォルト値になっており、環境変数設定を忘れても
+    # 起動できてしまう危険な設計だった。必須項目へ変更する。
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
