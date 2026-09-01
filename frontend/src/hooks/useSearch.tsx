@@ -1,215 +1,195 @@
 import { useState, useCallback } from 'react';
 import { api } from '../services/api';
-import type { 
-  SearchSpotParams, 
-  Spot, 
+import type { SpotResult } from '../services/api';
+import type {
+  SearchSpotParams,
+  Spot,
   ImageSearchResult,
   VoiceSearchResult,
-  AIRecommendation 
+  AIRecommendation,
 } from '../types';
 
+/**
+ * 検索結果(SpotResult: Web検索由来、まだDBに永続化されていない)を
+ * 画面表示用のSpot型に変換する。
+ * is_public/created_by/visit_count/created_at はDB永続化後に確定する
+ * 値のため、検索結果の時点では暫定値を入れる。
+ */
+const spotResultToSpot = (r: SpotResult): Spot => ({
+  id: r.id,
+  name: r.name,
+  description: r.description,
+  category: r.category,
+  address: r.location?.address,
+  latitude: r.location?.latitude,
+  longitude: r.location?.longitude,
+  location: r.location,
+  rating: r.rating,
+  price_level: r.price_level,
+  estimated_duration: r.estimated_duration,
+  is_public: true,
+  created_by: '',
+  visit_count: 0,
+  created_at: new Date().toISOString(),
+});
+
+/**
+ * useSearch
+ *
+ * [2026-09-01 Gate #7e] 全面書き換え。
+ * 旧実装は usePlan.tsx / useAuth.tsx と同種のバグを抱えていた:
+ * 実在しない `api.post(...)`(axios風の汎用呼び出し)と
+ * `/travel/search/spots`・`/ai/search/image` 等の実在しないURLを
+ * 前提にしていた。
+ *
+ * 一方 `services/api.ts` の `CompleteTravelAPI` には既に
+ * `searchSpots` / `searchByImage` / `searchByVoice` という、
+ * 実際に動作する検索実装(WebSearchServiceによるWikipedia/
+ * OpenStreetMap/Overpass API検索、無ければ拡張AI検索へフォールバック)
+ * が完結して存在していたため、そちらへ委譲する。
+ *
+ * `getAIRecommendations` / `generateItinerary` は呼び出し元が
+ * 存在せず(grep で確認済み)、対応するバックエンド実装も無いため
+ * 今回は削除した。
+ */
 export const useSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<Spot[]>([]);
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
 
-  // テキスト検索
-  const searchSpots = useCallback(async (params: SearchSpotParams) => {
+  // テキスト検索(基本)
+  const searchSpots = useCallback(async (params: SearchSpotParams): Promise<Spot[]> => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await api.post('/travel/search/spots', params);
-      const results = response.data.data;
-      setSearchResults(results);
-      return results;
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'スポット検索に失敗しました');
+      const response = await api.searchSpots({
+        query: params.query,
+        location: params.location,
+        max_results: params.max_results,
+      });
+
+      const spots = (response.data?.spots ?? []).map(spotResultToSpot);
+      setSearchResults(spots);
+      return spots;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'スポット検索に失敗しました');
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // AI テキスト検索（高度検索）
-  const aiTextSearch = useCallback(async (params: {
-    query: string;
-    location?: { latitude: number; longitude: number };
-    radius?: number;
-    filters?: {
-      categories?: string[];
-      price_range?: string;
-      rating_min?: number;
-      open_now?: boolean;
-    };
-    max_results?: number;
-    include_ai_suggestions?: boolean;
-  }) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.post('/ai/search/text', params);
-      const { spots, query_analysis, search_metadata } = response.data.data;
-      
-      setSearchResults(spots);
-      
-      // AI推薦があれば設定
-      if (search_metadata.ai_enhanced) {
-        setAiRecommendations(spots.filter((spot: any) => spot.ai_confidence > 0.8));
-      }
-      
-      return {
-        spots,
-        query_analysis,
-        search_metadata
+  // AI テキスト検索(現状はsearchSpotsと同じ統合AI検索を利用する)
+  const aiTextSearch = useCallback(
+    async (params: {
+      query: string;
+      location?: { latitude: number; longitude: number } | null;
+      radius?: number;
+      filters?: {
+        categories?: string[];
+        price_range?: string;
+        rating_min?: number;
+        open_now?: boolean;
       };
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'AI検索に失敗しました');
-      throw err;
-    } finally {
-      setLoading(false);
+      max_results?: number;
+      include_ai_suggestions?: boolean;
     }
-  }, []);
+  ): Promise<{ spots: Spot[]; search_metadata?: Record<string, unknown> }> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.searchSpots({
+          query: params.query,
+          location: params.location ?? undefined,
+          max_results: params.max_results,
+        });
+
+        const spots = (response.data?.spots ?? []).map(spotResultToSpot);
+        setSearchResults(spots);
+
+        return {
+          spots,
+          search_metadata: response.data?.search_metadata,
+        };
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'AI検索に失敗しました');
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // 画像認識検索
-  const imageSearch = useCallback(async (
-    imageFile: File,
-    location?: { latitude: number; longitude: number },
-    maxResults: number = 10
-  ): Promise<ImageSearchResult> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-      if (location) {
-        formData.append('location', JSON.stringify(location));
+  const imageSearch = useCallback(
+    async (
+      imageFile: File,
+      location?: { latitude: number; longitude: number }
+    ): Promise<ImageSearchResult> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.searchByImage(imageFile, location);
+        const spots: Spot[] = (response.data?.spots ?? []).map(spotResultToSpot);
+        const detectedObjects: string[] = response.data?.image_analysis?.detected_objects ?? [];
+        const confidence: number = response.data?.image_analysis?.overall_confidence ?? 0.8;
+
+        const result: ImageSearchResult = {
+          suggested_spots: spots,
+          recognized_objects: detectedObjects.map((name) => ({ name, confidence })),
+        };
+
+        setSearchResults(spots);
+        return result;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '画像検索に失敗しました');
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      formData.append('max_results', maxResults.toString());
-
-      const response = await api.post('/ai/search/image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const result = response.data.data;
-      setSearchResults(result.suggested_spots || []);
-      
-      return result;
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || '画像検索に失敗しました');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 音声検索
-  const voiceSearch = useCallback(async (
-    audioBlob: Blob,
-    language: string = 'ja',
-    location?: { latitude: number; longitude: number },
-    maxResults: number = 10
-  ): Promise<VoiceSearchResult> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('voice_data', audioBlob, 'voice.wav');
-      
-      const requestData = {
-        language,
-        location,
-        max_results: maxResults
-      };
-      formData.append('request_data', JSON.stringify(requestData));
+  const voiceSearch = useCallback(
+    async (
+      audioBlob: Blob,
+      language: string = 'ja',
+      location?: { latitude: number; longitude: number }
+    ): Promise<VoiceSearchResult> => {
+      setLoading(true);
+      setError(null);
 
-      const response = await api.post('/ai/search/voice', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      try {
+        const response = await api.searchByVoice(audioBlob, { language, location });
+        const spots: Spot[] = (response.data?.spots ?? []).map(spotResultToSpot);
 
-      const result = response.data.data;
-      setSearchResults(result.spots || []);
-      
-      return result;
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || '音声検索に失敗しました');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        const result: VoiceSearchResult = {
+          spots,
+          transcribed_text: response.data?.speech_recognition?.transcribed_text,
+          confidence: response.data?.speech_recognition?.confidence,
+          audio_duration: response.data?.speech_recognition?.audio_duration,
+        };
 
-  // AI推薦システム
-  const getAIRecommendations = useCallback(async (params: {
-    user_preferences?: {
-      favorite_categories?: string[];
-      budget_range?: string;
-      activity_level?: string;
-    };
-    location: { latitude: number; longitude: number };
-    travel_style?: string;
-    budget_range?: string;
-    duration?: number;
-    interests?: string[];
-  }) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.post('/ai/recommendations', params);
-      const { spots, recommendation_metadata } = response.data.data;
-      
-      setAiRecommendations(spots);
-      
-      return {
-        spots,
-        recommendation_metadata
-      };
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'AI推薦取得に失敗しました');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setSearchResults(spots);
+        return result;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '音声検索に失敗しました');
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
-  // スマート行程生成
-  const generateItinerary = useCallback(async (params: {
-    destination: string;
-    start_date: string;
-    end_date: string;
-    preferences: {
-      budget?: number;
-      travel_style?: string;
-      interests?: string[];
-      pace?: string;
-    };
-    must_visit?: string[];
-    avoid_places?: string[];
-  }) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await api.post('/ai/itinerary/generate', params);
-      return response.data.data;
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || '行程生成に失敗しました');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // 音声録音機能（Web API使用）
+  // 音声録音機能(Web API使用、バックエンド非依存)
   const startVoiceRecording = useCallback(async (): Promise<{
     stop: () => Promise<Blob>;
     isRecording: boolean;
@@ -218,50 +198,48 @@ export const useSearch = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks: Blob[] = [];
-      
+
       mediaRecorder.ondataavailable = (event) => {
         audioChunks.push(event.data);
       };
-      
+
       mediaRecorder.start();
-      
+
       return {
-        stop: () => new Promise((resolve) => {
-          mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            stream.getTracks().forEach(track => track.stop());
-            resolve(audioBlob);
-          };
-          mediaRecorder.stop();
-        }),
-        isRecording: true
+        stop: () =>
+          new Promise((resolve) => {
+            mediaRecorder.onstop = () => {
+              const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+              stream.getTracks().forEach((track) => track.stop());
+              resolve(audioBlob);
+            };
+            mediaRecorder.stop();
+          }),
+        isRecording: true,
       };
-    } catch (err: any) {
+    } catch (err) {
       setError('マイクへのアクセスが許可されていません');
       throw err;
     }
   }, []);
 
-  // 検索履歴の管理
+  // 検索履歴の管理(ローカルストレージのみ、バックエンド非依存)
   const addToSearchHistory = useCallback((query: string, results: Spot[]) => {
     const history = JSON.parse(localStorage.getItem('searchHistory') || '[]');
     const newEntry = {
       query,
       resultCount: results.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
-    // 重複削除と最新10件のみ保持
-    const updatedHistory = [newEntry, ...history.filter((h: any) => h.query !== query)].slice(0, 10);
+
+    const updatedHistory = [newEntry, ...history.filter((h: { query: string }) => h.query !== query)].slice(0, 10);
     localStorage.setItem('searchHistory', JSON.stringify(updatedHistory));
   }, []);
 
-  // 検索履歴取得
   const getSearchHistory = useCallback(() => {
     return JSON.parse(localStorage.getItem('searchHistory') || '[]');
   }, []);
 
-  // 検索結果クリア
   const clearSearchResults = useCallback(() => {
     setSearchResults([]);
     setAiRecommendations([]);
@@ -277,12 +255,10 @@ export const useSearch = () => {
     aiTextSearch,
     imageSearch,
     voiceSearch,
-    getAIRecommendations,
-    generateItinerary,
     startVoiceRecording,
     addToSearchHistory,
     getSearchHistory,
     clearSearchResults,
-    clearError: () => setError(null)
+    clearError: () => setError(null),
   };
 };

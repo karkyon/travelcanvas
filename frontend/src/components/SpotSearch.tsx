@@ -5,7 +5,7 @@ import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
-import type { Spot, SearchSpotParams } from '../../types';
+import type { Spot, SearchSpotParams } from '../types';
 
 interface SpotSearchProps {
   onSpotSelect?: (spot: Spot) => void;

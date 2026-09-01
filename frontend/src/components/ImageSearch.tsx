@@ -4,7 +4,7 @@ import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
-import type { ImageSearchResult } from '../../types';
+import type { ImageSearchResult } from '../types';
 
 interface ImageSearchProps {
   onSpotSelect?: (spot: any) => void;
@@ -141,7 +141,11 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
       }
 
       // 最初の画像で検索（マルチ画像は将来の機能として残す）
-      const result = await imageSearch(selectedImages[0], location);
+      const firstImage = selectedImages[0];
+      if (!firstImage) {
+        return;
+      }
+      const result = await imageSearch(firstImage, location);
       
       setSearchResults(result);
       onResultsChange?.(result);
@@ -328,7 +332,7 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
                             </p>
                           )}
                           <div className="flex items-center mt-2 text-sm text-gray-600">
-                            <span>類似度: {Math.round(spot.similarity * 100)}%</span>
+                            <span>類似度: {Math.round((spot.similarity ?? 0) * 100)}%</span>
                           </div>
                         </div>
                         <Button

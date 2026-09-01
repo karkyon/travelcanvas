@@ -5,7 +5,7 @@
 
 // スポット関連の型
 export interface Spot {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   category: string;
@@ -14,9 +14,20 @@ export interface Spot {
   longitude?: number;
   rating?: number;
   price_range?: string;
+  price_level?: string;
+  estimated_duration?: number;
+  /** AI画像検索由来の類似度スコア(0-1) */
+  similarity?: number;
+  /** AI検索由来の関連度スコア(0-1) */
+  relevance_score?: number;
+  location?: {
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+  };
   image_url?: string;
   is_public: boolean;
-  created_by: number;
+  created_by: string;
   visit_count: number;
   created_at: string;
   updated_at?: string;
@@ -29,30 +40,44 @@ export interface SearchSpotParams {
     latitude: number;
     longitude: number;
   };
+  category?: string;
   categories?: string[];
   priceRange?: string;
   ratingMin?: number;
   openNow?: boolean;
   radius?: number;
+  max_results?: number;
+  price_level?: string;
+  min_rating?: number;
 }
 
 // 画像検索結果
 export interface ImageSearchResult {
-  spots: Spot[];
-  landmarks: Array<{
+  suggested_spots: Spot[];
+  recognized_objects: Array<{
     name: string;
     confidence: number;
-    location?: {
-      latitude: number;
-      longitude: number;
-    };
   }>;
-  suggestions: string[];
+}
+
+// 音声検索結果
+export interface VoiceSearchResult {
+  spots: Spot[];
+  transcribed_text?: string;
+  confidence?: number;
+  audio_duration?: number;
+}
+
+// AI推薦
+export interface AIRecommendation {
+  spot: Spot;
+  reason?: string;
+  confidence?: number;
 }
 
 // ユーザー関連
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   is_active: boolean;

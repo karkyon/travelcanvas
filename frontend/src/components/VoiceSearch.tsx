@@ -4,7 +4,7 @@ import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
-import type { VoiceSearchResult } from '../../types';
+import type { VoiceSearchResult } from '../types';
 
 interface VoiceSearchProps {
   onSpotSelect?: (spot: any) => void;
@@ -26,7 +26,7 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
   const [searchResults, setSearchResults] = useState<VoiceSearchResult | null>(null);
   const [transcription, setTranscription] = useState<string>('');
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaRecorderRef = useRef<{ stop: () => Promise<Blob> } | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -82,7 +82,7 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
       startAudioLevelMonitoring(stream);
       
       // 停止処理の保存
-      mediaRecorderRef.current = { stop } as any;
+      mediaRecorderRef.current = { stop };
       
       addToast({
         type: 'info',
