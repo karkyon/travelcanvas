@@ -4,8 +4,8 @@
  */
 
 import React, { Component, ReactNode } from 'react';
-import { Button } from '../Button';
-import { Card } from '../Card';
+import Button from './Button';
+import Card from './Card';
 
 interface ErrorBoundaryState {
   hasError: boolean;

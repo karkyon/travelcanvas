@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import Button from '../Button'
-import Modal from '../Modal'
+import Button from '../common/Button'
+import Modal from '../common/Modal'
 
 interface HeaderProps {
   onMenuClick?: () => void

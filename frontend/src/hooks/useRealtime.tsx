@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { webSocketService, WebSocketEventHandlers } from '../services/websocket';
+import { webSocketService, WebSocketEventHandlers } from '../services/WebSocket';
 import { usePlanStore } from '../store/planStore';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'react-hot-toast';

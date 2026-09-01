@@ -4,9 +4,9 @@
  */
 import React, { useState, useEffect } from 'react';
 import { spotApiService, SpotResponse } from '../services/spotApi';
-import Button from './Button';
-import Card from './Card';
-import Toast from './Toast';
+import Button from './common/Button';
+import Card from './common/Card';
+import Toast from './common/Toast';
 
 interface SpotListProps {
   onSpotSelect?: (spot: SpotResponse) => void;

@@ -4,10 +4,10 @@
  */
 import React, { useState, useEffect } from 'react';
 import { spotApiService, SpotData } from '../services/spotApi';
-import Button from './Button';
-import Input from './Input';
-import Card from './Card';
-import Toast from './Toast';
+import Button from './common/Button';
+import Input from './common/Input';
+import Card from './common/Card';
+import Toast from './common/Toast';
 
 interface SpotRegistrationProps {
   onSpotCreated?: (spot: any) => void;

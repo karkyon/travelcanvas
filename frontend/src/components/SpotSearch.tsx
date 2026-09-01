@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { useSearch } from '../../hooks/useSearch';
-import { useToast } from '../common/Toast';
-import Button from '../common/Button';
-import Input from '../common/Input';
-import Card from '../common/Card';
-import { LoadingSpinner } from '../common/LoadingSpinner';
+import { useSearch } from '../hooks/useSearch';
+import { useToast } from './common/Toast';
+import Button from './common/Button';
+import Input from './common/Input';
+import Card from './common/Card';
+import { LoadingSpinner } from './common/LoadingSpinner';
 import type { Spot, SearchSpotParams } from '../../types';
 
 interface SpotSearchProps {

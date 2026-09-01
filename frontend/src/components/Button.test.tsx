@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import Button from './Button'
+import Button from './common/Button'
 
 describe('Button Component', () => {
   it('renders with default props', () => {

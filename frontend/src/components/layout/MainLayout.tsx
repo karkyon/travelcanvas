@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import Toast from '../Toast'
+import Toast from '../common/Toast'
 
 interface MainLayoutProps {
   children: React.ReactNode

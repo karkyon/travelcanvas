@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { useToast } from '../common/Toast';
-import { api } from '../../services/api';
-import Button from '../common/Button';
-import Input from '../common/Input';
-import Card from '../common/Card';
-import Modal from '../common/Modal';
-import { LoadingSpinner } from '../common/LoadingSpinner';
+import { useToast } from './common/Toast';
+import { api } from '../services/api';
+import Button from './common/Button';
+import Input from './common/Input';
+import Card from './common/Card';
+import Modal from './common/Modal';
+import { LoadingSpinner } from './common/LoadingSpinner';
 import type { TravelPlan } from '../../types';
 
 interface ShareModalProps {
