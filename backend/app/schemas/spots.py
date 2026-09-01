@@ -42,7 +42,7 @@ class SpotUpdate(BaseModel):
 class SpotResponse(SpotBase):
     """スポットレスポンススキーマ"""
     id: uuid.UUID
-    created_by: int
+    created_by: uuid.UUID
     is_public: bool
     visit_count: int
     created_at: datetime

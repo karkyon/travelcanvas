@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots
+from app.api.v1 import spots, travel
 
 # アプリケーション作成
 app = FastAPI(
@@ -79,3 +79,4 @@ except ImportError as e:
 print("🚀 TravelCanvas API - Ready to start")
 
 app.include_router(spots.router, prefix="/api/v1")
+app.include_router(travel.router, prefix="/api/v1")
