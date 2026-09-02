@@ -37,6 +37,15 @@ export interface SpotResponse extends SpotData {
   updated_at?: string;
 }
 
+export interface FavoriteData {
+  id: string;
+  spot_id: string;
+  personal_note?: string;
+  personal_rating?: number;
+  created_at: string;
+  spot: SpotResponse;
+}
+
 class SpotApiService {
   /**
    * 新しいスポットを作成
@@ -91,6 +100,36 @@ class SpotApiService {
    */
   async testConnection(): Promise<{ message: string; version: string; timestamp: string }> {
     const response = await apiService.testConnection();
+    return response.data;
+  }
+
+  // ===== お気に入り関連 =====
+  // [Gate #15] backend/app/api/v1/spots.pyにお気に入りAPIを実装したのに合わせて追加。
+
+  /**
+   * 自分のお気に入りスポット一覧を取得
+   */
+  async getFavorites(): Promise<FavoriteData[]> {
+    const response = await apiService.get<FavoriteData[]>('/spots/favorites');
+    return response.data;
+  }
+
+  /**
+   * スポットをお気に入りに追加
+   */
+  async addFavorite(spotId: string, note?: string, rating?: number): Promise<FavoriteData> {
+    const response = await apiService.post<FavoriteData>(`/spots/${spotId}/favorite`, {
+      personal_note: note,
+      personal_rating: rating,
+    });
+    return response.data;
+  }
+
+  /**
+   * スポットをお気に入りから解除
+   */
+  async removeFavorite(spotId: string): Promise<{ message: string }> {
+    const response = await apiService.delete<{ message: string }>(`/spots/${spotId}/favorite`);
     return response.data;
   }
 }

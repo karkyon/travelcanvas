@@ -18,6 +18,8 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ value: string; label: string }>>([]);
+  // [Gate #15] お気に入りAPI(backend/app/api/v1/spots.py)を新規実装したのに合わせて追加。
+  const [favoriteSpotIds, setFavoriteSpotIds] = useState<Set<string>>(new Set());
   const { addToast } = useToast();
   
   const loadSpots = async () => {
@@ -35,6 +37,40 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
       setIsLoading(false);
     }
   };
+
+  const loadFavorites = async () => {
+    try {
+      const favorites = await spotApiService.getFavorites();
+      setFavoriteSpotIds(new Set(favorites.map((f) => f.spot_id)));
+    } catch (error) {
+      console.error('お気に入り読み込みエラー:', error);
+    }
+  };
+
+  const toggleFavorite = async (spot: SpotResponse) => {
+    const isFavorite = favoriteSpotIds.has(spot.id);
+    try {
+      if (isFavorite) {
+        await spotApiService.removeFavorite(spot.id);
+        setFavoriteSpotIds((prev) => {
+          const next = new Set(prev);
+          next.delete(spot.id);
+          return next;
+        });
+        addToast({ message: 'お気に入りを解除しました', type: 'success' });
+      } else {
+        await spotApiService.addFavorite(spot.id);
+        setFavoriteSpotIds((prev) => new Set(prev).add(spot.id));
+        addToast({ message: 'お気に入りに追加しました', type: 'success' });
+      }
+    } catch (error) {
+      console.error('お気に入り更新エラー:', error);
+      addToast({
+        message: error instanceof Error ? error.message : 'お気に入りの更新に失敗しました',
+        type: 'error'
+      });
+    }
+  };
   
   const loadCategories = async () => {
     try {
@@ -50,6 +86,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   
   useEffect(() => {
     loadCategories();
+    loadFavorites();
   }, []);
   
   useEffect(() => {
@@ -182,6 +219,14 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                     className="flex-1"
                   >
                     詳細
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleFavorite(spot)}
+                    className={favoriteSpotIds.has(spot.id) ? 'text-pink-600 hover:text-pink-700 hover:bg-pink-50' : ''}
+                  >
+                    {favoriteSpotIds.has(spot.id) ? '★ お気に入り' : '☆ お気に入り'}
                   </Button>
                   <Button
                     variant="ghost"

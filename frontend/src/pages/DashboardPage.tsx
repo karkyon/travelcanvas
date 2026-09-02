@@ -12,12 +12,12 @@ const DashboardPage: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
   const [loading, setLoading] = useState(true);
   // [Gate #14] 以前は登録スポット/お気に入り/訪問済みが常にハードコードの0だった。
-  // GET /spots/ は実際に到達可能になった(Gate #10のトークン同期修正)ため、
-  // 自分が登録したスポット数はここで実データに置き換える。
-  // お気に入り/訪問済みはUserSpotFavoriteテーブルは存在するが、それを取得する
-  // APIエンドポイントがバックエンドに一切実装されていないため(spots.py確認済み)、
-  // 実データ化できず0のまま。バックエンド側の対応が別途必要。
+  // [Gate #15] お気に入りAPI(backend/app/api/v1/spots.py)を新規実装したのに合わせ、
+  // 登録スポット数・お気に入り数の両方を実データに置き換える。
+  // 訪問済みはSpotに対応する「訪問済みフラグ」自体がデータモデルに存在しない
+  // (visit_countはあるが「自分が訪れたか」の真偽値ではない)ため、今回は対象外。
   const [spotCount, setSpotCount] = useState(0);
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const [statsLoading, setStatsLoading] = useState(true);
 
   // 認証チェック（一度だけ実行）
@@ -33,15 +33,19 @@ const DashboardPage: React.FC = () => {
     setLoading(false);
   }, []); // 空の依存配列で一度だけ実行
 
-  // 登録スポット数を取得
+  // 登録スポット数・お気に入り数を取得
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     (async () => {
       try {
-        const spots = await spotApiService.getSpots(undefined, 100);
+        const [spots, favorites] = await Promise.all([
+          spotApiService.getSpots(undefined, 100),
+          spotApiService.getFavorites(),
+        ]);
         setSpotCount(spots.filter((s) => s.created_by === user.id).length);
+        setFavoriteCount(favorites.length);
       } catch (error) {
-        console.error('スポット数取得エラー:', error);
+        console.error('統計取得エラー:', error);
       } finally {
         setStatsLoading(false);
       }
@@ -95,7 +99,7 @@ const DashboardPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <h3 className="text-lg font-semibold text-gray-900">お気に入り</h3>
-                <p className="text-2xl font-bold text-green-600">0</p>
+                <p className="text-2xl font-bold text-green-600">{statsLoading ? '…' : favoriteCount}</p>
               </div>
             </div>
           </div>

@@ -50,3 +50,22 @@ class SpotResponse(SpotBase):
     
     class Config:
         from_attributes = True
+
+
+class FavoriteCreate(BaseModel):
+    """お気に入り登録スキーマ"""
+    personal_note: Optional[str] = None
+    personal_rating: Optional[float] = None
+
+
+class FavoriteResponse(BaseModel):
+    """お気に入りレスポンススキーマ(スポット詳細を内包)"""
+    id: uuid.UUID
+    spot_id: uuid.UUID
+    personal_note: Optional[str] = None
+    personal_rating: Optional[float] = None
+    created_at: datetime
+    spot: SpotResponse
+
+    class Config:
+        from_attributes = True
