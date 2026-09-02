@@ -22,6 +22,7 @@ import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/components/common/Toast';
 import { spotApiService } from '@/services/spotApi';
+import type { ScheduleItem as ScheduleItemType } from '@/types';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -62,12 +63,63 @@ const PlannerPage: React.FC = () => {
     addDay,
     removeDay,
     clearCurrentPlan,
+    updateScheduleItem,
+    deleteScheduleItem,
   } = usePlanStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanDestination, setNewPlanDestination] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // [Gate #18] DayView.tsxのonItemClick/onItemEdit/onItemDeleteがどこからも
+  // 渡されておらず、日程に追加したスケジュールアイテムをクリックしても編集も
+  // 削除も一切できなかった。編集モーダルとstoreへの実際の保存処理を実装する。
+  const [editingItem, setEditingItem] = useState<ScheduleItemType | null>(null);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    start_time: string;
+    end_time: string;
+    location_name: string;
+    cost: string;
+    notes: string;
+  }>({ title: '', start_time: '', end_time: '', location_name: '', cost: '', notes: '' });
+  const [isSavingItem, setIsSavingItem] = useState(false);
+
+  const openEditItem = (item: ScheduleItemType) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      start_time: item.start_time || '',
+      end_time: item.end_time || '',
+      location_name: item.location_name || '',
+      cost: item.cost !== undefined ? String(item.cost) : '',
+      notes: item.notes || '',
+    });
+  };
+
+  const handleSaveEditItem = async () => {
+    if (!editingItem) return;
+    setIsSavingItem(true);
+    try {
+      await updateScheduleItem(editingItem.id, {
+        title: editForm.title,
+        start_time: editForm.start_time || undefined,
+        end_time: editForm.end_time || undefined,
+        location_name: editForm.location_name || undefined,
+        cost: editForm.cost ? Number(editForm.cost) : undefined,
+        notes: editForm.notes || undefined,
+      });
+      setEditingItem(null);
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!confirm('このスポットを日程から削除しますか？')) return;
+    await deleteScheduleItem(itemId);
+  };
 
   // [Gate #16] SearchPage.tsxの「プランに追加」ボタンはlocation.state.newSpotで
   // スポットを渡していたが、これまでPlannerPage側で一切受け取っておらず、
@@ -287,9 +339,78 @@ const PlannerPage: React.FC = () => {
               </div>
             </Card>
           ) : activeDay ? (
-            <DayView day={activeDay} planId={currentPlan.id} isActive />
+            <DayView
+              day={activeDay}
+              planId={currentPlan.id}
+              isActive
+              onItemClick={openEditItem}
+              onItemEdit={openEditItem}
+              onItemDelete={handleDeleteItem}
+            />
           ) : null}
         </div>
+
+        {/* スケジュールアイテム編集モーダル(Gate #18) */}
+        <Modal isOpen={!!editingItem} onClose={() => setEditingItem(null)} title="スポットを編集">
+          <Modal.Body>
+            <div className="space-y-4">
+              <Input
+                label="タイトル"
+                value={editForm.title}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                fullWidth
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="開始時刻"
+                  type="time"
+                  value={editForm.start_time}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
+                  fullWidth
+                />
+                <Input
+                  label="終了時刻"
+                  type="time"
+                  value={editForm.end_time}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, end_time: e.target.value }))}
+                  fullWidth
+                />
+              </div>
+              <Input
+                label="場所"
+                value={editForm.location_name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
+                fullWidth
+              />
+              <Input
+                label="費用(円)"
+                type="number"
+                value={editForm.cost}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, cost: e.target.value }))}
+                fullWidth
+              />
+              <Input
+                label="メモ"
+                value={editForm.notes}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                fullWidth
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              キャンセル
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveEditItem}
+              loading={isSavingItem}
+              disabled={!editForm.title.trim()}
+            >
+              保存
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     );
   }
