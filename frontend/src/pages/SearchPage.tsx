@@ -292,7 +292,9 @@ const SearchPage: React.FC = () => {
   };
 
   const addSpotToPlan = (spot: SearchResult) => {
-    toast.success(`${spot.name}をプランに追加しました`);
+    // [Gate #16] 以前はここで即座に成功トーストを出していたが、実際には
+    // PlannerPage側で何も受け取っておらず何も保存されない偽の成功表示だった。
+    // 実際の追加処理・成功通知はPlannerPage側の受け取りロジックで行う。
     navigate('/planner', { state: { newSpot: spot } });
   };
 

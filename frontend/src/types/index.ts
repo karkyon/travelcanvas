@@ -202,6 +202,8 @@ export interface TravelPlan {
   center_coordinates?: Coordinates;
   tags?: string[];
   status?: 'draft' | 'active' | 'completed' | 'archived' | 'shared';
+  created_at?: string;
+  updated_at?: string;
   days: DaySchedule[];
 }
 

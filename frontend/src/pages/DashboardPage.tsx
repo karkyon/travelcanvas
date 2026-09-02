@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { spotApiService } from '../services/spotApi';
+import { usePlanStore } from '../store/planStore';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +20,16 @@ const DashboardPage: React.FC = () => {
   const [spotCount, setSpotCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [statsLoading, setStatsLoading] = useState(true);
+  // [Gate #16] 「最近の活動」は常に固定の「まだ活動がありません」表示だった。
+  // バックエンドに専用の活動ログテーブルは存在しないため、既存のスポット/プラン
+  // 作成日時(created_at)から擬似的な活動フィードを構成する。
+  interface ActivityItem {
+    id: string;
+    type: 'spot' | 'plan';
+    label: string;
+    createdAt: string;
+  }
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
 
   // 認証チェック（一度だけ実行）
   useEffect(() => {
@@ -44,6 +55,31 @@ const DashboardPage: React.FC = () => {
         ]);
         setSpotCount(spots.filter((s) => s.created_by === user.id).length);
         setFavoriteCount(favorites.length);
+
+        await usePlanStore.getState().loadPlans();
+        const plans = usePlanStore.getState().plans;
+
+        const spotActivities: ActivityItem[] = spots
+          .filter((s) => s.created_by === user.id)
+          .map((s) => ({
+            id: `spot-${s.id}`,
+            type: 'spot',
+            label: `「${s.name}」を登録しました`,
+            createdAt: s.created_at,
+          }));
+        const planActivities: ActivityItem[] = plans
+          .filter((p) => p.created_at)
+          .map((p) => ({
+            id: `plan-${p.id}`,
+            type: 'plan',
+            label: `「${p.title}」プランを作成しました`,
+            createdAt: p.created_at as string,
+          }));
+
+        const merged = [...spotActivities, ...planActivities]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 5);
+        setActivities(merged);
       } catch (error) {
         console.error('統計取得エラー:', error);
       } finally {
@@ -168,13 +204,29 @@ const DashboardPage: React.FC = () => {
         {/* 最近の活動 */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">最近の活動</h2>
-          <div className="text-center py-8 text-gray-500">
-            <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            <p>まだ活動がありません</p>
-            <p className="text-sm">スポットを検索・登録して始めましょう！</p>
-          </div>
+          {activities.length > 0 ? (
+            <ul className="divide-y divide-gray-100">
+              {activities.map((activity) => (
+                <li key={activity.id} className="flex items-center gap-3 py-3">
+                  <span className="text-xl">{activity.type === 'spot' ? '📍' : '🗺️'}</span>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-800">{activity.label}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(activity.createdAt).toLocaleString('ja-JP')}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <p>まだ活動がありません</p>
+              <p className="text-sm">スポットを検索・登録して始めましょう！</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

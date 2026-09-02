@@ -10,7 +10,7 @@
  * /planner/:planId -> 選択したプランの日程編集画面(PlanHeader + 日タブ + DayView)
  */
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
 import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
@@ -20,6 +20,18 @@ import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useToast } from '@/components/common/Toast';
+
+// SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
+interface IncomingSpot {
+  name: string;
+  description?: string;
+  category?: string;
+  address?: string;
+  location?: { latitude?: number; longitude?: number; address?: string };
+  estimated_duration?: number;
+  estimated_cost?: number;
+}
 
 // 日付から曜日を算出(DaySchedule型にday_of_weekフィールドが存在しないため、DayView.tsxと同じ方式)
 const getDayOfWeek = (dateStr?: string): string => {
@@ -33,6 +45,8 @@ const getDayOfWeek = (dateStr?: string): string => {
 const PlannerPage: React.FC = () => {
   const { planId } = useParams<{ planId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { addToast } = useToast();
 
   const {
     plans,
@@ -53,6 +67,71 @@ const PlannerPage: React.FC = () => {
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanDestination, setNewPlanDestination] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // [Gate #16] SearchPage.tsxの「プランに追加」ボタンはlocation.state.newSpotで
+  // スポットを渡していたが、これまでPlannerPage側で一切受け取っておらず、
+  // 検索結果が実際にはどこにも保存されないまま「プランに追加しました」という
+  // 偽の成功トーストだけが表示されていた実害バグ。ここで実際に受け取り処理する。
+  const incomingSpot = (location.state as { newSpot?: IncomingSpot } | null)?.newSpot;
+  const [isAddSpotModalOpen, setIsAddSpotModalOpen] = useState(false);
+  const [isAddingSpot, setIsAddingSpot] = useState(false);
+
+  useEffect(() => {
+    if (incomingSpot) {
+      setIsAddSpotModalOpen(true);
+    }
+  }, [incomingSpot]);
+
+  const addSpotToExistingOrNewPlan = async (targetPlanId?: string) => {
+    if (!incomingSpot) return;
+    setIsAddingSpot(true);
+    try {
+      let plan = targetPlanId ? plans.find((p) => p.id === targetPlanId) : undefined;
+
+      if (!plan) {
+        // 新規プランとして作成(検索結果の名前をプラン名の初期値に)
+        const created = await createPlan({
+          title: `${incomingSpot.name}の旅`,
+          days: [],
+        });
+        if (!created) throw new Error('プランの作成に失敗しました');
+        plan = created;
+      }
+
+      await loadPlan(plan.id);
+      // ロード直後のstoreの最新状態を直接参照(useEffectの再レンダリング待ちを避ける)
+      const loadedPlan = usePlanStore.getState().currentPlan;
+      if (!loadedPlan) throw new Error('プランの読み込みに失敗しました');
+
+      if (loadedPlan.days.length === 0) {
+        addDay();
+      }
+
+      await usePlanStore.getState().addScheduleItem(0, {
+        title: incomingSpot.name,
+        description: incomingSpot.description,
+        category: (incomingSpot.category as any) || 'sightseeing',
+        location_name: incomingSpot.name,
+        address: incomingSpot.address || incomingSpot.location?.address,
+        latitude: incomingSpot.location?.latitude,
+        longitude: incomingSpot.location?.longitude,
+        duration: incomingSpot.estimated_duration,
+        cost: incomingSpot.estimated_cost,
+      });
+
+      addToast({ message: `${incomingSpot.name}をプランに追加しました`, type: 'success' });
+      setIsAddSpotModalOpen(false);
+      navigate(`/planner/${plan.id}`, { replace: true, state: null });
+    } catch (error) {
+      console.error('スポット追加エラー:', error);
+      addToast({
+        message: error instanceof Error ? error.message : 'プランへの追加に失敗しました',
+        type: 'error',
+      });
+    } finally {
+      setIsAddingSpot(false);
+    }
+  };
 
   // 一覧画面: プラン一覧を読み込む
   useEffect(() => {
@@ -280,6 +359,46 @@ const PlannerPage: React.FC = () => {
             disabled={!newPlanTitle.trim()}
           >
             作成
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* 検索結果からのスポット追加モーダル(Gate #16) */}
+      <Modal
+        isOpen={isAddSpotModalOpen}
+        onClose={() => {
+          setIsAddSpotModalOpen(false);
+          navigate('/planner', { replace: true, state: null });
+        }}
+        title="プランに追加"
+      >
+        <Modal.Body>
+          <p className="text-sm text-gray-600 mb-4">
+            「{incomingSpot?.name}」をどのプランに追加しますか？
+          </p>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {plans.map((plan) => (
+              <button
+                key={plan.id}
+                onClick={() => addSpotToExistingOrNewPlan(plan.id)}
+                disabled={isAddingSpot}
+                className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              >
+                <div className="font-medium text-gray-900">{plan.title}</div>
+                {plan.destination && (
+                  <div className="text-xs text-gray-500">📍 {plan.destination}</div>
+                )}
+              </button>
+            ))}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="primary"
+            onClick={() => addSpotToExistingOrNewPlan(undefined)}
+            loading={isAddingSpot}
+          >
+            ＋ 新しいプランを作成して追加
           </Button>
         </Modal.Footer>
       </Modal>
