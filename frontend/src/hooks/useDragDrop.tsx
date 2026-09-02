@@ -14,7 +14,6 @@ export const useDragDrop = () => {
   });
 
   const dragImageRef = useRef<HTMLElement | null>(null);
-  const ghostElementRef = useRef<HTMLElement | null>(null);
 
   // ドラッグ開始
   const handleDragStart = useCallback((
@@ -121,11 +120,11 @@ export const useDragDrop = () => {
         onSuccess?.(result);
       } else {
         // 異なるコンテナ間での移動の場合
-        const [sourcePlanId, sourceDayId] = sourceContainer.split('-');
-        const [targetPlanId, targetDayId] = targetContainer.split('-');
+        const [, sourceDayId] = sourceContainer.split('-');
+        const [, targetDayId] = targetContainer.split('-');
         
         // アイテムの移動（日付間移動）
-        await moveItemBetweenDays(itemId, sourceDayId, targetDayId, targetIndex);
+        await moveItemBetweenDays(itemId, sourceDayId ?? '', targetDayId ?? '', targetIndex);
         
         const result: DropResult = {
           success: true,
@@ -192,7 +191,7 @@ export const useDragDrop = () => {
   }, []);
 
   // 現在のアイテム順序取得（仮実装 - 実際はstoreから取得）
-  const getCurrentItemOrder = useCallback((planId: string, dayId: string): string[] => {
+  const getCurrentItemOrder = useCallback((_planId: string, _dayId: string): string[] => {
     // TODO: storeから実際の順序を取得
     return [];
   }, []);
@@ -200,9 +199,9 @@ export const useDragDrop = () => {
   // 日付間でのアイテム移動
   const moveItemBetweenDays = useCallback(async (
     itemId: string,
-    sourceDayId: string,
-    targetDayId: string,
-    targetIndex: number
+    _sourceDayId: string,
+    _targetDayId: string,
+    _targetIndex: number
   ) => {
     // TODO: APIを呼び出して日付間移動を実行
     // 現在はupdateScheduleItemDetailsを使用して日付を更新
@@ -233,9 +232,9 @@ export const useDragDrop = () => {
 
   // スマートスナッピング（時間に基づく自動配置）
   const calculateSnapPosition = useCallback((
-    draggedItem: ScheduleItem,
-    targetContainer: string,
-    mouseY: number
+    _draggedItem: ScheduleItem,
+    _targetContainer: string,
+    _mouseY: number
   ): number => {
     // TODO: 時間ベースの自動スナッピング計算
     // 営業時間、移動時間、バッファ時間を考慮した最適位置を計算
@@ -265,8 +264,8 @@ export const useDragDrop = () => {
   // アクセシビリティサポート
   const handleKeyboardMove = useCallback((
     event: React.KeyboardEvent,
-    item: ScheduleItem,
-    direction: 'up' | 'down'
+    _item: ScheduleItem,
+    _direction: 'up' | 'down'
   ) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();

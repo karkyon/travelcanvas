@@ -634,7 +634,7 @@ class WebSearchService {
     return 'tourist_attraction';
   }
 
-  private mapOSMCategoryToOurs(type: string, osmClass: string): string {
+  private mapOSMCategoryToOurs(_type: string, osmClass: string): string {
     const categoryMap: { [key: string]: string } = {
       'tourism': 'tourist_attraction',
       'leisure': 'nature',

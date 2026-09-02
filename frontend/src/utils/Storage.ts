@@ -82,6 +82,13 @@ class UnifiedStorage {
   }
 
   /**
+   * 現在のストレージタイプを取得
+   */
+  getType(): StorageType {
+    return this.type;
+  }
+
+  /**
    * データを保存
    */
   setItem<T>(key: string, value: T, options?: {

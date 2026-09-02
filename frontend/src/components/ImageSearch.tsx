@@ -3,7 +3,6 @@ import { useSearch } from '../hooks/useSearch';
 import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
-import { LoadingSpinner } from './common/LoadingSpinner';
 import type { ImageSearchResult } from '../types';
 
 interface ImageSearchProps {

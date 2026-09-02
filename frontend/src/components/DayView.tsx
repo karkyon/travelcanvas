@@ -6,6 +6,7 @@ import Button from './common/Button';
 import Card from './common/Card';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
+import Input from './common/Input';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 
 interface DayViewProps {
@@ -29,12 +30,11 @@ const DayView: React.FC<DayViewProps> = ({
   onItemDelete,
   className = ''
 }) => {
-  const { addNewScheduleItem, updateScheduleItemDetails, deleteScheduleItem } = usePlan();
-  const { dragState, handleDragStart, handleDragOver, handleDragLeave, handleDrop, handleDragEnd } = useDragDrop();
+  const { addNewScheduleItem, deleteScheduleItem } = usePlan();
+  const { dragState, handleDragStart, handleDrop, handleDragEnd, isItemDragged } = useDragDrop();
   const { addToast } = useToast();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<ScheduleItemType | null>(null);
   const [newItemData, setNewItemData] = useState<Partial<CreateScheduleItemData>>({
     title: '',
     description: '',
@@ -44,8 +44,25 @@ const DayView: React.FC<DayViewProps> = ({
     location_name: '',
     address: '',
     cost: 0,
-    priority: 'medium'
+    priority: 3
   });
+
+  // 優先度(数値)と表示ラベルの相互変換
+  const priorityToLabel = (p?: number): 'low' | 'medium' | 'high' => {
+    if (p === undefined) return 'medium';
+    if (p <= 2) return 'low';
+    if (p >= 4) return 'high';
+    return 'medium';
+  };
+
+  // 日付から曜日を算出(DaySchedule型にday_of_weekフィールドが存在しないため)
+  const getDayOfWeek = (dateStr?: string): string => {
+    if (!dateStr) return '';
+    const labels = ['日', '月', '火', '水', '木', '金', '土'];
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '';
+    return labels[d.getDay()] || '';
+  };
 
   // 時間の計算
   const timeStats = useMemo(() => {
@@ -68,7 +85,7 @@ const DayView: React.FC<DayViewProps> = ({
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     
-    return day.events.findIndex(event => event.start_time > currentTime);
+    return day.events.findIndex(event => (event.start_time || '') > currentTime);
   }, [day.events, showTimeProgress]);
 
   // スケジュールアイテム追加
@@ -95,7 +112,7 @@ const DayView: React.FC<DayViewProps> = ({
         address: newItemData.address || '',
         cost: newItemData.cost || 0,
         currency: 'JPY',
-        priority: newItemData.priority || 'medium',
+        priority: newItemData.priority || 3,
         travel_method: newItemData.travel_method || 'walking',
         travel_time: newItemData.travel_time || 0,
         travel_cost: newItemData.travel_cost || 0,
@@ -114,7 +131,7 @@ const DayView: React.FC<DayViewProps> = ({
         location_name: '',
         address: '',
         cost: 0,
-        priority: 'medium'
+        priority: 3
       });
 
       addToast({
@@ -130,29 +147,6 @@ const DayView: React.FC<DayViewProps> = ({
       });
     }
   }, [newItemData, addNewScheduleItem, planId, day.id, addToast]);
-
-  // スケジュールアイテム編集
-  const handleEditItem = useCallback(async (item: ScheduleItemType) => {
-    try {
-      if (!editingItem) return;
-
-      await updateScheduleItemDetails(item.id, editingItem);
-      
-      setEditingItem(null);
-      
-      addToast({
-        type: 'success',
-        message: 'スケジュールを更新しました'
-      });
-
-    } catch (error) {
-      console.error('スケジュール更新エラー:', error);
-      addToast({
-        type: 'error',
-        message: 'スケジュールの更新に失敗しました'
-      });
-    }
-  }, [editingItem, updateScheduleItemDetails, addToast]);
 
   // スケジュールアイテム削除
   const handleDeleteItem = useCallback(async (itemId: string) => {
@@ -201,7 +195,7 @@ const DayView: React.FC<DayViewProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              {day.date} ({day.day_of_week})
+              {day.date} ({getDayOfWeek(day.date)})
             </h3>
             <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
               <span>📍 {timeStats.eventCount}件</span>
@@ -269,20 +263,37 @@ const DayView: React.FC<DayViewProps> = ({
               )}
               
               {/* スケジュールアイテム */}
-              <ScheduleItem
-                item={event}
-                isNext={showTimeProgress && index === nextEventIndex}
+              <div
                 draggable
                 onDragStart={(e) => handleDragStart(e, event, `${planId}-${day.id}`)}
                 onDragEnd={handleDragEnd}
                 onClick={() => onItemClick?.(event)}
-                onEdit={() => {
-                  setEditingItem(event);
-                  onItemEdit?.(event);
-                }}
-                onDelete={() => handleDeleteItem(event.id)}
-                className={dragState.isItemDragged(event.id) ? 'opacity-50' : ''}
-              />
+                className={isItemDragged(event.id) ? 'opacity-50' : ''}
+              >
+                <ScheduleItem
+                  id={event.id}
+                  title={event.title}
+                  description={event.description}
+                  startTime={event.start_time || ''}
+                  endTime={event.end_time || ''}
+                  duration={event.duration || 0}
+                  locationName={event.location_name || ''}
+                  address={event.address || ''}
+                  cost={event.cost}
+                  currency={event.currency}
+                  category={event.category}
+                  priority={priorityToLabel(event.priority)}
+                  travelMethod={event.travel_method}
+                  travelTime={event.travel_time}
+                  travelCost={event.travel_cost}
+                  notes={event.notes}
+                  isNext={showTimeProgress && index === nextEventIndex}
+                  bookingInfo={event.booking_info as { url?: string; phone?: string } | undefined}
+                  contactInfo={event.contact_info as { website?: string; phone?: string } | undefined}
+                  onEdit={() => onItemEdit?.(event)}
+                  onDelete={() => handleDeleteItem(event.id)}
+                />
+              </div>
             </div>
           ))
         )}
@@ -335,17 +346,16 @@ const DayView: React.FC<DayViewProps> = ({
                 </label>
                 <select
                   value={newItemData.category || 'sightseeing'}
-                  onChange={(e) => setNewItemData(prev => ({ ...prev, category: e.target.value }))}
+                  onChange={(e) => setNewItemData(prev => ({ ...prev, category: e.target.value as CreateScheduleItemData['category'] }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 >
                   <option value="sightseeing">観光・名所</option>
-                  <option value="food">グルメ・レストラン</option>
+                  <option value="dining">グルメ・レストラン</option>
                   <option value="shopping">ショッピング</option>
-                  <option value="entertainment">エンターテイメント</option>
-                  <option value="culture">文化・歴史</option>
-                  <option value="nature">自然・公園</option>
+                  <option value="activity">エンターテイメント</option>
                   <option value="accommodation">宿泊施設</option>
-                  <option value="transport">交通・移動</option>
+                  <option value="transportation">交通・移動</option>
+                  <option value="other">その他</option>
                 </select>
               </div>
 
@@ -354,13 +364,13 @@ const DayView: React.FC<DayViewProps> = ({
                   優先度
                 </label>
                 <select
-                  value={newItemData.priority || 'medium'}
-                  onChange={(e) => setNewItemData(prev => ({ ...prev, priority: e.target.value as any }))}
+                  value={newItemData.priority ?? 3}
+                  onChange={(e) => setNewItemData(prev => ({ ...prev, priority: Number(e.target.value) }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 >
-                  <option value="low">低</option>
-                  <option value="medium">中</option>
-                  <option value="high">高</option>
+                  <option value={1}>低</option>
+                  <option value={3}>中</option>
+                  <option value={5}>高</option>
                 </select>
               </div>
             </div>

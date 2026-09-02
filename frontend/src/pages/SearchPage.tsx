@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Mic, Search, Upload, MapPin, Star, Clock, DollarSign, Globe, Zap, Target } from 'lucide-react';
+import { Camera, Mic, Search, MapPin, Star, Clock, DollarSign, Globe, Zap, Target } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { useAuthStore } from '../store/authStore';
 import { searchSpots, searchByImage, searchByVoice } from '../services/api';
 
 interface SearchResult {
@@ -31,14 +30,12 @@ interface SearchResult {
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
   const [searchType, setSearchType] = useState<'text' | 'image' | 'voice'>('text');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchMetadata, setSearchMetadata] = useState<any>(null);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [userLocation, setUserLocation] = useState({

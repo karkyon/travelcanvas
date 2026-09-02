@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Navigation, Route, Zap, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { MapPin, Zap, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { env } from '../../config/env';
 
 interface MapLocation {
@@ -89,7 +89,7 @@ const MapView: React.FC<MapViewProps> = ({
   showRoutes = true,
   showMarkers = true,
   onLocationClick,
-  onRouteClick,
+  onRouteClick: _onRouteClick,
   className = ''
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);

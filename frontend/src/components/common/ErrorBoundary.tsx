@@ -196,7 +196,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
    * エラーレポートを送信
    */
   private handleSendReport = async () => {
-    const { error, errorInfo, errorId } = this.state;
+    const { error, errorId } = this.state;
     
     if (!error) return;
 
@@ -373,7 +373,7 @@ export function withErrorBoundary<P extends object>(
  * useErrorHandler Hook - 手動でエラーをエラーバウンダリに送信
  */
 export function useErrorHandler() {
-  return React.useCallback((error: Error, errorInfo?: any) => {
+  return React.useCallback((error: Error, _errorInfo?: any) => {
     // エラーをthrowしてエラーバウンダリに捕捉させる
     setTimeout(() => {
       throw error;

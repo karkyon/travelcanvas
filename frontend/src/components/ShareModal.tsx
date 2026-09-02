@@ -5,7 +5,6 @@ import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
 import Modal from './common/Modal';
-import { LoadingSpinner } from './common/LoadingSpinner';
 import type { TravelPlan } from '../types';
 
 interface ShareModalProps {

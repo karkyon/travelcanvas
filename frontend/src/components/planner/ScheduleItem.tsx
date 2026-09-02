@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, Navigation, AlertTriangle 
@@ -67,7 +67,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   contactInfo,
   onUpdate,
   onDelete,
-  onEdit,
+  onEdit: _onEdit,
   onShare,
   isDragging = false,
   dragRef,

@@ -788,7 +788,7 @@ class CompleteTravelAPI {
   private applyAdvancedAIRanking(
     spots: SpotResult[], 
     query: string, 
-    location?: { latitude: number; longitude: number },
+    _location?: { latitude: number; longitude: number },
     preferences?: SearchPreferences
   ): SpotResult[] {
     return spots.map(spot => {
