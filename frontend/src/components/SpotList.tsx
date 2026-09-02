@@ -20,6 +20,8 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   const [categories, setCategories] = useState<Array<{ value: string; label: string }>>([]);
   // [Gate #15] お気に入りAPI(backend/app/api/v1/spots.py)を新規実装したのに合わせて追加。
   const [favoriteSpotIds, setFavoriteSpotIds] = useState<Set<string>>(new Set());
+  // [Gate #19] 訪問記録API(backend/app/api/v1/spots.py)を新規実装したのに合わせて追加。
+  const [visitedSpotIds, setVisitedSpotIds] = useState<Set<string>>(new Set());
   const { addToast } = useToast();
   
   const loadSpots = async () => {
@@ -44,6 +46,40 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
       setFavoriteSpotIds(new Set(favorites.map((f) => f.spot_id)));
     } catch (error) {
       console.error('お気に入り読み込みエラー:', error);
+    }
+  };
+
+  const loadVisits = async () => {
+    try {
+      const visits = await spotApiService.getVisits();
+      setVisitedSpotIds(new Set(visits.map((v) => v.spot_id)));
+    } catch (error) {
+      console.error('訪問記録読み込みエラー:', error);
+    }
+  };
+
+  const toggleVisited = async (spot: SpotResponse) => {
+    const isVisited = visitedSpotIds.has(spot.id);
+    try {
+      if (isVisited) {
+        await spotApiService.removeVisit(spot.id);
+        setVisitedSpotIds((prev) => {
+          const next = new Set(prev);
+          next.delete(spot.id);
+          return next;
+        });
+        addToast({ message: '訪問済みを取り消しました', type: 'success' });
+      } else {
+        await spotApiService.addVisit(spot.id);
+        setVisitedSpotIds((prev) => new Set(prev).add(spot.id));
+        addToast({ message: '訪問済みにしました', type: 'success' });
+      }
+    } catch (error) {
+      console.error('訪問記録更新エラー:', error);
+      addToast({
+        message: error instanceof Error ? error.message : '訪問記録の更新に失敗しました',
+        type: 'error'
+      });
     }
   };
 
@@ -87,6 +123,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   useEffect(() => {
     loadCategories();
     loadFavorites();
+    loadVisits();
   }, []);
   
   useEffect(() => {
@@ -227,6 +264,14 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                     className={favoriteSpotIds.has(spot.id) ? 'text-pink-600 hover:text-pink-700 hover:bg-pink-50' : ''}
                   >
                     {favoriteSpotIds.has(spot.id) ? '★ お気に入り' : '☆ お気に入り'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleVisited(spot)}
+                    className={visitedSpotIds.has(spot.id) ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : ''}
+                  >
+                    {visitedSpotIds.has(spot.id) ? '✓ 訪問済み' : '訪問済みにする'}
                   </Button>
                   <Button
                     variant="ghost"

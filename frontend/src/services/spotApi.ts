@@ -46,6 +46,14 @@ export interface FavoriteData {
   spot: SpotResponse;
 }
 
+export interface VisitData {
+  id: string;
+  spot_id: string;
+  visit_note?: string;
+  visited_at: string;
+  spot: SpotResponse;
+}
+
 class SpotApiService {
   /**
    * 新しいスポットを作成
@@ -130,6 +138,35 @@ class SpotApiService {
    */
   async removeFavorite(spotId: string): Promise<{ message: string }> {
     const response = await apiService.delete<{ message: string }>(`/spots/${spotId}/favorite`);
+    return response.data;
+  }
+
+  // ===== 訪問記録関連 =====
+  // [Gate #19] backend/app/api/v1/spots.pyに訪問記録APIを実装したのに合わせて追加。
+
+  /**
+   * 自分の訪問済みスポット一覧を取得
+   */
+  async getVisits(): Promise<VisitData[]> {
+    const response = await apiService.get<VisitData[]>('/spots/visits');
+    return response.data;
+  }
+
+  /**
+   * スポットを訪問済みとして記録
+   */
+  async addVisit(spotId: string, note?: string): Promise<VisitData> {
+    const response = await apiService.post<VisitData>(`/spots/${spotId}/visit`, {
+      visit_note: note,
+    });
+    return response.data;
+  }
+
+  /**
+   * 訪問済み記録を取り消す
+   */
+  async removeVisit(spotId: string): Promise<{ message: string }> {
+    const response = await apiService.delete<{ message: string }>(`/spots/${spotId}/visit`);
     return response.data;
   }
 }

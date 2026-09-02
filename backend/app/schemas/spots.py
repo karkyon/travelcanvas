@@ -69,3 +69,20 @@ class FavoriteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class VisitCreate(BaseModel):
+    """訪問記録スキーマ"""
+    visit_note: Optional[str] = None
+
+
+class VisitResponse(BaseModel):
+    """訪問記録レスポンススキーマ(スポット詳細を内包)"""
+    id: uuid.UUID
+    spot_id: uuid.UUID
+    visit_note: Optional[str] = None
+    visited_at: datetime
+    spot: SpotResponse
+
+    class Config:
+        from_attributes = True

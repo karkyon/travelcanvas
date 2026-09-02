@@ -234,3 +234,28 @@ class UserSpotFavorite(Base):
     __table_args__ = (
         {"extend_existing": True},
     )
+
+
+class UserSpotVisit(Base):
+    """ユーザー訪問済みスポット - MVP版
+
+    [Gate #19] ダッシュボードの「訪問済み」統計は常にハードコードの0だった。
+    Spot.visit_countは全ユーザー合算の表示回数カウンタであり、
+    「自分が訪れたかどうか」を表す真偽値/記録ではないため転用できず、
+    新規テーブルとして追加する(既存テーブルへのALTERではなく追加のみ、
+    UserSpotFavoriteと対になる構造)。
+    """
+    __tablename__ = "user_spot_visits"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
+
+    # 訪問メモ
+    visit_note = Column(Text, nullable=True)
+
+    visited_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        {"extend_existing": True},
+    )

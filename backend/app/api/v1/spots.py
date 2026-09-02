@@ -8,8 +8,12 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models.models import Spot, User, UserSpotFavorite
-from app.schemas.spots import SpotCreate, SpotUpdate, SpotResponse, FavoriteCreate, FavoriteResponse
+from app.models.models import Spot, User, UserSpotFavorite, UserSpotVisit
+from app.schemas.spots import (
+    SpotCreate, SpotUpdate, SpotResponse,
+    FavoriteCreate, FavoriteResponse,
+    VisitCreate, VisitResponse,
+)
 from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/spots", tags=["spots"])
@@ -200,6 +204,133 @@ async def remove_favorite(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"お気に入り解除エラー: {str(e)}"
+        )
+
+
+# ===== 訪問記録関連API =====
+# [Gate #19] ダッシュボードの「訪問済み」統計は常にハードコードの0だった。
+# Spot.visit_countは全ユーザー合算の表示回数カウンタで「自分が訪れたか」を
+# 表さないため、UserSpotVisit(新規テーブル、追加のみのマイグレーション)を
+# 使って実装する。/visits は /{spot_id} より前に定義する必要がある(favoritesと同じ理由)。
+
+@router.get("/visits", response_model=List[VisitResponse])
+async def get_visits(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """自分の訪問済みスポット一覧を取得"""
+    visits = (
+        db.query(UserSpotVisit)
+        .filter(UserSpotVisit.user_id == current_user.id)
+        .order_by(UserSpotVisit.visited_at.desc())
+        .all()
+    )
+
+    results = []
+    for visit in visits:
+        spot = db.query(Spot).filter(Spot.id == visit.spot_id).first()
+        if spot is None:
+            continue
+        results.append({
+            "id": visit.id,
+            "spot_id": visit.spot_id,
+            "visit_note": visit.visit_note,
+            "visited_at": visit.visited_at,
+            "spot": spot,
+        })
+    return results
+
+
+@router.post("/{spot_id}/visit", response_model=VisitResponse, status_code=status.HTTP_201_CREATED)
+async def add_visit(
+    spot_id: uuid.UUID,
+    visit_data: VisitCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """スポットを訪問済みとして記録"""
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    if not spot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="スポットが見つかりません"
+        )
+    if not spot.is_public and spot.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="アクセス権限がありません"
+        )
+
+    existing = (
+        db.query(UserSpotVisit)
+        .filter(
+            UserSpotVisit.user_id == current_user.id,
+            UserSpotVisit.spot_id == spot_id,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="既に訪問済みとして記録されています"
+        )
+
+    try:
+        new_visit = UserSpotVisit(
+            user_id=current_user.id,
+            spot_id=spot_id,
+            visit_note=visit_data.visit_note,
+        )
+        db.add(new_visit)
+        # 表示回数カウンタもあわせて加算(既存のSpot.visit_countの意味と整合させる)
+        spot.visit_count = (spot.visit_count or 0) + 1
+        db.commit()
+        db.refresh(new_visit)
+        return {
+            "id": new_visit.id,
+            "spot_id": new_visit.spot_id,
+            "visit_note": new_visit.visit_note,
+            "visited_at": new_visit.visited_at,
+            "spot": spot,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"訪問記録エラー: {str(e)}"
+        )
+
+
+@router.delete("/{spot_id}/visit")
+async def remove_visit(
+    spot_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """訪問済み記録を取り消す"""
+    visit = (
+        db.query(UserSpotVisit)
+        .filter(
+            UserSpotVisit.user_id == current_user.id,
+            UserSpotVisit.spot_id == spot_id,
+        )
+        .first()
+    )
+    if not visit:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="訪問記録が見つかりません"
+        )
+
+    try:
+        db.delete(visit)
+        db.commit()
+        return {"message": "訪問記録を取り消しました"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"訪問記録削除エラー: {str(e)}"
         )
 
 

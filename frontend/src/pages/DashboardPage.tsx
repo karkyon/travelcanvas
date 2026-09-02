@@ -15,10 +15,11 @@ const DashboardPage: React.FC = () => {
   // [Gate #14] 以前は登録スポット/お気に入り/訪問済みが常にハードコードの0だった。
   // [Gate #15] お気に入りAPI(backend/app/api/v1/spots.py)を新規実装したのに合わせ、
   // 登録スポット数・お気に入り数の両方を実データに置き換える。
-  // 訪問済みはSpotに対応する「訪問済みフラグ」自体がデータモデルに存在しない
-  // (visit_countはあるが「自分が訪れたか」の真偽値ではない)ため、今回は対象外。
+  // [Gate #19] 訪問記録API(UserSpotVisit新規テーブル)を実装したのに合わせ、
+  // 訪問済み数も実データに置き換える。
   const [spotCount, setSpotCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
+  const [visitedCount, setVisitedCount] = useState(0);
   const [statsLoading, setStatsLoading] = useState(true);
   // [Gate #16] 「最近の活動」は常に固定の「まだ活動がありません」表示だった。
   // バックエンドに専用の活動ログテーブルは存在しないため、既存のスポット/プラン
@@ -49,12 +50,14 @@ const DashboardPage: React.FC = () => {
     if (!isAuthenticated || !user) return;
     (async () => {
       try {
-        const [spots, favorites] = await Promise.all([
+        const [spots, favorites, visits] = await Promise.all([
           spotApiService.getSpots(undefined, 100),
           spotApiService.getFavorites(),
+          spotApiService.getVisits(),
         ]);
         setSpotCount(spots.filter((s) => s.created_by === user.id).length);
         setFavoriteCount(favorites.length);
+        setVisitedCount(visits.length);
 
         await usePlanStore.getState().loadPlans();
         const plans = usePlanStore.getState().plans;
@@ -149,7 +152,7 @@ const DashboardPage: React.FC = () => {
               </div>
               <div className="ml-4">
                 <h3 className="text-lg font-semibold text-gray-900">訪問済み</h3>
-                <p className="text-2xl font-bold text-purple-600">0</p>
+                <p className="text-2xl font-bold text-purple-600">{statsLoading ? '…' : visitedCount}</p>
               </div>
             </div>
           </div>
