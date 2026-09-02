@@ -14,11 +14,21 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
 import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
+import DateNavigation from '@/components/planner/DateNavigation';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+
+// 日付から曜日を算出(DaySchedule型にday_of_weekフィールドが存在しないため、DayView.tsxと同じ方式)
+const getDayOfWeek = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  const labels = ['日', '月', '火', '水', '木', '金', '土'];
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return labels[d.getDay()] || '';
+};
 
 const PlannerPage: React.FC = () => {
   const { planId } = useParams<{ planId?: string }>();
@@ -124,21 +134,32 @@ const PlannerPage: React.FC = () => {
 
           <PlanHeader plan={currentPlan} className="mb-6" />
 
-          {/* 日タブ */}
-          <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-            {currentPlan.days.map((day, index) => (
-              <button
-                key={day.id}
-                onClick={() => setCurrentDay(index)}
-                className={`px-4 py-2 rounded-lg whitespace-nowrap text-sm font-medium transition-colors ${
-                  index === currentDayIndex
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Day {index + 1}
-              </button>
-            ))}
+          {/* 日タブナビゲーション + 日ごとの概要(スポット数・所要時間・予算) */}
+          {currentPlan.days.length > 0 && (
+            <DateNavigation
+              className="mb-4 rounded-lg overflow-hidden"
+              currentDay={currentDayIndex}
+              onDayChange={setCurrentDay}
+              travelDates={{
+                startDate: currentPlan.days[0]?.date || currentPlan.start_date || '',
+                endDate: currentPlan.days[currentPlan.days.length - 1]?.date || currentPlan.end_date || '',
+              }}
+              days={currentPlan.days.map((day, index) => ({
+                index,
+                date: day.date || '',
+                dayOfWeek: getDayOfWeek(day.date),
+                isActive: index === currentDayIndex,
+                isCompleted: false,
+                eventCount: day.events.length,
+                status: index === currentDayIndex ? 'current' : 'upcoming',
+                highlights: day.events.slice(0, 3).map((e) => e.title),
+                totalCost: day.events.reduce((sum, e) => sum + (e.cost || 0), 0),
+                totalDuration: day.events.reduce((sum, e) => sum + (e.duration || 0), 0),
+              }))}
+            />
+          )}
+
+          <div className="flex items-center gap-2 mb-4">
             <Button variant="outline" size="sm" onClick={addDay}>
               ＋ 日を追加
             </Button>
