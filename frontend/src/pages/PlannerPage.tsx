@@ -21,6 +21,7 @@ import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/components/common/Toast';
+import { spotApiService } from '@/services/spotApi';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -72,15 +73,38 @@ const PlannerPage: React.FC = () => {
   // スポットを渡していたが、これまでPlannerPage側で一切受け取っておらず、
   // 検索結果が実際にはどこにも保存されないまま「プランに追加しました」という
   // 偽の成功トーストだけが表示されていた実害バグ。ここで実際に受け取り処理する。
-  const incomingSpot = (location.state as { newSpot?: IncomingSpot } | null)?.newSpot;
+  // [Gate #17] SpotListPage.tsxの「詳細」ボタンも同様にlocation.state.spotId
+  // (登録済みスポットのID)を渡していたが、こちらも一切受け取られていなかった。
+  // spotIdのみの場合はAPIから詳細を取得してから同じ追加フローに合流させる。
+  const routeState = location.state as { newSpot?: IncomingSpot; spotId?: string } | null;
+  const [incomingSpot, setIncomingSpot] = useState<IncomingSpot | undefined>(routeState?.newSpot);
   const [isAddSpotModalOpen, setIsAddSpotModalOpen] = useState(false);
   const [isAddingSpot, setIsAddingSpot] = useState(false);
 
   useEffect(() => {
-    if (incomingSpot) {
+    if (routeState?.newSpot) {
+      setIncomingSpot(routeState.newSpot);
       setIsAddSpotModalOpen(true);
+    } else if (routeState?.spotId) {
+      (async () => {
+        try {
+          const spot = await spotApiService.getSpot(routeState.spotId as string);
+          setIncomingSpot({
+            name: spot.name,
+            description: spot.description,
+            category: spot.category,
+            address: spot.address,
+            location: { latitude: spot.latitude, longitude: spot.longitude },
+          });
+          setIsAddSpotModalOpen(true);
+        } catch (error) {
+          console.error('スポット詳細取得エラー:', error);
+          addToast({ message: 'スポット情報の取得に失敗しました', type: 'error' });
+        }
+      })();
     }
-  }, [incomingSpot]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeState?.newSpot, routeState?.spotId]);
 
   const addSpotToExistingOrNewPlan = async (targetPlanId?: string) => {
     if (!incomingSpot) return;
