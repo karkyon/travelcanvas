@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '@/types';
+import { api as apiService } from '@/services/api';
 
 // [2026-09-01 Gate #7d] api.ts と同じ環境変数解決方式に統一。
 // 旧実装は 'http://192.168.1.248:8000/api/v1'(旧サーバー、廃止済み)
@@ -64,6 +65,9 @@ export const useAuthStore = create<AuthState>()(
 
         // トークンとユーザー情報がある場合は認証済みとする
         if (state.token && state.user) {
+          // [Gate #10] apiServiceはlocalStorageの別キー('auth_token'/'access_token')
+          // からしかトークンを読まないため、zustand永続化からの復元時にも明示的に同期する。
+          apiService.setAccessToken(state.token);
           set({ 
             isAuthenticated: true, 
             isInitialized: true 
@@ -110,6 +114,7 @@ export const useAuthStore = create<AuthState>()(
           } else {
             console.warn('⚠️ 認証確認失敗:', response.status);
             // トークンが無効な場合はクリア
+            apiService.clearAccessToken();
             set({
               user: null,
               token: null,
@@ -121,6 +126,7 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch (error) {
           console.error('❌ 認証確認エラー:', error);
+          apiService.clearAccessToken();
           set({
             user: null,
             token: null,
@@ -156,6 +162,11 @@ export const useAuthStore = create<AuthState>()(
 
           const data = await response.json();
           console.log('✅ ログイン成功:', data);
+
+          // [Gate #10] apiServiceのaxiosクライアントにもトークンを同期する。
+          // これが無いと、ログイン後もspots/travel-plans等の認証必須APIが
+          // Authorizationヘッダー無しで送信され、常に401で失敗していた。
+          apiService.setAccessToken(data.access_token);
 
           set({
             user: data.user,
@@ -202,6 +213,8 @@ export const useAuthStore = create<AuthState>()(
           const data = await response.json();
           console.log('✅ 登録成功:', data);
 
+          apiService.setAccessToken(data.access_token);
+
           set({
             user: data.user,
             token: data.access_token,
@@ -223,6 +236,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         console.log('🚪 ログアウト');
+        apiService.clearAccessToken();
         set({
           user: null,
           token: null,

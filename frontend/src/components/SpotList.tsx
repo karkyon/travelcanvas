@@ -56,7 +56,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
     loadSpots();
   }, [selectedCategory, refreshTrigger]);
   
-  const handleDeleteSpot = async (spotId: number) => {
+  const handleDeleteSpot = async (spotId: string) => {
     if (!confirm('このスポットを削除しますか？')) {
       return;
     }

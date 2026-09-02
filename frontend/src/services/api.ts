@@ -281,6 +281,19 @@ class CompleteTravelAPI {
     localStorage.setItem('access_token', accessToken);
   }
 
+  // [Gate #10] authStore.tsは独自のfetch実装でログイン/登録を行っており、
+  // このクラスのsetTokens/clearTokens(private)を一度も呼んでいなかったため、
+  // ログイン後もaxiosクライアントにAuthorizationヘッダーが一切付与されず、
+  // 認証必須の全API(スポット作成・プラン作成・日程保存等)が常に401で
+  // 静かに失敗していた実害バグ。authStore.tsから同期できるよう公開する。
+  setAccessToken(accessToken: string): void {
+    this.setTokens(accessToken);
+  }
+
+  clearAccessToken(): void {
+    this.clearTokens();
+  }
+
   private clearTokens(): void {
     this.accessToken = null;
     localStorage.removeItem('auth_token');
