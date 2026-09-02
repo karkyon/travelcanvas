@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService } from '@/services/api';
+import Button from '@/components/common/Button';
 
 interface SettingsTab {
   id: string;
@@ -19,6 +20,10 @@ const SettingsPage: React.FC = () => {
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
+  // [Gate #21] パスワード変更は「開発中」表示で無効化されていた。
+  // backend/app/api/v1/auth.pyに/auth/change-passwordを新規実装したのに
+  // 合わせて実際に呼び出す。
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   
   const [profileData, setProfileData] = useState({
@@ -394,10 +399,14 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-          <p className="text-sm text-yellow-800">
-            <strong>注意:</strong> パスワード変更機能は開発中です。
-          </p>
+        <div className="mt-4">
+          <Button
+            variant="primary"
+            onClick={handleChangePassword}
+            loading={isChangingPassword}
+          >
+            パスワードを変更
+          </Button>
         </div>
       </div>
     </div>
@@ -432,6 +441,38 @@ const SettingsPage: React.FC = () => {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordData.current_password || !passwordData.new_password) {
+      showMessage('現在のパスワードと新しいパスワードを入力してください', 'error');
+      return;
+    }
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      showMessage('新しいパスワードが一致しません', 'error');
+      return;
+    }
+    if (passwordData.new_password.length < 8) {
+      showMessage('新しいパスワードは8文字以上にしてください', 'error');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await apiService.changePassword({
+        current_password: passwordData.current_password,
+        new_password: passwordData.new_password,
+      });
+      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+      showMessage('パスワードを変更しました', 'success');
+    } catch (error) {
+      console.error('パスワード変更エラー:', error);
+      showMessage(
+        error instanceof Error ? error.message : 'パスワードの変更に失敗しました',
+        'error'
+      );
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 

@@ -392,8 +392,10 @@ class CompleteTravelAPI {
     current_password: string; 
     new_password: string; 
   }): Promise<ApiResponse<void>> {
-    const response = await this.client.post<ApiResponse<void>>('/auth/change-password', data);
-    return response.data;
+    // [Gate #21] 実バックエンド(/auth/change-password、今回新規実装)は
+    // ApiResponseラッパー無しで {message: string} を直接返す。
+    await this.client.post<{ message: string }>('/auth/change-password', data);
+    return { success: true } as ApiResponse<void>;
   }
 
   // ===== 統合AI検索システム =====
