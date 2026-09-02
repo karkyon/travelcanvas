@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import Header from './Header'
 import Sidebar from './Sidebar'
-import Toast from '../common/Toast'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -52,9 +51,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           </div>
         </main>
       </div>
-
-      {/* トースト通知 */}
-      <Toast />
 
       {/* サイドバーオーバーレイ（モバイル） */}
       {showSidebar && isSidebarOpen && (

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { User } from '@/types';
 
 // [2026-09-01 Gate #7d] api.ts と同じ環境変数解決方式に統一。
 // 旧実装は 'http://192.168.1.248:8000/api/v1'(旧サーバー、廃止済み)
@@ -10,11 +11,9 @@ const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
   'http://192.168.1.248:8000/api/v1';
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-}
+// [Gate #7j] authStore独自のローカルUser型(id: number)がバックエンドの
+// UUID移行(Gate #5)に追従できておらず放置されていた実害バグ。
+// 全体で唯一の定義であるtypes/index.tsのUser型(id: string/UUID)に統一。
 
 interface AuthState {
   user: User | null;

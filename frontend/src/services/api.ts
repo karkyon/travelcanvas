@@ -201,6 +201,29 @@ class CompleteTravelAPI {
     this.initializeWebSearchService();
   }
 
+  // ===== 汎用HTTPメソッド =====
+  // [Gate #7j] AdminUsers.tsx/AdminDashboard.tsxがapi.get/post等を直接呼び出していたが
+  // CompleteTravelAPIには存在しなかった(コンパイルエラーの原因)。this.clientはprivateのため、
+  // 個別の名前付きメソッドが用意されていないエンドポイント向けの薄い汎用ラッパーを公開する。
+  // 注意: /admin/* 系エンドポイントはバックエンド未実装(2026-09-02時点で backend/app/api/ に
+  // admin関連ルーターが存在しないことを確認済み)。呼び出し自体はコンパイル可能になるが、
+  // 実行時は404になる。管理画面機能を実際に動作させるにはバックエンドAPI実装が別途必要。
+  async get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+    return this.client.get<T>(url, config);
+  }
+
+  async post<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.client.post<T>(url, data, config);
+  }
+
+  async put<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.client.put<T>(url, data, config);
+  }
+
+  async delete<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+    return this.client.delete<T>(url, config);
+  }
+
   // ===== 初期化メソッド =====
   private setupInterceptors(): void {
     // リクエストインターセプター

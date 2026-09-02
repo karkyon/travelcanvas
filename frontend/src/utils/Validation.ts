@@ -229,8 +229,8 @@ export const validateTimeRange = (startTime: string, endTime: string): FieldVali
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
 
-  const startMinutes = startHour * 60 + startMin;
-  const endMinutes = endHour * 60 + endMin;
+  const startMinutes = (startHour ?? 0) * 60 + (startMin ?? 0);
+  const endMinutes = (endHour ?? 0) * 60 + (endMin ?? 0);
 
   if (startMinutes >= endMinutes) {
     return { isValid: false, error: '終了時間は開始時間より後に設定してください' };

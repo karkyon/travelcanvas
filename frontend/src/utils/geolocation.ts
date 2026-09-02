@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-export interface GeolocationPosition {
+export interface SimpleGeolocationPosition {
   latitude: number;
   longitude: number;
   accuracy?: number;
@@ -16,7 +16,7 @@ export interface GeolocationError {
 
 export class GeolocationService {
   private static instance: GeolocationService;
-  private cache: GeolocationPosition | null = null;
+  private cache: SimpleGeolocationPosition | null = null;
   private readonly CACHE_DURATION = 10 * 60 * 1000; // 10分
 
   static getInstance(): GeolocationService {
@@ -34,7 +34,7 @@ export class GeolocationService {
     enableHighAccuracy?: boolean;
     maximumAge?: number;
     useCache?: boolean;
-  }): Promise<GeolocationPosition> {
+  }): Promise<SimpleGeolocationPosition> {
     const defaultOptions = {
       timeout: 10000, // 10秒
       enableHighAccuracy: false, // バッテリー節約のためfalse
@@ -59,9 +59,9 @@ export class GeolocationService {
     try {
       console.log('📍 位置情報取得開始...');
       
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        const successCallback = (pos: GeolocationPosition) => {
-          const result: GeolocationPosition = {
+      const position = await new Promise<SimpleGeolocationPosition>((resolve, reject) => {
+        const successCallback = (pos: globalThis.GeolocationPosition) => {
+          const result: SimpleGeolocationPosition = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
@@ -118,7 +118,7 @@ export class GeolocationService {
   /**
    * IP基づく概算位置取得（フォールバック）
    */
-  async getLocationByIP(): Promise<GeolocationPosition> {
+  async getLocationByIP(): Promise<SimpleGeolocationPosition> {
     try {
       console.log('🌐 IP基づく位置情報取得中...');
       
@@ -159,7 +159,7 @@ export class GeolocationService {
 
           if (isNaN(lat) || isNaN(lon)) continue;
 
-          const position: GeolocationPosition = {
+          const position: SimpleGeolocationPosition = {
             latitude: lat,
             longitude: lon,
             accuracy: 10000, // IP位置情報は精度が低い
@@ -232,7 +232,7 @@ export class GeolocationService {
   /**
    * デフォルト位置（東京）を取得
    */
-  private getFallbackPosition(): GeolocationPosition {
+  private getFallbackPosition(): SimpleGeolocationPosition {
     return {
       latitude: 35.6762,  // 東京駅
       longitude: 139.6503,
@@ -245,7 +245,7 @@ export class GeolocationService {
    * エラーメッセージの取得
    */
   private getErrorMessage(error: GeolocationPositionError): GeolocationError {
-    const errorMessages = {
+    const errorMessages: Record<number, string> = {
       [error.PERMISSION_DENIED]: '位置情報の使用が拒否されました。ブラウザの設定で位置情報を許可してください。',
       [error.POSITION_UNAVAILABLE]: '位置情報を取得できませんでした。GPS機能をオンにしてください。',
       [error.TIMEOUT]: '位置情報の取得がタイムアウトしました。もう一度お試しください。'
@@ -263,7 +263,7 @@ export const geolocationService = GeolocationService.getInstance();
 
 // React Hook形式のユーティリティ
 export const useGeolocation = () => {
-  const [position, setPosition] = useState<GeolocationPosition | null>(null);
+  const [position, setPosition] = useState<SimpleGeolocationPosition | null>(null);
   const [error, setError] = useState<GeolocationError | null>(null);
   const [loading, setLoading] = useState(false);
 

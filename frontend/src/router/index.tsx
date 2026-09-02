@@ -248,9 +248,9 @@ export const router = createBrowserRouter([
   },
 ], {
   // 🚀 React Router v7 Future Flags の設定
+  // [Gate #7j] インストール済みのreact-router-dom@6.30.1にはv7_startTransitionフラグが
+  // 存在しない(@remix-run/router FutureConfig型を確認済み、他5項目は有効)ため除去。
   future: {
-    // Transition機能の有効化
-    v7_startTransition: true,
     // 相対パス処理の改善
     v7_relativeSplatPath: true,
     // フェッチャーの永続化

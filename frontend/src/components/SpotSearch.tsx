@@ -120,8 +120,8 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
     try {
       const searchParams: SearchSpotParams = {
         query: query.trim(),
-        location,
-        radius_km: filters.radius,
+        location: location || undefined,
+        radius: filters.radius,
         max_results: 20,
         price_level: filters.priceRange === 'all' ? undefined : filters.priceRange,
         min_rating: filters.ratingMin > 0 ? filters.ratingMin : undefined

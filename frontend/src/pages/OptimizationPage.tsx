@@ -50,7 +50,11 @@ const OptimizationPage: React.FC = () => {
   const fetchOptimizationResult = async () => {
     try {
       const response = await getOptimizationResult(jobId!);
-      setOptimizationResult(response.data);
+      // [Gate #7j] 実バックエンド(backend/app/api/v1/ai.py)にはジョブ型の最適化結果取得
+      // エンドポイント・progress/job_id/status追跡機構は未実装であることを確認済み
+      // (/optimize-routeが同期的にwaypointsを返すのみ)。このポーリングUIはそれを前提に
+      // 書かれた将来設計のままのため、型のみ整合させて残す。
+      setOptimizationResult(response.data as unknown as OptimizationResult);
       
       // まだ処理中の場合は5秒後に再チェック
       if (response.data.status === 'processing') {

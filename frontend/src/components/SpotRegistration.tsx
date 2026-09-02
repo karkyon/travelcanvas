@@ -7,7 +7,7 @@ import { spotApiService, SpotData } from '../services/spotApi';
 import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
-import Toast from './common/Toast';
+import { useToast } from './common/Toast';
 
 interface SpotRegistrationProps {
   onSpotCreated?: (spot: any) => void;
@@ -28,7 +28,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
   
   const [categories, setCategories] = useState<Array<{ value: string; label: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { addToast } = useToast();
   
   // カテゴリ読み込み
   useEffect(() => {
@@ -44,7 +44,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
     loadCategories();
   }, []);
   
-  const handleInputChange = (field: keyof SpotData, value: string | number) => {
+  const handleInputChange = (field: keyof SpotData, value: string | number | undefined) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -55,7 +55,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
     e.preventDefault();
     
     if (!formData.name.trim()) {
-      setToast({ message: 'スポット名は必須です', type: 'error' });
+      addToast({ message: 'スポット名は必須です', type: 'error' });
       return;
     }
     
@@ -63,7 +63,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
     
     try {
       const newSpot = await spotApiService.createSpot(formData);
-      setToast({ message: 'スポットを登録しました！', type: 'success' });
+      addToast({ message: 'スポットを登録しました！', type: 'success' });
       
       // フォームリセット
       setFormData({
@@ -84,7 +84,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
       
     } catch (error) {
       console.error('スポット作成エラー:', error);
-      setToast({ 
+      addToast({ 
         message: error instanceof Error ? error.message : 'スポット登録に失敗しました', 
         type: 'error' 
       });
@@ -238,14 +238,6 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
         </form>
       </div>
       
-      {/* トースト通知 */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </Card>
   );
 };

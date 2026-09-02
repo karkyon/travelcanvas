@@ -110,7 +110,7 @@ const SearchPage: React.FC = () => {
     
     setUploadedImages(prev => [...prev, ...files].slice(0, 20));
     
-    if (files.length > 0) {
+    if (files[0]) {
       handleImageSearch(files[0]);
     }
   };
@@ -229,7 +229,7 @@ const SearchPage: React.FC = () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
         console.log('🛑 AI音声録音を停止しました');
-        toast.info('音声録音を停止、AI解析中...');
+        toast('音声録音を停止、AI解析中...', { icon: 'ℹ️' });
       }
     } catch (error) {
       console.error('音声録音停止エラー:', error);

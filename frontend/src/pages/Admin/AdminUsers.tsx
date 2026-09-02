@@ -365,7 +365,7 @@ const AdminUsers: React.FC = () => {
 
       const response = await api.get(`/admin/users?${params.toString()}`);
       setUsers(response.data);
-      setPagination(response.pagination);
+      setPagination(response.data.pagination);
     } catch (error) {
       console.error('Failed to fetch users:', error);
       toast.error('ユーザー一覧の取得に失敗しました');
@@ -482,7 +482,7 @@ const AdminUsers: React.FC = () => {
             value={`${filters.sort_by}-${filters.sort_order}`}
             onChange={(e) => {
               const [sort_by, sort_order] = e.target.value.split('-');
-              setFilters(prev => ({ ...prev, sort_by, sort_order: sort_order as 'asc' | 'desc' }));
+              setFilters(prev => ({ ...prev, sort_by: sort_by || prev.sort_by, sort_order: (sort_order as 'asc' | 'desc') || prev.sort_order }));
             }}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >

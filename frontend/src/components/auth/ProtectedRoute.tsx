@@ -6,13 +6,16 @@ import LoadingSpinner from '@/components/common/LoadingSpinner'
 interface ProtectedRouteProps {
   children: React.ReactNode
   requireAuth?: boolean
+  /** 必要なロール('admin'等)。未指定時はロールチェックを行わない */
+  requireRole?: string
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requireAuth = true 
+  requireAuth = true,
+  requireRole
 }) => {
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { isAuthenticated, isLoading, user } = useAuthStore()
   const location = useLocation()
 
   if (isLoading) {
@@ -31,6 +34,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!requireAuth && isAuthenticated) {
     // Redirect authenticated users away from login/register pages
     return <Navigate to="/dashboard" replace />
+  }
+
+  // [Gate #7j] requireRoleがpropとして渡されていたが実装が存在せず、/adminが
+  // 認証済みユーザーなら誰でも通過できる実害的なアクセス制御バグだった。
+  if (requireRole && user?.user_type !== requireRole && user?.role !== requireRole) {
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>

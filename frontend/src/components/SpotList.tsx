@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { spotApiService, SpotResponse } from '../services/spotApi';
 import Button from './common/Button';
 import Card from './common/Card';
-import Toast from './common/Toast';
+import { useToast } from './common/Toast';
 
 interface SpotListProps {
   onSpotSelect?: (spot: SpotResponse) => void;
@@ -18,7 +18,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<Array<{ value: string; label: string }>>([]);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { addToast } = useToast();
   
   const loadSpots = async () => {
     setIsLoading(true);
@@ -27,7 +27,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
       setSpots(spotsData);
     } catch (error) {
       console.error('スポット読み込みエラー:', error);
-      setToast({ 
+      addToast({ 
         message: 'スポットの読み込みに失敗しました', 
         type: 'error' 
       });
@@ -63,11 +63,11 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
     
     try {
       await spotApiService.deleteSpot(spotId);
-      setToast({ message: 'スポットを削除しました', type: 'success' });
+      addToast({ message: 'スポットを削除しました', type: 'success' });
       loadSpots(); // リロード
     } catch (error) {
       console.error('スポット削除エラー:', error);
-      setToast({ 
+      addToast({ 
         message: error instanceof Error ? error.message : 'スポットの削除に失敗しました', 
         type: 'error' 
       });
@@ -198,14 +198,6 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
         </div>
       )}
       
-      {/* トースト通知 */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 };

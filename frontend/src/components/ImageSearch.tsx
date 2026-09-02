@@ -102,7 +102,8 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
     setPreviewUrls(prev => {
       // URLを解放
-      URL.revokeObjectURL(prev[index]);
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
       return prev.filter((_, i) => i !== index);
     });
   }, []);
