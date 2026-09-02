@@ -504,9 +504,9 @@ class CompleteTravelAPI {
           total_count: searchResults.data.spots.length,
           image_analysis: imageAnalysis,
           search_metadata: {
+            ...searchResults.data.search_metadata,
             search_type: 'advanced_ai_image_search',
-            confidence: imageAnalysis.overall_confidence,
-            ...searchResults.data.search_metadata
+            confidence: imageAnalysis.overall_confidence
           }
         }
       };
@@ -551,9 +551,9 @@ class CompleteTravelAPI {
           transcribed_text: speechRecognition.transcribed_text,
           speech_analysis: speechRecognition,
           search_metadata: {
+            ...searchResults.data.search_metadata,
             search_type: 'advanced_ai_voice_search',
-            confidence: speechRecognition.confidence,
-            ...searchResults.data.search_metadata
+            confidence: speechRecognition.confidence
           }
         }
       };
@@ -755,7 +755,7 @@ class CompleteTravelAPI {
     // より多様な結果を生成
     if (spots.length < 3) {
       for (let i = 0; i < Math.min(3 - spots.length, 2); i++) {
-        const category = categories[i % categories.length];
+        const category = categories[i % categories.length] || 'other';
         const distance = Math.random() * 15;
         
         spots.push({
@@ -877,7 +877,7 @@ class CompleteTravelAPI {
     const categories = ['tourist_attraction', 'restaurant', 'shopping', 'culture', 'nature'];
     
     for (let i = 0; i < 3; i++) {
-      const category = categories[i % categories.length];
+      const category = categories[i % categories.length] || 'other';
       const distance = Math.random() * 20;
       
       mockSpots.push({
@@ -993,7 +993,7 @@ class CompleteTravelAPI {
       }
     ];
 
-    const selectedTranscription = advancedTranscriptions[Math.floor(Math.random() * advancedTranscriptions.length)];
+    const selectedTranscription = advancedTranscriptions[Math.floor(Math.random() * advancedTranscriptions.length)]!;
     
     return {
       transcribed_text: selectedTranscription.text,
@@ -1046,12 +1046,12 @@ class CompleteTravelAPI {
   }
 
   async getSpotCategories(): Promise<ApiResponse<{ categories: Array<{ value: string; label: string }> }>> {
-    const response = await this.client.get<{ categories: Array<{ value: string; label: string }> }>('/spots/categories/list');
+    const response = await this.client.get<ApiResponse<{ categories: Array<{ value: string; label: string }> }>>('/spots/categories/list');
     return response.data;
   }
 
   async testConnection(): Promise<ApiResponse<{ message: string; version: string; timestamp: string }>> {
-    const response = await this.client.get<{ message: string; version: string; timestamp: string }>('/spots/test/ping');
+    const response = await this.client.get<ApiResponse<{ message: string; version: string; timestamp: string }>>('/spots/test/ping');
     return response.data;
   }
 

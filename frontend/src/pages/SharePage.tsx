@@ -13,26 +13,11 @@ import {
   getCollaborators,
   removeCollaborator 
 } from '../services/api';
+import type { ShareLink, Collaborator } from '../services/api';
 
-interface ShareSettings {
-  share_url: string;
-  qr_code_url: string;
-  share_token: string;
-  permission: 'view_only' | 'comment' | 'edit';
-  expires_at?: string;
-  password_protected: boolean;
-  allow_public: boolean;
-}
-
-interface Collaborator {
-  id: string;
-  email: string;
-  full_name: string;
-  permission: 'view_only' | 'comment' | 'edit' | 'admin';
-  joined_at: string;
-  last_activity?: string;
-  status: 'pending' | 'active' | 'inactive';
-}
+// 実バックエンドのレスポンス形状(ShareLink)に準拠。
+// QRコードはバックエンド未提供のため、共有URLからクライアント側で生成する。
+type ShareSettings = ShareLink;
 
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -45,7 +30,7 @@ const SharePage: React.FC = () => {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   
   // フォーム状態
-  const [permission, setPermission] = useState<'view_only' | 'comment' | 'edit'>('view_only');
+  const [permission, setPermission] = useState<'view' | 'edit'>('view');
   const [sharePassword, setSharePassword] = useState('');
   const [allowPublic, setAllowPublic] = useState(false);
   const [expiryDate, setExpiryDate] = useState('');
@@ -62,12 +47,12 @@ const SharePage: React.FC = () => {
   const loadShareSettings = async () => {
     try {
       const response = await getShareSettings(planId!);
-      if (response.data) {
-        setShareSettings(response.data);
-        setPermission(response.data.permission);
-        setAllowPublic(response.data.allow_public);
-        if (response.data.expires_at) {
-          setExpiryDate(response.data.expires_at.split('T')[0]);
+      const existing = response.data?.[0];
+      if (existing) {
+        setShareSettings(existing);
+        setPermission(existing.permission);
+        if (existing.expires_at) {
+          setExpiryDate(existing.expires_at.split('T')[0] || '');
         }
       }
     } catch (error) {
@@ -91,9 +76,7 @@ const SharePage: React.FC = () => {
     try {
       const response = await createShareLink(planId!, {
         permission,
-        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined,
-        share_password: sharePassword || undefined,
-        allow_public: allowPublic
+        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined
       });
       
       setShareSettings(response.data);
@@ -110,11 +93,9 @@ const SharePage: React.FC = () => {
     
     setIsSaving(true);
     try {
-      await updateShareSettings(planId!, shareSettings.share_token, {
+      await updateShareSettings(planId!, shareSettings.id, {
         permission,
-        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined,
-        share_password: sharePassword || undefined,
-        allow_public: allowPublic
+        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined
       });
       
       await loadShareSettings();
@@ -127,9 +108,9 @@ const SharePage: React.FC = () => {
   };
 
   const handleCopyLink = async () => {
-    if (shareSettings?.share_url) {
+    if (shareSettings?.url) {
       try {
-        await navigator.clipboard.writeText(shareSettings.share_url);
+        await navigator.clipboard.writeText(shareSettings.url);
         setMessage({ text: 'リンクをコピーしました', type: 'success' });
       } catch (error) {
         setMessage({ text: 'リンクのコピーに失敗しました', type: 'error' });
@@ -144,9 +125,9 @@ const SharePage: React.FC = () => {
     try {
       await inviteCollaborator(planId!, {
         email: inviteEmail,
-        permission: 'edit',
-        message: inviteMessage
+        role: 'editor'
       });
+      void inviteMessage; // TODO: バックエンドがinvite本文をサポートしたら送信する
       
       setInviteEmail('');
       setInviteMessage('');
@@ -171,34 +152,32 @@ const SharePage: React.FC = () => {
     }
   };
 
-  const getPermissionIcon = (perm: string) => {
-    switch (perm) {
-      case 'view_only': return <Eye size={16} className="text-blue-500" />;
-      case 'comment': return <Edit3 size={16} className="text-yellow-500" />;
-      case 'edit': return <Edit3 size={16} className="text-green-500" />;
-      case 'admin': return <Shield size={16} className="text-purple-500" />;
+  const getPermissionIcon = (role: Collaborator['role']) => {
+    switch (role) {
+      case 'viewer': return <Eye size={16} className="text-blue-500" />;
+      case 'editor': return <Edit3 size={16} className="text-green-500" />;
+      case 'owner': return <Shield size={16} className="text-purple-500" />;
       default: return <Eye size={16} className="text-gray-500" />;
     }
   };
 
-  const getPermissionText = (perm: string) => {
-    switch (perm) {
-      case 'view_only': return '閲覧のみ';
-      case 'comment': return 'コメント可';
-      case 'edit': return '編集可能';
-      case 'admin': return '管理者';
+  const getPermissionText = (role: Collaborator['role']) => {
+    switch (role) {
+      case 'viewer': return '閲覧のみ';
+      case 'editor': return '編集可能';
+      case 'owner': return '管理者';
       default: return '不明';
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: Collaborator['status']) => {
     switch (status) {
-      case 'active':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">アクティブ</span>;
+      case 'accepted':
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">参加済み</span>;
       case 'pending':
         return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">招待中</span>;
-      case 'inactive':
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">非アクティブ</span>;
+      case 'declined':
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">辞退</span>;
       default:
         return null;
     }
@@ -262,7 +241,7 @@ const SharePage: React.FC = () => {
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        value={shareSettings.share_url}
+                        value={shareSettings.url}
                         readOnly
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
                       />
@@ -282,7 +261,7 @@ const SharePage: React.FC = () => {
                     </label>
                     <div className="flex items-center gap-4">
                       <img
-                        src={shareSettings.qr_code_url}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareSettings.url)}`}
                         alt="QRコード"
                         className="w-24 h-24 border rounded-lg"
                       />
@@ -291,7 +270,7 @@ const SharePage: React.FC = () => {
                           スマホでスキャンしてアクセス
                         </p>
                         <a
-                          href={shareSettings.qr_code_url}
+                          href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareSettings.url)}`}
                           download="qrcode.png"
                           className="inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
                         >
@@ -324,11 +303,10 @@ const SharePage: React.FC = () => {
                   </label>
                   <select
                     value={permission}
-                    onChange={(e) => setPermission(e.target.value as any)}
+                    onChange={(e) => setPermission(e.target.value as 'view' | 'edit')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="view_only">👀 閲覧のみ</option>
-                    <option value="comment">💬 コメント可能</option>
+                    <option value="view">👀 閲覧のみ</option>
                     <option value="edit">✏️ 編集可能</option>
                   </select>
                 </div>
@@ -457,21 +435,16 @@ const SharePage: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-gray-900">
-                            {collaborator.full_name || collaborator.email}
+                            {collaborator.name || collaborator.email}
                           </span>
                           {getStatusBadge(collaborator.status)}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                          {getPermissionIcon(collaborator.permission)}
-                          <span>{getPermissionText(collaborator.permission)}</span>
+                          {getPermissionIcon(collaborator.role)}
+                          <span>{getPermissionText(collaborator.role)}</span>
                           <span>•</span>
                           <span>{collaborator.email}</span>
                         </div>
-                        {collaborator.last_activity && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            最終アクティビティ: {new Date(collaborator.last_activity).toLocaleDateString('ja-JP')}
-                          </p>
-                        )}
                       </div>
                       
                       <button

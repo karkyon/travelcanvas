@@ -47,8 +47,8 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     const totalDuration = plan.days?.reduce((daySum, day) => 
       daySum + day.events.reduce((eventSum, event) => eventSum + (event.duration || 0), 0), 0) || 0;
 
-    const startDate = new Date(plan.start_date);
-    const endDate = new Date(plan.end_date);
+    const startDate = new Date(plan.start_date || 0);
+    const endDate = new Date(plan.end_date || 0);
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     return {
@@ -217,9 +217,9 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 {/* 日程 */}
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <div className="text-sm text-blue-800">
-                    <span className="font-medium">📅 {formatDate(plan.start_date)}</span>
+                    <span className="font-medium">📅 {formatDate(plan.start_date || '')}</span>
                     <span className="mx-2">〜</span>
-                    <span className="font-medium">{formatDate(plan.end_date)}</span>
+                    <span className="font-medium">{formatDate(plan.end_date || '')}</span>
                   </div>
                 </div>
 

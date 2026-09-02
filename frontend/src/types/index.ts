@@ -196,6 +196,7 @@ export interface TravelPlan {
   visibility?: 'private' | 'shared_link' | 'public';
   center_coordinates?: Coordinates;
   tags?: string[];
+  status?: 'draft' | 'active' | 'completed' | 'archived' | 'shared';
   days: DaySchedule[];
 }
 

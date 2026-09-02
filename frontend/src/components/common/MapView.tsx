@@ -127,8 +127,8 @@ const MapView: React.FC<MapViewProps> = ({
       const google = (window as any).google;
       
       const center = centerLocation || (locations.length > 0 ? {
-        lat: locations[0].latitude,
-        lng: locations[0].longitude
+        lat: locations[0]!.latitude,
+        lng: locations[0]!.longitude
       } : { lat: 35.6762, lng: 139.6503 }); // デフォルト: 東京
 
       const map = new google.maps.Map(mapRef.current, {
@@ -233,8 +233,8 @@ const MapView: React.FC<MapViewProps> = ({
         }));
 
         const request = {
-          origin: new google.maps.LatLng(locations[0].latitude, locations[0].longitude),
-          destination: new google.maps.LatLng(locations[locations.length - 1].latitude, locations[locations.length - 1].longitude),
+          origin: new google.maps.LatLng(locations[0]!.latitude, locations[0]!.longitude),
+          destination: new google.maps.LatLng(locations[locations.length - 1]!.latitude, locations[locations.length - 1]!.longitude),
           waypoints,
           travelMode: google.maps.TravelMode.TRANSIT,
           optimizeWaypoints: true
@@ -261,8 +261,8 @@ const MapView: React.FC<MapViewProps> = ({
       const google = (window as any).google;
       if (locations.length === 1) {
         mapInstance.setCenter({
-          lat: locations[0].latitude,
-          lng: locations[0].longitude
+          lat: locations[0]!.latitude,
+          lng: locations[0]!.longitude
         });
         mapInstance.setZoom(zoom);
       } else {
