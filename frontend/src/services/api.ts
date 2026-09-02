@@ -177,9 +177,21 @@ export interface OptimizationResult {
 }
 
 // ===== API設定 =====
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  import.meta.env.VITE_API_URL ||
-  'http://192.168.1.248:8000/api/v1';
+// [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
+// (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
+// environment:はコンテナ起動時の値でありViteの静的ビルドには反映されない)、
+// 常に下記フォールバックの廃止済み旧サーバー(192.168.1.248)が使われていた実害バグ。
+// さらにVITE_API_URLの値自体に/api/v1が含まれておらず二重に壊れていた。
+// Dockerfile/docker-compose.yml側もビルドARGを正しく受け取るよう修正済み(同Gate)。
+function resolveApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:8001';
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 // ===== メインAPIクラス =====
 class CompleteTravelAPI {
@@ -1079,29 +1091,56 @@ class CompleteTravelAPI {
   }
 
   // ===== 旅行プラン関連API =====
+  // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして
+  // /api/v1配下にマウント)と一致しておらず、'/plans'という存在しないパスに送信していた
+  // ため、Gate #6で実装したtravel-plans CRUD APIはフロントエンドから一度も到達できて
+  // いなかった実害バグ。あわせて、バックエンドのTravelPlanは days/events を itinerary
+  // (JSONカラム、既存)にネストして保持する形状のため、レスポンス受信時に itinerary.days
+  // をフロントエンドのTravelPlan.daysへ展開し、送信時は逆にitineraryへ包む変換を行う。
+  private planFromApi(raw: any): any {
+    if (!raw) return raw;
+    const { itinerary, ...rest } = raw;
+    return {
+      ...rest,
+      days: itinerary?.days ?? [],
+    };
+  }
+
+  private planToApi(planData: any): any {
+    if (!planData) return planData;
+    const { days, ...rest } = planData;
+    if (days === undefined) return rest;
+    return {
+      ...rest,
+      itinerary: { days },
+    };
+  }
+
   async getPlans(): Promise<ApiResponse<any[]>> {
-    const response = await this.client.get<ApiResponse<any[]>>('/plans');
-    return response.data;
+    const response = await this.client.get<ApiResponse<any[]>>('/travel-plans/');
+    const body = response.data as any;
+    const plans = (body.plans ?? body.data ?? []).map((p: any) => this.planFromApi(p));
+    return { success: true, message: body.message, data: plans } as ApiResponse<any[]>;
   }
 
   async createPlan(planData: any): Promise<ApiResponse<any>> {
-    const response = await this.client.post<ApiResponse<any>>('/plans', planData);
-    return response.data;
+    const response = await this.client.post<any>('/travel-plans/', this.planToApi(planData));
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
   }
 
   async getPlan(planId: string): Promise<ApiResponse<any>> {
-    const response = await this.client.get<ApiResponse<any>>(`/plans/${planId}`);
-    return response.data;
+    const response = await this.client.get<any>(`/travel-plans/${planId}`);
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
   }
 
   async updatePlan(planId: string, planData: any): Promise<ApiResponse<any>> {
-    const response = await this.client.put<ApiResponse<any>>(`/plans/${planId}`, planData);
-    return response.data;
+    const response = await this.client.put<any>(`/travel-plans/${planId}`, this.planToApi(planData));
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
   }
 
   async deletePlan(planId: string): Promise<ApiResponse<void>> {
-    const response = await this.client.delete<ApiResponse<void>>(`/plans/${planId}`);
-    return response.data;
+    await this.client.delete<void>(`/travel-plans/${planId}`);
+    return { success: true } as ApiResponse<void>;
   }
 
   // ===== 通知関連API =====

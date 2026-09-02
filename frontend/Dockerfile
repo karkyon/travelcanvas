@@ -6,6 +6,12 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# [Gate #8] VITE_API_URLはViteの静的ビルド時に import.meta.env として埋め込まれるため、
+# コンテナ起動時のenvironment:では反映されない。docker-compose.ymlのbuild.args経由で
+# ビルドARGとして正しく受け取る。
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
 RUN npx vite build
 
 FROM node:24-alpine AS runtime

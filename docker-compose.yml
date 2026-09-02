@@ -85,8 +85,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # [Gate #8] VITE_API_URLはビルド時にVite静的バンドルへ埋め込む必要があるため、
+      # 下のenvironment:(コンテナ起動時の値、Viteには無効)ではなくbuild.args経由で渡す。
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     restart: unless-stopped
     environment:
+      # 参考値。実際にフロントエンドが使うのは上のbuild.argsでビルド時に埋め込まれた値。
       VITE_API_URL: http://localhost:8001
       VITE_APP_NAME: TravelCanvas
     ports:

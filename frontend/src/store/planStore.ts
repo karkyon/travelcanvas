@@ -253,9 +253,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
     
     try {
-      // APIにアイテム追加
-      // const response = await apiService.addScheduleItem(day.id, newItem);
-      toast.success('スポットを追加しました');
+      // [Gate #8] backend/app/models/models.pyのTravelPlan.itinerary(JSON)フィールドに
+      // days全体を保存する。専用のイベント単位APIはバックエンド未実装のため、
+      // プラン全体のPUTで永続化する(既存のupdatePlanアクションを再利用)。
+      await get().updatePlan(state.currentPlan.id, { days: updatedPlan.days });
     } catch (error) {
       console.error('Add schedule item error:', error);
       toast.error('スポットの追加に失敗しました');
@@ -280,9 +281,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
     
     try {
-      // APIにアイテム更新
-      // const response = await apiService.updateScheduleItem(itemId, item);
-      toast.success('スポットを更新しました');
+      await get().updatePlan(state.currentPlan.id, { days: updatedPlan.days });
     } catch (error) {
       console.error('Update schedule item error:', error);
       toast.error('スポットの更新に失敗しました');
@@ -305,9 +304,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
     
     try {
-      // APIからアイテム削除
-      // const response = await apiService.deleteScheduleItem(itemId);
-      toast.success('スポットを削除しました');
+      await get().updatePlan(state.currentPlan.id, { days: updatedPlan.days });
     } catch (error) {
       console.error('Delete schedule item error:', error);
       toast.error('スポットの削除に失敗しました');
@@ -339,8 +336,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
     
     try {
-      // APIに並び替え保存
-      // await apiService.reorderScheduleItems(day.id, itemIds);
+      await get().updatePlan(state.currentPlan.id, { days: updatedPlan.days });
     } catch (error) {
       console.error('Reorder items error:', error);
       toast.error('並び替えの保存に失敗しました');
@@ -386,9 +382,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
     
     try {
-      // APIに移動保存
-      // await apiService.moveScheduleItem(itemId, toDay.id, newIndex);
-      toast.success('スポットを移動しました');
+      await get().updatePlan(state.currentPlan.id, { days: updatedPlan.days });
     } catch (error) {
       console.error('Move item error:', error);
       toast.error('スポットの移動に失敗しました');

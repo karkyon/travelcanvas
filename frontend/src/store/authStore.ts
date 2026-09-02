@@ -6,10 +6,23 @@ import type { User } from '@/types';
 // 旧実装は 'http://192.168.1.248:8000/api/v1'(旧サーバー、廃止済み)
 // をハードコードしており、omega-dev2上では認証系APIが常に
 // 到達不能なホストへ送信され、静かに失敗する状態だった。
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://192.168.1.248:8000/api/v1';
+// [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
+// (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
+// environment:はコンテナ起動時の値でありViteの静的ビルドには反映されない)、
+// 常に下記フォールバックの廃止済み旧サーバー(192.168.1.248)が使われていた実害バグ。
+// さらにVITE_API_URLの値自体に/api/v1が含まれておらず二重に壊れていた。
+// resolveApiBaseUrlで正規化し、Dockerfile/docker-compose.yml側もビルドARGを
+// 正しく受け取るよう修正済み(同Gate)。
+function resolveApiBaseUrl(): string {
+  const raw =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:8001';
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 // [Gate #7j] authStore独自のローカルUser型(id: number)がバックエンドの
 // UUID移行(Gate #5)に追従できておらず放置されていた実害バグ。
