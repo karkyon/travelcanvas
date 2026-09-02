@@ -17,6 +17,10 @@ pydantic-settings==2.1.0
 
 # Authentication & Security
 passlib[bcrypt]==1.7.4
+# [Gate #9] passlib 1.7.4 は bcrypt>=4.1.0 の内部API変更(__about__モジュール削除)に
+# 未対応で、実際のパスワード長に関係なく "password cannot be longer than 72 bytes" を
+# 誤って送出する既知の互換性バグがある。bcryptを4.1未満に固定して回避(業界標準の回避策)。
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
 
@@ -89,8 +93,7 @@ alembic==1.12.1  # Already included above
 # JSON Web Tokens (統一)
 python-jose[cryptography]==3.3.0  # Already included above
 
-# Password Hashing (統一)
-passlib[bcrypt]==1.7.4  # Already included above
+# Password Hashing (統一) - passlib[bcrypt]は上部で定義済み(重複削除)
 
 # Type Hints
 typing-extensions==4.8.0
