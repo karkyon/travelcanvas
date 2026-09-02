@@ -96,12 +96,13 @@ class WebSearchService {
       ];
 
       const results = await Promise.allSettled(searchPromises);
+      const [wikipediaResult, nominatimResult, overpassResult] = results;
       
       // 2. 結果をマージ・重複除去
       const allResults = this.mergeSearchResults(
-        results[0].status === 'fulfilled' ? results[0].value : [],
-        results[1].status === 'fulfilled' ? results[1].value : [],
-        results[2].status === 'fulfilled' ? results[2].value : []
+        wikipediaResult && wikipediaResult.status === 'fulfilled' ? wikipediaResult.value : [],
+        nominatimResult && nominatimResult.status === 'fulfilled' ? nominatimResult.value : [],
+        overpassResult && overpassResult.status === 'fulfilled' ? overpassResult.value : []
       );
 
       // 結果をログ出力
@@ -617,7 +618,7 @@ class WebSearchService {
 
   // ユーティリティメソッド群は元のまま維持（長すぎるため省略）
   private extractLocationName(displayName: string): string {
-    return displayName.split(',')[0].trim();
+    return (displayName.split(',')[0] || displayName).trim();
   }
 
   private inferCategoryFromText(text: string): string {
@@ -740,13 +741,13 @@ class WebSearchService {
     let random = Math.random() * totalWeight;
     
     for (let i = 0; i < categories.length; i++) {
-      random -= weights[i];
+      random -= weights[i] ?? 0;
       if (random <= 0) {
-        return categories[i];
+        return categories[i] ?? categories[0] ?? 'other';
       }
     }
     
-    return categories[0];
+    return categories[0] ?? 'other';
   }
 
   private getCategoryLabel(category: string): string {

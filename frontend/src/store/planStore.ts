@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { TravelPlan, ScheduleItem, DaySchedule, Spot } from '@/types';
+import { TravelPlan, ScheduleItem, DaySchedule } from '@/types';
 import { api as apiService } from '@/services/api';
+import type { SpotResult } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 interface PlanState {
@@ -9,7 +10,7 @@ interface PlanState {
   currentPlan: TravelPlan | null;
   currentDayIndex: number;
   isLoading: boolean;
-  searchResults: Spot[];
+  searchResults: SpotResult[];
   
   // Actions
   loadPlans: () => Promise<void>;
@@ -173,13 +174,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     
     const newDay: DaySchedule = {
       id: `day_${Date.now()}`,
-      plan_id: state.currentPlan.id,
-      day_number: state.currentPlan.days.length + 1,
       date: new Date(Date.now() + state.currentPlan.days.length * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      title: `Day ${state.currentPlan.days.length + 1}`,
-      events: [],
-      total_cost: 0,
-      total_duration: 0
+      events: []
     };
     
     const updatedPlan = {
@@ -221,7 +217,6 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const day = state.currentPlan.days[dayIndex];
     const newItem: ScheduleItem = {
       id: `item_${Date.now()}`,
-      day_id: day.id,
       title: item.title || '新しいスポット',
       description: item.description || '',
       category: item.category || 'sightseeing',
@@ -234,15 +229,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       address: item.address,
       cost: item.cost || 0,
       currency: item.currency || 'JPY',
-      priority: item.priority || 'medium',
+      priority: item.priority ?? 3,
       travel_method: item.travel_method,
       travel_time: item.travel_time,
       travel_cost: item.travel_cost,
       notes: item.notes,
       booking_info: item.booking_info,
-      contact_info: item.contact_info,
-      status: 'pending',
-      order_index: day.events.length
+      contact_info: item.contact_info
     };
     
     const updatedDay = {
@@ -327,12 +320,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     if (!state.currentPlan || !state.currentPlan.days[dayIndex]) return;
     
     const day = state.currentPlan.days[dayIndex];
-    const reorderedEvents = itemIds.map(id => 
-      day.events.find(event => event.id === id)!
-    ).map((event, index) => ({
-      ...event,
-      order_index: index
-    }));
+    const reorderedEvents = itemIds
+      .map(id => day.events.find(event => event.id === id))
+      .filter((event): event is ScheduleItem => event !== undefined);
     
     const updatedDay = {
       ...day,
@@ -364,6 +354,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     
     const fromDay = state.currentPlan.days[fromDayIndex];
     const toDay = state.currentPlan.days[toDayIndex];
+    if (!fromDay || !toDay) return;
+
     const itemToMove = fromDay.events.find(event => event.id === itemId);
     
     if (!itemToMove) return;
@@ -377,9 +369,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       ...toDay,
       events: [
         ...toDay.events.slice(0, newIndex),
-        { ...itemToMove, day_id: toDay.id, order_index: newIndex },
+        itemToMove,
         ...toDay.events.slice(newIndex)
-      ].map((event, index) => ({ ...event, order_index: index }))
+      ]
     };
     
     const updatedPlan = {

@@ -122,7 +122,7 @@ export interface Coordinates {
   longitude: number;
 }
 
-export type TransportMode = 'walking' | 'bicycle' | 'car' | 'taxi' | 'bus' | 'train' | 'subway' | 'plane' | 'boat' | 'other';
+export type TransportMode = 'walking' | 'bicycle' | 'car' | 'taxi' | 'bus' | 'train' | 'subway' | 'plane' | 'boat' | 'other' | 'tram' | 'ferry' | 'driving' | 'transit';
 
 export type EventCategory = 'accommodation' | 'transportation' | 'activity' | 'dining' | 'shopping' | 'sightseeing' | 'other';
 

@@ -90,7 +90,9 @@ export const formatDuration = (minutes: number): string => {
  * 時間の加算（既存関数 - 後方互換性維持）
  */
 export function addMinutes(time: string, minutes: number): string {
-  const [hours, mins] = time.split(':').map(Number);
+  const parts = time.split(':').map(Number);
+  const hours = parts[0] ?? 0;
+  const mins = parts[1] ?? 0;
   const totalMinutes = hours * 60 + mins + minutes;
   const newHours = Math.floor(totalMinutes / 60) % 24;
   const newMins = totalMinutes % 60;
@@ -190,7 +192,7 @@ export const generateDateRange = (startDate: string, endDate: string): string[] 
   const end = new Date(endDate);
   
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    dates.push(d.toISOString().split('T')[0]);
+    dates.push(d.toISOString().split('T')[0] || '');
   }
   
   return dates;
@@ -367,7 +369,7 @@ export const categoryColors: Record<string, string> = {
  * カテゴリアイコンを取得（関数版）
  */
 export const getCategoryIcon = (category: EventCategory): string => {
-  return categoryIcons[category] || categoryIcons.default;
+  return categoryIcons[category] || categoryIcons.default || '📍';
 };
 
 /**
@@ -387,6 +389,7 @@ export const getTransportIcon = (transport: TransportMode): string => {
     plane: '✈️',
     driving: '🚗',
     transit: '🚌',
+    boat: '⛵',
     other: '🚶'
   };
   return iconMap[transport] || '🚶';
@@ -494,7 +497,9 @@ export function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j] as T;
+    shuffled[j] = temp as T;
   }
   return shuffled;
 }
@@ -763,7 +768,7 @@ const getBrowserName = (userAgent: string): string => {
 
 const getBrowserVersion = (userAgent: string): string => {
   const match = userAgent.match(/(Chrome|Firefox|Safari|Edge|Opera)\/([0-9.]+)/);
-  return match ? match[2] : 'Unknown';
+  return match ? (match[2] || 'Unknown') : 'Unknown';
 };
 
 // ============================================================================
