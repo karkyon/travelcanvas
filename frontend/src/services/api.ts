@@ -12,15 +12,11 @@ export interface ApiResponse<T = any> {
   };
 }
 
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  name?: string;
-  avatar_url?: string;
-  created_at: string;
-  updated_at: string;
-}
+// [Gate #20] このファイル独自のUser型定義(name/avatar_url等、実バックエンドの
+// Userモデルに存在しないフィールドを含む古い定義)がtypes/index.tsの正規のUser型と
+// 重複していた。正規の型に統一する。
+import type { User } from '@/types';
+export type { User };
 
 export interface LoginCredentials {
   email: string;
@@ -379,14 +375,17 @@ class CompleteTravelAPI {
     }
   }
 
+  // [Gate #20] 実バックエンド(GET/PUT /auth/me、今回新規実装)は
+  // ApiResponseラッパー無しでユーザーオブジェクトを直接返す(他の多くの
+  // エンドポイントと同じ形状)。この関数側でApiResponse形状に包み直す。
   async getCurrentUser(): Promise<ApiResponse<User>> {
-    const response = await this.client.get<ApiResponse<User>>('/auth/me');
-    return response.data;
+    const response = await this.client.get<User>('/auth/me');
+    return { success: true, data: response.data } as ApiResponse<User>;
   }
 
-  async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
-    const response = await this.client.put<ApiResponse<User>>('/auth/me', data);
-    return response.data;
+  async updateProfile(data: Partial<User> & { preferences?: Record<string, unknown> }): Promise<ApiResponse<User>> {
+    const response = await this.client.put<User>('/auth/me', data);
+    return { success: true, data: response.data } as ApiResponse<User>;
   }
 
   async changePassword(data: { 

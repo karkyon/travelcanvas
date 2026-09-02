@@ -85,6 +85,7 @@ export interface User {
   is_superuser?: boolean;
   role?: string;
   user_type?: string;
+  preferences?: Record<string, unknown>;
   created_at: string;
   updated_at?: string;
 }

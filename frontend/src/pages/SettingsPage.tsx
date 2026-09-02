@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
   CheckCircle, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { api as apiService } from '@/services/api';
 
 interface SettingsTab {
   id: string;
@@ -44,6 +45,36 @@ const SettingsPage: React.FC = () => {
     theme: 'light',
     travel_style: 'balanced'
   });
+
+  // [Gate #20] 以前は保存ボタンがsetTimeoutで成功を偽装するだけで、
+  // 実際にはどこにも保存されず、画面初期値も常に固定のデフォルト値だった。
+  // GET /auth/me(今回新規実装)から実際に保存済みのpreferencesを読み込む。
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await apiService.getCurrentUser();
+        const saved = response.data?.preferences as Record<string, any> | undefined;
+        if (saved) {
+          if (saved.full_name || saved.bio) {
+            setProfileData((prev) => ({
+              ...prev,
+              full_name: saved.full_name ?? prev.full_name,
+              bio: saved.bio ?? prev.bio,
+            }));
+          }
+          if (saved.notification_settings) {
+            setNotificationSettings((prev) => ({ ...prev, ...saved.notification_settings }));
+          }
+          const { full_name, bio, notification_settings, ...rest } = saved;
+          if (Object.keys(rest).length > 0) {
+            setPreferences((prev) => ({ ...prev, ...rest }));
+          }
+        }
+      } catch (error) {
+        console.error('設定読み込みエラー:', error);
+      }
+    })();
+  }, []);
 
   const [passwordData, setPasswordData] = useState({
     current_password: '',
@@ -382,11 +413,23 @@ const SettingsPage: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // TODO: 実際のAPI呼び出し処理
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 模擬的な保存処理
+      await apiService.updateProfile({
+        username: profileData.username || undefined,
+        email: profileData.email || undefined,
+        preferences: {
+          full_name: profileData.full_name,
+          bio: profileData.bio,
+          notification_settings: notificationSettings,
+          ...preferences,
+        },
+      });
       showMessage('設定を保存しました', 'success');
     } catch (error) {
-      showMessage('保存に失敗しました', 'error');
+      console.error('設定保存エラー:', error);
+      showMessage(
+        error instanceof Error ? error.message : '保存に失敗しました',
+        'error'
+      );
     } finally {
       setIsSaving(false);
     }

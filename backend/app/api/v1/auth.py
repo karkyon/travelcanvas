@@ -4,10 +4,11 @@ from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.auth import get_current_active_user
 from app.models.models import User
 
 router = APIRouter()
@@ -39,6 +40,28 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+
+class UserDetailResponse(BaseModel):
+    """[Gate #20] GET/PUT /me用の詳細ユーザー情報。preferences(JSON)を含む。"""
+    id: str
+    username: str
+    email: str
+    user_type: str
+    is_verified: bool
+    is_active: bool
+    preferences: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    """[Gate #20] プロフィール更新スキーマ。渡されたフィールドのみ更新する。"""
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    preferences: Optional[Dict[str, Any]] = None
 
 # ユーティリティ関数
 def hash_password(password: str) -> str:
@@ -179,3 +202,71 @@ async def test_auth():
             "POST /api/v1/auth/login"
         ]
     }
+
+
+# ===== プロフィール関連API =====
+# [Gate #20] SettingsPage.tsx(プロフィール/通知設定/環境設定)の保存処理は
+# 常にsetTimeoutで成功を偽装するだけで、実際にはどこにも保存していなかった。
+# User.preferencesはUUIDベースラインの時点で既にモデル・DBに存在していた
+# (マイグレーション不要)ため、GET/PUT /auth/meを実装してこのJSONカラムに
+# username/email以外の任意設定(通知設定・言語/タイムゾーン等)をまとめて保存する。
+# あわせて、authStore.tsのcheckAuth()が呼んでいた/auth/me(GET)がこれまで
+# 存在しておらず404になる状態だったのも解消する。
+
+@router.get("/me", response_model=UserDetailResponse)
+async def get_me(
+    current_user: User = Depends(get_current_active_user)
+):
+    """現在のユーザー情報を取得(preferencesを含む)"""
+    return current_user
+
+
+@router.put("/me", response_model=UserDetailResponse)
+async def update_me(
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """現在のユーザー情報を更新"""
+    try:
+        if update_data.username is not None and update_data.username != current_user.username:
+            existing = db.query(User).filter(
+                User.username == update_data.username,
+                User.id != current_user.id
+            ).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="このユーザー名は既に使用されています"
+                )
+            current_user.username = update_data.username
+
+        if update_data.email is not None and update_data.email != current_user.email:
+            existing = db.query(User).filter(
+                User.email == update_data.email,
+                User.id != current_user.id
+            ).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="このメールアドレスは既に使用されています"
+                )
+            current_user.email = update_data.email
+
+        if update_data.preferences is not None:
+            # 既存のpreferencesとマージ(通知設定だけ更新、等の部分更新に対応)
+            merged = dict(current_user.preferences or {})
+            merged.update(update_data.preferences)
+            current_user.preferences = merged
+
+        db.commit()
+        db.refresh(current_user)
+        return current_user
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"プロフィール更新エラー: {str(e)}"
+        )
