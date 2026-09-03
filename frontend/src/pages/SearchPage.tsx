@@ -38,9 +38,24 @@ const SearchPage: React.FC = () => {
   const [searchMetadata, setSearchMetadata] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
+  // [Gate #22] SearchSettingsPage.tsx(/search/settings)で保存した検索設定
+  // (優先エリア・候補数)は localStorage には保存されていたが、SearchPage.tsx側は
+  // 一切読み込んでおらず、常にmax_results:5・東京固定のデフォルト位置決め打ちで
+  // 検索していた実害バグ。設定を読み込んで実際の検索条件に反映する。
+  const loadSearchPreferences = () => {
+    try {
+      const saved = localStorage.getItem('search_preferences');
+      if (saved) return JSON.parse(saved);
+    } catch (error) {
+      console.error('検索設定読み込みエラー:', error);
+    }
+    return null;
+  };
+  const searchPreferences = loadSearchPreferences();
+  const maxResults: number = searchPreferences?.searchSettings?.maxResults ?? 5;
   const [userLocation, setUserLocation] = useState({
-    latitude: 35.6762,
-    longitude: 139.6503
+    latitude: searchPreferences?.preferredArea?.latitude ?? 35.6762,
+    longitude: searchPreferences?.preferredArea?.longitude ?? 139.6503
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +95,7 @@ const SearchPage: React.FC = () => {
       const response = await searchSpots({
         query: searchQuery,
         location: userLocation,
-        max_results: 5
+        max_results: maxResults
       });
       
       console.log('✅ AI検索レスポンス:', response);
@@ -257,7 +272,7 @@ const SearchPage: React.FC = () => {
       const response = await searchByVoice(audioBlob, {
         location: userLocation,
         language: 'ja',
-        max_results: 5
+        max_results: maxResults
       });
       
       console.log('✅ AI音声解析レスポンス:', response);
