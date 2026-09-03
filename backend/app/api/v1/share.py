@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models.models import PlanCollaborator, PlanShareLink, TravelPlan, User
+from app.models.models import Notification, PlanCollaborator, PlanShareLink, TravelPlan, User
 
 router = APIRouter(prefix="/travel-plans", tags=["share"])
 
@@ -196,6 +196,21 @@ async def invite_collaborator(
         invite_message=payload.get("message"),
     )
     db.add(collab)
+
+    # [Gate #26] 招待先が既存ユーザーであれば通知を作成する。
+    # メール送信は実装していないため、招待先が未登録メールアドレスの場合は
+    # 通知もメールもどちらも届かない(相手にリンクを直接共有する必要がある)。
+    if invited_user:
+        notification = Notification(
+            id=uuid.uuid4(),
+            user_id=invited_user.id,
+            type="collaborator_invite",
+            title=f"「{plan.title}」に招待されました",
+            message=(payload.get("message") or f"{current_user.username}さんから旅行プランへの招待が届いています。").strip(),
+            related_plan_id=plan.id,
+        )
+        db.add(notification)
+
     db.commit()
     db.refresh(collab)
 

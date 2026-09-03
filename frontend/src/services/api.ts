@@ -131,8 +131,9 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'error' | 'success';
-  read: boolean;
+  type: string;
+  is_read: boolean;
+  related_plan_id?: string | null;
   created_at: string;
 }
 
@@ -1158,19 +1159,29 @@ class CompleteTravelAPI {
   }
 
   // ===== 通知関連API =====
-  async getNotifications(): Promise<ApiResponse<Notification[]>> {
-    const response = await this.client.get<ApiResponse<Notification[]>>('/notifications');
-    return response.data;
+  // [Gate #26] URLは実装済みだったが、バックエンド(/notifications)自体が
+  // 一切存在しなかった(本Gateでnotifications.pyを新規実装)。他のAPIと同様、
+  // 生JSONを返すためクライアント側でApiResponse形状へ手動で包む。
+  async getNotifications(unreadOnly = false): Promise<ApiResponse<Notification[]>> {
+    const response = await this.client.get<Notification[]>('/notifications/', {
+      params: unreadOnly ? { unread_only: true } : undefined,
+    });
+    return { success: true, data: response.data } as ApiResponse<Notification[]>;
+  }
+
+  async getUnreadNotificationCount(): Promise<ApiResponse<{ unread_count: number }>> {
+    const response = await this.client.get<{ unread_count: number }>('/notifications/unread-count');
+    return { success: true, data: response.data } as ApiResponse<{ unread_count: number }>;
   }
 
   async markNotificationAsRead(notificationId: string): Promise<ApiResponse<void>> {
-    const response = await this.client.post<ApiResponse<void>>(`/notifications/${notificationId}/read`);
-    return response.data;
+    await this.client.post<any>(`/notifications/${notificationId}/read`);
+    return { success: true } as ApiResponse<void>;
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
-    const response = await this.client.post<ApiResponse<void>>('/notifications/mark-all-read');
-    return response.data;
+    await this.client.post<any>('/notifications/read-all');
+    return { success: true } as ApiResponse<void>;
   }
 
   async getNotificationSettings(): Promise<ApiResponse<NotificationSettings>> {
@@ -1327,7 +1338,8 @@ export const aiAPI = {
 };
 
 export const notificationsAPI = {
-  getNotifications: () => api.getNotifications(),
+  getNotifications: (unreadOnly?: boolean) => api.getNotifications(unreadOnly),
+  getUnreadCount: () => api.getUnreadNotificationCount(),
   markAsRead: (id: string) => api.markNotificationAsRead(id),
   markAllAsRead: () => api.markAllNotificationsAsRead(),
   getSettings: () => api.getNotificationSettings(),

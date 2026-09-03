@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots, travel, ai, admin, share
+from app.api.v1 import spots, travel, ai, admin, share, notifications
 
 # アプリケーション作成
 app = FastAPI(
@@ -87,3 +87,5 @@ app.include_router(ai.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 # [Gate #25] share.pyも新規実装。プラン共有・コラボレーター機能のエンドポイント。
 app.include_router(share.router, prefix="/api/v1")
+# [Gate #26] notifications.pyも新規実装。通知一覧・既読管理のエンドポイント。
+app.include_router(notifications.router, prefix="/api/v1")

@@ -185,6 +185,23 @@ class PlanCollaborator(Base):
     plan = relationship("TravelPlan", back_populates="collaborators")
     user = relationship("User")
 
+class Notification(Base):
+    """通知モデル"""
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    type = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=True)
+    related_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # リレーションシップ
+    user = relationship("User")
+    related_plan = relationship("TravelPlan")
+
 class OptimizationResult(Base):
     """最適化結果モデル"""
     __tablename__ = "optimization_results"

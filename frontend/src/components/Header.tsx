@@ -14,6 +14,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 
 const Header: React.FC = () => {
@@ -22,6 +23,28 @@ const Header: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  // [Gate #26] 以前は実データと無関係な固定の未読バッジ(常時点滅)だった。
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await notificationsAPI.getUnreadCount();
+        setUnreadCount(response.data?.unread_count ?? 0);
+      } catch (error) {
+        // 通知バッジの取得失敗はユーザー体験上致命的ではないため、
+        // トースト等では通知せずログのみに留める。
+        console.error('Failed to fetch unread notification count:', error);
+      }
+    };
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const handleLogout = async () => {
     try {
@@ -246,8 +269,11 @@ const Header: React.FC = () => {
               title="通知"
             >
               <Bell size={18} />
-              {/* 通知バッジ（仮） */}
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-red-500 text-white rounded-full">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </Link>
 
             {/* ユーザーメニュー */}
