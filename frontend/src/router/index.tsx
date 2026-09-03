@@ -20,6 +20,11 @@ import SpotRegisterPage from '@/pages/SpotRegisterPage';
 import SpotListPage from '@/pages/SpotListPage';
 import ProfilePage from '@/pages/ProfilePage';
 
+// [Gate #24] 管理者ページのインポート。以前はどちらもファイルは存在するが
+// ここでインポート・ルート登録されておらず、画面として一度も到達できなかった。
+import AdminDashboard from '@/pages/Admin/AdminDashboard';
+import AdminUsers from '@/pages/Admin/AdminUsers';
+
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
@@ -28,6 +33,22 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
   
+  return <>{children}</>;
+};
+
+// [Gate #24] 管理者権限が必要なルートを保護するコンポーネント。
+// 未ログインまたは管理者以外は/へリダイレクトする(各ページ内のuseEffectでも
+// 二重にチェックしているが、ルート単位でも早期にガードする)。
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user?.user_type !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -180,6 +201,29 @@ export const router = createBrowserRouter([
             <ProfilePage />
           </ProtectedRoute>
         ),
+      },
+
+      // 🛡️ 管理者ページ [Gate #24]
+      {
+        path: 'admin',
+        children: [
+          {
+            index: true,
+            element: (
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: 'users',
+            element: (
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
+            ),
+          },
+        ],
       },
       
       // 📲 通知関連

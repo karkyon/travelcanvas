@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots, travel, ai
+from app.api.v1 import spots, travel, ai, admin
 
 # アプリケーション作成
 app = FastAPI(
@@ -83,3 +83,5 @@ app.include_router(travel.router, prefix="/api/v1")
 # [Gate #23] ai.pyはこれまでファイルは存在するがinclude_routerされておらず、
 # /optimize-route・/optimization/*系エンドポイントが実際には一切到達不能だった。
 app.include_router(ai.router, prefix="/api/v1")
+# [Gate #24] admin.pyも同様にinclude_routerされておらず、/admin/*は一切到達不能だった。
+app.include_router(admin.router, prefix="/api/v1")
