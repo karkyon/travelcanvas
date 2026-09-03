@@ -182,3 +182,8 @@ travelcanvas_fix_requirements.py
 *.before_uuid_migration
 travelcanvas_migrate_uuid_*.py
 apply_gate_*.py
+apply_gate[0-9]*.py
+
+# Vitest/Playwright report output (regenerated on every test run)
+frontend/test-results/
+test-results/

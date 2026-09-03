@@ -11,7 +11,7 @@ TravelCanvas Backend - 統一認証システム
 """
 
 from typing import List, Optional, Union, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import time
 import json
@@ -418,123 +418,62 @@ class AuthManager:
     def create_session(
         self,
         user_id: str,
-        client_ip: str,
-        user_agent: str,
+        refresh_token_hash: str,
+        ip_address: Optional[str],
+        device_info: Optional[dict],
         db: Session
-    ) -> str:
-        """セッション作成"""
-        
-        session_id = str(uuid4())
-        expires_at = datetime.utcnow() + timedelta(minutes=settings.SESSION_EXPIRE_MINUTES)
-        
-        # データベースセッション記録
+    ) -> "UserSession":
+        """セッション作成。refresh tokenの秘密部分はDBへ平文保存せず、
+        呼び出し側でハッシュ化した値(refresh_token_hash)のみをsession_tokenへ
+        保存する(セッション検証・ローテーション・再利用検知はこのハッシュの
+        一致で行う)。"""
+
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
         db_session = UserSession(
-            id=session_id,
+            id=uuid4(),
             user_id=user_id,
-            client_ip=client_ip,
-            user_agent=user_agent,
+            session_token=refresh_token_hash,
+            ip_address=ip_address,
+            device_info=device_info,
             expires_at=expires_at,
-            is_active=True
+            is_active=True,
         )
-        
+
         db.add(db_session)
-        
-        # Redisキャッシュ
-        if self.redis_client:
-            try:
-                session_data = {
-                    "user_id": user_id,
-                    "client_ip": client_ip,
-                    "user_agent": user_agent,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "expires_at": expires_at.isoformat(),
-                    "is_active": True
-                }
-                
-                self.redis_client.setex(
-                    f"session:{session_id}",
-                    settings.SESSION_EXPIRE_MINUTES * 60,
-                    json.dumps(session_data)
-                )
-                
-            except Exception as e:
-                self.logger.warning(f"Failed to cache session: {str(e)}")
-        
         db.commit()
-        
-        self.logger.info(f"Session created: {session_id} for user: {user_id}")
-        return session_id
-    
+        db.refresh(db_session)
+
+        self.logger.info(f"Session created: {db_session.id} for user: {user_id}")
+        return db_session
+
     def verify_session(self, session_id: str, db: Session) -> Optional[UserSession]:
-        """セッション検証"""
-        
-        # Redisから取得試行
-        if self.redis_client:
-            try:
-                session_data = self.redis_client.get(f"session:{session_id}")
-                if session_data:
-                    data = json.loads(session_data)
-                    expires_at = datetime.fromisoformat(data["expires_at"])
-                    
-                    if datetime.utcnow() < expires_at and data.get("is_active"):
-                        # セッション有効期限延長
-                        self.extend_session(session_id, db)
-                        
-                        # 仮のUserSessionオブジェクト作成
-                        session = UserSession()
-                        session.id = session_id
-                        session.user_id = data["user_id"]
-                        session.client_ip = data["client_ip"]
-                        session.user_agent = data["user_agent"]
-                        session.expires_at = expires_at
-                        session.is_active = data["is_active"]
-                        
-                        return session
-                        
-            except Exception as e:
-                self.logger.warning(f"Failed to get session from cache: {str(e)}")
-        
-        # データベースから取得
-        session = db.query(UserSession).filter(
+        """セッション検証(DBのみ。Redisキャッシュは使用しない)。"""
+        return db.query(UserSession).filter(
             UserSession.id == session_id,
             UserSession.is_active == True,
-            UserSession.expires_at > datetime.utcnow()
+            UserSession.expires_at > datetime.now(timezone.utc)
         ).first()
-        
-        if session:
-            # セッション有効期限延長
-            self.extend_session(session_id, db)
-        
-        return session
     
     def extend_session(self, session_id: str, db: Session):
-        """セッション有効期限延長"""
-        
-        new_expires_at = datetime.utcnow() + timedelta(minutes=settings.SESSION_EXPIRE_MINUTES)
-        
-        # データベース更新
+        """セッション有効期限延長(DBのみ)。"""
+        new_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         db.query(UserSession).filter(UserSession.id == session_id).update({
             "expires_at": new_expires_at,
-            "updated_at": datetime.utcnow()
+            "updated_at": datetime.now(timezone.utc)
         })
-        
-        # Redisキャッシュ更新
-        if self.redis_client:
-            try:
-                session_data = self.redis_client.get(f"session:{session_id}")
-                if session_data:
-                    data = json.loads(session_data)
-                    data["expires_at"] = new_expires_at.isoformat()
-                    
-                    self.redis_client.setex(
-                        f"session:{session_id}",
-                        settings.SESSION_EXPIRE_MINUTES * 60,
-                        json.dumps(data)
-                    )
-                    
-            except Exception as e:
-                self.logger.warning(f"Failed to extend session cache: {str(e)}")
-        
+        db.commit()
+
+    def rotate_session_token(self, session_id: str, new_token_hash: str, db: Session) -> None:
+        """[Gate #28] refresh token使用時のローテーション。session_tokenを
+        新しいハッシュへ差し替え、有効期限も延長する。1つのrefresh tokenは
+        1回しか使えず、使用の度に新しいtokenへ入れ替わる。"""
+        new_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        db.query(UserSession).filter(UserSession.id == session_id).update({
+            "session_token": new_token_hash,
+            "expires_at": new_expires_at,
+            "updated_at": datetime.now(timezone.utc),
+        })
         db.commit()
     
     def revoke_session(self, session_id: str, db: Session):
@@ -543,7 +482,7 @@ class AuthManager:
         # データベース更新
         db.query(UserSession).filter(UserSession.id == session_id).update({
             "is_active": False,
-            "updated_at": datetime.utcnow()
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Redisキャッシュ削除
@@ -557,18 +496,23 @@ class AuthManager:
         
         self.logger.info(f"Session revoked: {session_id}")
     
-    def revoke_all_user_sessions(self, user_id: str, db: Session):
-        """ユーザーの全セッション無効化"""
+    def revoke_all_user_sessions(self, user_id: str, db: Session, except_session_id: Optional[str] = None):
+        """ユーザーの全セッション無効化。except_session_idを指定すると、
+        そのセッションだけは有効なまま残す(例: パスワード変更後に
+        他デバイスだけログアウトさせ、今操作している端末は維持する)。"""
         
         # データベース更新
-        sessions = db.query(UserSession).filter(
+        query = db.query(UserSession).filter(
             UserSession.user_id == user_id,
             UserSession.is_active == True
-        ).all()
+        )
+        if except_session_id:
+            query = query.filter(UserSession.id != except_session_id)
+        sessions = query.all()
         
         for session in sessions:
             session.is_active = False
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
             
             # Redisキャッシュ削除
             if self.redis_client:
@@ -579,7 +523,7 @@ class AuthManager:
         
         db.commit()
         
-        self.logger.info(f"All sessions revoked for user: {user_id}")
+        self.logger.info(f"All sessions revoked for user: {user_id} (except: {except_session_id})")
     
     # ==========================================
     # ユーザー認証（統一版）
@@ -908,6 +852,16 @@ def get_current_active_user(
         return auth_result.user
     
     return auth_result
+
+
+def get_current_session_id(
+    auth_result: Union[User, AuthResult] = Depends(get_current_user)
+) -> Optional[str]:
+    """[Gate #28] 現在のアクセストークンに紐づくsession_idを取得する
+    (logout/logout-all/パスワード変更後の他session失効で使用)。"""
+    if isinstance(auth_result, AuthResult) and auth_result.token_data:
+        return auth_result.token_data.session_id
+    return None
 
 
 def get_current_user_optional(

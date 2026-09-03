@@ -203,6 +203,10 @@ class CompleteTravelAPI {
       headers: {
         'Content-Type': 'application/json',
       },
+      // [Gate #28] refresh tokenをhttpOnly cookieで発行するようにしたため、
+      // /auth/refresh 等へcookieを送るにはwithCredentialsが必須
+      // (これが無いとブラウザはcross-originリクエストにcookieを付与しない)。
+      withCredentials: true,
     });
 
     this.setupInterceptors();
@@ -247,9 +251,41 @@ class CompleteTravelAPI {
     );
 
     // レスポンスインターセプター
+    // [Gate #28] access tokenの有効期限切れ(401)を検知したら、httpOnly
+    // cookieのrefresh tokenで裏側から新しいaccess tokenを取得し、元の
+    // リクエストを1回だけ自動リトライする。/auth/login, /auth/register,
+    // /auth/refresh 自体の401(=資格情報が実際に無効)はリトライ対象外とし、
+    // 無限ループを防ぐため1リクエストにつき1回のみ再試行する。
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
-      (error: AxiosError) => {
+      async (error: AxiosError) => {
+        const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
+        const url = originalRequest?.url || '';
+        const isAuthEndpoint =
+          url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh');
+
+        if (
+          error.response?.status === 401 &&
+          originalRequest &&
+          !originalRequest._retry &&
+          !isAuthEndpoint &&
+          this.accessToken // トークンを一度も持ったことが無ければログイン画面へ委ねる
+        ) {
+          originalRequest._retry = true;
+          try {
+            const refreshResponse = await this.client.post('/auth/refresh');
+            const newAccessToken = (refreshResponse.data as { access_token?: string })?.access_token;
+            if (newAccessToken) {
+              this.setAccessToken(newAccessToken);
+              originalRequest.headers = originalRequest.headers || {};
+              (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${newAccessToken}`;
+              return this.client.request(originalRequest);
+            }
+          } catch {
+            this.clearAccessToken();
+          }
+        }
+
         this.handleApiError(error);
         return Promise.reject(error);
       }

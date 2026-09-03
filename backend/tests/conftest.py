@@ -35,6 +35,19 @@ from app.main import app  # noqa: E402
 from app.core.auth import get_current_user, AuthResult  # noqa: E402
 from app.models.models import User, UserType  # noqa: E402
 from app.api.v1.auth import hash_password  # noqa: E402
+from app.utils.rate_limiter import _rate_limit_storage  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """[Gate #28] レート制限はプロセス内メモリ(モジュールグローバル辞書)で
+    管理されており、DBトランザクションのロールバックでは戻らない。
+    TestClientは常に同一の疑似IP('testclient')を使うため、これをテスト毎に
+    クリアしないと、あるテストでの試行回数が別テストのレート制限判定に
+    漏れ出し、テスト同士が意図せず干渉してしまう。"""
+    _rate_limit_storage.clear()
+    yield
+    _rate_limit_storage.clear()
 
 
 @pytest.fixture()

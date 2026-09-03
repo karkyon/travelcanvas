@@ -95,6 +95,7 @@ export const useAuthStore = create<AuthState>()(
           console.log('🔍 認証状態確認中...');
 
           const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            credentials: 'include',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -147,6 +148,7 @@ export const useAuthStore = create<AuthState>()(
           
           const response = await fetch(apiUrl, {
             method: 'POST',
+            credentials: 'include',
             headers: {
               'Content-Type': 'application/json',
             },
@@ -196,6 +198,7 @@ export const useAuthStore = create<AuthState>()(
           
           const response = await fetch(apiUrl, {
             method: 'POST',
+            credentials: 'include',
             headers: {
               'Content-Type': 'application/json',
             },
@@ -236,6 +239,11 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         console.log('🚪 ログアウト');
+        // [Gate #28] サーバー側のセッション(refresh token)も失効させる。
+        // 失敗しても(ネットワーク断など)クライアント側の状態は必ずクリアする。
+        apiService.post('/auth/logout').catch(() => {
+          console.warn('⚠️ サーバー側セッションの失効に失敗しましたが、ローカルの認証状態はクリアします');
+        });
         apiService.clearAccessToken();
         set({
           user: null,

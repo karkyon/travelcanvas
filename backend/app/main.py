@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.v1 import spots, travel, ai, admin, share, notifications
 from app.core.exceptions import TravelCanvasException, ErrorCategory
+from app.core.config import settings
+import logging
+import uuid
+
+logger = logging.getLogger("travelcanvas")
 
 # アプリケーション作成
 app = FastAPI(
@@ -13,10 +18,47 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+
+# [Gate #28] request_idをリクエストごとに発行し、レスポンスヘッダーと
+# エラーレスポンス両方に載せる。内部例外の文字列自体はクライアントへ
+# 返さず(下のグローバルハンドラ参照)、サーバー側ログとrequest_idで
+# 追跡できるようにする。
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """[Gate #28] 個別routeのexcept Exception as e節が str(e) をそのまま
+    detailへ返し、内部の例外メッセージ(SQLエラー文等)をクライアントへ
+    露出させていた(auth.pyのregister/login/change_password等)。
+    この後の修正でそれらは汎用メッセージ+request_idを返すよう変更したが、
+    想定外の未捕捉例外についても、ここで最終防波堤として同様に扱う。"""
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.exception(f"[{request_id}] Unhandled exception on {request.method} {request.url.path}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "サーバー内部でエラーが発生しました。しばらくしてから再試行してください。",
+            "request_id": request_id,
+        },
+    )
+
+
 # CORS設定
+# [Gate #28] allow_origins=["*"] と allow_credentials=True の組み合わせは
+# 仕様上無効(ブラウザはワイルドカードOriginへのcredentials付きレスポンスを
+# 拒否する)。refresh tokenをhttpOnly cookieで発行する都合上、Cookie送信には
+# credentials付きリクエストが必須のため、実際に許可するオリジンを明示する
+# settings.CORS_ORIGINSへ切り替える。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 開発環境：すべてのオリジンを許可
+    allow_origins=settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

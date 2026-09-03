@@ -1,17 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Any, List
+import hashlib
+import secrets
+import logging
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.auth import get_current_active_user
-from app.models.models import User
+from app.core.auth import get_current_active_user, get_current_session_id, auth_manager
+from app.models.models import User, UserSession
+from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter()
+
+logger = logging.getLogger("travelcanvas.auth")
+
+REFRESH_COOKIE_NAME = "refresh_token"
+REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 # パスワードハッシュ化
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -83,6 +92,19 @@ class PasswordChange(BaseModel):
             raise ValueError('新しいパスワードは8文字以上にしてください')
         return v
 
+
+class SessionInfo(BaseModel):
+    """[Gate #28] セッション(device/session)一覧表示用"""
+    id: str
+    ip_address: Optional[str] = None
+    device_info: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    expires_at: datetime
+    is_current: bool
+
+    class Config:
+        from_attributes = True
+
 # ユーティリティ関数
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -101,14 +123,52 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
+
+# ===== [Gate #28] refresh token ユーティリティ =====
+# refresh tokenは "{session_id}.{secret}" という不透明な文字列としてhttpOnly
+# cookieでのみ発行する(レスポンスJSONには含めない/localStorageにも置かない)。
+# DBにはsecretの平文ではなくSHA-256ハッシュ(session_token列)のみを保存し、
+# 使用の度に新しいsecretへローテーションする。ハッシュが一致しない
+# (=既にローテーション済みの古いtokenが再送されてきた)場合は盗用の兆候と
+# みなし、そのセッションを即座に失効させる。
+
+def _hash_refresh_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def _generate_refresh_secret() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _parse_refresh_cookie(raw: str):
+    if not raw or "." not in raw:
+        return None, None
+    session_id, _, secret = raw.partition(".")
+    return session_id, secret
+
+
+def _access_token_for(user: User, session_id: str) -> str:
+    return create_access_token(
+        data={"sub": str(user.id), "username": user.username, "session_id": str(session_id)}
+    )
+
 @router.post("/register", response_model=TokenResponse)
 async def register(
     user_data: UserRegister,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """新規ユーザー登録"""
-    
+
+    # [Gate #28] IPベースのレート制限。ログインと同じ閾値を流用する。
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"register:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登録試行回数が上限に達しました。しばらく待ってから再試行してください。"
+        )
+
     try:
         # ユーザー重複チェック
         existing_user = db.query(User).filter(
@@ -138,11 +198,26 @@ async def register(
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        
-        # アクセストークン作成
-        access_token = create_access_token(
-            data={"sub": str(new_user.id), "username": new_user.username}
+
+        # [Gate #28] セッションを作成し、refresh tokenをhttpOnly cookieで発行する。
+        secret = _generate_refresh_secret()
+        session = auth_manager.create_session(
+            user_id=new_user.id,
+            refresh_token_hash=_hash_refresh_secret(secret),
+            ip_address=client_ip,
+            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            db=db,
         )
+        response.set_cookie(
+            key=REFRESH_COOKIE_NAME,
+            value=f"{session.id}.{secret}",
+            httponly=True,
+            secure=settings.APP_ENV == "production",
+            samesite="lax",
+            path=REFRESH_COOKIE_PATH,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        )
+        access_token = _access_token_for(new_user, session.id)
         
         return TokenResponse(
             access_token=access_token,
@@ -158,19 +233,41 @@ async def register(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        # [Gate #28] 内部例外の文字列(SQL文言等)をそのままクライアントへ返す
+        # と情報漏洩になるため、汎用メッセージのみを返し、詳細はサーバー
+        # ログ(request_id付き)にのみ記録する。
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.exception(f"[{request_id}] registration failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"登録に失敗しました: {str(e)}"
+            detail="登録に失敗しました。しばらくしてから再試行してください。"
         )
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
     login_data: UserLogin,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """ユーザーログイン"""
-    
+
+    # [Gate #28] IPベース・メールアドレスベース両方でレート制限する
+    # (単一IPからの複数アカウント総当り、単一アカウントへの分散総当り
+    # の双方をある程度緩和する)。
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"login_ip:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="ログイン試行回数が上限に達しました。しばらく待ってから再試行してください。"
+        )
+    if not check_rate_limit(f"login_email:{login_data.email}", settings.RATE_LIMIT_AUTH, 60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="ログイン試行回数が上限に達しました。しばらく待ってから再試行してください。"
+        )
+
     try:
         # ユーザー取得
         user = db.query(User).filter(User.email == login_data.email).first()
@@ -186,11 +283,26 @@ async def login(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="アカウントが無効です"
             )
-        
-        # アクセストークン作成
-        access_token = create_access_token(
-            data={"sub": str(user.id), "username": user.username}
+
+        # [Gate #28] セッションを作成し、refresh tokenをhttpOnly cookieで発行する。
+        secret = _generate_refresh_secret()
+        session = auth_manager.create_session(
+            user_id=user.id,
+            refresh_token_hash=_hash_refresh_secret(secret),
+            ip_address=client_ip,
+            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            db=db,
         )
+        response.set_cookie(
+            key=REFRESH_COOKIE_NAME,
+            value=f"{session.id}.{secret}",
+            httponly=True,
+            secure=settings.APP_ENV == "production",
+            samesite="lax",
+            path=REFRESH_COOKIE_PATH,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        )
+        access_token = _access_token_for(user, session.id)
         
         return TokenResponse(
             access_token=access_token,
@@ -206,11 +318,158 @@ async def login(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.exception(f"[{request_id}] login failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"ログインに失敗しました: {str(e)}"
+            detail="ログインに失敗しました。しばらくしてから再試行してください。"
         )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token_endpoint(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """[Gate #28] refresh tokenをhttpOnly cookieから読み取り、ローテーション
+    したうえで新しいaccess token/refresh tokenを発行する。1つのrefresh
+    tokenは1回しか使えない(使うたびに新しいものへ入れ替わる)。既に
+    ローテーション済みの(=一度使われた)tokenが再送された場合は盗用の
+    兆候とみなし、そのセッションを即座に失効させて401を返す。"""
+    raw_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
+    session_id, secret = _parse_refresh_cookie(raw_cookie) if raw_cookie else (None, None)
+
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="セッションが無効です。再度ログインしてください。"
+    )
+    if not session_id or not secret:
+        raise invalid
+
+    session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    if not session:
+        raise invalid
+
+    presented_hash = _hash_refresh_secret(secret)
+
+    if not session.is_active or (session.expires_at and session.expires_at <= datetime.now(timezone.utc)):
+        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+        raise invalid
+
+    if session.session_token != presented_hash:
+        # [Gate #28] 再利用検知: 既にローテーション済みのtokenが送られてきた。
+        # 盗用されたrefresh tokenが使われた可能性があるため、このセッション
+        # を即座に失効させる。
+        auth_manager.revoke_session(str(session.id), db)
+        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+        logger.warning(f"refresh token reuse detected, session revoked: {session.id}")
+        raise invalid
+
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user or not user.is_active:
+        auth_manager.revoke_session(str(session.id), db)
+        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+        raise invalid
+
+    new_secret = _generate_refresh_secret()
+    auth_manager.rotate_session_token(str(session.id), _hash_refresh_secret(new_secret), db)
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=f"{session.id}.{new_secret}",
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        path=REFRESH_COOKIE_PATH,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+    )
+    access_token = _access_token_for(user, session.id)
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            username=user.username,
+            email=user.email,
+            user_type=user.user_type,
+            is_verified=user.is_verified,
+        ),
+    )
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    response: Response,
+    session_id: Optional[str] = Depends(get_current_session_id),
+    db: Session = Depends(get_db),
+):
+    """[Gate #28] 現在のセッションのみ失効させる。"""
+    if session_id:
+        auth_manager.revoke_session(session_id, db)
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+    return {"message": "ログアウトしました"}
+
+
+@router.post("/logout-all")
+async def logout_all(
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """[Gate #28] 現在のユーザーの全セッションを失効させる(全デバイスでログアウト)。"""
+    auth_manager.revoke_all_user_sessions(str(current_user.id), db)
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+    return {"message": "すべてのデバイスからログアウトしました"}
+
+
+@router.get("/sessions", response_model=List[SessionInfo])
+async def list_sessions(
+    current_user: User = Depends(get_current_active_user),
+    current_session_id: Optional[str] = Depends(get_current_session_id),
+    db: Session = Depends(get_db),
+):
+    """[Gate #28] 現在有効なセッション(ログイン中デバイス)の一覧。"""
+    sessions = (
+        db.query(UserSession)
+        .filter(
+            UserSession.user_id == current_user.id,
+            UserSession.is_active == True,
+            UserSession.expires_at > datetime.now(timezone.utc),
+        )
+        .order_by(UserSession.created_at.desc())
+        .all()
+    )
+    return [
+        SessionInfo(
+            id=str(s.id),
+            ip_address=s.ip_address,
+            device_info=s.device_info,
+            created_at=s.created_at,
+            expires_at=s.expires_at,
+            is_current=(str(s.id) == str(current_session_id)),
+        )
+        for s in sessions
+    ]
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session_endpoint(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """[Gate #28] 指定したセッションを失効させる(他デバイスの個別ログアウト)。
+    自分以外のユーザーのセッションは失効できない(403)。"""
+    session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="セッションが見つかりません")
+    if str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="このセッションを操作する権限がありません")
+    auth_manager.revoke_session(session_id, db)
+    return {"message": "セッションを失効させました"}
 
 @router.get("/test")
 async def test_auth():
@@ -284,11 +543,12 @@ async def update_me(
         return current_user
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("profile update failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"プロフィール更新エラー: {str(e)}"
+            detail="プロフィールの更新に失敗しました。しばらくしてから再試行してください。"
         )
 
 
@@ -296,11 +556,15 @@ async def update_me(
 async def change_password(
     password_data: PasswordChange,
     current_user: User = Depends(get_current_active_user),
+    current_session_id: Optional[str] = Depends(get_current_session_id),
     db: Session = Depends(get_db)
 ):
     """[Gate #21] パスワード変更。SettingsPage.tsxで「開発中」として無効化
     されていた機能を実装する。frontend/src/services/api.tsのchangePasswordが
-    既に呼んでいた /auth/change-password をここで実装する。"""
+    既に呼んでいた /auth/change-password をここで実装する。
+    [Gate #28] パスワード変更後は今使っているセッション以外の全セッション
+    (=他デバイスのログイン状態)を失効させる。パスワードが漏洩して変更した
+    ケースを想定した既定挙動。"""
     if not verify_password(password_data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -310,10 +574,14 @@ async def change_password(
     try:
         current_user.hashed_password = hash_password(password_data.new_password)
         db.commit()
-        return {"message": "パスワードを変更しました"}
-    except Exception as e:
+        auth_manager.revoke_all_user_sessions(
+            str(current_user.id), db, except_session_id=current_session_id
+        )
+        return {"message": "パスワードを変更しました。他のデバイスからはログアウトされます。"}
+    except Exception:
         db.rollback()
+        logger.exception("password change failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"パスワード変更エラー: {str(e)}"
+            detail="パスワードの変更に失敗しました。しばらくしてから再試行してください。"
         )
