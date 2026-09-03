@@ -15,6 +15,7 @@ import { usePlanStore } from '@/store/planStore';
 import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
 import DateNavigation from '@/components/planner/DateNavigation';
+import OptimizationPanel from '@/components/planner/OptimizationPanel';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -287,7 +288,21 @@ const PlannerPage: React.FC = () => {
             ← プラン一覧へ戻る
           </Button>
 
+          {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
+              どこからもリンクされておらずUIから一度も到達できなかった。 */}
+          <div className="flex items-center justify-end mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/share/${currentPlan.id}`)}
+            >
+              🤝 共有
+            </Button>
+          </div>
+
           <PlanHeader plan={currentPlan} className="mb-6" />
+
+          <OptimizationPanel plan={currentPlan} className="mb-6" />
 
           {/* 日タブナビゲーション + 日ごとの概要(スポット数・所要時間・予算) */}
           {currentPlan.days.length > 0 && (

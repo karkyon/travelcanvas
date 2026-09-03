@@ -125,14 +125,14 @@ const SharePage: React.FC = () => {
     try {
       await inviteCollaborator(planId!, {
         email: inviteEmail,
-        role: 'editor'
+        role: 'editor',
+        message: inviteMessage || undefined,
       });
-      void inviteMessage; // TODO: バックエンドがinvite本文をサポートしたら送信する
       
       setInviteEmail('');
       setInviteMessage('');
       await loadCollaborators();
-      setMessage({ text: 'コラボレーターを招待しました', type: 'success' });
+      setMessage({ text: 'コラボレーターを招待しました(招待中ステータスで一覧に追加されます。メール通知は現時点では送信されません。相手にはリンクを直接共有してください)', type: 'success' });
     } catch (error) {
       setMessage({ text: 'コラボレーターの招待に失敗しました', type: 'error' });
     } finally {

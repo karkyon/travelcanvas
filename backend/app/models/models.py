@@ -151,6 +151,39 @@ class TravelPlan(Base):
     
     # リレーションシップ
     user = relationship("User", back_populates="travel_plans")
+    share_links = relationship("PlanShareLink", back_populates="plan", cascade="all, delete-orphan")
+    collaborators = relationship("PlanCollaborator", back_populates="plan", cascade="all, delete-orphan")
+
+class PlanShareLink(Base):
+    """旅行プラン共有リンクモデル"""
+    __tablename__ = "plan_share_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    token = Column(String, unique=True, index=True, nullable=False)
+    permission = Column(String, default="view")  # view | edit
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # リレーションシップ
+    plan = relationship("TravelPlan", back_populates="share_links")
+
+class PlanCollaborator(Base):
+    """旅行プランコラボレーターモデル"""
+    __tablename__ = "plan_collaborators"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    email = Column(String, nullable=False)
+    role = Column(String, default="viewer")  # viewer | editor | owner
+    status = Column(String, default="pending")  # pending | accepted | declined
+    invite_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # リレーションシップ
+    plan = relationship("TravelPlan", back_populates="collaborators")
+    user = relationship("User")
 
 class OptimizationResult(Base):
     """最適化結果モデル"""

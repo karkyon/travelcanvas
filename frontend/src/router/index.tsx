@@ -242,8 +242,13 @@ export const router = createBrowserRouter([
       },
       
       // 🤝 共有・コラボレーション
+      // [Gate #25] このルートはプラン所有者が共有リンク/コラボレーターを
+      // 管理する画面(SharePage.tsx)であり、公開の共有トークン閲覧画面では
+      // ない。以前はパラメータ名がshareTokenになっていたが、SharePage.tsx
+      // 側は一貫してplanIdを読んでおり、常にundefinedになっていた(この
+      // ルート自体もどこからもリンクされておらず、一度も到達できていなかった)。
       {
-        path: 'share/:shareToken',
+        path: 'share/:planId',
         element: (
           <ProtectedRoute>
             <SharePage />
