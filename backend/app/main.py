@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.api.v1 import spots, travel, ai, admin, share, notifications
+from app.core.exceptions import TravelCanvasException, ErrorCategory
 
 # アプリケーション作成
 app = FastAPI(
@@ -65,6 +66,37 @@ async def not_found_handler(request, exc):
     return JSONResponse(
         status_code=404,
         content={"detail": f"Endpoint not found: {request.url.path}"}
+    )
+
+# [Gate #27] app/core/exceptions.py には AuthenticationError/AuthorizationError/
+# ValidationError等の統一例外クラス一式が定義されていたが、これらを捕捉する
+# exception_handlerがこれまで一切登録されておらず、例えば未認証状態で保護された
+# エンドポイントへアクセスした場合(get_current_active_userがAuthenticationErrorを
+# raiseするケース)、クリーンな401ではなく未処理例外としてサーバーエラーになって
+# いた(通常のログイン済みフローでは踏まれない経路のため、手動テストや監査でも
+# 発見されていなかった)。カテゴリ別に適切なHTTPステータスへ変換する。
+_CATEGORY_STATUS_MAP = {
+    ErrorCategory.AUTHENTICATION: 401,
+    ErrorCategory.AUTHORIZATION: 403,
+    ErrorCategory.VALIDATION: 422,
+    ErrorCategory.BUSINESS_LOGIC: 400,
+    ErrorCategory.RATE_LIMIT: 429,
+    ErrorCategory.EXTERNAL_SERVICE: 502,
+    ErrorCategory.MAINTENANCE: 503,
+    ErrorCategory.SYSTEM: 500,
+}
+
+
+@app.exception_handler(TravelCanvasException)
+async def travelcanvas_exception_handler(request: Request, exc: TravelCanvasException):
+    status_code = _CATEGORY_STATUS_MAP.get(exc.category, 500)
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "detail": exc.user_message,
+            "error_code": exc.error_code.value if exc.error_code else None,
+            "error_id": exc.error_id,
+        },
     )
 
 # 認証APIルートを含める

@@ -33,6 +33,9 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     const px = `${size}px`;
     return (
       <div
+        data-testid="loading-spinner"
+        role="status"
+        aria-label="読み込み中"
         className={`animate-spin rounded-full border-b-2 border-current ${color} ${className}`}
         style={{ width: px, height: px }}
       />
@@ -43,6 +46,9 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   return (
     <div
+      data-testid="loading-spinner"
+      role="status"
+      aria-label="読み込み中"
       className={`animate-spin rounded-full border-b-2 border-current ${sizeClass} ${color} ${className}`}
     />
   );

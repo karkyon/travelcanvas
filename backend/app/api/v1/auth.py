@@ -53,6 +53,14 @@ class UserDetailResponse(BaseModel):
     preferences: Optional[Dict[str, Any]] = None
     created_at: datetime
 
+    # [Gate #27] User.idはDB上UUID型カラムのため、ORMオブジェクトから直接
+    # 変換するとPydantic v2ではstrへ暗黙変換されずResponseValidationError
+    # (実質500エラー)になっていた実バグの修正。GET/PUT /auth/meを実際に
+    # 呼び出すpytestで発覚した。
+    @validator('id', pre=True)
+    def _stringify_id(cls, v):
+        return str(v)
+
     class Config:
         from_attributes = True
 

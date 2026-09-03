@@ -14,14 +14,14 @@ from app.schemas.spots import (
     FavoriteCreate, FavoriteResponse,
     VisitCreate, VisitResponse,
 )
-from app.core.auth import get_current_user
+from app.core.auth import get_current_active_user
 
 router = APIRouter(prefix="/spots", tags=["spots"])
 
 @router.post("/", response_model=SpotResponse, status_code=status.HTTP_201_CREATED)
 async def create_spot(
     spot_data: SpotCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """新しいスポットを作成"""
@@ -53,7 +53,7 @@ async def create_spot(
 
 @router.get("/", response_model=List[SpotResponse])
 async def get_spots(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
     category: Optional[str] = None,
     limit: int = 20
@@ -76,6 +76,36 @@ async def get_spots(
             detail=f"スポット取得エラー: {str(e)}"
         )
 
+# ===== 固定パスの静的ルート =====
+# [Gate #27 / A-011] /categories/list, /test/ping は /{spot_id}(UUID型パスパラメータ)
+# より前に定義する必要がある。FastAPI/Starletteはパスセグメント数が一致しない限り
+# 実際には衝突しないが(このルートはいずれも2セグメント、{spot_id}は1セグメントの
+# ため現状422は再現しなかった)、定義順に依存する脆い書き方であることに変わりは
+# ないため、お気に入り・訪問記録の固定ルートと同じ位置(パラメータ化ルートより前)
+# へ移動し、route順序に対する回帰テストで担保する。
+
+@router.get("/categories/list")
+async def get_categories():
+    """利用可能なカテゴリ一覧"""
+    return {
+        "categories": [
+            {"value": "restaurant", "label": "レストラン"},
+            {"value": "sightseeing", "label": "観光地"},
+            {"value": "accommodation", "label": "宿泊"},
+            {"value": "shopping", "label": "ショッピング"},
+            {"value": "other", "label": "その他"}
+        ]
+    }
+
+@router.get("/test/ping")
+async def test_spots_api():
+    """スポットAPI動作テスト"""
+    return {
+        "message": "スポットAPI正常動作中",
+        "version": "MVP-1.0.0",
+        "timestamp": datetime.now().isoformat()
+    }
+
 # ===== お気に入り関連API =====
 # [Gate #15] UserSpotFavoriteテーブルはDBに存在していたが、これを操作するAPIが
 # 一切実装されていなかった(Gate #14で発見・記録済みのギャップ)。今回実装する。
@@ -86,7 +116,7 @@ async def get_spots(
 
 @router.get("/favorites", response_model=List[FavoriteResponse])
 async def get_favorites(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """自分のお気に入りスポット一覧を取得"""
@@ -118,7 +148,7 @@ async def get_favorites(
 async def add_favorite(
     spot_id: uuid.UUID,
     favorite_data: FavoriteCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポットをお気に入りに追加"""
@@ -177,7 +207,7 @@ async def add_favorite(
 @router.delete("/{spot_id}/favorite")
 async def remove_favorite(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポットをお気に入りから削除"""
@@ -215,7 +245,7 @@ async def remove_favorite(
 
 @router.get("/visits", response_model=List[VisitResponse])
 async def get_visits(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """自分の訪問済みスポット一覧を取得"""
@@ -245,7 +275,7 @@ async def get_visits(
 async def add_visit(
     spot_id: uuid.UUID,
     visit_data: VisitCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポットを訪問済みとして記録"""
@@ -304,7 +334,7 @@ async def add_visit(
 @router.delete("/{spot_id}/visit")
 async def remove_visit(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """訪問済み記録を取り消す"""
@@ -337,7 +367,7 @@ async def remove_visit(
 @router.get("/{spot_id}", response_model=SpotResponse)
 async def get_spot(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポット詳細取得"""
@@ -362,7 +392,7 @@ async def get_spot(
 async def update_spot(
     spot_id: uuid.UUID,
     spot_data: SpotUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポット更新"""
@@ -399,7 +429,7 @@ async def update_spot(
 @router.delete("/{spot_id}")
 async def delete_spot(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """スポット削除"""
@@ -427,25 +457,3 @@ async def delete_spot(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"スポット削除エラー: {str(e)}"
         )
-
-@router.get("/categories/list")
-async def get_categories():
-    """利用可能なカテゴリ一覧"""
-    return {
-        "categories": [
-            {"value": "restaurant", "label": "レストラン"},
-            {"value": "sightseeing", "label": "観光地"},
-            {"value": "accommodation", "label": "宿泊"},
-            {"value": "shopping", "label": "ショッピング"},
-            {"value": "other", "label": "その他"}
-        ]
-    }
-
-@router.get("/test/ping")
-async def test_spots_api():
-    """スポットAPI動作テスト"""
-    return {
-        "message": "スポットAPI正常動作中",
-        "version": "MVP-1.0.0",
-        "timestamp": datetime.now().isoformat()
-    }

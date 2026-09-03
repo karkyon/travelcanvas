@@ -81,6 +81,18 @@ async def get_travel_plans(
     return {"plans": plans, "total": total}
 
 
+# [Gate #27 / A-011] /test/ping は /{plan_id}(UUID型パスパラメータ)より前に
+# 定義する必要がある。spots.py の固定ルートと同じ理由・同じ対応。
+@router.get("/test/ping")
+async def test_travel_plans_api():
+    """旅行プランAPI動作テスト"""
+    return {
+        "message": "旅行プランAPI正常動作中",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
 @router.get("/{plan_id}", response_model=TravelPlanResponse)
 async def get_travel_plan(
     plan_id: uuid.UUID,
@@ -174,13 +186,3 @@ async def delete_travel_plan(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"旅行プラン削除エラー: {str(e)}",
         )
-
-
-@router.get("/test/ping")
-async def test_travel_plans_api():
-    """旅行プランAPI動作テスト"""
-    return {
-        "message": "旅行プランAPI正常動作中",
-        "version": "1.0.0",
-        "timestamp": datetime.now().isoformat(),
-    }

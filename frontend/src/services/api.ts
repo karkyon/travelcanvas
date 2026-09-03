@@ -670,10 +670,10 @@ class CompleteTravelAPI {
     };
 
     return Object.entries(interests)
-      .filter(([_, value]) => value >= 7)
+      .filter(([, value]) => value >= 7)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 3)
-      .map(([key, _]) => labels[key] || key);
+      .map(([key]) => labels[key] || key);
   }
 
   private inferCategoriesFromQuery(query: string): string[] {
@@ -1063,20 +1063,16 @@ class CompleteTravelAPI {
     if (category && category !== 'all') params.append('category', category);
     if (limit) params.append('limit', limit.toString());
     
-    try {
-      const response = await this.client.get<any[]>(`/spots/?${params}`);
-      
-      if (Array.isArray(response.data)) {
-        return {
-          success: true,
-          message: '取得完了',
-          data: response.data
-        };
-      } else {
-        return response.data;
-      }
-    } catch (error) {
-      throw error;
+    const response = await this.client.get<any[]>(`/spots/?${params}`);
+
+    if (Array.isArray(response.data)) {
+      return {
+        success: true,
+        message: '取得完了',
+        data: response.data
+      };
+    } else {
+      return response.data;
     }
   }
 
@@ -1184,15 +1180,9 @@ class CompleteTravelAPI {
     return { success: true } as ApiResponse<void>;
   }
 
-  async getNotificationSettings(): Promise<ApiResponse<NotificationSettings>> {
-    const response = await this.client.get<ApiResponse<NotificationSettings>>('/settings/notifications');
-    return response.data;
-  }
-
-  async updateNotificationSettings(settings: Partial<NotificationSettings>): Promise<ApiResponse<NotificationSettings>> {
-    const response = await this.client.put<ApiResponse<NotificationSettings>>('/settings/notifications', settings);
-    return response.data;
-  }
+  // [Gate #27 / A-009] getNotificationSettings/updateNotificationSettingsは
+  // 対応するbackend routeが存在せず(呼べば404)、どのUIコンポーネントからも
+  // 呼ばれていない死コードだったため削除した。実装はGate #28で行う。
 
   // ===== 共有関連API =====
   // [Gate #25] URLが実プレフィックス(/travel-plans)と一致しておらず、共有・
@@ -1272,27 +1262,10 @@ class CompleteTravelAPI {
   }
 
   // ===== その他のAPI =====
-  async getPrivacySettings(): Promise<ApiResponse<any>> {
-    const response = await this.client.get<ApiResponse<any>>('/settings/privacy');
-    return response.data;
-  }
-
-  async updatePrivacySettings(settings: any): Promise<ApiResponse<any>> {
-    const response = await this.client.put<ApiResponse<any>>('/settings/privacy', settings);
-    return response.data;
-  }
-
-  async deleteAccount(password?: string): Promise<ApiResponse<void>> {
-    const response = await this.client.delete<ApiResponse<void>>('/auth/delete-account', {
-      data: { password }
-    });
-    return response.data;
-  }
-
-  async exportData(): Promise<ApiResponse<any>> {
-    const response = await this.client.post<ApiResponse<any>>('/account/export');
-    return response.data;
-  }
+  // [Gate #27 / A-009] getPrivacySettings/updatePrivacySettings/deleteAccount/
+  // exportDataは対応するbackend routeが存在せず(呼べば404)、どのUI
+  // コンポーネントからも呼ばれていない死コードだったため削除した
+  // (偽の導線をゼロにする)。実装はGate #28(アカウントライフサイクル)で行う。
 
   async healthCheck(): Promise<boolean> {
     try {
@@ -1315,7 +1288,8 @@ export const authAPI = {
   getCurrentUser: () => api.getCurrentUser(),
   updateProfile: (data: Partial<User>) => api.updateProfile(data),
   changePassword: (data: { current_password: string; new_password: string }) => api.changePassword(data),
-  deleteAccount: (password?: string) => api.deleteAccount(password)
+  // [Gate #27 / A-009] deleteAccountは対応するbackend routeが存在しないため削除。
+  // 実装はGate #28で行う。
 };
 
 export const travelAPI = {
@@ -1342,17 +1316,11 @@ export const notificationsAPI = {
   getUnreadCount: () => api.getUnreadNotificationCount(),
   markAsRead: (id: string) => api.markNotificationAsRead(id),
   markAllAsRead: () => api.markAllNotificationsAsRead(),
-  getSettings: () => api.getNotificationSettings(),
-  updateSettings: (settings: Partial<NotificationSettings>) => api.updateNotificationSettings(settings)
 };
 
-export const settingsAPI = {
-  getNotificationSettings: () => api.getNotificationSettings(),
-  updateNotificationSettings: (settings: Partial<NotificationSettings>) => api.updateNotificationSettings(settings),
-  getPrivacySettings: () => api.getPrivacySettings(),
-  updatePrivacySettings: (settings: any) => api.updatePrivacySettings(settings),
-  exportData: () => api.exportData()
-};
+// [Gate #27 / A-009] settingsAPI(通知設定/プライバシー設定/データエクスポート)は
+// 対応するbackend routeが存在しないまま公開されていたため削除した。
+// 実装はGate #28で行う。
 
 export const shareAPI = {
   createShareLink: (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string }) => 

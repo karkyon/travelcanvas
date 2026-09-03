@@ -30,6 +30,7 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
   className = '',
   children,
   href,
+  onClick,
   ...props
 }, ref) => {
   const baseClasses = [
@@ -84,11 +85,16 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
     xl: 'w-7 h-7'
   };
 
+  const isDisabled = Boolean(disabled) || loading;
+
   const classes = [
     ...baseClasses,
     ...variantClasses[variant],
     sizeClasses[size],
     fullWidth ? 'w-full' : '',
+    // href版(<a>)にはネイティブのdisabled属性が存在しないため、視覚的な
+    // disabled表現をclassNameでも明示する(aria-disabledと合わせて対応)。
+    href && isDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
     className
   ].filter(Boolean).join(' ');
 
@@ -123,10 +129,33 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
   );
 
   if (href) {
+    // [Gate #27] <a>要素はネイティブのdisabled属性を持たないため、これまで
+    // disabled/loading状態でもクリック・キーボード操作・スクリーンリーダー
+    // からは常に有効なリンクとして扱われていた(実アクセシビリティ不具合)。
+    // aria-disabledに加え、クリック・キーボード操作の抑止、tabIndex制御で
+    // <button>版と同等の「操作できない」状態に揃える。
+    const handleAnchorClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (isDisabled) {
+        event.preventDefault();
+        return;
+      }
+      (onClick as React.MouseEventHandler<HTMLAnchorElement> | undefined)?.(event);
+    };
+
+    const handleAnchorKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>) => {
+      if (isDisabled && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+      }
+    };
+
     return (
       <a
-        href={href}
+        href={isDisabled ? undefined : href}
         className={classes}
+        aria-disabled={isDisabled}
+        tabIndex={isDisabled ? -1 : undefined}
+        onClick={handleAnchorClick}
+        onKeyDown={handleAnchorKeyDown}
         ref={ref as React.Ref<HTMLAnchorElement>}
         {...(props as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
       >
@@ -138,7 +167,9 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
   return (
     <button
       className={classes}
-      disabled={disabled || loading}
+      disabled={isDisabled}
+      aria-disabled={isDisabled}
+      onClick={onClick}
       ref={ref as React.Ref<HTMLButtonElement>}
       {...props}
     >

@@ -62,7 +62,8 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/auth/reset-password',
     VERIFY_EMAIL: '/auth/verify-email',
     UPGRADE_GUEST: '/auth/upgrade-guest',
-    DELETE_ACCOUNT: '/auth/delete-account'
+    // [Gate #27 / A-009] DELETE_ACCOUNTは対応するbackend routeが存在せず、
+    // どこからも参照されていなかったため削除。実装はGate #28で行う。
   },
   
   // 旅行プラン

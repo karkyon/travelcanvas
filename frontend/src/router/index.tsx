@@ -25,6 +25,7 @@ import ProfilePage from '@/pages/ProfilePage';
 import AdminDashboard from '@/pages/Admin/AdminDashboard';
 import AdminUsers from '@/pages/Admin/AdminUsers';
 import NotificationsPage from '@/pages/NotificationsPage';
+import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -254,6 +255,9 @@ export const router = createBrowserRouter([
       },
       
       // 🤖 AI最適化
+      // [Gate #27 / item8] 以前は固定の「開発中です」表示だった。
+      // AI最適化自体はGate #23で実装済み(OptimizationPanel経由でplan単位に
+      // 実行)のため、実際にプランを選択して最適化へ進める画面に置き換える。
       {
         path: 'optimization',
         children: [
@@ -261,12 +265,7 @@ export const router = createBrowserRouter([
             index: true,
             element: (
               <ProtectedRoute>
-                <div className="container mx-auto px-4 py-8">
-                  <h1 className="text-2xl font-bold mb-6">AI最適化</h1>
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <p className="text-gray-600">AI最適化機能は開発中です。</p>
-                  </div>
-                </div>
+                <OptimizationSelectPage />
               </ProtectedRoute>
             ),
           },
