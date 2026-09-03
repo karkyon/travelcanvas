@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots, travel
+from app.api.v1 import spots, travel, ai
 
 # アプリケーション作成
 app = FastAPI(
@@ -80,3 +80,6 @@ print("🚀 TravelCanvas API - Ready to start")
 
 app.include_router(spots.router, prefix="/api/v1")
 app.include_router(travel.router, prefix="/api/v1")
+# [Gate #23] ai.pyはこれまでファイルは存在するがinclude_routerされておらず、
+# /optimize-route・/optimization/*系エンドポイントが実際には一切到達不能だった。
+app.include_router(ai.router, prefix="/api/v1")

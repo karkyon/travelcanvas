@@ -50,13 +50,12 @@ const OptimizationPage: React.FC = () => {
   const fetchOptimizationResult = async () => {
     try {
       const response = await getOptimizationResult(jobId!);
-      // [Gate #7j] 実バックエンド(backend/app/api/v1/ai.py)にはジョブ型の最適化結果取得
-      // エンドポイント・progress/job_id/status追跡機構は未実装であることを確認済み
-      // (/optimize-routeが同期的にwaypointsを返すのみ)。このポーリングUIはそれを前提に
-      // 書かれた将来設計のままのため、型のみ整合させて残す。
+      // [Gate #23] 実バックエンド(backend/app/api/v1/ai.py)は緯度経度に基づく
+      // 最近傍法で日程を並べ替える同期処理として実装済み。生成直後から常に
+      // status="completed"を返すため、以下のポーリング分岐は実質実行されない。
       setOptimizationResult(response.data as unknown as OptimizationResult);
       
-      // まだ処理中の場合は5秒後に再チェック
+      // まだ処理中の場合は5秒後に再チェック(将来ジョブを非同期化する場合の保険)
       if (response.data.status === 'processing') {
         setTimeout(fetchOptimizationResult, 5000);
       } else {

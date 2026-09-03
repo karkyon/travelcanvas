@@ -1229,24 +1229,30 @@ class CompleteTravelAPI {
   }
 
   // ===== 最適化関連API =====
+  // [Gate #23] 実バックエンド(backend/app/api/v1/ai.py)はこれまでmain.pyに
+  // include_routerされておらず、/plans/{id}/optimize・/optimization/*は全て
+  // 404で到達不能だった。加えてURLも実プレフィックス(/travel-plans)と不一致
+  // だった。バックエンドは{success,message,data}形式でラップされた応答を
+  // 返さない生JSONを返すため、getPlan/updatePlan等と同様にクライアント側で
+  // ApiResponse形状へ手動で包む。
   async optimizePlan(planId: string, optimizationData: OptimizationRequest): Promise<ApiResponse<{ job_id: string; status: string }>> {
-    const response = await this.client.post<ApiResponse<{ job_id: string; status: string }>>(`/plans/${planId}/optimize`, optimizationData);
-    return response.data;
+    const response = await this.client.post<{ job_id: string; status: string }>(`/travel-plans/${planId}/optimize`, optimizationData);
+    return { success: true, data: response.data } as ApiResponse<{ job_id: string; status: string }>;
   }
 
   async getOptimizationResult(jobId: string): Promise<ApiResponse<OptimizationResult>> {
-    const response = await this.client.get<ApiResponse<OptimizationResult>>(`/optimization/${jobId}`);
-    return response.data;
+    const response = await this.client.get<any>(`/optimization/${jobId}`);
+    return { success: true, data: response.data } as ApiResponse<OptimizationResult>;
   }
 
   async applyOptimization(jobId: string): Promise<ApiResponse<void>> {
-    const response = await this.client.post<ApiResponse<void>>(`/optimization/${jobId}/apply`);
-    return response.data;
+    await this.client.post<any>(`/optimization/${jobId}/apply`);
+    return { success: true } as ApiResponse<void>;
   }
 
   async cancelOptimization(jobId: string): Promise<ApiResponse<void>> {
-    const response = await this.client.post<ApiResponse<void>>(`/optimization/${jobId}/cancel`);
-    return response.data;
+    await this.client.post<any>(`/optimization/${jobId}/cancel`);
+    return { success: true } as ApiResponse<void>;
   }
 
   // ===== その他のAPI =====
