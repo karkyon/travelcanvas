@@ -31,7 +31,7 @@ const DayView: React.FC<DayViewProps> = ({
   className = ''
 }) => {
   const { addNewScheduleItem, deleteScheduleItem } = usePlan();
-  const { dragState, handleDragStart, handleDrop, handleDragEnd, isItemDragged } = useDragDrop();
+  const { dragState, handleDragStart, handleDrop, handleDragEnd, handleKeyboardMove, isItemDragged } = useDragDrop();
   const { addToast } = useToast();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -265,9 +265,13 @@ const DayView: React.FC<DayViewProps> = ({
               {/* スケジュールアイテム */}
               <div
                 draggable
+                tabIndex={0}
+                role="listitem"
+                aria-label={`${event.title}(上下矢印キーで並べ替え)`}
                 onDragStart={(e) => handleDragStart(e, event, `${planId}-${day.id}`)}
                 onDragEnd={handleDragEnd}
                 onClick={() => onItemClick?.(event)}
+                onKeyDown={(e) => handleKeyboardMove(e, event, planId, day.id)}
                 className={isItemDragged(event.id) ? 'opacity-50' : ''}
               >
                 <ScheduleItem

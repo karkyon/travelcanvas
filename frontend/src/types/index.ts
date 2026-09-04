@@ -206,6 +206,10 @@ export interface TravelPlan {
   created_at?: string;
   updated_at?: string;
   days: DaySchedule[];
+  // [Gate #31.5C] Gate #29正規化API(/plans)の楽観的並行制御用リビジョン。
+  // 正規化APIから読み込んだプランのみ設定される(旧/travel-plans経由の
+  // データには存在しない)。
+  revision?: number;
 }
 
 export interface CreatePlanData {

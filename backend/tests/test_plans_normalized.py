@@ -210,3 +210,16 @@ def test_specific_404_messages_are_not_swallowed_by_generic_handler(auth_client)
     res = client.get(f"/api/v1/spots/{fake_uuid}")
     assert res.status_code == 404
     assert res.json()["detail"] == "スポットが見つかりません"
+
+
+def test_get_plan_detail_sets_etag_header_matching_body_revision(auth_client):
+    """[Gate #31.5C] GETのdocstringが「ETagヘッダーにrevisionを載せる」と
+    説明していたにも関わらず実装されていなかった不整合の回帰テスト。"""
+    client, _user = auth_client
+    res = client.post("/api/v1/travel-plans/", json={"title": "ETag検証プラン"})
+    plan_id = res.json()["id"]
+
+    res = client.get(f"/api/v1/plans/{plan_id}")
+    assert res.status_code == 200
+    body_revision = res.json()["revision"]
+    assert res.headers.get("etag") == f'"{body_revision}"'

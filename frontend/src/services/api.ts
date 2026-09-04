@@ -67,6 +67,41 @@ export interface SearchPreferences {
   };
 }
 
+// [Gate #31.5C] 正規化Plan/Day/Event API (/plans) のレスポンス型
+export interface NormalizedEvent {
+  id: string;
+  day_id: string;
+  title: string;
+  description?: string | null;
+  event_type: string;
+  start_at?: string | null;
+  end_at?: string | null;
+  local_start_time?: string | null;
+  is_all_day: boolean;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  locked: boolean;
+  sort_order: number;
+}
+
+export interface NormalizedDay {
+  id: string;
+  local_date: string;
+  timezone_id: string;
+  title?: string | null;
+  notes?: string | null;
+  sort_order: number;
+  events?: NormalizedEvent[];
+}
+
+export interface NormalizedPlanDetail {
+  id: string;
+  title: string;
+  revision: number;
+  days: NormalizedDay[];
+}
+
 export interface SpotResult {
   id: string;
   name: string;
@@ -649,6 +684,99 @@ class CompleteTravelAPI {
   async deletePlan(planId: string): Promise<ApiResponse<void>> {
     await this.client.delete<void>(`/travel-plans/${planId}`);
     return { success: true } as ApiResponse<void>;
+  }
+
+  // ===== [Gate #31.5C] 正規化Plan/Day/Event API (/plans、Gate #29正本) =====
+  // 以前はplanStore.tsが/travel-plans(itinerary JSON一括PUT)のみを使い、
+  // Gate #29で実装済みのこのAPI群(day/event単位CRUD・並べ替え・Undo・
+  // revision/If-Matchによる楽観的並行制御)には一切接続されていなかった。
+
+  async getPlanDetail(planId: string): Promise<ApiResponse<NormalizedPlanDetail>> {
+    const response = await this.client.get<NormalizedPlanDetail>(`/plans/${planId}`);
+    return { success: true, data: response.data } as ApiResponse<NormalizedPlanDetail>;
+  }
+
+  async createDay(
+    planId: string,
+    data: { local_date: string; timezone_id?: string; title?: string; notes?: string },
+    idempotencyKey: string
+  ): Promise<NormalizedDay> {
+    const response = await this.client.post<NormalizedDay>(
+      `/plans/${planId}/days`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
+    return response.data;
+  }
+
+  async updateDay(
+    planId: string, dayId: string,
+    data: { title?: string; notes?: string; sort_order?: number },
+    ifMatch: number
+  ): Promise<NormalizedDay> {
+    const response = await this.client.put<NormalizedDay>(
+      `/plans/${planId}/days/${dayId}`, data, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async deleteDay(planId: string, dayId: string, ifMatch: number): Promise<{ revision: number }> {
+    const response = await this.client.delete<{ revision: number }>(
+      `/plans/${planId}/days/${dayId}`, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async createEvent(
+    planId: string,
+    data: {
+      day_id: string; title: string; description?: string; event_type?: string;
+      local_start_time?: string; address?: string; latitude?: number; longitude?: number;
+    },
+    idempotencyKey: string
+  ): Promise<NormalizedEvent> {
+    const response = await this.client.post<NormalizedEvent>(
+      `/plans/${planId}/events`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
+    return response.data;
+  }
+
+  async updateEvent(
+    planId: string, eventId: string,
+    data: Partial<{
+      title: string; description: string; event_type: string; local_start_time: string;
+      address: string; latitude: number; longitude: number; locked: boolean;
+    }>,
+    ifMatch: number
+  ): Promise<NormalizedEvent> {
+    const response = await this.client.put<NormalizedEvent>(
+      `/plans/${planId}/events/${eventId}`, data, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async deleteEvent(planId: string, eventId: string, ifMatch: number): Promise<{ revision: number }> {
+    const response = await this.client.delete<{ revision: number }>(
+      `/plans/${planId}/events/${eventId}`, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async moveEvent(
+    planId: string, eventId: string,
+    data: { day_id?: string; sort_order: number },
+    ifMatch: number, idempotencyKey: string
+  ): Promise<NormalizedEvent> {
+    const response = await this.client.post<NormalizedEvent>(
+      `/plans/${planId}/events/${eventId}/move`, data,
+      { headers: { 'If-Match': String(ifMatch), 'Idempotency-Key': idempotencyKey } }
+    );
+    return response.data;
+  }
+
+  async undoLastPlanChange(planId: string, ifMatch: number): Promise<{ revision: number }> {
+    const response = await this.client.post<{ revision: number }>(
+      `/plans/${planId}/undo`, {}, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
   }
 
   // ===== 通知関連API =====

@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { usePlan } from './usePlan';
+import { usePlanStore } from '../store/planStore';
 import type { ScheduleItem, DragDropState, DropResult } from '../types';
 
 export const useDragDrop = () => {
-  const { reorderSchedule, updateScheduleItemDetails } = usePlan();
+  const { reorderSchedule } = usePlan();
   
   const [dragState, setDragState] = useState<DragDropState>({
     isDragging: false,
@@ -190,25 +191,38 @@ export const useDragDrop = () => {
     return newArray;
   }, []);
 
-  // 現在のアイテム順序取得（仮実装 - 実際はstoreから取得）
-  const getCurrentItemOrder = useCallback((_planId: string, _dayId: string): string[] => {
-    // TODO: storeから実際の順序を取得
-    return [];
+  // 現在のアイテム順序取得
+  // [Gate #31.5C] 監査是正(R-08): 以前は常に空配列を返すTODOスタブで、
+  // 同日内の並べ替え(reorderArray)が実質的に機能していなかった。
+  // planStore.currentPlanから実際の順序を取得する。
+  const getCurrentItemOrder = useCallback((planId: string, dayId: string): string[] => {
+    const currentPlan = usePlanStore.getState().currentPlan;
+    if (!currentPlan || currentPlan.id !== planId) return [];
+    const day = currentPlan.days.find((d) => d.id === dayId);
+    return day ? day.events.map((event) => event.id) : [];
   }, []);
 
   // 日付間でのアイテム移動
+  // [Gate #31.5C] 監査是正(R-08): 以前はday_idを渡さずupdateScheduleItemDetails
+  // (プラン全体PUT)を呼ぶだけで、実際には何も移動していなかった
+  // (コメントアウトされたTODOがそのまま放置されていた)。
+  // planStore.moveItemBetweenDaysはdayIndex(数値)で日を特定する設計のため、
+  // dayId(文字列)からインデックスを解決してから呼び出す。
   const moveItemBetweenDays = useCallback(async (
     itemId: string,
-    _sourceDayId: string,
-    _targetDayId: string,
-    _targetIndex: number
+    sourceDayId: string,
+    targetDayId: string,
+    targetIndex: number
   ) => {
-    // TODO: APIを呼び出して日付間移動を実行
-    // 現在はupdateScheduleItemDetailsを使用して日付を更新
-    await updateScheduleItemDetails(itemId, {
-      // day_id: targetDayId, // API仕様に基づいて実装
-    });
-  }, [updateScheduleItemDetails]);
+    const currentPlan = usePlanStore.getState().currentPlan;
+    if (!currentPlan) return;
+
+    const fromDayIndex = currentPlan.days.findIndex((d) => d.id === sourceDayId);
+    const toDayIndex = currentPlan.days.findIndex((d) => d.id === targetDayId);
+    if (fromDayIndex === -1 || toDayIndex === -1) return;
+
+    await usePlanStore.getState().moveItemBetweenDays(itemId, fromDayIndex, toDayIndex, targetIndex);
+  }, []);
 
   // マルチセレクションサポート
   const handleMultiSelect = useCallback((
@@ -231,14 +245,30 @@ export const useDragDrop = () => {
   }, []);
 
   // スマートスナッピング（時間に基づく自動配置）
+  // [Gate #31.5C] 監査是正(R-08): 以前は常に0を返すだけのTODOスタブ
+  // だった。ドラッグ位置(コンテナ内の相対Y座標)を1日の表示時間範囲に
+  // 線形マッピングし、15分単位にスナップした時刻文字列を返す実装に
+  // 置き換える。
+  // 注記: 本関数はロジックとして実装済みだが、ピクセル単位の時間軸
+  // ビジュアル(タイムグリッド表示)をDayView.tsxへ統合する作業は
+  // 別途のUI変更が必要なため次Gate以降のスコープとする(呼び出し元の
+  // ドラッグ中プレビュー表示への配線は未実施)。
   const calculateSnapPosition = useCallback((
     _draggedItem: ScheduleItem,
     _targetContainer: string,
-    _mouseY: number
-  ): number => {
-    // TODO: 時間ベースの自動スナッピング計算
-    // 営業時間、移動時間、バッファ時間を考慮した最適位置を計算
-    return 0;
+    mouseY: number,
+    containerTop: number = 0,
+    containerHeight: number = 800,
+    dayStartHour: number = 6,
+    dayEndHour: number = 24
+  ): string => {
+    const relativeY = Math.max(0, Math.min(1, (mouseY - containerTop) / containerHeight));
+    const totalMinutes = (dayEndHour - dayStartHour) * 60;
+    const targetMinutes = dayStartHour * 60 + relativeY * totalMinutes;
+    const snapped = Math.round(targetMinutes / 15) * 15; // 15分単位にスナップ
+    const hh = Math.floor(snapped / 60) % 24;
+    const mm = snapped % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   }, []);
 
   // ドラッグプレビューの更新
@@ -261,17 +291,33 @@ export const useDragDrop = () => {
     }
   }, []);
 
-  // アクセシビリティサポート
-  const handleKeyboardMove = useCallback((
+  // アクセシビリティサポート: キーボードによる同日内の並べ替え
+  // [Gate #31.5C] 監査是正(R-08): 以前はEnter/Spaceキーを検知するだけで
+  // 実際の移動処理が無いTODOスタブだった。矢印キーで前後のアイテムと
+  // 入れ替え、reorderScheduleを呼び出す実装に置き換える。
+  const handleKeyboardMove = useCallback(async (
     event: React.KeyboardEvent,
-    _item: ScheduleItem,
-    _direction: 'up' | 'down'
+    item: ScheduleItem,
+    planId: string,
+    dayId: string
   ) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      // TODO: キーボードによる移動の実装
-    }
-  }, []);
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+
+    const currentOrder = getCurrentItemOrder(planId, dayId);
+    const currentIndex = currentOrder.indexOf(item.id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = event.key === 'ArrowUp' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentOrder.length) return;
+
+    const newOrder = [...currentOrder];
+    const tmp = newOrder[currentIndex]!;
+    newOrder[currentIndex] = newOrder[targetIndex]!;
+    newOrder[targetIndex] = tmp;
+
+    await reorderSchedule(planId, dayId, newOrder);
+  }, [getCurrentItemOrder, reorderSchedule]);
 
   return {
     dragState,

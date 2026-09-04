@@ -181,7 +181,7 @@ const PlannerPage: React.FC = () => {
       if (!loadedPlan) throw new Error('プランの読み込みに失敗しました');
 
       if (loadedPlan.days.length === 0) {
-        addDay();
+        await addDay();
       }
 
       await usePlanStore.getState().addScheduleItem(0, {
@@ -342,6 +342,17 @@ const PlannerPage: React.FC = () => {
                 この日を削除
               </Button>
             )}
+            {/* [Gate #31.5C] Gate #29 APIが持つ直近1件のUndoを画面から呼べる
+                ようにする。編集操作は全て正規化APIを経由するようになった
+                ため、ここから正しくUndoできる。 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => usePlanStore.getState().undoLastChange()}
+              title="直前の変更を取り消す"
+            >
+              ↩ 元に戻す
+            </Button>
           </div>
 
           {currentPlan.days.length === 0 ? (

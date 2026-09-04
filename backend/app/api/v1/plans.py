@@ -26,7 +26,7 @@ import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
 from typing import Optional, List, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
@@ -272,12 +272,21 @@ def _event_to_dict(event: TravelEvent) -> dict:
 @router.get("/{plan_id}", response_model=PlanDetailResponse)
 async def get_plan_detail(
     plan_id: str,
+    response: Response,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """プラン詳細を日/イベント込みで返す。レスポンスヘッダーETagに
-    現在のrevisionを載せる(以降の更新系呼び出しでIf-Matchに使う)。"""
+    """プラン詳細を日/イベント込みで返す。revisionはレスポンスボディの
+    `revision`フィールドとETagヘッダーの両方で返す(以降の更新系呼び出し
+    でIf-Matchに使う)。
+
+    [Gate #31.5C] 以前はこのdocstringが「レスポンスヘッダーETagに
+    revisionを載せる」と説明していたが、実装はボディにrevisionを返す
+    のみでETagヘッダーは設定されていなかった(説明とコードが矛盾していた)。
+    ボディでのrevision取得は今のフロントエンド実装で十分機能するため
+    そのまま維持しつつ、ETagヘッダーも合わせて設定し実態と説明を一致させる。"""
     plan = _get_owned_plan(db, plan_id, current_user, min_role="viewer")
+    response.headers["ETag"] = f'"{plan.revision}"'
     days = (
         db.query(TravelDay)
         .filter(TravelDay.plan_id == plan.id)
