@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -172,6 +172,9 @@ app.include_router(ai.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 # [Gate #25] share.pyも新規実装。プラン共有・コラボレーター機能のエンドポイント。
 app.include_router(share.router, prefix="/api/v1")
+# [Gate #30] 認証不要の共有トークン解決API。share.router(owner専用管理API)
+# とはpath prefixレベルで完全に分離している(/public/share vs /travel-plans)。
+app.include_router(public_share.router, prefix="/api/v1")
 # [Gate #26] notifications.pyも新規実装。通知一覧・既読管理のエンドポイント。
 app.include_router(notifications.router, prefix="/api/v1")
 # [Gate #29] /plans: travel_days/travel_events正規テーブルを正本とする新API。

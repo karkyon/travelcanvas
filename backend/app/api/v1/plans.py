@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
+from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
     IdempotencyRecord, User,
@@ -151,16 +152,13 @@ class PlanDetailResponse(BaseModel):
 
 # ===== 共通ヘルパー =====
 
-def _get_owned_plan(db: Session, plan_id: str, user: User) -> TravelPlan:
-    try:
-        plan_uuid = uuid.UUID(plan_id)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="旅行プランが見つかりません")
-    plan = db.query(TravelPlan).filter(TravelPlan.id == plan_uuid).first()
-    if not plan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="旅行プランが見つかりません")
-    if plan.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="アクセス権限がありません")
+def _get_owned_plan(db: Session, plan_id: str, user: User, min_role: str = "editor") -> TravelPlan:
+    """[Gate #30] 名称は既存のまま維持しているが、実体は
+    owner/editor/viewerを判定するrequire_plan_accessへ委譲する。
+    Day/EventのCRUD・移動・Undoはeditor以上、閲覧(GET)はviewer以上を要求
+    するため呼び出し側でmin_roleを指定する(デフォルトはeditor=書き込み系)。
+    """
+    plan, _role = require_plan_access(db, plan_id, user, min_role=min_role)
     return plan
 
 
@@ -279,7 +277,7 @@ async def get_plan_detail(
 ):
     """プラン詳細を日/イベント込みで返す。レスポンスヘッダーETagに
     現在のrevisionを載せる(以降の更新系呼び出しでIf-Matchに使う)。"""
-    plan = _get_owned_plan(db, plan_id, current_user)
+    plan = _get_owned_plan(db, plan_id, current_user, min_role="viewer")
     days = (
         db.query(TravelDay)
         .filter(TravelDay.plan_id == plan.id)

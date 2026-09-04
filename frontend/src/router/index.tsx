@@ -12,6 +12,7 @@ import SearchPage from '@/pages/SearchPage';
 import SearchSettingsPage from '@/pages/SearchSettingsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SharePage from '@/pages/SharePage';
+import PublicSharePage from '@/pages/PublicSharePage';
 import OptimizationPage from '@/pages/OptimizationPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
@@ -252,6 +253,14 @@ export const router = createBrowserRouter([
             <SharePage />
           </ProtectedRoute>
         ),
+      },
+
+      // 🔓 共有リンクの公開閲覧(未認証) [Gate #30]
+      // 管理画面(share/:planId)とはpath自体を分離し、衝突を避ける。
+      // ProtectedRouteで包まないため未ログインでもアクセス可能。
+      {
+        path: 's/:token',
+        element: <PublicSharePage />,
       },
       
       // 🤖 AI最適化

@@ -140,9 +140,17 @@ export interface Notification {
 export interface ShareLink {
   id: string;
   plan_id: string;
-  url: string;
+  // [Gate #30] 生トークンURLはDBに平文保存しなくなったため、作成直後の
+  // レスポンスにのみ含まれる(以降の一覧取得ではnull)。
+  url: string | null;
+  token_prefix: string;
   permission: 'view' | 'edit';
+  has_passcode: boolean;
+  max_uses: number | null;
+  use_count: number;
   expires_at?: string;
+  revoked_at?: string | null;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -154,6 +162,20 @@ export interface Collaborator {
   email: string;
   name?: string;
   status: 'pending' | 'accepted' | 'declined';
+  decided_at?: string | null;
+  plan_title?: string | null;
+}
+
+export interface PublicSharedPlan {
+  plan_id: string;
+  title: string;
+  description?: string | null;
+  destination?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  itinerary: any;
+  permission: 'view' | 'edit';
+  can_edit: boolean;
 }
 
 export interface OptimizationRequest {
@@ -1225,9 +1247,41 @@ class CompleteTravelAPI {
   // コラボレーター機能のバックエンド自体もこれまで存在しなかった(share.pyを
   // 本Gateで新規実装)。getPlan/updatePlan等と同様、バックエンドは生JSONを
   // 返すためクライアント側でApiResponse形状へ手動で包む。
+  async revokeShareLink(planId: string, shareId: string): Promise<ApiResponse<ShareLink>> {
+    const response = await this.client.post<ShareLink>(`/travel-plans/${planId}/share/${shareId}/revoke`);
+    return { success: true, data: response.data } as ApiResponse<ShareLink>;
+  }
+
+  async listMyInvitations(): Promise<ApiResponse<Collaborator[]>> {
+    const response = await this.client.get<Collaborator[]>('/travel-plans/invitations');
+    return { success: true, data: response.data } as ApiResponse<Collaborator[]>;
+  }
+
+  async acceptInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
+    const response = await this.client.post<Collaborator>(`/travel-plans/invitations/${collaboratorId}/accept`);
+    return { success: true, data: response.data } as ApiResponse<Collaborator>;
+  }
+
+  async declineInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
+    const response = await this.client.post<Collaborator>(`/travel-plans/invitations/${collaboratorId}/decline`);
+    return { success: true, data: response.data } as ApiResponse<Collaborator>;
+  }
+
+  // [Gate #30] 認証不要の公開共有リンク解決。未ログインでも呼び出せる
+  // (this.clientはトークン未保持でもAuthorizationヘッダーを付けないだけで
+  // 正常にリクエストできる)。
+  async resolvePublicShare(token: string, passcode?: string): Promise<ApiResponse<PublicSharedPlan>> {
+    const response = await this.client.post<PublicSharedPlan>(`/public/share/${token}/resolve`, {
+      passcode: passcode || undefined,
+    });
+    return { success: true, data: response.data } as ApiResponse<PublicSharedPlan>;
+  }
+
   async createShareLink(planId: string, shareData: {
     permission: 'view' | 'edit';
     expires_at?: string;
+    passcode?: string;
+    max_uses?: number;
   }): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post<ShareLink>(`/travel-plans/${planId}/share`, shareData);
     return { success: true, data: response.data } as ApiResponse<ShareLink>;
@@ -1241,6 +1295,8 @@ class CompleteTravelAPI {
   async updateShareSettings(planId: string, shareId: string, data: {
     permission?: 'view' | 'edit';
     expires_at?: string;
+    passcode?: string | null;
+    max_uses?: number | null;
   }): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.put<ShareLink>(`/travel-plans/${planId}/share/${shareId}`, data);
     return { success: true, data: response.data } as ApiResponse<ShareLink>;
@@ -1359,12 +1415,17 @@ export const notificationsAPI = {
 // 実装はGate #28で行う。
 
 export const shareAPI = {
-  createShareLink: (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string }) => 
+  createShareLink: (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number }) =>
     api.createShareLink(planId, shareData),
   getShareSettings: (planId: string) => api.getShareSettings(planId),
-  updateShareSettings: (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string }) => 
+  updateShareSettings: (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null }) =>
     api.updateShareSettings(planId, shareId, data),
+  revokeShareLink: (planId: string, shareId: string) => api.revokeShareLink(planId, shareId),
   deleteShareLink: (planId: string, shareId: string) => api.deleteShareLink(planId, shareId),
+  listMyInvitations: () => api.listMyInvitations(),
+  acceptInvitation: (collaboratorId: string) => api.acceptInvitation(collaboratorId),
+  declineInvitation: (collaboratorId: string) => api.declineInvitation(collaboratorId),
+  resolvePublicShare: (token: string, passcode?: string) => api.resolvePublicShare(token, passcode),
   inviteCollaborator: (planId: string, inviteData: { email: string; role: 'viewer' | 'editor'; message?: string }) => 
     api.inviteCollaborator(planId, inviteData),
   getCollaborators: (planId: string) => api.getCollaborators(planId),
@@ -1388,12 +1449,17 @@ export const createSpot = (data: any) => api.createSpot(data);
 export const getSpotCategories = () => api.getSpotCategories();
 export const testConnection = () => api.testConnection();
 
-export const createShareLink = (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string }) => 
+export const createShareLink = (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number }) =>
   api.createShareLink(planId, shareData);
 export const getShareSettings = (planId: string) => api.getShareSettings(planId);
-export const updateShareSettings = (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string }) => 
+export const updateShareSettings = (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null }) =>
   api.updateShareSettings(planId, shareId, data);
+export const revokeShareLink = (planId: string, shareId: string) => api.revokeShareLink(planId, shareId);
 export const deleteShareLink = (planId: string, shareId: string) => api.deleteShareLink(planId, shareId);
+export const listMyInvitations = () => api.listMyInvitations();
+export const acceptInvitation = (collaboratorId: string) => api.acceptInvitation(collaboratorId);
+export const declineInvitation = (collaboratorId: string) => api.declineInvitation(collaboratorId);
+export const resolvePublicShare = (token: string, passcode?: string) => api.resolvePublicShare(token, passcode);
 export const inviteCollaborator = (planId: string, inviteData: { email: string; role: 'viewer' | 'editor'; message?: string }) => 
   api.inviteCollaborator(planId, inviteData);
 export const getCollaborators = (planId: string) => api.getCollaborators(planId);

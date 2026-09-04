@@ -6,16 +6,19 @@
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { Bell, Check, CheckCheck, Users, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
-import { notificationsAPI } from '@/services/api';
-import type { Notification } from '@/services/api';
+import { notificationsAPI, listMyInvitations, acceptInvitation, declineInvitation } from '@/services/api';
+import type { Notification, Collaborator } from '@/services/api';
 import { toast } from 'react-hot-toast';
 
 const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [invitations, setInvitations] = React.useState<Collaborator[]>([]);
+  const [invitationsLoading, setInvitationsLoading] = React.useState(true);
+  const [decidingId, setDecidingId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const navigate = useNavigate();
 
@@ -32,9 +35,52 @@ const NotificationsPage: React.FC = () => {
     }
   }, []);
 
+  // [Gate #30] 招待(PlanCollaborator)を承諾/辞退できる手段がこれまで
+  // 一切存在しなかった(承諾しても永久にプランへアクセスできなかった)。
+  // 通知ページに「保留中の招待」セクションを追加し、その場でaccept/decline
+  // できるようにする。
+  const fetchInvitations = React.useCallback(async () => {
+    try {
+      setInvitationsLoading(true);
+      const response = await listMyInvitations();
+      setInvitations((response.data ?? []).filter((i) => i.status === 'pending'));
+    } catch (error) {
+      console.error('Failed to fetch invitations:', error);
+    } finally {
+      setInvitationsLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    fetchInvitations();
+  }, [fetchNotifications, fetchInvitations]);
+
+  const handleAcceptInvitation = async (id: string) => {
+    setDecidingId(id);
+    try {
+      await acceptInvitation(id);
+      setInvitations((prev) => prev.filter((i) => i.id !== id));
+      toast.success('招待を承諾しました');
+    } catch (error) {
+      toast.error('招待の承諾に失敗しました');
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  const handleDeclineInvitation = async (id: string) => {
+    setDecidingId(id);
+    try {
+      await declineInvitation(id);
+      setInvitations((prev) => prev.filter((i) => i.id !== id));
+      toast.success('招待を辞退しました');
+    } catch (error) {
+      toast.error('招待の辞退に失敗しました');
+    } finally {
+      setDecidingId(null);
+    }
+  };
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -85,6 +131,46 @@ const NotificationsPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {!invitationsLoading && invitations.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
+            <Users size={16} />
+            保留中の招待 ({invitations.length})
+          </h2>
+          <div className="space-y-2">
+            {invitations.map((inv) => (
+              <Card key={inv.id} className="p-4">
+                <p className="font-medium text-gray-900">
+                  「{inv.plan_title || '旅行プラン'}」への招待
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  権限: {inv.role === 'editor' ? '編集可能' : '閲覧のみ'}
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    onClick={() => handleAcceptInvitation(inv.id)}
+                    disabled={decidingId === inv.id}
+                  >
+                    <Check size={14} className="mr-1" />
+                    承諾する
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeclineInvitation(inv.id)}
+                    disabled={decidingId === inv.id}
+                  >
+                    <X size={14} className="mr-1" />
+                    辞退する
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">

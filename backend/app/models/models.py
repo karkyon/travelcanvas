@@ -164,14 +164,25 @@ class TravelPlan(Base):
     days = relationship("TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order")
 
 class PlanShareLink(Base):
-    """旅行プラン共有リンクモデル"""
+    """旅行プラン共有リンクモデル
+
+    [Gate #30] トークンの生値はDBに平文保存しない(監査指摘)。生成時に
+    一度だけ生値を発行し、DBにはSHA-256ハッシュ(token_hash)のみを保存
+    する。token_prefixは一覧画面でリンクを識別するための非秘匿な表示用
+    先頭数文字(単体では推測に使えない長さ)。
+    """
     __tablename__ = "plan_share_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
-    token = Column(String, unique=True, index=True, nullable=False)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    token_prefix = Column(String(8), nullable=False)
     permission = Column(String, default="view")  # view | edit
+    passcode_hash = Column(String, nullable=True)
+    max_uses = Column(Integer, nullable=True)
+    use_count = Column(Integer, nullable=False, default=0, server_default="0")
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # リレーションシップ
@@ -189,6 +200,8 @@ class PlanCollaborator(Base):
     status = Column(String, default="pending")  # pending | accepted | declined
     invite_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # [Gate #30] 招待された側がaccept/declineした日時。pending中はNULL。
+    decided_at = Column(DateTime(timezone=True), nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="collaborators")

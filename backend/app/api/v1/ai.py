@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
+from app.core.plan_access import require_plan_access
 from app.models.models import OptimizationResult, TravelPlan, User
 
 router = APIRouter(tags=["ai-optimization"])
@@ -106,12 +107,11 @@ def _plan_metrics(days: List[Dict[str, Any]]) -> Dict[str, float]:
     }
 
 
-def _get_owned_plan(db: Session, plan_id: uuid.UUID, user: User) -> TravelPlan:
-    plan = db.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
-    if not plan:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="旅行プランが見つかりません")
-    if plan.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="アクセス権限がありません")
+def _get_owned_plan(db: Session, plan_id: uuid.UUID, user: User, min_role: str = "editor") -> TravelPlan:
+    """[Gate #30] 最適化の実行・適用・キャンセルはitineraryを書き換える
+    破壊的操作のためeditor以上を要求する(デフォルト)。結果の閲覧のみは
+    呼び出し側でmin_role="viewer"を指定する。"""
+    plan, _role = require_plan_access(db, plan_id, user, min_role=min_role)
     return plan
 
 
@@ -206,7 +206,7 @@ async def get_optimization_result(
 
     plan_id = (result.original_data or {}).get("plan_id")
     if plan_id:
-        _get_owned_plan(db, uuid.UUID(plan_id), current_user)
+        _get_owned_plan(db, uuid.UUID(plan_id), current_user, min_role="viewer")
 
     original_metrics = (result.original_data or {}).get("metrics", {})
     optimized_metrics = (result.optimized_data or {}).get("metrics", {})

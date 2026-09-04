@@ -1,40 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Link, QrCode, Mail, Copy, Eye, Edit3, Shield, 
-  Users, Trash2, Settings, CheckCircle, AlertCircle 
+import {
+  Link, QrCode, Mail, Copy, Eye, Edit3, Shield,
+  Users, Trash2, Ban, Settings, CheckCircle, AlertCircle
 } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { 
-  createShareLink, 
-  getShareSettings, 
-  updateShareSettings,
+import {
+  createShareLink,
+  getShareSettings,
+  revokeShareLink,
   inviteCollaborator,
   getCollaborators,
-  removeCollaborator 
+  removeCollaborator
 } from '../services/api';
 import type { ShareLink, Collaborator } from '../services/api';
-
-// 実バックエンドのレスポンス形状(ShareLink)に準拠。
-// QRコードはバックエンド未提供のため、共有URLからクライアント側で生成する。
-type ShareSettings = ShareLink;
 
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
-  
-  const [shareSettings, setShareSettings] = useState<ShareSettings | null>(null);
+
+  const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
+  // [Gate #30] 生の共有URLはDBに保存されないため、作成直後のこの1回しか
+  // 表示できない。一覧を再取得してもここには戻ってこない。
+  const [justCreatedUrl, setJustCreatedUrl] = useState<string | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  
+
   // フォーム状態
   const [permission, setPermission] = useState<'view' | 'edit'>('view');
-  const [sharePassword, setSharePassword] = useState('');
-  const [allowPublic, setAllowPublic] = useState(false);
+  const [sharePasscode, setSharePasscode] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [maxUses, setMaxUses] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
   const [inviteMessage, setInviteMessage] = useState('');
 
   useEffect(() => {
@@ -47,14 +47,7 @@ const SharePage: React.FC = () => {
   const loadShareSettings = async () => {
     try {
       const response = await getShareSettings(planId!);
-      const existing = response.data?.[0];
-      if (existing) {
-        setShareSettings(existing);
-        setPermission(existing.permission);
-        if (existing.expires_at) {
-          setExpiryDate(existing.expires_at.split('T')[0] || '');
-        }
-      }
+      setShareLinks(response.data ?? []);
     } catch (error) {
       console.error('共有設定の取得に失敗:', error);
     }
@@ -76,11 +69,16 @@ const SharePage: React.FC = () => {
     try {
       const response = await createShareLink(planId!, {
         permission,
-        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined
+        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined,
+        passcode: sharePasscode || undefined,
+        max_uses: maxUses ? Number(maxUses) : undefined,
       });
-      
-      setShareSettings(response.data);
-      setMessage({ text: '共有リンクを作成しました', type: 'success' });
+
+      setJustCreatedUrl(response.data.url ? `${window.location.origin}${response.data.url}` : null);
+      setSharePasscode('');
+      setMaxUses('');
+      await loadShareSettings();
+      setMessage({ text: '共有リンクを作成しました(URLは今だけ表示されます。必ずコピーしてください)', type: 'success' });
     } catch (error) {
       setMessage({ text: '共有リンクの作成に失敗しました', type: 'error' });
     } finally {
@@ -88,47 +86,37 @@ const SharePage: React.FC = () => {
     }
   };
 
-  const handleUpdateShare = async () => {
-    if (!shareSettings) return;
-    
-    setIsSaving(true);
+  const handleRevokeShare = async (shareId: string) => {
+    if (!confirm('この共有リンクを失効させますか？(この操作は取り消せません)')) return;
     try {
-      await updateShareSettings(planId!, shareSettings.id, {
-        permission,
-        expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined
-      });
-      
+      await revokeShareLink(planId!, shareId);
       await loadShareSettings();
-      setMessage({ text: '共有設定を更新しました', type: 'success' });
+      setMessage({ text: '共有リンクを失効させました', type: 'success' });
     } catch (error) {
-      setMessage({ text: '共有設定の更新に失敗しました', type: 'error' });
-    } finally {
-      setIsSaving(false);
+      setMessage({ text: '共有リンクの失効に失敗しました', type: 'error' });
     }
   };
 
-  const handleCopyLink = async () => {
-    if (shareSettings?.url) {
-      try {
-        await navigator.clipboard.writeText(shareSettings.url);
-        setMessage({ text: 'リンクをコピーしました', type: 'success' });
-      } catch (error) {
-        setMessage({ text: 'リンクのコピーに失敗しました', type: 'error' });
-      }
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage({ text: 'リンクをコピーしました', type: 'success' });
+    } catch (error) {
+      setMessage({ text: 'リンクのコピーに失敗しました', type: 'error' });
     }
   };
 
   const handleInviteCollaborator = async () => {
     if (!inviteEmail) return;
-    
+
     setIsSaving(true);
     try {
       await inviteCollaborator(planId!, {
         email: inviteEmail,
-        role: 'editor',
+        role: inviteRole,
         message: inviteMessage || undefined,
       });
-      
+
       setInviteEmail('');
       setInviteMessage('');
       await loadCollaborators();
@@ -142,7 +130,7 @@ const SharePage: React.FC = () => {
 
   const handleRemoveCollaborator = async (collaboratorId: string) => {
     if (!confirm('このコラボレーターを削除しますか？')) return;
-    
+
     try {
       await removeCollaborator(planId!, collaboratorId);
       await loadCollaborators();
@@ -183,6 +171,16 @@ const SharePage: React.FC = () => {
     }
   };
 
+  const getShareStatusBadge = (share: ShareLink) => {
+    if (share.revoked_at) {
+      return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">失効済み</span>;
+    }
+    if (!share.is_active) {
+      return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">無効(期限切れ/上限到達)</span>;
+    }
+    return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">有効</span>;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -213,8 +211,8 @@ const SharePage: React.FC = () => {
         {/* メッセージ表示 */}
         {message && (
           <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
-            message.type === 'success' 
-              ? 'bg-green-100 text-green-800 border border-green-200' 
+            message.type === 'success'
+              ? 'bg-green-100 text-green-800 border border-green-200'
               : 'bg-red-100 text-red-800 border border-red-200'
           }`}>
             {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
@@ -231,57 +229,76 @@ const SharePage: React.FC = () => {
                 <Link size={20} />
                 URL共有
               </h2>
-              
-              {shareSettings ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      共有URL
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={shareSettings.url}
-                        readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-                      />
-                      <button
-                        onClick={handleCopyLink}
-                        className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1"
-                      >
-                        <Copy size={16} />
-                        コピー
-                      </button>
-                    </div>
+
+              {justCreatedUrl && (
+                <div className="mb-4 space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 font-medium">
+                    このURLは今だけ表示されます。ページを離れると二度と表示できません。
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={justCreatedUrl}
+                      readOnly
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                    />
+                    <button
+                      onClick={() => handleCopyLink(justCreatedUrl)}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1"
+                    >
+                      <Copy size={16} />
+                      コピー
+                    </button>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      QRコード
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareSettings.url)}`}
-                        alt="QRコード"
-                        className="w-24 h-24 border rounded-lg"
-                      />
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">
-                          スマホでスキャンしてアクセス
-                        </p>
-                        <a
-                          href={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareSettings.url)}`}
-                          download="qrcode.png"
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
-                        >
-                          <QrCode size={14} />
-                          ダウンロード
-                        </a>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(justCreatedUrl)}`}
+                      alt="QRコード"
+                      className="w-20 h-20 border rounded-lg bg-white"
+                    />
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                      <QrCode size={14} />
+                      スマホでスキャンしてアクセス
+                    </p>
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {shareLinks.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {shareLinks.map((share) => (
+                    <div key={share.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg text-sm">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-gray-500">...{share.token_prefix}</span>
+                          {getShareStatusBadge(share)}
+                          {share.has_passcode && (
+                            <span title="パスコード保護あり">
+                              <Shield size={14} className="text-purple-500" />
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-gray-500 text-xs">
+                          {share.permission === 'edit' ? '編集可能' : '閲覧のみ'}
+                          {share.max_uses != null && ` ・ 使用 ${share.use_count}/${share.max_uses}回`}
+                          {share.expires_at && ` ・ 期限 ${new Date(share.expires_at).toLocaleDateString('ja-JP')}`}
+                        </div>
+                      </div>
+                      {!share.revoked_at && (
+                        <button
+                          onClick={() => handleRevokeShare(share.id)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          title="失効させる"
+                        >
+                          <Ban size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {shareLinks.length === 0 && !justCreatedUrl && (
                 <div className="text-center py-8 text-gray-500">
                   <Link size={48} className="mx-auto mb-4 opacity-50" />
                   <p className="mb-4">まだ共有リンクが作成されていません</p>
@@ -289,13 +306,13 @@ const SharePage: React.FC = () => {
               )}
             </div>
 
-            {/* 権限設定 */}
+            {/* 新規共有リンクの設定 */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Settings size={20} />
-                権限設定
+                新しい共有リンクを発行
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -307,23 +324,23 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="view">👀 閲覧のみ</option>
-                    <option value="edit">✏️ 編集可能</option>
+                    <option value="edit">✏️ 編集可能(将来対応。現在は閲覧のみ動作)</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    パスワード保護（任意）
+                    パスコード保護（任意）
                   </label>
                   <input
                     type="password"
-                    value={sharePassword}
-                    onChange={(e) => setSharePassword(e.target.value)}
-                    placeholder="パスワードを設定（推奨）"
+                    value={sharePasscode}
+                    onChange={(e) => setSharePasscode(e.target.value)}
+                    placeholder="設定すると閲覧時に入力が必要になります"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     有効期限（任意）
@@ -335,39 +352,30 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="allowPublic"
-                    checked={allowPublic}
-                    onChange={(e) => setAllowPublic(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="allowPublic" className="ml-2 block text-sm text-gray-700">
-                    検索エンジンでの公開を許可
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    最大使用回数（任意）
                   </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxUses}
+                    onChange={(e) => setMaxUses(e.target.value)}
+                    placeholder="例: 10"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
-              
+
               <div className="mt-6">
-                {shareSettings ? (
-                  <button
-                    onClick={handleUpdateShare}
-                    disabled={isSaving}
-                    className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? '更新中...' : '設定を更新'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleCreateShare}
-                    disabled={isSaving}
-                    className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? '作成中...' : '共有リンクを作成'}
-                  </button>
-                )}
+                <button
+                  onClick={handleCreateShare}
+                  disabled={isSaving}
+                  className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? '作成中...' : '共有リンクを発行'}
+                </button>
               </div>
             </div>
           </div>
@@ -380,7 +388,7 @@ const SharePage: React.FC = () => {
                 <Mail size={20} />
                 メール招待
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -394,7 +402,21 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    権限
+                  </label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as 'viewer' | 'editor')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="viewer">👀 閲覧のみ</option>
+                    <option value="editor">✏️ 編集可能</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     招待メッセージ（任意）
@@ -407,7 +429,7 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                
+
                 <button
                   onClick={handleInviteCollaborator}
                   disabled={!inviteEmail || isSaving}
@@ -424,7 +446,7 @@ const SharePage: React.FC = () => {
                 <Users size={20} />
                 コラボレーター ({collaborators.length})
               </h2>
-              
+
               {collaborators.length > 0 ? (
                 <div className="space-y-3">
                   {collaborators.map((collaborator) => (
@@ -446,7 +468,7 @@ const SharePage: React.FC = () => {
                           <span>{collaborator.email}</span>
                         </div>
                       </div>
-                      
+
                       <button
                         onClick={() => handleRemoveCollaborator(collaborator.id)}
                         className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
@@ -475,10 +497,11 @@ const SharePage: React.FC = () => {
             <div className="text-sm text-yellow-800">
               <p className="font-medium mb-1">💡 共有時の注意事項</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>パスワード保護を設定することを強く推奨します</li>
-                <li>有効期限を設定することでセキュリティが向上します</li>
+                <li>共有URLは発行直後の画面でしか表示されません。必ずその場でコピーしてください</li>
+                <li>パスコード保護を設定することを強く推奨します</li>
+                <li>有効期限・最大使用回数を設定することでセキュリティが向上します</li>
                 <li>編集権限を与える場合は信頼できる相手にのみ付与してください</li>
-                <li>不要になった共有リンクは削除してください</li>
+                <li>不要になった共有リンクは失効させてください</li>
               </ul>
             </div>
           </div>
