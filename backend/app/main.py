@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import spots, travel, ai, admin, share, notifications
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -105,6 +105,17 @@ async def test_endpoint():
 # エラーハンドラー
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
+    # [Gate #29] このハンドラはステータスコード404の"全て"を横取りする
+    # ため、以前はルーティング自体が一致しなかった場合(Starletteの既定
+    # detail="Not Found")と、route内で意図的にraiseしたHTTPException(404,
+    # detail="...")の両方を区別せず、後者の具体的なメッセージまで
+    # "Endpoint not found: ..." という汎用文言で上書きしてしまっていた
+    # (/plans/{id}/undoの「取り消せる変更がありません」で発覚したが、
+    # spots.py/travel.py等、404を意図的に返す全routeに影響していた
+    # 既存バグ)。Starletteの既定detailの時だけ汎用メッセージにする。
+    detail = getattr(exc, "detail", None)
+    if detail and detail != "Not Found":
+        return JSONResponse(status_code=404, content={"detail": detail})
     return JSONResponse(
         status_code=404,
         content={"detail": f"Endpoint not found: {request.url.path}"}
@@ -163,3 +174,6 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(share.router, prefix="/api/v1")
 # [Gate #26] notifications.pyも新規実装。通知一覧・既読管理のエンドポイント。
 app.include_router(notifications.router, prefix="/api/v1")
+# [Gate #29] /plans: travel_days/travel_events正規テーブルを正本とする新API。
+# 既存の/travel-plans(itinerary JSONベース)と並行稼働する。
+app.include_router(plans.router, prefix="/api/v1")

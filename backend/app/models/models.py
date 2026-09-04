@@ -3,7 +3,10 @@ TravelCanvas Database Models - 最終完成版
 統一されたBaseクラスを使用、重複定義なし
 """
 import uuid
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, JSON, ForeignKey
+from sqlalchemy import (
+    Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
+    ForeignKey, UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -146,6 +149,11 @@ class TravelPlan(Base):
     status = Column(String, default="draft")
     preferences = Column(JSON, nullable=True)
     itinerary = Column(JSON, nullable=True)
+    # [Gate #29] 楽観的並行制御用のリビジョン番号。/plans系の新エンドポイントの
+    # 更新・削除・並べ替えはこの値をIf-Matchヘッダーで要求し、一致しない場合は
+    # 409を返す。更新の度に加算される。既存の/travel-plansエンドポイント
+    # (itinerary JSONベース)は当面この値を変更しない(後方互換維持のため)。
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -153,6 +161,7 @@ class TravelPlan(Base):
     user = relationship("User", back_populates="travel_plans")
     share_links = relationship("PlanShareLink", back_populates="plan", cascade="all, delete-orphan")
     collaborators = relationship("PlanCollaborator", back_populates="plan", cascade="all, delete-orphan")
+    days = relationship("TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order")
 
 class PlanShareLink(Base):
     """旅行プラン共有リンクモデル"""
@@ -308,4 +317,147 @@ class UserSpotVisit(Base):
 
     __table_args__ = (
         {"extend_existing": True},
+    )
+
+
+# ==========================================
+# [Gate #29] Plan/Day/Event 正規化
+# ==========================================
+# TravelPlan.itinerary (JSON blob)から段階的に移行する正規テーブル群。
+# 既存の/travel-plansエンドポイントとitinerary JSONは後方互換のためこの
+# Gateでは変更しない。新設の/plansエンドポイント(app/api/v1/plans.py)が
+# これらのテーブルを読み書きの正本として使う。
+
+
+class TravelDay(Base):
+    """旅行プランの「日」。1プラン×1現地日で一意。"""
+    __tablename__ = "travel_days"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    local_date = Column(Date, nullable=False)
+    timezone_id = Column(String, nullable=False, default="UTC")
+    title = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    plan = relationship("TravelPlan", back_populates="days")
+    events = relationship(
+        "TravelEvent", back_populates="day", cascade="all, delete-orphan",
+        order_by="TravelEvent.sort_order",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "local_date", name="uq_travel_days_plan_date"),
+    )
+
+
+class TravelEvent(Base):
+    """旅程イベント(観光・食事・移動等)。"""
+    __tablename__ = "travel_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    day_id = Column(UUID(as_uuid=True), ForeignKey("travel_days.id"), nullable=False)
+    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=True)
+
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    event_type = Column(String, nullable=False, default="activity")
+
+    start_at = Column(DateTime(timezone=True), nullable=True)
+    end_at = Column(DateTime(timezone=True), nullable=True)
+    local_start_time = Column(String, nullable=True)  # "HH:MM" 表示用
+    is_all_day = Column(Boolean, nullable=False, default=False)
+
+    address = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+
+    locked = Column(Boolean, nullable=False, default=False)  # 最適化対象から除外
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    day = relationship("TravelDay", back_populates="events")
+
+
+class EventLink(Base):
+    """イベントへの補助的な関連情報(メモ/URL等)。将来の文書・予約テーブルへの
+    参照はsource_type/source_idの汎用形で拡張する想定。"""
+    __tablename__ = "event_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=False)
+    link_type = Column(String, nullable=False)  # note | url | other
+    label = Column(String, nullable=True)
+    url = Column(String, nullable=True)
+    body = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanVersion(Base):
+    """プラン全体の論理版。変更が確定するたびに1行追加する。"""
+    __tablename__ = "plan_versions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    revision = Column(Integer, nullable=False)
+    summary = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "revision", name="uq_plan_versions_plan_revision"),
+    )
+
+
+class ChangeSet(Base):
+    """1回の変更操作(作成/更新/削除/並べ替え/Undo)の単位。"""
+    __tablename__ = "change_sets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    source = Column(String, nullable=False, default="manual")  # manual|optimization|replan|import|undo
+    base_revision = Column(Integer, nullable=False)
+    resulting_revision = Column(Integer, nullable=False)
+    applied_at = Column(DateTime(timezone=True), server_default=func.now())
+    undone_at = Column(DateTime(timezone=True), nullable=True)
+
+    items = relationship("ChangeItem", back_populates="change_set", cascade="all, delete-orphan")
+
+
+class ChangeItem(Base):
+    """ChangeSet内の個別エンティティ差分。Undo時にafter->beforeへ戻す。"""
+    __tablename__ = "change_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id"), nullable=False)
+    entity_type = Column(String, nullable=False)  # travel_day | travel_event
+    entity_id = Column(UUID(as_uuid=True), nullable=False)
+    action = Column(String, nullable=False)  # create | update | delete | reorder
+    before_json = Column(JSON, nullable=True)
+    after_json = Column(JSON, nullable=True)
+
+    change_set = relationship("ChangeSet", back_populates="items")
+
+
+class IdempotencyRecord(Base):
+    """[Gate #29] Idempotency-Keyによる重複実行防止。同一user×endpoint×keyの
+    再送に対し、実際の処理を再実行せず前回のレスポンスをそのまま返す。"""
+    __tablename__ = "idempotency_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    key = Column(String, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    endpoint = Column(String, nullable=False)
+    response_status = Column(Integer, nullable=False)
+    response_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("key", "user_id", "endpoint", name="uq_idempotency_key_user_endpoint"),
     )
