@@ -12,10 +12,10 @@
 一元的に解決し、全API(travel.py / plans.py / ai.py / share.py)から
 共通で利用する唯一の判定ロジックとする。
 
-なお app/utils/permissions.py という896行の権限管理フレームワークが
-既に存在するが、grep調査の結果アプリケーションのどこからもimportされて
-いない(ghost code)ことを確認した。本モジュールはそれを置き換えるもの
-ではなく、実際に配線されている新しい最小実装として追加する。
+なお [Gate #31.5B] app/utils/permissions.py という896行の権限管理
+フレームワークが以前存在したが、grep調査の結果アプリケーションの
+どこからもimportされていない(ghost code)ことを確認したため削除した。
+本モジュールが唯一のplan認可正本である。
 """
 import uuid
 from typing import Optional, Tuple

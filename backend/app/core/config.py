@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     
     # レート制限設定
     RATE_LIMIT_AUTH: int = 5       # 認証試行回数制限
+    # [Gate #31.5B] 公開共有リンク解決は未認証で叩けるため、token総当たり
+    # 攻撃を緩和する目的でIPベースのレート制限を設ける。
+    RATE_LIMIT_PUBLIC_SHARE: int = 30  # 1分あたりのIPごとの試行回数上限
     RATE_LIMIT_GUEST: int = 100    # ゲストユーザー制限
     RATE_LIMIT_REGISTERED: int = 1000  # 登録ユーザー制限
     RATE_LIMIT_PREMIUM: int = 5000     # プレミアムユーザー制限

@@ -6,10 +6,14 @@
 できること、viewer/editorのロール境界、共有トークンの失効/期限切れ/
 使用回数上限/パスコード、およびトークンがDBに平文保存されていないことを
 検証する。
+
+[Gate #31.5B] 使用回数上限の消費が同時アクセス下でも原子的であること、
+IPベースのレート制限、監査ログ(ShareAccessLog)、公開ビューへのfield
+policy(itinerary内の機微情報の除去)を検証する。
 """
 from app.core.auth import get_current_user, AuthResult
 from app.core.database import SessionLocal
-from app.models.models import PlanShareLink
+from app.models.models import PlanShareLink, ShareAccessLog
 
 
 def _create_plan(client, title="共有テストプラン"):
@@ -329,3 +333,142 @@ def test_public_resolve_requires_correct_passcode(auth_client):
 
     res = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={"passcode": "sesame123"})
     assert res.status_code == 200
+
+
+# ===== Gate #31.5B: 使用回数の原子性・レート制限・監査ログ・field policy =====
+
+def test_concurrent_resolve_never_exceeds_max_uses(auth_client, db_session):
+    """[Gate #31.5B 監査是正R-05] max_uses=1のリンクに対し、複数スレッドから
+    同時に解決を試みても、成功するのはちょうど1件のみであることを検証する
+    (read-modify-writeのレースコンディションが無いことの直接的な証明)。"""
+    import threading
+
+    client, _user = auth_client
+    plan_id = _create_plan(client, title="同時アクセス検証プラン")
+    res = client.post(
+        f"/api/v1/travel-plans/{plan_id}/share",
+        json={"permission": "view", "max_uses": 1},
+    )
+    raw_token = res.json()["url"].rsplit("/", 1)[-1]
+
+    results = []
+    lock = threading.Lock()
+
+    def _attempt():
+        r = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={})
+        with lock:
+            results.append(r.status_code)
+
+    threads = [threading.Thread(target=_attempt) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert results.count(200) == 1, f"200が複数/0件発生: {results}"
+    assert results.count(404) == 7
+
+    share = db_session.query(PlanShareLink).filter(PlanShareLink.plan_id == plan_id).first()
+    db_session.refresh(share)
+    assert share.use_count == 1  # 8回試行しても1しか消費されていない
+
+
+def test_public_resolve_is_rate_limited_per_ip(auth_client):
+    """[Gate #31.5B] 同一IPからの過剰なリクエストは429で拒否される。"""
+    from app.core.config import settings
+
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/share", json={"permission": "view"})
+    raw_token = res.json()["url"].rsplit("/", 1)[-1]
+
+    last_status = None
+    for _ in range(settings.RATE_LIMIT_PUBLIC_SHARE + 5):
+        last_status = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={}).status_code
+
+    assert last_status == 429
+
+
+def test_public_resolve_sets_no_store_cache_control(auth_client):
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/share", json={"permission": "view"})
+    raw_token = res.json()["url"].rsplit("/", 1)[-1]
+
+    resolve_res = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={})
+    assert resolve_res.headers.get("cache-control") == "no-store"
+
+
+def test_public_resolve_writes_audit_log(auth_client, db_session):
+    """[Gate #31.5B] 成功・失敗いずれの試行もShareAccessLogへ記録される。"""
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/share", json={"permission": "view"})
+    share_id = res.json()["id"]
+    raw_token = res.json()["url"].rsplit("/", 1)[-1]
+
+    client.post(f"/api/v1/public/share/{raw_token}/resolve", json={})
+    client.post("/api/v1/public/share/completely-invalid-token/resolve", json={})
+
+    logs = db_session.query(ShareAccessLog).all()
+    results = {log.result for log in logs}
+    assert "success" in results
+    assert "invalid" in results
+    success_log = next(log for log in logs if log.result == "success")
+    assert str(success_log.share_id) == share_id
+
+
+def test_public_resolve_redacts_sensitive_itinerary_fields(auth_client, db_session):
+    """[Gate #31.5B 監査是正R-06] itinerary内の予約番号・連絡先・正確な
+    緯度経度等が公開ビューから除去され、通常のフィールドは残ることを検証する。"""
+    from app.models.models import TravelPlan
+
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+
+    plan = db_session.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
+    plan.itinerary = {
+        "days": [
+            {
+                "title": "1日目",
+                "events": [
+                    {
+                        "name": "ホテルチェックイン",
+                        "reservation_number": "RSV-12345",
+                        "confirmation_code": "ABCDEF",
+                        "contact_phone": "090-1234-5678",
+                        "email": "guest@example.com",
+                        "latitude": 34.687315,
+                        "longitude": 135.526201,
+                        "notes": "普通のメモ",
+                    }
+                ],
+            }
+        ]
+    }
+    db_session.commit()
+
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/share", json={"permission": "view"})
+    raw_token = res.json()["url"].rsplit("/", 1)[-1]
+
+    resolve_res = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={})
+    assert resolve_res.status_code == 200
+    event = resolve_res.json()["itinerary"]["days"][0]["events"][0]
+
+    assert "reservation_number" not in event
+    assert "confirmation_code" not in event
+    assert "contact_phone" not in event
+    assert "email" not in event
+    assert "latitude" not in event
+    assert "longitude" not in event
+    assert event["name"] == "ホテルチェックイン"
+    assert event["notes"] == "普通のメモ"
+
+
+def test_utils_permissions_module_no_longer_exists(auth_client):
+    """[Gate #31.5B 監査是正R-04] 旧app/utils/permissions.py(ghost code、
+    plan_access.pyとの認可正本二重化の原因)が削除されていることを確認する。"""
+    import importlib.util
+
+    spec = importlib.util.find_spec("app.utils.permissions")
+    assert spec is None, "app/utils/permissions.py が依然として存在します(認可正本が二重化しています)"

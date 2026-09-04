@@ -586,3 +586,24 @@ class OpeningHours(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     place = relationship("Place", back_populates="opening_hours")
+
+
+# ==========================================
+# [Gate #31.5B] 共有リンクアクセス監査ログ
+# ==========================================
+# 公開共有リンク解決(未認証)への全アクセス試行を記録する。誰が(IPアドレス)
+# ・いつ・どの結果(成功/失効/期限切れ/上限到達/パスコード誤り/レート制限)
+# でアクセスしたかを追跡できるようにし、不正利用の調査を可能にする。
+# tokenの生値は記録しない(token_hashのみ)。
+
+class ShareAccessLog(Base):
+    """公開共有リンクへのアクセス試行監査ログ"""
+    __tablename__ = "share_access_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id"), nullable=True)
+    token_hash = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    # result: success | invalid | passcode_failed | rate_limited
+    result = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

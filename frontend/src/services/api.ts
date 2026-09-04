@@ -526,192 +526,31 @@ class CompleteTravelAPI {
     }
   }
 
-  async searchByImage(file: File, location?: { latitude: number; longitude: number }): Promise<ApiResponse<any>> {
-    console.log('🖼️ 統合AI画像検索開始');
-    
-    try {
-      // 高度な画像解析を実行
-      const imageAnalysis = await this.performAdvancedImageAnalysis(file);
-      
-      // 解析結果からスポット検索
-      const searchQuery = imageAnalysis.detected_keywords.join(' ');
-      const searchRequest: SearchRequest = {
-        query: searchQuery,
-        location,
-        max_results: 5
-      };
-      
-      const searchResults = await this.searchSpots(searchRequest);
-      
-      return {
-        success: true,
-        message: `画像からAI解析により${searchResults.data.spots.length}件のスポットを特定`,
-        data: {
-          spots: searchResults.data.spots,
-          total_count: searchResults.data.spots.length,
-          image_analysis: imageAnalysis,
-          search_metadata: {
-            ...searchResults.data.search_metadata,
-            search_type: 'advanced_ai_image_search',
-            confidence: imageAnalysis.overall_confidence
-          }
-        }
-      };
-      
-    } catch (error) {
-      console.error('統合AI画像検索エラー:', error);
-      return {
-        success: false,
-        message: 'AI画像解析中にエラーが発生しました',
-        data: { spots: [], total_count: 0 }
-      };
-    }
+  // [Gate #31.5B] 監査是正: 以前はファイル名の文字列マッチ(「tower」「寺」
+  // 等)だけで「AI画像解析により物体を検出した」と称する架空の結果
+  // (detected_objects等)を生成していた。実装が存在しないことを正直に
+  // 伝え、架空データは一切返さない。実装され次第この関数を差し替える。
+  async searchByImage(_file: File, _location?: { latitude: number; longitude: number }): Promise<ApiResponse<any>> {
+    return {
+      success: false,
+      message: 'この機能は現在利用できません(画像からのスポット検索は未実装です)',
+      data: { spots: [], total_count: 0, error_code: 'FEATURE_UNAVAILABLE' },
+    };
   }
 
-  // AI音声検索（統合版）
-  async searchByVoice(audioBlob: Blob, data: {
+  // [Gate #31.5B] 監査是正: 以前は録音内容を一切解析せず、5つの固定文の
+  // 中からMath.random()で1つを選んで「音声認識結果」として返していた
+  // (録音内容と無関係な文字起こしがユーザーに表示される実害があった)。
+  // 実装が存在しないことを正直に伝え、架空データは一切返さない。
+  async searchByVoice(_audioBlob: Blob, _data: {
     location?: { latitude: number; longitude: number };
     language?: string;
     max_results?: number;
   }): Promise<ApiResponse<any>> {
-    console.log('🎤 統合AI音声検索開始');
-    
-    try {
-      // 高度な音声認識を実行
-      const speechRecognition = await this.performAdvancedSpeechRecognition(audioBlob, data.language || 'ja');
-      
-      // 認識されたテキストでスポット検索
-      const searchRequest: SearchRequest = {
-        query: speechRecognition.transcribed_text,
-        location: data.location,
-        max_results: data.max_results || 5
-      };
-      
-      const searchResults = await this.searchSpots(searchRequest);
-      
-      return {
-        success: true,
-        message: `音声からAI認識により${searchResults.data.spots.length}件のスポットを発見`,
-        data: {
-          spots: searchResults.data.spots,
-          total_count: searchResults.data.spots.length,
-          transcribed_text: speechRecognition.transcribed_text,
-          speech_analysis: speechRecognition,
-          search_metadata: {
-            ...searchResults.data.search_metadata,
-            search_type: 'advanced_ai_voice_search',
-            confidence: speechRecognition.confidence
-          }
-        }
-      };
-      
-    } catch (error) {
-      console.error('統合AI音声検索エラー:', error);
-      return {
-        success: false,
-        message: 'AI音声認識中にエラーが発生しました',
-        data: { spots: [], total_count: 0 }
-      };
-    }
-  }
-  private async performAdvancedImageAnalysis(file: File): Promise<any> {
-    const fileName = file.name.toLowerCase();
-    const fileSize = file.size;
-    const fileType = file.type;
-    
-    const analysis = {
-      detected_objects: [] as string[],
-      detected_keywords: [] as string[],
-      scene_type: '',
-      architectural_style: '',
-      color_analysis: '',
-      overall_confidence: 0.87
-    };
-
-    // ファイル情報による詳細推測
-    if (fileName.includes('tower') || fileName.includes('タワー')) {
-      analysis.detected_objects = ['高層建築物', 'タワー', '展望台', '都市景観'];
-      analysis.detected_keywords = ['東京タワー', 'スカイツリー', '観光地', '夜景'];
-      analysis.scene_type = 'urban_landmark';
-      analysis.architectural_style = 'modern_tower';
-      analysis.color_analysis = '赤・白・夜間照明';
-    } else if (fileName.includes('temple') || fileName.includes('寺')) {
-      analysis.detected_objects = ['寺院建築', '伝統建築', '宗教施設', '屋根瓦'];
-      analysis.detected_keywords = ['寺院', '神社', '歴史的建造物', '文化遺産'];
-      analysis.scene_type = 'religious_site';
-      analysis.architectural_style = 'traditional_japanese';
-      analysis.color_analysis = '木材・朱色・緑';
-    } else if (fileName.includes('food') || fileName.includes('料理')) {
-      analysis.detected_objects = ['料理', '食べ物', 'レストラン', '食器'];
-      analysis.detected_keywords = ['グルメ', 'レストラン', '美味しい店', '和食'];
-      analysis.scene_type = 'food_establishment';
-      analysis.color_analysis = '温かい色調・食欲をそそる';
-    } else {
-      analysis.detected_objects = ['建築物', '都市景観', '観光スポット'];
-      analysis.detected_keywords = ['観光地', '人気スポット', '東京', '散策'];
-      analysis.scene_type = 'general_attraction';
-      analysis.color_analysis = '多様な色彩';
-    }
-
-    // ファイルサイズ・タイプによる信頼度調整
-    if (fileSize > 1024 * 1024) analysis.overall_confidence += 0.05; // 高解像度画像
-    if (fileType.includes('jpeg') || fileType.includes('jpg')) analysis.overall_confidence += 0.03;
-
-    return analysis;
-  }
-
-  private async performAdvancedSpeechRecognition(audioBlob: Blob, language: string): Promise<any> {
-    const audioDuration = audioBlob.size / (16 * 1024); // 概算秒数
-    
-    const advancedTranscriptions = [
-      { 
-        text: "東京の美味しいラーメン店を探しています", 
-        intent: "food_search", 
-        confidence: 0.95,
-        emotion: "enthusiastic",
-        keywords: ["ラーメン", "美味しい", "東京"]
-      },
-      { 
-        text: "渋谷周辺の観光スポットを教えてください", 
-        intent: "tourism_search", 
-        confidence: 0.91,
-        emotion: "curious",
-        keywords: ["渋谷", "観光", "スポット"]
-      },
-      { 
-        text: "新宿でショッピングできる場所はありますか", 
-        intent: "shopping_search", 
-        confidence: 0.93,
-        emotion: "interested",
-        keywords: ["新宿", "ショッピング", "買い物"]
-      },
-      { 
-        text: "浅草の歴史的な場所を見学したいです", 
-        intent: "cultural_search", 
-        confidence: 0.89,
-        emotion: "respectful",
-        keywords: ["浅草", "歴史", "見学"]
-      },
-      { 
-        text: "コーヒーが美味しいカフェを探しています", 
-        intent: "cafe_search", 
-        confidence: 0.94,
-        emotion: "relaxed",
-        keywords: ["コーヒー", "カフェ", "美味しい"]
-      }
-    ];
-
-    const selectedTranscription = advancedTranscriptions[Math.floor(Math.random() * advancedTranscriptions.length)]!;
-    
     return {
-      transcribed_text: selectedTranscription.text,
-      confidence: selectedTranscription.confidence,
-      language_detected: language,
-      intent: selectedTranscription.intent,
-      emotion_analysis: selectedTranscription.emotion,
-      extracted_keywords: selectedTranscription.keywords,
-      audio_quality: audioDuration > 2 ? 'high' : 'medium',
-      processing_time_ms: 1000 + Math.floor(Math.random() * 1000)
+      success: false,
+      message: 'この機能は現在利用できません(音声からのスポット検索は未実装です)',
+      data: { spots: [], total_count: 0, error_code: 'FEATURE_UNAVAILABLE' },
     };
   }
 
