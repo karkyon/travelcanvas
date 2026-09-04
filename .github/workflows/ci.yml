@@ -24,24 +24,57 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (非ブロッキング・既知の負債を可視化するのみ)
-        run: npx eslint . --ext ts,tsx || echo "::warning::eslintで問題が検出されました(現時点では既知の技術的負債として非ブロッキング。Gate 4で解消予定)"
+      # [Gate #31.5A] 2026-09-04時点で142 error / 16 warning(大半が
+      # @typescript-eslint/no-explicit-any)。ドメイン型を個別設計しないと
+      # 安全に解消できないため、Gate #31.5D以降で段階的に解消する計画とし、
+      # このGateでは非blockingのまま維持する(instructions 4章 Gate #31.5Aの
+      # 範囲外)。
+      - name: Lint (非ブロッキング・既知の技術的負債を可視化するのみ)
+        run: npx eslint . --ext ts,tsx || echo "::warning::eslintで142 error/16 warningを検出(2026-09-04時点、主にno-explicit-any)。Gate #31.5D以降で段階的に解消予定。現時点では非blocking"
         continue-on-error: true
+
+      # [Gate #31.5A] 以前はここに「418件の既知エラーがあるため意図的に
+      # 含めていない」という注意書きがあったが、独立検証の結果 tsc --noEmit
+      # は0エラーであり、コメント自体が陳腐化していた(コメントが現実と
+      # 矛盾する状態を放置していた)。実態に合わせてblocking化する。
+      - name: Type-check (ブロッキング)
+        run: npx tsc --noEmit
 
       - name: Build (ブロッキング)
         run: npx vite build
 
-      # 注意: `tsc`によるTypeScript型チェックは意図的に含めていない。
-      # 現時点で418件の既知エラーがあり(型定義未整備・store実装未接続等、
-      # Planner/DragDrop/Optimization機能群が構造的に未完成なことが原因)、
-      # Gate 4(計画コア)着手時に型・store実装を本格修復した後、
-      # このワークフローへ`npx tsc --noEmit`をブロッキングとして追加すること。
+      - name: Unit tests (ブロッキング)
+        run: npm test -- --run
 
   backend:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+    # [Gate #31.5A] 以前はPostgreSQLサービスが無く、DATABASE_URL/JWT_SECRET_KEY
+    # (どちらもデフォルト値を持たない必須設定)も一切注入されていなかったため、
+    # 「Import smoke test」自体が起動時のPydantic必須項目バリデーションで
+    # 失敗していた(mainブランチのActionsがbackend jobで恒常的に赤くなって
+    # いた直接原因)。CI専用の非秘密な固定値を用いて解消する。
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: travelcanvas_app
+          POSTGRES_PASSWORD: ci-only-not-a-real-secret
+          POSTGRES_DB: travelcanvas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U travelcanvas_app"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      # CI専用の非秘密な固定値。本番/開発環境の値とは一切関係が無く、
+      # このジョブの使い捨てPostgreSQLコンテナにのみ通用する。
+      DATABASE_URL: postgresql://travelcanvas_app:ci-only-not-a-real-secret@localhost:5432/travelcanvas_test
+      JWT_SECRET_KEY: ci-only-dummy-jwt-secret-not-used-anywhere-else
     steps:
       - uses: actions/checkout@v4
 
@@ -61,16 +94,29 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      - name: Lint (非ブロッキング・既知の負債を可視化するのみ)
+      # [Gate #31.5A] 2026-09-04時点で1623件(大半が空白/フォーマット系の
+      # W293/W292等)。Gate #31.5D以降で段階的に解消する計画とし、このGate
+      # では非blockingのまま維持する(instructions 4章 Gate #31.5Aの範囲外)。
+      - name: Lint (非ブロッキング・既知の技術的負債を可視化するのみ)
         run: |
           pip install flake8
-          flake8 app --max-line-length=120 --count || echo "::warning::flake8で問題が検出されました(現時点では既知の技術的負債として非ブロッキング)"
+          flake8 app --max-line-length=120 --count || echo "::warning::flake8で1623件を検出(2026-09-04時点、主に空白/フォーマット系)。Gate #31.5D以降で段階的に解消予定。現時点では非blocking"
         continue-on-error: true
 
       - name: Import smoke test (ブロッキング)
         run: python -c "from app.main import app; print('app import OK:', app.title if hasattr(app, \"title\") else app)"
 
-      # 注意: `mypy`による型チェックも同様に意図的に含めていない。
+      - name: Alembic upgrade -> downgrade -> upgrade (ブロッキング)
+        run: |
+          alembic upgrade head
+          alembic downgrade -1
+          alembic upgrade head
+
+      - name: pytest 全件 (ブロッキング)
+        run: python -m pytest tests/ -v
+
+      # 注意: `mypy`による型チェックは引き続き意図的に含めていない。
       # backend/pyproject.toml に poetry ベースの別依存定義が存在するが、
       # 実際にDockerfileが使用するのは requirements.txt (pip) であり、
-      # pyproject.tomlは重複・未整理のまま放置されている(別途整理が必要)。
+      # pyproject.tomlは重複・未整理のまま放置されている(別途整理が必要、
+      # Gate #31.5D以降のスコープ)。
