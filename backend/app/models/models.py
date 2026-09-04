@@ -474,3 +474,115 @@ class IdempotencyRecord(Base):
     __table_args__ = (
         UniqueConstraint("key", "user_id", "endpoint", name="uq_idempotency_key_user_endpoint"),
     )
+
+
+# ==========================================
+# [Gate #31] Candidate/Place/Search正規化
+# ==========================================
+# 監査指摘: frontendがWikipedia/Nominatim/Overpass APIを直接叩き、結果が
+# 0件やエラー時には Math.random() で生成した架空の評価・座標・住所を
+# 実データであるかのようにユーザーへ提示していた(webSearchService.ts
+# generateMockResults)。本Gateでbackend adapterへ検索を集約し、
+# source(provider/URL/取得日時)を保持する正規モデルを新設する。
+# mock/random fallbackは本Gateの新規実装には一切含めない
+# (プロバイダ失敗時は0件を返すのみで、絶対にデータを捏造しない)。
+
+class SearchCandidate(Base):
+    """検索で得られた未確定の候補。同一query・providerへの再検索でも
+    重複削除せず毎回新規行として保持する(比較提示のため)。"""
+    __tablename__ = "search_candidates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    query = Column(String, nullable=False)
+    provider = Column(String, nullable=False)  # wikipedia | nominatim | overpass
+    external_id = Column(String, nullable=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    address = Column(String, nullable=True)
+    raw_payload = Column(JSON, nullable=True)
+    searched_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    source_records = relationship(
+        "SourceRecord", back_populates="candidate", cascade="all, delete-orphan"
+    )
+
+
+class Place(Base):
+    """候補(Candidate)をユーザーが採用(adopt)して確定した正規の場所。"""
+    __tablename__ = "places"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    address = Column(String, nullable=True)
+    adopted_from_candidate_id = Column(
+        UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True
+    )
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    field_sources = relationship(
+        "FieldSource", back_populates="place", cascade="all, delete-orphan"
+    )
+    opening_hours = relationship(
+        "OpeningHours", back_populates="place", cascade="all, delete-orphan"
+    )
+
+
+class SourceRecord(Base):
+    """1回の外部取得(provider呼び出し)の記録。candidateまたはplaceの
+    どちらかに紐づく。freshness_stateはこのレコードが今も鮮度を保って
+    いるかを表す(呼び出し側が取得後の経過時間から判定して更新する)。"""
+    __tablename__ = "source_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    provider = Column(String, nullable=False)
+    source_url = Column(String, nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False)
+    freshness_state = Column(String, nullable=False, default="fresh")  # fresh | stale | expired
+    raw_response = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    candidate = relationship("SearchCandidate", back_populates="source_records")
+    place = relationship("Place")
+
+
+class FieldSource(Base):
+    """Placeの個々のフィールドがどのSourceRecordに由来するかを記録する。
+    1つのPlaceの複数フィールドが異なるproviderに由来するケースを表現できる。"""
+    __tablename__ = "field_sources"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
+    field_name = Column(String, nullable=False)
+    value = Column(Text, nullable=True)
+    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    place = relationship("Place", back_populates="field_sources")
+    source_record = relationship("SourceRecord")
+
+
+class OpeningHours(Base):
+    """[Gate #31 スコープ] モデルのみ新設。providerからの自動取得・
+    populateは次Gate以降(Overpassのopening_hoursタグ解析等)。"""
+    __tablename__ = "opening_hours"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 0=月 ... 6=日
+    open_time = Column(String, nullable=True)  # "09:00"
+    close_time = Column(String, nullable=True)  # "18:00"
+    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    place = relationship("Place", back_populates="opening_hours")

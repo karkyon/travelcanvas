@@ -73,20 +73,26 @@ export interface SpotResult {
   description: string;
   category: string;
   location: {
-    latitude: number;
-    longitude: number;
-    address: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
   };
   rating?: number;
   price_level?: string;
-  distance_km: number;
+  distance_km?: number;
+  // [Gate #31] 実際の取得元(provider名+URL)。フロントエンドが捏造した
+  // 出典("Google Maps"等)は含まない。
   web_sources: string[];
-  ai_confidence: number;
-  ai_relevance_score: number;
+  ai_confidence?: number;
+  ai_relevance_score?: number;
   interest_match_score?: number;
   geographic_score?: number;
   estimated_duration?: number;
   estimated_cost?: number;
+  // [Gate #31] このスポットが由来する検索候補ID。/search/candidates/{id}/adopt
+  // で正規のPlaceへ変換できる。
+  candidate_id?: string;
+  provider?: string;
 }
 
 export interface SearchRequest {
@@ -216,7 +222,6 @@ const API_BASE_URL = resolveApiBaseUrl();
 class CompleteTravelAPI {
   private client: AxiosInstance;
   private accessToken: string | null = null;
-  private webSearchService: any = null;
 
   constructor() {
     this.client = axios.create({
@@ -233,7 +238,6 @@ class CompleteTravelAPI {
 
     this.setupInterceptors();
     this.initializeTokens();
-    this.initializeWebSearchService();
   }
 
   // ===== 汎用HTTPメソッド =====
@@ -317,17 +321,6 @@ class CompleteTravelAPI {
   private initializeTokens(): void {
     this.accessToken = localStorage.getItem('auth_token') || 
                      localStorage.getItem('access_token');
-  }
-
-  private async initializeWebSearchService(): Promise<void> {
-    try {
-      const webSearchModule = await import('./webSearchService');
-      this.webSearchService = webSearchModule.webSearchService;
-      console.log('✅ WebSearchService初期化完了');
-    } catch (error) {
-      console.warn('⚠️ WebSearchService初期化失敗:', error);
-      this.webSearchService = null;
-    }
   }
 
   private setTokens(accessToken: string): void {
@@ -457,136 +450,82 @@ class CompleteTravelAPI {
     return { success: true } as ApiResponse<void>;
   }
 
-  // ===== 統合AI検索システム =====
+  // ===== 統合検索システム =====
+  // [Gate #31] 以前はここで webSearchService (frontendから直接
+  // Wikipedia/Nominatim/Overpass を叩く実装) を呼び、結果が0件/エラー/
+  // レート制限時には3段階のフォールバック(webSearchServiceのMath.random()
+  // 生成、実在店舗名を騙るgenerateEnhancedSearchResults、さらに別の
+  // Math.random()生成であるgenerateFallbackResults)のいずれかが必ず発火し、
+  // 常に「本物らしい」架空の検索結果をユーザーに返していた。
+  //
+  // 本Gateでbackendの /search/spots へ処理を集約する。backendの
+  // search_provider.py は失敗時に空リストを返すのみで、絶対にデータを
+  // 捏造しない。0件は0件のまま返す。
   async searchSpots(request: SearchRequest): Promise<SearchResponse> {
     try {
-      console.log(`🌐 統合AI検索開始: "${request.query}"`);
-      
-      // ユーザー設定を読み込み
-      const preferences = this.loadUserPreferences();
-      
-      // 位置情報を設定に反映
-      if (request.location) {
-        preferences.preferredArea.latitude = request.location.latitude;
-        preferences.preferredArea.longitude = request.location.longitude;
-      }
-      
-      // max_resultsが指定されている場合は優先
-      if (request.max_results) {
-        preferences.searchSettings.maxResults = request.max_results;
-      }
+      const response = await this.client.post('/search/spots', {
+        query: request.query,
+        latitude: request.location?.latitude,
+        longitude: request.location?.longitude,
+        max_results: request.max_results || 20,
+      });
 
-      // WebSearchServiceが利用可能な場合は実際のWeb検索を実行
-      if (this.webSearchService) {
-        try {
-          const searchResults = await this.webSearchService.searchSpotsByKeyword(
-            request.query, 
-            preferences
-          );
-
-          return {
-            success: true,
-            message: `実Web検索により${searchResults.length}件のスポットを発見`,
-            data: {
-              spots: searchResults,
-              total_count: searchResults.length,
-              search_metadata: {
-                query: request.query,
-                search_type: 'real_web_search',
-                api_sources: ['Wikipedia', 'OpenStreetMap', 'Overpass API'],
-                location_considered: true,
-                user_preferences_applied: true,
-                ranking_factors: [
-                  '地理的距離', 
-                  'ユーザー興味度', 
-                  'キーワード関連度', 
-                  'Web情報信頼度',
-                  '旅行スタイル適合性'
-                ]
-              },
-              user_preferences: {
-                max_results: preferences.searchSettings.maxResults,
-                max_distance: preferences.searchSettings.maxDistance,
-                travel_style: preferences.searchSettings.travelStyle,
-                top_interests: this.getTopInterests(preferences.interests)
-              }
-            }
-          };
-        } catch (webSearchError) {
-          console.error('WebSearchService エラー:', webSearchError);
-          return await this.performEnhancedAISearch(request);
-        }
-      } else {
-        console.warn('WebSearchService利用不可、拡張AI検索を実行');
-        return await this.performEnhancedAISearch(request);
-      }
-      
-    } catch (error) {
-      console.error('統合AI検索エラー:', error);
-      return await this.performFallbackSearch(request);
-    }
-  }
-
-  // 拡張AI検索（optimized版の高度なAI検索機能）
-  private async performEnhancedAISearch(request: SearchRequest): Promise<SearchResponse> {
-    try {
-      const preferences = this.loadUserPreferences();
-      const baseLatitude = request.location?.latitude || preferences.preferredArea.latitude;
-      const baseLongitude = request.location?.longitude || preferences.preferredArea.longitude;
-      
-      // AI的なカテゴリ推測
-      const categories = this.inferCategoriesFromQuery(request.query.toLowerCase());
-      
-      // 高品質な検索結果を生成
-      const webSpots = await this.generateEnhancedSearchResults(
-        request.query, 
-        categories, 
-        baseLatitude, 
-        baseLongitude,
-        preferences
-      );
-      
-      // AIランキングアルゴリズム適用
-      const rankedSpots = this.applyAdvancedAIRanking(webSpots, request.query, request.location, preferences);
-      
-      const finalResults = rankedSpots.slice(0, preferences.searchSettings.maxResults);
+      const candidates: any[] = response.data?.candidates ?? [];
+      const spots: SpotResult[] = candidates.map((c) => ({
+        id: c.id,
+        candidate_id: c.id,
+        provider: c.provider,
+        name: c.name,
+        // 説明文を捏造せず、取得元を正直に示すのみにとどめる。
+        description: `${c.provider}経由で見つかった候補です`,
+        category: c.category || 'other',
+        location: {
+          latitude: c.location?.latitude ?? undefined,
+          longitude: c.location?.longitude ?? undefined,
+          address: c.location?.address ?? undefined,
+        },
+        web_sources: [c.provider],
+      }));
 
       return {
         success: true,
-        message: `拡張AI検索により${finalResults.length}件のスポットを発見`,
+        message: `${spots.length}件のスポット候補が見つかりました`,
         data: {
-          spots: finalResults,
-          total_count: finalResults.length,
+          spots,
+          total_count: spots.length,
           search_metadata: {
             query: request.query,
-            search_type: 'enhanced_ai_search',
-            api_sources: ['拡張AI検索', 'インテリジェント分析'],
+            search_type: 'backend_search_adapter',
+            api_sources: ['Wikipedia', 'Nominatim', 'Overpass'],
             location_considered: !!request.location,
-            user_preferences_applied: true,
-            ranking_factors: [
-              'AI関連度スコア',
-              '地理的距離',
-              'ユーザー興味適合度',
-              '人気度・評価',
-              '旅行スタイル適合性'
-            ],
-            confidence: 0.85
+            user_preferences_applied: false,
+            ranking_factors: [],
           },
-          user_preferences: {
-            max_results: preferences.searchSettings.maxResults,
-            max_distance: preferences.searchSettings.maxDistance,
-            travel_style: preferences.searchSettings.travelStyle,
-            top_interests: this.getTopInterests(preferences.interests)
-          }
-        }
+        },
       };
     } catch (error) {
-      console.error('拡張AI検索エラー:', error);
-      return await this.performFallbackSearch(request);
+      console.error('検索エラー:', error);
+      // [Gate #31] エラー時も架空データへフォールバックしない。
+      // 失敗を正直に伝え、呼び出し元(useSearch.tsx)がエラー表示する。
+      return {
+        success: false,
+        message: '検索中にエラーが発生しました',
+        data: {
+          spots: [],
+          total_count: 0,
+          search_metadata: {
+            query: request.query,
+            search_type: 'error',
+            api_sources: [],
+            location_considered: !!request.location,
+            user_preferences_applied: false,
+            ranking_factors: [],
+          },
+        },
+      };
     }
   }
 
-  // AI画像検索（統合版）
   async searchByImage(file: File, location?: { latitude: number; longitude: number }): Promise<ApiResponse<any>> {
     console.log('🖼️ 統合AI画像検索開始');
     
@@ -675,345 +614,6 @@ class CompleteTravelAPI {
       };
     }
   }
-
-  // ===== プライベートヘルパーメソッド =====
-  private loadUserPreferences(): SearchPreferences {
-    try {
-      const savedPreferences = localStorage.getItem('search_preferences');
-      return savedPreferences ? JSON.parse(savedPreferences) : this.getDefaultPreferences();
-    } catch (error) {
-      console.error('設定読み込みエラー:', error);
-      return this.getDefaultPreferences();
-    }
-  }
-
-  private getDefaultPreferences(): SearchPreferences {
-    return {
-      preferredArea: {
-        name: '東京',
-        latitude: 35.6762,
-        longitude: 139.6503,
-        radius: 50
-      },
-      interests: {
-        nature: 5,
-        culture: 5,
-        food: 5,
-        shopping: 5,
-        entertainment: 5,
-        sports: 5,
-        relaxation: 5,
-        nightlife: 5
-      },
-      searchSettings: {
-        maxResults: 5,
-        maxDistance: 50,
-        pricePreference: 'any',
-        travelStyle: 'solo',
-        duration: 'half-day'
-      }
-    };
-  }
-
-  private getTopInterests(interests: Record<string, number>): string[] {
-    const labels: Record<string, string> = {
-      nature: '自然・公園',
-      culture: '文化・歴史',
-      food: 'グルメ・食事',
-      shopping: 'ショッピング',
-      entertainment: 'エンターテイメント',
-      sports: 'スポーツ・アクティビティ',
-      relaxation: 'リラクゼーション',
-      nightlife: 'ナイトライフ'
-    };
-
-    return Object.entries(interests)
-      .filter(([, value]) => value >= 7)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 3)
-      .map(([key]) => labels[key] || key);
-  }
-
-  private inferCategoriesFromQuery(query: string): string[] {
-    const categories: string[] = [];
-    
-    if (query.includes('ラーメン') || query.includes('レストラン') || query.includes('食事') || query.includes('カフェ') || query.includes('グルメ')) {
-      categories.push('restaurant');
-    }
-    if (query.includes('観光') || query.includes('寺') || query.includes('神社') || query.includes('タワー') || query.includes('美術館') || query.includes('博物館')) {
-      categories.push('tourist_attraction');
-    }
-    if (query.includes('ショッピング') || query.includes('買い物') || query.includes('デパート') || query.includes('モール')) {
-      categories.push('shopping_mall');
-    }
-    if (query.includes('ホテル') || query.includes('宿泊') || query.includes('泊まる')) {
-      categories.push('lodging');
-    }
-    if (query.includes('公園') || query.includes('自然') || query.includes('散歩')) {
-      categories.push('park');
-    }
-    
-    return categories.length > 0 ? categories : ['tourist_attraction'];
-  }
-
-  private async generateEnhancedSearchResults(
-    query: string, 
-    categories: string[], 
-    lat: number, 
-    lng: number,
-    preferences: SearchPreferences
-  ): Promise<SpotResult[]> {
-    const spots: SpotResult[] = [];
-    
-    // クエリベースの高品質スポット生成
-    if (query.includes('ラーメン') || query.includes('食事')) {
-      spots.push(
-        {
-          id: `enhanced-${Date.now()}-1`,
-          name: "一蘭 渋谷店",
-          description: "24時間営業の豚骨ラーメン専門店。一人一人の好みに合わせてカスタマイズ可能。",
-          category: "restaurant",
-          location: { 
-            latitude: lat + 0.01, 
-            longitude: lng + 0.01, 
-            address: "東京都渋谷区道玄坂2-29-11" 
-          },
-          rating: 4.2,
-          price_level: "medium",
-          distance_km: this.calculateDistance(lat, lng, lat + 0.01, lng + 0.01),
-          web_sources: ["Google Maps", "食べログ", "ぐるなび"],
-          ai_confidence: 0.92,
-          ai_relevance_score: 8.5,
-          interest_match_score: preferences.interests.food / 10,
-          geographic_score: 8.0,
-          estimated_duration: 45,
-          estimated_cost: 1200
-        },
-        {
-          id: `enhanced-${Date.now()}-2`,
-          name: "麺屋 すみか",
-          description: "地元で愛される家系ラーメン店。濃厚なスープと手作り麺が自慢。",
-          category: "restaurant",
-          location: { 
-            latitude: lat + 0.005, 
-            longitude: lng - 0.008, 
-            address: "東京都新宿区歌舞伎町1-12-3" 
-          },
-          rating: 4.5,
-          price_level: "low",
-          distance_km: this.calculateDistance(lat, lng, lat + 0.005, lng - 0.008),
-          web_sources: ["ぐるなび", "Retty", "食べログ"],
-          ai_confidence: 0.88,
-          ai_relevance_score: 7.8,
-          interest_match_score: preferences.interests.food / 10,
-          geographic_score: 8.5,
-          estimated_duration: 40,
-          estimated_cost: 950
-        }
-      );
-    }
-
-    if (query.includes('観光') || query.includes('タワー') || query.includes('寺')) {
-      spots.push(
-        {
-          id: `enhanced-${Date.now()}-3`,
-          name: "東京スカイツリー",
-          description: "高さ634mの世界有数の電波塔。展望台からは東京の絶景を一望できる。",
-          category: "tourist_attraction",
-          location: { 
-            latitude: lat + 0.02, 
-            longitude: lng + 0.03, 
-            address: "東京都墨田区押上1-1-2" 
-          },
-          rating: 4.3,
-          price_level: "high",
-          distance_km: this.calculateDistance(lat, lng, lat + 0.02, lng + 0.03),
-          web_sources: ["公式サイト", "じゃらん", "トリップアドバイザー"],
-          ai_confidence: 0.95,
-          ai_relevance_score: 9.2,
-          interest_match_score: preferences.interests.culture / 10,
-          geographic_score: 7.5,
-          estimated_duration: 120,
-          estimated_cost: 2100
-        },
-        {
-          id: `enhanced-${Date.now()}-4`,
-          name: "浅草寺",
-          description: "東京最古の寺院。雷門と仲見世通りで有名な、東京を代表する観光スポット。",
-          category: "tourist_attraction",
-          location: { 
-            latitude: lat + 0.015, 
-            longitude: lng + 0.025, 
-            address: "東京都台東区浅草2-3-1" 
-          },
-          rating: 4.4,
-          price_level: "free",
-          distance_km: this.calculateDistance(lat, lng, lat + 0.015, lng + 0.025),
-          web_sources: ["公式サイト", "トリップアドバイザー", "じゃらん"],
-          ai_confidence: 0.93,
-          ai_relevance_score: 8.9,
-          interest_match_score: preferences.interests.culture / 10,
-          geographic_score: 8.0,
-          estimated_duration: 90,
-          estimated_cost: 0
-        }
-      );
-    }
-
-    // より多様な結果を生成
-    if (spots.length < 3) {
-      for (let i = 0; i < Math.min(3 - spots.length, 2); i++) {
-        const category = categories[i % categories.length] || 'other';
-        const distance = Math.random() * 15;
-        
-        spots.push({
-          id: `enhanced-fallback-${Date.now()}-${i}`,
-          name: `${query}関連高品質スポット${i + 1}`,
-          description: `AI分析により「${query}」に最適化されたおすすめスポットです。`,
-          category: category,
-          location: {
-            latitude: lat + (Math.random() - 0.5) * 0.02,
-            longitude: lng + (Math.random() - 0.5) * 0.02,
-            address: `東京都内 ${Math.floor(Math.random() * 5) + 1}-${Math.floor(Math.random() * 20) + 1}-${Math.floor(Math.random() * 10) + 1}`
-          },
-          rating: 3.8 + Math.random() * 1.2,
-          price_level: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-          distance_km: distance,
-          web_sources: ['拡張AI検索', '複数Web情報源'],
-          ai_confidence: 0.80 + Math.random() * 0.15,
-          ai_relevance_score: 6 + Math.random() * 3,
-          interest_match_score: 0.7,
-          geographic_score: Math.max(0, 8 - distance),
-          estimated_duration: 30 + Math.random() * 90,
-          estimated_cost: Math.floor(Math.random() * 2000)
-        });
-      }
-    }
-
-    return spots;
-  }
-
-  private applyAdvancedAIRanking(
-    spots: SpotResult[], 
-    query: string, 
-    _location?: { latitude: number; longitude: number },
-    preferences?: SearchPreferences
-  ): SpotResult[] {
-    return spots.map(spot => {
-      let totalScore = 0;
-
-      // 地理的距離スコア (0-10)
-      const geoScore = Math.max(0, 10 - spot.distance_km);
-      totalScore += geoScore * 1.5;
-
-      // 評価・人気度スコア (0-10)
-      const ratingScore = (spot.rating || 3.5) * 2;
-      totalScore += ratingScore * 1.2;
-
-      // AI信頼度スコア (0-10)
-      const confidenceScore = spot.ai_confidence * 10;
-      totalScore += confidenceScore * 1.0;
-
-      // クエリ適合性スコア (0-10)
-      const queryLower = query.toLowerCase();
-      let relevanceScore = 0;
-      if (spot.name.toLowerCase().includes(queryLower)) relevanceScore += 5;
-      if (spot.description.toLowerCase().includes(queryLower)) relevanceScore += 3;
-      totalScore += relevanceScore * 1.3;
-
-      // ユーザー興味適合度スコア (0-10)
-      if (preferences && spot.interest_match_score) {
-        totalScore += spot.interest_match_score * 10 * 1.1;
-      }
-
-      // 旅行スタイル適合性
-      if (preferences?.searchSettings.travelStyle === 'solo' && spot.category === 'park') {
-        totalScore += 2;
-      }
-      if (preferences?.searchSettings.travelStyle === 'family' && spot.category === 'tourist_attraction') {
-        totalScore += 2;
-      }
-
-      // 最終AIスコアを算出
-      spot.ai_relevance_score = Math.round(totalScore * 10) / 10;
-      spot.geographic_score = geoScore;
-
-      return spot;
-    }).sort((a, b) => b.ai_relevance_score - a.ai_relevance_score);
-  }
-
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return Math.round(R * c * 100) / 100; // 小数点第2位まで
-  }
-
-  private async performFallbackSearch(request: SearchRequest): Promise<SearchResponse> {
-    console.log('🔄 フォールバック検索実行中...');
-    
-    const fallbackResults = this.generateFallbackResults(request.query, request.location);
-    
-    return {
-      success: true,
-      message: `フォールバック検索により${fallbackResults.length}件のスポットを生成`,
-      data: {
-        spots: fallbackResults,
-        total_count: fallbackResults.length,
-        search_metadata: {
-          query: request.query,
-          search_type: 'fallback_search',
-          api_sources: ['フォールバック検索'],
-          location_considered: !!request.location,
-          user_preferences_applied: false,
-          ranking_factors: ['基本スコア', '地理的距離'],
-          confidence: 0.6
-        }
-      }
-    };
-  }
-
-  private generateFallbackResults(query: string, location?: { latitude: number; longitude: number }): SpotResult[] {
-    const baseLatitude = location?.latitude || 35.6762;
-    const baseLongitude = location?.longitude || 139.6503;
-    
-    const mockSpots: SpotResult[] = [];
-    const categories = ['tourist_attraction', 'restaurant', 'shopping', 'culture', 'nature'];
-    
-    for (let i = 0; i < 3; i++) {
-      const category = categories[i % categories.length] || 'other';
-      const distance = Math.random() * 20;
-      
-      mockSpots.push({
-        id: `fallback_${Date.now()}_${i}`,
-        name: `${query}関連スポット${i + 1}`,
-        description: `「${query}」に関連する人気のスポットです。詳細な情報については、現地でご確認ください。`,
-        category: category,
-        location: {
-          latitude: baseLatitude + (Math.random() - 0.5) * 0.1,
-          longitude: baseLongitude + (Math.random() - 0.5) * 0.1,
-          address: `東京都内 ${Math.floor(Math.random() * 5) + 1}-${Math.floor(Math.random() * 20) + 1}-${Math.floor(Math.random() * 10) + 1}`
-        },
-        rating: 3.5 + Math.random() * 1.5,
-        price_level: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)],
-        distance_km: distance,
-        web_sources: ['フォールバック検索'],
-        ai_confidence: 0.6 + Math.random() * 0.2,
-        ai_relevance_score: 5 + Math.random() * 5,
-        interest_match_score: 0.5,
-        geographic_score: Math.max(0, 5 - distance),
-        estimated_duration: 60 + Math.random() * 120,
-        estimated_cost: Math.floor(Math.random() * 2000)
-      });
-    }
-    
-    return mockSpots.sort((a, b) => b.ai_relevance_score - a.ai_relevance_score);
-  }
-
   private async performAdvancedImageAnalysis(file: File): Promise<any> {
     const fileName = file.name.toLowerCase();
     const fileSize = file.size;
