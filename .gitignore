@@ -187,3 +187,7 @@ apply_gate[0-9]*.py
 # Vitest/Playwright report output (regenerated on every test run)
 frontend/test-results/
 test-results/
+
+# Gate patch検証用に一時展開される依存キャッシュ (pip install --target)
+backend/.gate*_deps-py*/
+*.bundle
