@@ -375,6 +375,10 @@ class TravelEvent(Base):
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
     day_id = Column(UUID(as_uuid=True), ForeignKey("travel_days.id"), nullable=False)
     spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=True)
+    # [Gate #32] このイベントがcandidate/place(Gate #31正規化検索結果)から
+    # 採用されたものであれば、そのPlaceを参照する(出典追跡・地図上の
+    # candidate<->event紐付けのため)。手動作成されたイベントはNULL。
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
@@ -606,4 +610,32 @@ class ShareAccessLog(Base):
     ip_address = Column(String, nullable=True)
     # result: success | invalid | passcode_failed | rate_limited
     result = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ==========================================
+# [Gate #32] PLAN MAP基礎 — route segment
+# ==========================================
+
+class RouteSegment(Base):
+    """1日の中で連続する2イベント間の移動区間推定。
+
+    [Gate #32 スコープ] 外部ルーティングAPI(Google Directions等)は
+    APIキー未提供のため利用しない。距離はhaversine(大円距離)による
+    概算のみを保持し、is_estimate=Trueで確定値ではないことを明示する
+    (v5.1仕様「計算失敗時は直線距離を確定値にせず概算と明示する」に対応)。
+    """
+    __tablename__ = "route_segments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    from_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    to_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    mode = Column(String, nullable=False)  # walking | driving | transit
+    distance_km = Column(Float, nullable=True)
+    duration_minutes = Column(Float, nullable=True)
+    is_estimate = Column(Boolean, nullable=False, default=True)
+    provider = Column(String, nullable=False)  # 例: "haversine_estimate"
+    algorithm_version = Column(String, nullable=False)
+    computed_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

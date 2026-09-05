@@ -83,6 +83,7 @@ export interface NormalizedEvent {
   longitude?: number | null;
   locked: boolean;
   sort_order: number;
+  place_id?: string | null;
 }
 
 export interface NormalizedDay {
@@ -100,6 +101,35 @@ export interface NormalizedPlanDetail {
   title: string;
   revision: number;
   days: NormalizedDay[];
+}
+
+// [Gate #32] PLAN MAP: route/insertion preview のレスポンス型
+export interface LegPreview {
+  from_event_id?: string | null;
+  to_event_id?: string | null;
+  mode: string;
+  distance_km?: number | null;
+  duration_minutes?: number | null;
+  is_estimate: boolean;
+  unknown: boolean;
+}
+
+export interface RoutePreview {
+  day_id: string;
+  legs: LegPreview[];
+  total_distance_km?: number | null;
+  total_duration_minutes?: number | null;
+  provider: string;
+  algorithm_version: string;
+}
+
+export interface InsertionPreview {
+  day_id: string;
+  before: RoutePreview;
+  after: RoutePreview;
+  added_distance_km?: number | null;
+  added_duration_minutes?: number | null;
+  unknown: boolean;
 }
 
 export interface SpotResult {
@@ -561,6 +591,17 @@ class CompleteTravelAPI {
     }
   }
 
+  // [Gate #32] 検索候補(candidate)を正規のPlaceへ採用する(Gate #31
+  // /search/candidates/{id}/adopt)。「旅程に追加」フローで、adopt→
+  // createEvent(place_id指定)の順に呼ぶ。
+  async adoptCandidate(candidateId: string): Promise<{
+    id: string; name: string; category?: string;
+    location: { latitude?: number; longitude?: number; address?: string };
+  }> {
+    const response = await this.client.post(`/search/candidates/${candidateId}/adopt`);
+    return response.data;
+  }
+
   // [Gate #31.5B] 監査是正: 以前はファイル名の文字列マッチ(「tower」「寺」
   // 等)だけで「AI画像解析により物体を検出した」と称する架空の結果
   // (detected_objects等)を生成していた。実装が存在しないことを正直に
@@ -730,6 +771,7 @@ class CompleteTravelAPI {
     data: {
       day_id: string; title: string; description?: string; event_type?: string;
       local_start_time?: string; address?: string; latitude?: number; longitude?: number;
+      place_id?: string;
     },
     idempotencyKey: string
   ): Promise<NormalizedEvent> {
@@ -775,6 +817,24 @@ class CompleteTravelAPI {
   async undoLastPlanChange(planId: string, ifMatch: number): Promise<{ revision: number }> {
     const response = await this.client.post<{ revision: number }>(
       `/plans/${planId}/undo`, {}, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  // ===== [Gate #32] PLAN MAP: route/insertion preview =====
+  async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
+    const response = await this.client.get<RoutePreview>(
+      `/plans/${planId}/days/${dayId}/route-preview`, { params: { mode } }
+    );
+    return response.data;
+  }
+
+  async getInsertionPreview(
+    planId: string, dayId: string,
+    data: { place_id?: string; latitude?: number; longitude?: number; after_event_id?: string; mode?: string }
+  ): Promise<InsertionPreview> {
+    const response = await this.client.post<InsertionPreview>(
+      `/plans/${planId}/days/${dayId}/insertion-preview`, data
     );
     return response.data;
   }

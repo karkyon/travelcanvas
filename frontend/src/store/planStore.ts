@@ -50,6 +50,14 @@ interface PlanState {
 
   // Schedule item management
   addScheduleItem: (dayIndex: number, item: Partial<ScheduleItem>) => Promise<void>;
+  // [Gate #32] 検索候補(candidate)を採用してその日程へ追加する
+  // (「候補に追加」とは別の「旅程に追加」導線)。afterEventIdを指定すると
+  // その直後へ挿入する(未指定なら末尾)。
+  addScheduleItemFromCandidate: (
+    dayIndex: number,
+    candidateId: string,
+    fallbackTitle?: string
+  ) => Promise<void>;
   updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<void>;
   deleteScheduleItem: (itemId: string) => Promise<void>;
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
@@ -377,6 +385,44 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       set({ currentPlan: plan });
       console.error('Add schedule item error:', error);
       toast.error('スポットの追加に失敗しました');
+    }
+  },
+
+  // [Gate #32] 検索候補を「旅程に追加」する。まず候補をPlaceへ採用
+  // (adopt)し、そのplace_idでイベントを作成する。「候補に追加」
+  // (検索結果に残しておくだけの操作、既にGate #31の検索時点でDBへ
+  // 保存済み)とは明確に分離された、確定的な操作。
+  addScheduleItemFromCandidate: async (dayIndex: number, candidateId: string, fallbackTitle?: string) => {
+    const state = get();
+    if (!state.currentPlan || !state.currentPlan.days[dayIndex]) return;
+    if (state.currentPlan.revision === undefined) {
+      toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
+      return;
+    }
+
+    const plan = state.currentPlan;
+    const day = plan.days[dayIndex]!;
+
+    try {
+      const place = await apiService.adoptCandidate(candidateId);
+      await apiService.createEvent(
+        plan.id,
+        {
+          day_id: day.id,
+          title: place.name || fallbackTitle || '新しいスポット',
+          event_type: place.category || 'sightseeing',
+          address: place.location?.address,
+          latitude: place.location?.latitude,
+          longitude: place.location?.longitude,
+          place_id: place.id,
+        },
+        generateIdempotencyKey()
+      );
+      await get().loadPlan(plan.id);
+      toast.success(`${place.name}を旅程に追加しました`);
+    } catch (error) {
+      console.error('Add schedule item from candidate error:', error);
+      toast.error('候補の旅程への追加に失敗しました');
     }
   },
 

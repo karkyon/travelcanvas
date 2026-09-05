@@ -23,6 +23,9 @@ import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/components/common/Toast';
 import { spotApiService } from '@/services/spotApi';
+import { api as apiService } from '@/services/api';
+import type { RoutePreview } from '@/services/api';
+import PlanMap from '@/components/planner/PlanMap';
 import type { ScheduleItem as ScheduleItemType } from '@/types';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
@@ -66,12 +69,18 @@ const PlannerPage: React.FC = () => {
     clearCurrentPlan,
     updateScheduleItem,
     deleteScheduleItem,
+    searchResults,
+    addScheduleItemFromCandidate,
   } = usePlanStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanDestination, setNewPlanDestination] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  // [Gate #32] PLAN MAP: timelineとMAPの双方向選択同期用
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
+  const [showMap, setShowMap] = useState(true);
 
   // [Gate #18] DayView.tsxのonItemClick/onItemEdit/onItemDeleteがどこからも
   // 渡されておらず、日程に追加したスケジュールアイテムをクリックしても編集も
@@ -226,6 +235,28 @@ const PlannerPage: React.FC = () => {
     }
   }, [planId]);
 
+  // [Gate #32] 表示中の日が変わるたびに移動概算(route-preview)を取得する。
+  // 座標が無い/1件以下の日はlegsが空になるだけで、架空の値は作らない。
+  useEffect(() => {
+    const activeDay = currentPlan?.days[currentDayIndex];
+    if (!currentPlan || !activeDay) {
+      setRoutePreview(null);
+      return;
+    }
+    let cancelled = false;
+    apiService
+      .getRoutePreview(currentPlan.id, activeDay.id, 'walking')
+      .then((preview) => {
+        if (!cancelled) setRoutePreview(preview);
+      })
+      .catch(() => {
+        if (!cancelled) setRoutePreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPlan?.id, currentDayIndex, currentPlan?.days.length]);
+
   const handleCreatePlan = async () => {
     if (!newPlanTitle.trim()) return;
     setIsCreating(true);
@@ -353,6 +384,13 @@ const PlannerPage: React.FC = () => {
             >
               ↩ 元に戻す
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMap((prev) => !prev)}
+            >
+              {showMap ? '地図を隠す' : '🗺 地図を表示'}
+            </Button>
           </div>
 
           {currentPlan.days.length === 0 ? (
@@ -365,14 +403,33 @@ const PlannerPage: React.FC = () => {
               </div>
             </Card>
           ) : activeDay ? (
-            <DayView
-              day={activeDay}
-              planId={currentPlan.id}
-              isActive
-              onItemClick={openEditItem}
-              onItemEdit={openEditItem}
-              onItemDelete={handleDeleteItem}
-            />
+            <>
+              {showMap && (
+                <div className="mb-4">
+                  <PlanMap
+                    day={activeDay}
+                    candidates={searchResults}
+                    routePreview={routePreview}
+                    selectedEventId={selectedEventId}
+                    onSelectEvent={setSelectedEventId}
+                    onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
+                      addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
+                    }
+                  />
+                </div>
+              )}
+              <DayView
+                day={activeDay}
+                planId={currentPlan.id}
+                isActive
+                onItemClick={(item) => {
+                  setSelectedEventId(item.id);
+                  openEditItem(item);
+                }}
+                onItemEdit={openEditItem}
+                onItemDelete={handleDeleteItem}
+              />
+            </>
           ) : null}
         </div>
 

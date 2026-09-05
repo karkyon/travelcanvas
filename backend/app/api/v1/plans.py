@@ -35,8 +35,9 @@ from app.core.auth import get_current_active_user
 from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
-    IdempotencyRecord, User,
+    IdempotencyRecord, User, Place,
 )
+from app.services.route_estimator import estimate_leg
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -85,6 +86,11 @@ class EventCreate(BaseModel):
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # [Gate #32] 検索候補(Gate #31 /search)から採用したPlaceのID。
+    # 指定された場合、title/address/latitude/longitudeのうち未指定の
+    # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
+    # 分離しつつ、旅程に追加した際は出典を引き継ぐため)。
+    place_id: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
@@ -121,11 +127,12 @@ class EventResponse(BaseModel):
     longitude: Optional[float] = None
     locked: bool
     sort_order: int
+    place_id: Optional[str] = None
 
-    @field_validator("id", "day_id", mode="before")
+    @field_validator("id", "day_id", "place_id", mode="before")
     @classmethod
     def _stringify_ids(cls, v):
-        return str(v)
+        return str(v) if v is not None else v
 
     class Config:
         from_attributes = True
@@ -252,6 +259,7 @@ def _day_to_dict(day: TravelDay) -> dict:
 def _event_to_dict(event: TravelEvent) -> dict:
     return {
         "day_id": str(event.day_id),
+        "place_id": str(event.place_id) if event.place_id else None,
         "title": event.title,
         "description": event.description,
         "event_type": event.event_type,
@@ -426,13 +434,33 @@ async def create_event(
     if not day:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
 
+    # [Gate #32] place_idが指定された場合、未指定フィールドをPlaceの値で
+    # 補完する(検索候補を「旅程に追加」する導線)。
+    title = event_data.title
+    address = event_data.address
+    latitude = event_data.latitude
+    longitude = event_data.longitude
+    place_uuid: Optional[uuid.UUID] = None
+    if event_data.place_id:
+        try:
+            place_uuid = uuid.UUID(event_data.place_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="place_idの形式が不正です")
+        place = db.query(Place).filter(Place.id == place_uuid).first()
+        if not place:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定したPlaceが見つかりません")
+        title = title or place.name
+        address = address if address is not None else place.address
+        latitude = latitude if latitude is not None else place.latitude
+        longitude = longitude if longitude is not None else place.longitude
+
     max_sort = db.query(TravelEvent).filter(TravelEvent.day_id == day.id).count()
     new_event = TravelEvent(
-        plan_id=plan.id, day_id=day.id,
-        title=event_data.title, description=event_data.description,
+        plan_id=plan.id, day_id=day.id, place_id=place_uuid,
+        title=title, description=event_data.description,
         event_type=event_data.event_type, start_at=event_data.start_at, end_at=event_data.end_at,
         local_start_time=event_data.local_start_time, is_all_day=event_data.is_all_day,
-        address=event_data.address, latitude=event_data.latitude, longitude=event_data.longitude,
+        address=address, latitude=latitude, longitude=longitude,
         sort_order=max_sort,
     )
     db.add(new_event)
@@ -658,9 +686,193 @@ def _undo_event_item(db: Session, plan: TravelPlan, item: ChangeItem):
         before = item.before_json
         db.add(TravelEvent(
             id=item.entity_id, plan_id=plan.id, day_id=before["day_id"],
+            place_id=before.get("place_id"),
             title=before["title"], description=before.get("description"),
             event_type=before.get("event_type", "activity"), local_start_time=before.get("local_start_time"),
             is_all_day=before.get("is_all_day", False), address=before.get("address"),
             latitude=before.get("latitude"), longitude=before.get("longitude"),
             locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
         ))
+
+
+# ===== [Gate #32] PLAN MAP: route preview / insertion preview =====
+# v5.1仕様: 「候補を日付/時間スロットへドラッグすると挿入プレビューを
+# 開始する」「採用前に移動時間/距離/営業時間/差分をpreviewし、承認後
+# のみ正本更新」に対応する。ここでの計算はDBへ一切書き込まない
+# (route_segmentsへの永続化は将来のGateで検討、本Gateではpreview応答
+# のみを返す)。座標が無い地点(provider不在・曖昧位置)はunknownとして
+# 明示し、架空の距離・時間を作らない。
+
+class LegPreview(BaseModel):
+    from_event_id: Optional[str] = None
+    to_event_id: Optional[str] = None
+    mode: str
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[float] = None
+    is_estimate: bool
+    unknown: bool = False  # 座標欠落等でduration/distanceを算出できない場合True
+
+
+class RoutePreviewResponse(BaseModel):
+    day_id: str
+    legs: List[LegPreview]
+    total_distance_km: Optional[float] = None
+    total_duration_minutes: Optional[float] = None
+    provider: str
+    algorithm_version: str
+
+
+def _compute_day_legs(events: List[TravelEvent], mode: str) -> List[LegPreview]:
+    legs: List[LegPreview] = []
+    for i in range(len(events) - 1):
+        a, b = events[i], events[i + 1]
+        result = estimate_leg(a.latitude, a.longitude, b.latitude, b.longitude, mode)
+        if result is None:
+            legs.append(LegPreview(
+                from_event_id=str(a.id), to_event_id=str(b.id), mode=mode,
+                is_estimate=True, unknown=True,
+            ))
+        else:
+            legs.append(LegPreview(
+                from_event_id=str(a.id), to_event_id=str(b.id),
+                mode=result["mode"], distance_km=result["distance_km"],
+                duration_minutes=result["duration_minutes"], is_estimate=True, unknown=False,
+            ))
+    return legs
+
+
+def _summarize_legs(legs: List["LegPreview"]):
+    """区間リストの合計距離・時間を返す。座標不明の区間が1件でもあれば
+    合計は算出不能(None)とする。区間が0件(イベントが0〜1件)の場合は
+    「移動が無い」という確定事実なので0を返す(Noneにしない)。"""
+    if any(leg.unknown for leg in legs):
+        return None, None
+    total_distance = round(sum(leg.distance_km or 0 for leg in legs), 2)
+    total_duration = round(sum(leg.duration_minutes or 0 for leg in legs), 1)
+    return total_distance, total_duration
+
+
+@router.get("/{plan_id}/days/{day_id}/route-preview", response_model=RoutePreviewResponse)
+async def get_route_preview(
+    plan_id: str,
+    day_id: str,
+    mode: str = "walking",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """指定日の現在のイベント順序に基づき、区間ごとの概算移動距離・時間を
+    返す(閲覧のみ、viewer可)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
+    if not day:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
+
+    events = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.day_id == day.id)
+        .order_by(TravelEvent.sort_order)
+        .all()
+    )
+    legs = _compute_day_legs(events, mode)
+    total_distance, total_duration = _summarize_legs(legs)
+    return RoutePreviewResponse(
+        day_id=str(day.id),
+        legs=legs,
+        total_distance_km=total_distance,
+        total_duration_minutes=total_duration,
+        provider="haversine_estimate",
+        algorithm_version="haversine-v1",
+    )
+
+
+class InsertionPreviewRequest(BaseModel):
+    place_id: Optional[str] = None
+    # place_idが無い場合、直接座標を指定して仮のスポットとして試算できる
+    # (未採用のcandidateを試すため)。
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    after_event_id: Optional[str] = None  # Noneなら日の先頭へ挿入
+    mode: str = "walking"
+
+
+class InsertionPreviewResponse(BaseModel):
+    day_id: str
+    before: RoutePreviewResponse
+    after: RoutePreviewResponse
+    added_distance_km: Optional[float] = None
+    added_duration_minutes: Optional[float] = None
+    unknown: bool = False
+
+
+@router.post("/{plan_id}/days/{day_id}/insertion-preview", response_model=InsertionPreviewResponse)
+async def preview_insertion(
+    plan_id: str,
+    day_id: str,
+    body: InsertionPreviewRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """候補(place_idまたは直接座標)を指定日の特定位置へ挿入した場合の
+    移動時間・距離の変化を、何も確定させずに試算する(viewer可、DBへの
+    書き込みは一切行わない)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
+    if not day:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
+
+    events = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.day_id == day.id)
+        .order_by(TravelEvent.sort_order)
+        .all()
+    )
+    before_legs = _compute_day_legs(events, body.mode)
+    before_distance, before_duration = _summarize_legs(before_legs)
+    before_resp = RoutePreviewResponse(
+        day_id=str(day.id), legs=before_legs,
+        total_distance_km=before_distance,
+        total_duration_minutes=before_duration,
+        provider="haversine_estimate", algorithm_version="haversine-v1",
+    )
+
+    lat, lon = body.latitude, body.longitude
+    if body.place_id:
+        place = db.query(Place).filter(Place.id == body.place_id).first()
+        if not place:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定したPlaceが見つかりません")
+        lat, lon = place.latitude, place.longitude
+
+    # 仮想イベント(DBには保存しない、計算専用の一時オブジェクト)を
+    # 挿入位置へ差し込んだ順序を作る。
+    virtual = TravelEvent(id=uuid.uuid4(), latitude=lat, longitude=lon)
+    ordered = list(events)
+    if body.after_event_id:
+        idx = next((i for i, e in enumerate(ordered) if str(e.id) == body.after_event_id), None)
+        if idx is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="after_event_idのイベントが見つかりません")
+        ordered.insert(idx + 1, virtual)
+    else:
+        ordered.insert(0, virtual)
+
+    after_legs = _compute_day_legs(ordered, body.mode)
+    after_distance, after_duration = _summarize_legs(after_legs)
+    after_resp = RoutePreviewResponse(
+        day_id=str(day.id), legs=after_legs,
+        total_distance_km=after_distance,
+        total_duration_minutes=after_duration,
+        provider="haversine_estimate", algorithm_version="haversine-v1",
+    )
+
+    unknown = lat is None or lon is None
+    added_distance = None
+    added_duration = None
+    if not unknown and before_resp.total_distance_km is not None and after_resp.total_distance_km is not None:
+        added_distance = round(after_resp.total_distance_km - before_resp.total_distance_km, 2)
+    if not unknown and before_resp.total_duration_minutes is not None and after_resp.total_duration_minutes is not None:
+        added_duration = round(after_resp.total_duration_minutes - before_resp.total_duration_minutes, 1)
+
+    return InsertionPreviewResponse(
+        day_id=str(day.id), before=before_resp, after=after_resp,
+        added_distance_km=added_distance, added_duration_minutes=added_duration,
+        unknown=unknown,
+    )
