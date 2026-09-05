@@ -333,7 +333,7 @@ const PlannerPage: React.FC = () => {
 
           <PlanHeader plan={currentPlan} className="mb-6" />
 
-          <OptimizationPanel plan={currentPlan} className="mb-6" />
+          <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mb-6" />
 
           {/* 日タブナビゲーション + 日ごとの概要(スポット数・所要時間・予算) */}
           {currentPlan.days.length > 0 && (

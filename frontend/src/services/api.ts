@@ -132,6 +132,24 @@ export interface InsertionPreview {
   unknown: boolean;
 }
 
+// [Gate #33] 説明可能な経路最適化の提案レスポンス型
+export interface OptimizationProposal {
+  day_id: string;
+  base_revision: number;
+  algorithm: string;
+  algorithm_version: string;
+  proposed_order: string[];
+  locked_event_ids: string[];
+  before_total_distance_km?: number | null;
+  after_total_distance_km?: number | null;
+  before_total_duration_minutes?: number | null;
+  after_total_duration_minutes?: number | null;
+  saved_distance_km?: number | null;
+  saved_duration_minutes?: number | null;
+  warnings: string[];
+  has_improvement: boolean;
+}
+
 export interface SpotResult {
   id: string;
   name: string;
@@ -835,6 +853,29 @@ class CompleteTravelAPI {
   ): Promise<InsertionPreview> {
     const response = await this.client.post<InsertionPreview>(
       `/plans/${planId}/days/${dayId}/insertion-preview`, data
+    );
+    return response.data;
+  }
+
+  // ===== [Gate #33] 説明可能な経路最適化(提案・適用) =====
+  // [Gate #33 監査是正] 旧OptimizationPanelは「AI最適化」と称し天候・混雑・
+  // 予算等の設定項目を持っていたが、backend実体は近傍法(座標のみ考慮)の
+  // ままでこれらの設定は一切効果を持たなかった(見せかけのUI)。本APIは
+  // 実際に行われている処理(近傍法・座標ベース・locked除外)だけを提案する。
+  async getOptimizationProposal(planId: string, dayId: string): Promise<OptimizationProposal> {
+    const response = await this.client.post<OptimizationProposal>(
+      `/plans/${planId}/days/${dayId}/optimization-proposal`
+    );
+    return response.data;
+  }
+
+  async applyOptimizationProposal(
+    planId: string, dayId: string, proposedOrder: string[], ifMatch: number
+  ): Promise<NormalizedDay> {
+    const response = await this.client.post<NormalizedDay>(
+      `/plans/${planId}/days/${dayId}/optimization-proposal/apply`,
+      { proposed_order: proposedOrder },
+      { headers: { 'If-Match': String(ifMatch) } }
     );
     return response.data;
   }

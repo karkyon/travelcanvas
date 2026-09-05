@@ -37,7 +37,7 @@ from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
     IdempotencyRecord, User, Place,
 )
-from app.services.route_estimator import estimate_leg
+from app.services.route_estimator import estimate_leg, haversine_km
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -224,6 +224,22 @@ def _record_change_and_bump_revision(
 ) -> int:
     """1件の変更を記録し、plan.revisionを1つ進める。ChangeSet 1件につき
     ChangeItem 1件という単純な粒度にしている(Undoは直近1件を対象とする)。"""
+    return _record_batch_change_and_bump_revision(
+        db, plan, user, source, [(entity_type, entity_id, action, before_json, after_json)]
+    )
+
+
+def _record_batch_change_and_bump_revision(
+    db: Session, plan: TravelPlan, user: User, source: str,
+    changes: List[tuple],
+) -> int:
+    """[Gate #33] 複数の変更を単一のChangeSet(単一のrevision進行)として
+    記録する。最適化提案の適用のように「複数イベントの並べ替えをまとめて
+    1操作として扱い、1回のUndoで全体を戻せるようにしたい」場合に使う。
+    undo_last_changeは既にChangeSet内の全ChangeItemをループ処理する設計
+    だったため、本関数の追加だけでバッチUndoに対応できる。changesは
+    (entity_type, entity_id, action, before_json, after_json) のタプルの
+    リスト。"""
     base_revision = plan.revision
     new_revision = base_revision + 1
 
@@ -234,13 +250,17 @@ def _record_change_and_bump_revision(
     db.add(change_set)
     db.flush()
 
-    db.add(ChangeItem(
-        change_set_id=change_set.id, entity_type=entity_type, entity_id=entity_id,
-        action=action, before_json=before_json, after_json=after_json,
-    ))
+    for entity_type, entity_id, action, before_json, after_json in changes:
+        db.add(ChangeItem(
+            change_set_id=change_set.id, entity_type=entity_type, entity_id=entity_id,
+            action=action, before_json=before_json, after_json=after_json,
+        ))
 
     plan.revision = new_revision
-    db.add(PlanVersion(plan_id=plan.id, revision=new_revision, summary=f"{action} {entity_type}"))
+    db.add(PlanVersion(
+        plan_id=plan.id, revision=new_revision,
+        summary=f"{source}: {len(changes)}件の変更" if len(changes) > 1 else f"{changes[0][2]} {changes[0][0]}",
+    ))
 
     db.commit()
     return new_revision
@@ -875,4 +895,224 @@ async def preview_insertion(
         day_id=str(day.id), before=before_resp, after=after_resp,
         added_distance_km=added_distance, added_duration_minutes=added_duration,
         unknown=unknown,
+    )
+
+
+# ===== [Gate #33] 説明可能な経路最適化(提案 -> 承認 -> 適用 -> Undo) =====
+# 監査是正: 「AI最適化」と称していたが実体は近傍法(nearest neighbor)に
+# よる並べ替えのみであり、天候・混雑・予算等の設定項目(旧OptimizationPanel)
+# はバックエンドに一切効果を与えていなかった(UI上の見せかけの設定)。
+# 本Gateでは名称を実体に合わせ("nearest_neighbor_haversine")、以下を満たす:
+# - hard constraint: locked=Trueのイベントは並べ替えの対象から除外し、
+#   元の位置に固定する。
+# - 提案(proposal)はDBに一切書き込まず、現在の正規化データから都度計算する。
+# - 適用(apply)はIf-Matchでrevision不一致なら409を返し、複数イベントの
+#   並べ替えを単一のChangeSet(単一revision進行)として記録するため、
+#   1回のUndoで全体を戻せる。
+# - 座標が無いイベントは架空の位置を作らず、並べ替え対象から除外して
+#   元の相対順序のまま保持する(warningsで明示)。
+
+ALGORITHM_NAME = "nearest_neighbor_haversine"
+ALGORITHM_VERSION = "nn-haversine-v1"
+
+
+class OptimizationLegPreview(BaseModel):
+    from_event_id: Optional[str] = None
+    to_event_id: Optional[str] = None
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[float] = None
+    unknown: bool = False
+
+
+class OptimizationProposalResponse(BaseModel):
+    day_id: str
+    base_revision: int
+    algorithm: str
+    algorithm_version: str
+    proposed_order: List[str]  # event_idの新しい並び順(sort_order昇順)
+    locked_event_ids: List[str]
+    before_total_distance_km: Optional[float] = None
+    after_total_distance_km: Optional[float] = None
+    before_total_duration_minutes: Optional[float] = None
+    after_total_duration_minutes: Optional[float] = None
+    saved_distance_km: Optional[float] = None
+    saved_duration_minutes: Optional[float] = None
+    warnings: List[str] = []
+    has_improvement: bool = False
+
+
+def _nearest_neighbor_order(events: List[TravelEvent]) -> List[TravelEvent]:
+    if not events:
+        return []
+    remaining = list(events)
+    ordered = [remaining.pop(0)]
+    while remaining:
+        current = ordered[-1]
+        nearest_idx = min(
+            range(len(remaining)),
+            key=lambda i: haversine_km(current.latitude, current.longitude, remaining[i].latitude, remaining[i].longitude),
+        )
+        ordered.append(remaining.pop(nearest_idx))
+    return ordered
+
+
+def _optimize_day_order(events: List[TravelEvent]) -> tuple:
+    """sort_order順のイベントリストを受け取り、lockedなイベントの位置は
+    固定したまま、unlockedかつ座標を持つイベントだけを最近傍法で並べ替えた
+    新しい順序を返す。(新しい順序のTravelEventリスト, warnings)のタプル。"""
+    warnings: List[str] = []
+    unlocked_indices = [i for i, e in enumerate(events) if not e.locked]
+    unlocked_events = [events[i] for i in unlocked_indices]
+
+    with_coords = [e for e in unlocked_events if e.latitude is not None and e.longitude is not None]
+    without_coords = [e for e in unlocked_events if e.latitude is None or e.longitude is None]
+    if without_coords:
+        warnings.append(
+            f"{len(without_coords)}件のイベントは位置情報が無いため並べ替え対象外です(元の順序のまま保持)"
+        )
+
+    ordered_with_coords = _nearest_neighbor_order(with_coords) if len(with_coords) > 1 else with_coords
+    new_unlocked_order = ordered_with_coords + without_coords
+
+    result = list(events)
+    for idx, event in zip(unlocked_indices, new_unlocked_order):
+        result[idx] = event
+    return result, warnings
+
+
+def _day_route_totals(events: List[TravelEvent], mode: str = "walking"):
+    legs = _compute_day_legs(events, mode)
+    return _summarize_legs(legs)
+
+
+@router.post("/{plan_id}/days/{day_id}/optimization-proposal", response_model=OptimizationProposalResponse)
+async def create_optimization_proposal(
+    plan_id: str,
+    day_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """指定日のイベント順序を最近傍法で並べ替える提案を計算する
+    (閲覧のみ、viewer可、DBへは一切書き込まない)。lockedなイベントは
+    固定し、座標の無いイベントは並べ替え対象外として保持する。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
+    if not day:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
+
+    events = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.day_id == day.id)
+        .order_by(TravelEvent.sort_order)
+        .all()
+    )
+
+    if len(events) < 2:
+        return OptimizationProposalResponse(
+            day_id=str(day.id), base_revision=plan.revision,
+            algorithm=ALGORITHM_NAME, algorithm_version=ALGORITHM_VERSION,
+            proposed_order=[str(e.id) for e in events],
+            locked_event_ids=[str(e.id) for e in events if e.locked],
+            warnings=["イベントが2件未満のため並べ替えの余地がありません"],
+            has_improvement=False,
+        )
+
+    before_distance, before_duration = _day_route_totals(events)
+    new_order, warnings = _optimize_day_order(events)
+    after_distance, after_duration = _day_route_totals(new_order)
+
+    has_improvement = (
+        before_distance is not None and after_distance is not None
+        and after_distance < before_distance - 0.01
+    )
+    if not has_improvement and not warnings:
+        warnings.append("この順序が既に最短(またはこれ以上の改善候補がありません)")
+
+    return OptimizationProposalResponse(
+        day_id=str(day.id),
+        base_revision=plan.revision,
+        algorithm=ALGORITHM_NAME,
+        algorithm_version=ALGORITHM_VERSION,
+        proposed_order=[str(e.id) for e in new_order],
+        locked_event_ids=[str(e.id) for e in events if e.locked],
+        before_total_distance_km=before_distance,
+        after_total_distance_km=after_distance,
+        before_total_duration_minutes=before_duration,
+        after_total_duration_minutes=after_duration,
+        saved_distance_km=(
+            round(before_distance - after_distance, 2)
+            if before_distance is not None and after_distance is not None else None
+        ),
+        saved_duration_minutes=(
+            round(before_duration - after_duration, 1)
+            if before_duration is not None and after_duration is not None else None
+        ),
+        warnings=warnings,
+        has_improvement=has_improvement,
+    )
+
+
+class OptimizationApplyRequest(BaseModel):
+    proposed_order: List[str]
+
+
+@router.post("/{plan_id}/days/{day_id}/optimization-proposal/apply", response_model=DayWithEvents)
+async def apply_optimization_proposal(
+    plan_id: str,
+    day_id: str,
+    body: OptimizationApplyRequest,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """提案されたproposed_orderを実際に適用する。If-Matchのrevisionが
+    現在のplan.revisionと一致しない場合は409(他の変更と競合)を返す
+    (提案生成後、適用までの間に別の変更が入ったケースを検出するため)。
+    複数イベントの並べ替えを単一のChangeSetとして記録し、1回のUndoで
+    全体を戻せるようにする。lockedなイベントの並び順が含まれていても
+    その位置がずれていなければ影響しない(locked自体は動かない設計)。"""
+    plan = _get_owned_plan(db, plan_id, current_user)
+    _require_if_match(plan, if_match)
+
+    day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
+    if not day:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
+
+    events_by_id = {
+        str(e.id): e
+        for e in db.query(TravelEvent).filter(TravelEvent.day_id == day.id).all()
+    }
+    if set(body.proposed_order) != set(events_by_id.keys()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="proposed_orderが現在のイベント集合と一致しません(提案取得後に変更があった可能性があります)",
+        )
+
+    changes = []
+    for new_sort_order, event_id in enumerate(body.proposed_order):
+        event = events_by_id[event_id]
+        if event.locked:
+            continue  # ロック済みイベントの位置は変更しない
+        if event.sort_order == new_sort_order:
+            continue
+        before = _event_to_dict(event)
+        event.sort_order = new_sort_order
+        changes.append(("travel_event", event.id, "reorder", before, _event_to_dict(event)))
+
+    if changes:
+        db.flush()
+        _record_batch_change_and_bump_revision(db, plan, current_user, "optimization", changes)
+    else:
+        db.commit()
+
+    updated_events = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.day_id == day.id)
+        .order_by(TravelEvent.sort_order)
+        .all()
+    )
+    db.refresh(day)
+    return DayWithEvents(
+        **DayResponse.model_validate(day).model_dump(mode="json"),
+        events=[EventResponse.model_validate(e).model_dump(mode="json") for e in updated_events],
     )
