@@ -1,6 +1,7 @@
 """
 TravelCanvas MVP スポットAPI
 """
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -15,6 +16,8 @@ from app.schemas.spots import (
     VisitCreate, VisitResponse,
 )
 from app.core.auth import get_current_active_user
+
+logger = logging.getLogger("travelcanvas")
 
 router = APIRouter(prefix="/spots", tags=["spots"])
 
@@ -44,11 +47,12 @@ async def create_spot(
         
         return new_spot
         
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"スポット作成エラー: {str(e)}"
+            detail="スポットの作成に失敗しました。しばらくしてから再試行してください。"
         )
 
 @router.get("/", response_model=List[SpotResponse])
@@ -70,10 +74,11 @@ async def get_spots(
         spots = query.order_by(Spot.created_at.desc()).limit(limit).all()
         return spots
         
-    except Exception as e:
+    except Exception:
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"スポット取得エラー: {str(e)}"
+            detail="スポットの取得に失敗しました。しばらくしてから再試行してください。"
         )
 
 # ===== 固定パスの静的ルート =====
@@ -196,11 +201,12 @@ async def add_favorite(
             "created_at": new_favorite.created_at,
             "spot": spot,
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"お気に入り登録エラー: {str(e)}"
+            detail="お気に入りの登録に失敗しました。しばらくしてから再試行してください。"
         )
 
 
@@ -229,11 +235,12 @@ async def remove_favorite(
         db.delete(favorite)
         db.commit()
         return {"message": "お気に入りを解除しました"}
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"お気に入り解除エラー: {str(e)}"
+            detail="お気に入りの解除に失敗しました。しばらくしてから再試行してください。"
         )
 
 
@@ -323,11 +330,12 @@ async def add_visit(
             "visited_at": new_visit.visited_at,
             "spot": spot,
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"訪問記録エラー: {str(e)}"
+            detail="訪問記録の登録に失敗しました。しばらくしてから再試行してください。"
         )
 
 
@@ -356,11 +364,12 @@ async def remove_visit(
         db.delete(visit)
         db.commit()
         return {"message": "訪問記録を取り消しました"}
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"訪問記録削除エラー: {str(e)}"
+            detail="訪問記録の削除に失敗しました。しばらくしてから再試行してください。"
         )
 
 
@@ -419,11 +428,12 @@ async def update_spot(
         db.commit()
         db.refresh(spot)
         return spot
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"スポット更新エラー: {str(e)}"
+            detail="スポットの更新に失敗しました。しばらくしてから再試行してください。"
         )
 
 @router.delete("/{spot_id}")
@@ -451,9 +461,10 @@ async def delete_spot(
         db.delete(spot)
         db.commit()
         return {"message": "スポットを削除しました"}
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"スポット削除エラー: {str(e)}"
+            detail="スポットの削除に失敗しました。しばらくしてから再試行してください。"
         )

@@ -1,57 +1,65 @@
 """
-[Gate #27] AI最適化(Gate #23実装の近傍法による経路並べ替え)の最小縦切り
-テスト。日程未登録時の失敗系と、座標を持つイベントを含む日程の正常系を
-実際にoptimize -> job結果取得のジョブ型フローとして検証する。
+[Gate #34] 旧ジョブ型最適化API(Gate #23実装)は完全廃止された。
+
+このファイルは元々、そのジョブ型フロー(optimize -> job結果取得)の
+正常系・異常系を検証していたが、当該APIはP0-02(plan.itineraryを
+revision/If-Match/ChangeSet/Undoを一切通さず直接書き換える)として
+廃止対象になったため、5エンドポイント全てが410 Goneを固定で返すことを
+検証するテストへ置き換える。新しい提案ベースの最適化
+(/plans/{plan}/days/{day}/optimization-proposal)のテストは
+test_optimization_proposal.pyを参照。
 """
 
 
-def _create_plan_with_itinerary(client):
-    create_res = client.post(
-        "/api/v1/travel-plans/", json={"title": "最適化テストプラン"}
-    )
-    plan_id = create_res.json()["id"]
-
-    itinerary = {
-        "days": [
-            {
-                "date": "2026-10-01",
-                "events": [
-                    {"id": "e1", "latitude": 35.6812, "longitude": 139.7671},
-                    {"id": "e2", "latitude": 35.7100, "longitude": 139.8107},
-                    {"id": "e3", "latitude": 35.6586, "longitude": 139.7454},
-                ],
-            }
-        ]
-    }
-    update_res = client.put(
-        f"/api/v1/travel-plans/{plan_id}", json={"itinerary": itinerary}
-    )
-    assert update_res.status_code == 200
-    return plan_id
-
-
-def test_optimize_plan_without_itinerary_returns_400(auth_client):
+def test_legacy_optimize_travel_plan_returns_410(auth_client):
     client, _user = auth_client
-    create_res = client.post(
-        "/api/v1/travel-plans/", json={"title": "空プラン"}
-    )
+    create_res = client.post("/api/v1/travel-plans/", json={"title": "廃止APIテストプラン"})
     plan_id = create_res.json()["id"]
 
     res = client.post(f"/api/v1/travel-plans/{plan_id}/optimize", json={})
-    assert res.status_code == 400
+    assert res.status_code == 410
+    assert res.json()["detail"]["error_code"] == "LEGACY_ENDPOINT_RETIRED"
 
 
-def test_optimize_plan_and_fetch_result(auth_client):
+def test_legacy_get_optimization_result_returns_410(auth_client):
     client, _user = auth_client
-    plan_id = _create_plan_with_itinerary(client)
+    res = client.get("/api/v1/optimization/00000000-0000-0000-0000-000000000000")
+    assert res.status_code == 410
+    assert res.json()["detail"]["error_code"] == "LEGACY_ENDPOINT_RETIRED"
 
-    optimize_res = client.post(f"/api/v1/travel-plans/{plan_id}/optimize", json={})
-    assert optimize_res.status_code == 200
-    job_id = optimize_res.json()["job_id"]
-    assert optimize_res.json()["status"] == "completed"
 
-    result_res = client.get(f"/api/v1/optimization/{job_id}")
-    assert result_res.status_code == 200
-    body = result_res.json()
-    assert "result" in body
-    assert "improvements" in body["result"]
+def test_legacy_apply_optimization_result_returns_410(auth_client):
+    client, _user = auth_client
+    res = client.post("/api/v1/optimization/00000000-0000-0000-0000-000000000000/apply")
+    assert res.status_code == 410
+    assert res.json()["detail"]["error_code"] == "LEGACY_ENDPOINT_RETIRED"
+
+
+def test_legacy_cancel_optimization_result_returns_410(auth_client):
+    client, _user = auth_client
+    res = client.post("/api/v1/optimization/00000000-0000-0000-0000-000000000000/cancel")
+    assert res.status_code == 410
+    assert res.json()["detail"]["error_code"] == "LEGACY_ENDPOINT_RETIRED"
+
+
+def test_legacy_optimize_route_returns_410(auth_client):
+    client, _user = auth_client
+    res = client.post("/api/v1/optimize-route", json={"waypoints": []})
+    assert res.status_code == 410
+    assert res.json()["detail"]["error_code"] == "LEGACY_ENDPOINT_RETIRED"
+
+
+def test_legacy_optimize_endpoints_never_write_itinerary(auth_client, db_session):
+    """[Gate #34 回帰] 廃止済みapplyを叩いても、正規化テーブルはおろか
+    旧itineraryも一切変更されないことを確認する(P0-02の再発防止)。"""
+    from app.models.models import TravelPlan
+
+    client, _user = auth_client
+    create_res = client.post("/api/v1/travel-plans/", json={"title": "書込み拒否確認プラン"})
+    plan_id = create_res.json()["id"]
+
+    res = client.post(f"/api/v1/optimization/{plan_id}/apply")
+    assert res.status_code == 410
+
+    plan = db_session.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
+    assert plan.itinerary is None

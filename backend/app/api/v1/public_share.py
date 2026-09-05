@@ -16,16 +16,28 @@ tokenの生値はDBに一切保存せずSHA-256ハッシュのみで照合する
    超過しうる)から、DB上のUPDATE...WHERE...RETURNINGによる単一の原子的
    操作へ変更した。同時に複数リクエストが解決を試みても、max_uses以上の
    消費は起こり得ない。
-2. 匿名公開ビューへ返すitineraryにfield policy(危険キーの再帰的除去)を
-   適用し、予約番号・QR/Barcode・連絡先・パスワード・正確な緯度経度等を
-   既定で除外するようにした。
+2. 匿名公開ビューへ返す内容へfield policyを適用した。
 3. IPベースのレート制限、Cache-Control: no-store、全アクセス試行の監査
    ログ(ShareAccessLog)を追加した。
+
+[Gate #34 P0-01/4.3] 2026-09-05監査で指摘された通り、本APIは従来
+`plan.itinerary`(自由形式JSON blob、旧正本)をそのまま(キー名の
+ブロックリスト除去のみ行って)返しており、Gate #29で導入された
+正規化正本(`travel_days`/`travel_events`)と表示内容が食い違い得る
+状態だった。本Gateで、公開ビューは常に`TravelDay`/`TravelEvent`から
+明示的なホワイトリストのフィールドのみを組み立てて構築するよう変更する。
+これにより:
+- 表示されるday/eventは常に正本(`/plans/*`経由で更新される正規化
+  テーブル)と一致する(旧itineraryとの分岐が構造的に発生し得ない)。
+- 予約番号・confirmation・QR/barcode・連絡先・正確な緯度経度・内部ID・
+  notes等はブロックリストではなく、そもそも出力候補に含めない
+  (ホワイトリスト方式)。
+- 公開投影の形は固定スキーマ(`days: [{date, title, events: [...]}]`)
+  であり、任意dictの再帰下降が不要になる。
 """
 import hashlib
-import re
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
@@ -34,7 +46,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import PlanShareLink, ShareAccessLog, TravelPlan
+from app.models.models import PlanShareLink, ShareAccessLog, TravelDay, TravelEvent, TravelPlan
 from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/public/share", tags=["public-share"])
@@ -48,33 +60,48 @@ class ResolveShareRequest(BaseModel):
     passcode: Optional[str] = None
 
 
-# [Gate #31.5B] フィールドポリシー: 匿名公開ビューへ絶対に含めないキーの
-# パターン(大文字小文字を区別しない)。予約番号・QR/Barcode・連絡先・
-# 認証情報・正確な位置情報等。itineraryは自由形式JSON(Dict[str, Any])で
-# ありスキーマが強制されていないため、キー名ベースのブロックリスト方式で
-# 再帰的に除去する(ホワイトリスト方式にすると既存の正当なフィールドまで
-# 過剰に消してしまうため、既知の危険パターンの除去を優先する設計)。
-_SENSITIVE_KEY_PATTERN = re.compile(
-    r"(reservation|confirmation|booking[_-]?number|qr[_-]?code|barcode|"
-    r"phone|tel(ephone)?|email|contact|passport|credit[_-]?card|"
-    r"card[_-]?number|password|secret|api[_-]?key|token|"
-    r"latitude|longitude|^lat$|^lng$|^lon$|coordinates?|geo|"
-    r"personal|ssn|my[_-]?number)",
-    re.IGNORECASE,
-)
+def _public_event(event: TravelEvent) -> Dict[str, Any]:
+    """[Gate #34] イベントの公開投影。ホワイトリストされたフィールドのみ。
+    address/latitude/longitude(正確な位置)、spot_id/place_id/day_id/
+    plan_id(内部ID)、description(自由記述、機密混入の恐れ)は既定で
+    含めない。"""
+    return {
+        "title": event.title,
+        "event_type": event.event_type,
+        "local_start_time": event.local_start_time,
+        "is_all_day": event.is_all_day,
+    }
 
 
-def _redact_for_public_view(value: Any) -> Any:
-    """itinerary(自由形式JSON)から機微なキーを再帰的に除去する。"""
-    if isinstance(value, dict):
-        return {
-            k: _redact_for_public_view(v)
-            for k, v in value.items()
-            if not _SENSITIVE_KEY_PATTERN.search(str(k))
-        }
-    if isinstance(value, list):
-        return [_redact_for_public_view(v) for v in value]
-    return value
+def _public_day(day: TravelDay, events: List[TravelEvent]) -> Dict[str, Any]:
+    return {
+        "date": day.local_date.isoformat() if day.local_date else None,
+        "title": day.title,
+        "events": [_public_event(e) for e in events],
+    }
+
+
+def _build_public_days(db: Session, plan_id) -> List[Dict[str, Any]]:
+    days = (
+        db.query(TravelDay)
+        .filter(TravelDay.plan_id == plan_id)
+        .order_by(TravelDay.local_date.asc(), TravelDay.sort_order.asc())
+        .all()
+    )
+    if not days:
+        return []
+
+    events = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.day_id.in_([d.id for d in days]))
+        .order_by(TravelEvent.sort_order.asc())
+        .all()
+    )
+    events_by_day: Dict[Any, List[TravelEvent]] = {}
+    for e in events:
+        events_by_day.setdefault(e.day_id, []).append(e)
+
+    return [_public_day(d, events_by_day.get(d.id, [])) for d in days]
 
 
 def _client_ip(request: Request) -> str:
@@ -174,8 +201,8 @@ async def resolve_share_token(
 
     _log_access(db, share_id=share.id, token_hash=token_hash, ip=ip, result="success")
 
-    # フィールドポリシー: 匿名公開ビューでは budget/preferences に加えて
-    # itinerary内の予約番号・連絡先・正確な位置情報等を再帰的に除去する。
+    # [Gate #34] 公開ビューは正規化テーブル(travel_days/travel_events)
+    # から固定スキーマで構築する。旧`plan.itinerary`は一切参照しない。
     return {
         "plan_id": str(plan.id),
         "title": plan.title,
@@ -183,7 +210,7 @@ async def resolve_share_token(
         "destination": plan.destination,
         "start_date": plan.start_date.isoformat() if plan.start_date else None,
         "end_date": plan.end_date.isoformat() if plan.end_date else None,
-        "itinerary": _redact_for_public_view(plan.itinerary),
+        "days": _build_public_days(db, plan.id),
         "permission": permission,
         "can_edit": False,
     }

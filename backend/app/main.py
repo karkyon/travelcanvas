@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -75,11 +76,74 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """[Gate #34] liveness専用。プロセスが応答できているかのみを見る。
+    DB接続・migration状態はここでは確認しない(readinessは/readyに分離)。"""
     return {
         "status": "OK",
         "message": "TravelCanvas API is healthy",
         "version": "1.0.0"
     }
+
+
+# [Gate #34 P0-06] 従来の/healthはDB接続やmigration状態を一切見ないため、
+# DBが落ちていてもauth routerが欠落していても常にOKを返し得た(2026-09-05
+# 監査 P1-06)。/readyをliveness([/health)とは別の readiness として新設し、
+# DB接続・alembicのmigration head到達・必須routerの登録有無を確認する。
+# 失敗時は503を返し、接続文字列や内部例外の本文は一切含めない。
+_REQUIRED_ROUTE_PREFIXES = ("/api/v1/auth", "/api/v1/travel-plans", "/api/v1/plans")
+
+
+def _check_required_routers_registered() -> bool:
+    registered_paths = [getattr(r, "path", "") for r in app.routes]
+    for prefix in _REQUIRED_ROUTE_PREFIXES:
+        if not any(p.startswith(prefix) for p in registered_paths):
+            return False
+    return True
+
+
+def _check_database_ready() -> bool:
+    from app.core.database import engine
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        logger.exception("readiness check: database connectivity failed")
+        return False
+
+
+def _check_migration_head_ready() -> bool:
+    """alembic_versionテーブルに何らかのrevisionが記録されていることのみ
+    確認する(具体的なrevision文字列はビルドごとに変わるため一致比較は
+    しない。テーブル不在/空はmigration未適用の signal として扱う)。"""
+    from app.core.database import engine
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).first()
+        return row is not None
+    except Exception:
+        logger.exception("readiness check: migration head check failed")
+        return False
+
+
+@app.get("/ready")
+async def readiness_check():
+    db_ok = _check_database_ready()
+    migration_ok = db_ok and _check_migration_head_ready()
+    routers_ok = _check_required_routers_registered()
+
+    checks = {
+        "database": db_ok,
+        "migration": migration_ok,
+        "required_routers": routers_ok,
+    }
+    all_ok = all(checks.values())
+
+    return JSONResponse(
+        status_code=200 if all_ok else 503,
+        content={"status": "ready" if all_ok else "not_ready", "checks": checks},
+    )
+
 
 @app.get("/api/v1/health")
 async def api_health():
@@ -89,6 +153,7 @@ async def api_health():
         "endpoints": [
             "/docs",
             "/health", 
+            "/ready",
             "/api/v1/auth/register",
             "/api/v1/auth/login",
             "/api/v1/auth/test"
@@ -152,21 +217,22 @@ async def travelcanvas_exception_handler(request: Request, exc: TravelCanvasExce
         },
     )
 
-# 認証APIルートを含める
-try:
-    from app.api.v1.auth import router as auth_router
-    app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
-    print("✅ Auth routes loaded successfully")
-except ImportError as e:
-    print(f"⚠️ Auth routes could not be loaded: {e}")
-    print("   基本機能のみで起動します")
+# [Gate #34 P0-05] 認証APIルートを含める。
+# 以前は`except ImportError`で握り潰し、「基本機能のみで起動」を続けて
+# いた(2026-09-05監査)。認証routerが欠落した状態でも/healthがOKを返し
+# 続け、障害の発見が遅れる致命的なfail-silentだったため、ここでは
+# 例外を握り潰さず、そのまま起動失敗として伝播させる(fail-fast)。
+from app.api.v1.auth import router as auth_router  # noqa: E402
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
+logger.info("Auth routes loaded successfully")
 
-print("🚀 TravelCanvas API - Ready to start")
+logger.info("TravelCanvas API - Ready to start")
 
 app.include_router(spots.router, prefix="/api/v1")
 app.include_router(travel.router, prefix="/api/v1")
 # [Gate #23] ai.pyはこれまでファイルは存在するがinclude_routerされておらず、
 # /optimize-route・/optimization/*系エンドポイントが実際には一切到達不能だった。
+# [Gate #34] このrouterは現在、全エンドポイントが410 Goneを返す廃止済みAPI。
 app.include_router(ai.router, prefix="/api/v1")
 # [Gate #24] admin.pyも同様にinclude_routerされておらず、/admin/*は一切到達不能だった。
 app.include_router(admin.router, prefix="/api/v1")
@@ -181,5 +247,5 @@ app.include_router(search.router, prefix="/api/v1")
 # [Gate #26] notifications.pyも新規実装。通知一覧・既読管理のエンドポイント。
 app.include_router(notifications.router, prefix="/api/v1")
 # [Gate #29] /plans: travel_days/travel_events正規テーブルを正本とする新API。
-# 既存の/travel-plans(itinerary JSONベース)と並行稼働する。
+# 既存の/travel-plans(itinerary JSONベース)と並行稼働する(metadata CRUDのみ)。
 app.include_router(plans.router, prefix="/api/v1")

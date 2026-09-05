@@ -1,7 +1,16 @@
 """
 TravelCanvas 旅行プラン(TravelPlan) CRUD API
 既存 spots.py の実装パターンに準拠。
+
+[Gate #34] このrouterはプランmetadata(title/description/destination/
+start_date/end_date/budget/status/preferences)のCRUDに限定する。
+`itinerary`(旧JSON blob正本)はGate #29以降、正規化された
+travel_days/travel_events(app/api/v1/plans.py)が唯一の書込み正本であり、
+このrouter経由でのitinerary書換えはrevision/If-Match/Idempotency/
+ChangeSet/Undoの全保証を迂回する(2026-09-05監査 P0-01/P0-02)。
+そのため本Gateでitineraryフィールドの書込みを明示的に拒否する。
 """
+import logging
 import uuid
 from datetime import datetime
 
@@ -22,7 +31,29 @@ from app.schemas.travel_plan import (
     TravelPlanListResponse,
 )
 
+logger = logging.getLogger("travelcanvas")
+
 router = APIRouter(prefix="/travel-plans", tags=["travel-plans"])
+
+# [Gate #34] metadata CRUDでは書き込みを受け付けないフィールド。
+# `itinerary`をrequestに含めてもサイレントに無視せず、422で明示的に
+# 拒否する(壊れた/混乱した呼び出し元を早期に気づかせるため)。
+_LEGACY_ITINERARY_FIELD = "itinerary"
+
+
+def _reject_itinerary_write(update_data: dict) -> None:
+    if _LEGACY_ITINERARY_FIELD in update_data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "detail": (
+                    "itineraryはこのAPIでは更新できません。日/イベントの"
+                    "変更は /plans/{plan_id}/days および "
+                    "/plans/{plan_id}/days/{day_id}/events を使用してください。"
+                ),
+                "error_code": "LEGACY_ITINERARY_WRITE_REJECTED",
+            },
+        )
 
 
 @router.post("/", response_model=TravelPlanResponse, status_code=status.HTTP_201_CREATED)
@@ -31,7 +62,7 @@ async def create_travel_plan(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """新しい旅行プランを作成"""
+    """新しい旅行プランを作成(metadataのみ。itineraryはこのAPIでは受け付けない)"""
     try:
         new_plan = TravelPlan(
             user_id=current_user.id,
@@ -51,11 +82,14 @@ async def create_travel_plan(
 
         return new_plan
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
+        logger.exception("旅行プラン作成中に予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"旅行プラン作成エラー: {str(e)}",
+            detail="旅行プランの作成に失敗しました。しばらくしてから再試行してください。",
         )
 
 
@@ -122,10 +156,16 @@ async def update_travel_plan(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """旅行プラン更新(owner/editorが編集可能。viewerは403)"""
+    """旅行プラン更新(owner/editorが編集可能。viewerは403)
+
+    [Gate #34] itineraryフィールドが含まれる場合は422で拒否する
+    (day/eventの正本は/plans/*のみ)。
+    """
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
 
     update_data = plan_data.dict(exclude_unset=True)
+    _reject_itinerary_write(update_data)
+
     for field, value in update_data.items():
         setattr(plan, field, value)
 
@@ -133,11 +173,14 @@ async def update_travel_plan(
         db.commit()
         db.refresh(plan)
         return plan
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
+        logger.exception("旅行プラン更新中に予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"旅行プラン更新エラー: {str(e)}",
+            detail="旅行プランの更新に失敗しました。しばらくしてから再試行してください。",
         )
 
 
@@ -160,9 +203,12 @@ async def delete_travel_plan(
         db.delete(plan)
         db.commit()
         return {"message": "旅行プランを削除しました"}
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
+        logger.exception("旅行プラン削除中に予期しないエラーが発生しました")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"旅行プラン削除エラー: {str(e)}",
+            detail="旅行プランの削除に失敗しました。しばらくしてから再試行してください。",
         )

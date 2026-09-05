@@ -419,33 +419,30 @@ def test_public_resolve_writes_audit_log(auth_client, db_session):
 
 
 def test_public_resolve_redacts_sensitive_itinerary_fields(auth_client, db_session):
-    """[Gate #31.5B 監査是正R-06] itinerary内の予約番号・連絡先・正確な
-    緯度経度等が公開ビューから除去され、通常のフィールドは残ることを検証する。"""
-    from app.models.models import TravelPlan
+    """[Gate #34] 公開ビューは正規化テーブル(TravelDay/TravelEvent)から
+    固定ホワイトリストで構築されるため、address/緯度経度/内部ID等は
+    そもそも出力候補に含まれない(ブロックリストの除去漏れという構造的
+    リスクごと解消されていることを検証する)。"""
+    import datetime as _dt
+    from app.models.models import TravelDay, TravelEvent
 
     client, _user = auth_client
     plan_id = _create_plan(client)
 
-    plan = db_session.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
-    plan.itinerary = {
-        "days": [
-            {
-                "title": "1日目",
-                "events": [
-                    {
-                        "name": "ホテルチェックイン",
-                        "reservation_number": "RSV-12345",
-                        "confirmation_code": "ABCDEF",
-                        "contact_phone": "090-1234-5678",
-                        "email": "guest@example.com",
-                        "latitude": 34.687315,
-                        "longitude": 135.526201,
-                        "notes": "普通のメモ",
-                    }
-                ],
-            }
-        ]
-    }
+    day = TravelDay(plan_id=plan_id, local_date=_dt.date(2026, 10, 1), title="1日目")
+    db_session.add(day)
+    db_session.flush()
+    event = TravelEvent(
+        plan_id=plan_id,
+        day_id=day.id,
+        title="ホテルチェックイン",
+        event_type="accommodation",
+        address="大阪府大阪市北区1-2-3 ホテル内 予約番号RSV-12345",
+        latitude=34.687315,
+        longitude=135.526201,
+        description="confirmation_code: ABCDEF / tel 090-1234-5678",
+    )
+    db_session.add(event)
     db_session.commit()
 
     res = client.post(f"/api/v1/travel-plans/{plan_id}/share", json={"permission": "view"})
@@ -453,16 +450,21 @@ def test_public_resolve_redacts_sensitive_itinerary_fields(auth_client, db_sessi
 
     resolve_res = client.post(f"/api/v1/public/share/{raw_token}/resolve", json={})
     assert resolve_res.status_code == 200
-    event = resolve_res.json()["itinerary"]["days"][0]["events"][0]
+    body = resolve_res.json()
+    assert "itinerary" not in body  # [Gate #34] 旧itineraryキーはもう返らない
 
-    assert "reservation_number" not in event
-    assert "confirmation_code" not in event
-    assert "contact_phone" not in event
-    assert "email" not in event
-    assert "latitude" not in event
-    assert "longitude" not in event
-    assert event["name"] == "ホテルチェックイン"
-    assert event["notes"] == "普通のメモ"
+    public_day = body["days"][0]
+    assert public_day["date"] == "2026-10-01"
+    public_event = public_day["events"][0]
+
+    assert public_event["title"] == "ホテルチェックイン"
+    assert public_event["event_type"] == "accommodation"
+    # ホワイトリスト方式のため、そもそも住所・座標・自由記述descriptionは
+    # 公開投影のフィールドとして存在しない。
+    assert "address" not in public_event
+    assert "latitude" not in public_event
+    assert "longitude" not in public_event
+    assert "description" not in public_event
 
 
 def test_utils_permissions_module_no_longer_exists(auth_client):
