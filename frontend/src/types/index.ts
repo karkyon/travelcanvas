@@ -246,38 +246,6 @@ export interface DropResult {
   error?: string;
 }
 
-// 最適化
-export interface OptimizationRequest {
-  plan_id?: string;
-  optimization_type: 'time_efficient' | 'cost_efficient' | 'balanced' | string;
-  constraints?: Record<string, unknown>;
-  preferences?: Record<string, unknown>;
-}
-
-export interface OptimizationResult {
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  job_id?: string;
-  optimized_plan?: TravelPlan;
-  improvements?: Record<string, unknown>;
-  score?: number;
-}
-
-export interface OptimizationJob {
-  job_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  plan_id?: string;
-  created_at?: string;
-}
-
-export interface OptimizationHistory {
-  id: string;
-  plan_id?: string;
-  optimization_type?: string;
-  original?: OptimizationResult;
-  optimized?: OptimizationResult;
-  created_at?: string;
-}
-
 // 認証
 export interface LoginCredentials {
   username: string;

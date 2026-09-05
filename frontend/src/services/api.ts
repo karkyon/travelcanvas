@@ -267,23 +267,6 @@ export interface PublicSharedPlan {
   can_edit: boolean;
 }
 
-export interface OptimizationRequest {
-  preferences: {
-    transportation: string;
-    budget_level: string;
-    pace: string;
-  };
-  constraints?: any;
-}
-
-export interface OptimizationResult {
-  job_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  result?: any;
-  estimated_completion?: string;
-  error_message?: string;
-}
-
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
