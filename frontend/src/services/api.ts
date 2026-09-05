@@ -995,31 +995,12 @@ class CompleteTravelAPI {
   }
 
   // ===== 最適化関連API =====
-  // [Gate #23] 実バックエンド(backend/app/api/v1/ai.py)はこれまでmain.pyに
-  // include_routerされておらず、/plans/{id}/optimize・/optimization/*は全て
-  // 404で到達不能だった。加えてURLも実プレフィックス(/travel-plans)と不一致
-  // だった。バックエンドは{success,message,data}形式でラップされた応答を
-  // 返さない生JSONを返すため、getPlan/updatePlan等と同様にクライアント側で
-  // ApiResponse形状へ手動で包む。
-  async optimizePlan(planId: string, optimizationData: OptimizationRequest): Promise<ApiResponse<{ job_id: string; status: string }>> {
-    const response = await this.client.post<{ job_id: string; status: string }>(`/travel-plans/${planId}/optimize`, optimizationData);
-    return { success: true, data: response.data } as ApiResponse<{ job_id: string; status: string }>;
-  }
-
-  async getOptimizationResult(jobId: string): Promise<ApiResponse<OptimizationResult>> {
-    const response = await this.client.get<any>(`/optimization/${jobId}`);
-    return { success: true, data: response.data } as ApiResponse<OptimizationResult>;
-  }
-
-  async applyOptimization(jobId: string): Promise<ApiResponse<void>> {
-    await this.client.post<any>(`/optimization/${jobId}/apply`);
-    return { success: true } as ApiResponse<void>;
-  }
-
-  async cancelOptimization(jobId: string): Promise<ApiResponse<void>> {
-    await this.client.post<any>(`/optimization/${jobId}/cancel`);
-    return { success: true } as ApiResponse<void>;
-  }
+  // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
+  // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
+  // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された
+  // ことに伴い除去。Gate #33で新設された、plan/day単位の説明可能な
+  // 経路最適化(提案->適用->Undo)は applyOptimizationProposal 等、
+  // 別メソッド(このクラス内に存在)を通じて行う。
 
   // ===== その他のAPI =====
   // [Gate #27 / A-009] getPrivacySettings/updatePrivacySettings/deleteAccount/
@@ -1100,13 +1081,6 @@ export const shareAPI = {
   removeCollaborator: (planId: string, collaboratorId: string) => api.removeCollaborator(planId, collaboratorId)
 };
 
-export const optimizationAPI = {
-  optimizePlan: (planId: string, data: OptimizationRequest) => api.optimizePlan(planId, data),
-  getOptimizationResult: (jobId: string) => api.getOptimizationResult(jobId),
-  applyOptimization: (jobId: string) => api.applyOptimization(jobId),
-  cancelOptimization: (jobId: string) => api.cancelOptimization(jobId)
-};
-
 // ===== 便利な関数のエクスポート =====
 export const searchSpots = (request: SearchRequest) => api.searchSpots(request);
 export const searchByImage = (file: File, location?: { latitude: number; longitude: number }) => api.searchByImage(file, location);
@@ -1132,10 +1106,5 @@ export const inviteCollaborator = (planId: string, inviteData: { email: string; 
   api.inviteCollaborator(planId, inviteData);
 export const getCollaborators = (planId: string) => api.getCollaborators(planId);
 export const removeCollaborator = (planId: string, collaboratorId: string) => api.removeCollaborator(planId, collaboratorId);
-
-export const optimizePlan = (planId: string, data: OptimizationRequest) => api.optimizePlan(planId, data);
-export const getOptimizationResult = (jobId: string) => api.getOptimizationResult(jobId);
-export const applyOptimization = (jobId: string) => api.applyOptimization(jobId);
-export const cancelOptimization = (jobId: string) => api.cancelOptimization(jobId);
 
 export default api;

@@ -13,7 +13,6 @@ import SearchSettingsPage from '@/pages/SearchSettingsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SharePage from '@/pages/SharePage';
 import PublicSharePage from '@/pages/PublicSharePage';
-import OptimizationPage from '@/pages/OptimizationPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 // 新しく作成したページのインポート
@@ -267,26 +266,17 @@ export const router = createBrowserRouter([
       // [Gate #27 / item8] 以前は固定の「開発中です」表示だった。
       // AI最適化自体はGate #23で実装済み(OptimizationPanel経由でplan単位に
       // 実行)のため、実際にプランを選択して最適化へ進める画面に置き換える。
+      // [Gate #34b] 旧ジョブ型結果画面(/optimization/:jobId, OptimizationPage)は
+      // Gate #34aでバックエンドの対応エンドポイントを410 Goneへ廃止済みのため、
+      // 到達しても常にエラーになる状態だった。ルート・画面ごと除去し、
+      // /optimization はプラン選択画面(OptimizationSelectPage)のみに一本化する。
       {
         path: 'optimization',
-        children: [
-          {
-            index: true,
-            element: (
-              <ProtectedRoute>
-                <OptimizationSelectPage />
-              </ProtectedRoute>
-            ),
-          },
-          {
-            path: ':jobId',
-            element: (
-              <ProtectedRoute>
-                <OptimizationPage />
-              </ProtectedRoute>
-            ),
-          },
-        ],
+        element: (
+          <ProtectedRoute>
+            <OptimizationSelectPage />
+          </ProtectedRoute>
+        ),
       },
       
       // 📄 エラー・その他
