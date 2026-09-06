@@ -2,11 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService } from '@/services/api';
 import Button from '@/components/common/Button';
+import {
+  listOfflinePacks,
+  deleteOfflinePack,
+  clearAllOfflinePacks,
+  type OfflinePackSummary,
+} from '@/utils/offlinePack';
 
 interface SettingsTab {
   id: string;
@@ -412,11 +418,102 @@ const SettingsPage: React.FC = () => {
     </div>
   );
 
+  // [Gate #36] オフラインパック管理タブ
+  const [offlinePacks, setOfflinePacks] = useState<OfflinePackSummary[]>([]);
+  const [isLoadingPacks, setIsLoadingPacks] = useState(false);
+
+  const refreshOfflinePacks = async () => {
+    setIsLoadingPacks(true);
+    try {
+      const packs = await listOfflinePacks();
+      setOfflinePacks(packs);
+    } catch (error) {
+      console.error('Failed to list offline packs:', error);
+    } finally {
+      setIsLoadingPacks(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'offline') {
+      refreshOfflinePacks();
+    }
+  }, [activeTab]);
+
+  const handleDeletePack = async (planId: string) => {
+    await deleteOfflinePack(planId);
+    await refreshOfflinePacks();
+  };
+
+  const handleClearAllPacks = async () => {
+    if (!window.confirm('保存済みのオフラインデータをすべて削除します。よろしいですか?')) {
+      return;
+    }
+    await clearAllOfflinePacks();
+    await refreshOfflinePacks();
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const OfflineTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">オフラインデータ</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          プランナー画面の「オフラインで使う」で保存したプランがここに表示されます。
+          この端末に暗号化して保存されており、7日間で自動的に失効します。
+        </p>
+      </div>
+
+      {isLoadingPacks ? (
+        <p className="text-sm text-gray-500">読み込み中...</p>
+      ) : offlinePacks.length === 0 ? (
+        <p className="text-sm text-gray-500">保存されているオフラインデータはありません。</p>
+      ) : (
+        <div className="space-y-3">
+          {offlinePacks.map((pack) => (
+            <div
+              key={pack.planId}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900 truncate">{pack.planTitle}</p>
+                <p className="text-xs text-gray-500">
+                  {formatBytes(pack.approxSizeBytes)} ・
+                  {new Date(pack.expiresAt).toLocaleDateString('ja-JP')}まで有効
+                </p>
+              </div>
+              <button
+                onClick={() => handleDeletePack(pack.planId)}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="このオフラインデータを削除"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {offlinePacks.length > 0 && (
+        <Button variant="ghost" onClick={handleClearAllPacks}>
+          <Trash2 size={16} className="inline mr-2" />
+          すべてのオフラインデータを削除
+        </Button>
+      )}
+    </div>
+  );
+
   const tabs: SettingsTab[] = [
     { id: 'profile', name: 'プロフィール', icon: <User size={16} />, component: ProfileTab },
     { id: 'notifications', name: '通知', icon: <Bell size={16} />, component: NotificationsTab },
     { id: 'preferences', name: '設定', icon: <Settings size={16} />, component: PreferencesTab },
     { id: 'security', name: 'セキュリティ', icon: <Shield size={16} />, component: SecurityTab },
+    { id: 'offline', name: 'オフライン', icon: <Download size={16} />, component: OfflineTab },
   ];
 
   const handleSave = async () => {

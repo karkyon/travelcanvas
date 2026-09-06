@@ -59,6 +59,7 @@ const PlannerPage: React.FC = () => {
     currentPlan,
     currentDayIndex,
     isLoading,
+    isOfflineData,
     loadPlans,
     loadPlan,
     createPlan,
@@ -71,6 +72,9 @@ const PlannerPage: React.FC = () => {
     deleteScheduleItem,
     searchResults,
     addScheduleItemFromCandidate,
+    saveCurrentPlanOffline,
+    removeOfflinePlan,
+    checkOfflineAvailability,
   } = usePlanStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -81,6 +85,9 @@ const PlannerPage: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   const [showMap, setShowMap] = useState(true);
+  // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
+  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
 
   // [Gate #18] DayView.tsxのonItemClick/onItemEdit/onItemDeleteがどこからも
   // 渡されておらず、日程に追加したスケジュールアイテムをクリックしても編集も
@@ -234,6 +241,37 @@ const PlannerPage: React.FC = () => {
       clearCurrentPlan();
     }
   }, [planId]);
+
+  // [Gate #36] オフラインパックの保存有無を表示に反映する
+  useEffect(() => {
+    if (!currentPlan) {
+      setIsOfflineSaved(false);
+      return;
+    }
+    let cancelled = false;
+    checkOfflineAvailability(currentPlan.id).then((available) => {
+      if (!cancelled) setIsOfflineSaved(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPlan?.id]);
+
+  const handleToggleOfflineSave = async () => {
+    if (!currentPlan) return;
+    if (isOfflineSaved) {
+      await removeOfflinePlan(currentPlan.id);
+      setIsOfflineSaved(false);
+      return;
+    }
+    setIsSavingOffline(true);
+    try {
+      const success = await saveCurrentPlanOffline();
+      if (success) setIsOfflineSaved(true);
+    } finally {
+      setIsSavingOffline(false);
+    }
+  };
 
   // [Gate #32] 表示中の日が変わるたびに移動概算(route-preview)を取得する。
   // 座標が無い/1件以下の日はlegsが空になるだけで、架空の値は作らない。
@@ -391,7 +429,26 @@ const PlannerPage: React.FC = () => {
             >
               {showMap ? '地図を隠す' : '🗺 地図を表示'}
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleOfflineSave}
+              disabled={isSavingOffline}
+              title="このプランを暗号化してこの端末に保存し、オフラインでも閲覧できるようにします"
+            >
+              {isSavingOffline
+                ? '保存中...'
+                : isOfflineSaved
+                ? '📴 オフライン保存済み(削除)'
+                : '📥 オフラインで使う'}
+            </Button>
           </div>
+
+          {isOfflineData && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
+              📴 オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
+            </div>
+          )}
 
           {currentPlan.days.length === 0 ? (
             <Card>

@@ -27,6 +27,13 @@ import { TravelPlan, ScheduleItem, DaySchedule, EventCategory } from '@/types';
 import { api as apiService } from '@/services/api';
 import type { SpotResult, NormalizedDay, NormalizedEvent } from '@/services/api';
 import { toast } from 'react-hot-toast';
+import {
+  saveOfflinePack,
+  loadOfflinePack,
+  deleteOfflinePack,
+  isOfflinePackAvailable,
+} from '@/utils/offlinePack';
+import { useAuthStore } from '@/store/authStore';
 
 interface PlanState {
   // State
@@ -35,6 +42,10 @@ interface PlanState {
   currentDayIndex: number;
   isLoading: boolean;
   searchResults: SpotResult[];
+  // [Gate #36] Offline Travel Pack。trueの場合、currentPlanはネットワーク
+  // 取得に失敗し暗号化ローカルパックから復元したデータであることを示す
+  // (最新でない可能性があるため、画面側で明示する)。
+  isOfflineData: boolean;
 
   // Actions
   loadPlans: () => Promise<void>;
@@ -42,6 +53,9 @@ interface PlanState {
   createPlan: (planData: Partial<TravelPlan>) => Promise<TravelPlan | null>;
   updatePlan: (planId: string, planData: Partial<TravelPlan>) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
+  saveCurrentPlanOffline: () => Promise<boolean>;
+  removeOfflinePlan: (planId: string) => Promise<void>;
+  checkOfflineAvailability: (planId: string) => Promise<boolean>;
 
   // Day management
   setCurrentDay: (dayIndex: number) => void;
@@ -120,6 +134,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   currentDayIndex: 0,
   isLoading: false,
   searchResults: [],
+  isOfflineData: false,
 
   // プラン一覧読み込み
   loadPlans: async () => {
@@ -142,6 +157,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // 特定プラン読み込み
   // [Gate #31.5C] メタデータ(title/destination/日付等)は/travel-plansから、
   // 日/イベントとrevisionは正規化API(/plans)から取得し、マージする。
+  // [Gate #36] ネットワーク取得に失敗した場合、暗号化オフラインパックが
+  // あればそこから復元する(FR-032)。パックはあくまで最後にオンラインで
+  // 取得できた時点のスナップショットであり、最新でない可能性がある。
   loadPlan: async (planId: string) => {
     set({ isLoading: true });
 
@@ -168,11 +186,85 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         currentPlan: merged,
         currentDayIndex: 0,
         isLoading: false,
+        isOfflineData: false,
       });
     } catch (error) {
       console.error('Load plan error:', error);
-      set({ isLoading: false });
+
+      const authState = useAuthStore.getState();
+      // [Gate #36] 執筆時点でGate #35(Guest Travel View)がまだmainへ
+      // マージされていないため、ゲスト用トークンには依存しない。
+      // マージ後はguestTokenも対象に含めるとゲストもオフライン保存できる。
+      const token = authState.token;
+
+      if (token) {
+        try {
+          const offlinePlan = await loadOfflinePack<TravelPlan>(planId, token);
+          if (offlinePlan) {
+            set({
+              currentPlan: offlinePlan,
+              currentDayIndex: 0,
+              isLoading: false,
+              isOfflineData: true,
+            });
+            toast('オフラインで保存されたデータを表示しています(最新でない可能性があります)', {
+              icon: '📴',
+            });
+            return;
+          }
+        } catch (offlineError) {
+          console.error('Offline pack load error:', offlineError);
+        }
+      }
+
+      set({ isLoading: false, isOfflineData: false });
       toast.error('プランの読み込みに失敗しました');
+    }
+  },
+
+  // [Gate #36] 現在表示中のプランをオフラインパックとして保存する。
+  saveCurrentPlanOffline: async () => {
+    const { currentPlan } = get();
+    if (!currentPlan) {
+      toast.error('保存するプランがありません');
+      return false;
+    }
+
+    const authState = useAuthStore.getState();
+    // [Gate #36] 同上、guestTokenには依存しない(Gate #35マージ後に対応予定)。
+    const token = authState.token;
+    if (!token) {
+      toast.error('オフライン保存にはログインが必要です');
+      return false;
+    }
+
+    try {
+      await saveOfflinePack(currentPlan.id, currentPlan.title, currentPlan, token);
+      toast.success('オフラインで使えるように保存しました');
+      return true;
+    } catch (error) {
+      console.error('Save offline pack error:', error);
+      toast.error('オフライン保存に失敗しました');
+      return false;
+    }
+  },
+
+  removeOfflinePlan: async (planId: string) => {
+    try {
+      await deleteOfflinePack(planId);
+      toast.success('オフラインデータを削除しました');
+    } catch (error) {
+      console.error('Delete offline pack error:', error);
+      toast.error('オフラインデータの削除に失敗しました');
+    }
+  },
+
+  checkOfflineAvailability: async (planId: string) => {
+    try {
+      return await isOfflinePackAvailable(planId);
+    } catch (error) {
+      console.error('Check offline availability error:', error);
+      return false;
     }
   },
 
