@@ -76,11 +76,19 @@ const PlannerPage: React.FC = () => {
     saveCurrentPlanOffline,
     removeOfflinePlan,
     checkOfflineAvailability,
+    createQuickPlan,
   } = usePlanStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanDestination, setNewPlanDestination] = useState('');
+  // [Gate #38] Quick Plan(CA-001): 開始日・終了日・最初の予定も同じ画面で
+  // 入力できるようにする。全て任意項目(未定でも保存できる)。
+  const [newPlanStartDate, setNewPlanStartDate] = useState('');
+  const [newPlanEndDate, setNewPlanEndDate] = useState('');
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventTime, setNewEventTime] = useState('');
+  const [newEventLocation, setNewEventLocation] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   // [Gate #32] PLAN MAP: timelineとMAPの双方向選択同期用
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -368,20 +376,32 @@ const PlannerPage: React.FC = () => {
   }, [currentPlan?.id, currentDayIndex, currentPlan?.days.length]);
 
   const handleCreatePlan = async () => {
-    if (!newPlanTitle.trim()) return;
+    // [Gate #38] CA-001の受入条件「旅行名未入力でも作成できる」に合わせ、
+    // タイトル必須のガードを撤廃。空欄時はstore側で目的地/日付から自動生成する。
     setIsCreating(true);
     try {
-      const created = await createPlan({
-        title: newPlanTitle.trim(),
-        destination: newPlanDestination.trim() || undefined,
-        days: [],
+      const created = await createQuickPlan({
+        title: newPlanTitle,
+        destination: newPlanDestination,
+        startDate: newPlanStartDate,
+        endDate: newPlanEndDate,
+        firstEventTitle: newEventTitle,
+        firstEventTime: newEventTime,
+        firstEventLocation: newEventLocation,
       });
       if (created) {
         setIsCreateModalOpen(false);
         setNewPlanTitle('');
         setNewPlanDestination('');
+        setNewPlanStartDate('');
+        setNewPlanEndDate('');
+        setNewEventTitle('');
+        setNewEventTime('');
+        setNewEventLocation('');
         navigate(`/planner/${created.id}`);
       }
+      // createがnullの場合、createQuickPlan内部(createPlan)が既にエラー
+      // トーストを表示済み。入力内容は保持されるので再試行できる。
     } finally {
       setIsCreating(false);
     }
@@ -723,11 +743,14 @@ const PlannerPage: React.FC = () => {
         )}
       </div>
 
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="新しいプラン">
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="新しい旅行プラン">
         <Modal.Body>
           <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              未定の項目は空欄のままで大丈夫です。後からいつでも追加・変更できます。
+            </p>
             <Input
-              label="プラン名"
+              label="プラン名(任意、未入力なら自動で名付けます)"
               value={newPlanTitle}
               onChange={(e) => setNewPlanTitle(e.target.value)}
               placeholder="例: 東京旅行"
@@ -741,6 +764,53 @@ const PlannerPage: React.FC = () => {
               placeholder="例: 東京"
               fullWidth
             />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="開始日(任意)"
+                type="date"
+                value={newPlanStartDate}
+                onChange={(e) => setNewPlanStartDate(e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="終了日(任意)"
+                type="date"
+                value={newPlanEndDate}
+                onChange={(e) => setNewPlanEndDate(e.target.value)}
+                fullWidth
+              />
+            </div>
+
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700 mb-3">
+                最初の予定(任意)
+              </p>
+              <div className="space-y-3">
+                <Input
+                  label="予定名"
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  placeholder="例: ホテルチェックイン"
+                  fullWidth
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="時刻(任意)"
+                    type="time"
+                    value={newEventTime}
+                    onChange={(e) => setNewEventTime(e.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="場所(任意)"
+                    value={newEventLocation}
+                    onChange={(e) => setNewEventLocation(e.target.value)}
+                    placeholder="例: 東京駅"
+                    fullWidth
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </Modal.Body>
         <Modal.Footer>
@@ -751,11 +821,11 @@ const PlannerPage: React.FC = () => {
             variant="primary"
             onClick={handleCreatePlan}
             loading={isCreating}
-            disabled={!newPlanTitle.trim()}
           >
             作成
           </Button>
         </Modal.Footer>
+
       </Modal>
 
       {/* 検索結果からのスポット追加モーダル(Gate #16) */}

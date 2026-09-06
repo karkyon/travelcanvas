@@ -56,6 +56,18 @@ interface PlanState {
   saveCurrentPlanOffline: () => Promise<boolean>;
   removeOfflinePlan: (planId: string) => Promise<void>;
   checkOfflineAvailability: (planId: string) => Promise<boolean>;
+  // [Gate #38] Quick Plan: 「旅行名未入力→自動生成」「予定を1件登録した状態で
+  // プランナーへ着地」までを1回の呼び出しで完結させる。DBスキーマは無変更、
+  // 既存のcreatePlan/loadPlan/addDay/addScheduleItemを内部で順に呼ぶだけ。
+  createQuickPlan: (input: {
+    title?: string;
+    destination?: string;
+    startDate?: string;
+    endDate?: string;
+    firstEventTitle?: string;
+    firstEventTime?: string;
+    firstEventLocation?: string;
+  }) => Promise<TravelPlan | null>;
 
   // Day management
   setCurrentDay: (dayIndex: number) => void;
@@ -266,6 +278,60 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       console.error('Check offline availability error:', error);
       return false;
     }
+  },
+
+  createQuickPlan: async (input) => {
+    const destination = input.destination?.trim() || '';
+    const startDate = input.startDate?.trim() || undefined;
+
+    // [Gate #38 / CA-001] 旅行名は任意。未入力時は目的地+開始日から自動生成し、
+    // どちらも無ければ「新しい旅行」にフォールバックする。
+    let title = input.title?.trim();
+    if (!title) {
+      if (destination && startDate) {
+        title = `${destination}旅行(${startDate})`;
+      } else if (destination) {
+        title = `${destination}旅行`;
+      } else if (startDate) {
+        title = `${startDate}の旅行`;
+      } else {
+        title = '新しい旅行';
+      }
+    }
+
+    const created = await get().createPlan({
+      title,
+      destination: destination || undefined,
+      start_date: startDate,
+      end_date: input.endDate?.trim() || undefined,
+    } as Partial<TravelPlan>);
+
+    if (!created) {
+      // createPlan側で既にエラートーストを出しているため、ここでは何もしない。
+      return null;
+    }
+
+    // addDay/addScheduleItemはcurrentPlan.revisionを要求するため、
+    // メタデータのみのcreatePlan直後ではなく、正規化データを含めて
+    // 再取得してから使う。
+    await get().loadPlan(created.id);
+
+    // [CA-001] 「予定を1件登録できる」ところまでを自動保存する。
+    // 日・予定名のいずれも未入力なら、空のプランのまま(タイトルのみ)で
+    // 返し、後続の手動編集に委ねる。
+    const hasFirstEvent = !!input.firstEventTitle?.trim();
+    if (startDate || hasFirstEvent) {
+      await get().addDay();
+    }
+    if (hasFirstEvent) {
+      await get().addScheduleItem(0, {
+        title: input.firstEventTitle!.trim(),
+        start_time: input.firstEventTime?.trim() || undefined,
+        location_name: input.firstEventLocation?.trim() || undefined,
+      });
+    }
+
+    return get().currentPlan;
   },
 
   // プラン作成(メタデータのみ。/travel-plansが正本)

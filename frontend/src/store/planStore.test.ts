@@ -69,6 +69,129 @@ describe('loadPlan', () => {
   });
 });
 
+describe('createQuickPlan [Gate #38]', () => {
+  function mockCreateAndLoad(title: string) {
+    mockedApi.createPlan.mockResolvedValue({
+      success: true,
+      data: { id: PLAN_ID, title, days: [] },
+    });
+    mockedApi.getPlan.mockResolvedValue({
+      success: true,
+      data: { id: PLAN_ID, title, days: [] },
+    });
+    mockedApi.getPlanDetail.mockResolvedValue({
+      success: true,
+      data: { id: PLAN_ID, title, revision: 1, days: [] },
+    });
+  }
+
+  it('目的地と開始日の両方があればタイトルを自動生成する', async () => {
+    mockCreateAndLoad('大阪旅行(2026-11-01)');
+
+    await usePlanStore.getState().createQuickPlan({
+      destination: '大阪',
+      startDate: '2026-11-01',
+    });
+
+    expect(mockedApi.createPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '大阪旅行(2026-11-01)' })
+    );
+  });
+
+  it('目的地のみの場合は目的地名から生成する', async () => {
+    mockCreateAndLoad('福岡旅行');
+
+    await usePlanStore.getState().createQuickPlan({ destination: '福岡' });
+
+    expect(mockedApi.createPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '福岡旅行' })
+    );
+  });
+
+  it('目的地・開始日ともに無い場合は「新しい旅行」にフォールバックする', async () => {
+    mockCreateAndLoad('新しい旅行');
+
+    await usePlanStore.getState().createQuickPlan({});
+
+    expect(mockedApi.createPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '新しい旅行' })
+    );
+  });
+
+  it('タイトルを明示指定した場合は自動生成しない', async () => {
+    mockCreateAndLoad('自分で決めた名前');
+
+    await usePlanStore.getState().createQuickPlan({
+      title: '自分で決めた名前',
+      destination: '無視されるはずの目的地',
+    });
+
+    expect(mockedApi.createPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '自分で決めた名前' })
+    );
+  });
+
+  it('開始日と最初の予定を指定すると、日程作成→予定登録まで自動で行う', async () => {
+    mockCreateAndLoad('京都旅行(2026-12-01)');
+    mockedApi.createDay.mockResolvedValue({
+      id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [],
+    });
+    mockedApi.createEvent.mockResolvedValue({
+      id: 'event-1', day_id: DAY_ID, title: 'チェックイン', event_type: 'sightseeing',
+      is_all_day: false, locked: false, sort_order: 0,
+    });
+    // addDay/addScheduleItem内部のloadPlanが呼ばれるたびに最新状態を返すよう
+    // revisionを進めながら返す。
+    mockedApi.getPlanDetail
+      .mockResolvedValueOnce({ success: true, data: { id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 1, days: [] } })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 2, days: [{ id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [] }] },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 3,
+          days: [{ id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [
+            { id: 'event-1', day_id: DAY_ID, title: 'チェックイン', event_type: 'sightseeing', is_all_day: false, locked: false, sort_order: 0 },
+          ] }],
+        },
+      });
+
+    const result = await usePlanStore.getState().createQuickPlan({
+      destination: '京都',
+      startDate: '2026-12-01',
+      firstEventTitle: 'チェックイン',
+    });
+
+    expect(mockedApi.createDay).toHaveBeenCalled();
+    expect(mockedApi.createEvent).toHaveBeenCalledWith(
+      PLAN_ID,
+      expect.objectContaining({ day_id: DAY_ID, title: 'チェックイン' }),
+      expect.any(String)
+    );
+    expect(result?.days[0]?.events).toHaveLength(1);
+  });
+
+  it('日付も最初の予定も無指定なら日程・予定は作らない', async () => {
+    mockCreateAndLoad('新しい旅行');
+
+    await usePlanStore.getState().createQuickPlan({});
+
+    expect(mockedApi.createDay).not.toHaveBeenCalled();
+    expect(mockedApi.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('プラン作成自体が失敗した場合はnullを返し、日程作成を試みない', async () => {
+    mockedApi.createPlan.mockResolvedValue({ success: false });
+
+    const result = await usePlanStore.getState().createQuickPlan({ destination: '失敗テスト' });
+
+    expect(result).toBeNull();
+    expect(mockedApi.createDay).not.toHaveBeenCalled();
+  });
+});
+
 describe('addScheduleItem', () => {
   it('楽観的に追加した後、正規化APIのcreateEventを呼び、成功時に最新状態を再取得する', async () => {
     await seedLoadedPlan(1);
