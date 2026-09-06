@@ -12,7 +12,7 @@ TravelCanvas Backend - 統一認証システム
 
 from typing import List, Optional, Union, Dict, Any, Tuple
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import uuid4, UUID
 import time
 import json
 import hashlib
@@ -588,8 +588,15 @@ class AuthManager:
         # ゲストユーザーの場合
         if token_data.is_guest:
             # ゲストユーザー情報を作成
+            # [Gate #35] token_data.user_idは文字列だが、TravelPlan.user_id等の
+            # DB側UUID列とはstr("...") == UUID("...")がPythonでは常にFalseに
+            # なるため、ここでUUID型へ変換しないと所有権チェックが常に失敗する
+            # (plan.user_id == user.id が絶対にTrueにならない)。
             guest_user = User()
-            guest_user.id = token_data.user_id
+            try:
+                guest_user.id = UUID(str(token_data.user_id))
+            except (ValueError, TypeError):
+                raise AuthenticationError("無効なトークンです")
             guest_user.user_type = UserType.GUEST
             guest_user.is_active = True
             guest_user.is_verified = False
@@ -862,6 +869,25 @@ def get_current_session_id(
     if isinstance(auth_result, AuthResult) and auth_result.token_data:
         return auth_result.token_data.session_id
     return None
+
+
+def get_current_user_or_guest(
+    auth_result: Union[User, AuthResult] = Depends(get_current_user)
+) -> User:
+    """認証必須だがゲストトークンも許可する(Gate #35 Guest Travel View用)。
+
+    get_current_active_userとの唯一の違いは、is_guestを理由に拒否しない点。
+    ゲスト用エンドポイント(POST /api/v1/travel-plans等、自分のプランのみを
+    対象とするCRUD)でのみ使う。管理・共有・決済等、会員限定機能では
+    引き続きget_current_active_userを使うこと。
+    """
+    if isinstance(auth_result, AuthResult):
+        if not auth_result.is_authenticated:
+            raise AuthenticationError("認証が必要です")
+
+        return auth_result.user
+
+    return auth_result
 
 
 def get_current_user_optional(

@@ -1,7 +1,25 @@
 
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuthStore } from '@/store/authStore';
 
 const LandingPage = () => {
+  const navigate = useNavigate();
+  const { startGuestSession, isLoading } = useAuthStore();
+  const [guestError, setGuestError] = useState<string | null>(null);
+
+  const handleGuestStart = async () => {
+    setGuestError(null);
+    try {
+      await startGuestSession();
+      navigate('/planner');
+    } catch (error) {
+      setGuestError(
+        error instanceof Error ? error.message : 'ゲストセッションの開始に失敗しました'
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -33,6 +51,20 @@ const LandingPage = () => {
             >
               ログイン
             </Link>
+          </div>
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleGuestStart}
+              disabled={isLoading}
+              className="text-sm text-gray-500 hover:text-blue-600 underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'ゲストセッションを開始しています...' : '登録せずに試してみる(ゲストとして始める)'}
+            </button>
+            {guestError && (
+              <p className="mt-2 text-sm text-red-600">{guestError}</p>
+            )}
           </div>
         </div>
         

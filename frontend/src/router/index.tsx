@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
+import GuestUpgradePage from '@/pages/GuestUpgradePage';
 import DashboardPage from '@/pages/DashboardPage';
 import PlannerPage from '@/pages/PlannerPage';
 import SearchPage from '@/pages/SearchPage';
@@ -89,6 +90,17 @@ export const router = createBrowserRouter([
           <AuthRedirect>
             <RegisterPage />
           </AuthRedirect>
+        ),
+      },
+      {
+        // [Gate #35] AuthRedirectでラップしない。ゲストはisAuthenticated=trueの
+        // ためAuthRedirectだと即座に/dashboardへ弾かれてしまう。認証(ゲスト含む)
+        // 必須のみをProtectedRouteで課し、非ゲストの場合はページ自身がリダイレクトする。
+        path: 'guest/upgrade',
+        element: (
+          <ProtectedRoute>
+            <GuestUpgradePage />
+          </ProtectedRoute>
         ),
       },
       

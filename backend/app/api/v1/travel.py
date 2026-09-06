@@ -9,6 +9,12 @@ travel_days/travel_events(app/api/v1/plans.py)が唯一の書込み正本であ�
 このrouter経由でのitinerary書換えはrevision/If-Match/Idempotency/
 ChangeSet/Undoの全保証を迂回する(2026-09-05監査 P0-01/P0-02)。
 そのため本Gateでitineraryフィールドの書込みを明示的に拒否する。
+
+[Gate #35] このrouterの5エンドポイント(POST/GET一覧/GET単体/PUT/DELETE)は
+get_current_active_userからget_current_user_or_guestへ変更した。ゲストは
+自分が作成したプランのみ操作でき(TravelPlan.user_id == current_user.id、
+挙動は既存のまま変更なし)、共有・協業・通知等の会員限定機能には一切
+影響しない。
 """
 import logging
 import uuid
@@ -21,7 +27,7 @@ from typing import Optional
 from sqlalchemy import or_
 
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
 from app.models.models import TravelPlan, User
 from app.schemas.travel_plan import (
@@ -59,7 +65,7 @@ def _reject_itinerary_write(update_data: dict) -> None:
 @router.post("/", response_model=TravelPlanResponse, status_code=status.HTTP_201_CREATED)
 async def create_travel_plan(
     plan_data: TravelPlanCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """新しい旅行プランを作成(metadataのみ。itineraryはこのAPIでは受け付けない)"""
@@ -95,7 +101,7 @@ async def create_travel_plan(
 
 @router.get("/", response_model=TravelPlanListResponse)
 async def get_travel_plans(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
     status_filter: Optional[str] = None,
     skip: int = 0,
@@ -141,7 +147,7 @@ async def test_travel_plans_api():
 @router.get("/{plan_id}", response_model=TravelPlanResponse)
 async def get_travel_plan(
     plan_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """旅行プラン詳細取得(owner/editor/viewerいずれでも閲覧可能)"""
@@ -153,7 +159,7 @@ async def get_travel_plan(
 async def update_travel_plan(
     plan_id: uuid.UUID,
     plan_data: TravelPlanUpdate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """旅行プラン更新(owner/editorが編集可能。viewerは403)
@@ -187,7 +193,7 @@ async def update_travel_plan(
 @router.delete("/{plan_id}")
 async def delete_travel_plan(
     plan_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """旅行プラン削除

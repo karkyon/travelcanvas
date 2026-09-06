@@ -11,7 +11,7 @@ import logging
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.auth import get_current_active_user, get_current_session_id, auth_manager
+from app.core.auth import get_current_active_user, get_current_session_id, get_current_user_or_guest, auth_manager
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 
@@ -49,6 +49,25 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+
+class GuestSessionResponse(BaseModel):
+    """[Gate #35] POST /auth/guest の応答。ゲストはusername/emailを持たない
+    ためTokenResponse/UserResponseは使わず専用モデルとする。"""
+    access_token: str
+    token_type: str
+    user_type: str
+    guest_id: str
+    expires_in_hours: int
+
+
+class GuestUpgradeRequest(BaseModel):
+    """[Gate #35] POST /auth/guest/upgrade の入力。UserRegisterと同じ形だが、
+    「新規作成」ではなく「既存ゲストuser行の昇格」であることを明示するため
+    別モデルとして定義する。"""
+    username: str
+    email: EmailStr
+    password: str
 
 
 class UserDetailResponse(BaseModel):
@@ -151,6 +170,162 @@ def _access_token_for(user: User, session_id: str) -> str:
     return create_access_token(
         data={"sub": str(user.id), "username": user.username, "session_id": str(session_id)}
     )
+
+@router.post("/guest", response_model=GuestSessionResponse, status_code=status.HTTP_201_CREATED)
+async def create_guest_session(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """[Gate #35] ログイン不要でプラン作成・閲覧ができるゲストセッションを発行する。
+
+    ゲストは実際に`users`テーブルへ1行作成する(username/email/hashed_passwordは
+    全てNULL、user_type='guest')。これはtravel_plans.user_idがusers.idへの
+    外部キーであり、DBスキーマを一切変更せずに既存の所有権チェック
+    (TravelPlan.user_id == current_user.id)をそのまま再利用するための設計。
+    このuser行は`/auth/guest/upgrade`で正規アカウントへその場で昇格するか、
+    settings.GUEST_TOKEN_EXPIRE_HOURS経過後は誰にも到達不能な孤児行として
+    残る(定期クリーンアップは別Gateで対応。本パッチのスコープ外)。
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"guest:{client_ip}", settings.RATE_LIMIT_GUEST, 3600):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="ゲストセッションの発行回数が上限に達しました。しばらく待ってから再試行してください。"
+        )
+
+    try:
+        guest_user = User(
+            username=None,
+            email=None,
+            hashed_password=None,
+            user_type="guest",
+            is_active=True,
+            is_verified=False,
+        )
+        db.add(guest_user)
+        db.commit()
+        db.refresh(guest_user)
+
+        guest_token = auth_manager.create_guest_token(str(guest_user.id))
+
+        return GuestSessionResponse(
+            access_token=guest_token,
+            token_type="bearer",
+            user_type="guest",
+            guest_id=str(guest_user.id),
+            expires_in_hours=settings.GUEST_TOKEN_EXPIRE_HOURS,
+        )
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.exception(f"[{request_id}] guest session creation failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ゲストセッションの作成に失敗しました。しばらくしてから再試行してください。"
+        )
+
+
+@router.post("/guest/upgrade", response_model=TokenResponse)
+async def upgrade_guest_to_user(
+    upgrade_data: GuestUpgradeRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """[Gate #35] ゲストを正規アカウントへ昇格する。
+
+    新規userを作るのではなく、ゲストが既に持っている`users`行を
+    その場でupdateする。travel_plans.user_idは変更しないため、
+    ゲスト中に作成した全プランの所有権は自動的にそのまま正規
+    アカウントへ引き継がれる(FK参照先の行自体が昇格するため)。
+    """
+    if current_user.user_type != "guest":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="この操作はゲストセッションでのみ実行できます。"
+        )
+
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"guest_upgrade:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="試行回数が上限に達しました。しばらく待ってから再試行してください。"
+        )
+
+    try:
+        existing_user = db.query(User).filter(
+            (User.email == upgrade_data.email) |
+            (User.username == upgrade_data.username)
+        ).first()
+
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="このメールアドレスまたはユーザー名は既に使用されています"
+            )
+
+        db_user = db.query(User).filter(User.id == current_user.id).first()
+        if not db_user or db_user.user_type != "guest":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ゲストセッションが見つかりません。"
+            )
+
+        db_user.username = upgrade_data.username
+        db_user.email = upgrade_data.email
+        db_user.hashed_password = hash_password(upgrade_data.password)
+        db_user.user_type = "registered"
+        db_user.is_verified = False
+
+        db.commit()
+        db.refresh(db_user)
+
+        secret = _generate_refresh_secret()
+        session = auth_manager.create_session(
+            user_id=db_user.id,
+            refresh_token_hash=_hash_refresh_secret(secret),
+            ip_address=client_ip,
+            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            db=db,
+        )
+        response.set_cookie(
+            key=REFRESH_COOKIE_NAME,
+            value=f"{session.id}.{secret}",
+            httponly=True,
+            secure=settings.APP_ENV == "production",
+            samesite="lax",
+            path=REFRESH_COOKIE_PATH,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        )
+        access_token = _access_token_for(db_user, session.id)
+
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserResponse(
+                id=str(db_user.id),
+                username=db_user.username,
+                email=db_user.email,
+                user_type=db_user.user_type,
+                is_verified=db_user.is_verified
+            )
+        )
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.exception(f"[{request_id}] guest upgrade failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="アカウント昇格に失敗しました。しばらくしてから再試行してください。"
+        )
+
 
 @router.post("/register", response_model=TokenResponse)
 async def register(

@@ -36,12 +36,19 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
+  // [Gate #35] Guest Travel View。登録ユーザーのuser/tokenとは別枠で保持する。
+  // /auth/me は会員限定のため、既存のcheckAuthのロジックには一切触れない。
+  isGuest: boolean;
+  guestToken: string | null;
+  guestId: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
   checkAuth: () => Promise<void>;
   initialize: () => void;
+  startGuestSession: () => Promise<void>;
+  upgradeGuest: (username: string, email: string, password: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -53,6 +60,9 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       isInitialized: false,
       error: null,
+      isGuest: false,
+      guestToken: null,
+      guestId: null,
 
       // 初期化処理
       initialize: () => {
@@ -73,6 +83,16 @@ export const useAuthStore = create<AuthState>()(
             isInitialized: true 
           });
           console.log('✅ 認証状態復元完了');
+        } else if (state.isGuest && state.guestToken) {
+          // [Gate #35] ゲストセッションの復元。/auth/meを呼ばないため
+          // checkAuthとは独立して、保存済みのguestTokenをそのまま信頼する
+          // (期限切れの場合は後続のAPI呼び出しが401になった時点で判明する)。
+          apiService.setAccessToken(state.guestToken);
+          set({
+            isAuthenticated: true,
+            isInitialized: true,
+          });
+          console.log('✅ ゲストセッション復元完了');
         } else {
           set({ 
             isAuthenticated: false, 
@@ -241,9 +261,13 @@ export const useAuthStore = create<AuthState>()(
         console.log('🚪 ログアウト');
         // [Gate #28] サーバー側のセッション(refresh token)も失効させる。
         // 失敗しても(ネットワーク断など)クライアント側の状態は必ずクリアする。
-        apiService.post('/auth/logout').catch(() => {
-          console.warn('⚠️ サーバー側セッションの失効に失敗しましたが、ローカルの認証状態はクリアします');
-        });
+        // [Gate #35] ゲストセッションはrefresh token(サーバー側セッション)を
+        // 持たないため、/auth/logoutの呼び出しはisGuestでない場合のみ行う。
+        if (!get().isGuest) {
+          apiService.post('/auth/logout').catch(() => {
+            console.warn('⚠️ サーバー側セッションの失効に失敗しましたが、ローカルの認証状態はクリアします');
+          });
+        }
         apiService.clearAccessToken();
         set({
           user: null,
@@ -251,7 +275,99 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           isInitialized: true,
           error: null,
+          isGuest: false,
+          guestToken: null,
+          guestId: null,
         });
+      },
+
+      startGuestSession: async () => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/guest`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'ゲストセッションの開始に失敗しました' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          apiService.setAccessToken(data.access_token);
+
+          set({
+            isGuest: true,
+            guestToken: data.access_token,
+            guestId: data.guest_id,
+            isAuthenticated: true,
+            isLoading: false,
+            isInitialized: true,
+            error: null,
+          });
+        } catch (error) {
+          console.error('❌ ゲストセッション開始エラー:', error);
+          set({
+            isLoading: false,
+            isInitialized: true,
+            error: error instanceof Error ? error.message : 'ゲストセッションの開始に失敗しました',
+          });
+          throw error;
+        }
+      },
+
+      upgradeGuest: async (username: string, email: string, password: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const { guestToken } = get();
+          if (!guestToken) {
+            throw new Error('ゲストセッションが見つかりません。最初からやり直してください。');
+          }
+
+          const response = await fetch(`${API_BASE_URL}/auth/guest/upgrade`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${guestToken}`,
+            },
+            body: JSON.stringify({ username, email, password }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'アカウント登録に失敗しました' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          apiService.setAccessToken(data.access_token);
+
+          set({
+            user: data.user,
+            token: data.access_token,
+            isAuthenticated: true,
+            isGuest: false,
+            guestToken: null,
+            guestId: null,
+            isLoading: false,
+            isInitialized: true,
+            error: null,
+          });
+        } catch (error) {
+          console.error('❌ ゲスト昇格エラー:', error);
+          set({
+            isLoading: false,
+            isInitialized: true,
+            error: error instanceof Error ? error.message : 'アカウント登録に失敗しました',
+          });
+          throw error;
+        }
       },
 
       clearError: () => set({ error: null }),
@@ -262,6 +378,9 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         isAuthenticated: state.isAuthenticated,
+        isGuest: state.isGuest,
+        guestToken: state.guestToken,
+        guestId: state.guestId,
       }),
       onRehydrateStorage: () => (state) => {
         // ストレージから復元後に初期化

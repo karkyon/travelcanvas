@@ -20,7 +20,7 @@ import { toast } from 'react-hot-toast';
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { user, logout, isAuthenticated, isGuest } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   // [Gate #26] 以前は実データと無関係な固定の未読バッジ(常時点滅)だった。
@@ -189,6 +189,17 @@ const Header: React.FC = () => {
   // 認証済みユーザー向けのフルヘッダー
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      {/* [Gate #35] ゲストセッション中は常時表示するアカウント登録の案内バー。
+          データが消えるわけではないが、端末やブラウザを変えると失われるため、
+          目立つ位置で「保存」を促す。 */}
+      {isGuest && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-800">
+          ゲストとして利用中です。このブラウザ以外からは続きを見られません。{' '}
+          <Link to="/guest/upgrade" className="font-semibold underline underline-offset-2 hover:text-amber-900">
+            アカウントを作成して保存する
+          </Link>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* ロゴ */}
@@ -289,7 +300,7 @@ const Header: React.FC = () => {
                   <User size={16} className="text-white" />
                 </div>
                 <span className="hidden sm:block font-medium">
-                  {user?.username || 'ユーザー'}
+                  {isGuest ? 'ゲスト' : (user?.username || 'ユーザー')}
                 </span>
               </button>
 
