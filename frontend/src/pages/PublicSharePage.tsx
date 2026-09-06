@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Lock, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Lock, MapPin, Calendar, AlertCircle, Share2 } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { resolvePublicShare } from '../services/api';
 import type { PublicSharedPlan } from '../services/api';
@@ -56,6 +56,27 @@ const PublicSharePage: React.FC = () => {
     setPasscodeError(null);
     await load(passcode);
     setSubmitting(false);
+  };
+
+  // [Gate #41 / CA-002] 「Web Share APIおよびLINE共有導線」への対応。
+  // navigator.shareが使えない環境(主にPC版ブラウザ)ではURLコピーへ
+  // フォールバックする。
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: plan?.title || 'TravelCanvas', url });
+      } catch {
+        // ユーザーによるキャンセル等は何もしない。
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      window.alert('リンクをコピーしました');
+    } catch {
+      window.prompt('このURLをコピーしてください', url);
+    }
   };
 
   if (state === 'loading') {
@@ -117,14 +138,25 @@ const PublicSharePage: React.FC = () => {
 
   if (!plan) return null;
 
-  const days: any[] = (plan.itinerary && (plan.itinerary as any).days) || [];
+  // [Gate #41] Gate #34a以降、backendはdaysをplanオブジェクト直下に返す
+  // (itinerary.daysではない)。以前はここが常に空配列になっていたバグを修正。
+  const days = plan.days || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-2 inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-          <Lock size={12} />
-          共有リンクによる閲覧専用ビュー
+        <div className="flex items-center justify-between mb-2">
+          <div className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+            <Lock size={12} />
+            共有リンクによる閲覧専用ビュー
+          </div>
+          <button
+            onClick={handleShare}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <Share2 size={14} />
+            共有
+          </button>
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-3">{plan.title}</h1>
         <div className="flex flex-wrap items-center gap-4 text-gray-600 text-sm mb-6">
@@ -150,16 +182,19 @@ const PublicSharePage: React.FC = () => {
 
         {days.length > 0 ? (
           <div className="space-y-4">
-            {days.map((day: any, idx: number) => (
+            {days.map((day, idx) => (
               <div key={idx} className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="font-semibold text-gray-900 mb-2">
-                  {day.title || `${idx + 1}日目`}
+                  {day.title || (day.date ? new Date(day.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }) : `${idx + 1}日目`)}
                 </h2>
-                {Array.isArray(day.events) && day.events.length > 0 ? (
+                {day.events.length > 0 ? (
                   <ul className="space-y-2">
-                    {day.events.map((ev: any, evIdx: number) => (
+                    {day.events.map((ev, evIdx) => (
                       <li key={evIdx} className="text-sm text-gray-700 border-l-2 border-blue-200 pl-3">
-                        {ev.title || ev.name || '(名称未設定のイベント)'}
+                        {ev.local_start_time && (
+                          <span className="text-gray-400 mr-2">{ev.local_start_time}</span>
+                        )}
+                        {ev.title || '(名称未設定のイベント)'}
                       </li>
                     ))}
                   </ul>

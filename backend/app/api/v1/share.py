@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.core.plan_access import require_plan_access
-from app.models.models import Notification, PlanCollaborator, PlanShareLink, TravelPlan, User
+from app.models.models import Notification, PlanCollaborator, PlanShareLink, ShareAccessLog, TravelPlan, User
 
 router = APIRouter(prefix="/travel-plans", tags=["share"])
 
@@ -48,15 +48,32 @@ def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _share_link_to_dict(share: PlanShareLink, raw_token: Optional[str] = None) -> dict:
+def _share_link_to_dict(share: PlanShareLink, raw_token: Optional[str] = None, db: Optional[Session] = None) -> dict:
     """[Gate #30] tokenの生値はDBに保存していないため、生成直後の
     レスポンス(raw_tokenが渡された場合)でのみ完全なURLを返す。それ以外
     (一覧・更新後の再取得)ではtoken_prefixのみを返し、生値は二度と
     再現しない(トークン漏洩時の影響範囲を最小化するための意図的な設計)。
+
+    [Gate #41 / CA-002] 「閲覧回数・最終閲覧日時」の受入条件に対応するため、
+    last_accessed_atを追加する。ShareAccessLog(既存、Gate #31.5B)から
+    result='success'の最新created_atを引く。dbが渡されない場合(生成直後、
+    まだアクセスされ得ない)はNoneのまま返す。
     """
     now = datetime.now(timezone.utc)
     is_expired = bool(share.expires_at and share.expires_at <= now)
     is_exhausted = bool(share.max_uses is not None and share.use_count >= share.max_uses)
+
+    last_accessed_at = None
+    if db is not None:
+        last_log = (
+            db.query(ShareAccessLog)
+            .filter(ShareAccessLog.share_id == share.id, ShareAccessLog.result == "success")
+            .order_by(ShareAccessLog.created_at.desc())
+            .first()
+        )
+        if last_log and last_log.created_at:
+            last_accessed_at = last_log.created_at.isoformat()
+
     return {
         "id": str(share.id),
         "plan_id": str(share.plan_id),
@@ -66,6 +83,7 @@ def _share_link_to_dict(share: PlanShareLink, raw_token: Optional[str] = None) -
         "has_passcode": share.passcode_hash is not None,
         "max_uses": share.max_uses,
         "use_count": share.use_count,
+        "last_accessed_at": last_accessed_at,
         "expires_at": share.expires_at.isoformat() if share.expires_at else None,
         "revoked_at": share.revoked_at.isoformat() if share.revoked_at else None,
         "is_active": not (share.revoked_at or is_expired or is_exhausted),
@@ -148,7 +166,7 @@ async def list_share_links(
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
     shares = db.query(PlanShareLink).filter(PlanShareLink.plan_id == plan.id).all()
-    return [_share_link_to_dict(s) for s in shares]
+    return [_share_link_to_dict(s, db=db) for s in shares]
 
 
 @router.put("/{plan_id}/share/{share_id}")

@@ -261,6 +261,36 @@ const SharePage: React.FC = () => {
                       スマホでスキャンしてアクセス
                     </p>
                   </div>
+
+                  {/* [Gate #41 / CA-002] 「所有者が共有プレビューで公開内容を
+                      事前確認できる」受入条件への対応。生成直後のURLは今だけ
+                      有効なため、この場ですぐ確認・共有できるようにする。 */}
+                  <div className="flex gap-2 pt-1">
+                    <a
+                      href={justCreatedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center px-3 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 text-sm"
+                    >
+                      共有前プレビューを開く
+                    </a>
+                    <button
+                      onClick={async () => {
+                        if (navigator.share) {
+                          try {
+                            await navigator.share({ title: 'TravelCanvas', url: justCreatedUrl });
+                          } catch {
+                            /* ユーザーによるキャンセルは無視 */
+                          }
+                        } else {
+                          await handleCopyLink(justCreatedUrl);
+                        }
+                      }}
+                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                    >
+                      共有する
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -280,8 +310,11 @@ const SharePage: React.FC = () => {
                         </div>
                         <div className="text-gray-500 text-xs">
                           {share.permission === 'edit' ? '編集可能' : '閲覧のみ'}
-                          {share.max_uses != null && ` ・ 使用 ${share.use_count}/${share.max_uses}回`}
+                          {` ・ 使用 ${share.use_count}${share.max_uses != null ? `/${share.max_uses}` : ''}回`}
                           {share.expires_at && ` ・ 期限 ${new Date(share.expires_at).toLocaleDateString('ja-JP')}`}
+                          {share.last_accessed_at
+                            ? ` ・ 最終閲覧 ${new Date(share.last_accessed_at).toLocaleString('ja-JP')}`
+                            : ' ・ 未閲覧'}
                         </div>
                       </div>
                       {!share.revoked_at && (
