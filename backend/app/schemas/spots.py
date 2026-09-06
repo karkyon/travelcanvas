@@ -72,8 +72,28 @@ class FavoriteResponse(BaseModel):
 
 
 class VisitCreate(BaseModel):
-    """訪問記録スキーマ"""
+    """訪問記録スキーマ
+
+    [Gate #37] source/confidence/detected_accuracy_metersはGPS自動判定
+    (Visited Area Layer)用のオプション項目。未指定時はsource='manual'として
+    従来通り扱う(後方互換)。
+    """
     visit_note: Optional[str] = None
+    source: str = "manual"
+    confidence: Optional[float] = None
+    detected_accuracy_meters: Optional[float] = None
+
+    @validator("source")
+    def validate_source(cls, v):
+        if v not in ("manual", "auto_gps"):
+            raise ValueError("sourceは'manual'または'auto_gps'である必要があります")
+        return v
+
+    @validator("confidence")
+    def validate_confidence(cls, v):
+        if v is not None and not (0.0 <= v <= 1.0):
+            raise ValueError("confidenceは0.0から1.0の範囲である必要があります")
+        return v
 
 
 class VisitResponse(BaseModel):
@@ -82,6 +102,9 @@ class VisitResponse(BaseModel):
     spot_id: uuid.UUID
     visit_note: Optional[str] = None
     visited_at: datetime
+    source: str = "manual"
+    confidence: Optional[float] = None
+    detected_accuracy_meters: Optional[float] = None
     spot: SpotResponse
 
     class Config:

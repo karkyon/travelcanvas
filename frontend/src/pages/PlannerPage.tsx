@@ -27,6 +27,7 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import type { ScheduleItem as ScheduleItemType } from '@/types';
+import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -88,6 +89,11 @@ const PlannerPage: React.FC = () => {
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  // [Gate #37] Visited Area Layer: GPS自動判定
+  const [isAutoDetectEnabled, setIsAutoDetectEnabled] = useState(false);
+  const [visitSuggestion, setVisitSuggestion] = useState<VisitSuggestion | null>(null);
+  const [autoDetectError, setAutoDetectError] = useState<string | null>(null);
+  const visitDetectorRef = React.useRef<VisitDetector | null>(null);
 
   // [Gate #18] DayView.tsxのonItemClick/onItemEdit/onItemDeleteがどこからも
   // 渡されておらず、日程に追加したスケジュールアイテムをクリックしても編集も
@@ -256,6 +262,72 @@ const PlannerPage: React.FC = () => {
       cancelled = true;
     };
   }, [currentPlan?.id]);
+
+  // [Gate #37] 自動検出のON/OFFと表示中の日付に応じてVisitDetectorを起動/停止する。
+  // 「今日」の日程イベント(spot_idを持つもののみ)だけを対象にする —
+  // 過去/未来の予定に対してGPS判定を行っても意味が無いため。
+  useEffect(() => {
+    const activeDay = currentPlan?.days[currentDayIndex];
+    const isToday =
+      !!activeDay?.date && new Date(activeDay.date).toDateString() === new Date().toDateString();
+
+    if (!isAutoDetectEnabled || !activeDay || !isToday) {
+      visitDetectorRef.current?.stop();
+      visitDetectorRef.current = null;
+      return;
+    }
+
+    const targets = activeDay.events
+      .filter((e) => e.spot_id && e.latitude != null && e.longitude != null)
+      .map((e) => ({
+        eventId: e.id,
+        spotId: e.spot_id as string,
+        title: e.title,
+        latitude: e.latitude as number,
+        longitude: e.longitude as number,
+      }));
+
+    if (visitDetectorRef.current) {
+      visitDetectorRef.current.updateTargets(targets);
+    } else {
+      const detector = new VisitDetector(
+        targets,
+        (suggestion) => setVisitSuggestion(suggestion),
+        (message) => setAutoDetectError(message)
+      );
+      detector.start();
+      visitDetectorRef.current = detector;
+    }
+
+    return () => {
+      // isAutoDetectEnabledやactiveDayが変わる際にeffectがクリーンアップ
+      // される場合のみ止める(依存配列の変化ごとに毎回止めて張り直す)。
+    };
+  }, [isAutoDetectEnabled, currentPlan?.id, currentDayIndex, currentPlan?.days]);
+
+  // ページを離れる際は必ず位置情報監視を止める
+  useEffect(() => {
+    return () => {
+      visitDetectorRef.current?.stop();
+    };
+  }, []);
+
+  const handleConfirmVisitSuggestion = async () => {
+    if (!visitSuggestion) return;
+    try {
+      await spotApiService.addVisit(visitSuggestion.spotId, undefined, {
+        source: 'auto_gps',
+        confidence: visitSuggestion.confidence,
+        detectedAccuracyMeters: visitSuggestion.accuracyMeters,
+      });
+      addToast({ message: '訪問済みとして記録しました', type: 'success' });
+    } catch (error) {
+      console.error('Failed to record auto-detected visit:', error);
+      addToast({ message: '訪問記録の保存に失敗しました', type: 'error' });
+    } finally {
+      setVisitSuggestion(null);
+    }
+  };
 
   const handleToggleOfflineSave = async () => {
     if (!currentPlan) return;
@@ -442,11 +514,49 @@ const PlannerPage: React.FC = () => {
                 ? '📴 オフライン保存済み(削除)'
                 : '📥 オフラインで使う'}
             </Button>
+            {activeDay?.date &&
+              new Date(activeDay.date).toDateString() === new Date().toDateString() && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setAutoDetectError(null);
+                    setIsAutoDetectEnabled((prev) => !prev);
+                  }}
+                  title="現在地が近くのスポットに一定時間留まると、訪問済みにするか提案します(このタブを開いている間のみ動作します)"
+                >
+                  {isAutoDetectEnabled ? '📍 自動検出をOFFにする' : '📍 近くのスポットを自動検出する'}
+                </Button>
+              )}
           </div>
 
           {isOfflineData && (
             <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
               📴 オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
+            </div>
+          )}
+
+          {autoDetectError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+              {autoDetectError}
+            </div>
+          )}
+
+          {visitSuggestion && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+              <span>
+                📍「{visitSuggestion.title}」の近くに
+                {Math.round(visitSuggestion.dwellMs / 60000)}分ほど滞在したようです(信頼度
+                {Math.round(visitSuggestion.confidence * 100)}%)。訪問済みにしますか?
+              </span>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button size="sm" variant="primary" onClick={handleConfirmVisitSuggestion}>
+                  訪問済みにする
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setVisitSuggestion(null)}>
+                  無視
+                </Button>
+              </div>
             </div>
           )}
 

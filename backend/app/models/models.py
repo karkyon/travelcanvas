@@ -328,6 +328,13 @@ class UserSpotVisit(Base):
 
     visited_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # [Gate #37] Visited Area Layer: GPS自動判定による訪問記録に対応する。
+    # 既存の手動記録行はsource='manual'のまま(server_defaultにより後方互換)。
+    # confidence/detected_accuracy_metersは手動記録では常にNULL。
+    source = Column(String, nullable=False, server_default="manual")
+    confidence = Column(Float, nullable=True)
+    detected_accuracy_meters = Column(Float, nullable=True)
+
     __table_args__ = (
         {"extend_existing": True},
     )

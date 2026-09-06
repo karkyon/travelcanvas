@@ -51,6 +51,11 @@ export interface VisitData {
   spot_id: string;
   visit_note?: string;
   visited_at: string;
+  // [Gate #37] Visited Area Layer: GPS自動判定による訪問記録の付随情報。
+  // 手動記録時はsource='manual'、confidence/detected_accuracy_metersはundefined。
+  source?: 'manual' | 'auto_gps';
+  confidence?: number;
+  detected_accuracy_meters?: number;
   spot: SpotResponse;
 }
 
@@ -154,10 +159,21 @@ class SpotApiService {
 
   /**
    * スポットを訪問済みとして記録
+   * [Gate #37] detection引数を追加。省略時は従来通りsource='manual'として
+   * backend側で扱われる(後方互換)。
    */
-  async addVisit(spotId: string, note?: string): Promise<VisitData> {
+  async addVisit(
+    spotId: string,
+    note?: string,
+    detection?: { source: 'auto_gps'; confidence: number; detectedAccuracyMeters: number }
+  ): Promise<VisitData> {
     const response = await apiService.post<VisitData>(`/spots/${spotId}/visit`, {
       visit_note: note,
+      ...(detection && {
+        source: detection.source,
+        confidence: detection.confidence,
+        detected_accuracy_meters: detection.detectedAccuracyMeters,
+      }),
     });
     return response.data;
   }

@@ -273,6 +273,9 @@ async def get_visits(
             "spot_id": visit.spot_id,
             "visit_note": visit.visit_note,
             "visited_at": visit.visited_at,
+            "source": visit.source,
+            "confidence": visit.confidence,
+            "detected_accuracy_meters": visit.detected_accuracy_meters,
             "spot": spot,
         })
     return results
@@ -317,6 +320,9 @@ async def add_visit(
             user_id=current_user.id,
             spot_id=spot_id,
             visit_note=visit_data.visit_note,
+            source=visit_data.source,
+            confidence=visit_data.confidence,
+            detected_accuracy_meters=visit_data.detected_accuracy_meters,
         )
         db.add(new_visit)
         # 表示回数カウンタもあわせて加算(既存のSpot.visit_countの意味と整合させる)
@@ -328,6 +334,9 @@ async def add_visit(
             "spot_id": new_visit.spot_id,
             "visit_note": new_visit.visit_note,
             "visited_at": new_visit.visited_at,
+            "source": new_visit.source,
+            "confidence": new_visit.confidence,
+            "detected_accuracy_meters": new_visit.detected_accuracy_meters,
             "spot": spot,
         }
     except Exception:
