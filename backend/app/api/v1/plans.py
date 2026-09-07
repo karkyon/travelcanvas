@@ -31,7 +31,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_active_user, get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
@@ -301,7 +301,7 @@ def _event_to_dict(event: TravelEvent) -> dict:
 async def get_plan_detail(
     plan_id: str,
     response: Response,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """プラン詳細を日/イベント込みで返す。revisionはレスポンスボディの
@@ -343,7 +343,7 @@ async def create_day(
     plan_id: str,
     day_data: DayCreate,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -383,7 +383,7 @@ async def update_day(
     day_id: str,
     day_data: DayUpdate,
     if_match: Optional[str] = Header(None, alias="If-Match"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -412,7 +412,7 @@ async def delete_day(
     plan_id: str,
     day_id: str,
     if_match: Optional[str] = Header(None, alias="If-Match"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -441,7 +441,7 @@ async def create_event(
     plan_id: str,
     event_data: EventCreate,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -503,7 +503,7 @@ async def update_event(
     event_id: str,
     event_data: EventUpdate,
     if_match: Optional[str] = Header(None, alias="If-Match"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -539,7 +539,7 @@ async def delete_event(
     plan_id: str,
     event_id: str,
     if_match: Optional[str] = Header(None, alias="If-Match"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
@@ -568,7 +568,7 @@ async def move_event(
     move_data: EventMove,
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """同日内の並べ替え、または別日への移動。ロックされたイベントは移動不可。"""
@@ -617,7 +617,7 @@ async def move_event(
 async def undo_last_change(
     plan_id: str,
     if_match: Optional[str] = Header(None, alias="If-Match"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
     """直近の(まだUndoされていない)ChangeSet 1件を取り消す。"""
