@@ -18,18 +18,19 @@ get_current_active_userからget_current_user_or_guestへ変更した。ゲス�
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Optional
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
 
 from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
-from app.models.models import TravelPlan, User
+from app.models.models import TravelPlan, TravelDay, TravelEvent, User
 from app.schemas.travel_plan import (
     TravelPlanCreate,
     TravelPlanUpdate,
@@ -187,6 +188,130 @@ async def update_travel_plan(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="旅行プランの更新に失敗しました。しばらくしてから再試行してください。",
+        )
+
+
+class PlanCloneRequest(BaseModel):
+    """[Gate #39] 旅程複製リクエスト。全項目任意。"""
+    title: Optional[str] = None
+    start_date: Optional[date] = None
+
+
+@router.post("/{plan_id}/clone", response_model=TravelPlanResponse, status_code=status.HTTP_201_CREATED)
+async def clone_travel_plan(
+    plan_id: uuid.UUID,
+    clone_data: PlanCloneRequest,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """旅行プランを複製する(CA-005)。
+
+    [Gate #39 設計]
+    - 所有者本人のプランのみ複製可能(editor/viewerによる複製は将来のGateで
+      collaborator権限と合わせて設計する。現時点ではrequire_plan_accessに
+      min_role="owner"を要求する)。
+    - `start_date`を指定した場合、元プランの最初の日(TravelDayが1件も
+      無ければplan.start_date)を基準日として、全日程・全イベントの日時を
+      その差分だけ平行移動する。未指定の場合は元の日付をそのまま複製する。
+    - 複製されないもの: 旧`itinerary` JSON blob(常にNoneで作成)、旧`revision`
+      (新規プランは1から)。
+    - 複製されるもの: TravelDay/TravelEventの全カラム。現時点のモデルには
+      予約番号・支払情報等の機微フィールドが存在しないため除外処理は不要。
+      将来FR-010〜013(予約管理)が実装された場合はこのエンドポイントの
+      見直しが必要。
+    - `TravelEvent.locked`は複製先で常にFalseにリセットする(最適化対象から
+      除外する理由は元プラン固有の判断のため、複製先では引き継がない)。
+    """
+    original_plan, _role = require_plan_access(db, plan_id, current_user, min_role="owner")
+
+    original_days = (
+        db.query(TravelDay)
+        .options(joinedload(TravelDay.events))
+        .filter(TravelDay.plan_id == original_plan.id)
+        .order_by(TravelDay.sort_order)
+        .all()
+    )
+
+    date_delta: Optional[timedelta] = None
+    if clone_data.start_date is not None:
+        if original_days:
+            base_date = original_days[0].local_date
+        elif original_plan.start_date is not None:
+            base_date = original_plan.start_date.date()
+        else:
+            base_date = None
+        if base_date is not None:
+            date_delta = clone_data.start_date - base_date
+
+    def _shift_datetime(value: Optional[datetime]) -> Optional[datetime]:
+        if value is None or date_delta is None:
+            return value
+        return value + date_delta
+
+    new_title = clone_data.title if clone_data.title and clone_data.title.strip() else f"{original_plan.title}のコピー"
+
+    new_plan = TravelPlan(
+        user_id=current_user.id,
+        title=new_title,
+        description=original_plan.description,
+        destination=original_plan.destination,
+        start_date=_shift_datetime(original_plan.start_date),
+        end_date=_shift_datetime(original_plan.end_date),
+        budget=original_plan.budget,
+        preferences=original_plan.preferences,
+        status="draft",
+    )
+
+    try:
+        db.add(new_plan)
+        db.flush()  # new_plan.idを確定させる(まだcommitしない)
+
+        for day in original_days:
+            new_local_date = day.local_date + date_delta if date_delta is not None else day.local_date
+            new_day = TravelDay(
+                plan_id=new_plan.id,
+                local_date=new_local_date,
+                timezone_id=day.timezone_id,
+                title=day.title,
+                notes=day.notes,
+                sort_order=day.sort_order,
+            )
+            db.add(new_day)
+            db.flush()  # new_day.idを確定させる
+
+            for event in day.events:
+                new_event = TravelEvent(
+                    plan_id=new_plan.id,
+                    day_id=new_day.id,
+                    spot_id=event.spot_id,
+                    place_id=event.place_id,
+                    title=event.title,
+                    description=event.description,
+                    event_type=event.event_type,
+                    start_at=_shift_datetime(event.start_at),
+                    end_at=_shift_datetime(event.end_at),
+                    local_start_time=event.local_start_time,
+                    is_all_day=event.is_all_day,
+                    address=event.address,
+                    latitude=event.latitude,
+                    longitude=event.longitude,
+                    locked=False,
+                    sort_order=event.sort_order,
+                )
+                db.add(new_event)
+
+        db.commit()
+        db.refresh(new_plan)
+        return new_plan
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("旅行プラン複製中に予期しないエラーが発生しました")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="旅行プランの複製に失敗しました。しばらくしてから再試行してください。",
         )
 
 
