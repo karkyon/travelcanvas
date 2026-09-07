@@ -3,9 +3,11 @@ TravelCanvas Database Models - 最終完成版
 統一されたBaseクラスを使用、重複定義なし
 """
 import uuid
+import hashlib
+from datetime import datetime, timedelta
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
-    ForeignKey, UniqueConstraint,
+    ForeignKey, UniqueConstraint, LargeBinary, Index, CheckConstraint, text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -470,20 +472,115 @@ class ChangeItem(Base):
 
 
 class IdempotencyRecord(Base):
-    """[Gate #29] Idempotency-Keyによる重複実行防止。同一user×endpoint×keyの
-    再送に対し、実際の処理を再実行せず前回のレスポンスをそのまま返す。"""
+    """[Gate #29 / Gate R2-1改訂] Idempotency-Keyによる重複実行防止。
+    R2-1でanonymous device(匿名端末)actorにも対応し、payload hash比較・
+    処理中(IN_PROGRESS)状態・TTLを追加した。既存user経由の呼び出し(plans.py等)
+    はpayload_hash/status/expires_atを明示せずINSERTしているため、Python側
+    default(下記_LEGACY_PAYLOAD_HASH_SENTINEL/_default_idempotency_expiry)で
+    後方互換を保つ。詳細はdocs/adr/ADR-quick-draft.md参照。"""
     __tablename__ = "idempotency_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     key = Column(String, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id"), nullable=True)
     endpoint = Column(String, nullable=False)
-    response_status = Column(Integer, nullable=False)
+    payload_hash = Column(
+        LargeBinary(32), nullable=False, default=lambda: _LEGACY_PAYLOAD_HASH_SENTINEL,
+    )
+    status = Column(String, nullable=False, default="COMPLETED")  # IN_PROGRESS/COMPLETED/FAILED
+    response_status = Column(Integer, nullable=True)
     response_json = Column(JSON, nullable=True)
+    error_json = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: _default_idempotency_expiry(),
+    )
 
     __table_args__ = (
-        UniqueConstraint("key", "user_id", "endpoint", name="uq_idempotency_key_user_endpoint"),
+        CheckConstraint(
+            "user_id IS NOT NULL OR device_id IS NOT NULL",
+            name="ck_idempotency_actor_present",
+        ),
+        Index(
+            "uq_idempotency_user", "key", "user_id", "endpoint",
+            unique=True, postgresql_where=text("user_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_idempotency_device", "key", "device_id", "endpoint",
+            unique=True, postgresql_where=text("device_id IS NOT NULL"),
+        ),
+    )
+
+
+# ==========================================
+# [Gate R2-1] QuickDraft Domain Foundation
+# 正式契約(DOC-06 `POST /v1/quick-drafts`)のためのモデル。設計判断の詳細は
+# docs/adr/ADR-quick-draft.mdを参照。payload暗号化の実装はGate R2-2で導入し、
+# 本Gateはスキーマ(devices/quick_drafts)のみを追加する。
+# ==========================================
+
+_LEGACY_PAYLOAD_HASH_SENTINEL = b"\x00" * 32
+
+
+def _default_idempotency_expiry():
+    return datetime.utcnow() + timedelta(days=7)
+
+
+def _default_device_expiry():
+    return datetime.utcnow() + timedelta(days=30)
+
+
+def _default_quick_draft_expiry():
+    return datetime.utcnow() + timedelta(days=30)
+
+
+class QuickDraftStatus(str, Enum):
+    """[Gate R2-1] ADR-quick-draft.md §4のQuickDraft状態機械。"""
+    ACTIVE = "ACTIVE"
+    PROMOTED = "PROMOTED"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"
+
+
+class Device(Base):
+    """[Gate R2-1] QuickDraft専用のanonymous device identity。
+    既存guest(users.user_type='guest'のステートレスJWT)とは別モデルとして
+    併存させる(ADR-quick-draft.md §決定事項2/3)。token本体はDBへ保存せず、
+    SHA-256 digestのみ保存する。"""
+    __tablename__ = "devices"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    token_digest = Column(LargeBinary(32), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, default=_default_device_expiry)
+
+    quick_drafts = relationship("QuickDraft", back_populates="device")
+
+
+class QuickDraft(Base):
+    """[Gate R2-1] DOC-06 `POST /v1/quick-drafts` の正式永続モデル。
+    作成・promote APIの実装はGate R2-2/R2-3で行う(本Gateはスキーマのみ)。"""
+    __tablename__ = "quick_drafts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id"), nullable=False, index=True)
+    payload_ciphertext = Column(LargeBinary, nullable=False)
+    revision = Column(Integer, nullable=False, default=1)
+    status = Column(String, nullable=False, default=QuickDraftStatus.ACTIVE.value)
+    expires_at = Column(
+        DateTime(timezone=True), nullable=False, default=_default_quick_draft_expiry,
+    )
+    promoted_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    device = relationship("Device", back_populates="quick_drafts")
+
+    __table_args__ = (
+        Index("ix_quick_drafts_status_expires", "status", "expires_at"),
     )
 
 
