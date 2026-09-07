@@ -369,7 +369,7 @@ pytest tests/integration/ -v
 テスト用のデータベースは自動で作成・削除されます：
 ```bash
 # テスト用DB作成
-TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/travelcanvas_test
+TEST_DATABASE_URL=postgresql://<user>:<password>@localhost:5432/travelcanvas_test
 ```
 
 ## 🛠️ トラブルシューティング

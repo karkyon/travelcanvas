@@ -155,13 +155,16 @@ async def api_health():
             "/health", 
             "/ready",
             "/api/v1/auth/register",
-            "/api/v1/auth/login",
-            "/api/v1/auth/test"
+            "/api/v1/auth/login"
         ]
     }
 
+# [Gate R0] 認証不要な診断用エンドポイント。以前は本番でも常時公開されて
+# いたため、settings.DEBUG限定にする(DEBUG=Falseでは404)。
 @app.get("/test")
 async def test_endpoint():
+    if not settings.DEBUG:
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     return {
         "message": "Test endpoint working",
         "cors": "enabled"

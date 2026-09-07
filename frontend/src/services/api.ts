@@ -698,9 +698,12 @@ class CompleteTravelAPI {
   // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして
   // /api/v1配下にマウント)と一致しておらず、'/plans'という存在しないパスに送信していた
   // ため、Gate #6で実装したtravel-plans CRUD APIはフロントエンドから一度も到達できて
-  // いなかった実害バグ。あわせて、バックエンドのTravelPlanは days/events を itinerary
-  // (JSONカラム、既存)にネストして保持する形状のため、レスポンス受信時に itinerary.days
-  // をフロントエンドのTravelPlan.daysへ展開し、送信時は逆にitineraryへ包む変換を行う。
+  // いなかった実害バグ。
+  // [Gate R0] 以前はここでitinerary.daysをTravelPlan.daysへ展開していたが、
+  // Gate #29以降daysの正本は正規化API(/plans/*)のTravelDayであり、本APIの
+  // itinerary JSON列は書込み対象外(Gate #34で422拒否)。ここでのdays展開は、
+  // 正規化データ未取得時(loadPlan内でdetail取得に失敗した場合)のfallback
+  // としてのみ残す。恒久対応はGate R1以降で検討する。
   private planFromApi(raw: any): any {
     if (!raw) return raw;
     const { itinerary, ...rest } = raw;
@@ -710,14 +713,16 @@ class CompleteTravelAPI {
     };
   }
 
+  // [Gate R0] 旧itinerary(JSON blob)書込み変換を削除。Gate #34でbackend
+  // (/travel-plans)がitineraryフィールドを422で拒否するようになって以降、
+  // このwrap処理は到達しても失敗するだけの契約違反コードとして残っていた
+  // (2026-09-07 最新コード再監査報告書 追加技術欠陥#3)。day/eventの書込みは
+  // 正規化API(/plans/*、createDay/updateDay/createEvent等)のみが正本であり、
+  // metadata API(/travel-plans)へdaysを送ることはない(現行挙動を維持する)。
   private planToApi(planData: any): any {
     if (!planData) return planData;
-    const { days, ...rest } = planData;
-    if (days === undefined) return rest;
-    return {
-      ...rest,
-      itinerary: { days },
-    };
+    const { days: _days, ...rest } = planData;
+    return rest;
   }
 
   async getPlans(): Promise<ApiResponse<any[]>> {

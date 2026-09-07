@@ -52,10 +52,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_PREMIUM: int = 5000     # プレミアムユーザー制限
     
     # CORS設定 - Union[str, List[str]]にして文字列も受け入れる
+    # [Gate R0] 廃止済みの開発機IP(192.168.1.248)を既定値から除去。
     CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.1.248:3000"
+        "http://127.0.0.1:3000"
     ]
     
     # アプリケーション設定
@@ -86,8 +86,7 @@ class Settings(BaseSettings):
             if not v.strip():
                 return [
                     "http://localhost:3000",
-                    "http://127.0.0.1:3000",
-                    "http://192.168.1.248:3000"
+                    "http://127.0.0.1:3000"
                 ]
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):

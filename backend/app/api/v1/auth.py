@@ -646,9 +646,13 @@ async def revoke_session_endpoint(
     auth_manager.revoke_session(session_id, db)
     return {"message": "セッションを失効させました"}
 
+# [Gate R0] 認証不要な診断用エンドポイント。settings.DEBUG限定にする
+# (DEBUG=Falseでは404)。
 @router.get("/test")
 async def test_auth():
-    """認証API テスト"""
+    """認証API テスト(DEBUG限定)"""
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
     return {
         "message": "Authentication API is working",
         "endpoints": [

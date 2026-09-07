@@ -93,10 +93,18 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 ## 🌐 Access URLs
 
+### Manual dev servers (`npm run dev` / `uvicorn --reload`、上記1〜3節)
 - **Frontend (React + Vite)**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 - **Redoc**: http://localhost:8000/redoc
+
+### Docker Compose (`docker-compose.yml`、omega-dev2本番相当構成)
+[Gate R0] 上記の手動起動と、Docker Compose経由の起動ではホスト公開
+ポートが異なる(docker-compose.ymlの`ports:`参照)。
+- **Frontend**: http://localhost:4173
+- **Backend API**: http://localhost:8001
+- **API Documentation**: http://localhost:8001/docs
 
 ## 🛠️ Development Commands
 
@@ -138,8 +146,7 @@ travelcanvas/
 │   │   ├── models/         # Database models
 │   │   └── main.py         # Application entry point
 │   ├── tests/              # Backend tests
-│   ├── requirements.txt    # Python dependencies
-│   └── pyproject.toml      # Poetry configuration
+│   └── requirements.txt    # Python dependencies
 ├── frontend/               # React + Vite application
 │   ├── src/
 │   │   ├── components/     # React components

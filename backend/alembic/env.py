@@ -15,8 +15,12 @@ if os.path.exists(env_path):
     load_dotenv(env_path)
     print(f"✓ Loaded environment from: {env_path}")
 
-# デフォルト設定
-DATABASE_URL = "postgresql://travelcanvas:password@localhost:5432/travelcanvas_dev"
+# [Gate R0] 以前はここに固定fallback URL(パスワード"password"を含む)を
+# 持たせており、かつ後段でDATABASE_URLの先頭50文字をprintしていた。
+# 接続情報の断片をログへ出す設計・偽の既定認証情報を持たせる設計はどちらも
+# secret管理として不適切なため、どちらも廃止する。設定が見つからない場合は
+# 起動時に明確な例外で停止させる。
+DATABASE_URL = None
 target_metadata = None
 
 # モデルインポート
@@ -31,11 +35,18 @@ except ImportError as e:
 try:
     from app.core.config import settings
     DATABASE_URL = settings.DATABASE_URL
-    print(f"✓ Using DATABASE_URL from settings")
+    print("✓ Using DATABASE_URL from settings")
 except ImportError:
-    # 環境変数から直接取得
-    DATABASE_URL = os.getenv('DATABASE_URL', DATABASE_URL)
-    print(f"✓ Using DATABASE_URL from env: {DATABASE_URL[:50]}...")
+    # 環境変数から直接取得(値そのものはログに出さない)
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    if DATABASE_URL:
+        print("✓ Using DATABASE_URL from environment variable")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not configured. Set it via .env.local or the "
+        "DATABASE_URL environment variable before running Alembic."
+    )
 
 config = context.config
 

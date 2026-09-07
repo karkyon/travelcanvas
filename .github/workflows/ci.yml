@@ -7,7 +7,16 @@ on:
     branches: [main]
 
 jobs:
+  # [Gate R0] tracked secret scanをCIでblocking化する。
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan tracked files for secrets (ブロッキング)
+        run: python3 scripts/security/scan_secrets.py
+
   frontend:
+    needs: secret-scan
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -48,6 +57,7 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    needs: secret-scan
     defaults:
       run:
         working-directory: backend

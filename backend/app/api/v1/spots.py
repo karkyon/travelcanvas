@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import Spot, User, UserSpotFavorite, UserSpotVisit
 from app.schemas.spots import (
@@ -102,9 +103,13 @@ async def get_categories():
         ]
     }
 
+# [Gate R0] 認証不要な診断用エンドポイント。settings.DEBUG限定にする
+# (DEBUG=Falseでは404)。ルート順序自体は本Gateで変更しない。
 @router.get("/test/ping")
 async def test_spots_api():
-    """スポットAPI動作テスト"""
+    """スポットAPI動作テスト(DEBUG限定)"""
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
     return {
         "message": "スポットAPI正常動作中",
         "version": "MVP-1.0.0",

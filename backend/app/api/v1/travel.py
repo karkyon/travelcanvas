@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from sqlalchemy import or_
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
@@ -135,9 +136,13 @@ async def get_travel_plans(
 
 # [Gate #27 / A-011] /test/ping は /{plan_id}(UUID型パスパラメータ)より前に
 # 定義する必要がある。spots.py の固定ルートと同じ理由・同じ対応。
+# [Gate R0] 認証不要な診断用エンドポイント。settings.DEBUG限定にする
+# (DEBUG=Falseでは404)。ルート順序自体は本Gateで変更しない。
 @router.get("/test/ping")
 async def test_travel_plans_api():
-    """旅行プランAPI動作テスト"""
+    """旅行プランAPI動作テスト(DEBUG限定)"""
+    if not settings.DEBUG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
     return {
         "message": "旅行プランAPI正常動作中",
         "version": "1.0.0",
