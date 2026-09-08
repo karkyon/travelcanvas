@@ -15,13 +15,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models.models import OptimizationResult, TravelPlan, User
+from app.models.models import AuditLog, OptimizationResult, TravelPlan, User
+from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -220,6 +221,7 @@ async def get_user_detail(
 
 @router.post("/users/manage")
 async def manage_users(
+    request: Request,
     payload: dict = Body(...),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -255,4 +257,84 @@ async def manage_users(
             u.is_verified = False
 
     db.commit()
+
+    # [Gate R2-7] 監査ログ: 管理者によるユーザーアカウント操作
+    # (アカウント停止/復活/認証状態変更)は最も監査要求が強い操作の一つ
+    # のため、対象ユーザーごとに1行ずつ記録する。
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "")[:255]
+    for u in users:
+        record_audit_event(
+            action=f"admin_user_{action}",
+            resource_type="user",
+            user_id=admin.id,
+            resource_id=u.id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            details={"target_user_id": str(u.id)},
+        )
+
     return {"success": True, "updated_count": len(users)}
+
+
+@router.get("/audit-logs")
+async def list_audit_logs(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    user_id: Optional[str] = None,
+):
+    """監査ログ一覧(Gate R2-7、DOC-11監査要件に対応)。
+
+    list_usersと同じdictベースの応答形式に合わせる(既存フロントエンド
+    AdminDashboard.tsxの他エンドポイントとの一貫性のため、schemas.AuditLog
+    は流用しない)。
+    """
+    query = db.query(AuditLog)
+
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if user_id:
+        try:
+            query = query.filter(AuditLog.user_id == uuid.UUID(user_id))
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不正なuser_idです")
+
+    total_count = query.count()
+    logs = (
+        query.order_by(AuditLog.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    total_pages = math.ceil(total_count / page_size) if total_count else 0
+
+    return {
+        "audit_logs": [
+            {
+                "id": str(log.id),
+                "user_id": str(log.user_id) if log.user_id else None,
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "resource_id": str(log.resource_id) if log.resource_id else None,
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+                "details": log.details,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            }
+            for log in logs
+        ],
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
+    }

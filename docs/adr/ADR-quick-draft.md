@@ -15,6 +15,7 @@
 | v2 (2026-09-07) | v1の設計不備を独立clone再調査のうえ是正: (1) 未定義ヘッダー`X-Device-Token`を廃止しAuthorization Bearer方式へ統一、(2) UUID列への`COALESCE(...,'')`を部分unique indexへ訂正、(3) Idempotency状態遷移を2段階commitへ変更（単一transactionでは`OPERATION_IN_PROGRESS`の即時応答要件を満たせないため）、(4) migrationを「additiveのみ」とした記述を訂正（`user_id`のNOT NULL緩和を明記）、(5) token生成・保存・expiry・replay・stale in-progress回収・監査方針を具体化。パッチスクリプトはbackend pytest実行前に専用test DBへ`DATABASE_URL`を安全に切替える処理を追加。 |
 | v3 (2026-09-07) | omega-dev2実行でbackend 151/151・frontend tsc/build/vitest 61/61すべて成功したが、`diff_check`が`git add -A`でworktree直下の無関係な未追跡ファイル(ユーザーが確認用に置いたコピー)まで拾い「意図外の差分」として誤検知しcommit直前で失敗、rollback。ADR/trace文書自体の内容変更は無し。パッチスクリプトを本Gateが作成した2ファイルのみ明示`git add`する方式へ修正し、commit後の残差分チェックも未追跡ファイルを無視するよう修正。 |
 | v4 (2026-09-08, Gate R2-6) | R2-5完了時点でPARTIALのまま残っていた4項目のうち「Playwright browser E2E」「CIへのE2E blocking追加」を実装。詳細はdocs/trace/gate-r2-trace.mdのR2-6行、および本ADR §11参照。副次的発見1として`frontend/src/services/quickDraftApi.ts`の`resolveApiBaseUrl()`が`docker-compose.yml`のbuild引数`VITE_API_URL`を見ておらず`VITE_API_BASE_URL`のみ参照していたため、`VITE_API_URL`を変更する本番相当デプロイでは常に既定値`http://localhost:8001`へ誤fallbackする不整合を発見・是正(omega-dev2では既定値と実際の値が偶然一致するため症状が表面化していなかった)。副次的発見2として`frontend/Dockerfile`のruntime stageが`COPY --from=build`に`--chown`を指定しておらずroot:root所有のままだったため、`USER node`後の`npm run preview`が`package.json`を`EACCES`で読めずfrontendコンテナが起動不能というインフラ上の既存バグを発見・是正(`--chown=node:node`を追加)。**v1はomega-dev2実行時、`docker compose up -d --build`のfrontendビルドが`npm ci`でlockfile不同期(`@playwright/test`が`package-lock.json`未反映)のため失敗しrollback(無傷)。v2で`package-lock.json`を修正対象へ追加して是正したが、イメージビルド自体は成功したもののfrontendコンテナ起動後に上記EACCESで再起動ループしhealth待機タイムアウト、再度rollback(無傷)。v3でDockerfileの`--chown`修正を追加して是正。**v4はv3実行時、docker/frontend起動・backend pytest(177/177)・frontend tsc/build/vitest(62/62)まで全て成功したがPlaywright実行時にguest bootstrap後`/login`への連続リダイレクトが発生し失敗、rollback(無傷)。原因未特定のためcurlベースの診断ステップとE2E側のHTTPエラー計装を追加して原因特定を試みる段階。** **v5はv4実行時、curl診断でbackend側(guest token発行・`/travel-plans/`取得)は正常と確認できたが、`waitForLoadState('networkidle')`自体がタイムアウトし診断ログが埋もれたため、networkidle待ちを廃止しフレーム遷移回数カウント方式へ変更、また要望により過去セッションの残置ファイル自動削除を追加。** **v6はv5実行で真因が判明: `frontend/src/components/Header.tsx`の未読通知バッジポーリングeffectが`isGuest`を使わずguestでも会員限定の`/notifications/unread-count`を叩き続け、401→`/auth/refresh`401→`window.location.href='/login'`強制リロードを無限に繰り返していた実害バグ。effectガードに`isGuest`を追加して是正。**** |
+| v5 (2026-09-08, Gate R2-7) | R2-5完了時点で残っていた最後の2項目「accessibility試験」「audit/metric基盤」を実装。詳細は本ADR §9(改訂)・§12、docs/trace/gate-r2-trace.mdのR2-7行参照。この完了をもってR2-5の未達4項目が全て解消し、FR-043/G1はVERIFIED判定の前提条件を満たす（DOC-10更新は別途実施）。 |
 
 ## 背景
 
@@ -133,9 +134,12 @@ CREATE UNIQUE INDEX uq_idempotency_device
 
 ### 9. Audit/metric
 
-- `QuickDraftCreated` / `QuickDraftPromoted` / `QuickDraftExpired` / `QuickDraftRevoked` / `QuickDraftIdempotencyConflict`をDOC-06 §31準拠の監査イベントとして記録する。
-- 監査上のactor表現は`device_id`（またはpromote後は`user_id`）のみとし、token本体・payload内容は記録しない（DOC-13「Token Hash」「Data Minimization」準拠）。
-- metric: 作成成功率、promote成功率、`IDEMPOTENCY_KEY_REUSED`発生率、`OPERATION_IN_PROGRESS`発生率、stale in-progress強制FAILED件数、60秒以内初回イベント保存達成率（DOC-04 UI受入条件に対応）。
+**[Gate R2-7改訂] 本節で述べていた監査イベントはR2-6完了時点まで未実装(`schemas.AuditLog`は定義済みだがDBテーブル・書き込み経路が存在しないゴーストスキーマ)だった。R2-7で`audit_logs`テーブル(migration `9f0906d65cdc`)と`app/services/audit_service.record_audit_event()`により実体化した。**
+
+- 実装済み: ログイン成功/失敗(`login_success`/`login_failed`)、QuickDraft promote成功(`quickdraft_promoted`)、管理者によるユーザー操作(`admin_user_suspend`/`admin_user_unsuspend`/`admin_user_verify`/`admin_user_unverify`)を`audit_logs`へ永続化。`GET /api/v1/admin/audit-logs`(管理者専用、ページネーション対応)で参照可能。
+- 監査ログ書き込みは独立DBセッションで行い、書き込み失敗時は例外を握りつぶしwarningログのみ残す(監査ログの欠落より本来の操作失敗の方が実害が大きいため)。
+- token本体・パスワードは記録しない(`login_failed`のdetailsにはemailのみ、パスワードは含めない)。
+- **未実装(次Gate以降のスコープ)**: `QuickDraftCreated`/`QuickDraftExpired`/`QuickDraftRevoked`/`QuickDraftIdempotencyConflict`の監査イベント化、および作成成功率・promote成功率等のmetricダッシュボード自体(現時点では`audit_logs`への生ログ蓄積とAPI参照のみ。集計・可視化は別途)。
 
 ### 10. Rollback/restore
 
@@ -157,6 +161,12 @@ downgradeでは、(2)を`user_id`へ`NOT NULL`を戻す前に、`device_id IS NO
 - 実行環境: omega-dev2上で`docker compose up -d`済みのフルスタック（backend: 8001 / frontend: 4173）に対して実行する。開発サンドボックス環境にはdockerが無いため、browser E2Eの実地実行はomega-dev2側でパッチスクリプト自身が行う。
 - CI: `.github/workflows/ci.yml`の`e2e` job が `docker compose up -d --build` でpostgres/redis/backend/frontendを起動し、`frontend`/`backend` jobの成功後にblocking実行する。
 - 未対象: accessibility試験、audit/metric基盤（監査イベント永続化・ダッシュボード）は本Gateのスコープ外。docs/trace/gate-r2-trace.mdのR2-5行に残存項目として明記済み。
+
+### 12. Accessibility試験・監査ログ基盤（Gate R2-7追記）
+
+- **Accessibility試験**: `frontend/e2e/a11y.spec.ts`（Playwright + `@axe-core/playwright`）で、ランディングページ("/")とゲストのプランナー画面("/planner")の2画面をWCAG 2.0/2.1 A・AA相当のルールセット(`wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`)でスキャンする。violationsが1件でもあれば、ルールID・重要度・該当要素数・参考URLを列挙して失敗させる。動的なキーボード操作シナリオ(タブ順序、フォーカストラップ等)は本Gateのスコープ外。
+- **Audit/metric基盤**: §9(改訂)参照。`audit_logs`テーブル新設(migration `9f0906d65cdc`、additive only)、`app/services/audit_service.py`、`GET /api/v1/admin/audit-logs`。
+- この2件の完了により、docs/trace/gate-r2-trace.mdのR2-5行が「未達」としていた4項目(Playwright browser E2E・CIへのE2E blocking追加・accessibility試験・audit/metric基盤)が全て解消した。
 
 ## 却下した代替案
 

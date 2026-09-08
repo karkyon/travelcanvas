@@ -30,6 +30,7 @@ from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_pa
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import Device, QuickDraft, TravelDay, TravelEvent, TravelPlan, User
+from app.services.audit_service import record_audit_event
 from app.services.quickdraft_idempotency import (
     IdempotencyInProgress,
     IdempotencyKeyReused,
@@ -474,6 +475,19 @@ async def promote_quick_draft(
             }
 
         finalize_success(db, record.id, 201, response_body)
+
+        # [Gate R2-7] 監査ログ: QuickDraftのplanへのpromote(FC-101〜105の
+        # 中核操作。誰が・どのdraftを・どのplanへ確定したかを記録する)
+        record_audit_event(
+            action="quickdraft_promoted",
+            resource_type="travel_plan",
+            user_id=current_user.id,
+            resource_id=plan.id,
+            ip_address=(request.client.host if request.client else None),
+            user_agent=request.headers.get("user-agent", "")[:255],
+            details={"quick_draft_id": str(draft.id)},
+        )
+
         return JSONResponse(status_code=201, content=response_body)
 
     except QuickDraftProblemError as e:

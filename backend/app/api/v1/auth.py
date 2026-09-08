@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.auth import get_current_active_user, get_current_session_id, get_current_user_or_guest, auth_manager
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
+from app.services.audit_service import record_audit_event
 
 router = APIRouter()
 
@@ -448,12 +449,30 @@ async def login(
         user = db.query(User).filter(User.email == login_data.email).first()
         
         if not user or not verify_password(login_data.password, user.hashed_password):
+            # [Gate R2-7] 監査ログ: ログイン失敗。総当り調査のためメール
+            # アドレス自体はdetailsに残すが、パスワードは一切記録しない。
+            record_audit_event(
+                action="login_failed",
+                resource_type="user",
+                user_id=(user.id if user else None),
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent", "")[:255],
+                details={"email": login_data.email},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="メールアドレスまたはパスワードが正しくありません"
             )
         
         if not user.is_active:
+            record_audit_event(
+                action="login_failed",
+                resource_type="user",
+                user_id=user.id,
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent", "")[:255],
+                details={"reason": "account_inactive"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="アカウントが無効です"
@@ -478,7 +497,18 @@ async def login(
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         )
         access_token = _access_token_for(user, session.id)
-        
+
+        # [Gate R2-7] 監査ログ: ログイン成功
+        record_audit_event(
+            action="login_success",
+            resource_type="user",
+            user_id=user.id,
+            resource_id=user.id,
+            ip_address=client_ip,
+            user_agent=request.headers.get("user-agent", "")[:255],
+            details={"session_id": str(session.id)},
+        )
+
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",

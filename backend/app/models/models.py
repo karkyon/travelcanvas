@@ -743,3 +743,33 @@ class RouteSegment(Base):
     algorithm_version = Column(String, nullable=False)
     computed_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ==========================================
+# [Gate R2-7] 監査ログ永続化基盤(audit/metric基盤)
+# ==========================================
+# docs/trace/gate-r2-trace.md のR2-5行が「未達」としていたaudit/metric基盤。
+# backend/app/schemas/schemas.py の AuditLog/AuditLogResponse は既に定義済み
+# だったが、対応するDBテーブル・書き込み経路・参照APIが一つも存在しない
+# ゴーストスキーマだった(このGateで実体化する)。
+#
+# 記録方針: ログイン成功/失敗、QuickDraft promote、管理者によるユーザー
+# アカウント操作(suspend/unsuspend/verify/unverify)の4系統から書き込む
+# (app/services/audit_service.py の record_audit_event() 経由)。
+# 書き込み失敗(DB例外等)で本来のリクエスト処理自体を失敗させないよう、
+# 呼び出し側は例外を握りつぶして warning ログのみ残す設計とする
+# (詳細は audit_service.py 参照)。
+
+class AuditLog(Base):
+    """監査ログモデル(schemas.AuditLogに対応する永続化実体)"""
+    __tablename__ = "audit_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String, nullable=False, index=True)
+    resource_type = Column(String, nullable=False, index=True)
+    resource_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    details = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
