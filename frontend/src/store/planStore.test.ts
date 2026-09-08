@@ -10,7 +10,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePlanStore } from './planStore';
-import { api as apiService } from '@/services/api';
+import { api as apiService, travelAPI } from '@/services/api';
+import { createQuickDraft, getStoredDeviceToken } from '@/services/quickDraftApi';
 
 vi.mock('@/services/api', () => ({
   api: {
@@ -30,6 +31,15 @@ vi.mock('@/services/api', () => ({
     undoLastPlanChange: vi.fn(),
     searchSpots: vi.fn(),
   },
+  // [Gate R2-4] createQuickPlanがpromoteQuickDraftをtravelAPI経由で呼ぶため追加。
+  travelAPI: {
+    promoteQuickDraft: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/quickDraftApi', () => ({
+  createQuickDraft: vi.fn(),
+  getStoredDeviceToken: vi.fn(),
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -37,6 +47,9 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 const mockedApi = apiService as unknown as Record<string, any>;
+const mockedTravelApi = travelAPI as unknown as Record<string, any>;
+const mockedCreateQuickDraft = createQuickDraft as unknown as ReturnType<typeof vi.fn>;
+const mockedGetStoredDeviceToken = getStoredDeviceToken as unknown as ReturnType<typeof vi.fn>;
 
 const PLAN_ID = 'plan-1';
 const DAY_ID = 'day-1';
@@ -69,11 +82,26 @@ describe('loadPlan', () => {
   });
 });
 
-describe('createQuickPlan [Gate #38]', () => {
-  function mockCreateAndLoad(title: string) {
-    mockedApi.createPlan.mockResolvedValue({
-      success: true,
-      data: { id: PLAN_ID, title, days: [] },
+describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
+  function mockDraftAndPromote(title: string, opts?: { events?: any[] }) {
+    mockedGetStoredDeviceToken.mockReturnValue('stored-device-token');
+    mockedCreateQuickDraft.mockResolvedValue({
+      id: 'draft-1',
+      revision: 1,
+      status: 'ACTIVE',
+      expires_at: '2099-01-01T00:00:00Z',
+      title,
+      start_date: '2026-01-01',
+      end_date: '2026-01-01',
+      events: opts?.events ?? [],
+      device_token: 'issued-device-token',
+    });
+    mockedTravelApi.promoteQuickDraft.mockResolvedValue({
+      id: PLAN_ID,
+      revision: 1,
+      title,
+      quick_draft_id: 'draft-1',
+      quick_draft_status: 'PROMOTED',
     });
     mockedApi.getPlan.mockResolvedValue({
       success: true,
@@ -86,77 +114,68 @@ describe('createQuickPlan [Gate #38]', () => {
   }
 
   it('目的地と開始日の両方があればタイトルを自動生成する', async () => {
-    mockCreateAndLoad('大阪旅行(2026-11-01)');
+    mockDraftAndPromote('大阪旅行(2026-11-01)');
 
     await usePlanStore.getState().createQuickPlan({
       destination: '大阪',
       startDate: '2026-11-01',
     });
 
-    expect(mockedApi.createPlan).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '大阪旅行(2026-11-01)' })
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '大阪旅行(2026-11-01)' }),
+      expect.any(String)
     );
   });
 
   it('目的地のみの場合は目的地名から生成する', async () => {
-    mockCreateAndLoad('福岡旅行');
+    mockDraftAndPromote('福岡旅行');
 
     await usePlanStore.getState().createQuickPlan({ destination: '福岡' });
 
-    expect(mockedApi.createPlan).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '福岡旅行' })
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '福岡旅行' }),
+      expect.any(String)
     );
   });
 
   it('目的地・開始日ともに無い場合は「新しい旅行」にフォールバックする', async () => {
-    mockCreateAndLoad('新しい旅行');
+    mockDraftAndPromote('新しい旅行');
 
     await usePlanStore.getState().createQuickPlan({});
 
-    expect(mockedApi.createPlan).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '新しい旅行' })
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '新しい旅行' }),
+      expect.any(String)
     );
   });
 
   it('タイトルを明示指定した場合は自動生成しない', async () => {
-    mockCreateAndLoad('自分で決めた名前');
+    mockDraftAndPromote('自分で決めた名前');
 
     await usePlanStore.getState().createQuickPlan({
       title: '自分で決めた名前',
       destination: '無視されるはずの目的地',
     });
 
-    expect(mockedApi.createPlan).toHaveBeenCalledWith(
-      expect.objectContaining({ title: '自分で決めた名前' })
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '自分で決めた名前' }),
+      expect.any(String)
     );
   });
 
-  it('開始日と最初の予定を指定すると、日程作成→予定登録まで自動で行う', async () => {
-    mockCreateAndLoad('京都旅行(2026-12-01)');
-    mockedApi.createDay.mockResolvedValue({
-      id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [],
+  it('開始日と最初の予定を指定すると、QuickDraft作成→promoteまで自動で行う', async () => {
+    mockDraftAndPromote('京都旅行(2026-12-01)', {
+      events: [{ title: 'チェックイン', local_date: '2026-12-01' }],
     });
-    mockedApi.createEvent.mockResolvedValue({
-      id: 'event-1', day_id: DAY_ID, title: 'チェックイン', event_type: 'sightseeing',
-      is_all_day: false, locked: false, sort_order: 0,
+    mockedApi.getPlanDetail.mockResolvedValueOnce({
+      success: true,
+      data: {
+        id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 1,
+        days: [{ id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [
+          { id: 'event-1', day_id: DAY_ID, title: 'チェックイン', event_type: 'sightseeing', is_all_day: false, locked: false, sort_order: 0 },
+        ] }],
+      },
     });
-    // addDay/addScheduleItem内部のloadPlanが呼ばれるたびに最新状態を返すよう
-    // revisionを進めながら返す。
-    mockedApi.getPlanDetail
-      .mockResolvedValueOnce({ success: true, data: { id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 1, days: [] } })
-      .mockResolvedValueOnce({
-        success: true,
-        data: { id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 2, days: [{ id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [] }] },
-      })
-      .mockResolvedValueOnce({
-        success: true,
-        data: {
-          id: PLAN_ID, title: '京都旅行(2026-12-01)', revision: 3,
-          days: [{ id: DAY_ID, local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [
-            { id: 'event-1', day_id: DAY_ID, title: 'チェックイン', event_type: 'sightseeing', is_all_day: false, locked: false, sort_order: 0 },
-          ] }],
-        },
-      });
 
     const result = await usePlanStore.getState().createQuickPlan({
       destination: '京都',
@@ -164,31 +183,49 @@ describe('createQuickPlan [Gate #38]', () => {
       firstEventTitle: 'チェックイン',
     });
 
-    expect(mockedApi.createDay).toHaveBeenCalled();
-    expect(mockedApi.createEvent).toHaveBeenCalledWith(
-      PLAN_ID,
-      expect.objectContaining({ day_id: DAY_ID, title: 'チェックイン' }),
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        events: [expect.objectContaining({ title: 'チェックイン', local_date: '2026-12-01' })],
+      }),
       expect.any(String)
+    );
+    expect(mockedTravelApi.promoteQuickDraft).toHaveBeenCalledWith(
+      'draft-1', 'stored-device-token', expect.any(String)
     );
     expect(result?.days[0]?.events).toHaveLength(1);
   });
 
-  it('日付も最初の予定も無指定なら日程・予定は作らない', async () => {
-    mockCreateAndLoad('新しい旅行');
+  it('日付も最初の予定も無指定なら空のevents配列でdraftを作成する(day/eventは作られない)', async () => {
+    mockDraftAndPromote('新しい旅行');
 
     await usePlanStore.getState().createQuickPlan({});
 
-    expect(mockedApi.createDay).not.toHaveBeenCalled();
-    expect(mockedApi.createEvent).not.toHaveBeenCalled();
+    expect(mockedCreateQuickDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ events: [] }),
+      expect.any(String)
+    );
   });
 
-  it('プラン作成自体が失敗した場合はnullを返し、日程作成を試みない', async () => {
-    mockedApi.createPlan.mockResolvedValue({ success: false });
+  it('QuickDraft作成自体が失敗した場合はnullを返し、promoteを試みない', async () => {
+    mockedCreateQuickDraft.mockRejectedValue(new Error('network error'));
 
     const result = await usePlanStore.getState().createQuickPlan({ destination: '失敗テスト' });
 
     expect(result).toBeNull();
-    expect(mockedApi.createDay).not.toHaveBeenCalled();
+    expect(mockedTravelApi.promoteQuickDraft).not.toHaveBeenCalled();
+  });
+
+  it('promoteが失敗した場合もnullを返す', async () => {
+    mockedGetStoredDeviceToken.mockReturnValue('stored-device-token');
+    mockedCreateQuickDraft.mockResolvedValue({
+      id: 'draft-1', revision: 1, status: 'ACTIVE', expires_at: '2099-01-01T00:00:00Z',
+      start_date: '2026-01-01', end_date: '2026-01-01', events: [],
+    });
+    mockedTravelApi.promoteQuickDraft.mockRejectedValue(new Error('promote failed'));
+
+    const result = await usePlanStore.getState().createQuickPlan({ destination: '失敗テスト2' });
+
+    expect(result).toBeNull();
   });
 });
 

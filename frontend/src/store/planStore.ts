@@ -24,8 +24,9 @@
  */
 import { create } from 'zustand';
 import { TravelPlan, ScheduleItem, DaySchedule, EventCategory } from '@/types';
-import { api as apiService } from '@/services/api';
+import { api as apiService, travelAPI } from '@/services/api';
 import type { SpotResult, NormalizedDay, NormalizedEvent } from '@/services/api';
+import { createQuickDraft, getStoredDeviceToken } from '@/services/quickDraftApi';
 import { toast } from 'react-hot-toast';
 import {
   saveOfflinePack,
@@ -299,37 +300,75 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       }
     }
 
-    const created = await get().createPlan({
-      title,
-      destination: destination || undefined,
-      start_date: startDate,
-      end_date: input.endDate?.trim() || undefined,
-    } as Partial<TravelPlan>);
+    // [Gate R2-4] 以前はcreatePlan(/travel-plans)→loadPlan→addDay→
+    // addScheduleItemと4回の別リクエストに分けており、途中で失敗すると
+    // 中間状態のplan/dayが残る問題があった(Gate R2系列で監査指摘)。
+    // 正式QuickDraft API(POST /quick-drafts→POST /quick-drafts/{id}/promote)
+    // へ置き換え、plan+day+eventをbackend側の単一transactionで作成する。
+    //
+    // QuickDraftのstart_date/end_dateは必須のため、未入力時は今日の日付を
+    // 補う(events未指定なら実際にday/eventが作られないのは従来と同じ)。
+    const today = new Date().toISOString().slice(0, 10);
+    const effectiveStartDate = startDate || today;
+    const effectiveEndDate = input.endDate?.trim() || effectiveStartDate;
 
-    if (!created) {
-      // createPlan側で既にエラートーストを出しているため、ここでは何もしない。
+    const hasFirstEvent = !!input.firstEventTitle?.trim();
+    const events = hasFirstEvent
+      ? [
+          {
+            title: input.firstEventTitle!.trim(),
+            local_date: effectiveStartDate,
+            start_time: input.firstEventTime?.trim() || undefined,
+            // [制約] QuickDraftEventInputにはlocation_name相当のフィールドが
+            // 無い(Gate R2-2時点のスキーマ)。情報を失わないようdescription
+            // へ退避する(将来のGateでフィールド追加を検討)。
+            description: input.firstEventLocation?.trim() || undefined,
+          },
+        ]
+      : [];
+
+    let draft;
+    try {
+      draft = await createQuickDraft(
+        {
+          title,
+          start_date: effectiveStartDate,
+          end_date: effectiveEndDate,
+          events,
+        },
+        generateIdempotencyKey(),
+      );
+    } catch (error) {
+      console.error('QuickDraft作成エラー:', error);
+      toast.error('プランの作成に失敗しました');
       return null;
     }
 
-    // addDay/addScheduleItemはcurrentPlan.revisionを要求するため、
-    // メタデータのみのcreatePlan直後ではなく、正規化データを含めて
-    // 再取得してから使う。
-    await get().loadPlan(created.id);
+    const deviceToken = getStoredDeviceToken();
+    if (!deviceToken) {
+      // createQuickDraftが新規device発行した場合は必ずstorageへ保存される
+      // ため、通常ここには来ない(bootstrap直後の一貫性チェック)。
+      console.error('QuickDraft promoteエラー: device_tokenが見つかりません');
+      toast.error('プランの作成に失敗しました');
+      return null;
+    }
 
-    // [CA-001] 「予定を1件登録できる」ところまでを自動保存する。
-    // 日・予定名のいずれも未入力なら、空のプランのまま(タイトルのみ)で
-    // 返し、後続の手動編集に委ねる。
-    const hasFirstEvent = !!input.firstEventTitle?.trim();
-    if (startDate || hasFirstEvent) {
-      await get().addDay();
+    let promoted;
+    try {
+      promoted = await travelAPI.promoteQuickDraft(
+        draft.id,
+        deviceToken,
+        generateIdempotencyKey(),
+      );
+    } catch (error) {
+      console.error('QuickDraft promoteエラー:', error);
+      toast.error('プランの作成に失敗しました');
+      return null;
     }
-    if (hasFirstEvent) {
-      await get().addScheduleItem(0, {
-        title: input.firstEventTitle!.trim(),
-        start_time: input.firstEventTime?.trim() || undefined,
-        location_name: input.firstEventLocation?.trim() || undefined,
-      });
-    }
+
+    // promoteのresponseはid/revision等のみの最小形なので、日程・予定を
+    // 含む正規化データは改めてloadPlanで取得する。
+    await get().loadPlan(promoted.id);
 
     return get().currentPlan;
   },

@@ -752,6 +752,33 @@ class CompleteTravelAPI {
     return { success: true } as ApiResponse<void>;
   }
 
+  // [Gate R2-4] POST /quick-drafts/{id}/promote。既存セッション(guest/member)の
+  // Authorizationをthis.clientのinterceptorがそのまま付与する(promoteはuser/owner
+  // 認証が正式契約のため、これで正しい)。device_tokenはbody側で送る
+  // (ADR-quick-draft.md §決定事項3: Authorizationヘッダーはuser/guest認証で
+  // 埋まっており、device所有証明を同時に運べないため)。
+  async promoteQuickDraft(
+    draftId: string,
+    deviceToken: string,
+    idempotencyKey: string,
+    opts?: { target_plan_id?: string; base_revision?: number },
+  ): Promise<{
+    id: string;
+    revision: number;
+    title?: string;
+    start_date?: string;
+    end_date?: string;
+    quick_draft_id: string;
+    quick_draft_status: string;
+  }> {
+    const response = await this.client.post(
+      `/quick-drafts/${draftId}/promote`,
+      { device_token: deviceToken, ...opts },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+    return response.data;
+  }
+
   // ===== [Gate #31.5C] 正規化Plan/Day/Event API (/plans、Gate #29正本) =====
   // 以前はplanStore.tsが/travel-plans(itinerary JSON一括PUT)のみを使い、
   // Gate #29で実装済みのこのAPI群(day/event単位CRUD・並べ替え・Undo・
@@ -1046,6 +1073,12 @@ export const travelAPI = {
   getPlan: (id: string) => api.getPlan(id),
   updatePlan: (id: string, data: any) => api.updatePlan(id, data),
   deletePlan: (id: string) => api.deletePlan(id),
+  promoteQuickDraft: (
+    draftId: string,
+    deviceToken: string,
+    idempotencyKey: string,
+    opts?: { target_plan_id?: string; base_revision?: number },
+  ) => api.promoteQuickDraft(draftId, deviceToken, idempotencyKey, opts),
   searchSpots: (request: SearchRequest) => api.searchSpots(request),
   getSpots: (category?: string, limit?: number) => api.getSpots(category, limit),
   createSpot: (data: any) => api.createSpot(data),
