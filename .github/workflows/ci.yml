@@ -130,3 +130,96 @@ jobs:
       # 実際にDockerfileが使用するのは requirements.txt (pip) であり、
       # pyproject.tomlは重複・未整理のまま放置されている(別途整理が必要、
       # Gate #31.5D以降のスコープ)。
+
+  # [Gate R2-6] docs/trace/gate-r2-trace.md のR2-5行が「未達」としていた
+  # 「Playwright browser E2E」「CIへのE2E blocking追加」を満たすジョブ。
+  # frontend/backend jobとは別に、docker composeでフルスタック(postgres/
+  # redis/backend/frontend)を実際に起動し、匿名ゲスト開始→QuickDraft作成
+  # →promote→reload後の永続化確認までを本物のブラウザ(chromium)で検証する。
+  e2e:
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # docker-compose.ymlはDB_PASSWORD等を.envからの読込み必須としている
+      # (`${DB_PASSWORD:?DB_PASSWORD must be set in .env}`)。このジョブの
+      # 使い捨てスタックにのみ通用するCI専用の非秘密な固定値を注入する。
+      # ENCRYPTION_KEYはbackend/app/core/crypto.pyがsha256で決定的に鍵導出
+      # するため、任意の文字列で良い(Fernet形式の事前生成は不要)。
+      - name: Create CI-only .env for docker compose
+        run: |
+          cat > .env <<'EOF'
+          DB_NAME_DEV=travelcanvas
+          DB_USER=travelcanvas_app
+          DB_PASSWORD=ci-only-not-a-real-secret
+          DATABASE_URL=postgresql://travelcanvas_app:ci-only-not-a-real-secret@postgres:5432/travelcanvas
+          JWT_SECRET_KEY=ci-only-dummy-jwt-secret-not-used-anywhere-else
+          ENCRYPTION_KEY=ci-only-dummy-encryption-key-not-used-anywhere-else
+          VITE_API_URL=http://localhost:8001
+          EOF
+
+      - name: Build & start full stack (postgres/redis/backend/frontend)
+        run: docker compose up -d --build
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:8001/health >/dev/null; then
+              echo "backend is healthy"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::backendが時間内にhealthyになりませんでした"
+          docker compose logs backend
+          exit 1
+
+      - name: Alembic upgrade head (コンテナ内)
+        run: docker compose exec -T backend alembic upgrade head
+
+      - name: Wait for frontend
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4173 >/dev/null; then
+              echo "frontend is up"; exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::frontendが時間内に応答しませんでした"
+          docker compose logs frontend
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies + Playwright browser
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Playwright E2E (ブロッキング)
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:4173
+          CI: 'true'
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down full stack
+        if: always()
+        run: docker compose down -v

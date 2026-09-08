@@ -62,7 +62,18 @@ function storeDeviceToken(token: string): void {
 }
 
 function resolveApiBaseUrl(): string {
-  const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+  // [Gate R2-6] services/api.ts (resolveBaseURL付近)はVITE_API_BASE_URLと
+  // VITE_API_URLの両方をfallback順に見るが、本ファイルは従来
+  // VITE_API_BASE_URLしか見ておらず、docker-compose.ymlがbuild引数として
+  // 実際に注入するのはVITE_API_URLの方だった(frontend.build.args参照)。
+  // そのため本番相当のDockerビルドでは常にハードコード既定値
+  // 'http://localhost:8001'へフォールバックしてしまう不整合があった
+  // (omega-dev2では既定値と実際のbackendアドレスが偶然一致するため、
+  // これまで症状が表面化していなかった)。api.ts と同じ優先順位に揃える。
+  const raw =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:8001';
   const trimmed = raw.replace(/\/+$/, '');
   return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
 }

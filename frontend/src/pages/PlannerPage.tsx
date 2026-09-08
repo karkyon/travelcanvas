@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
+import { useAuthStore } from '@/store/authStore';
 import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
 import DateNavigation from '@/components/planner/DateNavigation';
@@ -78,6 +79,8 @@ const PlannerPage: React.FC = () => {
     checkOfflineAvailability,
     createQuickPlan,
   } = usePlanStore();
+
+  const { isGuest } = useAuthStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState('');
@@ -355,9 +358,17 @@ const PlannerPage: React.FC = () => {
 
   // [Gate #32] 表示中の日が変わるたびに移動概算(route-preview)を取得する。
   // 座標が無い/1件以下の日はlegsが空になるだけで、架空の値は作らない。
+  // [Gate R2-6 v8] backend `GET /plans/{id}/days/{id}/route-preview` は
+  // `get_current_active_user`(会員限定)を要求するため、ゲストが呼ぶと
+  // 常に401になる。Header.tsxの通知ポーリングと同じ実害バグパターン
+  // (401→axiosインターセプターの/auth/refresh試行→これも401→
+  // window.location.href='/login'強制リロード)がここでも発生していた
+  // (Playwright E2E実行で発覚)。ゲストの間はroute-preview取得自体を
+  // 行わないようにする(catchで握りつぶしても、interceptor側の強制
+  // リダイレクトは止められないため、呼び出し自体を避ける必要がある)。
   useEffect(() => {
     const activeDay = currentPlan?.days[currentDayIndex];
-    if (!currentPlan || !activeDay) {
+    if (!currentPlan || !activeDay || isGuest) {
       setRoutePreview(null);
       return;
     }
@@ -373,7 +384,7 @@ const PlannerPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentPlan?.id, currentDayIndex, currentPlan?.days.length]);
+  }, [currentPlan?.id, currentDayIndex, currentPlan?.days.length, isGuest]);
 
   const handleCreatePlan = async () => {
     // [Gate #38] CA-001の受入条件「旅行名未入力でも作成できる」に合わせ、

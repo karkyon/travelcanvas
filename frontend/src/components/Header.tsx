@@ -27,7 +27,16 @@ const Header: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // [Gate R2-6 v6] isGuestを分割代入していたが本effectのガードで一度も
+    // 使われておらず、guestユーザーでも/notifications/unread-count
+    // (会員限定、backend側はget_current_active_userでguestを明示的に拒否)
+    // をポーリングし続けていた。401→axiosインターセプターの
+    // /auth/refresh試行→これも401→window.location.href='/login'という
+    // 強制リロードが60秒間隔(かつマウント直後にも即時実行)で発生し、
+    // ゲストが/plannerに留まっている間ずっと強制ログアウトを繰り返す
+    // 実害バグだった(Playwright E2E実行で発覚)。通知は会員限定機能の
+    // ため、ゲストの間はポーリング自体を行わないようにする。
+    if (!isAuthenticated || isGuest) {
       setUnreadCount(0);
       return;
     }
@@ -44,7 +53,7 @@ const Header: React.FC = () => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isGuest]);
 
   const handleLogout = async () => {
     try {

@@ -18,9 +18,17 @@ FROM node:24-alpine AS runtime
 
 WORKDIR /app
 
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
+# [Gate R2-6] 以前はここで`--chown`を指定しておらずCOPY --from=buildが
+# root:rootで全ファイルをコピーしていた。直後のUSER nodeでnode(uid 1000)
+# ユーザーへ切り替えると、root所有のツリーを`npm run preview`(package.json
+# 読込)が読めずEACCES: permission deniedでコンテナが起動不能になっていた
+# (`docker compose up -d --build`でfrontendコンテナを実際に再作成した際に
+# 初めて顕在化。以前のGate検証はtsc/build/vitestのみでフルスタック起動を
+# 伴わなかったため未発見だった)。COPY時点でnode:nodeへ所有権を渡すことで
+# 解消する。
+COPY --from=build --chown=node:node /app/package*.json ./
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
 
 USER node
 

@@ -14,6 +14,7 @@
 | v1 (2026-09-07) | 初版。omega-dev2実行時にbackend pytestが`DATABASE_URL`未分離のため安全装置で失敗、rollbackで無傷。コード変更・pushなし。 |
 | v2 (2026-09-07) | v1の設計不備を独立clone再調査のうえ是正: (1) 未定義ヘッダー`X-Device-Token`を廃止しAuthorization Bearer方式へ統一、(2) UUID列への`COALESCE(...,'')`を部分unique indexへ訂正、(3) Idempotency状態遷移を2段階commitへ変更（単一transactionでは`OPERATION_IN_PROGRESS`の即時応答要件を満たせないため）、(4) migrationを「additiveのみ」とした記述を訂正（`user_id`のNOT NULL緩和を明記）、(5) token生成・保存・expiry・replay・stale in-progress回収・監査方針を具体化。パッチスクリプトはbackend pytest実行前に専用test DBへ`DATABASE_URL`を安全に切替える処理を追加。 |
 | v3 (2026-09-07) | omega-dev2実行でbackend 151/151・frontend tsc/build/vitest 61/61すべて成功したが、`diff_check`が`git add -A`でworktree直下の無関係な未追跡ファイル(ユーザーが確認用に置いたコピー)まで拾い「意図外の差分」として誤検知しcommit直前で失敗、rollback。ADR/trace文書自体の内容変更は無し。パッチスクリプトを本Gateが作成した2ファイルのみ明示`git add`する方式へ修正し、commit後の残差分チェックも未追跡ファイルを無視するよう修正。 |
+| v4 (2026-09-08, Gate R2-6) | R2-5完了時点でPARTIALのまま残っていた4項目のうち「Playwright browser E2E」「CIへのE2E blocking追加」を実装。詳細はdocs/trace/gate-r2-trace.mdのR2-6行、および本ADR §11参照。副次的発見1として`frontend/src/services/quickDraftApi.ts`の`resolveApiBaseUrl()`が`docker-compose.yml`のbuild引数`VITE_API_URL`を見ておらず`VITE_API_BASE_URL`のみ参照していたため、`VITE_API_URL`を変更する本番相当デプロイでは常に既定値`http://localhost:8001`へ誤fallbackする不整合を発見・是正(omega-dev2では既定値と実際の値が偶然一致するため症状が表面化していなかった)。副次的発見2として`frontend/Dockerfile`のruntime stageが`COPY --from=build`に`--chown`を指定しておらずroot:root所有のままだったため、`USER node`後の`npm run preview`が`package.json`を`EACCES`で読めずfrontendコンテナが起動不能というインフラ上の既存バグを発見・是正(`--chown=node:node`を追加)。**v1はomega-dev2実行時、`docker compose up -d --build`のfrontendビルドが`npm ci`でlockfile不同期(`@playwright/test`が`package-lock.json`未反映)のため失敗しrollback(無傷)。v2で`package-lock.json`を修正対象へ追加して是正したが、イメージビルド自体は成功したもののfrontendコンテナ起動後に上記EACCESで再起動ループしhealth待機タイムアウト、再度rollback(無傷)。v3でDockerfileの`--chown`修正を追加して是正。**v4はv3実行時、docker/frontend起動・backend pytest(177/177)・frontend tsc/build/vitest(62/62)まで全て成功したがPlaywright実行時にguest bootstrap後`/login`への連続リダイレクトが発生し失敗、rollback(無傷)。原因未特定のためcurlベースの診断ステップとE2E側のHTTPエラー計装を追加して原因特定を試みる段階。** **v5はv4実行時、curl診断でbackend側(guest token発行・`/travel-plans/`取得)は正常と確認できたが、`waitForLoadState('networkidle')`自体がタイムアウトし診断ログが埋もれたため、networkidle待ちを廃止しフレーム遷移回数カウント方式へ変更、また要望により過去セッションの残置ファイル自動削除を追加。** **v6はv5実行で真因が判明: `frontend/src/components/Header.tsx`の未読通知バッジポーリングeffectが`isGuest`を使わずguestでも会員限定の`/notifications/unread-count`を叩き続け、401→`/auth/refresh`401→`window.location.href='/login'`強制リロードを無限に繰り返していた実害バグ。effectガードに`isGuest`を追加して是正。**** |
 
 ## 背景
 
@@ -148,6 +149,14 @@ R2-1のmigrationは以下の2種類を含む。
 downgradeでは、(2)を`user_id`へ`NOT NULL`を戻す前に、`device_id IS NOT NULL AND user_id IS NULL`の行（=device発行のidempotency record）が存在しないことを確認する（存在すれば失敗させ、データ損失を伴うdowngradeを自動実行しない）。(1)は追加列・追加テーブル・追加indexを削除するだけで既存データへ影響しない。
 
 - 本ADR自体（R2-0）はコード変更を伴わないため、rollbackは本ファイル・trace表の`git revert`のみで完結する。
+
+### 11. E2E検証（Gate R2-6追記）
+
+- 対象シナリオ: 匿名ゲスト開始 → QuickDraft作成(`POST /quick-drafts`) → promote(`POST /quick-drafts/{id}/promote`、`createQuickPlan()`内で作成に連続して自動実行) → `/planner/{id}`遷移確認 → **reload**による再取得後もplan/日程/予定の表示が保持されること(=DBへの実永続化の確認。クライアント側optimistic stateの検証ではないこと) → 一覧画面に戻っても表示が継続すること。
+- 実行方式: `frontend/e2e/quickdraft-flow.spec.ts`（Playwright、chromium）。`frontend/playwright.config.ts`の`baseURL`は既定`http://localhost:4173`（`PLAYWRIGHT_BASE_URL`で上書き可）。
+- 実行環境: omega-dev2上で`docker compose up -d`済みのフルスタック（backend: 8001 / frontend: 4173）に対して実行する。開発サンドボックス環境にはdockerが無いため、browser E2Eの実地実行はomega-dev2側でパッチスクリプト自身が行う。
+- CI: `.github/workflows/ci.yml`の`e2e` job が `docker compose up -d --build` でpostgres/redis/backend/frontendを起動し、`frontend`/`backend` jobの成功後にblocking実行する。
+- 未対象: accessibility試験、audit/metric基盤（監査イベント永続化・ダッシュボード）は本Gateのスコープ外。docs/trace/gate-r2-trace.mdのR2-5行に残存項目として明記済み。
 
 ## 却下した代替案
 
