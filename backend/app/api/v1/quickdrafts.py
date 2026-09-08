@@ -1,5 +1,6 @@
 """
-[Gate R2-2] `POST /v1/quick-drafts` (DOC-06)。
+[Gate R2-2/R2-3] `POST /v1/quick-drafts` と `POST /v1/quick-drafts/{id}/promote`
+(DOC-06)。
 
 実URLは既存の全routerと同じく `/api/v1` prefixで公開する(main.pyで
 `app.include_router(quickdrafts.router, prefix="/api/v1")`)。DOC-06本文は
@@ -7,8 +8,6 @@
 省略形になっており、既存実装の慣習(全endpointが/api/v1配下)と矛盾する。
 本Gateでは実装済みの他routerとの一貫性を優先し、/api/v1/quick-draftsと
 する。
-
-promote(`POST /v1/quick-drafts/{id}/promote`)はGate R2-3で追加する。
 
 設計の詳細はdocs/adr/ADR-quick-draft.mdを参照。
 """
@@ -25,10 +24,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user_or_guest
 from app.core.config import settings
-from app.core.crypto import EncryptionNotConfigured, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
-from app.models.models import Device, QuickDraft
+from app.core.plan_access import require_plan_access
+from app.models.models import Device, QuickDraft, TravelDay, TravelEvent, TravelPlan, User
 from app.services.quickdraft_idempotency import (
     IdempotencyInProgress,
     IdempotencyKeyReused,
@@ -110,6 +111,29 @@ class QuickDraftResponse(BaseModel):
     end_date: date_cls
     events: List[QuickDraftEventIn]
     device_token: Optional[str] = None  # 新規device発行時(bootstrap)のみ含む
+
+
+class PromoteRequest(BaseModel):
+    """[Gate R2-3] `POST /quick-drafts/{id}/promote` のrequest body。
+
+    DOC-06本文の正式契約は`target_plan_id?,base_revision`のみだが、
+    draft作成者本人であることの証明として`device_token`を追加で必須と
+    する(ADR-quick-draft.md §決定事項3。Authorizationヘッダーは
+    user/guest認証で埋まっており、device所有証明を同時に運べないため)。
+    """
+    target_plan_id: Optional[str] = None
+    base_revision: Optional[int] = None
+    device_token: str
+
+
+class PromoteResponse(BaseModel):
+    id: str  # promote後のTravelPlan.id
+    revision: int
+    title: Optional[str] = None
+    start_date: Optional[date_cls] = None
+    end_date: Optional[date_cls] = None
+    quick_draft_id: str
+    quick_draft_status: str
 
 
 # ==========================================
@@ -259,5 +283,202 @@ async def create_quick_draft(
         finalize_failure(db, record.id, {"code": e.code, "message": e.message})
         raise
     except Exception as e:
+        finalize_failure(db, record.id, {"code": "INTERNAL_ERROR", "message": "internal error"})
+        raise
+
+
+# ==========================================
+# [Gate R2-3] POST /quick-drafts/{id}/promote
+# ==========================================
+
+PROMOTE_ENDPOINT_TEMPLATE = "POST /v1/quick-drafts/{id}/promote"
+
+
+def _verify_device_ownership(draft: QuickDraft, device_token: str, db: Session) -> None:
+    """draft作成時に発行されたdevice tokenの所有者本人であることを確認する。
+    Authorizationヘッダーはuser/guest認証で埋まっているため、device所有証明は
+    request body側で別途受け取る設計(ADR-quick-draft.md §決定事項3)。"""
+    digest = _hash_device_token(device_token)
+    device = db.query(Device).filter(Device.id == draft.device_id).first()
+    if device is None or device.token_digest != digest:
+        raise _problem(403, "PERMISSION_DENIED", "device_tokenがこのdraftの作成者と一致しません")
+
+
+def _decrypt_draft_payload(draft: QuickDraft) -> dict:
+    try:
+        plaintext = decrypt_payload(draft.payload_ciphertext)
+    except (ValueError, EncryptionNotConfigured) as e:
+        raise _problem(
+            503, "TEMPORARILY_UNAVAILABLE", "QuickDraft機能は現在利用できません(復号エラー)"
+        ) from e
+    return json.loads(plaintext.decode("utf-8"))
+
+
+def _apply_draft_to_plan(db: Session, plan: TravelPlan, payload: dict) -> None:
+    """decrypt済みQuickDraft payload(title/start_date/end_date/events)を
+    TravelDay/TravelEventとしてplanへ書き込む。同一local_dateのTravelDayが
+    既存なら再利用し、無ければ新規作成する(全-or-nothingはSAVEPOINTで
+    呼び出し側が保証する)。"""
+    events = payload.get("events") or []
+    day_cache: dict = {}
+
+    def _parse_date(value: Optional[str]) -> date_cls:
+        return date_cls.fromisoformat(value) if value else date_cls.today()
+
+    def _get_or_create_day(local_date_str: Optional[str]) -> TravelDay:
+        parsed = _parse_date(local_date_str or payload.get("start_date"))
+        key = parsed.isoformat()
+        if key in day_cache:
+            return day_cache[key]
+        existing = (
+            db.query(TravelDay)
+            .filter(TravelDay.plan_id == plan.id, TravelDay.local_date == parsed)
+            .first()
+        )
+        if existing:
+            day_cache[key] = existing
+            return existing
+        day = TravelDay(
+            plan_id=plan.id,
+            local_date=parsed,
+            sort_order=len(day_cache),
+        )
+        db.add(day)
+        db.flush()
+        day_cache[key] = day
+        return day
+
+    for idx, ev in enumerate(events):
+        day = _get_or_create_day(ev.get("local_date"))
+        event = TravelEvent(
+            plan_id=plan.id,
+            day_id=day.id,
+            title=ev.get("title") or "無題の予定",
+            description=ev.get("description"),
+            local_start_time=ev.get("start_time"),
+            sort_order=idx,
+        )
+        db.add(event)
+
+
+@router.post("/{draft_id}/promote", response_model=None, status_code=201)
+async def promote_quick_draft(
+    draft_id: str,
+    body: PromoteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+):
+    if not idempotency_key:
+        raise _problem(400, "INVALID_REQUEST", "Idempotency-Key header is required")
+
+    draft = db.query(QuickDraft).filter(QuickDraft.id == draft_id).first()
+    if draft is None:
+        raise _problem(404, "RESOURCE_NOT_FOUND", "quick draft not found")
+
+    _verify_device_ownership(draft, body.device_token, db)
+
+    now = datetime.now(timezone.utc)
+    expires_at = draft.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if draft.status in ("EXPIRED", "REVOKED") or (draft.status == "ACTIVE" and expires_at <= now):
+        raise _problem(410, "RESOURCE_GONE", f"quick draft is {draft.status.lower()} or expired")
+
+    payload_dict = jsonable_encoder(body)
+    payload_hash = compute_payload_hash(payload_dict)
+    endpoint = PROMOTE_ENDPOINT_TEMPLATE.format(id=draft_id)
+
+    if draft.status == "PROMOTED":
+        # 既にpromote済み: 同一request(同key・同payload)ならidempotency層が
+        # そのままcacheを返す。異なるrequestなら明示的に409とする。
+        try:
+            outcome, record = claim_or_get_cached(
+                db, idempotency_key, endpoint, payload_hash, user_id=current_user.id,
+            )
+        except IdempotencyKeyReused:
+            raise _problem(409, "IDEMPOTENCY_KEY_REUSED", "この操作は既に異なる内容で実行されています")
+        except IdempotencyInProgress:
+            raise _problem(409, "OPERATION_IN_PROGRESS", "この操作は現在処理中です")
+        if outcome == "cached":
+            cached_body = dict(record.response_json or {})
+            return JSONResponse(status_code=record.response_status or 201, content=cached_body)
+        # claimはできたが、draftは既にPROMOTED済み = 異なるrequestでの再promote試行
+        finalize_failure(db, record.id, {"code": "ALREADY_PROMOTED", "message": "draft already promoted"})
+        raise _problem(
+            409, "ALREADY_PROMOTED",
+            f"このdraftは既にplan {draft.promoted_plan_id} へpromote済みです",
+        )
+
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(
+        f"quickdraft_promote:{client_ip}", settings.RATE_LIMIT_QUICKDRAFT_CREATE, 3600
+    ):
+        raise _problem(429, "RATE_LIMITED", "rate limit exceeded")
+
+    try:
+        outcome, record = claim_or_get_cached(
+            db, idempotency_key, endpoint, payload_hash, user_id=current_user.id,
+        )
+    except IdempotencyKeyReused:
+        raise _problem(409, "IDEMPOTENCY_KEY_REUSED", "この操作は既に異なる内容で実行されています")
+    except IdempotencyInProgress:
+        raise _problem(409, "OPERATION_IN_PROGRESS", "この操作は現在処理中です")
+
+    if outcome == "cached":
+        cached_body = dict(record.response_json or {})
+        return JSONResponse(status_code=record.response_status or 201, content=cached_body)
+
+    try:
+        with db.begin_nested():
+            payload = _decrypt_draft_payload(draft)
+
+            if body.target_plan_id:
+                plan, _role = require_plan_access(db, body.target_plan_id, current_user, min_role="editor")
+                if body.base_revision is not None and body.base_revision != plan.revision:
+                    raise _problem(
+                        409, "REVISION_CONFLICT",
+                        f"対象プランが他の変更で更新されています(現在のリビジョン: {plan.revision})",
+                    )
+            else:
+                start_dt = datetime.fromisoformat(payload["start_date"]) if payload.get("start_date") else None
+                end_dt = datetime.fromisoformat(payload["end_date"]) if payload.get("end_date") else None
+                plan = TravelPlan(
+                    user_id=current_user.id,
+                    title=payload.get("title") or "新しい旅行",
+                    start_date=start_dt,
+                    end_date=end_dt,
+                    status="draft",
+                )
+                db.add(plan)
+                db.flush()
+
+            _apply_draft_to_plan(db, plan, payload)
+
+            plan.revision = (plan.revision or 1) + 1
+            draft.status = "PROMOTED"
+            draft.promoted_plan_id = plan.id
+            db.flush()
+            db.refresh(plan)
+
+            response_body = {
+                "id": str(plan.id),
+                "revision": plan.revision,
+                "title": plan.title,
+                "start_date": plan.start_date.isoformat() if plan.start_date else None,
+                "end_date": plan.end_date.isoformat() if plan.end_date else None,
+                "quick_draft_id": str(draft.id),
+                "quick_draft_status": draft.status,
+            }
+
+        finalize_success(db, record.id, 201, response_body)
+        return JSONResponse(status_code=201, content=response_body)
+
+    except QuickDraftProblemError as e:
+        finalize_failure(db, record.id, {"code": e.code, "message": e.message})
+        raise
+    except Exception:
         finalize_failure(db, record.id, {"code": "INTERNAL_ERROR", "message": "internal error"})
         raise
