@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -220,6 +220,27 @@ async def travelcanvas_exception_handler(request: Request, exc: TravelCanvasExce
         },
     )
 
+# [Gate R2-2] QuickDraft(POST /quick-drafts, 今後のpromoteも含む)のみ、
+# DOC-06準拠のapplication/problem+jsonエラー封筒を新規導入する。既存API
+# ({"error":{...}}形式)は本Gateでは変更しない(影響範囲を限定するため、
+# 全API統一は別Gateで行う。docs/adr/ADR-quick-draft.md §7参照)。
+from app.api.v1.quickdrafts import QuickDraftProblemError  # noqa: E402
+
+
+@app.exception_handler(QuickDraftProblemError)
+async def quickdraft_problem_handler(request: Request, exc: QuickDraftProblemError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        media_type="application/problem+json",
+        content={
+            "type": "about:blank",
+            "title": exc.message,
+            "status": exc.status_code,
+            "code": exc.code,
+            "correlation_id": getattr(request.state, "request_id", None),
+        },
+    )
+
 # [Gate #34 P0-05] 認証APIルートを含める。
 # 以前は`except ImportError`で握り潰し、「基本機能のみで起動」を続けて
 # いた(2026-09-05監査)。認証routerが欠落した状態でも/healthがOKを返し
@@ -252,3 +273,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 # [Gate #29] /plans: travel_days/travel_events正規テーブルを正本とする新API。
 # 既存の/travel-plans(itinerary JSONベース)と並行稼働する(metadata CRUDのみ)。
 app.include_router(plans.router, prefix="/api/v1")
+# [Gate R2-2] POST /quick-drafts (DOC-06正式契約)。anonymous device tokenで
+# ログイン前にplan/day/event相当を単一transactionで作成する。promote
+# (/quick-drafts/{id}/promote)はGate R2-3で追加する。
+app.include_router(quickdrafts.router, prefix="/api/v1")

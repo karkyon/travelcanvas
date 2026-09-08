@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     RATE_LIMIT_GUEST: int = 100    # ゲストユーザー制限
     RATE_LIMIT_REGISTERED: int = 1000  # 登録ユーザー制限
     RATE_LIMIT_PREMIUM: int = 5000     # プレミアムユーザー制限
+    # [Gate R2-2] anonymous device tokenでの匿名作成のため、IPベースの
+    # レート制限を別途設ける(1時間あたり)。
+    RATE_LIMIT_QUICKDRAFT_CREATE: int = 20
+
+    # [Gate R2-2] QuickDraft payload field encryption用の鍵。
+    # 注意: DATABASE_URL/JWT_SECRET_KEYと異なり意図的にOptionalとする。
+    # 必須化するとomega-dev2の.envに未設定の場合にbackend全体が起動不能に
+    # なる(QuickDraftという新機能のために既存全APIを道連れにしてしまう)
+    # ため、未設定時はQuickDraft関連呼び出し時にのみ明確なエラーを返す設計
+    # とする(backend/app/core/crypto.py参照)。
+    ENCRYPTION_KEY: Optional[str] = None
     
     # CORS設定 - Union[str, List[str]]にして文字列も受け入れる
     # [Gate R0] 廃止済みの開発機IP(192.168.1.248)を既定値から除去。
