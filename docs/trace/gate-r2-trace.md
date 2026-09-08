@@ -41,6 +41,8 @@
 | migration説明 | 「additiveのみ」と記述していたが`user_id`のNOT NULL緩和を含んでおり不正確 | 緩和である旨を明記し、downgrade時のデータ有無チェックを追加 |
 | token/expiry/replay/audit | 未確定のまま次Gateへ先送りしていた | 生成方式(既存`_generate_refresh_secret`再利用)、保存(digestのみ)、expiry、stale in-progress回収、監査event/metricを具体化 |
 
+| R2-5 | Backend/Frontend/E2E/CI/観測 一式検証 | quickdraft_purge.py, テスト2ファイル | PARTIAL | retention purge(論理expire/物理delete/stale in-progress回収)とidempotencyの真の並行性(2独立DBコネクション)は実装・pytest確認済み(177/177)。**未達のまま**: Playwright browser E2E、CIへのE2E blocking追加、accessibility試験、audit/metric基盤(監査イベントの永続化・ダッシュボード)。これらが揃うまでFR-043/G1完了とは判定しない |
+
 ## 却下案の記録
 
 Gate R2a（仮`POST /api/v1/travel-plans/quick`、既存TravelPlan直書き）は2026-09-07付で不採用確定。理由と詳細はADR「却下した代替案」章、および`TravelCanvas_最新コード再々監査報告書_HEAD6d81e90_2026-09-07.md`を参照。
