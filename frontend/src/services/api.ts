@@ -307,6 +307,12 @@ const API_BASE_URL = resolveApiBaseUrl();
 class CompleteTravelAPI {
   private client: AxiosInstance;
   private accessToken: string | null = null;
+  // [Gate R2-8] ゲストセッション判定。authStore.tsのisGuestと同期して
+  // 保持し、会員限定APIへの401時に「実質的な403」として静かに失敗させる
+  // (トークンrefresh試行・強制ログアウトリダイレクトを行わない)ために使う。
+  // 個々のコンポーネント側のisGuestガード漏れがあっても、この層で
+  // 強制リロードループを起こさないための多層防御。
+  private isGuestSession: boolean = false;
 
   constructor() {
     this.client = axios.create({
@@ -380,7 +386,11 @@ class CompleteTravelAPI {
           originalRequest &&
           !originalRequest._retry &&
           !isAuthEndpoint &&
-          this.accessToken // トークンを一度も持ったことが無ければログイン画面へ委ねる
+          this.accessToken && // トークンを一度も持ったことが無ければログイン画面へ委ねる
+          !this.isGuestSession // [Gate R2-8] guestはrefresh cookieを持たないため
+          // refreshは常に失敗する。無駄なリクエストと、その失敗が結局
+          // handleApiErrorの強制リダイレクトへ繋がることを避けるため
+          // refresh自体を試みない。
         ) {
           originalRequest._retry = true;
           try {
@@ -427,6 +437,13 @@ class CompleteTravelAPI {
     this.clearTokens();
   }
 
+  // [Gate R2-8] authStore.tsのisGuest変更(guestログイン成功/member昇格/
+  // 通常ログイン/ログアウト)と同期して呼び出す。会員限定APIへの401を
+  // 「実質403」として扱うかどうかの判定に使う。
+  setGuestMode(isGuest: boolean): void {
+    this.isGuestSession = isGuest;
+  }
+
   private clearTokens(): void {
     this.accessToken = null;
     localStorage.removeItem('auth_token');
@@ -441,6 +458,21 @@ class CompleteTravelAPI {
     if (error.response?.status) {
       switch (error.response.status) {
         case 401:
+          // [Gate R2-8] ゲストセッション中の401は「会員限定機能への
+          // アクセス」である可能性が高く、資格情報が実際に無効という
+          // ケースとは区別する。従来はゲストでも一律にclearTokens()+
+          // 強制`/login`リダイレクトを行っており、ゲストが会員限定APIを
+          // (isGuestガード漏れ等で)呼んだ場合に強制ログアウトループが
+          // 発生する実害バグがあった(Gate R2-6で発見、個別effect側は
+          // 是正済みだが、本ハンドラ自体はその場しのぎの対症療法だった)。
+          // ゲストの場合はトークンを消さず、リダイレクトもせず、通常の
+          // エラーとして呼び出し元へ返すだけに留める(呼び出し元が
+          // catchしなければコンソールにエラーが出るのみで、UIの強制遷移
+          // は起きない)。
+          if (this.isGuestSession) {
+            message = 'この操作にはログインが必要です。';
+            break;
+          }
           message = '認証が必要です。ログインしてください。';
           this.clearTokens();
           if (typeof window !== 'undefined') {

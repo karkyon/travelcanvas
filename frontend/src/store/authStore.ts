@@ -78,6 +78,7 @@ export const useAuthStore = create<AuthState>()(
           // [Gate #10] apiServiceはlocalStorageの別キー('auth_token'/'access_token')
           // からしかトークンを読まないため、zustand永続化からの復元時にも明示的に同期する。
           apiService.setAccessToken(state.token);
+          apiService.setGuestMode(false);
           set({ 
             isAuthenticated: true, 
             isInitialized: true 
@@ -88,12 +89,14 @@ export const useAuthStore = create<AuthState>()(
           // checkAuthとは独立して、保存済みのguestTokenをそのまま信頼する
           // (期限切れの場合は後続のAPI呼び出しが401になった時点で判明する)。
           apiService.setAccessToken(state.guestToken);
+          apiService.setGuestMode(true);
           set({
             isAuthenticated: true,
             isInitialized: true,
           });
           console.log('✅ ゲストセッション復元完了');
         } else {
+          apiService.setGuestMode(false);
           set({ 
             isAuthenticated: false, 
             isInitialized: true 
@@ -136,6 +139,7 @@ export const useAuthStore = create<AuthState>()(
             console.warn('⚠️ 認証確認失敗:', response.status);
             // トークンが無効な場合はクリア
             apiService.clearAccessToken();
+            apiService.setGuestMode(false);
             set({
               user: null,
               token: null,
@@ -148,6 +152,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error('❌ 認証確認エラー:', error);
           apiService.clearAccessToken();
+          apiService.setGuestMode(false);
           set({
             user: null,
             token: null,
@@ -189,6 +194,7 @@ export const useAuthStore = create<AuthState>()(
           // これが無いと、ログイン後もspots/travel-plans等の認証必須APIが
           // Authorizationヘッダー無しで送信され、常に401で失敗していた。
           apiService.setAccessToken(data.access_token);
+          apiService.setGuestMode(false);
 
           set({
             user: data.user,
@@ -237,6 +243,7 @@ export const useAuthStore = create<AuthState>()(
           console.log('✅ 登録成功:', data);
 
           apiService.setAccessToken(data.access_token);
+          apiService.setGuestMode(false);
 
           set({
             user: data.user,
@@ -269,6 +276,7 @@ export const useAuthStore = create<AuthState>()(
           });
         }
         apiService.clearAccessToken();
+        apiService.setGuestMode(false);
         set({
           user: null,
           token: null,
@@ -300,6 +308,7 @@ export const useAuthStore = create<AuthState>()(
 
           const data = await response.json();
           apiService.setAccessToken(data.access_token);
+          apiService.setGuestMode(true);
 
           set({
             isGuest: true,
@@ -347,6 +356,7 @@ export const useAuthStore = create<AuthState>()(
 
           const data = await response.json();
           apiService.setAccessToken(data.access_token);
+          apiService.setGuestMode(false);
 
           set({
             user: data.user,

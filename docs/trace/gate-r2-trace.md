@@ -50,3 +50,20 @@
 ## 却下案の記録
 
 Gate R2a（仮`POST /api/v1/travel-plans/quick`、既存TravelPlan直書き）は2026-09-07付で不採用確定。理由と詳細はADR「却下した代替案」章、および`TravelCanvas_最新コード再々監査報告書_HEAD6d81e90_2026-09-07.md`を参照。
+
+## Gate番号外の修正: ゲスト×会員限定API 401ハンドラ根本修正（2026-09-08）
+
+R2-6で発見した「ゲストが会員限定APIを呼ぶと401→`/auth/refresh`401→`window.location.href='/login'`強制リロード」という実害バグ(Header.tsx/PlannerPage.tsxの個別`isGuest`ガード漏れ)は、当時は対症療法(個々のeffectへガード追加)のみで是正していた。ADR-quick-draft.md §11に「根本修正(401ハンドラ自体の見直し)は将来のGateで検討する価値がある」と記載していた件を、ユーザー承認のうえ本修正で対応。
+
+**対象**: `frontend/src/services/api.ts`, `frontend/src/store/authStore.ts`, `frontend/src/store/planStore.test.ts`
+
+**内容**:
+- `CompleteTravelAPI`(api.ts)へ`isGuestSession`フラグと`setGuestMode(isGuest: boolean)`を追加。
+- response interceptorの401→refresh自動リトライを、ゲストセッション中はスキップする(ゲストはrefresh cookieを持たないため常に失敗するだけの無駄なリクエストだった)。
+- `handleApiError`の401分岐を、ゲストセッション中は`clearTokens()`も`window.location.href='/login'`も行わず、通常のエラーとして呼び出し元へ返すだけに変更(会員限定APIへのアクセスを実質403として扱う)。
+- `authStore.ts`の`isGuest`が変化する全箇所(`initialize`の3分岐、`checkAuth`の2箇所、`login`、`register`、`logout`、`startGuestSession`、`upgradeGuest`)で`apiService.setGuestMode()`を同期呼び出しするよう統一。
+- `planStore.test.ts`の`@/services/api`モックに`setGuestMode`/`setAccessToken`/`clearAccessToken`を追加(authStoreの`onRehydrateStorage`が同じモックを共有するため、追加しないと非同期タイムアウト後に`setGuestMode is not a function`で失敗する)。
+
+**効果**: 今後、新規コンポーネントが`isGuest`ガードを追加し忘れて会員限定APIを呼んでしまっても、401ハンドラ自体がゲストセッションを認識して静かに失敗させるため、Header.tsx/PlannerPage.tsxで発生したような強制ログアウトループの再発を防ぐ多層防御になる(個別effectのガードは引き続き推奨するベストプラクティスとして残す)。
+
+**検証**: frontend tsc 0エラー、vitest 62/62成功、vite build成功。backend側の変更は無し。

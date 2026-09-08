@@ -30,6 +30,14 @@ vi.mock('@/services/api', () => ({
     moveEvent: vi.fn(),
     undoLastPlanChange: vi.fn(),
     searchSpots: vi.fn(),
+    // [Gate R2-8] authStoreのonRehydrateStorage(setTimeoutで非同期に
+    // 発火するstate.initialize())が同じ`@/services/api`モックを共有する
+    // ため、authStore側で新たに使われるようになったメソッドもここに
+    // 含めておかないと、このファイルのテスト実行後に非同期で
+    // "setGuestMode is not a function" が発生する。
+    setGuestMode: vi.fn(),
+    setAccessToken: vi.fn(),
+    clearAccessToken: vi.fn(),
   },
   // [Gate R2-4] createQuickPlanがpromoteQuickDraftをtravelAPI経由で呼ぶため追加。
   travelAPI: {
