@@ -481,6 +481,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/documents`)}
+            >
+              📄 文書
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/share/${currentPlan.id}`)}
             >
               🤝 共有

@@ -440,6 +440,53 @@ export interface ExtractionCandidateCreateData {
   evidence_locator?: string;
 }
 
+// [Gate R3-10] FR-013文書ウォレット(documents/document_links)。
+// backend/app/api/v1/documents.py (Gate R3-6)に対応するfrontend型。
+// Object Storage未導入のため実ファイルは扱わず、storage_key(クライアント
+// 側で決めた参照文字列)とメタデータのみを登録する
+// (docs/adr/ADR-documents-minimal.md参照)。
+
+export type DocumentClassification = 'public' | 'internal' | 'confidential' | 'restricted';
+
+export interface TravelDocument {
+  id: string;
+  plan_id: string;
+  owner_user_id: string | null;
+  classification: DocumentClassification;
+  document_type: string | null;
+  original_filename: string | null;
+  storage_key: string;
+  mime_type: string | null;
+  size: number | null;
+  sha256: string | null;
+  malware_status: string;
+  ocr_status: string;
+  retention_until: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface DocumentCreateData {
+  classification: DocumentClassification;
+  document_type?: string;
+  original_filename: string;
+  storage_key: string;
+  mime_type?: string;
+  size?: number;
+  sha256?: string;
+}
+
+export interface DocumentLink {
+  id: string;
+  document_id: string;
+  entity_type: string;
+  entity_id: string;
+  relation_type: string;
+  display_order: number;
+  created_at: string;
+}
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -1207,6 +1254,33 @@ class CompleteTravelAPI {
     return response.data;
   }
 
+  // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
+  async getDocuments(planId: string): Promise<TravelDocument[]> {
+    const response = await this.client.get<TravelDocument[]>(`/plans/${planId}/documents`);
+    return response.data;
+  }
+
+  async getDocument(planId: string, documentId: string): Promise<TravelDocument> {
+    const response = await this.client.get<TravelDocument>(`/plans/${planId}/documents/${documentId}`);
+    return response.data;
+  }
+
+  async createDocument(planId: string, data: DocumentCreateData): Promise<TravelDocument> {
+    const response = await this.client.post<TravelDocument>(`/plans/${planId}/documents`, data);
+    return response.data;
+  }
+
+  async deleteDocument(planId: string, documentId: string, ifMatch: number): Promise<void> {
+    await this.client.delete(`/plans/${planId}/documents/${documentId}`, {
+      headers: { 'If-Match': String(ifMatch) },
+    });
+  }
+
+  async getDocumentLinks(planId: string, documentId: string): Promise<DocumentLink[]> {
+    const response = await this.client.get<DocumentLink[]>(`/plans/${planId}/documents/${documentId}/links`);
+    return response.data;
+  }
+
   // ===== [Gate #32] PLAN MAP: route/insertion preview =====
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get<RoutePreview>(
@@ -1522,5 +1596,13 @@ export const rejectExtractionCandidate = (planId: string, jobId: string, candida
   api.rejectExtractionCandidate(planId, jobId, candidateId);
 export const confirmImportJob = (planId: string, jobId: string) => api.confirmImportJob(planId, jobId);
 export const rejectImportJob = (planId: string, jobId: string) => api.rejectImportJob(planId, jobId);
+
+// [Gate R3-10] FR-013文書ウォレット(documents/document_links)
+export const getDocuments = (planId: string) => api.getDocuments(planId);
+export const getDocument = (planId: string, documentId: string) => api.getDocument(planId, documentId);
+export const createDocument = (planId: string, data: DocumentCreateData) => api.createDocument(planId, data);
+export const deleteDocument = (planId: string, documentId: string, ifMatch: number) =>
+  api.deleteDocument(planId, documentId, ifMatch);
+export const getDocumentLinks = (planId: string, documentId: string) => api.getDocumentLinks(planId, documentId);
 
 export default api;

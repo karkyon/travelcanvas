@@ -29,6 +29,7 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
 import ReservationsPage from '@/pages/ReservationsPage';
 import ImportsPage from '@/pages/ImportsPage';
+import DocumentsPage from '@/pages/DocumentsPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -159,6 +160,18 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ImportsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📄 [Gate R3-10] 文書ウォレット(FR-013)。backend(Gate R3-6)は
+      // 実装済みだったがどこからもリンクされておらず画面から到達不能
+      // だった(同上パターンの再発防止)。
+      {
+        path: 'planner/:planId/documents',
+        element: (
+          <ProtectedRoute>
+            <DocumentsPage />
           </ProtectedRoute>
         ),
       },
