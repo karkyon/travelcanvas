@@ -463,7 +463,6 @@ def confirm_import_job(
         type=reservation_type,
         status=reservation_status,
         provider_name=fields.get("provider_name"),
-        holder_name=fields.get("holder_name"),
         guest_count=fields.get("guest_count"),
         start_at=fields.get("start_at"),
         end_at=fields.get("end_at"),
@@ -472,10 +471,28 @@ def confirm_import_job(
         currency=fields.get("currency"),
         payment_status=fields.get("payment_status"),
         cancellation_deadline=fields.get("cancellation_deadline"),
-        contact_phone=fields.get("contact_phone"),
         contact_url=fields.get("contact_url"),
         notes=fields.get("notes"),
     )
+
+    # [Gate R3-8] holder_name/contact_phoneは暗号化列のみへ書き込む。
+    if fields.get("holder_name"):
+        try:
+            r.holder_name_ciphertext = encrypt_payload(str(fields["holder_name"]).encode("utf-8"))
+        except EncryptionNotConfigured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="名義の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+            )
+
+    if fields.get("contact_phone"):
+        try:
+            r.contact_phone_ciphertext = encrypt_payload(str(fields["contact_phone"]).encode("utf-8"))
+        except EncryptionNotConfigured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="連絡先電話番号の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+            )
 
     if "confirmation_number" in fields:
         try:

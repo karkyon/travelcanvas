@@ -853,7 +853,15 @@ class Reservation(Base):
     confirmation_number_masked = Column(String, nullable=True)
     pin_ciphertext = Column(LargeBinary, nullable=True)
 
-    holder_name = Column(String, nullable=True)
+    holder_name = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用(下記参照)
+    # [Gate R3-8] holder_name/contact_phoneの暗号化列。DOC-05 §6.1は
+    # holder_ciphertext/contact_phone_ciphertextを要求しており、Gate R3-0
+    # 時点の平文カラムはスコープ限定だった(ADR-reservation-minimal.md参照)。
+    # 本Gateで暗号化列を追加し、以後の作成・更新はこちらのみへ書き込む。
+    # 上記の平文列(holder_name/contact_phone)はDOC-11 §14の
+    # expand/contractパターンに従い、削除せず後方互換のため残す
+    # (additive only原則。過去データの再確認・監査時の参照用)。
+    holder_name_ciphertext = Column(LargeBinary, nullable=True)
     guest_count = Column(Integer, nullable=True)
 
     start_at = Column(DateTime(timezone=True), nullable=True)
@@ -865,7 +873,8 @@ class Reservation(Base):
     payment_status = Column(String, nullable=True)
 
     cancellation_deadline = Column(DateTime(timezone=True), nullable=True)
-    contact_phone = Column(String, nullable=True)
+    contact_phone = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用
+    contact_phone_ciphertext = Column(LargeBinary, nullable=True)
     contact_url = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -932,11 +941,9 @@ class EventReservation(Base):
 # DOC-05 §6.3: reservation_id、plan_member_id、name_ciphertext、
 # seat_ciphertext、special_request_ciphertext。
 #
-# [スコープ限定] Gate R3-0のholder_name/contact_phoneと同じ理由により、
-# name/seat/special_requestは平文カラムとする(予約閲覧権限を持つ
-# 共同編集者へは通常表示される情報であり、confirmation_number/pinほどの
-# 機微性を持たないと判断。将来の暗号化列追加はadditive migrationで
-# 対応可能な設計としている)。
+# [Gate R3-8で解消] Gate R3-0時点ではname/seat/special_requestを平文
+# カラムとするスコープ限定を行っていたが、本Gateで暗号化列を追加した
+# (下記ReservationParticipantクラス参照)。
 #
 # [スコープ限定] plan_member_idはPlanCollaborator.idへのFK(nullable)と
 # する。DOC-05は「plan_member_id」という汎用名だが、本コードベースには
@@ -959,9 +966,17 @@ class ReservationParticipant(Base):
     )
     plan_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
 
-    name = Column(String, nullable=False)
+    # [Gate R3-8] 非推奨・後方互換用の平文列(既存データ参照用に残す。
+    # additive only原則によりDROPしない)。以後の作成・更新は
+    # *_ciphertext列のみへ書き込む(app/api/v1/reservations.py参照)。
+    name = Column(String, nullable=True)
     seat = Column(String, nullable=True)
     special_request = Column(Text, nullable=True)
+
+    # [Gate R3-8] Gate R2-2/R3-0と同じFernet field encryption。
+    name_ciphertext = Column(LargeBinary, nullable=True)
+    seat_ciphertext = Column(LargeBinary, nullable=True)
+    special_request_ciphertext = Column(LargeBinary, nullable=True)
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -65,7 +65,10 @@ def test_create_and_list_participants(auth_client, db_session):
         ReservationParticipant.id == uuid.UUID(body["id"])
     ).first()
     assert row is not None
-    assert row.name == "山田太郎"
+    # [Gate R3-8] name/seatは暗号化列へ保存されるようになった(平文列は
+    # 後方互換のため残るが、新規行では書き込まれずNoneのまま)。
+    assert row.name is None
+    assert row.name_ciphertext is not None
 
     client.post(endpoint, json={"name": "山田花子", "seat": "12B"})
 

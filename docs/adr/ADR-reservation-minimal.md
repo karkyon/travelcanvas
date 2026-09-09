@@ -191,6 +191,52 @@ relation_type/is_locked更新、リンク解除、ロック済みリンク解除
 
 ---
 
+## 改訂: Gate R3-8（2026-09-09）
+
+DOC-05 §6.1/§6.3が本来要求するholder_ciphertext/contact_phone_
+ciphertext/reservation_participants.name_ciphertext等の暗号化を実装
+した(Gate R3-0/R3-1で意図的にスコープ限定していたholder_name/
+contact_phone/name/seat/special_requestの平文カラム運用を解消)。
+
+- DOC-11 §14「暗号化移行は二重読取・新規暗号化・再暗号化・旧列削除」の
+  expand/contractパターンのうちexpand(新列追加+backfill)のみを実施。
+  旧平文列(`holder_name`/`contact_phone`/`name`/`seat`/
+  `special_request`)はadditive only原則により削除せず、後方互換の
+  ため残す(将来の非additiveメンテナンスGateでcontract(旧列削除)を
+  実施する想定)。
+- 以後の作成・更新はciphertext列のみへ書き込む(旧平文列は新規行では
+  常にNULLのまま)。
+- migration内でGate R2-2と同じ`app/core/crypto.py`のFernet暗号化を
+  用いて既存データをbackfillする。`ENCRYPTION_KEY`未設定環境では
+  backfillをスキップし警告を出力するのみとし、migration自体は失敗
+  させない(既存の`EncryptionNotConfigured`許容パターンを踏襲)。
+- レスポンスは`ciphertext`列を優先して復号し、無ければ旧平文列へ
+  フォールバックする(`_decrypt_or_none(...) or 旧平文値`)。これにより
+  backfill未実施の既存データも引き続き表示できる。
+- `reservation_participants.name`は元々NOT NULL制約だったが、新規行
+  では書き込まなくなるためnullableへ緩和した(データそのものは失わない
+  安全な変更)。
+- Gate R3-7(`imports.py`)のconfirm処理も同様にholder_name/
+  contact_phoneをciphertext列へ書き込むよう追随した。
+
+検証: サンドボックスで`alembic upgrade head`成功、alembic headが
+`e6b2c847a1d9`(down_revision=`d3e5f9a1b264`)の単一headになることを
+確認。新規`tests/test_gate_r3_8_field_encryption.py`(5ケース:
+holder_name/contact_phone暗号化保存、update時のciphertext限定書き込み、
+backfill前レガシー行のフォールバック読み取り、participant fields暗号化
+保存、participant update時のciphertext限定書き込み)全てPASS。
+downgrade→生SQLでの平文データ投入→upgradeによりbackfillが実データに
+対して正しく暗号化・復号できることも個別に検証済み。既存
+`test_gate_r3_1_reservation_participants.py`の1件(DB直接検証で平文を
+期待していたテスト)をciphertext保存を前提とする内容へ更新。既存
+backend全テスト含め226件全てPASS(リグレッションなし)。
+
+次Gate候補: `lookup_hash`による盲検索index(DOC-11 §6.3)、
+frontend UI(取込ジョブ一覧・候補レビュー画面、チケットQR表示)、
+`documents`のObject Storage実連携、旧平文列のcontract(削除)。
+
+---
+
 ## 改訂: Gate R3-5（2026-09-09）
 
 DOC-05 §6.4の`tickets`(FR-012 QR・チケット)を追加した。設計判断:

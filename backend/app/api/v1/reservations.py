@@ -175,6 +175,30 @@ def _mask_confirmation_number(raw: Optional[str]) -> Optional[str]:
     return "*" * (len(raw) - 4) + raw[-4:]
 
 
+def _decrypt_or_none(ciphertext: Optional[bytes]) -> Optional[str]:
+    """[Gate R3-8] 復号ヘルパー。ciphertextが無い、または復号失敗時はNoneを返す
+    (呼び出し側で旧平文列へのフォールバックに使う)。"""
+    if not ciphertext:
+        return None
+    try:
+        return decrypt_payload(ciphertext).decode("utf-8")
+    except (EncryptionNotConfigured, ValueError):
+        return None
+
+
+def _encrypt_or_raise(raw: Optional[str], field_label: str) -> Optional[bytes]:
+    """[Gate R3-8] 暗号化ヘルパー。rawがNone/空文字ならNoneを返す(暗号化しない)。"""
+    if not raw:
+        return None
+    try:
+        return encrypt_payload(raw.encode("utf-8"))
+    except EncryptionNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"{field_label}の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+        )
+
+
 def _to_response(r: Reservation) -> ReservationResponse:
     return ReservationResponse(
         id=str(r.id),
@@ -186,7 +210,7 @@ def _to_response(r: Reservation) -> ReservationResponse:
         provider_name=r.provider_name,
         confirmation_number_masked=r.confirmation_number_masked,
         has_pin=r.pin_ciphertext is not None,
-        holder_name=r.holder_name,
+        holder_name=_decrypt_or_none(r.holder_name_ciphertext) or r.holder_name,
         guest_count=r.guest_count,
         start_at=r.start_at,
         end_at=r.end_at,
@@ -195,7 +219,7 @@ def _to_response(r: Reservation) -> ReservationResponse:
         currency=r.currency,
         payment_status=r.payment_status,
         cancellation_deadline=r.cancellation_deadline,
-        contact_phone=r.contact_phone,
+        contact_phone=_decrypt_or_none(r.contact_phone_ciphertext) or r.contact_phone,
         contact_url=r.contact_url,
         notes=r.notes,
         revision=r.revision,
@@ -298,7 +322,6 @@ def create_reservation(
         type=payload.type,
         status=payload.status,
         provider_name=payload.provider_name,
-        holder_name=payload.holder_name,
         guest_count=payload.guest_count,
         start_at=payload.start_at,
         end_at=payload.end_at,
@@ -307,10 +330,13 @@ def create_reservation(
         currency=payload.currency,
         payment_status=payload.payment_status,
         cancellation_deadline=payload.cancellation_deadline,
-        contact_phone=payload.contact_phone,
         contact_url=payload.contact_url,
         notes=payload.notes,
     )
+    # [Gate R3-8] holder_name/contact_phoneは暗号化列のみへ書き込む
+    # (旧平文列は後方互換のためモデルに残すが、新規行では常にNULLのまま)。
+    r.holder_name_ciphertext = _encrypt_or_raise(payload.holder_name, "名義")
+    r.contact_phone_ciphertext = _encrypt_or_raise(payload.contact_phone, "連絡先電話番号")
 
     if payload.confirmation_number:
         try:
@@ -421,6 +447,16 @@ def update_reservation(
                 )
         else:
             r.pin_ciphertext = None
+
+    if "holder_name" in data:
+        raw = data.pop("holder_name")
+        r.holder_name_ciphertext = _encrypt_or_raise(raw, "名義")
+        r.holder_name = None  # [Gate R3-8] 旧平文列は以後更新しない
+
+    if "contact_phone" in data:
+        raw = data.pop("contact_phone")
+        r.contact_phone_ciphertext = _encrypt_or_raise(raw, "連絡先電話番号")
+        r.contact_phone = None  # [Gate R3-8] 旧平文列は以後更新しない
 
     for field, value in data.items():
         setattr(r, field, value)
@@ -555,9 +591,9 @@ def _to_participant_response(p: ReservationParticipant) -> ParticipantResponse:
         id=str(p.id),
         reservation_id=str(p.reservation_id),
         plan_member_id=str(p.plan_member_id) if p.plan_member_id else None,
-        name=p.name,
-        seat=p.seat,
-        special_request=p.special_request,
+        name=_decrypt_or_none(p.name_ciphertext) or p.name or "",
+        seat=_decrypt_or_none(p.seat_ciphertext) or p.seat,
+        special_request=_decrypt_or_none(p.special_request_ciphertext) or p.special_request,
         revision=p.revision,
         created_at=p.created_at,
         updated_at=p.updated_at,
@@ -597,10 +633,12 @@ def create_participant(
     p = ReservationParticipant(
         reservation_id=r.id,
         plan_member_id=payload.plan_member_id or None,
-        name=payload.name,
-        seat=payload.seat,
-        special_request=payload.special_request,
     )
+    # [Gate R3-8] name/seat/special_requestは暗号化列のみへ書き込む
+    # (旧平文列は後方互換のためモデルに残すが、新規行では常にNULLのまま)。
+    p.name_ciphertext = _encrypt_or_raise(payload.name, "参加者氏名")
+    p.seat_ciphertext = _encrypt_or_raise(payload.seat, "座席")
+    p.special_request_ciphertext = _encrypt_or_raise(payload.special_request, "特別リクエスト")
     db.add(p)
     db.commit()
     db.refresh(p)
@@ -649,6 +687,22 @@ def update_participant(
     p = _get_participant_or_404(db, r.id, participant_id)
 
     data = payload.model_dump(exclude_unset=True)
+
+    if "name" in data:
+        raw = data.pop("name")
+        p.name_ciphertext = _encrypt_or_raise(raw, "参加者氏名")
+        p.name = None  # [Gate R3-8] 旧平文列は以後更新しない
+
+    if "seat" in data:
+        raw = data.pop("seat")
+        p.seat_ciphertext = _encrypt_or_raise(raw, "座席")
+        p.seat = None
+
+    if "special_request" in data:
+        raw = data.pop("special_request")
+        p.special_request_ciphertext = _encrypt_or_raise(raw, "特別リクエスト")
+        p.special_request = None
+
     for field, value in data.items():
         setattr(p, field, value)
     p.revision += 1
