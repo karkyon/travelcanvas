@@ -1147,3 +1147,101 @@ class DocumentLink(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     document = relationship("Document")
+
+
+# ==========================================================================
+# [Gate R3-7] 予約取込(import_jobs / extraction_candidates、FR-011)
+# ==========================================================================
+# DOC-05 §6.7: import_jobs(ジョブ状態、provider、原本、モデル、同意、
+# 開始終了、エラー)、extraction_candidates(field_path、
+# candidate_value_ciphertext、confidence、evidence_locator、
+# review_status、reviewed_by/at)。DOC-05 §18.2状態遷移:
+# uploaded -> scanning -> extracting -> review_required -> confirmed/rejected。
+# 「確定前に本テーブルからドメインへ反映しない」(§6.7)。
+#
+# [スコープ限定] 本コードベースにはAI/OCR providerが一切導入されて
+# いない(DOC-08 §3のImage/OCR行はPillow/OpenCV + provider adapterを
+# 候補としているのみで未実装)。そのため本Gateでは:
+# - `uploaded -> scanning -> extracting`の自動遷移(実際のOCR/AI抽出)を
+#   実装しない。ジョブは作成時点で直接`review_required`となり、
+#   候補(extraction_candidates)は利用者自身が(実質的に手動転記として)
+#   登録する運用とする(DOC-02「AIは提案と抽出を行うが…重要変更を無確認で
+#   実行しない」の「無確認で実行しない」部分、すなわち人間レビュー必須
+#   という制約は本Gateでも厳格に維持する。AIによる自動生成が無いだけ)。
+# - `quarantined`(malware検知)/`retry_wait`(provider障害)は対応する
+#   provider自体が無いため本Gateでは到達しない状態として定義だけ残す。
+# - `confirmed`確定時、review_status="accepted"の候補のみをReservation
+#   フィールドへ反映する(DOC-05 §6.7の「確定前に反映しない」を実装で
+#   保証。confirm操作自体がowner/editor限定かつ監査ログ必須)。
+
+class ImportJobStatus(str, Enum):
+    """DOC-05 §18.2。本Gateではuploaded/scanning/extractingへの自動遷移は
+    発生しない(スコープ限定、上部コメント参照)。ジョブはreview_required
+    として作成される。"""
+    UPLOADED = "uploaded"
+    SCANNING = "scanning"
+    EXTRACTING = "extracting"
+    REVIEW_REQUIRED = "review_required"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    QUARANTINED = "quarantined"
+    RETRY_WAIT = "retry_wait"
+    FAILED = "failed"
+
+
+class ExtractionCandidateReviewStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class ImportJob(Base):
+    """[Gate R3-7] FR-011予約取込ジョブの最小永続モデル。"""
+    __tablename__ = "import_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    # [スコープ限定] providerは常に"manual"(AI/OCR provider未導入のため)。
+    provider = Column(String, nullable=False, default="manual")
+    status = Column(String, nullable=False, default=ImportJobStatus.REVIEW_REQUIRED.value)
+    consent_given = Column(Boolean, nullable=False, default=False)
+    error_message = Column(Text, nullable=True)
+
+    # 確定時に生成されたReservationへの参照(confirm操作で設定)。
+    result_reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
+
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    plan = relationship("TravelPlan")
+    document = relationship("Document")
+    result_reservation = relationship("Reservation")
+
+
+class ExtractionCandidate(Base):
+    """[Gate R3-7] 抽出候補(DOC-05 §6.7)。確定前はドメインへ一切反映
+    されない。candidate_valueはGate R2-2/R3-0と同じFernet field
+    encryptionで保護する(confirmation_number等の機微情報を含みうる)。"""
+    __tablename__ = "extraction_candidates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    import_job_id = Column(UUID(as_uuid=True), ForeignKey("import_jobs.id"), nullable=False, index=True)
+
+    field_path = Column(String, nullable=False)  # 例: "type"/"confirmation_number"/"start_at"
+    candidate_value_ciphertext = Column(LargeBinary, nullable=False)
+    confidence = Column(Float, nullable=False, default=1.0)  # [スコープ限定] 手動入力のため既定1.0
+    evidence_locator = Column(String, nullable=True)  # 例: 原本内の参照(ページ番号等の自由記述)
+
+    review_status = Column(String, nullable=False, default=ExtractionCandidateReviewStatus.PENDING.value)
+    reviewed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    import_job = relationship("ImportJob")
+    reviewed_by = relationship("User")
