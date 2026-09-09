@@ -487,6 +487,48 @@ export interface DocumentLink {
   created_at: string;
 }
 
+// [Gate R3-11] FR-012 QR・チケット(tickets)。
+// backend/app/api/v1/reservations.py (Gate R3-5)のticketエンドポイントに
+// 対応するfrontend型。payloadはAPIから平文で返らない(has_payloadのみ)。
+// 完全開示はrevealTicket()経由のみ(share_policy依存の権限判定+監査ログ)。
+
+export type TicketStatus = 'active' | 'used' | 'expired' | 'revoked';
+export type TicketSharePolicy = 'owner_editor' | 'all_collaborators';
+
+export interface Ticket {
+  id: string;
+  reservation_id: string;
+  ticket_type: string;
+  holder_member_id: string | null;
+  has_payload: boolean;
+  barcode_format: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  status: TicketStatus;
+  offline_allowed: boolean;
+  share_policy: TicketSharePolicy;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface TicketCreateData {
+  ticket_type: string;
+  payload?: string;
+  barcode_format?: string;
+  valid_from?: string;
+  valid_to?: string;
+  status?: TicketStatus;
+  offline_allowed?: boolean;
+  share_policy?: TicketSharePolicy;
+}
+
+export interface TicketRevealResult {
+  id: string;
+  payload: string | null;
+  barcode_format: string | null;
+}
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -1281,6 +1323,32 @@ class CompleteTravelAPI {
     return response.data;
   }
 
+  // [Gate R3-11] FR-012 QR・チケット(tickets)
+  async getTickets(planId: string, reservationId: string): Promise<Ticket[]> {
+    const response = await this.client.get<Ticket[]>(`/plans/${planId}/reservations/${reservationId}/tickets`);
+    return response.data;
+  }
+
+  async createTicket(planId: string, reservationId: string, data: TicketCreateData): Promise<Ticket> {
+    const response = await this.client.post<Ticket>(
+      `/plans/${planId}/reservations/${reservationId}/tickets`, data
+    );
+    return response.data;
+  }
+
+  async deleteTicket(planId: string, reservationId: string, ticketId: string, ifMatch: number): Promise<void> {
+    await this.client.delete(`/plans/${planId}/reservations/${reservationId}/tickets/${ticketId}`, {
+      headers: { 'If-Match': String(ifMatch) },
+    });
+  }
+
+  async revealTicket(planId: string, reservationId: string, ticketId: string): Promise<TicketRevealResult> {
+    const response = await this.client.post<TicketRevealResult>(
+      `/plans/${planId}/reservations/${reservationId}/tickets/${ticketId}/reveal`, {}
+    );
+    return response.data;
+  }
+
   // ===== [Gate #32] PLAN MAP: route/insertion preview =====
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get<RoutePreview>(
@@ -1604,5 +1672,14 @@ export const createDocument = (planId: string, data: DocumentCreateData) => api.
 export const deleteDocument = (planId: string, documentId: string, ifMatch: number) =>
   api.deleteDocument(planId, documentId, ifMatch);
 export const getDocumentLinks = (planId: string, documentId: string) => api.getDocumentLinks(planId, documentId);
+
+// [Gate R3-11] FR-012 QR・チケット(tickets)
+export const getTickets = (planId: string, reservationId: string) => api.getTickets(planId, reservationId);
+export const createTicket = (planId: string, reservationId: string, data: TicketCreateData) =>
+  api.createTicket(planId, reservationId, data);
+export const deleteTicket = (planId: string, reservationId: string, ticketId: string, ifMatch: number) =>
+  api.deleteTicket(planId, reservationId, ticketId, ifMatch);
+export const revealTicket = (planId: string, reservationId: string, ticketId: string) =>
+  api.revealTicket(planId, reservationId, ticketId);
 
 export default api;

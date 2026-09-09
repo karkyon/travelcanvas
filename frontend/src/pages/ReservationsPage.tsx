@@ -15,8 +15,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
-  Ticket, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
-  Users, X, CalendarDays, Lock, Unlock, Link2,
+  Ticket as TicketIcon, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
+  Users, X, CalendarDays, Lock, Unlock, Link2, QrCode,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -35,10 +35,15 @@ import api, {
   createReservationEventLink,
   updateReservationEventLink,
   deleteReservationEventLink,
+  getTickets,
+  createTicket,
+  deleteTicket,
+  revealTicket,
 } from '@/services/api';
 import type {
   Reservation, ReservationCreateData, ReservationParticipant,
   ReservationEventLink, NormalizedDay, NormalizedEvent,
+  Ticket, TicketCreateData,
 } from '@/services/api';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
@@ -49,7 +54,7 @@ const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }
   { value: 'ferry', label: '船', icon: <Ship size={16} /> },
   { value: 'rental_car', label: 'レンタカー', icon: <Car size={16} /> },
   { value: 'restaurant', label: '飲食', icon: <UtensilsCrossed size={16} /> },
-  { value: 'activity', label: '体験', icon: <Ticket size={16} /> },
+  { value: 'activity', label: '体験', icon: <TicketIcon size={16} /> },
   { value: 'admission', label: '入場', icon: <Landmark size={16} /> },
   { value: 'other', label: 'その他', icon: <HelpCircle size={16} /> },
 ];
@@ -162,6 +167,16 @@ const ReservationsPage: React.FC = () => {
   const [newLinkRelationType, setNewLinkRelationType] = useState<'primary' | 'required' | 'related'>('required');
   const [isAddingLink, setIsAddingLink] = useState(false);
 
+  // [Gate R3-11] チケット(tickets)
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isTicketsLoading, setIsTicketsLoading] = useState(false);
+  const [isAddTicketOpen, setIsAddTicketOpen] = useState(false);
+  const [newTicketType, setNewTicketType] = useState('');
+  const [newTicketPayload, setNewTicketPayload] = useState('');
+  const [newTicketBarcodeFormat, setNewTicketBarcodeFormat] = useState('');
+  const [isAddingTicket, setIsAddingTicket] = useState(false);
+  const [revealedTickets, setRevealedTickets] = useState<Record<string, string | null>>({});
+
   const loadReservations = useCallback(async () => {
     if (!planId) return;
     setIsLoading(true);
@@ -212,14 +227,32 @@ const ReservationsPage: React.FC = () => {
     }
   }, [planId]);
 
+  // [Gate R3-11] チケット一覧の読み込み
+  const loadTickets = useCallback(async (reservation: Reservation) => {
+    if (!planId) return;
+    setIsTicketsLoading(true);
+    try {
+      const data = await getTickets(planId, reservation.id);
+      setTickets(data);
+    } catch {
+      setTickets([]);
+    } finally {
+      setIsTicketsLoading(false);
+    }
+  }, [planId]);
+
   const openDetail = (reservation: Reservation) => {
     setSelected(reservation);
     setRevealed(null);
     setParticipants([]);
     setEventLinks([]);
     setIsAddLinkOpen(false);
+    setTickets([]);
+    setIsAddTicketOpen(false);
+    setRevealedTickets({});
     loadParticipants(reservation);
     loadEventLinks(reservation);
+    loadTickets(reservation);
   };
 
   const closeDetail = () => {
@@ -228,6 +261,9 @@ const ReservationsPage: React.FC = () => {
     setParticipants([]);
     setEventLinks([]);
     setIsAddLinkOpen(false);
+    setTickets([]);
+    setIsAddTicketOpen(false);
+    setRevealedTickets({});
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -357,6 +393,50 @@ const ReservationsPage: React.FC = () => {
       if (!linkedEventIds.has(ev.id)) linkCandidates.push({ day, event: ev });
     }
   }
+
+  // [Gate R3-11] チケット(tickets)
+  const handleAddTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planId || !selected || !newTicketType.trim()) return;
+    setIsAddingTicket(true);
+    setError(null);
+    try {
+      const payload: TicketCreateData = { ticket_type: newTicketType.trim() };
+      if (newTicketPayload.trim()) payload.payload = newTicketPayload.trim();
+      if (newTicketBarcodeFormat.trim()) payload.barcode_format = newTicketBarcodeFormat.trim();
+      await createTicket(planId, selected.id, payload);
+      setNewTicketType('');
+      setNewTicketPayload('');
+      setNewTicketBarcodeFormat('');
+      setIsAddTicketOpen(false);
+      await loadTickets(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'チケットの追加に失敗しました');
+    } finally {
+      setIsAddingTicket(false);
+    }
+  };
+
+  const handleDeleteTicket = async (ticket: Ticket) => {
+    if (!planId || !selected) return;
+    if (!window.confirm(`「${ticket.ticket_type}」チケットを削除しますか?`)) return;
+    try {
+      await deleteTicket(planId, selected.id, ticket.id, ticket.revision);
+      await loadTickets(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'チケットの削除に失敗しました');
+    }
+  };
+
+  const handleRevealTicket = async (ticket: Ticket) => {
+    if (!planId || !selected) return;
+    try {
+      const result = await revealTicket(planId, selected.id, ticket.id);
+      setRevealedTickets((prev) => ({ ...prev, [ticket.id]: result.payload }));
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'チケットの表示に失敗しました(権限が必要な場合があります)');
+    }
+  };
 
   if (!planId) {
     return (
@@ -689,6 +769,117 @@ const ReservationsPage: React.FC = () => {
                       <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddLinkOpen(false)}>
                         キャンセル
                       </Button>
+                    </form>
+                  )}
+                </div>
+
+                {/* [Gate R3-11] チケット(QR/バーコード) */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <QrCode size={16} /> チケット
+                    </div>
+                    {!isAddTicketOpen && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<Plus size={14} />}
+                        onClick={() => setIsAddTicketOpen(true)}
+                      >
+                        追加
+                      </Button>
+                    )}
+                  </div>
+
+                  {isTicketsLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <div className="space-y-2 mb-3">
+                      {tickets.length === 0 && (
+                        <div className="text-sm text-gray-400">チケットが登録されていません</div>
+                      )}
+                      {tickets.map((t) => (
+                        <div key={t.id} className="text-sm bg-gray-50 rounded px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">{t.ticket_type}</span>
+                              {t.barcode_format && (
+                                <span className="text-xs text-gray-500 ml-2">{t.barcode_format}</span>
+                              )}
+                              <span className="text-xs text-gray-400 ml-2">
+                                {t.has_payload ? 'データあり' : 'データなし'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {t.has_payload && (
+                                revealedTickets[t.id] === undefined ? (
+                                  <Button variant="ghost" size="sm" icon={<Eye size={14} />} onClick={() => handleRevealTicket(t)}>
+                                    表示
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={<EyeOff size={14} />}
+                                    onClick={() => setRevealedTickets((prev) => {
+                                      const next = { ...prev };
+                                      delete next[t.id];
+                                      return next;
+                                    })}
+                                  >
+                                    隠す
+                                  </Button>
+                                )
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTicket(t)}
+                                className="text-gray-400 hover:text-red-600"
+                                aria-label="チケットを削除"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          {revealedTickets[t.id] !== undefined && (
+                            <div className="mt-1 text-xs font-mono break-all text-gray-700">
+                              {revealedTickets[t.id] || '(データなし)'}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isAddTicketOpen && (
+                    <form onSubmit={handleAddTicket} className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          placeholder="種類(例: boarding_pass)"
+                          value={newTicketType}
+                          onChange={(e) => setNewTicketType(e.target.value)}
+                          containerClassName="flex-1 min-w-[140px]"
+                        />
+                        <Input
+                          placeholder="バーコード形式(任意。例: QR_CODE)"
+                          value={newTicketBarcodeFormat}
+                          onChange={(e) => setNewTicketBarcodeFormat(e.target.value)}
+                          containerClassName="flex-1 min-w-[140px]"
+                        />
+                      </div>
+                      <Input
+                        placeholder="QR/バーコードのデータ(任意)"
+                        value={newTicketPayload}
+                        onChange={(e) => setNewTicketPayload(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" variant="outline" size="sm" loading={isAddingTicket} disabled={!newTicketType.trim()}>
+                          追加
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddTicketOpen(false)}>
+                          キャンセル
+                        </Button>
+                      </div>
                     </form>
                   )}
                 </div>
