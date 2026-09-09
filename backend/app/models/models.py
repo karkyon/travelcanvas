@@ -883,6 +883,50 @@ class Reservation(Base):
 
 
 # ==========================================================================
+# [Gate R3-3] イベント複数紐付け(event_reservations中間表)
+# ==========================================================================
+# DOC-05 §6.2: event_id、reservation_id、relation_type(primary/required/
+# related)、is_locked。多対多を許容(連泊等で1予約が複数イベントに紐付く
+# ケースに対応)。
+#
+# [スコープ限定/後方互換] Gate R3-0で導入した`Reservation.event_id`
+# (単一FK)は本Gateでも削除・非推奨化しない(additive only原則)。
+# 既存frontend(ReservationsPage.tsx)やGate R3-0/R3-1のAPIレスポンス
+# 形状との互換性を保つため、create/update時にevent_idが設定された
+# 場合は自動的にrelation_type="primary"のevent_reservationsリンクを
+# 同期作成する(app/api/v1/reservations.pyの_sync_primary_event_link
+# 参照)。複数イベントへの追加リンクはevent_reservations専用エンドポイント
+# (relation_type="required"/"related")経由でのみ作成する。
+
+class ReservationEventRelationType(str, Enum):
+    """DOC-05 §6.2。"""
+    PRIMARY = "primary"
+    REQUIRED = "required"
+    RELATED = "related"
+
+
+class EventReservation(Base):
+    """[Gate R3-3] 予約とイベントの多対多紐付け。"""
+    __tablename__ = "event_reservations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=False, index=True)
+    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True)
+    relation_type = Column(String, nullable=False, default=ReservationEventRelationType.PRIMARY.value)
+    is_locked = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    event = relationship("TravelEvent")
+    reservation = relationship("Reservation")
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "reservation_id", name="uq_event_reservations_event_reservation"),
+    )
+
+
+# ==========================================================================
 # [Gate R3-1] 予約参加者(reservation_participants)
 # ==========================================================================
 # DOC-05 §6.3: reservation_id、plan_member_id、name_ciphertext、

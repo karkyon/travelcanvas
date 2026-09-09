@@ -26,13 +26,23 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
-from app.models.models import Reservation, ReservationParticipant, ReservationStatus, ReservationType, User
+from app.models.models import (
+    EventReservation,
+    Reservation,
+    ReservationEventRelationType,
+    ReservationParticipant,
+    ReservationStatus,
+    ReservationType,
+    TravelEvent,
+    User,
+)
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/plans", tags=["reservations"])
 
 _VALID_TYPES = {t.value for t in ReservationType}
 _VALID_STATUSES = {s.value for s in ReservationStatus}
+_VALID_RELATION_TYPES = {t.value for t in ReservationEventRelationType}
 
 
 # ==========================================
@@ -229,6 +239,35 @@ def _user_agent(request: Request) -> str:
     return request.headers.get("user-agent", "")[:255]
 
 
+def _sync_primary_event_link(db: Session, reservation: Reservation) -> None:
+    """[Gate R3-3] 後方互換同期。Reservation.event_id(単一FK)が設定されて
+    いる場合、対応するevent_reservationsのprimaryリンクが存在しなければ
+    作成する。既存の複数イベントリンク(required/related)には一切触れない。
+    event_idがNoneの場合は何もしない(既存リンクの自動削除は行わない。
+    リンクの削除は専用DELETEエンドポイントを介した明示操作とする)。
+    """
+    if not reservation.event_id:
+        return
+    exists = (
+        db.query(EventReservation)
+        .filter(
+            EventReservation.event_id == reservation.event_id,
+            EventReservation.reservation_id == reservation.id,
+        )
+        .first()
+    )
+    if exists is None:
+        db.add(
+            EventReservation(
+                event_id=reservation.event_id,
+                reservation_id=reservation.id,
+                relation_type=ReservationEventRelationType.PRIMARY.value,
+                is_locked=False,
+            )
+        )
+        db.commit()
+
+
 # ==========================================
 # エンドポイント
 # ==========================================
@@ -290,6 +329,7 @@ def create_reservation(
     db.add(r)
     db.commit()
     db.refresh(r)
+    _sync_primary_event_link(db, r)
 
     record_audit_event(
         action="reservation_created",
@@ -383,6 +423,7 @@ def update_reservation(
     r.revision += 1
     db.commit()
     db.refresh(r)
+    _sync_primary_event_link(db, r)
 
     record_audit_event(
         action="reservation_updated",
@@ -629,5 +670,203 @@ def delete_participant(
 
     p.deleted_at = datetime.now(dt_timezone.utc)
     p.revision += 1
+    db.commit()
+    return None
+
+
+# ==========================================================================
+# [Gate R3-3] イベント複数紐付け(event_reservations)
+# ==========================================================================
+# DOC-05 §6.2: 1予約が複数イベントに紐付くケース(連泊等)に対応する。
+# 既存のReservation.event_id(単一FK)との関係は_sync_primary_event_link()
+# 参照。
+
+class EventLinkCreateRequest(BaseModel):
+    event_id: str
+    relation_type: str = ReservationEventRelationType.PRIMARY.value
+    is_locked: bool = False
+
+    @field_validator("relation_type")
+    @classmethod
+    def _validate_relation_type(cls, v: str) -> str:
+        if v not in _VALID_RELATION_TYPES:
+            raise ValueError(f"relation_typeは次のいずれかである必要があります: {sorted(_VALID_RELATION_TYPES)}")
+        return v
+
+
+class EventLinkUpdateRequest(BaseModel):
+    relation_type: Optional[str] = None
+    is_locked: Optional[bool] = None
+
+    @field_validator("relation_type")
+    @classmethod
+    def _validate_relation_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_RELATION_TYPES:
+            raise ValueError(f"relation_typeは次のいずれかである必要があります: {sorted(_VALID_RELATION_TYPES)}")
+        return v
+
+
+class EventLinkResponse(BaseModel):
+    id: str
+    event_id: str
+    reservation_id: str
+    relation_type: str
+    is_locked: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+def _to_event_link_response(link: EventReservation) -> EventLinkResponse:
+    return EventLinkResponse(
+        id=str(link.id),
+        event_id=str(link.event_id),
+        reservation_id=str(link.reservation_id),
+        relation_type=link.relation_type,
+        is_locked=link.is_locked,
+        created_at=link.created_at,
+        updated_at=link.updated_at,
+    )
+
+
+def _get_event_link_or_404(db: Session, reservation_id, link_id) -> EventReservation:
+    link = (
+        db.query(EventReservation)
+        .filter(
+            EventReservation.id == link_id,
+            EventReservation.reservation_id == reservation_id,
+        )
+        .first()
+    )
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="イベント紐付けが見つかりません")
+    return link
+
+
+@router.post(
+    "/{plan_id}/reservations/{reservation_id}/events",
+    response_model=EventLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_event_link(
+    plan_id: str,
+    reservation_id: str,
+    payload: EventLinkCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """予約へイベントを追加で紐付ける(連泊等、1予約=複数イベント)。
+    紐付け先イベントは同一planに属している必要がある(他planのイベントを
+    誤って紐付けないため)。同一(event_id, reservation_id)の重複は409。
+    """
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    event = (
+        db.query(TravelEvent)
+        .filter(TravelEvent.id == payload.event_id, TravelEvent.plan_id == plan.id)
+        .first()
+    )
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="紐付け先のイベントが見つかりません(同一旅行プラン内である必要があります)",
+        )
+
+    existing = (
+        db.query(EventReservation)
+        .filter(
+            EventReservation.event_id == event.id,
+            EventReservation.reservation_id == r.id,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="このイベントは既に紐付け済みです")
+
+    link = EventReservation(
+        event_id=event.id,
+        reservation_id=r.id,
+        relation_type=payload.relation_type,
+        is_locked=payload.is_locked,
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    return _to_event_link_response(link)
+
+
+@router.get(
+    "/{plan_id}/reservations/{reservation_id}/events",
+    response_model=List[EventLinkResponse],
+)
+def list_event_links(
+    plan_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    rows = (
+        db.query(EventReservation)
+        .filter(EventReservation.reservation_id == r.id)
+        .order_by(EventReservation.created_at.asc())
+        .all()
+    )
+    return [_to_event_link_response(link) for link in rows]
+
+
+@router.patch(
+    "/{plan_id}/reservations/{reservation_id}/events/{link_id}",
+    response_model=EventLinkResponse,
+)
+def update_event_link(
+    plan_id: str,
+    reservation_id: str,
+    link_id: str,
+    payload: EventLinkUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    link = _get_event_link_or_404(db, r.id, link_id)
+
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(link, field, value)
+
+    db.commit()
+    db.refresh(link)
+    return _to_event_link_response(link)
+
+
+@router.delete(
+    "/{plan_id}/reservations/{reservation_id}/events/{link_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_event_link(
+    plan_id: str,
+    reservation_id: str,
+    link_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """イベント紐付けを解除する(ハード削除。中間表そのものはsoft delete概念を
+    持たない。ただしis_locked=Trueのリンクは、確定済み予定として誤操作から
+    保護するため解除不可とする)。
+    """
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    link = _get_event_link_or_404(db, r.id, link_id)
+
+    if link.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="このイベント紐付けはロックされているため解除できません(先にis_locked解除が必要です)",
+        )
+
+    db.delete(link)
     db.commit()
     return None

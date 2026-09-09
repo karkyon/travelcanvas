@@ -144,3 +144,47 @@ DOC-05 §6.3の`reservation_participants`を追加した。設計判断:
 
 次Gate候補: `event_reservations`中間表、`tickets`、FR-011予約取込、
 参加者本人によるセルフサービス編集、frontend UI。
+
+---
+
+## 改訂: Gate R3-3（2026-09-09）
+
+DOC-05 §6.2の`event_reservations`中間表を追加した。設計判断:
+
+- 既存の`Reservation.event_id`(単一FK、Gate R3-0)は削除・非推奨化しない
+  (additive only。既存frontend `ReservationsPage.tsx`との後方互換を保つ
+  ため)。予約作成・更新時に`event_id`が指定されると、
+  `relation_type="primary"`の`event_reservations`リンクを自動同期作成する
+  (`_sync_primary_event_link()`)。既存の複数リンクには一切触れない。
+- migrationは新規テーブル作成に加え、既存`reservations.event_id`を持つ
+  行から`primary`リンクをバックフィルする(Gate #29の慣習に合わせ
+  `uuid.uuid4()`をPython側で採番。`gen_random_uuid()`等のDB拡張機能には
+  依存しない)。
+- 追加リンク専用エンドポイント(`POST/GET/PATCH/DELETE
+  .../reservations/{id}/events[/{link_id}]`)を新設。紐付け先イベントは
+  同一plan内であることを検証(404)、重複リンクは409。
+- `is_locked=True`のリンクは解除(DELETE)を拒否する(409)。確定済みの
+  複数日紐付けを誤操作から保護する簡易ガードであり、DOC-05は
+  `is_locked`の意味を明記していないため、本Gateでは「解除保護フラグ」
+  として解釈した(将来DOC-05側で異なる意味が明確化された場合は追随する)。
+- 中間表自体は`deleted_at`を持たず、リンク解除はハード削除とする(予約
+  本体・参加者と異なり、リンクは監査上の履歴価値を持たない単純な関連
+  情報と判断)。
+
+エンドポイント: `POST/GET /api/v1/plans/{plan_id}/reservations/{id}/events`、
+`PATCH/DELETE .../events/{link_id}`。権限は既存予約と同じ
+owner/editor(書き込み)・viewer以上(閲覧)。
+
+検証: サンドボックス(PostgreSQL 16 + venv、本Gateから新規構築)で
+`alembic upgrade head`成功、alembic headが`a7c3e561f890`
+(down_revision=`d2f6b385c917`)の単一headになることを確認。新規
+`tests/test_gate_r3_3_event_reservations.py`(8ケース: primaryリンク
+自動作成、連泊時の追加リンク、重複409、他plan所属イベント404、
+relation_type/is_locked更新、リンク解除、ロック済みリンク解除拒否409、
+他ユーザー403)全てPASS。既存backend全テスト含め196件全てPASS
+(リグレッションなし)。
+
+次Gate候補: frontend UI(`ReservationsPage.tsx`への複数イベント紐付け
+表示・連泊UI追加)、`tickets`、FR-011予約取込、
+`reservation_participants`/`holder_name`/`contact_phone`の暗号化列化、
+`lookup_hash`による盲検索index。
