@@ -1027,6 +1027,14 @@ class CompleteTravelAPI {
     return { success: true } as ApiResponse<void>;
   }
 
+  // [Gate R3-12] FR-047 旅程複製。backend(Gate #39)はDB/API実装済みだったが
+  // frontendから一切到達不能だった(Gate #25等と同じ「実装済みだが未到達」
+  // パターン)。
+  async clonePlan(planId: string, data?: { title?: string; start_date?: string }): Promise<ApiResponse<any>> {
+    const response = await this.client.post<any>(`/travel-plans/${planId}/clone`, data ?? {});
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
+  }
+
   // [Gate R2-4] POST /quick-drafts/{id}/promote。既存セッション(guest/member)の
   // Authorizationをthis.clientのinterceptorがそのまま付与する(promoteはuser/owner
   // 認証が正式契約のため、これで正しい)。device_tokenはbody側で送る
@@ -1549,6 +1557,7 @@ export const travelAPI = {
   getPlan: (id: string) => api.getPlan(id),
   updatePlan: (id: string, data: any) => api.updatePlan(id, data),
   deletePlan: (id: string) => api.deletePlan(id),
+  clonePlan: (id: string, data?: { title?: string; start_date?: string }) => api.clonePlan(id, data),
   promoteQuickDraft: (
     draftId: string,
     deviceToken: string,

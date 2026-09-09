@@ -423,6 +423,21 @@ const PlannerPage: React.FC = () => {
     await deletePlan(id);
   };
 
+  // [Gate R3-12] FR-047 旅程複製
+  const [cloningPlanId, setCloningPlanId] = useState<string | null>(null);
+  const handleClonePlan = async (id: string, title: string) => {
+    if (!confirm(`「${title}」を複製しますか？`)) return;
+    setCloningPlanId(id);
+    try {
+      await apiService.clonePlan(id);
+      await loadPlans();
+    } catch {
+      alert('複製に失敗しました。しばらくしてから再試行してください。');
+    } finally {
+      setCloningPlanId(null);
+    }
+  };
+
   // ===== 詳細画面(日程編集) =====
   if (planId) {
     if (isLoading && !currentPlan) {
@@ -758,7 +773,18 @@ const PlannerPage: React.FC = () => {
                     {plan.days?.length ?? 0}日間の日程
                   </p>
                 </div>
-                <div className="px-5 pb-4 flex justify-end">
+                <div className="px-5 pb-4 flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={cloningPlanId === plan.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClonePlan(plan.id, plan.title);
+                    }}
+                  >
+                    複製
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
