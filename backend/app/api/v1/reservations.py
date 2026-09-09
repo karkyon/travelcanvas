@@ -33,6 +33,9 @@ from app.models.models import (
     ReservationParticipant,
     ReservationStatus,
     ReservationType,
+    Ticket,
+    TicketSharePolicy,
+    TicketStatus,
     TravelEvent,
     User,
 )
@@ -43,6 +46,8 @@ router = APIRouter(prefix="/plans", tags=["reservations"])
 _VALID_TYPES = {t.value for t in ReservationType}
 _VALID_STATUSES = {s.value for s in ReservationStatus}
 _VALID_RELATION_TYPES = {t.value for t in ReservationEventRelationType}
+_VALID_TICKET_STATUSES = {s.value for s in TicketStatus}
+_VALID_SHARE_POLICIES = {p.value for p in TicketSharePolicy}
 
 
 # ==========================================
@@ -214,7 +219,7 @@ def _get_reservation_or_404(db: Session, plan_id, reservation_id) -> Reservation
     return r
 
 
-def _require_if_match(r: Reservation, if_match: Optional[str]) -> None:
+def _require_if_match(r, if_match: Optional[str]) -> None:
     if if_match is None or if_match.strip() == "":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -870,3 +875,354 @@ def delete_event_link(
     db.delete(link)
     db.commit()
     return None
+
+
+# ==========================================================================
+# [Gate R3-5] チケット(tickets、FR-012 QR・チケット)
+# ==========================================================================
+
+class TicketCreateRequest(BaseModel):
+    ticket_type: str = Field(..., max_length=100)
+    holder_member_id: Optional[str] = None
+    payload: Optional[str] = Field(None, max_length=4000)
+    barcode_format: Optional[str] = Field(None, max_length=50)
+    valid_from: Optional[datetime] = None
+    valid_to: Optional[datetime] = None
+    status: str = TicketStatus.ACTIVE.value
+    offline_allowed: bool = True
+    share_policy: str = TicketSharePolicy.OWNER_EDITOR.value
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: str) -> str:
+        if v not in _VALID_TICKET_STATUSES:
+            raise ValueError(f"statusは次のいずれかである必要があります: {sorted(_VALID_TICKET_STATUSES)}")
+        return v
+
+    @field_validator("share_policy")
+    @classmethod
+    def _validate_share_policy(cls, v: str) -> str:
+        if v not in _VALID_SHARE_POLICIES:
+            raise ValueError(f"share_policyは次のいずれかである必要があります: {sorted(_VALID_SHARE_POLICIES)}")
+        return v
+
+
+class TicketUpdateRequest(BaseModel):
+    ticket_type: Optional[str] = Field(None, max_length=100)
+    holder_member_id: Optional[str] = None
+    payload: Optional[str] = Field(None, max_length=4000)
+    barcode_format: Optional[str] = Field(None, max_length=50)
+    valid_from: Optional[datetime] = None
+    valid_to: Optional[datetime] = None
+    status: Optional[str] = None
+    offline_allowed: Optional[bool] = None
+    share_policy: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_TICKET_STATUSES:
+            raise ValueError(f"statusは次のいずれかである必要があります: {sorted(_VALID_TICKET_STATUSES)}")
+        return v
+
+    @field_validator("share_policy")
+    @classmethod
+    def _validate_share_policy(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in _VALID_SHARE_POLICIES:
+            raise ValueError(f"share_policyは次のいずれかである必要があります: {sorted(_VALID_SHARE_POLICIES)}")
+        return v
+
+
+class TicketResponse(BaseModel):
+    id: str
+    reservation_id: str
+    ticket_type: str
+    holder_member_id: Optional[str]
+    has_payload: bool
+    barcode_format: Optional[str]
+    valid_from: Optional[datetime]
+    valid_to: Optional[datetime]
+    status: str
+    offline_allowed: bool
+    share_policy: str
+    revision: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class TicketRevealResponse(BaseModel):
+    id: str
+    payload: Optional[str]
+    barcode_format: Optional[str]
+
+
+def _to_ticket_response(t: Ticket) -> TicketResponse:
+    return TicketResponse(
+        id=str(t.id),
+        reservation_id=str(t.reservation_id),
+        ticket_type=t.ticket_type,
+        holder_member_id=str(t.holder_member_id) if t.holder_member_id else None,
+        has_payload=t.payload_ciphertext is not None,
+        barcode_format=t.barcode_format,
+        valid_from=t.valid_from,
+        valid_to=t.valid_to,
+        status=t.status,
+        offline_allowed=t.offline_allowed,
+        share_policy=t.share_policy,
+        revision=t.revision,
+        created_at=t.created_at,
+        updated_at=t.updated_at,
+    )
+
+
+def _get_ticket_or_404(db: Session, reservation_id, ticket_id) -> Ticket:
+    t = (
+        db.query(Ticket)
+        .filter(
+            Ticket.id == ticket_id,
+            Ticket.reservation_id == reservation_id,
+            Ticket.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if t is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="チケットが見つかりません")
+    return t
+
+
+def _min_role_for_reveal(ticket: Ticket) -> str:
+    """share_policyに応じてreveal可能な最低ロールを決める(DOC-05 §6.4)。"""
+    if ticket.share_policy == TicketSharePolicy.ALL_COLLABORATORS.value:
+        return "viewer"
+    return "editor"
+
+
+@router.post(
+    "/{plan_id}/reservations/{reservation_id}/tickets",
+    response_model=TicketResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_ticket(
+    plan_id: str,
+    reservation_id: str,
+    payload: TicketCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    t = Ticket(
+        reservation_id=r.id,
+        ticket_type=payload.ticket_type,
+        holder_member_id=payload.holder_member_id or None,
+        barcode_format=payload.barcode_format,
+        valid_from=payload.valid_from,
+        valid_to=payload.valid_to,
+        status=payload.status,
+        offline_allowed=payload.offline_allowed,
+        share_policy=payload.share_policy,
+    )
+
+    if payload.payload:
+        try:
+            t.payload_ciphertext = encrypt_payload(payload.payload.encode("utf-8"))
+        except EncryptionNotConfigured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="チケットpayloadの暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+            )
+
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+
+    record_audit_event(
+        action="ticket_created",
+        resource_type="ticket",
+        user_id=current_user.id,
+        resource_id=t.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "reservation_id": str(r.id), "ticket_type": t.ticket_type},
+    )
+
+    return _to_ticket_response(t)
+
+
+@router.get("/{plan_id}/reservations/{reservation_id}/tickets", response_model=List[TicketResponse])
+def list_tickets(
+    plan_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    rows = (
+        db.query(Ticket)
+        .filter(Ticket.reservation_id == r.id, Ticket.deleted_at.is_(None))
+        .order_by(Ticket.created_at.asc())
+        .all()
+    )
+    return [_to_ticket_response(t) for t in rows]
+
+
+@router.get(
+    "/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}",
+    response_model=TicketResponse,
+)
+def get_ticket(
+    plan_id: str,
+    reservation_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    t = _get_ticket_or_404(db, r.id, ticket_id)
+    return _to_ticket_response(t)
+
+
+@router.patch(
+    "/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}",
+    response_model=TicketResponse,
+)
+def update_ticket(
+    plan_id: str,
+    reservation_id: str,
+    ticket_id: str,
+    payload: TicketUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    t = _get_ticket_or_404(db, r.id, ticket_id)
+    _require_if_match(t, if_match)
+
+    data = payload.model_dump(exclude_unset=True)
+
+    if "payload" in data:
+        raw = data.pop("payload")
+        if raw:
+            try:
+                t.payload_ciphertext = encrypt_payload(raw.encode("utf-8"))
+            except EncryptionNotConfigured:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="チケットpayloadの暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+                )
+        else:
+            t.payload_ciphertext = None
+
+    for field, value in data.items():
+        setattr(t, field, value)
+
+    t.revision += 1
+    db.commit()
+    db.refresh(t)
+
+    record_audit_event(
+        action="ticket_updated",
+        resource_type="ticket",
+        user_id=current_user.id,
+        resource_id=t.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "fields": sorted(data.keys())},
+    )
+
+    return _to_ticket_response(t)
+
+
+@router.delete(
+    "/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_ticket(
+    plan_id: str,
+    reservation_id: str,
+    ticket_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    t = _get_ticket_or_404(db, r.id, ticket_id)
+    _require_if_match(t, if_match)
+
+    t.deleted_at = datetime.now(dt_timezone.utc)
+    t.revision += 1
+    db.commit()
+
+    record_audit_event(
+        action="ticket_deleted",
+        resource_type="ticket",
+        user_id=current_user.id,
+        resource_id=t.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id)},
+    )
+    return None
+
+
+@router.post(
+    "/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}/reveal",
+    response_model=TicketRevealResponse,
+)
+def reveal_ticket(
+    plan_id: str,
+    reservation_id: str,
+    ticket_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[DOC-05 §6.4/§19] payload(QR/バーコード生データ)の完全開示。
+    share_policyに応じて必要ロールが変わる(既定owner_editor: owner/editor
+    のみ。all_collaborators: viewerも可)。呼び出しを必ず監査ログへ記録する。
+    """
+    # まずviewer以上でプラン自体へのアクセスを確認してからticketのshare_policyを見る
+    # (存在有無を漏らさないため、権限判定の前にオブジェクトを読む)。
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    t = _get_ticket_or_404(db, r.id, ticket_id)
+
+    required_role = _min_role_for_reveal(t)
+    from app.core.plan_access import _ROLE_RANK
+    if _ROLE_RANK.get(role, 0) < _ROLE_RANK.get(required_role, 99):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"このチケットの表示には{required_role}以上の権限が必要です",
+        )
+
+    payload_value = None
+    if t.payload_ciphertext:
+        try:
+            payload_value = decrypt_payload(t.payload_ciphertext).decode("utf-8")
+        except (EncryptionNotConfigured, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="チケットpayloadの復号に失敗しました",
+            )
+
+    record_audit_event(
+        action="ticket_revealed",
+        resource_type="ticket",
+        user_id=current_user.id,
+        resource_id=t.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "reservation_id": str(r.id)},
+    )
+
+    return TicketRevealResponse(id=str(t.id), payload=payload_value, barcode_format=t.barcode_format)

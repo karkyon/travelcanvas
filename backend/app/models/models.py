@@ -970,3 +970,71 @@ class ReservationParticipant(Base):
 
     reservation = relationship("Reservation")
     plan_member = relationship("PlanCollaborator")
+
+
+# ==========================================================================
+# [Gate R3-5] チケット(tickets、FR-012 QR・チケット)
+# ==========================================================================
+# DOC-05 §6.4: id、reservation_id、ticket_type、holder_member_id、
+# payload_ciphertext、barcode_format、display_document_id、valid_from/to、
+# status、offline_allowed、share_policy、key_version。
+#
+# [スコープ限定] display_document_id(DOC-05 §6.5 documentsテーブルへの
+# 参照。チケット画像そのものを文書として保存するケース)は、documents
+# テーブル自体が本コードベースに未実装(FR-013文書ウォレット、次Gate候補)
+# のため、本Gateでは外部キー制約無しのnullable UUID列として先行定義する
+# のみとする(additive migrationで後日FK制約を追加可能な設計)。DOC-05の
+# 制約「payloadまたはdocumentの少なくとも一方」はdisplay_document_idが
+# 実質使えない本Gateでは検証しない(payload必須として扱う)。
+#
+# payload_ciphertext(QR/バーコードの生データ)はGate R2-2/R3-0と同じ
+# Fernet field encryptionを再利用する(app/core/crypto.py)。DOC-11本来の
+# KMS envelope encryptionへの移行は将来のfollow-upとする(ADR-reservation
+# -minimal.md §2と同じ位置づけ)。
+
+class TicketStatus(str, Enum):
+    """本Gateで定義する状態(DOC-05に明示のenum値は無いため、DOC-02の
+    利用シナリオから妥当な値を採用)。"""
+    ACTIVE = "active"
+    USED = "used"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
+
+
+class TicketSharePolicy(str, Enum):
+    """share_policy: チケットpayloadの閲覧可否をどの権限レベルまで
+    許容するか。DOC-05は値を明示しないため、既存のowner/editor/viewer
+    3区分に合わせて定義する。"""
+    OWNER_EDITOR = "owner_editor"  # 既定。owner/editorのみreveal可
+    ALL_COLLABORATORS = "all_collaborators"  # viewerも含め全員reveal可
+
+
+class Ticket(Base):
+    """[Gate R3-5] FR-012 QR・チケットの最小永続モデル。"""
+    __tablename__ = "tickets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True)
+    ticket_type = Column(String, nullable=False)  # 例: boarding_pass/entry_ticket/other
+    holder_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
+
+    # 秘密値(Fernet field encryption)。QR/バーコードの生データ本体。
+    payload_ciphertext = Column(LargeBinary, nullable=True)
+    barcode_format = Column(String, nullable=True)  # 例: QR_CODE/CODE128/PDF417
+    # [スコープ限定] documentsテーブル未実装のためFK制約は付与しない(上部コメント参照)。
+    display_document_id = Column(UUID(as_uuid=True), nullable=True)
+
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_to = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, nullable=False, default=TicketStatus.ACTIVE.value)
+    offline_allowed = Column(Boolean, nullable=False, default=True)
+    share_policy = Column(String, nullable=False, default=TicketSharePolicy.OWNER_EDITOR.value)
+    key_version = Column(Integer, nullable=False, default=1, server_default="1")
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    reservation = relationship("Reservation")
+    holder_member = relationship("PlanCollaborator")

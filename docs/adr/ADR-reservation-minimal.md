@@ -188,3 +188,47 @@ relation_type/is_locked更新、リンク解除、ロック済みリンク解除
 表示・連泊UI追加)、`tickets`、FR-011予約取込、
 `reservation_participants`/`holder_name`/`contact_phone`の暗号化列化、
 `lookup_hash`による盲検索index。
+
+---
+
+## 改訂: Gate R3-5（2026-09-09）
+
+DOC-05 §6.4の`tickets`(FR-012 QR・チケット)を追加した。設計判断:
+
+- `display_document_id`(DOC-05 §6.5 `documents`テーブルへの参照)は、
+  `documents`テーブル自体が本コードベースに未実装(FR-013文書ウォレット、
+  次Gate候補)のため、外部キー制約無しのnullable UUID列として先行定義
+  するのみとした。additive migrationで後日FK制約を追加可能。
+- DOC-05 §8の制約「payloadまたはdocumentの少なくとも一方」は、
+  `display_document_id`が実質使えない本Gateでは検証しない(payload必須
+  として運用する想定。DB CHECK制約としては実装していない)。
+- `payload_ciphertext`(QR/バーコード生データ)はGate R2-2/R3-0と同じ
+  Fernet field encryptionを再利用。
+- `share_policy`(DOC-05に値の明記が無いため本Gateで定義): 既定
+  `owner_editor`(owner/editorのみreveal可)、`all_collaborators`
+  (viewerも含め全員reveal可)の2値。revealエンドポイントは
+  `share_policy`に応じて必要ロールを動的に判定する。
+- `status`(DOC-05に値の明記が無いため本Gateで定義): active/used/
+  expired/revokedの4値。
+- DB CHECK制約: `valid_from < valid_to`(両方設定時のみ、DOC-05 §8)。
+- 権限: 作成/更新/削除はowner/editor、閲覧(一覧・詳細)はviewer以上
+  (payloadは`has_payload`真偽値のみ返しmaskする)。revealはshare_policy
+  依存、呼び出しを`record_audit_event()`で監査ログに残す。
+
+エンドポイント: `POST/GET /api/v1/plans/{plan_id}/reservations/{id}/tickets`、
+`GET/PATCH/DELETE .../tickets/{ticket_id}`、`POST .../tickets/{ticket_id}/reveal`。
+
+検証: サンドボックスで`alembic upgrade head`成功、alembic headが
+`b48d9f2c6e17`(down_revision=`a7c3e561f890`)の単一headになることを確認。
+新規`tests/test_gate_r3_5_tickets.py`(8ケース: 作成時マスク表示、一覧・
+詳細、reveal+監査呼び出し検証、If-Match必須/409/成功、soft delete、
+share_policy既定でのviewer 403、share_policy=all_collaboratorsでの
+viewer許可、他ユーザー403)全てPASS。既存backend全テスト含め204件
+全てPASS(リグレッションなし)。
+
+次Gate候補: `documents`/`document_links`(FR-013文書ウォレット。実装後は
+`tickets.display_document_id`へFK制約追加)、FR-011予約取込
+(`import_jobs`/`extraction_candidates`)、
+`reservation_participants`/`holder_name`/`contact_phone`の暗号化列化、
+`lookup_hash`による盲検索index、frontend UI(チケット表示・QRコード
+レンダリング)。
