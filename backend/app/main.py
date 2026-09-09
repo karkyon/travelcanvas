@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations, documents
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -281,3 +281,5 @@ app.include_router(quickdrafts.router, prefix="/api/v1")
 # plans.router(/plans)と同じprefixだが別routerファイルであり、
 # plans.pyのdays/events CRUDとは独立して管理する。
 app.include_router(reservations.router, prefix="/api/v1")
+# [Gate R3-6] FR-013文書ウォレットの最小実装。/plans/{plan_id}/documents配下。
+app.include_router(documents.router, prefix="/api/v1")

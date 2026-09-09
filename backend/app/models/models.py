@@ -1038,3 +1038,112 @@ class Ticket(Base):
 
     reservation = relationship("Reservation")
     holder_member = relationship("PlanCollaborator")
+
+
+# ==========================================================================
+# [Gate R3-6] 文書ウォレット(documents / document_links、FR-013)
+# ==========================================================================
+# DOC-05 §6.5/§6.6: documents(id、plan_id、owner_user_id、classification、
+# document_type、original_filename_ciphertext、storage_key、mime_type、
+# size、sha256、encryption_key_ref、malware_status、ocr_status、
+# retention_until、created_at、deleted_at)、document_links(document_id、
+# entity_type/id、relation_type(original/receipt/ticket/map/attachment)、
+# display_order)。
+#
+# [スコープ限定] 本コードベースにはObject Storage連携(DOC-08 §4.3)が
+# 一切存在しない(S3等のクライアント・署名URL発行・malwareスキャン
+# provider・OCR providerのいずれも未導入)。そのため本Gateでは:
+# - 実ファイルバイト列は一切扱わない(DOC-05 §20「大容量原本はDBへ
+#   格納せずObject keyとhashだけ保持」の方針通り、storage_keyは呼び出し側
+#   が別途アップロード済みのオブジェクトキーをそのまま渡す前提とする。
+#   DOC-06 §9の`POST /plans/{id}/documents/uploads`(署名URL発行)は
+#   Object Storage未導入のため実装しない。将来的にObject Storageを
+#   導入する際にこのGateのAPIを置き換える)。
+# - malware_status/ocr_statusはクライアント入力を受け付けず、常に
+#   "not_scanned"/"not_requested"で作成する(スキャナ・OCR未導入のため。
+#   将来のバッチジョブがこれらの状態を更新する想定)。
+# - encryption_key_ref(DOC-11 §6.3 envelope encryptionのKMS参照)は
+#   KMS未導入のためnullable、常にNULLとする(Gate R2-2/R3-0と同じ
+#   Fernet対称鍵暗号化をoriginal_filenameへ適用するのみ)。
+
+class DocumentClassification(str, Enum):
+    """DOC-11 §2 データ分類。"""
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    CONFIDENTIAL = "confidential"
+    RESTRICTED = "restricted"
+
+
+class DocumentMalwareStatus(str, Enum):
+    NOT_SCANNED = "not_scanned"  # [スコープ限定] 本Gateでは常にこの値
+    CLEAN = "clean"
+    INFECTED = "infected"
+    QUARANTINED = "quarantined"
+
+
+class DocumentOcrStatus(str, Enum):
+    NOT_REQUESTED = "not_requested"  # [スコープ限定] 本Gateでは常にこの値
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class DocumentLinkRelationType(str, Enum):
+    """DOC-05 §6.6。"""
+    ORIGINAL = "original"
+    RECEIPT = "receipt"
+    TICKET = "ticket"
+    MAP = "map"
+    ATTACHMENT = "attachment"
+
+
+class Document(Base):
+    """[Gate R3-6] FR-013文書ウォレットの最小永続モデル(メタデータのみ)。"""
+    __tablename__ = "documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    classification = Column(String, nullable=False, default=DocumentClassification.INTERNAL.value)
+    document_type = Column(String, nullable=True)  # 例: receipt/ticket/passport/map/other(自由記述)
+
+    # 秘密値(Fernet field encryption)。ファイル名自体が機微な情報を
+    # 含みうるため暗号化する(DOC-05 §6.5)。
+    original_filename_ciphertext = Column(LargeBinary, nullable=True)
+
+    storage_key = Column(String, nullable=False)  # [スコープ限定] 呼び出し側が別途アップロード済みの参照
+    mime_type = Column(String, nullable=True)
+    size = Column(Integer, nullable=True)  # バイト数
+    sha256 = Column(String(64), nullable=True)
+    encryption_key_ref = Column(String, nullable=True)  # [スコープ限定] KMS未導入のため常にNULL
+
+    malware_status = Column(String, nullable=False, default=DocumentMalwareStatus.NOT_SCANNED.value)
+    ocr_status = Column(String, nullable=False, default=DocumentOcrStatus.NOT_REQUESTED.value)
+    retention_until = Column(DateTime(timezone=True), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    plan = relationship("TravelPlan")
+    owner = relationship("User")
+
+
+class DocumentLink(Base):
+    """[Gate R3-6] 文書と他エンティティ(予約・チケット・イベント等)の
+    紐付け(DOC-05 §6.6)。entity_id はポリモーフィックのためFK制約を
+    持たない(entity_typeごとにAPI側で存在検証する)。"""
+    __tablename__ = "document_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False, index=True)
+    entity_type = Column(String, nullable=False)  # 例: reservation/ticket/event/attachment
+    entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    relation_type = Column(String, nullable=False, default=DocumentLinkRelationType.ATTACHMENT.value)
+    display_order = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    document = relationship("Document")
