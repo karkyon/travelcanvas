@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -277,3 +277,7 @@ app.include_router(plans.router, prefix="/api/v1")
 # ログイン前にplan/day/event相当を単一transactionで作成する。promote
 # (/quick-drafts/{id}/promote)はGate R2-3で追加する。
 app.include_router(quickdrafts.router, prefix="/api/v1")
+# [Gate R3-0] FR-010予約管理の最小実装。/plans/{plan_id}/reservations配下。
+# plans.router(/plans)と同じprefixだが別routerファイルであり、
+# plans.pyのdays/events CRUDとは独立して管理する。
+app.include_router(reservations.router, prefix="/api/v1")

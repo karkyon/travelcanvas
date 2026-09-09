@@ -773,3 +773,110 @@ class AuditLog(Base):
     user_agent = Column(String, nullable=True)
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+# ==========================================
+# [Gate R3-0] 予約管理(FR-010)最小実装
+# ==========================================
+# DOC-10 FR-010は静的評価「SCAFFOLDED 5%」(itinerary中の任意JSON=booking_url
+# 断片のみ)であり、独立clone(HEAD 793c8eb)でのgrep確認でもReservation実体は
+# 存在しない「ゴースト」ではなく単純に未着手であることを確認した。
+#
+# DOC-05 §6.1が定義するreservationsのフル仕様(KMS envelope暗号化・
+# blind index、reservation_participants、tickets、import_jobs等)は
+# 中〜大規模スコープであり、本Gateでは意図的に以下へ限定する
+# (docs/adr/ADR-reservation-minimal.md §4に根拠を記載):
+#
+# 1. 暗号化はDOC-11本来のKMS envelope encryptionではなく、Gate R2-2の
+#    QuickDraft同様 app/core/crypto.py のFernet field encryptionを再利用する
+#    (confirmation_number/pinのみ暗号化対象。lookup_hashによる盲検索索引は
+#    次Gateスコープ)。
+# 2. event_reservations多対多中間表は設けず、reservations.event_idの
+#    単一FKに限定する(1予約=最大1イベント紐付け)。複数イベントに跨る
+#    予約(例: 連泊で複数日イベントに紐付け)は次Gateスコープ。
+# 3. reservation_participants/tickets/import_jobsは対象外(次Gate以降)。
+# 4. holder_name/contact_phoneは平文カラムとする(DOC-05は暗号化列を
+#    要求するが、氏名・電話は既にevent_reservations経由の共同編集者へ
+#    通常表示される情報であり、confirmation_number/pinほどの機微性を
+#    持たないと判断。ただし将来の暗号化列追加はadditiveなmigrationで
+#    可能な設計としている)。
+#
+# 権限: SC-11マトリクス(DOC-04)通り、作成・編集・削除はowner/editor、
+# 閲覧はviewer以上(ただしviewerへはconfirmation_number/pinをmaskして
+# 返す)。maskされた値の完全開示は専用reveal endpointを介し、
+# record_audit_event()で監査ログに残す(DOC-05 §18.1 reveal監査要件に対応)。
+
+class ReservationType(str, Enum):
+    """DOC-02 FR-010: 宿泊/航空/鉄道/バス/船/レンタカー/飲食/体験/入場/その他。"""
+    ACCOMMODATION = "accommodation"
+    FLIGHT = "flight"
+    TRAIN = "train"
+    BUS = "bus"
+    FERRY = "ferry"
+    RENTAL_CAR = "rental_car"
+    RESTAURANT = "restaurant"
+    ACTIVITY = "activity"
+    ADMISSION = "admission"
+    OTHER = "other"
+
+
+class ReservationStatus(str, Enum):
+    """DOC-05 §18.1状態遷移: candidate->confirmed->used、confirmed<->modified、
+    confirmed/modified->cancelled、confirmed->no_show。"""
+    CANDIDATE = "candidate"
+    CONFIRMED = "confirmed"
+    MODIFIED = "modified"
+    CANCELLED = "cancelled"
+    USED = "used"
+    NO_SHOW = "no_show"
+
+
+class Reservation(Base):
+    """[Gate R3-0] FR-010予約管理の最小永続モデル。"""
+    __tablename__ = "reservations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    # [Gate R3-0スコープ限定] 単一イベントのみへの紐付け(§上部コメント2参照)。
+    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True, index=True)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+
+    type = Column(String, nullable=False)  # ReservationType
+    status = Column(String, nullable=False, default=ReservationStatus.CONFIRMED.value)
+    provider_name = Column(String, nullable=True)
+
+    # 秘密値(Fernet field encryption。app/core/crypto.py参照)。
+    confirmation_number_ciphertext = Column(LargeBinary, nullable=True)
+    # 一覧・masked表示用の非機微プレフィックス("****1234"形式)。単体では
+    # 予約特定に使えない末尾4文字相当のみを平文保持する(DOC-11 §6.3の
+    # 盲検索indexとは異なる、表示専用の簡易マスク)。
+    confirmation_number_masked = Column(String, nullable=True)
+    pin_ciphertext = Column(LargeBinary, nullable=True)
+
+    holder_name = Column(String, nullable=True)
+    guest_count = Column(Integer, nullable=True)
+
+    start_at = Column(DateTime(timezone=True), nullable=True)
+    end_at = Column(DateTime(timezone=True), nullable=True)
+    timezone_id = Column(String, nullable=True)
+
+    total_amount = Column(Float, nullable=True)
+    currency = Column(String(3), nullable=True)
+    payment_status = Column(String, nullable=True)
+
+    cancellation_deadline = Column(DateTime(timezone=True), nullable=True)
+    contact_phone = Column(String, nullable=True)
+    contact_url = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    plan = relationship("TravelPlan")
+    event = relationship("TravelEvent")
+
+    __table_args__ = (
+        Index("ix_reservations_plan_start", "plan_id", "start_at"),
+    )
