@@ -286,6 +286,80 @@ export interface PublicSharedPlan {
   can_edit: boolean;
 }
 
+// ===== [Gate R3-2] 予約管理(FR-010) =====
+// backend/app/api/v1/reservations.py (Gate R3-0/R3-1)に対応するfrontend型。
+// confirmation_number/pinはAPIから平文で返らない(masked表示のみ)。
+// 完全開示はrevealReservation()経由のみ(監査ログ必須、backend側で強制)。
+
+export interface Reservation {
+  id: string;
+  plan_id: string;
+  event_id: string | null;
+  place_id: string | null;
+  type: string;
+  status: string;
+  provider_name: string | null;
+  confirmation_number_masked: string | null;
+  has_pin: boolean;
+  holder_name: string | null;
+  guest_count: number | null;
+  start_at: string | null;
+  end_at: string | null;
+  timezone_id: string | null;
+  total_amount: number | null;
+  currency: string | null;
+  payment_status: string | null;
+  cancellation_deadline: string | null;
+  contact_phone: string | null;
+  contact_url: string | null;
+  notes: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ReservationRevealResult {
+  id: string;
+  confirmation_number: string | null;
+  pin: string | null;
+}
+
+export interface ReservationParticipant {
+  id: string;
+  reservation_id: string;
+  plan_member_id: string | null;
+  name: string;
+  seat: string | null;
+  special_request: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ReservationCreateData {
+  type: string;
+  status?: string;
+  provider_name?: string;
+  confirmation_number?: string;
+  pin?: string;
+  holder_name?: string;
+  guest_count?: number;
+  event_id?: string;
+  place_id?: string;
+  start_at?: string;
+  end_at?: string;
+  timezone_id?: string;
+  total_amount?: number;
+  currency?: string;
+  payment_status?: string;
+  cancellation_deadline?: string;
+  contact_phone?: string;
+  contact_url?: string;
+  notes?: string;
+}
+
+export type ReservationUpdateData = Partial<ReservationCreateData>;
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -905,6 +979,75 @@ class CompleteTravelAPI {
     return response.data;
   }
 
+  // ===== [Gate R3-2] 予約管理(FR-010) frontend連携 =====
+  // backend/app/api/v1/reservations.py (Gate R3-0/R3-1)。/plans/{planId}/...
+  // 配下のdays/eventsと同じ「response.data直返し」パターンに揃える。
+
+  async getReservations(planId: string): Promise<Reservation[]> {
+    const response = await this.client.get<Reservation[]>(`/plans/${planId}/reservations`);
+    return response.data;
+  }
+
+  async getReservation(planId: string, reservationId: string): Promise<Reservation> {
+    const response = await this.client.get<Reservation>(`/plans/${planId}/reservations/${reservationId}`);
+    return response.data;
+  }
+
+  async createReservation(planId: string, data: ReservationCreateData): Promise<Reservation> {
+    const response = await this.client.post<Reservation>(`/plans/${planId}/reservations`, data);
+    return response.data;
+  }
+
+  async updateReservation(
+    planId: string, reservationId: string, data: ReservationUpdateData, ifMatch: number
+  ): Promise<Reservation> {
+    const response = await this.client.request<Reservation>({
+      method: 'PATCH',
+      url: `/plans/${planId}/reservations/${reservationId}`,
+      data,
+      headers: { 'If-Match': String(ifMatch) },
+    });
+    return response.data;
+  }
+
+  async deleteReservation(planId: string, reservationId: string, ifMatch: number): Promise<void> {
+    await this.client.delete(`/plans/${planId}/reservations/${reservationId}`, {
+      headers: { 'If-Match': String(ifMatch) },
+    });
+  }
+
+  async revealReservation(planId: string, reservationId: string): Promise<ReservationRevealResult> {
+    const response = await this.client.post<ReservationRevealResult>(
+      `/plans/${planId}/reservations/${reservationId}/reveal`, {}
+    );
+    return response.data;
+  }
+
+  async getReservationParticipants(planId: string, reservationId: string): Promise<ReservationParticipant[]> {
+    const response = await this.client.get<ReservationParticipant[]>(
+      `/plans/${planId}/reservations/${reservationId}/participants`
+    );
+    return response.data;
+  }
+
+  async createReservationParticipant(
+    planId: string, reservationId: string,
+    data: { name: string; seat?: string; special_request?: string; plan_member_id?: string }
+  ): Promise<ReservationParticipant> {
+    const response = await this.client.post<ReservationParticipant>(
+      `/plans/${planId}/reservations/${reservationId}/participants`, data
+    );
+    return response.data;
+  }
+
+  async deleteReservationParticipant(
+    planId: string, reservationId: string, participantId: string
+  ): Promise<void> {
+    await this.client.delete(
+      `/plans/${planId}/reservations/${reservationId}/participants/${participantId}`
+    );
+  }
+
   // ===== [Gate #32] PLAN MAP: route/insertion preview =====
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get<RoutePreview>(
@@ -1178,5 +1321,23 @@ export const inviteCollaborator = (planId: string, inviteData: { email: string; 
   api.inviteCollaborator(planId, inviteData);
 export const getCollaborators = (planId: string) => api.getCollaborators(planId);
 export const removeCollaborator = (planId: string, collaboratorId: string) => api.removeCollaborator(planId, collaboratorId);
+
+// ===== [Gate R3-2] 予約管理(FR-010) =====
+export const getReservations = (planId: string) => api.getReservations(planId);
+export const getReservation = (planId: string, reservationId: string) => api.getReservation(planId, reservationId);
+export const createReservation = (planId: string, data: ReservationCreateData) => api.createReservation(planId, data);
+export const updateReservation = (planId: string, reservationId: string, data: ReservationUpdateData, ifMatch: number) =>
+  api.updateReservation(planId, reservationId, data, ifMatch);
+export const deleteReservation = (planId: string, reservationId: string, ifMatch: number) =>
+  api.deleteReservation(planId, reservationId, ifMatch);
+export const revealReservation = (planId: string, reservationId: string) => api.revealReservation(planId, reservationId);
+export const getReservationParticipants = (planId: string, reservationId: string) =>
+  api.getReservationParticipants(planId, reservationId);
+export const createReservationParticipant = (
+  planId: string, reservationId: string,
+  data: { name: string; seat?: string; special_request?: string; plan_member_id?: string }
+) => api.createReservationParticipant(planId, reservationId, data);
+export const deleteReservationParticipant = (planId: string, reservationId: string, participantId: string) =>
+  api.deleteReservationParticipant(planId, reservationId, participantId);
 
 export default api;

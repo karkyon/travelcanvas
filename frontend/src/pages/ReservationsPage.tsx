@@ -1,0 +1,548 @@
+/**
+ * ReservationsPage - SC-11 予約一覧・詳細(DOC-04 §画面詳細)。
+ *
+ * [Gate R3-2] backend/app/api/v1/reservations.py (Gate R3-0/R3-1)は
+ * API/DBのみ実装済みでfrontendから一切到達不能だった(DOC-02 §1.1
+ * 「画面だけ、APIだけ、DBだけ存在する状態は完成としない」に反する状態)。
+ * 本画面でPlannerPageから到達可能にし、一覧・作成・編集・削除・
+ * confirmation_number/pinのreveal・参加者管理までを縦に貫通させる。
+ *
+ * 権限はbackend側(plan_access.py)が最終判定するため、frontendはUIの
+ * 出し分け(viewerには編集ボタンを出さない等)のみを行う不変条件の
+ * 二重チェックとして扱う(信頼境界はbackend)。
+ */
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
+  Ticket, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
+  Users, X,
+} from 'lucide-react';
+import Button from '@/components/common/Button';
+import Card from '@/components/common/Card';
+import Input from '@/components/common/Input';
+import Modal from '@/components/common/Modal';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+import {
+  getReservations,
+  createReservation,
+  deleteReservation,
+  revealReservation,
+  getReservationParticipants,
+  createReservationParticipant,
+  deleteReservationParticipant,
+} from '@/services/api';
+import type {
+  Reservation, ReservationCreateData, ReservationParticipant,
+} from '@/services/api';
+
+const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
+  { value: 'accommodation', label: '宿泊', icon: <Building2 size={16} /> },
+  { value: 'flight', label: '航空', icon: <Plane size={16} /> },
+  { value: 'train', label: '鉄道', icon: <Train size={16} /> },
+  { value: 'bus', label: 'バス', icon: <Bus size={16} /> },
+  { value: 'ferry', label: '船', icon: <Ship size={16} /> },
+  { value: 'rental_car', label: 'レンタカー', icon: <Car size={16} /> },
+  { value: 'restaurant', label: '飲食', icon: <UtensilsCrossed size={16} /> },
+  { value: 'activity', label: '体験', icon: <Ticket size={16} /> },
+  { value: 'admission', label: '入場', icon: <Landmark size={16} /> },
+  { value: 'other', label: 'その他', icon: <HelpCircle size={16} /> },
+];
+
+const STATUS_LABEL: Record<string, string> = {
+  candidate: '未確定',
+  confirmed: '確定',
+  modified: '変更あり',
+  cancelled: 'キャンセル',
+  used: '利用済み',
+  no_show: '不参加',
+};
+
+function typeIcon(type: string): React.ReactNode {
+  return RESERVATION_TYPES.find((t) => t.value === type)?.icon ?? <HelpCircle size={16} />;
+}
+
+function typeLabel(type: string): string {
+  return RESERVATION_TYPES.find((t) => t.value === type)?.label ?? type;
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '未設定';
+  try {
+    return new Date(value).toLocaleString('ja-JP', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return value;
+  }
+}
+
+interface ReservationFormState {
+  type: string;
+  provider_name: string;
+  confirmation_number: string;
+  pin: string;
+  holder_name: string;
+  guest_count: string;
+  start_at: string;
+  end_at: string;
+  total_amount: string;
+  currency: string;
+  notes: string;
+}
+
+const EMPTY_FORM: ReservationFormState = {
+  type: 'accommodation',
+  provider_name: '',
+  confirmation_number: '',
+  pin: '',
+  holder_name: '',
+  guest_count: '',
+  start_at: '',
+  end_at: '',
+  total_amount: '',
+  currency: 'JPY',
+  notes: '',
+};
+
+function formToPayload(form: ReservationFormState): ReservationCreateData {
+  const payload: ReservationCreateData = { type: form.type };
+  if (form.provider_name) payload.provider_name = form.provider_name;
+  if (form.confirmation_number) payload.confirmation_number = form.confirmation_number;
+  if (form.pin) payload.pin = form.pin;
+  if (form.holder_name) payload.holder_name = form.holder_name;
+  if (form.guest_count) payload.guest_count = Number(form.guest_count);
+  if (form.start_at) payload.start_at = new Date(form.start_at).toISOString();
+  if (form.end_at) payload.end_at = new Date(form.end_at).toISOString();
+  if (form.total_amount) payload.total_amount = Number(form.total_amount);
+  if (form.currency) payload.currency = form.currency;
+  if (form.notes) payload.notes = form.notes;
+  return payload;
+}
+
+const ReservationsPage: React.FC = () => {
+  const { planId } = useParams<{ planId: string }>();
+  const navigate = useNavigate();
+
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<ReservationFormState>(EMPTY_FORM);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [selected, setSelected] = useState<Reservation | null>(null);
+  const [revealed, setRevealed] = useState<{ confirmation_number: string | null; pin: string | null } | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
+
+  const [participants, setParticipants] = useState<ReservationParticipant[]>([]);
+  const [isParticipantsLoading, setIsParticipantsLoading] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState('');
+  const [newParticipantSeat, setNewParticipantSeat] = useState('');
+
+  const loadReservations = useCallback(async () => {
+    if (!planId) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await getReservations(planId);
+      setReservations(data);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '予約一覧の取得に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [planId]);
+
+  useEffect(() => {
+    loadReservations();
+  }, [loadReservations]);
+
+  const loadParticipants = useCallback(async (reservation: Reservation) => {
+    if (!planId) return;
+    setIsParticipantsLoading(true);
+    try {
+      const data = await getReservationParticipants(planId, reservation.id);
+      setParticipants(data);
+    } catch {
+      setParticipants([]);
+    } finally {
+      setIsParticipantsLoading(false);
+    }
+  }, [planId]);
+
+  const openDetail = (reservation: Reservation) => {
+    setSelected(reservation);
+    setRevealed(null);
+    setParticipants([]);
+    loadParticipants(reservation);
+  };
+
+  const closeDetail = () => {
+    setSelected(null);
+    setRevealed(null);
+    setParticipants([]);
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planId) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await createReservation(planId, formToPayload(createForm));
+      setIsCreateOpen(false);
+      setCreateForm(EMPTY_FORM);
+      await loadReservations();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '予約の作成に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (reservation: Reservation) => {
+    if (!planId) return;
+    if (!window.confirm(`「${reservation.provider_name || typeLabel(reservation.type)}」を削除しますか?`)) return;
+    try {
+      await deleteReservation(planId, reservation.id, reservation.revision);
+      if (selected?.id === reservation.id) closeDetail();
+      await loadReservations();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '予約の削除に失敗しました');
+    }
+  };
+
+  const handleReveal = async () => {
+    if (!planId || !selected) return;
+    setIsRevealing(true);
+    try {
+      const result = await revealReservation(planId, selected.id);
+      setRevealed({ confirmation_number: result.confirmation_number, pin: result.pin });
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '予約番号の開示に失敗しました(権限が必要です)');
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
+  const handleAddParticipant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planId || !selected || !newParticipantName.trim()) return;
+    try {
+      await createReservationParticipant(planId, selected.id, {
+        name: newParticipantName.trim(),
+        seat: newParticipantSeat.trim() || undefined,
+      });
+      setNewParticipantName('');
+      setNewParticipantSeat('');
+      await loadParticipants(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '参加者の追加に失敗しました');
+    }
+  };
+
+  const handleRemoveParticipant = async (participant: ReservationParticipant) => {
+    if (!planId || !selected) return;
+    try {
+      await deleteReservationParticipant(planId, selected.id, participant.id);
+      await loadParticipants(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '参加者の削除に失敗しました');
+    }
+  };
+
+  if (!planId) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        プランが選択されていません。
+        <div className="mt-4">
+          <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
+            ← プランへ戻る
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">予約一覧</h1>
+        </div>
+        <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
+          新規予約
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
+      ) : reservations.length === 0 ? (
+        <Card padding="lg" className="text-center text-gray-500">
+          予約がまだ登録されていません。「新規予約」から追加できます。
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {reservations.map((r) => (
+            <Card
+              key={r.id}
+              padding="md"
+              hover
+              onClick={() => openDetail(r)}
+              className="cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500">{typeIcon(r.type)}</span>
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {r.provider_name || typeLabel(r.type)}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {typeLabel(r.type)} ・ {formatDateTime(r.start_at)}
+                      {r.confirmation_number_masked && ` ・ 予約番号 ${r.confirmation_number_masked}`}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                  {STATUS_LABEL[r.status] ?? r.status}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* 新規予約作成 */}
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="新規予約" size="md">
+        <form onSubmit={handleCreate}>
+          <Modal.Body>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">種類</label>
+                <select
+                  value={createForm.type}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  {RESERVATION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <Input
+                label="事業者名"
+                value={createForm.provider_name}
+                onChange={(e) => setCreateForm((f) => ({ ...f, provider_name: e.target.value }))}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="予約番号"
+                  value={createForm.confirmation_number}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, confirmation_number: e.target.value }))}
+                />
+                <Input
+                  label="PIN"
+                  value={createForm.pin}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, pin: e.target.value }))}
+                />
+              </div>
+              <Input
+                label="名義"
+                value={createForm.holder_name}
+                onChange={(e) => setCreateForm((f) => ({ ...f, holder_name: e.target.value }))}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="開始日時"
+                  type="datetime-local"
+                  value={createForm.start_at}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, start_at: e.target.value }))}
+                />
+                <Input
+                  label="終了日時"
+                  type="datetime-local"
+                  value={createForm.end_at}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, end_at: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="金額"
+                  type="number"
+                  value={createForm.total_amount}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, total_amount: e.target.value }))}
+                />
+                <Input
+                  label="通貨"
+                  value={createForm.currency}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, currency: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <textarea
+                  value={createForm.notes}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2"
+                  rows={3}
+                />
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="ghost" type="button" onClick={() => setIsCreateOpen(false)}>キャンセル</Button>
+            <Button variant="primary" type="submit" loading={isSaving}>作成</Button>
+          </Modal.Footer>
+        </form>
+      </Modal>
+
+      {/* 予約詳細 */}
+      <Modal isOpen={!!selected} onClose={closeDetail} title="予約詳細" size="lg">
+        {selected && (
+          <>
+            <Modal.Body>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-lg font-semibold">
+                  {typeIcon(selected.type)}
+                  {selected.provider_name || typeLabel(selected.type)}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="text-gray-500">種類</div>
+                    <div>{typeLabel(selected.type)}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">状態</div>
+                    <div>{STATUS_LABEL[selected.status] ?? selected.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">開始</div>
+                    <div>{formatDateTime(selected.start_at)}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">終了</div>
+                    <div>{formatDateTime(selected.end_at)}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">名義</div>
+                    <div>{selected.holder_name || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">金額</div>
+                    <div>
+                      {selected.total_amount != null
+                        ? `${selected.total_amount.toLocaleString()} ${selected.currency ?? ''}`
+                        : '-'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 予約番号・PIN(マスク表示 + reveal) */}
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">予約番号 / PIN</span>
+                    {!revealed && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<Eye size={14} />}
+                        loading={isRevealing}
+                        onClick={handleReveal}
+                      >
+                        表示する
+                      </Button>
+                    )}
+                    {revealed && (
+                      <Button variant="ghost" size="sm" icon={<EyeOff size={14} />} onClick={() => setRevealed(null)}>
+                        隠す
+                      </Button>
+                    )}
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <div>
+                      予約番号:{' '}
+                      {revealed
+                        ? (revealed.confirmation_number || '(未登録)')
+                        : (selected.confirmation_number_masked || '(未登録)')}
+                    </div>
+                    <div>
+                      PIN: {revealed ? (revealed.pin || '(未登録)') : (selected.has_pin ? '••••' : '(未登録)')}
+                    </div>
+                  </div>
+                </div>
+
+                {selected.notes && (
+                  <div>
+                    <div className="text-gray-500 text-sm mb-1">メモ</div>
+                    <div className="text-sm whitespace-pre-wrap">{selected.notes}</div>
+                  </div>
+                )}
+
+                {/* 参加者 */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <Users size={16} /> 参加者
+                  </div>
+                  {isParticipantsLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <div className="space-y-2 mb-3">
+                      {participants.length === 0 && (
+                        <div className="text-sm text-gray-400">参加者が登録されていません</div>
+                      )}
+                      {participants.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
+                          <span>{p.name}{p.seat ? `(座席: ${p.seat})` : ''}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveParticipant(p)}
+                            className="text-gray-400 hover:text-red-600"
+                            aria-label="参加者を削除"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <form onSubmit={handleAddParticipant} className="flex gap-2">
+                    <Input
+                      placeholder="氏名"
+                      value={newParticipantName}
+                      onChange={(e) => setNewParticipantName(e.target.value)}
+                      containerClassName="flex-1"
+                    />
+                    <Input
+                      placeholder="座席(任意)"
+                      value={newParticipantSeat}
+                      onChange={(e) => setNewParticipantSeat(e.target.value)}
+                      containerClassName="w-32"
+                    />
+                    <Button type="submit" variant="outline" size="sm">追加</Button>
+                  </form>
+                </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => handleDelete(selected)}>
+                削除
+              </Button>
+              <Button variant="ghost" onClick={closeDetail}>閉じる</Button>
+            </Modal.Footer>
+          </>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+export default ReservationsPage;

@@ -27,6 +27,7 @@ import AdminDashboard from '@/pages/Admin/AdminDashboard';
 import AdminUsers from '@/pages/Admin/AdminUsers';
 import NotificationsPage from '@/pages/NotificationsPage';
 import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
+import ReservationsPage from '@/pages/ReservationsPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -135,6 +136,17 @@ export const router = createBrowserRouter([
             ),
           },
         ],
+      },
+
+      // 🧳 [Gate R3-2] 予約一覧・詳細(SC-11)。backend(Gate R3-0/R3-1)は
+      // 実装済みだったがどこからもリンクされておらず画面から到達不能だった。
+      {
+        path: 'planner/:planId/reservations',
+        element: (
+          <ProtectedRoute>
+            <ReservationsPage />
+          </ProtectedRoute>
+        ),
       },
       
       // 🔍 AI検索機能（拡張版）

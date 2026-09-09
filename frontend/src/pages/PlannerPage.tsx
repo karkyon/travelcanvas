@@ -461,8 +461,16 @@ const PlannerPage: React.FC = () => {
           </Button>
 
           {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
-              どこからもリンクされておらずUIから一度も到達できなかった。 */}
-          <div className="flex items-center justify-end mb-2">
+              どこからもリンクされておらずUIから一度も到達できなかった。
+              [Gate R3-2] 予約一覧も同様に実装済みだが未到達だったため追加。 */}
+          <div className="flex items-center justify-end gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/reservations`)}
+            >
+              🧳 予約
+            </Button>
             <Button
               variant="outline"
               size="sm"
