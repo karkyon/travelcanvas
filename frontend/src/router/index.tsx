@@ -28,6 +28,7 @@ import AdminUsers from '@/pages/Admin/AdminUsers';
 import NotificationsPage from '@/pages/NotificationsPage';
 import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
 import ReservationsPage from '@/pages/ReservationsPage';
+import ImportsPage from '@/pages/ImportsPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -145,6 +146,19 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ReservationsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📥 [Gate R3-9] 予約取込(FR-011)。backend(Gate R3-7)は実装済み
+      // だったがどこからもリンクされておらず画面から到達不能だった
+      // (Gate #25/R3-2と同じパターンの再発防止として、実装直後に
+      // 到達経路も必ず追加する)。
+      {
+        path: 'planner/:planId/imports',
+        element: (
+          <ProtectedRoute>
+            <ImportsPage />
           </ProtectedRoute>
         ),
       },

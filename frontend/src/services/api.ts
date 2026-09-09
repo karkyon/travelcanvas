@@ -384,6 +384,62 @@ export interface ReservationEventLinkUpdateData {
   is_locked?: boolean;
 }
 
+// [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)。
+// backend/app/api/v1/imports.py (Gate R3-7)に対応するfrontend型。
+// AI/OCR provider未導入のため、ジョブは作成時点でreview_requiredとなり、
+// 候補は利用者自身が登録する(docs/adr/ADR-import-minimal.md参照)。
+
+export type ImportFieldPath =
+  | 'type' | 'status' | 'provider_name' | 'confirmation_number' | 'pin'
+  | 'holder_name' | 'guest_count' | 'start_at' | 'end_at' | 'timezone_id'
+  | 'total_amount' | 'currency' | 'payment_status' | 'cancellation_deadline'
+  | 'contact_phone' | 'contact_url' | 'notes';
+
+export interface ImportJob {
+  id: string;
+  plan_id: string;
+  document_id: string | null;
+  provider: string;
+  status: 'uploaded' | 'scanning' | 'extracting' | 'review_required' | 'confirmed' | 'rejected'
+    | 'quarantined' | 'retry_wait' | 'failed';
+  consent_given: boolean;
+  error_message: string | null;
+  result_reservation_id: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ExtractionCandidate {
+  id: string;
+  import_job_id: string;
+  field_path: string;
+  value: string | null;
+  confidence: number;
+  evidence_locator: string | null;
+  review_status: 'pending' | 'accepted' | 'rejected';
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface ImportJobDetail extends ImportJob {
+  candidates: ExtractionCandidate[];
+}
+
+export interface ImportJobCreateData {
+  document_id?: string;
+  consent_given: boolean;
+}
+
+export interface ExtractionCandidateCreateData {
+  field_path: ImportFieldPath;
+  value: string;
+  confidence?: number;
+  evidence_locator?: string;
+}
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -1102,6 +1158,55 @@ class CompleteTravelAPI {
     await this.client.delete(`/plans/${planId}/reservations/${reservationId}/events/${linkId}`);
   }
 
+  // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
+  async getImportJobs(planId: string): Promise<ImportJob[]> {
+    const response = await this.client.get<ImportJob[]>(`/plans/${planId}/imports`);
+    return response.data;
+  }
+
+  async getImportJob(planId: string, jobId: string): Promise<ImportJobDetail> {
+    const response = await this.client.get<ImportJobDetail>(`/plans/${planId}/imports/${jobId}`);
+    return response.data;
+  }
+
+  async createImportJob(planId: string, data: ImportJobCreateData): Promise<ImportJob> {
+    const response = await this.client.post<ImportJob>(`/plans/${planId}/imports`, data);
+    return response.data;
+  }
+
+  async createExtractionCandidate(
+    planId: string, jobId: string, data: ExtractionCandidateCreateData
+  ): Promise<ExtractionCandidate> {
+    const response = await this.client.post<ExtractionCandidate>(
+      `/plans/${planId}/imports/${jobId}/candidates`, data
+    );
+    return response.data;
+  }
+
+  async acceptExtractionCandidate(planId: string, jobId: string, candidateId: string): Promise<ExtractionCandidate> {
+    const response = await this.client.post<ExtractionCandidate>(
+      `/plans/${planId}/imports/${jobId}/candidates/${candidateId}/accept`, {}
+    );
+    return response.data;
+  }
+
+  async rejectExtractionCandidate(planId: string, jobId: string, candidateId: string): Promise<ExtractionCandidate> {
+    const response = await this.client.post<ExtractionCandidate>(
+      `/plans/${planId}/imports/${jobId}/candidates/${candidateId}/reject`, {}
+    );
+    return response.data;
+  }
+
+  async confirmImportJob(planId: string, jobId: string): Promise<ImportJob> {
+    const response = await this.client.post<ImportJob>(`/plans/${planId}/imports/${jobId}/confirm`, {});
+    return response.data;
+  }
+
+  async rejectImportJob(planId: string, jobId: string): Promise<ImportJob> {
+    const response = await this.client.post<ImportJob>(`/plans/${planId}/imports/${jobId}/reject`, {});
+    return response.data;
+  }
+
   // ===== [Gate #32] PLAN MAP: route/insertion preview =====
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get<RoutePreview>(
@@ -1404,5 +1509,18 @@ export const updateReservationEventLink = (
 ) => api.updateReservationEventLink(planId, reservationId, linkId, data);
 export const deleteReservationEventLink = (planId: string, reservationId: string, linkId: string) =>
   api.deleteReservationEventLink(planId, reservationId, linkId);
+
+// [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
+export const getImportJobs = (planId: string) => api.getImportJobs(planId);
+export const getImportJob = (planId: string, jobId: string) => api.getImportJob(planId, jobId);
+export const createImportJob = (planId: string, data: ImportJobCreateData) => api.createImportJob(planId, data);
+export const createExtractionCandidate = (planId: string, jobId: string, data: ExtractionCandidateCreateData) =>
+  api.createExtractionCandidate(planId, jobId, data);
+export const acceptExtractionCandidate = (planId: string, jobId: string, candidateId: string) =>
+  api.acceptExtractionCandidate(planId, jobId, candidateId);
+export const rejectExtractionCandidate = (planId: string, jobId: string, candidateId: string) =>
+  api.rejectExtractionCandidate(planId, jobId, candidateId);
+export const confirmImportJob = (planId: string, jobId: string) => api.confirmImportJob(planId, jobId);
+export const rejectImportJob = (planId: string, jobId: string) => api.rejectImportJob(planId, jobId);
 
 export default api;
