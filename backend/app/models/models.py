@@ -880,3 +880,49 @@ class Reservation(Base):
     __table_args__ = (
         Index("ix_reservations_plan_start", "plan_id", "start_at"),
     )
+
+
+# ==========================================================================
+# [Gate R3-1] 予約参加者(reservation_participants)
+# ==========================================================================
+# DOC-05 §6.3: reservation_id、plan_member_id、name_ciphertext、
+# seat_ciphertext、special_request_ciphertext。
+#
+# [スコープ限定] Gate R3-0のholder_name/contact_phoneと同じ理由により、
+# name/seat/special_requestは平文カラムとする(予約閲覧権限を持つ
+# 共同編集者へは通常表示される情報であり、confirmation_number/pinほどの
+# 機微性を持たないと判断。将来の暗号化列追加はadditive migrationで
+# 対応可能な設計としている)。
+#
+# [スコープ限定] plan_member_idはPlanCollaborator.idへのFK(nullable)と
+# する。DOC-05は「plan_member_id」という汎用名だが、本コードベースには
+# 独立した`plan_members`テーブルが無く、ownerはTravelPlan.user_id、
+# 招待済みメンバーはPlanCollaboratorで表現される(Gate #30)。参加者は
+# 必ずしもplanのメンバーとは限らない(例: 同行する未登録の子供・同僚)ため
+# nullable(名前のみの参加者も許容)とする。
+#
+# 権限: DOC-05 §6.3「アクセスは予約権限＋本人条件を評価」とあるが、
+# 本人(plan_member)自身によるセルフサービス編集は次Gateスコープとし、
+# 本Gateでは予約と同じowner/editor(書き込み)・viewer以上(閲覧)に単純化する。
+
+class ReservationParticipant(Base):
+    """[Gate R3-1] 予約参加者(DOC-05 §6.3)。"""
+    __tablename__ = "reservation_participants"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    reservation_id = Column(
+        UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True,
+    )
+    plan_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
+
+    name = Column(String, nullable=False)
+    seat = Column(String, nullable=True)
+    special_request = Column(Text, nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    reservation = relationship("Reservation")
+    plan_member = relationship("PlanCollaborator")

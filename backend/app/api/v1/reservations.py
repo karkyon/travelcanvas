@@ -26,7 +26,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
-from app.models.models import Reservation, ReservationStatus, ReservationType, User
+from app.models.models import Reservation, ReservationParticipant, ReservationStatus, ReservationType, User
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/plans", tags=["reservations"])
@@ -472,3 +472,162 @@ def reveal_reservation(
     )
 
     return ReservationRevealResponse(id=str(r.id), confirmation_number=confirmation_number, pin=pin)
+
+
+# ==========================================================================
+# [Gate R3-1] 予約参加者(reservation_participants)
+# ==========================================================================
+
+class ParticipantCreateRequest(BaseModel):
+    name: str = Field(..., max_length=200)
+    seat: Optional[str] = Field(None, max_length=50)
+    special_request: Optional[str] = None
+    plan_member_id: Optional[str] = None
+
+
+class ParticipantUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=200)
+    seat: Optional[str] = Field(None, max_length=50)
+    special_request: Optional[str] = None
+    plan_member_id: Optional[str] = None
+
+
+class ParticipantResponse(BaseModel):
+    id: str
+    reservation_id: str
+    plan_member_id: Optional[str]
+    name: str
+    seat: Optional[str]
+    special_request: Optional[str]
+    revision: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+def _to_participant_response(p: ReservationParticipant) -> ParticipantResponse:
+    return ParticipantResponse(
+        id=str(p.id),
+        reservation_id=str(p.reservation_id),
+        plan_member_id=str(p.plan_member_id) if p.plan_member_id else None,
+        name=p.name,
+        seat=p.seat,
+        special_request=p.special_request,
+        revision=p.revision,
+        created_at=p.created_at,
+        updated_at=p.updated_at,
+    )
+
+
+def _get_participant_or_404(db: Session, reservation_id, participant_id) -> ReservationParticipant:
+    p = (
+        db.query(ReservationParticipant)
+        .filter(
+            ReservationParticipant.id == participant_id,
+            ReservationParticipant.reservation_id == reservation_id,
+            ReservationParticipant.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if p is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="参加者が見つかりません")
+    return p
+
+
+@router.post(
+    "/{plan_id}/reservations/{reservation_id}/participants",
+    response_model=ParticipantResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_participant(
+    plan_id: str,
+    reservation_id: str,
+    payload: ParticipantCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    p = ReservationParticipant(
+        reservation_id=r.id,
+        plan_member_id=payload.plan_member_id or None,
+        name=payload.name,
+        seat=payload.seat,
+        special_request=payload.special_request,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return _to_participant_response(p)
+
+
+@router.get(
+    "/{plan_id}/reservations/{reservation_id}/participants",
+    response_model=List[ParticipantResponse],
+)
+def list_participants(
+    plan_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+
+    rows = (
+        db.query(ReservationParticipant)
+        .filter(
+            ReservationParticipant.reservation_id == r.id,
+            ReservationParticipant.deleted_at.is_(None),
+        )
+        .order_by(ReservationParticipant.created_at.asc())
+        .all()
+    )
+    return [_to_participant_response(p) for p in rows]
+
+
+@router.patch(
+    "/{plan_id}/reservations/{reservation_id}/participants/{participant_id}",
+    response_model=ParticipantResponse,
+)
+def update_participant(
+    plan_id: str,
+    reservation_id: str,
+    participant_id: str,
+    payload: ParticipantUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    p = _get_participant_or_404(db, r.id, participant_id)
+
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(p, field, value)
+    p.revision += 1
+
+    db.commit()
+    db.refresh(p)
+    return _to_participant_response(p)
+
+
+@router.delete(
+    "/{plan_id}/reservations/{reservation_id}/participants/{participant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_participant(
+    plan_id: str,
+    reservation_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    r = _get_reservation_or_404(db, plan.id, reservation_id)
+    p = _get_participant_or_404(db, r.id, participant_id)
+
+    p.deleted_at = datetime.now(dt_timezone.utc)
+    p.revision += 1
+    db.commit()
+    return None

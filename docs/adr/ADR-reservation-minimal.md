@@ -113,3 +113,34 @@ viewerへのreveal許可、および共有リンク経由でのreservation閲覧
 4. `import_jobs`/`extraction_candidates`(FR-011予約メール・文書取込)
 5. `lookup_hash`による盲検索index(DOC-11 §6.3)
 6. frontend側UI(Event Detail DrawerのReservationセクション、DOC-04 §11)
+
+---
+
+## 改訂: Gate R3-1（2026-09-09）
+
+DOC-05 §6.3の`reservation_participants`を追加した。設計判断:
+
+- `name`/`seat`/`special_request`は平文カラムとする(Gate R3-0の
+  `holder_name`/`contact_phone`と同じ理由。予約閲覧権限を持つ共同編集者
+  へ通常表示される情報であり、confirmation_number/pinほどの機微性を
+  持たないと判断)。
+- `plan_member_id`は`PlanCollaborator.id`へのFK(nullable)とする。
+  DOC-05は汎用的に「plan_member_id」と書いているが、本コードベースには
+  独立した`plan_members`テーブルが無く(owner=`TravelPlan.user_id`、
+  招待済みメンバー=`PlanCollaborator`、Gate #30)、参加者は必ずしも
+  planのメンバーとは限らない(同行する未登録の子供・同僚等)ため
+  nullableとした。
+- DOC-05 §6.3「アクセスは予約権限＋本人条件を評価」のうち、本人
+  (plan_member本人)によるセルフサービス編集は次Gateスコープとし、
+  本Gateでは予約と同じowner/editor(書き込み)・viewer以上(閲覧)に
+  単純化した。
+
+エンドポイント: `POST/GET /api/v1/plans/{plan_id}/reservations/{id}/participants`、
+`PATCH/DELETE .../participants/{participant_id}`(soft delete)。
+
+検証: サンドボックスでmigration適用(alembic head `d2f6b385c917`、単一head)、
+新規4テスト含めbackend全188件PASS、独立clone再検証は今後の実サーバー
+適用後に実施予定。
+
+次Gate候補: `event_reservations`中間表、`tickets`、FR-011予約取込、
+参加者本人によるセルフサービス編集、frontend UI。
