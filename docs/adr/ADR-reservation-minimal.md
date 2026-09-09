@@ -278,3 +278,100 @@ viewer許可、他ユーザー403)全てPASS。既存backend全テスト含め20
 `reservation_participants`/`holder_name`/`contact_phone`の暗号化列化、
 `lookup_hash`による盲検索index、frontend UI(チケット表示・QRコード
 レンダリング)。
+
+---
+
+## 改訂: Gate R3-13（2026-09-09）
+
+DOC-11 §6.3 / DOC-08 §19が要求する`lookup_hash`による盲検索(blind index)
+を実装した(Gate R3-3のADR本文で次Gateスコープとしていた項目、Gate R3-8
+改訂の§5でも「次にやるべきこと」の1番目として引き継がれていた)。
+
+### 背景
+
+`confirmation_number`はGate R3-0からFernet field encryption(暗号文)
+として保存されており、DB側で平文WHERE検索・LIKE検索が一切できない。
+利用者が「あの予約番号の予約を探したい」という操作を行うための手段が
+存在しなかった。
+
+### 決定事項
+
+1. **完全一致検索のみをサポートする(末尾検索は対象外)**。DOC-03 §7
+   「予約番号検索が必要な場合、暗号文に加えて限定的なblind indexを保持
+   する。blind indexは漏洩リスクを評価し、完全一致または末尾検索だけに
+   制限する」とあるうち、本Gateでは完全一致側のみを実装する。POC-03は
+   「末尾検索」も要求しているが、末尾検索用のblind indexは末尾N文字を
+   別途HMAC化した専用索引が必要であり(完全一致用の索引を流用できない)、
+   スコープ拡大となるため次Gateへ送る。
+2. **鍵をENCRYPTION_KEYと分離する**。DOC-08 §19「Lookup: HMAC blind
+   index、用途別key」に従い、新規設定`LOOKUP_INDEX_KEY`を導入した。
+   データ暗号化用の鍵とは独立させることで、一方の鍵が漏洩してももう
+   一方の保護には影響しない設計とする。
+3. **正規化を固定する**。`confirmation_number`の表記ゆれ(大文字小文字・
+   前後空白)を許容するため、HMAC計算前に`strip()+upper()`で正規化する
+   (`app/core/crypto.py normalize_lookup_value`)。登録経路(作成/更新)
+   と検索経路の両方が同じ正規化を必ず経由するため、実装上は
+   `compute_lookup_hash()`内に正規化を内包し、呼び出し側が正規化を
+   意識しなくても一致するようにした。
+4. **LOOKUP_INDEX_KEY未設定時は検索機能のみを503にする(作成・更新は
+   妨げない)**。ENCRYPTION_KEYと異なり、confirmation_number自体の
+   保存(暗号化)には影響しない付加的な索引であるため、鍵未設定時に
+   予約の作成・編集そのものをブロックすると既存機能への破壊的変更に
+   なってしまう。索引が空のままの予約は単に検索対象から漏れるだけ
+   とし、後から鍵を設定してbackfill migrationを再実行すれば解消できる
+   設計とした。
+5. **APIレスポンスには`confirmation_number_lookup_hash`を一切含めない**。
+   `ReservationResponse`に対応フィールドを追加していない(内部的な
+   検索索引専用。DOC-04 §4 用語集の「Blind Index」定義通り、平文を
+   保存しないための限定検索用索引であり、UIに露出する情報ではない)。
+6. **検索エンドポイントの権限・スコープ**。
+   `GET /api/v1/plans/{plan_id}/reservations/search?confirmation_number=...`
+   とし、既存の一覧・詳細と同じ`viewer`以上の権限、かつ`plan_id`配下に
+   スコープする(他planの予約はヒットしない。全plan横断検索は対象外)。
+   FastAPIのルーティング順序上、`/reservations/search`は
+   `/reservations/{reservation_id}`より前に定義する必要があり(でないと
+   "search"がUUID相当のreservation_idとして解釈されてしまう)、本Gateの
+   実装でもその順序を守っている。
+
+### migrationとbackfillで見つかった不具合と修正
+
+migrationのbackfillロジックは、既存の`confirmation_number_ciphertext`
+を復号して`compute_lookup_hash()`を計算する処理だが、`op.get_bind()`
+経由の生SQL(`bind.execute(sa.text(...))`)で取得した`bytea`列は
+psycopg2上`memoryview`として返り、`Fernet.decrypt()`は`bytes`/`str`
+以外を受け付けず`TypeError: token must be bytes or str`で失敗する
+ことをサンドボックス検証で発見した(Gate R3-8のbackfillは`encrypt_payload`
+のみを使っており、この経路の問題が顕在化していなかった)。
+`bytes(row.confirmation_number_ciphertext)`による明示的な型変換を追加
+して解消した。alembicのtransactional DDLにより、修正前の失敗時も
+DB状態は自動的にロールバックされ、破損した中間状態は残らないことを
+併せて確認した。
+
+### 検証
+
+サンドボックス(PostgreSQL 16 + venv、既存DBを再利用)で
+`alembic upgrade head`成功、alembic headが`5d57e3208d2a`
+(down_revision=`e6b2c847a1d9`)の単一headになることを確認。
+
+新規`tests/test_gate_r3_13_lookup_hash.py`(10ケース: 完全一致検索、
+正規化(大文字小文字・前後空白)一致、未一致時の空リスト、confirmation_number
+未指定400、更新時のlookup_hash更新(旧番号でヒットしなくなり新番号で
+ヒットする)、クリア時のlookup_hash削除、APIレスポンス(作成/一覧/検索)
+への`confirmation_number_lookup_hash`非露出、plan間のスコープ分離、
+他ユーザー403、LOOKUP_INDEX_KEY未設定時の検索503)全てPASS。既存
+backend全テスト含め236件全てPASS(リグレッションなし)。
+
+さらに、ORM経由ではなく実際に暗号文のみを持つダミー予約行を直接投入し、
+`alembic downgrade -1`→`alembic upgrade head`のサイクルで
+backfillロジック自体を実データで検証した(復号→正規化→HMAC計算した
+値が、アプリケーション側の`compute_lookup_hash()`の期待値と完全一致
+することを確認)。この検証中に上記のmemoryview/bytes不一致の不具合を
+発見・修正している。
+
+### 次Gate候補
+
+末尾検索用の専用blind index(末尾4桁等をHMAC化した別列)、
+`reservation_participants`側の氏名検索、DOC-10監査の継続
+(FR-046画像/PDF出力等)、旧平文列(`holder_name`/`contact_phone`/
+`name`/`seat`/`special_request`)のcontract(削除)、Object Storage
+実連携。

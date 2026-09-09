@@ -851,6 +851,12 @@ class Reservation(Base):
     # 予約特定に使えない末尾4文字相当のみを平文保持する(DOC-11 §6.3の
     # 盲検索indexとは異なる、表示専用の簡易マスク)。
     confirmation_number_masked = Column(String, nullable=True)
+    # [Gate R3-13] DOC-11 §6.3 / DOC-08 §19 blind index。confirmation_number
+    # (暗号化フィールド)に対する完全一致検索のためのHMAC-SHA256決定的ハッシュ
+    # (app/core/crypto.py compute_lookup_hash参照)。LOOKUP_INDEX_KEYで導出し、
+    # ENCRYPTION_KEYとは異なる鍵を使う(用途別鍵分離)。APIレスポンスには
+    # 一切含めない(内部的な検索索引専用)。
+    confirmation_number_lookup_hash = Column(String(64), nullable=True, index=True)
     pin_ciphertext = Column(LargeBinary, nullable=True)
 
     holder_name = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用(下記参照)

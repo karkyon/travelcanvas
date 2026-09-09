@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     # ため、未設定時はQuickDraft関連呼び出し時にのみ明確なエラーを返す設計
     # とする(backend/app/core/crypto.py参照)。
     ENCRYPTION_KEY: Optional[str] = None
+
+    # [Gate R3-13] confirmation_number等の暗号化フィールドに対する盲検索
+    # (blind index)用のHMAC鍵。DOC-08 §19「Lookup: HMAC blind index、用途別key」
+    # に従い、ENCRYPTION_KEY(データ暗号化用)とは別鍵にする(鍵の用途分離。
+    # 片方が漏洩してももう片方の保護には影響しない設計)。ENCRYPTION_KEY同様、
+    # 未設定でもbackend全体は起動可能とし、検索機能呼び出し時にのみ明確な
+    # エラーを返す(app/core/crypto.py参照)。
+    LOOKUP_INDEX_KEY: Optional[str] = None
     
     # CORS設定 - Union[str, List[str]]にして文字列も受け入れる
     # [Gate R0] 廃止済みの開発機IP(192.168.1.248)を既定値から除去。
