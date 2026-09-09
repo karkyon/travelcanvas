@@ -16,14 +16,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
   Ticket, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
-  Users, X,
+  Users, X, CalendarDays, Lock, Unlock, Link2,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import {
+import api, {
   getReservations,
   createReservation,
   deleteReservation,
@@ -31,9 +31,14 @@ import {
   getReservationParticipants,
   createReservationParticipant,
   deleteReservationParticipant,
+  getReservationEventLinks,
+  createReservationEventLink,
+  updateReservationEventLink,
+  deleteReservationEventLink,
 } from '@/services/api';
 import type {
   Reservation, ReservationCreateData, ReservationParticipant,
+  ReservationEventLink, NormalizedDay, NormalizedEvent,
 } from '@/services/api';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
@@ -56,6 +61,13 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'キャンセル',
   used: '利用済み',
   no_show: '不参加',
+};
+
+// [Gate R3-3] event_reservations.relation_type表示ラベル(DOC-05 §6.2)。
+const RELATION_TYPE_LABEL: Record<string, string> = {
+  primary: '主紐付け',
+  required: '必須(連泊等)',
+  related: '関連',
 };
 
 function typeIcon(type: string): React.ReactNode {
@@ -141,6 +153,15 @@ const ReservationsPage: React.FC = () => {
   const [newParticipantName, setNewParticipantName] = useState('');
   const [newParticipantSeat, setNewParticipantSeat] = useState('');
 
+  // [Gate R3-3] イベント複数紐付け(event_reservations)
+  const [eventLinks, setEventLinks] = useState<ReservationEventLink[]>([]);
+  const [isLinksLoading, setIsLinksLoading] = useState(false);
+  const [planDays, setPlanDays] = useState<NormalizedDay[]>([]);
+  const [isAddLinkOpen, setIsAddLinkOpen] = useState(false);
+  const [newLinkEventId, setNewLinkEventId] = useState('');
+  const [newLinkRelationType, setNewLinkRelationType] = useState<'primary' | 'required' | 'related'>('required');
+  const [isAddingLink, setIsAddingLink] = useState(false);
+
   const loadReservations = useCallback(async () => {
     if (!planId) return;
     setIsLoading(true);
@@ -172,17 +193,41 @@ const ReservationsPage: React.FC = () => {
     }
   }, [planId]);
 
+  // [Gate R3-3] イベント紐付け一覧 + 紐付け候補となるplanの全イベント(日程別)を読み込む。
+  const loadEventLinks = useCallback(async (reservation: Reservation) => {
+    if (!planId) return;
+    setIsLinksLoading(true);
+    try {
+      const [links, planDetail] = await Promise.all([
+        getReservationEventLinks(planId, reservation.id),
+        api.getPlanDetail(planId),
+      ]);
+      setEventLinks(links);
+      setPlanDays(planDetail.data.days || []);
+    } catch {
+      setEventLinks([]);
+      setPlanDays([]);
+    } finally {
+      setIsLinksLoading(false);
+    }
+  }, [planId]);
+
   const openDetail = (reservation: Reservation) => {
     setSelected(reservation);
     setRevealed(null);
     setParticipants([]);
+    setEventLinks([]);
+    setIsAddLinkOpen(false);
     loadParticipants(reservation);
+    loadEventLinks(reservation);
   };
 
   const closeDetail = () => {
     setSelected(null);
     setRevealed(null);
     setParticipants([]);
+    setEventLinks([]);
+    setIsAddLinkOpen(false);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -252,6 +297,66 @@ const ReservationsPage: React.FC = () => {
       setError(e?.response?.data?.detail || '参加者の削除に失敗しました');
     }
   };
+
+  // [Gate R3-3] イベント複数紐付け(連泊等)
+  const handleAddEventLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planId || !selected || !newLinkEventId) return;
+    setIsAddingLink(true);
+    setError(null);
+    try {
+      await createReservationEventLink(planId, selected.id, {
+        event_id: newLinkEventId,
+        relation_type: newLinkRelationType,
+      });
+      setNewLinkEventId('');
+      setNewLinkRelationType('required');
+      setIsAddLinkOpen(false);
+      await loadEventLinks(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'イベント紐付けの追加に失敗しました');
+    } finally {
+      setIsAddingLink(false);
+    }
+  };
+
+  const handleToggleLinkLock = async (link: ReservationEventLink) => {
+    if (!planId || !selected) return;
+    try {
+      await updateReservationEventLink(planId, selected.id, link.id, { is_locked: !link.is_locked });
+      await loadEventLinks(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'イベント紐付けの更新に失敗しました');
+    }
+  };
+
+  const handleDeleteEventLink = async (link: ReservationEventLink) => {
+    if (!planId || !selected) return;
+    try {
+      await deleteReservationEventLink(planId, selected.id, link.id);
+      await loadEventLinks(selected);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || 'イベント紐付けの解除に失敗しました(ロック中の可能性があります)');
+    }
+  };
+
+  // planDaysから「イベントID -> 表示ラベル(日付+タイトル)」の逆引きを作る。
+  const eventLabel = (eventId: string): string => {
+    for (const day of planDays) {
+      const found = (day.events || []).find((ev) => ev.id === eventId);
+      if (found) return `${day.local_date} ${found.title}`;
+    }
+    return eventId;
+  };
+
+  // 既に紐付け済みのイベントを候補から除外する。
+  const linkedEventIds = new Set(eventLinks.map((l) => l.event_id));
+  const linkCandidates: { day: NormalizedDay; event: NormalizedEvent }[] = [];
+  for (const day of planDays) {
+    for (const ev of day.events || []) {
+      if (!linkedEventIds.has(ev.id)) linkCandidates.push({ day, event: ev });
+    }
+  }
 
   if (!planId) {
     return (
@@ -486,6 +591,107 @@ const ReservationsPage: React.FC = () => {
                     <div className="text-sm whitespace-pre-wrap">{selected.notes}</div>
                   </div>
                 )}
+
+                {/* [Gate R3-3] 紐付いているイベント(連泊等の複数日紐付け) */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Link2 size={16} /> 紐付いているイベント
+                    </div>
+                    {!isAddLinkOpen && linkCandidates.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<Plus size={14} />}
+                        onClick={() => setIsAddLinkOpen(true)}
+                      >
+                        追加
+                      </Button>
+                    )}
+                  </div>
+
+                  {isLinksLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <div className="space-y-2 mb-3">
+                      {eventLinks.length === 0 && (
+                        <div className="text-sm text-gray-400">紐付いているイベントがありません</div>
+                      )}
+                      {eventLinks.map((link) => (
+                        <div
+                          key={link.id}
+                          className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CalendarDays size={14} className="text-gray-400 shrink-0" />
+                            <span className="truncate">{eventLabel(link.event_id)}</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 shrink-0">
+                              {RELATION_TYPE_LABEL[link.relation_type] ?? link.relation_type}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLinkLock(link)}
+                              className="text-gray-400 hover:text-gray-700 p-1"
+                              aria-label={link.is_locked ? 'ロック解除' : 'ロック'}
+                              title={link.is_locked ? 'ロック解除する' : '誤操作防止のためロックする'}
+                            >
+                              {link.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEventLink(link)}
+                              disabled={link.is_locked}
+                              className="text-gray-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed p-1"
+                              aria-label="イベント紐付けを解除"
+                              title={link.is_locked ? 'ロック中は解除できません' : '紐付けを解除する'}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isAddLinkOpen && (
+                    <form onSubmit={handleAddEventLink} className="flex flex-wrap gap-2 items-end">
+                      <div className="flex-1 min-w-[180px]">
+                        <label className="block text-xs text-gray-500 mb-1">イベント</label>
+                        <select
+                          value={newLinkEventId}
+                          onChange={(e) => setNewLinkEventId(e.target.value)}
+                          className="w-full border rounded-lg px-2 py-1.5 text-sm"
+                        >
+                          <option value="">選択してください</option>
+                          {linkCandidates.map(({ day, event }) => (
+                            <option key={event.id} value={event.id}>
+                              {day.local_date} {event.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">紐付け種別</label>
+                        <select
+                          value={newLinkRelationType}
+                          onChange={(e) => setNewLinkRelationType(e.target.value as 'required' | 'related')}
+                          className="border rounded-lg px-2 py-1.5 text-sm"
+                        >
+                          <option value="required">必須(連泊等)</option>
+                          <option value="related">関連</option>
+                        </select>
+                      </div>
+                      <Button type="submit" variant="outline" size="sm" loading={isAddingLink} disabled={!newLinkEventId}>
+                        紐付ける
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddLinkOpen(false)}>
+                        キャンセル
+                      </Button>
+                    </form>
+                  )}
+                </div>
 
                 {/* 参加者 */}
                 <div className="border-t pt-4">

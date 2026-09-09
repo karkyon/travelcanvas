@@ -360,6 +360,30 @@ export interface ReservationCreateData {
 
 export type ReservationUpdateData = Partial<ReservationCreateData>;
 
+// [Gate R3-3] event_reservations中間表(複数イベント紐付け)。
+// backend/app/api/v1/reservations.py の create_event_link/list_event_links/
+// update_event_link/delete_event_link に対応。
+export interface ReservationEventLink {
+  id: string;
+  event_id: string;
+  reservation_id: string;
+  relation_type: 'primary' | 'required' | 'related' | string;
+  is_locked: boolean;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ReservationEventLinkCreateData {
+  event_id: string;
+  relation_type?: 'primary' | 'required' | 'related';
+  is_locked?: boolean;
+}
+
+export interface ReservationEventLinkUpdateData {
+  relation_type?: 'primary' | 'required' | 'related';
+  is_locked?: boolean;
+}
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -1048,6 +1072,36 @@ class CompleteTravelAPI {
     );
   }
 
+  // [Gate R3-3] event_reservations中間表(複数イベント紐付け)
+  async getReservationEventLinks(planId: string, reservationId: string): Promise<ReservationEventLink[]> {
+    const response = await this.client.get<ReservationEventLink[]>(
+      `/plans/${planId}/reservations/${reservationId}/events`
+    );
+    return response.data;
+  }
+
+  async createReservationEventLink(
+    planId: string, reservationId: string, data: ReservationEventLinkCreateData
+  ): Promise<ReservationEventLink> {
+    const response = await this.client.post<ReservationEventLink>(
+      `/plans/${planId}/reservations/${reservationId}/events`, data
+    );
+    return response.data;
+  }
+
+  async updateReservationEventLink(
+    planId: string, reservationId: string, linkId: string, data: ReservationEventLinkUpdateData
+  ): Promise<ReservationEventLink> {
+    const response = await this.client.patch<ReservationEventLink>(
+      `/plans/${planId}/reservations/${reservationId}/events/${linkId}`, data
+    );
+    return response.data;
+  }
+
+  async deleteReservationEventLink(planId: string, reservationId: string, linkId: string): Promise<void> {
+    await this.client.delete(`/plans/${planId}/reservations/${reservationId}/events/${linkId}`);
+  }
+
   // ===== [Gate #32] PLAN MAP: route/insertion preview =====
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get<RoutePreview>(
@@ -1339,5 +1393,16 @@ export const createReservationParticipant = (
 ) => api.createReservationParticipant(planId, reservationId, data);
 export const deleteReservationParticipant = (planId: string, reservationId: string, participantId: string) =>
   api.deleteReservationParticipant(planId, reservationId, participantId);
+
+// [Gate R3-3] event_reservations中間表(複数イベント紐付け)
+export const getReservationEventLinks = (planId: string, reservationId: string) =>
+  api.getReservationEventLinks(planId, reservationId);
+export const createReservationEventLink = (planId: string, reservationId: string, data: ReservationEventLinkCreateData) =>
+  api.createReservationEventLink(planId, reservationId, data);
+export const updateReservationEventLink = (
+  planId: string, reservationId: string, linkId: string, data: ReservationEventLinkUpdateData
+) => api.updateReservationEventLink(planId, reservationId, linkId, data);
+export const deleteReservationEventLink = (planId: string, reservationId: string, linkId: string) =>
+  api.deleteReservationEventLink(planId, reservationId, linkId);
 
 export default api;
