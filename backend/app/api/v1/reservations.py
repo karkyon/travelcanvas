@@ -255,7 +255,7 @@ def _to_response(r: Reservation) -> ReservationResponse:
         provider_name=r.provider_name,
         confirmation_number_masked=r.confirmation_number_masked,
         has_pin=r.pin_ciphertext is not None,
-        holder_name=_decrypt_or_none(r.holder_name_ciphertext) or r.holder_name,
+        holder_name=_decrypt_or_none(r.holder_name_ciphertext),
         guest_count=r.guest_count,
         start_at=r.start_at,
         end_at=r.end_at,
@@ -264,7 +264,7 @@ def _to_response(r: Reservation) -> ReservationResponse:
         currency=r.currency,
         payment_status=r.payment_status,
         cancellation_deadline=r.cancellation_deadline,
-        contact_phone=_decrypt_or_none(r.contact_phone_ciphertext) or r.contact_phone,
+        contact_phone=_decrypt_or_none(r.contact_phone_ciphertext),
         contact_url=r.contact_url,
         notes=r.notes,
         revision=r.revision,
@@ -584,12 +584,10 @@ def update_reservation(
     if "holder_name" in data:
         raw = data.pop("holder_name")
         r.holder_name_ciphertext = _encrypt_or_raise(raw, "名義")
-        r.holder_name = None  # [Gate R3-8] 旧平文列は以後更新しない
 
     if "contact_phone" in data:
         raw = data.pop("contact_phone")
         r.contact_phone_ciphertext = _encrypt_or_raise(raw, "連絡先電話番号")
-        r.contact_phone = None  # [Gate R3-8] 旧平文列は以後更新しない
 
     for field, value in data.items():
         setattr(r, field, value)
@@ -724,9 +722,9 @@ def _to_participant_response(p: ReservationParticipant) -> ParticipantResponse:
         id=str(p.id),
         reservation_id=str(p.reservation_id),
         plan_member_id=str(p.plan_member_id) if p.plan_member_id else None,
-        name=_decrypt_or_none(p.name_ciphertext) or p.name or "",
-        seat=_decrypt_or_none(p.seat_ciphertext) or p.seat,
-        special_request=_decrypt_or_none(p.special_request_ciphertext) or p.special_request,
+        name=_decrypt_or_none(p.name_ciphertext) or "",
+        seat=_decrypt_or_none(p.seat_ciphertext),
+        special_request=_decrypt_or_none(p.special_request_ciphertext),
         revision=p.revision,
         created_at=p.created_at,
         updated_at=p.updated_at,
@@ -872,18 +870,15 @@ def update_participant(
     if "name" in data:
         raw = data.pop("name")
         p.name_ciphertext = _encrypt_or_raise(raw, "参加者氏名")
-        p.name = None  # [Gate R3-8] 旧平文列は以後更新しない
         p.name_lookup_hash = _compute_participant_name_lookup_hash_or_none(raw)
 
     if "seat" in data:
         raw = data.pop("seat")
         p.seat_ciphertext = _encrypt_or_raise(raw, "座席")
-        p.seat = None
 
     if "special_request" in data:
         raw = data.pop("special_request")
         p.special_request_ciphertext = _encrypt_or_raise(raw, "特別リクエスト")
-        p.special_request = None
 
     for field, value in data.items():
         setattr(p, field, value)

@@ -863,14 +863,10 @@ class Reservation(Base):
     confirmation_number_suffix_lookup_hash = Column(String(64), nullable=True, index=True)
     pin_ciphertext = Column(LargeBinary, nullable=True)
 
-    holder_name = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用(下記参照)
-    # [Gate R3-8] holder_name/contact_phoneの暗号化列。DOC-05 §6.1は
-    # holder_ciphertext/contact_phone_ciphertextを要求しており、Gate R3-0
-    # 時点の平文カラムはスコープ限定だった(ADR-reservation-minimal.md参照)。
-    # 本Gateで暗号化列を追加し、以後の作成・更新はこちらのみへ書き込む。
-    # 上記の平文列(holder_name/contact_phone)はDOC-11 §14の
-    # expand/contractパターンに従い、削除せず後方互換のため残す
-    # (additive only原則。過去データの再確認・監査時の参照用)。
+    # [Gate R3-16] holder_name平文列はDOC-11 §14 expand/contractのcontract
+    # フェーズとして削除した(Gate R3-8のコメントを参照。以前はここに
+    # `holder_name = Column(String, nullable=True)` が存在した)。
+    # holder_name_ciphertextのみが正本となる。
     holder_name_ciphertext = Column(LargeBinary, nullable=True)
     guest_count = Column(Integer, nullable=True)
 
@@ -883,7 +879,7 @@ class Reservation(Base):
     payment_status = Column(String, nullable=True)
 
     cancellation_deadline = Column(DateTime(timezone=True), nullable=True)
-    contact_phone = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用
+    # [Gate R3-16] contact_phone平文列も同様にcontract済み(削除)。
     contact_phone_ciphertext = Column(LargeBinary, nullable=True)
     contact_url = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
@@ -976,12 +972,10 @@ class ReservationParticipant(Base):
     )
     plan_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
 
-    # [Gate R3-8] 非推奨・後方互換用の平文列(既存データ参照用に残す。
-    # additive only原則によりDROPしない)。以後の作成・更新は
-    # *_ciphertext列のみへ書き込む(app/api/v1/reservations.py参照)。
-    name = Column(String, nullable=True)
-    seat = Column(String, nullable=True)
-    special_request = Column(Text, nullable=True)
+    # [Gate R3-16] name/seat/special_requestの平文列はDOC-11 §14
+    # expand/contractのcontractフェーズとして削除した(Gate R3-8時点では
+    # ここに`name`/`seat`/`special_request`平文Columnが存在した)。
+    # *_ciphertext列のみが正本となる。
 
     # [Gate R3-8] Gate R2-2/R3-0と同じFernet field encryption。
     name_ciphertext = Column(LargeBinary, nullable=True)

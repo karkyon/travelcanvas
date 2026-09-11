@@ -489,3 +489,83 @@ SyntaxError(`unmatched ')'`)を作り込んだ。サンドボックスでの
 
 DOC-10監査の継続(FR-046画像/PDF出力は「IDEA」評価が正確と確認済み。
 他のFRの調査)、旧平文列のcontract(削除)、Object Storage実連携。
+
+---
+
+## 改訂: Gate R3-16（2026-09-11）
+
+Gate R3-8以来「次Gate候補」として繰り返し挙げていた「旧平文列のcontract
+(削除)」を実施した。DOC-11 §14 expand/contractパターンのcontractフェーズ
+にあたる。
+
+### 事前調査(参照箇所の洗い出し)
+
+実装着手前に、独立clone上で旧平文列(`reservations.holder_name`/
+`contact_phone`、`reservation_participants.name`/`seat`/
+`special_request`)への全参照箇所をgrepで洗い出した。結果:
+
+- 書き込み参照: `app/api/v1/reservations.py`の更新処理内で、暗号化後に
+  旧列へ`None`を代入する5箇所のみ(Gate R3-8で「以後更新しない」ため
+  明示的にクリアしていた箇所)。
+- 読み取り参照: `_to_response`/`_to_participant_response`内の
+  `_decrypt_or_none(ciphertext) or 旧平文値`という後方互換フォールバック
+  5箇所のみ。
+- それ以外(frontend、他のAPIルーター、admin機能等)からの参照は無し。
+
+参照範囲が限定的であることを確認できたため、削除の影響範囲は
+`app/models/models.py`と`app/api/v1/reservations.py`の2ファイルに
+限定されると判断した。
+
+### 決定事項
+
+1. **pre-flightチェック付きの破壊的migrationとする**。旧平文列に値が
+   入っているのに対応するciphertext列がNULLの行(=Gate R3-8のbackfill
+   未実施、またはENCRYPTION_KEY未設定時に作成された行)が1件でも
+   存在する場合、そのデータは列削除で失われてしまう。これを防ぐため、
+   migrationのupgrade()冒頭で該当行数を数えるpre-flightチェックを行い、
+   1件でも検出されたら`RuntimeError`を送出してmigration全体を中断する
+   (alembicのtransactional DDLにより、それまでのカラム削除操作も
+   ロールバックされる)。
+2. **read側のフォールバックを撤去する**。`_decrypt_or_none(ciphertext)
+   or 旧平文値`という表現から`or 旧平文値`部分を削除した(列自体が
+   無くなるため、参照するとAttributeErrorになる)。
+3. **write側の`= None`代入を削除する**。列が無くなるため不要。
+4. **downgrade()はスキーマ形状のみを復元し、データは復元しない**ことを
+   migrationのdocstringに明記した。列を削除した時点でデータは失われ、
+   downgradeは「列を追加し直す」ことしか出来ない。
+5. **本番/開発DBへの自動適用はしない**。他のGate(R3-13〜15)と異なり、
+   本migrationは破壊的(non-additive)であるため、パッチスクリプトによる
+   自動`alembic upgrade head`の対象に含めず、pre-flightチェックの結果を
+   見た利用者自身が実行する運用とする。
+
+### 検証
+
+サンドボックスで2パターンを検証した。
+
+- **正常系**: 全行がciphertext化済み(または平文列自体がNULL)の状態で
+  `alembic upgrade head`を実行し、成功して単一head `29f832c03c75`
+  (down_revision=`725cce80af7c`)に到達することを確認。
+- **危険系**: 生SQLで直接、ciphertext列がNULLのまま`holder_name`に
+  平文値を持つ行を投入し(ORM経由だとGate R3-16後のモデルクラスに
+  もはや`holder_name`属性が無いため書き込みが黙って無視されてしまう
+  ことに気付き、生SQLでの投入に切り替えて検証した)、`alembic upgrade
+  head`を実行したところ、pre-flightチェックが1行を検出して
+  `RuntimeError`を送出し、migrationが中断されること、`alembic current`
+  が`725cce80af7c`のまま進んでいないこと、`holder_name`列が実際に
+  まだ存在すること(=データが保護されたこと)を確認した。
+
+既存テストのうち、削除された平文列への直接アサーション(`row.name is
+None`等)を含む6ケースを、ciphertext列のみを見るよう更新した。特に
+Gate R3-8で追加していた「旧データのフォールバック読み取り」テストは、
+そのフォールバック自体が本Gateで意図的に撤去された機能であるため、
+廃止の記録として別内容のテストに置き換えた(詳細はテストファイルの
+コメント参照)。新規`tests/test_gate_r3_16_contract_plaintext_columns.py`
+(6ケース: モデルに平文列属性が存在しないこと、作成・取得のroundtrip、
+未指定時のNone、参加者側の同等テスト)を追加。backend全体256件(既存
+250件+新規6件、うち6件は更新のみで新規テストファイル6件と合わせて
+実質256件)全てPASS。
+
+### 次Gate候補
+
+Object Storage実連携、FR-034/035/046(しおり生成・安全な印刷・公開・
+画像/PDF出力)をまとめたG1-G2縦切りGateの新規設計、DOC-10監査の継続。
