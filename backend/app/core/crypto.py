@@ -76,8 +76,36 @@ def compute_lookup_hash(raw: str) -> str:
     """[Gate R3-13] DOC-11 §6.3 / DOC-08 §19 blind index。confirmation_number等の
     暗号化フィールドに対する完全一致検索のためのHMAC-SHA256決定的ハッシュを
     16進文字列で返す。POC-03「完全一致または末尾検索だけに制限」のうち
-    完全一致側のみを実装する(末尾検索は次Gateスコープ、ADR参照)。"""
+    完全一致側を実装する(末尾検索は下記compute_suffix_lookup_hash参照)。"""
     mac = hmac.new(_get_lookup_index_key(), normalize_lookup_value(raw).encode("utf-8"), hashlib.sha256)
+    return mac.hexdigest()
+
+
+# [Gate R3-14] DOC-04 SC-17「予約番号: 既定表示=末尾4桁」/ SC-10「予約番号は
+# 末尾検索を可能にしても結果画面ではマスクする」に合わせ、末尾検索の単位を
+# 4文字に固定する(confirmation_number_maskedの表示単位と揃える)。
+SUFFIX_LOOKUP_LENGTH = 4
+
+
+def compute_suffix_lookup_hash(raw: str, length: int = SUFFIX_LOOKUP_LENGTH):
+    """[Gate R3-14] POC-03「blind indexで予約番号末尾検索」に対応する、末尾N文字
+    専用のHMAC blind index。完全一致用の`compute_lookup_hash`とは別の索引で
+    あり、値の衝突を避けるため入力に固定タグ(`SUFFIXn:`)を付与してから
+    HMAC計算する(同じ鍵を使っても、完全一致索引・末尾索引・将来追加され得る
+    他の索引が互いに推測材料にならないようにするドメイン分離)。
+
+    正規化後の文字列が`length`未満の場合はNoneを返す(索引を作らない)。
+    短い予約番号に対して末尾一致検索を許すと、実質的に完全一致検索と
+    同程度の絞り込み精度になり、末尾マスク表示("****1234"相当)が提供する
+    はずの秘匿性を損なうため。
+    """
+    normalized = normalize_lookup_value(raw)
+    if len(normalized) < length:
+        return None
+    suffix = normalized[-length:]
+    mac = hmac.new(
+        _get_lookup_index_key(), f"SUFFIX{length}:{suffix}".encode("utf-8"), hashlib.sha256
+    )
     return mac.hexdigest()
 
 

@@ -375,3 +375,58 @@ backfillロジック自体を実データで検証した(復号→正規化→HM
 (FR-046画像/PDF出力等)、旧平文列(`holder_name`/`contact_phone`/
 `name`/`seat`/`special_request`)のcontract(削除)、Object Storage
 実連携。
+
+---
+
+## 改訂: Gate R3-14（2026-09-09）
+
+Gate R3-13で次Gateスコープとしていた「末尾検索用の専用blind index」を
+実装した。DOC-04 SC-10「予約番号は末尾検索を可能にしても結果画面では
+マスクする」、SC-17「予約番号: 既定表示=末尾4桁」、POC-03「blind index
+で予約番号末尾検索」に対応する。
+
+### 決定事項
+
+1. **末尾4文字固定**。SC-17の既定マスク表示("****1234")が末尾4桁を
+   露出している設計と単位を揃え、末尾検索も4文字固定とした。可変長に
+   すると「何文字から検索できるか」がUIの一貫性を崩し、また短い桁数を
+   許すほど実質的に完全一致検索へ近づき秘匿性が下がるため、固定長を
+   採用した。
+2. **完全一致索引とは別列・別ドメインのHMAC**。同じ`LOOKUP_INDEX_KEY`を
+   使うが、HMAC計算前の入力に`"SUFFIX4:"`という固定タグを付与する
+   (`app/core/crypto.py compute_suffix_lookup_hash`)。これにより、
+   同一予約番号に対する完全一致索引の値と末尾索引の値が異なり、一方の
+   索引値から他方を逆算する手がかりにならないようにしている(ドメイン
+   分離)。
+3. **4文字未満の予約番号には索引を作らない**。正規化後の文字列が4文字
+   未満の場合、`compute_suffix_lookup_hash`はNoneを返し、
+   `confirmation_number_suffix_lookup_hash`はNULLのままとなる。この
+   ような短い予約番号を「末尾一致」で検索可能にすると、実質的に完全
+   一致検索と同じ絞り込み精度になってしまうため。
+4. **既存の`GET .../reservations/search`エンドポイントを拡張**。新規
+   エンドポイントを作らず、既存の`confirmation_number`(完全一致)に
+   加えて`confirmation_number_suffix`(末尾一致)を任意パラメータとして
+   追加した。どちらか一方が必須(両方指定・どちらも未指定は400)。
+   `confirmation_number_suffix`が4文字以外の場合も400とする(索引の
+   粒度と一致しない検索は常に空振りになり、利用者に無意味な「該当なし」
+   を返してしまうため、リクエスト時点でエラーとして知らせる)。
+
+### 検証
+
+サンドボックスで`alembic upgrade head`成功、alembic headが
+`cc0e6eee0159`(down_revision=`5d57e3208d2a`)の単一headになることを
+確認。
+
+新規`tests/test_gate_r3_14_suffix_lookup_hash.py`(10ケース: 末尾4文字
+一致検索、正規化(大文字小文字)一致、末尾指定4文字以外での400(3文字・
+5文字)、完全一致パラメータとの同時指定400、両パラメータ未指定400、
+4文字未満の予約番号での索引未作成(検索パラメータ自体が3文字のため
+400になることを確認)、更新時のsuffix_lookup_hash更新、クリア時の
+suffix_lookup_hash削除、APIレスポンスへの`confirmation_number_suffix_lookup_hash`
+非露出、Gate R3-13の完全一致検索が引き続き動作することのリグレッション
+確認)全てPASS。
+
+### 次Gate候補
+
+`reservation_participants`側の氏名検索、DOC-10監査の継続(FR-046画像/
+PDF出力等)、旧平文列のcontract(削除)、Object Storage実連携。

@@ -24,9 +24,11 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import (
+    SUFFIX_LOOKUP_LENGTH,
     EncryptionNotConfigured,
     LookupIndexNotConfigured,
     compute_lookup_hash,
+    compute_suffix_lookup_hash,
     decrypt_payload,
     encrypt_payload,
 )
@@ -218,6 +220,18 @@ def _compute_lookup_hash_or_none(raw: Optional[str]) -> Optional[str]:
         return None
 
 
+def _compute_suffix_lookup_hash_or_none(raw: Optional[str]) -> Optional[str]:
+    """[Gate R3-14] 末尾検索用blind index計算ヘルパー。_compute_lookup_hash_or_none
+    と同じ理由でLOOKUP_INDEX_KEY未設定時はNoneを返す(検索機能のみへ影響)。
+    正規化後4文字未満の場合はcompute_suffix_lookup_hash自体がNoneを返す。"""
+    if not raw:
+        return None
+    try:
+        return compute_suffix_lookup_hash(raw)
+    except LookupIndexNotConfigured:
+        return None
+
+
 def _to_response(r: Reservation) -> ReservationResponse:
     return ReservationResponse(
         id=str(r.id),
@@ -367,6 +381,9 @@ def create_reservation(
             )
         r.confirmation_number_masked = _mask_confirmation_number(payload.confirmation_number)
         r.confirmation_number_lookup_hash = _compute_lookup_hash_or_none(payload.confirmation_number)
+        r.confirmation_number_suffix_lookup_hash = _compute_suffix_lookup_hash_or_none(
+            payload.confirmation_number
+        )
 
     if payload.pin:
         try:
@@ -415,44 +432,81 @@ def list_reservations(
 @router.get("/{plan_id}/reservations/search", response_model=List[ReservationResponse])
 def search_reservations(
     plan_id: str,
-    confirmation_number: str,
+    confirmation_number: Optional[str] = None,
+    confirmation_number_suffix: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    """[Gate R3-13] DOC-11 §6.3 / DOC-08 §19 blind indexによる予約番号の
-    完全一致検索。confirmation_numberは暗号化されており平文WHERE検索が
-    できないため、HMAC blind index(confirmation_number_lookup_hash)で
-    照合する。POC-03「完全一致または末尾検索だけに制限」のうち完全一致側の
-    みを実装する(末尾検索はスコープ外。docs/adr/ADR-reservation-minimal.md
-    参照)。パスは`{reservation_id}`より前に定義し、"search"がUUIDとして
-    誤って解釈されないようにする。
+    """[Gate R3-13/R3-14] DOC-11 §6.3 / DOC-08 §19 / POC-03「完全一致または
+    末尾検索だけに制限」に対応するblind index検索。confirmation_numberは
+    暗号化されており平文WHERE検索ができないため、2種類のHMAC blind index
+    のいずれかで照合する。
+
+    - `confirmation_number`: 完全一致(confirmation_number_lookup_hash)。
+    - `confirmation_number_suffix`: 末尾4文字での一致
+      (confirmation_number_suffix_lookup_hash、app/core/crypto.py
+      SUFFIX_LOOKUP_LENGTH参照)。DOC-04 SC-17の既定マスク表示("****1234")
+      と同じ末尾4文字単位。4文字以外の長さで渡された場合は400とする
+      (索引の粒度と一致しない検索は常に空振りになり、利用者に無意味な
+      「該当なし」を返してしまうため)。
+
+    どちらか一方を必須とする(両方指定/どちらも未指定は400)。パスは
+    `{reservation_id}`より前に定義し、"search"がUUIDとして誤って解釈
+    されないようにする。
     """
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
 
-    if not confirmation_number or not confirmation_number.strip():
+    has_exact = bool(confirmation_number and confirmation_number.strip())
+    has_suffix = bool(confirmation_number_suffix and confirmation_number_suffix.strip())
+
+    if has_exact and has_suffix:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="confirmation_numberは必須です"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="confirmation_numberとconfirmation_number_suffixは同時に指定できません",
+        )
+    if not has_exact and not has_suffix:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="confirmation_numberまたはconfirmation_number_suffixのいずれかが必要です",
         )
 
-    try:
-        target_hash = compute_lookup_hash(confirmation_number)
-    except LookupIndexNotConfigured:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="予約番号検索が設定されていません(サーバー側のLOOKUP_INDEX_KEY未設定)",
-        )
+    if has_suffix:
+        normalized_suffix = confirmation_number_suffix.strip()
+        if len(normalized_suffix) != SUFFIX_LOOKUP_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation_number_suffixは{SUFFIX_LOOKUP_LENGTH}文字である必要があります",
+            )
+        try:
+            target_hash = compute_suffix_lookup_hash(normalized_suffix)
+        except LookupIndexNotConfigured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="予約番号検索が設定されていません(サーバー側のLOOKUP_INDEX_KEY未設定)",
+            )
+        filter_column = Reservation.confirmation_number_suffix_lookup_hash
+    else:
+        try:
+            target_hash = compute_lookup_hash(confirmation_number)
+        except LookupIndexNotConfigured:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="予約番号検索が設定されていません(サーバー側のLOOKUP_INDEX_KEY未設定)",
+            )
+        filter_column = Reservation.confirmation_number_lookup_hash
 
     rows = (
         db.query(Reservation)
         .filter(
             Reservation.plan_id == plan.id,
             Reservation.deleted_at.is_(None),
-            Reservation.confirmation_number_lookup_hash == target_hash,
+            filter_column == target_hash,
         )
         .order_by(Reservation.start_at.asc().nullslast(), Reservation.created_at.asc())
         .all()
     )
     return [_to_response(r) for r in rows]
+
 
 
 @router.get("/{plan_id}/reservations/{reservation_id}", response_model=ReservationResponse)
@@ -495,10 +549,12 @@ def update_reservation(
                 )
             r.confirmation_number_masked = _mask_confirmation_number(raw)
             r.confirmation_number_lookup_hash = _compute_lookup_hash_or_none(raw)
+            r.confirmation_number_suffix_lookup_hash = _compute_suffix_lookup_hash_or_none(raw)
         else:
             r.confirmation_number_ciphertext = None
             r.confirmation_number_masked = None
             r.confirmation_number_lookup_hash = None
+            r.confirmation_number_suffix_lookup_hash = None
 
     if "pin" in data:
         raw = data.pop("pin")

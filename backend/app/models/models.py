@@ -857,6 +857,10 @@ class Reservation(Base):
     # ENCRYPTION_KEYとは異なる鍵を使う(用途別鍵分離)。APIレスポンスには
     # 一切含めない(内部的な検索索引専用)。
     confirmation_number_lookup_hash = Column(String(64), nullable=True, index=True)
+    # [Gate R3-14] DOC-04 SC-10/SC-17・POC-03対応。末尾4文字専用のHMAC blind
+    # index(app/core/crypto.py compute_suffix_lookup_hash参照)。上の完全一致用
+    # lookup_hashとは別列・別ドメインのHMAC値であり、混同できない。
+    confirmation_number_suffix_lookup_hash = Column(String(64), nullable=True, index=True)
     pin_ciphertext = Column(LargeBinary, nullable=True)
 
     holder_name = Column(String, nullable=True)  # [Gate R3-8] 非推奨・後方互換用(下記参照)
