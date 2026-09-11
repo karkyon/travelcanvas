@@ -28,6 +28,7 @@ from app.core.crypto import (
     EncryptionNotConfigured,
     LookupIndexNotConfigured,
     compute_lookup_hash,
+    compute_participant_name_lookup_hash,
     compute_suffix_lookup_hash,
     decrypt_payload,
     encrypt_payload,
@@ -228,6 +229,17 @@ def _compute_suffix_lookup_hash_or_none(raw: Optional[str]) -> Optional[str]:
         return None
     try:
         return compute_suffix_lookup_hash(raw)
+    except LookupIndexNotConfigured:
+        return None
+
+
+def _compute_participant_name_lookup_hash_or_none(raw: Optional[str]) -> Optional[str]:
+    """[Gate R3-15] 参加者氏名検索用blind index計算ヘルパー。他のヘルパーと
+    同じ理由でLOOKUP_INDEX_KEY未設定時はNoneを返す(検索機能のみへ影響)。"""
+    if not raw:
+        return None
+    try:
+        return compute_participant_name_lookup_hash(raw)
     except LookupIndexNotConfigured:
         return None
 
@@ -760,6 +772,7 @@ def create_participant(
     p.name_ciphertext = _encrypt_or_raise(payload.name, "参加者氏名")
     p.seat_ciphertext = _encrypt_or_raise(payload.seat, "座席")
     p.special_request_ciphertext = _encrypt_or_raise(payload.special_request, "特別リクエスト")
+    p.name_lookup_hash = _compute_participant_name_lookup_hash_or_none(payload.name)
     db.add(p)
     db.commit()
     db.refresh(p)
@@ -791,6 +804,53 @@ def list_participants(
     return [_to_participant_response(p) for p in rows]
 
 
+@router.get(
+    "/{plan_id}/reservations/participants/search",
+    response_model=List[ParticipantResponse],
+)
+def search_participants(
+    plan_id: str,
+    name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate R3-15] DOC-11 §6.3 blind indexによる参加者氏名の完全一致検索。
+    reservation_participants.nameは暗号化されており平文WHERE検索が
+    できないため、HMAC blind index(name_lookup_hash)で照合する。予約
+    個別ではなく`plan_id`配下の全予約の参加者を横断検索する(「この旅行の
+    予約に田中さんはいるか」という使い方を想定)。パスの segment 数が
+    `/{reservation_id}/participants`(2segments)や
+    `/{reservation_id}/participants/{participant_id}`(3segments)と
+    一致しないため、定義順に関わらず衝突しない。
+    """
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+
+    if not name or not name.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="nameは必須です")
+
+    try:
+        target_hash = compute_participant_name_lookup_hash(name)
+    except LookupIndexNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="参加者氏名検索が設定されていません(サーバー側のLOOKUP_INDEX_KEY未設定)",
+        )
+
+    rows = (
+        db.query(ReservationParticipant)
+        .join(Reservation, ReservationParticipant.reservation_id == Reservation.id)
+        .filter(
+            Reservation.plan_id == plan.id,
+            Reservation.deleted_at.is_(None),
+            ReservationParticipant.deleted_at.is_(None),
+            ReservationParticipant.name_lookup_hash == target_hash,
+        )
+        .order_by(ReservationParticipant.created_at.asc())
+        .all()
+    )
+    return [_to_participant_response(p) for p in rows]
+
+
 @router.patch(
     "/{plan_id}/reservations/{reservation_id}/participants/{participant_id}",
     response_model=ParticipantResponse,
@@ -813,6 +873,7 @@ def update_participant(
         raw = data.pop("name")
         p.name_ciphertext = _encrypt_or_raise(raw, "参加者氏名")
         p.name = None  # [Gate R3-8] 旧平文列は以後更新しない
+        p.name_lookup_hash = _compute_participant_name_lookup_hash_or_none(raw)
 
     if "seat" in data:
         raw = data.pop("seat")

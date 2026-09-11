@@ -109,6 +109,20 @@ def compute_suffix_lookup_hash(raw: str, length: int = SUFFIX_LOOKUP_LENGTH):
     return mac.hexdigest()
 
 
+def compute_participant_name_lookup_hash(raw: str) -> str:
+    """[Gate R3-15] reservation_participants.nameに対する完全一致blind index。
+    `compute_lookup_hash`(confirmation_number用)とは別ドメイン
+    (`"PARTICIPANT_NAME:"`タグ)のHMACとする。異なるフィールド間で索引値の
+    相関を取れないようにするドメイン分離であり、Gate R3-14の
+    `compute_suffix_lookup_hash`と同じ考え方。"""
+    mac = hmac.new(
+        _get_lookup_index_key(),
+        f"PARTICIPANT_NAME:{normalize_lookup_value(raw)}".encode("utf-8"),
+        hashlib.sha256,
+    )
+    return mac.hexdigest()
+
+
 def encrypt_payload(plaintext: bytes) -> bytes:
     return _get_fernet().encrypt(plaintext)
 

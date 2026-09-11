@@ -430,3 +430,62 @@ suffix_lookup_hash削除、APIレスポンスへの`confirmation_number_suffix_l
 
 `reservation_participants`側の氏名検索、DOC-10監査の継続(FR-046画像/
 PDF出力等)、旧平文列のcontract(削除)、Object Storage実連携。
+
+---
+
+## 改訂: Gate R3-15（2026-09-09）
+
+Gate R3-13の次Gate候補で挙げていた「`reservation_participants`側の氏名
+検索」を実装した。DOC-11 §6.3のblind indexパターンを、Gate R3-1で
+追加した`reservation_participants.name`(Gate R3-8で暗号化列化済み)へ
+適用する。
+
+### 決定事項
+
+1. **完全一致検索のみ**。Gate R3-13のconfirmation_numberと同じ方針とし、
+   末尾検索や部分一致は対象外とする(氏名の末尾一致は「名字だけで検索」
+   のような用途に本来向くが、そのような要件がDOC群に明記されていない
+   ため、過剰実装を避けスコープを最小に留めた)。
+2. **ドメイン分離**。`compute_participant_name_lookup_hash`は
+   confirmation_number用の`compute_lookup_hash`と同じ`LOOKUP_INDEX_KEY`を
+   使うが、入力に`"PARTICIPANT_NAME:"`タグを付与し、異なるフィールド間
+   でHMAC値の相関が取れないようにする(Gate R3-14の末尾索引と同じ設計
+   パターン)。
+3. **plan横断検索**。予約個別ではなく`plan_id`配下の全予約の参加者を
+   横断検索する。「この旅行の予約に田中さんが参加しているか」という
+   利用シーンを想定し、個別予約IDを事前に知らなくても検索できるように
+   した。`GET /{plan_id}/reservations/participants/search?name=...`
+   というパスは、既存の`{reservation_id}/participants`(2 segments)や
+   `{reservation_id}/participants/{participant_id}`(3 segments)と
+   segment数が異なるため、定義順に関わらずルーティング衝突は起きない
+   (Gate R3-13の`/reservations/search`のような定義順の配慮は不要)。
+4. **他のblind indexと同じ運用ルールを踏襲**。LOOKUP_INDEX_KEY未設定時は
+   検索のみ503、作成・更新は妨げない。APIレスポンスに
+   `name_lookup_hash`は一切含めない。
+
+### 検証
+
+サンドボックスで`alembic upgrade head`成功、alembic headが
+`725cce80af7c`(down_revision=`cc0e6eee0159`)の単一headになることを
+確認。
+
+新規`tests/test_gate_r3_15_participant_name_lookup_hash.py`(11ケース:
+完全一致検索、正規化一致、未一致、name未指定400、同一plan内の複数予約
+横断検索、plan間のスコープ分離、更新時のlookup_hash更新、APIレスポンス
+への非露出、他ユーザー403、LOOKUP_INDEX_KEY未設定時503)全てPASS。
+
+### migration適用中に見つけて修正した実装ミス
+
+検索エンドポイント追加のためのstr_replace編集で、置換対象の`old_str`に
+`@router.patch(`デコレータ行を含めていながら`new_str`側にその行を
+書き戻し忘れ、直後の`update_participant`のデコレータが消失する
+SyntaxError(`unmatched ')'`)を作り込んだ。サンドボックスでの
+`pytest`実行(conftest.pyのimportエラーとして表面化)で発見し、
+その場で修正した。パッチスクリプト生成・独立clone適用の前に
+必ずサンドボックスでpytestを実行する運用が、このような単純な
+編集ミスを本番投入前に確実に捕捉することを改めて確認した。
+
+### 次Gate候補
+
+DOC-10監査の継続(FR-046画像/PDF出力は「IDEA」評価が正確と確認済み。
+他のFRの調査)、旧平文列のcontract(削除)、Object Storage実連携。

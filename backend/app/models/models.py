@@ -988,6 +988,11 @@ class ReservationParticipant(Base):
     seat_ciphertext = Column(LargeBinary, nullable=True)
     special_request_ciphertext = Column(LargeBinary, nullable=True)
 
+    # [Gate R3-15] DOC-11 §6.3 blind index。nameに対する完全一致検索用の
+    # HMAC-SHA256(app/core/crypto.py compute_participant_name_lookup_hash
+    # 参照)。confirmation_number用lookup_hashとは別ドメインのHMAC値。
+    name_lookup_hash = Column(String(64), nullable=True, index=True)
+
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
