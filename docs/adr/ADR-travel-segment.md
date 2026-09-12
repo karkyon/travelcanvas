@@ -189,15 +189,55 @@ transaction」というエラーを起こす不具合を作り込んだ。
   なし)。
 - `python -m compileall app alembic`: エラー0。
 
+## 改訂: Gate M2(frontend接続)
+
+Gate M1のbackend契約を、実際の画面から到達可能にした(DOC-02 §1.1
+「画面だけ、APIだけ、DBだけ存在する状態は完成としない」への対応。
+Gate R3-2/#25と同じ「backend実装済みだがfrontend未到達」パターンの
+再発防止)。
+
+### 実施内容
+
+- `frontend/src/services/api.ts`: `TravelSegment`/`SegmentCreateData`/
+  `SegmentUpdateData`型、および`getSegments`/`getSegment`/
+  `createSegment`(Idempotency-Key付き)/`updateSegment`/`deleteSegment`
+  (If-Match付き)をGate #29 Day/Event APIと同じパターンで追加。
+- `frontend/src/pages/SegmentsPage.tsx`新規: 一覧(mode/status/距離/
+  時間/費用/推奨出発時刻/便名/platform表示、概算値のバッジ表示)、
+  作成・編集モーダル、削除。
+- `frontend/src/router/index.tsx`: `/planner/:planId/segments`ルート追加。
+- `frontend/src/pages/PlannerPage.tsx`: 移動区間ボタン追加(既存の
+  予約ボタンと同じ配置パターン)。
+
+### スコープ判断
+
+- 作成・編集の端点(from/to)はUIからEventのみ選択可能とした。Place
+  端点はGate M1のbackend契約には存在するが、frontend側にPlace選択UI
+  (候補一覧からの選定導線)がまだ無いため、本Gateのスコープ外とした
+  (既存のPlace端点を持つSegmentの一覧表示自体は可能)。
+- E2Eテストは追加していない(既存e2eディレクトリにはauth/quickdraftの
+  2本のみ存在し、Day/Event/Reservation等の既存機能についても専用E2Eが
+  整備されていないプロジェクトの現状水準に合わせた)。
+
+### 検証
+
+- `npm install`後、変更前のbaseline(vitest 62件PASS、type-checkエラー0)
+  を確認してから着手した。
+- `frontend/src/services/api.test.ts`にTravelSegment APIクライアントの
+  単体テスト5件を追加(axiosクライアントをモックし、URL・HTTPメソッド・
+  Idempotency-Key/If-Matchヘッダーの付与を検証)。
+- 変更後: type-checkエラー0、テスト67件PASS(62+5、リグレッションなし)、
+  ビルド成功(既存のchunk sizeに関する警告のみ、エラー0)。
+- backend側は無変更のため305件PASSを再確認するに留めた。
+
 ## 残件(次Gate)
 
-- **Gate M2(frontend縦切り)**: `frontend/src/types/index.ts`への型追加、
-  `frontend/src/services/api.ts`へのSegment CRUD client、Planner/Map
-  画面への表示・編集UI、frontend tests、E2E。本Gate M1完了後もFR-014は
-  「backend完了・frontend未接続」のためPARTIAL評価とし、Gate M2完了後に
-  RELEASED候補へ上げる。
 - **FR-015**: route_options/route_legs(複数経路比較)、外部Directions
   API連携、リアルタイム運行情報。
+- **Place端点のfrontend選択UI**: 現状はEvent端点のみUIから選択可能。
+  候補一覧からPlaceを選ぶ導線を追加する。
+- **E2E**: Segment作成・編集・削除の実画面フローをカバーするPlaywright
+  テスト(既存e2eディレクトリの整備水準に合わせて次Gateで検討)。
 - 既存route-preview/insertion-preview(非永続プレビュー計算)と、本Gateの
   永続Segment CRUDとの統合(「プレビューから採用してSegmentを作成する」
-  UIフロー)はGate M2以降で検討する。
+  UIフロー)は将来のGateで検討する。

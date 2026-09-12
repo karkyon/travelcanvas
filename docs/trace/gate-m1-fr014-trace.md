@@ -34,15 +34,18 @@
 | 22 | 既存route_segmentsデータの保持(rename migration) | ADR §2 | ✓ | - | - | ✓ | - | ✓(サンドボックス) | - | - | - | - | IMPLEMENTED | migration `5bf5b47a715d`; サンドボックス実データ検証(件数・ID・値完全一致、downgrade→再upgrade) |
 | 23 | 未backfillデータに対する安全なmigration中断 | ADR §4 | ✓ | - | - | ✓ | - | ✓(サンドボックス) | - | ✓ | - | - | IMPLEMENTED | pre-flightチェック; サンドボックスで端点XOR違反データを用いた中断検証 |
 | 24 | legacy `mode='transit'`の正規化 | ADR §3 | ✓ | - | - | ✓ | - | ✓(サンドボックス) | - | - | - | - | IMPLEMENTED | migration内`UPDATE ... SET mode='mixed'`; サンドボックス実データ検証 |
-| 25 | frontend型定義・APIクライアント | Gate M2 | - | - | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | 未着手(Gate M2で実施) |
-| 26 | Planner/Map画面でのSegment表示・編集UI | Gate M2 | - | - | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | 未着手(Gate M2で実施) |
-| 27 | frontend tests / E2E | Gate M2 | - | - | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | 未着手(Gate M2で実施) |
+| 25 | frontend型定義・APIクライアント | Gate M2 | - | - | - | - | ✓ | - | - | - | ✓ | ✗ | IMPLEMENTED | `api.ts` TravelSegment型/CRUD client; `api.test.ts` TravelSegment API client(5ケース) |
+| 26 | Planner/Map画面でのSegment表示・編集UI | Gate M2 | - | - | - | - | - | - | - | - | ✓ | ✗ | IMPLEMENTED | `SegmentsPage.tsx`(一覧・作成・編集・削除)、`router/index.tsx`、`PlannerPage.tsx`のボタン導線 |
+| 27 | frontend tests / E2E | Gate M2 | - | - | - | - | ✓ | - | - | - | ✓ | ✗ | PARTIAL | `api.test.ts`単体テスト5件PASS(62→67件、リグレッションなし)。E2Eは未着手(次Gate候補) |
 
 ## 総括
 
 - backend契約(DB/API/model/migration/unit/integration/concurrency/security)は
   全項目 IMPLEMENTED または検証済み。
-- frontend(型・APIクライアント・UI・テスト・E2E)は全項目 NOT STARTED。
-- そのため、FR-014全体の評価は **PARTIAL**(backend完了・frontend未接続)
-  とする。Gate M2でfrontend縦切りとE2Eを完了させた時点でRELEASED候補へ
-  引き上げる。
+- frontend: 型定義・APIクライアント・Planner画面へのUI導線は IMPLEMENTED。
+  E2Eのみ PARTIAL(未着手)。
+- Place端点のfrontend選択UI(候補一覧からの選定導線)、FR-015
+  (route_options/route_legs)は引き続き未着手。
+- FR-014全体の評価は、E2E・Place端点UIが残るため引き続き **PARTIAL**
+  とするが、Gate M1(backend)・Gate M2(frontend基本UI)の完了により
+  実際の画面から作成・編集・削除・閲覧が可能な状態に到達した。

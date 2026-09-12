@@ -384,6 +384,70 @@ export interface ReservationEventLinkUpdateData {
   is_locked?: boolean;
 }
 
+// [Gate M2] FR-014移動区間(TravelSegment)。backend/app/api/v1/segments.py
+// (Gate M1)に対応するfrontend型。DOC-05 §7.1参照。
+export type SegmentMode =
+  | 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed';
+export type SegmentStatus = 'planned' | 'confirmed' | 'cancelled';
+
+export interface TravelSegment {
+  id: string;
+  plan_id: string;
+  from_event_id: string | null;
+  from_place_id: string | null;
+  to_event_id: string | null;
+  to_place_id: string | null;
+  mode: SegmentMode;
+  status: SegmentStatus;
+  planned_departure_at: string | null;
+  planned_arrival_at: string | null;
+  distance_km: number | null;
+  duration_minutes: number | null;
+  cost: string | null; // Decimalはstringとしてやり取りする(精度保持のため)
+  currency: string | null;
+  preparation_minutes: number;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  transport_number: string | null;
+  platform: string | null;
+  transfer_count: number | null;
+  luggage_note: string | null;
+  reservation_id: string | null;
+  is_estimate: boolean;
+  provider: string;
+  algorithm_version: string;
+  computed_at: string;
+  recommended_departure_at: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface SegmentCreateData {
+  from_event_id?: string;
+  from_place_id?: string;
+  to_event_id?: string;
+  to_place_id?: string;
+  mode: SegmentMode;
+  status?: SegmentStatus;
+  planned_departure_at?: string;
+  planned_arrival_at?: string;
+  distance_km?: number;
+  duration_minutes?: number;
+  cost?: string;
+  currency?: string;
+  preparation_minutes?: number;
+  buffer_before_minutes?: number;
+  buffer_after_minutes?: number;
+  transport_number?: string;
+  platform?: string;
+  transfer_count?: number;
+  luggage_note?: string;
+  reservation_id?: string;
+}
+
+export type SegmentUpdateData = Partial<SegmentCreateData>;
+
 // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)。
 // backend/app/api/v1/imports.py (Gate R3-7)に対応するfrontend型。
 // AI/OCR provider未導入のため、ジョブは作成時点でreview_requiredとなり、
@@ -1255,6 +1319,46 @@ class CompleteTravelAPI {
     await this.client.delete(`/plans/${planId}/reservations/${reservationId}/events/${linkId}`);
   }
 
+  // ===== [Gate M2] FR-014移動区間(TravelSegment) frontend連携 =====
+  // backend/app/api/v1/segments.py (Gate M1)。/plans/{planId}/segments配下。
+  // days/eventsと同じIf-Match/Idempotency-Keyパターンに揃える
+  // (Idempotency-KeyはPOST必須。reservations POSTとは異なる契約なので注意)。
+
+  async getSegments(planId: string): Promise<TravelSegment[]> {
+    const response = await this.client.get<TravelSegment[]>(`/plans/${planId}/segments`);
+    return response.data;
+  }
+
+  async getSegment(planId: string, segmentId: string): Promise<TravelSegment> {
+    const response = await this.client.get<TravelSegment>(`/plans/${planId}/segments/${segmentId}`);
+    return response.data;
+  }
+
+  async createSegment(
+    planId: string, data: SegmentCreateData, idempotencyKey: string
+  ): Promise<TravelSegment> {
+    const response = await this.client.post<TravelSegment>(
+      `/plans/${planId}/segments`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
+    return response.data;
+  }
+
+  async updateSegment(
+    planId: string, segmentId: string, data: SegmentUpdateData, ifMatch: number
+  ): Promise<TravelSegment> {
+    const response = await this.client.patch<TravelSegment>(
+      `/plans/${planId}/segments/${segmentId}`, data, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async deleteSegment(planId: string, segmentId: string, ifMatch: number): Promise<{ revision: number }> {
+    const response = await this.client.delete<{ revision: number }>(
+      `/plans/${planId}/segments/${segmentId}`, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
   // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
   async getImportJobs(planId: string): Promise<ImportJob[]> {
     const response = await this.client.get<ImportJob[]>(`/plans/${planId}/imports`);
@@ -1660,6 +1764,16 @@ export const updateReservationEventLink = (
 ) => api.updateReservationEventLink(planId, reservationId, linkId, data);
 export const deleteReservationEventLink = (planId: string, reservationId: string, linkId: string) =>
   api.deleteReservationEventLink(planId, reservationId, linkId);
+
+// [Gate M2] FR-014移動区間(TravelSegment)
+export const getSegments = (planId: string) => api.getSegments(planId);
+export const getSegment = (planId: string, segmentId: string) => api.getSegment(planId, segmentId);
+export const createSegment = (planId: string, data: SegmentCreateData, idempotencyKey: string) =>
+  api.createSegment(planId, data, idempotencyKey);
+export const updateSegment = (planId: string, segmentId: string, data: SegmentUpdateData, ifMatch: number) =>
+  api.updateSegment(planId, segmentId, data, ifMatch);
+export const deleteSegment = (planId: string, segmentId: string, ifMatch: number) =>
+  api.deleteSegment(planId, segmentId, ifMatch);
 
 // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
 export const getImportJobs = (planId: string) => api.getImportJobs(planId);

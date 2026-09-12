@@ -30,6 +30,7 @@ import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
 import ReservationsPage from '@/pages/ReservationsPage';
 import ImportsPage from '@/pages/ImportsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
+import SegmentsPage from '@/pages/SegmentsPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -172,6 +173,18 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DocumentsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 🚶 [Gate M2] 移動区間(FR-014)。backend(Gate M1)は実装済みだった
+      // がどこからもリンクされておらず画面から到達不能だった(Gate R3-2/
+      // #25と同じパターンの再発防止)。
+      {
+        path: 'planner/:planId/segments',
+        element: (
+          <ProtectedRoute>
+            <SegmentsPage />
           </ProtectedRoute>
         ),
       },
