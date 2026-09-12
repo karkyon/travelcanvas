@@ -11,16 +11,18 @@
  * 出し分け(viewerには編集ボタンを出さない等)のみを行う不変条件の
  * 二重チェックとして扱う(信頼境界はbackend)。
  *
- * スコープ: 作成・編集の端点(from/to)はEventのみをUIから選択できるように
- * する(Place端点はGate M1のbackend契約には存在するが、frontend側で
- * Place選択UIを提供する候補導線がまだ無いため、本Gateでは選択肢に含めない。
- * 既存のPlace端点を持つSegmentは一覧・詳細表示は可能)。
+ * スコープ: 作成・編集の端点(from/to)はEvent、またはこのplanの既存
+ * イベント・移動区間で既に使われているPlaceから選択できる([Gate M2改訂]
+ * Place選択UI追加。バックエンドにPlaceのplan横断一覧APIが存在しないため
+ * (Placeはplanに属さないグローバルなエンティティ)、このplan内で既に
+ * 参照されているPlace IDのみを候補として提示する。新規のPlace採用導線
+ * (検索→候補採用)からの直接選択は未対応)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   PersonStanding, Car, Train, Bus, Ship, Plane, Bike, Car as TaxiIcon,
-  Shuffle, Plus, Trash2, Pencil, X, HelpCircle,
+  Shuffle, Plus, Trash2, Pencil, X, HelpCircle, MapPin,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -30,7 +32,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import api, { getSegments, createSegment, updateSegment, deleteSegment } from '@/services/api';
 import type {
   TravelSegment, SegmentCreateData, SegmentMode, SegmentStatus,
-  NormalizedDay, NormalizedEvent,
+  NormalizedDay, NormalizedEvent, PlaceDetail,
 } from '@/services/api';
 
 const MODE_OPTIONS: { value: SegmentMode; label: string; icon: React.ReactNode }[] = [
@@ -77,15 +79,27 @@ function formatDateTime(value: string | null): string {
   }
 }
 
-function eventLabel(events: NormalizedEvent[], eventId: string | null): string {
-  if (!eventId) return '(Place)';
-  const found = events.find((e) => e.id === eventId);
-  return found ? found.title : '(不明なイベント)';
+function endpointLabel(
+  events: NormalizedEvent[], places: Record<string, PlaceDetail>,
+  eventId: string | null, placeId: string | null,
+): string {
+  if (eventId) {
+    const found = events.find((e) => e.id === eventId);
+    return found ? found.title : '(不明なイベント)';
+  }
+  if (placeId) {
+    return places[placeId]?.name ?? '(場所)';
+  }
+  return '(未設定)';
 }
 
 interface SegmentFormState {
+  from_type: 'event' | 'place';
   from_event_id: string;
+  from_place_id: string;
+  to_type: 'event' | 'place';
   to_event_id: string;
+  to_place_id: string;
   mode: SegmentMode;
   status: SegmentStatus;
   planned_departure_at: string;
@@ -99,8 +113,12 @@ interface SegmentFormState {
 }
 
 const EMPTY_FORM: SegmentFormState = {
+  from_type: 'event',
   from_event_id: '',
+  from_place_id: '',
+  to_type: 'event',
   to_event_id: '',
+  to_place_id: '',
   mode: 'walking',
   status: 'planned',
   planned_departure_at: '',
@@ -115,11 +133,19 @@ const EMPTY_FORM: SegmentFormState = {
 
 function formToPayload(form: SegmentFormState): SegmentCreateData {
   const payload: SegmentCreateData = {
-    from_event_id: form.from_event_id,
-    to_event_id: form.to_event_id,
     mode: form.mode,
     status: form.status,
   };
+  if (form.from_type === 'event') {
+    payload.from_event_id = form.from_event_id;
+  } else {
+    payload.from_place_id = form.from_place_id;
+  }
+  if (form.to_type === 'event') {
+    payload.to_event_id = form.to_event_id;
+  } else {
+    payload.to_place_id = form.to_place_id;
+  }
   if (form.planned_departure_at) payload.planned_departure_at = new Date(form.planned_departure_at).toISOString();
   if (form.planned_arrival_at) payload.planned_arrival_at = new Date(form.planned_arrival_at).toISOString();
   if (form.cost) {
@@ -142,6 +168,7 @@ const SegmentsPage: React.FC = () => {
   const [planRevision, setPlanRevision] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [places, setPlaces] = useState<Record<string, PlaceDetail>>({});
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -150,6 +177,7 @@ const SegmentsPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const allEvents: NormalizedEvent[] = days.flatMap((d) => d.events ?? []);
+  const placeOptions = Object.values(places);
 
   const loadAll = useCallback(async () => {
     if (!planId) return;
@@ -161,9 +189,37 @@ const SegmentsPage: React.FC = () => {
         api.getPlanDetail(planId),
       ]);
       setSegments(segmentList);
+      let loadedEvents: NormalizedEvent[] = [];
       if (planDetail.success && planDetail.data) {
         setDays(planDetail.data.days ?? []);
         setPlanRevision(planDetail.data.revision);
+        loadedEvents = (planDetail.data.days ?? []).flatMap((d) => d.events ?? []);
+      }
+
+      // [Gate M2改訂] このplan内で既に参照されているPlace IDを収集し、
+      // 選択候補として名称を取得しておく(events.place_id + 既存Segmentの
+      // from/to_place_id)。
+      const placeIds = new Set<string>();
+      loadedEvents.forEach((e) => { if (e.place_id) placeIds.add(e.place_id); });
+      segmentList.forEach((s) => {
+        if (s.from_place_id) placeIds.add(s.from_place_id);
+        if (s.to_place_id) placeIds.add(s.to_place_id);
+      });
+      if (placeIds.size > 0) {
+        const entries = await Promise.all(
+          Array.from(placeIds).map(async (id) => {
+            try {
+              return [id, await api.getPlace(id)] as const;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const placeMap: Record<string, PlaceDetail> = {};
+        entries.forEach((entry) => { if (entry) placeMap[entry[0]] = entry[1]; });
+        setPlaces(placeMap);
+      } else {
+        setPlaces({});
       }
     } catch (e: any) {
       setError(e?.response?.data?.detail || '移動区間一覧の取得に失敗しました');
@@ -186,8 +242,12 @@ const SegmentsPage: React.FC = () => {
   const openEditForm = (segment: TravelSegment) => {
     setEditingId(segment.id);
     setForm({
+      from_type: segment.from_place_id ? 'place' : 'event',
       from_event_id: segment.from_event_id ?? '',
+      from_place_id: segment.from_place_id ?? '',
+      to_type: segment.to_place_id ? 'place' : 'event',
       to_event_id: segment.to_event_id ?? '',
+      to_place_id: segment.to_place_id ?? '',
       mode: segment.mode,
       status: segment.status,
       planned_departure_at: segment.planned_departure_at ? segment.planned_departure_at.slice(0, 16) : '',
@@ -205,12 +265,14 @@ const SegmentsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!planId) return;
-    if (!form.from_event_id || !form.to_event_id) {
-      setFormError('出発・到着イベントを両方選択してください');
+    const fromId = form.from_type === 'event' ? form.from_event_id : form.from_place_id;
+    const toId = form.to_type === 'event' ? form.to_event_id : form.to_place_id;
+    if (!fromId || !toId) {
+      setFormError('出発・到着をそれぞれ選択してください');
       return;
     }
-    if (form.from_event_id === form.to_event_id) {
-      setFormError('出発と到着に同じイベントは選択できません');
+    if (form.from_type === form.to_type && fromId === toId) {
+      setFormError('出発と到着に同じものは選択できません');
       return;
     }
     setIsSaving(true);
@@ -297,7 +359,9 @@ const SegmentsPage: React.FC = () => {
                       <span className="text-xs text-gray-500">{STATUS_LABEL[segment.status]}</span>
                     </div>
                     <div className="mt-1 text-sm text-gray-700">
-                      {eventLabel(allEvents, segment.from_event_id)} → {eventLabel(allEvents, segment.to_event_id)}
+                      {endpointLabel(allEvents, places, segment.from_event_id, segment.from_place_id)}
+                      {' → '}
+                      {endpointLabel(allEvents, places, segment.to_event_id, segment.to_place_id)}
                     </div>
                     <div className="mt-1 text-xs text-gray-500 space-x-3">
                       {segment.distance_km != null && (
@@ -346,31 +410,95 @@ const SegmentsPage: React.FC = () => {
             {formError && <p className="text-sm text-red-600">{formError}</p>}
 
             <div>
-              <label className="block text-sm font-medium mb-1">出発イベント</label>
-              <select
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                value={form.from_event_id}
-                onChange={(e) => setForm({ ...form, from_event_id: e.target.value })}
-              >
-                <option value="">選択してください</option>
-                {allEvents.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium">出発</label>
+                <div className="flex gap-1 text-xs">
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 rounded ${form.from_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    onClick={() => setForm({ ...form, from_type: 'event' })}
+                  >
+                    イベント
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 ${form.from_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    onClick={() => setForm({ ...form, from_type: 'place' })}
+                    disabled={placeOptions.length === 0}
+                  >
+                    <MapPin size={12} /> 場所
+                  </button>
+                </div>
+              </div>
+              {form.from_type === 'event' ? (
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.from_event_id}
+                  onChange={(e) => setForm({ ...form, from_event_id: e.target.value })}
+                >
+                  <option value="">選択してください</option>
+                  {allEvents.map((ev) => (
+                    <option key={ev.id} value={ev.id}>{ev.title}</option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.from_place_id}
+                  onChange={(e) => setForm({ ...form, from_place_id: e.target.value })}
+                >
+                  <option value="">選択してください</option>
+                  {placeOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">到着イベント</label>
-              <select
-                className="w-full border rounded-md px-3 py-2 text-sm"
-                value={form.to_event_id}
-                onChange={(e) => setForm({ ...form, to_event_id: e.target.value })}
-              >
-                <option value="">選択してください</option>
-                {allEvents.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium">到着</label>
+                <div className="flex gap-1 text-xs">
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 rounded ${form.to_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    onClick={() => setForm({ ...form, to_type: 'event' })}
+                  >
+                    イベント
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 rounded flex items-center gap-1 ${form.to_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    onClick={() => setForm({ ...form, to_type: 'place' })}
+                    disabled={placeOptions.length === 0}
+                  >
+                    <MapPin size={12} /> 場所
+                  </button>
+                </div>
+              </div>
+              {form.to_type === 'event' ? (
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.to_event_id}
+                  onChange={(e) => setForm({ ...form, to_event_id: e.target.value })}
+                >
+                  <option value="">選択してください</option>
+                  {allEvents.map((ev) => (
+                    <option key={ev.id} value={ev.id}>{ev.title}</option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  value={form.to_place_id}
+                  onChange={(e) => setForm({ ...form, to_place_id: e.target.value })}
+                >
+                  <option value="">選択してください</option>
+                  {placeOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>

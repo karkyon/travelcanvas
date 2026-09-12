@@ -448,6 +448,15 @@ export interface SegmentCreateData {
 
 export type SegmentUpdateData = Partial<SegmentCreateData>;
 
+// [Gate M2改訂] Place端点選択UI用。GET /places/{place_id}(Gate #31)の
+// レスポンス型。Placeはplanに属さないグローバルなエンティティ。
+export interface PlaceDetail {
+  id: string;
+  name: string;
+  category?: string | null;
+  location: { latitude?: number | null; longitude?: number | null; address?: string | null };
+}
+
 // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)。
 // backend/app/api/v1/imports.py (Gate R3-7)に対応するfrontend型。
 // AI/OCR provider未導入のため、ジョブは作成時点でreview_requiredとなり、
@@ -958,6 +967,14 @@ class CompleteTravelAPI {
     location: { latitude?: number; longitude?: number; address?: string };
   }> {
     const response = await this.client.post(`/search/candidates/${candidateId}/adopt`);
+    return response.data;
+  }
+
+  // [Gate M2改訂] Segment端点としてPlaceを選択する際、名称表示のために
+  // 単体取得する(GET /places/{place_id}、Gate #31)。Placeはplanに属さない
+  // グローバルなエンティティのため一覧APIは無く、個別取得のみを提供する。
+  async getPlace(placeId: string): Promise<PlaceDetail> {
+    const response = await this.client.get<PlaceDetail>(`/places/${placeId}`);
     return response.data;
   }
 

@@ -44,7 +44,8 @@
   全項目 IMPLEMENTED または検証済み。
 - frontend: 型定義・APIクライアント・Planner画面へのUI導線は IMPLEMENTED。
   E2Eのみ PARTIAL(未着手)。
-- Place端点のfrontend選択UI(候補一覧からの選定導線)、FR-015
+- Place端点のfrontend選択UI(このplan内で既に参照されているPlaceに限定した
+  ドロップダウン)を追加。新規Place採用導線からの直接選択、FR-015
   (route_options/route_legs)は引き続き未着手。
 - FR-014全体の評価は、E2E・Place端点UIが残るため引き続き **PARTIAL**
   とするが、Gate M1(backend)・Gate M2(frontend基本UI)の完了により

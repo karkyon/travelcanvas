@@ -241,3 +241,37 @@ Gate R3-2/#25と同じ「backend実装済みだがfrontend未到達」パター�
 - 既存route-preview/insertion-preview(非永続プレビュー計算)と、本Gateの
   永続Segment CRUDとの統合(「プレビューから採用してSegmentを作成する」
   UIフロー)は将来のGateで検討する。
+
+## 改訂: Place端点のfrontend選択UI
+
+Gate M2の残件のうち「Place端点のfrontend選択UI」を実装した。
+
+### 決定事項
+
+backendにはPlaceのplan横断一覧API(Placeはplanに属さないグローバルな
+エンティティのため)が存在しない。新規にそのようなAPIを追加するのは
+本改訂のスコープを超えるため、frontend側だけで完結する現実的な代替
+アプローチを採った: **このplanの既存イベント(`event.place_id`)および
+既存Segment(`from_place_id`/`to_place_id`)で既に参照されているPlace ID**
+を候補として収集し、`GET /places/{id}`(Gate #31、個別取得のみ提供)で
+名称を解決してドロップダウンに表示する。
+
+- `SegmentsPage.tsx`の作成・編集フォームに、出発・到着それぞれ独立した
+  「イベント/場所」切替トグルを追加した。
+- 候補Placeが1件も無い場合は「場所」タブを無効化し、誤操作を防ぐ。
+- 一覧表示側(`endpointLabel`)もPlace端点を名称で表示するよう改修した
+  (旧実装は`(Place)`という無意味なプレースホルダのみを表示していた)。
+
+### 残件
+
+- 検索→候補採用の新規Place採用導線からSegment作成画面へ直接遷移する
+  UIフロー(現状は「まずイベントとして採用してから移動区間を作る」
+  という間接的な経路のみ)。
+- backend側にPlaceのplan横断一覧・検索APIを追加すれば、より柔軟な
+  Place選択が可能になる(将来のGate候補)。
+
+### 検証
+
+- `npm install`後、`tsc --noEmit`エラー0、`vitest run` 67件PASS
+  (リグレッションなし、Segment関連の既存5件も含め全て継続PASS)、
+  `vite build`成功を確認。
