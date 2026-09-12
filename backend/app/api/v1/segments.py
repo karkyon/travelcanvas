@@ -182,6 +182,8 @@ class SegmentResponse(BaseModel):
     transfer_count: Optional[int] = None
     luggage_note: Optional[str] = None
     reservation_id: Optional[str] = None
+    # [Gate M3] FR-015複数経路比較で採用された場合のRouteOption参照。
+    route_option_id: Optional[str] = None
     is_estimate: bool
     provider: str
     algorithm_version: str
@@ -372,6 +374,7 @@ def _to_response(seg: TravelSegment, db: Session) -> dict:
         "transfer_count": seg.transfer_count,
         "luggage_note": seg.luggage_note,
         "reservation_id": str(seg.reservation_id) if seg.reservation_id else None,
+        "route_option_id": str(seg.route_option_id) if seg.route_option_id else None,
         "is_estimate": seg.is_estimate,
         "provider": seg.provider,
         "algorithm_version": seg.algorithm_version,

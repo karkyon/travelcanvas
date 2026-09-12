@@ -693,6 +693,6 @@ def test_response_does_not_leak_internal_fields(auth_client):
         "mode", "status", "planned_departure_at", "planned_arrival_at", "distance_km",
         "duration_minutes", "cost", "currency", "preparation_minutes", "buffer_before_minutes",
         "buffer_after_minutes", "transport_number", "platform", "transfer_count",
-        "luggage_note", "reservation_id", "is_estimate", "provider", "algorithm_version",
+        "luggage_note", "reservation_id", "route_option_id", "is_estimate", "provider", "algorithm_version",
         "computed_at", "recommended_departure_at", "revision", "created_at", "updated_at",
     }

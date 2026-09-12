@@ -773,6 +773,12 @@ class TravelSegment(Base):
 
     reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
 
+    # [Gate M3] FR-015複数経路比較。採用されたRouteOption(候補)への参照。
+    # additive(nullable)。route_optionsテーブルはGate M3で新設したため、
+    # Gate M1時点ではこの列を先行追加しなかった(ADR-travel-segment.md
+    # 「参照先tableが無い状態でFKなしのUUID列だけ先行追加しない」を参照)。
+    route_option_id = Column(UUID(as_uuid=True), ForeignKey("route_options.id"), nullable=True)
+
     # [Gate #32から継続] haversine fallback由来かどうかの由来管理(provenance)。
     is_estimate = Column(Boolean, nullable=False, default=True)
     provider = Column(String, nullable=False)  # "haversine_estimate" | "manual" 等
@@ -787,6 +793,101 @@ class TravelSegment(Base):
 # 後方互換エイリアス(Gate #32時点のimport元を壊さないため)。
 # 新規コードはTravelSegmentを使うこと。
 RouteSegment = TravelSegment
+
+
+# ==========================================
+# [Gate M3] FR-015 複数経路比較 — RouteOption / RouteLeg
+# ==========================================
+
+class RouteOption(Base):
+    """[Gate M3] FR-015 複数経路比較(DOC-05 §7.2 route_options)。
+
+    TravelSegment(FR-014、採用済みの移動区間)とは異なり、RouteOptionは
+    「まだ採用されていない候補」を表す。同一のfrom/to端点に対して複数の
+    RouteOptionを作成・比較し(最速/最安/乗換少/徒歩少/バリアフリー/景観/
+    環境負荷等)、ユーザーが選んだ1件をTravelSegmentとして採用する
+    (`POST .../route-options/{id}/adopt`。採用後はTravelSegment.
+    route_option_idが本テーブルの行を指す)。
+
+    外部ルーティングAPIは未導入のため、本Gateでは`provider="manual"`
+    (手動登録、DOC-02 FR-015「ルート取得不能時は手動区間を登録できる」)
+    のみをサポートする。将来、外部providerを追加する場合も
+    provider列で区別できるよう設計している。
+    """
+    __tablename__ = "route_options"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+
+    from_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    to_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+
+    # candidate | adopted | discarded
+    status = Column(String, nullable=False, default="candidate", server_default="candidate")
+
+    # [Gate M3] DOC-02 FR-015の比較軸。全て概算・推定であり確定値ではない。
+    total_duration_minutes = Column(Float, nullable=True)
+    total_cost = Column(Numeric(14, 2), nullable=True)
+    currency = Column(String(3), nullable=True)
+    total_distance_km = Column(Float, nullable=True)
+    walking_minutes = Column(Float, nullable=True)
+    transfer_count = Column(Integer, nullable=True)
+    accessibility_score = Column(Float, nullable=True)  # 0.0-1.0、高いほどバリアフリー
+    scenic_score = Column(Float, nullable=True)  # 0.0-1.0、高いほど景観が良い
+    co2_estimate_kg = Column(Float, nullable=True)
+
+    # [Gate M3] DOC-02「外部経路値には提供元、取得時刻、推定幅を保存する」。
+    duration_estimate_low_minutes = Column(Float, nullable=True)
+    duration_estimate_high_minutes = Column(Float, nullable=True)
+
+    provider = Column(String, nullable=False)  # "manual" 等
+    retrieved_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_estimate = Column(Boolean, nullable=False, default=True)
+    algorithm_version = Column(String, nullable=False)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class RouteLeg(Base):
+    """[Gate M3] FR-015複数経路比較(DOC-05 §7.2 route_legs)。RouteOption
+    内の個別の乗り継ぎ区間(徒歩→鉄道→徒歩、のような複合交通の1ステップ)。
+    順序はleg_orderで保持する。
+
+    from/to はEvent/Placeのような正式なエンティティへの参照ではなく、
+    自由記述のラベル(例: "渋谷駅"、"3番出口")とする。経路候補の途中
+    経由地はTravelEvent/Placeとして正式登録されているとは限らないため。
+    """
+    __tablename__ = "route_legs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    route_option_id = Column(UUID(as_uuid=True), ForeignKey("route_options.id"), nullable=False, index=True)
+
+    leg_order = Column(Integer, nullable=False)
+    mode = Column(String, nullable=False)
+    line = Column(String, nullable=True)  # 路線名
+    operator = Column(String, nullable=True)  # 事業者
+    platform = Column(String, nullable=True)
+    from_label = Column(String, nullable=True)
+    to_label = Column(String, nullable=True)
+    departure_at = Column(DateTime(timezone=True), nullable=True)
+    arrival_at = Column(DateTime(timezone=True), nullable=True)
+    distance_km = Column(Float, nullable=True)
+    duration_minutes = Column(Float, nullable=True)
+    # unknown | on_time | delayed | cancelled。外部providerからのリアルタイム
+    # 運行情報は本Gateでは未導入のため、常にunknownとなる(捏造しない)。
+    realtime_status = Column(String, nullable=False, default="unknown", server_default="unknown")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("route_option_id", "leg_order", name="uq_route_legs_option_order"),
+    )
 
 
 # ==========================================

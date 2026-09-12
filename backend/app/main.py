@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations, documents, imports, segments
+from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations, documents, imports, segments, route_options
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -277,6 +277,8 @@ app.include_router(plans.router, prefix="/api/v1")
 # (app/api/v1/segments.py)。既存route-preview/insertion-preview
 # (plans.py、非永続)とは独立。
 app.include_router(segments.router, prefix="/api/v1")
+# [Gate M3] FR-015複数経路比較。/plans/{plan_id}/route-options配下。
+app.include_router(route_options.router, prefix="/api/v1")
 # [Gate R2-2] POST /quick-drafts (DOC-06正式契約)。anonymous device tokenで
 # ログイン前にplan/day/event相当を単一transactionで作成する。promote
 # (/quick-drafts/{id}/promote)はGate R2-3で追加する。

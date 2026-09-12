@@ -322,6 +322,7 @@ def _segment_to_dict(seg: TravelSegment) -> dict:
         "transfer_count": seg.transfer_count,
         "luggage_note": seg.luggage_note,
         "reservation_id": str(seg.reservation_id) if seg.reservation_id else None,
+        "route_option_id": str(seg.route_option_id) if seg.route_option_id else None,
         "is_estimate": seg.is_estimate,
         "provider": seg.provider,
         "algorithm_version": seg.algorithm_version,
@@ -807,6 +808,7 @@ def _undo_segment_item(db: Session, plan: TravelPlan, item: ChangeItem):
             transfer_count=before.get("transfer_count"),
             luggage_note=before.get("luggage_note"),
             reservation_id=before.get("reservation_id"),
+            route_option_id=before.get("route_option_id"),
             is_estimate=before.get("is_estimate", True),
             provider=before.get("provider", "manual"),
             algorithm_version=before.get("algorithm_version", "manual-v1"),
@@ -821,7 +823,7 @@ def _apply_segment_snapshot(seg: TravelSegment, snapshot: dict) -> None:
         "planned_departure_at", "planned_arrival_at", "distance_km", "duration_minutes",
         "cost", "currency", "preparation_minutes", "buffer_before_minutes",
         "buffer_after_minutes", "transport_number", "platform", "transfer_count",
-        "luggage_note", "reservation_id", "is_estimate", "provider", "algorithm_version",
+        "luggage_note", "reservation_id", "route_option_id", "is_estimate", "provider", "algorithm_version",
         "computed_at",
     ):
         if key not in snapshot:
