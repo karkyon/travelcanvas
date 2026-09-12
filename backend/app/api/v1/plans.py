@@ -24,6 +24,7 @@ JSON blobに日程・イベントを丸ごと保持しており、フロント�
 """
 import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
+from decimal import Decimal
 from typing import Optional, List, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
@@ -35,7 +36,7 @@ from app.core.auth import get_current_active_user, get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
-    IdempotencyRecord, User, Place,
+    IdempotencyRecord, User, Place, TravelSegment,
 )
 from app.services.route_estimator import estimate_leg, haversine_km
 
@@ -295,6 +296,39 @@ def _event_to_dict(event: TravelEvent) -> dict:
     }
 
 
+def _segment_to_dict(seg: TravelSegment) -> dict:
+    """[Gate M1] TravelSegmentのUndo用スナップショット。idも含めて保持し、
+    Undo時に元のPKで復元できるようにする(_undo_segment_item参照)。"""
+    return {
+        "id": str(seg.id),
+        "plan_id": str(seg.plan_id),
+        "from_event_id": str(seg.from_event_id) if seg.from_event_id else None,
+        "from_place_id": str(seg.from_place_id) if seg.from_place_id else None,
+        "to_event_id": str(seg.to_event_id) if seg.to_event_id else None,
+        "to_place_id": str(seg.to_place_id) if seg.to_place_id else None,
+        "mode": seg.mode,
+        "status": seg.status,
+        "planned_departure_at": seg.planned_departure_at.isoformat() if seg.planned_departure_at else None,
+        "planned_arrival_at": seg.planned_arrival_at.isoformat() if seg.planned_arrival_at else None,
+        "distance_km": seg.distance_km,
+        "duration_minutes": seg.duration_minutes,
+        "cost": str(seg.cost) if seg.cost is not None else None,
+        "currency": seg.currency,
+        "preparation_minutes": seg.preparation_minutes,
+        "buffer_before_minutes": seg.buffer_before_minutes,
+        "buffer_after_minutes": seg.buffer_after_minutes,
+        "transport_number": seg.transport_number,
+        "platform": seg.platform,
+        "transfer_count": seg.transfer_count,
+        "luggage_note": seg.luggage_note,
+        "reservation_id": str(seg.reservation_id) if seg.reservation_id else None,
+        "is_estimate": seg.is_estimate,
+        "provider": seg.provider,
+        "algorithm_version": seg.algorithm_version,
+        "computed_at": seg.computed_at.isoformat() if seg.computed_at else None,
+    }
+
+
 # ===== プラン全体取得 =====
 
 @router.get("/{plan_id}", response_model=PlanDetailResponse)
@@ -551,13 +585,33 @@ async def delete_event(
 
     before = _event_to_dict(event)
     event_uuid = event.id
+
+    # [Gate M1] このEventを端点(from/to)に持つTravelSegmentは、Event削除後に
+    # 外部キー違反(500)を起こしてはならない。単純なON DELETE SET NULLは
+    # 端点XOR CHECK制約(from_event_id/from_place_idのちょうど一方)を破壊
+    # するため使えない。ここでEventと同一ChangeSet・同一transactionで
+    # Segmentも削除し、Undo時に両方を復元する(ADR-travel-segment.md参照)。
+    affected_segments = (
+        db.query(TravelSegment)
+        .filter(
+            TravelSegment.plan_id == plan.id,
+            (TravelSegment.from_event_id == event_uuid) | (TravelSegment.to_event_id == event_uuid),
+        )
+        .all()
+    )
+    changes = [("travel_event", event_uuid, "delete", before, None)]
+    for seg in affected_segments:
+        changes.append(("travel_segment", seg.id, "delete", _segment_to_dict(seg), None))
+        db.delete(seg)
+    # [Gate M1] Segmentの削除を先に確定させてからEventを削除する。
+    # SQLAlchemyの自動flush順序推定に依存せず、明示的に2段階でflushすることで
+    # travel_segments_from/to_event_id_fkeyのFK違反(500)を確実に防ぐ。
+    db.flush()
+
     db.delete(event)
     db.flush()
 
-    new_revision = _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_event", event_uuid, "delete",
-        before_json=before, after_json=None,
-    )
+    new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
     return {"message": "イベントを削除しました", "revision": new_revision}
 
 
@@ -635,11 +689,19 @@ async def undo_last_change(
 
     items = db.query(ChangeItem).filter(ChangeItem.change_set_id == change_set.id).all()
 
+    # [Gate M1] entity_type順序を保証する: travel_segmentの復元(action=delete)は
+    # 復元先のtravel_eventが先に存在している必要があるため、
+    # travel_day/travel_eventを先に処理してからtravel_segmentを処理する
+    # (ChangeItemのクエリ結果順序はDBに依存し保証されないため、明示的に
+    # 2パスに分ける)。
     for item in items:
         if item.entity_type == "travel_day":
             _undo_day_item(db, plan, item)
         elif item.entity_type == "travel_event":
             _undo_event_item(db, plan, item)
+    for item in items:
+        if item.entity_type == "travel_segment":
+            _undo_segment_item(db, plan, item)
 
     change_set.undone_at = datetime.now(dt_timezone.utc)
     db.flush()
@@ -690,6 +752,86 @@ def _undo_day_item(db: Session, plan: TravelPlan, item: ChangeItem):
                 latitude=e.get("latitude"), longitude=e.get("longitude"),
                 locked=e.get("locked", False), sort_order=e.get("sort_order", 0),
             ))
+
+
+def _parse_segment_dt(v):
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v
+    return datetime.fromisoformat(v)
+
+
+def _parse_segment_cost(v):
+    if v is None:
+        return None
+    if isinstance(v, Decimal):
+        return v
+    return Decimal(v)
+
+
+def _undo_segment_item(db: Session, plan: TravelPlan, item: ChangeItem):
+    """[Gate M1] TravelSegmentのUndo。現状Segment自体の直接編集APIからの
+    ChangeItemはcreate/update/deleteの3種のみ発生し得る(delete_eventからの
+    cascade削除分も含めactionは常にdeleteかcreate)。"""
+    if item.action == "create":
+        seg = db.query(TravelSegment).filter(TravelSegment.id == item.entity_id).first()
+        if seg:
+            db.delete(seg)
+    elif item.action == "update" and item.before_json:
+        seg = db.query(TravelSegment).filter(TravelSegment.id == item.entity_id).first()
+        if seg:
+            _apply_segment_snapshot(seg, item.before_json)
+    elif item.action == "delete" and item.before_json:
+        before = item.before_json
+        db.add(TravelSegment(
+            id=item.entity_id,
+            plan_id=plan.id,
+            from_event_id=before.get("from_event_id"),
+            from_place_id=before.get("from_place_id"),
+            to_event_id=before.get("to_event_id"),
+            to_place_id=before.get("to_place_id"),
+            mode=before["mode"],
+            status=before.get("status", "planned"),
+            planned_departure_at=_parse_segment_dt(before.get("planned_departure_at")),
+            planned_arrival_at=_parse_segment_dt(before.get("planned_arrival_at")),
+            distance_km=before.get("distance_km"),
+            duration_minutes=before.get("duration_minutes"),
+            cost=_parse_segment_cost(before.get("cost")),
+            currency=before.get("currency"),
+            preparation_minutes=before.get("preparation_minutes", 0),
+            buffer_before_minutes=before.get("buffer_before_minutes", 0),
+            buffer_after_minutes=before.get("buffer_after_minutes", 0),
+            transport_number=before.get("transport_number"),
+            platform=before.get("platform"),
+            transfer_count=before.get("transfer_count"),
+            luggage_note=before.get("luggage_note"),
+            reservation_id=before.get("reservation_id"),
+            is_estimate=before.get("is_estimate", True),
+            provider=before.get("provider", "manual"),
+            algorithm_version=before.get("algorithm_version", "manual-v1"),
+            computed_at=_parse_segment_dt(before.get("computed_at")) or datetime.now(dt_timezone.utc),
+        ))
+
+
+def _apply_segment_snapshot(seg: TravelSegment, snapshot: dict) -> None:
+    dt_fields = {"planned_departure_at", "planned_arrival_at", "computed_at"}
+    for key in (
+        "from_event_id", "from_place_id", "to_event_id", "to_place_id", "mode", "status",
+        "planned_departure_at", "planned_arrival_at", "distance_km", "duration_minutes",
+        "cost", "currency", "preparation_minutes", "buffer_before_minutes",
+        "buffer_after_minutes", "transport_number", "platform", "transfer_count",
+        "luggage_note", "reservation_id", "is_estimate", "provider", "algorithm_version",
+        "computed_at",
+    ):
+        if key not in snapshot:
+            continue
+        value = snapshot[key]
+        if key in dt_fields:
+            value = _parse_segment_dt(value)
+        elif key == "cost":
+            value = _parse_segment_cost(value)
+        setattr(seg, key, value)
 
 
 def _undo_event_item(db: Session, plan: TravelPlan, item: ChangeItem):

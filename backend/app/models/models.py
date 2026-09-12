@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
     ForeignKey, UniqueConstraint, LargeBinary, Index, CheckConstraint, text,
+    Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -718,31 +719,74 @@ class ShareAccessLog(Base):
 
 
 # ==========================================
-# [Gate #32] PLAN MAP基礎 — route segment
+# [Gate #32→M1] PLAN移動区間 — TravelSegment (旧RouteSegment)
 # ==========================================
 
-class RouteSegment(Base):
-    """1日の中で連続する2イベント間の移動区間推定。
+class TravelSegment(Base):
+    """[Gate M1] FR-014 移動区間(DOC-05 §7.1 travel_segments)。
 
-    [Gate #32 スコープ] 外部ルーティングAPI(Google Directions等)は
-    APIキー未提供のため利用しない。距離はhaversine(大円距離)による
-    概算のみを保持し、is_estimate=Trueで確定値ではないことを明示する
-    (v5.1仕様「計算失敗時は直線距離を確定値にせず概算と明示する」に対応)。
+    Gate #32では`RouteSegment`/`route_segments`という名称で「1日の中で
+    連続する2イベント間の移動区間の(haversine概算による)推定」のみを
+    持っていた。Gate M1でDOC-05 §7.1の正式仕様に合わせて`TravelSegment`/
+    `travel_segments`へrenameし、Event/Place双方を端点に取れるようにし、
+    計画出発・到着、費用、準備・余裕時間、便名、platform、乗換、荷物条件、
+    予約紐付け、状態、revisionを追加した(docs/adr/ADR-travel-segment.md
+    参照)。table renameはexpand migrationとし、既存行のID・値は保持する
+    (drop/recreateしない)。
+
+    端点(from/to)はEvent/Placeのどちらか一方のみを指す(XOR)。DB CHECK
+    制約`ck_travel_segments_from_endpoint_xor`/`..._to_endpoint_xor`で
+    強制する(migration側)。
     """
-    __tablename__ = "route_segments"
+    __tablename__ = "travel_segments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
     from_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
     to_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
-    mode = Column(String, nullable=False)  # walking | driving | transit
+    to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+
+    # walking | driving | train | bus | ferry | flight | bicycle | taxi | mixed
+    mode = Column(String, nullable=False)
+    # planned | confirmed | cancelled
+    status = Column(String, nullable=False, default="planned", server_default="planned")
+
+    planned_departure_at = Column(DateTime(timezone=True), nullable=True)
+    planned_arrival_at = Column(DateTime(timezone=True), nullable=True)
+
     distance_km = Column(Float, nullable=True)
     duration_minutes = Column(Float, nullable=True)
+
+    # [Gate M1] 金額はFloatではなくNumericで保持する(DOC-03の金額精度規約)。
+    cost = Column(Numeric(14, 2), nullable=True)
+    currency = Column(String(3), nullable=True)
+
+    preparation_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+    buffer_before_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+    buffer_after_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+
+    transport_number = Column(String, nullable=True)  # 便名・列車番号等
+    platform = Column(String, nullable=True)
+    transfer_count = Column(Integer, nullable=True)
+    luggage_note = Column(Text, nullable=True)
+
+    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
+
+    # [Gate #32から継続] haversine fallback由来かどうかの由来管理(provenance)。
     is_estimate = Column(Boolean, nullable=False, default=True)
-    provider = Column(String, nullable=False)  # 例: "haversine_estimate"
+    provider = Column(String, nullable=False)  # "haversine_estimate" | "manual" 等
     algorithm_version = Column(String, nullable=False)
     computed_at = Column(DateTime(timezone=True), nullable=False)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# 後方互換エイリアス(Gate #32時点のimport元を壊さないため)。
+# 新規コードはTravelSegmentを使うこと。
+RouteSegment = TravelSegment
 
 
 # ==========================================

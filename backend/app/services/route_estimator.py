@@ -20,10 +20,22 @@ ALGORITHM_VERSION = "haversine-v1"
 PROVIDER_NAME = "haversine_estimate"
 
 # 移動手段ごとの想定巡航速度(km/h)。実測ではなく一般的な目安値。
+# [Gate M1] FR-014の正式mode語彙(walking/driving/train/bus/ferry/flight/
+# bicycle/taxi/mixed)をhaversine fallbackでも概算できるよう拡張した。
+# 既存のwalking/driving/transitの値は変更していない(route-preview/
+# insertion-previewの既存挙動を壊さないため)。
 _MODE_SPEED_KMH = {
     "walking": 4.5,
     "driving": 30.0,
     "transit": 20.0,
+    # [Gate M1] 追加
+    "train": 60.0,
+    "bus": 25.0,
+    "ferry": 35.0,
+    "flight": 500.0,
+    "bicycle": 15.0,
+    "taxi": 28.0,
+    "mixed": 20.0,  # 複合交通は単一速度で表現できないため、目安として保持
 }
 
 # 直線距離に対し実際の道路網で生じる迂回を補正する係数(目安)。
@@ -31,6 +43,14 @@ _MODE_DETOUR_FACTOR = {
     "walking": 1.3,
     "driving": 1.4,
     "transit": 1.5,
+    # [Gate M1] 追加
+    "train": 1.2,
+    "bus": 1.4,
+    "ferry": 1.05,
+    "flight": 1.05,
+    "bicycle": 1.3,
+    "taxi": 1.4,
+    "mixed": 1.4,
 }
 
 
