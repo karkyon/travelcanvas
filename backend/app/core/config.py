@@ -69,6 +69,22 @@ class Settings(BaseSettings):
     # 未設定でもbackend全体は起動可能とし、検索機能呼び出し時にのみ明確な
     # エラーを返す(app/core/crypto.py参照)。
     LOOKUP_INDEX_KEY: Optional[str] = None
+
+    # [Gate M5] FR-013文書ウォレットのObject Storage実連携。
+    # 実クラウドストレージ(S3等)のAPIキーは未提供のため、
+    # app/services/storage_backend.pyのLocalFilesystemBackend
+    # (dockerボリューム上のローカルディスク)を既定とする。将来
+    # 実クラウドproviderの認証情報が提供された場合は、同モジュールの
+    # StorageBackendインターフェースを実装するアダプタへ差し替える設計。
+    DOCUMENT_STORAGE_DIR: str = "/app/storage/documents"
+    DOCUMENT_MAX_UPLOAD_SIZE_BYTES: int = 20 * 1024 * 1024  # 20MB
+
+    # [Gate M5] 期限付きダウンロードURL(DOC-02 FR-013)の署名鍵。
+    # ENCRYPTION_KEY/LOOKUP_INDEX_KEYと同じ理由で別鍵にする(用途別鍵分離)。
+    # 未設定でもbackend全体は起動可能とし、ダウンロードURL発行時にのみ
+    # 明確なエラーを返す(app/services/storage_backend.py参照)。
+    DOCUMENT_DOWNLOAD_SIGNING_KEY: Optional[str] = None
+    DOCUMENT_DOWNLOAD_URL_TTL_SECONDS: int = 900  # 15分
     
     # CORS設定 - Union[str, List[str]]にして文字列も受け入れる
     # [Gate R0] 廃止済みの開発機IP(192.168.1.248)を既定値から除去。

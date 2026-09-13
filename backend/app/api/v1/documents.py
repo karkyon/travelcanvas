@@ -16,7 +16,8 @@ docs/adr/ADR-reservation-minimal.mdを参照。要旨: Object Storage連携が
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -37,6 +38,20 @@ from app.models.models import (
     User,
 )
 from app.services.audit_service import record_audit_event
+from app.services.storage_backend import (
+    DownloadSigningNotConfigured,
+    DownloadTokenInvalid,
+    FileTooLargeError,
+    UnsupportedFileTypeError,
+    compute_sha256,
+    generate_storage_key,
+    get_storage_backend,
+    issue_download_token,
+    load_decrypted_file,
+    save_encrypted_file,
+    validate_upload,
+    verify_download_token,
+)
 
 router = APIRouter(prefix="/plans", tags=["documents"])
 
@@ -307,6 +322,169 @@ def create_document(
     )
 
     return _to_response(d)
+
+
+@router.post(
+    "/{plan_id}/documents/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED
+)
+async def upload_document(
+    plan_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    classification: str = Form(DocumentClassification.INTERNAL.value),
+    document_type: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate M5] FR-013 Object Storage実連携。実ファイルを受け取り、
+    ローカルディスク(既定backend)へFernet暗号化して保存する。
+    `storage_key`/`mime_type`/`size`/`sha256`はすべて実ファイル内容から
+    算出し、クライアント入力を信頼しない(既存の`POST .../documents`
+    (storage_key等をクライアントが指定するメタデータのみ登録用)とは
+    別の、実アップロード専用エンドポイント。詳細はADR-object-storage.md
+    参照)。
+    """
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+
+    if classification not in _VALID_CLASSIFICATIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"classificationは次のいずれかである必要があります: {sorted(_VALID_CLASSIFICATIONS)}",
+        )
+
+    content = await file.read()
+
+    try:
+        ext, mime_type = validate_upload(file.filename or "", content)
+    except FileTooLargeError as e:
+        raise HTTPException(status_code=413, detail=str(e))
+    except UnsupportedFileTypeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    storage_key = generate_storage_key(plan.id, ext)
+    backend = get_storage_backend()
+
+    try:
+        save_encrypted_file(backend, storage_key, content)
+    except EncryptionNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ファイルの暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+        )
+
+    d = Document(
+        plan_id=plan.id,
+        owner_user_id=current_user.id,
+        classification=classification,
+        document_type=document_type,
+        storage_key=storage_key,
+        mime_type=mime_type,
+        size=len(content),
+        sha256=compute_sha256(content),
+        malware_status=DocumentMalwareStatus.NOT_SCANNED.value,
+        ocr_status=DocumentOcrStatus.NOT_REQUESTED.value,
+    )
+
+    try:
+        d.original_filename_ciphertext = encrypt_payload((file.filename or "unknown").encode("utf-8"))
+    except EncryptionNotConfigured:
+        backend.delete(storage_key)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ファイル名の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+        )
+
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+
+    record_audit_event(
+        action="document_uploaded",
+        resource_type="document",
+        user_id=current_user.id,
+        resource_id=d.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "classification": d.classification, "size": d.size},
+    )
+
+    return _to_response(d)
+
+
+@router.get("/{plan_id}/documents/{document_id}/download-url", response_model=dict)
+def get_document_download_url(
+    plan_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate M5] DOC-02 FR-013「期限付きURL」対応。ACL確認は本エンドポイント
+    (通常のplan権限)でのみ行い、発行されたトークン自体は
+    `GET /documents/download`で単独検証される(トークンにACL情報は
+    含めず、発行時点のACLチェックとTTLで安全性を担保する設計)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    d = _get_document_or_404(db, plan.id, document_id)
+
+    try:
+        token, expires_at = issue_download_token(d.id)
+    except DownloadSigningNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ダウンロードURLが設定されていません(サーバー側のDOCUMENT_DOWNLOAD_SIGNING_KEY未設定)",
+        )
+
+    return {"url": f"/api/v1/plans/documents/download?token={token}", "expires_at": expires_at}
+
+
+@router.get("/documents/download")
+def download_document(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """[Gate M5] 署名付きトークンによる期限付きダウンロード。トークン
+    自体が発行時点のACLチェック済みの証跡であるため、本エンドポイントは
+    再度plan権限を確認しない(トークンの有効期限とHMAC署名のみで安全性を
+    担保する、S3署名付きURLと同じ設計思想)。"""
+    try:
+        document_id = verify_download_token(token)
+    except DownloadTokenInvalid as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except DownloadSigningNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ダウンロードURLが設定されていません(サーバー側のDOCUMENT_DOWNLOAD_SIGNING_KEY未設定)",
+        )
+
+    d = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+    if d is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文書が見つかりません")
+
+    backend = get_storage_backend()
+    try:
+        content = load_decrypted_file(backend, d.storage_key)
+    except EncryptionNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ファイルの復号が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ファイル本体が見つかりません")
+
+    filename = "document"
+    if d.original_filename_ciphertext:
+        try:
+            filename = decrypt_payload(d.original_filename_ciphertext).decode("utf-8")
+        except (EncryptionNotConfigured, ValueError):
+            pass
+
+    def _iter():
+        yield content
+
+    return StreamingResponse(
+        _iter(),
+        media_type=d.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{plan_id}/documents", response_model=List[DocumentResponse])
