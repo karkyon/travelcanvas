@@ -6,22 +6,21 @@
  * DBだけ存在する状態は完成としない」に反する状態)。本画面でPlannerPage
  * から到達可能にする。
  *
- * [スコープ限定] Object Storageが未導入のため、実ファイルはサーバーへ
- * 一切アップロードされない(docs/adr/ADR-documents-minimal.md参照)。
- * ファイル選択時、ブラウザのSubtleCrypto APIでSHA-256をクライアント側
- * 計算し、ファイル名・種類・サイズと共にメタデータとしてのみ登録する。
- * storage_keyは実際のオブジェクトストレージ導入までの暫定的な
- * プレースホルダー("local-pending/...")とする。
+ * [Gate M6改訂] Gate M5でbackendにObject Storage実連携(実アップロード・
+ * 暗号化保存・期限付きダウンロードURL)が追加されたため、本画面も
+ * `uploadDocument`(実ファイルアップロード)経由へ切り替えた。旧来の
+ * "local-pending/..."プレースホルダーによるメタデータのみ登録は廃止する
+ * (ADR-object-storage.md参照)。
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FileText, Trash2, Upload } from 'lucide-react';
+import { Plus, FileText, Trash2, Upload, Download } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { getDocuments, createDocument, deleteDocument } from '@/services/api';
+import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl } from '@/services/api';
 import type { TravelDocument, DocumentClassification } from '@/services/api';
 
 const CLASSIFICATION_OPTIONS: { value: DocumentClassification; label: string }[] = [
@@ -42,12 +41,6 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function computeSha256(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 const DocumentsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
@@ -59,11 +52,10 @@ const DocumentsPage: React.FC = () => {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [computedSha256, setComputedSha256] = useState<string | null>(null);
-  const [isHashing, setIsHashing] = useState(false);
   const [classification, setClassification] = useState<DocumentClassification>('internal');
   const [documentType, setDocumentType] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!planId) return;
@@ -85,26 +77,13 @@ const DocumentsPage: React.FC = () => {
 
   const resetCreateForm = () => {
     setSelectedFile(null);
-    setComputedSha256(null);
     setDocumentType('');
     setClassification('internal');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setSelectedFile(file);
-    setComputedSha256(null);
-    if (!file) return;
-    setIsHashing(true);
-    try {
-      const hash = await computeSha256(file);
-      setComputedSha256(hash);
-    } catch {
-      setComputedSha256(null);
-    } finally {
-      setIsHashing(false);
-    }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(e.target.files?.[0] ?? null);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -113,23 +92,13 @@ const DocumentsPage: React.FC = () => {
     setIsSaving(true);
     setError(null);
     try {
-      // [スコープ限定] Object Storage未導入のため、storage_keyは実体を
-      // 持たないプレースホルダーとする(上部ファイルdocstring参照)。
-      const storageKey = `local-pending/${Date.now()}-${selectedFile.name}`;
-      await createDocument(planId, {
-        classification,
-        document_type: documentType || undefined,
-        original_filename: selectedFile.name,
-        storage_key: storageKey,
-        mime_type: selectedFile.type || undefined,
-        size: selectedFile.size,
-        sha256: computedSha256 || undefined,
-      });
+      await uploadDocument(planId, selectedFile, classification, documentType || undefined);
       setIsCreateOpen(false);
       resetCreateForm();
       await loadDocuments();
     } catch (e: any) {
-      setError(e?.response?.data?.detail || '文書の登録に失敗しました');
+      const detail = e?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : detail?.message || 'アップロードに失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -143,6 +112,21 @@ const DocumentsPage: React.FC = () => {
       await loadDocuments();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '文書の削除に失敗しました');
+    }
+  };
+
+  const handleDownload = async (doc: TravelDocument) => {
+    if (!planId) return;
+    setDownloadingId(doc.id);
+    setError(null);
+    try {
+      const { url } = await getDocumentDownloadUrl(planId, doc.id);
+      window.open(resolveDownloadUrl(url), '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : detail?.message || 'ダウンロードURLの取得に失敗しました');
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -166,11 +150,11 @@ const DocumentsPage: React.FC = () => {
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">文書ウォレット</h1>
           <p className="text-sm text-gray-500 mt-1">
-            領収書・確認書等のメタデータを登録できます(現在は実ファイルの保存には対応していません)。
+            領収書・確認書等のファイルをアップロード・管理できます(暗号化して保存されます)。
           </p>
         </div>
         <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
-          新規登録
+          新規アップロード
         </Button>
       </div>
 
@@ -182,7 +166,7 @@ const DocumentsPage: React.FC = () => {
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : documents.length === 0 ? (
         <Card padding="lg" className="text-center text-gray-500">
-          文書がまだ登録されていません。「新規登録」から追加できます。
+          文書がまだ登録されていません。「新規アップロード」から追加できます。
         </Card>
       ) : (
         <div className="space-y-3">
@@ -202,35 +186,41 @@ const DocumentsPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(d)}
-                  className="text-gray-400 hover:text-red-600 shrink-0 p-1"
-                  aria-label="削除"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(d)}
+                    disabled={downloadingId === d.id}
+                    className="text-gray-400 hover:text-blue-600 p-1 disabled:opacity-50"
+                    aria-label="ダウンロード"
+                  >
+                    <Download size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(d)}
+                    className="text-gray-400 hover:text-red-600 p-1"
+                    aria-label="削除"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             </Card>
           ))}
         </div>
       )}
 
-      {/* 新規登録 */}
+      {/* 新規アップロード */}
       <Modal
         isOpen={isCreateOpen}
         onClose={() => { setIsCreateOpen(false); resetCreateForm(); }}
-        title="文書メタデータの登録"
+        title="文書のアップロード"
         size="md"
       >
         <form onSubmit={handleCreate}>
           <Modal.Body>
             <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-amber-50 text-amber-800 text-xs">
-                現在はファイルの実体を保存する機能が未実装です。ファイル名・種類・
-                サイズ・SHA-256ハッシュ等のメタデータのみ登録されます。
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ファイル</label>
                 <input
@@ -239,10 +229,9 @@ const DocumentsPage: React.FC = () => {
                   onChange={handleFileSelect}
                   className="w-full text-sm"
                 />
-                {isHashing && <div className="text-xs text-gray-400 mt-1">SHA-256を計算中...</div>}
-                {computedSha256 && (
-                  <div className="text-xs text-gray-400 mt-1 truncate">SHA-256: {computedSha256}</div>
-                )}
+                <div className="text-xs text-gray-400 mt-1">
+                  PDF・画像(jpg/png/gif/webp/bmp)・Office文書に対応。サーバー側で暗号化して保存されます。
+                </div>
               </div>
 
               <div>
@@ -274,9 +263,9 @@ const DocumentsPage: React.FC = () => {
               type="submit"
               icon={<Upload size={16} />}
               loading={isSaving}
-              disabled={!selectedFile || isHashing}
+              disabled={!selectedFile}
             >
-              登録
+              アップロード
             </Button>
           </Modal.Footer>
         </form>

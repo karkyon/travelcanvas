@@ -10,7 +10,7 @@
  * 含まれないことを保証する回帰テストである。
  */
 import { describe, it, expect } from 'vitest';
-import { api } from './api';
+import { api, resolveDownloadUrl } from './api';
 
 describe('planToApi', () => {
   it('never emits an itinerary key, even when days is present', () => {
@@ -169,5 +169,38 @@ describe('RouteOption API client', () => {
     (api as any).client = { post: mockPost };
     const result = await api.adoptRouteOption('plan-1', 'opt-1', 4);
     expect(result.segment_id).toBe('seg-1');
+  });
+});
+
+// [Gate M6] FR-013 Object Storage実連携(Gate M5)のfrontend APIクライアント
+// メソッドが、正しいURL・HTTPメソッド・Content-Typeでaxiosを呼び出すことを
+// 検証する。
+describe('Document upload/download API client', () => {
+  it('uploadDocument POSTs multipart/form-data to the upload endpoint', async () => {
+    const mockPost = async (url: string, data: any, config: any) => {
+      expect(url).toBe('/plans/plan-1/documents/upload');
+      expect(data).toBeInstanceOf(FormData);
+      expect(config.headers['Content-Type']).toBe('multipart/form-data');
+      return { data: { id: 'doc-1', original_filename: 'receipt.pdf' } };
+    };
+    (api as any).client = { post: mockPost };
+    const file = new File(['dummy content'], 'receipt.pdf', { type: 'application/pdf' });
+    const result = await api.uploadDocument('plan-1', file, 'internal', 'receipt');
+    expect(result.id).toBe('doc-1');
+  });
+
+  it('getDocumentDownloadUrl calls GET on the download-url endpoint', async () => {
+    const mockGet = async (url: string) => {
+      expect(url).toBe('/plans/plan-1/documents/doc-1/download-url');
+      return { data: { url: '/api/v1/plans/documents/download?token=abc', expires_at: 12345 } };
+    };
+    (api as any).client = { get: mockGet };
+    const result = await api.getDocumentDownloadUrl('plan-1', 'doc-1');
+    expect(result.expires_at).toBe(12345);
+  });
+
+  it('resolveDownloadUrl combines the backend origin with the relative url', () => {
+    const resolved = resolveDownloadUrl('/api/v1/plans/documents/download?token=abc');
+    expect(resolved).toMatch(/^https?:\/\/.+\/api\/v1\/plans\/documents\/download\?token=abc$/);
   });
 });

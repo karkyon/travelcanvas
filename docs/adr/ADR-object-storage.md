@@ -118,3 +118,30 @@ response_model=List[DocumentResponse])`デコレータ行を誤って消して�
 - frontend側の実アップロードUI(現状のDocumentsPage.tsxはメタデータ
   登録のみ、ブラウザSubtleCryptoでのSHA-256計算に留まる。実アップロード
   フローへの更新は次Gate)。
+
+## 改訂: Gate M6(frontend接続)
+
+Gate M5のbackend契約(実アップロード・期限付きダウンロードURL)を、
+実際の画面から使えるようにした。
+
+### 実施内容
+
+- `frontend/src/services/api.ts`: `uploadDocument`(multipart/form-data
+  でのPOST)、`getDocumentDownloadUrl`、および両者のオリジンを解決する
+  `resolveDownloadUrl`ヘルパーを追加。
+- `frontend/src/pages/DocumentsPage.tsx`: 旧来の
+  `createDocument`+`"local-pending/..."`プレースホルダー
+  +ブラウザSubtleCryptoでのSHA-256計算(Gate R3-10)を廃止し、
+  `uploadDocument`(実ファイルアップロード)へ全面的に切り替えた。
+  一覧の各文書にダウンロードボタンを追加し、`getDocumentDownloadUrl`で
+  発行した期限付きURLを新規タブで開く。
+
+### 検証
+
+- `npm install`後、変更前のbaseline(vitest 73件PASS、`tsc --noEmit`
+  エラー0)を確認してから着手した。
+- `frontend/src/services/api.test.ts`にアップロード/ダウンロードURL
+  APIクライアントの単体テスト3件を追加。
+- 変更後: `tsc --noEmit`エラー0、`vitest run` 76件PASS(73+3、
+  リグレッションなし)、`vite build`成功を確認。
+- backend側は無変更のため338件PASSを再確認するに留めた。

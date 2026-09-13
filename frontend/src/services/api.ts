@@ -1613,6 +1613,31 @@ class CompleteTravelAPI {
     return response.data;
   }
 
+  // [Gate M6] FR-013 Object Storage実連携(Gate M5)への接続。実ファイルを
+  // multipart/form-dataでアップロードする。storage_key/mime_type/size/
+  // sha256はすべてサーバー側が実ファイル内容から算出するため、クライアント
+  // からは送らない(createDocumentのメタデータのみ登録とは別の経路)。
+  async uploadDocument(
+    planId: string, file: File, classification: DocumentClassification, documentType?: string
+  ): Promise<TravelDocument> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('classification', classification);
+    if (documentType) formData.append('document_type', documentType);
+    const response = await this.client.post<TravelDocument>(
+      `/plans/${planId}/documents/upload`, formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  }
+
+  async getDocumentDownloadUrl(planId: string, documentId: string): Promise<{ url: string; expires_at: number }> {
+    const response = await this.client.get<{ url: string; expires_at: number }>(
+      `/plans/${planId}/documents/${documentId}/download-url`
+    );
+    return response.data;
+  }
+
   async deleteDocument(planId: string, documentId: string, ifMatch: number): Promise<void> {
     await this.client.delete(`/plans/${planId}/documents/${documentId}`, {
       headers: { 'If-Match': String(ifMatch) },
@@ -2004,6 +2029,21 @@ export const createDocument = (planId: string, data: DocumentCreateData) => api.
 export const deleteDocument = (planId: string, documentId: string, ifMatch: number) =>
   api.deleteDocument(planId, documentId, ifMatch);
 export const getDocumentLinks = (planId: string, documentId: string) => api.getDocumentLinks(planId, documentId);
+
+// [Gate M6] FR-013 Object Storage実連携(Gate M5)接続
+export const uploadDocument = (
+  planId: string, file: File, classification: DocumentClassification, documentType?: string
+) => api.uploadDocument(planId, file, classification, documentType);
+export const getDocumentDownloadUrl = (planId: string, documentId: string) =>
+  api.getDocumentDownloadUrl(planId, documentId);
+
+// [Gate M6] download-urlが返す`url`はbackendのAPI root("/api/v1"含む)から
+// の絶対パスであり、frontendのAPI_BASE_URL(常に"/api/v1"で終わる)とは
+// オリジンのみ共有すればよい。オリジン部分を導出して結合する。
+export function resolveDownloadUrl(relativeUrl: string): string {
+  const origin = API_BASE_URL.replace(/\/api\/v1$/, '');
+  return `${origin}${relativeUrl}`;
+}
 
 // [Gate R3-11] FR-012 QR・チケット(tickets)
 export const getTickets = (planId: string, reservationId: string) => api.getTickets(planId, reservationId);
