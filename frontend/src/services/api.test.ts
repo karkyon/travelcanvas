@@ -96,3 +96,78 @@ describe('TravelSegment API client', () => {
     expect(result.id).toBe('seg-9');
   });
 });
+
+// [Gate M4] FR-015複数経路比較(RouteOption/RouteLeg)のAPIクライアント
+// メソッドが、正しいURL・HTTPメソッド・ヘッダー(Idempotency-Key/If-Match)
+// でaxiosを呼び出すことを検証する。
+describe('RouteOption API client', () => {
+  it('getRouteOptions calls GET /plans/{planId}/route-options', async () => {
+    const mockGet = async (url: string) => {
+      expect(url).toBe('/plans/plan-1/route-options');
+      return { data: [] };
+    };
+    (api as any).client = { get: mockGet };
+    const result = await api.getRouteOptions('plan-1');
+    expect(result).toEqual([]);
+  });
+
+  it('createRouteOption sends Idempotency-Key header and POSTs to the route-options endpoint', async () => {
+    const mockPost = async (url: string, data: any, config: any) => {
+      expect(url).toBe('/plans/plan-1/route-options');
+      expect(data.from_event_id).toBe('e1');
+      expect(config.headers['Idempotency-Key']).toBe('key-123');
+      return { data: { id: 'opt-1' } };
+    };
+    (api as any).client = { post: mockPost };
+    const result = await api.createRouteOption(
+      'plan-1', { from_event_id: 'e1', to_event_id: 'e2' }, 'key-123',
+    );
+    expect(result.id).toBe('opt-1');
+  });
+
+  it('updateRouteOption sends If-Match header and PATCHes the option', async () => {
+    const mockPatch = async (url: string, data: any, config: any) => {
+      expect(url).toBe('/plans/plan-1/route-options/opt-1');
+      expect(data.status).toBe('discarded');
+      expect(config.headers['If-Match']).toBe('3');
+      return { data: { id: 'opt-1', status: 'discarded' } };
+    };
+    (api as any).client = { patch: mockPatch };
+    const result = await api.updateRouteOption('plan-1', 'opt-1', { status: 'discarded' }, 3);
+    expect(result.status).toBe('discarded');
+  });
+
+  it('deleteRouteOption sends If-Match header and DELETEs the option', async () => {
+    const mockDelete = async (url: string, config: any) => {
+      expect(url).toBe('/plans/plan-1/route-options/opt-1');
+      expect(config.headers['If-Match']).toBe('2');
+      return { data: { revision: 3 } };
+    };
+    (api as any).client = { delete: mockDelete };
+    const result = await api.deleteRouteOption('plan-1', 'opt-1', 2);
+    expect(result.revision).toBe(3);
+  });
+
+  it('addRouteLeg sends If-Match header and POSTs to the legs endpoint', async () => {
+    const mockPost = async (url: string, data: any, config: any) => {
+      expect(url).toBe('/plans/plan-1/route-options/opt-1/legs');
+      expect(data.mode).toBe('walking');
+      expect(config.headers['If-Match']).toBe('1');
+      return { data: { id: 'leg-1', leg_order: 0 } };
+    };
+    (api as any).client = { post: mockPost };
+    const result = await api.addRouteLeg('plan-1', 'opt-1', { mode: 'walking' }, 1);
+    expect(result.id).toBe('leg-1');
+  });
+
+  it('adoptRouteOption sends If-Match header and POSTs to the adopt endpoint', async () => {
+    const mockPost = async (url: string, _data: any, config: any) => {
+      expect(url).toBe('/plans/plan-1/route-options/opt-1/adopt');
+      expect(config.headers['If-Match']).toBe('4');
+      return { data: { revision: 5, route_option: { id: 'opt-1' }, segment_id: 'seg-1' } };
+    };
+    (api as any).client = { post: mockPost };
+    const result = await api.adoptRouteOption('plan-1', 'opt-1', 4);
+    expect(result.segment_id).toBe('seg-1');
+  });
+});

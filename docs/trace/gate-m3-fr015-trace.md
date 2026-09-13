@@ -27,14 +27,16 @@
 | 15 | Idempotency-Key(POST) | - | ✓ | - | - | ✓ | ✓ | ✗ | ✗ | IMPLEMENTED | `claim_or_get_cached`再利用; `test_post_without_idempotency_key_returns_400`, `test_idempotency_replay_returns_same_resource`, `test_idempotency_key_reused_with_different_payload_returns_409` |
 | 16 | If-Match/revision | - | ✓ | - | - | ✓ | ✓ | ✗ | ✗ | IMPLEMENTED | `_require_if_match`再利用; `test_patch_requires_if_match` |
 | 17 | Undo対応 | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | route_option/route_legのChangeItemはUndoループ未対応(ADR §8参照) |
-| 18 | frontend型定義・UI | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | 未着手(次Gate) |
-| 19 | E2E | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | 未着手(次Gate) |
+| 18 | frontend型定義・UI | - | - | - | - | ✓ | - | ✓ | ✗ | IMPLEMENTED | `api.ts` RouteOption型/CRUD client; `RouteOptionsPage.tsx`(一覧・作成・削除・採用); `api.test.ts` RouteOption API client(6ケース) |
+| 19 | E2E | - | - | - | - | - | - | - | ✗ | NOT STARTED | 未着手(次Gate) |
 
 ## 総括
 
 - backend契約(DB/API/model/migration/unit/ACL)の大部分は IMPLEMENTED。
-- リアルタイム運行情報(外部provider)、Undo対応、frontend、E2Eは
-  NOT STARTED。
+- frontend: 型定義・APIクライアント・候補一覧/作成/削除/採用UIは
+  IMPLEMENTED。leg詳細編集UIは簡易表示のみ(次Gate候補)。
+- リアルタイム運行情報(外部provider)、Undo対応、E2Eは NOT STARTED。
 - DOC-02上FR-015は「SHOULD/G3-G5」(FR-014より優先度が低い)であり、
-  backend縦切りの完了をもって一定の前進とするが、FR-015全体としては
+  Gate M3(backend)・Gate M4(frontend基本UI)の完了により実際の画面
+  から候補作成・比較・採用が可能な状態に到達したが、FR-015全体としては
   引き続き **PARTIAL** である。

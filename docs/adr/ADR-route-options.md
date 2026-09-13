@@ -130,4 +130,50 @@ Gate M1→M2と同じ段階分けとし、本GateはFR-015のbackend契約のみ
 - Undo対応(route_option/route_legのChangeItem復元)。
 - 外部Directions API等の実providerの追加。
 - leg並べ替え・途中挿入。
-- frontend型定義・APIクライアント・UI・E2E(Gate M4相当)。
+- E2E。
+
+## 改訂: Gate M4(frontend接続)
+
+Gate M3のbackend契約を、実際の画面から到達可能にした(Gate M1→M2と
+同じ段階分け)。
+
+### 実施内容
+
+- `frontend/src/services/api.ts`: `RouteOption`/`RouteLeg`/
+  `RouteOptionCreateData`/`RouteOptionUpdateData`/`RouteLegCreateData`/
+  `RouteLegUpdateData`/`AdoptRouteOptionResponse`型、および
+  `getRouteOptions`/`getRouteOption`/`createRouteOption`
+  (Idempotency-Key付き)/`updateRouteOption`/`deleteRouteOption`/
+  `addRouteLeg`/`updateRouteLeg`/`deleteRouteLeg`/`adoptRouteOption`
+  (If-Match付き)をGate M2のSegment APIと同じパターンで追加。
+- `frontend/src/pages/RouteOptionsPage.tsx`新規: 候補一覧(所要時間/
+  距離/費用/乗換/徒歩時間/バリアフリー/景観/CO2の比較指標表示、
+  採用済み/見送りバッジ、leg一覧の簡易表示)、候補作成モーダル、
+  削除、採用(adopt)ボタン。
+- `frontend/src/router/index.tsx`: `/planner/:planId/route-options`
+  ルート追加。
+- `frontend/src/pages/PlannerPage.tsx`: 「🗺️ 経路の比較」ボタン追加。
+
+### スコープ判断
+
+- leg(乗り継ぎ区間)の追加・編集UIは本画面では簡易表示のみとし、
+  詳細な追加・編集フォームは次Gateへ送った(候補自体の比較・採用が
+  FR-015の中核機能であり、legはbackend契約上は既に完備しているため、
+  UI側の優先度を候補比較に絞った)。
+- Place端点の選択はSegmentsPage(Gate M2改訂)と同様の制約を持つ
+  (backendにPlaceのplan横断一覧APIが無いため)。本画面ではさらに
+  簡略化し、Event端点のみをUIから選択可能とした。
+
+### 検証
+
+- `npm install`後、変更前のbaseline(vitest 67件PASS、`tsc --noEmit`
+  エラー0)を確認してから着手した。
+- `frontend/src/services/api.test.ts`にRouteOption APIクライアントの
+  単体テスト6件を追加。
+- 変更後: `tsc --noEmit`エラー0、`vitest run` 73件PASS(67+6、
+  リグレッションなし)、`vite build`成功を確認。
+- backend側は無変更のため327件PASSを再確認するに留めた。
+
+### 残件(更新)
+
+- leg詳細編集UI、Undo対応、外部Directions API連携、leg並べ替え、E2E。

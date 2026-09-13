@@ -496,6 +496,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/route-options`)}
+            >
+              🗺️ 経路の比較
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/planner/${currentPlan.id}/imports`)}
             >
               📥 予約取込

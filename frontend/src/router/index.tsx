@@ -31,6 +31,7 @@ import ReservationsPage from '@/pages/ReservationsPage';
 import ImportsPage from '@/pages/ImportsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import SegmentsPage from '@/pages/SegmentsPage';
+import RouteOptionsPage from '@/pages/RouteOptionsPage';
 
 // 認証が必要なルートを保護するコンポーネント
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -185,6 +186,17 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <SegmentsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 🗺️ [Gate M4] 経路の比較(FR-015)。backend(Gate M3)は実装済みだった
+      // がどこからもリンクされておらず画面から到達不能だった。
+      {
+        path: 'planner/:planId/route-options',
+        element: (
+          <ProtectedRoute>
+            <RouteOptionsPage />
           </ProtectedRoute>
         ),
       },

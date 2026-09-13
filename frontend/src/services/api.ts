@@ -457,6 +457,102 @@ export interface PlaceDetail {
   location: { latitude?: number | null; longitude?: number | null; address?: string | null };
 }
 
+// [Gate M4] FR-015複数経路比較(RouteOption/RouteLeg)。
+// backend/app/api/v1/route_options.py (Gate M3)に対応するfrontend型。
+export type RouteOptionStatus = 'candidate' | 'adopted' | 'discarded';
+export type RealtimeStatus = 'unknown' | 'on_time' | 'delayed' | 'cancelled';
+
+export interface RouteLeg {
+  id: string;
+  route_option_id: string;
+  leg_order: number;
+  mode: SegmentMode;
+  line: string | null;
+  operator: string | null;
+  platform: string | null;
+  from_label: string | null;
+  to_label: string | null;
+  departure_at: string | null;
+  arrival_at: string | null;
+  distance_km: number | null;
+  duration_minutes: number | null;
+  realtime_status: RealtimeStatus;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface RouteOption {
+  id: string;
+  plan_id: string;
+  from_event_id: string | null;
+  from_place_id: string | null;
+  to_event_id: string | null;
+  to_place_id: string | null;
+  status: RouteOptionStatus;
+  total_duration_minutes: number | null;
+  total_cost: string | null;
+  currency: string | null;
+  total_distance_km: number | null;
+  walking_minutes: number | null;
+  transfer_count: number | null;
+  accessibility_score: number | null;
+  scenic_score: number | null;
+  co2_estimate_kg: number | null;
+  duration_estimate_low_minutes: number | null;
+  duration_estimate_high_minutes: number | null;
+  provider: string;
+  retrieved_at: string;
+  expires_at: string | null;
+  is_estimate: boolean;
+  algorithm_version: string;
+  revision: number;
+  created_at: string;
+  updated_at: string | null;
+  legs: RouteLeg[];
+}
+
+export interface RouteLegCreateData {
+  mode: SegmentMode;
+  line?: string;
+  operator?: string;
+  platform?: string;
+  from_label?: string;
+  to_label?: string;
+  departure_at?: string;
+  arrival_at?: string;
+  distance_km?: number;
+  duration_minutes?: number;
+}
+
+export type RouteLegUpdateData = Partial<RouteLegCreateData> & { realtime_status?: RealtimeStatus };
+
+export interface RouteOptionCreateData {
+  from_event_id?: string;
+  from_place_id?: string;
+  to_event_id?: string;
+  to_place_id?: string;
+  total_duration_minutes?: number;
+  total_cost?: string;
+  currency?: string;
+  total_distance_km?: number;
+  walking_minutes?: number;
+  transfer_count?: number;
+  accessibility_score?: number;
+  scenic_score?: number;
+  co2_estimate_kg?: number;
+  duration_estimate_low_minutes?: number;
+  duration_estimate_high_minutes?: number;
+  legs?: RouteLegCreateData[];
+}
+
+export type RouteOptionUpdateData = Partial<Omit<RouteOptionCreateData, 'legs'>> & { status?: RouteOptionStatus };
+
+export interface AdoptRouteOptionResponse {
+  revision: number;
+  route_option: RouteOption;
+  segment_id: string;
+}
+
 // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)。
 // backend/app/api/v1/imports.py (Gate R3-7)に対応するfrontend型。
 // AI/OCR provider未導入のため、ジョブは作成時点でreview_requiredとなり、
@@ -1376,6 +1472,82 @@ class CompleteTravelAPI {
     return response.data;
   }
 
+  // ===== [Gate M4] FR-015複数経路比較(RouteOption/RouteLeg) frontend連携 =====
+  // backend/app/api/v1/route_options.py (Gate M3)。/plans/{planId}/route-options配下。
+
+  async getRouteOptions(planId: string): Promise<RouteOption[]> {
+    const response = await this.client.get<RouteOption[]>(`/plans/${planId}/route-options`);
+    return response.data;
+  }
+
+  async getRouteOption(planId: string, optionId: string): Promise<RouteOption> {
+    const response = await this.client.get<RouteOption>(`/plans/${planId}/route-options/${optionId}`);
+    return response.data;
+  }
+
+  async createRouteOption(
+    planId: string, data: RouteOptionCreateData, idempotencyKey: string
+  ): Promise<RouteOption> {
+    const response = await this.client.post<RouteOption>(
+      `/plans/${planId}/route-options`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
+    return response.data;
+  }
+
+  async updateRouteOption(
+    planId: string, optionId: string, data: RouteOptionUpdateData, ifMatch: number
+  ): Promise<RouteOption> {
+    const response = await this.client.patch<RouteOption>(
+      `/plans/${planId}/route-options/${optionId}`, data, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async deleteRouteOption(planId: string, optionId: string, ifMatch: number): Promise<{ revision: number }> {
+    const response = await this.client.delete<{ revision: number }>(
+      `/plans/${planId}/route-options/${optionId}`, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async addRouteLeg(
+    planId: string, optionId: string, data: RouteLegCreateData, ifMatch: number
+  ): Promise<RouteLeg> {
+    const response = await this.client.post<RouteLeg>(
+      `/plans/${planId}/route-options/${optionId}/legs`, data, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async updateRouteLeg(
+    planId: string, optionId: string, legId: string, data: RouteLegUpdateData, ifMatch: number
+  ): Promise<RouteLeg> {
+    const response = await this.client.patch<RouteLeg>(
+      `/plans/${planId}/route-options/${optionId}/legs/${legId}`, data,
+      { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async deleteRouteLeg(
+    planId: string, optionId: string, legId: string, ifMatch: number
+  ): Promise<{ revision: number }> {
+    const response = await this.client.delete<{ revision: number }>(
+      `/plans/${planId}/route-options/${optionId}/legs/${legId}`,
+      { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
+  async adoptRouteOption(
+    planId: string, optionId: string, ifMatch: number
+  ): Promise<AdoptRouteOptionResponse> {
+    const response = await this.client.post<AdoptRouteOptionResponse>(
+      `/plans/${planId}/route-options/${optionId}/adopt`, {}, { headers: { 'If-Match': String(ifMatch) } }
+    );
+    return response.data;
+  }
+
   // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
   async getImportJobs(planId: string): Promise<ImportJob[]> {
     const response = await this.client.get<ImportJob[]>(`/plans/${planId}/imports`);
@@ -1791,6 +1963,26 @@ export const updateSegment = (planId: string, segmentId: string, data: SegmentUp
   api.updateSegment(planId, segmentId, data, ifMatch);
 export const deleteSegment = (planId: string, segmentId: string, ifMatch: number) =>
   api.deleteSegment(planId, segmentId, ifMatch);
+
+// [Gate M4] FR-015複数経路比較(RouteOption/RouteLeg)
+export const getRouteOptions = (planId: string) => api.getRouteOptions(planId);
+export const getRouteOption = (planId: string, optionId: string) => api.getRouteOption(planId, optionId);
+export const createRouteOption = (planId: string, data: RouteOptionCreateData, idempotencyKey: string) =>
+  api.createRouteOption(planId, data, idempotencyKey);
+export const updateRouteOption = (
+  planId: string, optionId: string, data: RouteOptionUpdateData, ifMatch: number
+) => api.updateRouteOption(planId, optionId, data, ifMatch);
+export const deleteRouteOption = (planId: string, optionId: string, ifMatch: number) =>
+  api.deleteRouteOption(planId, optionId, ifMatch);
+export const addRouteLeg = (planId: string, optionId: string, data: RouteLegCreateData, ifMatch: number) =>
+  api.addRouteLeg(planId, optionId, data, ifMatch);
+export const updateRouteLeg = (
+  planId: string, optionId: string, legId: string, data: RouteLegUpdateData, ifMatch: number
+) => api.updateRouteLeg(planId, optionId, legId, data, ifMatch);
+export const deleteRouteLeg = (planId: string, optionId: string, legId: string, ifMatch: number) =>
+  api.deleteRouteLeg(planId, optionId, legId, ifMatch);
+export const adoptRouteOption = (planId: string, optionId: string, ifMatch: number) =>
+  api.adoptRouteOption(planId, optionId, ifMatch);
 
 // [Gate R3-9] FR-011予約取込(import_jobs/extraction_candidates)
 export const getImportJobs = (planId: string) => api.getImportJobs(planId);
