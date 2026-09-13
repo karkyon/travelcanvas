@@ -48,7 +48,7 @@ def _upload(client, plan_id, filename="receipt.pdf", content=_PDF_BYTES, classif
 
 # ===== アップロード =====
 
-def test_upload_computes_real_metadata(auth_client):
+def test_upload_computes_real_metadata(auth_client, db_session):
     client, _user = auth_client
     plan_id = _create_plan(client)
 
@@ -60,7 +60,13 @@ def test_upload_computes_real_metadata(auth_client):
     assert body["mime_type"] == "application/pdf"
     assert body["original_filename"] == "receipt.pdf"
     assert body["malware_status"] == "not_scanned"
-    assert body["storage_key"]  # サーバー側で生成される
+    assert "storage_key" not in body  # [Gate M7 P0-02] 内部参照は公開しない
+
+    import uuid as uuid_module
+    from app.models.models import Document
+    row = db_session.query(Document).filter(Document.id == uuid_module.UUID(body["id"])).first()
+    assert row is not None
+    assert row.storage_key  # サーバー側で生成される(DBには保持する)
 
 
 def test_upload_rejects_oversized_file(auth_client):
@@ -117,14 +123,20 @@ def test_upload_requires_editor_role(auth_client, make_user, db_session):
 
 # ===== 暗号化保存 =====
 
-def test_uploaded_file_is_encrypted_at_rest(auth_client):
+def test_uploaded_file_is_encrypted_at_rest(auth_client, db_session):
     """[Gate M5] ディスク上のファイルが平文のまま保存されていないこと
-    (Fernet暗号化されていること)を確認する。"""
+    (Fernet暗号化されていること)を確認する。[Gate M7 P0-02]
+    storage_keyはレスポンスから除外されたため、DBから直接取得する。"""
+    import uuid as uuid_module
+    from app.models.models import Document
+
     client, _user = auth_client
     plan_id = _create_plan(client)
 
     res = _upload(client, plan_id)
-    storage_key = res.json()["storage_key"]
+    document_id = res.json()["id"]
+    row = db_session.query(Document).filter(Document.id == uuid_module.UUID(document_id)).first()
+    storage_key = row.storage_key
 
     backend = storage_module.get_storage_backend()
     raw_on_disk = backend.load(storage_key)

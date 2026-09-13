@@ -1,20 +1,36 @@
 """
-[Gate R3-6] FR-013文書ウォレット 最小実装API(documents/document_links)。
+[Gate R3-6/M5/M7] FR-013文書ウォレット API(documents/document_links)。
 
-スコープ限定の理由はapp/models/models.pyのDocumentクラス直上コメントと
-docs/adr/ADR-reservation-minimal.mdを参照。要旨: Object Storage連携が
-未導入のため実ファイルは一切扱わず、storage_key(呼び出し側が別途
-アップロード済みのオブジェクトキー)を受け取ってメタデータのみを管理する。
+[Gate M7 改訂 2026-09-13] 2026-09-13監査(P0-01/P0-02/P0-03)により、
+以下の安全化を行った。詳細な設計判断はdocs/adr/ADR-documents-minimal.md
+「Gate M7改訂」を参照。
+
+- 旧`POST /{plan_id}/documents`(クライアント指定storage_keyを受理する
+  metadata登録API)は、Gate M5でサーバー生成型upload APIへ信頼境界を
+  移行した後も公開されたままであり、他文書のstorage_keyを指定した
+  偽装metadata作成を許していた(P0-01)。本Gateで410 Goneとして閉鎖する。
+- `storage_key`は内部参照であり、利用者に返す必要がないため通常の
+  `DocumentResponse`から除外する(P0-02)。
+- classification="restricted"の文書は、明示的なdocument単位の権限grant
+  domainが現行に存在しないため、安全側の既定値として文書のowner本人
+  (`owner_user_id`)のみが閲覧・ダウンロード・リンク操作できることとし、
+  他のplan viewer/editorには存在・件数・ファイル名・download URLの
+  いずれも一覧・詳細・リンク経路から漏らさない(存在しないdocument_idと
+  区別できない404で応答する)(P0-03)。plan owner自身がRESTRICTED文書の
+  owner_user_idでない場合も同様に404となる(誤って曖昧なplan owner特権を
+  発明しない)。
 
 権限(DOC-04 §9 SC-11マトリクスに準拠。documentsはplan単位の資源):
-- 作成/更新/削除: owner/editor
-- 閲覧(一覧・詳細): viewer以上。classificationに関わらず、本Gateでは
-  original_filenameを含め通常表示する(DOC-11 §2でoriginal_filenameは
-  "権限"表示に分類されており、confirmation_number/pin/ticket payloadの
-  ような明示revealを要求する"reveal"表示ではないため)。
+- 作成(アップロード)/更新/削除: owner/editor
+- 閲覧(一覧・詳細): viewer以上、ただしRESTRICTED文書は上記の通り
+  document owner本人限定。original_filenameはDOC-11 §2で「権限」表示に
+  分類されており(confirmation_number/pin/ticket payloadのような明示
+  revealを要求する"reveal"表示ではない)、閲覧権限がある場合は通常表示する。
 """
+import re
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -32,6 +48,7 @@ from app.models.models import (
     DocumentLinkRelationType,
     DocumentMalwareStatus,
     DocumentOcrStatus,
+    DocumentPurgeStatus,
     Reservation,
     Ticket,
     TravelEvent,
@@ -60,27 +77,35 @@ _VALID_RELATION_TYPES = {r.value for r in DocumentLinkRelationType}
 _VALID_ENTITY_TYPES = {"reservation", "ticket", "event", "attachment"}
 
 
+def _is_document_owner(d: Document, user: User) -> bool:
+    return d.owner_user_id is not None and str(d.owner_user_id) == str(user.id)
+
+
+def _document_visible_to(d: Document, user: User) -> bool:
+    """[Gate M7 P0-03] classification="restricted"の文書はdocument owner
+    本人にのみ可視とする(明示的なdocument単位grant domainが無いため、
+    安全側の既定値としてowner-onlyを採用する)。それ以外のclassification
+    は既存通りplanロール(viewer以上)のみで可視とする。"""
+    if d.classification != DocumentClassification.RESTRICTED.value:
+        return True
+    return _is_document_owner(d, user)
+
+
+def _build_content_disposition(filename: str) -> str:
+    """[Gate M7 P1-01] 復号済みfilenameをそのままheaderへ組み立てると、
+    CR/LFによるheader injectionや非ASCII文字の不正なエンコードが起こり
+    得た。RFC 6266 / RFC 5987相当の形式(ASCII fallback + filename*)で
+    安全に組み立てる。"""
+    cleaned = (filename or "document").replace("\r", "").replace("\n", "")
+    ascii_fallback = cleaned.encode("ascii", "replace").decode("ascii").replace('"', "_")
+    ascii_fallback = re.sub(r"[\x00-\x1f\x7f]", "_", ascii_fallback).strip() or "document"
+    encoded = quote(cleaned, safe="")
+    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
+
+
 # ==========================================
 # スキーマ
 # ==========================================
-
-class DocumentCreateRequest(BaseModel):
-    classification: str = DocumentClassification.INTERNAL.value
-    document_type: Optional[str] = Field(None, max_length=100)
-    original_filename: str = Field(..., max_length=500)
-    storage_key: str = Field(..., max_length=1000)
-    mime_type: Optional[str] = Field(None, max_length=255)
-    size: Optional[int] = Field(None, ge=0)
-    sha256: Optional[str] = Field(None, min_length=64, max_length=64)
-    retention_until: Optional[datetime] = None
-
-    @field_validator("classification")
-    @classmethod
-    def _validate_classification(cls, v: str) -> str:
-        if v not in _VALID_CLASSIFICATIONS:
-            raise ValueError(f"classificationは次のいずれかである必要があります: {sorted(_VALID_CLASSIFICATIONS)}")
-        return v
-
 
 class DocumentUpdateRequest(BaseModel):
     classification: Optional[str] = None
@@ -97,13 +122,16 @@ class DocumentUpdateRequest(BaseModel):
 
 
 class DocumentResponse(BaseModel):
+    """[Gate M7 P0-02] `storage_key`は内部のObject Storage参照であり、
+    利用者への公開に必要な情報ではない(ダウンロードは署名付きURL経由の
+    `download-url`/`download`エンドポイントで完結する)ため、通常の
+    レスポンスからは意図的に除外する。"""
     id: str
     plan_id: str
     owner_user_id: Optional[str]
     classification: str
     document_type: Optional[str]
     original_filename: Optional[str]
-    storage_key: str
     mime_type: Optional[str]
     size: Optional[int]
     sha256: Optional[str]
@@ -164,7 +192,6 @@ def _to_response(d: Document) -> DocumentResponse:
         classification=d.classification,
         document_type=d.document_type,
         original_filename=filename,
-        storage_key=d.storage_key,
         mime_type=d.mime_type,
         size=d.size,
         sha256=d.sha256,
@@ -189,13 +216,16 @@ def _to_link_response(link: DocumentLink) -> DocumentLinkResponse:
     )
 
 
-def _get_document_or_404(db: Session, plan_id, document_id) -> Document:
+def _get_document_or_404(db: Session, plan_id, document_id, current_user: User) -> Document:
+    """[Gate M7 P0-03] RESTRICTED文書をdocument owner以外から隠すため、
+    可視性チェックに失敗した場合も「存在しない」場合と同一の404を返す
+    (存在の有無・件数・classificationを外部から推測できないようにする)。"""
     d = (
         db.query(Document)
         .filter(Document.id == document_id, Document.plan_id == plan_id, Document.deleted_at.is_(None))
         .first()
     )
-    if d is None:
+    if d is None or not _document_visible_to(d, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文書が見つかりません")
     return d
 
@@ -273,55 +303,25 @@ def _validate_link_target_exists(db: Session, plan_id, entity_type: str, entity_
 # エンドポイント: documents
 # ==========================================
 
-@router.post("/{plan_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-def create_document(
-    plan_id: str,
-    payload: DocumentCreateRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_or_guest),
-):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+@router.post("/{plan_id}/documents", status_code=status.HTTP_410_GONE, include_in_schema=False)
+def create_document_deprecated(plan_id: str):
+    """[Gate M7 P0-01是正] 旧metadata登録API(クライアントが`storage_key`/
+    MIME/size/sha256を自由に指定できた)は、Gate M5でサーバー生成型
+    upload API(`POST .../documents/upload`)へ信頼境界を移行した後も
+    公開されたままであり、他文書のstorage_keyを指定した偽装metadata
+    作成や、宣言値と実体が一致しないmetadata登録を許していた。
 
-    d = Document(
-        plan_id=plan.id,
-        owner_user_id=current_user.id,
-        classification=payload.classification,
-        document_type=payload.document_type,
-        storage_key=payload.storage_key,
-        mime_type=payload.mime_type,
-        size=payload.size,
-        sha256=payload.sha256,
-        retention_until=payload.retention_until,
-        # [スコープ限定] スキャナ・OCR未導入のため常に既定値で作成する
-        # (クライアント入力を受け付けない。上部モジュールdocstring参照)。
-        malware_status=DocumentMalwareStatus.NOT_SCANNED.value,
-        ocr_status=DocumentOcrStatus.NOT_REQUESTED.value,
+    本Gateで通常利用を410 Goneとして閉鎖する。内部移行専用の代替経路は
+    現行コードベースに利用実績が無いため新設しない
+    (docs/adr/ADR-documents-minimal.md「Gate M7改訂」参照)。
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "このエンドポイントは廃止されました。"
+            "POST /api/v1/plans/{plan_id}/documents/upload を使用してください。"
+        ),
     )
-
-    try:
-        d.original_filename_ciphertext = encrypt_payload(payload.original_filename.encode("utf-8"))
-    except EncryptionNotConfigured:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="ファイル名の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
-        )
-
-    db.add(d)
-    db.commit()
-    db.refresh(d)
-
-    record_audit_event(
-        action="document_created",
-        resource_type="document",
-        user_id=current_user.id,
-        resource_id=d.id,
-        ip_address=_client_ip(request),
-        user_agent=_user_agent(request),
-        details={"plan_id": str(plan.id), "classification": d.classification},
-    )
-
-    return _to_response(d)
 
 
 @router.post(
@@ -423,7 +423,7 @@ def get_document_download_url(
     `GET /documents/download`で単独検証される(トークンにACL情報は
     含めず、発行時点のACLチェックとTTLで安全性を担保する設計)。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
 
     try:
         token, expires_at = issue_download_token(d.id)
@@ -439,15 +439,27 @@ def get_document_download_url(
 @router.get("/documents/download")
 def download_document(
     token: str,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """[Gate M5] 署名付きトークンによる期限付きダウンロード。トークン
     自体が発行時点のACLチェック済みの証跡であるため、本エンドポイントは
     再度plan権限を確認しない(トークンの有効期限とHMAC署名のみで安全性を
-    担保する、S3署名付きURLと同じ設計思想)。"""
+    担保する、S3署名付きURLと同じ設計思想)。
+
+    [Gate M7 P1-02] 成功・失敗いずれもaudit_logsへ記録するが、token文字列
+    やstorage_key、filenameといった機微値はdetailsへ含めない
+    (resource_id=document_idのみを記録し、再度検索可能な形に留める)。"""
     try:
         document_id = verify_download_token(token)
     except DownloadTokenInvalid as e:
+        record_audit_event(
+            action="document_download_denied",
+            resource_type="document",
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+            details={"reason": "invalid_token"},
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except DownloadSigningNotConfigured:
         raise HTTPException(
@@ -457,6 +469,14 @@ def download_document(
 
     d = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
     if d is None:
+        record_audit_event(
+            action="document_download_denied",
+            resource_type="document",
+            resource_id=document_id,
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+            details={"reason": "not_found"},
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文書が見つかりません")
 
     backend = get_storage_backend()
@@ -468,6 +488,14 @@ def download_document(
             detail="ファイルの復号が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
         )
     except FileNotFoundError:
+        record_audit_event(
+            action="document_download_denied",
+            resource_type="document",
+            resource_id=d.id,
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+            details={"reason": "file_missing"},
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ファイル本体が見つかりません")
 
     filename = "document"
@@ -477,13 +505,22 @@ def download_document(
         except (EncryptionNotConfigured, ValueError):
             pass
 
+    record_audit_event(
+        action="document_downloaded",
+        resource_type="document",
+        resource_id=d.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(d.plan_id)},
+    )
+
     def _iter():
         yield content
 
     return StreamingResponse(
         _iter(),
         media_type=d.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": _build_content_disposition(filename)},
     )
 
 
@@ -500,7 +537,9 @@ def list_documents(
         .order_by(Document.created_at.desc())
         .all()
     )
-    return [_to_response(d) for d in rows]
+    # [Gate M7 P0-03] RESTRICTED文書はdocument owner本人以外の一覧から除外する
+    # (件数・ファイル名も含め、非ownerには一切露出しない)。
+    return [_to_response(d) for d in rows if _document_visible_to(d, current_user)]
 
 
 @router.get("/{plan_id}/documents/{document_id}", response_model=DocumentResponse)
@@ -511,7 +550,7 @@ def get_document(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     return _to_response(d)
 
 
@@ -526,7 +565,7 @@ def update_document(
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     _require_if_match(d, if_match)
 
     data = payload.model_dump(exclude_unset=True)
@@ -572,11 +611,24 @@ def delete_document(
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     _require_if_match(d, if_match)
 
     d.deleted_at = datetime.now(dt_timezone.utc)
     d.revision += 1
+    db.commit()
+
+    # [Gate M7 P0-04] soft delete直後に実storage fileの削除を試みる。
+    # 失敗してもDBの論理削除自体は既に確定させ、purge_statusをpendingの
+    # ままにしておくことで、後から`scripts/run_document_purge.py`が
+    # 再試行できるようにする(即時失敗でユーザー操作自体を失敗させない)。
+    # ファイル不在は成功として扱う(idempotent)。
+    backend = get_storage_backend()
+    try:
+        backend.delete(d.storage_key)
+        d.purge_status = DocumentPurgeStatus.PURGED.value
+    except (OSError, ValueError):
+        d.purge_status = DocumentPurgeStatus.FAILED.value
     db.commit()
 
     record_audit_event(
@@ -586,7 +638,7 @@ def delete_document(
         resource_id=d.id,
         ip_address=_client_ip(request),
         user_agent=_user_agent(request),
-        details={"plan_id": str(plan.id)},
+        details={"plan_id": str(plan.id), "purge_status": d.purge_status},
     )
     return None
 
@@ -608,7 +660,7 @@ def create_document_link(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     _validate_link_target_exists(db, plan.id, payload.entity_type, payload.entity_id)
 
     link = DocumentLink(
@@ -635,7 +687,7 @@ def list_document_links(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     rows = (
         db.query(DocumentLink)
         .filter(DocumentLink.document_id == d.id)
@@ -657,7 +709,7 @@ def delete_document_link(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    d = _get_document_or_404(db, plan.id, document_id)
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
     link = _get_link_or_404(db, d.id, link_id)
 
     db.delete(link)

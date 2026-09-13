@@ -1266,6 +1266,18 @@ class DocumentLinkRelationType(str, Enum):
     ATTACHMENT = "attachment"
 
 
+class DocumentPurgeStatus(str, Enum):
+    """[Gate M7] soft delete後の実storage file purgeの進捗状態。
+    P0-04是正: DELETE後もstorage file自体は残ったままだった問題への対応。
+    pending: 未purge(未削除、または削除試行前/再試行待ち)。
+    purged: storage file削除試行が成功(ファイル不在も成功扱い、idempotent)。
+    failed: 直近の削除試行が失敗し再試行待ち(app/services/document_purge_service.py参照)。
+    """
+    PENDING = "pending"
+    PURGED = "purged"
+    FAILED = "failed"
+
+
 class Document(Base):
     """[Gate R3-6] FR-013文書ウォレットの最小永続モデル(メタデータのみ)。"""
     __tablename__ = "documents"
@@ -1290,6 +1302,10 @@ class Document(Base):
     malware_status = Column(String, nullable=False, default=DocumentMalwareStatus.NOT_SCANNED.value)
     ocr_status = Column(String, nullable=False, default=DocumentOcrStatus.NOT_REQUESTED.value)
     retention_until = Column(DateTime(timezone=True), nullable=True)
+
+    # [Gate M7] P0-04是正: soft delete後の実storage file purgeを再試行可能に
+    # 追跡するための状態列(app/services/document_purge_service.py参照)。
+    purge_status = Column(String, nullable=False, default=DocumentPurgeStatus.PENDING.value, server_default="pending")
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

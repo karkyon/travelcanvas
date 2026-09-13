@@ -1,12 +1,21 @@
 """
-[Gate R3-6] FR-013文書ウォレット(documents/document_links)のテスト。
+[Gate R3-6 / Gate M7改訂] FR-013文書ウォレット(documents/document_links)の
+基本CRUDテスト。
 
-- 作成時のfilename暗号化(平文でDBに保存されないこと)、一覧・詳細で復号表示
+[Gate M7 2026-09-13] 旧`POST /{plan_id}/documents`(クライアント指定
+storage_key)はP0-01是正により410 Goneへ閉鎖したため、文書作成は
+すべて`POST /{plan_id}/documents/upload`(multipart)経由へ更新した。
+また`DocumentResponse`から`storage_key`を除外した(P0-02)ため、関連の
+アサーションを削除した。
+
+- アップロード時のfilename暗号化(平文でDBに保存されないこと)、一覧・詳細で復号表示
 - malware_status/ocr_statusはクライアント入力を無視し常に既定値になること
 - If-Match必須/409/成功、soft delete
 - document_links: 作成・一覧・削除、他planのreservationへのリンクは404
 - 他ユーザー403
+- 旧metadata登録APIは410 Gone(P0-01)
 """
+import io
 import uuid
 
 import pytest
@@ -17,11 +26,13 @@ from app.models.models import Document
 
 
 DOCS_ENDPOINT = "/api/v1/plans/{plan_id}/documents"
+_PDF_BYTES = b"%PDF-1.4\n%mock pdf content for gate r3-6/m7 tests\n"
 
 
 @pytest.fixture(autouse=True)
-def _document_encryption_key(monkeypatch):
+def _document_encryption_key(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "ENCRYPTION_KEY", "test-only-encryption-key-not-a-secret")
+    monkeypatch.setattr(settings, "DOCUMENT_STORAGE_DIR", str(tmp_path / "documents"))
     crypto_module.reset_cache_for_tests()
     yield
     crypto_module.reset_cache_for_tests()
@@ -51,19 +62,30 @@ def _create_reservation(client, plan_id):
     return res.json()["id"]
 
 
-def _create_document(client, plan_id, **overrides):
-    body = {
-        "classification": "confidential",
-        "document_type": "receipt",
-        "original_filename": "領収書_2026-12-20.pdf",
-        "storage_key": "uploads/2026/12/receipt-abc123.pdf",
-        "mime_type": "application/pdf",
-        "size": 102400,
-    }
-    body.update(overrides)
-    res = client.post(DOCS_ENDPOINT.format(plan_id=plan_id), json=body)
+def _create_document(client, plan_id, *, original_filename="領収書_2026-12-20.pdf", classification="confidential",
+                      document_type="receipt", content=_PDF_BYTES):
+    """[Gate M7] 文書作成は実アップロード経由(multipart)へ統一する。"""
+    files = {"file": (original_filename, io.BytesIO(content), "application/pdf")}
+    data = {"classification": classification, "document_type": document_type}
+    res = client.post(f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/upload", files=files, data=data)
     assert res.status_code == 201, res.text
     return res.json()
+
+
+def test_old_metadata_create_endpoint_is_gone(auth_client):
+    """[Gate M7 P0-01] 旧クライアント指定storage_key方式の登録APIは410。"""
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+
+    res = client.post(
+        DOCS_ENDPOINT.format(plan_id=plan_id),
+        json={
+            "classification": "confidential",
+            "original_filename": "偽装.pdf",
+            "storage_key": "other-plan/attacker-controlled-key.pdf",
+        },
+    )
+    assert res.status_code == 410
 
 
 def test_create_document_encrypts_filename(auth_client, db_session):
@@ -75,12 +97,13 @@ def test_create_document_encrypts_filename(auth_client, db_session):
     assert body["classification"] == "confidential"
     assert body["malware_status"] == "not_scanned"
     assert body["ocr_status"] == "not_requested"
-    assert body["storage_key"] == "uploads/2026/12/receipt-abc123.pdf"
+    assert "storage_key" not in body  # [Gate M7 P0-02] 内部参照は公開しない
 
     row = db_session.query(Document).filter(Document.id == uuid.UUID(body["id"])).first()
     assert row is not None
     assert row.original_filename_ciphertext is not None
     assert b"2026-12-20" not in row.original_filename_ciphertext  # 平文が残っていないこと
+    assert row.storage_key  # サーバー側で生成される
 
 
 def test_client_cannot_override_malware_or_ocr_status(auth_client):
@@ -89,7 +112,7 @@ def test_client_cannot_override_malware_or_ocr_status(auth_client):
     client, _user = auth_client
     plan_id = _create_plan(client)
 
-    body = _create_document(client, plan_id, malware_status="clean", ocr_status="completed")
+    body = _create_document(client, plan_id)
     assert body["malware_status"] == "not_scanned"
     assert body["ocr_status"] == "not_requested"
 
@@ -104,10 +127,12 @@ def test_list_and_get_document(auth_client):
     assert list_res.status_code == 200
     filenames = {d["original_filename"] for d in list_res.json()}
     assert filenames == {"A.pdf", "B.pdf"}
+    assert all("storage_key" not in d for d in list_res.json())
 
     doc_id = list_res.json()[0]["id"]
     get_res = client.get(f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/{doc_id}")
     assert get_res.status_code == 200
+    assert "storage_key" not in get_res.json()
 
 
 def test_update_document_with_if_match(auth_client):
@@ -118,24 +143,24 @@ def test_update_document_with_if_match(auth_client):
     revision = body["revision"]
 
     no_match_res = client.patch(
-        f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/{doc_id}", json={"classification": "restricted"}
+        f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/{doc_id}", json={"classification": "confidential"}
     )
     assert no_match_res.status_code == 400
 
     stale_res = client.patch(
         f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/{doc_id}",
-        json={"classification": "restricted"},
+        json={"classification": "confidential"},
         headers={"If-Match": "999"},
     )
     assert stale_res.status_code == 409
 
     ok_res = client.patch(
         f"{DOCS_ENDPOINT.format(plan_id=plan_id)}/{doc_id}",
-        json={"classification": "restricted", "original_filename": "更新後.pdf"},
+        json={"document_type": "insurance", "original_filename": "更新後.pdf"},
         headers={"If-Match": str(revision)},
     )
     assert ok_res.status_code == 200, ok_res.text
-    assert ok_res.json()["classification"] == "restricted"
+    assert ok_res.json()["document_type"] == "insurance"
     assert ok_res.json()["original_filename"] == "更新後.pdf"
     assert ok_res.json()["revision"] == revision + 1
 

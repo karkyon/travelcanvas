@@ -609,11 +609,13 @@ export interface ExtractionCandidateCreateData {
   evidence_locator?: string;
 }
 
-// [Gate R3-10] FR-013文書ウォレット(documents/document_links)。
-// backend/app/api/v1/documents.py (Gate R3-6)に対応するfrontend型。
-// Object Storage未導入のため実ファイルは扱わず、storage_key(クライアント
-// 側で決めた参照文字列)とメタデータのみを登録する
-// (docs/adr/ADR-documents-minimal.md参照)。
+// [Gate R3-10/M7改訂] FR-013文書ウォレット(documents/document_links)。
+// backend/app/api/v1/documents.py (Gate R3-6→M5→M7)に対応するfrontend型。
+// [Gate M7 P0-01/P0-02] 旧クライアント指定storage_key方式の登録API
+// (createDocument/DocumentCreateData)はbackend側で410 Goneとなったため
+// 削除した。文書作成は`uploadDocument`(実multipartアップロード)のみを
+// 経路とする。`storage_key`は内部のObject Storage参照でありbackendの
+// 通常レスポンスから除外されたため、frontend型からも削除した。
 
 export type DocumentClassification = 'public' | 'internal' | 'confidential' | 'restricted';
 
@@ -624,7 +626,6 @@ export interface TravelDocument {
   classification: DocumentClassification;
   document_type: string | null;
   original_filename: string | null;
-  storage_key: string;
   mime_type: string | null;
   size: number | null;
   sha256: string | null;
@@ -634,16 +635,6 @@ export interface TravelDocument {
   revision: number;
   created_at: string;
   updated_at: string | null;
-}
-
-export interface DocumentCreateData {
-  classification: DocumentClassification;
-  document_type?: string;
-  original_filename: string;
-  storage_key: string;
-  mime_type?: string;
-  size?: number;
-  sha256?: string;
 }
 
 export interface DocumentLink {
@@ -1608,11 +1599,6 @@ class CompleteTravelAPI {
     return response.data;
   }
 
-  async createDocument(planId: string, data: DocumentCreateData): Promise<TravelDocument> {
-    const response = await this.client.post<TravelDocument>(`/plans/${planId}/documents`, data);
-    return response.data;
-  }
-
   // [Gate M6] FR-013 Object Storage実連携(Gate M5)への接続。実ファイルを
   // multipart/form-dataでアップロードする。storage_key/mime_type/size/
   // sha256はすべてサーバー側が実ファイル内容から算出するため、クライアント
@@ -2025,7 +2011,6 @@ export const rejectImportJob = (planId: string, jobId: string) => api.rejectImpo
 // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
 export const getDocuments = (planId: string) => api.getDocuments(planId);
 export const getDocument = (planId: string, documentId: string) => api.getDocument(planId, documentId);
-export const createDocument = (planId: string, data: DocumentCreateData) => api.createDocument(planId, data);
 export const deleteDocument = (planId: string, documentId: string, ifMatch: number) =>
   api.deleteDocument(planId, documentId, ifMatch);
 export const getDocumentLinks = (planId: string, documentId: string) => api.getDocumentLinks(planId, documentId);
