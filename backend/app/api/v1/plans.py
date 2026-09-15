@@ -36,7 +36,7 @@ from app.core.auth import get_current_active_user, get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
-    IdempotencyRecord, User, Place, TravelSegment,
+    IdempotencyRecord, User, Place, TravelSegment, RouteOption, RouteLeg,
 )
 from app.services.route_estimator import estimate_leg, haversine_km
 
@@ -695,6 +695,11 @@ async def undo_last_change(
     # travel_day/travel_eventを先に処理してからtravel_segmentを処理する
     # (ChangeItemのクエリ結果順序はDBに依存し保証されないため、明示的に
     # 2パスに分ける)。
+    # [Gate M8 P1-03是正] route_option/route_legも同じ理由で明示的に処理する。
+    # 2026-09-13監査で「undo_last_changeがroute_option/route_legを処理せず、
+    # adopt採用のUndoでtravel_segmentのみ戻りRouteOption.statusが
+    # 'adopted'のまま残る部分Undoが起きる」ことが指摘されていた
+    # (このGateまでは対応するentity_type分岐自体が存在しなかった)。
     for item in items:
         if item.entity_type == "travel_day":
             _undo_day_item(db, plan, item)
@@ -703,6 +708,12 @@ async def undo_last_change(
     for item in items:
         if item.entity_type == "travel_segment":
             _undo_segment_item(db, plan, item)
+    for item in items:
+        if item.entity_type == "route_option":
+            _undo_route_option_item(db, plan, item)
+    for item in items:
+        if item.entity_type == "route_leg":
+            _undo_route_leg_item(db, plan, item)
 
     change_set.undone_at = datetime.now(dt_timezone.utc)
     db.flush()
@@ -834,6 +845,129 @@ def _apply_segment_snapshot(seg: TravelSegment, snapshot: dict) -> None:
         elif key == "cost":
             value = _parse_segment_cost(value)
         setattr(seg, key, value)
+
+
+def _undo_route_option_item(db: Session, plan: TravelPlan, item: ChangeItem):
+    """[Gate M8] RouteOptionのUndo。create_route_option/delete_route_optionは
+    子RouteLegを個別のChangeItemとしては記録せず、before_json/after_jsonの
+    `_legs`キーへ埋め込みで一括記録する(RouteLeg.route_option_idはDB側の
+    cascade削除を持たないため、Undo時も明示的に子から処理する必要がある)。
+    adopt_route_optionによる"update"(status: candidate->adopted)は通常の
+    フィールド復元のみで良い(legsは変化しないため)。"""
+    if item.action == "create":
+        legs = (item.after_json or {}).get("_legs", [])
+        for leg_snap in legs:
+            leg = db.query(RouteLeg).filter(RouteLeg.id == uuid.UUID(leg_snap["id"])).first()
+            if leg:
+                db.delete(leg)
+        db.flush()
+        option = db.query(RouteOption).filter(RouteOption.id == item.entity_id).first()
+        if option:
+            db.delete(option)
+    elif item.action == "update" and item.before_json:
+        option = db.query(RouteOption).filter(RouteOption.id == item.entity_id).first()
+        if option:
+            _apply_route_option_snapshot(option, item.before_json)
+    elif item.action == "delete" and item.before_json:
+        before = dict(item.before_json)
+        legs = before.pop("_legs", [])
+        restored = RouteOption(
+            id=item.entity_id, plan_id=plan.id,
+            from_event_id=before.get("from_event_id"), from_place_id=before.get("from_place_id"),
+            to_event_id=before.get("to_event_id"), to_place_id=before.get("to_place_id"),
+            status=before.get("status", "candidate"),
+            total_duration_minutes=before.get("total_duration_minutes"),
+            total_cost=_parse_segment_cost(before.get("total_cost")),
+            currency=before.get("currency"),
+            total_distance_km=before.get("total_distance_km"),
+            walking_minutes=before.get("walking_minutes"),
+            transfer_count=before.get("transfer_count"),
+            accessibility_score=before.get("accessibility_score"),
+            scenic_score=before.get("scenic_score"),
+            co2_estimate_kg=before.get("co2_estimate_kg"),
+            duration_estimate_low_minutes=before.get("duration_estimate_low_minutes"),
+            duration_estimate_high_minutes=before.get("duration_estimate_high_minutes"),
+            provider=before.get("provider", "manual"),
+            retrieved_at=_parse_segment_dt(before.get("retrieved_at")),
+            expires_at=_parse_segment_dt(before.get("expires_at")),
+            is_estimate=before.get("is_estimate", True),
+            algorithm_version=before.get("algorithm_version", "manual-v1"),
+        )
+        db.add(restored)
+        db.flush()
+        for leg_snap in legs:
+            db.add(RouteLeg(
+                id=uuid.UUID(leg_snap["id"]), route_option_id=restored.id,
+                leg_order=leg_snap["leg_order"], mode=leg_snap["mode"],
+                line=leg_snap.get("line"), operator=leg_snap.get("operator"),
+                platform=leg_snap.get("platform"),
+                from_label=leg_snap.get("from_label"), to_label=leg_snap.get("to_label"),
+                departure_at=_parse_segment_dt(leg_snap.get("departure_at")),
+                arrival_at=_parse_segment_dt(leg_snap.get("arrival_at")),
+                distance_km=leg_snap.get("distance_km"), duration_minutes=leg_snap.get("duration_minutes"),
+                realtime_status=leg_snap.get("realtime_status", "unknown"),
+            ))
+
+
+def _apply_route_option_snapshot(option: "RouteOption", snapshot: dict) -> None:
+    dt_fields = {"retrieved_at", "expires_at"}
+    for key in (
+        "from_event_id", "from_place_id", "to_event_id", "to_place_id", "status",
+        "total_duration_minutes", "total_cost", "currency", "total_distance_km",
+        "walking_minutes", "transfer_count", "accessibility_score", "scenic_score",
+        "co2_estimate_kg", "duration_estimate_low_minutes", "duration_estimate_high_minutes",
+        "provider", "retrieved_at", "expires_at", "is_estimate", "algorithm_version",
+    ):
+        if key not in snapshot:
+            continue
+        value = snapshot[key]
+        if key in dt_fields:
+            value = _parse_segment_dt(value)
+        elif key == "total_cost":
+            value = _parse_segment_cost(value)
+        setattr(option, key, value)
+
+
+def _undo_route_leg_item(db: Session, plan: TravelPlan, item: ChangeItem):
+    """[Gate M8] 単独のadd_route_leg/update_route_leg/delete_route_leg操作
+    (既存かつ削除されていないRouteOptionへの単一leg操作)のUndo。
+    RouteOption自体のcreate/delete時に一括作成/削除されるlegsは
+    `_undo_route_option_item`側の`_legs`埋め込みで処理するため、ここでは
+    重複して扱わない。"""
+    if item.action == "create":
+        leg = db.query(RouteLeg).filter(RouteLeg.id == item.entity_id).first()
+        if leg:
+            db.delete(leg)
+    elif item.action == "update" and item.before_json:
+        leg = db.query(RouteLeg).filter(RouteLeg.id == item.entity_id).first()
+        if leg:
+            _apply_route_leg_snapshot(leg, item.before_json)
+    elif item.action == "delete" and item.before_json:
+        before = item.before_json
+        db.add(RouteLeg(
+            id=item.entity_id, route_option_id=uuid.UUID(before["route_option_id"]),
+            leg_order=before["leg_order"], mode=before["mode"],
+            line=before.get("line"), operator=before.get("operator"), platform=before.get("platform"),
+            from_label=before.get("from_label"), to_label=before.get("to_label"),
+            departure_at=_parse_segment_dt(before.get("departure_at")),
+            arrival_at=_parse_segment_dt(before.get("arrival_at")),
+            distance_km=before.get("distance_km"), duration_minutes=before.get("duration_minutes"),
+            realtime_status=before.get("realtime_status", "unknown"),
+        ))
+
+
+def _apply_route_leg_snapshot(leg: "RouteLeg", snapshot: dict) -> None:
+    dt_fields = {"departure_at", "arrival_at"}
+    for key in (
+        "leg_order", "mode", "line", "operator", "platform", "from_label", "to_label",
+        "departure_at", "arrival_at", "distance_km", "duration_minutes", "realtime_status",
+    ):
+        if key not in snapshot:
+            continue
+        value = snapshot[key]
+        if key in dt_fields:
+            value = _parse_segment_dt(value)
+        setattr(leg, key, value)
 
 
 def _undo_event_item(db: Session, plan: TravelPlan, item: ChangeItem):

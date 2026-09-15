@@ -177,3 +177,48 @@ Gate M3のbackend契約を、実際の画面から到達可能にした(Gate M1�
 ### 残件(更新)
 
 - leg詳細編集UI、Undo対応、外部Directions API連携、leg並べ替え、E2E。
+
+## 改訂: Gate M8(RouteOption/RouteLeg完全Undo、2026-09-13監査P1-03対応)
+
+2026-09-13総合再監査P1-03で、`undo_last_change`(app/api/v1/plans.py)が
+`route_option`/`route_leg`というentity_typeを一切処理しない(該当する
+if分岐自体が存在しない)ことが指摘された。これにより、adopt採用を
+Undoすると`TravelSegment`だけが戻り、`RouteOption.status`が`adopted`の
+まま残る「部分Undo」が発生していた。
+
+### 是正内容
+
+1. `app/api/v1/plans.py`の`undo_last_change`ループへ`route_option`/
+   `route_leg`のentity_type分岐(`_undo_route_option_item`/
+   `_undo_route_leg_item`)を追加した。
+2. `create_route_option`/`delete_route_option`は、legsを個別のChangeItem
+   として記録していなかった(legsはoption作成/削除に付随して一括作成/
+   削除されるのみ)。このため、経路候補の削除をUndoしても子RouteLegを
+   復元する手段がそもそも存在しなかった。本Gateで、before_json/
+   after_jsonへ`_legs`キー(各legのスナップショット配列)を埋め込む
+   `_option_snapshot_with_legs`ヘルパーを新設し、create/delete両方の
+   ChangeItemに含めるよう変更した(`RouteLeg.route_option_id`はDB側の
+   cascade削除を持たないため、Undo側でも明示的に子から処理する)。
+3. 単独の`add_route_leg`/`update_route_leg`/`delete_route_leg`操作
+   (既存かつ削除されていない候補への単一leg操作)は、通常の
+   create/update/delete ChangeItemとして個別にUndoできるようにした。
+4. adopt自体は`route_option`の"update"(status: candidate→adopted)と
+   `travel_segment`の"create"/"update"を1つのChangeSetとして既に記録
+   していた(Gate M3時点)。本Gateでroute_option分岐を追加したことで、
+   このChangeSetのUndoが両方を元に戻せるようになった。
+
+### 検証
+
+- 新規`tests/test_gate_m8_route_undo.py`(7ケース: adopt後Undoで
+  segment/option両方が戻ること、option作成Undoでlegsごと削除、
+  option削除Undoでlegsごと復元、leg単独のadd/delete/update Undo、
+  option単独のstatus更新Undo)全てPASS。
+- backend全体355件(既存348+新規7)全てPASS、リグレッションなし。
+- `python -m compileall`エラー0、secret scan 0。
+
+### 残件(次Gate候補)
+
+- 経路候補の並べ替え(leg_orderの一括変更)操作自体が未実装のため、
+  そのUndoも未対応(操作自体が存在しないため対象外)。
+- 複数経路候補を一括discardする操作のUndoは、実装され次第同じ
+  batch ChangeSetパターンで対応する。

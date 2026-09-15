@@ -262,6 +262,22 @@ def _option_to_dict(option: RouteOption) -> dict:
     }
 
 
+def _option_snapshot_with_legs(db: Session, option: RouteOption) -> dict:
+    """[Gate M8 P1-03是正] Undo用スナップショットに子RouteLegも埋め込む。
+    RouteLeg.route_option_idはDB cascade削除を持たないため、
+    create/delete route_optionのUndo(app/api/v1/plans.pyの
+    `_undo_route_option_item`)がlegsも一括で復元/削除できるようにする。"""
+    snapshot = _option_to_dict(option)
+    legs = (
+        db.query(RouteLeg)
+        .filter(RouteLeg.route_option_id == option.id)
+        .order_by(RouteLeg.leg_order.asc())
+        .all()
+    )
+    snapshot["_legs"] = [_leg_to_response(l) for l in legs]
+    return snapshot
+
+
 def _get_option_or_404(db: Session, plan_id, option_id: str) -> RouteOption:
     try:
         oid = uuid.UUID(str(option_id))
@@ -410,7 +426,7 @@ def create_route_option(
 
         _record_change_and_bump_revision(
             db, plan, current_user, "manual", "route_option", option.id, "create",
-            before_json=None, after_json=_option_to_dict(option),
+            before_json=None, after_json=_option_snapshot_with_legs(db, option),
         )
         db.refresh(option)
         response_body = _option_to_response(option, db)
@@ -477,7 +493,7 @@ def delete_route_option(
     _require_if_match(plan, if_match)
     option = _get_option_or_404(db, plan.id, option_id)
 
-    before = _option_to_dict(option)
+    before = _option_snapshot_with_legs(db, option)
     option_id_uuid = option.id
 
     legs = db.query(RouteLeg).filter(RouteLeg.route_option_id == option.id).all()
