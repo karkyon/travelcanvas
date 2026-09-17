@@ -481,6 +481,32 @@ export interface RouteLeg {
   updated_at: string | null;
 }
 
+// ===== [Gate L1] FR-029当日モード(NOW/NEXT) =====
+
+export interface TodayEvent {
+  id: string;
+  title: string;
+  event_type: string;
+  start_at: string | null;
+  end_at: string | null;
+  local_start_time: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  has_ticket: boolean;
+  reservation_id: string | null;
+}
+
+export interface TodayResponse {
+  plan_id: string;
+  today_date: string | null;
+  timezone_id: string | null;
+  server_time: string;
+  now_event: TodayEvent | null;
+  next_event: TodayEvent | null;
+  minutes_until_next: number | null;
+}
+
 export interface RouteOption {
   id: string;
   plan_id: string;
@@ -1589,6 +1615,14 @@ class CompleteTravelAPI {
   }
 
   // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
+  // ===== [Gate L1] FR-029当日モード(NOW/NEXT) frontend連携 =====
+  // backend/app/api/v1/plans.py の GET /plans/{planId}/today。
+
+  async getToday(planId: string): Promise<TodayResponse> {
+    const response = await this.client.get<TodayResponse>(`/plans/${planId}/today`);
+    return response.data;
+  }
+
   async getDocuments(planId: string): Promise<TravelDocument[]> {
     const response = await this.client.get<TravelDocument[]>(`/plans/${planId}/documents`);
     return response.data;
@@ -2009,6 +2043,9 @@ export const confirmImportJob = (planId: string, jobId: string) => api.confirmIm
 export const rejectImportJob = (planId: string, jobId: string) => api.rejectImportJob(planId, jobId);
 
 // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
+// [Gate L1] FR-029当日モード(NOW/NEXT)
+export const getToday = (planId: string) => api.getToday(planId);
+
 export const getDocuments = (planId: string) => api.getDocuments(planId);
 export const getDocument = (planId: string, documentId: string) => api.getDocument(planId, documentId);
 export const deleteDocument = (planId: string, documentId: string, ifMatch: number) =>

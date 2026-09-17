@@ -30,6 +30,7 @@ import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
 import ReservationsPage from '@/pages/ReservationsPage';
 import ImportsPage from '@/pages/ImportsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
+import TodayPage from '@/pages/TodayPage';
 import SegmentsPage from '@/pages/SegmentsPage';
 import RouteOptionsPage from '@/pages/RouteOptionsPage';
 
@@ -174,6 +175,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DocumentsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // ☀️ [Gate L1] FR-029当日モード(NOW/NEXT)。DOC-04 SC-07。
+      {
+        path: 'planner/:planId/today',
+        element: (
+          <ProtectedRoute>
+            <TodayPage />
           </ProtectedRoute>
         ),
       },
