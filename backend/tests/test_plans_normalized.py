@@ -71,7 +71,6 @@ def test_create_event_and_move_to_another_day(auth_client):
     client, _user = auth_client
     plan_id = _create_underlying_plan(client)
     day1 = client.post(f"/api/v1/plans/{plan_id}/days", json={"local_date": "2026-12-01"}).json()
-    day2_rev = client.get(f"/api/v1/plans/{plan_id}").json()["revision"]
     day2 = client.post(
         f"/api/v1/plans/{plan_id}/days", json={"local_date": "2026-12-02"}
     ).json()

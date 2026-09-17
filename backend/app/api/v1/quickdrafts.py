@@ -283,7 +283,7 @@ async def create_quick_draft(
         # みが取り消される。Phase AのIN_PROGRESS claimは外側transactionに残る)。
         finalize_failure(db, record.id, {"code": e.code, "message": e.message})
         raise
-    except Exception as e:
+    except Exception:
         finalize_failure(db, record.id, {"code": "INTERNAL_ERROR", "message": "internal error"})
         raise
 

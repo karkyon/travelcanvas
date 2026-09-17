@@ -520,7 +520,6 @@ def search_reservations(
     return [_to_response(r) for r in rows]
 
 
-
 @router.get("/{plan_id}/reservations/{reservation_id}", response_model=ReservationResponse)
 def get_reservation(
     plan_id: str,

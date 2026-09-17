@@ -25,7 +25,7 @@ JSON blobに日程・イベントを丸ごと保持しており、フロント�
 import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
 from decimal import Decimal
-from typing import Optional, List, Any, Dict
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
@@ -207,7 +207,9 @@ def _check_idempotency(db: Session, user: User, endpoint: str, key: Optional[str
     return None
 
 
-def _store_idempotency(db: Session, user: User, endpoint: str, key: Optional[str], status_code: int, response_json: dict):
+def _store_idempotency(
+    db: Session, user: User, endpoint: str, key: Optional[str], status_code: int, response_json: dict
+):
     if not key:
         return
     record = IdempotencyRecord(
@@ -1228,7 +1230,9 @@ def _nearest_neighbor_order(events: List[TravelEvent]) -> List[TravelEvent]:
         current = ordered[-1]
         nearest_idx = min(
             range(len(remaining)),
-            key=lambda i: haversine_km(current.latitude, current.longitude, remaining[i].latitude, remaining[i].longitude),
+            key=lambda i: haversine_km(
+                current.latitude, current.longitude, remaining[i].latitude, remaining[i].longitude
+            ),
         )
         ordered.append(remaining.pop(nearest_idx))
     return ordered

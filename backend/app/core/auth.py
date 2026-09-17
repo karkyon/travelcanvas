@@ -10,15 +10,12 @@ TravelCanvas Backend - 統一認証システム
 - ゲスト認証と会員認証のハイブリッド対応
 """
 
-from typing import List, Optional, Union, Dict, Any, Tuple
+from typing import List, Optional, Union, Dict, Any
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4, UUID
-import time
-import json
-import hashlib
 from enum import Enum
 
-from fastapi import Depends, HTTPException, status, Request, Security
+from fastapi import Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,7 +26,7 @@ import redis
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.logging import get_logger, log_security_event, SecurityEvents
-from app.core.exceptions import AuthenticationError, ValidationError
+from app.core.exceptions import AuthenticationError
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 
@@ -96,7 +93,7 @@ class SessionStatus(str, Enum):
 
 class TokenData:
     """トークンデータ（統一版）"""
-    
+
     def __init__(
         self,
         user_id: Optional[str] = None,
@@ -116,7 +113,7 @@ class TokenData:
         self.expires_at = expires_at
         self.permissions = permissions or []
         self.is_guest = is_guest
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式に変換"""
         return {
@@ -129,7 +126,7 @@ class TokenData:
             "permissions": self.permissions,
             "is_guest": self.is_guest
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TokenData":
         """辞書から作成"""
@@ -147,7 +144,7 @@ class TokenData:
 
 class AuthResult:
     """認証結果"""
-    
+
     def __init__(
         self,
         user: Optional[User] = None,
@@ -169,24 +166,24 @@ class AuthResult:
 
 class AuthManager:
     """統一認証マネージャー"""
-    
+
     def __init__(self):
         self.pwd_context = pwd_context
         self.redis_client = redis_client
         self.logger = get_logger(f"{__name__}.AuthManager")
-    
+
     # ==========================================
     # パスワード処理（統一版）
     # ==========================================
-    
+
     def hash_password(self, password: str) -> str:
         """パスワードハッシュ化"""
         return self.pwd_context.hash(password)
-    
+
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """パスワード検証"""
         return self.pwd_context.verify(plain_password, hashed_password)
-    
+
     def validate_password_strength(self, password: str) -> Dict[str, Any]:
         """パスワード強度検証（統一版）"""
         result = {
@@ -195,104 +192,104 @@ class AuthManager:
             "strength_score": 0,
             "suggestions": []
         }
-        
+
         # 長さチェック
         if len(password) < settings.PASSWORD_MIN_LENGTH:
             result["is_valid"] = False
             result["errors"].append(f"パスワードは{settings.PASSWORD_MIN_LENGTH}文字以上である必要があります")
-        
+
         if len(password) > settings.PASSWORD_MAX_LENGTH:
             result["is_valid"] = False
             result["errors"].append(f"パスワードは{settings.PASSWORD_MAX_LENGTH}文字以下である必要があります")
-        
+
         # 強度スコア計算
         score = 0
-        
+
         # 文字種チェック
         has_upper = any(c.isupper() for c in password)
         has_lower = any(c.islower() for c in password)
         has_digit = any(c.isdigit() for c in password)
         has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
-        
+
         if has_upper:
             score += 1
         else:
             result["suggestions"].append("大文字を含めてください")
-        
+
         if has_lower:
             score += 1
         else:
             result["suggestions"].append("小文字を含めてください")
-        
+
         if has_digit:
             score += 1
         else:
             result["suggestions"].append("数字を含めてください")
-        
+
         if has_special:
             score += 1
         else:
             result["suggestions"].append("特殊文字を含めてください")
-        
+
         # 長さボーナス
         if len(password) >= 12:
             score += 1
         elif len(password) >= 10:
             score += 0.5
-        
+
         result["strength_score"] = min(score, 5)
-        
+
         # 弱いパスワードパターンチェック
         weak_patterns = ["password", "123456", "qwerty", "admin", "guest"]
         if any(pattern in password.lower() for pattern in weak_patterns):
             result["is_valid"] = False
             result["errors"].append("一般的なパスワードパターンは使用できません")
-        
+
         return result
-    
+
     # ==========================================
     # JWT処理（統一版）
     # ==========================================
-    
+
     def create_access_token(
         self,
         data: Dict[str, Any],
         expires_delta: Optional[timedelta] = None
     ) -> str:
         """アクセストークン生成（統一版）"""
-        
+
         to_encode = data.copy()
-        
+
         # 有効期限設定
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        
+
         to_encode.update({
             "exp": expire,
             "iat": datetime.utcnow(),
             "type": "access"
         })
-        
+
         # JWT生成
         encoded_jwt = jwt.encode(
             to_encode,
             settings.JWT_SECRET_KEY,
             algorithm=settings.JWT_ALGORITHM
         )
-        
+
         return encoded_jwt
-    
+
     def create_refresh_token(
         self,
         user_id: str,
         session_id: str
     ) -> str:
         """リフレッシュトークン生成"""
-        
+
         expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
+
         to_encode = {
             "user_id": user_id,
             "session_id": session_id,
@@ -300,20 +297,20 @@ class AuthManager:
             "iat": datetime.utcnow(),
             "type": "refresh"
         }
-        
+
         encoded_jwt = jwt.encode(
             to_encode,
             settings.JWT_SECRET_KEY,
             algorithm=settings.JWT_ALGORITHM
         )
-        
+
         return encoded_jwt
-    
+
     def create_guest_token(self, guest_id: str) -> str:
         """ゲストトークン生成"""
-        
+
         expire = datetime.utcnow() + timedelta(hours=settings.GUEST_TOKEN_EXPIRE_HOURS)
-        
+
         to_encode = {
             "guest_id": guest_id,
             "user_type": UserType.GUEST.value,
@@ -321,18 +318,18 @@ class AuthManager:
             "iat": datetime.utcnow(),
             "type": "guest"
         }
-        
+
         encoded_jwt = jwt.encode(
             to_encode,
             settings.JWT_SECRET_KEY,
             algorithm=settings.JWT_ALGORITHM
         )
-        
+
         return encoded_jwt
-    
+
     def verify_token(self, token: str) -> Optional[TokenData]:
         """トークン検証（統一版）"""
-        
+
         try:
             # JWT デコード
             payload = jwt.decode(
@@ -340,10 +337,10 @@ class AuthManager:
                 settings.JWT_SECRET_KEY,
                 algorithms=[settings.JWT_ALGORITHM]
             )
-            
+
             # 基本データ取得
             token_type = payload.get("type", "access")
-            
+
             # トークンタイプ別処理
             if token_type == "access":
                 return self._parse_access_token(payload)
@@ -354,21 +351,21 @@ class AuthManager:
             else:
                 self.logger.warning(f"Unknown token type: {token_type}")
                 return None
-        
+
         except JWTError as e:
             self.logger.warning(f"JWT verification failed: {str(e)}")
             return None
         except Exception as e:
             self.logger.error(f"Token verification error: {str(e)}")
             return None
-    
+
     def _parse_access_token(self, payload: Dict[str, Any]) -> Optional[TokenData]:
         """アクセストークン解析"""
-        
+
         user_id = payload.get("sub")
         if not user_id:
             return None
-        
+
         return TokenData(
             user_id=user_id,
             username=payload.get("username"),
@@ -379,30 +376,30 @@ class AuthManager:
             permissions=payload.get("permissions", []),
             is_guest=payload.get("user_type") == UserType.GUEST.value
         )
-    
+
     def _parse_refresh_token(self, payload: Dict[str, Any]) -> Optional[TokenData]:
         """リフレッシュトークン解析"""
-        
-        user_id = payload.get("user_id") 
+
+        user_id = payload.get("user_id")
         session_id = payload.get("session_id")
-        
+
         if not user_id or not session_id:
             return None
-        
+
         return TokenData(
             user_id=user_id,
             session_id=session_id,
             token_type=TokenType.REFRESH,
             expires_at=datetime.fromtimestamp(payload["exp"]) if payload.get("exp") else None
         )
-    
+
     def _parse_guest_token(self, payload: Dict[str, Any]) -> Optional[TokenData]:
         """ゲストトークン解析"""
-        
+
         guest_id = payload.get("guest_id")
         if not guest_id:
             return None
-        
+
         return TokenData(
             user_id=guest_id,
             user_type=UserType.GUEST,
@@ -410,11 +407,11 @@ class AuthManager:
             expires_at=datetime.fromtimestamp(payload["exp"]) if payload.get("exp") else None,
             is_guest=True
         )
-    
+
     # ==========================================
     # セッション管理（統一版）
     # ==========================================
-    
+
     def create_session(
         self,
         user_id: str,
@@ -451,10 +448,10 @@ class AuthManager:
         """セッション検証(DBのみ。Redisキャッシュは使用しない)。"""
         return db.query(UserSession).filter(
             UserSession.id == session_id,
-            UserSession.is_active == True,
+            UserSession.is_active.is_(True),
             UserSession.expires_at > datetime.now(timezone.utc)
         ).first()
-    
+
     def extend_session(self, session_id: str, db: Session):
         """セッション有効期限延長(DBのみ)。"""
         new_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
@@ -475,60 +472,60 @@ class AuthManager:
             "updated_at": datetime.now(timezone.utc),
         })
         db.commit()
-    
+
     def revoke_session(self, session_id: str, db: Session):
         """セッション無効化"""
-        
+
         # データベース更新
         db.query(UserSession).filter(UserSession.id == session_id).update({
             "is_active": False,
             "updated_at": datetime.now(timezone.utc)
         })
-        
+
         # Redisキャッシュ削除
         if self.redis_client:
             try:
                 self.redis_client.delete(f"session:{session_id}")
             except Exception as e:
                 self.logger.warning(f"Failed to delete session cache: {str(e)}")
-        
+
         db.commit()
-        
+
         self.logger.info(f"Session revoked: {session_id}")
-    
+
     def revoke_all_user_sessions(self, user_id: str, db: Session, except_session_id: Optional[str] = None):
         """ユーザーの全セッション無効化。except_session_idを指定すると、
         そのセッションだけは有効なまま残す(例: パスワード変更後に
         他デバイスだけログアウトさせ、今操作している端末は維持する)。"""
-        
+
         # データベース更新
         query = db.query(UserSession).filter(
             UserSession.user_id == user_id,
-            UserSession.is_active == True
+            UserSession.is_active.is_(True)
         )
         if except_session_id:
             query = query.filter(UserSession.id != except_session_id)
         sessions = query.all()
-        
+
         for session in sessions:
             session.is_active = False
             session.updated_at = datetime.now(timezone.utc)
-            
+
             # Redisキャッシュ削除
             if self.redis_client:
                 try:
                     self.redis_client.delete(f"session:{session.id}")
                 except Exception as e:
                     self.logger.warning(f"Failed to delete session cache: {str(e)}")
-        
+
         db.commit()
-        
+
         self.logger.info(f"All sessions revoked for user: {user_id} (except: {except_session_id})")
-    
+
     # ==========================================
     # ユーザー認証（統一版）
     # ==========================================
-    
+
     def authenticate_user(
         self,
         email: Optional[str],
@@ -537,7 +534,7 @@ class AuthManager:
         db: Session
     ) -> Optional[User]:
         """ユーザー認証"""
-        
+
         # ユーザー取得
         query = db.query(User)
         if email:
@@ -546,45 +543,45 @@ class AuthManager:
             query = query.filter(User.username == username)
         else:
             return None
-        
+
         user = query.first()
-        
+
         if not user:
             self.logger.warning(f"User not found: {email or username}")
             return None
-        
+
         if not user.is_active:
             self.logger.warning(f"Inactive user login attempt: {user.id}")
             return None
-        
+
         if not user.hashed_password:
             self.logger.warning(f"User has no password set: {user.id}")
             return None
-        
+
         # パスワード検証
         if not self.verify_password(password, user.hashed_password):
             self.logger.warning(f"Invalid password for user: {user.id}")
             return None
-        
+
         self.logger.info(f"User authenticated successfully: {user.id}")
         return user
-    
+
     def get_current_user(
         self,
         credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
         db: Session = Depends(get_db)
     ) -> Union[User, AuthResult]:
         """現在のユーザー取得（統一版）"""
-        
+
         if not credentials:
             # 認証なしでもゲストとして扱う（ハイブリッド認証）
             return AuthResult(is_guest=True)
-        
+
         # トークン検証
         token_data = self.verify_token(credentials.credentials)
         if not token_data:
             raise AuthenticationError("無効なトークンです")
-        
+
         # ゲストユーザーの場合
         if token_data.is_guest:
             # ゲストユーザー情報を作成
@@ -600,28 +597,28 @@ class AuthManager:
             guest_user.user_type = UserType.GUEST
             guest_user.is_active = True
             guest_user.is_verified = False
-            
+
             return AuthResult(
                 user=guest_user,
                 token_data=token_data,
                 is_authenticated=True,
                 is_guest=True
             )
-        
+
         # 登録ユーザーの場合
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if not user:
             raise AuthenticationError("ユーザーが見つかりません")
-        
+
         if not user.is_active:
             raise AuthenticationError("アカウントが無効です")
-        
+
         # セッション検証（セッションIDがある場合）
         if token_data.session_id:
             session = self.verify_session(token_data.session_id, db)
             if not session:
                 raise AuthenticationError("セッションが無効です")
-        
+
         return AuthResult(
             user=user,
             token_data=token_data,
@@ -629,11 +626,11 @@ class AuthManager:
             is_guest=False,
             session_id=token_data.session_id
         )
-    
+
     # ==========================================
     # ログイン・ログアウト処理
     # ==========================================
-    
+
     def login_user(
         self,
         email: Optional[str],
@@ -645,12 +642,12 @@ class AuthManager:
         db: Session
     ) -> Dict[str, Any]:
         """ユーザーログイン"""
-        
+
         # レート制限チェック
         rate_limit_key = f"login_attempt:{client_ip}"
         if not check_rate_limit(rate_limit_key, settings.RATE_LIMIT_AUTH, 60):
             raise AuthenticationError("ログイン試行回数が上限に達しました。しばらく待ってから再試行してください。")
-        
+
         # ユーザー認証
         user = self.authenticate_user(email, username, password, db)
         if not user:
@@ -665,16 +662,16 @@ class AuthManager:
                 }
             )
             raise AuthenticationError("メールアドレス/ユーザー名またはパスワードが正しくありません")
-        
+
         # セッション作成
         session_id = self.create_session(user.id, client_ip, user_agent, db)
-        
+
         # トークン生成
         token_expire = timedelta(
-            days=settings.REMEMBER_ME_EXPIRE_DAYS if remember_me 
+            days=settings.REMEMBER_ME_EXPIRE_DAYS if remember_me
             else settings.ACCESS_TOKEN_EXPIRE_MINUTES / 1440  # 分を日に変換
         )
-        
+
         access_token = self.create_access_token(
             data={
                 "sub": str(user.id),
@@ -685,9 +682,9 @@ class AuthManager:
             },
             expires_delta=token_expire
         )
-        
+
         refresh_token = self.create_refresh_token(str(user.id), session_id)
-        
+
         # セキュリティログ
         log_security_event(
             SecurityEvents.LOGIN_SUCCESS,
@@ -699,7 +696,7 @@ class AuthManager:
                 "remember_me": remember_me
             }
         )
-        
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -714,7 +711,7 @@ class AuthManager:
             },
             "session_id": session_id
         }
-    
+
     def logout_user(
         self,
         session_id: Optional[str],
@@ -723,11 +720,11 @@ class AuthManager:
         db: Session
     ):
         """ユーザーログアウト"""
-        
+
         if all_sessions and user_id:
             # 全セッション無効化
             self.revoke_all_user_sessions(user_id, db)
-            
+
             # セキュリティログ
             log_security_event(
                 SecurityEvents.LOGOUT,
@@ -737,11 +734,11 @@ class AuthManager:
                     "session_count": "all"
                 }
             )
-            
+
         elif session_id:
             # 特定セッション無効化
             self.revoke_session(session_id, db)
-            
+
             # セキュリティログ
             log_security_event(
                 SecurityEvents.LOGOUT,
@@ -751,29 +748,29 @@ class AuthManager:
                     "session_id": session_id
                 }
             )
-    
+
     def refresh_token(
         self,
         refresh_token: str,
         db: Session
     ) -> Dict[str, Any]:
         """トークンリフレッシュ"""
-        
+
         # リフレッシュトークン検証
         token_data = self.verify_token(refresh_token)
         if not token_data or token_data.token_type != TokenType.REFRESH:
             raise AuthenticationError("無効なリフレッシュトークンです")
-        
+
         # ユーザー取得
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if not user or not user.is_active:
             raise AuthenticationError("ユーザーが見つかりません")
-        
+
         # セッション検証
         session = self.verify_session(token_data.session_id, db)
         if not session:
             raise AuthenticationError("セッションが無効です")
-        
+
         # 新しいアクセストークン生成
         new_access_token = self.create_access_token(
             data={
@@ -784,30 +781,30 @@ class AuthManager:
                 "permissions": []
             }
         )
-        
+
         return {
             "access_token": new_access_token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         }
-    
+
     # ==========================================
     # ゲストユーザー処理
     # ==========================================
-    
+
     def create_guest_session(
         self,
         client_ip: str,
         user_agent: str
     ) -> Dict[str, Any]:
         """ゲストセッション作成"""
-        
+
         # ゲストID生成
         guest_id = f"guest_{uuid4().hex[:12]}"
-        
+
         # ゲストトークン生成
         guest_token = self.create_guest_token(guest_id)
-        
+
         # セキュリティログ
         log_security_event(
             SecurityEvents.GUEST_SESSION_CREATED,
@@ -816,7 +813,7 @@ class AuthManager:
                 "client_ip": client_ip
             }
         )
-        
+
         return {
             "guest_token": guest_token,
             "guest_id": guest_id,
@@ -848,16 +845,16 @@ def get_current_active_user(
     auth_result: Union[User, AuthResult] = Depends(get_current_user)
 ) -> User:
     """アクティブユーザー取得（認証必須）"""
-    
+
     if isinstance(auth_result, AuthResult):
         if not auth_result.is_authenticated:
             raise AuthenticationError("認証が必要です")
-        
+
         if auth_result.is_guest:
             raise AuthenticationError("この機能は会員のみ利用できます")
-        
+
         return auth_result.user
-    
+
     return auth_result
 
 
@@ -895,7 +892,7 @@ def get_current_user_optional(
     db: Session = Depends(get_db)
 ) -> Optional[Union[User, AuthResult]]:
     """現在のユーザー取得（認証オプション）"""
-    
+
     try:
         return auth_manager.get_current_user(credentials, db)
     except AuthenticationError:

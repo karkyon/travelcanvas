@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import SessionLocal
-from app.services.quickdraft_purge import purge_expired_quickdrafts
+from app.core.database import SessionLocal  # noqa: E402
+from app.services.quickdraft_purge import purge_expired_quickdrafts  # noqa: E402
 
 
 def main() -> int:

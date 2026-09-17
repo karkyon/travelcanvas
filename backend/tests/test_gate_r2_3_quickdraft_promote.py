@@ -8,7 +8,7 @@ import pytest
 
 from app.core.config import settings
 from app.core import crypto as crypto_module
-from app.models.models import Device, QuickDraft, TravelPlan, TravelDay, TravelEvent
+from app.models.models import QuickDraft, TravelPlan, TravelEvent
 
 
 CREATE_ENDPOINT = "/api/v1/quick-drafts"

@@ -2,13 +2,11 @@
 [Gate M3] FR-015複数経路比較(RouteOption/RouteLeg)のテスト。
 """
 import uuid
-from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from app.core.auth import get_current_user, AuthResult
 from app.main import app
-from app.models.models import Place, PlanCollaborator
+from app.models.models import PlanCollaborator
 
 
 PLAN_ENDPOINT = "/api/v1/plans/{plan_id}"

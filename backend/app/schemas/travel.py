@@ -3,13 +3,13 @@ TravelCanvas Backend - 旅行プラン用スキーマ
 競合優位機能に対応した包括的なスキーマ定義
 """
 
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date, time
 from enum import Enum
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, root_validator
 from app.schemas.common import BaseResponse, PaginatedResponse
 
 
@@ -98,7 +98,7 @@ class Location(BaseModel):
     address: Optional[str] = Field(None, description="住所", max_length=500)
     place_id: Optional[str] = Field(None, description="Google Place ID")
     timezone: Optional[str] = Field(None, description="タイムゾーン")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -115,15 +115,15 @@ class TimeRange(BaseModel):
     """時間範囲"""
     start_time: time = Field(..., description="開始時間")
     end_time: time = Field(..., description="終了時間")
-    
+
     @root_validator
     def validate_time_range(cls, values):
         start = values.get('start_time')
         end = values.get('end_time')
-        
+
         if start and end and start >= end:
             raise ValueError('開始時間は終了時間より前である必要があります')
-        
+
         return values
 
 
@@ -133,7 +133,7 @@ class CostInfo(BaseModel):
     currency: str = Field(default="JPY", description="通貨コード")
     category: Optional[str] = Field(None, description="費用カテゴリ")
     per_person: bool = Field(default=True, description="一人当たりかどうか")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -166,7 +166,7 @@ class SpotBase(BaseModel):
 class SpotCreate(SpotBase):
     """観光スポット作成"""
     images: List[str] = Field(default=[], description="画像URL", max_items=10)
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -202,7 +202,7 @@ class SpotResponse(SpotBase):
     best_visit_time: Optional[str] = Field(None, description="おすすめ訪問時間")
     crowd_level: Optional[str] = Field(None, description="混雑度")
     accessibility: Optional[Dict[str, bool]] = Field(None, description="アクセシビリティ情報")
-    
+
     class Config:
         from_attributes = True
 
@@ -219,15 +219,15 @@ class TravelEventBase(BaseModel):
     start_time: datetime = Field(..., description="開始時間")
     end_time: datetime = Field(..., description="終了時間")
     location: Optional[Location] = Field(None, description="位置情報")
-    
+
     @root_validator
     def validate_time_range(cls, values):
         start = values.get('start_time')
         end = values.get('end_time')
-        
+
         if start and end and start >= end:
             raise ValueError('開始時間は終了時間より前である必要があります')
-        
+
         return values
 
 
@@ -239,7 +239,7 @@ class TravelEventCreate(TravelEventBase):
     priority: int = Field(default=1, description="優先度", ge=1, le=5)
     color: Optional[str] = Field(None, description="表示色", regex=r"^#[0-9A-Fa-f]{6}$")
     icon: Optional[str] = Field(None, description="表示アイコン")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -295,17 +295,17 @@ class TravelEventResponse(TravelEventBase):
     icon: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     # 現在時刻表示機能用
     is_current: bool = Field(default=False, description="現在進行中")
     is_next: bool = Field(default=False, description="次の予定")
     time_until: Optional[str] = Field(None, description="開始までの時間")
     time_remaining: Optional[str] = Field(None, description="残り時間")
     is_overdue: bool = Field(default=False, description="予定時刻超過")
-    
+
     # 移動情報
     transport_to_here: Optional[Dict[str, Any]] = Field(None, description="ここまでの移動情報")
-    
+
     class Config:
         from_attributes = True
 
@@ -342,12 +342,12 @@ class TravelDayResponse(TravelDayBase):
     total_duration: int = Field(0, description="総所要時間（分）")
     estimated_cost: Decimal = Field(Decimal('0'), description="推定費用")
     weather_forecast: Optional[Dict[str, Any]] = Field(None, description="天気予報")
-    
+
     # 日付ジャンプナビゲーション用
     is_current_day: bool = Field(default=False, description="今日かどうか")
     is_completed: bool = Field(default=False, description="完了済みかどうか")
     progress_percentage: float = Field(0, description="進行率")
-    
+
     class Config:
         from_attributes = True
 
@@ -363,15 +363,15 @@ class TravelPlanBase(BaseModel):
     destination: str = Field(..., description="目的地", max_length=200)
     start_date: date = Field(..., description="開始日")
     end_date: date = Field(..., description="終了日")
-    
+
     @root_validator
     def validate_date_range(cls, values):
         start = values.get('start_date')
         end = values.get('end_date')
-        
+
         if start and end and start > end:
             raise ValueError('開始日は終了日より前である必要があります')
-        
+
         return values
 
 
@@ -382,7 +382,7 @@ class TravelPlanCreate(TravelPlanBase):
     budget: Optional[CostInfo] = Field(None, description="予算")
     participants: int = Field(default=1, description="参加者数", ge=1, le=100)
     preferences: Optional[Dict[str, Any]] = Field(None, description="旅行設定")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -428,30 +428,30 @@ class TravelPlanResponse(TravelPlanBase):
     budget: Optional[CostInfo] = None
     participants: int
     preferences: Optional[Dict[str, Any]] = None
-    
+
     # 統計情報
     total_days: int = 0
     total_events: int = 0
     total_duration: int = 0
     estimated_cost: Decimal = Decimal('0')
-    
+
     # 日程データ
     days: List[TravelDayResponse] = []
-    
+
     # AI最適化情報
     is_optimized: bool = False
     optimization_score: Optional[float] = Field(None, description="最適化スコア", ge=0, le=100)
     last_optimized: Optional[datetime] = None
-    
+
     # 共有情報
     share_token: Optional[str] = None
     qr_code_url: Optional[str] = None
-    
+
     # メタデータ
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_accessed: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -479,7 +479,7 @@ class Route(BaseModel):
     total_duration: int = Field(..., description="総所要時間（秒）")
     transport_mode: TransportMode = Field(..., description="主要交通手段")
     cost: Optional[CostInfo] = Field(None, description="移動費用")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -513,7 +513,7 @@ class OptimizationRequest(BaseModel):
     optimization_type: OptimizationType = Field(..., description="最適化タイプ")
     constraints: Optional[Dict[str, Any]] = Field(None, description="制約条件")
     preferences: Optional[Dict[str, Any]] = Field(None, description="優先設定")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -539,7 +539,7 @@ class OptimizationResult(BaseModel):
     improvements: Dict[str, Any] = Field(..., description="改善内容")
     score: float = Field(..., description="最適化スコア", ge=0, le=100)
     execution_time: float = Field(..., description="処理時間（秒）")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -579,7 +579,7 @@ class ShareInvitation(BaseModel):
 class ShareLinkResponse(BaseResponse):
     """共有リンクレスポンス"""
     data: Dict[str, Any]
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -675,7 +675,7 @@ class PlanStatistics(BaseModel):
     average_plan_duration: float = 0
     most_visited_destinations: List[Dict[str, Any]] = []
     popular_event_types: List[Dict[str, Any]] = []
-    
+
     class Config:
         schema_extra = {
             "example": {

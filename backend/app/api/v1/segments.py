@@ -14,12 +14,12 @@ docs/trace/gate-m1-fr014-trace.mdを参照。
 """
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -38,7 +38,6 @@ from app.services.quickdraft_idempotency import (
 # [Gate M1] Day/Event側の楽観ロック(If-Match)・ChangeSet記録は
 # app/api/v1/plans.py の実装を正本として再利用する(重複実装しない)。
 from app.api.v1.plans import (
-    _get_owned_plan,
     _require_if_match,
     _record_change_and_bump_revision,
     _segment_to_dict,

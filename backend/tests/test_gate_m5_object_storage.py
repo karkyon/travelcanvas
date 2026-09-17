@@ -3,7 +3,6 @@
 署名付きダウンロードURL)のテスト。
 """
 import io
-import time
 
 import pytest
 
@@ -197,7 +196,6 @@ def test_download_with_expired_token_rejected(auth_client):
 
 
 def test_download_url_requires_viewer_access(client, make_user):
-    import uuid
     from app.core.auth import get_current_user, AuthResult
     from app.main import app
 

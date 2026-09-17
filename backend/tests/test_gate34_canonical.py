@@ -13,8 +13,6 @@ import sys
 import textwrap
 from pathlib import Path
 
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # P0-01 / 4.2: 旧itinerary書込み封鎖

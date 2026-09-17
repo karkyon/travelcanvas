@@ -30,7 +30,7 @@ if "test" not in _db_url:
         "テスト専用DBのURLを設定してください。"
     )
 
-from app.core.database import engine, SessionLocal, get_db  # noqa: E402
+from app.core.database import engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.core.auth import get_current_user, AuthResult  # noqa: E402
 from app.models.models import User, UserType  # noqa: E402

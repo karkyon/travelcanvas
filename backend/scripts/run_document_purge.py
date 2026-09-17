@@ -18,8 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import SessionLocal
-from app.services.document_purge_service import (
+from app.core.database import SessionLocal  # noqa: E402
+from app.services.document_purge_service import (  # noqa: E402
     purge_deleted_documents,
     soft_delete_expired_retention_documents,
 )

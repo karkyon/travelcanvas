@@ -3,7 +3,6 @@ TravelCanvas Database Models - 最終完成版
 統一されたBaseクラスを使用、重複定義なし
 """
 import uuid
-import hashlib
 from datetime import datetime, timedelta
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
@@ -13,7 +12,6 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime
 from enum import Enum
 
 # 統一されたBaseクラスをインポート
@@ -23,21 +21,24 @@ from app.core.database import Base
 # 列挙型定義
 # ==========================================
 
+
 class UserType(str, Enum):
     """ユーザータイプ"""
     GUEST = "guest"
-    REGISTERED = "registered" 
+    REGISTERED = "registered"
     PREMIUM = "premium"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
 
-class PlanStatus(str, Enum):  
+
+class PlanStatus(str, Enum):
     """プラン状態"""
     DRAFT = "draft"
     ACTIVE = "active"
     COMPLETED = "completed"
     ARCHIVED = "archived"
     SHARED = "shared"
+
 
 class EventCategory(str, Enum):
     """イベントカテゴリ"""
@@ -49,6 +50,7 @@ class EventCategory(str, Enum):
     SIGHTSEEING = "sightseeing"
     OTHER = "other"
 
+
 class OptimizationType(str, Enum):
     """最適化タイプ"""
     ROUTE = "route"
@@ -57,21 +59,23 @@ class OptimizationType(str, Enum):
     PREFERENCE = "preference"
     MIXED = "mixed"
 
+
 class SharePermission(str, Enum):
     """共有権限"""
     VIEW = "view"
     EDIT = "edit"
-    ADMIN = "admin"  
+    ADMIN = "admin"
     OWNER = "owner"
 
 # ==========================================
 # データベースモデル（唯一の定義場所）
 # ==========================================
 
+
 class User(Base):
     """ユーザーモデル - 唯一の定義"""
     __tablename__ = "users"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
@@ -84,17 +88,18 @@ class User(Base):
     preferences = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # リレーションシップ
     travels = relationship("Travel", back_populates="owner")
     travel_plans = relationship("TravelPlan", back_populates="user")
     sessions = relationship("UserSession", back_populates="user")
     created_spots = relationship("Spot", back_populates="creator")
 
+
 class UserSession(Base):
     """ユーザーセッションモデル"""
     __tablename__ = "user_sessions"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     session_token = Column(String, unique=True, index=True, nullable=False)
@@ -104,14 +109,15 @@ class UserSession(Base):
     ip_address = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # リレーションシップ
     user = relationship("User", back_populates="sessions")
+
 
 class Travel(Base):
     """旅行モデル"""
     __tablename__ = "travels"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     title = Column(String, index=True)
     description = Column(Text)
@@ -125,22 +131,23 @@ class Travel(Base):
     preferences = Column(JSON, nullable=True)
     status = Column(String, default="draft")
     is_public = Column(Boolean, default=False)
-    
+
     # 外部キー
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    
+
     # タイムスタンプ
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # リレーションシップ
     owner = relationship("User", back_populates="travels")
     optimization_results = relationship("OptimizationResult", back_populates="travel")
 
+
 class TravelPlan(Base):
     """旅行プランモデル"""
     __tablename__ = "travel_plans"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
@@ -159,12 +166,15 @@ class TravelPlan(Base):
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # リレーションシップ
     user = relationship("User", back_populates="travel_plans")
     share_links = relationship("PlanShareLink", back_populates="plan", cascade="all, delete-orphan")
     collaborators = relationship("PlanCollaborator", back_populates="plan", cascade="all, delete-orphan")
-    days = relationship("TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order")
+    days = relationship(
+        "TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order"
+    )
+
 
 class PlanShareLink(Base):
     """旅行プラン共有リンクモデル
@@ -191,6 +201,7 @@ class PlanShareLink(Base):
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="share_links")
 
+
 class PlanCollaborator(Base):
     """旅行プランコラボレーターモデル"""
     __tablename__ = "plan_collaborators"
@@ -210,6 +221,7 @@ class PlanCollaborator(Base):
     plan = relationship("TravelPlan", back_populates="collaborators")
     user = relationship("User")
 
+
 class Notification(Base):
     """通知モデル"""
     __tablename__ = "notifications"
@@ -227,10 +239,11 @@ class Notification(Base):
     user = relationship("User")
     related_plan = relationship("TravelPlan")
 
+
 class OptimizationResult(Base):
     """最適化結果モデル"""
     __tablename__ = "optimization_results"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     travel_id = Column(UUID(as_uuid=True), ForeignKey("travels.id"))
     optimization_type = Column(String)
@@ -238,7 +251,7 @@ class OptimizationResult(Base):
     optimized_data = Column(JSON)
     improvement_metrics = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # リレーションシップ
     travel = relationship("Travel", back_populates="optimization_results")
 
@@ -250,61 +263,63 @@ class OptimizationResult(Base):
 class SpotCategory(str, Enum):
     """スポットカテゴリ - MVP版"""
     RESTAURANT = "restaurant"        # レストラン
-    SIGHTSEEING = "sightseeing"     # 観光地  
+    SIGHTSEEING = "sightseeing"     # 観光地
     ACCOMMODATION = "accommodation"  # 宿泊
     SHOPPING = "shopping"           # ショッピング
     OTHER = "other"                 # その他
 
+
 class Spot(Base):
     """MVPスポットモデル - シンプル版"""
     __tablename__ = "spots"
-    
+
     # 基本情報
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     category = Column(String(50), nullable=False, default="other")
-    
+
     # 位置情報（MVP版：手動入力）
     address = Column(String(500), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    
+
     # MVPメタデータ
     rating = Column(Float, nullable=True)  # 1-5評価
     price_range = Column(String(10), nullable=True)  # $, $$, $$$
-    
+
     # 画像（MVP版：URL文字列）
     image_url = Column(String(500), nullable=True)
-    
+
     # ユーザー関連
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     is_public = Column(Boolean, default=False)
-    
+
     # 統計
     visit_count = Column(Integer, default=0)
-    
+
     # タイムスタンプ
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # リレーションシップ
     creator = relationship("User", back_populates="created_spots")
+
 
 class UserSpotFavorite(Base):
     """ユーザーお気に入りスポット - MVP版"""
     __tablename__ = "user_spot_favorites"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
-    
+
     # 個人メモ
     personal_note = Column(Text, nullable=True)
     personal_rating = Column(Float, nullable=True)
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # ユニーク制約
     __table_args__ = (
         {"extend_existing": True},

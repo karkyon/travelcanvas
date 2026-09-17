@@ -22,6 +22,7 @@ logger = logging.getLogger("travelcanvas")
 
 router = APIRouter(prefix="/spots", tags=["spots"])
 
+
 @router.post("/", response_model=SpotResponse, status_code=status.HTTP_201_CREATED)
 async def create_spot(
     spot_data: SpotCreate,
@@ -41,13 +42,13 @@ async def create_spot(
             image_url=spot_data.image_url,
             created_by=current_user.id
         )
-        
+
         db.add(new_spot)
         db.commit()
         db.refresh(new_spot)
-        
+
         return new_spot
-        
+
     except Exception:
         db.rollback()
         logger.exception("予期しないエラーが発生しました")
@@ -55,6 +56,7 @@ async def create_spot(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="スポットの作成に失敗しました。しばらくしてから再試行してください。"
         )
+
 
 @router.get("/", response_model=List[SpotResponse])
 async def get_spots(
@@ -66,15 +68,15 @@ async def get_spots(
     """スポット一覧取得"""
     try:
         query = db.query(Spot).filter(
-            (Spot.created_by == current_user.id) | (Spot.is_public == True)
+            (Spot.created_by == current_user.id) | (Spot.is_public.is_(True))
         )
-        
+
         if category and category != "all":
             query = query.filter(Spot.category == category)
-        
+
         spots = query.order_by(Spot.created_at.desc()).limit(limit).all()
         return spots
-        
+
     except Exception:
         logger.exception("予期しないエラーが発生しました")
         raise HTTPException(
@@ -89,6 +91,7 @@ async def get_spots(
 # ため現状422は再現しなかった)、定義順に依存する脆い書き方であることに変わりは
 # ないため、お気に入り・訪問記録の固定ルートと同じ位置(パラメータ化ルートより前)
 # へ移動し、route順序に対する回帰テストで担保する。
+
 
 @router.get("/categories/list")
 async def get_categories():
@@ -105,6 +108,8 @@ async def get_categories():
 
 # [Gate R0] 認証不要な診断用エンドポイント。settings.DEBUG限定にする
 # (DEBUG=Falseでは404)。ルート順序自体は本Gateで変更しない。
+
+
 @router.get("/test/ping")
 async def test_spots_api():
     """スポットAPI動作テスト(DEBUG限定)"""
@@ -123,6 +128,7 @@ async def test_spots_api():
 # FastAPI/Starletteは構造的に一致するパスをUUID変換に失敗しても次のルートへ
 # フォールバックしないため、順序を誤ると /spots/favorites への全リクエストが
 # 422(UUID解析エラー)になる。
+
 
 @router.get("/favorites", response_model=List[FavoriteResponse])
 async def get_favorites(
@@ -395,23 +401,24 @@ async def get_spot(
 ):
     """スポット詳細取得"""
     spot = db.query(Spot).filter(Spot.id == spot_id).first()
-    
+
     if not spot:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="スポットが見つかりません"
         )
-    
+
     # アクセス権限チェック
     if not spot.is_public and spot.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="アクセス権限がありません"
         )
-    
+
     return spot
 
-@router.put("/{spot_id}", response_model=SpotResponse)  
+
+@router.put("/{spot_id}", response_model=SpotResponse)
 async def update_spot(
     spot_id: uuid.UUID,
     spot_data: SpotUpdate,
@@ -420,24 +427,24 @@ async def update_spot(
 ):
     """スポット更新"""
     spot = db.query(Spot).filter(Spot.id == spot_id).first()
-    
+
     if not spot:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="スポットが見つかりません"
         )
-    
+
     if spot.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="編集権限がありません"
         )
-    
+
     # 更新処理
     update_data = spot_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(spot, field, value)
-    
+
     try:
         db.commit()
         db.refresh(spot)
@@ -450,6 +457,7 @@ async def update_spot(
             detail="スポットの更新に失敗しました。しばらくしてから再試行してください。"
         )
 
+
 @router.delete("/{spot_id}")
 async def delete_spot(
     spot_id: uuid.UUID,
@@ -458,19 +466,19 @@ async def delete_spot(
 ):
     """スポット削除"""
     spot = db.query(Spot).filter(Spot.id == spot_id).first()
-    
+
     if not spot:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="スポットが見つかりません"
         )
-    
+
     if spot.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="削除権限がありません"
         )
-    
+
     try:
         db.delete(spot)
         db.commit()

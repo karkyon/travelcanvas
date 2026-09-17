@@ -6,17 +6,22 @@ from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def get_user_by_email(db: Session, email: str):
     return db.execute(select(User).where(User.email == email)).scalar_one_or_none()
 
+
 def get_user_by_username(db: Session, username: str):
     return db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+
 
 def create_user(db: Session, user: UserCreate):
     hashed_password = get_password_hash(user.password)
@@ -29,6 +34,7 @@ def create_user(db: Session, user: UserCreate):
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 def authenticate_user(db: Session, email: str, password: str):
     user = get_user_by_email(db, email)

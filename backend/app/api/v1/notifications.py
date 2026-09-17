@@ -14,7 +14,6 @@
 スコープ外(将来の拡張として、必要になった時点で追加する)。
 """
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func

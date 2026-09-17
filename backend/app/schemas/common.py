@@ -3,7 +3,7 @@ TravelCanvas Backend - 共通スキーマ
 API レスポンス、ページネーション、エラーハンドリングの統一
 """
 
-from typing import Optional, Any, Dict, List, Generic, TypeVar, Union
+from typing import Optional, Any, Dict, List, Generic, TypeVar
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
@@ -49,7 +49,7 @@ class BaseResponse(BaseModel):
     message: str = Field(..., description="レスポンスメッセージ")
     timestamp: float = Field(..., description="タイムスタンプ（UNIX時間）")
     request_id: Optional[str] = Field(None, description="リクエストID")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -62,6 +62,7 @@ class BaseResponse(BaseModel):
 
 
 T = TypeVar('T')
+
 
 class DataResponse(GenericModel, Generic[T]):
     """データ付きレスポンス"""
@@ -87,7 +88,7 @@ class ErrorResponse(BaseResponse):
     error_type: str = Field(..., description="エラータイプ")
     details: Optional[List[ErrorDetail]] = Field(None, description="エラー詳細")
     help_url: Optional[str] = Field(None, description="ヘルプURL")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -123,7 +124,7 @@ class PaginationMeta(BaseModel):
     has_previous: bool = Field(..., description="前のページがあるか")
     next_page: Optional[int] = Field(None, description="次のページ番号")
     previous_page: Optional[int] = Field(None, description="前のページ番号")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -149,11 +150,11 @@ class PaginationParams(BaseModel):
     """ページネーションパラメータ"""
     page: int = Field(default=1, description="ページ番号", ge=1)
     page_size: int = Field(default=20, description="1ページあたりの項目数", ge=1, le=100)
-    
+
     def offset(self) -> int:
         """オフセット計算"""
         return (self.page - 1) * self.page_size
-    
+
     def limit(self) -> int:
         """リミット取得"""
         return self.page_size
@@ -167,7 +168,7 @@ class SortParam(BaseModel):
     """ソートパラメータ"""
     field: str = Field(..., description="ソートフィールド")
     order: SortOrder = Field(default=SortOrder.ASC, description="ソート順序")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -192,7 +193,7 @@ class SearchParams(BaseModel):
     exact_match: bool = Field(default=False, description="完全一致検索")
     case_sensitive: bool = Field(default=False, description="大文字小文字を区別")
     fields: Optional[List[str]] = Field(None, description="検索対象フィールド")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -215,7 +216,7 @@ class FileInfo(BaseModel):
     size: int = Field(..., description="ファイルサイズ（バイト）", ge=0)
     url: str = Field(..., description="ファイルURL")
     thumbnail_url: Optional[str] = Field(None, description="サムネイルURL")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -238,7 +239,7 @@ class FileUploadRequest(BaseModel):
     purpose: str = Field(..., description="アップロード目的")
     folder: Optional[str] = Field(None, description="保存フォルダ")
     public: bool = Field(default=False, description="公開ファイル")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -259,7 +260,7 @@ class Coordinates(BaseModel):
     longitude: float = Field(..., description="経度", ge=-180, le=180)
     altitude: Optional[float] = Field(None, description="高度（メートル）")
     accuracy: Optional[float] = Field(None, description="精度（メートル）", ge=0)
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -295,7 +296,7 @@ class CountMetric(BaseModel):
     label: str = Field(..., description="指標名")
     count: int = Field(..., description="件数", ge=0)
     percentage: Optional[float] = Field(None, description="割合", ge=0, le=100)
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -320,7 +321,7 @@ class StatisticsSummary(BaseModel):
     minimum: Optional[float] = Field(None, description="最小値")
     maximum: Optional[float] = Field(None, description="最大値")
     median: Optional[float] = Field(None, description="中央値")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -343,7 +344,7 @@ class RateLimitInfo(BaseModel):
     remaining: int = Field(..., description="残り回数", ge=0)
     reset_time: datetime = Field(..., description="リセット時刻")
     retry_after: Optional[int] = Field(None, description="再試行までの秒数", ge=0)
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -388,7 +389,7 @@ class Notification(BaseModel):
     expires_at: Optional[datetime] = Field(None, description="有効期限")
     action_url: Optional[str] = Field(None, description="アクションURL")
     metadata: Optional[Dict[str, Any]] = Field(None, description="メタデータ")
-    
+
     class Config:
         from_attributes = True
         schema_extra = {
@@ -417,7 +418,7 @@ class SystemStatus(BaseModel):
     redis_status: str = Field(..., description="Redis状態")
     ai_service_status: str = Field(..., description="AIサービス状態")
     last_health_check: datetime = Field(..., description="最終ヘルスチェック")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -438,7 +439,7 @@ class FeatureFlag(BaseModel):
     enabled: bool = Field(..., description="有効フラグ")
     description: Optional[str] = Field(None, description="説明")
     user_groups: Optional[List[str]] = Field(None, description="対象ユーザーグループ")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -467,7 +468,7 @@ class BulkOperationRequest(BaseModel):
     operation: str = Field(..., description="操作タイプ")
     target_ids: List[UUID] = Field(..., description="対象ID", max_items=100)
     parameters: Optional[Dict[str, Any]] = Field(None, description="操作パラメータ")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -491,7 +492,7 @@ class BulkOperationResult(BaseModel):
     success_count: int = Field(..., description="成功数", ge=0)
     error_count: int = Field(..., description="エラー数", ge=0)
     errors: List[ErrorDetail] = Field(default=[], description="エラー詳細")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -521,7 +522,7 @@ class HealthCheck(BaseModel):
     response_time: float = Field(..., description="応答時間（ミリ秒）", ge=0)
     timestamp: datetime = Field(..., description="チェック時刻")
     details: Optional[Dict[str, Any]] = Field(None, description="詳細情報")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -543,7 +544,7 @@ class SystemDiagnostics(BaseModel):
     checks: List[HealthCheck] = Field(..., description="チェック結果")
     performance_metrics: Dict[str, float] = Field(..., description="パフォーマンス指標")
     resource_usage: Dict[str, Any] = Field(..., description="リソース使用状況")
-    
+
     class Config:
         schema_extra = {
             "example": {
@@ -577,13 +578,13 @@ def create_success_response(
         "message": message,
         "timestamp": datetime.now().timestamp()
     }
-    
+
     if data is not None:
         response["data"] = data
-    
+
     if request_id:
         response["request_id"] = request_id
-    
+
     return response
 
 
@@ -602,13 +603,13 @@ def create_error_response(
         "error_type": error_type,
         "timestamp": datetime.now().timestamp()
     }
-    
+
     if details:
         response["details"] = [detail.dict() for detail in details]
-    
+
     if request_id:
         response["request_id"] = request_id
-    
+
     return response
 
 
@@ -619,7 +620,7 @@ def create_pagination_meta(
 ) -> PaginationMeta:
     """ページネーション情報生成"""
     total_pages = (total_items + page_size - 1) // page_size
-    
+
     return PaginationMeta(
         page=page,
         page_size=page_size,

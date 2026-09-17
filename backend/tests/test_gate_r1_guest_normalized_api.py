@@ -131,9 +131,9 @@ def test_guest_can_undo_last_change(client):
     plan_id = client.post(
         "/api/v1/travel-plans/", json={"title": "Undoテスト"}, headers=headers
     ).json()["id"]
-    day_id = client.post(
+    client.post(
         f"/api/v1/plans/{plan_id}/days", json={"local_date": "2026-12-12"}, headers=headers
-    ).json()["id"]
+    )
 
     rev = client.get(f"/api/v1/plans/{plan_id}", headers=headers).json()["revision"]
     undo_res = client.post(
@@ -184,7 +184,6 @@ def test_full_vertical_slice_guest_to_upgrade_preserves_normalized_data(client):
     assert len(after_upgrade.json()["days"][0]["events"]) == 1
 
     # 昇格後も正規化APIへの新規書込みが続けて行える。
-    rev = after_upgrade.json()["revision"]
     day2_res = client.post(
         f"/api/v1/plans/{plan_id}/days", json={"local_date": "2026-12-21"}, headers=new_headers
     )

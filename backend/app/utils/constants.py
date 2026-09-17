@@ -4,7 +4,6 @@ TravelCanvas 定数定義 (統合版)
 """
 
 from enum import Enum
-from typing import Dict, List, Any
 
 # ===== アプリケーション基本定数 =====
 
@@ -14,6 +13,7 @@ API_VERSION = "v1"
 
 # ===== ユーザー関連定数 =====
 
+
 class UserRole(str, Enum):
     """ユーザーロール"""
     GUEST = "guest"
@@ -21,12 +21,14 @@ class UserRole(str, Enum):
     PREMIUM = "premium"
     ADMIN = "admin"
 
+
 class UserStatus(str, Enum):
     """ユーザーステータス"""
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
     DELETED = "deleted"
+
 
 # ユーザー制限
 USER_LIMITS = {
@@ -70,6 +72,7 @@ USER_LIMITS = {
 
 # ===== 旅行プラン関連定数 =====
 
+
 class PlanStatus(str, Enum):
     """旅行プラン状態"""
     DRAFT = "draft"
@@ -78,11 +81,13 @@ class PlanStatus(str, Enum):
     ARCHIVED = "archived"
     CANCELLED = "cancelled"
 
+
 class PlanVisibility(str, Enum):
     """旅行プラン公開設定"""
     PRIVATE = "private"
     LINK_ONLY = "link_only"
     PUBLIC = "public"
+
 
 class SpotCategory(str, Enum):
     """スポットカテゴリ"""
@@ -95,6 +100,7 @@ class SpotCategory(str, Enum):
     CULTURE = "culture"              # 文化・歴史
     NATURE = "nature"                # 自然
 
+
 class ItemStatus(str, Enum):
     """スケジュールアイテム状態"""
     PLANNED = "planned"
@@ -103,6 +109,7 @@ class ItemStatus(str, Enum):
     CANCELLED = "cancelled"
     SKIPPED = "skipped"
 
+
 class ItemPriority(str, Enum):
     """スケジュールアイテム優先度"""
     LOW = "low"
@@ -110,17 +117,19 @@ class ItemPriority(str, Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+
 # 旅行プラン制限
 PLAN_LIMITS = {
     "max_duration_days": 365,      # 最大期間
     "max_days_in_advance": 730,    # 最大何日先まで
     "max_title_length": 300,       # タイトル最大長
-    "max_description_length": 2000, # 説明最大長
+    "max_description_length": 2000,  # 説明最大長
     "max_items_per_day": 20,       # 1日最大アイテム数
     "max_collaborators": 50        # 最大コラボレーター数
 }
 
 # ===== 最適化関連定数 =====
+
 
 class OptimizationType(str, Enum):
     """最適化タイプ"""
@@ -128,6 +137,7 @@ class OptimizationType(str, Enum):
     COST = "cost"           # コスト最適化
     DISTANCE = "distance"   # 距離最適化
     BALANCED = "balanced"   # バランス最適化
+
 
 class OptimizationStatus(str, Enum):
     """最適化状態"""
@@ -137,12 +147,14 @@ class OptimizationStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+
 class OptimizationAlgorithm(str, Enum):
     """最適化アルゴリズム"""
     OR_TOOLS_VRP = "or_tools_vrp"
     GENETIC_ALGORITHM = "genetic_algorithm"
     SIMULATED_ANNEALING = "simulated_annealing"
     NEAREST_NEIGHBOR = "nearest_neighbor"
+
 
 # 最適化設定
 OPTIMIZATION_CONFIG = {
@@ -159,6 +171,7 @@ OPTIMIZATION_CONFIG = {
 
 # ===== 交通手段関連定数 =====
 
+
 class TransportMode(str, Enum):
     """交通手段"""
     WALKING = "walking"
@@ -173,6 +186,7 @@ class TransportMode(str, Enum):
     PLANE = "plane"
     FERRY = "ferry"
     SHINKANSEN = "shinkansen"
+
 
 # 交通手段別設定
 TRANSPORT_CONFIG = {
@@ -310,6 +324,7 @@ MAJOR_CITIES = {
 
 # ===== AI・検索関連定数 =====
 
+
 class AIServiceType(str, Enum):
     """AIサービスタイプ"""
     SPOT_SEARCH = "spot_search"
@@ -318,12 +333,14 @@ class AIServiceType(str, Enum):
     ROUTE_PLANNING = "route_planning"
     RECOMMENDATION = "recommendation"
 
+
 class SearchProvider(str, Enum):
     """検索プロバイダー"""
     GOOGLE_PLACES = "google_places"
     OPENAI_GPT = "openai_gpt"
     CUSTOM_DATABASE = "custom_database"
     HYBRID = "hybrid"
+
 
 # AI設定
 AI_CONFIG = {
@@ -338,12 +355,14 @@ AI_CONFIG = {
 
 # ===== ファイル・メディア関連定数 =====
 
+
 class FileType(str, Enum):
     """ファイルタイプ"""
     IMAGE = "image"
     DOCUMENT = "document"
     VIDEO = "video"
     AUDIO = "audio"
+
 
 # ファイル制限
 FILE_LIMITS = {
@@ -374,6 +393,7 @@ DANGEROUS_EXTENSIONS = {
 
 # ===== レート制限関連定数 =====
 
+
 class RateLimitType(str, Enum):
     """レート制限タイプ"""
     GLOBAL = "global"
@@ -381,6 +401,7 @@ class RateLimitType(str, Enum):
     IP = "ip"
     ENDPOINT = "endpoint"
     AI_SERVICE = "ai_service"
+
 
 # レート制限設定
 RATE_LIMITS = {
@@ -420,6 +441,7 @@ RATE_LIMITS = {
 
 # ===== エラーコード関連定数 =====
 
+
 class ErrorCode(str, Enum):
     """エラーコード"""
     # 認証関連
@@ -429,27 +451,28 @@ class ErrorCode(str, Enum):
     USER_NOT_FOUND = "USER_NOT_FOUND"
     USER_INACTIVE = "USER_INACTIVE"
     INSUFFICIENT_PERMISSIONS = "INSUFFICIENT_PERMISSIONS"
-    
+
     # バリデーション関連
     REQUIRED_FIELD_MISSING = "REQUIRED_FIELD_MISSING"
     INVALID_EMAIL_FORMAT = "INVALID_EMAIL_FORMAT"
     INVALID_PASSWORD_FORMAT = "INVALID_PASSWORD_FORMAT"
     INVALID_DATE_RANGE = "INVALID_DATE_RANGE"
-    
+
     # データ関連
     DUPLICATE_EMAIL = "DUPLICATE_EMAIL"
     DUPLICATE_USERNAME = "DUPLICATE_USERNAME"
     TRAVEL_PLAN_NOT_FOUND = "TRAVEL_PLAN_NOT_FOUND"
-    
+
     # 制限関連
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
     FILE_SIZE_TOO_LARGE = "FILE_SIZE_TOO_LARGE"
     INVALID_FILE_TYPE = "INVALID_FILE_TYPE"
-    
+
     # システム関連
     DATABASE_ERROR = "DATABASE_ERROR"
     EXTERNAL_API_ERROR = "EXTERNAL_API_ERROR"
     OPTIMIZATION_ERROR = "OPTIMIZATION_ERROR"
+
 
 # エラーメッセージ
 ERROR_MESSAGES = {
@@ -476,12 +499,14 @@ ERROR_MESSAGES = {
 
 # ===== 通知・メール関連定数 =====
 
+
 class NotificationType(str, Enum):
     """通知タイプ"""
     EMAIL = "email"
     PUSH = "push"
     SMS = "sms"
     IN_APP = "in_app"
+
 
 class NotificationEvent(str, Enum):
     """通知イベント"""
@@ -491,6 +516,7 @@ class NotificationEvent(str, Enum):
     COLLABORATION_INVITE = "collaboration_invite"
     OPTIMIZATION_COMPLETE = "optimization_complete"
     SYSTEM_MAINTENANCE = "system_maintenance"
+
 
 # メールテンプレート
 EMAIL_TEMPLATES = {
@@ -514,12 +540,14 @@ EMAIL_TEMPLATES = {
 
 # ===== システム設定関連定数 =====
 
+
 class SystemStatus(str, Enum):
     """システム状態"""
     OPERATIONAL = "operational"
     MAINTENANCE = "maintenance"
     DEGRADED = "degraded"
     OUTAGE = "outage"
+
 
 class FeatureFlag(str, Enum):
     """機能フラグ"""
@@ -528,6 +556,7 @@ class FeatureFlag(str, Enum):
     COLLABORATION = "collaboration"
     EXPORT_PDF = "export_pdf"
     PREMIUM_FEATURES = "premium_features"
+
 
 # デフォルト設定値
 DEFAULT_SETTINGS = {

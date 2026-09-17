@@ -20,7 +20,7 @@ from .models import (
 # __all__ でエクスポートするクラスを明示
 __all__ = [
     "User",
-    "UserSession", 
+    "UserSession",
     "Travel",
     "TravelPlan",
     "OptimizationResult",

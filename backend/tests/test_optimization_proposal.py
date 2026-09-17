@@ -6,9 +6,8 @@
 - 適用時にIf-Matchのrevisionが古いと409
 - 適用は単一のChangeSetとして記録され、1回のUndoで全体を戻せる
 """
-import uuid
 
-from app.models.models import Place, TravelEvent
+from app.models.models import TravelEvent
 
 
 def _create_plan(client, title="最適化テストプラン"):

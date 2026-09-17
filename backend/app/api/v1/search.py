@@ -7,10 +7,9 @@ frontendが直接外部APIを叩いていた検索処理をbackendへ集約す�
 正規のPlaceへ変換され、フィールドごとの出典(FieldSource)を記録する。
 """
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 

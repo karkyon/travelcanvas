@@ -18,6 +18,8 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # データベース依存性
+
+
 def get_db():
     db = SessionLocal()
     try:

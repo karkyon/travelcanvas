@@ -63,7 +63,7 @@ def _create_reservation(client, plan_id):
 
 
 def _create_document(client, plan_id, *, original_filename="領収書_2026-12-20.pdf", classification="confidential",
-                      document_type="receipt", content=_PDF_BYTES):
+                     document_type="receipt", content=_PDF_BYTES):
     """[Gate M7] 文書作成は実アップロード経由(multipart)へ統一する。"""
     files = {"file": (original_filename, io.BytesIO(content), "application/pdf")}
     data = {"classification": classification, "document_type": document_type}

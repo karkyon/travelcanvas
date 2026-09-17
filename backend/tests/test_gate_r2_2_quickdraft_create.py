@@ -5,7 +5,6 @@ conftest.pyのTestClient/db_session fixtureを使う(既存Gateのテストと�
 方式)。ENCRYPTION_KEYはこのテストファイル内でのみ設定し、他テストへ影響
 しないようmonkeypatchで管理する。
 """
-import json
 import uuid
 from datetime import date, timedelta
 

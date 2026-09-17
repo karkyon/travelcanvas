@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+from jose import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import hashlib
@@ -27,14 +27,18 @@ REFRESH_COOKIE_PATH = "/api/v1/auth"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Pydantic models
+
+
 class UserRegister(BaseModel):
     username: str
     email: EmailStr
     password: str
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class UserResponse(BaseModel):
     id: str
@@ -45,6 +49,7 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -126,11 +131,15 @@ class SessionInfo(BaseModel):
         from_attributes = True
 
 # ユーティリティ関数
+
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -138,7 +147,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
@@ -171,6 +180,7 @@ def _access_token_for(user: User, session_id: str) -> str:
     return create_access_token(
         data={"sub": str(user.id), "username": user.username, "session_id": str(session_id)}
     )
+
 
 @router.post("/guest", response_model=GuestSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_guest_session(
@@ -348,19 +358,19 @@ async def register(
     try:
         # ユーザー重複チェック
         existing_user = db.query(User).filter(
-            (User.email == user_data.email) | 
+            (User.email == user_data.email) |
             (User.username == user_data.username)
         ).first()
-        
+
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="このメールアドレスまたはユーザー名は既に使用されています"
             )
-        
+
         # パスワードハッシュ化
         hashed_password = hash_password(user_data.password)
-        
+
         # 新規ユーザー作成
         new_user = User(
             username=user_data.username,
@@ -370,7 +380,7 @@ async def register(
             is_active=True,
             is_verified=False
         )
-        
+
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
@@ -394,7 +404,7 @@ async def register(
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         )
         access_token = _access_token_for(new_user, session.id)
-        
+
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
@@ -406,7 +416,7 @@ async def register(
                 is_verified=new_user.is_verified
             )
         )
-        
+
     except HTTPException:
         raise
     except Exception:
@@ -419,6 +429,7 @@ async def register(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="登録に失敗しました。しばらくしてから再試行してください。"
         )
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
@@ -447,7 +458,7 @@ async def login(
     try:
         # ユーザー取得
         user = db.query(User).filter(User.email == login_data.email).first()
-        
+
         if not user or not verify_password(login_data.password, user.hashed_password):
             # [Gate R2-7] 監査ログ: ログイン失敗。総当り調査のためメール
             # アドレス自体はdetailsに残すが、パスワードは一切記録しない。
@@ -463,7 +474,7 @@ async def login(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="メールアドレスまたはパスワードが正しくありません"
             )
-        
+
         if not user.is_active:
             record_audit_event(
                 action="login_failed",
@@ -520,7 +531,7 @@ async def login(
                 is_verified=user.is_verified
             )
         )
-        
+
     except HTTPException:
         raise
     except Exception:
@@ -641,7 +652,7 @@ async def list_sessions(
         db.query(UserSession)
         .filter(
             UserSession.user_id == current_user.id,
-            UserSession.is_active == True,
+            UserSession.is_active.is_(True),
             UserSession.expires_at > datetime.now(timezone.utc),
         )
         .order_by(UserSession.created_at.desc())
@@ -678,6 +689,8 @@ async def revoke_session_endpoint(
 
 # [Gate R0] 認証不要な診断用エンドポイント。settings.DEBUG限定にする
 # (DEBUG=Falseでは404)。
+
+
 @router.get("/test")
 async def test_auth():
     """認証API テスト(DEBUG限定)"""

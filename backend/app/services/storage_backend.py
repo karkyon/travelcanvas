@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from app.core.config import settings
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import decrypt_payload, encrypt_payload
 from app.utils.validators import ALLOWED_DOCUMENT_EXTENSIONS, ALLOWED_IMAGE_EXTENSIONS
 
 # [Gate M5] DOC-02 FR-013の対象文書種別(予約確認書/旅券写し/保険/ビザ/

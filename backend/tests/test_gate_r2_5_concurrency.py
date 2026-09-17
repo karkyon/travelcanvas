@@ -23,7 +23,6 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from app.core.database import SessionLocal
 from app.models.models import Device

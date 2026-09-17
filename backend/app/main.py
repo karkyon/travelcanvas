@@ -2,7 +2,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from app.api.v1 import spots, travel, ai, admin, share, notifications, plans, public_share, search, quickdrafts, reservations, documents, imports, segments, route_options
+from app.api.v1 import (
+    spots, travel, ai, admin, share, notifications, plans, public_share, search,
+    quickdrafts, reservations, documents, imports, segments, route_options,
+)
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
@@ -66,13 +69,16 @@ app.add_middleware(
 )
 
 # 基本エンドポイント
+
+
 @app.get("/")
 async def root():
     return {
-        "message": "TravelCanvas API is running", 
+        "message": "TravelCanvas API is running",
         "status": "OK",
         "version": "1.0.0"
     }
+
 
 @app.get("/health")
 async def health_check():
@@ -148,11 +154,11 @@ async def readiness_check():
 @app.get("/api/v1/health")
 async def api_health():
     return {
-        "status": "healthy", 
+        "status": "healthy",
         "api_version": "v1",
         "endpoints": [
             "/docs",
-            "/health", 
+            "/health",
             "/ready",
             "/api/v1/auth/register",
             "/api/v1/auth/login"
@@ -161,6 +167,8 @@ async def api_health():
 
 # [Gate R0] 認証不要な診断用エンドポイント。以前は本番でも常時公開されて
 # いたため、settings.DEBUG限定にする(DEBUG=Falseでは404)。
+
+
 @app.get("/test")
 async def test_endpoint():
     if not settings.DEBUG:
@@ -171,6 +179,8 @@ async def test_endpoint():
     }
 
 # エラーハンドラー
+
+
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     # [Gate #29] このハンドラはステータスコード404の"全て"を横取りする

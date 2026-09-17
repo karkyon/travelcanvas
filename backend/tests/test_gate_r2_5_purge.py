@@ -6,7 +6,6 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from app.models.models import Device, IdempotencyRecord, QuickDraft, TravelPlan, User
 from app.services.quickdraft_purge import (

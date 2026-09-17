@@ -12,7 +12,6 @@ IPベースのレート制限、監査ログ(ShareAccessLog)、公開ビュー�
 policy(itinerary内の機微情報の除去)を検証する。
 """
 from app.core.auth import get_current_user, AuthResult
-from app.core.database import SessionLocal
 from app.models.models import PlanShareLink, ShareAccessLog
 
 

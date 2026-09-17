@@ -4,9 +4,6 @@
 実際の外部API(Wikipedia/Nominatim/Overpass)へは一切接続せず、各APIの
 実レスポンス形状を模したfixtureでhttpxをモックする(APIキー不要)。
 """
-import json
-from datetime import datetime, timezone
-from types import SimpleNamespace
 
 import pytest
 
@@ -22,7 +19,7 @@ class _FakeResponse:
         if self.status_code >= 400:
             raise RuntimeError(f"HTTP {self.status_code}")
 
-    def json(self):
+    def json(self):  # noqa: F811 - メソッド名。モジュールレベルのimport jsonとは無関係
         return self._json_data
 
 

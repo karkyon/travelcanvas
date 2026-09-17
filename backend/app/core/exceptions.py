@@ -10,7 +10,7 @@ TravelCanvas Backend - 統一例外処理システム
 - 構造化エラーレスポンス
 """
 
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 from enum import Enum
 import time
 from datetime import datetime
@@ -42,7 +42,7 @@ class ErrorSeverity(str, Enum):
 
 class ErrorCode(str, Enum):
     """エラーコード定義"""
-    
+
     # 認証エラー (AUTH_xxx)
     AUTH_TOKEN_INVALID = "AUTH_001"
     AUTH_TOKEN_EXPIRED = "AUTH_002"
@@ -52,13 +52,13 @@ class ErrorCode(str, Enum):
     AUTH_ACCOUNT_LOCKED = "AUTH_006"
     AUTH_SESSION_EXPIRED = "AUTH_007"
     AUTH_GUEST_RESTRICTED = "AUTH_008"
-    
+
     # 認可エラー (AUTHZ_xxx)
     AUTHZ_PERMISSION_DENIED = "AUTHZ_001"
     AUTHZ_ROLE_INSUFFICIENT = "AUTHZ_002"
     AUTHZ_RESOURCE_ACCESS_DENIED = "AUTHZ_003"
     AUTHZ_ADMIN_REQUIRED = "AUTHZ_004"
-    
+
     # バリデーションエラー (VALID_xxx)
     VALID_FIELD_REQUIRED = "VALID_001"
     VALID_FIELD_INVALID = "VALID_002"
@@ -68,7 +68,7 @@ class ErrorCode(str, Enum):
     VALID_DUPLICATE_VALUE = "VALID_006"
     VALID_CONSTRAINT_VIOLATION = "VALID_007"
     VALID_PASSWORD_WEAK = "VALID_008"
-    
+
     # ビジネスロジックエラー (BIZ_xxx)
     BIZ_TRAVEL_PLAN_NOT_FOUND = "BIZ_001"
     BIZ_TRAVEL_PLAN_ACCESS_DENIED = "BIZ_002"
@@ -78,7 +78,7 @@ class ErrorCode(str, Enum):
     BIZ_VOICE_RECOGNITION_FAILED = "BIZ_006"
     BIZ_EXPORT_FAILED = "BIZ_007"
     BIZ_IMPORT_FAILED = "BIZ_008"
-    
+
     # 外部サービスエラー (EXT_xxx)
     EXT_API_UNAVAILABLE = "EXT_001"
     EXT_API_RATE_LIMITED = "EXT_002"
@@ -87,19 +87,19 @@ class ErrorCode(str, Enum):
     EXT_REDIS_CONNECTION_FAILED = "EXT_005"
     EXT_FILE_STORAGE_ERROR = "EXT_006"
     EXT_EMAIL_SEND_FAILED = "EXT_007"
-    
+
     # システムエラー (SYS_xxx)
     SYS_INTERNAL_ERROR = "SYS_001"
     SYS_SERVICE_UNAVAILABLE = "SYS_002"
     SYS_TIMEOUT = "SYS_003"
     SYS_RESOURCE_EXHAUSTED = "SYS_004"
     SYS_CONFIGURATION_ERROR = "SYS_005"
-    
+
     # レート制限エラー (RATE_xxx)
     RATE_LIMIT_EXCEEDED = "RATE_001"
     RATE_LIMIT_IP_BLOCKED = "RATE_002"
     RATE_LIMIT_USER_SUSPENDED = "RATE_003"
-    
+
     # メンテナンスエラー (MAINT_xxx)
     MAINT_SCHEDULED_MAINTENANCE = "MAINT_001"
     MAINT_EMERGENCY_MAINTENANCE = "MAINT_002"
@@ -111,7 +111,7 @@ class ErrorCode(str, Enum):
 
 class TravelCanvasException(Exception):
     """TravelCanvas アプリケーション基底例外"""
-    
+
     def __init__(
         self,
         message: str,
@@ -124,7 +124,7 @@ class TravelCanvasException(Exception):
         context: Optional[Dict[str, Any]] = None
     ):
         super().__init__(message)
-        
+
         self.message = message
         self.error_code = error_code
         self.category = category
@@ -135,10 +135,10 @@ class TravelCanvasException(Exception):
         self.context = context or {}
         self.timestamp = time.time()
         self.datetime = datetime.utcnow()
-        
+
         # エラーID生成（追跡用）
         self.error_id = f"{category.value}_{int(self.timestamp)}_{hash(message) % 10000:04d}"
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """辞書形式変換"""
         return {
@@ -153,10 +153,10 @@ class TravelCanvasException(Exception):
             "context": self.context,
             "timestamp": self.timestamp
         }
-    
+
     def __str__(self) -> str:
         return f"[{self.error_code.value if self.error_code else 'UNKNOWN'}] {self.message}"
-    
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
@@ -172,7 +172,7 @@ class TravelCanvasException(Exception):
 
 class AuthenticationError(TravelCanvasException):
     """認証エラー"""
-    
+
     def __init__(
         self,
         message: str = "認証に失敗しました",
@@ -192,7 +192,7 @@ class AuthenticationError(TravelCanvasException):
 
 class TokenError(AuthenticationError):
     """トークンエラー"""
-    
+
     def __init__(
         self,
         message: str = "トークンが無効です",
@@ -209,7 +209,7 @@ class TokenError(AuthenticationError):
 
 class TokenExpiredError(AuthenticationError):
     """トークン有効期限切れエラー"""
-    
+
     def __init__(
         self,
         message: str = "トークンの有効期限が切れました",
@@ -225,7 +225,7 @@ class TokenExpiredError(AuthenticationError):
 
 class AuthorizationError(TravelCanvasException):
     """認可エラー"""
-    
+
     def __init__(
         self,
         message: str = "アクセス権限がありません",
@@ -245,7 +245,7 @@ class AuthorizationError(TravelCanvasException):
 
 class InsufficientPermissionError(AuthorizationError):
     """権限不足エラー"""
-    
+
     def __init__(
         self,
         required_permission: str,
@@ -257,7 +257,7 @@ class InsufficientPermissionError(AuthorizationError):
             "required_permission": required_permission,
             "user_permissions": user_permissions or []
         })
-        
+
         super().__init__(
             message=f"必要な権限がありません: {required_permission}",
             error_code=ErrorCode.AUTHZ_PERMISSION_DENIED,
@@ -268,7 +268,7 @@ class InsufficientPermissionError(AuthorizationError):
 
 class AdminRequiredError(AuthorizationError):
     """管理者権限必須エラー"""
-    
+
     def __init__(
         self,
         message: str = "管理者権限が必要です",
@@ -288,7 +288,7 @@ class AdminRequiredError(AuthorizationError):
 
 class ValidationError(TravelCanvasException):
     """バリデーションエラー"""
-    
+
     def __init__(
         self,
         message: str = "入力データが無効です",
@@ -310,14 +310,14 @@ class ValidationError(TravelCanvasException):
 
 class RequiredFieldError(ValidationError):
     """必須フィールドエラー"""
-    
+
     def __init__(
         self,
         field_name: str,
         details: Optional[Dict[str, Any]] = None
     ):
         field_errors = {field_name: ["この項目は必須です"]}
-        
+
         super().__init__(
             message=f"必須フィールドが不足しています: {field_name}",
             error_code=ErrorCode.VALID_FIELD_REQUIRED,
@@ -329,7 +329,7 @@ class RequiredFieldError(ValidationError):
 
 class InvalidFormatError(ValidationError):
     """フォーマット無効エラー"""
-    
+
     def __init__(
         self,
         field_name: str,
@@ -338,14 +338,14 @@ class InvalidFormatError(ValidationError):
         details: Optional[Dict[str, Any]] = None
     ):
         field_errors = {field_name: [f"正しい形式で入力してください（例: {expected_format}）"]}
-        
+
         details = details or {}
         details.update({
             "field_name": field_name,
             "expected_format": expected_format,
             "provided_value": str(provided_value) if provided_value is not None else None
         })
-        
+
         super().__init__(
             message=f"フィールド '{field_name}' の形式が無効です。期待する形式: {expected_format}",
             error_code=ErrorCode.VALID_FORMAT_INVALID,
@@ -357,7 +357,7 @@ class InvalidFormatError(ValidationError):
 
 class DuplicateValueError(ValidationError):
     """重複値エラー"""
-    
+
     def __init__(
         self,
         field_name: str,
@@ -365,13 +365,13 @@ class DuplicateValueError(ValidationError):
         details: Optional[Dict[str, Any]] = None
     ):
         field_errors = {field_name: ["この値は既に使用されています"]}
-        
+
         details = details or {}
         details.update({
             "field_name": field_name,
             "duplicate_value": str(value)
         })
-        
+
         super().__init__(
             message=f"重複した値が検出されました: {field_name} = {value}",
             error_code=ErrorCode.VALID_DUPLICATE_VALUE,
@@ -383,14 +383,14 @@ class DuplicateValueError(ValidationError):
 
 class PasswordTooWeakError(ValidationError):
     """パスワード強度不足エラー"""
-    
+
     def __init__(
         self,
         requirements: List[str],
         details: Optional[Dict[str, Any]] = None
     ):
         field_errors = {"password": requirements}
-        
+
         super().__init__(
             message="パスワードの強度が不足しています",
             error_code=ErrorCode.VALID_PASSWORD_WEAK,
@@ -406,7 +406,7 @@ class PasswordTooWeakError(ValidationError):
 
 class BusinessLogicError(TravelCanvasException):
     """ビジネスロジックエラー"""
-    
+
     def __init__(
         self,
         message: str,
@@ -426,7 +426,7 @@ class BusinessLogicError(TravelCanvasException):
 
 class TravelPlanNotFoundError(BusinessLogicError):
     """旅行プラン未発見エラー"""
-    
+
     def __init__(
         self,
         plan_id: str,
@@ -434,7 +434,7 @@ class TravelPlanNotFoundError(BusinessLogicError):
     ):
         details = details or {}
         details["plan_id"] = plan_id
-        
+
         super().__init__(
             message=f"旅行プランが見つかりません: {plan_id}",
             error_code=ErrorCode.BIZ_TRAVEL_PLAN_NOT_FOUND,
@@ -445,7 +445,7 @@ class TravelPlanNotFoundError(BusinessLogicError):
 
 class TravelPlanAccessDeniedError(BusinessLogicError):
     """旅行プランアクセス拒否エラー"""
-    
+
     def __init__(
         self,
         plan_id: str,
@@ -457,7 +457,7 @@ class TravelPlanAccessDeniedError(BusinessLogicError):
             "plan_id": plan_id,
             "user_id": user_id
         })
-        
+
         super().__init__(
             message=f"旅行プランへのアクセスが拒否されました: {plan_id}",
             error_code=ErrorCode.BIZ_TRAVEL_PLAN_ACCESS_DENIED,
@@ -468,7 +468,7 @@ class TravelPlanAccessDeniedError(BusinessLogicError):
 
 class OptimizationError(BusinessLogicError):
     """最適化エラー"""
-    
+
     def __init__(
         self,
         message: str = "最適化処理に失敗しました",
@@ -478,7 +478,7 @@ class OptimizationError(BusinessLogicError):
         details = details or {}
         if optimization_type:
             details["optimization_type"] = optimization_type
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.BIZ_OPTIMIZATION_FAILED,
@@ -489,7 +489,7 @@ class OptimizationError(BusinessLogicError):
 
 class SearchNoResultsError(BusinessLogicError):
     """検索結果なしエラー"""
-    
+
     def __init__(
         self,
         search_query: str,
@@ -501,7 +501,7 @@ class SearchNoResultsError(BusinessLogicError):
             "search_query": search_query,
             "search_type": search_type
         })
-        
+
         super().__init__(
             message=f"検索結果が見つかりません: {search_query}",
             error_code=ErrorCode.BIZ_SEARCH_NO_RESULTS,
@@ -516,7 +516,7 @@ class SearchNoResultsError(BusinessLogicError):
 
 class ExternalServiceError(TravelCanvasException):
     """外部サービスエラー"""
-    
+
     def __init__(
         self,
         message: str,
@@ -527,7 +527,7 @@ class ExternalServiceError(TravelCanvasException):
     ):
         details = details or {}
         details["service_name"] = service_name
-        
+
         super().__init__(
             message=message,
             error_code=error_code,
@@ -540,7 +540,7 @@ class ExternalServiceError(TravelCanvasException):
 
 class APIUnavailableError(ExternalServiceError):
     """API利用不可エラー"""
-    
+
     def __init__(
         self,
         service_name: str,
@@ -557,7 +557,7 @@ class APIUnavailableError(ExternalServiceError):
 
 class DatabaseConnectionError(ExternalServiceError):
     """データベース接続エラー"""
-    
+
     def __init__(
         self,
         message: str = "データベース接続に失敗しました",
@@ -578,7 +578,7 @@ class DatabaseConnectionError(ExternalServiceError):
 
 class RateLimitError(TravelCanvasException):
     """レート制限エラー"""
-    
+
     def __init__(
         self,
         message: str = "アクセス制限に達しました",
@@ -594,11 +594,11 @@ class RateLimitError(TravelCanvasException):
             "remaining": remaining,
             "retry_after": retry_after
         })
-        
+
         self.limit = limit
         self.remaining = remaining
         self.retry_after = retry_after
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.RATE_LIMIT_EXCEEDED,
@@ -611,7 +611,7 @@ class RateLimitError(TravelCanvasException):
 
 class IPBlockedError(RateLimitError):
     """IP ブロックエラー"""
-    
+
     def __init__(
         self,
         client_ip: str,
@@ -623,7 +623,7 @@ class IPBlockedError(RateLimitError):
             "client_ip": client_ip,
             "block_duration": block_duration
         })
-        
+
         super().__init__(
             message=f"IPアドレスがブロックされました: {client_ip}",
             retry_after=block_duration,
@@ -638,7 +638,7 @@ class IPBlockedError(RateLimitError):
 
 class MaintenanceError(TravelCanvasException):
     """メンテナンスエラー"""
-    
+
     def __init__(
         self,
         message: str = "システムメンテナンス中です",
@@ -649,9 +649,9 @@ class MaintenanceError(TravelCanvasException):
         details = details or {}
         if estimated_end:
             details["estimated_end"] = estimated_end
-        
+
         self.estimated_end = estimated_end
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.MAINT_SCHEDULED_MAINTENANCE,
@@ -668,7 +668,7 @@ class MaintenanceError(TravelCanvasException):
 
 class SystemError(TravelCanvasException):
     """システムエラー"""
-    
+
     def __init__(
         self,
         message: str = "システムエラーが発生しました",
@@ -688,7 +688,7 @@ class SystemError(TravelCanvasException):
 
 class ServiceUnavailableError(SystemError):
     """サービス利用不可エラー"""
-    
+
     def __init__(
         self,
         message: str = "サービスが一時的に利用できません",
@@ -704,7 +704,7 @@ class ServiceUnavailableError(SystemError):
 
 class TimeoutError(SystemError):
     """タイムアウトエラー"""
-    
+
     def __init__(
         self,
         operation: str,
@@ -716,7 +716,7 @@ class TimeoutError(SystemError):
             "operation": operation,
             "timeout_seconds": timeout_seconds
         })
-        
+
         super().__init__(
             message=f"操作がタイムアウトしました: {operation} ({timeout_seconds}秒)",
             error_code=ErrorCode.SYS_TIMEOUT,
@@ -752,7 +752,7 @@ def create_not_found_error(
         "resource_type": resource_type,
         "resource_id": resource_id
     })
-    
+
     return BusinessLogicError(
         message=f"{resource_type}が見つかりません: {resource_id}",
         details=details,
@@ -773,7 +773,7 @@ def create_access_denied_error(
         "resource_id": resource_id,
         "user_id": user_id
     })
-    
+
     return AuthorizationError(
         message=f"{resource_type}へのアクセスが拒否されました: {resource_id}",
         details=details,
@@ -788,14 +788,14 @@ def handle_external_api_error(
     operation: str
 ) -> ExternalServiceError:
     """外部APIエラーハンドリング"""
-    
+
     details = {
         "service_name": service_name,
         "status_code": status_code,
         "response_text": response_text[:500],  # レスポンステキストは500文字まで
         "operation": operation
     }
-    
+
     if status_code == 429:
         return ExternalServiceError(
             message=f"{service_name} APIのレート制限に達しました",
@@ -824,7 +824,7 @@ def handle_external_api_error(
 
 def extract_error_summary(exception: Exception) -> Dict[str, Any]:
     """例外からエラーサマリー抽出"""
-    
+
     if isinstance(exception, TravelCanvasException):
         return {
             "error_id": exception.error_id,
@@ -879,17 +879,17 @@ def should_log_error(exception: Exception) -> bool:
 def mask_sensitive_details(details: Dict[str, Any]) -> Dict[str, Any]:
     """機密情報マスク処理"""
     masked_details = details.copy()
-    
+
     sensitive_keys = [
         "password", "token", "secret", "key", "credential",
         "authorization", "cookie", "session"
     ]
-    
+
     for key, value in masked_details.items():
         if any(sensitive_key in key.lower() for sensitive_key in sensitive_keys):
             if isinstance(value, str) and len(value) > 4:
                 masked_details[key] = f"{value[:2]}***{value[-2:]}"
             else:
                 masked_details[key] = "***"
-    
+
     return masked_details

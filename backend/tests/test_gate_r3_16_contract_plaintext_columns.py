@@ -8,7 +8,6 @@ seat/special_request)を削除したことの確認。
 - migrationのpre-flightチェック自体はmigration実行時にのみ機能するため、
   ここではアプリケーションレベルの回帰が無いことを確認する。
 """
-import uuid
 
 import pytest
 

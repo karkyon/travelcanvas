@@ -35,7 +35,6 @@ class TravelPlanBase(BaseModel):
 
 class TravelPlanCreate(TravelPlanBase):
     """旅行プラン作成スキーマ"""
-    pass
 
 
 class TravelPlanUpdate(BaseModel):

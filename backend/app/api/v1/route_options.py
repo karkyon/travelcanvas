@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access
-from app.models.models import RouteOption, RouteLeg, TravelSegment, TravelEvent, Place, User
+from app.models.models import RouteOption, RouteLeg, TravelSegment, User
 from app.services.quickdraft_idempotency import (
     claim_or_get_cached,
     finalize_success,
@@ -35,7 +35,6 @@ from app.services.quickdraft_idempotency import (
 # [Gate M3] Day/Event/Segment側の楽観ロック(If-Match)・ChangeSet記録は
 # app/api/v1/plans.py の実装を正本として再利用する(重複実装しない)。
 from app.api.v1.plans import (
-    _get_owned_plan,
     _require_if_match,
     _record_change_and_bump_revision,
     _record_batch_change_and_bump_revision,
@@ -229,7 +228,7 @@ def _option_to_response(option: RouteOption, db: Session) -> dict:
         "revision": option.revision,
         "created_at": option.created_at,
         "updated_at": option.updated_at,
-        "legs": [_leg_to_response(l) for l in legs],
+        "legs": [_leg_to_response(leg) for leg in legs],
     })
 
 
@@ -274,7 +273,7 @@ def _option_snapshot_with_legs(db: Session, option: RouteOption) -> dict:
         .order_by(RouteLeg.leg_order.asc())
         .all()
     )
-    snapshot["_legs"] = [_leg_to_response(l) for l in legs]
+    snapshot["_legs"] = [_leg_to_response(leg) for leg in legs]
     return snapshot
 
 
@@ -658,7 +657,9 @@ def adopt_route_option(
         existing_segment.transfer_count = option.transfer_count
         existing_segment.revision += 1
         db.flush()
-        changes.append(("travel_segment", existing_segment.id, "update", segment_before, _segment_to_dict(existing_segment)))
+        changes.append((
+            "travel_segment", existing_segment.id, "update", segment_before, _segment_to_dict(existing_segment)
+        ))
         segment = existing_segment
     else:
         segment = TravelSegment(

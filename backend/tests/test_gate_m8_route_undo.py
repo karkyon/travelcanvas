@@ -9,8 +9,6 @@ adopt採用のUndoでtravel_segmentのみ戻りRouteOption.statusが
 """
 import uuid
 
-import pytest
-
 
 PLAN_ENDPOINT = "/api/v1/plans/{plan_id}"
 OPTIONS_ENDPOINT = PLAN_ENDPOINT + "/route-options"
@@ -134,8 +132,8 @@ def test_undo_after_option_delete_restores_option_and_legs(auth_client):
     assert restored.status_code == 200, restored.text
     restored_legs = restored.json()["legs"]
     assert len(restored_legs) == 2
-    assert {l["mode"] for l in restored_legs} == {"walking", "train"}
-    assert {l["from_label"] for l in restored_legs} == {"A", "B"}
+    assert {leg["mode"] for leg in restored_legs} == {"walking", "train"}
+    assert {leg["from_label"] for leg in restored_legs} == {"A", "B"}
 
 
 # ===== 単独のroute_leg操作のUndo =====
@@ -158,7 +156,7 @@ def test_undo_after_add_route_leg_removes_leg(auth_client):
     assert undo_res.status_code == 200, undo_res.text
 
     option_after = client.get(f"{OPTIONS_ENDPOINT.format(plan_id=plan_id)}/{option['id']}").json()
-    leg_ids_after = {l["id"] for l in option_after["legs"]}
+    leg_ids_after = {leg["id"] for leg in option_after["legs"]}
     assert new_leg_id not in leg_ids_after
     assert len(option_after["legs"]) == 2
 
@@ -180,7 +178,7 @@ def test_undo_after_delete_route_leg_restores_leg(auth_client):
     assert undo_res.status_code == 200, undo_res.text
 
     option_after = client.get(f"{OPTIONS_ENDPOINT.format(plan_id=plan_id)}/{option['id']}").json()
-    leg_ids_after = {l["id"] for l in option_after["legs"]}
+    leg_ids_after = {leg["id"] for leg in option_after["legs"]}
     assert leg_to_delete["id"] in leg_ids_after
     assert len(option_after["legs"]) == 2
 
@@ -204,7 +202,7 @@ def test_undo_after_update_route_leg_restores_previous_fields(auth_client):
     assert undo_res.status_code == 200, undo_res.text
 
     option_after = client.get(f"{OPTIONS_ENDPOINT.format(plan_id=plan_id)}/{option['id']}").json()
-    restored_leg = next(l for l in option_after["legs"] if l["id"] == leg["id"])
+    restored_leg = next(item for item in option_after["legs"] if item["id"] == leg["id"])
     assert restored_leg["mode"] == "walking"
 
 
