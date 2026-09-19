@@ -526,7 +526,7 @@ export function uniqueArray<T>(array: T[], key?: keyof T): T[] {
 /**
  * 配列の重複削除（関数版 - 拡張）
  */
-export const uniqueArrayByKey = <T>(array: T[], keyFn?: (item: T) => any): T[] => {
+export const uniqueArrayByKey = <T>(array: T[], keyFn?: (item: T) => unknown): T[] => {
   if (!keyFn) {
     return [...new Set(array)];
   }
@@ -576,7 +576,7 @@ export function deepClone<T>(obj: T): T {
   if (obj instanceof Object) {
     const clonedObj = {} as T;
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         clonedObj[key] = deepClone(obj[key]);
       }
     }
@@ -589,13 +589,13 @@ export function deepClone<T>(obj: T): T {
 /**
  * オブジェクトから空の値を除去（新機能）
  */
-export const removeEmpty = (obj: Record<string, any>): Record<string, any> => {
-  const cleaned: Record<string, any> = {};
-  
+export const removeEmpty = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned: Record<string, unknown> = {};
+
   for (const [key, value] of Object.entries(obj)) {
     if (value !== null && value !== undefined && value !== '') {
       if (typeof value === 'object' && !Array.isArray(value)) {
-        const nested = removeEmpty(value);
+        const nested = removeEmpty(value as Record<string, unknown>);
         if (Object.keys(nested).length > 0) {
           cleaned[key] = nested;
         }
@@ -604,7 +604,7 @@ export const removeEmpty = (obj: Record<string, any>): Record<string, any> => {
       }
     }
   }
-  
+
   return cleaned;
 };
 
@@ -615,7 +615,7 @@ export const removeEmpty = (obj: Record<string, any>): Record<string, any> => {
 /**
  * デバウンス関数（既存関数 - 後方互換性維持）
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -630,7 +630,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * スロットル関数（既存関数 - 後方互換性維持）
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -778,33 +778,56 @@ const getBrowserVersion = (userAgent: string): string => {
 /**
  * エラーメッセージを日本語化
  */
-export const getErrorMessage = (error: any): string => {
+// [Gate M9-FE-A] 以前は`error: any`で受けており、error.response.status等
+// への到達が型チェックを一切素通りしていた(services/api.tsのhandleApiError
+// で発見・修正した422 detail配列によるReact crashと同じ種類の穴)。
+// このutils/index.ts側は現時点でどこからも import されていない未使用
+// 関数だが、`unknown`で受けてtype guardする方針は他と揃える。
+interface AxiosLikeError {
+  response?: {
+    status?: number;
+    data?: {
+      error?: {
+        message?: string;
+      };
+    };
+  };
+  message?: string;
+}
+
+function isAxiosLikeError(error: unknown): error is AxiosLikeError {
+  return typeof error === 'object' && error !== null;
+}
+
+export const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') return error;
-  
-  if (error?.response?.data?.error?.message) {
-    return error.response.data.error.message;
-  }
-  
-  if (error?.response?.status) {
-    switch (error.response.status) {
-      case 401: return '認証が必要です';
-      case 403: return 'アクセス権限がありません';
-      case 404: return 'リソースが見つかりません';
-      case 429: return 'リクエスト制限に達しました';
-      case 500: return 'サーバーエラーが発生しました';
-      default: return `エラーが発生しました (${error.response.status})`;
+
+  if (isAxiosLikeError(error)) {
+    if (error.response?.data?.error?.message) {
+      return error.response.data.error.message;
     }
+
+    if (error.response?.status) {
+      switch (error.response.status) {
+        case 401: return '認証が必要です';
+        case 403: return 'アクセス権限がありません';
+        case 404: return 'リソースが見つかりません';
+        case 429: return 'リクエスト制限に達しました';
+        case 500: return 'サーバーエラーが発生しました';
+        default: return `エラーが発生しました (${error.response.status})`;
+      }
+    }
+
+    if (error.message) return error.message;
   }
-  
-  if (error?.message) return error.message;
-  
+
   return '予期しないエラーが発生しました';
 };
 
 /**
  * APIエラーハンドリング
  */
-export const handleApiError = (error: any, showNotification?: (message: string, type: 'error') => void) => {
+export const handleApiError = (error: unknown, showNotification?: (message: string, type: 'error') => void) => {
   const message = getErrorMessage(error);
   console.error('API Error:', error);
   

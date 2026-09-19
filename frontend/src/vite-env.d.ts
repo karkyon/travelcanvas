@@ -75,7 +75,7 @@ interface ImportMeta {
 declare global {
   // Service Worker registration
   interface Window {
-    workbox: any
+    workbox: unknown
   }
 
   // PWA Install Prompt
@@ -128,8 +128,8 @@ declare global {
   }
 
   interface LockManager {
-    request(name: string, callback: () => Promise<any>): Promise<any>
-    request(name: string, options: LockOptions, callback: () => Promise<any>): Promise<any>
+    request(name: string, callback: () => Promise<unknown>): Promise<unknown>
+    request(name: string, options: LockOptions, callback: () => Promise<unknown>): Promise<unknown>
     query(): Promise<LockManagerSnapshot>
   }
 
@@ -162,14 +162,14 @@ declare global {
   // Custom Error Types
   interface TravelCanvasError extends Error {
     code?: string
-    context?: Record<string, any>
+    context?: Record<string, unknown>
     timestamp?: string
   }
 
   // Analytics Types
   interface AnalyticsEvent {
     name: string
-    properties?: Record<string, any>
+    properties?: Record<string, unknown>
     timestamp?: number
   }
 
@@ -217,7 +217,7 @@ declare global {
   // WebSocket Message Types
   interface WSMessage {
     type: string
-    payload: any
+    payload: unknown
     timestamp: string
     userId?: string
   }
@@ -240,7 +240,7 @@ declare global {
   interface NotificationOptions {
     badge?: string
     body?: string
-    data?: any
+    data?: unknown
     dir?: NotificationDirection
     icon?: string
     image?: string
@@ -367,7 +367,7 @@ declare module '*.worker.js' {
 
 // JSON modules
 declare module '*.json' {
-  const content: any
+  const content: unknown
   export default content
 }
 

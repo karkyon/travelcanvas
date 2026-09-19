@@ -9,7 +9,7 @@ import { STORAGE_KEYS } from '../config/constants';
 export type StorageType = 'localStorage' | 'sessionStorage' | 'memory';
 
 // ストレージ操作の結果
-export interface StorageResult<T = any> {
+export interface StorageResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -338,24 +338,29 @@ export class AuthStorage {
 export class UserPreferencesStorage {
   private storage = localStorage;
 
-  setPreferences(preferences: Record<string, any>): void {
+  setPreferences(preferences: Record<string, unknown>): void {
     this.storage.setItem(STORAGE_KEYS.USER_PREFERENCES, preferences);
   }
 
-  getPreferences(): Record<string, any> {
-    const result = this.storage.getItem<Record<string, any>>(STORAGE_KEYS.USER_PREFERENCES);
+  getPreferences(): Record<string, unknown> {
+    const result = this.storage.getItem<Record<string, unknown>>(STORAGE_KEYS.USER_PREFERENCES);
     return result.success ? result.data! : {};
   }
 
-  setPreference(key: string, value: any): void {
+  setPreference(key: string, value: unknown): void {
     const preferences = this.getPreferences();
     preferences[key] = value;
     this.setPreferences(preferences);
   }
 
-  getPreference(key: string, defaultValue?: any): any {
+  // [Gate M9-FE-A] 呼び出し側が期待する型をジェネリクスで指定できるように
+  // する(以前は`any`で受け渡ししていたため、呼び出し側の型チェックが
+  // 完全に素通りしていた)。このclass自体は現時点でどこからも import
+  // されていない未使用ユーティリティだが、型の健全性は他ファイルと同じ
+  // 基準で揃える。
+  getPreference<T = unknown>(key: string, defaultValue?: T): T | undefined {
     const preferences = this.getPreferences();
-    return preferences[key] !== undefined ? preferences[key] : defaultValue;
+    return preferences[key] !== undefined ? (preferences[key] as T) : defaultValue;
   }
 
   removePreference(key: string): void {
@@ -400,6 +405,17 @@ export class CacheStorage {
   }
 }
 
+// [Gate M9-FE-A] 以前は`data: any`/`getQueue(): any[]`だった。キューに
+// 積む内容はitemのtypeによって形が変わり得るため`unknown`とし、消費側で
+// type narrowingさせる。
+export interface OfflineQueueItem {
+  id: string;
+  type: string;
+  data: unknown;
+  timestamp: number;
+  retryCount?: number;
+}
+
 /**
  * オフラインキュー管理
  */
@@ -407,20 +423,14 @@ export class OfflineQueueStorage {
   private storage = localStorage;
   private queueKey = STORAGE_KEYS.OFFLINE_QUEUE;
 
-  addToQueue(item: {
-    id: string;
-    type: string;
-    data: any;
-    timestamp: number;
-    retryCount?: number;
-  }): void {
+  addToQueue(item: OfflineQueueItem): void {
     const queue = this.getQueue();
     queue.push(item);
     this.storage.setItem(this.queueKey, queue);
   }
 
-  getQueue(): any[] {
-    const result = this.storage.getItem<any[]>(this.queueKey);
+  getQueue(): OfflineQueueItem[] {
+    const result = this.storage.getItem<OfflineQueueItem[]>(this.queueKey);
     return result.success ? result.data! : [];
   }
 
@@ -439,6 +449,19 @@ export class OfflineQueueStorage {
   }
 }
 
+// [Gate M9-FE-A] addError()の引数形状をそのまま名前付き型として切り出す
+// (以前はgetErrors()の戻り値だけ`any[]`になっており、追加したログの形が
+// 全く保証されていなかった)。
+export interface ErrorLogEntry {
+  id: string;
+  message: string;
+  stack?: string;
+  timestamp: number;
+  url: string;
+  userAgent: string;
+  userId?: string;
+}
+
 /**
  * エラーログ管理
  */
@@ -446,28 +469,20 @@ export class ErrorLogStorage {
   private storage = localStorage;
   private maxLogs = 50;
 
-  addError(error: {
-    id: string;
-    message: string;
-    stack?: string;
-    timestamp: number;
-    url: string;
-    userAgent: string;
-    userId?: string;
-  }): void {
+  addError(error: ErrorLogEntry): void {
     const logs = this.getErrors();
     logs.unshift(error);
-    
+
     // 最大件数を超えた場合は古いログを削除
     if (logs.length > this.maxLogs) {
       logs.splice(this.maxLogs);
     }
-    
+
     this.storage.setItem(STORAGE_KEYS.ERROR_LOGS, logs);
   }
 
-  getErrors(): any[] {
-    const result = this.storage.getItem<any[]>(STORAGE_KEYS.ERROR_LOGS);
+  getErrors(): ErrorLogEntry[] {
+    const result = this.storage.getItem<ErrorLogEntry[]>(STORAGE_KEYS.ERROR_LOGS);
     return result.success ? result.data! : [];
   }
 
