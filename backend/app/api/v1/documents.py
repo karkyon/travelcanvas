@@ -27,6 +27,7 @@
   分類されており(confirmation_number/pin/ticket payloadのような明示
   revealを要求する"reveal"表示ではない)、閲覧権限がある場合は通常表示する。
 """
+import logging
 import re
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
@@ -71,6 +72,7 @@ from app.services.storage_backend import (
 )
 
 router = APIRouter(prefix="/plans", tags=["documents"])
+logger = logging.getLogger("travelcanvas")
 
 _VALID_CLASSIFICATIONS = {c.value for c in DocumentClassification}
 _VALID_RELATION_TYPES = {r.value for r in DocumentLinkRelationType}
@@ -370,6 +372,26 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ファイルの暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)",
+        )
+    except OSError:
+        # [Gate M10 CORS調査] DOCUMENT_STORAGE_DIR配下へのディスク書き込みが
+        # 失敗した場合(権限不足/ディスク容量不足等)、従来はOSErrorが
+        # ここで捕捉されず未処理例外としてグローバルハンドラまで伝播していた。
+        # FastAPI/Starletteの既知の挙動として、未処理例外はCORSMiddlewareの
+        # 外側(ServerErrorMiddleware)で処理されるため、CORSMiddlewareが
+        # 付与するAccess-Control-Allow-Originヘッダーが一切付かない
+        # レスポンスになり、ブラウザ側には「CORS policyでブロック」としか
+        # 表示されない(実体は500)。HTTPExceptionへ変換してExceptionMiddleware
+        # (CORSMiddlewareの内側)経由の正規レスポンスにすることで、
+        # 常にCORSヘッダー付きの明確なエラーを返す。
+        logger.exception(
+            "document upload storage write failed (plan_id=%s, storage_key=%s)",
+            plan.id,
+            storage_key,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ファイルの保存に失敗しました。しばらくしてから再試行してください。",
         )
 
     d = Document(

@@ -76,7 +76,29 @@ class Settings(BaseSettings):
     # (dockerボリューム上のローカルディスク)を既定とする。将来
     # 実クラウドproviderの認証情報が提供された場合は、同モジュールの
     # StorageBackendインターフェースを実装するアダプタへ差し替える設計。
-    DOCUMENT_STORAGE_DIR: str = "/app/storage/documents"
+    #
+    # [Gate M10 CORS調査で判明した実バグの修正] 旧既定値
+    # "/app/storage/documents" は、backendサービスのbind mount
+    # (docker-compose.yml `./backend:/app`)配下の未管理パスであり、
+    # dockerによる所有権初期化が一切行われない。この配下はhost側の
+    # チェックアウトユーザーの所有のまま残るため、コンテナ内の非root
+    # 実行ユーザー(Dockerfile `USER appuser`)がmkdir/writeしようとすると
+    # 権限不一致でPermissionErrorになり得る(host側uidとappuserのuidが
+    # 一致する保証がないため)。これがGate M10 E2Eで発生していた、
+    # documents系エンドポイントのみ原因不明のCORSエラーになる不具合の
+    # 実体(未処理のPermissionErrorがCORSMiddlewareの外側
+    # ServerErrorMiddlewareまで伝播し、CORSヘッダーの付かない500に
+    # なっていた)。
+    # 既存のdocker-compose.ymlには`travelcanvas_uploads:/app/uploads`という
+    # 名前付きvolumeが既に定義されており(Dockerfileの複数ステージで
+    # `RUN mkdir -p logs uploads temp && chown -R appuser:appuser /app`
+    # によりビルド時にappuser所有で初期化される)、dockerは名前付きvolumeを
+    # 初回作成する際にマウント先のイメージ内容(所有権含む)をそのまま
+    # 引き継ぐため、appuserは`/app/uploads`配下を常に書き込みできる。
+    # 新規に別volumeを追加する運用変更を避けるため、文書保存先も
+    # この既存の管理下ディレクトリ配下(`/app/uploads/documents`)に
+    # 変更する。
+    DOCUMENT_STORAGE_DIR: str = "/app/uploads/documents"
     DOCUMENT_MAX_UPLOAD_SIZE_BYTES: int = 20 * 1024 * 1024  # 20MB
 
     # [Gate M5] 期限付きダウンロードURL(DOC-02 FR-013)の署名鍵。

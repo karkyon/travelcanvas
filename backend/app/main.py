@@ -13,6 +13,41 @@ import uuid
 
 logger = logging.getLogger("travelcanvas")
 
+# [Gate M10 CORS調査] CORSMiddlewareへ渡す許可オリジン一覧。以下の
+# unhandled_exception_handlerでも同じ一覧を参照する(単一の真実源)。
+_ALLOWED_CORS_ORIGINS = (
+    settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+)
+
+
+def _cors_headers_for_origin(request: Request) -> dict:
+    """[Gate M10 CORS調査で判明したFastAPI/Starletteの既知の挙動への対処]
+
+    `@app.exception_handler(Exception)`(このファイル下部で登録)は
+    StarletteのServerErrorMiddlewareにフックされる特別なハンドラであり、
+    ミドルウェアスタック上でCORSMiddlewareより外側(=CORSMiddlewareを
+    通らない経路)で実行される。そのため、ルートハンドラ内で
+    HTTPException以外の未処理例外が発生すると、レスポンス自体は
+    正常に返るにもかかわらずAccess-Control-Allow-Originヘッダーが
+    一切付与されず、ブラウザからは実体(500エラー)ではなく
+    「CORS policyでブロック」としか見えない現象が起きる
+    (Gate M10でdocuments系エンドポイントのみ発生していた問題の根本原因)。
+
+    根本原因となっていたPermissionError自体はGate M10で個別に修正済み
+    だが、将来別の想定外例外が発生した場合にも同じ現象を再発させない
+    ため、ここでCORSMiddlewareと同じ判定ロジック(許可リストと完全一致
+    するOriginのみ許可)でヘッダーを手動付与する(防御的多重化)。
+    """
+    origin = request.headers.get("origin")
+    if not origin or origin not in _ALLOWED_CORS_ORIGINS:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Vary": "Origin",
+    }
+
+
 # アプリケーション作成
 app = FastAPI(
     title="TravelCanvas API",
@@ -51,6 +86,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             "detail": "サーバー内部でエラーが発生しました。しばらくしてから再試行してください。",
             "request_id": request_id,
         },
+        # [Gate M10 CORS調査] このハンドラはCORSMiddlewareの外側で実行される
+        # ため、CORSMiddleware自体はこのレスポンスにヘッダーを付与できない。
+        # _cors_headers_for_origin()で同じ許可リストに基づき明示的に付与する。
+        headers=_cors_headers_for_origin(request),
     )
 
 
@@ -62,7 +101,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # settings.CORS_ORIGINSへ切り替える。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS],
+    allow_origins=_ALLOWED_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
