@@ -384,10 +384,19 @@ async def upload_document(
         # 表示されない(実体は500)。HTTPExceptionへ変換してExceptionMiddleware
         # (CORSMiddlewareの内側)経由の正規レスポンスにすることで、
         # 常にCORSヘッダー付きの明確なエラーを返す。
+        #
+        # [Gate M10-R1 P1] 上記M10修正時、このログにstorage_keyを含めて
+        # しまっていた。storage_keyはObject Storage内部参照であり、
+        # Gate M7でtoken/storage_key/filenameといった機微値をログ・
+        # audit_logs・エラーdetailへ一切出力しない方針を確立している
+        # (このファイル内の他エンドポイントのコメント、および
+        # test_gate_m7_document_hardening.py参照)。本ログもその方針に
+        # 合わせ、非機密識別子であるplan_idのみを出力する
+        # (request_idはlogging基盤のContextVarにより全ログへ自動付与される
+        # ため、ここで重ねて指定する必要はない)。
         logger.exception(
-            "document upload storage write failed (plan_id=%s, storage_key=%s)",
+            "document upload storage write failed (plan_id=%s)",
             plan.id,
-            storage_key,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

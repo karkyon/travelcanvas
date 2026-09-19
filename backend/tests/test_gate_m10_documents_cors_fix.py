@@ -99,6 +99,44 @@ def test_upload_storage_permission_error_returns_503_with_cors_headers(auth_clie
     assert res.headers.get("access-control-allow-credentials") == "true"
 
 
+def test_upload_storage_error_log_does_not_leak_storage_key(auth_client, monkeypatch, caplog):
+    """[Gate M10-R1 P1回帰] M10のOSError対応時に追加したログが、
+    storage_key(Object Storage内部参照)をそのまま出力してしまっていた。
+    Gate M7で確立したtoken/storage_key/filenameをログへ出さない方針
+    (test_gate_m7_document_hardening.py参照)に本ログも従うことを固定する。
+    generate_storage_keyを既知の固定値へmonkeypatchし、そのものずばりの
+    文字列がどのログレコードのメッセージにも一切現れないことを検証する。"""
+    import logging as _logging
+
+    from app.api.v1 import documents as documents_module
+
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+
+    known_storage_key = "SENTINEL-STORAGE-KEY-MUST-NOT-BE-LOGGED"
+    monkeypatch.setattr(documents_module, "generate_storage_key", lambda *_a, **_kw: known_storage_key)
+
+    def _raise_permission_error(self, storage_key, content):
+        raise PermissionError(13, "Permission denied", storage_key)
+
+    monkeypatch.setattr(storage_module.LocalFilesystemBackend, "save", _raise_permission_error)
+
+    files = {"file": ("receipt.pdf", io.BytesIO(b"%PDF-1.4\nmock\n"), "application/pdf")}
+    with caplog.at_level(_logging.DEBUG):
+        res = client.post(
+            f"/api/v1/plans/{plan_id}/documents/upload",
+            files=files,
+            headers={"Origin": _ORIGIN},
+        )
+
+    assert res.status_code == 503, res.text
+    for record in caplog.records:
+        assert known_storage_key not in record.getMessage(), (
+            "storage_keyがログに出力されています(Gate M7方針違反): "
+            f"{record.getMessage()}"
+        )
+
+
 def test_list_documents_unaffected_by_storage_errors(auth_client, monkeypatch):
     """[回帰] 一覧取得(list_documents)はストレージに一切触れないため、
     ストレージ書き込みが失敗する状況でも通常通り200かつCORSヘッダー付きで
