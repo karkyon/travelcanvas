@@ -57,6 +57,53 @@ def test_invite_collaborator(auth_client):
     assert res.json()["status"] == "pending"
 
 
+def test_list_my_invitations_is_not_shadowed_by_get_travel_plan_route(auth_client):
+    """[Gate M10-R2 P1回帰] `GET /api/v1/travel-plans/invitations`
+    (share.router の list_my_invitations)は、同じ"/travel-plans" prefixを
+    共有する travel.router の `GET /{plan_id}`(plan_id: uuid.UUID)より
+    後にinclude_routerされていたため、"invitations"という文字列がplan_id
+    として束縛される形でtravel.router側にマッチしてしまい、UUID変換に
+    失敗して422(FastAPI標準のRequestValidationError)になっていた
+    (本Gateまでbackend/frontend双方でE2E含め一度も検証されておらず、
+    実運用でも「招待を承諾する」画面が事実上機能していなかった)。
+    本テストはこの回帰を固定する: 認証済み会員がGETした際、422ではなく
+    200かつリスト形式で応答することを検証する(自分宛の招待が0件でも
+    エラーにならないことも含む)。"""
+    client, _user = auth_client
+
+    res = client.get("/api/v1/travel-plans/invitations")
+
+    assert res.status_code == 200, res.text
+    assert isinstance(res.json(), list)
+
+
+def test_list_my_invitations_actually_returns_pending_invitation(client, make_user):
+    """[Gate M10-R2 P1回帰] 上記の200/list形状の確認だけでなく、実際に
+    自分宛のpending招待がlist_my_invitations経由で正しく返ってくることも
+    合わせて固定する(route shadowingが解消していても、実装自体に別の
+    不具合が無いことの確認)。"""
+    from app.main import app
+
+    owner, _ = make_user()
+    invitee, _ = make_user()
+
+    _act_as(app, owner)
+    plan_id = _create_plan(client, title="招待一覧回帰テスト用プラン")
+    res = client.post(
+        f"/api/v1/travel-plans/{plan_id}/collaborators",
+        json={"email": invitee.email, "role": "editor"},
+    )
+    assert res.status_code == 200, res.text
+
+    _act_as(app, invitee)
+    res = client.get("/api/v1/travel-plans/invitations")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert any(item["plan_id"] == plan_id and item["status"] == "pending" for item in body)
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_non_owner_cannot_create_share_link(client, make_user):
     from app.main import app
 

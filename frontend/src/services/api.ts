@@ -732,6 +732,40 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+// [Gate M10-R2 P1] handleApiError()のdefault caseは以前
+// `apiError.detail`が存在すればそのままmessageへ代入していた。しかし
+// FastAPIが標準のRequestValidationError(422)を返した場合、`detail`は
+// 文字列ではなく`{type, loc, msg, input, ctx, url}`形状のオブジェクトの
+// 配列になる(アプリ独自のエラーレスポンス形式ではなくFastAPI標準形式)。
+// この非文字列値がそのままtoast.error()へ渡され、react-hot-toastが
+// それを直接childとしてレンダーしようとして
+// 「Objects are not valid as a React child」(React最小化エラー#31)で
+// アプリ全体がクラッシュしていた(Gate M10-R2 backend route shadowing
+// バグの発見時に実機で確認)。detailの形状を判定し、必ず文字列を返す
+// ようにする。
+export function extractApiErrorDetailMessage(detail: unknown): string | null {
+  if (detail == null) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'msg' in item) {
+          const msg = (item as { msg?: unknown }).msg;
+          return typeof msg === 'string' ? msg : null;
+        }
+        return null;
+      })
+      .filter((s): s is string => !!s);
+    return parts.length > 0 ? parts.join(' / ') : null;
+  }
+  if (typeof detail === 'object' && 'msg' in (detail as Record<string, unknown>)) {
+    const msg = (detail as { msg?: unknown }).msg;
+    return typeof msg === 'string' ? msg : null;
+  }
+  return null;
+}
+
 // ===== メインAPIクラス =====
 class CompleteTravelAPI {
   private client: AxiosInstance;
@@ -926,9 +960,12 @@ class CompleteTravelAPI {
         default:
           if (error.response?.data && typeof error.response.data === 'object') {
             const apiError = error.response.data as any;
-            if (apiError.message) message = apiError.message;
-            else if (apiError.detail) message = apiError.detail;
-            else if (apiError.error?.message) message = apiError.error.message;
+            if (typeof apiError.message === 'string') message = apiError.message;
+            else {
+              const detailMessage = extractApiErrorDetailMessage(apiError.detail);
+              if (detailMessage) message = detailMessage;
+              else if (typeof apiError.error?.message === 'string') message = apiError.error.message;
+            }
           }
       }
     } else if (error.code === 'NETWORK_ERROR' || error.code === 'ERR_NETWORK') {

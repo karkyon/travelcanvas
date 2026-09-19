@@ -10,7 +10,7 @@
  * 含まれないことを保証する回帰テストである。
  */
 import { describe, it, expect } from 'vitest';
-import { api, resolveDownloadUrl } from './api';
+import { api, resolveDownloadUrl, extractApiErrorDetailMessage } from './api';
 
 describe('planToApi', () => {
   it('never emits an itinerary key, even when days is present', () => {
@@ -206,5 +206,47 @@ describe('Document upload/download API client', () => {
   it('resolveDownloadUrl combines the backend origin with the relative url', () => {
     const resolved = resolveDownloadUrl('/api/v1/plans/documents/download?token=abc');
     expect(resolved).toMatch(/^https?:\/\/.+\/api\/v1\/plans\/documents\/download\?token=abc$/);
+  });
+});
+
+// [Gate M10-R2 P1] handleApiError()のdefault caseがFastAPI標準の
+// RequestValidationError(422、detailが{type,loc,msg,input,ctx,url}形状の
+// オブジェクト配列)をそのままtoast.error()へ渡し、react-hot-toastが
+// それをReact子要素としてレンダーしようとしてアプリ全体がクラッシュ
+// した(React最小化エラー#31)。extractApiErrorDetailMessage()は必ず
+// 文字列かnullを返すことを固定する回帰テスト。
+describe('extractApiErrorDetailMessage', () => {
+  it('returns a plain string detail unchanged', () => {
+    expect(extractApiErrorDetailMessage('権限がありません')).toBe('権限がありません');
+  });
+
+  it('extracts msg fields from a FastAPI validation-error array and joins them', () => {
+    const detail = [
+      { type: 'uuid_parsing', loc: ['path', 'plan_id'], msg: 'Input should be a valid UUID', input: 'invitations', ctx: {}, url: 'https://errors.pydantic.dev' },
+    ];
+    const result = extractApiErrorDetailMessage(detail);
+    expect(typeof result).toBe('string');
+    expect(result).toBe('Input should be a valid UUID');
+  });
+
+  it('joins multiple validation-error items into one string', () => {
+    const detail = [
+      { type: 'missing', loc: ['body', 'email'], msg: 'Field required', input: {}, ctx: {}, url: '' },
+      { type: 'missing', loc: ['body', 'password'], msg: 'Field required', input: {}, ctx: {}, url: '' },
+    ];
+    const result = extractApiErrorDetailMessage(detail);
+    expect(typeof result).toBe('string');
+    expect(result).toBe('Field required / Field required');
+  });
+
+  it('returns null for null/undefined detail', () => {
+    expect(extractApiErrorDetailMessage(null)).toBeNull();
+    expect(extractApiErrorDetailMessage(undefined)).toBeNull();
+  });
+
+  it('returns null rather than a raw object/array for unrecognized shapes', () => {
+    expect(extractApiErrorDetailMessage([{ unexpected: 'shape' }])).toBeNull();
+    expect(extractApiErrorDetailMessage({ unexpected: 'shape' })).toBeNull();
+    expect(extractApiErrorDetailMessage(42)).toBeNull();
   });
 });

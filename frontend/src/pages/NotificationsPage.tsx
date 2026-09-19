@@ -140,33 +140,46 @@ const NotificationsPage: React.FC = () => {
           </h2>
           <div className="space-y-2">
             {invitations.map((inv) => (
-              <Card key={inv.id} className="p-4">
-                <p className="font-medium text-gray-900">
-                  「{inv.plan_title || '旅行プラン'}」への招待
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  権限: {inv.role === 'editor' ? '編集可能' : '閲覧のみ'}
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    size="sm"
-                    onClick={() => handleAcceptInvitation(inv.id)}
-                    disabled={decidingId === inv.id}
-                  >
-                    <Check size={14} className="mr-1" />
-                    承諾する
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeclineInvitation(inv.id)}
-                    disabled={decidingId === inv.id}
-                  >
-                    <X size={14} className="mr-1" />
-                    辞退する
-                  </Button>
-                </div>
-              </Card>
+              // [Gate M10-R2 P1] 通常の通知一覧(下部の「通知」セクション)にも
+              // 同じplan.titleを含む文言(「{title}」に招待されました)が
+              // 別のNotificationレコードとして表示され得るため、単純な
+              // テキスト部分一致(hasText)だけではE2E側がどちらのカードか
+              // 一意に識別できない(実際にE2Eがこの曖昧さにより誤って通知
+              // カード側にマッチし、存在しない「承諾する」ボタンを
+              // クリックしようとして120秒タイムアウトする事象が発生した)。
+              // Cardコンポーネント自体は任意のHTML属性を転送しない作りの
+              // ため(CardProps側の変更は影響範囲が広く本修正の対象外と
+              // する)、薄いラップ用divにdata-testidを付与し、E2E側が
+              // 確実に「保留中の招待」カードだけを選択できるようにする。
+              <div key={inv.id} data-testid="pending-invitation-card">
+                <Card className="p-4">
+                  <p className="font-medium text-gray-900">
+                    「{inv.plan_title || '旅行プラン'}」への招待
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    権限: {inv.role === 'editor' ? '編集可能' : '閲覧のみ'}
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      onClick={() => handleAcceptInvitation(inv.id)}
+                      disabled={decidingId === inv.id}
+                    >
+                      <Check size={14} className="mr-1" />
+                      承諾する
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeclineInvitation(inv.id)}
+                      disabled={decidingId === inv.id}
+                    >
+                      <X size={14} className="mr-1" />
+                      辞退する
+                    </Button>
+                  </div>
+                </Card>
+              </div>
             ))}
           </div>
         </div>

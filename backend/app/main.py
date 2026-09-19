@@ -302,6 +302,24 @@ logger.info("Auth routes loaded successfully")
 logger.info("TravelCanvas API - Ready to start")
 
 app.include_router(spots.router, prefix="/api/v1")
+# [Gate M10-R2 P1] travel.router(GET /travel-plans/{plan_id}、plan_id:
+# uuid.UUID)とshare.router(同じ/travel-plans prefix配下に固定文字列route
+# GET /travel-plans/invitations等を持つ)は、共にprefix="/travel-plans"を
+# 共有している。FastAPI/Starletteはrouteを登録順に評価するため、
+# travel.routerを先に登録すると、"/travel-plans/invitations"へのGETが
+# share.routerの専用route(list_my_invitations)まで到達する前に
+# travel.routerの"/{plan_id}"へ"invitations"という文字列がplan_idとして
+# 束縛される形でマッチしてしまい、uuid.UUIDへの変換に失敗して422
+# (FastAPI標準のRequestValidationError)になっていた。この422は
+# frontend側のhandleApiError()がdetail配列をそのままtoast.error()へ
+# 渡してReactをクラッシュさせる別バグ(同Gateで別途修正)と重なり、
+# 「招待の一覧取得に失敗し、画面全体がクラッシュする」形で顕在化して
+# いた。固定文字列routeを持つshare.routerを、可変routeの travel.router
+# より先に登録することで、"/travel-plans/invitations"が正しく
+# share.router側にマッチするようにする(share.routerの他のrouteは全て
+# "/{plan_id}/share"等、plan_idの後に固定文字列が続く形のみでtravel.router
+# の"/{plan_id}"単体routeとは衝突しないため、この並び替えは安全)。
+app.include_router(share.router, prefix="/api/v1")
 app.include_router(travel.router, prefix="/api/v1")
 # [Gate #23] ai.pyはこれまでファイルは存在するがinclude_routerされておらず、
 # /optimize-route・/optimization/*系エンドポイントが実際には一切到達不能だった。
@@ -309,8 +327,6 @@ app.include_router(travel.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 # [Gate #24] admin.pyも同様にinclude_routerされておらず、/admin/*は一切到達不能だった。
 app.include_router(admin.router, prefix="/api/v1")
-# [Gate #25] share.pyも新規実装。プラン共有・コラボレーター機能のエンドポイント。
-app.include_router(share.router, prefix="/api/v1")
 # [Gate #30] 認証不要の共有トークン解決API。share.router(owner専用管理API)
 # とはpath prefixレベルで完全に分離している(/public/share vs /travel-plans)。
 app.include_router(public_share.router, prefix="/api/v1")
