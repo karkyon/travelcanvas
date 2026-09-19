@@ -180,7 +180,11 @@ describe('Document upload/download API client', () => {
     const mockPost = async (url: string, data: any, config: any) => {
       expect(url).toBe('/plans/plan-1/documents/upload');
       expect(data).toBeInstanceOf(FormData);
-      expect(config.headers['Content-Type']).toBe('multipart/form-data');
+      // [Gate M10 バグA修正] 'multipart/form-data' をboundary無しで明示指定
+      // するとbackend側でmultipartとして正しくパースできないため、
+      // Content-Typeはundefinedを指定し、axiosがFormDataから自動生成する
+      // boundary付きのContent-Typeに委ねる仕様とした。
+      expect(config.headers['Content-Type']).toBeUndefined();
       return { data: { id: 'doc-1', original_filename: 'receipt.pdf' } };
     };
     (api as any).client = { post: mockPost };

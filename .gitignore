@@ -187,6 +187,16 @@ apply_gate[0-9]*.py
 # Vitest/Playwright report output (regenerated on every test run)
 frontend/test-results/
 test-results/
+frontend/playwright-report/
+playwright-report/
+
+# [Gate M10 v17-v23] 検証・診断用スクリプト(verify_gate_*.py等)が
+# worktreeのdirty-checkを誤検知させた事故の再発防止
+verify_gate_*.py
+check_gate_*.py
+diagnose_gate_*.py
+debug_gate_*.py
+inspect_gate_*.py
 
 # Gate patch検証用に一時展開される依存キャッシュ (pip install --target)
 backend/.gate*_deps-py*/

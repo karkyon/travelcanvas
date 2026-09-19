@@ -1644,9 +1644,15 @@ class CompleteTravelAPI {
     formData.append('file', file);
     formData.append('classification', classification);
     if (documentType) formData.append('document_type', documentType);
+    // [Gate M10 バグA修正] 'multipart/form-data' を明示指定するとboundary
+    // パラメータが付与されないため、backend側でmultipartとして正しく
+    // パースできない(FastAPI/Starlette側はboundary無しのContent-Typeを
+    // multipart/form-dataと認識できず、リクエストパース自体に失敗する)。
+    // `Content-Type: undefined` を指定することで、axiosがFormDataを
+    // 検出しboundary付きのContent-Typeを自動生成する経路に委ねる。
     const response = await this.client.post<TravelDocument>(
       `/plans/${planId}/documents/upload`, formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      { headers: { 'Content-Type': undefined } }
     );
     return response.data;
   }

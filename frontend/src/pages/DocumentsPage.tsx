@@ -121,7 +121,28 @@ const DocumentsPage: React.FC = () => {
     setError(null);
     try {
       const { url } = await getDocumentDownloadUrl(planId, doc.id);
-      window.open(resolveDownloadUrl(url), '_blank', 'noopener,noreferrer');
+      const target = resolveDownloadUrl(url);
+      // [Gate M10 v23] window.open(url, '_blank', 'noopener,noreferrer')で
+      // 新規タブを開く方式は、クリックというユーザー操作からURL取得の
+      // await完了までの非同期な間隔により、Chromiumがユーザー操作起因の
+      // ポップアップと認識できず遷移をサイレントにブロックする現象が
+      // 実機(omega-dev2)で確認された(タブ自体は生成されるが
+      // about:blankのまま固まり、エラーも例外も発生しないため検出が
+      // 困難だった。v22で「クリック直後に同期的に空タブを開き後から
+      // locationを書き換える」方式に修正したが、それでも同一の症状が
+      // 再現したため、ポップアップ/新規タブを一切使わない方式に変更する)。
+      // backend側は既にContent-Disposition: attachmentを付与している
+      // (Gate M7)ため、非表示の<a>要素をクリックするだけで現在のタブの
+      // まま直接ダウンロードがトリガーされ、実際のページ遷移は発生しない
+      // (Content-Dispositionによりブラウザがナビゲーションをダウンロード
+      // へ差し替えるため)。ポップアップブロッカーの対象にもならない。
+      const link = document.createElement('a');
+      link.href = target;
+      link.rel = 'noreferrer';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : detail?.message || 'ダウンロードURLの取得に失敗しました');
