@@ -115,8 +115,8 @@ const RouteOptionsPage: React.FC = () => {
       if (planDetail.success && planDetail.data) {
         setDays(planDetail.data.days ?? []);
       }
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '経路候補一覧の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '経路候補一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -148,9 +148,9 @@ const RouteOptionsPage: React.FC = () => {
       await createRouteOption(planId, formToPayload(form), generateIdempotencyKey());
       setIsFormOpen(false);
       await loadAll();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setFormError(typeof detail === 'string' ? detail : detail?.message || '保存に失敗しました');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setFormError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || '保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -162,8 +162,8 @@ const RouteOptionsPage: React.FC = () => {
     try {
       await deleteRouteOption(planId, option.id, option.revision);
       await loadAll();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '削除に失敗しました');
     }
   };
 
@@ -172,9 +172,9 @@ const RouteOptionsPage: React.FC = () => {
     try {
       await adoptRouteOption(planId, option.id, option.revision);
       await loadAll();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : detail?.message || '採用に失敗しました');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || '採用に失敗しました');
     }
   };
 

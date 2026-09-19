@@ -3,14 +3,14 @@
  * キーワード、地図、画像からスポットを登録
  */
 import React, { useState, useEffect } from 'react';
-import { spotApiService, SpotData } from '../services/spotApi';
+import { spotApiService, SpotData, SpotResponse } from '../services/spotApi';
 import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
 import { useToast } from './common/Toast';
 
 interface SpotRegistrationProps {
-  onSpotCreated?: (spot: any) => void;
+  onSpotCreated?: (spot: SpotResponse) => void;
   onClose?: () => void;
 }
 

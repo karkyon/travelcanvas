@@ -28,6 +28,18 @@ interface SearchResult {
   popularity_score?: number;
 }
 
+// [Gate M9-FE-B1] searchSpots(テキスト検索)はsearch_metadataの全フィールドを
+// 返すが、searchByImage/searchByVoice(services/api.tsのUnavailableSearchResult、
+// 未実装のためsearch_metadataは常にundefined)とも共用するstateのため、
+// 画面が実際に参照する3フィールドのみを全てoptionalとして定義する。
+// confidenceは元々どの検索結果にも実在しないフィールドで、以前から
+// 常にundefinedのまま(実害なし)だった挙動を維持する。
+interface SearchMetadataDisplay {
+  search_type?: string;
+  ranking_factors?: string[];
+  confidence?: number;
+}
+
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchType, setSearchType] = useState<'text' | 'image' | 'voice'>('text');
@@ -35,7 +47,7 @@ const SearchPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [searchMetadata, setSearchMetadata] = useState<any>(null);
+  const [searchMetadata, setSearchMetadata] = useState<SearchMetadataDisplay | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   // [Gate #22] SearchSettingsPage.tsx(/search/settings)で保存した検索設定
@@ -102,7 +114,7 @@ const SearchPage: React.FC = () => {
       
       if (response.success && response.data?.spots) {
         setSearchResults(response.data.spots);
-        setSearchMetadata(response.data.search_metadata || null);
+        setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
         toast.success(`AI分析により${response.data.spots.length}件の最適なスポットを発見！`);
       } else {
         setSearchResults([]);
@@ -144,7 +156,7 @@ const SearchPage: React.FC = () => {
       
       if (response.success && response.data?.spots) {
         setSearchResults(response.data.spots);
-        setSearchMetadata(response.data.search_metadata || null);
+        setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
         
         if (response.data.image_analysis) {
           const analysis = response.data.image_analysis;
@@ -283,7 +295,7 @@ const SearchPage: React.FC = () => {
         }
         if (response.data.spots) {
           setSearchResults(response.data.spots);
-          setSearchMetadata(response.data.search_metadata || null);
+          setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
           toast.success(`音声認識成功: "${response.data.transcribed_text}" → ${response.data.spots.length}件のスポットを発見！`);
         } else {
           setSearchResults([]);

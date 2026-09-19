@@ -32,8 +32,8 @@ const PublicSharePage: React.FC = () => {
       const response = await resolvePublicShare(token, withPasscode);
       setPlan(response.data);
       setState('ok');
-    } catch (error: any) {
-      const status = error?.response?.status;
+    } catch (error) {
+      const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
       if (status === 401) {
         setState('needs_passcode');
         if (withPasscode) {

@@ -33,7 +33,7 @@ interface ScheduleItemProps {
     website?: string;
     phone?: string;
   };
-  onUpdate?: (id: string, data: any) => void;
+  onUpdate?: (id: string, data: { title: string; startTime: string; endTime: string; notes: string }) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onShare?: (id: string) => void;
@@ -73,6 +73,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   dragRef,
   style
 }) => {
+  void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({

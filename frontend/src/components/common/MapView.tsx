@@ -37,6 +37,57 @@ interface MapViewProps {
   className?: string;
 }
 
+// [Gate M9-FE-B1] @types/google.mapsを新規依存として追加せず、本ファイルが
+// 実際に使用するGoogle Maps JavaScript APIの表面のみを最小限に型付けする。
+interface GoogleLatLngBounds {
+  extend: (latLng: unknown) => void;
+}
+
+interface GoogleMapInstance {
+  setMapTypeId: (id: string) => void;
+  setCenter: (center: { lat: number; lng: number }) => void;
+  setZoom: (zoom: number) => void;
+  fitBounds: (bounds: GoogleLatLngBounds) => void;
+}
+
+interface GoogleMarkerInstance {
+  addListener: (event: string, handler: () => void) => void;
+}
+
+interface GoogleInfoWindowInstance {
+  open: (map: GoogleMapInstance, marker: GoogleMarkerInstance) => void;
+}
+
+interface GoogleDirectionsRendererInstance {
+  setMap: (map: GoogleMapInstance) => void;
+  setDirections: (result: unknown) => void;
+}
+
+interface GoogleDirectionsServiceInstance {
+  route: (
+    request: Record<string, unknown>,
+    callback: (result: unknown, status: string) => void
+  ) => void;
+}
+
+interface GoogleMapsNamespace {
+  Map: new (el: HTMLElement, opts: Record<string, unknown>) => GoogleMapInstance;
+  Marker: new (opts: Record<string, unknown>) => GoogleMarkerInstance;
+  InfoWindow: new (opts: Record<string, unknown>) => GoogleInfoWindowInstance;
+  LatLngBounds: new () => GoogleLatLngBounds;
+  LatLng: new (lat: number, lng: number) => unknown;
+  DirectionsService: new () => GoogleDirectionsServiceInstance;
+  DirectionsRenderer: new (opts: Record<string, unknown>) => GoogleDirectionsRendererInstance;
+  SymbolPath: { CIRCLE: unknown };
+  TravelMode: { TRANSIT: unknown };
+}
+
+declare global {
+  interface Window {
+    google?: { maps: GoogleMapsNamespace };
+  }
+}
+
 // Google Maps が利用できない場合のダミーマップコンポーネント
 const DummyMap: React.FC<{
   locations: MapLocation[];
@@ -92,8 +143,9 @@ const MapView: React.FC<MapViewProps> = ({
   onRouteClick: _onRouteClick,
   className = ''
 }) => {
+  void _onRouteClick;
   const mapRef = useRef<HTMLDivElement>(null);
-  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [mapInstance, setMapInstance] = useState<GoogleMapInstance | null>(null);
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
   const [showOptimizedRoute, setShowOptimizedRoute] = useState(true);
   const [currentView, setCurrentView] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap');
@@ -102,7 +154,7 @@ const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     const initGoogleMaps = () => {
       // Google Maps API が利用可能かチェック
-      if (typeof window !== 'undefined' && (window as any).google?.maps) {
+      if (typeof window !== 'undefined' && window.google?.maps) {
         setIsGoogleMapsLoaded(true);
         return;
       }
@@ -124,8 +176,8 @@ const MapView: React.FC<MapViewProps> = ({
   // マップの初期化
   useEffect(() => {
     if (isGoogleMapsLoaded && mapRef.current && !mapInstance) {
-      const google = (window as any).google;
-      
+      const google = window.google!;
+
       const center = centerLocation || (locations.length > 0 ? {
         lat: locations[0]!.latitude,
         lng: locations[0]!.longitude
@@ -156,7 +208,7 @@ const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     if (!mapInstance || !isGoogleMapsLoaded) return;
 
-    const google = (window as any).google;
+    const google = window.google!;
 
     // 既存のマーカーとルートをクリア
     // （実際の実装では、マーカーとルートの参照を保持して削除）
@@ -240,7 +292,7 @@ const MapView: React.FC<MapViewProps> = ({
           optimizeWaypoints: true
         };
 
-        directionsService.route(request, (result: any, status: any) => {
+        directionsService.route(request, (result: unknown, status: string) => {
           if (status === 'OK') {
             directionsRenderer.setDirections(result);
           }
@@ -258,7 +310,7 @@ const MapView: React.FC<MapViewProps> = ({
 
   const handleResetView = () => {
     if (mapInstance && locations.length > 0) {
-      const google = (window as any).google;
+      const google = window.google!;
       if (locations.length === 1) {
         mapInstance.setCenter({
           lat: locations[0]!.latitude,

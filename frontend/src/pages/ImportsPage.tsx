@@ -102,8 +102,8 @@ const ImportsPage: React.FC = () => {
     try {
       const data = await getImportJobs(planId);
       setJobs(data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '取込ジョブ一覧の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '取込ジョブ一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -119,8 +119,8 @@ const ImportsPage: React.FC = () => {
     try {
       const detail = await getImportJob(planId, job.id);
       setSelected(detail);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'ジョブ詳細の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブ詳細の取得に失敗しました');
     } finally {
       setIsDetailLoading(false);
     }
@@ -148,8 +148,8 @@ const ImportsPage: React.FC = () => {
       setIsCreateOpen(false);
       setConsentGiven(false);
       await loadJobs();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'ジョブの作成に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの作成に失敗しました');
     } finally {
       setIsCreating(false);
     }
@@ -166,8 +166,8 @@ const ImportsPage: React.FC = () => {
       });
       setNewValue('');
       await refreshDetail();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '候補の追加に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の追加に失敗しました');
     } finally {
       setIsAddingCandidate(false);
     }
@@ -178,8 +178,8 @@ const ImportsPage: React.FC = () => {
     try {
       await acceptExtractionCandidate(planId, selected.id, candidateId);
       await refreshDetail();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '候補の承認に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の承認に失敗しました');
     }
   };
 
@@ -188,8 +188,8 @@ const ImportsPage: React.FC = () => {
     try {
       await rejectExtractionCandidate(planId, selected.id, candidateId);
       await refreshDetail();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '候補の却下に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の却下に失敗しました');
     }
   };
 
@@ -204,8 +204,8 @@ const ImportsPage: React.FC = () => {
       if (updated.result_reservation_id) {
         navigate(`/planner/${planId}/reservations`);
       }
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'ジョブの確定に失敗しました(acceptされた候補にtypeが必要です)');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの確定に失敗しました(acceptされた候補にtypeが必要です)');
     } finally {
       setIsConfirming(false);
     }
@@ -218,8 +218,8 @@ const ImportsPage: React.FC = () => {
       await rejectImportJob(planId, selected.id);
       await loadJobs();
       closeDetail();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'ジョブの却下に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの却下に失敗しました');
     }
   };
 

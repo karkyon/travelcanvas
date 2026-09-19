@@ -407,6 +407,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   updatePlan: async (planId: string, planData: Partial<TravelPlan>) => {
     try {
       const { days: _days, revision: _revision, ...metaOnly } = planData;
+      void _days;
+      void _revision;
       const response = await apiService.updatePlan(planId, metaOnly);
 
       if (response.success && response.data) {
@@ -816,7 +818,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       await get().loadPlan(state.currentPlan.id);
     } catch (error) {
       console.error('Undo error:', error);
-      const status = (error as any)?.response?.status;
+      const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
       if (status === 404) {
         toast.error('取り消せる変更がありません');
       } else if (status === 409) {
@@ -832,7 +834,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // それ以外のエラーは通常のエラートーストのみ表示する。呼び出し元は
   // 呼ぶ前に楽観的更新のロールバックを済ませておくこと。
   _reconcileOnConflict: async (error: unknown, planId: string) => {
-    const status = (error as any)?.response?.status;
+    const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
     if (status === 409) {
       toast.error('他のユーザーまたは別の操作と競合しました。最新の内容を再読み込みしました。');
       await get().loadPlan(planId);

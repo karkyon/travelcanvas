@@ -54,8 +54,21 @@ vi.mock('react-hot-toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockedApi = apiService as unknown as Record<string, any>;
-const mockedTravelApi = travelAPI as unknown as Record<string, any>;
+interface MockedApiMethods {
+  getPlan: ReturnType<typeof vi.fn>;
+  getPlanDetail: ReturnType<typeof vi.fn>;
+  createEvent: ReturnType<typeof vi.fn>;
+  updateEvent: ReturnType<typeof vi.fn>;
+  moveEvent: ReturnType<typeof vi.fn>;
+  undoLastPlanChange: ReturnType<typeof vi.fn>;
+}
+
+interface MockedTravelApiMethods {
+  promoteQuickDraft: ReturnType<typeof vi.fn>;
+}
+
+const mockedApi = apiService as unknown as MockedApiMethods;
+const mockedTravelApi = travelAPI as unknown as MockedTravelApiMethods;
 const mockedCreateQuickDraft = createQuickDraft as unknown as ReturnType<typeof vi.fn>;
 const mockedGetStoredDeviceToken = getStoredDeviceToken as unknown as ReturnType<typeof vi.fn>;
 
@@ -91,7 +104,7 @@ describe('loadPlan', () => {
 });
 
 describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
-  function mockDraftAndPromote(title: string, opts?: { events?: any[] }) {
+  function mockDraftAndPromote(title: string, opts?: { events?: Record<string, unknown>[] }) {
     mockedGetStoredDeviceToken.mockReturnValue('stored-device-token');
     mockedCreateQuickDraft.mockResolvedValue({
       id: 'draft-1',

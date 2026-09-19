@@ -319,19 +319,24 @@ export const formatUserType = (userType: string): string => {
 };
 
 // エラーメッセージフォーマット
-export const formatErrorMessage = (error: any): string => {
+export const formatErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
     return error;
   }
-  
-  if (error?.response?.data?.error?.message) {
-    return error.response.data.error.message;
+
+  const err = error as
+    | { response?: { data?: { error?: { message?: string } } }; message?: string }
+    | null
+    | undefined;
+
+  if (err?.response?.data?.error?.message) {
+    return err.response.data.error.message;
   }
-  
-  if (error?.message) {
-    return error.message;
+
+  if (err?.message) {
+    return err.message;
   }
-  
+
   return '予期しないエラーが発生しました';
 };
 

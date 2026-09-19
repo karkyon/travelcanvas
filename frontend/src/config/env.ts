@@ -115,7 +115,7 @@ function validateEnvironment(): EnvironmentConfig {
     
     // 開発・デバッグ設定
     DEBUG: toBool(import.meta.env.VITE_DEBUG, import.meta.env.DEV),
-    LOG_LEVEL: (import.meta.env.VITE_LOG_LEVEL as any) || (import.meta.env.DEV ? 'debug' : 'warn'),
+    LOG_LEVEL: (import.meta.env.VITE_LOG_LEVEL as EnvironmentConfig['LOG_LEVEL']) || (import.meta.env.DEV ? 'debug' : 'warn'),
     MOCK_API: toBool(import.meta.env.VITE_MOCK_API, false),
     
     // パフォーマンス設定

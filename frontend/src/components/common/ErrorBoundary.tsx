@@ -373,7 +373,8 @@ export function withErrorBoundary<P extends object>(
  * useErrorHandler Hook - 手動でエラーをエラーバウンダリに送信
  */
 export function useErrorHandler() {
-  return React.useCallback((error: Error, _errorInfo?: any) => {
+  return React.useCallback((error: Error, _errorInfo?: unknown) => {
+    void _errorInfo;
     // エラーをthrowしてエラーバウンダリに捕捉させる
     setTimeout(() => {
       throw error;

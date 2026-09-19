@@ -61,8 +61,9 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
       await apiService.applyOptimizationProposal(plan.id, day.id, proposal.proposed_order, proposal.base_revision);
       await usePlanStore.getState().loadPlan(plan.id);
       setProposal(null);
-    } catch (e: any) {
-      if (e?.response?.status === 409) {
+    } catch (e) {
+      const status = (e as { response?: { status?: number } } | null | undefined)?.response?.status;
+      if (status === 409) {
         setError('他の変更と競合しました。もう一度提案を取得し直してください。');
       } else {
         setError('適用に失敗しました');

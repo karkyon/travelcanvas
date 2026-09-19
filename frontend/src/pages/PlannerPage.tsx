@@ -27,7 +27,7 @@ import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
-import type { ScheduleItem as ScheduleItemType } from '@/types';
+import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
@@ -220,7 +220,7 @@ const PlannerPage: React.FC = () => {
       await usePlanStore.getState().addScheduleItem(0, {
         title: incomingSpot.name,
         description: incomingSpot.description,
-        category: (incomingSpot.category as any) || 'sightseeing',
+        category: (incomingSpot.category as EventCategory) || 'sightseeing',
         location_name: incomingSpot.name,
         address: incomingSpot.address || incomingSpot.location?.address,
         latitude: incomingSpot.location?.latitude,

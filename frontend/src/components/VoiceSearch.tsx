@@ -4,10 +4,14 @@ import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
 import { LoadingSpinner } from './common/LoadingSpinner';
-import type { VoiceSearchResult } from '../types';
+import type { VoiceSearchResult, Spot } from '../types';
+
+interface WebkitWindow {
+  webkitAudioContext?: typeof AudioContext;
+}
 
 interface VoiceSearchProps {
-  onSpotSelect?: (spot: any) => void;
+  onSpotSelect?: (spot: Spot) => void;
   onResultsChange?: (results: VoiceSearchResult) => void;
   className?: string;
 }
@@ -34,7 +38,7 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
 
   // 音声レベル測定の開始
   const startAudioLevelMonitoring = useCallback((stream: MediaStream) => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = new (window.AudioContext || (window as unknown as WebkitWindow).webkitAudioContext)();
     const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
     

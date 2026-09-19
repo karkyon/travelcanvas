@@ -511,7 +511,7 @@ export const REGEX_PATTERNS = {
   USERNAME: VALIDATION_RULES.USERNAME.PATTERN,
   PASSWORD_STRENGTH: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/,
   PHONE_NUMBER: /^\+?[1-9]\d{1,14}$/,
-  URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
+  URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/,
   JAPANESE_POSTAL_CODE: /^\d{3}-\d{4}$/,
   LATITUDE: /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)$/,
   LONGITUDE: /^[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/

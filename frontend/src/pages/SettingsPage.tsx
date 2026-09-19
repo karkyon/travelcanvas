@@ -18,7 +18,7 @@ interface SettingsTab {
   id: string;
   name: string;
   icon: React.ReactNode;
-  component: React.ComponentType<any>;
+  component: React.ComponentType;
 }
 
 const SettingsPage: React.FC = () => {
@@ -64,19 +64,22 @@ const SettingsPage: React.FC = () => {
     (async () => {
       try {
         const response = await apiService.getCurrentUser();
-        const saved = response.data?.preferences as Record<string, any> | undefined;
+        const saved = response.data?.preferences as Record<string, unknown> | undefined;
         if (saved) {
           if (saved.full_name || saved.bio) {
             setProfileData((prev) => ({
               ...prev,
-              full_name: saved.full_name ?? prev.full_name,
-              bio: saved.bio ?? prev.bio,
+              full_name: (saved.full_name as string | undefined) ?? prev.full_name,
+              bio: (saved.bio as string | undefined) ?? prev.bio,
             }));
           }
           if (saved.notification_settings) {
-            setNotificationSettings((prev) => ({ ...prev, ...saved.notification_settings }));
+            setNotificationSettings((prev) => ({ ...prev, ...(saved.notification_settings as Record<string, unknown>) }));
           }
           const { full_name, bio, notification_settings, ...rest } = saved;
+          void full_name;
+          void bio;
+          void notification_settings;
           if (Object.keys(rest).length > 0) {
             setPreferences((prev) => ({ ...prev, ...rest }));
           }

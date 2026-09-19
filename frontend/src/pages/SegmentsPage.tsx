@@ -221,8 +221,8 @@ const SegmentsPage: React.FC = () => {
       } else {
         setPlaces({});
       }
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '移動区間一覧の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '移動区間一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -287,9 +287,9 @@ const SegmentsPage: React.FC = () => {
       }
       setIsFormOpen(false);
       await loadAll();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setFormError(typeof detail === 'string' ? detail : detail?.message || '保存に失敗しました');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setFormError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || '保存に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -301,8 +301,8 @@ const SegmentsPage: React.FC = () => {
     try {
       await deleteSegment(planId, segment.id, segment.revision);
       await loadAll();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '削除に失敗しました');
     }
   };
 

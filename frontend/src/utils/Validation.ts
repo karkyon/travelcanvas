@@ -17,7 +17,7 @@ export interface FieldValidationResult {
 }
 
 // 基本的なバリデーション関数
-export const isRequired = (value: any): FieldValidationResult => {
+export const isRequired = (value: unknown): FieldValidationResult => {
   const isValid = value !== null && value !== undefined && String(value).trim() !== '';
   return {
     isValid,

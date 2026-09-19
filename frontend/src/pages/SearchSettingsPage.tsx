@@ -106,7 +106,10 @@ const SearchSettingsPage: React.FC = () => {
   };
 
   // 検索設定の更新
-  const updateSearchSetting = (key: keyof typeof preferences.searchSettings, value: any) => {
+  const updateSearchSetting = <K extends keyof SearchPreferences['searchSettings']>(
+    key: K,
+    value: SearchPreferences['searchSettings'][K]
+  ) => {
     setPreferences(prev => ({
       ...prev,
       searchSettings: {
@@ -117,7 +120,10 @@ const SearchSettingsPage: React.FC = () => {
   };
 
   // エリア設定の更新
-  const updateArea = (field: keyof typeof preferences.preferredArea, value: any) => {
+  const updateArea = <K extends keyof SearchPreferences['preferredArea']>(
+    field: K,
+    value: SearchPreferences['preferredArea'][K]
+  ) => {
     setPreferences(prev => ({
       ...prev,
       preferredArea: {
@@ -349,8 +355,8 @@ const SearchSettingsPage: React.FC = () => {
             <div className="mt-3">
               <strong>重視する要素:</strong>{' '}
               {Object.entries(preferences.interests)
-                .filter(([_, value]) => value >= 7)
-                .map(([key, _]) => interestLabels[key as keyof typeof interestLabels])
+                .filter(([, value]) => value >= 7)
+                .map(([key]) => interestLabels[key as keyof typeof interestLabels])
                 .join(', ') || '特になし'}
             </div>
           </div>

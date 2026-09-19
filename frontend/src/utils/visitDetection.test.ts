@@ -45,12 +45,12 @@ describe('VisitDetector', () => {
   };
 
   let watchCallback: ((pos: GeolocationPosition) => void) | null = null;
-  let mockWatchId = 1;
+  const mockWatchId = 1;
 
   beforeEach(() => {
     watchCallback = null;
     vi.useFakeTimers();
-    (global as any).navigator = {
+    (global as unknown as { navigator: unknown }).navigator = {
       geolocation: {
         watchPosition: vi.fn((success: (pos: GeolocationPosition) => void) => {
           watchCallback = success;
@@ -146,6 +146,6 @@ describe('VisitDetector', () => {
     const detector = new VisitDetector([target], vi.fn());
     detector.start();
     detector.stop();
-    expect((navigator.geolocation as any).clearWatch).toHaveBeenCalledWith(mockWatchId);
+    expect((navigator.geolocation as unknown as { clearWatch: ReturnType<typeof vi.fn> }).clearWatch).toHaveBeenCalledWith(mockWatchId);
   });
 });

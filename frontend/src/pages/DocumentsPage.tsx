@@ -64,8 +64,8 @@ const DocumentsPage: React.FC = () => {
     try {
       const data = await getDocuments(planId);
       setDocuments(data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '文書一覧の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '文書一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -96,9 +96,9 @@ const DocumentsPage: React.FC = () => {
       setIsCreateOpen(false);
       resetCreateForm();
       await loadDocuments();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : detail?.message || 'アップロードに失敗しました');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || 'アップロードに失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -110,8 +110,8 @@ const DocumentsPage: React.FC = () => {
     try {
       await deleteDocument(planId, doc.id, doc.revision);
       await loadDocuments();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '文書の削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '文書の削除に失敗しました');
     }
   };
 
@@ -143,9 +143,9 @@ const DocumentsPage: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : detail?.message || 'ダウンロードURLの取得に失敗しました');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || 'ダウンロードURLの取得に失敗しました');
     } finally {
       setDownloadingId(null);
     }

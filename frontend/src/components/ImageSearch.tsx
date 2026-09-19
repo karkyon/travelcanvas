@@ -3,10 +3,10 @@ import { useSearch } from '../hooks/useSearch';
 import { useToast } from './common/Toast';
 import Button from './common/Button';
 import Card from './common/Card';
-import type { ImageSearchResult } from '../types';
+import type { ImageSearchResult, Spot } from '../types';
 
 interface ImageSearchProps {
-  onSpotSelect?: (spot: any) => void;
+  onSpotSelect?: (spot: Spot) => void;
   onResultsChange?: (results: ImageSearchResult) => void;
   className?: string;
 }

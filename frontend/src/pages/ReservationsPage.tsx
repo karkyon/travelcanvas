@@ -184,8 +184,8 @@ const ReservationsPage: React.FC = () => {
     try {
       const data = await getReservations(planId);
       setReservations(data);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '予約一覧の取得に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約一覧の取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -276,8 +276,8 @@ const ReservationsPage: React.FC = () => {
       setIsCreateOpen(false);
       setCreateForm(EMPTY_FORM);
       await loadReservations();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '予約の作成に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約の作成に失敗しました');
     } finally {
       setIsSaving(false);
     }
@@ -290,8 +290,8 @@ const ReservationsPage: React.FC = () => {
       await deleteReservation(planId, reservation.id, reservation.revision);
       if (selected?.id === reservation.id) closeDetail();
       await loadReservations();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '予約の削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約の削除に失敗しました');
     }
   };
 
@@ -301,8 +301,8 @@ const ReservationsPage: React.FC = () => {
     try {
       const result = await revealReservation(planId, selected.id);
       setRevealed({ confirmation_number: result.confirmation_number, pin: result.pin });
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '予約番号の開示に失敗しました(権限が必要です)');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約番号の開示に失敗しました(権限が必要です)');
     } finally {
       setIsRevealing(false);
     }
@@ -319,8 +319,8 @@ const ReservationsPage: React.FC = () => {
       setNewParticipantName('');
       setNewParticipantSeat('');
       await loadParticipants(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '参加者の追加に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '参加者の追加に失敗しました');
     }
   };
 
@@ -329,8 +329,8 @@ const ReservationsPage: React.FC = () => {
     try {
       await deleteReservationParticipant(planId, selected.id, participant.id);
       await loadParticipants(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '参加者の削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '参加者の削除に失敗しました');
     }
   };
 
@@ -349,8 +349,8 @@ const ReservationsPage: React.FC = () => {
       setNewLinkRelationType('required');
       setIsAddLinkOpen(false);
       await loadEventLinks(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'イベント紐付けの追加に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの追加に失敗しました');
     } finally {
       setIsAddingLink(false);
     }
@@ -361,8 +361,8 @@ const ReservationsPage: React.FC = () => {
     try {
       await updateReservationEventLink(planId, selected.id, link.id, { is_locked: !link.is_locked });
       await loadEventLinks(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'イベント紐付けの更新に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの更新に失敗しました');
     }
   };
 
@@ -371,8 +371,8 @@ const ReservationsPage: React.FC = () => {
     try {
       await deleteReservationEventLink(planId, selected.id, link.id);
       await loadEventLinks(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'イベント紐付けの解除に失敗しました(ロック中の可能性があります)');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの解除に失敗しました(ロック中の可能性があります)');
     }
   };
 
@@ -410,8 +410,8 @@ const ReservationsPage: React.FC = () => {
       setNewTicketBarcodeFormat('');
       setIsAddTicketOpen(false);
       await loadTickets(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'チケットの追加に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの追加に失敗しました');
     } finally {
       setIsAddingTicket(false);
     }
@@ -423,8 +423,8 @@ const ReservationsPage: React.FC = () => {
     try {
       await deleteTicket(planId, selected.id, ticket.id, ticket.revision);
       await loadTickets(selected);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'チケットの削除に失敗しました');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの削除に失敗しました');
     }
   };
 
@@ -433,8 +433,8 @@ const ReservationsPage: React.FC = () => {
     try {
       const result = await revealTicket(planId, selected.id, ticket.id);
       setRevealedTickets((prev) => ({ ...prev, [ticket.id]: result.payload }));
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'チケットの表示に失敗しました(権限が必要な場合があります)');
+    } catch (e) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの表示に失敗しました(権限が必要な場合があります)');
     }
   };
 
