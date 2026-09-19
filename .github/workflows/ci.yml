@@ -157,6 +157,13 @@ jobs:
           DATABASE_URL=postgresql://travelcanvas_app:ci-only-not-a-real-secret@postgres:5432/travelcanvas
           JWT_SECRET_KEY=ci-only-dummy-jwt-secret-not-used-anywhere-else
           ENCRYPTION_KEY=ci-only-dummy-encryption-key-not-used-anywhere-else
+          # [Gate M10-R1] document-wallet.spec.ts(FR-013)がCIのPlaywright
+          # E2Eに含まれるようになったため、DOCUMENT_DOWNLOAD_SIGNING_KEY
+          # 未設定のままだとダウンロードURL発行が503(DownloadSigningNot
+          # Configured)になりE2Eが失敗する。このジョブの使い捨てスタックに
+          # のみ通用する非秘密な固定値を注入する(本番/開発環境の値とは
+          # 一切関係が無い)。
+          DOCUMENT_DOWNLOAD_SIGNING_KEY=ci-only-dummy-download-signing-key-not-used-anywhere-else
           VITE_API_URL=http://localhost:8001
           EOF
 
