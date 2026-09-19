@@ -67,7 +67,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
   const fetchUserDetails = async (userId: string) => {
     try {
       setLoading(true);
-      const response = await api.get(`/admin/users/${userId}`);
+      const response = await api.get<{ statistics?: UserStatistics }>(`/admin/users/${userId}`);
       setStatistics(response.data.statistics ?? null);
     } catch (error) {
       console.error('Failed to fetch user details:', error);
@@ -289,7 +289,13 @@ const AdminUsers: React.FC = () => {
       if (filters.user_type) params.append('user_type', filters.user_type);
       if (filters.status) params.append('status', filters.status);
 
-      const response = await api.get(`/admin/users?${params.toString()}`);
+      const response = await api.get<{
+        users?: AdminUser[];
+        pagination?: Partial<{
+          page: number; page_size: number; total_count: number;
+          total_pages: number; has_next: boolean; has_prev: boolean;
+        }>;
+      }>(`/admin/users?${params.toString()}`);
       setUsers(response.data.users ?? []);
       setPagination((prev) => ({ ...prev, ...response.data.pagination }));
     } catch (error) {

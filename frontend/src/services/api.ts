@@ -1,8 +1,8 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 import { toast } from 'react-hot-toast';
 
 // ===== 型定義 =====
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data: T;
@@ -15,7 +15,7 @@ export interface ApiResponse<T = any> {
 // [Gate #20] このファイル独自のUser型定義(name/avatar_url等、実バックエンドの
 // Userモデルに存在しないフィールドを含む古い定義)がtypes/index.tsの正規のUser型と
 // 重複していた。正規の型に統一する。
-import type { User } from '@/types';
+import type { User, TravelPlan } from '@/types';
 export type { User };
 
 export interface LoginCredentials {
@@ -715,6 +715,96 @@ export interface TicketRevealResult {
   barcode_format: string | null;
 }
 
+// [Gate M9-FE-A2] handleApiError()のdefault caseが読む可能性のある
+// エラーレスポンス本文の形状。backendは複数の形式(自前のApiResponse形式・
+// FastAPI標準のRequestValidationError形式)を返し得るため、いずれの
+// フィールドも省略可能として扱う。
+interface ApiErrorResponseBody {
+  message?: string;
+  error?: { message?: string };
+  detail?: unknown;
+}
+
+// [Gate M9-FE-A2] POST /search/spots (backend/app/services/search_provider.py)
+// が返す個々の生候補の形状。この関数の中でのみ使う内部形状のため非export。
+interface SearchCandidateRaw {
+  id: string;
+  provider: string;
+  name: string;
+  category?: string;
+  location?: { latitude?: number; longitude?: number; address?: string };
+}
+
+// [Gate M9-FE-A2] searchByImage/searchByVoiceは対応するbackend実装が
+// 存在しないため常に空のspots/total_countのみを返す(架空データは返さない、
+// Gate #31.5B参照)。呼び出し元(hooks/useSearch.tsx・pages/SearchPage.tsx)
+// は将来実装予定だった image_analysis/speech_recognition/search_metadata/
+// transcribed_text 系のフィールドにoptional chainingで触れているが、
+// これらは現状のbackendから一切返らないため常にundefinedのままで、
+// 挙動は本Gate前後で変化しない。呼び出し元の当該コードパス自体の要否は
+// 別Gateで再監査する。
+export interface UnavailableSearchResult {
+  spots: SpotResult[];
+  total_count: number;
+  error_code: string;
+  search_metadata?: Record<string, unknown>;
+  image_analysis?: {
+    detected_objects?: string[];
+    overall_confidence?: number;
+  };
+  transcribed_text?: string;
+  speech_recognition?: {
+    transcribed_text?: string;
+    confidence?: number;
+    audio_duration?: number;
+  };
+}
+
+// [Gate M9-FE-A2] createSpot()のペイロード形状。travelAPI.createSpot/
+// 便利関数createSpotからも同じ形状を参照する。
+export interface CreateSpotData {
+  name: string;
+  description?: string;
+  category: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  price_range?: string;
+  image_url?: string;
+  is_public?: boolean;
+}
+
+// [Gate M9-FE-A2] searchByVoice()の第2引数の形状。aiAPI.searchByVoice/
+// 便利関数searchByVoiceからも同じ形状を参照する。
+export interface VoiceSearchRequestData {
+  location?: { latitude: number; longitude: number };
+  language?: string;
+  max_results?: number;
+}
+
+// [Gate M9-FE-A2] CompleteTravelAPIが実際に呼び出すHTTPクライアントの
+// 最小限のインターフェース。単体テスト(api.test.ts)が private client を
+// `(api as any).client = {...}` で丸ごと差し替えていたのを、型付きの
+// テスト専用シーム(setHttpClientForTesting、後述)経由に置き換えるために
+// 導入する。メソッドシグネチャ形式(プロパティ形式ではない)で宣言する
+// ことで、テスト側のモック関数がより狭い引数型を持っていても双変性に
+// より代入可能になる(実際のAxiosInstanceの複雑なオーバーロード型と
+// 完全一致するモックを書く必要がない)。
+// [Gate M9-FE-A2] 各メソッドを非ジェネリックにしているのは意図的。ジェネリック
+// (`get<T>(...): Promise<{data: T}>`)にすると、あらゆるTに対応できる関数
+// でなければ代入不能になり、固定の戻り値を返すテスト用モック関数を
+// setHttpClientForTesting()へ渡せなくなる(呼び出し側のthis.client.get<T>(...)
+// 自体は引き続きAxiosInstanceの本来のジェネリックシグネチャを使うため、
+// 本番コードの型安全性はここでは失われない)。
+export interface MinimalHttpClient {
+  get(url: string, config?: AxiosRequestConfig): Promise<{ data: unknown }>;
+  post(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<{ data: unknown }>;
+  put(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<{ data: unknown }>;
+  patch(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<{ data: unknown }>;
+  delete(url: string, config?: AxiosRequestConfig): Promise<{ data: unknown }>;
+  request(config: AxiosRequestConfig): Promise<{ data: unknown }>;
+}
+
 // ===== API設定 =====
 // [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
 // (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
@@ -801,20 +891,30 @@ class CompleteTravelAPI {
   // 注意: /admin/* 系エンドポイントはバックエンド未実装(2026-09-02時点で backend/app/api/ に
   // admin関連ルーターが存在しないことを確認済み)。呼び出し自体はコンパイル可能になるが、
   // 実行時は404になる。管理画面機能を実際に動作させるにはバックエンドAPI実装が別途必要。
-  async get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+  async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     return this.client.get<T>(url, config);
   }
 
-  async post<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+  async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     return this.client.post<T>(url, data, config);
   }
 
-  async put<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+  async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     return this.client.put<T>(url, data, config);
   }
 
-  async delete<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+  async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
     return this.client.delete<T>(url, config);
+  }
+
+  // [Gate M9-FE-A2] テスト専用の型付きシーム。以前は単体テストが
+  // `(api as any).client = {...}` でprivate clientを直接`any`キャストして
+  // 丸ごと差し替えており、モック関数の引数型が一切検査されていなかった。
+  // MinimalHttpClient(の部分集合)という明示的な型を受け取るこの
+  // メソッドを経由させることで、テストダブルの形状をコンパイル時に検証
+  // できるようにする。本番コードから呼ばれることはない。
+  setHttpClientForTesting(client: Partial<MinimalHttpClient>): void {
+    this.client = client as AxiosInstance;
   }
 
   // ===== 初期化メソッド =====
@@ -959,7 +1059,7 @@ class CompleteTravelAPI {
           break;
         default:
           if (error.response?.data && typeof error.response.data === 'object') {
-            const apiError = error.response.data as any;
+            const apiError = error.response.data as ApiErrorResponseBody;
             if (typeof apiError.message === 'string') message = apiError.message;
             else {
               const detailMessage = extractApiErrorDetailMessage(apiError.detail);
@@ -1046,14 +1146,14 @@ class CompleteTravelAPI {
   // 捏造しない。0件は0件のまま返す。
   async searchSpots(request: SearchRequest): Promise<SearchResponse> {
     try {
-      const response = await this.client.post('/search/spots', {
+      const response = await this.client.post<{ candidates?: SearchCandidateRaw[] }>('/search/spots', {
         query: request.query,
         latitude: request.location?.latitude,
         longitude: request.location?.longitude,
         max_results: request.max_results || 20,
       });
 
-      const candidates: any[] = response.data?.candidates ?? [];
+      const candidates: SearchCandidateRaw[] = response.data?.candidates ?? [];
       const spots: SpotResult[] = candidates.map((c) => ({
         id: c.id,
         candidate_id: c.id,
@@ -1132,7 +1232,11 @@ class CompleteTravelAPI {
   // 等)だけで「AI画像解析により物体を検出した」と称する架空の結果
   // (detected_objects等)を生成していた。実装が存在しないことを正直に
   // 伝え、架空データは一切返さない。実装され次第この関数を差し替える。
-  async searchByImage(_file: File, _location?: { latitude: number; longitude: number }): Promise<ApiResponse<any>> {
+  async searchByImage(
+    _file: File, _location?: { latitude: number; longitude: number }
+  ): Promise<ApiResponse<UnavailableSearchResult>> {
+    void _file;
+    void _location;
     return {
       success: false,
       message: 'この機能は現在利用できません(画像からのスポット検索は未実装です)',
@@ -1144,11 +1248,9 @@ class CompleteTravelAPI {
   // 中からMath.random()で1つを選んで「音声認識結果」として返していた
   // (録音内容と無関係な文字起こしがユーザーに表示される実害があった)。
   // 実装が存在しないことを正直に伝え、架空データは一切返さない。
-  async searchByVoice(_audioBlob: Blob, _data: {
-    location?: { latitude: number; longitude: number };
-    language?: string;
-    max_results?: number;
-  }): Promise<ApiResponse<any>> {
+  async searchByVoice(_audioBlob: Blob, _data: VoiceSearchRequestData): Promise<ApiResponse<UnavailableSearchResult>> {
+    void _audioBlob;
+    void _data;
     return {
       success: false,
       message: 'この機能は現在利用できません(音声からのスポット検索は未実装です)',
@@ -1157,12 +1259,12 @@ class CompleteTravelAPI {
   }
 
   // ===== スポット関連API =====
-  async getSpots(category?: string, limit = 20): Promise<ApiResponse<any[]>> {
+  async getSpots(category?: string, limit = 20): Promise<ApiResponse<unknown[]>> {
     const params = new URLSearchParams();
     if (category && category !== 'all') params.append('category', category);
     if (limit) params.append('limit', limit.toString());
     
-    const response = await this.client.get<any[]>(`/spots/?${params}`);
+    const response = await this.client.get<unknown>(`/spots/?${params}`);
 
     if (Array.isArray(response.data)) {
       return {
@@ -1171,22 +1273,12 @@ class CompleteTravelAPI {
         data: response.data
       };
     } else {
-      return response.data;
+      return response.data as ApiResponse<unknown[]>;
     }
   }
 
-  async createSpot(spotData: {
-    name: string;
-    description?: string;
-    category: string;
-    address?: string;
-    latitude?: number;
-    longitude?: number;
-    price_range?: string;
-    image_url?: string;
-    is_public?: boolean;
-  }): Promise<ApiResponse<any>> {
-    const response = await this.client.post<any>('/spots/', spotData);
+  async createSpot(spotData: CreateSpotData): Promise<ApiResponse<unknown>> {
+    const response = await this.client.post<ApiResponse<unknown>>('/spots/', spotData);
     return response.data;
   }
 
@@ -1210,13 +1302,13 @@ class CompleteTravelAPI {
   // itinerary JSON列は書込み対象外(Gate #34で422拒否)。ここでのdays展開は、
   // 正規化データ未取得時(loadPlan内でdetail取得に失敗した場合)のfallback
   // としてのみ残す。恒久対応はGate R1以降で検討する。
-  private planFromApi(raw: any): any {
-    if (!raw) return raw;
-    const { itinerary, ...rest } = raw;
+  private planFromApi(raw: unknown): TravelPlan {
+    if (!raw || typeof raw !== 'object') return raw as TravelPlan;
+    const { itinerary, ...rest } = raw as { itinerary?: { days?: unknown[] } } & Record<string, unknown>;
     return {
       ...rest,
-      days: itinerary?.days ?? [],
-    };
+      days: (itinerary?.days ?? []) as TravelPlan['days'],
+    } as TravelPlan;
   }
 
   // [Gate R0] 旧itinerary(JSON blob)書込み変換を削除。Gate #34でbackend
@@ -1225,32 +1317,33 @@ class CompleteTravelAPI {
   // (2026-09-07 最新コード再監査報告書 追加技術欠陥#3)。day/eventの書込みは
   // 正規化API(/plans/*、createDay/updateDay/createEvent等)のみが正本であり、
   // metadata API(/travel-plans)へdaysを送ることはない(現行挙動を維持する)。
-  private planToApi(planData: any): any {
+  private planToApi(planData: Partial<TravelPlan> | null | undefined): Record<string, unknown> | null | undefined {
     if (!planData) return planData;
     const { days: _days, ...rest } = planData;
+    void _days;
     return rest;
   }
 
-  async getPlans(): Promise<ApiResponse<any[]>> {
-    const response = await this.client.get<ApiResponse<any[]>>('/travel-plans/');
-    const body = response.data as any;
-    const plans = (body.plans ?? body.data ?? []).map((p: any) => this.planFromApi(p));
-    return { success: true, message: body.message, data: plans } as ApiResponse<any[]>;
+  async getPlans(): Promise<ApiResponse<TravelPlan[]>> {
+    const response = await this.client.get<{ plans?: unknown[]; data?: unknown[]; message?: string }>('/travel-plans/');
+    const body = response.data;
+    const plans = (body.plans ?? body.data ?? []).map((p: unknown) => this.planFromApi(p));
+    return { success: true, message: body.message ?? '', data: plans } as ApiResponse<TravelPlan[]>;
   }
 
-  async createPlan(planData: any): Promise<ApiResponse<any>> {
-    const response = await this.client.post<any>('/travel-plans/', this.planToApi(planData));
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
+  async createPlan(planData: Partial<TravelPlan>): Promise<ApiResponse<TravelPlan>> {
+    const response = await this.client.post<unknown>('/travel-plans/', this.planToApi(planData));
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
   }
 
-  async getPlan(planId: string): Promise<ApiResponse<any>> {
-    const response = await this.client.get<any>(`/travel-plans/${planId}`);
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
+  async getPlan(planId: string): Promise<ApiResponse<TravelPlan>> {
+    const response = await this.client.get<unknown>(`/travel-plans/${planId}`);
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
   }
 
-  async updatePlan(planId: string, planData: any): Promise<ApiResponse<any>> {
-    const response = await this.client.put<any>(`/travel-plans/${planId}`, this.planToApi(planData));
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
+  async updatePlan(planId: string, planData: Partial<TravelPlan>): Promise<ApiResponse<TravelPlan>> {
+    const response = await this.client.put<unknown>(`/travel-plans/${planId}`, this.planToApi(planData));
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
   }
 
   async deletePlan(planId: string): Promise<ApiResponse<void>> {
@@ -1261,9 +1354,9 @@ class CompleteTravelAPI {
   // [Gate R3-12] FR-047 旅程複製。backend(Gate #39)はDB/API実装済みだったが
   // frontendから一切到達不能だった(Gate #25等と同じ「実装済みだが未到達」
   // パターン)。
-  async clonePlan(planId: string, data?: { title?: string; start_date?: string }): Promise<ApiResponse<any>> {
-    const response = await this.client.post<any>(`/travel-plans/${planId}/clone`, data ?? {});
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<any>;
+  async clonePlan(planId: string, data?: { title?: string; start_date?: string }): Promise<ApiResponse<TravelPlan>> {
+    const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {});
+    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
   }
 
   // [Gate R2-4] POST /quick-drafts/{id}/promote。既存セッション(guest/member)の
@@ -1796,12 +1889,12 @@ class CompleteTravelAPI {
   }
 
   async markNotificationAsRead(notificationId: string): Promise<ApiResponse<void>> {
-    await this.client.post<any>(`/notifications/${notificationId}/read`);
+    await this.client.post<unknown>(`/notifications/${notificationId}/read`);
     return { success: true } as ApiResponse<void>;
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
-    await this.client.post<any>('/notifications/read-all');
+    await this.client.post<unknown>('/notifications/read-all');
     return { success: true } as ApiResponse<void>;
   }
 
@@ -1870,7 +1963,7 @@ class CompleteTravelAPI {
   }
 
   async deleteShareLink(planId: string, shareId: string): Promise<ApiResponse<void>> {
-    await this.client.delete<any>(`/travel-plans/${planId}/share/${shareId}`);
+    await this.client.delete<unknown>(`/travel-plans/${planId}/share/${shareId}`);
     return { success: true } as ApiResponse<void>;
   }
 
@@ -1889,7 +1982,7 @@ class CompleteTravelAPI {
   }
 
   async removeCollaborator(planId: string, collaboratorId: string): Promise<ApiResponse<void>> {
-    await this.client.delete<any>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
+    await this.client.delete<unknown>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
     return { success: true } as ApiResponse<void>;
   }
 
@@ -1934,9 +2027,9 @@ export const authAPI = {
 
 export const travelAPI = {
   getPlans: () => api.getPlans(),
-  createPlan: (data: any) => api.createPlan(data),
+  createPlan: (data: Partial<TravelPlan>) => api.createPlan(data),
   getPlan: (id: string) => api.getPlan(id),
-  updatePlan: (id: string, data: any) => api.updatePlan(id, data),
+  updatePlan: (id: string, data: Partial<TravelPlan>) => api.updatePlan(id, data),
   deletePlan: (id: string) => api.deletePlan(id),
   clonePlan: (id: string, data?: { title?: string; start_date?: string }) => api.clonePlan(id, data),
   promoteQuickDraft: (
@@ -1947,7 +2040,7 @@ export const travelAPI = {
   ) => api.promoteQuickDraft(draftId, deviceToken, idempotencyKey, opts),
   searchSpots: (request: SearchRequest) => api.searchSpots(request),
   getSpots: (category?: string, limit?: number) => api.getSpots(category, limit),
-  createSpot: (data: any) => api.createSpot(data),
+  createSpot: (data: CreateSpotData) => api.createSpot(data),
   getSpotCategories: () => api.getSpotCategories(),
   testConnection: () => api.testConnection()
 };
@@ -1955,7 +2048,7 @@ export const travelAPI = {
 export const aiAPI = {
   searchSpots: (request: SearchRequest) => api.searchSpots(request),
   searchByImage: (file: File, location?: { latitude: number; longitude: number }) => api.searchByImage(file, location),
-  searchByVoice: (blob: Blob, data: any) => api.searchByVoice(blob, data)
+  searchByVoice: (blob: Blob, data: VoiceSearchRequestData) => api.searchByVoice(blob, data)
 };
 
 export const notificationsAPI = {
@@ -1990,10 +2083,10 @@ export const shareAPI = {
 // ===== 便利な関数のエクスポート =====
 export const searchSpots = (request: SearchRequest) => api.searchSpots(request);
 export const searchByImage = (file: File, location?: { latitude: number; longitude: number }) => api.searchByImage(file, location);
-export const searchByVoice = (blob: Blob, data: any) => api.searchByVoice(blob, data);
+export const searchByVoice = (blob: Blob, data: VoiceSearchRequestData) => api.searchByVoice(blob, data);
 
 export const getSpots = (category?: string, limit?: number) => api.getSpots(category, limit);
-export const createSpot = (data: any) => api.createSpot(data);
+export const createSpot = (data: CreateSpotData) => api.createSpot(data);
 export const getSpotCategories = () => api.getSpotCategories();
 export const testConnection = () => api.testConnection();
 

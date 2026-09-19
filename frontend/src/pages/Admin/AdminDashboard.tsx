@@ -104,7 +104,7 @@ const AdminDashboard: React.FC = () => {
         setLoading(true);
       }
 
-      const response = await api.get('/admin/stats/system');
+      const response = await api.get<SystemStats>('/admin/stats/system');
       setStats(response.data);
       setLastRefresh(new Date());
 
