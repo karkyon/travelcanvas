@@ -33,14 +33,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # [Gate M9で件数のみ実測更新、2026-09-13時点]
-      # 199 error / 17 warning(大半が@typescript-eslint/no-explicit-any)。
-      # ドメイン型を個別設計しないと安全に解消できないため、別Gateで
-      # 段階的に解消する計画とし、このGateでは非blockingのまま維持する
-      # (今回のGate M9はbackend flake8のCI blocking化がスコープ)。
-      - name: Lint (非ブロッキング・既知の技術的負債を可視化するのみ)
-        run: npx eslint . --ext ts,tsx || echo "::warning::eslintで199 error/17 warningを検出(2026-09-13時点、主にno-explicit-any)。別Gateで段階的に解消予定。現時点では非blocking"
-        continue-on-error: true
+      # [Gate M9-FE-C1] frontend ESLintをblocking化する。
+      # Gate M9時点(2026-09-13)の199 error / 17 warningは、Gate M9-FE-A1/A2/B1
+      # (error 0件)、B2(Fast Refresh警告6件)、B3(hooks依存警告11件・既存
+      # eslint-disable除去)で0 error / 0 warningまで解消済み。以降はpackage.jsonの
+      # lint script(--report-unused-disable-directives --max-warnings 0)をそのまま
+      # 実行し、error・warning・未使用のeslint-disableが1件でもあればjobを失敗させる。
+      # (以前の`|| echo`と`continue-on-error: true`は、失敗を握りつぶすため削除)
+      - name: Lint (ブロッキング)
+        run: npm run lint
 
       # [Gate #31.5A] 以前はここに「418件の既知エラーがあるため意図的に
       # 含めていない」という注意書きがあったが、独立検証の結果 tsc --noEmit
