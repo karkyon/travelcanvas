@@ -5,18 +5,18 @@
  */
 import { TodayApi } from './today';
 import type { DocumentClassification, DocumentLink, TravelDocument } from '../types';
-import { decodeResponse } from '../decode';
-import { downloadUrlResult } from '../decoders';
+import { arrayOf, decodeResponse } from '../decode';
+import { documentLink, downloadUrlResult, travelDocument } from '../decoders';
 
 export class DocumentsApi extends TodayApi {
   async getDocuments(planId: string): Promise<TravelDocument[]> {
-    const response = await this.client.get<TravelDocument[]>(`/plans/${planId}/documents`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/documents`);
+    return decodeResponse(response.data, arrayOf(travelDocument), 'GET /plans/{plan_id}/documents');
   }
 
   async getDocument(planId: string, documentId: string): Promise<TravelDocument> {
-    const response = await this.client.get<TravelDocument>(`/plans/${planId}/documents/${documentId}`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/documents/${documentId}`);
+    return decodeResponse(response.data, travelDocument, 'GET /plans/{plan_id}/documents/{document_id}');
   }
 
   // [Gate M6] FR-013 Object Storage実連携(Gate M5)への接続。実ファイルを
@@ -36,11 +36,11 @@ export class DocumentsApi extends TodayApi {
     // multipart/form-dataと認識できず、リクエストパース自体に失敗する)。
     // `Content-Type: undefined` を指定することで、axiosがFormDataを
     // 検出しboundary付きのContent-Typeを自動生成する経路に委ねる。
-    const response = await this.client.post<TravelDocument>(
+    const response = await this.client.post(
       `/plans/${planId}/documents/upload`, formData,
       { headers: { 'Content-Type': undefined } }
     );
-    return response.data;
+    return decodeResponse(response.data, travelDocument, 'POST /plans/{plan_id}/documents/upload');
   }
 
   async getDocumentDownloadUrl(planId: string, documentId: string): Promise<{ url: string; expires_at: number }> {
@@ -57,7 +57,7 @@ export class DocumentsApi extends TodayApi {
   }
 
   async getDocumentLinks(planId: string, documentId: string): Promise<DocumentLink[]> {
-    const response = await this.client.get<DocumentLink[]>(`/plans/${planId}/documents/${documentId}/links`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/documents/${documentId}/links`);
+    return decodeResponse(response.data, arrayOf(documentLink), 'GET /plans/{plan_id}/documents/{document_id}/links');
   }
 }

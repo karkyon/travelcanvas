@@ -12,6 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import { api, resolveDownloadUrl, extractApiErrorDetailMessage } from './api';
 import type { TravelPlan } from '@/types';
+// [Gate M9-FE-C2b-2] 応答はruntime decoderで検証されるため、モック応答は実backendから
+// 採取した完全な形状(契約fixture)を基に、テストで見たい項目だけ上書きする。
+import fx from './api/__fixtures__/backendContractResponses.json';
 
 // [Gate M9-FE-A2] planToApi()はprivateメソッドのため、テストからは
 // 構造的に型付けされたアクセサ経由で呼び出す(`(api as any).planToApi`の
@@ -65,7 +68,7 @@ describe('TravelSegment API client', () => {
       expect(url).toBe('/plans/plan-1/segments');
       expect(data.mode).toBe('walking');
       expect(config.headers?.['Idempotency-Key']).toBe('key-123');
-      return { data: { id: 'seg-1', mode: 'walking' } };
+      return { data: { ...fx.segment, id: 'seg-1', mode: 'walking' } };
     };
     api.setHttpClientForTesting({ post: mockPost });
     const result = await api.createSegment(
@@ -79,7 +82,7 @@ describe('TravelSegment API client', () => {
       expect(url).toBe('/plans/plan-1/segments/seg-1');
       expect(data.mode).toBe('driving');
       expect(config.headers?.['If-Match']).toBe('3');
-      return { data: { id: 'seg-1', mode: 'driving' } };
+      return { data: { ...fx.segment, id: 'seg-1', mode: 'driving' } };
     };
     api.setHttpClientForTesting({ patch: mockPatch });
     const result = await api.updateSegment('plan-1', 'seg-1', { mode: 'driving' }, 3);
@@ -100,7 +103,7 @@ describe('TravelSegment API client', () => {
   it('getSegment calls GET on the specific segment path', async () => {
     const mockGet = async (url: string) => {
       expect(url).toBe('/plans/plan-1/segments/seg-9');
-      return { data: { id: 'seg-9' } };
+      return { data: { ...fx.segment, id: 'seg-9' } };
     };
     api.setHttpClientForTesting({ get: mockGet });
     const result = await api.getSegment('plan-1', 'seg-9');
@@ -127,7 +130,7 @@ describe('RouteOption API client', () => {
       expect(url).toBe('/plans/plan-1/route-options');
       expect(data.from_event_id).toBe('e1');
       expect(config.headers?.['Idempotency-Key']).toBe('key-123');
-      return { data: { id: 'opt-1' } };
+      return { data: { ...fx.route_option, id: 'opt-1' } };
     };
     api.setHttpClientForTesting({ post: mockPost });
     const result = await api.createRouteOption(
@@ -141,7 +144,7 @@ describe('RouteOption API client', () => {
       expect(url).toBe('/plans/plan-1/route-options/opt-1');
       expect(data.status).toBe('discarded');
       expect(config.headers?.['If-Match']).toBe('3');
-      return { data: { id: 'opt-1', status: 'discarded' } };
+      return { data: { ...fx.route_option, id: 'opt-1', status: 'discarded' } };
     };
     api.setHttpClientForTesting({ patch: mockPatch });
     const result = await api.updateRouteOption('plan-1', 'opt-1', { status: 'discarded' }, 3);
@@ -164,7 +167,7 @@ describe('RouteOption API client', () => {
       expect(url).toBe('/plans/plan-1/route-options/opt-1/legs');
       expect(data.mode).toBe('walking');
       expect(config.headers?.['If-Match']).toBe('1');
-      return { data: { id: 'leg-1', leg_order: 0 } };
+      return { data: { ...fx.route_leg, id: 'leg-1', leg_order: 0 } };
     };
     api.setHttpClientForTesting({ post: mockPost });
     const result = await api.addRouteLeg('plan-1', 'opt-1', { mode: 'walking' }, 1);
@@ -176,7 +179,7 @@ describe('RouteOption API client', () => {
       void _data;
       expect(url).toBe('/plans/plan-1/route-options/opt-1/adopt');
       expect(config.headers?.['If-Match']).toBe('4');
-      return { data: { revision: 5, route_option: { id: 'opt-1' }, segment_id: 'seg-1' } };
+      return { data: { revision: 5, route_option: { ...fx.route_option, id: 'opt-1' }, segment_id: 'seg-1' } };
     };
     api.setHttpClientForTesting({ post: mockPost });
     const result = await api.adoptRouteOption('plan-1', 'opt-1', 4);
@@ -197,7 +200,7 @@ describe('Document upload/download API client', () => {
       // Content-Typeはundefinedを指定し、axiosがFormDataから自動生成する
       // boundary付きのContent-Typeに委ねる仕様とした。
       expect(config.headers?.['Content-Type']).toBeUndefined();
-      return { data: { id: 'doc-1', original_filename: 'receipt.pdf' } };
+      return { data: { ...fx.document, id: 'doc-1', original_filename: 'receipt.pdf' } };
     };
     api.setHttpClientForTesting({ post: mockPost });
     const file = new File(['dummy content'], 'receipt.pdf', { type: 'application/pdf' });

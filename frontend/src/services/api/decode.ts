@@ -47,6 +47,17 @@ export const int: Decoder<number> = (v, path) =>
 
 export const bool: Decoder<boolean> = (v, path) => (typeof v === 'boolean' ? v : fail(path, '真偽値'));
 
+/**
+ * 列挙値(文字列リテラルの和型)。backendの許容値集合と一致させること
+ * (backend側で値を追加した場合、ここへ追加するまでは形式不正として検出される)。
+ */
+export const oneOf =
+  <T extends string>(...values: readonly T[]): Decoder<T> =>
+  (v, path) =>
+    typeof v === 'string' && (values as readonly string[]).includes(v)
+      ? (v as T)
+      : fail(path, `${values.join(' | ')} のいずれか`);
+
 export const nullable =
   <T>(decoder: Decoder<T>): Decoder<T | null> =>
   (v, path) =>

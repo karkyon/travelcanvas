@@ -11,9 +11,20 @@
  * (backend/app/api/v1/plans.py TodayResponse、reservations.py
  *  ReservationRevealResponse/TicketRevealResponse、documents.py download-url、
  *  plans.py/segments.py/route_options.py の削除・Undo応答)。
+ *
+ * [Gate M9-FE-C2b-2] 予約・参加者・イベント紐付け・チケット・移動区間・経路候補・
+ * 予約取込・文書の一覧/詳細/作成/更新応答へ拡大。列挙値の許容集合はbackendの定義
+ * (segments.py MODES/STATUSES、route_options.py STATUSES/REALTIME_STATUSES、
+ *  models.py ImportJobStatus/ExtractionCandidateReviewStatus/DocumentClassification/
+ *  TicketStatus/TicketSharePolicy)と一致させている。実backendの応答で検証した契約
+ * fixture: __fixtures__/backendContractResponses.json。
  */
-import type { ReservationRevealResult, TicketRevealResult, TodayEvent, TodayResponse } from './types';
-import { bool, int, nullable, num, object, str, type Decoder } from './decode';
+import type {
+  AdoptRouteOptionResponse, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
+  ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
+  TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
+} from './types';
+import { arrayOf, bool, int, nullable, num, object, oneOf, str, type Decoder } from './decode';
 
 export interface RevisionResult {
   revision: number;
@@ -65,4 +76,240 @@ export const ticketRevealResult: Decoder<TicketRevealResult> = object<TicketReve
   id: str,
   payload: nullable(str),
   barcode_format: nullable(str),
+});
+
+// ===== [Gate M9-FE-C2b-2] 予約(FR-010) =====
+
+export const reservation: Decoder<Reservation> = object<Reservation>({
+  id: str,
+  plan_id: str,
+  event_id: nullable(str),
+  place_id: nullable(str),
+  type: str,
+  status: str,
+  provider_name: nullable(str),
+  confirmation_number_masked: nullable(str),
+  has_pin: bool,
+  holder_name: nullable(str),
+  guest_count: nullable(int),
+  start_at: nullable(str),
+  end_at: nullable(str),
+  timezone_id: nullable(str),
+  total_amount: nullable(num),
+  currency: nullable(str),
+  payment_status: nullable(str),
+  cancellation_deadline: nullable(str),
+  contact_phone: nullable(str),
+  contact_url: nullable(str),
+  notes: nullable(str),
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+export const reservationParticipant: Decoder<ReservationParticipant> = object<ReservationParticipant>({
+  id: str,
+  reservation_id: str,
+  plan_member_id: nullable(str),
+  name: str,
+  seat: nullable(str),
+  special_request: nullable(str),
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+export const reservationEventLink: Decoder<ReservationEventLink> = object<ReservationEventLink>({
+  id: str,
+  event_id: str,
+  reservation_id: str,
+  relation_type: str,
+  is_locked: bool,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+// ===== [Gate M9-FE-C2b-2] チケット(FR-012) =====
+
+export const ticket: Decoder<Ticket> = object<Ticket>({
+  id: str,
+  reservation_id: str,
+  ticket_type: str,
+  holder_member_id: nullable(str),
+  has_payload: bool,
+  barcode_format: nullable(str),
+  valid_from: nullable(str),
+  valid_to: nullable(str),
+  status: oneOf('active', 'used', 'expired', 'revoked'),
+  offline_allowed: bool,
+  share_policy: oneOf('owner_editor', 'all_collaborators'),
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+// ===== [Gate M9-FE-C2b-2] 移動区間(FR-014) =====
+
+const segmentMode = oneOf('walking', 'driving', 'train', 'bus', 'ferry', 'flight', 'bicycle', 'taxi', 'mixed');
+
+export const travelSegment: Decoder<TravelSegment> = object<TravelSegment>({
+  id: str,
+  plan_id: str,
+  from_event_id: nullable(str),
+  from_place_id: nullable(str),
+  to_event_id: nullable(str),
+  to_place_id: nullable(str),
+  mode: segmentMode,
+  status: oneOf('planned', 'confirmed', 'cancelled'),
+  planned_departure_at: nullable(str),
+  planned_arrival_at: nullable(str),
+  distance_km: nullable(num),
+  duration_minutes: nullable(num),
+  // backendのDecimalは精度保持のため文字列で届く(Pydantic v2のJSON直列化)
+  cost: nullable(str),
+  currency: nullable(str),
+  preparation_minutes: int,
+  buffer_before_minutes: int,
+  buffer_after_minutes: int,
+  transport_number: nullable(str),
+  platform: nullable(str),
+  transfer_count: nullable(int),
+  luggage_note: nullable(str),
+  reservation_id: nullable(str),
+  is_estimate: bool,
+  provider: str,
+  algorithm_version: str,
+  computed_at: str,
+  recommended_departure_at: nullable(str),
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+// ===== [Gate M9-FE-C2b-2] 経路比較(FR-015) =====
+
+export const routeLeg: Decoder<RouteLeg> = object<RouteLeg>({
+  id: str,
+  route_option_id: str,
+  leg_order: int,
+  mode: segmentMode,
+  line: nullable(str),
+  operator: nullable(str),
+  platform: nullable(str),
+  from_label: nullable(str),
+  to_label: nullable(str),
+  departure_at: nullable(str),
+  arrival_at: nullable(str),
+  distance_km: nullable(num),
+  duration_minutes: nullable(num),
+  realtime_status: oneOf('unknown', 'on_time', 'delayed', 'cancelled'),
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+export const routeOption: Decoder<RouteOption> = object<RouteOption>({
+  id: str,
+  plan_id: str,
+  from_event_id: nullable(str),
+  from_place_id: nullable(str),
+  to_event_id: nullable(str),
+  to_place_id: nullable(str),
+  status: oneOf('candidate', 'adopted', 'discarded'),
+  total_duration_minutes: nullable(num),
+  total_cost: nullable(str),
+  currency: nullable(str),
+  total_distance_km: nullable(num),
+  walking_minutes: nullable(num),
+  transfer_count: nullable(int),
+  accessibility_score: nullable(num),
+  scenic_score: nullable(num),
+  co2_estimate_kg: nullable(num),
+  duration_estimate_low_minutes: nullable(num),
+  duration_estimate_high_minutes: nullable(num),
+  provider: str,
+  retrieved_at: str,
+  expires_at: nullable(str),
+  is_estimate: bool,
+  algorithm_version: str,
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+  legs: arrayOf(routeLeg),
+});
+
+export const adoptRouteOptionResponse: Decoder<AdoptRouteOptionResponse> = object<AdoptRouteOptionResponse>({
+  revision: int,
+  route_option: routeOption,
+  segment_id: str,
+});
+
+// ===== [Gate M9-FE-C2b-2] 予約取込(FR-011) =====
+
+export const importJob: Decoder<ImportJob> = object<ImportJob>({
+  id: str,
+  plan_id: str,
+  document_id: nullable(str),
+  provider: str,
+  status: oneOf(
+    'uploaded', 'scanning', 'extracting', 'review_required', 'confirmed', 'rejected',
+    'quarantined', 'retry_wait', 'failed',
+  ),
+  consent_given: bool,
+  error_message: nullable(str),
+  result_reservation_id: nullable(str),
+  started_at: str,
+  completed_at: nullable(str),
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+export const extractionCandidate: Decoder<ExtractionCandidate> = object<ExtractionCandidate>({
+  id: str,
+  import_job_id: str,
+  field_path: str,
+  value: nullable(str),
+  confidence: num,
+  evidence_locator: nullable(str),
+  review_status: oneOf('pending', 'accepted', 'rejected'),
+  reviewed_by_user_id: nullable(str),
+  reviewed_at: nullable(str),
+  created_at: str,
+});
+
+export const importJobDetail: Decoder<ImportJobDetail> = (value, path) => {
+  const job = importJob(value, path);
+  const candidates = object<{ candidates: ExtractionCandidate[] }>({
+    candidates: arrayOf(extractionCandidate),
+  })(value, path).candidates;
+  return { ...job, candidates };
+};
+
+// ===== [Gate M9-FE-C2b-2] 文書ウォレット(FR-013) =====
+
+export const travelDocument: Decoder<TravelDocument> = object<TravelDocument>({
+  id: str,
+  plan_id: str,
+  owner_user_id: nullable(str),
+  classification: oneOf('public', 'internal', 'confidential', 'restricted'),
+  document_type: nullable(str),
+  original_filename: nullable(str),
+  mime_type: nullable(str),
+  size: nullable(int),
+  sha256: nullable(str),
+  malware_status: str,
+  ocr_status: str,
+  retention_until: nullable(str),
+  revision: int,
+  created_at: str,
+  updated_at: nullable(str),
+});
+
+export const documentLink: Decoder<DocumentLink> = object<DocumentLink>({
+  id: str,
+  document_id: str,
+  entity_type: str,
+  entity_id: str,
+  relation_type: str,
+  display_order: int,
+  created_at: str,
 });

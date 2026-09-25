@@ -5,21 +5,21 @@
  */
 import { DocumentsApi } from './documents';
 import type { Ticket, TicketCreateData, TicketRevealResult } from '../types';
-import { decodeResponse } from '../decode';
-import { ticketRevealResult } from '../decoders';
+import { arrayOf, decodeResponse } from '../decode';
+import { ticket, ticketRevealResult } from '../decoders';
 
 export class TicketsApi extends DocumentsApi {
   // [Gate R3-11] FR-012 QR・チケット(tickets)
   async getTickets(planId: string, reservationId: string): Promise<Ticket[]> {
-    const response = await this.client.get<Ticket[]>(`/plans/${planId}/reservations/${reservationId}/tickets`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/reservations/${reservationId}/tickets`);
+    return decodeResponse(response.data, arrayOf(ticket), 'GET /plans/{plan_id}/reservations/{reservation_id}/tickets');
   }
 
   async createTicket(planId: string, reservationId: string, data: TicketCreateData): Promise<Ticket> {
-    const response = await this.client.post<Ticket>(
+    const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/tickets`, data
     );
-    return response.data;
+    return decodeResponse(response.data, ticket, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets');
   }
 
   async deleteTicket(planId: string, reservationId: string, ticketId: string, ifMatch: number): Promise<void> {

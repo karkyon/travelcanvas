@@ -5,38 +5,38 @@
  */
 import { SegmentsApi } from './segments';
 import type { AdoptRouteOptionResponse, RouteLeg, RouteLegCreateData, RouteLegUpdateData, RouteOption, RouteOptionCreateData, RouteOptionUpdateData } from '../types';
-import { decodeResponse } from '../decode';
-import { revisionResult } from '../decoders';
+import { arrayOf, decodeResponse } from '../decode';
+import { adoptRouteOptionResponse, revisionResult, routeLeg, routeOption } from '../decoders';
 
 export class RouteOptionsApi extends SegmentsApi {
   // backend/app/api/v1/route_options.py (Gate M3)。/plans/{planId}/route-options配下。
 
   async getRouteOptions(planId: string): Promise<RouteOption[]> {
-    const response = await this.client.get<RouteOption[]>(`/plans/${planId}/route-options`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/route-options`);
+    return decodeResponse(response.data, arrayOf(routeOption), 'GET /plans/{plan_id}/route-options');
   }
 
   async getRouteOption(planId: string, optionId: string): Promise<RouteOption> {
-    const response = await this.client.get<RouteOption>(`/plans/${planId}/route-options/${optionId}`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/route-options/${optionId}`);
+    return decodeResponse(response.data, routeOption, 'GET /plans/{plan_id}/route-options/{option_id}');
   }
 
   async createRouteOption(
     planId: string, data: RouteOptionCreateData, idempotencyKey: string
   ): Promise<RouteOption> {
-    const response = await this.client.post<RouteOption>(
+    const response = await this.client.post(
       `/plans/${planId}/route-options`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
     );
-    return response.data;
+    return decodeResponse(response.data, routeOption, 'POST /plans/{plan_id}/route-options');
   }
 
   async updateRouteOption(
     planId: string, optionId: string, data: RouteOptionUpdateData, ifMatch: number
   ): Promise<RouteOption> {
-    const response = await this.client.patch<RouteOption>(
+    const response = await this.client.patch(
       `/plans/${planId}/route-options/${optionId}`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, routeOption, 'PATCH /plans/{plan_id}/route-options/{option_id}');
   }
 
   async deleteRouteOption(planId: string, optionId: string, ifMatch: number): Promise<{ revision: number }> {
@@ -49,20 +49,20 @@ export class RouteOptionsApi extends SegmentsApi {
   async addRouteLeg(
     planId: string, optionId: string, data: RouteLegCreateData, ifMatch: number
   ): Promise<RouteLeg> {
-    const response = await this.client.post<RouteLeg>(
+    const response = await this.client.post(
       `/plans/${planId}/route-options/${optionId}/legs`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, routeLeg, 'POST /plans/{plan_id}/route-options/{option_id}/legs');
   }
 
   async updateRouteLeg(
     planId: string, optionId: string, legId: string, data: RouteLegUpdateData, ifMatch: number
   ): Promise<RouteLeg> {
-    const response = await this.client.patch<RouteLeg>(
+    const response = await this.client.patch(
       `/plans/${planId}/route-options/${optionId}/legs/${legId}`, data,
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, routeLeg, 'PATCH /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
   }
 
   async deleteRouteLeg(
@@ -78,9 +78,9 @@ export class RouteOptionsApi extends SegmentsApi {
   async adoptRouteOption(
     planId: string, optionId: string, ifMatch: number
   ): Promise<AdoptRouteOptionResponse> {
-    const response = await this.client.post<AdoptRouteOptionResponse>(
+    const response = await this.client.post(
       `/plans/${planId}/route-options/${optionId}/adopt`, {}, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, adoptRouteOptionResponse, 'POST /plans/{plan_id}/route-options/{option_id}/adopt');
   }
 }
