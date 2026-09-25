@@ -32,6 +32,20 @@ export interface NormalizedDay {
   events?: NormalizedEvent[];
 }
 
+/**
+ * [Gate M9-FE-C2b-3] POST /quick-drafts/{id}/promote の応答(backend quickdrafts.py response_body)。
+ * start_date/end_dateは未設定時にnullになる。
+ */
+export interface PromoteQuickDraftResult {
+  id: string;
+  revision: number;
+  title?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  quick_draft_id: string;
+  quick_draft_status: string;
+}
+
 export interface NormalizedPlanDetail {
   id: string;
   title: string;

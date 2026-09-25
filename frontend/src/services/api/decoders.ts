@@ -19,12 +19,15 @@
  *  TicketStatus/TicketSharePolicy)と一致させている。実backendの応答で検証した契約
  * fixture: __fixtures__/backendContractResponses.json。
  */
+import type { User } from '@/types';
 import type {
-  AdoptRouteOptionResponse, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
+  AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, NormalizedDay, NormalizedEvent,
+  NormalizedPlanDetail, Notification, OptimizationProposal, PlaceDetail, PromoteQuickDraftResult,
+  PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
   ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
 } from './types';
-import { arrayOf, bool, int, nullable, num, object, oneOf, str, type Decoder } from './decode';
+import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
 export interface RevisionResult {
   revision: number;
@@ -312,4 +315,211 @@ export const documentLink: Decoder<DocumentLink> = object<DocumentLink>({
   relation_type: str,
   display_order: int,
   created_at: str,
+});
+
+// ===== [Gate M9-FE-C2b-3] 正規化Plan/Day/Event(/plans) =====
+
+export const normalizedEvent: Decoder<NormalizedEvent> = object<NormalizedEvent>({
+  id: str,
+  day_id: str,
+  title: str,
+  description: optional(nullable(str)),
+  event_type: str,
+  start_at: optional(nullable(str)),
+  end_at: optional(nullable(str)),
+  local_start_time: optional(nullable(str)),
+  is_all_day: bool,
+  address: optional(nullable(str)),
+  latitude: optional(nullable(num)),
+  longitude: optional(nullable(num)),
+  locked: bool,
+  sort_order: int,
+  place_id: optional(nullable(str)),
+});
+
+/** 日の作成・更新応答にはeventsが含まれず、プラン詳細・最適化適用の応答には含まれる。 */
+export const normalizedDay: Decoder<NormalizedDay> = object<NormalizedDay>({
+  id: str,
+  local_date: str,
+  timezone_id: str,
+  title: optional(nullable(str)),
+  notes: optional(nullable(str)),
+  sort_order: int,
+  events: optional(arrayOf(normalizedEvent)),
+});
+
+export const normalizedPlanDetail: Decoder<NormalizedPlanDetail> = object<NormalizedPlanDetail>({
+  id: str,
+  title: str,
+  revision: int,
+  days: arrayOf(normalizedDay),
+});
+
+export const promoteQuickDraftResult: Decoder<PromoteQuickDraftResult> = object<PromoteQuickDraftResult>({
+  id: str,
+  revision: int,
+  title: optional(nullable(str)),
+  start_date: optional(nullable(str)),
+  end_date: optional(nullable(str)),
+  quick_draft_id: str,
+  quick_draft_status: str,
+});
+
+/**
+ * 旧metadata API(/travel-plans)の応答。本体の変換はplanFromApi()が担うため、
+ * ここでは後段が必ず使う識別子(id/title)だけを検証する(宣言外の項目は保持される)。
+ */
+export interface LegacyTravelPlanCore {
+  id: string;
+  title: string;
+}
+
+export const legacyTravelPlan: Decoder<LegacyTravelPlanCore> = object<LegacyTravelPlanCore>({ id: str, title: str });
+
+// ===== [Gate M9-FE-C2b-3] PLAN MAP・最適化 =====
+
+export const legPreview: Decoder<LegPreview> = object<LegPreview>({
+  from_event_id: optional(nullable(str)),
+  to_event_id: optional(nullable(str)),
+  mode: str,
+  distance_km: optional(nullable(num)),
+  duration_minutes: optional(nullable(num)),
+  is_estimate: bool,
+  unknown: bool,
+});
+
+export const routePreview: Decoder<RoutePreview> = object<RoutePreview>({
+  day_id: str,
+  legs: arrayOf(legPreview),
+  total_distance_km: optional(nullable(num)),
+  total_duration_minutes: optional(nullable(num)),
+  provider: str,
+  algorithm_version: str,
+});
+
+export const insertionPreview: Decoder<InsertionPreview> = object<InsertionPreview>({
+  day_id: str,
+  before: routePreview,
+  after: routePreview,
+  added_distance_km: optional(nullable(num)),
+  added_duration_minutes: optional(nullable(num)),
+  unknown: bool,
+});
+
+export const optimizationProposal: Decoder<OptimizationProposal> = object<OptimizationProposal>({
+  day_id: str,
+  base_revision: int,
+  algorithm: str,
+  algorithm_version: str,
+  proposed_order: arrayOf(str),
+  locked_event_ids: arrayOf(str),
+  before_total_distance_km: optional(nullable(num)),
+  after_total_distance_km: optional(nullable(num)),
+  before_total_duration_minutes: optional(nullable(num)),
+  after_total_duration_minutes: optional(nullable(num)),
+  saved_distance_km: optional(nullable(num)),
+  saved_duration_minutes: optional(nullable(num)),
+  warnings: arrayOf(str),
+  has_improvement: bool,
+});
+
+// ===== [Gate M9-FE-C2b-3] Place =====
+
+export const placeDetail: Decoder<PlaceDetail> = object<PlaceDetail>({
+  id: str,
+  name: str,
+  category: optional(nullable(str)),
+  location: object<PlaceDetail['location']>({
+    latitude: optional(nullable(num)),
+    longitude: optional(nullable(num)),
+    address: optional(nullable(str)),
+  }),
+});
+
+// ===== [Gate M9-FE-C2b-3] 共有・招待・公開共有 =====
+
+export const shareLink: Decoder<ShareLink> = object<ShareLink>({
+  id: str,
+  plan_id: str,
+  url: nullable(str),
+  token_prefix: str,
+  permission: oneOf('view', 'edit'),
+  has_passcode: bool,
+  max_uses: nullable(int),
+  use_count: int,
+  last_accessed_at: optional(nullable(str)),
+  expires_at: optional(nullable(str)),
+  revoked_at: optional(nullable(str)),
+  is_active: bool,
+  created_at: str,
+});
+
+export const collaborator: Decoder<Collaborator> = object<Collaborator>({
+  id: str,
+  // 未登録メールアドレスへの招待では空文字(backend _collaborator_to_dict)
+  user_id: str,
+  plan_id: str,
+  role: oneOf('viewer', 'editor', 'owner'),
+  email: str,
+  name: optional(nullable(str)),
+  status: oneOf('pending', 'accepted', 'declined'),
+  decided_at: optional(nullable(str)),
+  plan_title: optional(nullable(str)),
+});
+
+const publicSharedEvent: Decoder<PublicSharedEvent> = object<PublicSharedEvent>({
+  title: str,
+  event_type: str,
+  local_start_time: optional(nullable(str)),
+  is_all_day: bool,
+});
+
+const publicSharedDay: Decoder<PublicSharedDay> = object<PublicSharedDay>({
+  date: nullable(str),
+  title: nullable(str),
+  events: arrayOf(publicSharedEvent),
+});
+
+export const publicSharedPlan: Decoder<PublicSharedPlan> = object<PublicSharedPlan>({
+  plan_id: str,
+  title: str,
+  description: optional(nullable(str)),
+  destination: optional(nullable(str)),
+  start_date: optional(nullable(str)),
+  end_date: optional(nullable(str)),
+  days: arrayOf(publicSharedDay),
+  permission: oneOf('view', 'edit'),
+  can_edit: bool,
+});
+
+// ===== [Gate M9-FE-C2b-3] 通知・認証 =====
+
+export const notification: Decoder<Notification> = object<Notification>({
+  id: str,
+  title: str,
+  message: str,
+  type: str,
+  is_read: bool,
+  related_plan_id: optional(nullable(str)),
+  created_at: str,
+});
+
+export interface UnreadCount {
+  unread_count: number;
+}
+
+export const unreadCount: Decoder<UnreadCount> = object<UnreadCount>({ unread_count: int });
+
+export const user: Decoder<User> = object<User>({
+  id: str,
+  username: str,
+  email: str,
+  is_active: bool,
+  is_verified: optional(bool),
+  is_superuser: optional(bool),
+  role: optional(str),
+  user_type: optional(str),
+  preferences: optional(nullable(record)),
+  created_at: str,
+  updated_at: optional(str),
 });

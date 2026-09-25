@@ -77,6 +77,10 @@ export const arrayOf =
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/** 中身を問わないJSONオブジェクト(利用者設定のpreferences等、自由形式の値)。 */
+export const record: Decoder<Record<string, unknown>> = (v, path) =>
+  isRecord(v) ? v : fail(path, 'オブジェクト');
+
 /**
  * オブジェクトの各キーを検証する。shapeには型Tの全キーを列挙する必要がある
  * (キーの書き漏れはコンパイルエラーになる)。宣言外のキーは値を変えずに残す。

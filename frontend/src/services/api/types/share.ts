@@ -16,7 +16,8 @@ export interface ShareLink {
   use_count: number;
   // [Gate #41 / CA-002] 最終閲覧日時。ShareAccessLogから算出、未閲覧ならnull。
   last_accessed_at?: string | null;
-  expires_at?: string;
+  // [Gate M9-FE-C2b-3] backendは期限未設定時にnullを返す(実応答で確認)
+  expires_at?: string | null;
   revoked_at?: string | null;
   is_active: boolean;
   created_at: string;
@@ -28,7 +29,8 @@ export interface Collaborator {
   plan_id: string;
   role: 'viewer' | 'editor' | 'owner';
   email: string;
-  name?: string;
+  // [Gate M9-FE-C2b-3] backendは現状常にnullを返す(_collaborator_to_dict)
+  name?: string | null;
   status: 'pending' | 'accepted' | 'declined';
   decided_at?: string | null;
   plan_title?: string | null;

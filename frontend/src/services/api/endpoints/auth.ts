@@ -7,6 +7,8 @@ import type { User } from '@/types';
 import { ApiCore } from '../core';
 import type { ApiResponse, AuthResponse, LoginCredentials, RegisterData } from '../types';
 import { apiOk, apiOkVoid } from '../response';
+import { decodeResponse } from '../decode';
+import { user } from '../decoders';
 
 export class AuthApi extends ApiCore {
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -45,13 +47,13 @@ export class AuthApi extends ApiCore {
   // ApiResponseラッパー無しでユーザーオブジェクトを直接返す(他の多くの
   // エンドポイントと同じ形状)。この関数側でApiResponse形状に包み直す。
   async getCurrentUser(): Promise<ApiResponse<User>> {
-    const response = await this.client.get<User>('/auth/me');
-    return apiOk<User>(response.data);
+    const response = await this.client.get('/auth/me');
+    return apiOk<User>(decodeResponse(response.data, user, 'GET /auth/me'));
   }
 
-  async updateProfile(data: Partial<User> & { preferences?: Record<string, unknown> }): Promise<ApiResponse<User>> {
-    const response = await this.client.put<User>('/auth/me', data);
-    return apiOk<User>(response.data);
+  async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
+    const response = await this.client.put('/auth/me', data);
+    return apiOk<User>(decodeResponse(response.data, user, 'PUT /auth/me'));
   }
 
   async changePassword(data: { 

@@ -85,7 +85,8 @@ export interface User {
   is_superuser?: boolean;
   role?: string;
   user_type?: string;
-  preferences?: Record<string, unknown>;
+  // [Gate M9-FE-C2b-3] 未設定のユーザーではbackendがnullを返す(GET /auth/me 実応答で確認)
+  preferences?: Record<string, unknown> | null;
   created_at: string;
   updated_at?: string;
 }

@@ -5,6 +5,8 @@
  */
 import { AuthApi } from './auth';
 import type { ApiResponse, PlaceDetail, SearchRequest, SearchResponse, SpotResult, UnavailableSearchResult, VoiceSearchRequestData } from '../types';
+import { decodeResponse } from '../decode';
+import { placeDetail } from '../decoders';
 
 // [Gate M9-FE-A2] POST /search/spots (backend/app/services/search_provider.py)
 // が返す個々の生候補の形状。この関数の中でのみ使う内部形状のため非export。
@@ -104,11 +106,14 @@ export class SearchApi extends AuthApi {
   }
 
   // [Gate M2改訂] Segment端点としてPlaceを選択する際、名称表示のために
-  // 単体取得する(GET /places/{place_id}、Gate #31)。Placeはplanに属さない
+  // 単体取得する(GET /search/places/{place_id}、Gate #31)。
+  // [Gate M9-FE-C2b-3] 以前は `/places/{id}` を呼んでおり、backend(search.routerは
+  // prefix="/search")に存在しないため常に404だった。SegmentsPageは失敗を握りつぶして
+  // いたため、移動区間の端点Place名が一度も表示されていなかった(実backendで確認)。Placeはplanに属さない
   // グローバルなエンティティのため一覧APIは無く、個別取得のみを提供する。
   async getPlace(placeId: string): Promise<PlaceDetail> {
-    const response = await this.client.get<PlaceDetail>(`/places/${placeId}`);
-    return response.data;
+    const response = await this.client.get(`/search/places/${placeId}`);
+    return decodeResponse(response.data, placeDetail, 'GET /search/places/{place_id}');
   }
 
   // [Gate #31.5B] 監査是正: 以前はファイル名の文字列マッチ(「tower」「寺」

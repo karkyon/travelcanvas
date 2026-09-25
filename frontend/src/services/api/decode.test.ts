@@ -133,9 +133,14 @@ describe('危険度の高い応答のdecoder適用 (Gate M9-FE-C2b)', () => {
   });
 
   it('ApiResponseで包む応答はmessageを含む完全な形になる(以前は型アサーションで欠落)', async () => {
-    respondWith([{ id: 'n1' }]);
+    // [Gate M9-FE-C2b-3] 通知一覧もdecoder対象になったため、完全な形の応答を使う
+    const n1 = {
+      id: 'n1', title: '招待', message: '招待されました', type: 'collaborator_invite', is_read: false,
+      related_plan_id: null, created_at: '2026-09-26T00:00:00Z',
+    };
+    respondWith([n1]);
     const res = await api.getNotifications();
-    expect(res).toEqual({ success: true, message: '', data: [{ id: 'n1' }] });
+    expect(res).toEqual({ success: true, message: '', data: [n1] });
     respondWith(undefined);
     await expect(api.markAllNotificationsAsRead()).resolves.toEqual({ success: true, message: '', data: undefined });
   });

@@ -3,7 +3,9 @@
  *
  * __fixtures__/backendContractResponses.json は、sandboxの実backend(FastAPI +
  * PostgreSQL 16)へTestClientで予約・チケット・移動区間・経路・取込・文書・当日モードの
- * 各APIを実際に呼び出して採取した応答である。runtime decoderがこれらを受理すること
+ * 各APIを実際に呼び出して採取した応答である([Gate M9-FE-C2b-3] 正規化プラン・地図プレビュー・
+ * 最適化・共有・招待・公開共有・通知・認証・Place・QuickDraft promote・旧travel-plansを追加)。
+ * runtime decoderがこれらを受理すること
  * (=backendとfrontendの型契約が一致していること)を固定する。
  */
 import { describe, it, expect } from 'vitest';
@@ -13,6 +15,9 @@ import {
   adoptRouteOptionResponse, documentLink, downloadUrlResult, extractionCandidate, importJob, importJobDetail,
   reservation, reservationEventLink, reservationParticipant, reservationRevealResult, routeLeg, routeOption,
   ticket, ticketRevealResult, todayResponse, travelDocument, travelSegment,
+  collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
+  notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
+  shareLink, unreadCount, user,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -51,6 +56,42 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['document_link_list', arrayOf(documentLink)],
   ['document_download_url', downloadUrlResult],
   ['today', todayResponse],
+  // ----- [Gate M9-FE-C2b-3]
+  ['auth_me', user],
+  ['auth_me_updated', user],
+  ['travel_plan_created', legacyTravelPlan],
+  ['travel_plan_get', legacyTravelPlan],
+  ['travel_plan_list', (v, p) => arrayOf(legacyTravelPlan)((v as { plans: unknown }).plans, `${p}.plans`)],
+  ['day_created', normalizedDay],
+  ['day_created_minimal', normalizedDay],
+  ['day_updated', normalizedDay],
+  ['event_created', normalizedEvent],
+  ['event_created_coords', normalizedEvent],
+  ['event_updated', normalizedEvent],
+  ['event_moved', normalizedEvent],
+  ['plan_detail', normalizedPlanDetail],
+  ['route_preview', routePreview],
+  ['route_preview_empty', routePreview],
+  ['insertion_preview', insertionPreview],
+  ['optimization_proposal', optimizationProposal],
+  ['optimization_apply', normalizedDay],
+  ['place', placeDetail],
+  ['place_minimal', placeDetail],
+  ['share_created', shareLink],
+  ['share_created_full', shareLink],
+  ['share_list', arrayOf(shareLink)],
+  ['share_updated', shareLink],
+  ['share_revoked', shareLink],
+  ['public_share', publicSharedPlan],
+  ['collaborator_invited', collaborator],
+  ['collaborator_invited_unknown_user', collaborator],
+  ['collaborator_list', arrayOf(collaborator)],
+  ['invitation_list', arrayOf(collaborator)],
+  ['invitation_accepted', collaborator],
+  ['notification_list', arrayOf(notification)],
+  ['notification_list_unread', arrayOf(notification)],
+  ['notification_unread_count', unreadCount],
+  ['quickdraft_promoted', promoteQuickDraftResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

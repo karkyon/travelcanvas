@@ -5,23 +5,25 @@
  */
 import { TicketsApi } from './tickets';
 import type { InsertionPreview, NormalizedDay, OptimizationProposal, RoutePreview } from '../types';
+import { decodeResponse } from '../decode';
+import { insertionPreview, normalizedDay, optimizationProposal, routePreview } from '../decoders';
 
 export class PlanInsightsApi extends TicketsApi {
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
-    const response = await this.client.get<RoutePreview>(
+    const response = await this.client.get(
       `/plans/${planId}/days/${dayId}/route-preview`, { params: { mode } }
     );
-    return response.data;
+    return decodeResponse(response.data, routePreview, 'GET /plans/{plan_id}/days/{day_id}/route-preview');
   }
 
   async getInsertionPreview(
     planId: string, dayId: string,
     data: { place_id?: string; latitude?: number; longitude?: number; after_event_id?: string; mode?: string }
   ): Promise<InsertionPreview> {
-    const response = await this.client.post<InsertionPreview>(
+    const response = await this.client.post(
       `/plans/${planId}/days/${dayId}/insertion-preview`, data
     );
-    return response.data;
+    return decodeResponse(response.data, insertionPreview, 'POST /plans/{plan_id}/days/{day_id}/insertion-preview');
   }
 
   // [Gate #33 監査是正] 旧OptimizationPanelは「AI最適化」と称し天候・混雑・
@@ -29,20 +31,20 @@ export class PlanInsightsApi extends TicketsApi {
   // ままでこれらの設定は一切効果を持たなかった(見せかけのUI)。本APIは
   // 実際に行われている処理(近傍法・座標ベース・locked除外)だけを提案する。
   async getOptimizationProposal(planId: string, dayId: string): Promise<OptimizationProposal> {
-    const response = await this.client.post<OptimizationProposal>(
+    const response = await this.client.post(
       `/plans/${planId}/days/${dayId}/optimization-proposal`
     );
-    return response.data;
+    return decodeResponse(response.data, optimizationProposal, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal');
   }
 
   async applyOptimizationProposal(
     planId: string, dayId: string, proposedOrder: string[], ifMatch: number
   ): Promise<NormalizedDay> {
-    const response = await this.client.post<NormalizedDay>(
+    const response = await this.client.post(
       `/plans/${planId}/days/${dayId}/optimization-proposal/apply`,
       { proposed_order: proposedOrder },
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, normalizedDay, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal/apply');
   }
 }

@@ -91,7 +91,7 @@ export interface SearchResponse extends ApiResponse {
   };
 }
 
-// [Gate M2改訂] Place端点選択UI用。GET /places/{place_id}(Gate #31)の
+// [Gate M2改訂] Place端点選択UI用。GET /search/places/{place_id}(Gate #31)の
 // レスポンス型。Placeはplanに属さないグローバルなエンティティ。
 export interface PlaceDetail {
   id: string;

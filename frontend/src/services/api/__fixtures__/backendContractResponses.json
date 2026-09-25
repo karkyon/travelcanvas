@@ -1,7 +1,94 @@
 {
  "_meta": {
   "captured_at_head": "ff6f07b3c0155e4ae6d46d85a74b586494512a86",
-  "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2)。"
+  "captured_at_head_c2b3": "ac4c990f9be38899270868d16db951035cab8343",
+  "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2/C2b-3)。"
+ },
+ "auth_me": {
+  "created_at": "2026-09-25T22:47:05.446003Z",
+  "email": "owner_fixture@example.com",
+  "id": "da614489-9825-4167-90e8-d9bfb0348924",
+  "is_active": true,
+  "is_verified": true,
+  "preferences": null,
+  "user_type": "registered",
+  "username": "owner_fixture"
+ },
+ "auth_me_updated": {
+  "created_at": "2026-09-25T22:47:05.446003Z",
+  "email": "owner_fixture@example.com",
+  "id": "da614489-9825-4167-90e8-d9bfb0348924",
+  "is_active": true,
+  "is_verified": true,
+  "preferences": null,
+  "user_type": "registered",
+  "username": "owner_fixture"
+ },
+ "collaborator_invited": {
+  "decided_at": null,
+  "email": "invitee_fixture@example.com",
+  "id": "396cc2f6-c258-42dd-900f-969f8359f5cc",
+  "name": null,
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "role": "editor",
+  "status": "pending",
+  "user_id": "60a914cc-9d56-43e3-8af4-6f1a3d233ec7"
+ },
+ "collaborator_invited_unknown_user": {
+  "decided_at": null,
+  "email": "nobody_fixture@example.com",
+  "id": "e0d24d6d-ba65-43a3-a88f-5eecc33e09b4",
+  "name": null,
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "role": "viewer",
+  "status": "pending",
+  "user_id": ""
+ },
+ "collaborator_list": [
+  {
+   "decided_at": null,
+   "email": "invitee_fixture@example.com",
+   "id": "396cc2f6-c258-42dd-900f-969f8359f5cc",
+   "name": null,
+   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "role": "editor",
+   "status": "pending",
+   "user_id": "60a914cc-9d56-43e3-8af4-6f1a3d233ec7"
+  },
+  {
+   "decided_at": null,
+   "email": "nobody_fixture@example.com",
+   "id": "e0d24d6d-ba65-43a3-a88f-5eecc33e09b4",
+   "name": null,
+   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "role": "viewer",
+   "status": "pending",
+   "user_id": ""
+  }
+ ],
+ "day_created": {
+  "id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "local_date": "2026-11-10",
+  "notes": null,
+  "sort_order": 0,
+  "timezone_id": "Asia/Tokyo",
+  "title": "1日目"
+ },
+ "day_created_minimal": {
+  "id": "8dbd0374-e58e-40e1-a068-fb91c336b830",
+  "local_date": "2026-11-11",
+  "notes": null,
+  "sort_order": 1,
+  "timezone_id": "UTC",
+  "title": null
+ },
+ "day_updated": {
+  "id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "local_date": "2026-11-10",
+  "notes": "早起き",
+  "sort_order": 0,
+  "timezone_id": "Asia/Tokyo",
+  "title": "1日目"
  },
  "document": {
   "classification": "confidential",
@@ -63,6 +150,40 @@
    "updated_at": null
   }
  ],
+ "event_created": {
+  "address": "京都市東山区",
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "description": null,
+  "end_at": null,
+  "event_type": "activity",
+  "id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+  "is_all_day": false,
+  "latitude": 34.9949,
+  "local_start_time": "09:00",
+  "locked": false,
+  "longitude": 135.785,
+  "place_id": "51dcc47f-c783-45e5-b50a-1f4861dfd15f",
+  "sort_order": 0,
+  "start_at": null,
+  "title": "清水寺"
+ },
+ "event_created_coords": {
+  "address": "京都市伏見区",
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "description": "千本鳥居",
+  "end_at": null,
+  "event_type": "sightseeing",
+  "id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+  "is_all_day": false,
+  "latitude": 34.9671,
+  "local_start_time": null,
+  "locked": false,
+  "longitude": 135.7727,
+  "place_id": null,
+  "sort_order": 1,
+  "start_at": null,
+  "title": "伏見稲荷"
+ },
  "event_link": {
   "created_at": "2026-09-25T09:49:07.619000Z",
   "event_id": "e26b7608-c3e7-4427-b177-c76990e54452",
@@ -92,6 +213,40 @@
    "updated_at": null
   }
  ],
+ "event_moved": {
+  "address": null,
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "description": null,
+  "end_at": null,
+  "event_type": "activity",
+  "id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+  "is_all_day": false,
+  "latitude": 35.0094,
+  "local_start_time": null,
+  "locked": false,
+  "longitude": 135.6668,
+  "place_id": null,
+  "sort_order": 0,
+  "start_at": null,
+  "title": "嵐山"
+ },
+ "event_updated": {
+  "address": "京都市伏見区",
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "description": "千本鳥居",
+  "end_at": null,
+  "event_type": "sightseeing",
+  "id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+  "is_all_day": false,
+  "latitude": 34.9671,
+  "local_start_time": null,
+  "locked": true,
+  "longitude": 135.7727,
+  "place_id": null,
+  "sort_order": 1,
+  "start_at": null,
+  "title": "伏見稲荷"
+ },
  "import_candidate": {
   "confidence": 0.9,
   "created_at": "2026-09-25T09:49:07.619000Z",
@@ -188,6 +343,208 @@
    "updated_at": null
   }
  ],
+ "insertion_preview": {
+  "added_distance_km": 4.07,
+  "added_duration_minutes": 54.3,
+  "after": {
+   "algorithm_version": "haversine-v1",
+   "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+   "legs": [
+    {
+     "distance_km": 4.27,
+     "duration_minutes": 57.0,
+     "from_event_id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+     "is_estimate": true,
+     "mode": "walking",
+     "to_event_id": "16b157c4-3580-43b7-9eb8-e151f3caedf1",
+     "unknown": false
+    },
+    {
+     "distance_km": 13.95,
+     "duration_minutes": 186.0,
+     "from_event_id": "16b157c4-3580-43b7-9eb8-e151f3caedf1",
+     "is_estimate": true,
+     "mode": "walking",
+     "to_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+     "unknown": false
+    },
+    {
+     "distance_km": 13.95,
+     "duration_minutes": 186.0,
+     "from_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+     "is_estimate": true,
+     "mode": "walking",
+     "to_event_id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+     "unknown": false
+    }
+   ],
+   "provider": "haversine_estimate",
+   "total_distance_km": 32.17,
+   "total_duration_minutes": 429.0
+  },
+  "before": {
+   "algorithm_version": "haversine-v1",
+   "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+   "legs": [
+    {
+     "distance_km": 14.15,
+     "duration_minutes": 188.7,
+     "from_event_id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+     "is_estimate": true,
+     "mode": "walking",
+     "to_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+     "unknown": false
+    },
+    {
+     "distance_km": 13.95,
+     "duration_minutes": 186.0,
+     "from_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+     "is_estimate": true,
+     "mode": "walking",
+     "to_event_id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+     "unknown": false
+    }
+   ],
+   "provider": "haversine_estimate",
+   "total_distance_km": 28.1,
+   "total_duration_minutes": 374.7
+  },
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "unknown": false
+ },
+ "invitation_accepted": {
+  "decided_at": "2026-09-25T22:47:07.498191+00:00",
+  "email": "invitee_fixture@example.com",
+  "id": "396cc2f6-c258-42dd-900f-969f8359f5cc",
+  "name": null,
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "role": "editor",
+  "status": "accepted",
+  "user_id": "60a914cc-9d56-43e3-8af4-6f1a3d233ec7"
+ },
+ "invitation_list": [
+  {
+   "decided_at": null,
+   "email": "invitee_fixture@example.com",
+   "id": "396cc2f6-c258-42dd-900f-969f8359f5cc",
+   "name": null,
+   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "plan_title": "契約fixture旅行",
+   "role": "editor",
+   "status": "pending",
+   "user_id": "60a914cc-9d56-43e3-8af4-6f1a3d233ec7"
+  }
+ ],
+ "notification_list": [
+  {
+   "created_at": "2026-09-25T22:47:05.446003+00:00",
+   "id": "64d4b6b5-1007-4ff2-b58a-2e7f8f45c4fd",
+   "is_read": false,
+   "message": "一緒に行こう",
+   "related_plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "title": "「契約fixture旅行」に招待されました",
+   "type": "collaborator_invite"
+  }
+ ],
+ "notification_list_unread": [
+  {
+   "created_at": "2026-09-25T22:47:05.446003+00:00",
+   "id": "64d4b6b5-1007-4ff2-b58a-2e7f8f45c4fd",
+   "is_read": false,
+   "message": "一緒に行こう",
+   "related_plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "title": "「契約fixture旅行」に招待されました",
+   "type": "collaborator_invite"
+  }
+ ],
+ "notification_unread_count": {
+  "unread_count": 1
+ },
+ "optimization_apply": {
+  "events": [
+   {
+    "address": "京都市東山区",
+    "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+    "description": null,
+    "end_at": null,
+    "event_type": "activity",
+    "id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+    "is_all_day": false,
+    "latitude": 34.9949,
+    "local_start_time": "09:00",
+    "locked": false,
+    "longitude": 135.785,
+    "place_id": "51dcc47f-c783-45e5-b50a-1f4861dfd15f",
+    "sort_order": 0,
+    "start_at": null,
+    "title": "清水寺"
+   },
+   {
+    "address": "京都市伏見区",
+    "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+    "description": "千本鳥居",
+    "end_at": null,
+    "event_type": "sightseeing",
+    "id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+    "is_all_day": false,
+    "latitude": 34.9671,
+    "local_start_time": null,
+    "locked": true,
+    "longitude": 135.7727,
+    "place_id": null,
+    "sort_order": 1,
+    "start_at": null,
+    "title": "伏見稲荷"
+   },
+   {
+    "address": null,
+    "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+    "description": null,
+    "end_at": null,
+    "event_type": "activity",
+    "id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+    "is_all_day": false,
+    "latitude": 35.0094,
+    "local_start_time": null,
+    "locked": false,
+    "longitude": 135.6668,
+    "place_id": null,
+    "sort_order": 1,
+    "start_at": null,
+    "title": "嵐山"
+   }
+  ],
+  "id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "local_date": "2026-11-10",
+  "notes": "早起き",
+  "sort_order": 0,
+  "timezone_id": "Asia/Tokyo",
+  "title": "1日目"
+ },
+ "optimization_proposal": {
+  "after_total_distance_km": 28.1,
+  "after_total_duration_minutes": 374.7,
+  "algorithm": "nearest_neighbor_haversine",
+  "algorithm_version": "nn-haversine-v1",
+  "base_revision": 9,
+  "before_total_distance_km": 28.1,
+  "before_total_duration_minutes": 374.7,
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "has_improvement": false,
+  "locked_event_ids": [
+   "bc01eb3b-295a-4fe8-9028-e549d1acb429"
+  ],
+  "proposed_order": [
+   "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+   "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+   "bc01eb3b-295a-4fe8-9028-e549d1acb429"
+  ],
+  "saved_distance_km": 0.0,
+  "saved_duration_minutes": 0.0,
+  "warnings": [
+   "この順序が既に最短(またはこれ以上の改善候補がありません)"
+  ]
+ },
  "participant": {
   "created_at": "2026-09-25T09:49:07.619000Z",
   "id": "9f72f271-9e94-483d-bc18-098753a1d514",
@@ -212,6 +569,155 @@
    "updated_at": null
   }
  ],
+ "place": {
+  "category": "temple",
+  "field_sources": [],
+  "id": "51dcc47f-c783-45e5-b50a-1f4861dfd15f",
+  "location": {
+   "address": "京都市東山区",
+   "latitude": 34.9949,
+   "longitude": 135.785
+  },
+  "name": "清水寺"
+ },
+ "place_minimal": {
+  "category": null,
+  "field_sources": [],
+  "id": "d93a44f4-b00f-4179-a61e-f1254a81f5ec",
+  "location": {
+   "address": null,
+   "latitude": 34.9671,
+   "longitude": 135.7727
+  },
+  "name": "伏見稲荷大社"
+ },
+ "plan_detail": {
+  "days": [
+   {
+    "events": [
+     {
+      "address": "京都市東山区",
+      "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+      "description": null,
+      "end_at": null,
+      "event_type": "activity",
+      "id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+      "is_all_day": false,
+      "latitude": 34.9949,
+      "local_start_time": "09:00",
+      "locked": false,
+      "longitude": 135.785,
+      "place_id": "51dcc47f-c783-45e5-b50a-1f4861dfd15f",
+      "sort_order": 0,
+      "start_at": null,
+      "title": "清水寺"
+     },
+     {
+      "address": null,
+      "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+      "description": null,
+      "end_at": null,
+      "event_type": "activity",
+      "id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+      "is_all_day": false,
+      "latitude": 35.0094,
+      "local_start_time": null,
+      "locked": false,
+      "longitude": 135.6668,
+      "place_id": null,
+      "sort_order": 0,
+      "start_at": null,
+      "title": "嵐山"
+     },
+     {
+      "address": "京都市伏見区",
+      "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+      "description": "千本鳥居",
+      "end_at": null,
+      "event_type": "sightseeing",
+      "id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+      "is_all_day": false,
+      "latitude": 34.9671,
+      "local_start_time": null,
+      "locked": true,
+      "longitude": 135.7727,
+      "place_id": null,
+      "sort_order": 1,
+      "start_at": null,
+      "title": "伏見稲荷"
+     }
+    ],
+    "id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+    "local_date": "2026-11-10",
+    "notes": "早起き",
+    "sort_order": 0,
+    "timezone_id": "Asia/Tokyo",
+    "title": "1日目"
+   },
+   {
+    "events": [],
+    "id": "8dbd0374-e58e-40e1-a068-fb91c336b830",
+    "local_date": "2026-11-11",
+    "notes": null,
+    "sort_order": 1,
+    "timezone_id": "UTC",
+    "title": null
+   }
+  ],
+  "id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "revision": 9,
+  "title": "契約fixture旅行"
+ },
+ "public_share": {
+  "can_edit": false,
+  "days": [
+   {
+    "date": "2026-11-10",
+    "events": [
+     {
+      "event_type": "activity",
+      "is_all_day": false,
+      "local_start_time": "09:00",
+      "title": "清水寺"
+     },
+     {
+      "event_type": "sightseeing",
+      "is_all_day": false,
+      "local_start_time": null,
+      "title": "伏見稲荷"
+     },
+     {
+      "event_type": "activity",
+      "is_all_day": false,
+      "local_start_time": null,
+      "title": "嵐山"
+     }
+    ],
+    "title": "1日目"
+   },
+   {
+    "date": "2026-11-11",
+    "events": [],
+    "title": null
+   }
+  ],
+  "description": "説明",
+  "destination": "京都",
+  "end_date": "2026-11-12T00:00:00+00:00",
+  "permission": "view",
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "start_date": "2026-11-10T00:00:00+00:00",
+  "title": "契約fixture旅行"
+ },
+ "quickdraft_promoted": {
+  "end_date": "2026-09-27T00:00:00+00:00",
+  "id": "fa26cd95-c010-4b44-b6ff-a108fc6f466b",
+  "quick_draft_id": "6ada9523-ea8e-434f-8960-daa066f947c6",
+  "quick_draft_status": "PROMOTED",
+  "revision": 2,
+  "start_date": "2026-09-26T00:00:00+00:00",
+  "title": "QuickDraft契約"
+ },
  "reservation": {
   "cancellation_deadline": "2026-11-01T14:59:00Z",
   "confirmation_number_masked": "*****3456",
@@ -647,6 +1153,41 @@
   "updated_at": null,
   "walking_minutes": null
  },
+ "route_preview": {
+  "algorithm_version": "haversine-v1",
+  "day_id": "6b082fb3-448c-48ed-9aed-461f238458a0",
+  "legs": [
+   {
+    "distance_km": 14.15,
+    "duration_minutes": 188.7,
+    "from_event_id": "318058eb-3650-4fa2-8fec-d1d0738ae63a",
+    "is_estimate": true,
+    "mode": "walking",
+    "to_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+    "unknown": false
+   },
+   {
+    "distance_km": 13.95,
+    "duration_minutes": 186.0,
+    "from_event_id": "e0a04f12-c308-40d4-9769-14e63af4ffe5",
+    "is_estimate": true,
+    "mode": "walking",
+    "to_event_id": "bc01eb3b-295a-4fe8-9028-e549d1acb429",
+    "unknown": false
+   }
+  ],
+  "provider": "haversine_estimate",
+  "total_distance_km": 28.1,
+  "total_duration_minutes": 374.7
+ },
+ "route_preview_empty": {
+  "algorithm_version": "haversine-v1",
+  "day_id": "8dbd0374-e58e-40e1-a068-fb91c336b830",
+  "legs": [],
+  "provider": "haversine_estimate",
+  "total_distance_km": 0.0,
+  "total_duration_minutes": 0.0
+ },
  "segment": {
   "algorithm_version": "manual-v1",
   "buffer_after_minutes": 0,
@@ -748,6 +1289,98 @@
   "transport_number": "のぞみ1号",
   "updated_at": "2026-09-25T09:49:07.619000Z"
  },
+ "share_created": {
+  "created_at": "2026-09-25T22:47:05.446003+00:00",
+  "expires_at": null,
+  "has_passcode": false,
+  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
+  "is_active": true,
+  "last_accessed_at": null,
+  "max_uses": null,
+  "permission": "view",
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "revoked_at": null,
+  "token_prefix": "S1-NeOui",
+  "url": "/s/FIXTURE_PLACEHOLDER",
+  "use_count": 0
+ },
+ "share_created_full": {
+  "created_at": "2026-09-25T22:47:05.446003+00:00",
+  "expires_at": "2027-01-01T00:00:00+00:00",
+  "has_passcode": true,
+  "id": "6e83c5e0-3a3e-47de-bcd5-65b538434ff2",
+  "is_active": true,
+  "last_accessed_at": null,
+  "max_uses": 5,
+  "permission": "edit",
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "revoked_at": null,
+  "token_prefix": "pYFF2qik",
+  "url": "/s/FIXTURE_PLACEHOLDER",
+  "use_count": 0
+ },
+ "share_list": [
+  {
+   "created_at": "2026-09-25T22:47:05.446003+00:00",
+   "expires_at": null,
+   "has_passcode": false,
+   "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
+   "is_active": true,
+   "last_accessed_at": null,
+   "max_uses": null,
+   "permission": "view",
+   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "revoked_at": null,
+   "token_prefix": "S1-NeOui",
+   "url": null,
+   "use_count": 0
+  },
+  {
+   "created_at": "2026-09-25T22:47:05.446003+00:00",
+   "expires_at": "2027-01-01T00:00:00+00:00",
+   "has_passcode": true,
+   "id": "6e83c5e0-3a3e-47de-bcd5-65b538434ff2",
+   "is_active": true,
+   "last_accessed_at": null,
+   "max_uses": 5,
+   "permission": "edit",
+   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+   "revoked_at": null,
+   "token_prefix": "pYFF2qik",
+   "url": null,
+   "use_count": 0
+  }
+ ],
+ "share_revoked": {
+  "created_at": "2026-09-25T22:47:05.446003+00:00",
+  "expires_at": null,
+  "has_passcode": false,
+  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
+  "is_active": false,
+  "last_accessed_at": null,
+  "max_uses": 10,
+  "permission": "view",
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "revoked_at": "2026-09-25T22:47:06.278060+00:00",
+  "token_prefix": "S1-NeOui",
+  "url": null,
+  "use_count": 1
+ },
+ "share_updated": {
+  "created_at": "2026-09-25T22:47:05.446003+00:00",
+  "expires_at": null,
+  "has_passcode": false,
+  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
+  "is_active": true,
+  "last_accessed_at": null,
+  "max_uses": 10,
+  "permission": "view",
+  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "revoked_at": null,
+  "token_prefix": "S1-NeOui",
+  "url": null,
+  "use_count": 0
+ },
  "ticket": {
   "barcode_format": "QR_CODE",
   "created_at": "2026-09-25T09:49:07.619000Z",
@@ -827,5 +1460,55 @@
   "server_time": "2026-09-25T09:49:08.248916Z",
   "timezone_id": "UTC",
   "today_date": "2026-09-25"
+ },
+ "travel_plan_created": {
+  "budget": null,
+  "created_at": "2026-09-25T22:47:05.446003Z",
+  "description": "説明",
+  "destination": "京都",
+  "end_date": "2026-11-12",
+  "id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "itinerary": null,
+  "preferences": null,
+  "start_date": "2026-11-10",
+  "status": "draft",
+  "title": "契約fixture旅行",
+  "updated_at": null,
+  "user_id": "da614489-9825-4167-90e8-d9bfb0348924"
+ },
+ "travel_plan_get": {
+  "budget": null,
+  "created_at": "2026-09-25T22:47:05.446003Z",
+  "description": "説明",
+  "destination": "京都",
+  "end_date": "2026-11-12",
+  "id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+  "itinerary": null,
+  "preferences": null,
+  "start_date": "2026-11-10",
+  "status": "draft",
+  "title": "契約fixture旅行",
+  "updated_at": null,
+  "user_id": "da614489-9825-4167-90e8-d9bfb0348924"
+ },
+ "travel_plan_list": {
+  "plans": [
+   {
+    "budget": null,
+    "created_at": "2026-09-25T22:47:05.446003Z",
+    "description": "説明",
+    "destination": "京都",
+    "end_date": "2026-11-12",
+    "id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
+    "itinerary": null,
+    "preferences": null,
+    "start_date": "2026-11-10",
+    "status": "draft",
+    "title": "契約fixture旅行",
+    "updated_at": null,
+    "user_id": "da614489-9825-4167-90e8-d9bfb0348924"
+   }
+  ],
+  "total": 1
  }
 }
