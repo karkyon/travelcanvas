@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
+import { ProtectedRoute, AdminRoute, AuthRedirect } from './guards';
 
 // 既存ページのインポート
 import LandingPage from '@/pages/LandingPage';
@@ -34,43 +34,8 @@ import TodayPage from '@/pages/TodayPage';
 import SegmentsPage from '@/pages/SegmentsPage';
 import RouteOptionsPage from '@/pages/RouteOptionsPage';
 
-// 認証が必要なルートを保護するコンポーネント
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuthStore();
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-};
-
-// [Gate #24] 管理者権限が必要なルートを保護するコンポーネント。
-// 未ログインまたは管理者以外は/へリダイレクトする(各ページ内のuseEffectでも
-// 二重にチェックしているが、ルート単位でも早期にガードする)。
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, user } = useAuthStore();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  if (user?.user_type !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-// 認証済みユーザーのリダイレクト
-const AuthRedirect = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuthStore();
-  
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return <>{children}</>;
-};
+// [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
+// Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
 
 export const router = createBrowserRouter([
   {

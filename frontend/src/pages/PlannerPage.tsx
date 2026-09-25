@@ -22,7 +22,7 @@ import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useToast } from '@/components/common/Toast';
+import { useToast } from '@/components/common/toastContext';
 import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';

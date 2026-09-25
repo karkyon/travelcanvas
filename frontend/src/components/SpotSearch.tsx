@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearch } from '../hooks/useSearch';
-import { useToast } from './common/Toast';
+import { useToast } from './common/toastContext';
 import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';

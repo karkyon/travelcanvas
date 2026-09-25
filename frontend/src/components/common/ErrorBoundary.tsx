@@ -14,7 +14,7 @@ interface ErrorBoundaryState {
   errorId: string;
 }
 
-interface ErrorBoundaryProps {
+export interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
@@ -350,34 +350,3 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 export default ErrorBoundary;
-
-/**
- * withErrorBoundary HOC - コンポーネントをエラーバウンダリでラップ
- */
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<ErrorBoundaryProps, 'children'>
-) {
-  const WrappedComponent = (props: P) => (
-    <ErrorBoundary {...errorBoundaryProps}>
-      <Component {...props} />
-    </ErrorBoundary>
-  );
-
-  WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
-  
-  return WrappedComponent;
-}
-
-/**
- * useErrorHandler Hook - 手動でエラーをエラーバウンダリに送信
- */
-export function useErrorHandler() {
-  return React.useCallback((error: Error, _errorInfo?: unknown) => {
-    void _errorInfo;
-    // エラーをthrowしてエラーバウンダリに捕捉させる
-    setTimeout(() => {
-      throw error;
-    });
-  }, []);
-}

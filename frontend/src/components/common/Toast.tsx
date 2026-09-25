@@ -1,37 +1,8 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-
-type ToastType = 'success' | 'error' | 'warning' | 'info';
-type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
-
-interface Toast {
-  id: string;
-  type: ToastType;
-  title?: string;
-  message: string;
-  duration?: number;
-  closable?: boolean;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
-}
-
-interface ToastContextType {
-  addToast: (toast: Omit<Toast, 'id'>) => void;
-  removeToast: (id: string) => void;
-  clearToasts: () => void;
-}
-
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
-};
+// [Gate M9-FE-B2] Context・useToast Hook・型はtoastContext.tsへ移設
+// (Fast Refresh: コンポーネントと非コンポーネントのexport混在を解消)。
+import { ToastContext, type Toast, type ToastPosition } from './toastContext';
 
 interface ToastProviderProps {
   position?: ToastPosition;

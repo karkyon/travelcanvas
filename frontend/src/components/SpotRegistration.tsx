@@ -7,7 +7,7 @@ import { spotApiService, SpotData, SpotResponse } from '../services/spotApi';
 import Button from './common/Button';
 import Input from './common/Input';
 import Card from './common/Card';
-import { useToast } from './common/Toast';
+import { useToast } from './common/toastContext';
 
 interface SpotRegistrationProps {
   onSpotCreated?: (spot: SpotResponse) => void;

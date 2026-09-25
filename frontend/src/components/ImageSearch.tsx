@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useSearch } from '../hooks/useSearch';
-import { useToast } from './common/Toast';
+import { useToast } from './common/toastContext';
 import Button from './common/Button';
 import Card from './common/Card';
 import type { ImageSearchResult, Spot } from '../types';
