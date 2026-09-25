@@ -12,6 +12,8 @@ import type { CreateSpotData, DocumentClassification, ExtractionCandidateCreateD
 
 export * from './types';
 export { extractApiErrorDetailMessage } from './core';
+// [Gate M9-FE-C2b] 応答形式の検証失敗を呼び出し元で判定できるよう公開する。
+export { ApiDecodeError } from './decode';
 
 // ===== シングルトンインスタンス =====
 export const api = new CompleteTravelAPI();

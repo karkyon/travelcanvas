@@ -5,6 +5,8 @@
  */
 import { SegmentsApi } from './segments';
 import type { AdoptRouteOptionResponse, RouteLeg, RouteLegCreateData, RouteLegUpdateData, RouteOption, RouteOptionCreateData, RouteOptionUpdateData } from '../types';
+import { decodeResponse } from '../decode';
+import { revisionResult } from '../decoders';
 
 export class RouteOptionsApi extends SegmentsApi {
   // backend/app/api/v1/route_options.py (Gate M3)。/plans/{planId}/route-options配下。
@@ -38,10 +40,10 @@ export class RouteOptionsApi extends SegmentsApi {
   }
 
   async deleteRouteOption(planId: string, optionId: string, ifMatch: number): Promise<{ revision: number }> {
-    const response = await this.client.delete<{ revision: number }>(
+    const response = await this.client.delete(
       `/plans/${planId}/route-options/${optionId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/route-options/{option_id}');
   }
 
   async addRouteLeg(
@@ -66,11 +68,11 @@ export class RouteOptionsApi extends SegmentsApi {
   async deleteRouteLeg(
     planId: string, optionId: string, legId: string, ifMatch: number
   ): Promise<{ revision: number }> {
-    const response = await this.client.delete<{ revision: number }>(
+    const response = await this.client.delete(
       `/plans/${planId}/route-options/${optionId}/legs/${legId}`,
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
   }
 
   async adoptRouteOption(

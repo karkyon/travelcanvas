@@ -5,6 +5,7 @@
  */
 import { PlanInsightsApi } from './insights';
 import type { ApiResponse, Notification } from '../types';
+import { apiOk, apiOkVoid } from '../response';
 
 export class NotificationsApi extends PlanInsightsApi {
   // [Gate #26] URLは実装済みだったが、バックエンド(/notifications)自体が
@@ -14,21 +15,21 @@ export class NotificationsApi extends PlanInsightsApi {
     const response = await this.client.get<Notification[]>('/notifications/', {
       params: unreadOnly ? { unread_only: true } : undefined,
     });
-    return { success: true, data: response.data } as ApiResponse<Notification[]>;
+    return apiOk<Notification[]>(response.data);
   }
 
   async getUnreadNotificationCount(): Promise<ApiResponse<{ unread_count: number }>> {
     const response = await this.client.get<{ unread_count: number }>('/notifications/unread-count');
-    return { success: true, data: response.data } as ApiResponse<{ unread_count: number }>;
+    return apiOk<{ unread_count: number }>(response.data);
   }
 
   async markNotificationAsRead(notificationId: string): Promise<ApiResponse<void>> {
     await this.client.post<unknown>(`/notifications/${notificationId}/read`);
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
     await this.client.post<unknown>('/notifications/read-all');
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 }

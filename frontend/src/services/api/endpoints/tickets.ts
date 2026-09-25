@@ -5,6 +5,8 @@
  */
 import { DocumentsApi } from './documents';
 import type { Ticket, TicketCreateData, TicketRevealResult } from '../types';
+import { decodeResponse } from '../decode';
+import { ticketRevealResult } from '../decoders';
 
 export class TicketsApi extends DocumentsApi {
   // [Gate R3-11] FR-012 QR・チケット(tickets)
@@ -27,9 +29,9 @@ export class TicketsApi extends DocumentsApi {
   }
 
   async revealTicket(planId: string, reservationId: string, ticketId: string): Promise<TicketRevealResult> {
-    const response = await this.client.post<TicketRevealResult>(
+    const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/tickets/${ticketId}/reveal`, {}
     );
-    return response.data;
+    return decodeResponse(response.data, ticketRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}/reveal');
   }
 }

@@ -6,6 +6,9 @@
 import type { TravelPlan } from '@/types';
 import { SpotsApi } from './spots';
 import type { ApiResponse, NormalizedDay, NormalizedEvent, NormalizedPlanDetail } from '../types';
+import { apiOk, apiOkVoid } from '../response';
+import { decodeResponse } from '../decode';
+import { revisionResult } from '../decoders';
 
 export class PlansApi extends SpotsApi {
   // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして
@@ -43,27 +46,27 @@ export class PlansApi extends SpotsApi {
     const response = await this.client.get<{ plans?: unknown[]; data?: unknown[]; message?: string }>('/travel-plans/');
     const body = response.data;
     const plans = (body.plans ?? body.data ?? []).map((p: unknown) => this.planFromApi(p));
-    return { success: true, message: body.message ?? '', data: plans } as ApiResponse<TravelPlan[]>;
+    return apiOk(plans, body.message ?? '');
   }
 
   async createPlan(planData: Partial<TravelPlan>): Promise<ApiResponse<TravelPlan>> {
     const response = await this.client.post<unknown>('/travel-plans/', this.planToApi(planData));
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
+    return apiOk<TravelPlan>(this.planFromApi(response.data));
   }
 
   async getPlan(planId: string): Promise<ApiResponse<TravelPlan>> {
     const response = await this.client.get<unknown>(`/travel-plans/${planId}`);
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
+    return apiOk<TravelPlan>(this.planFromApi(response.data));
   }
 
   async updatePlan(planId: string, planData: Partial<TravelPlan>): Promise<ApiResponse<TravelPlan>> {
     const response = await this.client.put<unknown>(`/travel-plans/${planId}`, this.planToApi(planData));
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
+    return apiOk<TravelPlan>(this.planFromApi(response.data));
   }
 
   async deletePlan(planId: string): Promise<ApiResponse<void>> {
     await this.client.delete<void>(`/travel-plans/${planId}`);
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 
   // [Gate R3-12] FR-047 旅程複製。backend(Gate #39)はDB/API実装済みだったが
@@ -71,7 +74,7 @@ export class PlansApi extends SpotsApi {
   // パターン)。
   async clonePlan(planId: string, data?: { title?: string; start_date?: string }): Promise<ApiResponse<TravelPlan>> {
     const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {});
-    return { success: true, data: this.planFromApi(response.data) } as ApiResponse<TravelPlan>;
+    return apiOk<TravelPlan>(this.planFromApi(response.data));
   }
 
   // [Gate R2-4] POST /quick-drafts/{id}/promote。既存セッション(guest/member)の
@@ -107,7 +110,7 @@ export class PlansApi extends SpotsApi {
 
   async getPlanDetail(planId: string): Promise<ApiResponse<NormalizedPlanDetail>> {
     const response = await this.client.get<NormalizedPlanDetail>(`/plans/${planId}`);
-    return { success: true, data: response.data } as ApiResponse<NormalizedPlanDetail>;
+    return apiOk<NormalizedPlanDetail>(response.data);
   }
 
   async createDay(
@@ -133,10 +136,10 @@ export class PlansApi extends SpotsApi {
   }
 
   async deleteDay(planId: string, dayId: string, ifMatch: number): Promise<{ revision: number }> {
-    const response = await this.client.delete<{ revision: number }>(
+    const response = await this.client.delete(
       `/plans/${planId}/days/${dayId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/days/{day_id}');
   }
 
   async createEvent(
@@ -169,10 +172,10 @@ export class PlansApi extends SpotsApi {
   }
 
   async deleteEvent(planId: string, eventId: string, ifMatch: number): Promise<{ revision: number }> {
-    const response = await this.client.delete<{ revision: number }>(
+    const response = await this.client.delete(
       `/plans/${planId}/events/${eventId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/events/{event_id}');
   }
 
   async moveEvent(
@@ -188,9 +191,9 @@ export class PlansApi extends SpotsApi {
   }
 
   async undoLastPlanChange(planId: string, ifMatch: number): Promise<{ revision: number }> {
-    const response = await this.client.post<{ revision: number }>(
+    const response = await this.client.post(
       `/plans/${planId}/undo`, {}, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'POST /plans/{plan_id}/undo');
   }
 }

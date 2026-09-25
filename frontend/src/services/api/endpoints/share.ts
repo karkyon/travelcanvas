@@ -5,6 +5,7 @@
  */
 import { NotificationsApi } from './notifications';
 import type { ApiResponse, Collaborator, PublicSharedPlan, ShareLink } from '../types';
+import { apiOk, apiOkVoid } from '../response';
 
 export class ShareApi extends NotificationsApi {
   // [Gate #27 / A-009] getNotificationSettings/updateNotificationSettingsは
@@ -17,22 +18,22 @@ export class ShareApi extends NotificationsApi {
   // 返すためクライアント側でApiResponse形状へ手動で包む。
   async revokeShareLink(planId: string, shareId: string): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post<ShareLink>(`/travel-plans/${planId}/share/${shareId}/revoke`);
-    return { success: true, data: response.data } as ApiResponse<ShareLink>;
+    return apiOk<ShareLink>(response.data);
   }
 
   async listMyInvitations(): Promise<ApiResponse<Collaborator[]>> {
     const response = await this.client.get<Collaborator[]>('/travel-plans/invitations');
-    return { success: true, data: response.data } as ApiResponse<Collaborator[]>;
+    return apiOk<Collaborator[]>(response.data);
   }
 
   async acceptInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post<Collaborator>(`/travel-plans/invitations/${collaboratorId}/accept`);
-    return { success: true, data: response.data } as ApiResponse<Collaborator>;
+    return apiOk<Collaborator>(response.data);
   }
 
   async declineInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post<Collaborator>(`/travel-plans/invitations/${collaboratorId}/decline`);
-    return { success: true, data: response.data } as ApiResponse<Collaborator>;
+    return apiOk<Collaborator>(response.data);
   }
 
   // [Gate #30] 認証不要の公開共有リンク解決。未ログインでも呼び出せる
@@ -42,7 +43,7 @@ export class ShareApi extends NotificationsApi {
     const response = await this.client.post<PublicSharedPlan>(`/public/share/${token}/resolve`, {
       passcode: passcode || undefined,
     });
-    return { success: true, data: response.data } as ApiResponse<PublicSharedPlan>;
+    return apiOk<PublicSharedPlan>(response.data);
   }
 
   async createShareLink(planId: string, shareData: {
@@ -52,12 +53,12 @@ export class ShareApi extends NotificationsApi {
     max_uses?: number;
   }): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post<ShareLink>(`/travel-plans/${planId}/share`, shareData);
-    return { success: true, data: response.data } as ApiResponse<ShareLink>;
+    return apiOk<ShareLink>(response.data);
   }
 
   async getShareSettings(planId: string): Promise<ApiResponse<ShareLink[]>> {
     const response = await this.client.get<ShareLink[]>(`/travel-plans/${planId}/share`);
-    return { success: true, data: response.data } as ApiResponse<ShareLink[]>;
+    return apiOk<ShareLink[]>(response.data);
   }
 
   async updateShareSettings(planId: string, shareId: string, data: {
@@ -67,12 +68,12 @@ export class ShareApi extends NotificationsApi {
     max_uses?: number | null;
   }): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.put<ShareLink>(`/travel-plans/${planId}/share/${shareId}`, data);
-    return { success: true, data: response.data } as ApiResponse<ShareLink>;
+    return apiOk<ShareLink>(response.data);
   }
 
   async deleteShareLink(planId: string, shareId: string): Promise<ApiResponse<void>> {
     await this.client.delete<unknown>(`/travel-plans/${planId}/share/${shareId}`);
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 
   async inviteCollaborator(planId: string, inviteData: {
@@ -81,16 +82,16 @@ export class ShareApi extends NotificationsApi {
     message?: string;
   }): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post<Collaborator>(`/travel-plans/${planId}/collaborators`, inviteData);
-    return { success: true, data: response.data } as ApiResponse<Collaborator>;
+    return apiOk<Collaborator>(response.data);
   }
 
   async getCollaborators(planId: string): Promise<ApiResponse<Collaborator[]>> {
     const response = await this.client.get<Collaborator[]>(`/travel-plans/${planId}/collaborators`);
-    return { success: true, data: response.data } as ApiResponse<Collaborator[]>;
+    return apiOk<Collaborator[]>(response.data);
   }
 
   async removeCollaborator(planId: string, collaboratorId: string): Promise<ApiResponse<void>> {
     await this.client.delete<unknown>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 }

@@ -5,13 +5,15 @@
  */
 import { ImportsApi } from './imports';
 import type { TodayResponse } from '../types';
+import { decodeResponse } from '../decode';
+import { todayResponse } from '../decoders';
 
 export class TodayApi extends ImportsApi {
   // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
   // backend/app/api/v1/plans.py の GET /plans/{planId}/today。
 
   async getToday(planId: string): Promise<TodayResponse> {
-    const response = await this.client.get<TodayResponse>(`/plans/${planId}/today`);
-    return response.data;
+    const response = await this.client.get(`/plans/${planId}/today`);
+    return decodeResponse(response.data, todayResponse, 'GET /plans/{plan_id}/today');
   }
 }

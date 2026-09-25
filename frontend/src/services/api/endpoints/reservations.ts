@@ -5,6 +5,8 @@
  */
 import { PlansApi } from './plans';
 import type { Reservation, ReservationCreateData, ReservationEventLink, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationParticipant, ReservationRevealResult, ReservationUpdateData } from '../types';
+import { decodeResponse } from '../decode';
+import { reservationRevealResult } from '../decoders';
 
 export class ReservationsApi extends PlansApi {
   // backend/app/api/v1/reservations.py (Gate R3-0/R3-1)。/plans/{planId}/...
@@ -44,10 +46,10 @@ export class ReservationsApi extends PlansApi {
   }
 
   async revealReservation(planId: string, reservationId: string): Promise<ReservationRevealResult> {
-    const response = await this.client.post<ReservationRevealResult>(
+    const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/reveal`, {}
     );
-    return response.data;
+    return decodeResponse(response.data, reservationRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/reveal');
   }
 
   async getReservationParticipants(planId: string, reservationId: string): Promise<ReservationParticipant[]> {

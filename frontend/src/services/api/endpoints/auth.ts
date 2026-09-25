@@ -6,6 +6,7 @@
 import type { User } from '@/types';
 import { ApiCore } from '../core';
 import type { ApiResponse, AuthResponse, LoginCredentials, RegisterData } from '../types';
+import { apiOk, apiOkVoid } from '../response';
 
 export class AuthApi extends ApiCore {
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -45,12 +46,12 @@ export class AuthApi extends ApiCore {
   // エンドポイントと同じ形状)。この関数側でApiResponse形状に包み直す。
   async getCurrentUser(): Promise<ApiResponse<User>> {
     const response = await this.client.get<User>('/auth/me');
-    return { success: true, data: response.data } as ApiResponse<User>;
+    return apiOk<User>(response.data);
   }
 
   async updateProfile(data: Partial<User> & { preferences?: Record<string, unknown> }): Promise<ApiResponse<User>> {
     const response = await this.client.put<User>('/auth/me', data);
-    return { success: true, data: response.data } as ApiResponse<User>;
+    return apiOk<User>(response.data);
   }
 
   async changePassword(data: { 
@@ -60,6 +61,6 @@ export class AuthApi extends ApiCore {
     // [Gate #21] 実バックエンド(/auth/change-password、今回新規実装)は
     // ApiResponseラッパー無しで {message: string} を直接返す。
     await this.client.post<{ message: string }>('/auth/change-password', data);
-    return { success: true } as ApiResponse<void>;
+    return apiOkVoid();
   }
 }

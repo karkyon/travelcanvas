@@ -5,6 +5,8 @@
  */
 import { TodayApi } from './today';
 import type { DocumentClassification, DocumentLink, TravelDocument } from '../types';
+import { decodeResponse } from '../decode';
+import { downloadUrlResult } from '../decoders';
 
 export class DocumentsApi extends TodayApi {
   async getDocuments(planId: string): Promise<TravelDocument[]> {
@@ -42,10 +44,10 @@ export class DocumentsApi extends TodayApi {
   }
 
   async getDocumentDownloadUrl(planId: string, documentId: string): Promise<{ url: string; expires_at: number }> {
-    const response = await this.client.get<{ url: string; expires_at: number }>(
+    const response = await this.client.get(
       `/plans/${planId}/documents/${documentId}/download-url`
     );
-    return response.data;
+    return decodeResponse(response.data, downloadUrlResult, 'GET /plans/{plan_id}/documents/{document_id}/download-url');
   }
 
   async deleteDocument(planId: string, documentId: string, ifMatch: number): Promise<void> {

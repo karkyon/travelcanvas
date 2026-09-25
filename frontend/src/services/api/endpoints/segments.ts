@@ -5,6 +5,8 @@
  */
 import { ReservationsApi } from './reservations';
 import type { SegmentCreateData, SegmentUpdateData, TravelSegment } from '../types';
+import { decodeResponse } from '../decode';
+import { revisionResult } from '../decoders';
 
 export class SegmentsApi extends ReservationsApi {
   // backend/app/api/v1/segments.py (Gate M1)。/plans/{planId}/segments配下。
@@ -40,9 +42,9 @@ export class SegmentsApi extends ReservationsApi {
   }
 
   async deleteSegment(planId: string, segmentId: string, ifMatch: number): Promise<{ revision: number }> {
-    const response = await this.client.delete<{ revision: number }>(
+    const response = await this.client.delete(
       `/plans/${planId}/segments/${segmentId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return response.data;
+    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/segments/{segment_id}');
   }
 }
