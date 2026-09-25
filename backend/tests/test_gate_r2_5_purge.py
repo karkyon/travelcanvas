@@ -6,6 +6,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
 
 from app.models.models import Device, IdempotencyRecord, QuickDraft, TravelPlan, User
 from app.services.quickdraft_purge import (
@@ -13,6 +14,18 @@ from app.services.quickdraft_purge import (
     QUICK_DRAFT_PROMOTED_RETENTION_DAYS,
     purge_expired_quickdrafts,
 )
+
+
+@pytest.fixture(autouse=True)
+def _drain_preexisting_purgeable_rows(db_session):
+    """[Gate T-R2-5] purge_expired_quickdrafts()はテーブル全体を走査するため、
+    テストDBに既に存在する(他テストや過去の実行でcommit済みの)期限切れ行も
+    処理件数に含めてしまう。各テストの冒頭で一度purgeを実行して既存の対象行を
+    処理済みにしておき、以降の件数assertが「このテストが作った行」だけを
+    数えるようにする。db_sessionはテスト終了時にロールバックされるため、
+    ここでの削除・状態遷移はテストDBへ永続化されない。"""
+    purge_expired_quickdrafts(db_session)
+    yield
 
 
 def _make_device(db_session):
