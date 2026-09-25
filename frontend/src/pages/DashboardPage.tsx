@@ -32,18 +32,19 @@ const DashboardPage: React.FC = () => {
   }
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
-  // 認証チェック（一度だけ実行）
+  // 認証チェック
+  // [Gate M9-FE-B3] 以前は空の依存配列で「マウント時の一度だけ」判定しており、
+  // 表示中にログアウトしてもリダイレクトされなかった(exhaustive-deps警告)。
+  // isAuthenticatedの変化にも追随する。navigateはdata router配下で安定参照。
+  // (ユーザーオブジェクト全体をconsoleへ出力していたログは個人情報を含むため削除)
   useEffect(() => {
-    console.log('🔍 DashboardPage: 認証状態確認', { isAuthenticated, user });
-    
     if (!isAuthenticated) {
-      console.log('🚫 未認証のため、ログインページへリダイレクト');
       navigate('/login');
       return;
     }
-    
+
     setLoading(false);
-  }, []); // 空の依存配列で一度だけ実行
+  }, [isAuthenticated, navigate]);
 
   // 登録スポット数・お気に入り数を取得
   useEffect(() => {

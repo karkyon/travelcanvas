@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 // [Gate M9-FE-B2] Context・useToast Hook・型はtoastContext.tsへ移設
 // (Fast Refresh: コンポーネントと非コンポーネントのexport混在を解消)。
@@ -17,7 +17,17 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
 }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (toast: Omit<Toast, 'id'>) => {
+  // [Gate M9-FE-B3] addToast/removeToast/clearToastsとcontext valueを安定化する。
+  // 以前は描画のたびに関数・value objectが作り直されていたため、利用側で
+  // addToastをeffect/useCallbackの依存に含めると、toast表示(=Provider再描画)の
+  // たびに依存が変化し、「読み込み失敗→エラーtoast→再読み込み→…」の無限ループを
+  // 起こし得た(そのため利用側は依存から外さざるを得ず、exhaustive-deps警告の
+  // 原因になっていた)。挙動(toastの追加・自動削除・最大件数)は変更しない。
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
+  const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9);
     const newToast: Toast = {
       id,
@@ -37,15 +47,16 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
         removeToast(id);
       }, newToast.duration);
     }
-  };
+  }, [maxToasts, removeToast]);
 
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
-
-  const clearToasts = () => {
+  const clearToasts = useCallback(() => {
     setToasts([]);
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ addToast, removeToast, clearToasts }),
+    [addToast, removeToast, clearToasts]
+  );
 
   const positionClasses = {
     'top-right': 'top-4 right-4',
@@ -57,7 +68,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
   };
 
   return (
-    <ToastContext.Provider value={{ addToast, removeToast, clearToasts }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {createPortal(
         <div className={`fixed z-50 space-y-3 ${positionClasses[position]}`}>

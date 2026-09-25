@@ -262,6 +262,10 @@ const AdminUsers: React.FC = () => {
     sort_order: 'desc',
   });
 
+  // [Gate M9-FE-B3] 検索入力欄の即時値。filters.search(=API問い合わせに使う値)へは
+  // 下のデバウンスeffectで500ms後に反映する。
+  const [searchInput, setSearchInput] = React.useState('');
+
   const { user: currentUser } = useAuthStore();
   const navigate = useNavigate();
 
@@ -304,7 +308,6 @@ const AdminUsers: React.FC = () => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, pagination.page_size, filters]);
 
   React.useEffect(() => {
@@ -312,18 +315,17 @@ const AdminUsers: React.FC = () => {
   }, [fetchUsers]);
 
   // 検索デバウンス
+  // [Gate M9-FE-B3] 入力(searchInput)が500ms止まった時点でfilters.searchへ反映し、
+  // 同時にpage=1へ戻す。実際のfetchは上のeffect([fetchUsers])が1回だけ行う。
+  // 値が変わらない場合はprevをそのまま返し、不要な再fetchを起こさない。
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      if (pagination.page !== 1) {
-        setPagination((prev) => ({ ...prev, page: 1 }));
-      } else {
-        fetchUsers();
-      }
+      setFilters((prev) => (prev.search === searchInput ? prev : { ...prev, search: searchInput }));
+      setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
     }, 500);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.search]);
+  }, [searchInput]);
 
   const handleUserClick = (user: AdminUser) => {
     setSelectedUser(user);
@@ -370,8 +372,8 @@ const AdminUsers: React.FC = () => {
             <Input
               type="text"
               placeholder="🔍 ユーザー名、メールアドレスで検索..."
-              value={filters.search}
-              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
 

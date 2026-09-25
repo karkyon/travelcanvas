@@ -3,6 +3,64 @@ import { usePlan } from './usePlan';
 import { usePlanStore } from '../store/planStore';
 import type { ScheduleItem, DragDropState, DropResult } from '../types';
 
+// [Gate M9-FE-B3] 以下3つのhelperは以前hook内でuseCallback([])として定義され、
+// 定義位置より前のhandleDropから参照されていたため依存漏れ警告になっていた。
+// いずれもhookのstate/propsを一切参照しない(引数とusePlanStore.getState()のみ)
+// ため、hook外のモジュール関数へ移した。挙動は変更していない。
+
+/** 配列の並び替えヘルパー */
+export const reorderArray = (
+  array: string[],
+  itemId: string,
+  newIndex: number
+): string[] => {
+  const currentIndex = array.indexOf(itemId);
+  if (currentIndex === -1) return array;
+
+  const newArray = [...array];
+  newArray.splice(currentIndex, 1);
+  newArray.splice(newIndex, 0, itemId);
+
+  return newArray;
+};
+
+/**
+ * 現在のアイテム順序取得
+ * [Gate #31.5C] 監査是正(R-08): 以前は常に空配列を返すTODOスタブで、
+ * 同日内の並べ替え(reorderArray)が実質的に機能していなかった。
+ * planStore.currentPlanから実際の順序を取得する。
+ */
+export const getCurrentItemOrder = (planId: string, dayId: string): string[] => {
+  const currentPlan = usePlanStore.getState().currentPlan;
+  if (!currentPlan || currentPlan.id !== planId) return [];
+  const day = currentPlan.days.find((d) => d.id === dayId);
+  return day ? day.events.map((event) => event.id) : [];
+};
+
+/**
+ * 日付間でのアイテム移動
+ * [Gate #31.5C] 監査是正(R-08): 以前はday_idを渡さずupdateScheduleItemDetails
+ * (プラン全体PUT)を呼ぶだけで、実際には何も移動していなかった
+ * (コメントアウトされたTODOがそのまま放置されていた)。
+ * planStore.moveItemBetweenDaysはdayIndex(数値)で日を特定する設計のため、
+ * dayId(文字列)からインデックスを解決してから呼び出す。
+ */
+export const moveItemBetweenDays = async (
+  itemId: string,
+  sourceDayId: string,
+  targetDayId: string,
+  targetIndex: number
+): Promise<void> => {
+  const currentPlan = usePlanStore.getState().currentPlan;
+  if (!currentPlan) return;
+
+  const fromDayIndex = currentPlan.days.findIndex((d) => d.id === sourceDayId);
+  const toDayIndex = currentPlan.days.findIndex((d) => d.id === targetDayId);
+  if (fromDayIndex === -1 || toDayIndex === -1) return;
+
+  await usePlanStore.getState().moveItemBetweenDays(itemId, fromDayIndex, toDayIndex, targetIndex);
+};
+
 export const useDragDrop = () => {
   const { reorderSchedule } = usePlan();
   
@@ -175,55 +233,6 @@ export const useDragDrop = () => {
     });
   }, []);
 
-  // 配列の並び替えヘルパー
-  const reorderArray = useCallback((
-    array: string[],
-    itemId: string,
-    newIndex: number
-  ): string[] => {
-    const currentIndex = array.indexOf(itemId);
-    if (currentIndex === -1) return array;
-
-    const newArray = [...array];
-    newArray.splice(currentIndex, 1);
-    newArray.splice(newIndex, 0, itemId);
-    
-    return newArray;
-  }, []);
-
-  // 現在のアイテム順序取得
-  // [Gate #31.5C] 監査是正(R-08): 以前は常に空配列を返すTODOスタブで、
-  // 同日内の並べ替え(reorderArray)が実質的に機能していなかった。
-  // planStore.currentPlanから実際の順序を取得する。
-  const getCurrentItemOrder = useCallback((planId: string, dayId: string): string[] => {
-    const currentPlan = usePlanStore.getState().currentPlan;
-    if (!currentPlan || currentPlan.id !== planId) return [];
-    const day = currentPlan.days.find((d) => d.id === dayId);
-    return day ? day.events.map((event) => event.id) : [];
-  }, []);
-
-  // 日付間でのアイテム移動
-  // [Gate #31.5C] 監査是正(R-08): 以前はday_idを渡さずupdateScheduleItemDetails
-  // (プラン全体PUT)を呼ぶだけで、実際には何も移動していなかった
-  // (コメントアウトされたTODOがそのまま放置されていた)。
-  // planStore.moveItemBetweenDaysはdayIndex(数値)で日を特定する設計のため、
-  // dayId(文字列)からインデックスを解決してから呼び出す。
-  const moveItemBetweenDays = useCallback(async (
-    itemId: string,
-    sourceDayId: string,
-    targetDayId: string,
-    targetIndex: number
-  ) => {
-    const currentPlan = usePlanStore.getState().currentPlan;
-    if (!currentPlan) return;
-
-    const fromDayIndex = currentPlan.days.findIndex((d) => d.id === sourceDayId);
-    const toDayIndex = currentPlan.days.findIndex((d) => d.id === targetDayId);
-    if (fromDayIndex === -1 || toDayIndex === -1) return;
-
-    await usePlanStore.getState().moveItemBetweenDays(itemId, fromDayIndex, toDayIndex, targetIndex);
-  }, []);
-
   // マルチセレクションサポート
   const handleMultiSelect = useCallback((
     event: React.MouseEvent,
@@ -317,7 +326,7 @@ export const useDragDrop = () => {
     newOrder[targetIndex] = tmp;
 
     await reorderSchedule(planId, dayId, newOrder);
-  }, [getCurrentItemOrder, reorderSchedule]);
+  }, [reorderSchedule]);
 
   return {
     dragState,

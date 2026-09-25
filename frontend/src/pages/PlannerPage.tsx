@@ -166,15 +166,19 @@ const PlannerPage: React.FC = () => {
   const [incomingSpot, setIncomingSpot] = useState<IncomingSpot | undefined>(routeState?.newSpot);
   const [isAddSpotModalOpen, setIsAddSpotModalOpen] = useState(false);
   const [isAddingSpot, setIsAddingSpot] = useState(false);
+  // [Gate M9-FE-B3] effectが参照する値をローカル変数へ取り出し、依存を正確に宣言する
+  // (以前はeslint-disableで抑制していた。発火条件はnewSpot/spotIdの変化時のみで不変)。
+  const routeNewSpot = routeState?.newSpot;
+  const routeSpotId = routeState?.spotId;
 
   useEffect(() => {
-    if (routeState?.newSpot) {
-      setIncomingSpot(routeState.newSpot);
+    if (routeNewSpot) {
+      setIncomingSpot(routeNewSpot);
       setIsAddSpotModalOpen(true);
-    } else if (routeState?.spotId) {
+    } else if (routeSpotId) {
       (async () => {
         try {
-          const spot = await spotApiService.getSpot(routeState.spotId as string);
+          const spot = await spotApiService.getSpot(routeSpotId);
           setIncomingSpot({
             name: spot.name,
             description: spot.description,
@@ -189,8 +193,7 @@ const PlannerPage: React.FC = () => {
         }
       })();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeState?.newSpot, routeState?.spotId]);
+  }, [routeNewSpot, routeSpotId, addToast]);
 
   const addSpotToExistingOrNewPlan = async (targetPlanId?: string) => {
     if (!incomingSpot) return;
@@ -248,7 +251,7 @@ const PlannerPage: React.FC = () => {
     if (!planId) {
       loadPlans();
     }
-  }, [planId]);
+  }, [planId, loadPlans]);
 
   // 詳細画面: 指定プランを読み込む
   useEffect(() => {
@@ -257,22 +260,24 @@ const PlannerPage: React.FC = () => {
     } else {
       clearCurrentPlan();
     }
-  }, [planId]);
+  }, [planId, loadPlan, clearCurrentPlan]);
 
   // [Gate #36] オフラインパックの保存有無を表示に反映する
+  // [Gate M9-FE-B3] currentPlan全体ではなくidだけに依存させる(従来の発火条件と同じ)。
+  const currentPlanId = currentPlan?.id;
   useEffect(() => {
-    if (!currentPlan) {
+    if (!currentPlanId) {
       setIsOfflineSaved(false);
       return;
     }
     let cancelled = false;
-    checkOfflineAvailability(currentPlan.id).then((available) => {
+    checkOfflineAvailability(currentPlanId).then((available) => {
       if (!cancelled) setIsOfflineSaved(available);
     });
     return () => {
       cancelled = true;
     };
-  }, [currentPlan?.id]);
+  }, [currentPlanId, checkOfflineAvailability]);
 
   // [Gate #37] 自動検出のON/OFFと表示中の日付に応じてVisitDetectorを起動/停止する。
   // 「今日」の日程イベント(spot_idを持つもののみ)だけを対象にする —
@@ -366,15 +371,19 @@ const PlannerPage: React.FC = () => {
   // (Playwright E2E実行で発覚)。ゲストの間はroute-preview取得自体を
   // 行わないようにする(catchで握りつぶしても、interceptor側の強制
   // リダイレクトは止められないため、呼び出し自体を避ける必要がある)。
+  // [Gate M9-FE-B3] 以前はcurrentPlan全体を参照しながら依存を
+  // [currentPlan?.id, currentDayIndex, currentPlan?.days.length, isGuest]としていた
+  // (警告)。実際に使う値(プランID・表示中の日のID)だけに依存させる。表示中の日が
+  // 変わらないまま他の日が追加/削除された場合の無駄な再取得も起きなくなる。
+  const activeDayId = currentPlan?.days[currentDayIndex]?.id;
   useEffect(() => {
-    const activeDay = currentPlan?.days[currentDayIndex];
-    if (!currentPlan || !activeDay || isGuest) {
+    if (!currentPlanId || !activeDayId || isGuest) {
       setRoutePreview(null);
       return;
     }
     let cancelled = false;
     apiService
-      .getRoutePreview(currentPlan.id, activeDay.id, 'walking')
+      .getRoutePreview(currentPlanId, activeDayId, 'walking')
       .then((preview) => {
         if (!cancelled) setRoutePreview(preview);
       })
@@ -384,7 +393,7 @@ const PlannerPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentPlan?.id, currentDayIndex, currentPlan?.days.length, isGuest]);
+  }, [currentPlanId, activeDayId, isGuest]);
 
   const handleCreatePlan = async () => {
     // [Gate #38] CA-001の受入条件「旅行名未入力でも作成できる」に合わせ、

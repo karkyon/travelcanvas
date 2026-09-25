@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Link, QrCode, Mail, Copy, Eye, Edit3, Shield,
@@ -37,23 +37,18 @@ const SharePage: React.FC = () => {
   const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
   const [inviteMessage, setInviteMessage] = useState('');
 
-  useEffect(() => {
-    if (planId) {
-      loadShareSettings();
-      loadCollaborators();
-    }
-  }, [planId]);
-
-  const loadShareSettings = async () => {
+  // [Gate M9-FE-B3] planIdにのみ依存するuseCallbackとし、effectの依存を正しく
+  // 宣言する(発火条件は従来どおりplanId変化時のみ)。
+  const loadShareSettings = useCallback(async () => {
     try {
       const response = await getShareSettings(planId!);
       setShareLinks(response.data ?? []);
     } catch (error) {
       console.error('共有設定の取得に失敗:', error);
     }
-  };
+  }, [planId]);
 
-  const loadCollaborators = async () => {
+  const loadCollaborators = useCallback(async () => {
     try {
       const response = await getCollaborators(planId!);
       setCollaborators(response.data);
@@ -62,7 +57,14 @@ const SharePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [planId]);
+
+  useEffect(() => {
+    if (planId) {
+      loadShareSettings();
+      loadCollaborators();
+    }
+  }, [planId, loadShareSettings, loadCollaborators]);
 
   const handleCreateShare = async () => {
     setIsSaving(true);

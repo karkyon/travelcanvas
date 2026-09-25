@@ -734,7 +734,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       let revision = plan.revision!;
       for (let i = 0; i < reorderedEvents.length; i++) {
         const event = reorderedEvents[i]!;
-        // eslint-disable-next-line no-await-in-loop
+        // revisionを1件ずつ連鎖させるため、意図的に逐次awaitする(並列化不可)。
         await apiService.moveEvent(plan.id, event.id, { sort_order: i }, revision, generateIdempotencyKey());
         revision += 1;
       }

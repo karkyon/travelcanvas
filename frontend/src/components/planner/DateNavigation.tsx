@@ -43,18 +43,9 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
 
   useEffect(() => {
     // アクティブなタブが見えるようにスクロール
-    scrollToActiveTab();
-  }, [currentDay]);
-
-  const checkScrollPosition = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
-    }
-  };
-
-  const scrollToActiveTab = () => {
+    // [Gate M9-FE-B3] 以前はコンポーネント直下の関数scrollToActiveTab(currentDayを
+    // 参照)を呼んでおり依存漏れ警告になっていた。currentDay変化時にのみ実行する
+    // 意図どおり、処理本体をeffect内へ移した(scrollRefはrefのため依存不要)。
     if (scrollRef.current) {
       const activeTab = scrollRef.current.querySelector(`[data-day="${currentDay}"]`) as HTMLElement;
       if (activeTab) {
@@ -75,6 +66,14 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
           });
         }
       }
+    }
+  }, [currentDay]);
+
+  const checkScrollPosition = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
     }
   };
 

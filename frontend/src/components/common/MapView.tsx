@@ -88,6 +88,11 @@ declare global {
   }
 }
 
+// [Gate M9-FE-B3] routesの既定値。以前は引数既定値`routes = []`で描画のたびに新しい配列が
+// 作られ、routesを依存に持つマーカーeffectが親の再描画のたびに再実行されてマーカーを
+// 重複生成していた。モジュール定数にして参照を固定する。
+const EMPTY_ROUTES: MapRoute[] = [];
+
 // Google Maps が利用できない場合のダミーマップコンポーネント
 const DummyMap: React.FC<{
   locations: MapLocation[];
@@ -133,7 +138,7 @@ const DummyMap: React.FC<{
 
 const MapView: React.FC<MapViewProps> = ({
   locations,
-  routes = [],
+  routes = EMPTY_ROUTES,
   centerLocation,
   zoom = 13,
   height = '400px',
@@ -149,6 +154,13 @@ const MapView: React.FC<MapViewProps> = ({
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
   const [showOptimizedRoute, setShowOptimizedRoute] = useState(true);
   const [currentView, setCurrentView] = useState<'hybrid' | 'roadmap' | 'satellite'>('roadmap');
+  // [Gate M9-FE-B3] マーカーのclickリスナーからは常に最新のonLocationClickを呼ぶ。
+  // 以前は依存配列に含めておらず(警告)、単純に含めると親の再描画のたびにマーカーを
+  // 重複生成してしまう(既存マーカーを破棄していないため)。refで最新値だけを参照する。
+  const onLocationClickRef = useRef(onLocationClick);
+  useEffect(() => {
+    onLocationClickRef.current = onLocationClick;
+  }, [onLocationClick]);
 
   // Google Maps API の初期化
   useEffect(() => {
@@ -202,7 +214,9 @@ const MapView: React.FC<MapViewProps> = ({
 
       setMapInstance(map);
     }
-  }, [isGoogleMapsLoaded, centerLocation, zoom, currentView]);
+    // [Gate M9-FE-B3] locations/mapInstanceを依存に宣言。本体は`!mapInstance`で
+    // ガードされているため、地図インスタンスは従来どおり一度だけ生成される。
+  }, [isGoogleMapsLoaded, centerLocation, zoom, currentView, locations, mapInstance]);
 
   // マーカーとルートの表示
   useEffect(() => {
@@ -249,7 +263,7 @@ const MapView: React.FC<MapViewProps> = ({
 
         marker.addListener('click', () => {
           infoWindow.open(mapInstance, marker);
-          onLocationClick?.(location);
+          onLocationClickRef.current?.(location);
         });
       });
 
@@ -299,7 +313,7 @@ const MapView: React.FC<MapViewProps> = ({
         });
       }
     }
-  }, [mapInstance, locations, routes, showMarkers, showRoutes, showOptimizedRoute]);
+  }, [mapInstance, isGoogleMapsLoaded, locations, routes, showMarkers, showRoutes, showOptimizedRoute]);
 
   const handleViewChange = (view: 'hybrid' | 'roadmap' | 'satellite') => {
     setCurrentView(view);

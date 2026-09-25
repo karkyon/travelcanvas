@@ -9,7 +9,7 @@
  * 管理画面(SharePage.tsx, /share/:planId)とは意図的にpath自体を分離して
  * いる(監査指摘: 管理画面と公開画面のroute衝突解消)。
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Lock, MapPin, Calendar, AlertCircle, Share2 } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -26,7 +26,8 @@ const PublicSharePage: React.FC = () => {
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const load = async (withPasscode?: string) => {
+  // [Gate M9-FE-B3] tokenにのみ依存するuseCallbackとし、eslint-disableを除去。
+  const load = useCallback(async (withPasscode?: string) => {
     if (!token) return;
     try {
       const response = await resolvePublicShare(token, withPasscode);
@@ -43,12 +44,11 @@ const PublicSharePage: React.FC = () => {
         setState('invalid');
       }
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [load]);
 
   const handleSubmitPasscode = async (e: React.FormEvent) => {
     e.preventDefault();

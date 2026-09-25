@@ -2,7 +2,7 @@
  * スポット一覧コンポーネント
  * 登録済みスポットの表示と管理
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { spotApiService, SpotResponse } from '../services/spotApi';
 import Button from './common/Button';
 import Card from './common/Card';
@@ -24,7 +24,10 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   const [visitedSpotIds, setVisitedSpotIds] = useState<Set<string>>(new Set());
   const { addToast } = useToast();
   
-  const loadSpots = async () => {
+  // [Gate M9-FE-B3] useCallback化。発火条件は従来どおり
+  // 「マウント時・カテゴリ変更時・refreshTrigger変更時」のみ
+  // (addToastはToastProvider側で安定化済みのため再生成されない)。
+  const loadSpots = useCallback(async () => {
     setIsLoading(true);
     try {
       const spotsData = await spotApiService.getSpots(selectedCategory);
@@ -38,7 +41,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedCategory, addToast]);
 
   const loadFavorites = async () => {
     try {
@@ -128,7 +131,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
   
   useEffect(() => {
     loadSpots();
-  }, [selectedCategory, refreshTrigger]);
+  }, [loadSpots, refreshTrigger]);
   
   const handleDeleteSpot = async (spotId: string) => {
     if (!confirm('このスポットを削除しますか？')) {
