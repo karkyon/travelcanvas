@@ -1,38 +1,45 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { ProtectedRoute, AdminRoute, AuthRedirect } from './guards';
+import RouteErrorBoundary from './RouteErrorBoundary';
+import { lazyPage } from './lazyPage';
+
+// [Gate M9-FE-C3] 全ページをルート単位で遅延読込する(React.lazy)。以前は25ページを
+// 静的importしており、どの画面を開いても全画面分(main JS 約732kB)を最初に読み込んでいた。
+// 読込中の表示は components/Layout.tsx の<Suspense>、読込失敗(デプロイ後に旧chunkが
+// 消えた等)は lazyPage の1回限りの自動再読込と RouteErrorBoundary で扱う。
 
 // 既存ページのインポート
-import LandingPage from '@/pages/LandingPage';
-import LoginPage from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
-import GuestUpgradePage from '@/pages/GuestUpgradePage';
-import DashboardPage from '@/pages/DashboardPage';
-import PlannerPage from '@/pages/PlannerPage';
-import SearchPage from '@/pages/SearchPage';
-import SearchSettingsPage from '@/pages/SearchSettingsPage';
-import SettingsPage from '@/pages/SettingsPage';
-import SharePage from '@/pages/SharePage';
-import PublicSharePage from '@/pages/PublicSharePage';
-import NotFoundPage from '@/pages/NotFoundPage';
+const LandingPage = lazyPage(() => import('@/pages/LandingPage'));
+const LoginPage = lazyPage(() => import('@/pages/LoginPage'));
+const RegisterPage = lazyPage(() => import('@/pages/RegisterPage'));
+const GuestUpgradePage = lazyPage(() => import('@/pages/GuestUpgradePage'));
+const DashboardPage = lazyPage(() => import('@/pages/DashboardPage'));
+const PlannerPage = lazyPage(() => import('@/pages/PlannerPage'));
+const SearchPage = lazyPage(() => import('@/pages/SearchPage'));
+const SearchSettingsPage = lazyPage(() => import('@/pages/SearchSettingsPage'));
+const SettingsPage = lazyPage(() => import('@/pages/SettingsPage'));
+const SharePage = lazyPage(() => import('@/pages/SharePage'));
+const PublicSharePage = lazyPage(() => import('@/pages/PublicSharePage'));
+const NotFoundPage = lazyPage(() => import('@/pages/NotFoundPage'));
 
 // 新しく作成したページのインポート
-import SpotRegisterPage from '@/pages/SpotRegisterPage';
-import SpotListPage from '@/pages/SpotListPage';
-import ProfilePage from '@/pages/ProfilePage';
+const SpotRegisterPage = lazyPage(() => import('@/pages/SpotRegisterPage'));
+const SpotListPage = lazyPage(() => import('@/pages/SpotListPage'));
+const ProfilePage = lazyPage(() => import('@/pages/ProfilePage'));
 
 // [Gate #24] 管理者ページのインポート。以前はどちらもファイルは存在するが
 // ここでインポート・ルート登録されておらず、画面として一度も到達できなかった。
-import AdminDashboard from '@/pages/Admin/AdminDashboard';
-import AdminUsers from '@/pages/Admin/AdminUsers';
-import NotificationsPage from '@/pages/NotificationsPage';
-import OptimizationSelectPage from '@/pages/OptimizationSelectPage';
-import ReservationsPage from '@/pages/ReservationsPage';
-import ImportsPage from '@/pages/ImportsPage';
-import DocumentsPage from '@/pages/DocumentsPage';
-import TodayPage from '@/pages/TodayPage';
-import SegmentsPage from '@/pages/SegmentsPage';
-import RouteOptionsPage from '@/pages/RouteOptionsPage';
+const AdminDashboard = lazyPage(() => import('@/pages/Admin/AdminDashboard'));
+const AdminUsers = lazyPage(() => import('@/pages/Admin/AdminUsers'));
+const NotificationsPage = lazyPage(() => import('@/pages/NotificationsPage'));
+const OptimizationSelectPage = lazyPage(() => import('@/pages/OptimizationSelectPage'));
+const ReservationsPage = lazyPage(() => import('@/pages/ReservationsPage'));
+const ImportsPage = lazyPage(() => import('@/pages/ImportsPage'));
+const DocumentsPage = lazyPage(() => import('@/pages/DocumentsPage'));
+const TodayPage = lazyPage(() => import('@/pages/TodayPage'));
+const SegmentsPage = lazyPage(() => import('@/pages/SegmentsPage'));
+const RouteOptionsPage = lazyPage(() => import('@/pages/RouteOptionsPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -41,6 +48,9 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    // [Gate M9-FE-C3] 画面の描画・chunk読込で例外が起きた場合の回復画面
+    // (以前はReact Router既定の開発者向けエラー表示になっていた)。
+    errorElement: <RouteErrorBoundary />,
     children: [
       // 🏠 基本ページ
       {
