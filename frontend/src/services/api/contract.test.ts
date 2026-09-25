@@ -56,6 +56,7 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['document_link_list', arrayOf(documentLink)],
   ['document_download_url', downloadUrlResult],
   ['today', todayResponse],
+  ['today_with_transport', todayResponse],
   // ----- [Gate M9-FE-C2b-3]
   ['auth_me', user],
   ['auth_me_updated', user],

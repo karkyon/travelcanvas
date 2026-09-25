@@ -26,7 +26,6 @@ import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
 from decimal import Decimal
 from typing import Optional, List
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
@@ -41,6 +40,7 @@ from app.models.models import (
     Reservation, Ticket,
 )
 from app.services.route_estimator import estimate_leg, haversine_km
+from app.services import today_mode
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -381,6 +381,9 @@ class TodayEventResponse(BaseModel):
     id: str
     title: str
     event_type: str
+    # [Gate L1b] 当日表示用の実効開始時刻(UTC)。start_atが無くlocal_start_time
+    # のみの予定は TravelDay.local_date + local_start_time を日程のIANA
+    # タイムゾーンで解釈した値になる(出所はtime_source)。
     start_at: Optional[datetime]
     end_at: Optional[datetime]
     local_start_time: Optional[str]
@@ -389,6 +392,13 @@ class TodayEventResponse(BaseModel):
     longitude: Optional[float]
     has_ticket: bool
     reservation_id: Optional[str] = None
+    time_source: Optional[str] = None  # "start_at" | "local_start_time"
+    # [Gate L1b] この予定へ向かう移動区間(TravelSegment.to_event_id)の情報。
+    # 区間が無ければ3項目ともnull。transport_statusは採用済み経路の各区間の
+    # realtime_statusを集約したもの(cancelled > delayed > unknown > on_time)。
+    departure_at: Optional[datetime] = None
+    transport_mode: Optional[str] = None
+    transport_status: Optional[str] = None
 
 
 class TodayResponse(BaseModel):
@@ -399,21 +409,79 @@ class TodayResponse(BaseModel):
     now_event: Optional[TodayEventResponse]
     next_event: Optional[TodayEventResponse]
     minutes_until_next: Optional[int]
+    # [Gate L1b] 通信が切れた後も端末側でNOW/NEXTを再計算できるよう、
+    # 今日の時刻付き予定(と前日から継続中の予定)を実効開始時刻順で返す。
+    # day_end_atは「今日」の現地日付が終わる時刻(UTC)。
+    day_end_at: Optional[datetime] = None
+    events: List[TodayEventResponse] = []
 
 
-def _today_event_response(db: Session, e: TravelEvent) -> TodayEventResponse:
-    reservation = db.query(Reservation).filter(Reservation.event_id == e.id).first()
-    has_ticket = False
-    reservation_id = None
-    if reservation is not None:
-        reservation_id = str(reservation.id)
-        has_ticket = db.query(Ticket).filter(Ticket.reservation_id == reservation.id).count() > 0
-    return TodayEventResponse(
-        id=str(e.id), title=e.title, event_type=e.event_type,
-        start_at=e.start_at, end_at=e.end_at, local_start_time=e.local_start_time,
-        address=e.address, latitude=e.latitude, longitude=e.longitude,
-        has_ticket=has_ticket, reservation_id=reservation_id,
-    )
+def _today_event_responses(db: Session, timed_events) -> dict:
+    """TimedEventの一覧をTodayEventResponseへ変換する(予約・チケット・
+    移動区間・経路区間をまとめて取得し、予定ごとのN+1クエリを避ける)。"""
+    if not timed_events:
+        return {}
+    event_ids = [t.event.id for t in timed_events]
+
+    reservations = {}
+    for r in db.query(Reservation).filter(Reservation.event_id.in_(event_ids)).order_by(Reservation.created_at).all():
+        reservations.setdefault(r.event_id, r)
+    ticketed = set()
+    if reservations:
+        rows = (
+            db.query(Ticket.reservation_id)
+            .filter(Ticket.reservation_id.in_([r.id for r in reservations.values()]))
+            .distinct()
+            .all()
+        )
+        ticketed = {row[0] for row in rows}
+
+    segments = {}
+    for seg in (
+        db.query(TravelSegment)
+        .filter(TravelSegment.to_event_id.in_(event_ids), TravelSegment.status != "cancelled")
+        .order_by(TravelSegment.created_at)
+        .all()
+    ):
+        current = segments.get(seg.to_event_id)
+        # 採用済み経路(route_option_id)を持つ区間を優先する
+        if current is None or (current.route_option_id is None and seg.route_option_id is not None):
+            segments[seg.to_event_id] = seg
+    legs_by_option = {}
+    option_ids = [s.route_option_id for s in segments.values() if s.route_option_id is not None]
+    if option_ids:
+        for leg in (
+            db.query(RouteLeg)
+            .filter(RouteLeg.route_option_id.in_(option_ids))
+            .order_by(RouteLeg.leg_order)
+            .all()
+        ):
+            legs_by_option.setdefault(leg.route_option_id, []).append(leg)
+
+    out = {}
+    for t in timed_events:
+        e = t.event
+        reservation = reservations.get(e.id)
+        seg = segments.get(e.id)
+        departure_at = None
+        transport_mode = None
+        transport_status = None
+        if seg is not None:
+            legs = legs_by_option.get(seg.route_option_id, []) if seg.route_option_id else []
+            leg_departures = [leg.departure_at for leg in legs if leg.departure_at is not None]
+            departure_at = seg.planned_departure_at or (min(leg_departures) if leg_departures else None)
+            transport_mode = seg.mode
+            transport_status = today_mode.aggregate_realtime_status([leg.realtime_status for leg in legs])
+        out[e.id] = TodayEventResponse(
+            id=str(e.id), title=e.title, event_type=e.event_type,
+            start_at=t.start, end_at=e.end_at, local_start_time=e.local_start_time,
+            address=e.address, latitude=e.latitude, longitude=e.longitude,
+            has_ticket=reservation is not None and reservation.id in ticketed,
+            reservation_id=str(reservation.id) if reservation is not None else None,
+            time_source=t.time_source, departure_at=departure_at,
+            transport_mode=transport_mode, transport_status=transport_status,
+        )
+    return out
 
 
 @router.get("/{plan_id}/today", response_model=TodayResponse)
@@ -429,62 +497,33 @@ async def get_today(
     「今日」の判定は各TravelDay.timezone_id基準で行う(旅行先の現地時間で
     その日程が「今日」かどうかを判定する。プラン全体で単一タイムゾーンを
     前提にしない)。該当する日が無ければ(旅行期間外、または当日の日程が
-    未作成)、now_event/next_eventともにnullを返す(「問題なし」に見せる
-    誤表示を避けるため、この状態と実際に予定が無い状態を区別できるよう
-    today_dateもnullのままにする)。
+    未作成)today_dateはnullのままにし、「問題なし」に見せる誤表示を避ける。
 
-    NOW = 当日のイベントのうち start_at<=現在<=end_at(end_at未設定なら
-    start_at<=現在)であるもの。NEXT = 当日のイベントのうちstart_at>現在で
-    最も早いもの(翌日以降へは跨がない。DOC-04 SC-07は「今日」画面の
-    スコープであるため)。
-
-    本Gateのスコープは表示のための集約(NOW/NEXT/出発まで/チケット有無)
-    までとし、外部の遅延情報統合(FR-030)・オフライン表示(FR-032、
-    既存のoffline pack機能と組み合わせて利用可能)は別Gateとする。
+    [Gate L1b] NOW/NEXTの判定は app/services/today_mode.py に切り出した。
+    local_start_timeのみの予定(画面から作成した予定)を日程のタイムゾーンで
+    解釈して含めること、end_at未設定の予定を次の予定の開始までに限ること、
+    前日から継続中の予定をNOWに含めること、到着予定へ向かう移動区間の
+    出発時刻・遅延状況(FR-030のうち、登録済みの経路区間realtime_statusの
+    表示)を返すこと、端末側での再計算(FR-032オフライン表示)用に今日の
+    予定一覧を返すことを追加した。外部providerからの遅延情報の取得自体は
+    本Gateのスコープ外である。
     """
     plan = _get_owned_plan(db, plan_id, current_user, min_role="viewer")
 
     days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()
-    now_utc = datetime.now(dt_timezone.utc)
+    now_utc = today_mode.utcnow()
+    selection = today_mode.select_today(days, now_utc)
 
-    today_day = None
-    for day in days:
-        try:
-            tz = ZoneInfo(day.timezone_id)
-        except Exception:
-            tz = dt_timezone.utc
-        if day.local_date == now_utc.astimezone(tz).date():
-            today_day = day
-            break
-
-    if today_day is None:
-        return TodayResponse(
-            plan_id=str(plan.id), today_date=None, timezone_id=None,
-            server_time=now_utc, now_event=None, next_event=None, minutes_until_next=None,
-        )
-
-    events = sorted(
-        (e for e in today_day.events if e.start_at is not None),
-        key=lambda e: e.start_at,
-    )
-
-    now_event = None
-    next_event = None
-    minutes_until_next = None
-    for e in events:
-        if e.start_at <= now_utc and (e.end_at is None or e.end_at >= now_utc):
-            now_event = _today_event_response(db, e)
-            break
-    for e in events:
-        if e.start_at > now_utc:
-            next_event = _today_event_response(db, e)
-            minutes_until_next = int((e.start_at - now_utc).total_seconds() // 60)
-            break
+    responses = _today_event_responses(db, selection.events)
+    now_event = responses[selection.now_event.event.id] if selection.now_event else None
+    next_event = responses[selection.next_event.event.id] if selection.next_event else None
 
     return TodayResponse(
-        plan_id=str(plan.id), today_date=today_day.local_date, timezone_id=today_day.timezone_id,
+        plan_id=str(plan.id), today_date=selection.today_date, timezone_id=selection.timezone_id,
         server_time=now_utc, now_event=now_event, next_event=next_event,
-        minutes_until_next=minutes_until_next,
+        minutes_until_next=selection.minutes_until_next,
+        day_end_at=selection.day_end_at,
+        events=[responses[t.event.id] for t in selection.events],
     )
 
 

@@ -2,7 +2,8 @@
  "_meta": {
   "captured_at_head": "ff6f07b3c0155e4ae6d46d85a74b586494512a86",
   "captured_at_head_c2b3": "ac4c990f9be38899270868d16db951035cab8343",
-  "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2/C2b-3)。"
+  "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2/C2b-3)。",
+  "captured_at_head_l1b": "94d855a2c7fc876ec3e804c8ea24fe51920886aa (+Gate L1b today_mode)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -1453,13 +1454,15 @@
   "payload": "QR-DATA"
  },
  "today": {
-  "minutes_until_next": null,
-  "next_event": null,
-  "now_event": null,
-  "plan_id": "ac408ae8-1db7-496a-b69e-a23862ac5f7a",
-  "server_time": "2026-09-25T09:49:08.248916Z",
+  "plan_id": "4af2b3ef-8973-4f83-a47b-2a2e534e865d",
+  "today_date": "2026-09-25",
   "timezone_id": "UTC",
-  "today_date": "2026-09-25"
+  "server_time": "2026-09-25T23:34:55.585156Z",
+  "now_event": null,
+  "next_event": null,
+  "minutes_until_next": null,
+  "day_end_at": "2026-09-26T00:00:00Z",
+  "events": []
  },
  "travel_plan_created": {
   "budget": null,
@@ -1510,5 +1513,83 @@
    }
   ],
   "total": 1
+ },
+ "today_with_transport": {
+  "plan_id": "fcf3ab38-55af-4b65-b369-e9a3ba1059bb",
+  "today_date": "2026-05-01",
+  "timezone_id": "Asia/Tokyo",
+  "server_time": "2026-05-01T02:00:00Z",
+  "now_event": {
+   "id": "d59cb2cd-ed8f-41ad-8c0a-fcb055fd5f20",
+   "title": "ホテル",
+   "event_type": "activity",
+   "start_at": "2026-04-30T23:00:00Z",
+   "end_at": null,
+   "local_start_time": "08:00",
+   "address": "京都市下京区",
+   "latitude": 34.98,
+   "longitude": 135.76,
+   "has_ticket": false,
+   "reservation_id": null,
+   "time_source": "local_start_time",
+   "departure_at": null,
+   "transport_mode": null,
+   "transport_status": null
+  },
+  "next_event": {
+   "id": "66775c90-7e27-4629-b9ef-ab058252e5ff",
+   "title": "京都駅",
+   "event_type": "activity",
+   "start_at": "2026-05-01T06:00:00Z",
+   "end_at": "2026-05-01T07:00:00Z",
+   "local_start_time": "15:00",
+   "address": null,
+   "latitude": null,
+   "longitude": null,
+   "has_ticket": false,
+   "reservation_id": null,
+   "time_source": "local_start_time",
+   "departure_at": "2026-05-01T03:10:00Z",
+   "transport_mode": "mixed",
+   "transport_status": "delayed"
+  },
+  "minutes_until_next": 240,
+  "day_end_at": "2026-05-01T15:00:00Z",
+  "events": [
+   {
+    "id": "d59cb2cd-ed8f-41ad-8c0a-fcb055fd5f20",
+    "title": "ホテル",
+    "event_type": "activity",
+    "start_at": "2026-04-30T23:00:00Z",
+    "end_at": null,
+    "local_start_time": "08:00",
+    "address": "京都市下京区",
+    "latitude": 34.98,
+    "longitude": 135.76,
+    "has_ticket": false,
+    "reservation_id": null,
+    "time_source": "local_start_time",
+    "departure_at": null,
+    "transport_mode": null,
+    "transport_status": null
+   },
+   {
+    "id": "66775c90-7e27-4629-b9ef-ab058252e5ff",
+    "title": "京都駅",
+    "event_type": "activity",
+    "start_at": "2026-05-01T06:00:00Z",
+    "end_at": "2026-05-01T07:00:00Z",
+    "local_start_time": "15:00",
+    "address": null,
+    "latitude": null,
+    "longitude": null,
+    "has_ticket": false,
+    "reservation_id": null,
+    "time_source": "local_start_time",
+    "departure_at": "2026-05-01T03:10:00Z",
+    "transport_mode": "mixed",
+    "transport_status": "delayed"
+   }
+  ]
  }
 }

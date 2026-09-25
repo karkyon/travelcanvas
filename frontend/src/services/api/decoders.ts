@@ -47,6 +47,10 @@ export const todayEvent: Decoder<TodayEvent> = object<TodayEvent>({
   longitude: nullable(num),
   has_ticket: bool,
   reservation_id: nullable(str),
+  time_source: nullable(oneOf('start_at', 'local_start_time')),
+  departure_at: nullable(str),
+  transport_mode: nullable(str),
+  transport_status: nullable(oneOf('unknown', 'on_time', 'delayed', 'cancelled')),
 });
 
 export const todayResponse: Decoder<TodayResponse> = object<TodayResponse>({
@@ -57,6 +61,8 @@ export const todayResponse: Decoder<TodayResponse> = object<TodayResponse>({
   now_event: nullable(todayEvent),
   next_event: nullable(todayEvent),
   minutes_until_next: nullable(int),
+  day_end_at: nullable(str),
+  events: arrayOf(todayEvent),
 });
 
 export interface DownloadUrlResult {

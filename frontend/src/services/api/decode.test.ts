@@ -82,7 +82,7 @@ function respondWith(data: unknown): void {
 const todayEvent = {
   id: 'e1', title: '清水寺', event_type: 'sightseeing', start_at: '2026-10-01T09:00:00+09:00', end_at: null,
   local_start_time: '09:00', address: '京都市', latitude: 34.99, longitude: 135.78, has_ticket: false,
-  reservation_id: null,
+  reservation_id: null, time_source: 'start_at', departure_at: null, transport_mode: null, transport_status: null,
 };
 
 describe('危険度の高い応答のdecoder適用 (Gate M9-FE-C2b)', () => {
@@ -105,12 +105,15 @@ describe('危険度の高い応答のdecoder適用 (Gate M9-FE-C2b)', () => {
     const body = {
       plan_id: 'p', today_date: '2026-10-01', timezone_id: 'Asia/Tokyo', server_time: '2026-10-01T08:00:00Z',
       now_event: null, next_event: todayEvent, minutes_until_next: 60,
+      day_end_at: '2026-10-01T15:00:00Z', events: [todayEvent],
     };
     respondWith(body);
     await expect(api.getToday('p')).resolves.toEqual(body);
 
     respondWith({ ...body, next_event: { ...todayEvent, has_ticket: 'no' } });
     await expect(api.getToday('p')).rejects.toThrow(/\$\.next_event\.has_ticket/);
+    respondWith({ ...body, events: [{ ...todayEvent, transport_status: 'late' }] });
+    await expect(api.getToday('p')).rejects.toThrow(/\$\.events\[0\]\.transport_status/);
     respondWith({ ...body, server_time: undefined });
     await expect(api.getToday('p')).rejects.toBeInstanceOf(ApiDecodeError);
   });
