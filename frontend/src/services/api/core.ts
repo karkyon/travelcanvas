@@ -10,6 +10,16 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } f
 import { toast } from 'react-hot-toast';
 import type { MinimalHttpClient } from './types';
 
+// [Gate A1] 呼び出し元が自分でエラーを画面へ伝える場合(ログイン・登録・ゲスト開始/昇格・
+// セッション確認)に、共通エラー処理(toast表示・401時のトークン破棄と/loginへの強制遷移)を
+// 行わないための指定。これが無いと、例えばログイン画面で誤ったパスワードを入力した際の401で
+// 画面全体が/loginへ再読込され、入力内容とエラー表示が消えてしまう。
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    skipGlobalErrorHandler?: boolean;
+  }
+}
+
 // [Gate M9-FE-A2] handleApiError()のdefault caseが読む可能性のある
 // エラーレスポンス本文の形状。backendは複数の形式(自前のApiResponse形式・
 // FastAPI標準のRequestValidationError形式)を返し得るため、いずれの
@@ -133,7 +143,9 @@ export class ApiCore {
     // リクエストインターセプター
     this.client.interceptors.request.use(
       (config) => {
-        if (this.accessToken) {
+        // [Gate A1] 呼び出し元がAuthorizationを明示した場合(ゲスト昇格でゲストトークンを
+        // 指定する等)はそれを優先し、保持中のトークンで上書きしない。
+        if (this.accessToken && !config.headers.Authorization) {
           config.headers.Authorization = `Bearer ${this.accessToken}`;
         }
         return config;
@@ -168,7 +180,11 @@ export class ApiCore {
         ) {
           originalRequest._retry = true;
           try {
-            const refreshResponse = await this.client.post('/auth/refresh');
+            // [Gate A1] 元のリクエストが共通エラー処理を行わない指定なら、refresh失敗時も同様にする
+            // (refresh自体の401で/loginへ強制遷移しないため)。
+            const refreshResponse = await this.client.post('/auth/refresh', undefined, {
+              skipGlobalErrorHandler: originalRequest.skipGlobalErrorHandler,
+            });
             const newAccessToken = (refreshResponse.data as { access_token?: string })?.access_token;
             if (newAccessToken) {
               this.setAccessToken(newAccessToken);
@@ -181,7 +197,9 @@ export class ApiCore {
           }
         }
 
-        this.handleApiError(error);
+        if (!originalRequest?.skipGlobalErrorHandler) {
+          this.handleApiError(error);
+        }
         return Promise.reject(error);
       }
     );

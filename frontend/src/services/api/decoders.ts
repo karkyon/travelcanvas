@@ -26,6 +26,7 @@ import type {
   PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
   ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
+  AuthResponse, AuthUser, GuestSessionResponse,
 } from './types';
 import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -528,4 +529,32 @@ export const user: Decoder<User> = object<User>({
   preferences: optional(nullable(record)),
   created_at: str,
   updated_at: optional(str),
+});
+
+// ----- [Gate A1] 認証(login/register/guest/guest-upgrade)
+// backend/app/api/v1/auth.py UserResponse / TokenResponse / GuestSessionResponse。
+// user_typeはmodels.py UserTypeの値集合に限定する(AdminRoute等の権限判定に使うため、
+// 想定外の値を黙って受け入れない)。
+const userTypeValue = oneOf('guest', 'registered', 'premium', 'admin', 'super_admin');
+
+export const authUser: Decoder<AuthUser> = object<AuthUser>({
+  id: str,
+  username: str,
+  email: str,
+  user_type: userTypeValue,
+  is_verified: bool,
+});
+
+export const authResponse: Decoder<AuthResponse> = object<AuthResponse>({
+  access_token: str,
+  token_type: str,
+  user: authUser,
+});
+
+export const guestSessionResponse: Decoder<GuestSessionResponse> = object<GuestSessionResponse>({
+  access_token: str,
+  token_type: str,
+  user_type: oneOf('guest'),
+  guest_id: str,
+  expires_in_hours: int,
 });

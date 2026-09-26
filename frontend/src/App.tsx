@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import '@/styles/globals.css';
 
 function App() {
-  const { initialize, isInitialized, isLoading } = useAuthStore();
+  const { initialize, isInitialized } = useAuthStore();
 
   useEffect(() => {
     // アプリ起動時に認証状態を初期化
@@ -15,7 +15,12 @@ function App() {
   }, [initialize]);
 
   // 初期化中の表示
-  if (!isInitialized || isLoading) {
+  // [Gate A1] 以前は `!isInitialized || isLoading` としており、ログイン・登録・ゲスト開始/昇格の
+  // 通信中(isLoading)にもアプリ全体(RouterProvider)をこのスプラッシュへ差し替えていた。
+  // そのため通信のたびに画面が作り直され、ログイン失敗後にはメールアドレス等の入力内容が
+  // 消えていた(browser E2Eで発覚)。通信中の表示は各画面がisLoadingで行っているため、
+  // ここでは起動時の初期化(isInitialized)だけを待つ。
+  if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

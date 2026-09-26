@@ -4,12 +4,13 @@
  * あることを固定する契約テスト。期待値は分割前(HEAD 188dd19)の実測値。
  * APIを意図的に追加・削除した場合は、このリストも同じcommitで更新すること。
  * [Gate M9-FE-C2b] ApiDecodeError(応答形式の検証失敗)を公開exportへ追加。
+ * [Gate A1] 認証の一本化でAuthApiError、startGuestSession/upgradeGuest(メソッド・authAPI)を追加。
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
 
 const EXPECTED_EXPORTS = [
-  'ApiDecodeError', 'acceptExtractionCandidate', 'acceptInvitation', 'addRouteLeg',
+  'ApiDecodeError', 'AuthApiError', 'acceptExtractionCandidate', 'acceptInvitation', 'addRouteLeg',
   'adoptRouteOption', 'aiAPI', 'api', 'authAPI', 'confirmImportJob', 'createExtractionCandidate',
   'createImportJob', 'createReservation', 'createReservationEventLink',
   'createReservationParticipant', 'createRouteOption', 'createSegment', 'createShareLink',
@@ -50,14 +51,16 @@ const EXPECTED_METHODS = [
   'put', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
   'resolvePublicShare', 'revealReservation', 'revealTicket', 'revokeShareLink', 'searchByImage',
   'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode', 'setHttpClientForTesting',
-  'setTokens', 'setupInterceptors', 'testConnection', 'undoLastPlanChange', 'updateDay',
+  'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection', 'undoLastPlanChange', 'updateDay',
   'updateEvent', 'updatePlan', 'updateProfile', 'updateReservation', 'updateReservationEventLink',
-  'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument',
+  'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings', 'upgradeGuest',
+  'uploadDocument',
 ];
 
 const EXPECTED_GROUP_KEYS: Record<string, string[]> = {
   authAPI: [
-    'changePassword', 'getCurrentUser', 'login', 'logout', 'register', 'updateProfile',
+    'changePassword', 'getCurrentUser', 'login', 'logout', 'register', 'startGuestSession',
+    'updateProfile', 'upgradeGuest',
   ],
   travelAPI: [
     'clonePlan', 'createPlan', 'createSpot', 'deletePlan', 'getPlan', 'getPlans',

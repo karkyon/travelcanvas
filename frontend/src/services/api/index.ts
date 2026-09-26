@@ -8,12 +8,14 @@
 import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
-import type { CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
+import type { CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
 
 export * from './types';
 export { extractApiErrorDetailMessage } from './core';
 // [Gate M9-FE-C2b] 応答形式の検証失敗を呼び出し元で判定できるよう公開する。
 export { ApiDecodeError } from './decode';
+// [Gate A1] 認証API(login/register/guest)の失敗。authStoreが画面表示用の文言として使う。
+export { AuthApiError } from './endpoints/auth';
 
 // ===== シングルトンインスタンス =====
 export const api = new CompleteTravelAPI();
@@ -23,6 +25,9 @@ export const authAPI = {
   register: (data: RegisterData) => api.register(data),
   login: (credentials: LoginCredentials) => api.login(credentials),
   logout: () => api.logout(),
+  // [Gate A1] ゲスト開始・昇格もAPIクライアント経由に一本化した(以前はauthStoreの独自fetch)
+  startGuestSession: () => api.startGuestSession(),
+  upgradeGuest: (data: GuestUpgradeData, guestToken: string) => api.upgradeGuest(data, guestToken),
   getCurrentUser: () => api.getCurrentUser(),
   updateProfile: (data: Partial<User>) => api.updateProfile(data),
   changePassword: (data: { current_password: string; new_password: string }) => api.changePassword(data),

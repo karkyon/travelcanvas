@@ -17,7 +17,7 @@ import {
   ticket, ticketRevealResult, todayResponse, travelDocument, travelSegment,
   collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
-  shareLink, unreadCount, user,
+  shareLink, unreadCount, user, authResponse, guestSessionResponse,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -93,6 +93,11 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['notification_list_unread', arrayOf(notification)],
   ['notification_unread_count', unreadCount],
   ['quickdraft_promoted', promoteQuickDraftResult],
+  // ----- [Gate A1] 認証(login/register/guest/guest-upgrade)。authStoreの独自fetchを廃止しdecoder経由にした
+  ['auth_register', authResponse],
+  ['auth_login', authResponse],
+  ['auth_guest', guestSessionResponse],
+  ['auth_guest_upgrade', authResponse],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

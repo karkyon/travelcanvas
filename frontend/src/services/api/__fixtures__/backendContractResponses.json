@@ -3,7 +3,8 @@
   "captured_at_head": "ff6f07b3c0155e4ae6d46d85a74b586494512a86",
   "captured_at_head_c2b3": "ac4c990f9be38899270868d16db951035cab8343",
   "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2/C2b-3)。",
-  "captured_at_head_l1b": "94d855a2c7fc876ec3e804c8ea24fe51920886aa (+Gate L1b today_mode)"
+  "captured_at_head_l1b": "94d855a2c7fc876ec3e804c8ea24fe51920886aa (+Gate L1b today_mode)",
+  "captured_at_head_a1": "58969595e6bc85fa6ac99494f3c21c1d7645d0fa (Gate A1: auth_register/auth_login/auth_guest/auth_guest_upgrade。access_tokenは実JWTを伏字化)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -1591,5 +1592,45 @@
     "transport_status": "delayed"
    }
   ]
+ },
+ "auth_register": {
+  "access_token": "<redacted-jwt>",
+  "token_type": "bearer",
+  "user": {
+   "id": "e8d34d6a-a988-4020-a865-c09dd3f51763",
+   "username": "reg_fixture",
+   "email": "reg_fixture@example.com",
+   "user_type": "registered",
+   "is_verified": false
+  }
+ },
+ "auth_login": {
+  "access_token": "<redacted-jwt>",
+  "token_type": "bearer",
+  "user": {
+   "id": "e8d34d6a-a988-4020-a865-c09dd3f51763",
+   "username": "reg_fixture",
+   "email": "reg_fixture@example.com",
+   "user_type": "registered",
+   "is_verified": false
+  }
+ },
+ "auth_guest": {
+  "access_token": "<redacted-jwt>",
+  "token_type": "bearer",
+  "user_type": "guest",
+  "guest_id": "ab633df6-3289-419f-a1e7-6427e8be2f6c",
+  "expires_in_hours": 24
+ },
+ "auth_guest_upgrade": {
+  "access_token": "<redacted-jwt>",
+  "token_type": "bearer",
+  "user": {
+   "id": "ab633df6-3289-419f-a1e7-6427e8be2f6c",
+   "username": "up_fixture",
+   "email": "up_fixture@example.com",
+   "user_type": "registered",
+   "is_verified": false
+  }
  }
 }

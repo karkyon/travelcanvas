@@ -1,36 +1,27 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User } from '@/types';
 import { api as apiService } from '@/services/api';
+import type { SessionUser } from '@/services/api';
 
-// [2026-09-01 Gate #7d] api.ts と同じ環境変数解決方式に統一。
-// 旧実装は 'http://192.168.1.248:8000/api/v1'(旧サーバー、廃止済み)
-// をハードコードしており、omega-dev2上では認証系APIが常に
-// 到達不能なホストへ送信され、静かに失敗する状態だった。
-// [Gate #8] VITE_API_URL/VITE_API_BASE_URLはDockerビルド時に一切注入されておらず
-// (frontend/Dockerfileにビルド用ARGが無く、docker-compose.ymlのbuild.argsも未設定、
-// environment:はコンテナ起動時の値でありViteの静的ビルドには反映されない)、
-// 常に下記フォールバックの廃止済み旧サーバー(192.168.1.248)が使われていた実害バグ。
-// さらにVITE_API_URLの値自体に/api/v1が含まれておらず二重に壊れていた。
-// resolveApiBaseUrlで正規化し、Dockerfile/docker-compose.yml側もビルドARGを
-// 正しく受け取るよう修正済み(同Gate)。
-function resolveApiBaseUrl(): string {
-  const raw =
-    import.meta.env.VITE_API_BASE_URL ||
-    import.meta.env.VITE_API_URL ||
-    'http://localhost:8001';
-  const trimmed = raw.replace(/\/+$/, '');
-  return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+// [Gate A1] 認証処理をAPIクライアント(services/api)へ一本化した(B-002)。
+// 以前はこのファイルが独自のfetch()とAPI_BASE_URL解決を持ち、login/register/guest/
+// guest-upgrade/meの応答を検証せずに状態へ入れていた(decoder・interceptorを通らない)。
+// 通信・応答検証・エラー文言の生成はservices/api/endpoints/auth.tsが担い、
+// このstoreは状態とトークン同期(apiService.setAccessToken/setGuestMode)だけを担う。
+// あわせて、アクセストークンを含む応答全体やメールアドレスをconsoleへ出力していた
+// ログを削除した(ブラウザの開発者ツールや収集されたログからトークンが漏れるため)。
 
 // [Gate #7j] authStore独自のローカルUser型(id: number)がバックエンドの
 // UUID移行(Gate #5)に追従できておらず放置されていた実害バグ。
-// 全体で唯一の定義であるtypes/index.tsのUser型(id: string/UUID)に統一。
+// [Gate A1] login/register直後はbackend UserResponse(is_active/created_at無し)、
+// GET /auth/me後はUserの全項目を持つため、両方を表すSessionUserとする。
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
 
 interface AuthState {
-  user: User | null;
+  user: SessionUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -106,6 +97,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       // 認証状態チェック
+      // [Gate A1] GET /auth/me をAPIクライアント経由(decoder検証あり)で呼ぶ。silent指定のため
+      // 共通エラー処理(toast・/loginへの強制遷移)は行わず、失敗時はこれまでどおり状態をクリアする。
+      // access tokenが期限切れの場合は、interceptorがrefresh cookieでの更新を1回試みる。
       checkAuth: async () => {
         const { token } = get();
         if (!token) {
@@ -115,42 +109,18 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           set({ isLoading: true });
-          console.log('🔍 認証状態確認中...');
-
-          const response = await fetch(`${API_BASE_URL}/auth/me`, {
-            credentials: 'include',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
+          apiService.setAccessToken(token);
+          apiService.setGuestMode(false);
+          const response = await apiService.getCurrentUser({ silent: true });
+          set({
+            user: response.data,
+            isAuthenticated: true,
+            isLoading: false,
+            isInitialized: true,
+            error: null,
           });
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log('✅ 認証確認成功:', data);
-            set({
-              user: data.user || data,
-              isAuthenticated: true,
-              isLoading: false,
-              isInitialized: true,
-              error: null,
-            });
-          } else {
-            console.warn('⚠️ 認証確認失敗:', response.status);
-            // トークンが無効な場合はクリア
-            apiService.clearAccessToken();
-            apiService.setGuestMode(false);
-            set({
-              user: null,
-              token: null,
-              isAuthenticated: false,
-              isLoading: false,
-              isInitialized: true,
-              error: null,
-            });
-          }
         } catch (error) {
-          console.error('❌ 認証確認エラー:', error);
+          console.warn('⚠️ 認証確認に失敗したため認証状態をクリアします:', errorMessage(error, '不明なエラー'));
           apiService.clearAccessToken();
           apiService.setGuestMode(false);
           set({
@@ -166,29 +136,9 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
-          const apiUrl = `${API_BASE_URL}/auth/login`;
-          console.log('🔄 ログイン試行中...', { email, apiUrl });
-          
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password }),
-          });
-
-          console.log('📡 レスポンス状態:', response.status, response.statusText);
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: 'ログインに失敗しました' }));
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log('✅ ログイン成功:', data);
+          const data = await apiService.login({ email, password });
 
           // [Gate #10] apiServiceのaxiosクライアントにもトークンを同期する。
           // これが無いと、ログイン後もspots/travel-plans等の認証必須APIが
@@ -205,11 +155,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error) {
-          console.error('❌ ログインエラー:', error);
+          const message = errorMessage(error, 'ログインに失敗しました');
+          console.error('❌ ログインエラー:', message);
           set({
             isLoading: false,
             isInitialized: true,
-            error: error instanceof Error ? error.message : 'ログインに失敗しました',
+            error: message,
           });
           throw error;
         }
@@ -217,30 +168,9 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (username: string, email: string, password: string) => {
         set({ isLoading: true, error: null });
-        
+
         try {
-          const apiUrl = `${API_BASE_URL}/auth/register`;
-          console.log('🔄 登録試行中...', { username, email, apiUrl });
-          
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ username, email, password }),
-          });
-
-          console.log('📡 レスポンス状態:', response.status, response.statusText);
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: '登録に失敗しました' }));
-            console.error('❌ 登録エラーレスポンス:', errorData);
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log('✅ 登録成功:', data);
+          const data = await apiService.register({ username, email, password });
 
           apiService.setAccessToken(data.access_token);
           apiService.setGuestMode(false);
@@ -254,11 +184,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error) {
-          console.error('❌ 登録エラー:', error);
+          const message = errorMessage(error, '登録に失敗しました');
+          console.error('❌ 登録エラー:', message);
           set({
             isLoading: false,
             isInitialized: true,
-            error: error instanceof Error ? error.message : '登録に失敗しました',
+            error: message,
           });
           throw error;
         }
@@ -293,20 +224,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-          const response = await fetch(`${API_BASE_URL}/auth/guest`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: 'ゲストセッションの開始に失敗しました' }));
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
+          const data = await apiService.startGuestSession();
           apiService.setAccessToken(data.access_token);
           apiService.setGuestMode(true);
 
@@ -320,11 +238,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error) {
-          console.error('❌ ゲストセッション開始エラー:', error);
+          const message = errorMessage(error, 'ゲストセッションの開始に失敗しました');
+          console.error('❌ ゲストセッション開始エラー:', message);
           set({
             isLoading: false,
             isInitialized: true,
-            error: error instanceof Error ? error.message : 'ゲストセッションの開始に失敗しました',
+            error: message,
           });
           throw error;
         }
@@ -339,22 +258,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('ゲストセッションが見つかりません。最初からやり直してください。');
           }
 
-          const response = await fetch(`${API_BASE_URL}/auth/guest/upgrade`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${guestToken}`,
-            },
-            body: JSON.stringify({ username, email, password }),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: 'アカウント登録に失敗しました' }));
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
+          const data = await apiService.upgradeGuest({ username, email, password }, guestToken);
           apiService.setAccessToken(data.access_token);
           apiService.setGuestMode(false);
 
@@ -370,11 +274,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error) {
-          console.error('❌ ゲスト昇格エラー:', error);
+          const message = errorMessage(error, 'アカウント登録に失敗しました');
+          console.error('❌ ゲスト昇格エラー:', message);
           set({
             isLoading: false,
             isInitialized: true,
-            error: error instanceof Error ? error.message : 'アカウント登録に失敗しました',
+            error: message,
           });
           throw error;
         }

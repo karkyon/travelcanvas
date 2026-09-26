@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import Button from '../common/Button'
 import Modal from '../common/Modal'
-import type { User } from '../../types'
+// [Gate A1] authStoreのuserはlogin直後(backend UserResponse)とGET /auth/me後で項目が異なるためSessionUser
+import type { SessionUser } from '../../services/api'
 
 interface HeaderProps {
   onMenuClick?: () => void
-  user?: (User & { full_name?: string }) | null
+  user?: (SessionUser & { full_name?: string }) | null
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick, user }) => {

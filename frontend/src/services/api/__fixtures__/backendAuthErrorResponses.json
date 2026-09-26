@@ -1,0 +1,37 @@
+{
+ "_meta": {
+  "captured_at_head_a1": "58969595e6bc85fa6ac99494f3c21c1d7645d0fa",
+  "description": "実backend(FastAPI/PostgreSQL 16)の認証API失敗応答をTestClientで採取したfixture(Gate A1)。detailは文字列(400/401)またはFastAPI標準の検証エラー配列(422)になる。"
+ },
+ "auth_login_401": {
+  "status": 401,
+  "body": {
+   "detail": "メールアドレスまたはパスワードが正しくありません"
+  }
+ },
+ "auth_register_400": {
+  "status": 400,
+  "body": {
+   "detail": "このメールアドレスまたはユーザー名は既に使用されています"
+  }
+ },
+ "auth_register_422": {
+  "status": 422,
+  "body": {
+   "detail": [
+    {
+     "type": "value_error",
+     "loc": [
+      "body",
+      "email"
+     ],
+     "msg": "value is not a valid email address: The email address is not valid. It must have exactly one @-sign.",
+     "input": "not-an-email",
+     "ctx": {
+      "reason": "The email address is not valid. It must have exactly one @-sign."
+     }
+    }
+   ]
+  }
+ }
+}
