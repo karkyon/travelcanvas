@@ -1533,3 +1533,82 @@ class PlanConstraint(Base):
         ),
         Index("ix_constraints_plan_deleted", "plan_id", "deleted_at"),
     )
+
+
+# ==========================================================================
+# [Gate L3] 実行可能性検証(validation_runs / validation_issues、FR-017 / DOC-05 §7.4)
+# ==========================================================================
+# DOC-05 §7.4: 入力revision、情報鮮度、実行時刻、結果。issueはcode、severity、
+# entity、message_key、evidence_json、suggestion_json、resolved_at。
+#
+# - 検証1回分をスナップショットとして保存する(旅程を変えたら再検証する。
+#   resolved_atは持たず、再検証で消えたものが解消済み)。
+# - kind: violation(違反) / unverified(情報不足で検証できない)。
+#   「検証不能を問題なしにしない」(FR-017)ため、unverifiedを別枠で数える。
+# - 秘匿制約に関する問題は、制約の値を message / evidence / suggestion に
+#   一切保存しない(作成者本人には読出時に制約APIと同じ規則で題名を付ける)。
+class ValidationRun(Base):
+    """[Gate L3] 実行可能性検証の1回分。"""
+    __tablename__ = "validation_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    input_revision = Column(Integer, nullable=False)
+    # 旅程・制約・予約・区間の版の組み合わせのハッシュ。現在値と違えば結果は古い(is_stale)。
+    input_fingerprint = Column(String(64), nullable=False)
+    algorithm_version = Column(String(30), nullable=False)
+    status = Column(String(10), nullable=False)
+    error_count = Column(Integer, nullable=False, default=0)
+    warning_count = Column(Integer, nullable=False, default=0)
+    info_count = Column(Integer, nullable=False, default=0)
+    unverified_count = Column(Integer, nullable=False, default=0)
+    # {"unchecked": {...件数}, "constraint_results": [{"constraint_id","status"}]}
+    summary_json = Column(JSON, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    issues = relationship(
+        "ValidationIssue", back_populates="run", cascade="all, delete-orphan",
+        order_by="ValidationIssue.sort_order",
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN ('completed','failed')", name="ck_validation_runs_status"),
+        Index("ix_validation_runs_plan_created", "plan_id", "created_at"),
+    )
+
+
+class ValidationIssue(Base):
+    """[Gate L3] 検証で見つかった問題(違反または検証不能)。"""
+    __tablename__ = "validation_issues"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("validation_runs.id", ondelete="CASCADE"), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    code = Column(String(40), nullable=False)
+    kind = Column(String(10), nullable=False)
+    severity = Column(String(7), nullable=False)
+    message = Column(Text, nullable=False)
+    entity_type = Column(String(20), nullable=True)
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
+    entity_label = Column(String(300), nullable=True)
+    day_id = Column(UUID(as_uuid=True), nullable=True)
+    constraint_id = Column(UUID(as_uuid=True), ForeignKey("constraints.id", ondelete="CASCADE"), nullable=True)
+    constraint_owner_user_id = Column(UUID(as_uuid=True), nullable=True)
+    is_private_constraint = Column(Boolean, nullable=False, default=False)
+    evidence_json = Column(JSON, nullable=True)
+    suggestion_json = Column(JSON, nullable=True)
+
+    run = relationship("ValidationRun", back_populates="issues")
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('violation','unverified')", name="ck_validation_issues_kind"),
+        CheckConstraint("severity IN ('ERROR','WARNING','INFO')", name="ck_validation_issues_severity"),
+        CheckConstraint(
+            "is_private_constraint = false OR (constraint_id IS NOT NULL AND constraint_owner_user_id IS NOT NULL)",
+            name="ck_validation_issues_private_owner",
+        ),
+        Index("ix_validation_issues_run", "run_id", "sort_order"),
+    )

@@ -5,7 +5,8 @@
   "description": "実backend(FastAPI/PostgreSQL 16)の応答をTestClientで採取した契約fixture。frontendのruntime decoderが実応答を受理できることを固定する(Gate M9-FE-C2b-2/C2b-3)。",
   "captured_at_head_l1b": "94d855a2c7fc876ec3e804c8ea24fe51920886aa (+Gate L1b today_mode)",
   "captured_at_head_a1": "58969595e6bc85fa6ac99494f3c21c1d7645d0fa (Gate A1: auth_register/auth_login/auth_guest/auth_guest_upgrade。access_tokenは実JWTを伏字化)",
-  "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2: constraint_* 制約APIの実応答。他人から見た秘匿制約=constraint_masked)"
+  "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2: constraint_* 制約APIの実応答。他人から見た秘匿制約=constraint_masked)",
+  "captured_at_head_l3": "18665181c062bebaa924c0c4def1bb42e1a8c55a (+Gate L3: validation_run_* 実行可能性検証APIの実応答。他人の秘匿制約の問題はis_masked、作成者本人から見た詳細=validation_run_detail_owner_private)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -1950,5 +1951,644 @@
  "constraint_deleted": {
   "message": "制約を削除しました",
   "revision": 2
+ },
+ "validation_run_created": {
+  "id": "dc173388-9c1a-4468-a04b-3b5afd1520d8",
+  "plan_id": "5c302920-39ce-41cd-a9bc-ae80d4ea7319",
+  "status": "completed",
+  "algorithm_version": "feasibility-v1",
+  "input_revision": 7,
+  "is_stale": false,
+  "started_at": "2026-09-26T10:10:44.119123+00:00",
+  "finished_at": "2026-09-26T10:10:44.141054+00:00",
+  "created_by_me": true,
+  "counts": {
+   "error": 4,
+   "warning": 1,
+   "info": 0,
+   "unverified": 2
+  },
+  "unchecked": {
+   "event_time_unknown": 1
+  },
+  "constraint_results": [
+   {
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "status": "violated",
+    "is_private": true,
+    "is_mine": false,
+    "constraint_title": null
+   },
+   {
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "status": "unverified",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "海の見える店"
+   },
+   {
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "タクシーは避けたい"
+   },
+   {
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "22時までに宿へ"
+   }
+  ],
+  "issues": [
+   {
+    "id": "a92b09af-93c8-47c2-9bef-8841acc5bc7e",
+    "code": "TIME_OVERLAP",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「寿司 えび専門店」が「美術館」(10:00〜12:00)の途中に始まります",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "other_event_id": "10e6e47d-885e-437d-988d-ed6458c2512d",
+     "other_start": "2026-11-02T01:00:00+00:00",
+     "other_end": "2026-11-02T03:00:00+00:00",
+     "start": "2026-11-02T02:30:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:00:00+00:00"
+    }
+   },
+   {
+    "id": "e7fa8b69-cd56-42d2-8b7c-91173106c914",
+    "code": "TRAVEL_TIME_SHORTFALL",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「美術館」の終了(12:00)より前に「寿司 えび専門店」が始まるため、移動の20分を確保できません",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "美術館 → 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "available_minutes": -30,
+     "required_minutes": 20,
+     "shortage_minutes": 50
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:20:00+00:00"
+    }
+   },
+   {
+    "id": "8199a939-98e1-4b64-aa6b-5f4ceafab074",
+    "code": "POSSIBLE_CONSTRAINT_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "秘匿制約を満たしていない可能性があります(内容は作成者本人にだけ表示されます)",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "constraint_title": null,
+    "is_private_constraint": true,
+    "is_masked": true,
+    "evidence": null,
+    "suggestion": null
+   },
+   {
+    "id": "b2911adc-fb18-4b00-874e-6c1523ed5342",
+    "code": "CONSTRAINT_TIME_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "制約「22時までに宿へ」に違反: 「夜景」の終了(23:00)が22:00を過ぎています",
+    "entity_type": "event",
+    "entity_id": "aa021a47-0e56-4148-980a-77775afafbc5",
+    "entity_label": "2026-11-02 夜景",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "constraint_title": "22時までに宿へ",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "start": "2026-11-02T13:30:00+00:00",
+     "end": "2026-11-02T14:00:00+00:00",
+     "limit": "2026-11-02T13:00:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "latest_end": "2026-11-02T13:00:00+00:00"
+    }
+   },
+   {
+    "id": "4f7561aa-a5c7-4f52-acb1-644ae6337b8a",
+    "code": "AVOIDED_TRANSPORT_USED",
+    "kind": "violation",
+    "severity": "WARNING",
+    "message": "制約「タクシーは避けたい」に違反: 区間の移動手段がタクシーです",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "タクシー",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "constraint_title": "タクシーは避けたい",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "segment_mode": "taxi",
+     "weight": 80
+    },
+    "suggestion": {
+     "action": "choose_other_route"
+    }
+   },
+   {
+    "id": "225b276c-3c75-40f8-96d4-451291c4ce0a",
+    "code": "EVENT_TIME_UNKNOWN",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "「時刻未定の散策」は開始時刻が未定のため、時刻に関する検証ができません",
+    "entity_type": "event",
+    "entity_id": "2e87d762-49cc-464d-a1c5-27ecff31b264",
+    "entity_label": "2026-11-02 時刻未定の散策",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": {
+     "action": "set_start_time"
+    }
+   },
+   {
+    "id": "0945919f-f483-4dd1-8169-d99f026f4195",
+    "code": "CONSTRAINT_NOT_MACHINE_CHECKABLE",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "制約「海の見える店」を検証できません: 希望・一致条件は自動では判定できません(確認して手動で判断してください)",
+    "entity_type": null,
+    "entity_id": null,
+    "entity_label": null,
+    "day_id": null,
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "constraint_title": "海の見える店",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": null
+   }
+  ]
+ },
+ "validation_run_list": [
+  {
+   "id": "dc173388-9c1a-4468-a04b-3b5afd1520d8",
+   "plan_id": "5c302920-39ce-41cd-a9bc-ae80d4ea7319",
+   "status": "completed",
+   "algorithm_version": "feasibility-v1",
+   "input_revision": 7,
+   "is_stale": false,
+   "started_at": "2026-09-26T10:10:44.119123+00:00",
+   "finished_at": "2026-09-26T10:10:44.141054+00:00",
+   "created_by_me": true,
+   "counts": {
+    "error": 4,
+    "warning": 1,
+    "info": 0,
+    "unverified": 2
+   }
+  }
+ ],
+ "validation_run_detail_owner_private": {
+  "id": "dc173388-9c1a-4468-a04b-3b5afd1520d8",
+  "plan_id": "5c302920-39ce-41cd-a9bc-ae80d4ea7319",
+  "status": "completed",
+  "algorithm_version": "feasibility-v1",
+  "input_revision": 7,
+  "is_stale": false,
+  "started_at": "2026-09-26T10:10:44.119123+00:00",
+  "finished_at": "2026-09-26T10:10:44.141054+00:00",
+  "created_by_me": false,
+  "counts": {
+   "error": 4,
+   "warning": 1,
+   "info": 0,
+   "unverified": 2
+  },
+  "unchecked": {
+   "event_time_unknown": 1
+  },
+  "constraint_results": [
+   {
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "status": "violated",
+    "is_private": true,
+    "is_mine": true,
+    "constraint_title": "甲殻類は食べられない"
+   },
+   {
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "status": "unverified",
+    "is_private": false,
+    "is_mine": false,
+    "constraint_title": "海の見える店"
+   },
+   {
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": false,
+    "constraint_title": "タクシーは避けたい"
+   },
+   {
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": false,
+    "constraint_title": "22時までに宿へ"
+   }
+  ],
+  "issues": [
+   {
+    "id": "a92b09af-93c8-47c2-9bef-8841acc5bc7e",
+    "code": "TIME_OVERLAP",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「寿司 えび専門店」が「美術館」(10:00〜12:00)の途中に始まります",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "other_event_id": "10e6e47d-885e-437d-988d-ed6458c2512d",
+     "other_start": "2026-11-02T01:00:00+00:00",
+     "other_end": "2026-11-02T03:00:00+00:00",
+     "start": "2026-11-02T02:30:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:00:00+00:00"
+    }
+   },
+   {
+    "id": "e7fa8b69-cd56-42d2-8b7c-91173106c914",
+    "code": "TRAVEL_TIME_SHORTFALL",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「美術館」の終了(12:00)より前に「寿司 えび専門店」が始まるため、移動の20分を確保できません",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "美術館 → 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "available_minutes": -30,
+     "required_minutes": 20,
+     "shortage_minutes": 50
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:20:00+00:00"
+    }
+   },
+   {
+    "id": "8199a939-98e1-4b64-aa6b-5f4ceafab074",
+    "code": "POSSIBLE_CONSTRAINT_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "秘匿制約を満たしていない可能性があります(内容は作成者本人にだけ表示されます)",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "constraint_title": "甲殻類は食べられない",
+    "is_private_constraint": true,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": null
+   },
+   {
+    "id": "b2911adc-fb18-4b00-874e-6c1523ed5342",
+    "code": "CONSTRAINT_TIME_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "制約「22時までに宿へ」に違反: 「夜景」の終了(23:00)が22:00を過ぎています",
+    "entity_type": "event",
+    "entity_id": "aa021a47-0e56-4148-980a-77775afafbc5",
+    "entity_label": "2026-11-02 夜景",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "constraint_title": "22時までに宿へ",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "start": "2026-11-02T13:30:00+00:00",
+     "end": "2026-11-02T14:00:00+00:00",
+     "limit": "2026-11-02T13:00:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "latest_end": "2026-11-02T13:00:00+00:00"
+    }
+   },
+   {
+    "id": "4f7561aa-a5c7-4f52-acb1-644ae6337b8a",
+    "code": "AVOIDED_TRANSPORT_USED",
+    "kind": "violation",
+    "severity": "WARNING",
+    "message": "制約「タクシーは避けたい」に違反: 区間の移動手段がタクシーです",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "タクシー",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "constraint_title": "タクシーは避けたい",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "segment_mode": "taxi",
+     "weight": 80
+    },
+    "suggestion": {
+     "action": "choose_other_route"
+    }
+   },
+   {
+    "id": "225b276c-3c75-40f8-96d4-451291c4ce0a",
+    "code": "EVENT_TIME_UNKNOWN",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "「時刻未定の散策」は開始時刻が未定のため、時刻に関する検証ができません",
+    "entity_type": "event",
+    "entity_id": "2e87d762-49cc-464d-a1c5-27ecff31b264",
+    "entity_label": "2026-11-02 時刻未定の散策",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": {
+     "action": "set_start_time"
+    }
+   },
+   {
+    "id": "0945919f-f483-4dd1-8169-d99f026f4195",
+    "code": "CONSTRAINT_NOT_MACHINE_CHECKABLE",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "制約「海の見える店」を検証できません: 希望・一致条件は自動では判定できません(確認して手動で判断してください)",
+    "entity_type": null,
+    "entity_id": null,
+    "entity_label": null,
+    "day_id": null,
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "constraint_title": "海の見える店",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": null
+   }
+  ]
+ },
+ "validation_run_stale": {
+  "id": "dc173388-9c1a-4468-a04b-3b5afd1520d8",
+  "plan_id": "5c302920-39ce-41cd-a9bc-ae80d4ea7319",
+  "status": "completed",
+  "algorithm_version": "feasibility-v1",
+  "input_revision": 7,
+  "is_stale": true,
+  "started_at": "2026-09-26T10:10:44.119123+00:00",
+  "finished_at": "2026-09-26T10:10:44.141054+00:00",
+  "created_by_me": true,
+  "counts": {
+   "error": 4,
+   "warning": 1,
+   "info": 0,
+   "unverified": 2
+  },
+  "unchecked": {
+   "event_time_unknown": 1
+  },
+  "constraint_results": [
+   {
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "status": "violated",
+    "is_private": true,
+    "is_mine": false,
+    "constraint_title": null
+   },
+   {
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "status": "unverified",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "海の見える店"
+   },
+   {
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "タクシーは避けたい"
+   },
+   {
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "status": "violated",
+    "is_private": false,
+    "is_mine": true,
+    "constraint_title": "22時までに宿へ"
+   }
+  ],
+  "issues": [
+   {
+    "id": "a92b09af-93c8-47c2-9bef-8841acc5bc7e",
+    "code": "TIME_OVERLAP",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「寿司 えび専門店」が「美術館」(10:00〜12:00)の途中に始まります",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "other_event_id": "10e6e47d-885e-437d-988d-ed6458c2512d",
+     "other_start": "2026-11-02T01:00:00+00:00",
+     "other_end": "2026-11-02T03:00:00+00:00",
+     "start": "2026-11-02T02:30:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:00:00+00:00"
+    }
+   },
+   {
+    "id": "e7fa8b69-cd56-42d2-8b7c-91173106c914",
+    "code": "TRAVEL_TIME_SHORTFALL",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "「美術館」の終了(12:00)より前に「寿司 えび専門店」が始まるため、移動の20分を確保できません",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "美術館 → 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "available_minutes": -30,
+     "required_minutes": 20,
+     "shortage_minutes": 50
+    },
+    "suggestion": {
+     "action": "move_event",
+     "earliest_start": "2026-11-02T03:20:00+00:00"
+    }
+   },
+   {
+    "id": "8199a939-98e1-4b64-aa6b-5f4ceafab074",
+    "code": "POSSIBLE_CONSTRAINT_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "秘匿制約を満たしていない可能性があります(内容は作成者本人にだけ表示されます)",
+    "entity_type": "event",
+    "entity_id": "a34389ef-f945-4bbf-b408-083fd64738af",
+    "entity_label": "2026-11-02 寿司 えび専門店",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "1c484ad9-f628-42e7-ad22-c5e32f389e7b",
+    "constraint_title": null,
+    "is_private_constraint": true,
+    "is_masked": true,
+    "evidence": null,
+    "suggestion": null
+   },
+   {
+    "id": "b2911adc-fb18-4b00-874e-6c1523ed5342",
+    "code": "CONSTRAINT_TIME_VIOLATION",
+    "kind": "violation",
+    "severity": "ERROR",
+    "message": "制約「22時までに宿へ」に違反: 「夜景」の終了(23:00)が22:00を過ぎています",
+    "entity_type": "event",
+    "entity_id": "aa021a47-0e56-4148-980a-77775afafbc5",
+    "entity_label": "2026-11-02 夜景",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "f76bed74-de8d-4331-881b-e96408af5d89",
+    "constraint_title": "22時までに宿へ",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "start": "2026-11-02T13:30:00+00:00",
+     "end": "2026-11-02T14:00:00+00:00",
+     "limit": "2026-11-02T13:00:00+00:00"
+    },
+    "suggestion": {
+     "action": "move_event",
+     "latest_end": "2026-11-02T13:00:00+00:00"
+    }
+   },
+   {
+    "id": "4f7561aa-a5c7-4f52-acb1-644ae6337b8a",
+    "code": "AVOIDED_TRANSPORT_USED",
+    "kind": "violation",
+    "severity": "WARNING",
+    "message": "制約「タクシーは避けたい」に違反: 区間の移動手段がタクシーです",
+    "entity_type": "segment",
+    "entity_id": "24959c66-e25b-4ad6-ad48-ba12818fba50",
+    "entity_label": "タクシー",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": "7da5a371-f8bb-4bdb-847a-7f893994d7e9",
+    "constraint_title": "タクシーは避けたい",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": {
+     "segment_mode": "taxi",
+     "weight": 80
+    },
+    "suggestion": {
+     "action": "choose_other_route"
+    }
+   },
+   {
+    "id": "225b276c-3c75-40f8-96d4-451291c4ce0a",
+    "code": "EVENT_TIME_UNKNOWN",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "「時刻未定の散策」は開始時刻が未定のため、時刻に関する検証ができません",
+    "entity_type": "event",
+    "entity_id": "2e87d762-49cc-464d-a1c5-27ecff31b264",
+    "entity_label": "2026-11-02 時刻未定の散策",
+    "day_id": "2c3203cb-4852-40fd-9846-4de41ac25376",
+    "constraint_id": null,
+    "constraint_title": null,
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": {
+     "action": "set_start_time"
+    }
+   },
+   {
+    "id": "0945919f-f483-4dd1-8169-d99f026f4195",
+    "code": "CONSTRAINT_NOT_MACHINE_CHECKABLE",
+    "kind": "unverified",
+    "severity": "INFO",
+    "message": "制約「海の見える店」を検証できません: 希望・一致条件は自動では判定できません(確認して手動で判断してください)",
+    "entity_type": null,
+    "entity_id": null,
+    "entity_label": null,
+    "day_id": null,
+    "constraint_id": "7d8a6c50-5e40-4b8a-b753-dc5820555a29",
+    "constraint_title": "海の見える店",
+    "is_private_constraint": false,
+    "is_masked": false,
+    "evidence": null,
+    "suggestion": null
+   }
+  ]
+ },
+ "validation_run_clean": {
+  "id": "4edb6cc0-b5cb-4ae3-9c1c-dc1f262fd162",
+  "plan_id": "49912281-b0f0-425e-ab32-0abe2e4cbf15",
+  "status": "completed",
+  "algorithm_version": "feasibility-v1",
+  "input_revision": 1,
+  "is_stale": false,
+  "started_at": "2026-09-26T10:10:44.243283+00:00",
+  "finished_at": "2026-09-26T10:10:44.253306+00:00",
+  "created_by_me": true,
+  "counts": {
+   "error": 0,
+   "warning": 0,
+   "info": 0,
+   "unverified": 0
+  },
+  "unchecked": {},
+  "constraint_results": [],
+  "issues": []
  }
 }

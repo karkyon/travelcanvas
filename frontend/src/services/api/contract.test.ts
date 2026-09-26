@@ -18,6 +18,7 @@ import {
   collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
   shareLink, unreadCount, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
+  validationRunDetail, validationRunSummary,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -108,6 +109,12 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['constraint_masked', planConstraint],
   ['constraint_list_other', arrayOf(planConstraint)],
   ['constraint_deleted', revisionResult],
+  // ----- [Gate L3] 実行可能性検証(FR-017)。detail_owner_privateは秘匿制約の作成者本人から見た結果
+  ['validation_run_created', validationRunDetail],
+  ['validation_run_list', arrayOf(validationRunSummary)],
+  ['validation_run_detail_owner_private', validationRunDetail],
+  ['validation_run_stale', validationRunDetail],
+  ['validation_run_clean', validationRunDetail],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

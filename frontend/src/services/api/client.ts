@@ -4,9 +4,10 @@
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
 // [Gate L2] 継承チェーンの末尾に制約(FR-016)を追加: ... → Share → Constraints → CompleteTravelAPI
-import { ConstraintsApi } from './endpoints/constraints';
+// [Gate L3] 実行可能性検証(FR-017)を追加: ... → Constraints → Validation → CompleteTravelAPI
+import { ValidationApi } from './endpoints/validation';
 
-export class CompleteTravelAPI extends ConstraintsApi {
+export class CompleteTravelAPI extends ValidationApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

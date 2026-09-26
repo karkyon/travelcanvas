@@ -230,4 +230,9 @@ export const updateConstraint = (planId: string, constraintId: string, data: Con
 export const deleteConstraint = (planId: string, constraintId: string, ifMatch: number) =>
   api.deleteConstraint(planId, constraintId, ifMatch);
 
+// ===== [Gate L3] 実行可能性検証(FR-017) =====
+export const runValidation = (planId: string) => api.runValidation(planId);
+export const getValidationRuns = (planId: string, limit?: number) => api.getValidationRuns(planId, limit);
+export const getValidationRun = (planId: string, runId: string) => api.getValidationRun(planId, runId);
+
 export default api;

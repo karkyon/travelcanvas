@@ -28,6 +28,7 @@ import type {
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
   AuthResponse, AuthUser, GuestSessionResponse,
   ConstraintValue, PlanConstraint,
+  ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
 } from './types';
 import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -599,4 +600,61 @@ export const planConstraint: Decoder<PlanConstraint> = object<PlanConstraint>({
   has_reason: bool,
   revision: nullable(int),
   updated_at: nullable(str),
+});
+
+// ----- [Gate L3] 実行可能性検証(FR-017)。backend/app/api/v1/validation.py の応答。
+// 件数と検証不能の区別を誤ると「問題なし」と誤表示するため、数値と列挙値を厳密に検査する。
+export const validationCounts: Decoder<ValidationCounts> = object<ValidationCounts>({
+  error: int,
+  warning: int,
+  info: int,
+  unverified: int,
+});
+
+const validationSummaryShape = {
+  id: str,
+  plan_id: str,
+  status: oneOf('completed', 'failed'),
+  algorithm_version: str,
+  input_revision: int,
+  is_stale: bool,
+  started_at: str,
+  finished_at: nullable(str),
+  created_by_me: bool,
+  counts: validationCounts,
+};
+
+export const validationRunSummary: Decoder<ValidationRunSummary> = object<ValidationRunSummary>(validationSummaryShape);
+
+export const validationIssue: Decoder<ValidationIssue> = object<ValidationIssue>({
+  id: str,
+  code: str,
+  kind: oneOf('violation', 'unverified'),
+  severity: oneOf('ERROR', 'WARNING', 'INFO'),
+  message: str,
+  entity_type: nullable(str),
+  entity_id: nullable(str),
+  entity_label: nullable(str),
+  day_id: nullable(str),
+  constraint_id: nullable(str),
+  constraint_title: nullable(str),
+  is_private_constraint: bool,
+  is_masked: bool,
+  evidence: nullable(record),
+  suggestion: nullable(record),
+});
+
+export const constraintCheckResult: Decoder<ConstraintCheckResult> = object<ConstraintCheckResult>({
+  constraint_id: str,
+  status: oneOf('satisfied', 'violated', 'unverified', 'not_applicable'),
+  is_private: bool,
+  is_mine: bool,
+  constraint_title: nullable(str),
+});
+
+export const validationRunDetail: Decoder<ValidationRunDetail> = object<ValidationRunDetail>({
+  ...validationSummaryShape,
+  unchecked: record,
+  constraint_results: arrayOf(constraintCheckResult),
+  issues: arrayOf(validationIssue),
 });

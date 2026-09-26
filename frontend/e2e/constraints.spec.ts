@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
  * [Gate L2] FR-016 制約管理(SC-15の制約部分)のbrowser E2E。
  *
  * ゲストで旅行を作り、プランナーの「⚖️ 制約」から制約画面へ進んで次を確認する。
- *   1. 制約ゼロの表示と「検証(実行可能性チェック)は未実施」の注記が別に出る(SC-15)
+ *   1. 制約ゼロの表示と「まだ検証していない」注記が別に出る(SC-15。[Gate L3]で文言を変更)
  *   2. ハード制約(予算上限・共有)と、ソフト制約(個人・秘匿・理由付き)を画面から登録できる
  *   3. 再読込後もハード/ソフトの区分・秘匿の表示・本人向けの理由が保たれる(永続化)
  *   4. 秘匿制約の内容は画面のAPI応答では本人にだけ返り、他人向けの形(masked)とは別になる
@@ -51,7 +51,7 @@ test('制約: ハード(共有)とソフト(秘匿・理由付き)を登録し�
   await page.waitForURL(new RegExp(`/planner/${planId}/constraints$`), { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: '制約', exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/制約はまだ登録されていません/)).toBeVisible();
-  await expect(page.getByRole('note')).toContainText('まだ行っていません');
+  await expect(page.getByRole('note')).toContainText('まだ検証していません');
   await axeViolations(page, '制約画面(空)');
 
   // 2a. ハード・共有: 予算上限 50000円

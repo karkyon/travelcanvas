@@ -79,7 +79,7 @@ privateのCHECKに違反する。統合試験で検出した)。
 
 ## 3. スコープ外
 
-- 制約に照らした旅程の検証(FR-017、Gate L3)と最適化への反映(FR-018)。
+- 制約に照らした旅程の検証(FR-017) → Gate L3で実装(`ADR-feasibility-validation.md`)。最適化への反映(FR-018)。
 - 制約変更のUndo、制約の複製(旅程複製FR-047では複製しない)、有効期間のUI入力(APIのみ)。
 - 秘匿制約を持つメンバーが離脱した後のデータ削除(DOC-05 §22「deleted memberのprivate data」)。
 

@@ -7,8 +7,9 @@
  * - 「自分だけ(秘匿)」の制約は、題名・値・理由が作成者本人にだけ表示される。
  *   他のメンバーの画面には「秘匿制約がある」ことと、ハード/ソフトの別だけが出る。
  * - 理由は共有の制約でも作成者本人にだけ表示される。
- * - 旅程が制約を満たすかの検証(FR-017 実行可能性)はまだ行わない。
- *   「制約が無い」ことと「検証していない」ことを同じ表示にしない(SC-15)。
+ * - [Gate L3] 旅程の実行可能性チェック(FR-017)を実行し、最新の結果を表示する
+ *   (FeasibilityPanel)。各制約には「満たしている/満たしていない/検証できない/未検証」を付ける。
+ *   「制約が無い」「検証していない」「検証できない」「問題なし」を同じ表示にしない(SC-15)。
  * - 権限(共有制約の変更は編集者以上、秘匿制約は本人のみ)はbackendが判定し、
  *   拒否された場合は理由を表示する。
  */
@@ -20,9 +21,12 @@ import Card from '@/components/common/Card';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import {
-  api, createConstraint, deleteConstraint, extractApiErrorDetailMessage, getConstraints, updateConstraint,
+  api, createConstraint, deleteConstraint, extractApiErrorDetailMessage, getConstraints, getValidationRun,
+  getValidationRuns, runValidation, updateConstraint,
 } from '@/services/api';
-import type { ConstraintType, NormalizedDay, PlanConstraint } from '@/services/api';
+import type { ConstraintType, NormalizedDay, PlanConstraint, ValidationRunDetail } from '@/services/api';
+import FeasibilityPanel from './constraints/FeasibilityPanel';
+import { CONSTRAINT_STATUS_LABEL, constraintStatus } from './constraints/validationModel';
 import {
   OPERATOR_OPTIONS, TYPE_OPTIONS, UNIT_OPTIONS, applyTypePreset, describeCondition, describeScope, emptyForm,
   formFromConstraint, formToPayload, operatorKind, splitByHardness, typeLabel, unitLabel,
@@ -35,6 +39,14 @@ function errorMessage(e: unknown, fallback: string): string {
 }
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
+
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  satisfied: 'bg-green-100 text-green-800',
+  violated: 'bg-red-100 text-red-800',
+  unverified: 'bg-slate-200 text-slate-800',
+  not_applicable: 'bg-gray-100 text-gray-700',
+  not_checked: 'bg-gray-100 text-gray-700',
+};
 
 const ConstraintsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -51,23 +63,41 @@ const ConstraintsPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [latestRun, setLatestRun] = useState<ValidationRunDetail | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+
+  // 最新の検証結果(無ければnull)。取得の失敗は制約一覧の表示を妨げない。
+  const loadLatestRun = useCallback(async (id: string): Promise<ValidationRunDetail | null> => {
+    try {
+      const runs = await getValidationRuns(id, 1);
+      const latest = runs[0];
+      return latest ? await getValidationRun(id, latest.id) : null;
+    } catch (e) {
+      setRunError(errorMessage(e, '検証結果の取得に失敗しました'));
+      return null;
+    }
+  }, []);
+
   const load = useCallback(async () => {
     if (!planId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const [constraints, detail] = await Promise.all([
+      const [constraints, detail, run] = await Promise.all([
         getConstraints(planId),
         api.getPlanDetail(planId).catch(() => null),
+        loadLatestRun(planId),
       ]);
       setItems(constraints);
       setDays(detail?.data?.days ?? []);
+      setLatestRun(run);
     } catch (e) {
       setError(errorMessage(e, '制約の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
-  }, [planId]);
+  }, [planId, loadLatestRun]);
 
   useEffect(() => {
     load();
@@ -127,6 +157,19 @@ const ConstraintsPage: React.FC = () => {
     }
   };
 
+  const handleRun = async () => {
+    if (!planId) return;
+    setIsRunning(true);
+    setRunError(null);
+    try {
+      setLatestRun(await runValidation(planId));
+    } catch (err) {
+      setRunError(errorMessage(err, '検証の実行に失敗しました'));
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   const handleToggle = async (c: PlanConstraint) => {
     if (!planId || c.revision == null) return;
     setError(null);
@@ -161,6 +204,16 @@ const ConstraintsPage: React.FC = () => {
     );
   }
 
+  const renderStatus = (c: PlanConstraint) => {
+    if (!c.is_active) return null;
+    const st = constraintStatus(latestRun, c.id);
+    return (
+      <span className={`text-xs px-2 py-0.5 rounded ${STATUS_BADGE_CLASS[st]}`} data-testid={`constraint-status-${c.id}`}>
+        検証: {CONSTRAINT_STATUS_LABEL[st]}{latestRun?.is_stale && st !== 'not_checked' ? '(古い結果)' : ''}
+      </span>
+    );
+  };
+
   const renderCard = (c: PlanConstraint) => {
     if (c.visibility === 'masked') {
       return (
@@ -170,6 +223,7 @@ const ConstraintsPage: React.FC = () => {
             <span>他のメンバーの秘匿制約</span>
             <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{c.hardness === 'hard' ? 'ハード' : 'ソフト'}</span>
             {!c.is_active && <span className="text-xs px-2 py-0.5 rounded bg-gray-200">無効</span>}
+            {renderStatus(c)}
           </div>
           <p className="text-xs text-gray-500 mt-1">内容は作成した本人にだけ表示されます(旅程の判定には使われます)。</p>
         </Card>
@@ -192,6 +246,7 @@ const ConstraintsPage: React.FC = () => {
                 <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">自分だけ(秘匿)</span>
               )}
               {!c.is_active && <span className="text-xs px-2 py-0.5 rounded bg-gray-200">無効</span>}
+              {renderStatus(c)}
             </div>
             <div className="text-sm text-gray-600 mt-1">
               {typeLabel(c.constraint_type)} ・ {describeCondition(c)}
@@ -239,9 +294,13 @@ const ConstraintsPage: React.FC = () => {
         </Button>
       </div>
 
-      <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm" role="note">
-        旅程が制約を満たしているかの検証(実行可能性チェック)はまだ行っていません。
-      </div>
+      <FeasibilityPanel
+        run={latestRun}
+        hasConstraints={items.length > 0}
+        isRunning={isRunning}
+        error={runError}
+        onRun={handleRun}
+      />
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>}
 

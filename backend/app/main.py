@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
+    validation,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -365,3 +366,5 @@ app.include_router(documents.router, prefix="/api/v1")
 app.include_router(imports.router, prefix="/api/v1")
 # [Gate L2] FR-016制約管理。/plans/{plan_id}/constraints配下(ハード/ソフト、共有/秘匿)。
 app.include_router(constraints.router, prefix="/api/v1")
+# [Gate L3] FR-017実行可能性検証。/plans/{plan_id}/validation-runs配下(違反と検証不能を分けて返す)。
+app.include_router(validation.router, prefix="/api/v1")

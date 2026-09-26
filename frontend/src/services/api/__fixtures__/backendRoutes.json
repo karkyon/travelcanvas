@@ -2,7 +2,8 @@
  "_meta": {
   "description": "backend(app.main.app.routes)の /api/v1 配下の実ルート一覧(HEAD/OPTIONS除く)。frontendのAPI呼び出しURLが実在することを検査する(Gate M9-FE-C2b-3)。再生成: backendで app.routes を列挙。",
   "captured_at_head": "ac4c990f9be38899270868d16db951035cab8343",
-  "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2 constraints)"
+  "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2 constraints)",
+  "captured_at_head_l3": "18665181c062bebaa924c0c4def1bb42e1a8c55a (+Gate L3 validation-runs)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -59,6 +60,8 @@
   "GET /api/v1/plans/{plan_id}/segments",
   "GET /api/v1/plans/{plan_id}/segments/{segment_id}",
   "GET /api/v1/plans/{plan_id}/today",
+  "GET /api/v1/plans/{plan_id}/validation-runs",
+  "GET /api/v1/plans/{plan_id}/validation-runs/{run_id}",
   "GET /api/v1/search/places/{place_id}",
   "GET /api/v1/spots/",
   "GET /api/v1/spots/categories/list",
@@ -122,6 +125,7 @@
   "POST /api/v1/plans/{plan_id}/route-options/{option_id}/legs",
   "POST /api/v1/plans/{plan_id}/segments",
   "POST /api/v1/plans/{plan_id}/undo",
+  "POST /api/v1/plans/{plan_id}/validation-runs",
   "POST /api/v1/public/share/{token}/resolve",
   "POST /api/v1/quick-drafts",
   "POST /api/v1/quick-drafts/{draft_id}/promote",

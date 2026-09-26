@@ -6,6 +6,7 @@
  * [Gate M9-FE-C2b] ApiDecodeError(応答形式の検証失敗)を公開exportへ追加。
  * [Gate A1] 認証の一本化でAuthApiError、startGuestSession/upgradeGuest(メソッド・authAPI)を追加。
  * [Gate L2] 制約(FR-016)のget/create/update/deleteConstraint(export・メソッド)を追加。
+ * [Gate L3] 実行可能性検証(FR-017)のrunValidation/getValidationRuns/getValidationRun(export・メソッド)を追加。
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
@@ -22,10 +23,10 @@ const EXPECTED_EXPORTS = [
   'getDocumentLinks', 'getDocuments', 'getImportJob', 'getImportJobs', 'getReservation',
   'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRouteOption',
   'getRouteOptions', 'getSegment', 'getSegments', 'getShareSettings', 'getSpotCategories',
-  'getSpots', 'getTickets', 'getToday', 'inviteCollaborator', 'listMyInvitations',
+  'getSpots', 'getTickets', 'getToday', 'getValidationRun', 'getValidationRuns', 'inviteCollaborator', 'listMyInvitations',
   'notificationsAPI', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
   'resolveDownloadUrl', 'resolvePublicShare', 'revealReservation', 'revealTicket',
-  'revokeShareLink', 'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'testConnection',
+  'revokeShareLink', 'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'testConnection',
   'travelAPI', 'updateConstraint', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
   'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument',
 ];
@@ -46,11 +47,11 @@ const EXPECTED_METHODS = [
   'getPlans', 'getReservation', 'getReservationEventLinks', 'getReservationParticipants',
   'getReservations', 'getRouteOption', 'getRouteOptions', 'getRoutePreview', 'getSegment',
   'getSegments', 'getShareSettings', 'getSpotCategories', 'getSpots', 'getTickets', 'getToday',
-  'getUnreadNotificationCount', 'handleApiError', 'healthCheck', 'initializeTokens',
+  'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'handleApiError', 'healthCheck', 'initializeTokens',
   'inviteCollaborator', 'listMyInvitations', 'login', 'logout', 'markAllNotificationsAsRead',
   'markNotificationAsRead', 'moveEvent', 'planFromApi', 'planToApi', 'post', 'promoteQuickDraft',
   'put', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
-  'resolvePublicShare', 'revealReservation', 'revealTicket', 'revokeShareLink', 'searchByImage',
+  'resolvePublicShare', 'revealReservation', 'revealTicket', 'revokeShareLink', 'runValidation', 'searchByImage',
   'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode', 'setHttpClientForTesting',
   'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection', 'undoLastPlanChange', 'updateConstraint',
   'updateDay',
