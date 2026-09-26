@@ -91,7 +91,7 @@ class User(Base):
 
     # リレーションシップ
     travels = relationship("Travel", back_populates="owner")
-    travel_plans = relationship("TravelPlan", back_populates="user")
+    travel_plans = relationship("TravelPlan", back_populates="user", foreign_keys="TravelPlan.user_id")
     sessions = relationship("UserSession", back_populates="user")
     created_spots = relationship("Spot", back_populates="creator")
 
@@ -166,13 +166,34 @@ class TravelPlan(Base):
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # [Gate B-012] 2段階削除。DELETEで論理削除(deleted_at)し、purge_after(既定30日後)を
+    # 過ぎたらapp/services/plan_deletion.pyの完全削除で子データごと物理削除する。
+    # 論理削除中はrequire_plan_access等で存在しないもの(404)として扱う。
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    purge_after = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(deleted_at IS NULL AND purge_after IS NULL) OR (deleted_at IS NOT NULL AND purge_after IS NOT NULL)",
+            name="ck_travel_plans_deleted_consistency",
+        ),
+        Index("ix_travel_plans_purge_after", "purge_after", postgresql_where=text("deleted_at IS NOT NULL")),
+    )
 
     # リレーションシップ
-    user = relationship("User", back_populates="travel_plans")
-    share_links = relationship("PlanShareLink", back_populates="plan", cascade="all, delete-orphan")
-    collaborators = relationship("PlanCollaborator", back_populates="plan", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="travel_plans", foreign_keys=[user_id])
+    # [Gate B-012] passive_deletes: プランの物理削除はDBのON DELETE CASCADEに任せる
+    # (ORMが子を1件ずつ消すと、プラン内の横の参照の検査順で失敗するため)
+    share_links = relationship(
+        "PlanShareLink", back_populates="plan", cascade="all, delete-orphan", passive_deletes=True,
+    )
+    collaborators = relationship(
+        "PlanCollaborator", back_populates="plan", cascade="all, delete-orphan", passive_deletes=True,
+    )
     days = relationship(
-        "TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order"
+        "TravelDay", back_populates="plan", cascade="all, delete-orphan", order_by="TravelDay.sort_order",
+        passive_deletes=True,
     )
 
 
@@ -187,7 +208,7 @@ class PlanShareLink(Base):
     __tablename__ = "plan_share_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     token_hash = Column(String, unique=True, index=True, nullable=False)
     token_prefix = Column(String(8), nullable=False)
     permission = Column(String, default="view")  # view | edit
@@ -207,7 +228,7 @@ class PlanCollaborator(Base):
     __tablename__ = "plan_collaborators"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     email = Column(String, nullable=False)
     role = Column(String, default="viewer")  # viewer | editor | owner
@@ -231,7 +252,7 @@ class Notification(Base):
     type = Column(String, nullable=False)
     title = Column(String, nullable=False)
     message = Column(Text, nullable=True)
-    related_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=True)
+    related_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -372,7 +393,7 @@ class TravelDay(Base):
     __tablename__ = "travel_days"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     local_date = Column(Date, nullable=False)
     timezone_id = Column(String, nullable=False, default="UTC")
     title = Column(String, nullable=True)
@@ -397,8 +418,8 @@ class TravelEvent(Base):
     __tablename__ = "travel_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
-    day_id = Column(UUID(as_uuid=True), ForeignKey("travel_days.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    day_id = Column(UUID(as_uuid=True), ForeignKey("travel_days.id", ondelete="CASCADE"), nullable=False)
     spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=True)
     # [Gate #32] このイベントがcandidate/place(Gate #31正規化検索結果)から
     # 採用されたものであれば、そのPlaceを参照する(出典追跡・地図上の
@@ -433,7 +454,7 @@ class EventLink(Base):
     __tablename__ = "event_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=False)
+    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="CASCADE"), nullable=False)
     link_type = Column(String, nullable=False)  # note | url | other
     label = Column(String, nullable=True)
     url = Column(String, nullable=True)
@@ -446,7 +467,7 @@ class PlanVersion(Base):
     __tablename__ = "plan_versions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     revision = Column(Integer, nullable=False)
     summary = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -461,7 +482,7 @@ class ChangeSet(Base):
     __tablename__ = "change_sets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     source = Column(String, nullable=False, default="manual")  # manual|optimization|replan|import|undo
     base_revision = Column(Integer, nullable=False)
@@ -477,7 +498,7 @@ class ChangeItem(Base):
     __tablename__ = "change_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id"), nullable=False)
+    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="CASCADE"), nullable=False)
     entity_type = Column(String, nullable=False)  # travel_day | travel_event
     entity_id = Column(UUID(as_uuid=True), nullable=False)
     action = Column(String, nullable=False)  # create | update | delete | reorder
@@ -589,7 +610,7 @@ class QuickDraft(Base):
     expires_at = Column(
         DateTime(timezone=True), nullable=False, default=_default_quick_draft_expiry,
     )
-    promoted_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=True)
+    promoted_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -725,7 +746,7 @@ class ShareAccessLog(Base):
     __tablename__ = "share_access_logs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id"), nullable=True)
+    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True)
     token_hash = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     # result: success | invalid | passcode_failed | rate_limited
@@ -756,10 +777,16 @@ class TravelSegment(Base):
     __tablename__ = "travel_segments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
-    from_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
     from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
-    to_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    to_event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
     to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     # walking | driving | train | bus | ferry | flight | bicycle | taxi | mixed
@@ -786,13 +813,19 @@ class TravelSegment(Base):
     transfer_count = Column(Integer, nullable=True)
     luggage_note = Column(Text, nullable=True)
 
-    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
+    reservation_id = Column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
     # [Gate M3] FR-015複数経路比較。採用されたRouteOption(候補)への参照。
     # additive(nullable)。route_optionsテーブルはGate M3で新設したため、
     # Gate M1時点ではこの列を先行追加しなかった(ADR-travel-segment.md
     # 「参照先tableが無い状態でFKなしのUUID列だけ先行追加しない」を参照)。
-    route_option_id = Column(UUID(as_uuid=True), ForeignKey("route_options.id"), nullable=True)
+    route_option_id = Column(
+        UUID(as_uuid=True), ForeignKey("route_options.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
     # [Gate #32から継続] haversine fallback由来かどうかの由来管理(provenance)。
     is_estimate = Column(Boolean, nullable=False, default=True)
@@ -832,11 +865,17 @@ class RouteOption(Base):
     __tablename__ = "route_options"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    from_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    from_event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
     from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
-    to_event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True)
+    to_event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
     to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     # candidate | adopted | discarded
@@ -880,7 +919,10 @@ class RouteLeg(Base):
     __tablename__ = "route_legs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    route_option_id = Column(UUID(as_uuid=True), ForeignKey("route_options.id"), nullable=False, index=True)
+    route_option_id = Column(
+        UUID(as_uuid=True), ForeignKey("route_options.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
 
     leg_order = Column(Integer, nullable=False)
     mode = Column(String, nullable=False)
@@ -996,9 +1038,12 @@ class Reservation(Base):
     __tablename__ = "reservations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     # [Gate R3-0スコープ限定] 単一イベントのみへの紐付け(§上部コメント2参照)。
-    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=True, index=True)
+    event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True, index=True,
+    )
     place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     type = Column(String, nullable=False)  # ReservationType
@@ -1085,8 +1130,14 @@ class EventReservation(Base):
     __tablename__ = "event_reservations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id"), nullable=False, index=True)
-    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True)
+    event_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=False, index=True,
+    )
+    reservation_id = Column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
     relation_type = Column(String, nullable=False, default=ReservationEventRelationType.PRIMARY.value)
     is_locked = Column(Boolean, nullable=False, default=False)
 
@@ -1128,9 +1179,12 @@ class ReservationParticipant(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True,
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True,
     )
-    plan_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
+    plan_member_id = Column(
+        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
     # [Gate R3-16] name/seat/special_requestの平文列はDOC-11 §14
     # expand/contractのcontractフェーズとして削除した(Gate R3-8時点では
@@ -1198,9 +1252,15 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=False, index=True)
+    reservation_id = Column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
     ticket_type = Column(String, nullable=False)  # 例: boarding_pass/entry_ticket/other
-    holder_member_id = Column(UUID(as_uuid=True), ForeignKey("plan_collaborators.id"), nullable=True)
+    holder_member_id = Column(
+        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
     # 秘密値(Fernet field encryption)。QR/バーコードの生データ本体。
     payload_ciphertext = Column(LargeBinary, nullable=True)
@@ -1298,7 +1358,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     classification = Column(String, nullable=False, default=DocumentClassification.INTERNAL.value)
@@ -1338,7 +1398,7 @@ class DocumentLink(Base):
     __tablename__ = "document_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False, index=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
     entity_type = Column(String, nullable=False)  # 例: reservation/ticket/event/attachment
     entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     relation_type = Column(String, nullable=False, default=DocumentLinkRelationType.ATTACHMENT.value)
@@ -1400,8 +1460,11 @@ class ImportJob(Base):
     __tablename__ = "import_jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id"), nullable=False, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id = Column(
+        UUID(as_uuid=True), ForeignKey("documents.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
     created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # [スコープ限定] providerは常に"manual"(AI/OCR provider未導入のため)。
@@ -1411,7 +1474,10 @@ class ImportJob(Base):
     error_message = Column(Text, nullable=True)
 
     # 確定時に生成されたReservationへの参照(confirm操作で設定)。
-    result_reservation_id = Column(UUID(as_uuid=True), ForeignKey("reservations.id"), nullable=True)
+    result_reservation_id = Column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -1430,7 +1496,10 @@ class ExtractionCandidate(Base):
     __tablename__ = "extraction_candidates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    import_job_id = Column(UUID(as_uuid=True), ForeignKey("import_jobs.id"), nullable=False, index=True)
+    import_job_id = Column(
+        UUID(as_uuid=True), ForeignKey("import_jobs.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
 
     field_path = Column(String, nullable=False)  # 例: "type"/"confirmation_number"/"start_at"
     candidate_value_ciphertext = Column(LargeBinary, nullable=False)

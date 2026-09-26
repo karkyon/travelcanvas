@@ -27,6 +27,7 @@ import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
+import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 
@@ -427,9 +428,15 @@ const PlannerPage: React.FC = () => {
     }
   };
 
+  // [Gate B-012] 削除は論理削除。30日以内なら「最近削除したプラン」から復元できる。
+  const [trashRefreshKey, setTrashRefreshKey] = useState(0);
   const handleDeletePlan = async (id: string) => {
-    if (!confirm('このプランを削除しますか？')) return;
-    await deletePlan(id);
+    if (!confirm('このプランを削除しますか？\n削除から30日以内なら「最近削除したプラン」から復元できます。')) return;
+    try {
+      await deletePlan(id);
+    } finally {
+      setTrashRefreshKey((k) => k + 1);
+    }
   };
 
   // [Gate R3-12] FR-047 旅程複製
@@ -546,7 +553,7 @@ const PlannerPage: React.FC = () => {
             </Button>
           </div>
 
-          <PlanHeader plan={currentPlan} className="mb-6" />
+          <PlanHeader plan={currentPlan} className="mb-6" onDelete={() => navigate('/planner')} />
 
           <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mb-6" />
 
@@ -837,6 +844,8 @@ const PlannerPage: React.FC = () => {
             ))}
           </div>
         )}
+
+        <DeletedPlansSection refreshKey={trashRefreshKey} onRestored={() => loadPlans()} />
       </div>
 
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="新しい旅行プラン">

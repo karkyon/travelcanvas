@@ -44,6 +44,12 @@ def _get_owned_plan(db: Session, plan_id: uuid.UUID, user: User) -> TravelPlan:
     return plan
 
 
+def _plan_is_deleted(db: Session, plan_id) -> bool:
+    """[Gate B-012] 論理削除済み(または存在しない)プランか。"""
+    plan = db.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
+    return plan is None or plan.deleted_at is not None
+
+
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -374,6 +380,8 @@ async def list_my_invitations(
     result = []
     for inv in invitations:
         plan = db.query(TravelPlan).filter(TravelPlan.id == inv.plan_id).first()
+        if plan is not None and plan.deleted_at is not None:
+            continue  # [Gate B-012] 論理削除済みプランへの招待は表示しない
         item = _collaborator_to_dict(inv)
         item["plan_title"] = plan.title if plan else None
         result.append(item)
@@ -387,9 +395,9 @@ async def accept_invitation(
     db: Session = Depends(get_db),
 ):
     collab = db.query(PlanCollaborator).filter(PlanCollaborator.id == collaborator_id).first()
-    if not collab or collab.email != current_user.email:
+    if not collab or collab.email != current_user.email or _plan_is_deleted(db, collab.plan_id):
         # 他人宛の招待IDを推測されてもstatusを変更できないよう、存在有無を
-        # 問わず同一の404で応答する(IDOR対策)。
+        # 問わず同一の404で応答する(IDOR対策)。論理削除済みプランへの招待も同じ扱い。
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="招待が見つかりません")
     if collab.status != "pending":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="この招待は既に処理済みです")
@@ -409,7 +417,7 @@ async def decline_invitation(
     db: Session = Depends(get_db),
 ):
     collab = db.query(PlanCollaborator).filter(PlanCollaborator.id == collaborator_id).first()
-    if not collab or collab.email != current_user.email:
+    if not collab or collab.email != current_user.email or _plan_is_deleted(db, collab.plan_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="招待が見つかりません")
     if collab.status != "pending":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="この招待は既に処理済みです")

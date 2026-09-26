@@ -56,14 +56,16 @@ async def get_system_stats(
         key = user_type if user_type in user_type_counts else "registered"
         user_type_counts[key] += count
 
-    total_plans = db.query(func.count(TravelPlan.id)).scalar() or 0
-    active_plans = db.query(func.count(TravelPlan.id)).filter(TravelPlan.status == "active").scalar() or 0
-    completed_plans = db.query(func.count(TravelPlan.id)).filter(TravelPlan.status == "completed").scalar() or 0
-    draft_plans = db.query(func.count(TravelPlan.id)).filter(TravelPlan.status == "draft").scalar() or 0
+    # [Gate B-012] 論理削除済みプランは統計に含めない
+    live = TravelPlan.deleted_at.is_(None)
+    total_plans = db.query(func.count(TravelPlan.id)).filter(live).scalar() or 0
+    active_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "active").scalar() or 0
+    completed_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "completed").scalar() or 0
+    draft_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "draft").scalar() or 0
 
     duration_rows = (
         db.query(TravelPlan.start_date, TravelPlan.end_date)
-        .filter(TravelPlan.start_date.isnot(None), TravelPlan.end_date.isnot(None))
+        .filter(live, TravelPlan.start_date.isnot(None), TravelPlan.end_date.isnot(None))
         .all()
     )
     durations = [(end - start).days for start, end in duration_rows if end and start and (end - start).days >= 0]
@@ -71,7 +73,7 @@ async def get_system_stats(
 
     destination_rows = (
         db.query(TravelPlan.destination, func.count(TravelPlan.id).label("cnt"))
-        .filter(TravelPlan.destination.isnot(None), TravelPlan.destination != "")
+        .filter(live, TravelPlan.destination.isnot(None), TravelPlan.destination != "")
         .group_by(TravelPlan.destination)
         .order_by(func.count(TravelPlan.id).desc())
         .limit(5)
@@ -141,7 +143,7 @@ async def list_users(
     if users:
         rows = (
             db.query(TravelPlan.user_id, func.count(TravelPlan.id))
-            .filter(TravelPlan.user_id.in_([u.id for u in users]))
+            .filter(TravelPlan.user_id.in_([u.id for u in users]), TravelPlan.deleted_at.is_(None))
             .group_by(TravelPlan.user_id)
             .all()
         )
@@ -185,10 +187,15 @@ async def get_user_detail(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ユーザーが見つかりません")
 
-    total_plans = db.query(func.count(TravelPlan.id)).filter(TravelPlan.user_id == user.id).scalar() or 0
+    total_plans = (
+        db.query(func.count(TravelPlan.id))
+        .filter(TravelPlan.user_id == user.id, TravelPlan.deleted_at.is_(None))
+        .scalar()
+        or 0
+    )
     completed_plans = (
         db.query(func.count(TravelPlan.id))
-        .filter(TravelPlan.user_id == user.id, TravelPlan.status == "completed")
+        .filter(TravelPlan.user_id == user.id, TravelPlan.deleted_at.is_(None), TravelPlan.status == "completed")
         .scalar()
         or 0
     )

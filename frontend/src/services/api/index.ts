@@ -235,4 +235,9 @@ export const runValidation = (planId: string) => api.runValidation(planId);
 export const getValidationRuns = (planId: string, limit?: number) => api.getValidationRuns(planId, limit);
 export const getValidationRun = (planId: string, runId: string) => api.getValidationRun(planId, runId);
 
+// ===== [Gate B-012] 削除済みプラン(論理削除からの復元・完全削除) =====
+export const getDeletedPlans = () => api.getDeletedPlans();
+export const restorePlan = (planId: string) => api.restorePlan(planId);
+export const purgePlan = (planId: string) => api.purgePlan(planId);
+
 export default api;

@@ -87,3 +87,4 @@ privateのCHECKに違反する。統合試験で検出した)。
 
 日程・イベント・予約のいずれかを持つプランを `DELETE /travel-plans/{id}` で削除すると500になる
 (子テーブルの外部キーに削除時の扱いが無い)。FR-004の論理削除設計と合わせて別Gateで扱う。
+→ Gate B-012で解消(`docs/adr/ADR-plan-deletion.md`。論理削除→猶予期間→完全削除)。

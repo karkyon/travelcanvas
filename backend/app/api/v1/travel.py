@@ -32,6 +32,8 @@ from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
 from app.models.models import TravelPlan, TravelDay, TravelEvent, User
+from app.services import plan_deletion
+from app.services.audit_service import record_audit_event
 from app.schemas.travel_plan import (
     TravelPlanCreate,
     TravelPlanUpdate,
@@ -117,7 +119,8 @@ async def get_travel_plans(
     """
     collab_plan_ids = accessible_plan_ids_subquery(db, current_user)
     query = db.query(TravelPlan).filter(
-        or_(TravelPlan.user_id == current_user.id, TravelPlan.id.in_(collab_plan_ids))
+        or_(TravelPlan.user_id == current_user.id, TravelPlan.id.in_(collab_plan_ids)),
+        TravelPlan.deleted_at.is_(None),  # [Gate B-012] 論理削除済みは一覧に出さない
     )
 
     if status_filter:
@@ -148,6 +151,85 @@ async def test_travel_plans_api():
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
     }
+
+
+# ===== [Gate B-012] 論理削除済みプラン(復元・完全削除) =====
+# /{plan_id}(UUID型パスパラメータ)より前に定義する(/test/pingと同じ理由)。
+
+def _iso(dt) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def _deleted_plan_summary(plan: TravelPlan) -> dict:
+    return {
+        "id": str(plan.id),
+        "title": plan.title,
+        "destination": plan.destination,
+        "start_date": _iso(plan.start_date),
+        "end_date": _iso(plan.end_date),
+        "deleted_at": _iso(plan.deleted_at),
+        "purge_after": _iso(plan.purge_after),
+    }
+
+
+def _get_deleted_own_plan(db: Session, plan_id: uuid.UUID, user: User) -> TravelPlan:
+    """自分が所有する論理削除済みプラン。所有者以外・未削除・存在しない場合は同じ404。"""
+    plan = (
+        db.query(TravelPlan)
+        .filter(TravelPlan.id == plan_id, TravelPlan.user_id == user.id, TravelPlan.deleted_at.isnot(None))
+        .first()
+    )
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="削除済みの旅行プランが見つかりません")
+    return plan
+
+
+@router.get("/deleted")
+async def list_deleted_travel_plans(
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """自分が所有する論理削除済みプラン(猶予期間内で、まだ完全削除されていないもの)。新しく削除した順。"""
+    plans = (
+        db.query(TravelPlan)
+        .filter(TravelPlan.user_id == current_user.id, TravelPlan.deleted_at.isnot(None))
+        .order_by(TravelPlan.deleted_at.desc(), TravelPlan.id.asc())
+        .all()
+    )
+    return [_deleted_plan_summary(p) for p in plans]
+
+
+@router.post("/{plan_id}/restore", response_model=TravelPlanResponse)
+async def restore_travel_plan(
+    plan_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """論理削除を取り消す(所有者のみ、猶予期間内のみ)。共有リンクは失効したまま(再発行が必要)。"""
+    plan = _get_deleted_own_plan(db, plan_id, current_user)
+    if plan.purge_after is not None and plan.purge_after <= plan_deletion._now():
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="復元できる期間を過ぎています")
+    plan_deletion.restore_plan(plan)
+    db.commit()
+    db.refresh(plan)
+    record_audit_event(action="plan.restore", resource_type="travel_plan", user_id=current_user.id, resource_id=plan.id)
+    return plan
+
+
+@router.delete("/{plan_id}/permanent")
+async def purge_travel_plan(
+    plan_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """論理削除済みプランを今すぐ完全削除する(所有者のみ)。元に戻せない。"""
+    plan = _get_deleted_own_plan(db, plan_id, current_user)
+    if not plan_deletion.purge_plan(db, plan, actor_user_id=current_user.id, reason="owner_request"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="添付文書のファイルを削除できなかったため、完全削除を保留しました。時間をおいて再試行してください。",
+        )
+    return {"message": "旅行プランを完全に削除しました"}
 
 
 @router.get("/{plan_id}", response_model=TravelPlanResponse)
@@ -335,10 +417,20 @@ async def delete_travel_plan(
     """
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="owner")
 
+    # [Gate B-012] 物理削除(db.delete)は子データの外部キーで500になっていた。論理削除して
+    # 共有リンクを即時失効し、猶予期間(PLAN_DELETE_GRACE_DAYS)後に完全削除する。
     try:
-        db.delete(plan)
+        revoked = plan_deletion.soft_delete_plan(db, plan, current_user.id)
         db.commit()
-        return {"message": "旅行プランを削除しました"}
+        record_audit_event(
+            action="plan.delete", resource_type="travel_plan", user_id=current_user.id, resource_id=plan.id,
+            details={"revoked_share_links": revoked, "grace_days": settings.PLAN_DELETE_GRACE_DAYS},
+        )
+        return {
+            "message": "旅行プランを削除しました",
+            "deleted_at": _iso(plan.deleted_at),
+            "purge_after": _iso(plan.purge_after),
+        }
     except HTTPException:
         raise
     except Exception:

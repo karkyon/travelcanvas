@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # レート制限を別途設ける(1時間あたり)。
     RATE_LIMIT_QUICKDRAFT_CREATE: int = 20
 
+    # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
+    # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。
+    PLAN_DELETE_GRACE_DAYS: int = 30
+
     # [Gate R2-2] QuickDraft payload field encryption用の鍵。
     # 注意: DATABASE_URL/JWT_SECRET_KEYと異なり意図的にOptionalとする。
     # 必須化するとomega-dev2の.envに未設定の場合にbackend全体が起動不能に

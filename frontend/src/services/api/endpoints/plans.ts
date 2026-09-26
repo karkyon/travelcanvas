@@ -8,7 +8,7 @@ import { SpotsApi } from './spots';
 import type { ApiResponse, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, promoteQuickDraftResult, revisionResult } from '../decoders';
+import { legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decoders';
 
 export class PlansApi extends SpotsApi {
   // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして
@@ -65,8 +65,10 @@ export class PlansApi extends SpotsApi {
     return apiOk<TravelPlan>(this.planFromApi(decodeResponse(response.data, legacyTravelPlan, 'PUT /travel-plans/{plan_id}')));
   }
 
+  // [Gate B-012] 削除は論理削除(応答に完全削除の予定日時purge_afterを含む)。30日以内なら復元できる。
   async deletePlan(planId: string): Promise<ApiResponse<void>> {
-    await this.client.delete<void>(`/travel-plans/${planId}`);
+    const response = await this.client.delete<unknown>(`/travel-plans/${planId}`);
+    decodeResponse(response.data, planDeleteResult, 'DELETE /travel-plans/{plan_id}');
     return apiOkVoid();
   }
 

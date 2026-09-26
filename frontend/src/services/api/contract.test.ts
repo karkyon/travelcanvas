@@ -18,7 +18,7 @@ import {
   collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
   shareLink, unreadCount, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
-  validationRunDetail, validationRunSummary,
+  validationRunDetail, validationRunSummary, deletedPlanSummary, planDeleteResult, planPurgeResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -115,6 +115,12 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['validation_run_detail_owner_private', validationRunDetail],
   ['validation_run_stale', validationRunDetail],
   ['validation_run_clean', validationRunDetail],
+  // ----- [Gate B-012] 削除済みプラン(論理削除・一覧・復元・完全削除)
+  ['plan_soft_deleted', planDeleteResult],
+  ['deleted_plan_list', arrayOf(deletedPlanSummary)],
+  ['deleted_plan_list_empty', arrayOf(deletedPlanSummary)],
+  ['plan_restored', legacyTravelPlan],
+  ['plan_purged', planPurgeResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

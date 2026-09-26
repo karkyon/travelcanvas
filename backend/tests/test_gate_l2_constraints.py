@@ -456,6 +456,10 @@ def test_plan_deletion_cascades_to_constraints(auth_client, db_session):
     client.post(ENDPOINT.format(plan_id=plan_id), json=_private_body())
     res = client.delete(f"/api/v1/travel-plans/{plan_id}")
     assert res.status_code == 200, res.text
+    # [Gate B-012] DELETEは論理削除。制約は猶予期間中は残り、完全削除で消える
+    db_session.expire_all()
+    assert db_session.query(PlanConstraint).filter(PlanConstraint.plan_id == uuid.UUID(plan_id)).count() == 2
+    assert client.delete(f"/api/v1/travel-plans/{plan_id}/permanent").status_code == 200
     db_session.expire_all()
     assert db_session.query(PlanConstraint).filter(PlanConstraint.plan_id == uuid.UUID(plan_id)).count() == 0
 

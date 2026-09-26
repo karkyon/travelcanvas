@@ -29,6 +29,7 @@ import type {
   AuthResponse, AuthUser, GuestSessionResponse,
   ConstraintValue, PlanConstraint,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
+  DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
 } from './types';
 import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -657,4 +658,24 @@ export const validationRunDetail: Decoder<ValidationRunDetail> = object<Validati
   unchecked: record,
   constraint_results: arrayOf(constraintCheckResult),
   issues: arrayOf(validationIssue),
+});
+
+// ----- [Gate B-012] 削除済みプラン。backend/app/api/v1/travel.py の応答。
+// 復元期限(purge_after)を誤って表示すると、利用者が期限切れに気づかず復元できなくなるため必須とする。
+export const deletedPlanSummary: Decoder<DeletedPlanSummary> = object<DeletedPlanSummary>({
+  id: str,
+  title: str,
+  destination: nullable(str),
+  start_date: nullable(str),
+  end_date: nullable(str),
+  deleted_at: str,
+  purge_after: str,
+});
+
+export const planPurgeResult: Decoder<PlanPurgeResult> = object<PlanPurgeResult>({ message: str });
+
+export const planDeleteResult: Decoder<PlanDeleteResult> = object<PlanDeleteResult>({
+  message: str,
+  deleted_at: str,
+  purge_after: str,
 });

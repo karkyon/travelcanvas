@@ -102,23 +102,16 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
 
   // プラン削除
   const handleDeletePlan = useCallback(async () => {
+    // [Gate B-012] 成功・失敗の通知はplanStore.deletePlanが表示する(以前は二重表示で、
+    // 失敗時もここで「削除しました」と表示していた)。
     try {
       await deletePlan(plan.id);
-      onDelete?.();
       setShowDeleteModal(false);
-      
-      addToast({
-        type: 'success',
-        message: 'プランを削除しました'
-      });
+      onDelete?.();
     } catch (error) {
       console.error('プラン削除エラー:', error);
-      addToast({
-        type: 'error',
-        message: 'プラン削除に失敗しました'
-      });
     }
-  }, [plan.id, deletePlan, onDelete, addToast]);
+  }, [plan.id, deletePlan, onDelete]);
 
   // 編集キャンセル
   const handleCancelEdit = useCallback(() => {
@@ -452,7 +445,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               「{plan.title}」を削除しますか？
             </p>
             <p className="text-sm text-gray-500">
-              この操作は取り消すことができません。
+              削除から30日以内なら、プラン一覧の「最近削除したプラン」から復元できます。
             </p>
           </div>
         </Modal.Body>

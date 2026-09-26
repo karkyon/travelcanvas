@@ -7,6 +7,7 @@
  * [Gate A1] 認証の一本化でAuthApiError、startGuestSession/upgradeGuest(メソッド・authAPI)を追加。
  * [Gate L2] 制約(FR-016)のget/create/update/deleteConstraint(export・メソッド)を追加。
  * [Gate L3] 実行可能性検証(FR-017)のrunValidation/getValidationRuns/getValidationRun(export・メソッド)を追加。
+ * [Gate B-012] 削除済みプランのgetDeletedPlans/restorePlan/purgePlan(export・メソッド)を追加。
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
@@ -19,13 +20,14 @@ const EXPECTED_EXPORTS = [
   'createSpot', 'createTicket', 'declineInvitation', 'default', 'deleteConstraint', 'deleteDocument',
   'deleteReservation', 'deleteReservationEventLink', 'deleteReservationParticipant',
   'deleteRouteLeg', 'deleteRouteOption', 'deleteSegment', 'deleteShareLink', 'deleteTicket',
-  'extractApiErrorDetailMessage', 'getCollaborators', 'getConstraints', 'getDocument', 'getDocumentDownloadUrl',
+  'extractApiErrorDetailMessage', 'getCollaborators', 'getConstraints', 'getDeletedPlans', 'getDocument',
+  'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getImportJob', 'getImportJobs', 'getReservation',
   'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRouteOption',
   'getRouteOptions', 'getSegment', 'getSegments', 'getShareSettings', 'getSpotCategories',
   'getSpots', 'getTickets', 'getToday', 'getValidationRun', 'getValidationRuns', 'inviteCollaborator', 'listMyInvitations',
-  'notificationsAPI', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
-  'resolveDownloadUrl', 'resolvePublicShare', 'revealReservation', 'revealTicket',
+  'notificationsAPI', 'purgePlan', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
+  'resolveDownloadUrl', 'resolvePublicShare', 'restorePlan', 'revealReservation', 'revealTicket',
   'revokeShareLink', 'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'testConnection',
   'travelAPI', 'updateConstraint', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
   'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument',
@@ -41,7 +43,7 @@ const EXPECTED_METHODS = [
   'deleteConstraint', 'deleteDay', 'deleteDocument', 'deleteEvent', 'deletePlan', 'deleteReservation',
   'deleteReservationEventLink', 'deleteReservationParticipant', 'deleteRouteLeg',
   'deleteRouteOption', 'deleteSegment', 'deleteShareLink', 'deleteTicket', 'get',
-  'getCollaborators', 'getConstraints', 'getCurrentUser', 'getDocument', 'getDocumentDownloadUrl',
+  'getCollaborators', 'getConstraints', 'getCurrentUser', 'getDeletedPlans', 'getDocument', 'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getImportJob', 'getImportJobs', 'getInsertionPreview',
   'getNotifications', 'getOptimizationProposal', 'getPlace', 'getPlan', 'getPlanDetail',
   'getPlans', 'getReservation', 'getReservationEventLinks', 'getReservationParticipants',
@@ -50,8 +52,9 @@ const EXPECTED_METHODS = [
   'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'handleApiError', 'healthCheck', 'initializeTokens',
   'inviteCollaborator', 'listMyInvitations', 'login', 'logout', 'markAllNotificationsAsRead',
   'markNotificationAsRead', 'moveEvent', 'planFromApi', 'planToApi', 'post', 'promoteQuickDraft',
-  'put', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
-  'resolvePublicShare', 'revealReservation', 'revealTicket', 'revokeShareLink', 'runValidation', 'searchByImage',
+  'purgePlan', 'put', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
+  'resolvePublicShare', 'restorePlan', 'revealReservation', 'revealTicket', 'revokeShareLink', 'runValidation',
+  'searchByImage',
   'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode', 'setHttpClientForTesting',
   'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection', 'undoLastPlanChange', 'updateConstraint',
   'updateDay',

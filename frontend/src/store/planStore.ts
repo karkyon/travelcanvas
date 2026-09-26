@@ -447,11 +447,14 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           currentPlan: state.currentPlan?.id === planId ? null : state.currentPlan
         }));
 
-        toast.success('プランを削除しました');
+        // [Gate B-012] 削除は論理削除(30日以内なら復元できる)
+        toast.success('プランを削除しました(30日以内なら「最近削除したプラン」から復元できます)');
       }
     } catch (error) {
       console.error('Delete plan error:', error);
       toast.error('プランの削除に失敗しました');
+      // 呼出側(PlanHeader等)が成功扱いで画面を閉じないよう、失敗を伝える
+      throw error;
     }
   },
 

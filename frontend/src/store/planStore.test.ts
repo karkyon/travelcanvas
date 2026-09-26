@@ -367,3 +367,18 @@ describe('undoLastChange', () => {
     expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('deletePlan (Gate B-012)', () => {
+  it('成功すると一覧と表示中のプランから外し、失敗は呼出元へ伝える(成功と誤表示しない)', async () => {
+    const mocked = apiService as unknown as { deletePlan: ReturnType<typeof vi.fn> };
+    usePlanStore.setState({ plans: [{ id: 'p1' }, { id: 'p2' }] as never, currentPlan: { id: 'p1' } as never });
+    mocked.deletePlan.mockResolvedValueOnce({ success: true, message: '' });
+    await usePlanStore.getState().deletePlan('p1');
+    expect(usePlanStore.getState().plans.map((p) => p.id)).toEqual(['p2']);
+    expect(usePlanStore.getState().currentPlan).toBeNull();
+
+    mocked.deletePlan.mockRejectedValueOnce(new Error('500'));
+    await expect(usePlanStore.getState().deletePlan('p2')).rejects.toThrow('500');
+    expect(usePlanStore.getState().plans.map((p) => p.id)).toEqual(['p2']);
+  });
+});

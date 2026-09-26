@@ -194,7 +194,8 @@ async def resolve_share_token(
 
     plan_id, permission = result_row
 
-    plan = db.query(TravelPlan).filter(TravelPlan.id == plan_id).first()
+    # [Gate B-012] 論理削除済みプランの共有は無効(削除時にリンクも失効させているが二重に防ぐ)
+    plan = db.query(TravelPlan).filter(TravelPlan.id == plan_id, TravelPlan.deleted_at.is_(None)).first()
     if not plan:
         _log_access(db, share_id=share.id, token_hash=token_hash, ip=ip, result="invalid")
         _invalid_link()

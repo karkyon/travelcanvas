@@ -80,7 +80,13 @@ def require_plan_access(
     if min_role not in _ROLE_RANK:
         raise ValueError(f"unknown min_role: {min_role}")
 
-    plan = db.query(TravelPlan).filter(TravelPlan.id == _to_uuid(plan_id)).first()
+    # [Gate B-012] 論理削除済みのプランは存在しないものとして扱う(EX-015: 削除済みプランへの
+    # 更新を適用しない)。復元・完全削除はtravel.pyの専用エンドポイントだけが扱う。
+    plan = (
+        db.query(TravelPlan)
+        .filter(TravelPlan.id == _to_uuid(plan_id), TravelPlan.deleted_at.is_(None))
+        .first()
+    )
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="旅行プランが見つかりません")
 

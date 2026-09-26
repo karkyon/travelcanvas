@@ -671,6 +671,9 @@ def test_plan_deletion_cascades_runs(auth_client, db_session):
     plan_id = res.json()["id"]
     _run(client, plan_id)
     assert client.delete(f"/api/v1/travel-plans/{plan_id}").status_code in (200, 204)
+    # [Gate B-012] DELETEは論理削除。完全削除で検証結果も消える
+    assert client.delete(f"/api/v1/travel-plans/{plan_id}/permanent").status_code == 200
+    db_session.expire_all()
     assert db_session.query(ValidationRun).filter(ValidationRun.plan_id == uuid.UUID(plan_id)).count() == 0
 
 

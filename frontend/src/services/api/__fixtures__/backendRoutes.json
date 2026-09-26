@@ -3,7 +3,8 @@
   "description": "backend(app.main.app.routes)の /api/v1 配下の実ルート一覧(HEAD/OPTIONS除く)。frontendのAPI呼び出しURLが実在することを検査する(Gate M9-FE-C2b-3)。再生成: backendで app.routes を列挙。",
   "captured_at_head": "ac4c990f9be38899270868d16db951035cab8343",
   "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2 constraints)",
-  "captured_at_head_l3": "18665181c062bebaa924c0c4def1bb42e1a8c55a (+Gate L3 validation-runs)"
+  "captured_at_head_l3": "18665181c062bebaa924c0c4def1bb42e1a8c55a (+Gate L3 validation-runs)",
+  "captured_at_head_b012": "d8a217ce5781a5dccadb8762e6f56a103505923d (+Gate B-012 deleted/restore/permanent)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -24,6 +25,7 @@
   "DELETE /api/v1/spots/{spot_id}/visit",
   "DELETE /api/v1/travel-plans/{plan_id}",
   "DELETE /api/v1/travel-plans/{plan_id}/collaborators/{collaborator_id}",
+  "DELETE /api/v1/travel-plans/{plan_id}/permanent",
   "DELETE /api/v1/travel-plans/{plan_id}/share/{share_id}",
   "GET /api/v1/admin/audit-logs",
   "GET /api/v1/admin/stats/system",
@@ -70,6 +72,7 @@
   "GET /api/v1/spots/visits",
   "GET /api/v1/spots/{spot_id}",
   "GET /api/v1/travel-plans/",
+  "GET /api/v1/travel-plans/deleted",
   "GET /api/v1/travel-plans/invitations",
   "GET /api/v1/travel-plans/test/ping",
   "GET /api/v1/travel-plans/{plan_id}",
@@ -140,6 +143,7 @@
   "POST /api/v1/travel-plans/{plan_id}/clone",
   "POST /api/v1/travel-plans/{plan_id}/collaborators",
   "POST /api/v1/travel-plans/{plan_id}/optimize",
+  "POST /api/v1/travel-plans/{plan_id}/restore",
   "POST /api/v1/travel-plans/{plan_id}/share",
   "POST /api/v1/travel-plans/{plan_id}/share/{share_id}/revoke",
   "PUT /api/v1/auth/me",
