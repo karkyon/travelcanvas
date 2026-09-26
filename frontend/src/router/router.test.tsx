@@ -19,7 +19,8 @@ import RouteErrorBoundary from './RouteErrorBoundary';
 const EXPECTED_ROUTE_PATHS = [
   '/', '/(index)', '/login', '/register', '/guest/upgrade', '/dashboard', '/planner', '/planner/(index)',
   '/planner/:planId?', '/planner/:planId/reservations', '/planner/:planId/imports', '/planner/:planId/documents',
-  '/planner/:planId/today', '/planner/:planId/segments', '/planner/:planId/route-options', '/search',
+  '/planner/:planId/today', '/planner/:planId/segments', '/planner/:planId/route-options',
+  '/planner/:planId/constraints', '/search',
   '/search/(index)', '/search/settings', '/search/spots', '/spots', '/spots/(index)', '/spots/search',
   '/spots/register', '/settings', '/profile', '/admin', '/admin/(index)', '/admin/users', '/notifications',
   '/share/:planId', '/s/:token', '/optimization', '/404', '/*',

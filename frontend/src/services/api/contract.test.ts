@@ -17,7 +17,7 @@ import {
   ticket, ticketRevealResult, todayResponse, travelDocument, travelSegment,
   collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
-  shareLink, unreadCount, user, authResponse, guestSessionResponse,
+  shareLink, unreadCount, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -98,6 +98,16 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['auth_login', authResponse],
   ['auth_guest', guestSessionResponse],
   ['auth_guest_upgrade', authResponse],
+  // ----- [Gate L2] 制約(FR-016)。constraint_maskedは他のメンバーから見た秘匿制約
+  ['constraint_shared', planConstraint],
+  ['constraint_soft_between', planConstraint],
+  ['constraint_event_scope', planConstraint],
+  ['constraint_private_mine', planConstraint],
+  ['constraint_updated', planConstraint],
+  ['constraint_shared_other', planConstraint],
+  ['constraint_masked', planConstraint],
+  ['constraint_list_other', arrayOf(planConstraint)],
+  ['constraint_deleted', revisionResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

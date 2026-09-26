@@ -3,9 +3,10 @@
  *
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
-import { ShareApi } from './endpoints/share';
+// [Gate L2] 継承チェーンの末尾に制約(FR-016)を追加: ... → Share → Constraints → CompleteTravelAPI
+import { ConstraintsApi } from './endpoints/constraints';
 
-export class CompleteTravelAPI extends ShareApi {
+export class CompleteTravelAPI extends ConstraintsApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

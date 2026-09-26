@@ -1445,3 +1445,91 @@ class ExtractionCandidate(Base):
 
     import_job = relationship("ImportJob")
     reviewed_by = relationship("User")
+
+
+# ==========================================================================
+# [Gate L2] 制約(constraints、FR-016 制約管理 / DOC-05 §7.3)
+# ==========================================================================
+# DOC-05 §7.3: id、plan_id、owner_member_id、scope_type/id、type、hardness、
+# operator、value_ciphertext/json、weight、privacy_level、active_from/to、
+# reason_ciphertext、revision。
+# DOC-05 §17: hardness=hardの場合weight不要、privacy=privateならowner_member必須。
+# DOC-05 §19: constraints.reasonは分類R(本人のみ表示、AI禁止)。
+#
+# [スコープ限定] plan_membersテーブルは本コードベースに存在しない(招待は
+# plan_collaborators、所有者はtravel_plans.user_id)。そのためowner_member_id
+# の代わりにowner_user_id(作成者=本人)を必須列として持つ(privateの
+# 「owner必須」は常に満たされる)。
+#
+# privacy_level:
+#   shared  … 題名(title)・値(value_json)を平文列に持ち、プランのメンバー全員が
+#              詳細を閲覧できる。
+#   private … 題名・値を平文列に一切持たず、value_ciphertext(Fernet)だけに持つ。
+#              詳細は作成者本人のみ(プラン所有者にも見せない。FR-016「秘匿制約は
+#              詳細非表示のまま判定へ使う」/ DOC-06 §21「Constraint private: 本人」)。
+# reason_ciphertext … privacy_levelに関係なく常に暗号化し、作成者本人のみ閲覧可。
+#
+# scope_id … scope_typeがday/event/memberの場合の対象ID。day/eventは削除され得る
+# ため外部キーにしない(書込時にプラン所属を検証し、読出時に存在しなければ
+# scope_missingとして返す)。
+class PlanConstraint(Base):
+    """[Gate L2] 旅行の制約(ハード/ソフト、共有/秘匿)。"""
+    __tablename__ = "constraints"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    scope_type = Column(String(10), nullable=False)
+    scope_id = Column(UUID(as_uuid=True), nullable=True)
+
+    constraint_type = Column(String(30), nullable=False)
+    hardness = Column(String(4), nullable=False)
+    operator = Column(String(12), nullable=False)
+    weight = Column(Integer, nullable=True)
+    privacy_level = Column(String(7), nullable=False, default="shared")
+
+    # shared時のみ使用(private時はNULL)
+    title = Column(String(200), nullable=True)
+    # none_as_null=True: Python の None を JSON の null ではなく SQL の NULL として書く
+    # (既定の JSON 型は 'null' という値を保存し、private時の CHECK に違反する)。
+    value_json = Column(JSON(none_as_null=True), nullable=True)
+    # private時のみ使用: {"title": ..., "value": {...}} をFernetで暗号化したもの
+    value_ciphertext = Column(LargeBinary, nullable=True)
+    reason_ciphertext = Column(LargeBinary, nullable=True)
+
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    active_from = Column(DateTime(timezone=True), nullable=True)
+    active_to = Column(DateTime(timezone=True), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    plan = relationship("TravelPlan")
+    owner = relationship("User")
+
+    __table_args__ = (
+        CheckConstraint("scope_type IN ('plan','day','event','member')", name="ck_constraints_scope_type"),
+        CheckConstraint("(scope_type = 'plan') = (scope_id IS NULL)", name="ck_constraints_scope_id"),
+        CheckConstraint("hardness IN ('hard','soft')", name="ck_constraints_hardness"),
+        CheckConstraint(
+            "(hardness = 'hard' AND weight IS NULL) OR "
+            "(hardness = 'soft' AND weight IS NOT NULL AND weight BETWEEN 1 AND 100)",
+            name="ck_constraints_weight",
+        ),
+        CheckConstraint("privacy_level IN ('shared','private')", name="ck_constraints_privacy_level"),
+        CheckConstraint(
+            "(privacy_level = 'private' AND value_ciphertext IS NOT NULL AND title IS NULL AND value_json IS NULL)"
+            " OR (privacy_level = 'shared' AND value_ciphertext IS NULL AND title IS NOT NULL)",
+            name="ck_constraints_privacy_payload",
+        ),
+        CheckConstraint(
+            "active_from IS NULL OR active_to IS NULL OR active_from < active_to",
+            name="ck_constraints_active_window",
+        ),
+        Index("ix_constraints_plan_deleted", "plan_id", "deleted_at"),
+    )

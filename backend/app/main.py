@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
-    quickdrafts, reservations, documents, imports, segments, route_options,
+    quickdrafts, reservations, documents, imports, segments, route_options, constraints,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -99,11 +99,18 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # 拒否する)。refresh tokenをhttpOnly cookieで発行する都合上、Cookie送信には
 # credentials付きリクエストが必須のため、実際に許可するオリジンを明示する
 # settings.CORS_ORIGINSへ切り替える。
+# [Gate L2] PATCHが許可メソッドに無く、別オリジン(frontend :4173 → backend :8001)の
+# ブラウザからのPATCHはプリフライト(OPTIONS)が400で拒否され、一度も送信されて
+# いなかった(区間・経路候補・経路区間・予約×イベント紐付けの編集が画面から不能)。
+# 単体試験はHTTP層を差し替えるため検出できず、制約編集のbrowser E2Eで発覚した。
+# 全ルートのメソッドが許可されていることは tests/test_gate_l2_cors_methods.py で検査する。
+CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=CORS_ALLOWED_METHODS,
     allow_headers=["*"],
 )
 
@@ -356,3 +363,5 @@ app.include_router(reservations.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 # [Gate R3-7] FR-011予約取込の最小実装。/plans/{plan_id}/imports配下。
 app.include_router(imports.router, prefix="/api/v1")
+# [Gate L2] FR-016制約管理。/plans/{plan_id}/constraints配下(ハード/ソフト、共有/秘匿)。
+app.include_router(constraints.router, prefix="/api/v1")

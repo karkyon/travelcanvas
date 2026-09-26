@@ -5,19 +5,20 @@
  * APIを意図的に追加・削除した場合は、このリストも同じcommitで更新すること。
  * [Gate M9-FE-C2b] ApiDecodeError(応答形式の検証失敗)を公開exportへ追加。
  * [Gate A1] 認証の一本化でAuthApiError、startGuestSession/upgradeGuest(メソッド・authAPI)を追加。
+ * [Gate L2] 制約(FR-016)のget/create/update/deleteConstraint(export・メソッド)を追加。
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
 
 const EXPECTED_EXPORTS = [
   'ApiDecodeError', 'AuthApiError', 'acceptExtractionCandidate', 'acceptInvitation', 'addRouteLeg',
-  'adoptRouteOption', 'aiAPI', 'api', 'authAPI', 'confirmImportJob', 'createExtractionCandidate',
+  'adoptRouteOption', 'aiAPI', 'api', 'authAPI', 'confirmImportJob', 'createConstraint', 'createExtractionCandidate',
   'createImportJob', 'createReservation', 'createReservationEventLink',
   'createReservationParticipant', 'createRouteOption', 'createSegment', 'createShareLink',
-  'createSpot', 'createTicket', 'declineInvitation', 'default', 'deleteDocument',
+  'createSpot', 'createTicket', 'declineInvitation', 'default', 'deleteConstraint', 'deleteDocument',
   'deleteReservation', 'deleteReservationEventLink', 'deleteReservationParticipant',
   'deleteRouteLeg', 'deleteRouteOption', 'deleteSegment', 'deleteShareLink', 'deleteTicket',
-  'extractApiErrorDetailMessage', 'getCollaborators', 'getDocument', 'getDocumentDownloadUrl',
+  'extractApiErrorDetailMessage', 'getCollaborators', 'getConstraints', 'getDocument', 'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getImportJob', 'getImportJobs', 'getReservation',
   'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRouteOption',
   'getRouteOptions', 'getSegment', 'getSegments', 'getShareSettings', 'getSpotCategories',
@@ -25,21 +26,21 @@ const EXPECTED_EXPORTS = [
   'notificationsAPI', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
   'resolveDownloadUrl', 'resolvePublicShare', 'revealReservation', 'revealTicket',
   'revokeShareLink', 'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'testConnection',
-  'travelAPI', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
+  'travelAPI', 'updateConstraint', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
   'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument',
 ];
 
 const EXPECTED_METHODS = [
   'acceptExtractionCandidate', 'acceptInvitation', 'addRouteLeg', 'adoptCandidate',
   'adoptRouteOption', 'applyOptimizationProposal', 'changePassword', 'clearAccessToken',
-  'clearTokens', 'clonePlan', 'confirmImportJob', 'createDay', 'createEvent',
+  'clearTokens', 'clonePlan', 'confirmImportJob', 'createConstraint', 'createDay', 'createEvent',
   'createExtractionCandidate', 'createImportJob', 'createPlan', 'createReservation',
   'createReservationEventLink', 'createReservationParticipant', 'createRouteOption',
   'createSegment', 'createShareLink', 'createSpot', 'createTicket', 'declineInvitation', 'delete',
-  'deleteDay', 'deleteDocument', 'deleteEvent', 'deletePlan', 'deleteReservation',
+  'deleteConstraint', 'deleteDay', 'deleteDocument', 'deleteEvent', 'deletePlan', 'deleteReservation',
   'deleteReservationEventLink', 'deleteReservationParticipant', 'deleteRouteLeg',
   'deleteRouteOption', 'deleteSegment', 'deleteShareLink', 'deleteTicket', 'get',
-  'getCollaborators', 'getCurrentUser', 'getDocument', 'getDocumentDownloadUrl',
+  'getCollaborators', 'getConstraints', 'getCurrentUser', 'getDocument', 'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getImportJob', 'getImportJobs', 'getInsertionPreview',
   'getNotifications', 'getOptimizationProposal', 'getPlace', 'getPlan', 'getPlanDetail',
   'getPlans', 'getReservation', 'getReservationEventLinks', 'getReservationParticipants',
@@ -51,7 +52,8 @@ const EXPECTED_METHODS = [
   'put', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'removeCollaborator',
   'resolvePublicShare', 'revealReservation', 'revealTicket', 'revokeShareLink', 'searchByImage',
   'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode', 'setHttpClientForTesting',
-  'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection', 'undoLastPlanChange', 'updateDay',
+  'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection', 'undoLastPlanChange', 'updateConstraint',
+  'updateDay',
   'updateEvent', 'updatePlan', 'updateProfile', 'updateReservation', 'updateReservationEventLink',
   'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings', 'upgradeGuest',
   'uploadDocument',

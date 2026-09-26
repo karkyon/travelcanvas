@@ -8,7 +8,7 @@
 import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
-import type { CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
+import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
 
 export * from './types';
 export { extractApiErrorDetailMessage } from './core';
@@ -221,5 +221,13 @@ export const deleteTicket = (planId: string, reservationId: string, ticketId: st
   api.deleteTicket(planId, reservationId, ticketId, ifMatch);
 export const revealTicket = (planId: string, reservationId: string, ticketId: string) =>
   api.revealTicket(planId, reservationId, ticketId);
+
+// ===== [Gate L2] 制約(FR-016) =====
+export const getConstraints = (planId: string) => api.getConstraints(planId);
+export const createConstraint = (planId: string, data: ConstraintCreateData) => api.createConstraint(planId, data);
+export const updateConstraint = (planId: string, constraintId: string, data: ConstraintUpdateData, ifMatch: number) =>
+  api.updateConstraint(planId, constraintId, data, ifMatch);
+export const deleteConstraint = (planId: string, constraintId: string, ifMatch: number) =>
+  api.deleteConstraint(planId, constraintId, ifMatch);
 
 export default api;

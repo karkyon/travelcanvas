@@ -1,10 +1,12 @@
 {
  "_meta": {
   "description": "backend(app.main.app.routes)の /api/v1 配下の実ルート一覧(HEAD/OPTIONS除く)。frontendのAPI呼び出しURLが実在することを検査する(Gate M9-FE-C2b-3)。再生成: backendで app.routes を列挙。",
-  "captured_at_head": "ac4c990f9be38899270868d16db951035cab8343"
+  "captured_at_head": "ac4c990f9be38899270868d16db951035cab8343",
+  "captured_at_head_l2": "5b73cfeb16e8a09876a50115d6c838ca37deb82f (+Gate L2 constraints)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
+  "DELETE /api/v1/plans/{plan_id}/constraints/{constraint_id}",
   "DELETE /api/v1/plans/{plan_id}/days/{day_id}",
   "DELETE /api/v1/plans/{plan_id}/documents/{document_id}",
   "DELETE /api/v1/plans/{plan_id}/documents/{document_id}/links/{link_id}",
@@ -35,6 +37,8 @@
   "GET /api/v1/optimization/{job_id}",
   "GET /api/v1/plans/documents/download",
   "GET /api/v1/plans/{plan_id}",
+  "GET /api/v1/plans/{plan_id}/constraints",
+  "GET /api/v1/plans/{plan_id}/constraints/{constraint_id}",
   "GET /api/v1/plans/{plan_id}/days/{day_id}/route-preview",
   "GET /api/v1/plans/{plan_id}/documents",
   "GET /api/v1/plans/{plan_id}/documents/{document_id}",
@@ -68,6 +72,7 @@
   "GET /api/v1/travel-plans/{plan_id}",
   "GET /api/v1/travel-plans/{plan_id}/collaborators",
   "GET /api/v1/travel-plans/{plan_id}/share",
+  "PATCH /api/v1/plans/{plan_id}/constraints/{constraint_id}",
   "PATCH /api/v1/plans/{plan_id}/documents/{document_id}",
   "PATCH /api/v1/plans/{plan_id}/reservations/{reservation_id}",
   "PATCH /api/v1/plans/{plan_id}/reservations/{reservation_id}/events/{link_id}",
@@ -90,6 +95,7 @@
   "POST /api/v1/optimization/{job_id}/apply",
   "POST /api/v1/optimization/{job_id}/cancel",
   "POST /api/v1/optimize-route",
+  "POST /api/v1/plans/{plan_id}/constraints",
   "POST /api/v1/plans/{plan_id}/days",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/insertion-preview",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-proposal",

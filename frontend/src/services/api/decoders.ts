@@ -27,6 +27,7 @@ import type {
   ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
   AuthResponse, AuthUser, GuestSessionResponse,
+  ConstraintValue, PlanConstraint,
 } from './types';
 import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -557,4 +558,45 @@ export const guestSessionResponse: Decoder<GuestSessionResponse> = object<GuestS
   user_type: oneOf('guest'),
   guest_id: str,
   expires_in_hours: int,
+});
+
+// ----- [Gate L2] 制約(FR-016)。backend/app/api/v1/constraints.py の応答。
+// 列挙値はbackendの CONSTRAINT_TYPES / OPERATORS / SCOPE_TYPES と一致させる。
+// 他人の秘匿制約(visibility='masked')では題名・種類・値・理由などがnullになる。
+const strOrNum: Decoder<string | number> = (v, path) =>
+  typeof v === 'number' ? num(v, path) : str(v, path);
+
+export const constraintValue: Decoder<ConstraintValue> = object<ConstraintValue>({
+  value: nullable(strOrNum),
+  value_to: nullable(str),
+  unit: nullable(str),
+});
+
+export const planConstraint: Decoder<PlanConstraint> = object<PlanConstraint>({
+  id: str,
+  plan_id: str,
+  visibility: oneOf('full', 'masked', 'unavailable'),
+  is_mine: bool,
+  hardness: oneOf('hard', 'soft'),
+  privacy_level: oneOf('shared', 'private'),
+  scope_type: oneOf('plan', 'day', 'event', 'member'),
+  is_active: bool,
+  created_at: nullable(str),
+  title: nullable(str),
+  constraint_type: nullable(oneOf(
+    'reservation', 'opening_hours', 'last_transport', 'meeting', 'budget_limit', 'forbidden',
+    'preference', 'fatigue', 'scenery', 'meal_interval', 'avoid_transport', 'priority',
+  )),
+  operator: nullable(oneOf('before', 'after', 'between', 'max', 'min', 'equals', 'not_equals', 'avoid', 'prefer')),
+  value: nullable(constraintValue),
+  weight: nullable(int),
+  scope_id: nullable(str),
+  scope_label: nullable(str),
+  scope_missing: bool,
+  active_from: nullable(str),
+  active_to: nullable(str),
+  reason: nullable(str),
+  has_reason: bool,
+  revision: nullable(int),
+  updated_at: nullable(str),
 });
