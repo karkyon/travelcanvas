@@ -19,6 +19,7 @@ import {
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
   shareLink, unreadCount, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
   validationRunDetail, validationRunSummary, deletedPlanSummary, planDeleteResult, planPurgeResult,
+  collaboratorRemoveResult, itemDeleteResult, lockedRelationError, routeOptionDeleteResult, undoConflictError,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -121,6 +122,13 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['deleted_plan_list_empty', arrayOf(deletedPlanSummary)],
   ['plan_restored', legacyTravelPlan],
   ['plan_purged', planPurgeResult],
+  // ----- [Gate B-013] 個別削除(紐付け解除して削除)・確定ロック409・Undo競合409
+  ['event_deleted_detached', itemDeleteResult],
+  ['day_deleted', itemDeleteResult],
+  ['route_option_deleted_adopted', routeOptionDeleteResult],
+  ['collaborator_removed', collaboratorRemoveResult],
+  ['event_delete_locked_409', lockedRelationError],
+  ['undo_conflict_409', undoConflictError],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

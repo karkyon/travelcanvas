@@ -4,10 +4,10 @@
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
 import { NotificationsApi } from './notifications';
-import type { ApiResponse, Collaborator, PublicSharedPlan, ShareLink } from '../types';
+import type { ApiResponse, Collaborator, CollaboratorRemoveResult, PublicSharedPlan, ShareLink } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { collaborator, publicSharedPlan, shareLink } from '../decoders';
+import { collaborator, collaboratorRemoveResult, publicSharedPlan, shareLink } from '../decoders';
 
 export class ShareApi extends NotificationsApi {
   // [Gate #27 / A-009] getNotificationSettings/updateNotificationSettingsは
@@ -92,8 +92,11 @@ export class ShareApi extends NotificationsApi {
     return apiOk<Collaborator[]>(decodeResponse(response.data, arrayOf(collaborator), 'GET /travel-plans/{plan_id}/collaborators'));
   }
 
-  async removeCollaborator(planId: string, collaboratorId: string): Promise<ApiResponse<void>> {
-    await this.client.delete<unknown>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
-    return apiOkVoid();
+  // [Gate B-013] アクセス取消しは常に成功し、チケット担当者・参加者の割当だけが外れる。
+  async removeCollaborator(planId: string, collaboratorId: string): Promise<ApiResponse<CollaboratorRemoveResult>> {
+    const response = await this.client.delete<unknown>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
+    return apiOk<CollaboratorRemoveResult>(
+      decodeResponse(response.data, collaboratorRemoveResult, 'DELETE /travel-plans/{plan_id}/collaborators/{collaborator_id}')
+    );
   }
 }

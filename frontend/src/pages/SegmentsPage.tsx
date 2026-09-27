@@ -34,6 +34,7 @@ import type {
   TravelSegment, SegmentCreateData, SegmentMode, SegmentStatus,
   NormalizedDay, NormalizedEvent, PlaceDetail,
 } from '@/services/api';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 const MODE_OPTIONS: { value: SegmentMode; label: string; icon: React.ReactNode }[] = [
   { value: 'walking', label: '徒歩', icon: <PersonStanding size={16} /> },
@@ -222,7 +223,7 @@ const SegmentsPage: React.FC = () => {
         setPlaces({});
       }
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '移動区間一覧の取得に失敗しました');
+      setError(errorDetailMessage(e, '移動区間一覧の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
@@ -280,8 +281,8 @@ const SegmentsPage: React.FC = () => {
     try {
       const payload = formToPayload(form);
       if (editingId) {
-        const current = segments.find((s) => s.id === editingId);
-        await updateSegment(planId, editingId, payload, current?.revision ?? planRevision);
+        // [Gate B-014] If-Matchはbackendでプランの版番号と照合される(区間ごとのrevisionではない)
+        await updateSegment(planId, editingId, payload, planRevision);
       } else {
         await createSegment(planId, payload, generateIdempotencyKey());
       }
@@ -299,10 +300,10 @@ const SegmentsPage: React.FC = () => {
     if (!planId) return;
     if (!window.confirm('この移動区間を削除しますか?')) return;
     try {
-      await deleteSegment(planId, segment.id, segment.revision);
+      await deleteSegment(planId, segment.id, planRevision);
       await loadAll();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '削除に失敗しました');
+      setError(errorDetailMessage(e, '削除に失敗しました'));
     }
   };
 
@@ -390,10 +391,10 @@ const SegmentsPage: React.FC = () => {
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEditForm(segment)}>
+                    <Button variant="ghost" size="sm" onClick={() => openEditForm(segment)} aria-label="この移動区間を編集">
                       <Pencil size={14} />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(segment)}>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(segment)} aria-label="この移動区間を削除">
                       <Trash2 size={14} className="text-red-500" />
                     </Button>
                   </div>

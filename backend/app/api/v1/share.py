@@ -26,13 +26,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.core.plan_access import require_plan_access
 from app.models.models import Notification, PlanCollaborator, PlanShareLink, ShareAccessLog, TravelPlan, User
+from app.services import plan_item_deletion
+from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/travel-plans", tags=["share"])
 
@@ -336,9 +338,13 @@ async def list_collaborators(
 async def remove_collaborator(
     plan_id: uuid.UUID,
     collaborator_id: uuid.UUID,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    """共同編集者の削除(アクセス取消し)。[Gate B-013] 参加者・チケット担当者に
+    割り当てられていると外部キー違反で500になっていた。アクセス取消しは常に成功させ、
+    割当だけを外す(参加者・チケット・予約の本体は残す)。"""
     plan = _get_owned_plan(db, plan_id, current_user)
     collab = (
         db.query(PlanCollaborator)
@@ -348,9 +354,22 @@ async def remove_collaborator(
     if not collab:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="コラボレーターが見つかりません")
 
+    detached = plan_item_deletion.detach_collaborator_references(db, collab.id)
+    removed_id = collab.id
     db.delete(collab)
     db.commit()
-    return {"success": True}
+
+    # 監査にはメールアドレス等の個人情報を残さず、件数だけを記録する
+    record_audit_event(
+        action="collaborator_removed",
+        resource_type="plan_collaborator",
+        user_id=current_user.id,
+        resource_id=removed_id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent", "")[:255],
+        details={"plan_id": str(plan.id), **detached},
+    )
+    return {"success": True, "detached": detached}
 
 
 # ===== 招待の承諾・辞退 =====

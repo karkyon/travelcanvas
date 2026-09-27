@@ -14,6 +14,7 @@ import {
   removeCollaborator
 } from '../services/api';
 import type { ShareLink, Collaborator } from '../services/api';
+import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
 
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -134,9 +135,10 @@ const SharePage: React.FC = () => {
     if (!confirm('このコラボレーターを削除しますか？')) return;
 
     try {
-      await removeCollaborator(planId!, collaboratorId);
+      // [Gate B-013] 参加者・チケット担当に割り当てられていても削除でき、割当だけが外れる
+      const result = await removeCollaborator(planId!, collaboratorId);
       await loadCollaborators();
-      setMessage({ text: 'コラボレーターを削除しました', type: 'success' });
+      setMessage({ text: describeCollaboratorRemoval(result.data), type: 'success' });
     } catch (error) {
       setMessage({ text: 'コラボレーターの削除に失敗しました', type: 'error' });
     }
@@ -508,6 +510,7 @@ const SharePage: React.FC = () => {
                         onClick={() => handleRemoveCollaborator(collaborator.id)}
                         className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                         title="削除"
+                        aria-label={`${collaborator.email} を削除`}
                       >
                         <Trash2 size={16} />
                       </button>

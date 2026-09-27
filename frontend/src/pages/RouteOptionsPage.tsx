@@ -25,6 +25,8 @@ import api, {
 import type {
   RouteOption, RouteOptionCreateData, NormalizedDay, NormalizedEvent,
 } from '@/services/api';
+import { describeRouteOptionDeletion } from '@/store/itemDeletionMessages';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 function generateIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -92,8 +94,12 @@ const RouteOptionsPage: React.FC = () => {
 
   const [options, setOptions] = useState<RouteOption[]>([]);
   const [days, setDays] = useState<NormalizedDay[]>([]);
+  // [Gate B-014] 採用・削除のIf-Matchはbackendでプランの版番号と照合される(経路候補ごとの
+  // revisionではない)。以前は経路候補のrevisionを送っていたため、ほぼ常に409で失敗していた。
+  const [planRevision, setPlanRevision] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<OptionFormState>(EMPTY_FORM);
@@ -114,9 +120,10 @@ const RouteOptionsPage: React.FC = () => {
       setOptions(optionList);
       if (planDetail.success && planDetail.data) {
         setDays(planDetail.data.days ?? []);
+        setPlanRevision(planDetail.data.revision);
       }
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '経路候補一覧の取得に失敗しました');
+      setError(errorDetailMessage(e, '経路候補一覧の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
@@ -157,24 +164,27 @@ const RouteOptionsPage: React.FC = () => {
   };
 
   const handleDelete = async (option: RouteOption) => {
-    if (!planId) return;
+    if (!planId || planRevision === null) return;
     if (!window.confirm('この経路候補を削除しますか?')) return;
+    setNotice(null);
     try {
-      await deleteRouteOption(planId, option.id, option.revision);
+      const result = await deleteRouteOption(planId, option.id, planRevision);
+      setNotice(describeRouteOptionDeletion(result.detached?.segments_unlinked));
       await loadAll();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '削除に失敗しました');
+      setError(errorDetailMessage(e, '削除に失敗しました'));
     }
   };
 
   const handleAdopt = async (option: RouteOption) => {
-    if (!planId) return;
+    if (!planId || planRevision === null) return;
+    setNotice(null);
     try {
-      await adoptRouteOption(planId, option.id, option.revision);
+      await adoptRouteOption(planId, option.id, planRevision);
+      setNotice('経路候補を採用し、移動区間に反映しました。');
       await loadAll();
     } catch (e) {
-      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : (detail as { message?: string })?.message || '採用に失敗しました');
+      setError(errorDetailMessage(e, '採用に失敗しました'));
     }
   };
 
@@ -203,6 +213,11 @@ const RouteOptionsPage: React.FC = () => {
         {error && (
           <Card className="mb-4 bg-red-50 border-red-200">
             <p className="text-sm text-red-700">{error}</p>
+          </Card>
+        )}
+        {notice && (
+          <Card className="mb-4 bg-green-50 border-green-200">
+            <p className="text-sm text-green-800" role="status">{notice}</p>
           </Card>
         )}
 
@@ -265,11 +280,11 @@ const RouteOptionsPage: React.FC = () => {
                   </div>
                   <div className="flex gap-1">
                     {option.status !== 'adopted' && (
-                      <Button variant="ghost" size="sm" onClick={() => handleAdopt(option)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleAdopt(option)} aria-label="この経路候補を採用">
                         <CheckCircle2 size={14} className="text-green-600" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(option)}>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(option)} aria-label="この経路候補を削除">
                       <Trash2 size={14} className="text-red-500" />
                     </Button>
                   </div>

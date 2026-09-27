@@ -90,7 +90,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
           <Route size={18} className="text-blue-500" />
           この日の経路を並べ替える
         </span>
-        <span className="text-gray-400 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
+        <span className="text-gray-600 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
       </button>
 
       {isExpanded && (

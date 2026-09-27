@@ -30,14 +30,66 @@ import type {
   ConstraintValue, PlanConstraint,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
+  CollaboratorRemoveResult, DeletionImpact, ItemDeleteResult, LockedRelationDetail, RouteOptionDeleteResult,
+  UndoConflictDetail,
 } from './types';
-import { arrayOf, bool, int, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
+import { arrayOf, bool, int, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
 export interface RevisionResult {
   revision: number;
 }
 
 export const revisionResult: Decoder<RevisionResult> = object<RevisionResult>({ revision: int });
+
+// [Gate B-013] 個別削除で外した紐付け・一緒に削除したデータの件数。件数は利用者への
+// 案内(「予約1件との紐付けを外しました」)に使うため、非負の整数であることを検証する。
+const count = nonNegativeInt;
+
+export const deletionImpact: Decoder<DeletionImpact> = object<DeletionImpact>({
+  reservations_unlinked: count,
+  document_links_removed: count,
+  segments_removed: count,
+  route_options_removed: count,
+  segments_unlinked: count,
+});
+
+export const itemDeleteResult: Decoder<ItemDeleteResult> = object<ItemDeleteResult>({
+  revision: int,
+  detached: optional(deletionImpact),
+});
+
+export const routeOptionDeleteResult: Decoder<RouteOptionDeleteResult> = object<RouteOptionDeleteResult>({
+  revision: int,
+  detached: optional(object<{ segments_unlinked: number }>({ segments_unlinked: count })),
+});
+
+/** 確定ロックされた紐付けがあり削除できない409の応答本体 `{detail}` */
+export const lockedRelationError: Decoder<{ detail: LockedRelationDetail }> = object<{ detail: LockedRelationDetail }>({
+  detail: object<LockedRelationDetail>({
+    code: oneOf('locked_relation'),
+    message: str,
+    blocking: arrayOf(object<LockedRelationDetail['blocking'][number]>({
+      type: str, id: str, event_id: str, reservation_id: str, reason: str,
+    })),
+  }),
+});
+
+/** Undoで戻す先が変わっていて取り消せない409の応答本体 `{detail}` */
+export const undoConflictError: Decoder<{ detail: UndoConflictDetail }> = object<{ detail: UndoConflictDetail }>({
+  detail: object<UndoConflictDetail>({
+    code: oneOf('undo_conflict'),
+    message: str,
+    conflicts: arrayOf(object<UndoConflictDetail['conflicts'][number]>({ type: str, id: nullable(str), reason: str })),
+  }),
+});
+
+export const collaboratorRemoveResult: Decoder<CollaboratorRemoveResult> = object<CollaboratorRemoveResult>({
+  success: bool,
+  detached: optional(object<{ ticket_holders: number; participants: number }>({
+    ticket_holders: count,
+    participants: count,
+  })),
+});
 
 export const todayEvent: Decoder<TodayEvent> = object<TodayEvent>({
   id: str,

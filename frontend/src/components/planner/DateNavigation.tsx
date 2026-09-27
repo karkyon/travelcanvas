@@ -139,7 +139,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
         </div>
         <button
           onClick={() => setShowOverview(!showOverview)}
-          className="text-sm text-blue-500 hover:text-blue-700 font-medium"
+          className="text-sm text-blue-700 hover:text-blue-800 font-medium"
         >
           {showOverview ? '概要を閉じる' : '概要を表示'}
         </button>

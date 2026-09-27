@@ -153,12 +153,15 @@ const DayView: React.FC<DayViewProps> = ({
     if (!confirm('このスケジュールを削除しますか？')) return;
 
     try {
-      await deleteScheduleItem(itemId);
+      // [Gate B-013] 失敗(確定ロック・競合等)はストア側でロールバックと理由の表示を済ませる。
+      // 成功した時だけ成功表示を出し、予約等との紐付けを外した場合はその内容を案内する。
+      const { ok, note } = await deleteScheduleItem(itemId);
+      if (!ok) return;
       onItemDelete?.(itemId);
-      
+
       addToast({
         type: 'success',
-        message: 'スケジュールを削除しました'
+        message: note ?? 'スケジュールを削除しました'
       });
 
     } catch (error) {
@@ -222,8 +225,14 @@ const DayView: React.FC<DayViewProps> = ({
         </div>
       </Card>
 
-      {/* スケジュールリスト */}
-      <div className="space-y-3">
+      {/* スケジュールリスト
+          [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
+          aria-required-parent)。予定がある時だけ一覧の役割を与え、間の包みは役割無しにする。 */}
+      <div
+        className="space-y-3"
+        role={day.events.length > 0 ? 'list' : undefined}
+        aria-label={day.events.length > 0 ? `${day.date}の予定` : undefined}
+      >
         {day.events.length === 0 ? (
           /* 空の状態 */
           <Card variant="outlined" padding="lg">
@@ -246,7 +255,7 @@ const DayView: React.FC<DayViewProps> = ({
           </Card>
         ) : (
           day.events.map((event, index) => (
-            <div key={event.id}>
+            <div key={event.id} role="none">
               {/* ドロップゾーン */}
               {dragState.isDragging && (
                 <div

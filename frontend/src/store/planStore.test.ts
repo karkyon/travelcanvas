@@ -382,3 +382,78 @@ describe('deletePlan (Gate B-012)', () => {
     expect(usePlanStore.getState().plans.map((p) => p.id)).toEqual(['p2']);
   });
 });
+
+describe('個別削除 (Gate B-013)', () => {
+  const toastMock = async () => (await import('react-hot-toast')).toast as unknown as {
+    success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>;
+  };
+  const deleteApi = apiService as unknown as { deleteEvent: ReturnType<typeof vi.fn>; deleteDay: ReturnType<typeof vi.fn> };
+
+  async function seedWithEvent() {
+    await seedLoadedPlan(4);
+    usePlanStore.setState((s) => ({
+      currentPlan: {
+        ...s.currentPlan!,
+        days: [{ ...s.currentPlan!.days[0]!, events: [{ id: 'event-1', title: '夕食', category: 'dining' }] }],
+      },
+    }));
+  }
+
+  it('予定の削除で予約との紐付けを外した場合、予約が残り「元に戻す」で戻せる旨の案内を返す', async () => {
+    await seedWithEvent();
+    deleteApi.deleteEvent.mockResolvedValue({
+      revision: 5,
+      detached: { reservations_unlinked: 1, document_links_removed: 0, segments_removed: 0, route_options_removed: 0, segments_unlinked: 0 },
+    });
+    const outcome = await usePlanStore.getState().deleteScheduleItem('event-1');
+    expect(deleteApi.deleteEvent).toHaveBeenCalledWith(PLAN_ID, 'event-1', 4);
+    expect(usePlanStore.getState().currentPlan?.revision).toBe(5);
+    expect(outcome.ok).toBe(true);
+    expect(outcome.note).toContain('予約1件との紐付けを外しました');
+    expect(outcome.note).toContain('「元に戻す」');
+  });
+
+  it('何も外していなければ案内文はnull(旧backendのdetached無し応答も同様)', async () => {
+    await seedWithEvent();
+    deleteApi.deleteEvent.mockResolvedValue({ revision: 5 });
+    await expect(usePlanStore.getState().deleteScheduleItem('event-1')).resolves.toEqual({ ok: true, note: null });
+  });
+
+  it('確定ロックの409では失敗を返して予定を元に戻し、再読み込みせずにロック解除の方法を案内する', async () => {
+    await seedWithEvent();
+    deleteApi.deleteEvent.mockRejectedValue({
+      response: { status: 409, data: { detail: { code: 'locked_relation', message: 'x', blocking: [] } } },
+    });
+    await expect(usePlanStore.getState().deleteScheduleItem('event-1')).resolves.toEqual({ ok: false, note: null });
+    const toast = await toastMock();
+    expect(usePlanStore.getState().currentPlan?.days[0]?.events.map((e) => e.id)).toEqual(['event-1']);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('ロックを解除'));
+    expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(1); // seed時のみ
+  });
+
+  it('日程の削除でも同じ案内・ロック処理を行う', async () => {
+    await seedLoadedPlan(4);
+    usePlanStore.setState((s) => ({
+      currentPlan: {
+        ...s.currentPlan!,
+        days: [s.currentPlan!.days[0]!, { id: 'day-2', date: '2026-10-02', events: [] }],
+      },
+    }));
+    deleteApi.deleteDay.mockResolvedValue({
+      revision: 5,
+      detached: { reservations_unlinked: 0, document_links_removed: 0, segments_removed: 2, route_options_removed: 0, segments_unlinked: 0 },
+    });
+    await usePlanStore.getState().removeDay(1);
+    expect((await toastMock()).success).toHaveBeenCalledWith(expect.stringMatching(/^日程を削除しました。移動区間2件も削除しました。/));
+  });
+
+  it('Undoが関連データの変更で断られた場合(undo_conflict)は理由を伝えて再読み込みする', async () => {
+    await seedLoadedPlan(6);
+    mockedApi.undoLastPlanChange.mockRejectedValue({
+      response: { status: 409, data: { detail: { code: 'undo_conflict', message: 'x', conflicts: [] } } },
+    });
+    await usePlanStore.getState().undoLastChange();
+    expect((await toastMock()).error).toHaveBeenCalledWith(expect.stringContaining('何も変更していません'));
+    expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(2);
+  });
+});

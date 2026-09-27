@@ -5,10 +5,10 @@
  */
 import type { TravelPlan } from '@/types';
 import { SpotsApi } from './spots';
-import type { ApiResponse, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
+import type { ApiResponse, ItemDeleteResult, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decoders';
+import { itemDeleteResult, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decoders';
 
 export class PlansApi extends SpotsApi {
   // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして
@@ -130,11 +130,13 @@ export class PlansApi extends SpotsApi {
     return decodeResponse(response.data, normalizedDay, 'PUT /plans/{plan_id}/days/{day_id}');
   }
 
-  async deleteDay(planId: string, dayId: string, ifMatch: number): Promise<{ revision: number }> {
+  // [Gate B-013] 日程内の予定に紐付いた予約・文書は紐付けだけを外し、経路候補・移動区間は
+  // 一緒に削除する。外した件数はdetachedで返る(Undoで元に戻せる)。
+  async deleteDay(planId: string, dayId: string, ifMatch: number): Promise<ItemDeleteResult> {
     const response = await this.client.delete(
       `/plans/${planId}/days/${dayId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/days/{day_id}');
+    return decodeResponse(response.data, itemDeleteResult, 'DELETE /plans/{plan_id}/days/{day_id}');
   }
 
   async createEvent(
@@ -166,11 +168,11 @@ export class PlansApi extends SpotsApi {
     return decodeResponse(response.data, normalizedEvent, 'PUT /plans/{plan_id}/events/{event_id}');
   }
 
-  async deleteEvent(planId: string, eventId: string, ifMatch: number): Promise<{ revision: number }> {
+  async deleteEvent(planId: string, eventId: string, ifMatch: number): Promise<ItemDeleteResult> {
     const response = await this.client.delete(
       `/plans/${planId}/events/${eventId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/events/{event_id}');
+    return decodeResponse(response.data, itemDeleteResult, 'DELETE /plans/{plan_id}/events/{event_id}');
   }
 
   async moveEvent(

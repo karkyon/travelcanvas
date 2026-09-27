@@ -45,6 +45,10 @@ export const num: Decoder<number> = (v, path) =>
 export const int: Decoder<number> = (v, path) =>
   typeof v === 'number' && Number.isInteger(v) ? v : fail(path, '整数');
 
+/** [Gate B-013] 0以上の整数(件数)。 */
+export const nonNegativeInt: Decoder<number> = (v, path) =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fail(path, '0以上の整数');
+
 export const bool: Decoder<boolean> = (v, path) => (typeof v === 'boolean' ? v : fail(path, '真偽値'));
 
 /**

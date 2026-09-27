@@ -24,6 +24,7 @@ from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import RouteOption, RouteLeg, TravelSegment, User
+from app.services import plan_item_deletion
 from app.services.quickdraft_idempotency import (
     claim_or_get_cached,
     finalize_success,
@@ -495,6 +496,11 @@ def delete_route_option(
     before = _option_snapshot_with_legs(db, option)
     option_id_uuid = option.id
 
+    # [Gate B-013] 採用済みの経路候補を消すと、採用元として参照する移動区間の外部キー違反で
+    # 500になっていた。移動区間は利用者が採用した予定の一部なので残し、参照だけ外して
+    # 同じChangeSetへ記録する(Undoで経路候補と参照の両方を戻す)。
+    unlinked = plan_item_deletion.unlink_segments_from_route_options(db, {option.id})
+
     legs = db.query(RouteLeg).filter(RouteLeg.route_option_id == option.id).all()
     for leg in legs:
         db.delete(leg)
@@ -503,11 +509,12 @@ def delete_route_option(
     db.delete(option)
     db.flush()
 
-    new_revision = _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "route_option", option_id_uuid, "delete",
-        before_json=before, after_json=None,
-    )
-    return {"message": "経路候補を削除しました", "revision": new_revision}
+    changes = [("route_option", option_id_uuid, "delete", before, None)] + unlinked
+    new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    return {
+        "message": "経路候補を削除しました", "revision": new_revision,
+        "detached": {"segments_unlinked": len(unlinked)},
+    }
 
 
 @router.post("/{plan_id}/route-options/{option_id}/legs", status_code=201, response_model=dict)

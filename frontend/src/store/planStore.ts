@@ -35,6 +35,9 @@ import {
   isOfflinePackAvailable,
 } from '@/utils/offlinePack';
 import { useAuthStore } from '@/store/authStore';
+import {
+  LOCKED_RELATION_MESSAGE, UNDO_CONFLICT_MESSAGE, conflictCode, describeItemDeletion,
+} from '@/store/itemDeletionMessages';
 
 interface PlanState {
   // State
@@ -86,7 +89,12 @@ interface PlanState {
     fallbackTitle?: string
   ) => Promise<void>;
   updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<void>;
-  deleteScheduleItem: (itemId: string) => Promise<void>;
+  /**
+   * [Gate B-013] 成否と、外した紐付け等の案内文(無ければnull)を返す。失敗時は内部で
+   * ロールバックとエラー表示を済ませる(例外は投げない)ため、呼び出し側は ok を見て
+   * 成功表示を出すこと(以前は失敗しても呼び出し側が「削除しました」と表示していた)。
+   */
+  deleteScheduleItem: (itemId: string) => Promise<{ ok: boolean; note: string | null }>;
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
   moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<void>;
 
@@ -518,6 +526,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     try {
       const result = await apiService.deleteDay(plan.id, dayToRemove.id, plan.revision!);
       set((s) => (s.currentPlan ? { currentPlan: { ...s.currentPlan, revision: result.revision } } : s));
+      // [Gate B-013] 予約・文書との紐付けを外した・区間等を一緒に削除した場合は、その内容を知らせる
+      const note = describeItemDeletion('day', result.detached);
+      if (note) toast.success(note);
     } catch (error) {
       set({ currentPlan: plan, currentDayIndex: state.currentDayIndex });
       await get()._reconcileOnConflict(error, plan.id);
@@ -685,10 +696,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // スケジュールアイテム削除
   deleteScheduleItem: async (itemId: string) => {
     const state = get();
-    if (!state.currentPlan) return;
+    if (!state.currentPlan) return { ok: false, note: null };
     if (state.currentPlan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
-      return;
+      return { ok: false, note: null };
     }
 
     const plan = state.currentPlan;
@@ -704,9 +715,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     try {
       const result = await apiService.deleteEvent(plan.id, itemId, plan.revision!);
       set((s) => (s.currentPlan ? { currentPlan: { ...s.currentPlan, revision: result.revision } } : s));
+      // [Gate B-013] 予約・文書との紐付けを外した・区間等を一緒に削除した場合の案内(表示は呼び出し側)
+      return { ok: true, note: describeItemDeletion('event', result.detached) };
     } catch (error) {
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
+      return { ok: false, note: null };
     }
   },
 
@@ -825,7 +839,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       if (status === 404) {
         toast.error('取り消せる変更がありません');
       } else if (status === 409) {
-        toast.error('他の変更と競合したため取り消せませんでした。最新の内容を再読み込みします。');
+        // [Gate B-013] 削除後に関連する予約・文書などが変わっていた場合は、上書きせずに断られる
+        toast.error(conflictCode(error) === 'undo_conflict'
+          ? UNDO_CONFLICT_MESSAGE
+          : '他の変更と競合したため取り消せませんでした。最新の内容を再読み込みします。');
         await get().loadPlan(state.currentPlan.id);
       } else {
         toast.error('取り消しに失敗しました');
@@ -837,6 +854,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // それ以外のエラーは通常のエラートーストのみ表示する。呼び出し元は
   // 呼ぶ前に楽観的更新のロールバックを済ませておくこと。
   _reconcileOnConflict: async (error: unknown, planId: string) => {
+    // [Gate B-013] 確定ロックされた予約との紐付けがあり削除できなかった場合は、版の競合ではない
+    // (何も変更されていない)ため再読み込みせず、ロックの解除方法を案内する。
+    if (conflictCode(error) === 'locked_relation') {
+      toast.error(LOCKED_RELATION_MESSAGE);
+      return;
+    }
     const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
     if (status === 409) {
       toast.error('他のユーザーまたは別の操作と競合しました。最新の内容を再読み込みしました。');

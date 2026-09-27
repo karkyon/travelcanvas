@@ -29,6 +29,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -41,6 +42,7 @@ from app.models.models import (
 )
 from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
+from app.services import plan_item_deletion
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -613,16 +615,26 @@ async def delete_day(
     if not day:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="日程が見つかりません")
 
+    events = list(day.events)
+    # [Gate B-013] 日程内の予定を参照する予約・経路候補・移動区間等を先に処理する
+    # (予約との紐付けは解除、従属データは削除)。確定ロックがあれば何も変えずに409。
+    try:
+        detachment = plan_item_deletion.detach_event_references(db, [e.id for e in events])
+    except plan_item_deletion.LockedRelationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=plan_item_deletion.locked_detail(exc.blocking))
+
     before = _day_to_dict(day)
-    before["_events"] = [_event_to_dict(e) for e in day.events]  # cascade削除される子も記録
+    # cascade削除される予定も記録する。[Gate B-013] Undoで元のIDのまま戻せるようidも保存する
+    # (IDが変わると予約・制約・文書リンクの参照先が失われるため)。
+    before["_events"] = [{"id": str(e.id), **_event_to_dict(e)} for e in events]
+    day_uuid = day.id
     db.delete(day)
     db.flush()
 
-    new_revision = _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_day", day_id if isinstance(day_id, uuid.UUID) else uuid.UUID(day_id),
-        "delete", before_json=before, after_json=None,
-    )
-    return {"message": "日程を削除しました", "revision": new_revision}
+    changes = [("travel_day", day_uuid, "delete", before, None)] + detachment.changes
+    new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    return {"message": "日程を削除しました", "revision": new_revision, "detached": detachment.impact()}
 
 
 # ===== Event CRUD =====
@@ -743,33 +755,22 @@ async def delete_event(
     before = _event_to_dict(event)
     event_uuid = event.id
 
-    # [Gate M1] このEventを端点(from/to)に持つTravelSegmentは、Event削除後に
-    # 外部キー違反(500)を起こしてはならない。単純なON DELETE SET NULLは
-    # 端点XOR CHECK制約(from_event_id/from_place_idのちょうど一方)を破壊
-    # するため使えない。ここでEventと同一ChangeSet・同一transactionで
-    # Segmentも削除し、Undo時に両方を復元する(ADR-travel-segment.md参照)。
-    affected_segments = (
-        db.query(TravelSegment)
-        .filter(
-            TravelSegment.plan_id == plan.id,
-            (TravelSegment.from_event_id == event_uuid) | (TravelSegment.to_event_id == event_uuid),
-        )
-        .all()
-    )
-    changes = [("travel_event", event_uuid, "delete", before, None)]
-    for seg in affected_segments:
-        changes.append(("travel_segment", seg.id, "delete", _segment_to_dict(seg), None))
-        db.delete(seg)
-    # [Gate M1] Segmentの削除を先に確定させてからEventを削除する。
-    # SQLAlchemyの自動flush順序推定に依存せず、明示的に2段階でflushすることで
-    # travel_segments_from/to_event_id_fkeyのFK違反(500)を確実に防ぐ。
-    db.flush()
+    # [Gate M1] このEventを端点に持つTravelSegmentは同一ChangeSetで削除し、Undoで両方を戻す
+    # (ON DELETE SET NULLは端点XOR CHECKを壊すため使えない。ADR-travel-segment.md)。
+    # [Gate B-013] 同様に経路候補は削除、予約・文書との紐付けは解除して同じChangeSetへ記録する
+    # (app/services/plan_item_deletion.py)。確定ロックされた紐付けがあれば何も変えずに409。
+    try:
+        detachment = plan_item_deletion.detach_event_references(db, [event_uuid])
+    except plan_item_deletion.LockedRelationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=plan_item_deletion.locked_detail(exc.blocking))
 
     db.delete(event)
     db.flush()
 
+    changes = [("travel_event", event_uuid, "delete", before, None)] + detachment.changes
     new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
-    return {"message": "イベントを削除しました", "revision": new_revision}
+    return {"message": "イベントを削除しました", "revision": new_revision, "detached": detachment.impact()}
 
 
 @router.post("/{plan_id}/events/{event_id}/move", response_model=EventResponse)
@@ -844,35 +845,70 @@ async def undo_last_change(
     if not change_set:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="取り消せる変更がありません")
 
-    items = db.query(ChangeItem).filter(ChangeItem.change_set_id == change_set.id).all()
+    items = (
+        db.query(ChangeItem)
+        .filter(ChangeItem.change_set_id == change_set.id)
+        .order_by(ChangeItem.id)
+        .all()
+    )
+
+    # [Gate B-013] 何かを変更する前に、安全に戻せるかを全件検査する。削除後に予約が
+    # 別の予定へ紐付け直された・論理削除された、同じ日付の日程が作られた等の場合は、
+    # 既存の状態を上書きせずに409で断る(一部だけ戻った状態を残さない)。
+    conflicts = plan_item_deletion.check_undo_conflicts(db, plan, items)
+    if conflicts:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=plan_item_deletion.undo_conflict_detail(conflicts))
 
     # [Gate M1] entity_type順序を保証する: travel_segmentの復元(action=delete)は
     # 復元先のtravel_eventが先に存在している必要があるため、
     # travel_day/travel_eventを先に処理してからtravel_segmentを処理する
     # (ChangeItemのクエリ結果順序はDBに依存し保証されないため、明示的に
-    # 2パスに分ける)。
+    # 複数パスに分ける)。
     # [Gate M8 P1-03是正] route_option/route_legも同じ理由で明示的に処理する。
-    # 2026-09-13監査で「undo_last_changeがroute_option/route_legを処理せず、
-    # adopt採用のUndoでtravel_segmentのみ戻りRouteOption.statusが
-    # 'adopted'のまま残る部分Undoが起きる」ことが指摘されていた
-    # (このGateまでは対応するentity_type分岐自体が存在しなかった)。
-    for item in items:
-        if item.entity_type == "travel_day":
-            _undo_day_item(db, plan, item)
-        elif item.entity_type == "travel_event":
-            _undo_event_item(db, plan, item)
-    for item in items:
-        if item.entity_type == "travel_segment":
-            _undo_segment_item(db, plan, item)
-    for item in items:
-        if item.entity_type == "route_option":
-            _undo_route_option_item(db, plan, item)
-    for item in items:
-        if item.entity_type == "route_leg":
-            _undo_route_leg_item(db, plan, item)
+    # [Gate B-013] 削除された経路候補の復元(action=delete)は、それを採用元として
+    # 参照する移動区間の復元より先に行う(外部キーは即時検査のため)。予約・文書等との
+    # 関連は、参照先の予定・経路候補がすべて戻った後で戻す。各パスの後にflushして
+    # 外部キーの検査順を固定する。予期しない制約違反は途中まで戻った状態を残さず409にする。
+    def _passes():
+        for item in items:
+            if item.entity_type == "travel_day":
+                _undo_day_item(db, plan, item)
+            elif item.entity_type == "travel_event":
+                _undo_event_item(db, plan, item)
+        db.flush()
+        for item in items:
+            if item.entity_type == "route_option" and item.action == "delete":
+                _undo_route_option_item(db, plan, item)
+        db.flush()
+        for item in items:
+            if item.entity_type == "travel_segment":
+                _undo_segment_item(db, plan, item)
+        db.flush()
+        for item in items:
+            if item.entity_type == "route_option" and item.action != "delete":
+                _undo_route_option_item(db, plan, item)
+        db.flush()
+        for item in items:
+            if item.entity_type == "route_leg":
+                _undo_route_leg_item(db, plan, item)
+        db.flush()
+        for item in items:
+            if item.entity_type in plan_item_deletion.RELATION_ENTITY_TYPES:
+                plan_item_deletion.restore_relation_item(db, plan, item)
+        db.flush()
 
-    change_set.undone_at = datetime.now(dt_timezone.utc)
-    db.flush()
+    try:
+        with db.begin_nested():
+            _passes()
+            change_set.undone_at = datetime.now(dt_timezone.utc)
+            db.flush()
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=plan_item_deletion.undo_conflict_detail([{"type": "change_set", "id": str(change_set.id),
+                                                             "reason": "restore_failed"}]),
+        )
 
     # [Gate #29] Undoという操作自体を通常のChangeSetとして記録すると、
     # 「直近の未Undo変更」を検索する次回のUndoがこの記録自体を拾ってしまい、
@@ -913,13 +949,9 @@ def _undo_day_item(db: Session, plan: TravelPlan, item: ChangeItem):
         db.add(restored)
         db.flush()
         for e in events:
-            db.add(TravelEvent(
-                plan_id=plan.id, day_id=restored.id, title=e["title"], description=e.get("description"),
-                event_type=e.get("event_type", "activity"), local_start_time=e.get("local_start_time"),
-                is_all_day=e.get("is_all_day", False), address=e.get("address"),
-                latitude=e.get("latitude"), longitude=e.get("longitude"),
-                locked=e.get("locked", False), sort_order=e.get("sort_order", 0),
-            ))
+            # [Gate B-013] 元のIDで戻す(旧形式のidを持たない記録は新しいIDで戻す)
+            event_id = uuid.UUID(e["id"]) if e.get("id") else uuid.uuid4()
+            db.add(_restore_event(plan, event_id, {**e, "day_id": str(restored.id)}))
 
 
 def _parse_segment_dt(v):
@@ -1137,16 +1169,23 @@ def _undo_event_item(db: Session, plan: TravelPlan, item: ChangeItem):
             for k, v in item.before_json.items():
                 setattr(event, k, v)
     elif item.action == "delete" and item.before_json:
-        before = item.before_json
-        db.add(TravelEvent(
-            id=item.entity_id, plan_id=plan.id, day_id=before["day_id"],
-            place_id=before.get("place_id"),
-            title=before["title"], description=before.get("description"),
-            event_type=before.get("event_type", "activity"), local_start_time=before.get("local_start_time"),
-            is_all_day=before.get("is_all_day", False), address=before.get("address"),
-            latitude=before.get("latitude"), longitude=before.get("longitude"),
-            locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
-        ))
+        db.add(_restore_event(plan, item.entity_id, item.before_json))
+
+
+def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
+    """削除した予定をスナップショットから元のIDで作り直す([Gate B-013] 日程の削除の
+    Undoでも同じ項目を戻す。以前は日程のUndoで開始/終了時刻・place_idが失われていた)。"""
+    return TravelEvent(
+        id=event_id, plan_id=plan.id, day_id=before["day_id"],
+        place_id=before.get("place_id"),
+        title=before["title"], description=before.get("description"),
+        event_type=before.get("event_type", "activity"),
+        start_at=_parse_segment_dt(before.get("start_at")), end_at=_parse_segment_dt(before.get("end_at")),
+        local_start_time=before.get("local_start_time"),
+        is_all_day=before.get("is_all_day", False), address=before.get("address"),
+        latitude=before.get("latitude"), longitude=before.get("longitude"),
+        locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
+    )
 
 
 # ===== [Gate #32] PLAN MAP: route preview / insertion preview =====

@@ -4,9 +4,9 @@
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
 import { SegmentsApi } from './segments';
-import type { AdoptRouteOptionResponse, RouteLeg, RouteLegCreateData, RouteLegUpdateData, RouteOption, RouteOptionCreateData, RouteOptionUpdateData } from '../types';
+import type { AdoptRouteOptionResponse, RouteLeg, RouteLegCreateData, RouteLegUpdateData, RouteOption, RouteOptionCreateData, RouteOptionDeleteResult, RouteOptionUpdateData } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { adoptRouteOptionResponse, revisionResult, routeLeg, routeOption } from '../decoders';
+import { adoptRouteOptionResponse, revisionResult, routeLeg, routeOption, routeOptionDeleteResult } from '../decoders';
 
 export class RouteOptionsApi extends SegmentsApi {
   // backend/app/api/v1/route_options.py (Gate M3)。/plans/{planId}/route-options配下。
@@ -39,11 +39,12 @@ export class RouteOptionsApi extends SegmentsApi {
     return decodeResponse(response.data, routeOption, 'PATCH /plans/{plan_id}/route-options/{option_id}');
   }
 
-  async deleteRouteOption(planId: string, optionId: string, ifMatch: number): Promise<{ revision: number }> {
+  // [Gate B-013] 採用済みの候補を削除しても、採用した移動区間は残り参照だけが外れる。
+  async deleteRouteOption(planId: string, optionId: string, ifMatch: number): Promise<RouteOptionDeleteResult> {
     const response = await this.client.delete(
       `/plans/${planId}/route-options/${optionId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/route-options/{option_id}');
+    return decodeResponse(response.data, routeOptionDeleteResult, 'DELETE /plans/{plan_id}/route-options/{option_id}');
   }
 
   async addRouteLeg(
