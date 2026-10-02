@@ -6,9 +6,10 @@
 // [Gate L2] 継承チェーンの末尾に制約(FR-016)を追加: ... → Share → Constraints → CompleteTravelAPI
 // [Gate L3] 実行可能性検証(FR-017)を追加: ... → Constraints → Validation → CompleteTravelAPI
 // [Gate B-012] 削除済みプラン(復元・完全削除)を追加: ... → Validation → PlanTrash → CompleteTravelAPI
-import { PlanTrashApi } from './endpoints/planTrash';
+// [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026)を追加: ... → PlanTrash → Preparation → CompleteTravelAPI
+import { PreparationApi } from './endpoints/preparation';
 
-export class CompleteTravelAPI extends PlanTrashApi {
+export class CompleteTravelAPI extends PreparationApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

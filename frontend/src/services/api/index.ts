@@ -8,6 +8,7 @@
 import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
+import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
 
 export * from './types';
@@ -239,5 +240,24 @@ export const getValidationRun = (planId: string, runId: string) => api.getValida
 export const getDeletedPlans = () => api.getDeletedPlans();
 export const restorePlan = (planId: string) => api.restorePlan(planId);
 export const purgePlan = (planId: string) => api.purgePlan(planId);
+
+// ===== [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026) =====
+export const getPlanMembers = (planId: string) => api.getPlanMembers(planId);
+export const getPackingItems = (planId: string) => api.getPackingItems(planId);
+export const createPackingItem = (planId: string, data: PackingItemCreateData) => api.createPackingItem(planId, data);
+export const updatePackingItem = (planId: string, itemId: string, data: PackingItemUpdateData, ifMatch: number) =>
+  api.updatePackingItem(planId, itemId, data, ifMatch);
+export const deletePackingItem = (planId: string, itemId: string, ifMatch: number) =>
+  api.deletePackingItem(planId, itemId, ifMatch);
+export const getPackingSuggestions = (planId: string, conditions?: PackingSuggestionConditions) =>
+  api.getPackingSuggestions(planId, conditions);
+export const getPreparationTasks = (planId: string) => api.getPreparationTasks(planId);
+export const createPreparationTask = (planId: string, data: PreparationTaskCreateData) =>
+  api.createPreparationTask(planId, data);
+export const updatePreparationTask = (planId: string, taskId: string, data: PreparationTaskUpdateData, ifMatch: number) =>
+  api.updatePreparationTask(planId, taskId, data, ifMatch);
+export const deletePreparationTask = (planId: string, taskId: string, ifMatch: number) =>
+  api.deletePreparationTask(planId, taskId, ifMatch);
+export const getReadiness = (planId: string) => api.getReadiness(planId);
 
 export default api;

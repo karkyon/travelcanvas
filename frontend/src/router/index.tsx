@@ -41,6 +41,7 @@ const TodayPage = lazyPage(() => import('@/pages/TodayPage'));
 const SegmentsPage = lazyPage(() => import('@/pages/SegmentsPage'));
 const RouteOptionsPage = lazyPage(() => import('@/pages/RouteOptionsPage'));
 const ConstraintsPage = lazyPage(() => import('@/pages/ConstraintsPage'));
+const PreparationPage = lazyPage(() => import('@/pages/PreparationPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -194,6 +195,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ConstraintsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // ✅ [Gate P1] 出発前の準備(FR-025持ち物 / FR-026準備タスク・レディネス)。
+      {
+        path: 'planner/:planId/preparation',
+        element: (
+          <ProtectedRoute>
+            <PreparationPage />
           </ProtectedRoute>
         ),
       },

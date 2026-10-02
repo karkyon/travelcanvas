@@ -1681,3 +1681,135 @@ class ValidationIssue(Base):
         ),
         Index("ix_validation_issues_run", "run_id", "sort_order"),
     )
+
+
+# ==========================================================================
+# [Gate P1] 持ち物(FR-025)・準備タスク(FR-026)
+# ==========================================================================
+# DOC-05 §8.5 packing_items / preparation_tasks。レディネス(準備状況、FR-026)は
+# 保存せず、予約・持ち物・タスクから都度算出する読み取りモデル
+# (app/services/readiness.py)。
+
+class PackingItem(Base):
+    """[Gate P1] 持ち物。共有(shared)はメンバー全員、個人(personal)は作成者本人だけに見える。
+
+    個人の持ち物は薬・健康用品などを含み得るため(FC-070「本人限定」)、名前とメモを
+    平文列に持たず payload_ciphertext(Fernet)だけに保存する。
+    """
+    __tablename__ = "packing_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    scope = Column(String(8), nullable=False, default="shared")
+    # 共有の持ち物の担当者(メンバーのユーザーID)。メンバーから外れた担当者は未割当として扱う。
+    assignee_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    # shared時のみ使用(personal時はNULL)
+    name = Column(String(120), nullable=True)
+    note = Column(String(500), nullable=True)
+    # personal時のみ使用: {"name": ..., "note": ...} をFernetで暗号化したもの
+    payload_ciphertext = Column(LargeBinary, nullable=True)
+
+    category = Column(String(20), nullable=False, default="other")
+    quantity = Column(Integer, nullable=False, default=1, server_default="1")
+    is_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # to_prepare(未準備) / to_buy(要購入) / packed(梱包済み) / after_use(使用後・片付け済み)
+    status = Column(String(10), nullable=False, default="to_prepare")
+    # manual(手入力) / suggested(候補から採用)。採用した候補の識別子を残し、旅程変更時に
+    # 「もう不要かもしれない」候補を判定する。
+    source = Column(String(10), nullable=False, default="manual")
+    suggestion_key = Column(String(40), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("scope IN ('shared','personal')", name="ck_packing_items_scope"),
+        CheckConstraint(
+            "(scope = 'personal' AND payload_ciphertext IS NOT NULL AND name IS NULL AND note IS NULL"
+            " AND assignee_user_id IS NULL)"
+            " OR (scope = 'shared' AND payload_ciphertext IS NULL AND name IS NOT NULL)",
+            name="ck_packing_items_scope_payload",
+        ),
+        CheckConstraint(
+            "category IN ('clothing','toiletries','health','documents','electronics','money','gear','other')",
+            name="ck_packing_items_category",
+        ),
+        CheckConstraint("quantity BETWEEN 1 AND 999", name="ck_packing_items_quantity"),
+        CheckConstraint(
+            "status IN ('to_prepare','to_buy','packed','after_use')", name="ck_packing_items_status",
+        ),
+        CheckConstraint("source IN ('manual','suggested')", name="ck_packing_items_source"),
+        CheckConstraint(
+            "(source = 'suggested') = (suggestion_key IS NOT NULL)", name="ck_packing_items_suggestion_key",
+        ),
+        Index("ix_packing_items_plan_deleted", "plan_id", "deleted_at"),
+        Index(
+            "uq_packing_items_shared_suggestion", "plan_id", "suggestion_key", unique=True,
+            postgresql_where=text("deleted_at IS NULL AND scope = 'shared' AND suggestion_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_packing_items_personal_suggestion", "plan_id", "owner_user_id", "suggestion_key", unique=True,
+            postgresql_where=text("deleted_at IS NULL AND scope = 'personal' AND suggestion_key IS NOT NULL"),
+        ),
+    )
+
+
+class PreparationTask(Base):
+    """[Gate P1] 準備タスク(FR-026)。完了条件・担当者・期限を持つ。
+
+    readiness_key はレディネスの項目(例: 予約が無い宿泊予定)から作ったタスクの識別子。
+    同じ項目のタスクが完了していれば、その項目は「対応済み」として一覧から外れる
+    (例: 予約不要と確認した)。
+    """
+    __tablename__ = "preparation_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    assignee_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    title = Column(String(200), nullable=False)
+    description = Column(String(2000), nullable=True)
+    completion_criteria = Column(String(500), nullable=True)
+    due_at = Column(DateTime(timezone=True), nullable=True)
+    # open(未完了) / done(完了)
+    status = Column(String(4), nullable=False, default="open")
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    # 関連する対象(外部キーにしない。対象の個別削除を妨げないため。表示時に存在を確認する)
+    related_type = Column(String(20), nullable=True)
+    related_id = Column(UUID(as_uuid=True), nullable=True)
+    readiness_key = Column(String(80), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('open','done')", name="ck_preparation_tasks_status"),
+        CheckConstraint(
+            "(status = 'done') = (completed_at IS NOT NULL)", name="ck_preparation_tasks_completed",
+        ),
+        CheckConstraint(
+            "related_type IS NULL OR related_type IN ('event','reservation','segment','document','packing_item')",
+            name="ck_preparation_tasks_related_type",
+        ),
+        CheckConstraint(
+            "(related_type IS NULL) = (related_id IS NULL)", name="ck_preparation_tasks_related_pair",
+        ),
+        Index("ix_preparation_tasks_plan_deleted", "plan_id", "deleted_at"),
+        Index(
+            "uq_preparation_tasks_readiness_key", "plan_id", "readiness_key", unique=True,
+            postgresql_where=text("deleted_at IS NULL AND readiness_key IS NOT NULL"),
+        ),
+    )

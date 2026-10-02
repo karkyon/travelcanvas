@@ -32,6 +32,7 @@ import type {
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
   CollaboratorRemoveResult, DeletionImpact, ItemDeleteResult, LockedRelationDetail, RouteOptionDeleteResult,
   UndoConflictDetail,
+  PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem,
 } from './types';
 import { arrayOf, bool, int, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -730,4 +731,129 @@ export const planDeleteResult: Decoder<PlanDeleteResult> = object<PlanDeleteResu
   message: str,
   deleted_at: str,
   purge_after: str,
+});
+
+// ----- [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026)。backend/app/api/v1/preparation.py の応答。
+// 件数を誤ると「準備完了」と誤表示するため、件数・列挙値・真偽値を厳密に検査する。
+const PACKING_CATEGORIES = ['clothing', 'toiletries', 'health', 'documents', 'electronics', 'money', 'gear', 'other'] as const;
+
+export const planMember: Decoder<PlanMember> = object<PlanMember>({
+  user_id: str,
+  name: str,
+  role: oneOf('owner', 'editor', 'viewer'),
+  is_me: bool,
+});
+
+export const packingItem: Decoder<PackingItem> = object<PackingItem>({
+  id: str,
+  plan_id: str,
+  scope: oneOf('shared', 'personal'),
+  is_mine: bool,
+  visibility: oneOf('full', 'unavailable'),
+  name: nullable(str),
+  note: nullable(str),
+  category: oneOf(...PACKING_CATEGORIES),
+  quantity: int,
+  is_required: bool,
+  status: oneOf('to_prepare', 'to_buy', 'packed', 'after_use'),
+  source: oneOf('manual', 'suggested'),
+  suggestion_key: nullable(str),
+  assignee_user_id: nullable(str),
+  assignee_name: nullable(str),
+  assignee_missing: bool,
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+});
+
+export const packingSuggestions: Decoder<PackingSuggestions> = object<PackingSuggestions>({
+  algorithm_version: str,
+  inputs: record,
+  add: arrayOf(object({
+    key: str,
+    name: str,
+    category: oneOf(...PACKING_CATEGORIES),
+    scope: oneOf('shared', 'personal'),
+    is_required: bool,
+    quantity: int,
+    reason: str,
+  })),
+  remove: arrayOf(object({ item_id: str, suggestion_key: str, name: nullable(str), reason: str })),
+  change: arrayOf(object({
+    item_id: str, suggestion_key: str, name: nullable(str), current_quantity: int, suggested_quantity: int, reason: str,
+  })),
+  unverified: arrayOf(object({ code: str, message: str })),
+});
+
+export const preparationTask: Decoder<PreparationTask> = object<PreparationTask>({
+  id: str,
+  plan_id: str,
+  title: str,
+  description: nullable(str),
+  completion_criteria: nullable(str),
+  due_at: nullable(str),
+  is_overdue: bool,
+  status: oneOf('open', 'done'),
+  completed_at: nullable(str),
+  completed_by_name: nullable(str),
+  assignee_user_id: nullable(str),
+  assignee_name: nullable(str),
+  assignee_missing: bool,
+  related_type: nullable(oneOf('event', 'reservation', 'segment', 'document', 'packing_item')),
+  related_id: nullable(str),
+  related_label: nullable(str),
+  related_missing: bool,
+  readiness_key: nullable(str),
+  created_by_name: nullable(str),
+  can_edit: bool,
+  can_complete: bool,
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+});
+
+const readinessItem: Decoder<ReadinessItem> = object<ReadinessItem>({
+  key: str,
+  code: oneOf(
+    'unreserved', 'reservation_unconfirmed', 'reservation_unpaid', 'payment_unknown', 'cancellation_deadline_soon',
+    'task_overdue', 'task_unassigned', 'packing_unassigned', 'packing_shortage',
+  ),
+  category: oneOf('unreserved', 'unconfirmed', 'unpaid', 'deadline', 'unassigned', 'packing'),
+  severity: oneOf('high', 'medium', 'low'),
+  title: str,
+  detail: str,
+  entity_type: str,
+  entity_id: str,
+  link: nullable(str),
+  due_at: nullable(str),
+  convertible: bool,
+  task: nullable(object({
+    id: str,
+    status: oneOf('open', 'done'),
+    assignee_user_id: nullable(str),
+    assignee_name: nullable(str),
+    due_at: nullable(str),
+    revision: int,
+  })),
+});
+
+export const readiness: Decoder<Readiness> = object<Readiness>({
+  plan_id: str,
+  algorithm_version: str,
+  checked_at: str,
+  is_ready: bool,
+  counts: object({
+    total: nonNegativeInt,
+    by_severity: object({ high: nonNegativeInt, medium: nonNegativeInt, low: nonNegativeInt }),
+    by_category: object({
+      unreserved: nonNegativeInt, unconfirmed: nonNegativeInt, unpaid: nonNegativeInt, deadline: nonNegativeInt,
+      unassigned: nonNegativeInt, packing: nonNegativeInt,
+    }),
+  }),
+  resolved_by_tasks: nonNegativeInt,
+  tasks: object({ open: nonNegativeInt, done: nonNegativeInt }),
+  packing: object({
+    total: nonNegativeInt, packed: nonNegativeInt, required_total: nonNegativeInt, required_ready: nonNegativeInt,
+  }),
+  items: arrayOf(readinessItem),
 });

@@ -20,6 +20,7 @@ import {
   shareLink, unreadCount, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
   validationRunDetail, validationRunSummary, deletedPlanSummary, planDeleteResult, planPurgeResult,
   collaboratorRemoveResult, itemDeleteResult, lockedRelationError, routeOptionDeleteResult, undoConflictError,
+  packingItem, packingSuggestions, planMember, preparationTask, readiness,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -129,6 +130,24 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['collaborator_removed', collaboratorRemoveResult],
   ['event_delete_locked_409', lockedRelationError],
   ['undo_conflict_409', undoConflictError],
+  // ----- [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026)。*_otherは他のメンバー、*_assigneeは担当者から見た応答
+  ['plan_members', arrayOf(planMember)],
+  ['packing_item_shared', packingItem],
+  ['packing_item_suggested', packingItem],
+  ['packing_item_personal', packingItem],
+  ['packing_item_updated', packingItem],
+  ['packing_item_list', arrayOf(packingItem)],
+  ['packing_item_list_other', arrayOf(packingItem)],
+  ['packing_item_deleted', revisionResult],
+  ['packing_suggestions', packingSuggestions],
+  ['preparation_task_created', preparationTask],
+  ['preparation_task_from_readiness', preparationTask],
+  ['preparation_task_done', preparationTask],
+  ['preparation_task_list', arrayOf(preparationTask)],
+  ['preparation_task_list_assignee', arrayOf(preparationTask)],
+  ['preparation_task_deleted', revisionResult],
+  ['readiness_attention', readiness],
+  ['readiness_ready', readiness],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {
