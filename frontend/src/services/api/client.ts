@@ -13,9 +13,10 @@
 // [Gate P5] カレンダー・地図の書き出し(FR-036)を追加: ... → Booklet → ItineraryExport → CompleteTravelAPI
 // [Gate P6] データポータビリティ(FR-039)を追加: ... → ItineraryExport → DataExport → CompleteTravelAPI
 // [Gate P7] What-if・旅程ブランチ(FR-019)を追加: ... → DataExport → Branches → CompleteTravelAPI
-import { BranchesApi } from './endpoints/branches';
+// [Gate P8] カレンダー(ICS)の取込(FR-036)を追加: ... → Branches → CalendarImport → CompleteTravelAPI
+import { CalendarImportApi } from './endpoints/calendarImport';
 
-export class CompleteTravelAPI extends BranchesApi {
+export class CompleteTravelAPI extends CalendarImportApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

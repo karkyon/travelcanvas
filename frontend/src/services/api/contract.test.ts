@@ -26,6 +26,7 @@ import {
   booklet, bookletExport,
   retentionInfo,
   branch, branchDetail,
+  calendarImportPreview, calendarImportResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -211,6 +212,10 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['branch_deleted', revisionResult],
   ['branch_list', arrayOf(branch)],
   ['branch_list_viewer', arrayOf(branch)],
+  // ----- [Gate P8] カレンダー(ICS)の取込(FR-036)。*_days は日程が無い日を作る指定のプレビュー
+  ['calendar_import_preview', calendarImportPreview],
+  ['calendar_import_preview_days', calendarImportPreview],
+  ['calendar_import_applied', calendarImportResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

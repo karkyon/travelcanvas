@@ -50,6 +50,7 @@ const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
 const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
 const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
+const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -279,6 +280,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <BranchDetailPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📥 [Gate P8] カレンダー(ICS)の取込(FR-036、差分確認後に適用)。
+      {
+        path: 'planner/:planId/calendar-import',
+        element: (
+          <ProtectedRoute>
+            <CalendarImportPage />
           </ProtectedRoute>
         ),
       },

@@ -11,7 +11,8 @@
   "captured_at_head_p4": "Gate P3 (+Gate P4 booklet)",
   "captured_at_head_p5": "Gate P4 (+Gate P5 itinerary exports)",
   "captured_at_head_p6": "Gate P5 (+Gate P6 data export/retention)",
-  "captured_at_head_p7": "Gate P6 (+Gate P7 branches)"
+  "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
+  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -153,6 +154,8 @@
   "POST /api/v1/plans/{plan_id}/branches",
   "POST /api/v1/plans/{plan_id}/branches/{branch_id}/adopt",
   "POST /api/v1/plans/{plan_id}/budgets",
+  "POST /api/v1/plans/{plan_id}/calendar-import/apply",
+  "POST /api/v1/plans/{plan_id}/calendar-import/preview",
   "POST /api/v1/plans/{plan_id}/comments",
   "POST /api/v1/plans/{plan_id}/constraints",
   "POST /api/v1/plans/{plan_id}/days",

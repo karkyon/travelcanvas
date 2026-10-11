@@ -12,6 +12,7 @@ import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateDa
 import type { BookletExportCreateData, BookletOptions } from './types';
 import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
 import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
+import type { CalendarImportApplyItem } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -331,5 +332,11 @@ export const updateBranch = (planId: string, branchId: string, data: BranchUpdat
   api.updateBranch(planId, branchId, data, revision);
 export const adoptBranch = (planId: string, branchId: string, revision: number) => api.adoptBranch(planId, branchId, revision);
 export const deleteBranch = (planId: string, branchId: string, revision: number) => api.deleteBranch(planId, branchId, revision);
+
+// ===== [Gate P8] カレンダー(ICS)の取込(FR-036) =====
+export const previewCalendarImport = (planId: string, file: Blob, createMissingDays?: boolean) =>
+  api.previewCalendarImport(planId, file, createMissingDays);
+export const applyCalendarImport = (planId: string, items: CalendarImportApplyItem[], createMissingDays: boolean, revision: number) =>
+  api.applyCalendarImport(planId, items, createMissingDays, revision);
 
 export default api;

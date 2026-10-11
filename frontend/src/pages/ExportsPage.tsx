@@ -72,6 +72,11 @@ const ExportsPage: React.FC = () => {
         <p className="text-sm text-gray-700 mt-1">
           旅程をカレンダー・地図アプリ・表計算ソフトで使える形式で保存します。予約番号・チケット・メモ・参加者名は含めません。
         </p>
+        <p className="text-sm mt-1">
+          <button type="button" className="text-blue-800 underline" onClick={() => navigate(`/planner/${planId}/calendar-import`)}>
+            カレンダー(ICS)から予定を取り込む
+          </button>
+        </p>
       </div>
 
       <div aria-live="polite">

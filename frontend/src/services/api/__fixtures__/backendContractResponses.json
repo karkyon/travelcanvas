@@ -14,7 +14,8 @@
   "captured_at_head_p3": "Gate P2 (+Gate P3 polls/votes/comments)",
   "captured_at_head_p4": "Gate P3 (+Gate P4 booklet: preview/exports)",
   "captured_at_head_p6": "Gate P5 (+Gate P6 GET /privacy/retention)",
-  "captured_at_head_p7": "Gate P6 (+Gate P7 branches)"
+  "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
+  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -7777,5 +7778,176 @@
    "created_at": "2026-10-11T10:37:51.395824+00:00",
    "updated_at": "2026-10-11T10:37:51.395824+00:00"
   }
- ]
+ ],
+ "calendar_import_preview": {
+  "plan_id": "ee8fc949-f488-4dc0-abf3-7a8d941b99b6",
+  "plan_revision": 3,
+  "timezone_id": "Asia/Tokyo",
+  "create_missing_days": false,
+  "summary": {
+   "total": 4,
+   "create": 1,
+   "update": 1,
+   "skip": 2,
+   "skipped_by_reason": {
+    "no_day": 1,
+    "recurring": 1
+   }
+  },
+  "candidates": [
+   {
+    "index": 0,
+    "uid": "event-0a932984-ce01-4e4b-a001-51cb1b709152@travelcanvas.app",
+    "title": "清水寺(朝)",
+    "local_date": "2026-11-01",
+    "local_start_time": "09:00",
+    "is_all_day": false,
+    "address": null,
+    "action": "update",
+    "reason": null,
+    "event_id": "0a932984-ce01-4e4b-a001-51cb1b709152",
+    "changes": {
+     "title": {
+      "before": "清水寺",
+      "after": "清水寺(朝)"
+     },
+     "local_start_time": {
+      "before": "10:00",
+      "after": "09:00"
+     }
+    },
+    "day_exists": true
+   },
+   {
+    "index": 1,
+    "uid": "ext-1",
+    "title": "水族館",
+    "local_date": "2026-11-01",
+    "local_start_time": "15:00",
+    "is_all_day": false,
+    "address": "京都水族館",
+    "action": "create",
+    "reason": null,
+    "event_id": null,
+    "changes": null,
+    "day_exists": true
+   },
+   {
+    "index": 2,
+    "uid": "ext-2",
+    "title": "翌日の予定",
+    "local_date": "2026-11-02",
+    "local_start_time": null,
+    "is_all_day": true,
+    "address": null,
+    "action": "skip",
+    "reason": "no_day",
+    "event_id": null,
+    "changes": null,
+    "day_exists": false
+   },
+   {
+    "index": 3,
+    "uid": "ext-3",
+    "title": "毎週の会議",
+    "local_date": "2026-11-01",
+    "local_start_time": "10:00",
+    "is_all_day": false,
+    "address": null,
+    "action": "skip",
+    "reason": "recurring",
+    "event_id": null,
+    "changes": null,
+    "day_exists": true
+   }
+  ]
+ },
+ "calendar_import_preview_days": {
+  "plan_id": "ee8fc949-f488-4dc0-abf3-7a8d941b99b6",
+  "plan_revision": 3,
+  "timezone_id": "Asia/Tokyo",
+  "create_missing_days": true,
+  "summary": {
+   "total": 4,
+   "create": 2,
+   "update": 1,
+   "skip": 1,
+   "skipped_by_reason": {
+    "recurring": 1
+   }
+  },
+  "candidates": [
+   {
+    "index": 0,
+    "uid": "event-0a932984-ce01-4e4b-a001-51cb1b709152@travelcanvas.app",
+    "title": "清水寺(朝)",
+    "local_date": "2026-11-01",
+    "local_start_time": "09:00",
+    "is_all_day": false,
+    "address": null,
+    "action": "update",
+    "reason": null,
+    "event_id": "0a932984-ce01-4e4b-a001-51cb1b709152",
+    "changes": {
+     "title": {
+      "before": "清水寺",
+      "after": "清水寺(朝)"
+     },
+     "local_start_time": {
+      "before": "10:00",
+      "after": "09:00"
+     }
+    },
+    "day_exists": true
+   },
+   {
+    "index": 1,
+    "uid": "ext-1",
+    "title": "水族館",
+    "local_date": "2026-11-01",
+    "local_start_time": "15:00",
+    "is_all_day": false,
+    "address": "京都水族館",
+    "action": "create",
+    "reason": null,
+    "event_id": null,
+    "changes": null,
+    "day_exists": true
+   },
+   {
+    "index": 2,
+    "uid": "ext-2",
+    "title": "翌日の予定",
+    "local_date": "2026-11-02",
+    "local_start_time": null,
+    "is_all_day": true,
+    "address": null,
+    "action": "create",
+    "reason": null,
+    "event_id": null,
+    "changes": null,
+    "day_exists": false
+   },
+   {
+    "index": 3,
+    "uid": "ext-3",
+    "title": "毎週の会議",
+    "local_date": "2026-11-01",
+    "local_start_time": "10:00",
+    "is_all_day": false,
+    "address": null,
+    "action": "skip",
+    "reason": "recurring",
+    "event_id": null,
+    "changes": null,
+    "day_exists": true
+   }
+  ]
+ },
+ "calendar_import_applied": {
+  "plan_revision": 4,
+  "created": 2,
+  "updated": 1,
+  "created_days": 1
+ }
 }

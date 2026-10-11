@@ -38,6 +38,7 @@ import type {
   Booklet, BookletExport, BookletIncludes,
   RetentionInfo,
   Branch, BranchAssumptions, BranchDetail,
+  CalendarImportPreview, CalendarImportResult,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1217,4 +1218,36 @@ export const branchDetail: Decoder<BranchDetail> = object<BranchDetail>({
     fields: optional(arrayOf(str)),
   })),
   day_counts: arrayOf(object({ day_id: str, local_date: str, plan: nonNegativeInt, branch: nonNegativeInt })),
+});
+
+// ----- [Gate P8] カレンダー(ICS)の取込(FR-036)。backend/app/api/v1/calendar_import.py の応答。
+// 取り込む・取り込まないの区別や理由を誤ると、確認していない変更を本案へ入れてしまうため、列挙値を厳密に検査する。
+const IMPORT_REASONS = ['recurring', 'cancelled', 'unchanged', 'locked', 'duplicate', 'no_day'] as const;
+export const calendarImportPreview: Decoder<CalendarImportPreview> = object<CalendarImportPreview>({
+  plan_id: str,
+  plan_revision: int,
+  timezone_id: str,
+  create_missing_days: bool,
+  summary: object({
+    total: nonNegativeInt, create: nonNegativeInt, update: nonNegativeInt, skip: nonNegativeInt,
+    skipped_by_reason: record as Decoder<CalendarImportPreview['summary']['skipped_by_reason']>,
+  }),
+  candidates: arrayOf(object({
+    index: nonNegativeInt,
+    uid: nullable(str),
+    title: str,
+    local_date: str,
+    local_start_time: nullable(str),
+    is_all_day: bool,
+    address: nullable(str),
+    action: oneOf('create', 'update', 'skip'),
+    reason: nullable(oneOf(...IMPORT_REASONS)),
+    event_id: nullable(str),
+    changes: nullable(record as Decoder<Record<string, { before: unknown; after: unknown }>>),
+    day_exists: bool,
+  })),
+});
+
+export const calendarImportResult: Decoder<CalendarImportResult> = object<CalendarImportResult>({
+  plan_revision: int, created: nonNegativeInt, updated: nonNegativeInt, created_days: nonNegativeInt,
 });
