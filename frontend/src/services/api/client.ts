@@ -7,9 +7,10 @@
 // [Gate L3] 実行可能性検証(FR-017)を追加: ... → Constraints → Validation → CompleteTravelAPI
 // [Gate B-012] 削除済みプラン(復元・完全削除)を追加: ... → Validation → PlanTrash → CompleteTravelAPI
 // [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026)を追加: ... → PlanTrash → Preparation → CompleteTravelAPI
-import { PreparationApi } from './endpoints/preparation';
+// [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)を追加: ... → Preparation → Finance → CompleteTravelAPI
+import { FinanceApi } from './endpoints/finance';
 
-export class CompleteTravelAPI extends PreparationApi {
+export class CompleteTravelAPI extends FinanceApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

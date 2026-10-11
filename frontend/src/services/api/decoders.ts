@@ -33,8 +33,9 @@ import type {
   CollaboratorRemoveResult, DeletionImpact, ItemDeleteResult, LockedRelationDetail, RouteOptionDeleteResult,
   UndoConflictDetail,
   PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem,
+  Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement,
 } from './types';
-import { arrayOf, bool, int, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
+import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
 export interface RevisionResult {
   revision: number;
@@ -856,4 +857,123 @@ export const readiness: Decoder<Readiness> = object<Readiness>({
     total: nonNegativeInt, packed: nonNegativeInt, required_total: nonNegativeInt, required_ready: nonNegativeInt,
   }),
   items: arrayOf(readinessItem),
+});
+
+// ----- [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)。backend/app/api/v1/finance.py の応答。
+// 金額は文字列(Decimal)。数値として誤って受け取ると桁落ち・合計不一致になるため、
+// 金額は「数字と小数点の文字列」であることを検査する。
+const moneyString: Decoder<string> = matching(/^-?\d+(\.\d+)?$/, '金額の文字列');
+const EXPENSE_CATEGORIES = ['lodging', 'transport', 'food', 'activity', 'shopping', 'fee', 'cancellation', 'other'] as const;
+
+export const financeSettings: Decoder<FinanceSettings> = object<FinanceSettings>({
+  plan_id: str,
+  base_currency: str,
+  revision: nonNegativeInt,
+  is_default: bool,
+});
+
+export const budget: Decoder<Budget> = object<Budget>({
+  id: str,
+  plan_id: str,
+  kind: oneOf('total', 'category', 'day', 'member'),
+  category: nullable(oneOf(...EXPENSE_CATEGORIES)),
+  local_date: nullable(str),
+  is_private: bool,
+  amount: nullable(moneyString),
+  currency: str,
+  visibility: oneOf('full', 'unavailable'),
+  note: nullable(str),
+  revision: int,
+  updated_at: nullable(str),
+});
+
+const expenseShare: Decoder<ExpenseShare> = object<ExpenseShare>({
+  user_id: str,
+  name: str,
+  is_member: bool,
+  weight: nullable(str),
+  share_amount: moneyString,
+  base_share_amount: nullable(moneyString),
+  rounding_adjustment: moneyString,
+});
+
+export const expense: Decoder<Expense> = object<Expense>({
+  id: str,
+  plan_id: str,
+  kind: oneOf('expense', 'refund'),
+  refund_of_expense_id: nullable(str),
+  title: str,
+  category: oneOf(...EXPENSE_CATEGORIES),
+  local_date: nullable(str),
+  amount: moneyString,
+  currency: str,
+  tax_amount: nullable(moneyString),
+  fee_amount: nullable(moneyString),
+  fx_rate: nullable(str),
+  fx_source: nullable(str),
+  fx_date: nullable(str),
+  base_amount: nullable(moneyString),
+  base_currency: str,
+  is_converted: bool,
+  refunded_amount: nullable(moneyString),
+  paid_by_user_id: str,
+  paid_by_name: str,
+  paid_by_is_member: bool,
+  split_method: oneOf('equal', 'ratio', 'amount', 'none'),
+  shares: arrayOf(expenseShare),
+  related_type: nullable(oneOf('event', 'reservation', 'segment')),
+  related_id: nullable(str),
+  related_label: nullable(str),
+  related_missing: bool,
+  receipt_document_id: nullable(str),
+  receipt_missing: bool,
+  note: nullable(str),
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+});
+
+export const settlement: Decoder<Settlement> = object<Settlement>({
+  id: str,
+  plan_id: str,
+  from_user_id: str,
+  from_name: str,
+  to_user_id: str,
+  to_name: str,
+  amount: moneyString,
+  currency: str,
+  settled_on: nullable(str),
+  note: nullable(str),
+  revision: int,
+  created_at: nullable(str),
+});
+
+const budgetDiffShape = {
+  budget: nullable(moneyString),
+  actual: moneyString,
+  remaining: nullable(moneyString),
+  over: bool,
+};
+const budgetDiff: Decoder<BudgetDiff> = object<BudgetDiff>(budgetDiffShape);
+
+export const financeSummary: Decoder<FinanceSummary> = object<FinanceSummary>({
+  plan_id: str,
+  algorithm_version: str,
+  base_currency: str,
+  total: budgetDiff,
+  tax_total: moneyString,
+  fee_total: moneyString,
+  refund_total: moneyString,
+  reserved: object({ total: moneyString, unconverted: nonNegativeInt }),
+  by_category: arrayOf(object({ ...budgetDiffShape, category: oneOf(...EXPENSE_CATEGORIES) })),
+  by_day: arrayOf(object({ ...budgetDiffShape, local_date: str })),
+  undated_actual: moneyString,
+  my_budget: nullable(object({ ...budgetDiffShape, id: str, visibility: oneOf('full', 'unavailable') })),
+  unconverted_expenses: nonNegativeInt,
+  members: arrayOf(object({
+    user_id: str, name: str, is_member: bool, is_me: bool, paid: moneyString, owed: moneyString,
+    settled_out: moneyString, settled_in: moneyString, net: moneyString,
+  })),
+  transfers: arrayOf(object({ from_user_id: str, from_name: str, to_user_id: str, to_name: str, amount: moneyString })),
+  is_settled: bool,
 });

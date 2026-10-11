@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation,
+    validation, preparation, finance,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -371,3 +371,6 @@ app.include_router(validation.router, prefix="/api/v1")
 # [Gate P1] FR-025持ち物 / FR-026準備タスク・レディネス。/plans/{plan_id}/packing-items・
 # preparation-tasks・readiness・members配下。
 app.include_router(preparation.router, prefix="/api/v1")
+# [Gate P2] FR-027予算・費用 / FR-028立替・精算。/plans/{plan_id}/finance-settings・budgets・expenses・
+# settlements・finance-summary配下。
+app.include_router(finance.router, prefix="/api/v1")

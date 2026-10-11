@@ -9,7 +9,8 @@
   "captured_at_head_l3": "18665181c062bebaa924c0c4def1bb42e1a8c55a (+Gate L3: validation_run_* 実行可能性検証APIの実応答。他人の秘匿制約の問題はis_masked、作成者本人から見た詳細=validation_run_detail_owner_private)",
   "captured_at_head_b012": "d8a217ce5781a5dccadb8762e6f56a103505923d (+Gate B-012: plan_soft_deleted/deleted_plan_list/plan_restored/plan_purged 削除済みプランAPIの実応答)",
   "captured_at_head_b013": "5b8cd6bf2bc9ecfe8f857e147a1baed15fcfe84e (+Gate B-013: 予定・日程・採用済み経路候補・共同編集者の個別削除の実応答(detached)、確定ロック409(locked_relation)、Undo競合409(undo_conflict))",
-  "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 packing-items/preparation-tasks/readiness/members)"
+  "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 packing-items/preparation-tasks/readiness/members)",
+  "captured_at_head_p2": "Gate P1 (+Gate P2 finance-settings/budgets/expenses/settlements/finance-summary)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -3437,5 +3438,1021 @@
    "created_at": "2026-10-02T08:42:10.378742+00:00",
    "updated_at": "2026-10-02T08:42:10.378742+00:00"
   }
- ]
+ ],
+ "finance_settings_default": {
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "base_currency": "JPY",
+  "revision": 0,
+  "is_default": true
+ },
+ "finance_settings_updated": {
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "base_currency": "JPY",
+  "revision": 1,
+  "is_default": false
+ },
+ "budget_total": {
+  "id": "40e7007f-776d-4972-a12e-308de0d44b56",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "total",
+  "category": null,
+  "local_date": null,
+  "is_private": false,
+  "amount": "50000",
+  "currency": "JPY",
+  "visibility": "full",
+  "note": null,
+  "revision": 1,
+  "updated_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "budget_category": {
+  "id": "f6efe77c-ef50-43b2-9740-7f7bea199597",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "category",
+  "category": "food",
+  "local_date": null,
+  "is_private": false,
+  "amount": "3000",
+  "currency": "JPY",
+  "visibility": "full",
+  "note": null,
+  "revision": 1,
+  "updated_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "budget_member": {
+  "id": "c5b0fd5f-6f6a-4015-9c6c-d01ecd32c43e",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "member",
+  "category": null,
+  "local_date": null,
+  "is_private": true,
+  "amount": "15000",
+  "currency": "JPY",
+  "visibility": "full",
+  "note": null,
+  "revision": 1,
+  "updated_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "budget_updated": {
+  "id": "f6efe77c-ef50-43b2-9740-7f7bea199597",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "category",
+  "category": "food",
+  "local_date": null,
+  "is_private": false,
+  "amount": "3500",
+  "currency": "JPY",
+  "visibility": "full",
+  "note": null,
+  "revision": 2,
+  "updated_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "budget_list": [
+  {
+   "id": "40e7007f-776d-4972-a12e-308de0d44b56",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "total",
+   "category": null,
+   "local_date": null,
+   "is_private": false,
+   "amount": "50000",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 1,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "f6efe77c-ef50-43b2-9740-7f7bea199597",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "category",
+   "category": "food",
+   "local_date": null,
+   "is_private": false,
+   "amount": "3500",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 2,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "a9e655ec-2aec-413e-873b-fec2431d3026",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "day",
+   "category": null,
+   "local_date": "2026-11-01",
+   "is_private": false,
+   "amount": "20000",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 1,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "c5b0fd5f-6f6a-4015-9c6c-d01ecd32c43e",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "member",
+   "category": null,
+   "local_date": null,
+   "is_private": true,
+   "amount": "15000",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 1,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  }
+ ],
+ "expense_equal": {
+  "id": "1ac3b001-2630-43e1-9cfe-7983858a7ec3",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "expense",
+  "refund_of_expense_id": null,
+  "title": "夕食",
+  "category": "food",
+  "local_date": "2026-11-01",
+  "amount": "10000",
+  "currency": "JPY",
+  "tax_amount": "909",
+  "fee_amount": null,
+  "fx_rate": "1",
+  "fx_source": null,
+  "fx_date": null,
+  "base_amount": "10000",
+  "base_currency": "JPY",
+  "is_converted": true,
+  "refunded_amount": "0",
+  "paid_by_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+  "paid_by_name": "user_531e676476",
+  "paid_by_is_member": true,
+  "split_method": "equal",
+  "shares": [
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "weight": null,
+    "share_amount": "3334",
+    "base_share_amount": "3334",
+    "rounding_adjustment": "1"
+   },
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "weight": null,
+    "share_amount": "3333",
+    "base_share_amount": "3333",
+    "rounding_adjustment": "0"
+   },
+   {
+    "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "name": "user_46856db6c2",
+    "is_member": true,
+    "weight": null,
+    "share_amount": "3333",
+    "base_share_amount": "3333",
+    "rounding_adjustment": "0"
+   }
+  ],
+  "related_type": null,
+  "related_id": null,
+  "related_label": null,
+  "related_missing": false,
+  "receipt_document_id": null,
+  "receipt_missing": false,
+  "note": null,
+  "revision": 1,
+  "created_at": "2026-10-02T09:25:32.136745+00:00",
+  "updated_at": null
+ },
+ "expense_foreign": {
+  "id": "bbc5a35d-fa80-433f-a13c-b603749a8c96",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "expense",
+  "refund_of_expense_id": null,
+  "title": "空港バス",
+  "category": "transport",
+  "local_date": null,
+  "amount": "12.50",
+  "currency": "USD",
+  "tax_amount": null,
+  "fee_amount": null,
+  "fx_rate": "150.25",
+  "fx_source": "カード明細",
+  "fx_date": "2026-11-01",
+  "base_amount": "1878",
+  "base_currency": "JPY",
+  "is_converted": true,
+  "refunded_amount": "0.00",
+  "paid_by_user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+  "paid_by_name": "user_46856db6c2",
+  "paid_by_is_member": true,
+  "split_method": "ratio",
+  "shares": [
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "weight": "2",
+    "share_amount": "8.33",
+    "base_share_amount": "1251",
+    "rounding_adjustment": "0.00"
+   },
+   {
+    "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "name": "user_46856db6c2",
+    "is_member": true,
+    "weight": "1",
+    "share_amount": "4.17",
+    "base_share_amount": "627",
+    "rounding_adjustment": "0.01"
+   }
+  ],
+  "related_type": null,
+  "related_id": null,
+  "related_label": null,
+  "related_missing": false,
+  "receipt_document_id": null,
+  "receipt_missing": false,
+  "note": null,
+  "revision": 1,
+  "created_at": "2026-10-02T09:25:32.136745+00:00",
+  "updated_at": null
+ },
+ "expense_unconverted": {
+  "id": "58ec18eb-6c4c-4699-adfe-81bd0670c4bc",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "expense",
+  "refund_of_expense_id": null,
+  "title": "お土産",
+  "category": "shopping",
+  "local_date": null,
+  "amount": "20.00",
+  "currency": "EUR",
+  "tax_amount": null,
+  "fee_amount": null,
+  "fx_rate": null,
+  "fx_source": null,
+  "fx_date": null,
+  "base_amount": null,
+  "base_currency": "JPY",
+  "is_converted": false,
+  "refunded_amount": "0.00",
+  "paid_by_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+  "paid_by_name": "user_6bde14fc28",
+  "paid_by_is_member": true,
+  "split_method": "none",
+  "shares": [
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "weight": null,
+    "share_amount": "20.00",
+    "base_share_amount": null,
+    "rounding_adjustment": "0.00"
+   }
+  ],
+  "related_type": null,
+  "related_id": null,
+  "related_label": null,
+  "related_missing": false,
+  "receipt_document_id": null,
+  "receipt_missing": false,
+  "note": null,
+  "revision": 1,
+  "created_at": "2026-10-02T09:25:32.136745+00:00",
+  "updated_at": null
+ },
+ "expense_refund": {
+  "id": "a1f3ea87-162f-4d9c-bc12-964c2da027de",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "refund",
+  "refund_of_expense_id": "1ac3b001-2630-43e1-9cfe-7983858a7ec3",
+  "title": "夕食の一部返金",
+  "category": "food",
+  "local_date": null,
+  "amount": "1000",
+  "currency": "JPY",
+  "tax_amount": null,
+  "fee_amount": null,
+  "fx_rate": "1",
+  "fx_source": null,
+  "fx_date": null,
+  "base_amount": "1000",
+  "base_currency": "JPY",
+  "is_converted": true,
+  "refunded_amount": null,
+  "paid_by_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+  "paid_by_name": "user_531e676476",
+  "paid_by_is_member": true,
+  "split_method": "ratio",
+  "shares": [
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "weight": "3334",
+    "share_amount": "334",
+    "base_share_amount": "334",
+    "rounding_adjustment": "1"
+   },
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "weight": "3333",
+    "share_amount": "333",
+    "base_share_amount": "333",
+    "rounding_adjustment": "0"
+   },
+   {
+    "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "name": "user_46856db6c2",
+    "is_member": true,
+    "weight": "3333",
+    "share_amount": "333",
+    "base_share_amount": "333",
+    "rounding_adjustment": "0"
+   }
+  ],
+  "related_type": null,
+  "related_id": null,
+  "related_label": null,
+  "related_missing": false,
+  "receipt_document_id": null,
+  "receipt_missing": false,
+  "note": null,
+  "revision": 1,
+  "created_at": "2026-10-02T09:25:32.136745+00:00",
+  "updated_at": null
+ },
+ "expense_updated": {
+  "id": "58ec18eb-6c4c-4699-adfe-81bd0670c4bc",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "kind": "expense",
+  "refund_of_expense_id": null,
+  "title": "お土産",
+  "category": "shopping",
+  "local_date": null,
+  "amount": "20.00",
+  "currency": "EUR",
+  "tax_amount": null,
+  "fee_amount": null,
+  "fx_rate": "1.6E+2",
+  "fx_source": null,
+  "fx_date": null,
+  "base_amount": "3200",
+  "base_currency": "JPY",
+  "is_converted": true,
+  "refunded_amount": "0.00",
+  "paid_by_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+  "paid_by_name": "user_6bde14fc28",
+  "paid_by_is_member": true,
+  "split_method": "none",
+  "shares": [
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "weight": null,
+    "share_amount": "20.00",
+    "base_share_amount": "3200",
+    "rounding_adjustment": "0.00"
+   }
+  ],
+  "related_type": null,
+  "related_id": null,
+  "related_label": null,
+  "related_missing": false,
+  "receipt_document_id": null,
+  "receipt_missing": false,
+  "note": null,
+  "revision": 2,
+  "created_at": "2026-10-02T09:25:32.136745+00:00",
+  "updated_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "expense_deleted": {
+  "message": "支出を削除しました",
+  "revision": 2
+ },
+ "expense_list": [
+  {
+   "id": "1ac3b001-2630-43e1-9cfe-7983858a7ec3",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "expense",
+   "refund_of_expense_id": null,
+   "title": "夕食",
+   "category": "food",
+   "local_date": "2026-11-01",
+   "amount": "10000",
+   "currency": "JPY",
+   "tax_amount": "909",
+   "fee_amount": null,
+   "fx_rate": "1",
+   "fx_source": null,
+   "fx_date": null,
+   "base_amount": "10000",
+   "base_currency": "JPY",
+   "is_converted": true,
+   "refunded_amount": "1000",
+   "paid_by_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+   "paid_by_name": "user_531e676476",
+   "paid_by_is_member": true,
+   "split_method": "equal",
+   "shares": [
+    {
+     "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+     "name": "user_6bde14fc28",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "3334",
+     "base_share_amount": "3334",
+     "rounding_adjustment": "1"
+    },
+    {
+     "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+     "name": "user_531e676476",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "3333",
+     "base_share_amount": "3333",
+     "rounding_adjustment": "0"
+    },
+    {
+     "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+     "name": "user_46856db6c2",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "3333",
+     "base_share_amount": "3333",
+     "rounding_adjustment": "0"
+    }
+   ],
+   "related_type": null,
+   "related_id": null,
+   "related_label": null,
+   "related_missing": false,
+   "receipt_document_id": null,
+   "receipt_missing": false,
+   "note": null,
+   "revision": 1,
+   "created_at": "2026-10-02T09:25:32.136745+00:00",
+   "updated_at": null
+  },
+  {
+   "id": "01186f18-206e-479b-bbcc-00bcb58c6011",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "expense",
+   "refund_of_expense_id": null,
+   "title": "未換算",
+   "category": "other",
+   "local_date": null,
+   "amount": "5.00",
+   "currency": "EUR",
+   "tax_amount": null,
+   "fee_amount": null,
+   "fx_rate": null,
+   "fx_source": null,
+   "fx_date": null,
+   "base_amount": null,
+   "base_currency": "JPY",
+   "is_converted": false,
+   "refunded_amount": "0.00",
+   "paid_by_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+   "paid_by_name": "user_531e676476",
+   "paid_by_is_member": true,
+   "split_method": "equal",
+   "shares": [
+    {
+     "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+     "name": "user_6bde14fc28",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "1.67",
+     "base_share_amount": null,
+     "rounding_adjustment": "0.01"
+    },
+    {
+     "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+     "name": "user_531e676476",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "1.67",
+     "base_share_amount": null,
+     "rounding_adjustment": "0.01"
+    },
+    {
+     "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+     "name": "user_46856db6c2",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "1.66",
+     "base_share_amount": null,
+     "rounding_adjustment": "0.00"
+    }
+   ],
+   "related_type": null,
+   "related_id": null,
+   "related_label": null,
+   "related_missing": false,
+   "receipt_document_id": null,
+   "receipt_missing": false,
+   "note": null,
+   "revision": 1,
+   "created_at": "2026-10-02T09:25:32.136745+00:00",
+   "updated_at": null
+  },
+  {
+   "id": "58ec18eb-6c4c-4699-adfe-81bd0670c4bc",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "expense",
+   "refund_of_expense_id": null,
+   "title": "お土産",
+   "category": "shopping",
+   "local_date": null,
+   "amount": "20.00",
+   "currency": "EUR",
+   "tax_amount": null,
+   "fee_amount": null,
+   "fx_rate": "1.6E+2",
+   "fx_source": null,
+   "fx_date": null,
+   "base_amount": "3200",
+   "base_currency": "JPY",
+   "is_converted": true,
+   "refunded_amount": "0.00",
+   "paid_by_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+   "paid_by_name": "user_6bde14fc28",
+   "paid_by_is_member": true,
+   "split_method": "none",
+   "shares": [
+    {
+     "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+     "name": "user_6bde14fc28",
+     "is_member": true,
+     "weight": null,
+     "share_amount": "20.00",
+     "base_share_amount": "3200",
+     "rounding_adjustment": "0.00"
+    }
+   ],
+   "related_type": null,
+   "related_id": null,
+   "related_label": null,
+   "related_missing": false,
+   "receipt_document_id": null,
+   "receipt_missing": false,
+   "note": null,
+   "revision": 2,
+   "created_at": "2026-10-02T09:25:32.136745+00:00",
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "a1f3ea87-162f-4d9c-bc12-964c2da027de",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "refund",
+   "refund_of_expense_id": "1ac3b001-2630-43e1-9cfe-7983858a7ec3",
+   "title": "夕食の一部返金",
+   "category": "food",
+   "local_date": null,
+   "amount": "1000",
+   "currency": "JPY",
+   "tax_amount": null,
+   "fee_amount": null,
+   "fx_rate": "1",
+   "fx_source": null,
+   "fx_date": null,
+   "base_amount": "1000",
+   "base_currency": "JPY",
+   "is_converted": true,
+   "refunded_amount": null,
+   "paid_by_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+   "paid_by_name": "user_531e676476",
+   "paid_by_is_member": true,
+   "split_method": "ratio",
+   "shares": [
+    {
+     "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+     "name": "user_6bde14fc28",
+     "is_member": true,
+     "weight": "3334",
+     "share_amount": "334",
+     "base_share_amount": "334",
+     "rounding_adjustment": "1"
+    },
+    {
+     "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+     "name": "user_531e676476",
+     "is_member": true,
+     "weight": "3333",
+     "share_amount": "333",
+     "base_share_amount": "333",
+     "rounding_adjustment": "0"
+    },
+    {
+     "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+     "name": "user_46856db6c2",
+     "is_member": true,
+     "weight": "3333",
+     "share_amount": "333",
+     "base_share_amount": "333",
+     "rounding_adjustment": "0"
+    }
+   ],
+   "related_type": null,
+   "related_id": null,
+   "related_label": null,
+   "related_missing": false,
+   "receipt_document_id": null,
+   "receipt_missing": false,
+   "note": null,
+   "revision": 1,
+   "created_at": "2026-10-02T09:25:32.136745+00:00",
+   "updated_at": null
+  },
+  {
+   "id": "bbc5a35d-fa80-433f-a13c-b603749a8c96",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "expense",
+   "refund_of_expense_id": null,
+   "title": "空港バス",
+   "category": "transport",
+   "local_date": null,
+   "amount": "12.50",
+   "currency": "USD",
+   "tax_amount": null,
+   "fee_amount": null,
+   "fx_rate": "150.25",
+   "fx_source": "カード明細",
+   "fx_date": "2026-11-01",
+   "base_amount": "1878",
+   "base_currency": "JPY",
+   "is_converted": true,
+   "refunded_amount": "0.00",
+   "paid_by_user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+   "paid_by_name": "user_46856db6c2",
+   "paid_by_is_member": true,
+   "split_method": "ratio",
+   "shares": [
+    {
+     "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+     "name": "user_531e676476",
+     "is_member": true,
+     "weight": "2",
+     "share_amount": "8.33",
+     "base_share_amount": "1251",
+     "rounding_adjustment": "0.00"
+    },
+    {
+     "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+     "name": "user_46856db6c2",
+     "is_member": true,
+     "weight": "1",
+     "share_amount": "4.17",
+     "base_share_amount": "627",
+     "rounding_adjustment": "0.01"
+    }
+   ],
+   "related_type": null,
+   "related_id": null,
+   "related_label": null,
+   "related_missing": false,
+   "receipt_document_id": null,
+   "receipt_missing": false,
+   "note": null,
+   "revision": 1,
+   "created_at": "2026-10-02T09:25:32.136745+00:00",
+   "updated_at": null
+  }
+ ],
+ "finance_summary": {
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "algorithm_version": "finance-v1",
+  "base_currency": "JPY",
+  "total": {
+   "budget": "50000",
+   "actual": "14078",
+   "remaining": "35922",
+   "over": false
+  },
+  "tax_total": "909",
+  "fee_total": "0",
+  "refund_total": "1000",
+  "reserved": {
+   "total": "24000",
+   "unconverted": 0
+  },
+  "by_category": [
+   {
+    "category": "transport",
+    "budget": null,
+    "actual": "1878",
+    "remaining": null,
+    "over": false
+   },
+   {
+    "category": "food",
+    "budget": "3500",
+    "actual": "9000",
+    "remaining": "-5500",
+    "over": true
+   },
+   {
+    "category": "shopping",
+    "budget": null,
+    "actual": "3200",
+    "remaining": null,
+    "over": false
+   }
+  ],
+  "by_day": [
+   {
+    "local_date": "2026-11-01",
+    "budget": "20000",
+    "actual": "10000",
+    "remaining": "10000",
+    "over": false
+   }
+  ],
+  "undated_actual": "4078",
+  "my_budget": {
+   "id": "c5b0fd5f-6f6a-4015-9c6c-d01ecd32c43e",
+   "budget": "15000",
+   "actual": "4251",
+   "remaining": "10749",
+   "over": false,
+   "visibility": "full"
+  },
+  "unconverted_expenses": 1,
+  "members": [
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "is_me": true,
+    "paid": "9000",
+    "owed": "4251",
+    "settled_out": "0",
+    "settled_in": "0",
+    "net": "4749"
+   },
+   {
+    "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "name": "user_46856db6c2",
+    "is_member": true,
+    "is_me": false,
+    "paid": "1878",
+    "owed": "3627",
+    "settled_out": "0",
+    "settled_in": "0",
+    "net": "-1749"
+   },
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "is_me": false,
+    "paid": "3200",
+    "owed": "6200",
+    "settled_out": "0",
+    "settled_in": "0",
+    "net": "-3000"
+   }
+  ],
+  "transfers": [
+   {
+    "from_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "from_name": "user_6bde14fc28",
+    "to_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "to_name": "user_531e676476",
+    "amount": "3000"
+   },
+   {
+    "from_user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "from_name": "user_46856db6c2",
+    "to_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "to_name": "user_531e676476",
+    "amount": "1749"
+   }
+  ],
+  "is_settled": false
+ },
+ "settlement_created": {
+  "id": "164e55b7-27c0-4fae-aeb6-d92010c3e18b",
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "from_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+  "from_name": "user_6bde14fc28",
+  "to_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+  "to_name": "user_531e676476",
+  "amount": "3000",
+  "currency": "JPY",
+  "settled_on": "2026-11-05",
+  "note": "現金",
+  "revision": 1,
+  "created_at": "2026-10-02T09:25:32.136745+00:00"
+ },
+ "settlement_list": [
+  {
+   "id": "164e55b7-27c0-4fae-aeb6-d92010c3e18b",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "from_user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+   "from_name": "user_6bde14fc28",
+   "to_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+   "to_name": "user_531e676476",
+   "amount": "3000",
+   "currency": "JPY",
+   "settled_on": "2026-11-05",
+   "note": "現金",
+   "revision": 1,
+   "created_at": "2026-10-02T09:25:32.136745+00:00"
+  }
+ ],
+ "settlement_deleted": {
+  "message": "精算を取り消しました",
+  "revision": 2
+ },
+ "finance_summary_other": {
+  "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+  "algorithm_version": "finance-v1",
+  "base_currency": "JPY",
+  "total": {
+   "budget": "50000",
+   "actual": "14078",
+   "remaining": "35922",
+   "over": false
+  },
+  "tax_total": "909",
+  "fee_total": "0",
+  "refund_total": "1000",
+  "reserved": {
+   "total": "24000",
+   "unconverted": 0
+  },
+  "by_category": [
+   {
+    "category": "transport",
+    "budget": null,
+    "actual": "1878",
+    "remaining": null,
+    "over": false
+   },
+   {
+    "category": "food",
+    "budget": "3500",
+    "actual": "9000",
+    "remaining": "-5500",
+    "over": true
+   },
+   {
+    "category": "shopping",
+    "budget": null,
+    "actual": "3200",
+    "remaining": null,
+    "over": false
+   }
+  ],
+  "by_day": [
+   {
+    "local_date": "2026-11-01",
+    "budget": "20000",
+    "actual": "10000",
+    "remaining": "10000",
+    "over": false
+   }
+  ],
+  "undated_actual": "4078",
+  "my_budget": null,
+  "unconverted_expenses": 1,
+  "members": [
+   {
+    "user_id": "3a21136f-6197-4da3-91c3-8eff4ba07b66",
+    "name": "user_6bde14fc28",
+    "is_member": true,
+    "is_me": true,
+    "paid": "3200",
+    "owed": "6200",
+    "settled_out": "3000",
+    "settled_in": "0",
+    "net": "0"
+   },
+   {
+    "user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "name": "user_46856db6c2",
+    "is_member": true,
+    "is_me": false,
+    "paid": "1878",
+    "owed": "3627",
+    "settled_out": "0",
+    "settled_in": "0",
+    "net": "-1749"
+   },
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "is_me": false,
+    "paid": "9000",
+    "owed": "4251",
+    "settled_out": "0",
+    "settled_in": "3000",
+    "net": "1749"
+   }
+  ],
+  "transfers": [
+   {
+    "from_user_id": "e24d8c4b-0a47-4787-9673-0575c28ba362",
+    "from_name": "user_46856db6c2",
+    "to_user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "to_name": "user_531e676476",
+    "amount": "1749"
+   }
+  ],
+  "is_settled": false
+ },
+ "budget_list_other": [
+  {
+   "id": "40e7007f-776d-4972-a12e-308de0d44b56",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "total",
+   "category": null,
+   "local_date": null,
+   "is_private": false,
+   "amount": "50000",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 1,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "f6efe77c-ef50-43b2-9740-7f7bea199597",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "category",
+   "category": "food",
+   "local_date": null,
+   "is_private": false,
+   "amount": "3500",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 2,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  },
+  {
+   "id": "a9e655ec-2aec-413e-873b-fec2431d3026",
+   "plan_id": "4dc78a9b-b732-48fa-91e7-2a29f800b7f3",
+   "kind": "day",
+   "category": null,
+   "local_date": "2026-11-01",
+   "is_private": false,
+   "amount": "20000",
+   "currency": "JPY",
+   "visibility": "full",
+   "note": null,
+   "revision": 1,
+   "updated_at": "2026-10-02T09:25:32.136745+00:00"
+  }
+ ],
+ "finance_summary_empty": {
+  "plan_id": "65bc677d-84cc-4c13-b90e-3341c3ebfac1",
+  "algorithm_version": "finance-v1",
+  "base_currency": "JPY",
+  "total": {
+   "budget": null,
+   "actual": "0",
+   "remaining": null,
+   "over": false
+  },
+  "tax_total": "0",
+  "fee_total": "0",
+  "refund_total": "0",
+  "reserved": {
+   "total": "0",
+   "unconverted": 0
+  },
+  "by_category": [],
+  "by_day": [],
+  "undated_actual": "0",
+  "my_budget": null,
+  "unconverted_expenses": 0,
+  "members": [
+   {
+    "user_id": "77e7a019-0df8-4db4-95dd-29e2f309a801",
+    "name": "user_531e676476",
+    "is_member": true,
+    "is_me": true,
+    "paid": "0",
+    "owed": "0",
+    "settled_out": "0",
+    "settled_in": "0",
+    "net": "0"
+   }
+  ],
+  "transfers": [],
+  "is_settled": true
+ }
 }

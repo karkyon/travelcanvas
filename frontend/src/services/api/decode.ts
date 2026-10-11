@@ -49,6 +49,12 @@ export const int: Decoder<number> = (v, path) =>
 export const nonNegativeInt: Decoder<number> = (v, path) =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fail(path, '0以上の整数');
 
+/** [Gate P2] 正規表現に一致する文字列(金額の文字列など)。 */
+export const matching =
+  (re: RegExp, expected: string): Decoder<string> =>
+  (v, path) =>
+    typeof v === 'string' && re.test(v) ? v : fail(path, expected);
+
 export const bool: Decoder<boolean> = (v, path) => (typeof v === 'boolean' ? v : fail(path, '真偽値'));
 
 /**

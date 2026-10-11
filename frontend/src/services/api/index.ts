@@ -8,6 +8,7 @@
 import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
+import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
 
@@ -259,5 +260,26 @@ export const updatePreparationTask = (planId: string, taskId: string, data: Prep
 export const deletePreparationTask = (planId: string, taskId: string, ifMatch: number) =>
   api.deletePreparationTask(planId, taskId, ifMatch);
 export const getReadiness = (planId: string) => api.getReadiness(planId);
+
+// ===== [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028) =====
+export const getFinanceSettings = (planId: string) => api.getFinanceSettings(planId);
+export const updateFinanceSettings = (planId: string, baseCurrency: string, ifMatch: number) =>
+  api.updateFinanceSettings(planId, baseCurrency, ifMatch);
+export const getBudgets = (planId: string) => api.getBudgets(planId);
+export const createBudget = (planId: string, data: BudgetCreateData) => api.createBudget(planId, data);
+export const updateBudget = (planId: string, budgetId: string, data: { amount?: string; note?: string | null }, ifMatch: number) =>
+  api.updateBudget(planId, budgetId, data, ifMatch);
+export const deleteBudget = (planId: string, budgetId: string, ifMatch: number) => api.deleteBudget(planId, budgetId, ifMatch);
+export const getExpenses = (planId: string) => api.getExpenses(planId);
+export const createExpense = (planId: string, data: ExpenseCreateData) => api.createExpense(planId, data);
+export const updateExpense = (planId: string, expenseId: string, data: ExpenseUpdateData, ifMatch: number) =>
+  api.updateExpense(planId, expenseId, data, ifMatch);
+export const deleteExpense = (planId: string, expenseId: string, ifMatch: number) =>
+  api.deleteExpense(planId, expenseId, ifMatch);
+export const getSettlements = (planId: string) => api.getSettlements(planId);
+export const createSettlement = (planId: string, data: SettlementCreateData) => api.createSettlement(planId, data);
+export const deleteSettlement = (planId: string, settlementId: string, ifMatch: number) =>
+  api.deleteSettlement(planId, settlementId, ifMatch);
+export const getFinanceSummary = (planId: string) => api.getFinanceSummary(planId);
 
 export default api;

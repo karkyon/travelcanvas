@@ -21,6 +21,7 @@ import {
   validationRunDetail, validationRunSummary, deletedPlanSummary, planDeleteResult, planPurgeResult,
   collaboratorRemoveResult, itemDeleteResult, lockedRelationError, routeOptionDeleteResult, undoConflictError,
   packingItem, packingSuggestions, planMember, preparationTask, readiness,
+  budget, expense, financeSettings, financeSummary, settlement,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -148,6 +149,28 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['preparation_task_deleted', revisionResult],
   ['readiness_attention', readiness],
   ['readiness_ready', readiness],
+  // ----- [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)。*_otherは閲覧者(個人の予算が見えない)から見た応答
+  ['finance_settings_default', financeSettings],
+  ['finance_settings_updated', financeSettings],
+  ['budget_total', budget],
+  ['budget_category', budget],
+  ['budget_member', budget],
+  ['budget_updated', budget],
+  ['budget_list', arrayOf(budget)],
+  ['budget_list_other', arrayOf(budget)],
+  ['expense_equal', expense],
+  ['expense_foreign', expense],
+  ['expense_unconverted', expense],
+  ['expense_refund', expense],
+  ['expense_updated', expense],
+  ['expense_deleted', revisionResult],
+  ['expense_list', arrayOf(expense)],
+  ['finance_summary', financeSummary],
+  ['finance_summary_other', financeSummary],
+  ['finance_summary_empty', financeSummary],
+  ['settlement_created', settlement],
+  ['settlement_list', arrayOf(settlement)],
+  ['settlement_deleted', revisionResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

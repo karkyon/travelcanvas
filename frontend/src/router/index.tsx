@@ -42,6 +42,7 @@ const SegmentsPage = lazyPage(() => import('@/pages/SegmentsPage'));
 const RouteOptionsPage = lazyPage(() => import('@/pages/RouteOptionsPage'));
 const ConstraintsPage = lazyPage(() => import('@/pages/ConstraintsPage'));
 const PreparationPage = lazyPage(() => import('@/pages/PreparationPage'));
+const ExpensesPage = lazyPage(() => import('@/pages/ExpensesPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -205,6 +206,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <PreparationPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 💴 [Gate P2] 予算・費用・立替精算(FR-027/FR-028)。
+      {
+        path: 'planner/:planId/expenses',
+        element: (
+          <ProtectedRoute>
+            <ExpensesPage />
           </ProtectedRoute>
         ),
       },

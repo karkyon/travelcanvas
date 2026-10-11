@@ -1813,3 +1813,194 @@ class PreparationTask(Base):
             postgresql_where=text("deleted_at IS NULL AND readiness_key IS NOT NULL"),
         ),
     )
+
+
+# ==========================================================================
+# [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)
+# ==========================================================================
+# DOC-05 §8.6 budgets / expenses / expense_shares / settlements。金額はNumeric(Decimal)と
+# ISO 4217通貨コードで保持し(NFR-006)、丸め差は分担行の rounding_adjustment に明示する。
+# 換算レートは利用者が入力する(外部の為替providerは未接続)。レートの無い外貨の支出は
+# 基準通貨へ換算せず(base_amount NULL)、集計から除外したことを件数で示す(EX-013)。
+
+class PlanFinanceSettings(Base):
+    """[Gate P2] プランの基準通貨(予算・集計・精算の通貨)。行が無ければJPYとして扱う。"""
+    __tablename__ = "plan_finance_settings"
+
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True,
+    )
+    base_currency = Column(String(3), nullable=False, default="JPY")
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("base_currency ~ '^[A-Z]{3}$'", name="ck_plan_finance_settings_currency"),
+    )
+
+
+class Budget(Base):
+    """[Gate P2] 予算。kind=total(旅行全体)/category(カテゴリ別)/day(日別)/member(個人)。
+
+    個人の予算(FC-055 個人の秘匿上限)は本人だけに見え、金額を amount_ciphertext だけに保存する
+    (DOC-05 §19 budgets.private_limit = R、本人)。それ以外は基準通貨の amount を平文で持つ。
+    """
+    __tablename__ = "budgets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind = Column(String(8), nullable=False)
+    category = Column(String(20), nullable=True)
+    local_date = Column(Date, nullable=True)
+    member_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    amount = Column(Numeric(18, 2), nullable=True)
+    amount_ciphertext = Column(LargeBinary, nullable=True)
+    note = Column(String(200), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('total','category','day','member')", name="ck_budgets_kind"),
+        CheckConstraint(
+            "(kind = 'total' AND category IS NULL AND local_date IS NULL AND member_user_id IS NULL)"
+            " OR (kind = 'category' AND category IS NOT NULL AND local_date IS NULL AND member_user_id IS NULL)"
+            " OR (kind = 'day' AND category IS NULL AND local_date IS NOT NULL AND member_user_id IS NULL)"
+            " OR (kind = 'member' AND category IS NULL AND local_date IS NULL AND member_user_id IS NOT NULL)",
+            name="ck_budgets_kind_target",
+        ),
+        CheckConstraint(
+            "(kind = 'member' AND amount IS NULL AND amount_ciphertext IS NOT NULL)"
+            " OR (kind <> 'member' AND amount IS NOT NULL AND amount >= 0 AND amount_ciphertext IS NULL)",
+            name="ck_budgets_amount",
+        ),
+        Index("ix_budgets_plan_deleted", "plan_id", "deleted_at"),
+    )
+
+
+class Expense(Base):
+    """[Gate P2] 支出(実費)または返金。返金(kind=refund)は元の支出を参照し、集計では差し引く。
+
+    amount は支出した通貨(currency)の金額(税・手数料込み)。tax_amount / fee_amount は内訳。
+    fx_rate は 1 currency あたりの基準通貨額(利用者入力)。base_amount = amount × fx_rate を
+    基準通貨の最小単位へ丸めた値で、換算できない(レート未入力の外貨)場合はNULL。
+    関連する予約・予定・領収書(文書)は外部キーにしない(個別削除を妨げないため。表示時に存在を確認する)。
+    """
+    __tablename__ = "expenses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind = Column(String(7), nullable=False, default="expense")
+    refund_of_expense_id = Column(
+        UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=True,
+    )
+    title = Column(String(200), nullable=False)
+    category = Column(String(20), nullable=False, default="other")
+    local_date = Column(Date, nullable=True)
+    amount = Column(Numeric(18, 2), nullable=False)
+    currency = Column(String(3), nullable=False)
+    tax_amount = Column(Numeric(18, 2), nullable=True)
+    fee_amount = Column(Numeric(18, 2), nullable=True)
+    fx_rate = Column(Numeric(18, 8), nullable=True)
+    fx_source = Column(String(100), nullable=True)
+    fx_date = Column(Date, nullable=True)
+    base_amount = Column(Numeric(18, 2), nullable=True)
+    paid_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    split_method = Column(String(6), nullable=False, default="equal")
+    related_type = Column(String(20), nullable=True)
+    related_id = Column(UUID(as_uuid=True), nullable=True)
+    receipt_document_id = Column(UUID(as_uuid=True), nullable=True)
+    note = Column(String(500), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    shares = relationship(
+        "ExpenseShare", back_populates="expense", cascade="all, delete-orphan", passive_deletes=True,
+        order_by="ExpenseShare.sort_order",
+    )
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('expense','refund')", name="ck_expenses_kind"),
+        CheckConstraint("(kind = 'refund') = (refund_of_expense_id IS NOT NULL)", name="ck_expenses_refund_ref"),
+        CheckConstraint("amount >= 0", name="ck_expenses_amount"),
+        CheckConstraint("tax_amount IS NULL OR (tax_amount >= 0 AND tax_amount <= amount)", name="ck_expenses_tax"),
+        CheckConstraint("fee_amount IS NULL OR (fee_amount >= 0 AND fee_amount <= amount)", name="ck_expenses_fee"),
+        CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_expenses_currency"),
+        CheckConstraint("fx_rate IS NULL OR fx_rate > 0", name="ck_expenses_fx_rate"),
+        CheckConstraint("(fx_rate IS NULL) = (base_amount IS NULL)", name="ck_expenses_base_amount"),
+        CheckConstraint(
+            "category IN ('lodging','transport','food','activity','shopping','fee','cancellation','other')",
+            name="ck_expenses_category",
+        ),
+        CheckConstraint("split_method IN ('equal','ratio','amount','none')", name="ck_expenses_split_method"),
+        CheckConstraint(
+            "related_type IS NULL OR related_type IN ('event','reservation','segment')",
+            name="ck_expenses_related_type",
+        ),
+        CheckConstraint("(related_type IS NULL) = (related_id IS NULL)", name="ck_expenses_related_pair"),
+        Index("ix_expenses_plan_deleted", "plan_id", "deleted_at"),
+    )
+
+
+class ExpenseShare(Base):
+    """[Gate P2] 支出の負担者ごとの負担額。合計は支出額と必ず一致する(丸め差は rounding_adjustment に明示)。"""
+    __tablename__ = "expense_shares"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    expense_id = Column(UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    weight = Column(Numeric(12, 4), nullable=True)
+    share_amount = Column(Numeric(18, 2), nullable=False)
+    base_share_amount = Column(Numeric(18, 2), nullable=True)
+    rounding_adjustment = Column(Numeric(18, 2), nullable=False, default=0, server_default="0")
+
+    expense = relationship("Expense", back_populates="shares")
+
+    __table_args__ = (
+        UniqueConstraint("expense_id", "user_id", name="uq_expense_shares_expense_user"),
+        CheckConstraint("share_amount >= 0", name="ck_expense_shares_amount"),
+        CheckConstraint("base_share_amount IS NULL OR base_share_amount >= 0", name="ck_expense_shares_base"),
+        CheckConstraint("weight IS NULL OR weight > 0", name="ck_expense_shares_weight"),
+        Index("ix_expense_shares_expense", "expense_id", "sort_order"),
+    )
+
+
+class Settlement(Base):
+    """[Gate P2] メンバー間の精算(from が to へ基準通貨で支払った記録)。"""
+    __tablename__ = "settlements"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    from_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    amount = Column(Numeric(18, 2), nullable=False)
+    currency = Column(String(3), nullable=False)
+    settled_on = Column(Date, nullable=True)
+    note = Column(String(200), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_settlements_amount"),
+        CheckConstraint("from_user_id <> to_user_id", name="ck_settlements_parties"),
+        CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_settlements_currency"),
+        Index("ix_settlements_plan_deleted", "plan_id", "deleted_at"),
+    )
