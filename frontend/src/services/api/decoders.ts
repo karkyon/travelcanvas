@@ -37,6 +37,7 @@ import type {
   PlanComment, Poll, PollOption, PollVote,
   Booklet, BookletExport, BookletIncludes,
   RetentionInfo,
+  Branch, BranchAssumptions, BranchDetail,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1170,4 +1171,50 @@ export const retentionInfo: Decoder<RetentionInfo> = object<RetentionInfo>({
     period: str,
     note: str,
   })),
+});
+
+// ----- [Gate P7] What-if・旅程ブランチ(FR-019)。backend/app/api/v1/branches.py の応答(branch-v1)。
+// 採用できない理由(conflicts)と状態を誤ると、本案を壊す採用ボタンを出してしまうため、列挙値を厳密に検査する。
+const BRANCH_SCENARIOS = ['rain', 'delay', 'absence', 'budget', 'fatigue', 'custom'] as const;
+const branchShape = {
+  id: str,
+  plan_id: str,
+  algorithm_version: str,
+  title: str,
+  scenario_type: oneOf(...BRANCH_SCENARIOS),
+  // 想定の値は作成時にbackendが検証済み。画面は既知の項目だけを読む
+  assumptions: record as Decoder<BranchAssumptions>,
+  base_revision: int,
+  plan_revision: int,
+  plan_changed_since_base: bool,
+  status: oneOf('draft', 'adopted', 'discarded'),
+  state: oneOf('draft', 'adopted', 'discarded', 'adopted_undone'),
+  created_by_name: str,
+  adopted_at: nullable(str),
+  adopted_by_name: nullable(str),
+  summary: object({ added: nonNegativeInt, removed: nonNegativeInt, updated: nonNegativeInt, time_changed: nonNegativeInt }),
+  can_edit: bool,
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+};
+export const branch: Decoder<Branch> = object<Branch>(branchShape);
+
+export const branchDetail: Decoder<BranchDetail> = object<BranchDetail>({
+  ...branchShape,
+  days: arrayOf(object({ id: str, local_date: str, timezone_id: str, title: nullable(str) })),
+  content: arrayOf(object({
+    key: str, source_event_id: nullable(str), day_id: str, title: str, event_type: str,
+    local_start_time: nullable(str), is_all_day: bool, sort_order: int, locked: bool, removed: bool, note: nullable(str),
+  })),
+  ops: arrayOf(object({
+    op: oneOf('add', 'remove', 'update'), event_id: optional(str), key: optional(str), title: optional(str),
+    fields: optional(record), before: optional(record),
+  })),
+  conflicts: arrayOf(object({
+    op: oneOf('add', 'remove', 'update'), event_id: optional(str), key: optional(str), title: optional(str),
+    reason: oneOf('changed_in_plan', 'deleted_in_plan', 'locked', 'has_relations', 'day_missing'),
+    fields: optional(arrayOf(str)),
+  })),
+  day_counts: arrayOf(object({ day_id: str, local_date: str, plan: nonNegativeInt, branch: nonNegativeInt })),
 });

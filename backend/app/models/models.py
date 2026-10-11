@@ -2185,3 +2185,47 @@ class BookletExport(Base):
         ),
         CheckConstraint("version_no >= 1", name="ck_booklet_exports_version_no"),
     )
+
+
+class ItineraryBranch(Base):
+    """[Gate P7] What-if・旅程ブランチ(FR-019、DOC-05 §7.6 itinerary_branches)。
+
+    本案(正本の予定)を壊さずに、雨天・遅延・欠席・予算・体力などの想定で予定を組み替えた案を保存する。
+    base_snapshot は作成時点の本案の予定、content は分岐案の予定。採用時は
+    「分岐案での変更(base_snapshot→content の差分)」を現在の本案へ1つの変更セットとして適用する(Undo可能)。
+    """
+    __tablename__ = "itinerary_branches"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    scenario_type = Column(String(10), nullable=False, default="custom")
+    assumptions = Column(JSON, nullable=False)
+    base_revision = Column(Integer, nullable=False)
+    base_snapshot = Column(JSON, nullable=False)
+    content = Column(JSON, nullable=False)
+    status = Column(String(9), nullable=False, default="draft")
+    adopted_change_set_id = Column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
+    )
+    adopted_at = Column(DateTime(timezone=True), nullable=True)
+    adopted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "scenario_type IN ('rain','delay','absence','budget','fatigue','custom')",
+            name="ck_itinerary_branches_scenario",
+        ),
+        CheckConstraint("status IN ('draft','adopted','discarded')", name="ck_itinerary_branches_status"),
+        CheckConstraint("(status = 'adopted') = (adopted_at IS NOT NULL)", name="ck_itinerary_branches_adopted_at"),
+        CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="ck_itinerary_branches_title"),
+        Index("ix_itinerary_branches_plan_deleted", "plan_id", "deleted_at"),
+    )

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import fx from './__fixtures__/backendContractResponses.json';
-import { arrayOf, decodeResponse, object, ApiDecodeError, type Decoder } from './decode';
+import { arrayOf, decodeResponse, int, object, ApiDecodeError, type Decoder } from './decode';
 import {
   adoptRouteOptionResponse, documentLink, downloadUrlResult, extractionCandidate, importJob, importJobDetail,
   reservation, reservationEventLink, reservationParticipant, reservationRevealResult, routeLeg, routeOption,
@@ -25,6 +25,7 @@ import {
   planComment, poll,
   booklet, bookletExport,
   retentionInfo,
+  branch, branchDetail,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -201,6 +202,15 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['booklet_export_list_editor', arrayOf(bookletExport)],
   // ----- [Gate P6] データポータビリティ(FR-039)。保持期間の説明(エクスポート本体はファイルのため対象外)
   ['retention_info', retentionInfo],
+  // ----- [Gate P7] What-if・旅程ブランチ(FR-019)。*_viewer は閲覧者から見た一覧
+  ['branch_created_delay', branchDetail],
+  ['branch_content_saved', branchDetail],
+  ['branch_conflicted', branchDetail],
+  ['branch_adopted', object({ branch: branchDetail, plan_revision: int })],
+  ['branch_discarded', branchDetail],
+  ['branch_deleted', revisionResult],
+  ['branch_list', arrayOf(branch)],
+  ['branch_list_viewer', arrayOf(branch)],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

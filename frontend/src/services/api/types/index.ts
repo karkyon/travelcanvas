@@ -28,3 +28,4 @@ export * from './discussion';
 export * from './booklet';
 export * from './itineraryExport';
 export * from './dataExport';
+export * from './branches';

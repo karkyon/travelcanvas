@@ -11,6 +11,7 @@ import type { TravelPlan, User } from '@/types';
 import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateData, VoteInput } from './types';
 import type { BookletExportCreateData, BookletOptions } from './types';
 import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
+import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -319,5 +320,16 @@ export const downloadItineraryExport = (planId: string, format: ItineraryExportF
 export const getRetentionInfo = () => api.getRetentionInfo();
 export const downloadPlanDataExport = (planId: string) => api.downloadPlanDataExport(planId);
 export const downloadAccountDataExport = () => api.downloadAccountDataExport();
+
+// ===== [Gate P7] What-if・旅程ブランチ(FR-019) =====
+export const getBranches = (planId: string) => api.getBranches(planId);
+export const createBranch = (planId: string, data: BranchCreateData) => api.createBranch(planId, data);
+export const getBranch = (planId: string, branchId: string) => api.getBranch(planId, branchId);
+export const updateBranchContent = (planId: string, branchId: string, events: BranchContentInput[], revision: number) =>
+  api.updateBranchContent(planId, branchId, events, revision);
+export const updateBranch = (planId: string, branchId: string, data: BranchUpdateData, revision: number) =>
+  api.updateBranch(planId, branchId, data, revision);
+export const adoptBranch = (planId: string, branchId: string, revision: number) => api.adoptBranch(planId, branchId, revision);
+export const deleteBranch = (planId: string, branchId: string, revision: number) => api.deleteBranch(planId, branchId, revision);
 
 export default api;

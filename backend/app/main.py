@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation, finance, discussion, booklet, itinerary_export, data_export,
+    validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -388,3 +388,5 @@ app.include_router(itinerary_export.router, prefix="/api/v1")
 # [Gate P6] FR-039データポータビリティ。/plans/{plan_id}/data-export、/privacy/data-export・retention。
 app.include_router(data_export.plans_router, prefix="/api/v1")
 app.include_router(data_export.privacy_router, prefix="/api/v1")
+# [Gate P7] FR-019 What-if・旅程ブランチ。/plans/{plan_id}/branches配下。
+app.include_router(branches.router, prefix="/api/v1")

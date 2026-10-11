@@ -48,6 +48,8 @@ const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
 const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
 const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
+const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
+const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -259,6 +261,24 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ExportsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 🔀 [Gate P7] もしもの案(What-if・旅程ブランチ、FR-019)。
+      {
+        path: 'planner/:planId/branches',
+        element: (
+          <ProtectedRoute>
+            <BranchesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'planner/:planId/branches/:branchId',
+        element: (
+          <ProtectedRoute>
+            <BranchDetailPage />
           </ProtectedRoute>
         ),
       },
