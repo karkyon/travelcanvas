@@ -8,6 +8,7 @@
 import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
+import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateData, VoteInput } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -281,5 +282,23 @@ export const createSettlement = (planId: string, data: SettlementCreateData) => 
 export const deleteSettlement = (planId: string, settlementId: string, ifMatch: number) =>
   api.deleteSettlement(planId, settlementId, ifMatch);
 export const getFinanceSummary = (planId: string) => api.getFinanceSummary(planId);
+
+// ===== [Gate P3] 合意形成(FR-022)・コメント(FR-024) =====
+export const getPolls = (planId: string) => api.getPolls(planId);
+export const createPoll = (planId: string, data: PollCreateData) => api.createPoll(planId, data);
+export const updatePoll = (planId: string, pollId: string, data: PollUpdateData, ifMatch: number) =>
+  api.updatePoll(planId, pollId, data, ifMatch);
+export const deletePoll = (planId: string, pollId: string, ifMatch: number) => api.deletePoll(planId, pollId, ifMatch);
+export const putVotes = (planId: string, pollId: string, votes: VoteInput[]) => api.putVotes(planId, pollId, votes);
+export const resolveVote = (planId: string, pollId: string, voteId: string, resolved: boolean, note?: string) =>
+  api.resolveVote(planId, pollId, voteId, resolved, note);
+export const getComments = (planId: string, target?: { type: CommentTargetType; id?: string }) =>
+  api.getComments(planId, target);
+export const createComment = (planId: string, data: CommentCreateData) => api.createComment(planId, data);
+export const updateComment = (
+  planId: string, commentId: string, data: { body?: string; status?: 'open' | 'resolved' }, ifMatch: number
+) => api.updateComment(planId, commentId, data, ifMatch);
+export const deleteComment = (planId: string, commentId: string, ifMatch: number) =>
+  api.deleteComment(planId, commentId, ifMatch);
 
 export default api;

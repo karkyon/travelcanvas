@@ -24,3 +24,4 @@ export * from './planTrash';
 export * from './itemDeletion';
 export * from './preparation';
 export * from './finance';
+export * from './discussion';

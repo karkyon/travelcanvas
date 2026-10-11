@@ -2004,3 +2004,132 @@ class Settlement(Base):
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_settlements_currency"),
         Index("ix_settlements_plan_deleted", "plan_id", "deleted_at"),
     )
+
+
+# ==========================================================================
+# [Gate P3] 合意形成(FR-022)・コメント(FR-024)
+# ==========================================================================
+# DOC-05 §8.4 votes / concerns / comments。投票は「選択肢ごとに Love/OK/懸念/不可/棄権」を
+# メンバーが1票ずつ入れる。懸念・不可は理由を必須にし、解決(resolved_at)の履歴を持つ(FC-066)。
+# 対象(予定など)は外部キーにしない(予定の個別削除(B-013)を妨げないため。表示時に存在を確認する)。
+
+class Poll(Base):
+    """[Gate P3] 投票(候補の比較・決定)。veto_policy で「不可」の扱いを旅行ごとに決める(拒否権の濫用対策)。"""
+    __tablename__ = "polls"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(String(1000), nullable=True)
+    deadline_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(6), nullable=False, default="open")
+    # block: 不可1票で不成立(理由必須) / block_with_alternative: 不可には理由と代替案が必須 /
+    # advisory: 不可も参考意見として扱い、不成立にしない
+    veto_policy = Column(String(24), nullable=False, default="block")
+    is_anonymous = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    decided_option_id = Column(UUID(as_uuid=True), nullable=True)
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    options = relationship(
+        "PollOption", back_populates="poll", cascade="all, delete-orphan", passive_deletes=True,
+        order_by="PollOption.sort_order",
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN ('open','closed')", name="ck_polls_status"),
+        CheckConstraint("(status = 'closed') = (closed_at IS NOT NULL)", name="ck_polls_closed_at"),
+        CheckConstraint(
+            "veto_policy IN ('block','block_with_alternative','advisory')", name="ck_polls_veto_policy",
+        ),
+        Index("ix_polls_plan_deleted", "plan_id", "deleted_at"),
+    )
+
+
+class PollOption(Base):
+    """[Gate P3] 投票の選択肢。予定(event_id)を候補にする場合は外部キーにせず、表示時に存在を確認する。"""
+    __tablename__ = "poll_options"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    poll_id = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    label = Column(String(200), nullable=False)
+    event_id = Column(UUID(as_uuid=True), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    poll = relationship("Poll", back_populates="options")
+
+    __table_args__ = (Index("ix_poll_options_poll", "poll_id", "sort_order"),)
+
+
+class Vote(Base):
+    """[Gate P3] 選択肢へのメンバーの回答。懸念・不可は理由必須で、解決の記録を持つ(FC-066)。"""
+    __tablename__ = "votes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    poll_id = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    option_id = Column(UUID(as_uuid=True), ForeignKey("poll_options.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    value = Column(String(8), nullable=False)
+    reason = Column(String(500), nullable=True)
+    alternative = Column(String(200), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    resolution_note = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("option_id", "user_id", name="uq_votes_option_user"),
+        CheckConstraint("value IN ('love','ok','concern','veto','abstain')", name="ck_votes_value"),
+        CheckConstraint(
+            "value NOT IN ('concern','veto') OR reason IS NOT NULL", name="ck_votes_reason_required",
+        ),
+        CheckConstraint(
+            "resolved_at IS NULL OR value IN ('concern','veto')", name="ck_votes_resolution_kind",
+        ),
+        Index("ix_votes_poll", "poll_id"),
+    )
+
+
+class Comment(Base):
+    """[Gate P3] コメント(FR-024)。プラン・予定・予約・投票・支出に付ける。返信はparent_idでつなぐ。
+
+    削除は論理削除で、スレッドの形を保つため本文だけを返さなくする。メンションした相手には、本文を含まない通知を送る
+    (通知本文に予約番号や健康情報を含めない)。
+    """
+    __tablename__ = "comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    target_type = Column(String(12), nullable=False, default="plan")
+    target_id = Column(UUID(as_uuid=True), nullable=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    body = Column(Text, nullable=False)
+    mentions = Column(JSON(none_as_null=True), nullable=True)
+    status = Column(String(8), nullable=False, default="open")
+    edited_at = Column(DateTime(timezone=True), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "target_type IN ('plan','event','reservation','poll','expense')", name="ck_comments_target_type",
+        ),
+        CheckConstraint("(target_type = 'plan') = (target_id IS NULL)", name="ck_comments_target_id"),
+        CheckConstraint("status IN ('open','resolved')", name="ck_comments_status"),
+        CheckConstraint("char_length(body) BETWEEN 1 AND 2000", name="ck_comments_body_length"),
+        Index("ix_comments_plan_target", "plan_id", "target_type", "target_id"),
+    )

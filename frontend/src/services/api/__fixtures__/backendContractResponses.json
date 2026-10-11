@@ -10,7 +10,8 @@
   "captured_at_head_b012": "d8a217ce5781a5dccadb8762e6f56a103505923d (+Gate B-012: plan_soft_deleted/deleted_plan_list/plan_restored/plan_purged 削除済みプランAPIの実応答)",
   "captured_at_head_b013": "5b8cd6bf2bc9ecfe8f857e147a1baed15fcfe84e (+Gate B-013: 予定・日程・採用済み経路候補・共同編集者の個別削除の実応答(detached)、確定ロック409(locked_relation)、Undo競合409(undo_conflict))",
   "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 packing-items/preparation-tasks/readiness/members)",
-  "captured_at_head_p2": "Gate P1 (+Gate P2 finance-settings/budgets/expenses/settlements/finance-summary)"
+  "captured_at_head_p2": "Gate P1 (+Gate P2 finance-settings/budgets/expenses/settlements/finance-summary)",
+  "captured_at_head_p3": "Gate P2 (+Gate P3 polls/votes/comments)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -4454,5 +4455,1230 @@
   ],
   "transfers": [],
   "is_settled": true
- }
+ },
+ "poll_created": {
+  "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "algorithm_version": "consensus-v1",
+  "title": "2日目の夕食",
+  "description": "候補から選ぶ",
+  "deadline_at": "2030-01-01T03:00:00+00:00",
+  "status": "open",
+  "is_closed": false,
+  "veto_policy": "block",
+  "is_anonymous": false,
+  "counts_hidden": false,
+  "state": "voting",
+  "decided_option_id": null,
+  "created_by_name": "user_ad191ae911",
+  "can_manage": true,
+  "unanswered": [
+   {
+    "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+    "name": "user_90e408eed0"
+   },
+   {
+    "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+    "name": "user_ad191ae911"
+   },
+   {
+    "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+    "name": "user_dbd631cb4d"
+   }
+  ],
+  "options": [
+   {
+    "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+    "label": "寿司",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "pending",
+    "score": 0,
+    "counts": {
+     "love": 0,
+     "ok": 0,
+     "concern": 0,
+     "veto": 0,
+     "abstain": 0
+    },
+    "responders": 0,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 0,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": null,
+    "votes": []
+   },
+   {
+    "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+    "label": "焼肉",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "pending",
+    "score": 0,
+    "counts": {
+     "love": 0,
+     "ok": 0,
+     "concern": 0,
+     "veto": 0,
+     "abstain": 0
+    },
+    "responders": 0,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 0,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": null,
+    "votes": []
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "poll_voted": {
+  "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "algorithm_version": "consensus-v1",
+  "title": "2日目の夕食",
+  "description": "候補から選ぶ",
+  "deadline_at": "2030-01-01T03:00:00+00:00",
+  "status": "open",
+  "is_closed": false,
+  "veto_policy": "block",
+  "is_anonymous": false,
+  "counts_hidden": false,
+  "state": "needs_discussion",
+  "decided_option_id": null,
+  "created_by_name": "user_ad191ae911",
+  "can_manage": false,
+  "unanswered": [],
+  "options": [
+   {
+    "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+    "label": "寿司",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "blocked",
+    "score": 3,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 0,
+     "veto": 1,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 1,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": "veto",
+    "votes": [
+     {
+      "id": "0f5af522-2609-401c-900d-d3984027722c",
+      "is_mine": false,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "9001778d-5ebc-4758-bef3-98b10c691a1f",
+      "is_mine": true,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "veto",
+      "reason": "生魚が苦手",
+      "alternative": "天ぷら",
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": true
+     },
+     {
+      "id": "ca860426-3e7f-46fc-a4ce-d5698b12868c",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   },
+   {
+    "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+    "label": "焼肉",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "has_concerns",
+    "score": 2,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 1,
+     "veto": 0,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 1,
+    "unresolved_vetoes": 0,
+    "is_leading": true,
+    "is_decided": false,
+    "my_vote": "love",
+    "votes": [
+     {
+      "id": "2901ea99-96a1-4f8c-a4f7-676a2c4506fc",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "concern",
+      "reason": "前日も焼肉",
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "9c619179-671f-4a3a-9e79-b1d62890b7b5",
+      "is_mine": true,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "e5110d3a-00e3-4e32-a342-6a9e80d7e04b",
+      "is_mine": false,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "poll_resolved": {
+  "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "algorithm_version": "consensus-v1",
+  "title": "2日目の夕食",
+  "description": "候補から選ぶ",
+  "deadline_at": "2030-01-01T03:00:00+00:00",
+  "status": "open",
+  "is_closed": false,
+  "veto_policy": "block",
+  "is_anonymous": false,
+  "counts_hidden": false,
+  "state": "agreed",
+  "decided_option_id": null,
+  "created_by_name": "user_ad191ae911",
+  "can_manage": true,
+  "unanswered": [],
+  "options": [
+   {
+    "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+    "label": "寿司",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "blocked",
+    "score": 3,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 0,
+     "veto": 1,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 1,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": "love",
+    "votes": [
+     {
+      "id": "0f5af522-2609-401c-900d-d3984027722c",
+      "is_mine": true,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "9001778d-5ebc-4758-bef3-98b10c691a1f",
+      "is_mine": false,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "veto",
+      "reason": "生魚が苦手",
+      "alternative": "天ぷら",
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": true
+     },
+     {
+      "id": "ca860426-3e7f-46fc-a4ce-d5698b12868c",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   },
+   {
+    "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+    "label": "焼肉",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "agreed",
+    "score": 2,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 1,
+     "veto": 0,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 0,
+    "is_leading": true,
+    "is_decided": false,
+    "my_vote": "ok",
+    "votes": [
+     {
+      "id": "2901ea99-96a1-4f8c-a4f7-676a2c4506fc",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "concern",
+      "reason": "前日も焼肉",
+      "alternative": null,
+      "is_resolved": true,
+      "resolution_note": "前日は和食に変更",
+      "resolved_by_name": "user_ad191ae911",
+      "can_resolve": true
+     },
+     {
+      "id": "9c619179-671f-4a3a-9e79-b1d62890b7b5",
+      "is_mine": false,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "e5110d3a-00e3-4e32-a342-6a9e80d7e04b",
+      "is_mine": true,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "poll_decided": {
+  "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "algorithm_version": "consensus-v1",
+  "title": "2日目の夕食",
+  "description": "候補から選ぶ",
+  "deadline_at": "2030-01-01T03:00:00+00:00",
+  "status": "closed",
+  "is_closed": true,
+  "veto_policy": "block",
+  "is_anonymous": false,
+  "counts_hidden": false,
+  "state": "decided",
+  "decided_option_id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+  "created_by_name": "user_ad191ae911",
+  "can_manage": true,
+  "unanswered": [],
+  "options": [
+   {
+    "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+    "label": "寿司",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "blocked",
+    "score": 3,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 0,
+     "veto": 1,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 1,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": "love",
+    "votes": [
+     {
+      "id": "0f5af522-2609-401c-900d-d3984027722c",
+      "is_mine": true,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "9001778d-5ebc-4758-bef3-98b10c691a1f",
+      "is_mine": false,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "veto",
+      "reason": "生魚が苦手",
+      "alternative": "天ぷら",
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": true
+     },
+     {
+      "id": "ca860426-3e7f-46fc-a4ce-d5698b12868c",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   },
+   {
+    "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+    "label": "焼肉",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "agreed",
+    "score": 2,
+    "counts": {
+     "love": 1,
+     "ok": 1,
+     "concern": 1,
+     "veto": 0,
+     "abstain": 0
+    },
+    "responders": 3,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 0,
+    "is_leading": true,
+    "is_decided": true,
+    "my_vote": "ok",
+    "votes": [
+     {
+      "id": "2901ea99-96a1-4f8c-a4f7-676a2c4506fc",
+      "is_mine": false,
+      "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+      "name": "user_dbd631cb4d",
+      "value": "concern",
+      "reason": "前日も焼肉",
+      "alternative": null,
+      "is_resolved": true,
+      "resolution_note": "前日は和食に変更",
+      "resolved_by_name": "user_ad191ae911",
+      "can_resolve": true
+     },
+     {
+      "id": "9c619179-671f-4a3a-9e79-b1d62890b7b5",
+      "is_mine": false,
+      "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+      "name": "user_90e408eed0",
+      "value": "love",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     },
+     {
+      "id": "e5110d3a-00e3-4e32-a342-6a9e80d7e04b",
+      "is_mine": true,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "ok",
+      "reason": null,
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": false
+     }
+    ]
+   }
+  ],
+  "revision": 2,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "poll_anonymous_hidden": {
+  "id": "a7ea53eb-68b1-4c45-b492-836ac292b95e",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "algorithm_version": "consensus-v1",
+  "title": "集合時間",
+  "description": null,
+  "deadline_at": null,
+  "status": "open",
+  "is_closed": false,
+  "veto_policy": "advisory",
+  "is_anonymous": true,
+  "counts_hidden": true,
+  "state": "voting",
+  "decided_option_id": null,
+  "created_by_name": "user_ad191ae911",
+  "can_manage": true,
+  "unanswered": [
+   {
+    "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+    "name": "user_90e408eed0"
+   },
+   {
+    "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+    "name": "user_ad191ae911"
+   },
+   {
+    "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+    "name": "user_dbd631cb4d"
+   }
+  ],
+  "options": [
+   {
+    "id": "851955af-a53d-45bc-b787-4fad78cb8312",
+    "label": "9時",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "pending",
+    "score": null,
+    "counts": null,
+    "responders": 1,
+    "unresolved_concerns": 1,
+    "unresolved_vetoes": 0,
+    "is_leading": true,
+    "is_decided": false,
+    "my_vote": "concern",
+    "votes": [
+     {
+      "id": "46dc8cdc-31aa-42e4-9ea6-1aa717a84989",
+      "is_mine": true,
+      "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+      "name": "user_ad191ae911",
+      "value": "concern",
+      "reason": "早すぎる",
+      "alternative": null,
+      "is_resolved": false,
+      "resolution_note": null,
+      "resolved_by_name": null,
+      "can_resolve": true
+     }
+    ]
+   },
+   {
+    "id": "b3fbf6dd-2c5f-41be-88b1-d2b935e19a84",
+    "label": "10時",
+    "event_id": null,
+    "event_label": null,
+    "event_missing": false,
+    "state": "pending",
+    "score": null,
+    "counts": null,
+    "responders": 0,
+    "unresolved_concerns": 0,
+    "unresolved_vetoes": 0,
+    "is_leading": false,
+    "is_decided": false,
+    "my_vote": null,
+    "votes": []
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "poll_deleted": {
+  "message": "投票を削除しました",
+  "revision": 2
+ },
+ "poll_list": [
+  {
+   "id": "a7ea53eb-68b1-4c45-b492-836ac292b95e",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "algorithm_version": "consensus-v1",
+   "title": "集合時間",
+   "description": null,
+   "deadline_at": null,
+   "status": "open",
+   "is_closed": false,
+   "veto_policy": "advisory",
+   "is_anonymous": true,
+   "counts_hidden": true,
+   "state": "voting",
+   "decided_option_id": null,
+   "created_by_name": "user_ad191ae911",
+   "can_manage": true,
+   "unanswered": [
+    {
+     "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+     "name": "user_90e408eed0"
+    },
+    {
+     "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+     "name": "user_ad191ae911"
+    },
+    {
+     "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+     "name": "user_dbd631cb4d"
+    }
+   ],
+   "options": [
+    {
+     "id": "851955af-a53d-45bc-b787-4fad78cb8312",
+     "label": "9時",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "pending",
+     "score": null,
+     "counts": null,
+     "responders": 1,
+     "unresolved_concerns": 1,
+     "unresolved_vetoes": 0,
+     "is_leading": true,
+     "is_decided": false,
+     "my_vote": "concern",
+     "votes": [
+      {
+       "id": "46dc8cdc-31aa-42e4-9ea6-1aa717a84989",
+       "is_mine": true,
+       "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+       "name": "user_ad191ae911",
+       "value": "concern",
+       "reason": "早すぎる",
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": true
+      }
+     ]
+    },
+    {
+     "id": "b3fbf6dd-2c5f-41be-88b1-d2b935e19a84",
+     "label": "10時",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "pending",
+     "score": null,
+     "counts": null,
+     "responders": 0,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 0,
+     "is_leading": false,
+     "is_decided": false,
+     "my_vote": null,
+     "votes": []
+    }
+   ],
+   "revision": 1,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  },
+  {
+   "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "algorithm_version": "consensus-v1",
+   "title": "2日目の夕食",
+   "description": "候補から選ぶ",
+   "deadline_at": "2030-01-01T03:00:00+00:00",
+   "status": "closed",
+   "is_closed": true,
+   "veto_policy": "block",
+   "is_anonymous": false,
+   "counts_hidden": false,
+   "state": "decided",
+   "decided_option_id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+   "created_by_name": "user_ad191ae911",
+   "can_manage": true,
+   "unanswered": [],
+   "options": [
+    {
+     "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+     "label": "寿司",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "blocked",
+     "score": 3,
+     "counts": {
+      "love": 1,
+      "ok": 1,
+      "concern": 0,
+      "veto": 1,
+      "abstain": 0
+     },
+     "responders": 3,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 1,
+     "is_leading": false,
+     "is_decided": false,
+     "my_vote": "love",
+     "votes": [
+      {
+       "id": "0f5af522-2609-401c-900d-d3984027722c",
+       "is_mine": true,
+       "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+       "name": "user_ad191ae911",
+       "value": "love",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      },
+      {
+       "id": "9001778d-5ebc-4758-bef3-98b10c691a1f",
+       "is_mine": false,
+       "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+       "name": "user_90e408eed0",
+       "value": "veto",
+       "reason": "生魚が苦手",
+       "alternative": "天ぷら",
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": true
+      },
+      {
+       "id": "ca860426-3e7f-46fc-a4ce-d5698b12868c",
+       "is_mine": false,
+       "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+       "name": "user_dbd631cb4d",
+       "value": "ok",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      }
+     ]
+    },
+    {
+     "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+     "label": "焼肉",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "agreed",
+     "score": 2,
+     "counts": {
+      "love": 1,
+      "ok": 1,
+      "concern": 1,
+      "veto": 0,
+      "abstain": 0
+     },
+     "responders": 3,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 0,
+     "is_leading": true,
+     "is_decided": true,
+     "my_vote": "ok",
+     "votes": [
+      {
+       "id": "2901ea99-96a1-4f8c-a4f7-676a2c4506fc",
+       "is_mine": false,
+       "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+       "name": "user_dbd631cb4d",
+       "value": "concern",
+       "reason": "前日も焼肉",
+       "alternative": null,
+       "is_resolved": true,
+       "resolution_note": "前日は和食に変更",
+       "resolved_by_name": "user_ad191ae911",
+       "can_resolve": true
+      },
+      {
+       "id": "9c619179-671f-4a3a-9e79-b1d62890b7b5",
+       "is_mine": false,
+       "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+       "name": "user_90e408eed0",
+       "value": "love",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      },
+      {
+       "id": "e5110d3a-00e3-4e32-a342-6a9e80d7e04b",
+       "is_mine": true,
+       "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+       "name": "user_ad191ae911",
+       "value": "ok",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      }
+     ]
+    }
+   ],
+   "revision": 2,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  }
+ ],
+ "poll_list_viewer": [
+  {
+   "id": "a7ea53eb-68b1-4c45-b492-836ac292b95e",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "algorithm_version": "consensus-v1",
+   "title": "集合時間",
+   "description": null,
+   "deadline_at": null,
+   "status": "open",
+   "is_closed": false,
+   "veto_policy": "advisory",
+   "is_anonymous": true,
+   "counts_hidden": true,
+   "state": "voting",
+   "decided_option_id": null,
+   "created_by_name": "user_ad191ae911",
+   "can_manage": false,
+   "unanswered": [
+    {
+     "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+     "name": "user_90e408eed0"
+    },
+    {
+     "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+     "name": "user_ad191ae911"
+    },
+    {
+     "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+     "name": "user_dbd631cb4d"
+    }
+   ],
+   "options": [
+    {
+     "id": "851955af-a53d-45bc-b787-4fad78cb8312",
+     "label": "9時",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "pending",
+     "score": null,
+     "counts": null,
+     "responders": 1,
+     "unresolved_concerns": 1,
+     "unresolved_vetoes": 0,
+     "is_leading": true,
+     "is_decided": false,
+     "my_vote": null,
+     "votes": [
+      {
+       "id": "46dc8cdc-31aa-42e4-9ea6-1aa717a84989",
+       "is_mine": false,
+       "user_id": null,
+       "name": null,
+       "value": "concern",
+       "reason": "早すぎる",
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      }
+     ]
+    },
+    {
+     "id": "b3fbf6dd-2c5f-41be-88b1-d2b935e19a84",
+     "label": "10時",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "pending",
+     "score": null,
+     "counts": null,
+     "responders": 0,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 0,
+     "is_leading": false,
+     "is_decided": false,
+     "my_vote": null,
+     "votes": []
+    }
+   ],
+   "revision": 1,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  },
+  {
+   "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "algorithm_version": "consensus-v1",
+   "title": "2日目の夕食",
+   "description": "候補から選ぶ",
+   "deadline_at": "2030-01-01T03:00:00+00:00",
+   "status": "closed",
+   "is_closed": true,
+   "veto_policy": "block",
+   "is_anonymous": false,
+   "counts_hidden": false,
+   "state": "decided",
+   "decided_option_id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+   "created_by_name": "user_ad191ae911",
+   "can_manage": false,
+   "unanswered": [],
+   "options": [
+    {
+     "id": "b7c16918-163a-45a1-adf3-c14183c965ca",
+     "label": "寿司",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "blocked",
+     "score": 3,
+     "counts": {
+      "love": 1,
+      "ok": 1,
+      "concern": 0,
+      "veto": 1,
+      "abstain": 0
+     },
+     "responders": 3,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 1,
+     "is_leading": false,
+     "is_decided": false,
+     "my_vote": "veto",
+     "votes": [
+      {
+       "id": "0f5af522-2609-401c-900d-d3984027722c",
+       "is_mine": false,
+       "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+       "name": "user_ad191ae911",
+       "value": "love",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      },
+      {
+       "id": "9001778d-5ebc-4758-bef3-98b10c691a1f",
+       "is_mine": true,
+       "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+       "name": "user_90e408eed0",
+       "value": "veto",
+       "reason": "生魚が苦手",
+       "alternative": "天ぷら",
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": true
+      },
+      {
+       "id": "ca860426-3e7f-46fc-a4ce-d5698b12868c",
+       "is_mine": false,
+       "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+       "name": "user_dbd631cb4d",
+       "value": "ok",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      }
+     ]
+    },
+    {
+     "id": "f9a139cd-c360-4bd8-93f3-5850ea965ae0",
+     "label": "焼肉",
+     "event_id": null,
+     "event_label": null,
+     "event_missing": false,
+     "state": "agreed",
+     "score": 2,
+     "counts": {
+      "love": 1,
+      "ok": 1,
+      "concern": 1,
+      "veto": 0,
+      "abstain": 0
+     },
+     "responders": 3,
+     "unresolved_concerns": 0,
+     "unresolved_vetoes": 0,
+     "is_leading": true,
+     "is_decided": true,
+     "my_vote": "love",
+     "votes": [
+      {
+       "id": "2901ea99-96a1-4f8c-a4f7-676a2c4506fc",
+       "is_mine": false,
+       "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+       "name": "user_dbd631cb4d",
+       "value": "concern",
+       "reason": "前日も焼肉",
+       "alternative": null,
+       "is_resolved": true,
+       "resolution_note": "前日は和食に変更",
+       "resolved_by_name": "user_ad191ae911",
+       "can_resolve": false
+      },
+      {
+       "id": "9c619179-671f-4a3a-9e79-b1d62890b7b5",
+       "is_mine": true,
+       "user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+       "name": "user_90e408eed0",
+       "value": "love",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      },
+      {
+       "id": "e5110d3a-00e3-4e32-a342-6a9e80d7e04b",
+       "is_mine": false,
+       "user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+       "name": "user_ad191ae911",
+       "value": "ok",
+       "reason": null,
+       "alternative": null,
+       "is_resolved": false,
+       "resolution_note": null,
+       "resolved_by_name": null,
+       "can_resolve": false
+      }
+     ]
+    }
+   ],
+   "revision": 2,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  }
+ ],
+ "comment_created": {
+  "id": "8af6522d-c4ff-47a8-920a-f1115d668945",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "target_type": "plan",
+  "target_id": null,
+  "parent_id": null,
+  "author_user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+  "author_name": "user_ad191ae911",
+  "is_mine": true,
+  "is_deleted": false,
+  "body": "宿の予約番号は ABC12345 です",
+  "mentions": [
+   {
+    "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+    "name": "user_dbd631cb4d"
+   }
+  ],
+  "status": "open",
+  "sensitive_warning": true,
+  "sensitive_reasons": [
+   "keyword",
+   "code"
+  ],
+  "can_edit": true,
+  "can_moderate": true,
+  "edited_at": null,
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "comment_reply": {
+  "id": "22ae8f6a-1ea9-4323-afe3-150547f044cc",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "target_type": "plan",
+  "target_id": null,
+  "parent_id": "8af6522d-c4ff-47a8-920a-f1115d668945",
+  "author_user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+  "author_name": "user_90e408eed0",
+  "is_mine": true,
+  "is_deleted": false,
+  "body": "了解です",
+  "mentions": [],
+  "status": "open",
+  "sensitive_warning": false,
+  "sensitive_reasons": [],
+  "can_edit": true,
+  "can_moderate": true,
+  "edited_at": null,
+  "revision": 1,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "comment_updated": {
+  "id": "8af6522d-c4ff-47a8-920a-f1115d668945",
+  "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+  "target_type": "plan",
+  "target_id": null,
+  "parent_id": null,
+  "author_user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+  "author_name": "user_ad191ae911",
+  "is_mine": true,
+  "is_deleted": false,
+  "body": "宿は予約済みです",
+  "mentions": [
+   {
+    "user_id": "195ec5bc-9af6-4d80-b501-8dbc08027c7d",
+    "name": "user_dbd631cb4d"
+   }
+  ],
+  "status": "resolved",
+  "sensitive_warning": false,
+  "sensitive_reasons": [],
+  "can_edit": true,
+  "can_moderate": true,
+  "edited_at": "2026-10-02T10:05:48.834655+00:00",
+  "revision": 2,
+  "created_at": "2026-10-02T10:05:47.795616+00:00"
+ },
+ "comment_deleted": {
+  "message": "コメントを削除しました",
+  "revision": 3
+ },
+ "comment_list": [
+  {
+   "id": "22ae8f6a-1ea9-4323-afe3-150547f044cc",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "target_type": "plan",
+   "target_id": null,
+   "parent_id": "8af6522d-c4ff-47a8-920a-f1115d668945",
+   "author_user_id": "e3e4a279-61dd-4880-8265-dee3c1ba0a33",
+   "author_name": "user_90e408eed0",
+   "is_mine": false,
+   "is_deleted": false,
+   "body": "了解です",
+   "mentions": [],
+   "status": "open",
+   "sensitive_warning": false,
+   "sensitive_reasons": [],
+   "can_edit": false,
+   "can_moderate": true,
+   "edited_at": null,
+   "revision": 1,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  },
+  {
+   "id": "8af6522d-c4ff-47a8-920a-f1115d668945",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "target_type": "plan",
+   "target_id": null,
+   "parent_id": null,
+   "author_user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+   "author_name": "user_ad191ae911",
+   "is_mine": true,
+   "is_deleted": true,
+   "body": null,
+   "mentions": [],
+   "status": "resolved",
+   "sensitive_warning": false,
+   "sensitive_reasons": [],
+   "can_edit": false,
+   "can_moderate": false,
+   "edited_at": "2026-10-02T10:05:48.834655+00:00",
+   "revision": 3,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  }
+ ],
+ "comment_list_poll": [
+  {
+   "id": "3f06abb7-b6fe-4453-bd55-0f66748667fd",
+   "plan_id": "e2d858c6-2b3e-4053-b317-77ae538c69ed",
+   "target_type": "poll",
+   "target_id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",
+   "parent_id": null,
+   "author_user_id": "20b7a083-7342-434a-939e-c215348a42e2",
+   "author_name": "user_ad191ae911",
+   "is_mine": true,
+   "is_deleted": false,
+   "body": "決定ありがとう",
+   "mentions": [],
+   "status": "open",
+   "sensitive_warning": false,
+   "sensitive_reasons": [],
+   "can_edit": true,
+   "can_moderate": true,
+   "edited_at": null,
+   "revision": 1,
+   "created_at": "2026-10-02T10:05:47.795616+00:00"
+  }
+ ]
 }

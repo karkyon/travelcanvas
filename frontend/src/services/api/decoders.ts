@@ -34,6 +34,7 @@ import type {
   UndoConflictDetail,
   PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem,
   Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement,
+  PlanComment, Poll, PollOption, PollVote,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -976,4 +977,86 @@ export const financeSummary: Decoder<FinanceSummary> = object<FinanceSummary>({
   })),
   transfers: arrayOf(object({ from_user_id: str, from_name: str, to_user_id: str, to_name: str, amount: moneyString })),
   is_settled: bool,
+});
+
+// ----- [Gate P3] 合意形成(FR-022)・コメント(FR-024)。backend/app/api/v1/discussion.py の応答。
+// 状態・件数を誤ると「合意した」と誤表示するため、列挙値と件数を厳密に検査する。
+const VOTE_VALUES = ['love', 'ok', 'concern', 'veto', 'abstain'] as const;
+
+const pollVote: Decoder<PollVote> = object<PollVote>({
+  id: str,
+  is_mine: bool,
+  user_id: nullable(str),
+  name: nullable(str),
+  value: oneOf(...VOTE_VALUES),
+  reason: nullable(str),
+  alternative: nullable(str),
+  is_resolved: bool,
+  resolution_note: nullable(str),
+  resolved_by_name: nullable(str),
+  can_resolve: bool,
+});
+
+const pollOption: Decoder<PollOption> = object<PollOption>({
+  id: str,
+  label: str,
+  event_id: nullable(str),
+  event_label: nullable(str),
+  event_missing: bool,
+  state: oneOf('pending', 'blocked', 'has_concerns', 'agreed'),
+  score: nullable(int),
+  counts: nullable(object({
+    love: nonNegativeInt, ok: nonNegativeInt, concern: nonNegativeInt, veto: nonNegativeInt, abstain: nonNegativeInt,
+  })),
+  responders: nonNegativeInt,
+  unresolved_concerns: nonNegativeInt,
+  unresolved_vetoes: nonNegativeInt,
+  is_leading: bool,
+  is_decided: bool,
+  my_vote: nullable(oneOf(...VOTE_VALUES)),
+  votes: arrayOf(pollVote),
+});
+
+export const poll: Decoder<Poll> = object<Poll>({
+  id: str,
+  plan_id: str,
+  algorithm_version: str,
+  title: str,
+  description: nullable(str),
+  deadline_at: nullable(str),
+  status: oneOf('open', 'closed'),
+  is_closed: bool,
+  veto_policy: oneOf('block', 'block_with_alternative', 'advisory'),
+  is_anonymous: bool,
+  counts_hidden: bool,
+  state: oneOf('voting', 'agreed', 'decided', 'blocked', 'needs_discussion'),
+  decided_option_id: nullable(str),
+  created_by_name: nullable(str),
+  can_manage: bool,
+  unanswered: arrayOf(object({ user_id: str, name: str })),
+  options: arrayOf(pollOption),
+  revision: int,
+  created_at: nullable(str),
+});
+
+export const planComment: Decoder<PlanComment> = object<PlanComment>({
+  id: str,
+  plan_id: str,
+  target_type: oneOf('plan', 'event', 'reservation', 'poll', 'expense'),
+  target_id: nullable(str),
+  parent_id: nullable(str),
+  author_user_id: str,
+  author_name: str,
+  is_mine: bool,
+  is_deleted: bool,
+  body: nullable(str),
+  mentions: arrayOf(object({ user_id: str, name: str })),
+  status: oneOf('open', 'resolved'),
+  sensitive_warning: bool,
+  sensitive_reasons: arrayOf(str),
+  can_edit: bool,
+  can_moderate: bool,
+  edited_at: nullable(str),
+  revision: int,
+  created_at: nullable(str),
 });

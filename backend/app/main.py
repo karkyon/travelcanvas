@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation, finance,
+    validation, preparation, finance, discussion,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -374,3 +374,5 @@ app.include_router(preparation.router, prefix="/api/v1")
 # [Gate P2] FR-027予算・費用 / FR-028立替・精算。/plans/{plan_id}/finance-settings・budgets・expenses・
 # settlements・finance-summary配下。
 app.include_router(finance.router, prefix="/api/v1")
+# [Gate P3] FR-022合意形成(投票・懸念) / FR-024コメント・メンション通知。/plans/{plan_id}/polls・comments配下。
+app.include_router(discussion.router, prefix="/api/v1")

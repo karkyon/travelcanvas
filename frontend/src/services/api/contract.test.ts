@@ -22,6 +22,7 @@ import {
   collaboratorRemoveResult, itemDeleteResult, lockedRelationError, routeOptionDeleteResult, undoConflictError,
   packingItem, packingSuggestions, planMember, preparationTask, readiness,
   budget, expense, financeSettings, financeSummary, settlement,
+  planComment, poll,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -171,6 +172,21 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['settlement_created', settlement],
   ['settlement_list', arrayOf(settlement)],
   ['settlement_deleted', revisionResult],
+  // ----- [Gate P3] 合意形成(FR-022)・コメント(FR-024)。*_viewerは閲覧者から見た応答、anonymous_hiddenは件数を伏せた匿名投票
+  ['poll_created', poll],
+  ['poll_voted', poll],
+  ['poll_resolved', poll],
+  ['poll_decided', poll],
+  ['poll_anonymous_hidden', poll],
+  ['poll_deleted', revisionResult],
+  ['poll_list', arrayOf(poll)],
+  ['poll_list_viewer', arrayOf(poll)],
+  ['comment_created', planComment],
+  ['comment_reply', planComment],
+  ['comment_updated', planComment],
+  ['comment_deleted', revisionResult],
+  ['comment_list', arrayOf(planComment)],
+  ['comment_list_poll', arrayOf(planComment)],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {
