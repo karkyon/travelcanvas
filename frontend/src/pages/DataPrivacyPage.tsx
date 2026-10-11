@@ -5,7 +5,7 @@
  *   - アカウントのデータを書き出す(本人のプロフィール・所有する旅行すべて・参加している旅行での本人の作成物)
  *   - 削除後・バックアップ・監査の保持期間を説明する
  * 旅行ごとのエクスポートは各旅行の「書き出し」画面で行う(所有者だけ)。
- * アカウント単位の削除・同意の撤回は今後のGateで扱う(この画面ではできることだけを示す)。
+ * [Gate P9] 目的別の同意と撤回(ConsentsCard)、アカウントの削除(AccountDeletionCard)を追加。
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +17,8 @@ import { downloadAccountDataExport, getRetentionInfo } from '@/services/api';
 import type { RetentionInfo } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { describeDataExport, saveDataExport } from './exports/exportModel';
+import AccountDeletionCard from './privacy/AccountDeletionCard';
+import ConsentsCard from './privacy/ConsentsCard';
 
 const DataPrivacyPage: React.FC = () => {
   const navigate = useNavigate();
@@ -48,8 +50,10 @@ const DataPrivacyPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate('/settings')} className="mb-2">← 設定へ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">データの書き出しと保持期間</h1>
-      <p className="text-sm text-gray-700 mt-1">あなたのデータをファイルとして受け取れます。削除したデータがいつまで残るかも確認できます。</p>
+      <h1 className="text-2xl font-bold text-gray-900">データとプライバシー</h1>
+      <p className="text-sm text-gray-700 mt-1">
+        あなたのデータをファイルとして受け取れます。データの使い方への同意の変更、アカウントの削除、削除したデータがいつまで残るかの確認もできます。
+      </p>
 
       <div aria-live="polite">
         {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm break-all" role="status" data-testid="data-export-result">{message}</div>}
@@ -91,11 +95,12 @@ const DataPrivacyPage: React.FC = () => {
               ))}
             </dl>
           )}
-          <p className="text-sm text-gray-700 mt-3">
-            旅行の削除は各旅行の画面から行えます。アカウント全体の削除と、同意の撤回の画面は準備中です。
-          </p>
+          <p className="text-sm text-gray-700 mt-3">旅行の削除は各旅行の画面から行えます。</p>
         </section>
       </Card>
+
+      <ConsentsCard />
+      <AccountDeletionCard onDeleted={() => navigate('/account-deleted', { replace: true })} />
     </div>
   );
 };

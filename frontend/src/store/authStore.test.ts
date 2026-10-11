@@ -238,3 +238,17 @@ describe('authStore: checkAuth (Gate A1)', () => {
     expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: false, isInitialized: true });
   });
 });
+
+describe('authStore: clearLocalSession (Gate P9)', () => {
+  it('アカウント削除後: 通信せずにログイン状態・ゲスト状態・トークンを消す', () => {
+    const calls = serve({});
+    localStorage.setItem('auth_token', TOKEN);
+    useAuthStore.setState({ token: TOKEN, isAuthenticated: true, isGuest: true, guestToken: TOKEN, guestId: 'g1' });
+    useAuthStore.getState().clearLocalSession();
+    expect(calls).toEqual([]);
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null, token: null, isAuthenticated: false, isGuest: false, guestToken: null, guestId: null,
+    });
+    expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+});

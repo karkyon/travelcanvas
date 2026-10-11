@@ -35,6 +35,8 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** [Gate P9] サーバーへ通信せずに、この端末のログイン状態だけを消す(アカウント削除後。セッションは失効済み) */
+  clearLocalSession: () => void;
   clearError: () => void;
   checkAuth: () => Promise<void>;
   initialize: () => void;
@@ -206,6 +208,21 @@ export const useAuthStore = create<AuthState>()(
             console.warn('⚠️ サーバー側セッションの失効に失敗しましたが、ローカルの認証状態はクリアします');
           });
         }
+        apiService.clearAccessToken();
+        apiService.setGuestMode(false);
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isInitialized: true,
+          error: null,
+          isGuest: false,
+          guestToken: null,
+          guestId: null,
+        });
+      },
+
+      clearLocalSession: () => {
         apiService.clearAccessToken();
         apiService.setGuestMode(false);
         set({

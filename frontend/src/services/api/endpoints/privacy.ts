@@ -1,0 +1,37 @@
+/**
+ * アカウントの削除・同意の撤回(FR-039)
+ *
+ * [Gate P9] backend/app/api/v1/privacy.py。/privacy/account-deletion・/privacy/consents。
+ * 削除は取り消せないため、確認の文字と(登録ユーザーは)パスワードを送る。
+ * 失敗は各画面が理由を表示するため、共通エラー処理(toast・401時の/login遷移)を通さない(auth.tsと同じ)。
+ */
+import type { AxiosRequestConfig } from 'axios';
+import { CalendarImportApi } from './calendarImport';
+import type { AccountDeletionPreview, AccountDeletionResult, ConsentPurpose, ConsentState } from '../types';
+import { decodeResponse } from '../decode';
+import { accountDeletionPreview, accountDeletionResult, consentState } from '../decoders';
+
+const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
+
+export class PrivacyApi extends CalendarImportApi {
+  async getConsents(): Promise<ConsentState> {
+    const response = await this.client.get('/privacy/consents', SILENT);
+    return decodeResponse(response.data, consentState, 'GET /privacy/consents');
+  }
+
+  async updateConsents(consents: Partial<Record<ConsentPurpose, boolean>>): Promise<ConsentState> {
+    const response = await this.client.put('/privacy/consents', { consents }, SILENT);
+    return decodeResponse(response.data, consentState, 'PUT /privacy/consents');
+  }
+
+  async getAccountDeletionPreview(): Promise<AccountDeletionPreview> {
+    const response = await this.client.get('/privacy/account-deletion', SILENT);
+    return decodeResponse(response.data, accountDeletionPreview, 'GET /privacy/account-deletion');
+  }
+
+  async deleteAccount(confirmation: string, password?: string): Promise<AccountDeletionResult> {
+    const body = password ? { confirmation, password } : { confirmation };
+    const response = await this.client.post('/privacy/account-deletion', body, SILENT);
+    return decodeResponse(response.data, accountDeletionResult, 'POST /privacy/account-deletion');
+  }
+}

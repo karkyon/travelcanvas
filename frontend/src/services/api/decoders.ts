@@ -38,7 +38,7 @@ import type {
   Booklet, BookletExport, BookletIncludes,
   RetentionInfo,
   Branch, BranchAssumptions, BranchDetail,
-  CalendarImportPreview, CalendarImportResult,
+  CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1250,4 +1250,38 @@ export const calendarImportPreview: Decoder<CalendarImportPreview> = object<Cale
 
 export const calendarImportResult: Decoder<CalendarImportResult> = object<CalendarImportResult>({
   plan_revision: int, created: nonNegativeInt, updated: nonNegativeInt, created_days: nonNegativeInt,
+});
+
+// ----- [Gate P9] アカウントの削除・同意の撤回(FR-039)。backend/app/api/v1/privacy.py の応答。
+// 同意の有無を取り違えると撤回したつもりの目的を同意済みと表示してしまうため、目的と真偽値を厳密に検査する。
+export const consentState: Decoder<ConsentState> = object<ConsentState>({
+  purposes: arrayOf(object({
+    purpose: oneOf('ai_processing', 'location', 'analytics', 'marketing_email'),
+    label: str,
+    description: str,
+    in_use: bool,
+    granted: bool,
+    updated_at: nullable(str),
+  })),
+});
+
+export const accountDeletionPreview: Decoder<AccountDeletionPreview> = object<AccountDeletionPreview>({
+  account_type: oneOf('registered', 'guest'),
+  requires_password: bool,
+  confirmation_text: str,
+  owned_plans: arrayOf(object({ id: str, title: str, member_count: nonNegativeInt })),
+  member_plan_count: nonNegativeInt,
+  deleted_in_member_plans: object({
+    personal_packing_items: nonNegativeInt, private_constraints: nonNegativeInt, member_budgets: nonNegativeInt,
+    documents: nonNegativeInt,
+  }),
+  kept_in_member_plans: object({ comments: nonNegativeInt, expenses: nonNegativeInt, votes: nonNegativeInt }),
+  plan_delete_grace_days: nonNegativeInt,
+  retention: retentionInfo,
+});
+
+export const accountDeletionResult: Decoder<AccountDeletionResult> = object<AccountDeletionResult>({
+  deleted: bool,
+  summary: record as Decoder<Record<string, number>>,
+  plan_delete_grace_days: nonNegativeInt,
 });

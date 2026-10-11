@@ -51,6 +51,7 @@ const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
 const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
 const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
+const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -83,6 +84,11 @@ export const router = createBrowserRouter([
             <RegisterPage />
           </AuthRedirect>
         ),
+      },
+      // 🗑️ [Gate P9] アカウント削除の完了(認証不要。この端末のデータを消してログイン状態を消す)
+      {
+        path: 'account-deleted',
+        element: <AccountDeletedPage />,
       },
       {
         // [Gate #35] AuthRedirectでラップしない。ゲストはisAuthenticated=trueの

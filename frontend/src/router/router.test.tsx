@@ -17,7 +17,7 @@ import Layout from '@/components/Layout';
 import RouteErrorBoundary from './RouteErrorBoundary';
 
 const EXPECTED_ROUTE_PATHS = [
-  '/', '/(index)', '/login', '/register', '/guest/upgrade', '/dashboard', '/planner', '/planner/(index)',
+  '/', '/(index)', '/login', '/register', '/account-deleted', '/guest/upgrade', '/dashboard', '/planner', '/planner/(index)',
   '/planner/:planId?', '/planner/:planId/reservations', '/planner/:planId/imports', '/planner/:planId/documents',
   '/planner/:planId/today', '/planner/:planId/segments', '/planner/:planId/route-options',
   '/planner/:planId/constraints', '/planner/:planId/preparation', '/planner/:planId/expenses', '/planner/:planId/discussion',

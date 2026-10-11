@@ -6,7 +6,7 @@ from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
-    calendar_import,
+    calendar_import, privacy,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -393,3 +393,5 @@ app.include_router(data_export.privacy_router, prefix="/api/v1")
 app.include_router(branches.router, prefix="/api/v1")
 # [Gate P8] FR-036カレンダー(ICS)の取込(差分確認後に適用)。/plans/{plan_id}/calendar-import配下。
 app.include_router(calendar_import.router, prefix="/api/v1")
+# 🗑️ [Gate P9] アカウント削除・同意の撤回(FR-039)
+app.include_router(privacy.router, prefix="/api/v1")

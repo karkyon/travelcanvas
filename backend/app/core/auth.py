@@ -594,6 +594,10 @@ class AuthManager:
                 guest_user.id = UUID(str(token_data.user_id))
             except (ValueError, TypeError):
                 raise AuthenticationError("無効なトークンです")
+            # [Gate P9] 削除(無効化)されたゲストアカウントのトークンは受け付けない
+            row = db.query(User.is_active).filter(User.id == guest_user.id).first()
+            if row is not None and not row[0]:
+                raise AuthenticationError("アカウントが無効です")
             guest_user.user_type = UserType.GUEST
             guest_user.is_active = True
             guest_user.is_verified = False

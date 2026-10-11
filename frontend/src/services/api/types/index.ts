@@ -30,3 +30,4 @@ export * from './itineraryExport';
 export * from './dataExport';
 export * from './branches';
 export * from './calendarImport';
+export * from './privacy';

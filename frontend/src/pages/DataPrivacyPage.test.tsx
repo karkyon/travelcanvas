@@ -11,6 +11,11 @@ const m = vi.hoisted(() => ({
   downloadAccountDataExport: vi.fn(),
   downloadPlanDataExport: vi.fn(),
   downloadItineraryExport: vi.fn(),
+  // [Gate P9] 同意・アカウント削除のカード
+  getConsents: vi.fn(),
+  updateConsents: vi.fn(),
+  getAccountDeletionPreview: vi.fn(),
+  deleteAccount: vi.fn(),
 }));
 vi.mock('@/services/api', () => m);
 
@@ -34,6 +39,7 @@ function renderAt(path: string) {
 beforeEach(() => {
   for (const fn of Object.values(m)) fn.mockReset();
   m.getRetentionInfo.mockResolvedValue(fx.retention_info);
+  m.getConsents.mockResolvedValue(fx.privacy_consents_default);
   clicked = [];
   URL.createObjectURL = vi.fn(() => 'blob:mock');
   URL.revokeObjectURL = vi.fn();
@@ -50,7 +56,7 @@ describe('DataPrivacyPage (Gate P6)', () => {
     expect(list).toHaveTextContent(`削除後${fx.retention_info.plan_delete_grace_days}日間は復元できます`);
     expect(list).toHaveTextContent('バックアップ');
     expect(list).toHaveTextContent('回収できません');
-    expect(screen.getByText(/アカウント全体の削除と、同意の撤回の画面は準備中/)).toBeInTheDocument();
+    expect(screen.queryByText(/準備中/)).toBeNull();
   });
 
   it('アカウントのデータを書き出し、ファイル名とハッシュを案内する。失敗はエラー表示', async () => {

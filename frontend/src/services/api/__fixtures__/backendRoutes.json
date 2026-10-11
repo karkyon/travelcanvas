@@ -12,7 +12,8 @@
   "captured_at_head_p5": "Gate P4 (+Gate P5 itinerary exports)",
   "captured_at_head_p6": "Gate P5 (+Gate P6 data export/retention)",
   "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
-  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)"
+  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)",
+  "captured_at_head_p9": "Gate P8 (+Gate P9 account deletion/consents)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -103,6 +104,8 @@
   "GET /api/v1/plans/{plan_id}/today",
   "GET /api/v1/plans/{plan_id}/validation-runs",
   "GET /api/v1/plans/{plan_id}/validation-runs/{run_id}",
+  "GET /api/v1/privacy/account-deletion",
+  "GET /api/v1/privacy/consents",
   "GET /api/v1/privacy/data-export",
   "GET /api/v1/privacy/retention",
   "GET /api/v1/search/places/{place_id}",
@@ -191,6 +194,7 @@
   "POST /api/v1/plans/{plan_id}/settlements",
   "POST /api/v1/plans/{plan_id}/undo",
   "POST /api/v1/plans/{plan_id}/validation-runs",
+  "POST /api/v1/privacy/account-deletion",
   "POST /api/v1/public/share/{token}/resolve",
   "POST /api/v1/quick-drafts",
   "POST /api/v1/quick-drafts/{draft_id}/promote",
@@ -214,6 +218,7 @@
   "PUT /api/v1/plans/{plan_id}/events/{event_id}",
   "PUT /api/v1/plans/{plan_id}/finance-settings",
   "PUT /api/v1/plans/{plan_id}/polls/{poll_id}/votes",
+  "PUT /api/v1/privacy/consents",
   "PUT /api/v1/spots/{spot_id}",
   "PUT /api/v1/travel-plans/{plan_id}",
   "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}"

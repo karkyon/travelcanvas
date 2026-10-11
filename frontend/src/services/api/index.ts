@@ -12,7 +12,7 @@ import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateDa
 import type { BookletExportCreateData, BookletOptions } from './types';
 import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
 import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
-import type { CalendarImportApplyItem } from './types';
+import type { CalendarImportApplyItem, ConsentPurpose } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -338,5 +338,11 @@ export const previewCalendarImport = (planId: string, file: Blob, createMissingD
   api.previewCalendarImport(planId, file, createMissingDays);
 export const applyCalendarImport = (planId: string, items: CalendarImportApplyItem[], createMissingDays: boolean, revision: number) =>
   api.applyCalendarImport(planId, items, createMissingDays, revision);
+
+// ===== [Gate P9] アカウントの削除・同意の撤回(FR-039) =====
+export const getConsents = () => api.getConsents();
+export const updateConsents = (consents: Partial<Record<ConsentPurpose, boolean>>) => api.updateConsents(consents);
+export const getAccountDeletionPreview = () => api.getAccountDeletionPreview();
+export const deleteAccount = (confirmation: string, password?: string) => api.deleteAccount(confirmation, password);
 
 export default api;

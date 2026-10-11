@@ -26,7 +26,7 @@ import {
   booklet, bookletExport,
   retentionInfo,
   branch, branchDetail,
-  calendarImportPreview, calendarImportResult,
+  calendarImportPreview, calendarImportResult, consentState, accountDeletionPreview, accountDeletionResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -216,6 +216,10 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['calendar_import_preview', calendarImportPreview],
   ['calendar_import_preview_days', calendarImportPreview],
   ['calendar_import_applied', calendarImportResult],
+  ['privacy_consents_default', consentState],
+  ['privacy_consents_updated', consentState],
+  ['account_deletion_preview', accountDeletionPreview],
+  ['account_deletion_done', accountDeletionResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

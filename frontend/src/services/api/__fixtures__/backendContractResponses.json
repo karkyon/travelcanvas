@@ -7949,5 +7949,164 @@
   "created": 2,
   "updated": 1,
   "created_days": 1
+ },
+ "privacy_consents_default": {
+  "purposes": [
+   {
+    "purpose": "ai_processing",
+    "label": "AIによる文書・候補の処理",
+    "description": "予約メールや文書の読み取り、旅程案の作成に外部のAIを使うこと。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   },
+   {
+    "purpose": "location",
+    "label": "位置情報の利用",
+    "description": "現在地を使った当日の案内や、訪問記録の作成に位置情報を使うこと。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   },
+   {
+    "purpose": "analytics",
+    "label": "利用状況の分析",
+    "description": "サービス改善のため、操作の記録を個人を特定しない形で集計すること。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   },
+   {
+    "purpose": "marketing_email",
+    "label": "お知らせのメール",
+    "description": "新機能やキャンペーンのお知らせをメールで送ること(旅行の通知とは別です)。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   }
+  ]
+ },
+ "privacy_consents_updated": {
+  "purposes": [
+   {
+    "purpose": "ai_processing",
+    "label": "AIによる文書・候補の処理",
+    "description": "予約メールや文書の読み取り、旅程案の作成に外部のAIを使うこと。",
+    "in_use": false,
+    "granted": true,
+    "updated_at": "2026-10-11T12:13:28.923379+00:00"
+   },
+   {
+    "purpose": "location",
+    "label": "位置情報の利用",
+    "description": "現在地を使った当日の案内や、訪問記録の作成に位置情報を使うこと。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   },
+   {
+    "purpose": "analytics",
+    "label": "利用状況の分析",
+    "description": "サービス改善のため、操作の記録を個人を特定しない形で集計すること。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   },
+   {
+    "purpose": "marketing_email",
+    "label": "お知らせのメール",
+    "description": "新機能やキャンペーンのお知らせをメールで送ること(旅行の通知とは別です)。",
+    "in_use": false,
+    "granted": false,
+    "updated_at": null
+   }
+  ]
+ },
+ "account_deletion_preview": {
+  "account_type": "registered",
+  "requires_password": true,
+  "confirmation_text": "退会する",
+  "owned_plans": [
+   {
+    "id": "d6f58c81-be35-4266-8fbc-8e59705d8709",
+    "title": "退会の契約採取",
+    "member_count": 1
+   }
+  ],
+  "member_plan_count": 0,
+  "deleted_in_member_plans": {
+   "personal_packing_items": 0,
+   "private_constraints": 0,
+   "member_budgets": 0,
+   "documents": 0
+  },
+  "kept_in_member_plans": {
+   "comments": 0,
+   "expenses": 0,
+   "votes": 0
+  },
+  "plan_delete_grace_days": 30,
+  "retention": {
+   "plan_delete_grace_days": 30,
+   "quick_draft_expired_retention_days": 7,
+   "quick_draft_promoted_retention_days": 90,
+   "items": [
+    {
+     "key": "deleted_plan",
+     "label": "削除した旅行",
+     "period": "削除後30日間",
+     "note": "削除後30日間は復元できます。その後、予定・予約・文書の原本を含めて完全に削除します。"
+    },
+    {
+     "key": "quick_draft",
+     "label": "登録前の下書き(クイック作成)",
+     "period": "期限切れ後7日 / 旅行へ変換後90日",
+     "note": "期限を過ぎた下書きは自動で削除します。"
+    },
+    {
+     "key": "documents",
+     "label": "文書の原本",
+     "period": "設定した保持期限まで",
+     "note": "文書に保持期限を設定すると、期限後に原本を削除します。旅行を完全に削除した時も削除します。"
+    },
+    {
+     "key": "audit",
+     "label": "操作の記録(監査ログ)",
+     "period": "セキュリティ上の保持期間",
+     "note": "不正利用の調査のため、誰がいつ何をしたかだけを、予定名・予約番号・本文などの内容を含めずに記録し、旅行の削除後も保持します。"
+    },
+    {
+     "key": "backup",
+     "label": "バックアップ",
+     "period": "運用環境の設定による",
+     "note": "障害からの復旧のため、削除したデータも一定期間バックアップに残り、保持期間を過ぎると消去されます(設計上の目安は35日分と月次。運用環境の設定に従います)。"
+    },
+    {
+     "key": "exported",
+     "label": "書き出したファイル・印刷物",
+     "period": "回収できません",
+     "note": "エクスポートしたファイル・PDF・印刷物・共有したリンク先で保存されたものは、アプリから削除できません。"
+    }
+   ]
+  }
+ },
+ "account_deletion_done": {
+  "deleted": true,
+  "summary": {
+   "owned_plans": 1,
+   "share_links_revoked": 0,
+   "member_plans": 0,
+   "memberships_removed": 0,
+   "personal_packing_items": 0,
+   "private_constraints": 0,
+   "member_budgets": 0,
+   "documents": 0,
+   "documents_pending_purge": 0,
+   "notifications": 0,
+   "spot_favorites": 0,
+   "spot_visits": 0,
+   "sessions": 0
+  },
+  "plan_delete_grace_days": 30
  }
 }
