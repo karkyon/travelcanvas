@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation, finance, discussion, booklet,
+    validation, preparation, finance, discussion, booklet, itinerary_export,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -113,6 +113,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=CORS_ALLOWED_METHODS,
     allow_headers=["*"],
+    # [Gate P5] 書き出し(ICS/GPX/KML/CSV)の件数とファイル名を画面で読めるようにする
+    expose_headers=["X-Export-Count", "X-Export-Skipped", "X-Export-Excluded", "Content-Disposition"],
 )
 
 # 基本エンドポイント
@@ -379,3 +381,5 @@ app.include_router(finance.router, prefix="/api/v1")
 app.include_router(discussion.router, prefix="/api/v1")
 # [Gate P4] FR-034しおり生成 / FR-035安全な印刷・公開 / FR-046 PDF出力。/plans/{plan_id}/booklet・booklet-exports配下。
 app.include_router(booklet.router, prefix="/api/v1")
+# [Gate P5] FR-036カレンダー・地図の書き出し(ICS/GPX/KML/CSV)。/plans/{plan_id}/exports/*配下。
+app.include_router(itinerary_export.router, prefix="/api/v1")

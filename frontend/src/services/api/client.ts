@@ -10,9 +10,10 @@
 // [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)を追加: ... → Preparation → Finance → CompleteTravelAPI
 // [Gate P3] 合意形成(FR-022)・コメント(FR-024)を追加: ... → Finance → Discussion → CompleteTravelAPI
 // [Gate P4] しおり・印刷・PDF出力(FR-034/035/046)を追加: ... → Discussion → Booklet → CompleteTravelAPI
-import { BookletApi } from './endpoints/booklet';
+// [Gate P5] カレンダー・地図の書き出し(FR-036)を追加: ... → Booklet → ItineraryExport → CompleteTravelAPI
+import { ItineraryExportApi } from './endpoints/itineraryExport';
 
-export class CompleteTravelAPI extends BookletApi {
+export class CompleteTravelAPI extends ItineraryExportApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

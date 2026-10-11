@@ -10,6 +10,7 @@ import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
 import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateData, VoteInput } from './types';
 import type { BookletExportCreateData, BookletOptions } from './types';
+import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -309,5 +310,9 @@ export const createBookletExport = (planId: string, data: BookletExportCreateDat
   api.createBookletExport(planId, data);
 export const getBookletExport = (planId: string, exportId: string) => api.getBookletExport(planId, exportId);
 export const revokeBookletExport = (planId: string, exportId: string) => api.revokeBookletExport(planId, exportId);
+
+// ===== [Gate P5] カレンダー・地図・表計算への書き出し(FR-036) =====
+export const downloadItineraryExport = (planId: string, format: ItineraryExportFormat, options?: ItineraryExportOptions) =>
+  api.downloadItineraryExport(planId, format, options);
 
 export default api;

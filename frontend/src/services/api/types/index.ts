@@ -26,3 +26,4 @@ export * from './preparation';
 export * from './finance';
 export * from './discussion';
 export * from './booklet';
+export * from './itineraryExport';

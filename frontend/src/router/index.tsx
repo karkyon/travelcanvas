@@ -46,6 +46,7 @@ const ExpensesPage = lazyPage(() => import('@/pages/ExpensesPage'));
 const DiscussionPage = lazyPage(() => import('@/pages/DiscussionPage'));
 const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
 const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
+const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -247,6 +248,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <BookletPrintPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📤 [Gate P5] カレンダー・地図・表計算への書き出し(FR-036 ICS/GPX/KML/CSV)。
+      {
+        path: 'planner/:planId/exports',
+        element: (
+          <ProtectedRoute>
+            <ExportsPage />
           </ProtectedRoute>
         ),
       },

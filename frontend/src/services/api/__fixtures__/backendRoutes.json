@@ -8,7 +8,8 @@
   "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 preparation)",
   "captured_at_head_p2": "Gate P1 (+Gate P2 finance)",
   "captured_at_head_p3": "Gate P2 (+Gate P3 discussion)",
-  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet)"
+  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet)",
+  "captured_at_head_p5": "Gate P4 (+Gate P5 itinerary exports)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -64,6 +65,10 @@
   "GET /api/v1/plans/{plan_id}/documents/{document_id}/download-url",
   "GET /api/v1/plans/{plan_id}/documents/{document_id}/links",
   "GET /api/v1/plans/{plan_id}/expenses",
+  "GET /api/v1/plans/{plan_id}/exports/calendar.ics",
+  "GET /api/v1/plans/{plan_id}/exports/itinerary.csv",
+  "GET /api/v1/plans/{plan_id}/exports/places.gpx",
+  "GET /api/v1/plans/{plan_id}/exports/places.kml",
   "GET /api/v1/plans/{plan_id}/finance-settings",
   "GET /api/v1/plans/{plan_id}/finance-summary",
   "GET /api/v1/plans/{plan_id}/imports",
