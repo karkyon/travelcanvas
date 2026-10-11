@@ -641,6 +641,15 @@ const SettingsPage: React.FC = () => {
                   </button>
                 ))}
                 
+                {/* [Gate P6] FR-039 データの書き出しと保持期間 */}
+                <button
+                  onClick={() => navigate('/settings/data')}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Download size={16} />
+                  <span className="font-medium">データの書き出し</span>
+                </button>
+
                 <div className="border-t border-gray-200 pt-4 mt-4">
                   <button
                     onClick={handleLogout}

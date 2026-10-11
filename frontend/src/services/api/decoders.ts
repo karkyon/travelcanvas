@@ -36,6 +36,7 @@ import type {
   Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement,
   PlanComment, Poll, PollOption, PollVote,
   Booklet, BookletExport, BookletIncludes,
+  RetentionInfo,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1156,4 +1157,17 @@ export const bookletExport: Decoder<BookletExport> = object<BookletExport>({
   is_mine: bool,
   can_view: bool,
   can_revoke: bool,
+});
+
+// ----- [Gate P6] データポータビリティ(FR-039)。backend/app/api/v1/data_export.py の保持期間の説明。
+export const retentionInfo: Decoder<RetentionInfo> = object<RetentionInfo>({
+  plan_delete_grace_days: nonNegativeInt,
+  quick_draft_expired_retention_days: nonNegativeInt,
+  quick_draft_promoted_retention_days: nonNegativeInt,
+  items: arrayOf(object({
+    key: oneOf('deleted_plan', 'quick_draft', 'documents', 'audit', 'backup', 'exported'),
+    label: str,
+    period: str,
+    note: str,
+  })),
 });

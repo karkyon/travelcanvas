@@ -47,6 +47,7 @@ const DiscussionPage = lazyPage(() => import('@/pages/DiscussionPage'));
 const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
 const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
 const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
+const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -330,6 +331,15 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        ),
+      },
+      // 📦 [Gate P6] データの書き出しと保持期間(FR-039)。
+      {
+        path: 'settings/data',
+        element: (
+          <ProtectedRoute>
+            <DataPrivacyPage />
           </ProtectedRoute>
         ),
       },

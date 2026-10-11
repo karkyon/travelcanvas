@@ -10,13 +10,13 @@
  */
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Calendar, FileSpreadsheet, Map as MapIcon } from 'lucide-react';
+import { Calendar, FileJson, FileSpreadsheet, Map as MapIcon } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
-import { downloadItineraryExport } from '@/services/api';
+import { downloadItineraryExport, downloadPlanDataExport } from '@/services/api';
 import type { ItineraryExportFormat, ItineraryExportOptions, LocationPrecision } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import { FORMAT_LABEL, describeResult, saveFile } from './exports/exportModel';
+import { FORMAT_LABEL, describeDataExport, describeResult, saveDataExport, saveFile } from './exports/exportModel';
 
 const ExportsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -25,7 +25,7 @@ const ExportsPage: React.FC = () => {
   const [csvAddresses, setCsvAddresses] = useState(false);
   const [precision, setPrecision] = useState<LocationPrecision>('approx');
   const [excludeLodging, setExcludeLodging] = useState(true);
-  const [busy, setBusy] = useState<ItineraryExportFormat | null>(null);
+  const [busy, setBusy] = useState<ItineraryExportFormat | 'json' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +40,22 @@ const ExportsPage: React.FC = () => {
       setMessage(describeResult(format, file));
     } catch (e) {
       setError(errorDetailMessage(e, `${FORMAT_LABEL[format]}の書き出しに失敗しました`));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportJson = async () => {
+    if (!planId) return;
+    setBusy('json');
+    setError(null);
+    setMessage(null);
+    try {
+      const file = await downloadPlanDataExport(planId);
+      saveDataExport(file);
+      setMessage(describeDataExport(file));
+    } catch (e) {
+      setError(errorDetailMessage(e, '旅行データのエクスポートに失敗しました'));
     } finally {
       setBusy(null);
     }
@@ -124,6 +140,19 @@ const ExportsPage: React.FC = () => {
             </label>
             <Button variant="primary" size="sm" className="mt-3" loading={busy === 'csv'}
               onClick={() => run('csv', { include_addresses: csvAddresses })}>CSVを書き出す</Button>
+          </section>
+        </Card>
+
+        <Card padding="md">
+          <section aria-labelledby="export-json">
+            <h2 id="export-json" className="font-semibold text-gray-900 flex items-center gap-2"><FileJson size={18} aria-hidden="true" />旅行データ(JSON・所有者のみ)</h2>
+            <p className="text-sm text-gray-700 mt-1">
+              この旅行のデータ(日程・予約・持ち物・費用・投票・コメント・変更履歴など)をすべて1つのファイルにまとめます。
+              別のサービスへの移行や保管に使えます。予約番号・チケットの中身など暗号化している値と、他の参加者だけの情報は含めません。
+            </p>
+            <Button variant="outline" size="sm" className="mt-3" loading={busy === 'json'} onClick={exportJson}>
+              旅行データを書き出す
+            </Button>
           </section>
         </Card>
       </div>

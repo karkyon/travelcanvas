@@ -9,7 +9,8 @@
   "captured_at_head_p2": "Gate P1 (+Gate P2 finance)",
   "captured_at_head_p3": "Gate P2 (+Gate P3 discussion)",
   "captured_at_head_p4": "Gate P3 (+Gate P4 booklet)",
-  "captured_at_head_p5": "Gate P4 (+Gate P5 itinerary exports)"
+  "captured_at_head_p5": "Gate P4 (+Gate P5 itinerary exports)",
+  "captured_at_head_p6": "Gate P5 (+Gate P6 data export/retention)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -59,6 +60,7 @@
   "GET /api/v1/plans/{plan_id}/comments",
   "GET /api/v1/plans/{plan_id}/constraints",
   "GET /api/v1/plans/{plan_id}/constraints/{constraint_id}",
+  "GET /api/v1/plans/{plan_id}/data-export",
   "GET /api/v1/plans/{plan_id}/days/{day_id}/route-preview",
   "GET /api/v1/plans/{plan_id}/documents",
   "GET /api/v1/plans/{plan_id}/documents/{document_id}",
@@ -96,6 +98,8 @@
   "GET /api/v1/plans/{plan_id}/today",
   "GET /api/v1/plans/{plan_id}/validation-runs",
   "GET /api/v1/plans/{plan_id}/validation-runs/{run_id}",
+  "GET /api/v1/privacy/data-export",
+  "GET /api/v1/privacy/retention",
   "GET /api/v1/search/places/{place_id}",
   "GET /api/v1/spots/",
   "GET /api/v1/spots/categories/list",

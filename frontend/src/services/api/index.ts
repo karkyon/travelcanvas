@@ -315,4 +315,9 @@ export const revokeBookletExport = (planId: string, exportId: string) => api.rev
 export const downloadItineraryExport = (planId: string, format: ItineraryExportFormat, options?: ItineraryExportOptions) =>
   api.downloadItineraryExport(planId, format, options);
 
+// ===== [Gate P6] データポータビリティ(FR-039) =====
+export const getRetentionInfo = () => api.getRetentionInfo();
+export const downloadPlanDataExport = (planId: string) => api.downloadPlanDataExport(planId);
+export const downloadAccountDataExport = () => api.downloadAccountDataExport();
+
 export default api;

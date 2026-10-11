@@ -24,6 +24,7 @@ import {
   budget, expense, financeSettings, financeSummary, settlement,
   planComment, poll,
   booklet, bookletExport,
+  retentionInfo,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -198,6 +199,8 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['booklet_export_revoked', object({ export: bookletExport })],
   ['booklet_export_list', arrayOf(bookletExport)],
   ['booklet_export_list_editor', arrayOf(bookletExport)],
+  // ----- [Gate P6] データポータビリティ(FR-039)。保持期間の説明(エクスポート本体はファイルのため対象外)
+  ['retention_info', retentionInfo],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

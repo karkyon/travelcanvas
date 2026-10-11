@@ -12,7 +12,8 @@
   "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 packing-items/preparation-tasks/readiness/members)",
   "captured_at_head_p2": "Gate P1 (+Gate P2 finance-settings/budgets/expenses/settlements/finance-summary)",
   "captured_at_head_p3": "Gate P2 (+Gate P3 polls/votes/comments)",
-  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet: preview/exports)"
+  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet: preview/exports)",
+  "captured_at_head_p6": "Gate P5 (+Gate P6 GET /privacy/retention)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -6924,5 +6925,48 @@
    "can_view": true,
    "can_revoke": false
   }
- ]
+ ],
+ "retention_info": {
+  "plan_delete_grace_days": 30,
+  "quick_draft_expired_retention_days": 7,
+  "quick_draft_promoted_retention_days": 90,
+  "items": [
+   {
+    "key": "deleted_plan",
+    "label": "削除した旅行",
+    "period": "削除後30日間",
+    "note": "削除後30日間は復元できます。その後、予定・予約・文書の原本を含めて完全に削除します。"
+   },
+   {
+    "key": "quick_draft",
+    "label": "登録前の下書き(クイック作成)",
+    "period": "期限切れ後7日 / 旅行へ変換後90日",
+    "note": "期限を過ぎた下書きは自動で削除します。"
+   },
+   {
+    "key": "documents",
+    "label": "文書の原本",
+    "period": "設定した保持期限まで",
+    "note": "文書に保持期限を設定すると、期限後に原本を削除します。旅行を完全に削除した時も削除します。"
+   },
+   {
+    "key": "audit",
+    "label": "操作の記録(監査ログ)",
+    "period": "セキュリティ上の保持期間",
+    "note": "不正利用の調査のため、誰がいつ何をしたかだけを、予定名・予約番号・本文などの内容を含めずに記録し、旅行の削除後も保持します。"
+   },
+   {
+    "key": "backup",
+    "label": "バックアップ",
+    "period": "運用環境の設定による",
+    "note": "障害からの復旧のため、削除したデータも一定期間バックアップに残り、保持期間を過ぎると消去されます(設計上の目安は35日分と月次。運用環境の設定に従います)。"
+   },
+   {
+    "key": "exported",
+    "label": "書き出したファイル・印刷物",
+    "period": "回収できません",
+    "note": "エクスポートしたファイル・PDF・印刷物・共有したリンク先で保存されたものは、アプリから削除できません。"
+   }
+  ]
+ }
 }

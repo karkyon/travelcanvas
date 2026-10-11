@@ -1,7 +1,7 @@
 /**
  * [Gate P5] 書き出し画面(FR-036)の表示文言と保存処理。
  */
-import type { ItineraryExportFile, ItineraryExportFormat } from '@/services/api';
+import type { DataExportFile, ItineraryExportFile, ItineraryExportFormat } from '@/services/api';
 
 export const FORMAT_LABEL: Record<ItineraryExportFormat, string> = {
   ics: 'カレンダー(ICS)', gpx: '地図(GPX)', kml: '地図(KML)', csv: '表計算(CSV)',
@@ -27,6 +27,23 @@ export function saveFile(file: ItineraryExportFile): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `travelcanvas-${file.filename}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+// ----- [Gate P6] データのエクスポート(FR-039)
+
+export function describeDataExport(file: DataExportFile): string {
+  return `${file.filename} を保存しました。` + (file.sha256 ? `内容の確認用ハッシュ(SHA-256): ${file.sha256}` : '');
+}
+
+export function saveDataExport(file: DataExportFile): void {
+  const url = URL.createObjectURL(file.blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
