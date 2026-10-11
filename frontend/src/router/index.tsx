@@ -44,6 +44,8 @@ const ConstraintsPage = lazyPage(() => import('@/pages/ConstraintsPage'));
 const PreparationPage = lazyPage(() => import('@/pages/PreparationPage'));
 const ExpensesPage = lazyPage(() => import('@/pages/ExpensesPage'));
 const DiscussionPage = lazyPage(() => import('@/pages/DiscussionPage'));
+const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
+const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
 
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
@@ -227,6 +229,24 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DiscussionPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📖 [Gate P4] しおり・印刷(FR-034しおり生成 / FR-035安全な印刷 / FR-046 PDF出力)。
+      {
+        path: 'planner/:planId/booklet',
+        element: (
+          <ProtectedRoute>
+            <BookletPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'planner/:planId/booklet/:exportId',
+        element: (
+          <ProtectedRoute>
+            <BookletPrintPage />
           </ProtectedRoute>
         ),
       },

@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation, finance, discussion,
+    validation, preparation, finance, discussion, booklet,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -240,7 +240,8 @@ async def not_found_handler(request, exc):
     # 既存バグ)。Starletteの既定detailの時だけ汎用メッセージにする。
     detail = getattr(exc, "detail", None)
     if detail and detail != "Not Found":
-        return JSONResponse(status_code=404, content={"detail": detail})
+        # [Gate P4] route側が付けたヘッダー(公開共有の X-Robots-Tag 等)を落とさない
+        return JSONResponse(status_code=404, content={"detail": detail}, headers=getattr(exc, "headers", None))
     return JSONResponse(
         status_code=404,
         content={"detail": f"Endpoint not found: {request.url.path}"}
@@ -376,3 +377,5 @@ app.include_router(preparation.router, prefix="/api/v1")
 app.include_router(finance.router, prefix="/api/v1")
 # [Gate P3] FR-022合意形成(投票・懸念) / FR-024コメント・メンション通知。/plans/{plan_id}/polls・comments配下。
 app.include_router(discussion.router, prefix="/api/v1")
+# [Gate P4] FR-034しおり生成 / FR-035安全な印刷・公開 / FR-046 PDF出力。/plans/{plan_id}/booklet・booklet-exports配下。
+app.include_router(booklet.router, prefix="/api/v1")

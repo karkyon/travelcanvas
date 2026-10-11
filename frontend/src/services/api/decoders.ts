@@ -35,6 +35,7 @@ import type {
   PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem,
   Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement,
   PlanComment, Poll, PollOption, PollVote,
+  Booklet, BookletExport, BookletIncludes,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1059,4 +1060,100 @@ export const planComment: Decoder<PlanComment> = object<PlanComment>({
   edited_at: nullable(str),
   revision: int,
   created_at: nullable(str),
+});
+
+// ----- [Gate P4] しおり・印刷・PDF出力(FR-034/035/046)。backend/app/api/v1/booklet.py の応答(booklet-v1)。
+// 機密項目を含むかどうか(contains_sensitive・includes)と版の状態を誤ると、透かしや注意を出さずに
+// 印刷させてしまうため、列挙値と真偽値を厳密に検査する。
+const BOOKLET_THEMES = ['cute', 'simple', 'family', 'school', 'business', 'accessible', 'mono'] as const;
+const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'notes'] as const;
+const bookletIncludes: Decoder<BookletIncludes> = object<BookletIncludes>({
+  confirmation_numbers: bool, addresses: bool, phones: bool, participants: bool,
+});
+
+export const booklet: Decoder<Booklet> = object<Booklet>({
+  policy_version: str,
+  plan_id: str,
+  theme: oneOf(...BOOKLET_THEMES),
+  density: oneOf('normal', 'compact'),
+  format: oneOf('web', 'print'),
+  sections: arrayOf(oneOf(...BOOKLET_SECTIONS)),
+  includes: bookletIncludes,
+  contains_sensitive: bool,
+  generated_at: str,
+  input_revision: int,
+  current_revision: int,
+  is_stale: bool,
+  data_as_of: str,
+  warnings: arrayOf(oneOf('stale_revision', 'contains_sensitive', 'qr_not_included', 'unconverted_expenses')),
+  cover: nullable(object({
+    title: str, destination: nullable(str), start_date: nullable(str), end_date: nullable(str),
+    day_count: nonNegativeInt, member_count: nonNegativeInt,
+  })),
+  schedule: nullable(object({
+    days: arrayOf(object({
+      date: str, title: nullable(str), timezone_id: str,
+      events: arrayOf(object({
+        title: str, event_type: str, local_start_time: nullable(str), is_all_day: bool, end: nullable(str),
+        place_name: nullable(str), address: nullable(str), locked: bool,
+        reservations: arrayOf(object({ type: str, provider_name: nullable(str), status: str })),
+      })),
+    })),
+    transport: arrayOf(object({
+      mode: str, from_label: nullable(str), to_label: nullable(str), departure: nullable(str), arrival: nullable(str),
+      duration_minutes: nullable(nonNegativeInt), transport_number: nullable(str), platform: nullable(str),
+      status: str, is_estimate: bool,
+    })),
+  })),
+  map: nullable(object({
+    places: arrayOf(object({
+      label: str, date: nullable(str), address: nullable(str), latitude: nullable(num), longitude: nullable(num),
+    })),
+  })),
+  reservations: nullable(arrayOf(object({
+    type: str, provider_name: nullable(str), status: str, start: nullable(str), end: nullable(str),
+    timezone_id: nullable(str), guest_count: nullable(nonNegativeInt), confirmation: nullable(str),
+    confirmation_is_full: bool, contact_phone: nullable(str), cancellation_deadline: nullable(str),
+    payment_status: nullable(str),
+  }))),
+  packing: nullable(arrayOf(object({
+    name: str, category: str, quantity: nonNegativeInt, is_required: bool, status: str,
+  }))),
+  contacts: nullable(object({
+    member_count: nonNegativeInt,
+    members: nullable(arrayOf(str)),
+    reservation_contacts: nullable(arrayOf(object({
+      provider_name: nullable(str), type: str, phone: nullable(str), url: nullable(str),
+    }))),
+    hidden: arrayOf(oneOf('participants', 'phones')),
+  })),
+  costs: nullable(object({
+    base_currency: str, budget_total: nullable(moneyString), actual_total: moneyString, over: bool,
+    by_category: arrayOf(object({ category: str, budget: nullable(moneyString), actual: moneyString, over: bool })),
+    unconverted_expenses: nonNegativeInt,
+  })),
+  notes: nullable(arrayOf(str)),
+});
+
+export const bookletExport: Decoder<BookletExport> = object<BookletExport>({
+  id: str,
+  plan_id: str,
+  version_no: int,
+  format: oneOf('web', 'print'),
+  theme: oneOf(...BOOKLET_THEMES),
+  density: oneOf('normal', 'compact'),
+  sections: arrayOf(oneOf(...BOOKLET_SECTIONS)),
+  includes: bookletIncludes,
+  contains_sensitive: bool,
+  watermark_text: nullable(str),
+  valid_until: nullable(str),
+  input_revision: int,
+  is_stale: bool,
+  policy_version: str,
+  state: oneOf('active', 'revoked', 'expired'),
+  created_at: nullable(str),
+  created_by_name: str,
+  is_mine: bool,
+  can_view: bool,
+  can_revoke: bool,
 });

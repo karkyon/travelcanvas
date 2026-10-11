@@ -52,6 +52,15 @@ from app.utils.rate_limiter import check_rate_limit
 router = APIRouter(prefix="/public/share", tags=["public-share"])
 
 
+# [Gate P4] FR-035 / DOC-06: 公開ページは検索エンジンから除外し、リンク元へURL(トークン)を送らない。
+# エラー応答にも同じヘッダーを付ける。
+PUBLIC_HEADERS = {
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -116,7 +125,8 @@ def _log_access(db: Session, *, share_id, token_hash: str, ip: str, result: str)
 def _invalid_link():
     # 存在しない/失効済み/期限切れ/使用回数上限のいずれも同一の404で応答し、
     # 有効なtokenが存在するかどうかを外部から推測できないようにする。
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="この共有リンクは無効です")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="この共有リンクは無効です",
+                        headers=PUBLIC_HEADERS)
 
 
 @router.post("/{token}/resolve")
@@ -132,7 +142,7 @@ async def resolve_share_token(
     ログには一切トークン文字列そのものを含めない(token_hashのみ記録)。"""
     # [Gate #31.5B] レスポンスをキャッシュさせない(共有プランの内容や
     # 失効状態が中間キャッシュ・ブラウザに残らないようにする)。
-    response.headers["Cache-Control"] = "no-store"
+    response.headers.update(PUBLIC_HEADERS)
 
     ip = _client_ip(request)
     token_hash = _hash_token(token)
@@ -143,6 +153,7 @@ async def resolve_share_token(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="リクエストが多すぎます。しばらく待ってから再試行してください。",
+            headers=PUBLIC_HEADERS,
         )
 
     share = db.query(PlanShareLink).filter(PlanShareLink.token_hash == token_hash).first()
@@ -165,7 +176,8 @@ async def resolve_share_token(
         supplied = payload.passcode or ""
         if _hash_token(supplied) != share.passcode_hash:
             _log_access(db, share_id=share.id, token_hash=token_hash, ip=ip, result="passcode_failed")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="パスコードが正しくありません")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="パスコードが正しくありません",
+                                headers=PUBLIC_HEADERS)
 
     # [Gate #31.5B] 使用回数消費の原子化。ここまでのチェックはユーザーへ
     # 分かりやすいエラー(404/401)を返すための事前確認に過ぎず、実際の

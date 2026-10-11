@@ -2133,3 +2133,55 @@ class Comment(Base):
         CheckConstraint("char_length(body) BETWEEN 1 AND 2000", name="ck_comments_body_length"),
         Index("ix_comments_plan_target", "plan_id", "target_type", "target_id"),
     )
+
+
+class BookletExport(Base):
+    """[Gate P4] しおり・印刷版の版(FR-034/035/046、DOC-05 export_jobs の成果物なし版)。
+
+    PDF・印刷物そのものはサーバーに保存しない。ブラウザが同じ構造化データ(しおり投影)から
+    Web表示・印刷・PDF保存を行う。ここには「どの設定で、どの版番号を、どの旅程revisionから作ったか」、
+    作成時点の投影(暗号化)、機密情報を含む版の透かし・有効期限・失効を記録する。
+    """
+    __tablename__ = "booklet_exports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
+    )
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    version_no = Column(Integer, nullable=False)
+    format = Column(String(5), nullable=False, default="print")
+    theme = Column(String(12), nullable=False, default="simple")
+    density = Column(String(7), nullable=False, default="normal")
+    sections = Column(JSON, nullable=False)
+    includes = Column(JSON, nullable=False)
+    contains_sensitive = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    watermark_text = Column(String(200), nullable=True)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+    input_revision = Column(Integer, nullable=False)
+    policy_version = Column(String(20), nullable=False)
+    # 作成時点のしおり投影(JSON)を暗号化して保持する(版は作成後に変わらない)。失効時に消去する。
+    snapshot_ciphertext = Column(LargeBinary, nullable=True)
+    status = Column(String(7), nullable=False, default="active")
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "version_no", name="uq_booklet_exports_plan_version"),
+        CheckConstraint("format IN ('web','print')", name="ck_booklet_exports_format"),
+        CheckConstraint(
+            "theme IN ('cute','simple','family','school','business','accessible','mono')",
+            name="ck_booklet_exports_theme",
+        ),
+        CheckConstraint("density IN ('normal','compact')", name="ck_booklet_exports_density"),
+        CheckConstraint("status IN ('active','revoked')", name="ck_booklet_exports_status"),
+        CheckConstraint("(status = 'revoked') = (revoked_at IS NOT NULL)", name="ck_booklet_exports_revoked_at"),
+        CheckConstraint(
+            "(status = 'active') = (snapshot_ciphertext IS NOT NULL)", name="ck_booklet_exports_snapshot",
+        ),
+        CheckConstraint(
+            "NOT contains_sensitive OR (watermark_text IS NOT NULL AND valid_until IS NOT NULL)",
+            name="ck_booklet_exports_sensitive_guard",
+        ),
+        CheckConstraint("version_no >= 1", name="ck_booklet_exports_version_no"),
+    )

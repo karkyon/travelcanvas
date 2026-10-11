@@ -11,7 +11,8 @@
   "captured_at_head_b013": "5b8cd6bf2bc9ecfe8f857e147a1baed15fcfe84e (+Gate B-013: 予定・日程・採用済み経路候補・共同編集者の個別削除の実応答(detached)、確定ロック409(locked_relation)、Undo競合409(undo_conflict))",
   "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 packing-items/preparation-tasks/readiness/members)",
   "captured_at_head_p2": "Gate P1 (+Gate P2 finance-settings/budgets/expenses/settlements/finance-summary)",
-  "captured_at_head_p3": "Gate P2 (+Gate P3 polls/votes/comments)"
+  "captured_at_head_p3": "Gate P2 (+Gate P3 polls/votes/comments)",
+  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet: preview/exports)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -5679,6 +5680,1249 @@
    "edited_at": null,
    "revision": 1,
    "created_at": "2026-10-02T10:05:47.795616+00:00"
+  }
+ ],
+ "booklet_preview": {
+  "policy_version": "booklet-v1",
+  "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+  "theme": "simple",
+  "density": "normal",
+  "format": "print",
+  "sections": [
+   "cover",
+   "toc",
+   "schedule",
+   "map",
+   "reservations",
+   "packing",
+   "contacts",
+   "costs",
+   "notes"
+  ],
+  "includes": {
+   "confirmation_numbers": false,
+   "addresses": false,
+   "phones": false,
+   "participants": false
+  },
+  "contains_sensitive": false,
+  "generated_at": "2026-10-11T08:30:51.941976+00:00",
+  "input_revision": 5,
+  "current_revision": 5,
+  "is_stale": false,
+  "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+  "cover": {
+   "title": "京都しおり",
+   "destination": "京都",
+   "start_date": "2026-11-01",
+   "end_date": "2026-11-01",
+   "day_count": 1,
+   "member_count": 2
+  },
+  "schedule": {
+   "days": [
+    {
+     "date": "2026-11-01",
+     "title": "東山",
+     "timezone_id": "Asia/Tokyo",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "sightseeing",
+       "local_start_time": "10:00",
+       "is_all_day": false,
+       "end": null,
+       "place_name": null,
+       "address": null,
+       "locked": false,
+       "reservations": []
+      },
+      {
+       "title": "宿にチェックイン",
+       "event_type": "accommodation",
+       "local_start_time": "16:00",
+       "is_all_day": false,
+       "end": null,
+       "place_name": null,
+       "address": null,
+       "locked": false,
+       "reservations": [
+        {
+         "type": "accommodation",
+         "provider_name": "京の宿",
+         "status": "confirmed"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "transport": [
+    {
+     "mode": "bus",
+     "from_label": "清水寺",
+     "to_label": "宿にチェックイン",
+     "departure": "2026-11-01 14:30",
+     "arrival": "2026-11-01 15:00",
+     "duration_minutes": 30,
+     "transport_number": "206",
+     "platform": null,
+     "status": "planned",
+     "is_estimate": false
+    }
+   ]
+  },
+  "map": {
+   "places": [
+    {
+     "label": "清水寺",
+     "date": "2026-11-01",
+     "address": null,
+     "latitude": null,
+     "longitude": null
+    },
+    {
+     "label": "宿にチェックイン",
+     "date": "2026-11-01",
+     "address": null,
+     "latitude": null,
+     "longitude": null
+    }
+   ]
+  },
+  "reservations": [
+   {
+    "type": "accommodation",
+    "provider_name": "京の宿",
+    "status": "confirmed",
+    "start": "2026-11-01 16:00",
+    "end": "2026-11-02 10:00",
+    "timezone_id": "Asia/Tokyo",
+    "guest_count": 2,
+    "confirmation": "******4567",
+    "confirmation_is_full": false,
+    "contact_phone": null,
+    "cancellation_deadline": "2030-10-31 00:00",
+    "payment_status": null
+   }
+  ],
+  "packing": [
+   {
+    "name": "折りたたみ傘",
+    "category": "other",
+    "quantity": 1,
+    "is_required": true,
+    "status": "to_prepare"
+   }
+  ],
+  "contacts": {
+   "member_count": 2,
+   "members": null,
+   "reservation_contacts": null,
+   "hidden": [
+    "participants",
+    "phones"
+   ]
+  },
+  "costs": {
+   "base_currency": "JPY",
+   "budget_total": "50000",
+   "actual_total": "3000",
+   "over": false,
+   "by_category": [
+    {
+     "category": "food",
+     "budget": "2000",
+     "actual": "3000",
+     "over": true
+    }
+   ],
+   "unconverted_expenses": 1
+  },
+  "notes": [
+   "京の宿の無料取消期限: 2030-10-31 00:00",
+   "チケット・QRコードは印刷物に含めていません。当日はアプリのチケット画面で表示してください。",
+   "この版は作成時点の情報です。最新の予定はアプリで確認してください。"
+  ],
+  "warnings": [
+   "qr_not_included",
+   "unconverted_expenses"
+  ]
+ },
+ "booklet_preview_sensitive": {
+  "policy_version": "booklet-v1",
+  "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+  "theme": "mono",
+  "density": "compact",
+  "format": "print",
+  "sections": [
+   "cover",
+   "toc",
+   "schedule",
+   "map",
+   "reservations",
+   "packing",
+   "contacts",
+   "costs",
+   "notes"
+  ],
+  "includes": {
+   "confirmation_numbers": true,
+   "addresses": true,
+   "phones": true,
+   "participants": true
+  },
+  "contains_sensitive": true,
+  "generated_at": "2026-10-11T08:30:51.990425+00:00",
+  "input_revision": 5,
+  "current_revision": 5,
+  "is_stale": false,
+  "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+  "cover": {
+   "title": "京都しおり",
+   "destination": "京都",
+   "start_date": "2026-11-01",
+   "end_date": "2026-11-01",
+   "day_count": 1,
+   "member_count": 2
+  },
+  "schedule": {
+   "days": [
+    {
+     "date": "2026-11-01",
+     "title": "東山",
+     "timezone_id": "Asia/Tokyo",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "sightseeing",
+       "local_start_time": "10:00",
+       "is_all_day": false,
+       "end": null,
+       "place_name": null,
+       "address": "京都市東山区清水1-294",
+       "locked": false,
+       "reservations": []
+      },
+      {
+       "title": "宿にチェックイン",
+       "event_type": "accommodation",
+       "local_start_time": "16:00",
+       "is_all_day": false,
+       "end": null,
+       "place_name": null,
+       "address": null,
+       "locked": false,
+       "reservations": [
+        {
+         "type": "accommodation",
+         "provider_name": "京の宿",
+         "status": "confirmed"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "transport": [
+    {
+     "mode": "bus",
+     "from_label": "清水寺",
+     "to_label": "宿にチェックイン",
+     "departure": "2026-11-01 14:30",
+     "arrival": "2026-11-01 15:00",
+     "duration_minutes": 30,
+     "transport_number": "206",
+     "platform": null,
+     "status": "planned",
+     "is_estimate": false
+    }
+   ]
+  },
+  "map": {
+   "places": [
+    {
+     "label": "清水寺",
+     "date": "2026-11-01",
+     "address": "京都市東山区清水1-294",
+     "latitude": 34.99485,
+     "longitude": 135.78504
+    },
+    {
+     "label": "宿にチェックイン",
+     "date": "2026-11-01",
+     "address": null,
+     "latitude": null,
+     "longitude": null
+    }
+   ]
+  },
+  "reservations": [
+   {
+    "type": "accommodation",
+    "provider_name": "京の宿",
+    "status": "confirmed",
+    "start": "2026-11-01 16:00",
+    "end": "2026-11-02 10:00",
+    "timezone_id": "Asia/Tokyo",
+    "guest_count": 2,
+    "confirmation": "ABC1234567",
+    "confirmation_is_full": true,
+    "contact_phone": "075-123-4567",
+    "cancellation_deadline": "2030-10-31 00:00",
+    "payment_status": null
+   }
+  ],
+  "packing": [
+   {
+    "name": "折りたたみ傘",
+    "category": "other",
+    "quantity": 1,
+    "is_required": true,
+    "status": "to_prepare"
+   }
+  ],
+  "contacts": {
+   "member_count": 2,
+   "members": [
+    "user_da26f03bca",
+    "user_edbdbc1b70"
+   ],
+   "reservation_contacts": [
+    {
+     "provider_name": "京の宿",
+     "type": "accommodation",
+     "phone": "075-123-4567",
+     "url": null
+    }
+   ],
+   "hidden": []
+  },
+  "costs": {
+   "base_currency": "JPY",
+   "budget_total": "50000",
+   "actual_total": "3000",
+   "over": false,
+   "by_category": [
+    {
+     "category": "food",
+     "budget": "2000",
+     "actual": "3000",
+     "over": true
+    }
+   ],
+   "unconverted_expenses": 1
+  },
+  "notes": [
+   "京の宿の無料取消期限: 2030-10-31 00:00",
+   "チケット・QRコードは印刷物に含めていません。当日はアプリのチケット画面で表示してください。",
+   "この版には機密情報が含まれます。紛失・置き忘れに注意し、有効期限後は破棄してください。",
+   "この版は作成時点の情報です。最新の予定はアプリで確認してください。"
+  ],
+  "warnings": [
+   "contains_sensitive",
+   "qr_not_included",
+   "unconverted_expenses"
+  ]
+ },
+ "booklet_preview_cover_only": {
+  "policy_version": "booklet-v1",
+  "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+  "theme": "cute",
+  "density": "normal",
+  "format": "print",
+  "sections": [
+   "cover"
+  ],
+  "includes": {
+   "confirmation_numbers": false,
+   "addresses": false,
+   "phones": false,
+   "participants": false
+  },
+  "contains_sensitive": false,
+  "generated_at": "2026-10-11T08:30:52.022669+00:00",
+  "input_revision": 5,
+  "current_revision": 5,
+  "is_stale": false,
+  "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+  "cover": {
+   "title": "京都しおり",
+   "destination": "京都",
+   "start_date": "2026-11-01",
+   "end_date": "2026-11-01",
+   "day_count": 1,
+   "member_count": 2
+  },
+  "schedule": null,
+  "map": null,
+  "reservations": null,
+  "packing": null,
+  "contacts": null,
+  "costs": null,
+  "notes": null,
+  "warnings": []
+ },
+ "booklet_export_created": {
+  "export": {
+   "id": "e6e11e0a-a917-43fc-92cc-ea02a6e86e26",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 1,
+   "format": "web",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 5,
+   "is_stale": false,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": true,
+   "can_revoke": true
+  },
+  "booklet": {
+   "policy_version": "booklet-v1",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "theme": "simple",
+   "density": "normal",
+   "format": "web",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "generated_at": "2026-10-11T08:30:52.034166+00:00",
+   "input_revision": 5,
+   "current_revision": 5,
+   "is_stale": false,
+   "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+   "cover": {
+    "title": "京都しおり",
+    "destination": "京都",
+    "start_date": "2026-11-01",
+    "end_date": "2026-11-01",
+    "day_count": 1,
+    "member_count": 2
+   },
+   "schedule": {
+    "days": [
+     {
+      "date": "2026-11-01",
+      "title": "東山",
+      "timezone_id": "Asia/Tokyo",
+      "events": [
+       {
+        "title": "清水寺",
+        "event_type": "sightseeing",
+        "local_start_time": "10:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": []
+       },
+       {
+        "title": "宿にチェックイン",
+        "event_type": "accommodation",
+        "local_start_time": "16:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": [
+         {
+          "type": "accommodation",
+          "provider_name": "京の宿",
+          "status": "confirmed"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "transport": [
+     {
+      "mode": "bus",
+      "from_label": "清水寺",
+      "to_label": "宿にチェックイン",
+      "departure": "2026-11-01 14:30",
+      "arrival": "2026-11-01 15:00",
+      "duration_minutes": 30,
+      "transport_number": "206",
+      "platform": null,
+      "status": "planned",
+      "is_estimate": false
+     }
+    ]
+   },
+   "map": {
+    "places": [
+     {
+      "label": "清水寺",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     },
+     {
+      "label": "宿にチェックイン",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     }
+    ]
+   },
+   "reservations": [
+    {
+     "type": "accommodation",
+     "provider_name": "京の宿",
+     "status": "confirmed",
+     "start": "2026-11-01 16:00",
+     "end": "2026-11-02 10:00",
+     "timezone_id": "Asia/Tokyo",
+     "guest_count": 2,
+     "confirmation": "******4567",
+     "confirmation_is_full": false,
+     "contact_phone": null,
+     "cancellation_deadline": "2030-10-31 00:00",
+     "payment_status": null
+    }
+   ],
+   "packing": [
+    {
+     "name": "折りたたみ傘",
+     "category": "other",
+     "quantity": 1,
+     "is_required": true,
+     "status": "to_prepare"
+    }
+   ],
+   "contacts": {
+    "member_count": 2,
+    "members": null,
+    "reservation_contacts": null,
+    "hidden": [
+     "participants",
+     "phones"
+    ]
+   },
+   "costs": {
+    "base_currency": "JPY",
+    "budget_total": "50000",
+    "actual_total": "3000",
+    "over": false,
+    "by_category": [
+     {
+      "category": "food",
+      "budget": "2000",
+      "actual": "3000",
+      "over": true
+     }
+    ],
+    "unconverted_expenses": 1
+   },
+   "notes": [
+    "京の宿の無料取消期限: 2030-10-31 00:00",
+    "チケット・QRコードは印刷物に含めていません。当日はアプリのチケット画面で表示してください。",
+    "この版は作成時点の情報です。最新の予定はアプリで確認してください。"
+   ],
+   "warnings": [
+    "qr_not_included",
+    "unconverted_expenses"
+   ]
+  }
+ },
+ "booklet_export_sensitive": {
+  "export": {
+   "id": "988f7b95-f339-453a-b6bd-f19df4de16bc",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 2,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": true,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": true,
+   "watermark_text": "user_da26f03bca 専用・持出注意",
+   "valid_until": "2026-12-31T14:59:59+00:00",
+   "input_revision": 5,
+   "is_stale": false,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": true,
+   "can_revoke": true
+  },
+  "booklet": {
+   "policy_version": "booklet-v1",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "theme": "simple",
+   "density": "normal",
+   "format": "print",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": true,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": true,
+   "generated_at": "2026-10-11T08:30:52.071743+00:00",
+   "input_revision": 5,
+   "current_revision": 5,
+   "is_stale": false,
+   "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+   "cover": {
+    "title": "京都しおり",
+    "destination": "京都",
+    "start_date": "2026-11-01",
+    "end_date": "2026-11-01",
+    "day_count": 1,
+    "member_count": 2
+   },
+   "schedule": {
+    "days": [
+     {
+      "date": "2026-11-01",
+      "title": "東山",
+      "timezone_id": "Asia/Tokyo",
+      "events": [
+       {
+        "title": "清水寺",
+        "event_type": "sightseeing",
+        "local_start_time": "10:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": []
+       },
+       {
+        "title": "宿にチェックイン",
+        "event_type": "accommodation",
+        "local_start_time": "16:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": [
+         {
+          "type": "accommodation",
+          "provider_name": "京の宿",
+          "status": "confirmed"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "transport": [
+     {
+      "mode": "bus",
+      "from_label": "清水寺",
+      "to_label": "宿にチェックイン",
+      "departure": "2026-11-01 14:30",
+      "arrival": "2026-11-01 15:00",
+      "duration_minutes": 30,
+      "transport_number": "206",
+      "platform": null,
+      "status": "planned",
+      "is_estimate": false
+     }
+    ]
+   },
+   "map": {
+    "places": [
+     {
+      "label": "清水寺",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     },
+     {
+      "label": "宿にチェックイン",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     }
+    ]
+   },
+   "reservations": [
+    {
+     "type": "accommodation",
+     "provider_name": "京の宿",
+     "status": "confirmed",
+     "start": "2026-11-01 16:00",
+     "end": "2026-11-02 10:00",
+     "timezone_id": "Asia/Tokyo",
+     "guest_count": 2,
+     "confirmation": "ABC1234567",
+     "confirmation_is_full": true,
+     "contact_phone": null,
+     "cancellation_deadline": "2030-10-31 00:00",
+     "payment_status": null
+    }
+   ],
+   "packing": [
+    {
+     "name": "折りたたみ傘",
+     "category": "other",
+     "quantity": 1,
+     "is_required": true,
+     "status": "to_prepare"
+    }
+   ],
+   "contacts": {
+    "member_count": 2,
+    "members": null,
+    "reservation_contacts": null,
+    "hidden": [
+     "participants",
+     "phones"
+    ]
+   },
+   "costs": {
+    "base_currency": "JPY",
+    "budget_total": "50000",
+    "actual_total": "3000",
+    "over": false,
+    "by_category": [
+     {
+      "category": "food",
+      "budget": "2000",
+      "actual": "3000",
+      "over": true
+     }
+    ],
+    "unconverted_expenses": 1
+   },
+   "notes": [
+    "京の宿の無料取消期限: 2030-10-31 00:00",
+    "チケット・QRコードは印刷物に含めていません。当日はアプリのチケット画面で表示してください。",
+    "この版には機密情報が含まれます。紛失・置き忘れに注意し、有効期限後は破棄してください。",
+    "この版は作成時点の情報です。最新の予定はアプリで確認してください。"
+   ],
+   "warnings": [
+    "contains_sensitive",
+    "qr_not_included",
+    "unconverted_expenses"
+   ]
+  }
+ },
+ "booklet_export_stale": {
+  "export": {
+   "id": "e6e11e0a-a917-43fc-92cc-ea02a6e86e26",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 1,
+   "format": "web",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 5,
+   "is_stale": true,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": true,
+   "can_revoke": true
+  },
+  "booklet": {
+   "policy_version": "booklet-v1",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "theme": "simple",
+   "density": "normal",
+   "format": "web",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "generated_at": "2026-10-11T08:30:52.034166+00:00",
+   "input_revision": 5,
+   "current_revision": 6,
+   "is_stale": true,
+   "data_as_of": "2026-10-11T08:30:51.221107+00:00",
+   "cover": {
+    "title": "京都しおり",
+    "destination": "京都",
+    "start_date": "2026-11-01",
+    "end_date": "2026-11-01",
+    "day_count": 1,
+    "member_count": 2
+   },
+   "schedule": {
+    "days": [
+     {
+      "date": "2026-11-01",
+      "title": "東山",
+      "timezone_id": "Asia/Tokyo",
+      "events": [
+       {
+        "title": "清水寺",
+        "event_type": "sightseeing",
+        "local_start_time": "10:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": []
+       },
+       {
+        "title": "宿にチェックイン",
+        "event_type": "accommodation",
+        "local_start_time": "16:00",
+        "is_all_day": false,
+        "end": null,
+        "place_name": null,
+        "address": null,
+        "locked": false,
+        "reservations": [
+         {
+          "type": "accommodation",
+          "provider_name": "京の宿",
+          "status": "confirmed"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "transport": [
+     {
+      "mode": "bus",
+      "from_label": "清水寺",
+      "to_label": "宿にチェックイン",
+      "departure": "2026-11-01 14:30",
+      "arrival": "2026-11-01 15:00",
+      "duration_minutes": 30,
+      "transport_number": "206",
+      "platform": null,
+      "status": "planned",
+      "is_estimate": false
+     }
+    ]
+   },
+   "map": {
+    "places": [
+     {
+      "label": "清水寺",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     },
+     {
+      "label": "宿にチェックイン",
+      "date": "2026-11-01",
+      "address": null,
+      "latitude": null,
+      "longitude": null
+     }
+    ]
+   },
+   "reservations": [
+    {
+     "type": "accommodation",
+     "provider_name": "京の宿",
+     "status": "confirmed",
+     "start": "2026-11-01 16:00",
+     "end": "2026-11-02 10:00",
+     "timezone_id": "Asia/Tokyo",
+     "guest_count": 2,
+     "confirmation": "******4567",
+     "confirmation_is_full": false,
+     "contact_phone": null,
+     "cancellation_deadline": "2030-10-31 00:00",
+     "payment_status": null
+    }
+   ],
+   "packing": [
+    {
+     "name": "折りたたみ傘",
+     "category": "other",
+     "quantity": 1,
+     "is_required": true,
+     "status": "to_prepare"
+    }
+   ],
+   "contacts": {
+    "member_count": 2,
+    "members": null,
+    "reservation_contacts": null,
+    "hidden": [
+     "participants",
+     "phones"
+    ]
+   },
+   "costs": {
+    "base_currency": "JPY",
+    "budget_total": "50000",
+    "actual_total": "3000",
+    "over": false,
+    "by_category": [
+     {
+      "category": "food",
+      "budget": "2000",
+      "actual": "3000",
+      "over": true
+     }
+    ],
+    "unconverted_expenses": 1
+   },
+   "notes": [
+    "京の宿の無料取消期限: 2030-10-31 00:00",
+    "チケット・QRコードは印刷物に含めていません。当日はアプリのチケット画面で表示してください。",
+    "この版は作成時点の情報です。最新の予定はアプリで確認してください。"
+   ],
+   "warnings": [
+    "qr_not_included",
+    "unconverted_expenses",
+    "stale_revision"
+   ]
+  }
+ },
+ "booklet_export_revoked": {
+  "export": {
+   "id": "fa6f1264-2a3e-4523-9e31-339fd117281d",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 3,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 6,
+   "is_stale": false,
+   "policy_version": "booklet-v1",
+   "state": "revoked",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": false,
+   "can_revoke": false
+  }
+ },
+ "booklet_export_list": [
+  {
+   "id": "fa6f1264-2a3e-4523-9e31-339fd117281d",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 3,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 6,
+   "is_stale": false,
+   "policy_version": "booklet-v1",
+   "state": "revoked",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": false,
+   "can_revoke": false
+  },
+  {
+   "id": "988f7b95-f339-453a-b6bd-f19df4de16bc",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 2,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": true,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": true,
+   "watermark_text": "user_da26f03bca 専用・持出注意",
+   "valid_until": "2026-12-31T14:59:59+00:00",
+   "input_revision": 5,
+   "is_stale": true,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": true,
+   "can_revoke": true
+  },
+  {
+   "id": "e6e11e0a-a917-43fc-92cc-ea02a6e86e26",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 1,
+   "format": "web",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 5,
+   "is_stale": true,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": true,
+   "can_view": true,
+   "can_revoke": true
+  }
+ ],
+ "booklet_export_list_editor": [
+  {
+   "id": "fa6f1264-2a3e-4523-9e31-339fd117281d",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 3,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 6,
+   "is_stale": false,
+   "policy_version": "booklet-v1",
+   "state": "revoked",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": false,
+   "can_view": false,
+   "can_revoke": false
+  },
+  {
+   "id": "988f7b95-f339-453a-b6bd-f19df4de16bc",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 2,
+   "format": "print",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": true,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": true,
+   "watermark_text": "user_da26f03bca 専用・持出注意",
+   "valid_until": "2026-12-31T14:59:59+00:00",
+   "input_revision": 5,
+   "is_stale": true,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": false,
+   "can_view": false,
+   "can_revoke": false
+  },
+  {
+   "id": "e6e11e0a-a917-43fc-92cc-ea02a6e86e26",
+   "plan_id": "f1d36ec9-851a-4349-be4c-a0d4d92ef94a",
+   "version_no": 1,
+   "format": "web",
+   "theme": "simple",
+   "density": "normal",
+   "sections": [
+    "cover",
+    "toc",
+    "schedule",
+    "map",
+    "reservations",
+    "packing",
+    "contacts",
+    "costs",
+    "notes"
+   ],
+   "includes": {
+    "confirmation_numbers": false,
+    "addresses": false,
+    "phones": false,
+    "participants": false
+   },
+   "contains_sensitive": false,
+   "watermark_text": null,
+   "valid_until": null,
+   "input_revision": 5,
+   "is_stale": true,
+   "policy_version": "booklet-v1",
+   "state": "active",
+   "created_at": "2026-10-11T08:30:51.221107+00:00",
+   "created_by_name": "user_da26f03bca",
+   "is_mine": false,
+   "can_view": true,
+   "can_revoke": false
   }
  ]
 }

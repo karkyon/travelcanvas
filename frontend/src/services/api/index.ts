@@ -9,6 +9,7 @@ import { CompleteTravelAPI } from './client';
 import { API_BASE_URL } from './core';
 import type { TravelPlan, User } from '@/types';
 import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateData, VoteInput } from './types';
+import type { BookletExportCreateData, BookletOptions } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -300,5 +301,13 @@ export const updateComment = (
 ) => api.updateComment(planId, commentId, data, ifMatch);
 export const deleteComment = (planId: string, commentId: string, ifMatch: number) =>
   api.deleteComment(planId, commentId, ifMatch);
+
+// ===== [Gate P4] しおり・印刷・PDF出力(FR-034/035/046) =====
+export const previewBooklet = (planId: string, options: BookletOptions) => api.previewBooklet(planId, options);
+export const getBookletExports = (planId: string) => api.getBookletExports(planId);
+export const createBookletExport = (planId: string, data: BookletExportCreateData) =>
+  api.createBookletExport(planId, data);
+export const getBookletExport = (planId: string, exportId: string) => api.getBookletExport(planId, exportId);
+export const revokeBookletExport = (planId: string, exportId: string) => api.revokeBookletExport(planId, exportId);
 
 export default api;

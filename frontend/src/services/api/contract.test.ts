@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import fx from './__fixtures__/backendContractResponses.json';
-import { arrayOf, decodeResponse, ApiDecodeError, type Decoder } from './decode';
+import { arrayOf, decodeResponse, object, ApiDecodeError, type Decoder } from './decode';
 import {
   adoptRouteOptionResponse, documentLink, downloadUrlResult, extractionCandidate, importJob, importJobDetail,
   reservation, reservationEventLink, reservationParticipant, reservationRevealResult, routeLeg, routeOption,
@@ -23,6 +23,7 @@ import {
   packingItem, packingSuggestions, planMember, preparationTask, readiness,
   budget, expense, financeSettings, financeSummary, settlement,
   planComment, poll,
+  booklet, bookletExport,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -187,6 +188,16 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['comment_deleted', revisionResult],
   ['comment_list', arrayOf(planComment)],
   ['comment_list_poll', arrayOf(planComment)],
+  // ----- [Gate P4] しおり・印刷(FR-034/035/046)。*_sensitive は所有者が機密項目を含めた応答、*_editor は編集者から見た一覧
+  ['booklet_preview', booklet],
+  ['booklet_preview_sensitive', booklet],
+  ['booklet_preview_cover_only', booklet],
+  ['booklet_export_created', object({ export: bookletExport, booklet })],
+  ['booklet_export_sensitive', object({ export: bookletExport, booklet })],
+  ['booklet_export_stale', object({ export: bookletExport, booklet })],
+  ['booklet_export_revoked', object({ export: bookletExport })],
+  ['booklet_export_list', arrayOf(bookletExport)],
+  ['booklet_export_list_editor', arrayOf(bookletExport)],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

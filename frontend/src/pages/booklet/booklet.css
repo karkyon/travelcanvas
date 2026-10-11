@@ -1,0 +1,59 @@
+/* [Gate P4] しおりの印刷・PDF保存用スタイル(FR-034/035/046)。 */
+.booklet-watermark {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  overflow: hidden;
+}
+/* 透かしは擬似要素で描く(読み上げ・コントラスト検査の対象にしない。同じ文言を版情報に文字で載せる) */
+.booklet-watermark::before {
+  content: attr(data-text);
+  transform: rotate(-30deg);
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.09);
+  white-space: nowrap;
+}
+.booklet-mono {
+  filter: grayscale(1);
+}
+.booklet-checkbox {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 1.5px solid currentColor;
+  margin-right: 0.4em;
+  vertical-align: -0.1em;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .booklet-root {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .booklet-section {
+    break-inside: avoid-page;
+  }
+  .booklet-cover {
+    break-after: page;
+  }
+  a[href^='#'] {
+    text-decoration: none;
+    color: inherit;
+  }
+}

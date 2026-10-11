@@ -7,10 +7,12 @@
   "captured_at_head_b012": "d8a217ce5781a5dccadb8762e6f56a103505923d (+Gate B-012 deleted/restore/permanent)",
   "captured_at_head_p1": "2e062498a1a91756598093c43d04bc018e27962c (+Gate P1 preparation)",
   "captured_at_head_p2": "Gate P1 (+Gate P2 finance)",
-  "captured_at_head_p3": "Gate P2 (+Gate P3 discussion)"
+  "captured_at_head_p3": "Gate P2 (+Gate P3 discussion)",
+  "captured_at_head_p4": "Gate P3 (+Gate P4 booklet)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
+  "DELETE /api/v1/plans/{plan_id}/booklet-exports/{export_id}",
   "DELETE /api/v1/plans/{plan_id}/budgets/{budget_id}",
   "DELETE /api/v1/plans/{plan_id}/comments/{comment_id}",
   "DELETE /api/v1/plans/{plan_id}/constraints/{constraint_id}",
@@ -50,6 +52,8 @@
   "GET /api/v1/optimization/{job_id}",
   "GET /api/v1/plans/documents/download",
   "GET /api/v1/plans/{plan_id}",
+  "GET /api/v1/plans/{plan_id}/booklet-exports",
+  "GET /api/v1/plans/{plan_id}/booklet-exports/{export_id}",
   "GET /api/v1/plans/{plan_id}/budgets",
   "GET /api/v1/plans/{plan_id}/comments",
   "GET /api/v1/plans/{plan_id}/constraints",
@@ -130,6 +134,8 @@
   "POST /api/v1/optimization/{job_id}/apply",
   "POST /api/v1/optimization/{job_id}/cancel",
   "POST /api/v1/optimize-route",
+  "POST /api/v1/plans/{plan_id}/booklet-exports",
+  "POST /api/v1/plans/{plan_id}/booklet/preview",
   "POST /api/v1/plans/{plan_id}/budgets",
   "POST /api/v1/plans/{plan_id}/comments",
   "POST /api/v1/plans/{plan_id}/constraints",
