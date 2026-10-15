@@ -29,5 +29,6 @@ export * from './booklet';
 export * from './itineraryExport';
 export * from './dataExport';
 export * from './branches';
+export * from './replans';
 export * from './calendarImport';
 export * from './privacy';

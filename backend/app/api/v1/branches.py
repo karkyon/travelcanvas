@@ -360,6 +360,25 @@ def adopt_branch(plan_id: str, branch_id: str, request: Request, db: Session = D
     if not ops:
         raise HTTPException(status_code=409, detail={"code": "no_changes", "message": "本案からの変更がありません"})
 
+    changes = apply_ops(db, plan, ops)
+    new_revision = plans_api._record_batch_change_and_bump_revision(db, plan, current_user, "branch", changes)
+    cs = db.query(ChangeSet).filter(ChangeSet.plan_id == plan.id,
+                                    ChangeSet.resulting_revision == new_revision).first()
+    b.status = "adopted"
+    b.adopted_at = _now()
+    b.adopted_by_user_id = current_user.id
+    b.adopted_change_set_id = cs.id if cs else None
+    b.revision += 1
+    db.commit()
+    db.refresh(b)
+    _audit("branch_adopted", request, current_user, b, {"plan_revision": new_revision, **br.summarize(ops)})
+    return {"branch": _response(db, plan, b, current_user, role, _names(db, [b]), detail=True),
+            "plan_revision": new_revision}
+
+
+def apply_ops(db: Session, plan: TravelPlan, ops: List[Dict[str, Any]]) -> List[tuple]:
+    """差分(ops)を本案の予定へ当て、変更セット用の (entity_type, id, action, before, after) を返す。
+    [Gate P10] 再計画の承認(app/api/v1/replans.py)でも同じ処理を使うため関数に切り出した。"""
     days = {str(d.id): d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
     changes = []
     for o in ops:
@@ -392,19 +411,7 @@ def adopt_branch(plan_id: str, branch_id: str, request: Request, db: Session = D
                 _apply_time(ev, days[str(ev.day_id)], new_time)
             db.flush()
             changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
-    new_revision = plans_api._record_batch_change_and_bump_revision(db, plan, current_user, "branch", changes)
-    cs = db.query(ChangeSet).filter(ChangeSet.plan_id == plan.id,
-                                    ChangeSet.resulting_revision == new_revision).first()
-    b.status = "adopted"
-    b.adopted_at = _now()
-    b.adopted_by_user_id = current_user.id
-    b.adopted_change_set_id = cs.id if cs else None
-    b.revision += 1
-    db.commit()
-    db.refresh(b)
-    _audit("branch_adopted", request, current_user, b, {"plan_revision": new_revision, **br.summarize(ops)})
-    return {"branch": _response(db, plan, b, current_user, role, _names(db, [b]), detail=True),
-            "plan_revision": new_revision}
+    return changes
 
 
 @router.delete("/{plan_id}/branches/{branch_id}", response_model=dict)

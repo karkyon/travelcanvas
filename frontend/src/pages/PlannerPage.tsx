@@ -512,6 +512,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/alerts`)}
+            >
+              ⚠️ 遅延・休業の対応
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
             >
               🚶 移動区間

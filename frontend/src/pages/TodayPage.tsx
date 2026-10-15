@@ -240,6 +240,12 @@ const TodayPage: React.FC = () => {
         </button>
       </div>
 
+      <div className="mb-4">
+        <Button variant="outline" size="lg" onClick={() => navigate(`/planner/${planId}/alerts`)}>
+          ⚠️ 遅延・休業などの対応
+        </Button>
+      </div>
+
       {isStale && snapshot && (
         <div role="status" className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-900 text-sm flex items-start gap-2">
           <WifiOff size={18} aria-hidden="true" className="mt-0.5 shrink-0" />

@@ -13,6 +13,7 @@ import type { BookletExportCreateData, BookletOptions } from './types';
 import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
 import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
 import type { CalendarImportApplyItem, ConsentPurpose } from './types';
+import type { AlertCreateData, AlertUpdateData } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -344,5 +345,16 @@ export const getConsents = () => api.getConsents();
 export const updateConsents = (consents: Partial<Record<ConsentPurpose, boolean>>) => api.updateConsents(consents);
 export const getAccountDeletionPreview = () => api.getAccountDeletionPreview();
 export const deleteAccount = (confirmation: string, password?: string) => api.deleteAccount(confirmation, password);
+
+// ===== [Gate P10] 外部状況(アラート、FR-030)・安全な再計画(FR-031) =====
+export const getAlerts = (planId: string) => api.getAlerts(planId);
+export const createAlert = (planId: string, data: AlertCreateData) => api.createAlert(planId, data);
+export const updateAlert = (planId: string, alertId: string, data: AlertUpdateData, revision: number) =>
+  api.updateAlert(planId, alertId, data, revision);
+export const createReplan = (planId: string, alertId: string) => api.createReplan(planId, alertId);
+export const getReplan = (planId: string, replanId: string) => api.getReplan(planId, replanId);
+export const applyReplan = (planId: string, replanId: string, candidate: 'A' | 'B', planRevision: number) =>
+  api.applyReplan(planId, replanId, candidate, planRevision);
+export const rejectReplan = (planId: string, replanId: string, revision: number) => api.rejectReplan(planId, replanId, revision);
 
 export default api;

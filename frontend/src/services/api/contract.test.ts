@@ -27,6 +27,7 @@ import {
   retentionInfo,
   branch, branchDetail,
   calendarImportPreview, calendarImportResult, consentState, accountDeletionPreview, accountDeletionResult,
+  alertList, planAlert, replan, replanApplyResult, replanError,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -220,6 +221,18 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['privacy_consents_updated', consentState],
   ['account_deletion_preview', accountDeletionPreview],
   ['account_deletion_done', accountDeletionResult],
+  // ----- [Gate P10] 外部状況(アラート)・安全な再計画(FR-030/031)。*_editor は編集者から見た一覧、*_stale は作成後に本案が変わった案
+  ['alert_created', planAlert],
+  ['alert_dismissed', planAlert],
+  ['alert_list', alertList],
+  ['alert_list_editor', alertList],
+  ['replan_created', replan],
+  ['replan_closure', replan],
+  ['replan_rejected', replan],
+  ['replan_weather_last_day', replan],
+  ['replan_applied', replanApplyResult],
+  ['replan_stale', replan],
+  ['replan_stale_error', replanError],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

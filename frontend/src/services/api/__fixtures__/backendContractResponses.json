@@ -15,7 +15,8 @@
   "captured_at_head_p4": "Gate P3 (+Gate P4 booklet: preview/exports)",
   "captured_at_head_p6": "Gate P5 (+Gate P6 GET /privacy/retention)",
   "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
-  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)"
+  "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)",
+  "captured_at_head_p10": "Gate P9 (+Gate P10 alerts/replans)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -8108,5 +8109,895 @@
    "sessions": 0
   },
   "plan_delete_grace_days": 30
+ },
+ "alert_created": {
+  "id": "cb546690-c327-4f72-a52a-2595f48b8e10",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "kind": "delay",
+  "kind_label": "遅延",
+  "source": "user_report",
+  "source_label": "駅の掲示",
+  "confidence": "confirmed",
+  "observed_at": "2026-10-15T06:45:06.629425+00:00",
+  "is_stale": false,
+  "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+  "event_title": "新幹線で京都へ",
+  "event_local_start_time": "09:00",
+  "event_missing": false,
+  "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+  "local_date": "2026-11-01",
+  "delay_minutes": 120,
+  "note": null,
+  "status": "active",
+  "resolved_at": null,
+  "created_by_name": "user_9882f7e0a9",
+  "latest_replan_id": null,
+  "latest_replan_status": null,
+  "revision": 1,
+  "created_at": "2026-10-15T06:45:06.096839+00:00",
+  "updated_at": null
+ },
+ "replan_created": {
+  "id": "c1c2ee71-e0fc-4996-b7f9-ea4d43ec8b66",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "alert_id": "cb546690-c327-4f72-a52a-2595f48b8e10",
+  "algorithm_version": "replan-v1",
+  "base_revision": 8,
+  "plan_revision": 8,
+  "is_stale": false,
+  "status": "proposed",
+  "state": "proposed",
+  "applied_candidate": null,
+  "applied_at": null,
+  "applied_by_name": null,
+  "created_by_name": "user_9882f7e0a9",
+  "can_apply": true,
+  "candidates": [
+   {
+    "id": "A",
+    "strategy": "shift_later",
+    "label": "後ろの予定をずらす",
+    "description": "影響を受けた予定と、その後の予定を遅れの分だけ後ろへずらします。守る予定は動かしません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [
+     {
+      "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+      "title": "新幹線で京都へ",
+      "before_time": "09:00",
+      "after_time": "11:00",
+      "before_date": "2026-11-01",
+      "after_date": "2026-11-01"
+     }
+    ],
+    "lost": [
+     {
+      "event_id": "500ac7e1-8220-43e0-b1c6-97a5c218eada",
+      "title": "清水寺"
+     }
+    ],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 1,
+     "lost_count": 1,
+     "protected_count": 1,
+     "max_delay_minutes": 120,
+     "day_end_shift_minutes": 0
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   },
+   {
+    "id": "B",
+    "strategy": "keep_times",
+    "label": "後ろの予定の時刻を守る",
+    "description": "影響を受けた予定だけを遅らせ、重なる予定を外して、その後は元の時刻を守ります",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [
+     {
+      "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+      "title": "新幹線で京都へ",
+      "before_time": "09:00",
+      "after_time": "11:00",
+      "before_date": "2026-11-01",
+      "after_date": "2026-11-01"
+     }
+    ],
+    "lost": [
+     {
+      "event_id": "500ac7e1-8220-43e0-b1c6-97a5c218eada",
+      "title": "清水寺"
+     }
+    ],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 1,
+     "lost_count": 1,
+     "protected_count": 1,
+     "max_delay_minutes": 120,
+     "day_end_shift_minutes": 0
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "replan_closure": {
+  "id": "72dc23a8-88c0-4c56-a845-d627698ef954",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "alert_id": "2c6d8dad-3877-4914-9485-4218bd5a97b2",
+  "algorithm_version": "replan-v1",
+  "base_revision": 8,
+  "plan_revision": 8,
+  "is_stale": false,
+  "status": "proposed",
+  "state": "proposed",
+  "applied_candidate": null,
+  "applied_at": null,
+  "applied_by_name": null,
+  "created_by_name": "user_9882f7e0a9",
+  "can_apply": true,
+  "candidates": [
+   {
+    "id": "A",
+    "strategy": "remove",
+    "label": "予定を外す",
+    "description": "影響を受ける予定を外します。守る予定は外しません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [],
+    "lost": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策"
+     }
+    ],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 0,
+     "lost_count": 1,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   },
+   {
+    "id": "B",
+    "strategy": "move_next_day",
+    "label": "翌日へ移す",
+    "description": "影響を受ける予定を翌日の同じ時刻へ移します。守る予定は動かしません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策",
+      "before_time": "14:00",
+      "after_time": "14:00",
+      "before_date": "2026-11-01",
+      "after_date": "2026-11-02"
+     }
+    ],
+    "lost": [],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 1,
+     "lost_count": 0,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "replan_rejected": {
+  "id": "72dc23a8-88c0-4c56-a845-d627698ef954",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "alert_id": "2c6d8dad-3877-4914-9485-4218bd5a97b2",
+  "algorithm_version": "replan-v1",
+  "base_revision": 8,
+  "plan_revision": 8,
+  "is_stale": false,
+  "status": "rejected",
+  "state": "rejected",
+  "applied_candidate": null,
+  "applied_at": null,
+  "applied_by_name": null,
+  "created_by_name": "user_9882f7e0a9",
+  "can_apply": false,
+  "candidates": [
+   {
+    "id": "A",
+    "strategy": "remove",
+    "label": "予定を外す",
+    "description": "影響を受ける予定を外します。守る予定は外しません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [],
+    "lost": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策"
+     }
+    ],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 0,
+     "lost_count": 1,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   },
+   {
+    "id": "B",
+    "strategy": "move_next_day",
+    "label": "翌日へ移す",
+    "description": "影響を受ける予定を翌日の同じ時刻へ移します。守る予定は動かしません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策",
+      "before_time": "14:00",
+      "after_time": "14:00",
+      "before_date": "2026-11-01",
+      "after_date": "2026-11-02"
+     }
+    ],
+    "lost": [],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 1,
+     "lost_count": 0,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   }
+  ],
+  "revision": 2,
+  "created_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "replan_weather_last_day": {
+  "id": "1198245e-bce0-47ea-8434-d87eb1d29f5d",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "alert_id": "b5b077aa-e68d-4565-ba7f-413377788511",
+  "algorithm_version": "replan-v1",
+  "base_revision": 8,
+  "plan_revision": 8,
+  "is_stale": false,
+  "status": "proposed",
+  "state": "proposed",
+  "applied_candidate": null,
+  "applied_at": null,
+  "applied_by_name": null,
+  "created_by_name": "user_9882f7e0a9",
+  "can_apply": true,
+  "candidates": [
+   {
+    "id": "A",
+    "strategy": "remove",
+    "label": "予定を外す",
+    "description": "影響を受ける予定を外します。守る予定は外しません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [],
+    "lost": [
+     {
+      "event_id": "68be7a97-d19c-4072-8968-bf3a21e7f4f6",
+      "title": "嵐山"
+     }
+    ],
+    "protected": [],
+    "metrics": {
+     "changed_count": 0,
+     "lost_count": 1,
+     "protected_count": 0,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": null
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   },
+   {
+    "id": "B",
+    "strategy": "move_next_day",
+    "label": "翌日へ移す",
+    "description": "影響を受ける予定を翌日の同じ時刻へ移します。守る予定は動かしません",
+    "available": false,
+    "unavailable_reason": "翌日の日程がないため使えません",
+    "warnings": [],
+    "changes": [],
+    "lost": [],
+    "protected": [],
+    "metrics": {
+     "changed_count": 0,
+     "lost_count": 0,
+     "protected_count": 0,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": null
+    },
+    "cost_impact": null,
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "alert_dismissed": {
+  "id": "b5b077aa-e68d-4565-ba7f-413377788511",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "kind": "weather",
+  "kind_label": "雨天・警報",
+  "source": "user_report",
+  "source_label": null,
+  "confidence": "reported",
+  "observed_at": "2026-01-01T00:00:00+00:00",
+  "is_stale": true,
+  "event_id": null,
+  "event_title": null,
+  "event_local_start_time": null,
+  "event_missing": false,
+  "day_id": "8e9ba703-6ee0-4baf-9c97-46785101c24c",
+  "local_date": "2026-11-02",
+  "delay_minutes": null,
+  "note": null,
+  "status": "dismissed",
+  "resolved_at": "2026-10-15T06:45:07.289030+00:00",
+  "created_by_name": "user_9882f7e0a9",
+  "latest_replan_id": "1198245e-bce0-47ea-8434-d87eb1d29f5d",
+  "latest_replan_status": "proposed",
+  "revision": 2,
+  "created_at": "2026-10-15T06:45:06.096839+00:00",
+  "updated_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "replan_applied": {
+  "replan": {
+   "id": "c1c2ee71-e0fc-4996-b7f9-ea4d43ec8b66",
+   "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+   "alert_id": "cb546690-c327-4f72-a52a-2595f48b8e10",
+   "algorithm_version": "replan-v1",
+   "base_revision": 8,
+   "plan_revision": 9,
+   "is_stale": false,
+   "status": "applied",
+   "state": "applied",
+   "applied_candidate": "A",
+   "applied_at": "2026-10-15T06:45:07.366521+00:00",
+   "applied_by_name": "user_9882f7e0a9",
+   "created_by_name": "user_9882f7e0a9",
+   "can_apply": false,
+   "candidates": [
+    {
+     "id": "A",
+     "strategy": "shift_later",
+     "label": "後ろの予定をずらす",
+     "description": "影響を受けた予定と、その後の予定を遅れの分だけ後ろへずらします。守る予定は動かしません",
+     "available": true,
+     "unavailable_reason": null,
+     "warnings": [],
+     "changes": [
+      {
+       "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+       "title": "新幹線で京都へ",
+       "before_time": "09:00",
+       "after_time": "11:00",
+       "before_date": "2026-11-01",
+       "after_date": "2026-11-01"
+      }
+     ],
+     "lost": [
+      {
+       "event_id": "500ac7e1-8220-43e0-b1c6-97a5c218eada",
+       "title": "清水寺"
+      }
+     ],
+     "protected": [
+      {
+       "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+       "title": "料亭で昼食",
+       "local_start_time": "12:00",
+       "has_reservation": true
+      }
+     ],
+     "metrics": {
+      "changed_count": 1,
+      "lost_count": 1,
+      "protected_count": 1,
+      "max_delay_minutes": 120,
+      "day_end_shift_minutes": 0
+     },
+     "cost_impact": {
+      "currency": "JPY",
+      "lost_paid_amount": "0.00",
+      "lost_paid_count": 0,
+      "unconverted_count": 0
+     },
+     "notify_member_names": [
+      "user_98d6e31399"
+     ]
+    },
+    {
+     "id": "B",
+     "strategy": "keep_times",
+     "label": "後ろの予定の時刻を守る",
+     "description": "影響を受けた予定だけを遅らせ、重なる予定を外して、その後は元の時刻を守ります",
+     "available": true,
+     "unavailable_reason": null,
+     "warnings": [],
+     "changes": [
+      {
+       "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+       "title": "新幹線で京都へ",
+       "before_time": "09:00",
+       "after_time": "11:00",
+       "before_date": "2026-11-01",
+       "after_date": "2026-11-01"
+      }
+     ],
+     "lost": [
+      {
+       "event_id": "500ac7e1-8220-43e0-b1c6-97a5c218eada",
+       "title": "清水寺"
+      }
+     ],
+     "protected": [
+      {
+       "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+       "title": "料亭で昼食",
+       "local_start_time": "12:00",
+       "has_reservation": true
+      }
+     ],
+     "metrics": {
+      "changed_count": 1,
+      "lost_count": 1,
+      "protected_count": 1,
+      "max_delay_minutes": 120,
+      "day_end_shift_minutes": 0
+     },
+     "cost_impact": {
+      "currency": "JPY",
+      "lost_paid_amount": "0.00",
+      "lost_paid_count": 0,
+      "unconverted_count": 0
+     },
+     "notify_member_names": [
+      "user_98d6e31399"
+     ]
+    }
+   ],
+   "revision": 2,
+   "created_at": "2026-10-15T06:45:06.096839+00:00"
+  },
+  "plan_revision": 9
+ },
+ "alert_list": {
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "server_time": "2026-10-15T06:45:07.555312+00:00",
+  "can_edit": true,
+  "alerts": [
+   {
+    "id": "2c6d8dad-3877-4914-9485-4218bd5a97b2",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "closure",
+    "kind_label": "休業・中止",
+    "source": "user_report",
+    "source_label": null,
+    "confidence": "reported",
+    "observed_at": "2026-10-15T06:45:07.026038+00:00",
+    "is_stale": false,
+    "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+    "event_title": "庭園散策",
+    "event_local_start_time": "14:00",
+    "event_missing": false,
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "delay_minutes": null,
+    "note": null,
+    "status": "active",
+    "resolved_at": null,
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "72dc23a8-88c0-4c56-a845-d627698ef954",
+    "latest_replan_status": "rejected",
+    "revision": 1,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": null
+   },
+   {
+    "id": "cb546690-c327-4f72-a52a-2595f48b8e10",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "delay",
+    "kind_label": "遅延",
+    "source": "user_report",
+    "source_label": "駅の掲示",
+    "confidence": "confirmed",
+    "observed_at": "2026-10-15T06:45:06.629425+00:00",
+    "is_stale": false,
+    "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+    "event_title": "新幹線で京都へ",
+    "event_local_start_time": "11:00",
+    "event_missing": false,
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "delay_minutes": 120,
+    "note": null,
+    "status": "resolved",
+    "resolved_at": "2026-10-15T06:45:07.371275+00:00",
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "c1c2ee71-e0fc-4996-b7f9-ea4d43ec8b66",
+    "latest_replan_status": "applied",
+    "revision": 2,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": "2026-10-15T06:45:06.096839+00:00"
+   },
+   {
+    "id": "b5b077aa-e68d-4565-ba7f-413377788511",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "weather",
+    "kind_label": "雨天・警報",
+    "source": "user_report",
+    "source_label": null,
+    "confidence": "reported",
+    "observed_at": "2026-01-01T00:00:00+00:00",
+    "is_stale": true,
+    "event_id": null,
+    "event_title": null,
+    "event_local_start_time": null,
+    "event_missing": false,
+    "day_id": "8e9ba703-6ee0-4baf-9c97-46785101c24c",
+    "local_date": "2026-11-02",
+    "delay_minutes": null,
+    "note": null,
+    "status": "dismissed",
+    "resolved_at": "2026-10-15T06:45:07.289030+00:00",
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "1198245e-bce0-47ea-8434-d87eb1d29f5d",
+    "latest_replan_status": "proposed",
+    "revision": 2,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": "2026-10-15T06:45:06.096839+00:00"
+   }
+  ],
+  "detected": [
+   {
+    "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+    "event_title": "料亭で昼食",
+    "event_local_start_time": "12:00",
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "transport_status": "delayed",
+    "suggested_kind": "delay",
+    "observed_at": "2026-10-15T06:45:06.096839+00:00",
+    "is_stale": false
+   }
+  ]
+ },
+ "replan_stale": {
+  "id": "0aed3aa5-978c-443e-a4ce-ef3ce2a62366",
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "alert_id": "2c6d8dad-3877-4914-9485-4218bd5a97b2",
+  "algorithm_version": "replan-v1",
+  "base_revision": 12,
+  "plan_revision": 13,
+  "is_stale": true,
+  "status": "proposed",
+  "state": "proposed",
+  "applied_candidate": null,
+  "applied_at": null,
+  "applied_by_name": null,
+  "created_by_name": "user_9882f7e0a9",
+  "can_apply": false,
+  "candidates": [
+   {
+    "id": "A",
+    "strategy": "remove",
+    "label": "予定を外す",
+    "description": "影響を受ける予定を外します。守る予定は外しません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [],
+    "lost": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策"
+     }
+    ],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 0,
+     "lost_count": 1,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   },
+   {
+    "id": "B",
+    "strategy": "move_next_day",
+    "label": "翌日へ移す",
+    "description": "影響を受ける予定を翌日の同じ時刻へ移します。守る予定は動かしません",
+    "available": true,
+    "unavailable_reason": null,
+    "warnings": [],
+    "changes": [
+     {
+      "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+      "title": "庭園散策",
+      "before_time": "14:00",
+      "after_time": "14:00",
+      "before_date": "2026-11-01",
+      "after_date": "2026-11-02"
+     }
+    ],
+    "lost": [],
+    "protected": [
+     {
+      "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+      "title": "料亭で昼食",
+      "local_start_time": "12:00",
+      "has_reservation": true
+     }
+    ],
+    "metrics": {
+     "changed_count": 1,
+     "lost_count": 0,
+     "protected_count": 1,
+     "max_delay_minutes": 0,
+     "day_end_shift_minutes": -120
+    },
+    "cost_impact": {
+     "currency": "JPY",
+     "lost_paid_amount": "0.00",
+     "lost_paid_count": 0,
+     "unconverted_count": 0
+    },
+    "notify_member_names": [
+     "user_98d6e31399"
+    ]
+   }
+  ],
+  "revision": 1,
+  "created_at": "2026-10-15T06:45:06.096839+00:00"
+ },
+ "replan_stale_error": {
+  "detail": {
+   "code": "replan_stale",
+   "message": "再計画案を作った後に旅程が変わりました。もう一度再計画案を作ってください",
+   "current_revision": 13
+  }
+ },
+ "alert_list_editor": {
+  "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+  "server_time": "2026-10-15T06:45:07.703836+00:00",
+  "can_edit": true,
+  "alerts": [
+   {
+    "id": "2c6d8dad-3877-4914-9485-4218bd5a97b2",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "closure",
+    "kind_label": "休業・中止",
+    "source": "user_report",
+    "source_label": null,
+    "confidence": "reported",
+    "observed_at": "2026-10-15T06:45:07.026038+00:00",
+    "is_stale": false,
+    "event_id": "d6014a93-cb13-4ebb-80df-1430abb9ac1c",
+    "event_title": "庭園散策",
+    "event_local_start_time": "14:00",
+    "event_missing": false,
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "delay_minutes": null,
+    "note": null,
+    "status": "active",
+    "resolved_at": null,
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "72dc23a8-88c0-4c56-a845-d627698ef954",
+    "latest_replan_status": "rejected",
+    "revision": 1,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": null
+   },
+   {
+    "id": "cb546690-c327-4f72-a52a-2595f48b8e10",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "delay",
+    "kind_label": "遅延",
+    "source": "user_report",
+    "source_label": "駅の掲示",
+    "confidence": "confirmed",
+    "observed_at": "2026-10-15T06:45:06.629425+00:00",
+    "is_stale": false,
+    "event_id": "76b299c2-44bf-4751-a097-665c47ef0f14",
+    "event_title": "新幹線で京都へ",
+    "event_local_start_time": "11:00",
+    "event_missing": false,
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "delay_minutes": 120,
+    "note": null,
+    "status": "resolved",
+    "resolved_at": "2026-10-15T06:45:07.371275+00:00",
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "c1c2ee71-e0fc-4996-b7f9-ea4d43ec8b66",
+    "latest_replan_status": "applied",
+    "revision": 2,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": "2026-10-15T06:45:06.096839+00:00"
+   },
+   {
+    "id": "b5b077aa-e68d-4565-ba7f-413377788511",
+    "plan_id": "9fa748fd-ceab-4b0f-a3bc-56598d6101ac",
+    "kind": "weather",
+    "kind_label": "雨天・警報",
+    "source": "user_report",
+    "source_label": null,
+    "confidence": "reported",
+    "observed_at": "2026-01-01T00:00:00+00:00",
+    "is_stale": true,
+    "event_id": null,
+    "event_title": null,
+    "event_local_start_time": null,
+    "event_missing": false,
+    "day_id": "8e9ba703-6ee0-4baf-9c97-46785101c24c",
+    "local_date": "2026-11-02",
+    "delay_minutes": null,
+    "note": null,
+    "status": "dismissed",
+    "resolved_at": "2026-10-15T06:45:07.289030+00:00",
+    "created_by_name": "user_9882f7e0a9",
+    "latest_replan_id": "1198245e-bce0-47ea-8434-d87eb1d29f5d",
+    "latest_replan_status": "proposed",
+    "revision": 2,
+    "created_at": "2026-10-15T06:45:06.096839+00:00",
+    "updated_at": "2026-10-15T06:45:06.096839+00:00"
+   }
+  ],
+  "detected": [
+   {
+    "event_id": "0bad5ad8-c885-43aa-8142-73cd6dbd34ab",
+    "event_title": "料亭で昼食",
+    "event_local_start_time": "12:00",
+    "day_id": "47079a98-b474-4ea6-b5f8-2b3773ed0135",
+    "local_date": "2026-11-01",
+    "transport_status": "delayed",
+    "suggested_kind": "delay",
+    "observed_at": "2026-10-15T06:45:06.096839+00:00",
+    "is_stale": false
+   }
+  ]
  }
 }

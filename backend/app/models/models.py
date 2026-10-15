@@ -2229,3 +2229,87 @@ class ItineraryBranch(Base):
         CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="ck_itinerary_branches_title"),
         Index("ix_itinerary_branches_plan_deleted", "plan_id", "deleted_at"),
     )
+
+
+class PlanAlert(Base):
+    """[Gate P10] 旅程に影響する出来事(FR-030 外部状況、DOC-04 SC-24、DOC-13 AlertReceived)。
+
+    遅延・運休/欠航・休業/中止・天候を、利用者の報告(user_report)または登録済み経路の運行状態(route_status)から登録する。
+    情報源(source/source_label)・取得時刻(observed_at)・確度(confidence)を必ず持ち、古い情報を現在値のように見せない。
+    影響を受ける予定・日(event_id/day_id)には外部キーを張らない(B-013の個別削除を妨げないため。使う時に存在を確認する)。
+    """
+    __tablename__ = "plan_alerts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind = Column(String(12), nullable=False)
+    source = Column(String(12), nullable=False, default="user_report")
+    source_label = Column(String(100), nullable=True)
+    confidence = Column(String(9), nullable=False, default="reported")
+    observed_at = Column(DateTime(timezone=True), nullable=False)
+    event_id = Column(UUID(as_uuid=True), nullable=True)
+    day_id = Column(UUID(as_uuid=True), nullable=True)
+    delay_minutes = Column(Integer, nullable=True)
+    note = Column(String(500), nullable=True)
+    status = Column(String(9), nullable=False, default="active")
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('delay','cancellation','closure','weather')", name="ck_plan_alerts_kind"),
+        CheckConstraint("source IN ('user_report','route_status')", name="ck_plan_alerts_source"),
+        CheckConstraint("confidence IN ('confirmed','reported')", name="ck_plan_alerts_confidence"),
+        CheckConstraint("status IN ('active','resolved','dismissed')", name="ck_plan_alerts_status"),
+        CheckConstraint("(status = 'active') = (resolved_at IS NULL)", name="ck_plan_alerts_resolved_at"),
+        CheckConstraint(
+            "delay_minutes IS NULL OR delay_minutes BETWEEN 15 AND 720", name="ck_plan_alerts_delay_minutes",
+        ),
+        CheckConstraint(
+            "(kind IN ('delay','cancellation')) = (delay_minutes IS NOT NULL)", name="ck_plan_alerts_delay_kind",
+        ),
+        CheckConstraint("event_id IS NOT NULL OR day_id IS NOT NULL", name="ck_plan_alerts_target"),
+        Index("ix_plan_alerts_plan_status", "plan_id", "status"),
+    )
+
+
+class Replan(Base):
+    """[Gate P10] 安全な再計画(FR-031、DOC-13 ReplanReady/ReplanApplied)。
+
+    アラートを起点に、守る予定(確定・予約付き)を動かさない代わりの案A/Bを作る(candidates)。承認されるまで本案は変えない。
+    承認時は base_revision が本案の現在のrevisionと一致する場合だけ、選んだ案を1つの変更セット(source=replan)として適用する
+    (本案の「元に戻す」で取り消せる)。本案がその後変わっていれば古い案として適用を止める(黙って上書きしない)。
+    """
+    __tablename__ = "replans"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    alert_id = Column(UUID(as_uuid=True), ForeignKey("plan_alerts.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    base_revision = Column(Integer, nullable=False)
+    base_snapshot = Column(JSON, nullable=False)
+    candidates = Column(JSON, nullable=False)
+    status = Column(String(8), nullable=False, default="proposed")
+    applied_candidate = Column(String(1), nullable=True)
+    applied_change_set_id = Column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
+    )
+    applied_at = Column(DateTime(timezone=True), nullable=True)
+    applied_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('proposed','applied','rejected')", name="ck_replans_status"),
+        CheckConstraint(
+            "(status = 'applied') = (applied_at IS NOT NULL AND applied_candidate IS NOT NULL)",
+            name="ck_replans_applied",
+        ),
+        CheckConstraint("applied_candidate IS NULL OR applied_candidate IN ('A','B')", name="ck_replans_candidate"),
+        Index("ix_replans_plan_alert", "plan_id", "alert_id"),
+    )

@@ -50,6 +50,8 @@ const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
 const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
 const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
+const AlertsPage = lazyPage(() => import('@/pages/AlertsPage'));
+const ReplanPage = lazyPage(() => import('@/pages/ReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -296,6 +298,24 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CalendarImportPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // ⚠️ [Gate P10] 遅延・休業などの状況(アラート、FR-030)と安全な再計画(FR-031、案A/Bの比較・承認)。
+      {
+        path: 'planner/:planId/alerts',
+        element: (
+          <ProtectedRoute>
+            <AlertsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'planner/:planId/replans/:replanId',
+        element: (
+          <ProtectedRoute>
+            <ReplanPage />
           </ProtectedRoute>
         ),
       },

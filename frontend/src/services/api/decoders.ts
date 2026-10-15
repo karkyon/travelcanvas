@@ -39,6 +39,7 @@ import type {
   RetentionInfo,
   Branch, BranchAssumptions, BranchDetail,
   CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState,
+  AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1284,4 +1285,107 @@ export const accountDeletionResult: Decoder<AccountDeletionResult> = object<Acco
   deleted: bool,
   summary: record as Decoder<Record<string, number>>,
   plan_delete_grace_days: nonNegativeInt,
+});
+
+// ----- [Gate P10] 外部状況(アラート、FR-030)・安全な再計画(FR-031)。backend/app/api/v1/replans.py の応答(replan-v1)。
+// 情報の古さ(is_stale)・案の使用可否・適用できるか(is_stale/can_apply)を誤ると、古い情報で旅程を変える操作を出してしまうため、
+// 列挙値と真偽値を厳密に検査する。
+const ALERT_KINDS = ['delay', 'cancellation', 'closure', 'weather'] as const;
+const REPLAN_STATUSES = ['proposed', 'applied', 'rejected'] as const;
+export const planAlert: Decoder<PlanAlert> = object<PlanAlert>({
+  id: str,
+  plan_id: str,
+  kind: oneOf(...ALERT_KINDS),
+  kind_label: str,
+  source: oneOf('user_report', 'route_status'),
+  source_label: nullable(str),
+  confidence: oneOf('confirmed', 'reported'),
+  observed_at: nullable(str),
+  is_stale: bool,
+  event_id: nullable(str),
+  event_title: nullable(str),
+  event_local_start_time: nullable(str),
+  event_missing: bool,
+  day_id: nullable(str),
+  local_date: nullable(str),
+  delay_minutes: nullable(nonNegativeInt),
+  note: nullable(str),
+  status: oneOf('active', 'resolved', 'dismissed'),
+  resolved_at: nullable(str),
+  created_by_name: str,
+  latest_replan_id: nullable(str),
+  latest_replan_status: nullable(oneOf(...REPLAN_STATUSES)),
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+});
+
+export const alertList: Decoder<AlertList> = object<AlertList>({
+  plan_id: str,
+  server_time: str,
+  can_edit: bool,
+  alerts: arrayOf(planAlert),
+  detected: arrayOf(object({
+    event_id: str, event_title: str, event_local_start_time: nullable(str), day_id: str, local_date: nullable(str),
+    transport_status: oneOf('delayed', 'cancelled'), suggested_kind: oneOf('delay', 'cancellation'),
+    observed_at: nullable(str), is_stale: bool,
+  })),
+});
+
+export const replan: Decoder<Replan> = object<Replan>({
+  id: str,
+  plan_id: str,
+  alert_id: str,
+  algorithm_version: str,
+  base_revision: int,
+  plan_revision: int,
+  is_stale: bool,
+  status: oneOf(...REPLAN_STATUSES),
+  state: oneOf(...REPLAN_STATUSES, 'applied_undone'),
+  applied_candidate: nullable(oneOf('A', 'B')),
+  applied_at: nullable(str),
+  applied_by_name: nullable(str),
+  created_by_name: str,
+  can_apply: bool,
+  candidates: arrayOf(object({
+    id: oneOf('A', 'B'),
+    strategy: oneOf('shift_later', 'keep_times', 'remove', 'move_next_day'),
+    label: str,
+    description: str,
+    available: bool,
+    unavailable_reason: nullable(str),
+    warnings: arrayOf(str),
+    changes: arrayOf(object({
+      event_id: str, title: str, before_time: nullable(str), after_time: nullable(str), before_date: str, after_date: str,
+    })),
+    lost: arrayOf(object({ event_id: str, title: str })),
+    protected: arrayOf(object({ event_id: str, title: str, local_start_time: nullable(str), has_reservation: bool })),
+    metrics: object({
+      changed_count: nonNegativeInt, lost_count: nonNegativeInt, protected_count: nonNegativeInt,
+      max_delay_minutes: int, day_end_shift_minutes: nullable(int),
+    }),
+    cost_impact: nullable(object({
+      currency: matching(/^[A-Z]{3}$/, 'ISO 4217の通貨コード'),
+      lost_paid_amount: matching(/^-?\d+\.\d{2}$/, '小数2桁の金額文字列'),
+      lost_paid_count: nonNegativeInt,
+      unconverted_count: nonNegativeInt,
+    })),
+    notify_member_names: arrayOf(str),
+  })),
+  revision: int,
+  created_at: nullable(str),
+});
+
+export const replanApplyResult: Decoder<ReplanApplyResult> = object<ReplanApplyResult>({
+  replan, plan_revision: int,
+});
+
+/** 再計画の409の応答本体 `{detail}`(画面は code で案内を変える) */
+export const replanError: Decoder<{ detail: ReplanErrorDetail }> = object<{ detail: ReplanErrorDetail }>({
+  detail: object<ReplanErrorDetail>({
+    code: oneOf('replan_stale', 'replan_conflict', 'replan_closed', 'candidate_unavailable', 'no_changes', 'alert_target_changed'),
+    message: str,
+    current_revision: optional(int),
+    conflicts: optional(arrayOf(object({ op: str, event_id: optional(str), title: optional(str), reason: str }))),
+  }),
 });
