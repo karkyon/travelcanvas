@@ -32,6 +32,7 @@ import {
   syncConflictList, syncResolveResult, syncResponse,
   journalDraft, memoryList, travelMemory,
   locationTrack, locationTrackDetail, locationTrackList, trackPointsDeleteResult, trackPointsUploadResult,
+  actualPutResult, carryOverResult, journeyReview,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -273,6 +274,14 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['location_points_uploaded', trackPointsUploadResult],
   ['location_points_deleted', trackPointsDeleteResult],
   ['location_track_error_consent', object({ detail: object({ code: str, message: str }) })],
+  // [Gate P14] 旅の振り返り(FR-054・FR-053)
+  ['journey_empty', journeyReview],
+  ['journey_with_suggestions', journeyReview],
+  ['journey_recorded', journeyReview],
+  ['event_actual_visited', actualPutResult],
+  ['event_actual_skipped', actualPutResult],
+  ['event_carry_over', carryOverResult],
+  ['event_carry_over_error_visited', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

@@ -6,7 +6,7 @@ from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
-    calendar_import, privacy, replans, optimization, sync, memories, location_tracks,
+    calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -405,3 +405,5 @@ app.include_router(sync.router, prefix="/api/v1")
 app.include_router(memories.router, prefix="/api/v1")
 # [Gate P13] FR-038 任意の位置軌跡(本人だけの記録)。/plans/{plan_id}/location-tracks配下。
 app.include_router(location_tracks.router, prefix="/api/v1")
+# [Gate P14] FR-054 Plan-to-Memory・FR-053 旅の達成指標(振り返り)。/plans/{plan_id}/journey配下。
+app.include_router(journey.router, prefix="/api/v1")

@@ -44,6 +44,7 @@ import type {
   SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
   JournalDraft, JournalMemory, MemoryList, TravelMemory,
   LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
+  ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1604,4 +1605,62 @@ export const trackPointsUploadResult: Decoder<TrackPointsUploadResult> = object<
 });
 export const trackPointsDeleteResult: Decoder<TrackPointsDeleteResult> = object<TrackPointsDeleteResult>({
   removed: nonNegativeInt, point_count: nonNegativeInt, revision: int,
+});
+
+// ===== [Gate P14] 旅の振り返り(FR-054・FR-053) =====
+const rate = nullable(num);
+const eventActualRecord: Decoder<EventActualRecord> = object<EventActualRecord>({
+  status: oneOf('visited', 'skipped'),
+  actual_start_at: nullable(str),
+  actual_end_at: nullable(str),
+  source: oneOf('manual', 'suggested'),
+  note: nullable(str),
+  revision: int,
+  updated_at: nullable(str),
+});
+export const journeyReview: Decoder<JourneyReview> = object<JourneyReview>({
+  plan_id: str,
+  title: str,
+  days: arrayOf(object({
+    day_id: str,
+    date: str,
+    title: nullable(str),
+    timezone_id: str,
+    events: arrayOf(object({
+      event_id: str,
+      title: str,
+      planned_time: nullable(str),
+      planned_start_at: nullable(str),
+      has_location: bool,
+      actual: nullable(eventActualRecord),
+      memory_count: nonNegativeInt,
+      photo_count: nonNegativeInt,
+      suggestion: nullable(object({
+        actual_start_at: str, actual_end_at: str, basis: oneOf('track', 'memory'), points: nonNegativeInt,
+      })),
+      start_diff_minutes: nullable(int),
+    })),
+  })),
+  metrics: object({
+    planned_events: nonNegativeInt,
+    visited: nonNegativeInt,
+    skipped: nonNegativeInt,
+    unrecorded: nonNegativeInt,
+    plan_achievement_rate: rate,
+    visit_rate: rate,
+    photo_visit_rate: rate,
+    record_completion_rate: rate,
+    memory_events: nonNegativeInt,
+    stay_minutes: nullable(nonNegativeInt),
+    timed_visits: nonNegativeInt,
+    track_distance_m: nullable(num),
+    algorithm_version: str,
+  }),
+  can_edit: bool,
+});
+export const actualPutResult: Decoder<ActualPutResult> = object<ActualPutResult>({
+  event_id: str, actual: eventActualRecord,
+});
+export const carryOverResult: Decoder<CarryOverResult> = object<CarryOverResult>({
+  event_id: str, target_plan_id: str, target_day_id: str, target_revision: int,
 });

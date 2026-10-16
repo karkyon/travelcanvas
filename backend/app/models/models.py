@@ -2462,3 +2462,40 @@ class LocationPointBatch(Base):
         CheckConstraint("point_count >= 0", name="ck_location_point_batches_count"),
         Index("ix_location_point_batches_track_first", "track_id", "first_at"),
     )
+
+
+class EventActual(Base):
+    """[Gate P14] FR-054 Plan-to-Memory の実績(DOC-15 CA-012、DOC-04 SC-42 Journey Review)。
+
+    予定(TravelEvent)を実績で上書きせず、行った/行かなかった・実際の到着と出発を別の行で持つ(予定1件に実績1件)。
+    写真・メモ(memories)・支出・軌跡は同じ予定ID(event_id)で結び付く。
+    予定には外部キーを張らない(B-013の個別削除を妨げないため。予定が消えた実績は振り返りに出さない)。
+    """
+    __tablename__ = "event_actuals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    event_id = Column(UUID(as_uuid=True), nullable=False)
+    status = Column(String(7), nullable=False)
+    actual_start_at = Column(DateTime(timezone=True), nullable=True)
+    actual_end_at = Column(DateTime(timezone=True), nullable=True)
+    source = Column(String(9), nullable=False, default="manual")
+    note = Column(String(500), nullable=True)
+    recorded_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "event_id", name="uq_event_actuals_plan_event"),
+        CheckConstraint("status IN ('visited','skipped')", name="ck_event_actuals_status"),
+        CheckConstraint("source IN ('manual','suggested')", name="ck_event_actuals_source"),
+        CheckConstraint(
+            "status = 'visited' OR (actual_start_at IS NULL AND actual_end_at IS NULL)",
+            name="ck_event_actuals_skipped_times",
+        ),
+        CheckConstraint(
+            "actual_start_at IS NULL OR actual_end_at IS NULL OR actual_end_at >= actual_start_at",
+            name="ck_event_actuals_time_order",
+        ),
+    )

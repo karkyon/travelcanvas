@@ -34,5 +34,6 @@ export * from './optimization';
 export * from './sync';
 export * from './memories';
 export * from './location';
+export * from './journey';
 export * from './calendarImport';
 export * from './privacy';

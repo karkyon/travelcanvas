@@ -18,7 +18,8 @@
   "captured_at_head_l4": "Gate P10 (+Gate L4 optimization-candidates)",
   "captured_at_head_p11": "Gate L4 (+Gate P11 sync/conflicts)",
   "captured_at_head_p12": "Gate P12(FR-037 写真・メモ・旅行記)の実backend応答。account_deletion_previewへmemories件数を追加",
-  "captured_at_head_p13": "Gate P13(FR-038 任意の位置軌跡)の実backend応答。account_deletion_previewへlocation_tracks件数を追加"
+  "captured_at_head_p13": "Gate P13(FR-038 任意の位置軌跡)の実backend応答。account_deletion_previewへlocation_tracks件数を追加",
+  "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -32,6 +33,7 @@
   "DELETE /api/v1/plans/{plan_id}/documents/{document_id}/links/{link_id}",
   "DELETE /api/v1/plans/{plan_id}/events/{event_id}",
   "DELETE /api/v1/plans/{plan_id}/expenses/{expense_id}",
+  "DELETE /api/v1/plans/{plan_id}/journey/events/{event_id}",
   "DELETE /api/v1/plans/{plan_id}/location-tracks/{track_id}",
   "DELETE /api/v1/plans/{plan_id}/location-tracks/{track_id}/points",
   "DELETE /api/v1/plans/{plan_id}/memories/{memory_id}",
@@ -90,6 +92,7 @@
   "GET /api/v1/plans/{plan_id}/finance-summary",
   "GET /api/v1/plans/{plan_id}/imports",
   "GET /api/v1/plans/{plan_id}/imports/{job_id}",
+  "GET /api/v1/plans/{plan_id}/journey",
   "GET /api/v1/plans/{plan_id}/location-tracks",
   "GET /api/v1/plans/{plan_id}/location-tracks/{track_id}",
   "GET /api/v1/plans/{plan_id}/members",
@@ -199,6 +202,7 @@
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/candidates/{candidate_id}/reject",
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/confirm",
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/reject",
+  "POST /api/v1/plans/{plan_id}/journey/events/{event_id}/carry-over",
   "POST /api/v1/plans/{plan_id}/location-tracks",
   "POST /api/v1/plans/{plan_id}/location-tracks/{track_id}/points",
   "POST /api/v1/plans/{plan_id}/memories",
@@ -248,6 +252,7 @@
   "PUT /api/v1/plans/{plan_id}/days/{day_id}",
   "PUT /api/v1/plans/{plan_id}/events/{event_id}",
   "PUT /api/v1/plans/{plan_id}/finance-settings",
+  "PUT /api/v1/plans/{plan_id}/journey/events/{event_id}",
   "PUT /api/v1/plans/{plan_id}/polls/{poll_id}/votes",
   "PUT /api/v1/privacy/consents",
   "PUT /api/v1/spots/{spot_id}",

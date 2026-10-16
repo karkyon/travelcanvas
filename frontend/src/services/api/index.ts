@@ -18,6 +18,7 @@ import type { OptimizationTravelMode } from './types';
 import type { SyncOperationInput } from './types';
 import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput } from './types';
 import type { TrackMode, TrackPoint, TrackPrecision } from './types';
+import type { ActualInput } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -399,5 +400,13 @@ export const uploadTrackPoints = (planId: string, trackId: string, batchId: stri
 export const deleteTrackPoints = (planId: string, trackId: string, start: string, end: string) =>
   api.deleteTrackPoints(planId, trackId, start, end);
 export const deleteLocationTrack = (planId: string, trackId: string) => api.deleteLocationTrack(planId, trackId);
+
+// ===== [Gate P14] 旅の振り返り(FR-054・FR-053) =====
+export const getJourney = (planId: string) => api.getJourney(planId);
+export const putEventActual = (planId: string, eventId: string, input: ActualInput, revision?: number) =>
+  api.putEventActual(planId, eventId, input, revision);
+export const deleteEventActual = (planId: string, eventId: string) => api.deleteEventActual(planId, eventId);
+export const carryOverEvent = (planId: string, eventId: string, targetPlanId: string, targetDayId: string) =>
+  api.carryOverEvent(planId, eventId, targetPlanId, targetDayId);
 
 export default api;
