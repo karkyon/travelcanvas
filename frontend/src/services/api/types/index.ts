@@ -36,5 +36,6 @@ export * from './memories';
 export * from './location';
 export * from './journey';
 export * from './atlas';
+export * from './memoryReplan';
 export * from './calendarImport';
 export * from './privacy';

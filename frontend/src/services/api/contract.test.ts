@@ -34,6 +34,7 @@ import {
   locationTrack, locationTrackDetail, locationTrackList, trackPointsDeleteResult, trackPointsUploadResult,
   actualPutResult, carryOverResult, journeyReview,
   atlasResponse, atlasSettingsResult,
+  memoryReplanApplyResult, memoryReplanResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -288,6 +289,11 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['atlas_region', atlasResponse],
   ['atlas_area_2026', atlasResponse],
   ['atlas_settings_saved', atlasSettingsResult],
+  // [Gate P17] Memory Replan(FR-057)
+  ['memory_replan_empty', memoryReplanResult],
+  ['memory_replan', memoryReplanResult],
+  ['memory_replan_applied', memoryReplanApplyResult],
+  ['memory_replan_error_stale', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

@@ -46,6 +46,7 @@ import type {
   LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
   ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
   AtlasCell, AtlasResponse,
+  MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1699,4 +1700,36 @@ export const atlasResponse: Decoder<AtlasResponse> = object<AtlasResponse>({
 });
 export const atlasSettingsResult: Decoder<{ excluded_plan_ids: string[] }> = object<{ excluded_plan_ids: string[] }>({
   excluded_plan_ids: arrayOf(str),
+});
+
+// ===== [Gate P17] Memory Replan(FR-057) =====
+const replanInsight: Decoder<ReplanInsight> = object<ReplanInsight>({
+  kind: oneOf('stay_longer', 'stay_shorter', 'late_arrival', 'often_skipped'),
+  event_type: nullable(str),
+  minutes: nullable(nonNegativeInt),
+  samples: nonNegativeInt,
+  skipped: optional(nonNegativeInt),
+  plans: arrayOf(str),
+  examples: arrayOf(str),
+  applicable: bool,
+});
+export const memoryReplanResult: Decoder<MemoryReplanResult> = object<MemoryReplanResult>({
+  plan_id: str,
+  plan_revision: int,
+  insights: arrayOf(replanInsight),
+  proposals: arrayOf(object({
+    id: str,
+    kind: oneOf('stay_longer'),
+    event_type: str,
+    minutes: nonNegativeInt,
+    changes: arrayOf(object({ event_id: str, title: str, day_id: str, from: str, to: str })),
+    kept: arrayOf(object({ event_id: str, title: str, reason: oneOf('locked', 'has_reservation', 'next_day') })),
+  })),
+  input_fingerprint: str,
+  sample_count: nonNegativeInt,
+  algorithm_version: str,
+  can_apply: bool,
+});
+export const memoryReplanApplyResult: Decoder<MemoryReplanApplyResult> = object<MemoryReplanApplyResult>({
+  plan_id: str, plan_revision: int, applied: nonNegativeInt, proposal_id: str,
 });

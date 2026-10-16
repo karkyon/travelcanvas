@@ -61,7 +61,7 @@ export const MAX_VALID_DAYS = 90;
 const EVENT_TYPE_LABEL: Record<string, string> = {
   sightseeing: '観光', activity: 'アクティビティ', meal: '食事', dining: '食事', restaurant: '食事',
   transport: '移動', transportation: '移動', accommodation: '宿泊', lodging: '宿泊', shopping: '買い物',
-  meeting: '集合', other: 'その他',
+  meeting: '集合', museum: '美術館・博物館', other: 'その他',
 };
 export const eventTypeLabel = (t: string): string => EVENT_TYPE_LABEL[t] ?? t;
 

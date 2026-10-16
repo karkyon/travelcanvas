@@ -414,4 +414,9 @@ export const carryOverEvent = (planId: string, eventId: string, targetPlanId: st
 export const getAtlas = (precision: AtlasPrecision, year?: number | null) => api.getAtlas(precision, year);
 export const updateAtlasSettings = (excludedPlanIds: string[]) => api.updateAtlasSettings(excludedPlanIds);
 
+// ===== [Gate P17] Memory Replan(FR-057) =====
+export const getMemoryReplan = (planId: string) => api.getMemoryReplan(planId);
+export const applyMemoryReplan = (planId: string, proposalId: string, inputFingerprint: string, planRevision: number) =>
+  api.applyMemoryReplan(planId, proposalId, inputFingerprint, planRevision);
+
 export default api;

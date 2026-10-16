@@ -57,6 +57,7 @@ const MemoriesPage = lazyPage(() => import('@/pages/MemoriesPage'));
 const LocationTrackPage = lazyPage(() => import('@/pages/LocationTrackPage'));
 const JourneyPage = lazyPage(() => import('@/pages/JourneyPage'));
 const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
+const MemoryReplanPage = lazyPage(() => import('@/pages/MemoryReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -361,6 +362,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <JourneyPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 💡 [Gate P17] 過去の旅からの提案(FR-057 Memory Replan)。
+      {
+        path: 'planner/:planId/memory-replan',
+        element: (
+          <ProtectedRoute>
+            <MemoryReplanPage />
           </ProtectedRoute>
         ),
       },
