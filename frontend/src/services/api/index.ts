@@ -14,6 +14,7 @@ import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
 import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
 import type { CalendarImportApplyItem, ConsentPurpose } from './types';
 import type { AlertCreateData, AlertUpdateData } from './types';
+import type { OptimizationTravelMode } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -356,5 +357,13 @@ export const getReplan = (planId: string, replanId: string) => api.getReplan(pla
 export const applyReplan = (planId: string, replanId: string, candidate: 'A' | 'B', planRevision: number) =>
   api.applyReplan(planId, replanId, candidate, planRevision);
 export const rejectReplan = (planId: string, replanId: string, revision: number) => api.rejectReplan(planId, replanId, revision);
+
+// ===== [Gate L4] 説明可能な最適化(FR-018) =====
+export const getOptimizationCandidates = (planId: string, dayId: string, travelMode?: OptimizationTravelMode) =>
+  api.getOptimizationCandidates(planId, dayId, travelMode);
+export const applyOptimizationCandidate = (
+  planId: string, dayId: string, candidateId: string, inputFingerprint: string, planRevision: number,
+  travelMode?: OptimizationTravelMode,
+) => api.applyOptimizationCandidate(planId, dayId, candidateId, inputFingerprint, planRevision, travelMode);
 
 export default api;

@@ -40,6 +40,7 @@ import type {
   Branch, BranchAssumptions, BranchDetail,
   CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState,
   AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail,
+  OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1388,4 +1389,48 @@ export const replanError: Decoder<{ detail: ReplanErrorDetail }> = object<{ deta
     current_revision: optional(int),
     conflicts: optional(arrayOf(object({ op: str, event_id: optional(str), title: optional(str), reason: str }))),
   }),
+});
+
+// ----- [Gate L4] 説明可能な最適化(FR-018)。backend/app/api/v1/optimization.py の応答(explainable-opt-v1)。
+// 検証の件数・候補の種類・適用できるかを誤ると、制約を悪化させる並べ替えを「良い案」に見せてしまうため厳密に検査する。
+const optimizationMetricsShape = {
+  distance_km: num, duration_minutes: num, unknown_legs: nonNegativeInt,
+  error: nonNegativeInt, warning: nonNegativeInt, info: nonNegativeInt, unverified: nonNegativeInt,
+  constraints_satisfied: nonNegativeInt, constraints_violated: nonNegativeInt,
+};
+const optimizationIssue: Decoder<OptimizationIssue> = object<OptimizationIssue>({
+  code: str, severity: oneOf('ERROR', 'WARNING', 'INFO'), message: str, entity_label: nullable(str),
+  is_private_constraint: bool,
+});
+export const optimizationCandidates: Decoder<OptimizationCandidates> = object<OptimizationCandidates>({
+  plan_id: str,
+  day_id: str,
+  local_date: str,
+  algorithm_version: str,
+  validation_algorithm_version: str,
+  travel_mode: oneOf('walking', 'driving', 'train', 'bus', 'bicycle', 'taxi'),
+  base_revision: int,
+  input_fingerprint: str,
+  current: object({ order: arrayOf(str), metrics: object<OptimizationMetrics>(optimizationMetricsShape) }),
+  fixed: arrayOf(object({ event_id: str, title: str, reason: str })),
+  movable_count: nonNegativeInt,
+  candidates: arrayOf(object({
+    id: str,
+    kinds: arrayOf(oneOf('shortest', 'constraints')),
+    label: str,
+    order: arrayOf(str),
+    changes: arrayOf(object({
+      event_id: str, title: str, before_index: int, after_index: int, before_time: nullable(str), after_time: nullable(str),
+    })),
+    metrics: object({ ...optimizationMetricsShape, saved_distance_km: num, saved_duration_minutes: num }),
+    new_issues: arrayOf(optimizationIssue),
+    resolved_issues: arrayOf(optimizationIssue),
+    explanations: arrayOf(str),
+  })),
+  warnings: arrayOf(str),
+  can_apply: bool,
+});
+
+export const optimizationApplyResult: Decoder<OptimizationApplyResult> = object<OptimizationApplyResult>({
+  plan_revision: int, changed: nonNegativeInt, change_set_id: nullable(str), algorithm_version: str,
 });

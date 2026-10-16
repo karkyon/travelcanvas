@@ -6,7 +6,7 @@ from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
-    calendar_import, privacy, replans,
+    calendar_import, privacy, replans, optimization,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -397,3 +397,5 @@ app.include_router(calendar_import.router, prefix="/api/v1")
 app.include_router(privacy.router, prefix="/api/v1")
 # [Gate P10] FR-030 外部状況(アラート)・FR-031 安全な再計画。/plans/{plan_id}/alerts・/plans/{plan_id}/replans配下。
 app.include_router(replans.router, prefix="/api/v1")
+# [Gate L4] FR-018 説明可能な最適化(制約・実行可能性検証を入力にした並べ替え候補)。/plans/{plan_id}/days/{day_id}配下。
+app.include_router(optimization.router, prefix="/api/v1")

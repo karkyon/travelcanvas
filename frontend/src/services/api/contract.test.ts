@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import fx from './__fixtures__/backendContractResponses.json';
-import { arrayOf, decodeResponse, int, object, ApiDecodeError, type Decoder } from './decode';
+import { arrayOf, decodeResponse, int, object, str, ApiDecodeError, type Decoder } from './decode';
 import {
   adoptRouteOptionResponse, documentLink, downloadUrlResult, extractionCandidate, importJob, importJobDetail,
   reservation, reservationEventLink, reservationParticipant, reservationRevealResult, routeLeg, routeOption,
@@ -28,6 +28,7 @@ import {
   branch, branchDetail,
   calendarImportPreview, calendarImportResult, consentState, accountDeletionPreview, accountDeletionResult,
   alertList, planAlert, replan, replanApplyResult, replanError,
+  optimizationApplyResult, optimizationCandidates,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -233,6 +234,11 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['replan_applied', replanApplyResult],
   ['replan_stale', replan],
   ['replan_stale_error', replanError],
+  // ----- [Gate L4] 説明可能な最適化(FR-018)。*_none は今より良い候補が無い日、*_stale_error は入力の版が変わった適用
+  ['optimization_candidates', optimizationCandidates],
+  ['optimization_candidates_none', optimizationCandidates],
+  ['optimization_applied', optimizationApplyResult],
+  ['optimization_stale_error', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

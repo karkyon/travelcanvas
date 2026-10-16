@@ -1,26 +1,21 @@
 /**
- * OptimizationPanel - 経路最適化パネル(Gate #33)
+ * OptimizationPanel - この日の並べ替え(説明可能な最適化、SC-16 / FR-018)
  *
- * [Gate #33 監査是正] 以前は「AI最適化」と称し、時間効率/コスト重視/
- * バランス/エコの4モードと、天候考慮・混雑回避・徒歩許容度・食事休憩等
- * 多数の設定項目を持っていた。しかしbackend実体は緯度経度のみを見る
- * 近傍法(nearest neighbor)であり、これらの設定はUI上に存在するだけで
- * 一切の処理に反映されていなかった(見せかけの高機能感)。
- *
- * 本コンポーネントは実際に行われている処理だけを提示する:
- * - 現在表示中の日のイベントを、近傍法(直線距離ベース)で並べ替える
- *   提案を計算する(何も確定させない)。
- * - ロック済みイベント・位置情報が無いイベントは対象外であることを明示する。
- * - 適用前に移動距離の削減量(概算)を表示し、ユーザーが承認して初めて
- *   反映する。適用は1回のUndoで全体を取り消せる。
+ * [Gate #33] 近傍法による並び順の提案(時刻は変えない、制約・検証を見ない)だった。
+ * [Gate L4] backend/app/api/v1/optimization.py の候補へ置き換えた:
+ * - 並び順と時刻をまとめて提案する(時刻の枠を早い順に割り当て直す)。確定・予約付き・終日・位置なしの予定は動かさない
+ * - 「移動が最短の案」と「制約・検証を優先した案」を、元の順と比べて示す(距離・時間・検証のエラー/注意・守れていない制約)
+ * - 順番・時刻の変化、新たに出る問題・解消する問題、理由の文を表示する。承認して初めて適用し、「元に戻す」で取り消せる
+ * 距離・時間は直線距離による概算(外部の経路サービスは未接続)。
  */
 import React, { useState } from 'react';
-import { Route, Sparkles, Undo2, AlertTriangle } from 'lucide-react';
+import { Route, Sparkles, Undo2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
-import { api as apiService } from '../../services/api';
+import { applyOptimizationCandidate, getOptimizationCandidates } from '../../services/api';
 import { usePlanStore } from '../../store/planStore';
 import type { TravelPlan } from '../../types';
-import type { OptimizationProposal } from '../../services/api';
+import type { OptimizationCandidates, OptimizationCandidate } from '../../services/api';
+import { TREND_TEXT, confirmApplyText, describeMove, metricRows, optimizationErrorMessage } from './optimizationModel';
 
 interface OptimizationPanelProps {
   plan: TravelPlan;
@@ -28,54 +23,117 @@ interface OptimizationPanelProps {
   className?: string;
 }
 
+const TREND_CLASS = { better: 'text-green-800', worse: 'text-red-800', same: 'text-gray-700' } as const;
+
+const CandidateView: React.FC<{
+  data: OptimizationCandidates;
+  c: OptimizationCandidate;
+  applying: boolean;
+  onApply: (c: OptimizationCandidate) => void;
+}> = ({ data, c, applying, onApply }) => (
+  <section aria-label={c.label} className="border border-gray-200 rounded-lg p-3 space-y-2">
+    <h4 className="font-semibold text-gray-900">{c.label}</h4>
+    <table className="w-full text-sm">
+      <caption className="sr-only">{`${c.label}と今の順の比較`}</caption>
+      <thead>
+        <tr className="text-left text-gray-700">
+          <th scope="col" className="font-medium">項目</th>
+          <th scope="col" className="font-medium">今の順</th>
+          <th scope="col" className="font-medium">この案</th>
+          <th scope="col" className="font-medium">変化</th>
+        </tr>
+      </thead>
+      <tbody>
+        {metricRows(data.current.metrics, c.metrics).map((r) => (
+          <tr key={r.label}>
+            <th scope="row" className="font-normal text-gray-800">{r.label}</th>
+            <td className="text-gray-900">{r.before}</td>
+            <td className="text-gray-900">{r.after}</td>
+            <td className={TREND_CLASS[r.trend]}>{TREND_TEXT[r.trend]}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {c.explanations.length > 0 && (
+      <ul className="text-sm text-gray-900 list-disc pl-5" aria-label={`${c.label}の理由`}>
+        {c.explanations.map((s) => <li key={s}>{s}</li>)}
+      </ul>
+    )}
+    <div>
+      <h5 className="text-sm font-semibold text-gray-900">変わる予定</h5>
+      <ul className="text-sm text-gray-900 list-disc pl-5">{c.changes.map((x) => <li key={x.event_id}>{describeMove(x)}</li>)}</ul>
+    </div>
+    {c.resolved_issues.length > 0 && (
+      <div>
+        <h5 className="text-sm font-semibold text-green-800">解消する問題</h5>
+        <ul className="text-sm text-gray-900 list-disc pl-5">{c.resolved_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
+      </div>
+    )}
+    {c.new_issues.length > 0 && (
+      <div>
+        <h5 className="text-sm font-semibold text-red-800">新たに出る問題</h5>
+        <ul className="text-sm text-gray-900 list-disc pl-5">{c.new_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
+      </div>
+    )}
+    {data.can_apply && (
+      <button
+        type="button"
+        onClick={() => onApply(c)}
+        disabled={applying}
+        className="w-full px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        {applying ? <LoadingSpinner size="sm" /> : null}
+        {`「${c.label}」を適用`}
+      </button>
+    )}
+  </section>
+);
+
 const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isLoadingProposal, setIsLoadingProposal] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
-  const [proposal, setProposal] = useState<OptimizationProposal | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [data, setData] = useState<OptimizationCandidates | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [applied, setApplied] = useState<string | null>(null);
 
   const day = plan.days[dayIndex];
 
-  const handleFetchProposal = async () => {
+  const handleFetch = async () => {
     if (!day) return;
-    setIsLoadingProposal(true);
+    setIsLoading(true);
     setError(null);
-    setProposal(null);
+    setData(null);
+    setApplied(null);
     try {
-      const result = await apiService.getOptimizationProposal(plan.id, day.id);
-      setProposal(result);
+      setData(await getOptimizationCandidates(plan.id, day.id));
     } catch (e) {
-      console.error('Optimization proposal error:', e);
-      setError('提案の取得に失敗しました');
+      setError(optimizationErrorMessage(e));
     } finally {
-      setIsLoadingProposal(false);
+      setIsLoading(false);
     }
   };
 
-  const handleApply = async () => {
-    if (!day || !proposal) return;
-    setIsApplying(true);
+  const handleApply = async (c: OptimizationCandidate) => {
+    if (!day || !data) return;
+    if (!window.confirm(confirmApplyText(c))) return;
+    setApplying(c.id);
     setError(null);
     try {
-      await apiService.applyOptimizationProposal(plan.id, day.id, proposal.proposed_order, proposal.base_revision);
+      await applyOptimizationCandidate(plan.id, day.id, c.id, data.input_fingerprint, data.base_revision, data.travel_mode);
       await usePlanStore.getState().loadPlan(plan.id);
-      setProposal(null);
+      setData(null);
+      setApplied(`「${c.label}」を適用しました。取り消す場合は「直前の変更を取り消す」を押してください。`);
     } catch (e) {
-      const status = (e as { response?: { status?: number } } | null | undefined)?.response?.status;
-      if (status === 409) {
-        setError('他の変更と競合しました。もう一度提案を取得し直してください。');
-      } else {
-        setError('適用に失敗しました');
-      }
-      console.error('Apply optimization error:', e);
+      setError(optimizationErrorMessage(e));
     } finally {
-      setIsApplying(false);
+      setApplying(null);
     }
   };
 
   const handleUndo = async () => {
     await usePlanStore.getState().undoLastChange();
+    setApplied(null);
   };
 
   if (!day) return null;
@@ -83,96 +141,75 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${className}`}>
       <button
+        type="button"
         className="w-full flex items-center justify-between p-4 text-left"
+        aria-expanded={isExpanded}
         onClick={() => setIsExpanded((prev) => !prev)}
       >
         <span className="flex items-center gap-2 font-medium text-gray-900">
-          <Route size={18} className="text-blue-500" />
-          この日の経路を並べ替える
+          <Route size={18} className="text-blue-700" aria-hidden="true" />
+          この日の並べ替え(検証つき)
         </span>
-        <span className="text-gray-600 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
+        <span className="text-gray-700 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
       </button>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
-          <p className="text-sm text-gray-600">
-            各地点の緯度経度から、移動距離が短くなる順序を近傍法で計算します
-            (道路網は考慮しない直線距離ベースの概算です)。
+          <p className="text-sm text-gray-700">
+            移動距離(直線距離による概算)と、制約・実行可能性の検証結果を比べて、並び順と時刻の候補を示します。
+            確定・予約付きの予定は動かしません。適用するまで旅程は変わりません。
           </p>
 
-          {!proposal && (
-            <button
-              onClick={handleFetchProposal}
-              disabled={isLoadingProposal}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoadingProposal ? <LoadingSpinner size="sm" /> : <Sparkles size={16} />}
-              並べ替え案を計算する
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={isLoading}
+            className="w-full px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isLoading ? <LoadingSpinner size="sm" /> : <Sparkles size={16} aria-hidden="true" />}
+            並べ替え候補を計算する
+          </button>
 
           {error && (
-            <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 rounded-lg p-3">
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <div role="alert" className="flex items-start gap-2 text-sm text-red-800 bg-red-50 rounded-lg p-3">
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
 
-          {proposal && (
-            <div className="space-y-3">
-              {proposal.warnings.length > 0 && (
-                <div className="text-xs text-amber-700 bg-amber-50 rounded-lg p-3 space-y-1">
-                  {proposal.warnings.map((w, i) => (
-                    <p key={i}>⚠ {w}</p>
-                  ))}
-                </div>
-              )}
-
-              {proposal.has_improvement ? (
-                <div className="text-sm bg-green-50 text-green-800 rounded-lg p-3">
-                  <p className="font-medium">
-                    移動距離を約{proposal.saved_distance_km}km
-                    {proposal.saved_duration_minutes != null && `(約${Math.round(proposal.saved_duration_minutes)}分)`}
-                    削減できる見込みです
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    {proposal.before_total_distance_km}km → {proposal.after_total_distance_km}km(概算)
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">現在の順序が既に効率的か、改善余地がありません。</p>
-              )}
-
-              {proposal.locked_event_ids.length > 0 && (
-                <p className="text-xs text-gray-500">
-                  ロック済みのイベント{proposal.locked_event_ids.length}件は位置を固定しています。
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleApply}
-                  disabled={isApplying || !proposal.has_improvement}
-                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isApplying ? <LoadingSpinner size="sm" /> : null}
-                  この並び順を適用
-                </button>
-                <button
-                  onClick={() => setProposal(null)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  却下
-                </button>
-              </div>
-
+          {applied && (
+            <div className="space-y-2">
+              <p className="text-sm text-green-900 bg-green-50 rounded-lg p-3">{applied}</p>
               <button
+                type="button"
                 onClick={handleUndo}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-800 hover:text-gray-900"
               >
-                <Undo2 size={14} />
+                <Undo2 size={14} aria-hidden="true" />
                 直前の変更を取り消す
               </button>
+            </div>
+          )}
+
+          {data && (
+            <div className="space-y-3">
+              {data.warnings.length > 0 && (
+                <ul className="text-sm text-amber-900 bg-amber-50 rounded-lg p-3 space-y-1" aria-label="並べ替えの注意">
+                  {data.warnings.map((w) => <li key={w}>{w}</li>)}
+                </ul>
+              )}
+              {data.fixed.length > 0 && (
+                <div className="text-sm text-gray-800">
+                  <p className="font-medium flex items-center gap-1">
+                    <ShieldCheck size={14} className="text-green-700" aria-hidden="true" />動かさない予定
+                  </p>
+                  <ul className="list-disc pl-5">{data.fixed.map((f) => <li key={f.event_id}>{`${f.title}(${f.reason})`}</li>)}</ul>
+                </div>
+              )}
+              {data.candidates.map((c) => (
+                <CandidateView key={c.id} data={data} c={c} applying={applying === c.id} onApply={handleApply} />
+              ))}
+              <p className="text-xs text-gray-700">{`方式: ${data.algorithm_version}・検証: ${data.validation_algorithm_version}`}</p>
             </div>
           )}
         </div>

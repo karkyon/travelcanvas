@@ -16,9 +16,10 @@
 // [Gate P8] カレンダー(ICS)の取込(FR-036)を追加: ... → Branches → CalendarImport → CompleteTravelAPI
 // [Gate P9] アカウントの削除・同意の撤回(FR-039)を追加: ... → CalendarImport → Privacy → CompleteTravelAPI
 // [Gate P10] 外部状況(アラート、FR-030)・安全な再計画(FR-031)を追加: ... → Privacy → Replans → CompleteTravelAPI
-import { ReplansApi } from './endpoints/replans';
+// [Gate L4] 説明可能な最適化(FR-018)を追加: ... → Replans → Optimization → CompleteTravelAPI
+import { OptimizationApi } from './endpoints/optimization';
 
-export class CompleteTravelAPI extends ReplansApi {
+export class CompleteTravelAPI extends OptimizationApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

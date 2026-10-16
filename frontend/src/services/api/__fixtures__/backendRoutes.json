@@ -14,7 +14,8 @@
   "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
   "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)",
   "captured_at_head_p9": "Gate P8 (+Gate P9 account deletion/consents)",
-  "captured_at_head_p10": "Gate P9 (+Gate P10 alerts/replans)"
+  "captured_at_head_p10": "Gate P9 (+Gate P10 alerts/replans)",
+  "captured_at_head_l4": "Gate P10 (+Gate L4 optimization-candidates)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -169,6 +170,8 @@
   "POST /api/v1/plans/{plan_id}/constraints",
   "POST /api/v1/plans/{plan_id}/days",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/insertion-preview",
+  "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-candidates",
+  "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-candidates/apply",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-proposal",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-proposal/apply",
   "POST /api/v1/plans/{plan_id}/documents",
