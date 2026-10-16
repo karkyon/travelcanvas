@@ -9,6 +9,7 @@
  * 機密項目を含めると警告を出し、有効期限を必須にする(透かしは作成者名)。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ImageExportPanel from './booklet/ImageExportPanel';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -255,6 +256,9 @@ const BookletPage: React.FC = () => {
                 </ul>
               )}
             </Card>
+
+            {/* [Gate P16] 画像出力(FR-046)。機密項目を含めない投影から端末の中で作る */}
+            {planId && <ImageExportPanel planId={planId} options={options} />}
           </div>
 
           <div aria-live="polite">
