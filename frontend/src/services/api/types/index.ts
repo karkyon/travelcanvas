@@ -31,5 +31,6 @@ export * from './dataExport';
 export * from './branches';
 export * from './replans';
 export * from './optimization';
+export * from './sync';
 export * from './calendarImport';
 export * from './privacy';

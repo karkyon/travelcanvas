@@ -17,7 +17,8 @@
   "captured_at_head_p7": "Gate P6 (+Gate P7 branches)",
   "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)",
   "captured_at_head_p10": "Gate P9 (+Gate P10 alerts/replans)",
-  "captured_at_head_l4": "Gate P10 (+Gate L4 optimization-candidates)"
+  "captured_at_head_l4": "Gate P10 (+Gate L4 optimization-candidates)",
+  "captured_at_head_p11": "Gate L4 (+Gate P11 sync/conflicts)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -9201,5 +9202,245 @@
    "code": "optimization_stale",
    "message": "候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください"
   }
+ },
+ "sync_applied": {
+  "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
+  "plan_revision": 8,
+  "results": [
+   {
+    "operation_id": "1d9e5d2a-b73a-44eb-8142-eac91aa235cf",
+    "status": "applied",
+    "code": null,
+    "message": null,
+    "entity_id": "619b51af-05fc-4f50-a9bb-c7799ffeb7a6",
+    "temp_id": "event_temp_1",
+    "resulting_revision": 6,
+    "conflict": null
+   },
+   {
+    "operation_id": "fc8bbc88-3d2d-4ec5-82e5-20579aa799db",
+    "status": "applied",
+    "code": null,
+    "message": null,
+    "entity_id": "619b51af-05fc-4f50-a9bb-c7799ffeb7a6",
+    "temp_id": null,
+    "resulting_revision": 7,
+    "conflict": null
+   },
+   {
+    "operation_id": "ee83f9cd-8980-467e-be20-894a00cc2611",
+    "status": "applied",
+    "code": null,
+    "message": null,
+    "entity_id": "b47f770c-a908-40dc-bf1c-707c222fce9b",
+    "temp_id": null,
+    "resulting_revision": 8,
+    "conflict": null
+   }
+  ],
+  "summary": {
+   "applied": 3,
+   "already_applied": 0,
+   "conflicted": 0,
+   "rejected": 0
+  },
+  "pack_refresh_required": true
+ },
+ "sync_replayed": {
+  "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
+  "plan_revision": 8,
+  "results": [
+   {
+    "operation_id": "1d9e5d2a-b73a-44eb-8142-eac91aa235cf",
+    "status": "already_applied",
+    "code": null,
+    "message": null,
+    "entity_id": "619b51af-05fc-4f50-a9bb-c7799ffeb7a6",
+    "temp_id": "event_temp_1",
+    "resulting_revision": 6,
+    "conflict": null
+   },
+   {
+    "operation_id": "fc8bbc88-3d2d-4ec5-82e5-20579aa799db",
+    "status": "already_applied",
+    "code": null,
+    "message": null,
+    "entity_id": "619b51af-05fc-4f50-a9bb-c7799ffeb7a6",
+    "temp_id": null,
+    "resulting_revision": 7,
+    "conflict": null
+   },
+   {
+    "operation_id": "ee83f9cd-8980-467e-be20-894a00cc2611",
+    "status": "already_applied",
+    "code": null,
+    "message": null,
+    "entity_id": "b47f770c-a908-40dc-bf1c-707c222fce9b",
+    "temp_id": null,
+    "resulting_revision": 8,
+    "conflict": null
+   }
+  ],
+  "summary": {
+   "applied": 0,
+   "already_applied": 3,
+   "conflicted": 0,
+   "rejected": 0
+  },
+  "pack_refresh_required": false
+ },
+ "sync_mixed": {
+  "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
+  "plan_revision": 10,
+  "results": [
+   {
+    "operation_id": "b840e516-c616-41f6-844b-71f925d00c8d",
+    "status": "conflicted",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "feaeca54-2baf-4f36-b166-8a9cd7a907ba",
+    "temp_id": null,
+    "resulting_revision": null,
+    "conflict": {
+     "fields": [
+      "title"
+     ],
+     "mine": {
+      "title": "金閣寺"
+     },
+     "server": {
+      "title": "清水寺(朝)"
+     },
+     "server_deleted": false,
+     "title": "清水寺(朝)"
+    }
+   },
+   {
+    "operation_id": "033e98f2-0d41-4f44-8109-bd78c02d7c12",
+    "status": "conflicted",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "679fde56-e0a0-4dad-a6f5-8560b55c56e9",
+    "temp_id": null,
+    "resulting_revision": null,
+    "conflict": {
+     "fields": [
+      "local_start_time"
+     ],
+     "mine": null,
+     "server": {
+      "local_start_time": "12:30"
+     },
+     "server_deleted": false,
+     "deleted_by_me": true,
+     "title": "昼食"
+    }
+   },
+   {
+    "operation_id": "3bdacc2e-500a-4946-92d4-049ddf30c909",
+    "status": "rejected",
+    "code": "unknown_entity",
+    "message": "対象の予定が見つかりません",
+    "entity_id": null,
+    "temp_id": null,
+    "resulting_revision": null,
+    "conflict": null
+   }
+  ],
+  "summary": {
+   "applied": 0,
+   "already_applied": 0,
+   "conflicted": 2,
+   "rejected": 1
+  },
+  "pack_refresh_required": true
+ },
+ "sync_conflicts": {
+  "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
+  "plan_revision": 10,
+  "conflicts": [
+   {
+    "operation_id": "b840e516-c616-41f6-844b-71f925d00c8d",
+    "action": "update",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "feaeca54-2baf-4f36-b166-8a9cd7a907ba",
+    "title": "清水寺(朝)",
+    "conflict": {
+     "fields": [
+      "title"
+     ],
+     "mine": {
+      "title": "金閣寺"
+     },
+     "server": {
+      "title": "清水寺(朝)"
+     },
+     "server_deleted": false,
+     "title": "清水寺(朝)"
+    },
+    "current": {
+     "day_id": "446070c0-c072-4cad-aa53-feb9e0d4a261",
+     "title": "清水寺(朝)",
+     "description": null,
+     "event_type": "activity",
+     "local_start_time": "09:00",
+     "is_all_day": false,
+     "address": null,
+     "latitude": null,
+     "longitude": null
+    },
+    "server_deleted": false,
+    "created_at": "2026-10-15T08:03:37.436790+00:00"
+   },
+   {
+    "operation_id": "033e98f2-0d41-4f44-8109-bd78c02d7c12",
+    "action": "delete",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "679fde56-e0a0-4dad-a6f5-8560b55c56e9",
+    "title": "昼食",
+    "conflict": {
+     "fields": [
+      "local_start_time"
+     ],
+     "mine": null,
+     "server": {
+      "local_start_time": "12:30"
+     },
+     "server_deleted": false,
+     "deleted_by_me": true,
+     "title": "昼食"
+    },
+    "current": {
+     "day_id": "446070c0-c072-4cad-aa53-feb9e0d4a261",
+     "title": "昼食",
+     "description": null,
+     "event_type": "activity",
+     "local_start_time": "12:30",
+     "is_all_day": false,
+     "address": null,
+     "latitude": null,
+     "longitude": null
+    },
+    "server_deleted": false,
+    "created_at": "2026-10-15T08:03:37.436790+00:00"
+   }
+  ]
+ },
+ "sync_resolved_mine": {
+  "operation_id": "b840e516-c616-41f6-844b-71f925d00c8d",
+  "status": "resolved_mine",
+  "plan_revision": 11
+ },
+ "sync_resolved_server": {
+  "operation_id": "033e98f2-0d41-4f44-8109-bd78c02d7c12",
+  "status": "resolved_server",
+  "plan_revision": 11
+ },
+ "sync_conflicts_empty": {
+  "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
+  "plan_revision": 11,
+  "conflicts": []
  }
 }

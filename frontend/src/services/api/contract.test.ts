@@ -29,6 +29,7 @@ import {
   calendarImportPreview, calendarImportResult, consentState, accountDeletionPreview, accountDeletionResult,
   alertList, planAlert, replan, replanApplyResult, replanError,
   optimizationApplyResult, optimizationCandidates,
+  syncConflictList, syncResolveResult, syncResponse,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -239,6 +240,14 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['optimization_candidates_none', optimizationCandidates],
   ['optimization_applied', optimizationApplyResult],
   ['optimization_stale_error', object({ detail: object({ code: str, message: str }) })],
+  // ----- [Gate P11] オフライン編集・同期(FR-033)。*_replayed は同じ操作の再送、*_mixed は競合・拒否を含む送信
+  ['sync_applied', syncResponse],
+  ['sync_replayed', syncResponse],
+  ['sync_mixed', syncResponse],
+  ['sync_conflicts', syncConflictList],
+  ['sync_conflicts_empty', syncConflictList],
+  ['sync_resolved_mine', syncResolveResult],
+  ['sync_resolved_server', syncResolveResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

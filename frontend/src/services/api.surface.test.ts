@@ -19,6 +19,7 @@
  * [Gate P9] 同意の取得・更新、アカウント削除の説明・実行の4関数(export・メソッド)を追加。
  * [Gate P10] アラートの一覧・登録・変更、再計画案の作成・取得・適用・却下の7関数(export・メソッド)を追加。
  * [Gate L4] 説明可能な最適化の候補の計算・適用の2関数(export・メソッド)を追加。
+ * [Gate P11] オフライン同期の送信・競合の一覧・解決の3関数(export・メソッド)を追加。
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
@@ -44,16 +45,17 @@ const EXPECTED_EXPORTS = [
   'getPlanMembers', 'getPolls', 'getPreparationTasks', 'getReadiness', 'getReplan', 'getReservation',
   'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRetentionInfo',
   'getRouteOption', 'getRouteOptions', 'getSegment', 'getSegments', 'getSettlements', 'getShareSettings',
-  'getSpotCategories', 'getSpots', 'getTickets', 'getToday', 'getValidationRun', 'getValidationRuns',
-  'inviteCollaborator', 'listMyInvitations', 'notificationsAPI', 'previewBooklet', 'previewCalendarImport',
-  'purgePlan', 'putVotes', 'rejectExtractionCandidate', 'rejectImportJob', 'rejectReplan',
-  'removeCollaborator', 'resolveDownloadUrl', 'resolvePublicShare', 'resolveVote', 'restorePlan',
-  'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeShareLink', 'runValidation',
-  'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'testConnection', 'travelAPI', 'updateAlert',
-  'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents',
-  'updateConstraint', 'updateExpense', 'updateFinanceSettings', 'updatePackingItem', 'updatePoll',
-  'updatePreparationTask', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
-  'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument',
+  'getSpotCategories', 'getSpots', 'getSyncConflicts', 'getTickets', 'getToday', 'getValidationRun',
+  'getValidationRuns', 'inviteCollaborator', 'listMyInvitations', 'notificationsAPI', 'previewBooklet',
+  'previewCalendarImport', 'purgePlan', 'putVotes', 'rejectExtractionCandidate', 'rejectImportJob',
+  'rejectReplan', 'removeCollaborator', 'resolveDownloadUrl', 'resolvePublicShare', 'resolveSyncConflict',
+  'resolveVote', 'restorePlan', 'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeShareLink',
+  'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots', 'shareAPI', 'syncOperations',
+  'testConnection', 'travelAPI', 'updateAlert', 'updateBranch', 'updateBranchContent', 'updateBudget',
+  'updateComment', 'updateConsents', 'updateConstraint', 'updateExpense', 'updateFinanceSettings',
+  'updatePackingItem', 'updatePoll', 'updatePreparationTask', 'updateReservation',
+  'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings',
+  'uploadDocument',
 ];
 
 const EXPECTED_METHODS = [
@@ -79,17 +81,18 @@ const EXPECTED_METHODS = [
   'getPlans', 'getPolls', 'getPreparationTasks', 'getReadiness', 'getReplan', 'getReservation',
   'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRetentionInfo',
   'getRouteOption', 'getRouteOptions', 'getRoutePreview', 'getSegment', 'getSegments', 'getSettlements',
-  'getShareSettings', 'getSpotCategories', 'getSpots', 'getTickets', 'getToday', 'getUnreadNotificationCount',
-  'getValidationRun', 'getValidationRuns', 'handleApiError', 'healthCheck', 'initializeTokens',
-  'inviteCollaborator', 'listMyInvitations', 'login', 'logout', 'markAllNotificationsAsRead',
-  'markNotificationAsRead', 'moveEvent', 'planFromApi', 'planToApi', 'post', 'previewBooklet',
-  'previewCalendarImport', 'promoteQuickDraft', 'purgePlan', 'put', 'putVotes', 'register',
+  'getShareSettings', 'getSpotCategories', 'getSpots', 'getSyncConflicts', 'getTickets', 'getToday',
+  'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'handleApiError', 'healthCheck',
+  'initializeTokens', 'inviteCollaborator', 'listMyInvitations', 'login', 'logout',
+  'markAllNotificationsAsRead', 'markNotificationAsRead', 'moveEvent', 'planFromApi', 'planToApi', 'post',
+  'previewBooklet', 'previewCalendarImport', 'promoteQuickDraft', 'purgePlan', 'put', 'putVotes', 'register',
   'rejectExtractionCandidate', 'rejectImportJob', 'rejectReplan', 'removeCollaborator', 'resolvePublicShare',
-  'resolveVote', 'restorePlan', 'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeShareLink',
-  'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode',
-  'setHttpClientForTesting', 'setTokens', 'setupInterceptors', 'startGuestSession', 'testConnection',
-  'undoLastPlanChange', 'updateAlert', 'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment',
-  'updateConsents', 'updateConstraint', 'updateDay', 'updateEvent', 'updateExpense', 'updateFinanceSettings',
+  'resolveSyncConflict', 'resolveVote', 'restorePlan', 'revealReservation', 'revealTicket',
+  'revokeBookletExport', 'revokeShareLink', 'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots',
+  'setAccessToken', 'setGuestMode', 'setHttpClientForTesting', 'setTokens', 'setupInterceptors',
+  'startGuestSession', 'syncOperations', 'testConnection', 'undoLastPlanChange', 'updateAlert',
+  'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents',
+  'updateConstraint', 'updateDay', 'updateEvent', 'updateExpense', 'updateFinanceSettings',
   'updatePackingItem', 'updatePlan', 'updatePoll', 'updatePreparationTask', 'updateProfile',
   'updateReservation', 'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment',
   'updateShareSettings', 'upgradeGuest', 'uploadDocument',

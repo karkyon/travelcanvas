@@ -38,6 +38,12 @@ import { useAuthStore } from '@/store/authStore';
 import {
   LOCKED_RELATION_MESSAGE, UNDO_CONFLICT_MESSAGE, conflictCode, describeItemDeletion,
 } from '@/store/itemDeletionMessages';
+import {
+  applyResults, deviceId, enqueue, isNetworkError, loadConflictCount, loadQueue, saveConflictCount, toPayload,
+} from '@/utils/syncQueue';
+
+// [Gate P11] 通信できない時に端末へ溜めたことの案内
+export const OFFLINE_SAVED_MESSAGE = '通信できないため、この変更を端末に保存しました。通信が戻ると自動で送ります';
 
 interface PlanState {
   // State
@@ -50,6 +56,10 @@ interface PlanState {
   // 取得に失敗し暗号化ローカルパックから復元したデータであることを示す
   // (最新でない可能性があるため、画面側で明示する)。
   isOfflineData: boolean;
+  // [Gate P11] オフライン編集・同期(FR-033)。未同期の操作の件数、同期で競合した件数、同期中か
+  pendingSyncCount: number;
+  syncConflictCount: number;
+  isSyncing: boolean;
 
   // Actions
   loadPlans: () => Promise<void>;
@@ -108,6 +118,11 @@ interface PlanState {
   // Clear state
   clearCurrentPlan: () => void;
 
+  // [Gate P11] 端末に溜めた操作の件数を読み直す / 溜めた操作を送る(通信が戻った時・利用者の操作で)
+  refreshSyncState: (planId: string) => void;
+  syncPending: (planId: string) => Promise<void>;
+  setSyncConflictCount: (planId: string, count: number) => void;
+
   // 内部ヘルパー(export型には含めないが、実装上storeのgetから呼べるようにする)
   _reconcileOnConflict: (error: unknown, planId: string) => Promise<void>;
 }
@@ -156,6 +171,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   isLoading: false,
   searchResults: [],
   isOfflineData: false,
+  pendingSyncCount: 0,
+  syncConflictCount: 0,
+  isSyncing: false,
 
   // プラン一覧読み込み
   loadPlans: async () => {
@@ -595,6 +613,22 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       );
       await get().loadPlan(plan.id);
     } catch (error) {
+      if (isNetworkError(error)) {
+        // [Gate P11] 画面の予定(仮のID)はそのまま残し、作成を端末に溜める
+        const queued = enqueue(plan.id, {
+          action: 'create', temp_id: tempId, label: optimisticItem.title,
+          fields: {
+            day_id: day.id, title: optimisticItem.title, description: optimisticItem.description,
+            event_type: optimisticItem.category, local_start_time: optimisticItem.start_time || null,
+            address: optimisticItem.address, latitude: optimisticItem.latitude, longitude: optimisticItem.longitude,
+          },
+        });
+        if (queued) {
+          get().refreshSyncState(plan.id);
+          toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+          return;
+        }
+      }
       set({ currentPlan: plan });
       console.error('Add schedule item error:', error);
       toast.error('スポットの追加に失敗しました');
@@ -688,6 +722,23 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         };
       });
     } catch (error) {
+      if (isNetworkError(error)) {
+        // [Gate P11] 画面の変更はそのまま残し、変更を端末に溜める(編集を始めた版=今の画面の版)
+        const current = plan.days.flatMap((d) => d.events).find((e) => e.id === itemId);
+        const queued = enqueue(plan.id, {
+          action: 'update', entity_id: itemId, base_revision: plan.revision, label: item.title ?? current?.title ?? '予定',
+          fields: {
+            title: item.title, description: item.description, event_type: item.category,
+            local_start_time: item.start_time === undefined ? undefined : item.start_time || null,
+            address: item.address, latitude: item.latitude, longitude: item.longitude,
+          },
+        });
+        if (queued) {
+          get().refreshSyncState(plan.id);
+          toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+          return;
+        }
+      }
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
     }
@@ -718,6 +769,17 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       // [Gate B-013] 予約・文書との紐付けを外した・区間等を一緒に削除した場合の案内(表示は呼び出し側)
       return { ok: true, note: describeItemDeletion('event', result.detached) };
     } catch (error) {
+      if (isNetworkError(error)) {
+        // [Gate P11] 画面からは消したまま、削除を端末に溜める
+        const current = plan.days.flatMap((d) => d.events).find((e) => e.id === itemId);
+        const queued = enqueue(plan.id, {
+          action: 'delete', entity_id: itemId, base_revision: plan.revision, label: current?.title ?? '予定',
+        });
+        if (queued) {
+          get().refreshSyncState(plan.id);
+          return { ok: true, note: OFFLINE_SAVED_MESSAGE };
+        }
+      }
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
       return { ok: false, note: null };
@@ -853,6 +915,47 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // [Gate #31.5C] 409(revision不一致)を検出した場合はプランを再読み込みし、
   // それ以外のエラーは通常のエラートーストのみ表示する。呼び出し元は
   // 呼ぶ前に楽観的更新のロールバックを済ませておくこと。
+  refreshSyncState: (planId: string) => {
+    set({ pendingSyncCount: loadQueue(planId).length, syncConflictCount: loadConflictCount(planId) });
+  },
+
+  setSyncConflictCount: (planId: string, count: number) => {
+    saveConflictCount(planId, count);
+    set({ syncConflictCount: count });
+  },
+
+  syncPending: async (planId: string) => {
+    const queue = loadQueue(planId);
+    if (queue.length === 0 || get().isSyncing) {
+      get().refreshSyncState(planId);
+      return;
+    }
+    set({ isSyncing: true });
+    try {
+      const res = await apiService.syncOperations(planId, toPayload(queue), deviceId());
+      applyResults(planId, res.results);
+      const { applied, already_applied: replayed, conflicted, rejected } = res.summary;
+      saveConflictCount(planId, loadConflictCount(planId) + conflicted);
+      get().refreshSyncState(planId);
+      const parts = [`反映${applied + replayed}件`];
+      if (conflicted) parts.push(`競合${conflicted}件`);
+      if (rejected) parts.push(`反映できない変更${rejected}件`);
+      const text = `端末に保存していた変更を送りました(${parts.join('・')})`;
+      if (conflicted || rejected) toast.error(text);
+      else toast.success(text);
+      if (get().currentPlan?.id === planId) await get().loadPlan(planId);
+    } catch (error) {
+      // 通信できなければ溜めたまま次の機会に送る(再送しても二重に適用されない)
+      if (!isNetworkError(error)) {
+        console.error('Sync error:', error);
+        toast.error('端末に保存していた変更を送れませんでした。しばらくしてからもう一度お試しください');
+      }
+      get().refreshSyncState(planId);
+    } finally {
+      set({ isSyncing: false });
+    }
+  },
+
   _reconcileOnConflict: async (error: unknown, planId: string) => {
     // [Gate B-013] 確定ロックされた予約との紐付けがあり削除できなかった場合は、版の競合ではない
     // (何も変更されていない)ため再読み込みせず、ロックの解除方法を案内する。

@@ -41,6 +41,7 @@ import type {
   CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState,
   AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail,
   OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics,
+  SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1433,4 +1434,52 @@ export const optimizationCandidates: Decoder<OptimizationCandidates> = object<Op
 
 export const optimizationApplyResult: Decoder<OptimizationApplyResult> = object<OptimizationApplyResult>({
   plan_revision: int, changed: nonNegativeInt, change_set_id: nullable(str), algorithm_version: str,
+});
+
+// ----- [Gate P11] オフライン編集・同期(FR-033)。backend/app/api/v1/sync.py の応答。
+// 操作ごとの結果を取り違えると、競合した変更を「送信済み」として端末から消してしまうため、列挙値を厳密に検査する。
+const syncConflictDetail: Decoder<SyncConflictDetail> = object<SyncConflictDetail>({
+  fields: arrayOf(str),
+  mine: nullable(record),
+  server: nullable(record),
+  server_deleted: bool,
+  deleted_by_me: optional(bool),
+  title: optional(nullable(str)),
+});
+export const syncResponse: Decoder<SyncResponse> = object<SyncResponse>({
+  plan_id: str,
+  plan_revision: int,
+  results: arrayOf(object({
+    operation_id: str,
+    status: oneOf('applied', 'already_applied', 'conflicted', 'rejected'),
+    code: nullable(str),
+    message: nullable(str),
+    entity_id: nullable(str),
+    temp_id: nullable(str),
+    resulting_revision: nullable(int),
+    conflict: nullable(syncConflictDetail),
+  })),
+  summary: object({
+    applied: nonNegativeInt, already_applied: nonNegativeInt, conflicted: nonNegativeInt, rejected: nonNegativeInt,
+  }),
+  pack_refresh_required: bool,
+});
+export const syncConflictList: Decoder<SyncConflictList> = object<SyncConflictList>({
+  plan_id: str,
+  plan_revision: int,
+  conflicts: arrayOf(object({
+    operation_id: str,
+    action: oneOf('create', 'update', 'delete'),
+    code: nullable(str),
+    message: nullable(str),
+    entity_id: nullable(str),
+    title: nullable(str),
+    conflict: nullable(syncConflictDetail),
+    current: nullable(record),
+    server_deleted: bool,
+    created_at: nullable(str),
+  })),
+});
+export const syncResolveResult: Decoder<SyncResolveResult> = object<SyncResolveResult>({
+  operation_id: str, status: oneOf('resolved_mine', 'resolved_server'), plan_revision: int,
 });

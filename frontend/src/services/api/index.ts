@@ -15,6 +15,7 @@ import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './t
 import type { CalendarImportApplyItem, ConsentPurpose } from './types';
 import type { AlertCreateData, AlertUpdateData } from './types';
 import type { OptimizationTravelMode } from './types';
+import type { SyncOperationInput } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -365,5 +366,13 @@ export const applyOptimizationCandidate = (
   planId: string, dayId: string, candidateId: string, inputFingerprint: string, planRevision: number,
   travelMode?: OptimizationTravelMode,
 ) => api.applyOptimizationCandidate(planId, dayId, candidateId, inputFingerprint, planRevision, travelMode);
+
+// ===== [Gate P11] オフライン編集・同期(FR-033) =====
+export const syncOperations = (planId: string, operations: SyncOperationInput[], deviceId?: string) =>
+  api.syncOperations(planId, operations, deviceId);
+export const getSyncConflicts = (planId: string) => api.getSyncConflicts(planId);
+export const resolveSyncConflict = (
+  planId: string, operationId: string, resolution: 'keep_server' | 'use_mine', planRevision?: number,
+) => api.resolveSyncConflict(planId, operationId, resolution, planRevision);
 
 export default api;

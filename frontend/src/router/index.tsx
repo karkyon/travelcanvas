@@ -52,6 +52,7 @@ const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
 const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
 const AlertsPage = lazyPage(() => import('@/pages/AlertsPage'));
 const ReplanPage = lazyPage(() => import('@/pages/ReplanPage'));
+const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -316,6 +317,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ReplanPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📴 [Gate P11] 同期で競合した変更の確認・解決(FR-033)。
+      {
+        path: 'planner/:planId/sync',
+        element: (
+          <ProtectedRoute>
+            <SyncConflictsPage />
           </ProtectedRoute>
         ),
       },

@@ -2313,3 +2313,49 @@ class Replan(Base):
         CheckConstraint("applied_candidate IS NULL OR applied_candidate IN ('A','B')", name="ck_replans_candidate"),
         Index("ix_replans_plan_alert", "plan_id", "alert_id"),
     )
+
+
+class SyncOperation(Base):
+    """[Gate P11] オフラインで行った操作の受領記録(FR-033、DOC-06 §30、DOC-13 Operation ID)。
+
+    端末が付けた operation_id を利用者ごとに一意とし、同じ操作の再送は記録した結果を返す(二重に適用しない)。
+    競合(conflicted)は、操作した利用者が「サーバーの内容を残す」か「自分の変更を使う」で解決するまで残す。
+    temp_id は端末で作った予定の仮のIDで、作成が適用された後は同じ端末の後続の操作から本当のIDへ対応付ける。
+    予定(entity_id)には外部キーを張らない(B-013の個別削除を妨げないため。使う時に存在を確認する)。
+    """
+    __tablename__ = "sync_operations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    operation_id = Column(UUID(as_uuid=True), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    device_id = Column(String(64), nullable=True)
+    entity_type = Column(String(10), nullable=False, default="event")
+    action = Column(String(6), nullable=False)
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
+    temp_id = Column(String(64), nullable=True)
+    base_revision = Column(Integer, nullable=True)
+    fields = Column(JSON, nullable=True)
+    client_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(15), nullable=False)
+    code = Column(String(40), nullable=True)
+    conflict = Column(JSON, nullable=True)
+    resulting_revision = Column(Integer, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "operation_id", name="uq_sync_operations_user_operation"),
+        CheckConstraint("entity_type IN ('event')", name="ck_sync_operations_entity_type"),
+        CheckConstraint("action IN ('create','update','delete')", name="ck_sync_operations_action"),
+        CheckConstraint(
+            "status IN ('applied','conflicted','rejected','resolved_mine','resolved_server')",
+            name="ck_sync_operations_status",
+        ),
+        CheckConstraint(
+            "(status IN ('resolved_mine','resolved_server')) = (resolved_at IS NOT NULL)",
+            name="ck_sync_operations_resolved_at",
+        ),
+        Index("ix_sync_operations_plan_user_status", "plan_id", "user_id", "status"),
+        Index("ix_sync_operations_plan_user_temp", "plan_id", "user_id", "temp_id"),
+    )

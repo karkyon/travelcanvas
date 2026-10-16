@@ -27,6 +27,7 @@ import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
+import SyncStatusBar from '@/components/planner/SyncStatusBar';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
@@ -601,6 +602,8 @@ const PlannerPage: React.FC = () => {
               🤝 共有
             </Button>
           </div>
+
+          <SyncStatusBar planId={currentPlan.id} />
 
           <PlanHeader plan={currentPlan} className="mb-6" onDelete={() => navigate('/planner')} />
 
