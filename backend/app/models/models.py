@@ -2359,3 +2359,50 @@ class SyncOperation(Base):
         Index("ix_sync_operations_plan_user_status", "plan_id", "user_id", "status"),
         Index("ix_sync_operations_plan_user_temp", "plan_id", "user_id", "temp_id"),
     )
+
+
+class Memory(Base):
+    """[Gate P12] FR-037 写真・メモ・旅行記(DOC-04 SC-28、DOC-14 §4.5 MEMORY)。
+
+    予定・日・日時・場所へ、文章のメモ・写真・音声メモ・動画の参照(URL)を紐付ける。
+    - 写真・音声のファイルは文書と同じ保存先へ暗号化して保存する(storage_key は API が作り、利用者からは受け取らない)。
+    - 公開範囲(visibility): private=書いた本人だけ(既定、DOC-11 Privacy by Default)/ members=旅行のメンバー。
+    - 予定・日(event_id/day_id)には外部キーを張らない(B-013の個別削除を妨げないため。使う時に存在を確認する)。
+    - 位置(latitude/longitude)は旅行記の下書きでは既定で除外する(SC-28 公開前の検査)。
+    """
+    __tablename__ = "memories"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind = Column(String(10), nullable=False)
+    body = Column(Text, nullable=True)
+    event_id = Column(UUID(as_uuid=True), nullable=True)
+    day_id = Column(UUID(as_uuid=True), nullable=True)
+    occurred_at = Column(DateTime(timezone=True), nullable=True)
+    place_name = Column(String(200), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    video_url = Column(String(2000), nullable=True)
+    storage_key = Column(String, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    size = Column(Integer, nullable=True)
+    sha256 = Column(String(64), nullable=True)
+    visibility = Column(String(8), nullable=False, default="private")
+    include_in_journal = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('note','photo','audio','video')", name="ck_memories_kind"),
+        CheckConstraint("visibility IN ('private','members')", name="ck_memories_visibility"),
+        CheckConstraint("(kind IN ('photo','audio')) = (storage_key IS NOT NULL)", name="ck_memories_media"),
+        CheckConstraint("(kind = 'video') = (video_url IS NOT NULL)", name="ck_memories_video"),
+        CheckConstraint("kind <> 'note' OR body IS NOT NULL", name="ck_memories_note_body"),
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="ck_memories_location_pair"),
+        CheckConstraint("latitude IS NULL OR latitude BETWEEN -90 AND 90", name="ck_memories_latitude"),
+        CheckConstraint("longitude IS NULL OR longitude BETWEEN -180 AND 180", name="ck_memories_longitude"),
+        Index("ix_memories_plan_occurred", "plan_id", "occurred_at"),
+    )

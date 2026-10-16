@@ -53,6 +53,7 @@ const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
 const AlertsPage = lazyPage(() => import('@/pages/AlertsPage'));
 const ReplanPage = lazyPage(() => import('@/pages/ReplanPage'));
 const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
+const MemoriesPage = lazyPage(() => import('@/pages/MemoriesPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -327,6 +328,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <SyncConflictsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📷 [Gate P12] 写真・メモ・旅行記(FR-037)。
+      {
+        path: 'planner/:planId/memories',
+        element: (
+          <ProtectedRoute>
+            <MemoriesPage />
           </ProtectedRoute>
         ),
       },

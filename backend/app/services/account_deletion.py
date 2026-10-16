@@ -5,7 +5,8 @@
 - 所有する旅行: 論理削除(B-012 soft_delete_plan)。共有リンクは即時失効し、参加者もすぐに見られなくなる。
   猶予期間(PLAN_DELETE_GRACE_DAYS)後に既存の完全削除バッチで子データ・文書ファイルごと消える。
 - 参加している旅行: 参加(共同編集者の行)を外し、本人だけの情報を消す
-  (個人の持ち物・秘匿の条件・個人予算・本人がアップロードした文書)。担当の割当は外す。
+  (個人の持ち物・秘匿の条件・個人予算・本人がアップロードした文書・本人の旅の記録(P12、写真・音声のファイルを含む)・
+  本人の同期の受領記録(P11))。担当の割当は外す。
   コメント・支出・投票・変更履歴は同行者の記録として残し、名前は「退会済み-xxxxxxxx」と表示される。
 - 本人だけのデータ: セッション(IP・端末情報を含む)、通知、お気に入り・訪問記録、冪等性記録、
   本人宛ての招待(メールアドレスを含む)を削除する。
@@ -20,9 +21,9 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.models import (
-    Budget, Comment, Document, DocumentPurgeStatus, Expense, IdempotencyRecord, Notification, PackingItem,
-    PlanCollaborator, PlanConstraint, Poll, PreparationTask, TravelPlan, User, UserSession, UserSpotFavorite,
-    UserSpotVisit, Vote,
+    Budget, Comment, Document, DocumentPurgeStatus, Expense, IdempotencyRecord, Memory, Notification, PackingItem,
+    PlanCollaborator, PlanConstraint, Poll, PreparationTask, SyncOperation, TravelPlan, User, UserSession,
+    UserSpotFavorite, UserSpotVisit, Vote,
 )
 from app.services import plan_deletion
 from app.services.plan_item_deletion import detach_collaborator_references
@@ -94,6 +95,8 @@ def preview(db: Session, user: User) -> Dict[str, Any]:
         "documents": count(db.query(Document).filter(
             Document.owner_user_id == me, Document.deleted_at.is_(None),
             _others_plan_filter(Document.plan_id, owned_ids))),
+        "memories": count(db.query(Memory).filter(
+            Memory.author_user_id == me, _others_plan_filter(Memory.plan_id, owned_ids))),
     }
     kept = {
         "comments": count(db.query(Comment).filter(Comment.author_user_id == me, Comment.deleted_at.is_(None),
@@ -172,6 +175,20 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     pending = sum(0 if _delete_document_file(d, now) else 1 for d in docs)
     summary["documents"] = len(docs)
     summary["documents_pending_purge"] = pending
+    # [Gate P12] 参加している旅行に本人が残した旅の記録(写真・音声のファイルを含む)。
+    # 所有する旅行の記録は、旅行の完全削除でまとめて消える(plan_deletion)。
+    mems = db.query(Memory).filter(Memory.author_user_id == me, _others_plan_filter(Memory.plan_id, owned_ids)).all()
+    for mm in mems:
+        if mm.storage_key:
+            try:
+                get_storage_backend().delete(mm.storage_key)
+            except Exception:  # noqa: BLE001 - 行は消す。ファイルは保存先の掃除で消える(ADR-memories.md)
+                pass
+        db.delete(mm)
+    summary["memories"] = len(mems)
+    # [Gate P11] 同期の受領記録は端末から送った予定の内容を含むため、本人の分を消す
+    summary["sync_operations"] = db.query(SyncOperation).filter(SyncOperation.user_id == me).delete(
+        synchronize_session=False)
 
     summary["notifications"] = db.query(Notification).filter(Notification.user_id == me).delete(
         synchronize_session=False)

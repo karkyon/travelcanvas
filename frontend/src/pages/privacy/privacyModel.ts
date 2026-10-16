@@ -17,6 +17,7 @@ export function deletionEffects(p: AccountDeletionPreview): string[] {
       d.private_constraints && `秘匿の条件${d.private_constraints}件`,
       d.member_budgets && `個人予算${d.member_budgets}件`,
       d.documents && `あなたがアップロードした文書${d.documents}件`,
+      d.memories && `あなたの旅の記録${d.memories}件(写真・音声を含む)`,
     ].filter(Boolean);
     out.push(`参加している旅行${p.member_plan_count}件から抜けます。` +
       (parts.length ? `${parts.join('・')}を削除します。` : ''));

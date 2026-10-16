@@ -42,6 +42,7 @@ import type {
   AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail,
   OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics,
   SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
+  JournalDraft, JournalMemory, MemoryList, TravelMemory,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1276,7 +1277,7 @@ export const accountDeletionPreview: Decoder<AccountDeletionPreview> = object<Ac
   member_plan_count: nonNegativeInt,
   deleted_in_member_plans: object({
     personal_packing_items: nonNegativeInt, private_constraints: nonNegativeInt, member_budgets: nonNegativeInt,
-    documents: nonNegativeInt,
+    documents: nonNegativeInt, memories: optional(nonNegativeInt),
   }),
   kept_in_member_plans: object({ comments: nonNegativeInt, expenses: nonNegativeInt, votes: nonNegativeInt }),
   plan_delete_grace_days: nonNegativeInt,
@@ -1482,4 +1483,80 @@ export const syncConflictList: Decoder<SyncConflictList> = object<SyncConflictLi
 });
 export const syncResolveResult: Decoder<SyncResolveResult> = object<SyncResolveResult>({
   operation_id: str, status: oneOf('resolved_mine', 'resolved_server'), plan_revision: int,
+});
+
+// ===== [Gate P12] 写真・メモ・旅行記(FR-037) =====
+const memoryKind = oneOf('note', 'photo', 'audio', 'video');
+export const travelMemory: Decoder<TravelMemory> = object<TravelMemory>({
+  id: str,
+  plan_id: str,
+  kind: memoryKind,
+  body: nullable(str),
+  event_id: nullable(str),
+  day_id: nullable(str),
+  occurred_at: nullable(str),
+  place_name: nullable(str),
+  latitude: nullable(num),
+  longitude: nullable(num),
+  video_url: nullable(str),
+  has_media: bool,
+  mime_type: nullable(str),
+  size: nullable(nonNegativeInt),
+  visibility: oneOf('private', 'members'),
+  include_in_journal: bool,
+  author_name: str,
+  by_me: bool,
+  can_edit: bool,
+  can_delete: bool,
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+});
+export const memoryList: Decoder<MemoryList> = object<MemoryList>({
+  memories: arrayOf(travelMemory),
+  can_create: bool,
+  max_upload_bytes: nonNegativeInt,
+});
+const journalMemory: Decoder<JournalMemory> = object<JournalMemory>({
+  id: str,
+  kind: memoryKind,
+  body: nullable(str),
+  occurred_at: nullable(str),
+  place_name: nullable(str),
+  has_media: bool,
+  video_url: nullable(str),
+  latitude: nullable(num),
+  longitude: nullable(num),
+  by_me: bool,
+});
+export const journalDraft: Decoder<JournalDraft> = object<JournalDraft>({
+  title: str,
+  algorithm_version: str,
+  generated_at: nullable(str),
+  options: object({ include_locations: bool, include_media: bool, include_others: bool }),
+  days: arrayOf(object({
+    day_id: str,
+    date: str,
+    title: nullable(str),
+    entries: arrayOf(object({
+      event_id: str,
+      title: nullable(str),
+      planned_time: nullable(str),
+      status: oneOf('recorded', 'no_record'),
+      memories: arrayOf(journalMemory),
+    })),
+    day_memories: arrayOf(journalMemory),
+  })),
+  other_memories: arrayOf(journalMemory),
+  summary: object({
+    planned_events: nonNegativeInt, recorded_events: nonNegativeInt, memories: nonNegativeInt, photos: nonNegativeInt,
+  }),
+  checks: arrayOf(object({
+    code: oneOf('member_name', 'reservation_like', 'phone_like', 'photo_people', 'location_included',
+      'location_excluded', 'others_included'),
+    severity: oneOf('warning', 'info'),
+    memory_id: nullable(str),
+    message: str,
+  })),
+  markdown: str,
 });

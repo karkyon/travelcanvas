@@ -18,7 +18,8 @@
   "captured_at_head_p8": "Gate P7 (+Gate P8 calendar import)",
   "captured_at_head_p10": "Gate P9 (+Gate P10 alerts/replans)",
   "captured_at_head_l4": "Gate P10 (+Gate L4 optimization-candidates)",
-  "captured_at_head_p11": "Gate L4 (+Gate P11 sync/conflicts)"
+  "captured_at_head_p11": "Gate L4 (+Gate P11 sync/conflicts)",
+  "captured_at_head_p12": "Gate P12(FR-037 写真・メモ・旅行記)の実backend応答。account_deletion_previewへmemories件数を追加"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -8041,7 +8042,8 @@
    "personal_packing_items": 0,
    "private_constraints": 0,
    "member_budgets": 0,
-   "documents": 0
+   "documents": 0,
+   "memories": 0
   },
   "kept_in_member_plans": {
    "comments": 0,
@@ -9442,5 +9444,570 @@
   "plan_id": "dda50fcf-ccac-45ee-b09a-5f5437b6f2b7",
   "plan_revision": 11,
   "conflicts": []
+ },
+ "memory_note": {
+  "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+  "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+  "kind": "note",
+  "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+  "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+  "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+  "occurred_at": "2026-11-01T00:30:00+00:00",
+  "place_name": "清水寺",
+  "latitude": 34.99485,
+  "longitude": 135.78504,
+  "video_url": null,
+  "has_media": false,
+  "mime_type": null,
+  "size": null,
+  "visibility": "private",
+  "include_in_journal": true,
+  "author_name": "user_9e3659f5c2",
+  "by_me": true,
+  "can_edit": true,
+  "can_delete": true,
+  "revision": 1,
+  "created_at": "2026-10-15T08:49:47.614340+00:00",
+  "updated_at": null
+ },
+ "memory_photo": {
+  "id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+  "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+  "kind": "photo",
+  "body": null,
+  "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+  "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+  "occurred_at": null,
+  "place_name": null,
+  "latitude": null,
+  "longitude": null,
+  "video_url": null,
+  "has_media": true,
+  "mime_type": "image/png",
+  "size": 72,
+  "visibility": "members",
+  "include_in_journal": true,
+  "author_name": "user_9e3659f5c2",
+  "by_me": true,
+  "can_edit": true,
+  "can_delete": true,
+  "revision": 1,
+  "created_at": "2026-10-15T08:49:47.614340+00:00",
+  "updated_at": null
+ },
+ "memory_video": {
+  "id": "a59aeef5-78dc-45ca-82b5-78904c5d10b2",
+  "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+  "kind": "video",
+  "body": null,
+  "event_id": null,
+  "day_id": "e447f14d-4336-4389-b054-3b281cf5eee9",
+  "occurred_at": null,
+  "place_name": null,
+  "latitude": null,
+  "longitude": null,
+  "video_url": "https://video.example/v/9",
+  "has_media": false,
+  "mime_type": null,
+  "size": null,
+  "visibility": "private",
+  "include_in_journal": true,
+  "author_name": "user_9e3659f5c2",
+  "by_me": true,
+  "can_edit": true,
+  "can_delete": true,
+  "revision": 1,
+  "created_at": "2026-10-15T08:49:47.614340+00:00",
+  "updated_at": null
+ },
+ "memory_updated": {
+  "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+  "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+  "kind": "note",
+  "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+  "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+  "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+  "occurred_at": "2026-11-01T00:30:00+00:00",
+  "place_name": "清水寺",
+  "latitude": 34.99485,
+  "longitude": 135.78504,
+  "video_url": null,
+  "has_media": false,
+  "mime_type": null,
+  "size": null,
+  "visibility": "members",
+  "include_in_journal": true,
+  "author_name": "user_9e3659f5c2",
+  "by_me": true,
+  "can_edit": true,
+  "can_delete": true,
+  "revision": 2,
+  "created_at": "2026-10-15T08:49:47.614340+00:00",
+  "updated_at": "2026-10-15T08:49:47.614340+00:00"
+ },
+ "memory_list_member": {
+  "memories": [
+   {
+    "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "note",
+    "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+    "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "occurred_at": "2026-11-01T00:30:00+00:00",
+    "place_name": "清水寺",
+    "latitude": 34.99485,
+    "longitude": 135.78504,
+    "video_url": null,
+    "has_media": false,
+    "mime_type": null,
+    "size": null,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "user_9e3659f5c2",
+    "by_me": false,
+    "can_edit": false,
+    "can_delete": false,
+    "revision": 2,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": "2026-10-15T08:49:47.614340+00:00"
+   },
+   {
+    "id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "photo",
+    "body": null,
+    "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "occurred_at": null,
+    "place_name": null,
+    "latitude": null,
+    "longitude": null,
+    "video_url": null,
+    "has_media": true,
+    "mime_type": "image/png",
+    "size": 72,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "user_9e3659f5c2",
+    "by_me": false,
+    "can_edit": false,
+    "can_delete": false,
+    "revision": 1,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": null
+   },
+   {
+    "id": "96f6dba5-393b-4b29-b796-93e539b311d9",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "note",
+    "body": "友人の公開メモ",
+    "event_id": null,
+    "day_id": null,
+    "occurred_at": null,
+    "place_name": null,
+    "latitude": null,
+    "longitude": null,
+    "video_url": null,
+    "has_media": false,
+    "mime_type": null,
+    "size": null,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "hanako",
+    "by_me": true,
+    "can_edit": true,
+    "can_delete": true,
+    "revision": 1,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": null
+   }
+  ],
+  "can_create": true,
+  "max_upload_bytes": 20971520
+ },
+ "memory_list": {
+  "memories": [
+   {
+    "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "note",
+    "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+    "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "occurred_at": "2026-11-01T00:30:00+00:00",
+    "place_name": "清水寺",
+    "latitude": 34.99485,
+    "longitude": 135.78504,
+    "video_url": null,
+    "has_media": false,
+    "mime_type": null,
+    "size": null,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "user_9e3659f5c2",
+    "by_me": true,
+    "can_edit": true,
+    "can_delete": true,
+    "revision": 2,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": "2026-10-15T08:49:47.614340+00:00"
+   },
+   {
+    "id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "photo",
+    "body": null,
+    "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "occurred_at": null,
+    "place_name": null,
+    "latitude": null,
+    "longitude": null,
+    "video_url": null,
+    "has_media": true,
+    "mime_type": "image/png",
+    "size": 72,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "user_9e3659f5c2",
+    "by_me": true,
+    "can_edit": true,
+    "can_delete": true,
+    "revision": 1,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": null
+   },
+   {
+    "id": "96f6dba5-393b-4b29-b796-93e539b311d9",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "note",
+    "body": "友人の公開メモ",
+    "event_id": null,
+    "day_id": null,
+    "occurred_at": null,
+    "place_name": null,
+    "latitude": null,
+    "longitude": null,
+    "video_url": null,
+    "has_media": false,
+    "mime_type": null,
+    "size": null,
+    "visibility": "members",
+    "include_in_journal": true,
+    "author_name": "hanako",
+    "by_me": false,
+    "can_edit": false,
+    "can_delete": true,
+    "revision": 1,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": null
+   },
+   {
+    "id": "a59aeef5-78dc-45ca-82b5-78904c5d10b2",
+    "plan_id": "66e2ea5c-1f4b-4c9d-b523-ce1e86643870",
+    "kind": "video",
+    "body": null,
+    "event_id": null,
+    "day_id": "e447f14d-4336-4389-b054-3b281cf5eee9",
+    "occurred_at": null,
+    "place_name": null,
+    "latitude": null,
+    "longitude": null,
+    "video_url": "https://video.example/v/9",
+    "has_media": false,
+    "mime_type": null,
+    "size": null,
+    "visibility": "private",
+    "include_in_journal": true,
+    "author_name": "user_9e3659f5c2",
+    "by_me": true,
+    "can_edit": true,
+    "can_delete": true,
+    "revision": 1,
+    "created_at": "2026-10-15T08:49:47.614340+00:00",
+    "updated_at": null
+   }
+  ],
+  "can_create": true,
+  "max_upload_bytes": 20971520
+ },
+ "journal_draft": {
+  "title": "京都の旅",
+  "algorithm_version": "journal-draft-v1",
+  "generated_at": "2026-10-15T08:49:48.718350+00:00",
+  "options": {
+   "include_locations": false,
+   "include_media": true,
+   "include_others": false
+  },
+  "days": [
+   {
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "date": "2026-11-01",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+      "title": "清水寺",
+      "planned_time": "09:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+        "kind": "note",
+        "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+        "occurred_at": "2026-11-01T00:30:00+00:00",
+        "place_name": "清水寺",
+        "has_media": false,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       },
+       {
+        "id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+        "kind": "photo",
+        "body": null,
+        "occurred_at": null,
+        "place_name": null,
+        "has_media": true,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     }
+    ],
+    "day_memories": []
+   },
+   {
+    "day_id": "e447f14d-4336-4389-b054-3b281cf5eee9",
+    "date": "2026-11-02",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "fd82df4f-aaaf-436a-a127-a9f1a3e6a6a2",
+      "title": "美術館",
+      "planned_time": "10:00",
+      "status": "no_record",
+      "memories": []
+     }
+    ],
+    "day_memories": [
+     {
+      "id": "a59aeef5-78dc-45ca-82b5-78904c5d10b2",
+      "kind": "video",
+      "body": null,
+      "occurred_at": null,
+      "place_name": null,
+      "has_media": false,
+      "video_url": "https://video.example/v/9",
+      "latitude": null,
+      "longitude": null,
+      "by_me": true
+     }
+    ]
+   }
+  ],
+  "other_memories": [],
+  "summary": {
+   "planned_events": 2,
+   "recorded_events": 1,
+   "memories": 3,
+   "photos": 1
+  },
+  "checks": [
+   {
+    "code": "member_name",
+    "severity": "warning",
+    "memory_id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "message": "同行者の名前が含まれています。公開してよいか確認してください"
+   },
+   {
+    "code": "reservation_like",
+    "severity": "warning",
+    "memory_id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "message": "予約番号のような文字列が含まれています。公開する前に消してください"
+   },
+   {
+    "code": "photo_people",
+    "severity": "info",
+    "memory_id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+    "message": "写真に人の顔が写っていないか確認してください(顔の自動判定は行っていません)"
+   },
+   {
+    "code": "location_excluded",
+    "severity": "info",
+    "memory_id": null,
+    "message": "位置(緯度・経度)は1件の記録から除いています"
+   }
+  ],
+  "markdown": "# 京都の旅\n\n## 2026-11-01\n\n### 09:00 清水寺\n> hanakoと朝の参拝。確認番号 QX9Z81\n- 場所: 清水寺\n- 写真(アプリで表示)\n\n## 2026-11-02\n\n- 動画: <https://video.example/v/9>\n\n### 10:00 美術館\n(予定していた場所。記録はありません)\n"
+ },
+ "journal_draft_all": {
+  "title": "京都の旅",
+  "algorithm_version": "journal-draft-v1",
+  "generated_at": "2026-10-15T08:49:48.745144+00:00",
+  "options": {
+   "include_locations": true,
+   "include_media": true,
+   "include_others": true
+  },
+  "days": [
+   {
+    "day_id": "afef9b47-0029-47c2-a005-a7cab559001b",
+    "date": "2026-11-01",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "ace8db09-ce02-4c21-be65-327e5723c708",
+      "title": "清水寺",
+      "planned_time": "09:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+        "kind": "note",
+        "body": "hanakoと朝の参拝。確認番号 QX9Z81",
+        "occurred_at": "2026-11-01T00:30:00+00:00",
+        "place_name": "清水寺",
+        "has_media": false,
+        "video_url": null,
+        "latitude": 34.99485,
+        "longitude": 135.78504,
+        "by_me": true
+       },
+       {
+        "id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+        "kind": "photo",
+        "body": null,
+        "occurred_at": null,
+        "place_name": null,
+        "has_media": true,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     }
+    ],
+    "day_memories": []
+   },
+   {
+    "day_id": "e447f14d-4336-4389-b054-3b281cf5eee9",
+    "date": "2026-11-02",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "fd82df4f-aaaf-436a-a127-a9f1a3e6a6a2",
+      "title": "美術館",
+      "planned_time": "10:00",
+      "status": "no_record",
+      "memories": []
+     }
+    ],
+    "day_memories": [
+     {
+      "id": "a59aeef5-78dc-45ca-82b5-78904c5d10b2",
+      "kind": "video",
+      "body": null,
+      "occurred_at": null,
+      "place_name": null,
+      "has_media": false,
+      "video_url": "https://video.example/v/9",
+      "latitude": null,
+      "longitude": null,
+      "by_me": true
+     }
+    ]
+   }
+  ],
+  "other_memories": [
+   {
+    "id": "96f6dba5-393b-4b29-b796-93e539b311d9",
+    "kind": "note",
+    "body": "友人の公開メモ",
+    "occurred_at": null,
+    "place_name": null,
+    "has_media": false,
+    "video_url": null,
+    "latitude": null,
+    "longitude": null,
+    "by_me": false
+   }
+  ],
+  "summary": {
+   "planned_events": 2,
+   "recorded_events": 1,
+   "memories": 4,
+   "photos": 1
+  },
+  "checks": [
+   {
+    "code": "member_name",
+    "severity": "warning",
+    "memory_id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "message": "同行者の名前が含まれています。公開してよいか確認してください"
+   },
+   {
+    "code": "reservation_like",
+    "severity": "warning",
+    "memory_id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "message": "予約番号のような文字列が含まれています。公開する前に消してください"
+   },
+   {
+    "code": "location_included",
+    "severity": "warning",
+    "memory_id": "8d4ae3e2-8473-447a-b753-23a7a5193940",
+    "message": "位置(緯度・経度)を含めています。自宅や宿の場所が分からないか確認してください"
+   },
+   {
+    "code": "photo_people",
+    "severity": "info",
+    "memory_id": "2a6f2e21-0bf6-4b7d-9509-347afdaab3f6",
+    "message": "写真に人の顔が写っていないか確認してください(顔の自動判定は行っていません)"
+   },
+   {
+    "code": "others_included",
+    "severity": "info",
+    "memory_id": null,
+    "message": "他のメンバーの記録を含めています。公開する前に本人に確認してください"
+   }
+  ],
+  "markdown": "# 京都の旅\n\n## 2026-11-01\n\n### 09:00 清水寺\n> hanakoと朝の参拝。確認番号 QX9Z81\n- 場所: 清水寺(緯度 34.99485、経度 135.78504)\n- 写真(アプリで表示)\n\n## 2026-11-02\n\n- 動画: <https://video.example/v/9>\n\n### 10:00 美術館\n(予定していた場所。記録はありません)\n\n## そのほかの記録\n\n> 友人の公開メモ\n"
+ },
+ "memory_list_empty": {
+  "memories": [],
+  "can_create": true,
+  "max_upload_bytes": 20971520
+ },
+ "journal_draft_empty": {
+  "title": "空の旅",
+  "algorithm_version": "journal-draft-v1",
+  "generated_at": "2026-10-15T08:49:48.801389+00:00",
+  "options": {
+   "include_locations": false,
+   "include_media": true,
+   "include_others": false
+  },
+  "days": [],
+  "other_memories": [],
+  "summary": {
+   "planned_events": 0,
+   "recorded_events": 0,
+   "memories": 0,
+   "photos": 0
+  },
+  "checks": [],
+  "markdown": "# 空の旅\n"
+ },
+ "memory_error_event_not_found": {
+  "detail": {
+   "code": "event_not_found",
+   "message": "指定した予定が見つかりません"
+  }
  }
 }

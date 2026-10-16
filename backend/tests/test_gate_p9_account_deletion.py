@@ -94,7 +94,7 @@ def test_preview_does_not_change_anything(auth_client, make_user, db_session, mo
     assert body["owned_plans"] == [{"id": mine, "title": "自分の京都旅行", "member_count": 1}]
     assert body["member_plan_count"] == 1
     assert body["deleted_in_member_plans"] == {"personal_packing_items": 1, "private_constraints": 1,
-                                               "member_budgets": 1, "documents": 1}
+                                               "member_budgets": 1, "documents": 1, "memories": 0}
     assert body["kept_in_member_plans"] == {"comments": 1, "expenses": 1, "votes": 0}
     assert body["plan_delete_grace_days"] == settings.PLAN_DELETE_GRACE_DAYS
     assert [i["key"] for i in body["retention"]["items"]][0] == "deleted_plan"

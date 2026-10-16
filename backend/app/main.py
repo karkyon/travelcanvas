@@ -6,7 +6,7 @@ from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
-    calendar_import, privacy, replans, optimization, sync,
+    calendar_import, privacy, replans, optimization, sync, memories,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -401,3 +401,5 @@ app.include_router(replans.router, prefix="/api/v1")
 app.include_router(optimization.router, prefix="/api/v1")
 # [Gate P11] FR-033 オフライン編集・同期(操作の受領・競合の解決)。/plans/{plan_id}/sync配下。
 app.include_router(sync.router, prefix="/api/v1")
+# [Gate P12] FR-037 写真・メモ・旅行記。/plans/{plan_id}/memories配下。
+app.include_router(memories.router, prefix="/api/v1")

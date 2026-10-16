@@ -520,6 +520,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/memories`)}
+            >
+              📷 旅の記録
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
             >
               🚶 移動区間

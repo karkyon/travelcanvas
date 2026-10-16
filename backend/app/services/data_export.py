@@ -99,6 +99,7 @@ PLAN_TABLES = (
     m.PlanFinanceSettings, m.Budget, m.Expense, m.ExpenseShare, m.Settlement,
     m.Poll, m.PollOption, m.Vote, m.Comment,
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
+    m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory,
 )
 
 
@@ -207,6 +208,14 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["change_items"] = [row(x) for x in db.query(m.ChangeItem).filter(
         m.ChangeItem.change_set_id.in_(_ids(change_sets))).all()] if change_sets else []
     t["plan_versions"] = [row(x) for x in q(m.PlanVersion).all()]
+    # [Gate P12] P7〜P12で追加した旅行の表(以前の書き出しに漏れていたP7・P10・P11の表を含む)
+    t["itinerary_branches"] = [row(x) for x in q(m.ItineraryBranch).all()]
+    t["plan_alerts"] = [row(x) for x in q(m.PlanAlert).all()]
+    t["replans"] = [row(x) for x in q(m.Replan).all()]
+    # 同期の受領記録は送った本人の分だけ(他の人が端末から送った内容は含めない)
+    t["sync_operations"] = [row(x) for x in q(m.SyncOperation).filter(m.SyncOperation.user_id == me).all()]
+    # 旅の記録は本人の分と、メンバーに公開された分だけ(他の人の「自分だけ」の記録は含めない)。ファイルは含めない
+    t["memories"] = [row(x) for x in q(m.Memory).all() if x.author_user_id == me or x.visibility == "members"]
     return t
 
 
@@ -243,11 +252,13 @@ def contributions(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, A
         budgets.append(row(b, {"amount": _budget_amount(b)}))
     comments = [row(c) for c in db.query(m.Comment).filter(
         m.Comment.plan_id == plan.id, m.Comment.author_user_id == me, m.Comment.deleted_at.is_(None)).all()]
+    memories = [row(x) for x in db.query(m.Memory).filter(
+        m.Memory.plan_id == plan.id, m.Memory.author_user_id == me).all()]
     poll_ids = [p.id for p in db.query(m.Poll.id).filter(m.Poll.plan_id == plan.id).all()]
     votes = [row(v) for v in db.query(m.Vote).filter(m.Vote.poll_id.in_(poll_ids), m.Vote.user_id == me).all()] \
         if poll_ids else []
     return {"plan_id": str(plan.id), "title": plan.title, "personal_packing_items": personal, "constraints": cons,
-            "member_budgets": budgets, "comments": comments, "votes": votes}
+            "member_budgets": budgets, "comments": comments, "votes": votes, "memories": memories}
 
 
 def omitted_fields(models: Sequence = PLAN_TABLES + (m.TravelPlan, m.User)) -> Dict[str, List[str]]:
@@ -264,6 +275,8 @@ POLICY_NOTE = (
     "トークン、保存キー、IPアドレス、他の参加者のメールアドレスは含めていません。予約番号等はアプリの予約画面の"
     "「表示」で個別に確認できます。個人の持ち物・秘匿制約・個人予算は、あなた本人の分だけを復号して含めています。"
     "文書の原本ファイルは含めず、種類・サイズ・SHA-256などの一覧(document_manifest)を含めています。"
+    "旅の記録(memories)は、あなたの記録とメンバーに公開された記録を含め、写真・音声のファイルは含めていません"
+    "(アプリの「旅の記録」から個別に保存できます)。"
 )
 
 

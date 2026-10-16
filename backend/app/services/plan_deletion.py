@@ -24,7 +24,7 @@ from sqlalchemy import delete, func, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.models import Document, DocumentPurgeStatus, PlanShareLink, TravelPlan
+from app.models.models import Document, DocumentPurgeStatus, Memory, PlanShareLink, TravelPlan
 from app.services.audit_service import record_audit_event
 from app.services.storage_backend import get_storage_backend
 
@@ -85,9 +85,27 @@ def _purge_documents(db: Session, plan_id: uuid.UUID) -> bool:
     return ok
 
 
+def _purge_memory_files(db: Session, plan_id: uuid.UUID) -> bool:
+    """[Gate P12] 旅の記録の写真・音声ファイルを消す(行はプランの削除で連鎖して消える)。全て消せたらTrue。
+    ファイルが既に無い場合も成功として扱うため、失敗後の再試行で同じ処理を繰り返しても安全。"""
+    keys = [r[0] for r in db.query(Memory.storage_key).filter(
+        Memory.plan_id == plan_id, Memory.storage_key.isnot(None)).all()]
+    if not keys:
+        return True
+    backend = get_storage_backend()
+    ok = True
+    for key in keys:
+        try:
+            backend.delete(key)
+        except (OSError, ValueError):
+            ok = False
+    return ok
+
+
 def _row_counts(db: Session, plan_id: uuid.UUID) -> Dict[str, int]:
     counts = {}
-    for table in ("travel_days", "travel_events", "reservations", "documents", "travel_segments", "route_options"):
+    for table in ("travel_days", "travel_events", "reservations", "documents", "travel_segments", "route_options",
+                  "memories"):
         sql = text(f"SELECT count(*) FROM {table} WHERE plan_id = :p")
         counts[table] = int(db.execute(sql, {"p": plan_id}).scalar())
     return counts
@@ -102,6 +120,9 @@ def purge_plan(
     plan_id = plan.id
     if not _purge_documents(db, plan_id):
         logger.warning("plan purge postponed: document file deletion failed plan_id=%s", plan_id)
+        return False
+    if not _purge_memory_files(db, plan_id):
+        logger.warning("plan purge postponed: memory file deletion failed plan_id=%s", plan_id)
         return False
     counts = _row_counts(db, plan_id)
     try:

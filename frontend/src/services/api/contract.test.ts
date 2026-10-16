@@ -30,6 +30,7 @@ import {
   alertList, planAlert, replan, replanApplyResult, replanError,
   optimizationApplyResult, optimizationCandidates,
   syncConflictList, syncResolveResult, syncResponse,
+  journalDraft, memoryList, travelMemory,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -248,6 +249,18 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['sync_conflicts_empty', syncConflictList],
   ['sync_resolved_mine', syncResolveResult],
   ['sync_resolved_server', syncResolveResult],
+  // [Gate P12] 写真・メモ・旅行記(FR-037)
+  ['memory_note', travelMemory],
+  ['memory_photo', travelMemory],
+  ['memory_video', travelMemory],
+  ['memory_updated', travelMemory],
+  ['memory_list', memoryList],
+  ['memory_list_member', memoryList],
+  ['memory_list_empty', memoryList],
+  ['journal_draft', journalDraft],
+  ['journal_draft_all', journalDraft],
+  ['journal_draft_empty', journalDraft],
+  ['memory_error_event_not_found', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {
