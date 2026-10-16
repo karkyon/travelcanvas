@@ -201,3 +201,7 @@ inspect_gate_*.py
 # Gate patch検証用に一時展開される依存キャッシュ (pip install --target)
 backend/.gate*_deps-py*/
 *.bundle
+
+# [Gate O1] 運用: バックアップ(個人データを含む)と監視・演習の状態(scripts/ops/tcops.py)
+/backups/
+/ops-state/

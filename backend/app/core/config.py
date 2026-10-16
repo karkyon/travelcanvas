@@ -112,6 +112,10 @@ class Settings(BaseSettings):
     DOCUMENT_DOWNLOAD_SIGNING_KEY: Optional[str] = None
     DOCUMENT_DOWNLOAD_URL_TTL_SECONDS: int = 900  # 15分
 
+    # [Gate O1] 監視用の計測値(GET /metrics)を見るための合言葉。未設定の時は
+    # 同じ機械・LAN(私設アドレス)からだけ見られる(app/ops/metrics.py)。
+    METRICS_TOKEN: Optional[str] = None
+
     # CORS設定 - Union[str, List[str]]にして文字列も受け入れる
     # [Gate R0] 廃止済みの開発機IP(192.168.1.248)を既定値から除去。
     CORS_ORIGINS: Union[str, List[str]] = [

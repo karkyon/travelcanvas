@@ -118,6 +118,12 @@ jobs:
       - name: Import smoke test (ブロッキング)
         run: python -c "from app.main import app; print('app import OK:', app.title if hasattr(app, \"title\") else app)"
 
+      # [Gate O1] 運用コマンド(ホストの python3 で標準ライブラリだけで動くこと)の起動確認
+      - name: Ops CLI smoke test (ブロッキング)
+        run: |
+          python3 ../scripts/ops/tcops.py --help > /dev/null
+          python3 ../scripts/ops/tcops.py schedule print | grep -q "travelcanvas ops"
+
       - name: Alembic upgrade -> downgrade -> upgrade (ブロッキング)
         run: |
           alembic upgrade head

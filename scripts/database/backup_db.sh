@@ -1,27 +1,9 @@
 #!/bin/bash
-# TravelCanvas データベースバックアップ（統合強化版）
-
-BACKUP_DIR="$HOME/travelcanvas_backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p "$BACKUP_DIR"
-
-# 環境変数読み込み
-if [[ -f "$HOME/travelcanvas/.env.local" ]]; then
-    source "$HOME/travelcanvas/.env.local"
-else
-    echo "❌ .env.localファイルが見つかりません"
-    exit 1
-fi
-
-echo "📦 データベースをバックアップしています..."
-
-# PostgreSQLバックアップ
-PGPASSWORD="$DB_PASSWORD" pg_dump -h localhost -U "$DB_USER" "$DB_NAME_DEV" > "$BACKUP_DIR/travelcanvas_dev_$TIMESTAMP.sql"
-
-if [[ $? -eq 0 ]]; then
-    echo "✅ バックアップ完了: $BACKUP_DIR/travelcanvas_dev_$TIMESTAMP.sql"
-else
-    echo "❌ バックアップに失敗しました"
-    exit 1
-fi
+# TravelCanvas データベースバックアップ
+#
+# [Gate O1] 旧版はホストの pg_dump と ~/travelcanvas/.env.local を前提にしており、docker compose 構成では
+# 動かなかった(復元の手順・検証も無かった)。運用コマンド scripts/ops/tcops.py へ一本化し、本スクリプトは
+# 互換のための入口として残す。手順は docs/ops/RUNBOOK.md。
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+exec python3 scripts/ops/tcops.py backup "$@"

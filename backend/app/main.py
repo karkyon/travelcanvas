@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from functools import lru_cache
+from pathlib import Path
 from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
@@ -11,7 +13,10 @@ from app.api.v1 import (
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 import logging
+import time
 import uuid
+
+from app.ops import metrics as ops_metrics
 
 logger = logging.getLogger("travelcanvas")
 
@@ -68,7 +73,17 @@ app = FastAPI(
 async def request_id_middleware(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
-    response = await call_next(request)
+    # [Gate O1] 監視用の計測(ルートの型・状態の種類・所要時間)。実際のURLは記録しない。
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        ops_metrics.registry.observe(
+            request.method, ops_metrics.route_template(request.scope), 500, time.perf_counter() - started)
+        raise
+    ops_metrics.registry.observe(
+        request.method, ops_metrics.route_template(request.scope), response.status_code,
+        time.perf_counter() - started)
     response.headers["X-Request-ID"] = request_id
     return response
 
@@ -81,6 +96,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     この後の修正でそれらは汎用メッセージ+request_idを返すよう変更したが、
     想定外の未捕捉例外についても、ここで最終防波堤として同様に扱う。"""
     request_id = getattr(request.state, "request_id", "unknown")
+    ops_metrics.registry.count_exception()
     logger.exception(f"[{request_id}] Unhandled exception on {request.method} {request.url.path}")
     return JSONResponse(
         status_code=500,
@@ -184,15 +200,46 @@ def _check_migration_head_ready() -> bool:
         return False
 
 
+@lru_cache(maxsize=1)
+def _alembic_script_heads() -> frozenset:
+    """[Gate O1] コードが持つ migration の head(起動中は変わらないのでキャッシュ)。"""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+    cfg = Config(str(ini))
+    cfg.set_main_option("script_location", str(ini.parent / "alembic"))
+    return frozenset(ScriptDirectory.from_config(cfg).get_heads())
+
+
+def _check_migration_current() -> bool:
+    """[Gate O1] DB の版がコードの migration head と一致するか。
+
+    従来の migration チェックは「何らかの版が記録されている」ことしか見ておらず、コードを
+    更新して ``alembic upgrade head`` を忘れた状態(新しい表が無いまま動く)でも ready と答えていた。
+    rollback(コードだけ戻して downgrade を忘れた状態)の取り違えもここで検出する。"""
+    from app.core.database import engine
+    try:
+        heads = _alembic_script_heads()
+        with engine.connect() as conn:
+            rows = {r[0] for r in conn.execute(text("SELECT version_num FROM alembic_version"))}
+        return bool(heads) and rows == set(heads)
+    except Exception:
+        logger.exception("readiness check: migration version comparison failed")
+        return False
+
+
 @app.get("/ready")
 async def readiness_check():
     db_ok = _check_database_ready()
     migration_ok = db_ok and _check_migration_head_ready()
+    migration_current_ok = migration_ok and _check_migration_current()
     routers_ok = _check_required_routers_registered()
 
     checks = {
         "database": db_ok,
         "migration": migration_ok,
+        "migration_current": migration_current_ok,
         "required_routers": routers_ok,
     }
     all_ok = all(checks.values())
@@ -201,6 +248,21 @@ async def readiness_check():
         status_code=200 if all_ok else 503,
         content={"status": "ready" if all_ok else "not_ready", "checks": checks},
     )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint(request: Request):
+    """[Gate O1] 監視用の計測値(Prometheus のテキスト形式)。
+
+    METRICS_TOKEN を設定した場合は ``Authorization: Bearer <METRICS_TOKEN>`` が必要。未設定の時は
+    同じ機械・LAN(私設アドレス)からの要求だけに見せる。見せない時は存在も明かさず404。"""
+    client_host = request.client.host if request.client else None
+    token = getattr(settings, "METRICS_TOKEN", None)
+    if not ops_metrics.metrics_access_allowed(client_host, request.headers.get("authorization"), token):
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    return PlainTextResponse(
+        ops_metrics.registry.render(), media_type="text/plain; version=0.0.4; charset=utf-8",
+        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/v1/health")
