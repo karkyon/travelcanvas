@@ -19,9 +19,10 @@
 // [Gate L4] 説明可能な最適化(FR-018)を追加: ... → Replans → Optimization → CompleteTravelAPI
 // [Gate P11] オフライン編集・同期(FR-033)を追加: ... → Optimization → Sync → CompleteTravelAPI
 // [Gate P12] 写真・メモ・旅行記(FR-037)を追加: ... → Sync → Memories → CompleteTravelAPI
-import { MemoriesApi } from './endpoints/memories';
+// [Gate P13] 任意の位置軌跡(FR-038)を追加: ... → Memories → Location → CompleteTravelAPI
+import { LocationApi } from './endpoints/location';
 
-export class CompleteTravelAPI extends MemoriesApi {
+export class CompleteTravelAPI extends LocationApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

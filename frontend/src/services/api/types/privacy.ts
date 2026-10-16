@@ -31,6 +31,8 @@ export interface AccountDeletionPreview {
     personal_packing_items: number; private_constraints: number; member_budgets: number; documents: number;
     /** [Gate P12] 参加している旅行に残した旅の記録(古いサーバーの応答には無い) */
     memories?: number;
+    /** [Gate P13] 参加している旅行で記録した自分の位置の軌跡(古いサーバーの応答には無い) */
+    location_tracks?: number;
   };
   kept_in_member_plans: { comments: number; expenses: number; votes: number };
   plan_delete_grace_days: number;

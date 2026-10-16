@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.auth import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
 from app.api.v1.data_export import retention_info
+from app.api.v1 import location_tracks
 from app.core.auth import auth_manager, get_current_user_or_guest
 from app.core.database import get_db
 from app.models.models import User
@@ -106,6 +107,9 @@ def put_consents(payload: ConsentUpdate, request: Request, db: Session = Depends
                  current_user: User = Depends(get_current_user_or_guest)):
     user = _db_user(db, current_user)
     changed = cs.update(user, payload.consents)
+    if "location" in changed and payload.consents.get("location") is False:
+        # [Gate P13] 位置情報の同意を撤回したら、記録中・一時停止中の軌跡をすぐ止める
+        location_tracks.stop_active_tracks(db, user.id, "consent_withdrawn")
     db.commit()
     if changed:
         _audit(request, user, "privacy_consent_updated", {"changes": {k: payload.consents[k] for k in changed}})

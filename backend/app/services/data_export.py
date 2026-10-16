@@ -99,7 +99,7 @@ PLAN_TABLES = (
     m.PlanFinanceSettings, m.Budget, m.Expense, m.ExpenseShare, m.Settlement,
     m.Poll, m.PollOption, m.Vote, m.Comment,
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
-    m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory,
+    m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
 )
 
 
@@ -216,7 +216,24 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["sync_operations"] = [row(x) for x in q(m.SyncOperation).filter(m.SyncOperation.user_id == me).all()]
     # 旅の記録は本人の分と、メンバーに公開された分だけ(他の人の「自分だけ」の記録は含めない)。ファイルは含めない
     t["memories"] = [row(x) for x in q(m.Memory).all() if x.author_user_id == me or x.visibility == "members"]
+    # [Gate P13] 位置の軌跡は本人の分だけ(点は復号して含める)。他の人の軌跡は所有者にも出さない
+    t["location_tracks"] = own_location_tracks(db, plan, me)
     return t
+
+
+def own_location_tracks(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> List[Dict[str, Any]]:
+    out = []
+    for tr in db.query(m.LocationTrack).filter(m.LocationTrack.plan_id == plan.id, m.LocationTrack.user_id == me).all():
+        points: List[Any] = []
+        for b in db.query(m.LocationPointBatch).filter(m.LocationPointBatch.track_id == tr.id).all():
+            data = _decrypt_json(b.points_ciphertext)
+            if isinstance(data, list):
+                points.extend(data)
+        points.sort(key=lambda p: p.get("t", ""))
+        pts = [{"recorded_at": p.get("t"), "latitude": p.get("lat"), "longitude": p.get("lng"),
+                "accuracy_m": p.get("acc")} for p in points]
+        out.append(row(tr, {"points": pts}))
+    return out
 
 
 def document_manifest(db: Session, plan: m.TravelPlan) -> List[Dict[str, Any]]:
@@ -258,7 +275,8 @@ def contributions(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, A
     votes = [row(v) for v in db.query(m.Vote).filter(m.Vote.poll_id.in_(poll_ids), m.Vote.user_id == me).all()] \
         if poll_ids else []
     return {"plan_id": str(plan.id), "title": plan.title, "personal_packing_items": personal, "constraints": cons,
-            "member_budgets": budgets, "comments": comments, "votes": votes, "memories": memories}
+            "member_budgets": budgets, "comments": comments, "votes": votes, "memories": memories,
+            "location_tracks": own_location_tracks(db, plan, me)}
 
 
 def omitted_fields(models: Sequence = PLAN_TABLES + (m.TravelPlan, m.User)) -> Dict[str, List[str]]:
@@ -276,7 +294,7 @@ POLICY_NOTE = (
     "「表示」で個別に確認できます。個人の持ち物・秘匿制約・個人予算は、あなた本人の分だけを復号して含めています。"
     "文書の原本ファイルは含めず、種類・サイズ・SHA-256などの一覧(document_manifest)を含めています。"
     "旅の記録(memories)は、あなたの記録とメンバーに公開された記録を含め、写真・音声のファイルは含めていません"
-    "(アプリの「旅の記録」から個別に保存できます)。"
+    "(アプリの「旅の記録」から個別に保存できます)。位置の軌跡(location_tracks)は、あなた本人の分だけを復号して含めています。"
 )
 
 

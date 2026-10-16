@@ -7,6 +7,7 @@
 - 参加している旅行: 参加(共同編集者の行)を外し、本人だけの情報を消す
   (個人の持ち物・秘匿の条件・個人予算・本人がアップロードした文書・本人の旅の記録(P12、写真・音声のファイルを含む)・
   本人の同期の受領記録(P11))。担当の割当は外す。
+- 位置の軌跡(P13): 本人だけの記録のため、所有する旅行の分も含めてすぐ消す。
   コメント・支出・投票・変更履歴は同行者の記録として残し、名前は「退会済み-xxxxxxxx」と表示される。
 - 本人だけのデータ: セッション(IP・端末情報を含む)、通知、お気に入り・訪問記録、冪等性記録、
   本人宛ての招待(メールアドレスを含む)を削除する。
@@ -21,7 +22,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.models import (
-    Budget, Comment, Document, DocumentPurgeStatus, Expense, IdempotencyRecord, Memory, Notification, PackingItem,
+    Budget, Comment, Document, DocumentPurgeStatus, Expense, IdempotencyRecord, LocationTrack, Memory, Notification,
+    PackingItem,
     PlanCollaborator, PlanConstraint, Poll, PreparationTask, SyncOperation, TravelPlan, User, UserSession,
     UserSpotFavorite, UserSpotVisit, Vote,
 )
@@ -97,6 +99,8 @@ def preview(db: Session, user: User) -> Dict[str, Any]:
             _others_plan_filter(Document.plan_id, owned_ids))),
         "memories": count(db.query(Memory).filter(
             Memory.author_user_id == me, _others_plan_filter(Memory.plan_id, owned_ids))),
+        "location_tracks": count(db.query(LocationTrack).filter(
+            LocationTrack.user_id == me, _others_plan_filter(LocationTrack.plan_id, owned_ids))),
     }
     kept = {
         "comments": count(db.query(Comment).filter(Comment.author_user_id == me, Comment.deleted_at.is_(None),
@@ -186,6 +190,9 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
                 pass
         db.delete(mm)
     summary["memories"] = len(mems)
+    # [Gate P13] 位置の軌跡は本人だけのもの。所有する旅行の分も含めてすぐ消す(点は外部キーの連鎖で消える)
+    summary["location_tracks"] = db.query(LocationTrack).filter(LocationTrack.user_id == me).delete(
+        synchronize_session=False)
     # [Gate P11] 同期の受領記録は端末から送った予定の内容を含むため、本人の分を消す
     summary["sync_operations"] = db.query(SyncOperation).filter(SyncOperation.user_id == me).delete(
         synchronize_session=False)

@@ -2406,3 +2406,59 @@ class Memory(Base):
         CheckConstraint("longitude IS NULL OR longitude BETWEEN -180 AND 180", name="ck_memories_longitude"),
         Index("ix_memories_plan_occurred", "plan_id", "occurred_at"),
     )
+
+
+class LocationTrack(Base):
+    """[Gate P13] FR-038 任意の位置軌跡(DOC-15 CA-013/014、DOC-14 §4.4 TRACK、DOC-04 SC-43)。
+
+    本人の旅行記のための位置の記録。参加者への位置共有とは分離し、記録した本人以外(旅行の所有者を含む)には見せない。
+    - 記録は明示的に開始する(既定はOFF)。位置情報の利用への同意(P9の同意台帳 location)が必要で、撤回すると止まる。
+    - 旅行の期間に限る(auto_stop_at を過ぎたら止まる)。精度(precision)で保存する座標の細かさを丸める。
+    - mode: device_only=座標をサーバーへ送らない(端末だけに保存)/ synced=暗号化してサーバーへ保存する。
+    """
+    __tablename__ = "location_tracks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    mode = Column(String(11), nullable=False)
+    precision = Column(String(9), nullable=False)
+    status = Column(String(9), nullable=False, default="recording")
+    stopped_reason = Column(String(20), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    auto_stop_at = Column(DateTime(timezone=True), nullable=False)
+    stopped_at = Column(DateTime(timezone=True), nullable=True)
+    point_count = Column(Integer, nullable=False, default=0, server_default="0")
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("mode IN ('device_only','synced')", name="ck_location_tracks_mode"),
+        CheckConstraint("precision IN ('high','standard','low')", name="ck_location_tracks_precision"),
+        CheckConstraint("status IN ('recording','paused','stopped')", name="ck_location_tracks_status"),
+        CheckConstraint("(status = 'stopped') = (stopped_at IS NOT NULL)", name="ck_location_tracks_stopped_at"),
+        CheckConstraint("mode = 'synced' OR point_count = 0", name="ck_location_tracks_device_only_points"),
+        Index("ix_location_tracks_plan_user", "plan_id", "user_id"),
+    )
+
+
+class LocationPointBatch(Base):
+    """[Gate P13] 位置軌跡の点のまとまり(端末から送られた単位)。座標はまとめてFernetで暗号化して保存する。
+    batch_id は端末が付ける再送用のID(同じ軌跡で一意。再送しても二重に保存しない)。"""
+    __tablename__ = "location_point_batches"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    track_id = Column(UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
+    batch_id = Column(UUID(as_uuid=True), nullable=False)
+    points_ciphertext = Column(LargeBinary, nullable=False)
+    point_count = Column(Integer, nullable=False)
+    first_at = Column(DateTime(timezone=True), nullable=False)
+    last_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("track_id", "batch_id", name="uq_location_point_batches_track_batch"),
+        CheckConstraint("point_count >= 0", name="ck_location_point_batches_count"),
+        Index("ix_location_point_batches_track_first", "track_id", "first_at"),
+    )

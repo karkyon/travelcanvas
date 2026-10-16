@@ -31,6 +31,7 @@ import {
   optimizationApplyResult, optimizationCandidates,
   syncConflictList, syncResolveResult, syncResponse,
   journalDraft, memoryList, travelMemory,
+  locationTrack, locationTrackDetail, locationTrackList, trackPointsDeleteResult, trackPointsUploadResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -261,6 +262,17 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['journal_draft_all', journalDraft],
   ['journal_draft_empty', journalDraft],
   ['memory_error_event_not_found', object({ detail: object({ code: str, message: str }) })],
+  // [Gate P13] 任意の位置軌跡(FR-038)
+  ['location_tracks_no_consent', locationTrackList],
+  ['location_tracks_empty', locationTrackList],
+  ['location_tracks_active', locationTrackList],
+  ['location_track_started', locationTrack],
+  ['location_track_paused', locationTrack],
+  ['location_track_stopped', locationTrack],
+  ['location_track_detail', locationTrackDetail],
+  ['location_points_uploaded', trackPointsUploadResult],
+  ['location_points_deleted', trackPointsDeleteResult],
+  ['location_track_error_consent', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

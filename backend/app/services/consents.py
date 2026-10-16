@@ -3,8 +3,8 @@
 
 - 目的ごとに 同意する/しない と更新日時を users.preferences["privacy_consents"] に保存する(migrationなし)。
 - 既定は全て「同意しない」(DOC-11 §23 Privacy by Default)。
-- 現時点でこれらの目的の処理を行う機能は無い(in_use=False)。今後その処理を追加する時は、
-  処理の前に has_consent() を確認し、撤回後は新たな処理をしないこと(ADR-account-deletion.md §4)。
+- 処理を行う機能がある目的は in_use=True。処理の前に has_consent() を確認し、撤回後は新たな処理をしないこと
+  (ADR-account-deletion.md §4)。[Gate P13] location は位置の軌跡(FR-038)で使い、撤回すると記録中の軌跡を止める。
 """
 from datetime import datetime, timezone
 from typing import Any, Dict, List
@@ -16,7 +16,8 @@ PURPOSES: List[Dict[str, Any]] = [
     {"purpose": "ai_processing", "label": "AIによる文書・候補の処理",
      "description": "予約メールや文書の読み取り、旅程案の作成に外部のAIを使うこと。", "in_use": False},
     {"purpose": "location", "label": "位置情報の利用",
-     "description": "現在地を使った当日の案内や、訪問記録の作成に位置情報を使うこと。", "in_use": False},
+     "description": "旅の記録のために位置の軌跡を記録すること(旅行ごとに自分で開始・停止でき、本人だけが見られます)。",
+     "in_use": True},
     {"purpose": "analytics", "label": "利用状況の分析",
      "description": "サービス改善のため、操作の記録を個人を特定しない形で集計すること。", "in_use": False},
     {"purpose": "marketing_email", "label": "お知らせのメール",

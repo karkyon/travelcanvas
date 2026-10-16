@@ -54,6 +54,7 @@ const AlertsPage = lazyPage(() => import('@/pages/AlertsPage'));
 const ReplanPage = lazyPage(() => import('@/pages/ReplanPage'));
 const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
 const MemoriesPage = lazyPage(() => import('@/pages/MemoriesPage'));
+const LocationTrackPage = lazyPage(() => import('@/pages/LocationTrackPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -338,6 +339,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <MemoriesPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 📍 [Gate P13] 任意の位置軌跡(FR-038、本人だけの記録)。
+      {
+        path: 'planner/:planId/track',
+        element: (
+          <ProtectedRoute>
+            <LocationTrackPage />
           </ProtectedRoute>
         ),
       },

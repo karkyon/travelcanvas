@@ -43,6 +43,7 @@ import type {
   OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics,
   SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
   JournalDraft, JournalMemory, MemoryList, TravelMemory,
+  LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1277,7 +1278,7 @@ export const accountDeletionPreview: Decoder<AccountDeletionPreview> = object<Ac
   member_plan_count: nonNegativeInt,
   deleted_in_member_plans: object({
     personal_packing_items: nonNegativeInt, private_constraints: nonNegativeInt, member_budgets: nonNegativeInt,
-    documents: nonNegativeInt, memories: optional(nonNegativeInt),
+    documents: nonNegativeInt, memories: optional(nonNegativeInt), location_tracks: optional(nonNegativeInt),
   }),
   kept_in_member_plans: object({ comments: nonNegativeInt, expenses: nonNegativeInt, votes: nonNegativeInt }),
   plan_delete_grace_days: nonNegativeInt,
@@ -1559,4 +1560,48 @@ export const journalDraft: Decoder<JournalDraft> = object<JournalDraft>({
     message: str,
   })),
   markdown: str,
+});
+
+// ===== [Gate P13] 任意の位置軌跡(FR-038) =====
+const trackFields = {
+  id: str,
+  plan_id: str,
+  mode: oneOf('device_only', 'synced'),
+  precision: oneOf('high', 'standard', 'low'),
+  status: oneOf('recording', 'paused', 'stopped'),
+  stopped_reason: nullable(oneOf('user', 'trip_ended', 'consent_withdrawn')),
+  started_at: str,
+  auto_stop_at: str,
+  stopped_at: nullable(str),
+  point_count: nonNegativeInt,
+  revision: int,
+  created_at: nullable(str),
+  updated_at: nullable(str),
+};
+export const locationTrack: Decoder<LocationTrack> = object<LocationTrack>(trackFields);
+export const locationTrackList: Decoder<LocationTrackList> = object<LocationTrackList>({
+  tracks: arrayOf(locationTrack),
+  location_consent: bool,
+  trip_period: nullable(object({ start: str, end: str })),
+  in_trip_period: bool,
+  active_track_id: nullable(str),
+  can_start: bool,
+  max_points_per_request: nonNegativeInt,
+});
+export const locationTrackDetail: Decoder<LocationTrackDetail> = object<LocationTrackDetail>({
+  ...trackFields,
+  distance_m: num,
+  points: arrayOf(object({ recorded_at: str, latitude: num, longitude: num, accuracy_m: nullable(num) })),
+});
+export const trackPointsUploadResult: Decoder<TrackPointsUploadResult> = object<TrackPointsUploadResult>({
+  accepted: nonNegativeInt,
+  rejected: object({
+    invalid: optional(nonNegativeInt), low_accuracy: optional(nonNegativeInt), outside_period: optional(nonNegativeInt),
+  }),
+  point_count: nonNegativeInt,
+  replayed: bool,
+  status: oneOf('recording', 'paused', 'stopped'),
+});
+export const trackPointsDeleteResult: Decoder<TrackPointsDeleteResult> = object<TrackPointsDeleteResult>({
+  removed: nonNegativeInt, point_count: nonNegativeInt, revision: int,
 });

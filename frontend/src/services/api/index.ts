@@ -17,6 +17,7 @@ import type { AlertCreateData, AlertUpdateData } from './types';
 import type { OptimizationTravelMode } from './types';
 import type { SyncOperationInput } from './types';
 import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput } from './types';
+import type { TrackMode, TrackPoint, TrackPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -385,5 +386,18 @@ export const updateMemory = (planId: string, memoryId: string, input: MemoryUpda
 export const deleteMemory = (planId: string, memoryId: string) => api.deleteMemory(planId, memoryId);
 export const getMemoryMedia = (planId: string, memoryId: string) => api.getMemoryMedia(planId, memoryId);
 export const createJournalDraft = (planId: string, options: JournalOptions) => api.createJournalDraft(planId, options);
+
+// ===== [Gate P13] 任意の位置軌跡(FR-038) =====
+export const getLocationTracks = (planId: string) => api.getLocationTracks(planId);
+export const startLocationTrack = (planId: string, mode: TrackMode, precision: TrackPrecision) =>
+  api.startLocationTrack(planId, mode, precision);
+export const getLocationTrack = (planId: string, trackId: string) => api.getLocationTrack(planId, trackId);
+export const changeLocationTrack = (planId: string, trackId: string, action: 'pause' | 'resume' | 'stop', revision: number) =>
+  api.changeLocationTrack(planId, trackId, action, revision);
+export const uploadTrackPoints = (planId: string, trackId: string, batchId: string, points: TrackPoint[]) =>
+  api.uploadTrackPoints(planId, trackId, batchId, points);
+export const deleteTrackPoints = (planId: string, trackId: string, start: string, end: string) =>
+  api.deleteTrackPoints(planId, trackId, start, end);
+export const deleteLocationTrack = (planId: string, trackId: string) => api.deleteLocationTrack(planId, trackId);
 
 export default api;

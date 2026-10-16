@@ -527,6 +527,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/track`)}
+            >
+              📍 位置の記録
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
             >
               🚶 移動区間

@@ -30,7 +30,8 @@ describe('ConsentsCard (Gate P9)', () => {
     const boxes = within(list).getAllByRole('checkbox');
     expect(boxes).toHaveLength(4);
     expect(boxes.every((b) => !(b as HTMLInputElement).checked)).toBe(true);
-    expect(within(list).getAllByText('現在、この目的の処理を行う機能はありません。')).toHaveLength(4);
+    // [Gate P13] 位置情報は軌跡の記録で使うため、処理の無い目的は3つ
+    expect(within(list).getAllByText('現在、この目的の処理を行う機能はありません。')).toHaveLength(3);
     fireEvent.click(within(list).getByRole('checkbox', { name: /AIによる文書・候補の処理/ }));
     await waitFor(() => expect(m.updateConsents).toHaveBeenCalledWith({ ai_processing: true }));
     expect(await screen.findByRole('status')).toHaveTextContent('「AIによる文書・候補の処理」を同意するに変更しました。');

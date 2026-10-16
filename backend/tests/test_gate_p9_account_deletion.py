@@ -94,7 +94,8 @@ def test_preview_does_not_change_anything(auth_client, make_user, db_session, mo
     assert body["owned_plans"] == [{"id": mine, "title": "自分の京都旅行", "member_count": 1}]
     assert body["member_plan_count"] == 1
     assert body["deleted_in_member_plans"] == {"personal_packing_items": 1, "private_constraints": 1,
-                                               "member_budgets": 1, "documents": 1, "memories": 0}
+                                               "member_budgets": 1, "documents": 1, "memories": 0,
+                                               "location_tracks": 0}
     assert body["kept_in_member_plans"] == {"comments": 1, "expenses": 1, "votes": 0}
     assert body["plan_delete_grace_days"] == settings.PLAN_DELETE_GRACE_DAYS
     assert [i["key"] for i in body["retention"]["items"]][0] == "deleted_plan"
@@ -211,7 +212,10 @@ def test_consents(auth_client, db_session, audit_calls):
     assert res.status_code == 200
     purposes = res.json()["purposes"]
     assert [p["purpose"] for p in purposes] == ["ai_processing", "location", "analytics", "marketing_email"]
-    assert all(p["granted"] is False and p["updated_at"] is None and p["in_use"] is False for p in purposes)
+    assert all(p["granted"] is False and p["updated_at"] is None for p in purposes)
+    # [Gate P13] 位置情報は軌跡の記録(FR-038)で使う。他の目的はまだ処理を行う機能が無い
+    assert {p["purpose"]: p["in_use"] for p in purposes} == {
+        "ai_processing": False, "location": True, "analytics": False, "marketing_email": False}
     res = client.put("/api/v1/privacy/consents", json={"consents": {"ai_processing": True, "location": False}})
     assert res.status_code == 200, res.text
     got = {p["purpose"]: p for p in res.json()["purposes"]}
