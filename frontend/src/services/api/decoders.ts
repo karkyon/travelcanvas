@@ -45,6 +45,7 @@ import type {
   JournalDraft, JournalMemory, MemoryList, TravelMemory,
   LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
   ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
+  AtlasCell, AtlasResponse,
 } from './types';
 import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
 
@@ -1663,4 +1664,39 @@ export const actualPutResult: Decoder<ActualPutResult> = object<ActualPutResult>
 });
 export const carryOverResult: Decoder<CarryOverResult> = object<CarryOverResult>({
   event_id: str, target_plan_id: str, target_day_id: str, target_revision: int,
+});
+
+// ===== [Gate P15] Personal Travel Atlas(FR-052) =====
+const atlasState = oneOf('STAYED', 'VISITED', 'PASS_THROUGH', 'PLANNED');
+const atlasCell: Decoder<AtlasCell> = object<AtlasCell>({
+  key: str,
+  lat_min: num,
+  lat_max: num,
+  lng_min: num,
+  lng_max: num,
+  state: atlasState,
+  first_at: nullable(str),
+  last_at: nullable(str),
+  trips: arrayOf(object({ plan_id: str, title: str })),
+  evidence: object({
+    actual: optional(nonNegativeInt), memory: optional(nonNegativeInt), track: optional(nonNegativeInt),
+    planned: optional(nonNegativeInt),
+  }),
+});
+export const atlasResponse: Decoder<AtlasResponse> = object<AtlasResponse>({
+  precision: oneOf('region', 'area'),
+  year: nullable(int),
+  years: arrayOf(int),
+  plans: arrayOf(object({ plan_id: str, title: str, excluded: bool, observations: nonNegativeInt, is_owner: bool })),
+  cells: arrayOf(atlasCell),
+  summary: object({
+    cells: nonNegativeInt,
+    by_state: object({ STAYED: nonNegativeInt, VISITED: nonNegativeInt, PASS_THROUGH: nonNegativeInt, PLANNED: nonNegativeInt }),
+    visited_cells: nonNegativeInt,
+    revisit_rate: nullable(num),
+    algorithm_version: str,
+  }),
+});
+export const atlasSettingsResult: Decoder<{ excluded_plan_ids: string[] }> = object<{ excluded_plan_ids: string[] }>({
+  excluded_plan_ids: arrayOf(str),
 });

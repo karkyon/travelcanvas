@@ -33,6 +33,7 @@ import {
   journalDraft, memoryList, travelMemory,
   locationTrack, locationTrackDetail, locationTrackList, trackPointsDeleteResult, trackPointsUploadResult,
   actualPutResult, carryOverResult, journeyReview,
+  atlasResponse, atlasSettingsResult,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -282,6 +283,11 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['event_actual_skipped', actualPutResult],
   ['event_carry_over', carryOverResult],
   ['event_carry_over_error_visited', object({ detail: object({ code: str, message: str }) })],
+  // [Gate P15] Personal Travel Atlas(FR-052)
+  ['atlas_empty', atlasResponse],
+  ['atlas_region', atlasResponse],
+  ['atlas_area_2026', atlasResponse],
+  ['atlas_settings_saved', atlasSettingsResult],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

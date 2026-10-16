@@ -21,7 +21,8 @@
   "captured_at_head_p11": "Gate L4 (+Gate P11 sync/conflicts)",
   "captured_at_head_p12": "Gate P12(FR-037 写真・メモ・旅行記)の実backend応答。account_deletion_previewへmemories件数を追加",
   "captured_at_head_p13": "Gate P13(FR-038 任意の位置軌跡)の実backend応答。account_deletion_previewへlocation_tracks件数を追加",
-  "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答"
+  "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答",
+  "captured_at_head_p15": "Gate P15(FR-052 Personal Travel Atlas)の実backend応答"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -10385,5 +10386,225 @@
    "code": "already_visited",
    "message": "行った予定は次の旅行へ戻せません(行かなかった・未記録の予定だけ)"
   }
+ },
+ "atlas_empty": {
+  "precision": "region",
+  "year": null,
+  "years": [],
+  "plans": [],
+  "cells": [],
+  "summary": {
+   "cells": 0,
+   "by_state": {
+    "STAYED": 0,
+    "VISITED": 0,
+    "PASS_THROUGH": 0,
+    "PLANNED": 0
+   },
+   "visited_cells": 0,
+   "revisit_rate": null,
+   "algorithm_version": "atlas-v1"
+  }
+ },
+ "atlas_region": {
+  "precision": "region",
+  "year": null,
+  "years": [
+   2026,
+   2027
+  ],
+  "plans": [
+   {
+    "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+    "title": "京都2026",
+    "excluded": false,
+    "observations": 4,
+    "is_owner": true
+   },
+   {
+    "plan_id": "e43bf077-f2c3-4860-a34d-74f1bab0307f",
+    "title": "京都2027",
+    "excluded": false,
+    "observations": 1,
+    "is_owner": true
+   }
+  ],
+  "cells": [
+   {
+    "key": "0.1:34.9:135.7",
+    "lat_min": 34.9,
+    "lat_max": 35.0,
+    "lng_min": 135.7,
+    "lng_max": 135.8,
+    "state": "STAYED",
+    "first_at": "2026-11-01T01:00:00+00:00",
+    "last_at": "2026-11-01T01:00:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     },
+     {
+      "plan_id": "e43bf077-f2c3-4860-a34d-74f1bab0307f",
+      "title": "京都2027"
+     }
+    ],
+    "evidence": {
+     "actual": 1,
+     "planned": 1
+    }
+   },
+   {
+    "key": "0.1:34.6:135.8",
+    "lat_min": 34.6,
+    "lat_max": 34.7,
+    "lng_min": 135.8,
+    "lng_max": 135.9,
+    "state": "VISITED",
+    "first_at": "2026-11-01T00:00:00+00:00",
+    "last_at": "2026-11-01T00:00:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     }
+    ],
+    "evidence": {
+     "actual": 1
+    }
+   },
+   {
+    "key": "0.1:35.0:135.6",
+    "lat_min": 35.0,
+    "lat_max": 35.1,
+    "lng_min": 135.6,
+    "lng_max": 135.7,
+    "state": "VISITED",
+    "first_at": "2026-11-01T04:20:00+00:00",
+    "last_at": "2026-11-01T04:20:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     }
+    ],
+    "evidence": {
+     "memory": 1
+    }
+   },
+   {
+    "key": "0.1:34.8:135.7",
+    "lat_min": 34.8,
+    "lat_max": 34.9,
+    "lng_min": 135.7,
+    "lng_max": 135.8,
+    "state": "PASS_THROUGH",
+    "first_at": "2026-11-01T02:40:00+00:00",
+    "last_at": "2026-11-01T02:40:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     }
+    ],
+    "evidence": {
+     "track": 1
+    }
+   }
+  ],
+  "summary": {
+   "cells": 4,
+   "by_state": {
+    "STAYED": 1,
+    "VISITED": 2,
+    "PASS_THROUGH": 1,
+    "PLANNED": 0
+   },
+   "visited_cells": 3,
+   "revisit_rate": 0.3333,
+   "algorithm_version": "atlas-v1"
+  }
+ },
+ "atlas_area_2026": {
+  "precision": "area",
+  "year": 2026,
+  "years": [
+   2026,
+   2027
+  ],
+  "plans": [
+   {
+    "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+    "title": "京都2026",
+    "excluded": false,
+    "observations": 4,
+    "is_owner": true
+   },
+   {
+    "plan_id": "e43bf077-f2c3-4860-a34d-74f1bab0307f",
+    "title": "京都2027",
+    "excluded": false,
+    "observations": 1,
+    "is_owner": true
+   }
+  ],
+  "cells": [
+   {
+    "key": "1:34:135",
+    "lat_min": 34.0,
+    "lat_max": 35.0,
+    "lng_min": 135.0,
+    "lng_max": 136.0,
+    "state": "STAYED",
+    "first_at": "2026-11-01T00:00:00+00:00",
+    "last_at": "2026-11-01T02:40:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     }
+    ],
+    "evidence": {
+     "actual": 2,
+     "track": 1
+    }
+   },
+   {
+    "key": "1:35:135",
+    "lat_min": 35.0,
+    "lat_max": 36.0,
+    "lng_min": 135.0,
+    "lng_max": 136.0,
+    "state": "VISITED",
+    "first_at": "2026-11-01T04:20:00+00:00",
+    "last_at": "2026-11-01T04:20:00+00:00",
+    "trips": [
+     {
+      "plan_id": "cfdfe7ab-d777-4a16-a693-76f1131d967e",
+      "title": "京都2026"
+     }
+    ],
+    "evidence": {
+     "memory": 1
+    }
+   }
+  ],
+  "summary": {
+   "cells": 2,
+   "by_state": {
+    "STAYED": 1,
+    "VISITED": 1,
+    "PASS_THROUGH": 0,
+    "PLANNED": 0
+   },
+   "visited_cells": 2,
+   "revisit_rate": 0.0,
+   "algorithm_version": "atlas-v1"
+  }
+ },
+ "atlas_settings_saved": {
+  "excluded_plan_ids": [
+   "e43bf077-f2c3-4860-a34d-74f1bab0307f"
+  ]
  }
 }

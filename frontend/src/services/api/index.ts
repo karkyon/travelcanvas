@@ -19,6 +19,7 @@ import type { SyncOperationInput } from './types';
 import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput } from './types';
 import type { TrackMode, TrackPoint, TrackPrecision } from './types';
 import type { ActualInput } from './types';
+import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
 import type { ConstraintCreateData, ConstraintUpdateData, CreateSpotData, DocumentClassification, ExtractionCandidateCreateData, ImportJobCreateData, GuestUpgradeData, LoginCredentials, RegisterData, ReservationCreateData, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationUpdateData, RouteLegCreateData, RouteLegUpdateData, RouteOptionCreateData, RouteOptionUpdateData, SearchRequest, SegmentCreateData, SegmentUpdateData, TicketCreateData, VoiceSearchRequestData } from './types';
@@ -408,5 +409,9 @@ export const putEventActual = (planId: string, eventId: string, input: ActualInp
 export const deleteEventActual = (planId: string, eventId: string) => api.deleteEventActual(planId, eventId);
 export const carryOverEvent = (planId: string, eventId: string, targetPlanId: string, targetDayId: string) =>
   api.carryOverEvent(planId, eventId, targetPlanId, targetDayId);
+
+// ===== [Gate P15] Personal Travel Atlas(FR-052) =====
+export const getAtlas = (precision: AtlasPrecision, year?: number | null) => api.getAtlas(precision, year);
+export const updateAtlasSettings = (excludedPlanIds: string[]) => api.updateAtlasSettings(excludedPlanIds);
 
 export default api;

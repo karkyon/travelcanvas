@@ -56,6 +56,7 @@ const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
 const MemoriesPage = lazyPage(() => import('@/pages/MemoriesPage'));
 const LocationTrackPage = lazyPage(() => import('@/pages/LocationTrackPage'));
 const JourneyPage = lazyPage(() => import('@/pages/JourneyPage'));
+const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 
@@ -441,6 +442,15 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DataPrivacyPage />
+          </ProtectedRoute>
+        ),
+      },
+      // 🗺️ [Gate P15] Personal Travel Atlas(FR-052、旅行を横断した訪問地域。本人だけ)。
+      {
+        path: 'atlas',
+        element: (
+          <ProtectedRoute>
+            <AtlasPage />
           </ProtectedRoute>
         ),
       },

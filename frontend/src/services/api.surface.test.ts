@@ -23,6 +23,7 @@
  * [Gate P12] 写真・メモ・旅行記(FR-037)
  * [Gate P13] 任意の位置軌跡(FR-038)
  * [Gate P14] 旅の振り返り(FR-054・FR-053)
+ * [Gate P15] Personal Travel Atlas(FR-052)
  */
 import { describe, it, expect } from 'vitest';
 import * as apiModule from './api';
@@ -41,7 +42,7 @@ const EXPECTED_EXPORTS = [
   'deleteReservation', 'deleteReservationEventLink', 'deleteReservationParticipant', 'deleteRouteLeg',
   'deleteRouteOption', 'deleteSegment', 'deleteSettlement', 'deleteShareLink', 'deleteTicket',
   'deleteTrackPoints', 'downloadAccountDataExport', 'downloadItineraryExport', 'downloadPlanDataExport',
-  'extractApiErrorDetailMessage', 'getAccountDeletionPreview', 'getAlerts', 'getBookletExport',
+  'extractApiErrorDetailMessage', 'getAccountDeletionPreview', 'getAlerts', 'getAtlas', 'getBookletExport',
   'getBookletExports', 'getBranch', 'getBranches', 'getBudgets', 'getCollaborators', 'getComments',
   'getConsents', 'getConstraints', 'getDeletedPlans', 'getDocument', 'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getExpenses', 'getFinanceSettings', 'getFinanceSummary',
@@ -57,11 +58,11 @@ const EXPECTED_EXPORTS = [
   'resolveSyncConflict', 'resolveVote', 'restorePlan', 'revealReservation', 'revealTicket',
   'revokeBookletExport', 'revokeShareLink', 'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots',
   'shareAPI', 'startLocationTrack', 'syncOperations', 'testConnection', 'travelAPI', 'updateAlert',
-  'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents',
-  'updateConstraint', 'updateExpense', 'updateFinanceSettings', 'updateMemory', 'updatePackingItem',
-  'updatePoll', 'updatePreparationTask', 'updateReservation', 'updateReservationEventLink', 'updateRouteLeg',
-  'updateRouteOption', 'updateSegment', 'updateShareSettings', 'uploadDocument', 'uploadMemory',
-  'uploadTrackPoints',
+  'updateAtlasSettings', 'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment',
+  'updateConsents', 'updateConstraint', 'updateExpense', 'updateFinanceSettings', 'updateMemory',
+  'updatePackingItem', 'updatePoll', 'updatePreparationTask', 'updateReservation',
+  'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings',
+  'uploadDocument', 'uploadMemory', 'uploadTrackPoints',
 ];
 
 const EXPECTED_METHODS = [
@@ -80,19 +81,19 @@ const EXPECTED_METHODS = [
   'deleteReservation', 'deleteReservationEventLink', 'deleteReservationParticipant', 'deleteRouteLeg',
   'deleteRouteOption', 'deleteSegment', 'deleteSettlement', 'deleteShareLink', 'deleteTicket',
   'deleteTrackPoints', 'downloadAccountDataExport', 'downloadItineraryExport', 'downloadPlanDataExport',
-  'get', 'getAccountDeletionPreview', 'getAlerts', 'getBookletExport', 'getBookletExports', 'getBranch',
-  'getBranches', 'getBudgets', 'getCollaborators', 'getComments', 'getConsents', 'getConstraints',
-  'getCurrentUser', 'getDeletedPlans', 'getDocument', 'getDocumentDownloadUrl', 'getDocumentLinks',
-  'getDocuments', 'getExpenses', 'getFinanceSettings', 'getFinanceSummary', 'getImportJob', 'getImportJobs',
-  'getInsertionPreview', 'getJourney', 'getLocationTrack', 'getLocationTracks', 'getMemories',
-  'getMemoryMedia', 'getNotifications', 'getOptimizationCandidates', 'getOptimizationProposal',
-  'getPackingItems', 'getPackingSuggestions', 'getPlace', 'getPlan', 'getPlanDetail', 'getPlanMembers',
-  'getPlans', 'getPolls', 'getPreparationTasks', 'getReadiness', 'getReplan', 'getReservation',
-  'getReservationEventLinks', 'getReservationParticipants', 'getReservations', 'getRetentionInfo',
-  'getRouteOption', 'getRouteOptions', 'getRoutePreview', 'getSegment', 'getSegments', 'getSettlements',
-  'getShareSettings', 'getSpotCategories', 'getSpots', 'getSyncConflicts', 'getTickets', 'getToday',
-  'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'handleApiError', 'healthCheck',
-  'initializeTokens', 'inviteCollaborator', 'listMyInvitations', 'login', 'logout',
+  'get', 'getAccountDeletionPreview', 'getAlerts', 'getAtlas', 'getBookletExport', 'getBookletExports',
+  'getBranch', 'getBranches', 'getBudgets', 'getCollaborators', 'getComments', 'getConsents',
+  'getConstraints', 'getCurrentUser', 'getDeletedPlans', 'getDocument', 'getDocumentDownloadUrl',
+  'getDocumentLinks', 'getDocuments', 'getExpenses', 'getFinanceSettings', 'getFinanceSummary',
+  'getImportJob', 'getImportJobs', 'getInsertionPreview', 'getJourney', 'getLocationTrack',
+  'getLocationTracks', 'getMemories', 'getMemoryMedia', 'getNotifications', 'getOptimizationCandidates',
+  'getOptimizationProposal', 'getPackingItems', 'getPackingSuggestions', 'getPlace', 'getPlan',
+  'getPlanDetail', 'getPlanMembers', 'getPlans', 'getPolls', 'getPreparationTasks', 'getReadiness',
+  'getReplan', 'getReservation', 'getReservationEventLinks', 'getReservationParticipants', 'getReservations',
+  'getRetentionInfo', 'getRouteOption', 'getRouteOptions', 'getRoutePreview', 'getSegment', 'getSegments',
+  'getSettlements', 'getShareSettings', 'getSpotCategories', 'getSpots', 'getSyncConflicts', 'getTickets',
+  'getToday', 'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'handleApiError',
+  'healthCheck', 'initializeTokens', 'inviteCollaborator', 'listMyInvitations', 'login', 'logout',
   'markAllNotificationsAsRead', 'markNotificationAsRead', 'moveEvent', 'planFromApi', 'planToApi', 'post',
   'previewBooklet', 'previewCalendarImport', 'promoteQuickDraft', 'purgePlan', 'put', 'putEventActual',
   'putVotes', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'rejectReplan',
@@ -100,12 +101,12 @@ const EXPECTED_METHODS = [
   'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeShareLink', 'runValidation',
   'searchByImage', 'searchByVoice', 'searchSpots', 'setAccessToken', 'setGuestMode',
   'setHttpClientForTesting', 'setTokens', 'setupInterceptors', 'startGuestSession', 'startLocationTrack',
-  'syncOperations', 'testConnection', 'undoLastPlanChange', 'updateAlert', 'updateBranch',
-  'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents', 'updateConstraint', 'updateDay',
-  'updateEvent', 'updateExpense', 'updateFinanceSettings', 'updateMemory', 'updatePackingItem', 'updatePlan',
-  'updatePoll', 'updatePreparationTask', 'updateProfile', 'updateReservation', 'updateReservationEventLink',
-  'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings', 'upgradeGuest',
-  'uploadDocument', 'uploadMemory', 'uploadTrackPoints',
+  'syncOperations', 'testConnection', 'undoLastPlanChange', 'updateAlert', 'updateAtlasSettings',
+  'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents',
+  'updateConstraint', 'updateDay', 'updateEvent', 'updateExpense', 'updateFinanceSettings', 'updateMemory',
+  'updatePackingItem', 'updatePlan', 'updatePoll', 'updatePreparationTask', 'updateProfile',
+  'updateReservation', 'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment',
+  'updateShareSettings', 'upgradeGuest', 'uploadDocument', 'uploadMemory', 'uploadTrackPoints',
 ];
 
 const EXPECTED_GROUP_KEYS: Record<string, string[]> = {
