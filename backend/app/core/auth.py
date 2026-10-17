@@ -547,7 +547,8 @@ class AuthManager:
         user = query.first()
 
         if not user:
-            self.logger.warning(f"User not found: {email or username}")
+            # [Gate O2] 入力されたメールアドレス・ユーザー名はログに出さない(B-009)
+            self.logger.warning("Login attempt for unknown account")
             return None
 
         if not user.is_active:

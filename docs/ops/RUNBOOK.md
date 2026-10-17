@@ -13,6 +13,7 @@
 | 画面が開かない・APIが応答しない | `tcops.py monitor` | §3.1 |
 | `/ready` が 503(`migration_current` が false) | `docker compose exec -T backend alembic current` | §3.2 |
 | 5xx が増えた(`http_5xx`) | `docker compose logs --since 30m backend` | §3.3 |
+| ログに個人情報らしき値(`log_leak`) | `tcops.py log-scan --since 25h` | §3.6 |
 | 応答が遅い(`slow_responses`) | `/metrics` のルート別の時間 | §3.4 |
 | ディスクが少ない(`disk_low`) | `df -h`、`tcops.py list` | §3.5 |
 | バックアップが古い・無い(`backup_stale` / `backup_missing`) | `ops-state/logs/backup.log` | §4.1 |
@@ -49,6 +50,7 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | 毎日 03:10 | バックアップ(DB+保存ファイル)→ 目録とハッシュの検証 → 古い世代の整理 |
 | 毎日 03:40 | 猶予期間を過ぎた削除済みデータの完全削除(旅行30日・文書・QuickDraft) |
 | 毎週日曜 04:20 | 最新バックアップの復元演習(別DBへ復元 → 件数・保存ファイル・復号・migration 往復) |
+| 毎日 03:50 | 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(`log-scan`) |
 | 5分ごと | 監視(状態が変わった時だけ記録・通知) |
 
 ログは `ops-state/logs/*.log`、演習の記録は `ops-state/drills/`(どちらも git の対象外)。
@@ -130,6 +132,26 @@ python3 scripts/ops/tcops.py prune --dry-run   # 消える世代の確認
 python3 scripts/ops/tcops.py prune
 docker system df                               # 古いイメージは docker image prune(ボリュームは消さない)
 ```
+
+### 3.6 ログに個人情報らしき値が出た(`log_leak`)
+
+backend はログを書く時点でメールアドレス・トークン・暗号文・パスワードのハッシュ・SQL の値などを伏せている
+(`backend/app/core/log_safety.py`、設計は `docs/adr/ADR-log-safety.md`)。それでも検査で見つかった時:
+
+```bash
+python3 scripts/ops/tcops.py log-scan --since 25h     # 種類・行番号・伏せた抜粋(値そのものは出ない)
+cat ops-state/log_scan.json
+```
+
+1. **抜粋をチャット・Issue に貼る時も値は含まれていない**が、元のログ(`docker compose logs`)は貼らない。
+2. 出どころ(どの処理のログか)を抜粋から特定し、伏せる規則(`log_safety._RULES`)か、出どころのログ文を直す。
+   直したら `tests/test_gate_o2_log_safety.py` に同じ形の試験を足す。
+3. 漏れたログを消す: backend のログは docker のコンテナごとの記録なので、`docker compose up -d --force-recreate backend`
+   で作り直すと古いログは消える(DB・保存ファイルは消えない)。
+4. トークン(共有リンク・ダウンロード)が漏れていた場合は、該当の共有リンクを画面から失効させる。
+5. SQL の値を調査で見たい時も `SQL_ECHO=true` は短時間だけにする(値は常に伏せられるが、SQL 文そのものは出る)。
+
+出てよいメールアドレス(運営の送信元など)がある場合は、`.env` の `OPS_LOG_ALLOWED_EMAILS` にカンマ区切りで書く。
 
 ---
 
@@ -231,6 +253,7 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | `backup_stale` | 注意 | 最新のバックアップが26時間より古い |
 | `restore_drill_missing` / `restore_drill_stale` | 注意 | 復元演習の記録が無い / 8日より古い |
 | `metrics_unavailable` | 注意 | `/metrics` を取得できない |
+| `log_leak` | 注意 | 直近の `log-scan` で個人情報・秘密らしき値が見つかった(§3.6) |
 
 `/metrics` は Prometheus のテキスト形式なので、将来 Prometheus・Grafana を入れる時もそのまま取り込める。
 
@@ -241,3 +264,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | 日付 | 版 | 内容 |
 |---|---|---|
 | 2026-10-16 | 1 | Gate O1 で新設(B-010) |
+| 2026-10-17 | 2 | Gate O2: ログの個人情報の検査(`log-scan`、毎日 03:50、監視の `log_leak`、§3.6)。定期実行を登録済みの場合は `schedule install` をもう一度実行すると追加される |

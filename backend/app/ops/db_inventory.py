@@ -28,7 +28,7 @@ def engine_for(database: Optional[str]) -> Engine:
         raise SystemExit("DATABASE_URL が設定されていません")
     if database:
         url = replace_database(url, database)
-    return create_engine(url, poolclass=NullPool)
+    return create_engine(url, poolclass=NullPool, hide_parameters=True)
 
 
 def table_counts(engine: Engine) -> Dict[str, int]:

@@ -606,6 +606,10 @@ def evaluate_monitor(
             add("critical", "backup_missing", "検証済みのバックアップがありません")
         elif float(age) > th["backup_max_age_hours"]:
             add("warning", "backup_stale", "最後のバックアップから約%d時間経っています" % float(age))
+    if "log_leaks" in snapshot:
+        leaks = snapshot.get("log_leaks")
+        if leaks:
+            add("warning", "log_leak", "直近のログ検査で個人情報・秘密らしき値が %d 件見つかりました(log-scan)" % int(leaks))
     if "last_drill_age_days" in snapshot:
         age = snapshot.get("last_drill_age_days")
         if age is None:
@@ -663,6 +667,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "40 3 * * * cd %s && %s purge >> %s/purge.log 2>&1" % (repo_dir, tool, log),
         "# 毎週日曜 04:20 最新バックアップの復元演習(別DBへ復元して件数・復号・migrationの往復を確認)",
         "20 4 * * 0 cd %s && %s drill --from-latest >> %s/drill.log 2>&1" % (repo_dir, tool, log),
+        "# 毎日 03:50 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(B-009)",
+        "50 3 * * * cd %s && %s log-scan --since 25h >> %s/log-scan.log 2>&1" % (repo_dir, tool, log),
         "# 5分ごとの監視(状態が変わった時だけ通知)",
         "*/5 * * * * cd %s && %s monitor --quiet >> %s/monitor.log 2>&1" % (repo_dir, tool, log),
         CRON_END,

@@ -723,7 +723,9 @@ def log_function_call(func_name: str, args: Tuple, kwargs: Dict[str, Any], resul
         result: 結果
     """
     if settings.DEBUG:
-        logger.debug(f"Function call: {func_name}({args}, {kwargs}) -> {type(result).__name__}")
+        # [Gate O2] 引数の値(個人情報を含みうる)は出さず、件数と型だけにする
+        logger.debug("Function call: %s(%d args, keys=%s) -> %s", func_name, len(args), sorted(kwargs),
+                     type(result).__name__)
 
 
 def safe_dict_get(dictionary: Dict[str, Any], key: str, default: Any = None) -> Any:

@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -42,6 +43,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 # このファイルは backend/app/ops/cli.py。リポジトリ直下は3つ上(ホストで実行する前提)。
 REPO = Path(os.environ.get("OPS_REPO_DIR") or Path(__file__).resolve().parents[3])
 
+from app.core import log_safety  # noqa: E402  (標準ライブラリだけのモジュール)
 from app.ops import opslib  # noqa: E402  (標準ライブラリだけのモジュール)
 
 DEFAULT_DRILL_DB = "travelcanvas_restore_drill"
@@ -911,6 +913,12 @@ def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -
                 break
         except (OpsError, ValueError):
             continue
+    scan_state = state_dir() / "log_scan.json"
+    if scan_state.is_file():
+        try:
+            snap["log_leaks"] = int(json.loads(scan_state.read_text()).get("findings", 0))
+        except (ValueError, TypeError):
+            pass
     last_drill = state_dir() / "last_drill.json"
     snap["last_drill_age_days"] = None
     if last_drill.is_file():
@@ -963,6 +971,51 @@ def notify(trans: Mapping[str, List[str]], findings: Sequence[Mapping[str, str]]
 # ---------------------------------------------------------------------------
 # その他
 # ---------------------------------------------------------------------------
+
+def read_secret_lines(path: Optional[str]) -> List[str]:
+    """照合する秘密の値の一覧(1行1値)。値は表示しない。"""
+    if not path:
+        return []
+    return [ln.strip() for ln in Path(path).read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+
+def cmd_log_scan(ex: Executor, *, since: str, services: Sequence[str], secrets_file: Optional[str] = None,
+                 log_file: Optional[str] = None, record: bool = True) -> Dict[str, object]:
+    """[Gate O2] backend などのコンテナのログに、個人情報・秘密が出ていないかを検査する(B-009)。
+
+    見つけた値そのものは表示・保存しない(種類・行番号・伏せた抜粋だけ)。"""
+    if not re.match(r"^\d+[smhd]$|^\d{4}-\d{2}-\d{2}T[\d:]+Z?$", since or ""):
+        raise OpsError("--since は 25h・30m のような長さか、UTC の日時(2026-10-17T03:00:00Z)にしてください")
+    if log_file:
+        text = Path(log_file).read_text(encoding="utf-8", errors="replace")
+        source = "file"
+    elif isinstance(ex, ComposeExecutor):
+        for s in services:
+            if not re.match(r"^[a-z][a-z0-9_\-]*$", s):
+                raise OpsError("サービス名が不正です")
+        proc = ex.run(ex.compose + ["logs", "--no-color", "--no-log-prefix", "--since", since] + list(services),
+                      timeout=600)
+        text = (proc.stdout or b"").decode("utf-8", "replace") + (proc.stderr or b"").decode("utf-8", "replace")
+        source = "docker compose logs " + " ".join(services)
+    else:
+        raise OpsError("local モードでは --log-file が必要です")
+    allow = [e for e in (read_dotenv_value("OPS_LOG_ALLOWED_EMAILS") or "").split(",") if e.strip()]
+    findings = log_safety.find_leaks(text, read_secret_lines(secrets_file), max_findings=500, allow_emails=allow)
+    lines = text.count("\n")
+    result = {"at": now_utc().isoformat(), "since": since, "source": source, "lines": lines,
+              "findings": len(findings), "by_kind": log_safety.summarize(findings),
+              "samples": [{"kind": f["kind"], "line": f["line"], "excerpt": f["excerpt"]} for f in findings[:20]]}
+    if record:
+        write_json_atomic(state_dir() / "log_scan.json", result)
+    if findings:
+        kinds = ", ".join("%s=%d" % kv for kv in log_safety.summarize(findings).items())
+        log("ログ検査: %d 行中 %d 件の個人情報・秘密らしき値(%s)" % (lines, len(findings), kinds))
+        for f in findings[:20]:
+            log("  [%s] %s 行目: %s" % (f["kind"], f["line"], f["excerpt"]))
+    else:
+        log("ログ検査: %d 行を検査し、個人情報・秘密は見つかりませんでした(%s、%s)" % (lines, source, since))
+    return result
+
 
 PURGE_SCRIPTS = ("scripts/run_plan_purge.py", "scripts/run_document_purge.py", "scripts/run_quickdraft_purge.py")
 
@@ -1025,6 +1078,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("monitor")
     p.add_argument("--quiet", action="store_true", help="状態が変わった時だけ表示する")
     sub.add_parser("purge")
+    p = sub.add_parser("log-scan", help="コンテナのログに個人情報・秘密が出ていないかの検査(B-009)")
+    p.add_argument("--since", default="25h", help="25h・30m のような長さ、または UTC の日時")
+    p.add_argument("--service", action="append", dest="services", help="既定は backend")
+    p.add_argument("--secrets-file", help="照合する秘密の値の一覧(1行1値、0600 推奨)")
+    p.add_argument("--log-file", help="docker の代わりにこのファイルを検査する")
     p = sub.add_parser("schedule")
     p.add_argument("action", choices=("print", "install", "remove"))
     p.add_argument("--python", default=sys.executable if sys.executable.startswith("/") else "/usr/bin/python3")
@@ -1037,6 +1095,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             plan = cmd_rollback_plan(args.to)
             print(opslib.dumps_json(plan))
             return EXIT_OK if plan["ok"] else EXIT_WARN
+        if args.cmd == "log-scan" and args.log_file:
+            # ファイルを検査するだけなので、docker・DB への接続もバックアップの置き場所も要らない
+            res = cmd_log_scan(Executor(), since=args.since, services=args.services or ["backend"],
+                               secrets_file=args.secrets_file, log_file=args.log_file)
+            return EXIT_OK if not res["findings"] else EXIT_WARN
         dest = backup_dir(args.backup_dir)
         if args.cmd == "list":
             for bid in opslib.backup_ids_in(os.listdir(str(dest))):
@@ -1089,6 +1152,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return EXIT_CRIT if "critical" in levels else EXIT_WARN if levels else EXIT_OK
         if args.cmd == "purge":
             return cmd_purge(ex)
+        if args.cmd == "log-scan":
+            res = cmd_log_scan(ex, since=args.since, services=args.services or ["backend"],
+                               secrets_file=args.secrets_file, log_file=args.log_file)
+            return EXIT_OK if not res["findings"] else EXIT_WARN
     except (OpsError, ValueError) as exc:
         log("失敗: %s" % exc)
         return EXIT_ERROR

@@ -125,6 +125,9 @@ class Settings(BaseSettings):
 
     # アプリケーション設定
     DEBUG: bool = True
+    # [Gate O2] SQL をログへ出すか(調査用)。出す場合も値は伏せる(app/core/database.py)。
+    # 以前は DEBUG に連動しており、開発機で常に全SQLの値がログに出ていた。
+    SQL_ECHO: bool = False
     APP_NAME: str = "TravelCanvas"
     APP_VERSION: str = "1.0.0"
 

@@ -119,3 +119,67 @@ def auth_client(client, make_user, db_session):
     app.dependency_overrides[get_current_user] = _override_current_user
     yield client, user
     app.dependency_overrides.pop(get_current_user, None)
+
+
+# ---------------------------------------------------------------------------
+# [Gate O2] ログの個人情報・秘密の自動検査(B-009)
+#
+# 試験の全実行中に出力されるすべてのログ(DEBUG 以上。SQLAlchemy は WARNING 以上)を整形して検査し、
+# メールアドレス・JWT・暗号文・パスワードのハッシュ・Bearer・接続文字列の資格情報・URL のトークン・
+# SQL の値、および試験中に発行・使用された秘密の値(secrets.token_* の出力、ハッシュ化・照合した
+# パスワード、文書ダウンロードのトークン)が含まれていないかを見る。
+# 結果は最後に実行される tests/test_zz_log_leak_scan.py が判定する。
+# ---------------------------------------------------------------------------
+import logging as _logging  # noqa: E402
+import secrets as _secrets  # noqa: E402
+
+from passlib.context import CryptContext as _CryptContext  # noqa: E402
+
+from app.core.log_safety import LeakCollector as _LeakCollector  # noqa: E402
+from app.services import storage_backend as _storage_backend  # noqa: E402
+
+LEAK_COLLECTOR = _LeakCollector()
+
+
+def _register_result(func, min_len=16):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        value = result[0] if isinstance(result, tuple) else result
+        if isinstance(value, str) and len(value) >= min_len:
+            LEAK_COLLECTOR.add_secret(value)
+        return result
+
+    wrapper.__wrapped__ = func
+    return wrapper
+
+
+def _register_password(method):
+    def wrapper(self, secret, *args, **kwargs):
+        if isinstance(secret, str):
+            LEAK_COLLECTOR.add_secret(secret)
+        return method(self, secret, *args, **kwargs)
+
+    wrapper.__wrapped__ = method
+    return wrapper
+
+
+def pytest_configure(config):
+    if getattr(config, "_tc_leak_collector", None) is not None:
+        return
+    config._tc_leak_collector = LEAK_COLLECTOR
+    _secrets.token_urlsafe = _register_result(_secrets.token_urlsafe)
+    _secrets.token_hex = _register_result(_secrets.token_hex)
+    _storage_backend.issue_download_token = _register_result(_storage_backend.issue_download_token)
+    import app.api.v1.documents as _documents_api
+
+    _documents_api.issue_download_token = _register_result(_documents_api.issue_download_token)
+    _CryptContext.hash = _register_password(_CryptContext.hash)
+    _CryptContext.verify = _register_password(_CryptContext.verify)
+    from app.core import log_safety as _log_safety
+
+    _log_safety.set_raw_inspector(LEAK_COLLECTOR.inspect_raw)
+    root = _logging.getLogger()
+    root.addHandler(LEAK_COLLECTOR)
+    root.setLevel(_logging.DEBUG)
+    # SQL は件数が多いので通常は WARNING 以上だけ。値が伏せられることは test_gate_o2 で別に確かめる。
+    _logging.getLogger("sqlalchemy").setLevel(_logging.WARNING)

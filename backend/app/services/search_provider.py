@@ -66,7 +66,8 @@ async def search_wikipedia(query: str, client: Optional[httpx.AsyncClient] = Non
             })
         return results
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Wikipedia search failed for %r: %s", query, exc)
+        # [Gate O2] 検索語(利用者の入力)と、それを含むURL・例外の文面はログに出さない
+        logger.warning("Wikipedia search failed (query length %d): %s", len(query or ""), type(exc).__name__)
         return []
     finally:
         if owns_client:
@@ -113,7 +114,7 @@ async def search_nominatim(
             })
         return results
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Nominatim search failed for %r: %s", query, exc)
+        logger.warning("Nominatim search failed (query length %d): %s", len(query or ""), type(exc).__name__)
         return []
     finally:
         if owns_client:
@@ -169,7 +170,7 @@ async def search_overpass(
             })
         return results
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Overpass search failed for %r: %s", query, exc)
+        logger.warning("Overpass search failed (query length %d): %s", len(query or ""), type(exc).__name__)
         return []
     finally:
         if owns_client:
@@ -197,7 +198,7 @@ async def search_all_providers(
     combined: List[Dict[str, Any]] = []
     for provider_name, r in zip(("wikipedia", "nominatim", "overpass"), results):
         if isinstance(r, Exception):
-            logger.warning("%s provider raised: %s", provider_name, r)
+            logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
             continue
         combined.extend(r)
     return combined

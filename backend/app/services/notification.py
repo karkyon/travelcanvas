@@ -192,7 +192,8 @@ class NotificationService:
             # SMTP送信
             if settings.MOCK_EXTERNAL_APIS:
                 # モック送信（開発・テスト用）
-                logger.info(f"Mock email sent to {to_email}: {subject}")
+                # [Gate O2] 宛先・件名(個人情報を含みうる)はログに出さない
+                logger.info("Mock email sent")
                 return True
             else:
                 return await self._send_smtp(message, to_email)
@@ -217,11 +218,11 @@ class NotificationService:
                 # メール送信
                 server.sendmail(settings.EMAIL_FROM, to_email, message.as_string())
 
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info("Email sent successfully")
             return True
 
         except Exception as e:
-            logger.error(f"SMTP sending failed: {e}")
+            logger.error("SMTP sending failed: %s", type(e).__name__)
             return False
 
     async def _add_attachment(self, message: MIMEMultipart, attachment: Dict[str, Any]):
@@ -586,19 +587,19 @@ TravelCanvasへのご登録ありがとうございます。
     async def _send_push_notification(self, event: NotificationEvent, recipient: str, data: Dict[str, Any]) -> bool:
         """プッシュ通知送信（モック実装）"""
         # 実際の実装では FCM や APNs を使用
-        logger.info(f"Push notification sent to {recipient}: {event}")
+        logger.info("Push notification sent: %s", event)
         return True
 
     async def _send_sms_notification(self, event: NotificationEvent, recipient: str, data: Dict[str, Any]) -> bool:
         """SMS通知送信（モック実装）"""
         # 実際の実装では Twilio などのSMSサービスを使用
-        logger.info(f"SMS notification sent to {recipient}: {event}")
+        logger.info("SMS notification sent: %s", event)
         return True
 
     async def _send_in_app_notification(self, event: NotificationEvent, recipient: str, data: Dict[str, Any]) -> bool:
         """アプリ内通知送信（モック実装）"""
         # 実際の実装では WebSocket や データベースを使用
-        logger.info(f"In-app notification sent to {recipient}: {event}")
+        logger.info("In-app notification sent: %s", event)
         return True
 
     def get_queue_stats(self) -> Dict[str, Any]:
