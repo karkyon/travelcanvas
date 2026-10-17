@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate P2] FR-027 予算・費用 / FR-028 立替・精算(SC-23)のbrowser E2E。
@@ -24,20 +25,10 @@ async function axeViolations(page: Page, label: string): Promise<void> {
   }
 }
 
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function startGuestPlan(page: Page): Promise<string> {
-  await page.goto('/');
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
-  await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await newPlanButton.click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByPlaceholder('例: 東京旅行').fill(`P2費用E2E-${Date.now()}`);
-  await dialog.getByRole('button', { name: '作成' }).click();
-  await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
-  const match = page.url().match(/\/planner\/([0-9a-fA-F-]{36})/);
-  if (!match) throw new Error(`planIdをURLから取得できませんでした: ${page.url()}`);
-  return match[1];
+  const r = await startGuestPlanViaApi(page, `P2費用E2E-${Date.now()}`);
+  return r.planId;
 }
 
 async function addExpense(page: Page, fields: { title: string; amount: string; currency?: string; rate?: string; category?: string }) {

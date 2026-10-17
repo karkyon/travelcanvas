@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate P12] FR-037 写真・メモ・旅行記(SC-28)のbrowser E2E。
@@ -30,19 +31,9 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 }
 
 /** ゲストを開始し、プランはAPIで作る(QuickDraftの作成上限を使わないため。optimization.spec.tsと同じ) */
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function startGuestPlan(page: Page, title: string): Promise<{ planId: string; apiBase: string; token: string }> {
-  await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
-  const res = await page.request.post(`${apiBase}/travel-plans/`, {
-    headers: { Authorization: `Bearer ${token}` }, data: { title },
-  });
-  if (!res.ok()) throw new Error(`プランの作成に失敗しました: ${res.status()} ${await res.text()}`);
-  return { planId: (await res.json()).id as string, apiBase, token };
+  return startGuestPlanViaApi(page, title, { open: false });
 }
 
 test('旅の記録: メモと写真を予定に記録し、公開範囲を変え、旅行記の下書きで公開前の確認が出る', async ({ page, context }) => {

@@ -464,45 +464,50 @@ const ReservationsPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : reservations.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-500">
+        <Card padding="lg" className="text-center text-gray-600">
           予約がまだ登録されていません。「新規予約」から追加できます。
         </Card>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-3" aria-label="予約">
           {reservations.map((r) => (
-            <Card
-              key={r.id}
-              padding="md"
-              hover
-              onClick={() => openDetail(r)}
-              className="cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-500">{typeIcon(r.type)}</span>
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {r.provider_name || typeLabel(r.type)}
+            <li key={r.id}>
+              {/* [Gate E1] 以前は <div onClick> でキーボードから開けなかった。ボタンにして
+                  Tab で移動・Enter/Space で詳細を開けるようにする。 */}
+              <Card padding="none" hover>
+                <button
+                  type="button"
+                  onClick={() => openDetail(r)}
+                  aria-haspopup="dialog"
+                  className="w-full text-left p-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-600" aria-hidden="true">{typeIcon(r.type)}</span>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {r.provider_name || typeLabel(r.type)}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {typeLabel(r.type)} ・ {formatDateTime(r.start_at)}
+                          {r.confirmation_number_masked && ` ・ 予約番号 ${r.confirmation_number_masked}`}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {typeLabel(r.type)} ・ {formatDateTime(r.start_at)}
-                      {r.confirmation_number_masked && ` ・ 予約番号 ${r.confirmation_number_masked}`}
-                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                      {STATUS_LABEL[r.status] ?? r.status}
+                    </span>
                   </div>
-                </div>
-                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-                  {STATUS_LABEL[r.status] ?? r.status}
-                </span>
-              </div>
-            </Card>
+                </button>
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {/* 新規予約作成 */}
@@ -511,8 +516,9 @@ const ReservationsPage: React.FC = () => {
           <Modal.Body>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">種類</label>
+                <label htmlFor="reservation-create-type" className="block text-sm font-medium text-gray-700 mb-1">種類</label>
                 <select
+                  id="reservation-create-type"
                   value={createForm.type}
                   onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
                   className="w-full border rounded-lg px-3 py-2"
@@ -572,8 +578,9 @@ const ReservationsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <label htmlFor="reservation-create-notes" className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
                 <textarea
+                  id="reservation-create-notes"
                   value={createForm.notes}
                   onChange={(e) => setCreateForm((f) => ({ ...f, notes: e.target.value }))}
                   className="w-full border rounded-lg px-3 py-2"
@@ -602,27 +609,27 @@ const ReservationsPage: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-gray-500">種類</div>
+                    <div className="text-gray-600">種類</div>
                     <div>{typeLabel(selected.type)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">状態</div>
+                    <div className="text-gray-600">状態</div>
                     <div>{STATUS_LABEL[selected.status] ?? selected.status}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">開始</div>
+                    <div className="text-gray-600">開始</div>
                     <div>{formatDateTime(selected.start_at)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">終了</div>
+                    <div className="text-gray-600">終了</div>
                     <div>{formatDateTime(selected.end_at)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">名義</div>
+                    <div className="text-gray-600">名義</div>
                     <div>{selected.holder_name || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">金額</div>
+                    <div className="text-gray-600">金額</div>
                     <div>
                       {selected.total_amount != null
                         ? `${selected.total_amount.toLocaleString()} ${selected.currency ?? ''}`
@@ -652,7 +659,7 @@ const ReservationsPage: React.FC = () => {
                       </Button>
                     )}
                   </div>
-                  <div className="text-sm space-y-1">
+                  <div className="text-sm space-y-1" aria-live="polite">
                     <div>
                       予約番号:{' '}
                       {revealed
@@ -667,7 +674,7 @@ const ReservationsPage: React.FC = () => {
 
                 {selected.notes && (
                   <div>
-                    <div className="text-gray-500 text-sm mb-1">メモ</div>
+                    <div className="text-gray-600 text-sm mb-1">メモ</div>
                     <div className="text-sm whitespace-pre-wrap">{selected.notes}</div>
                   </div>
                 )}
@@ -684,6 +691,7 @@ const ReservationsPage: React.FC = () => {
                         size="sm"
                         icon={<Plus size={14} />}
                         onClick={() => setIsAddLinkOpen(true)}
+                        aria-label="イベントの紐付けを追加"
                       >
                         追加
                       </Button>
@@ -695,7 +703,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {eventLinks.length === 0 && (
-                        <div className="text-sm text-gray-400">紐付いているイベントがありません</div>
+                        <div className="text-sm text-gray-600">紐付いているイベントがありません</div>
                       )}
                       {eventLinks.map((link) => (
                         <div
@@ -703,9 +711,9 @@ const ReservationsPage: React.FC = () => {
                           className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <CalendarDays size={14} className="text-gray-400 shrink-0" />
+                            <CalendarDays size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
                             <span className="truncate">{eventLabel(link.event_id)}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 shrink-0">
                               {RELATION_TYPE_LABEL[link.relation_type] ?? link.relation_type}
                             </span>
                           </div>
@@ -713,7 +721,7 @@ const ReservationsPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleToggleLinkLock(link)}
-                              className="text-gray-400 hover:text-gray-700 p-1"
+                              className="text-gray-600 hover:text-gray-900 p-1"
                               aria-label={link.is_locked ? 'ロック解除' : 'ロック'}
                               title={link.is_locked ? 'ロック解除する' : '誤操作防止のためロックする'}
                             >
@@ -723,7 +731,7 @@ const ReservationsPage: React.FC = () => {
                               type="button"
                               onClick={() => handleDeleteEventLink(link)}
                               disabled={link.is_locked}
-                              className="text-gray-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed p-1"
+                              className="text-gray-600 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed p-1"
                               aria-label="イベント紐付けを解除"
                               title={link.is_locked ? 'ロック中は解除できません' : '紐付けを解除する'}
                             >
@@ -738,8 +746,9 @@ const ReservationsPage: React.FC = () => {
                   {isAddLinkOpen && (
                     <form onSubmit={handleAddEventLink} className="flex flex-wrap gap-2 items-end">
                       <div className="flex-1 min-w-[180px]">
-                        <label className="block text-xs text-gray-500 mb-1">イベント</label>
+                        <label htmlFor="reservation-link-event" className="block text-xs text-gray-600 mb-1">イベント</label>
                         <select
+                          id="reservation-link-event"
                           value={newLinkEventId}
                           onChange={(e) => setNewLinkEventId(e.target.value)}
                           className="w-full border rounded-lg px-2 py-1.5 text-sm"
@@ -753,8 +762,9 @@ const ReservationsPage: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">紐付け種別</label>
+                        <label htmlFor="reservation-link-relation" className="block text-xs text-gray-600 mb-1">紐付け種別</label>
                         <select
+                          id="reservation-link-relation"
                           value={newLinkRelationType}
                           onChange={(e) => setNewLinkRelationType(e.target.value as 'required' | 'related')}
                           className="border rounded-lg px-2 py-1.5 text-sm"
@@ -785,6 +795,7 @@ const ReservationsPage: React.FC = () => {
                         size="sm"
                         icon={<Plus size={14} />}
                         onClick={() => setIsAddTicketOpen(true)}
+                        aria-label="チケットを追加"
                       >
                         追加
                       </Button>
@@ -796,7 +807,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {tickets.length === 0 && (
-                        <div className="text-sm text-gray-400">チケットが登録されていません</div>
+                        <div className="text-sm text-gray-600">チケットが登録されていません</div>
                       )}
                       {tickets.map((t) => (
                         <div key={t.id} className="text-sm bg-gray-50 rounded px-3 py-2">
@@ -804,16 +815,16 @@ const ReservationsPage: React.FC = () => {
                             <div>
                               <span className="font-medium">{t.ticket_type}</span>
                               {t.barcode_format && (
-                                <span className="text-xs text-gray-500 ml-2">{t.barcode_format}</span>
+                                <span className="text-xs text-gray-600 ml-2">{t.barcode_format}</span>
                               )}
-                              <span className="text-xs text-gray-400 ml-2">
+                              <span className="text-xs text-gray-600 ml-2">
                                 {t.has_payload ? 'データあり' : 'データなし'}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {t.has_payload && (
                                 revealedTickets[t.id] === undefined ? (
-                                  <Button variant="ghost" size="sm" icon={<Eye size={14} />} onClick={() => handleRevealTicket(t)}>
+                                  <Button variant="ghost" size="sm" icon={<Eye size={14} />} onClick={() => handleRevealTicket(t)} aria-label={`チケット「${t.ticket_type}」のデータを表示`}>
                                     表示
                                   </Button>
                                 ) : (
@@ -821,6 +832,7 @@ const ReservationsPage: React.FC = () => {
                                     variant="ghost"
                                     size="sm"
                                     icon={<EyeOff size={14} />}
+                                    aria-label={`チケット「${t.ticket_type}」のデータを隠す`}
                                     onClick={() => setRevealedTickets((prev) => {
                                       const next = { ...prev };
                                       delete next[t.id];
@@ -834,8 +846,8 @@ const ReservationsPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteTicket(t)}
-                                className="text-gray-400 hover:text-red-600"
-                                aria-label="チケットを削除"
+                                className="text-gray-600 hover:text-red-700"
+                                aria-label={`チケット「${t.ticket_type}」を削除`}
                               >
                                 <X size={14} />
                               </button>
@@ -855,12 +867,14 @@ const ReservationsPage: React.FC = () => {
                     <form onSubmit={handleAddTicket} className="space-y-2">
                       <div className="flex flex-wrap gap-2">
                         <Input
+                          aria-label="チケットの種類"
                           placeholder="種類(例: boarding_pass)"
                           value={newTicketType}
                           onChange={(e) => setNewTicketType(e.target.value)}
                           containerClassName="flex-1 min-w-[140px]"
                         />
                         <Input
+                          aria-label="バーコード形式"
                           placeholder="バーコード形式(任意。例: QR_CODE)"
                           value={newTicketBarcodeFormat}
                           onChange={(e) => setNewTicketBarcodeFormat(e.target.value)}
@@ -868,13 +882,14 @@ const ReservationsPage: React.FC = () => {
                         />
                       </div>
                       <Input
+                        aria-label="QR/バーコードのデータ"
                         placeholder="QR/バーコードのデータ(任意)"
                         value={newTicketPayload}
                         onChange={(e) => setNewTicketPayload(e.target.value)}
                       />
                       <div className="flex gap-2">
                         <Button type="submit" variant="outline" size="sm" loading={isAddingTicket} disabled={!newTicketType.trim()}>
-                          追加
+                          チケットを登録
                         </Button>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setIsAddTicketOpen(false)}>
                           キャンセル
@@ -894,7 +909,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {participants.length === 0 && (
-                        <div className="text-sm text-gray-400">参加者が登録されていません</div>
+                        <div className="text-sm text-gray-600">参加者が登録されていません</div>
                       )}
                       {participants.map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
@@ -902,8 +917,8 @@ const ReservationsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleRemoveParticipant(p)}
-                            className="text-gray-400 hover:text-red-600"
-                            aria-label="参加者を削除"
+                            className="text-gray-600 hover:text-red-700"
+                            aria-label={`参加者「${p.name}」を削除`}
                           >
                             <X size={14} />
                           </button>
@@ -913,25 +928,27 @@ const ReservationsPage: React.FC = () => {
                   )}
                   <form onSubmit={handleAddParticipant} className="flex gap-2">
                     <Input
+                      aria-label="参加者の氏名"
                       placeholder="氏名"
                       value={newParticipantName}
                       onChange={(e) => setNewParticipantName(e.target.value)}
                       containerClassName="flex-1"
                     />
                     <Input
+                      aria-label="参加者の座席"
                       placeholder="座席(任意)"
                       value={newParticipantSeat}
                       onChange={(e) => setNewParticipantSeat(e.target.value)}
                       containerClassName="w-32"
                     />
-                    <Button type="submit" variant="outline" size="sm">追加</Button>
+                    <Button type="submit" variant="outline" size="sm" disabled={!newParticipantName.trim()}>参加者を追加</Button>
                   </form>
                 </div>
               </div>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => handleDelete(selected)}>
-                削除
+                予約を削除
               </Button>
               <Button variant="ghost" onClick={closeDetail}>閉じる</Button>
             </Modal.Footer>

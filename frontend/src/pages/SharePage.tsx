@@ -15,6 +15,7 @@ import {
 } from '../services/api';
 import type { ShareLink, Collaborator } from '../services/api';
 import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
+import LocalQrCode from '../components/share/LocalQrCode';
 
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -200,7 +201,7 @@ const SharePage: React.FC = () => {
         <div className="mb-8">
           <button
             onClick={() => navigate('/planner')}
-            className="text-blue-500 hover:text-blue-700 mb-4"
+            className="text-blue-700 hover:text-blue-900 mb-4"
           >
             ← プランナーに戻る
           </button>
@@ -214,7 +215,7 @@ const SharePage: React.FC = () => {
 
         {/* メッセージ表示 */}
         {message && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
+          <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
             message.type === 'success'
               ? 'bg-green-100 text-green-800 border border-green-200'
               : 'bg-red-100 text-red-800 border border-red-200'
@@ -244,24 +245,22 @@ const SharePage: React.FC = () => {
                       type="text"
                       value={justCreatedUrl}
                       readOnly
+                      aria-label="発行した共有URL"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
                     />
                     <button
                       onClick={() => handleCopyLink(justCreatedUrl)}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1"
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1"
                     >
                       <Copy size={16} />
                       コピー
                     </button>
                   </div>
                   <div className="flex items-center gap-4">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(justCreatedUrl)}`}
-                      alt="QRコード"
-                      className="w-20 h-20 border rounded-lg bg-white"
-                    />
-                    <p className="text-sm text-gray-600 flex items-center gap-1">
-                      <QrCode size={14} />
+                    {/* [Gate E1] QRは端末内で作る(共有URLのトークンを外部へ送らない) */}
+                    <LocalQrCode value={justCreatedUrl} size={80} label="共有リンクのQRコード" />
+                    <p className="text-sm text-gray-700 flex items-center gap-1">
+                      <QrCode size={14} aria-hidden="true" />
                       スマホでスキャンしてアクセス
                     </p>
                   </div>
@@ -274,7 +273,7 @@ const SharePage: React.FC = () => {
                       href={justCreatedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-center px-3 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 text-sm"
+                      className="flex-1 text-center px-3 py-2 border border-blue-300 text-blue-800 rounded-lg hover:bg-blue-100 text-sm"
                     >
                       共有前プレビューを開く
                     </a>
@@ -304,15 +303,16 @@ const SharePage: React.FC = () => {
                     <div key={share.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg text-sm">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-gray-500">...{share.token_prefix}</span>
+                          <span className="font-mono text-gray-600">...{share.token_prefix}</span>
                           {getShareStatusBadge(share)}
                           {share.has_passcode && (
-                            <span title="パスコード保護あり">
-                              <Shield size={14} className="text-purple-500" />
+                            <span title="パスコード保護あり" className="inline-flex items-center gap-0.5 text-xs text-purple-800">
+                              <Shield size={14} aria-hidden="true" />
+                              <span className="sr-only">パスコード保護あり</span>
                             </span>
                           )}
                         </div>
-                        <div className="text-gray-500 text-xs">
+                        <div className="text-gray-600 text-xs">
                           {share.permission === 'edit' ? '編集可能' : '閲覧のみ'}
                           {` ・ 使用 ${share.use_count}${share.max_uses != null ? `/${share.max_uses}` : ''}回`}
                           {share.expires_at && ` ・ 期限 ${new Date(share.expires_at).toLocaleDateString('ja-JP')}`}
@@ -324,8 +324,9 @@ const SharePage: React.FC = () => {
                       {!share.revoked_at && (
                         <button
                           onClick={() => handleRevokeShare(share.id)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
                           title="失効させる"
+                          aria-label={`共有リンク「...${share.token_prefix}」を失効させる`}
                         >
                           <Ban size={16} />
                         </button>
@@ -336,8 +337,8 @@ const SharePage: React.FC = () => {
               )}
 
               {shareLinks.length === 0 && !justCreatedUrl && (
-                <div className="text-center py-8 text-gray-500">
-                  <Link size={48} className="mx-auto mb-4 opacity-50" />
+                <div className="text-center py-8 text-gray-600">
+                  <Link size={48} className="mx-auto mb-4 opacity-50" aria-hidden="true" />
                   <p className="mb-4">まだ共有リンクが作成されていません</p>
                 </div>
               )}
@@ -352,10 +353,11 @@ const SharePage: React.FC = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-permission" className="block text-sm font-medium text-gray-700 mb-2">
                     アクセス権限
                   </label>
                   <select
+                    id="share-permission"
                     value={permission}
                     onChange={(e) => setPermission(e.target.value as 'view' | 'edit')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -366,10 +368,11 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-passcode" className="block text-sm font-medium text-gray-700 mb-2">
                     パスコード保護（任意）
                   </label>
                   <input
+                    id="share-passcode"
                     type="password"
                     value={sharePasscode}
                     onChange={(e) => setSharePasscode(e.target.value)}
@@ -379,10 +382,11 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-expiry" className="block text-sm font-medium text-gray-700 mb-2">
                     有効期限（任意）
                   </label>
                   <input
+                    id="share-expiry"
                     type="date"
                     value={expiryDate}
                     onChange={(e) => setExpiryDate(e.target.value)}
@@ -391,10 +395,11 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-max-uses" className="block text-sm font-medium text-gray-700 mb-2">
                     最大使用回数（任意）
                   </label>
                   <input
+                    id="share-max-uses"
                     type="number"
                     min={1}
                     value={maxUses}
@@ -409,7 +414,7 @@ const SharePage: React.FC = () => {
                 <button
                   onClick={handleCreateShare}
                   disabled={isSaving}
-                  className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? '作成中...' : '共有リンクを発行'}
                 </button>
@@ -428,10 +433,11 @@ const SharePage: React.FC = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-2">
                     メールアドレス
                   </label>
                   <input
+                    id="invite-email"
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
@@ -441,10 +447,11 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-2">
                     権限
                   </label>
                   <select
+                    id="invite-role"
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as 'viewer' | 'editor')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -455,10 +462,11 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-message" className="block text-sm font-medium text-gray-700 mb-2">
                     招待メッセージ（任意）
                   </label>
                   <textarea
+                    id="invite-message"
                     value={inviteMessage}
                     onChange={(e) => setInviteMessage(e.target.value)}
                     placeholder="一緒に旅行プランを作りましょう！"
@@ -470,7 +478,7 @@ const SharePage: React.FC = () => {
                 <button
                   onClick={handleInviteCollaborator}
                   disabled={!inviteEmail || isSaving}
-                  className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? '招待中...' : '招待を送信'}
                 </button>
@@ -498,7 +506,7 @@ const SharePage: React.FC = () => {
                           </span>
                           {getStatusBadge(collaborator.status)}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
                           {getPermissionIcon(collaborator.role)}
                           <span>{getPermissionText(collaborator.role)}</span>
                           <span>•</span>
@@ -508,7 +516,7 @@ const SharePage: React.FC = () => {
 
                       <button
                         onClick={() => handleRemoveCollaborator(collaborator.id)}
-                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
                         title="削除"
                         aria-label={`${collaborator.email} を削除`}
                       >
@@ -518,8 +526,8 @@ const SharePage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Users size={48} className="mx-auto mb-4 opacity-50" />
+                <div className="text-center py-8 text-gray-600">
+                  <Users size={48} className="mx-auto mb-4 opacity-50" aria-hidden="true" />
                   <p>まだコラボレーターがいません</p>
                   <p className="text-sm">メール招待でチームメンバーを追加しましょう</p>
                 </div>

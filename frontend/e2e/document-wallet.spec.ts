@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate M10] FR-013 文書ウォレット(documents)のbrowser E2E。
@@ -127,24 +128,10 @@ function diagnosticsSummary(state: DiagnosticsState): string {
   return lines.join('\n');
 }
 
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function createGuestPlan(page: Page, titleSuffix: string): Promise<string> {
-  await page.goto('/');
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
-  await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await newPlanButton.click();
-
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByPlaceholder('例: 東京旅行').fill(`M10文書E2E-${titleSuffix}`);
-  await dialog.getByRole('button', { name: '作成' }).click();
-
-  await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
-  const match = page.url().match(/\/planner\/([0-9a-fA-F-]{36})/);
-  if (!match) throw new Error(`planId をURLから取得できませんでした: ${page.url()}`);
-  return match[1];
+  const r = await startGuestPlanViaApi(page, `M10文書E2E-${titleSuffix}`);
+  return r.planId;
 }
 
 // [Gate M10-R2] restricted文書が別editorへ非露出であることをE2Eで検証する

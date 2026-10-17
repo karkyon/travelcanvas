@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate L2] FR-016 制約管理(SC-15の制約部分)のbrowser E2E。
@@ -26,21 +27,10 @@ async function axeViolations(page: Page, label: string): Promise<void> {
   }
 }
 
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function startGuestPlan(page: Page): Promise<string> {
-  await page.goto('/');
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
-  await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await newPlanButton.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByPlaceholder('例: 東京旅行').fill(`L2制約E2E-${Date.now()}`);
-  await dialog.getByRole('button', { name: '作成' }).click();
-  await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
-  const match = page.url().match(/\/planner\/([0-9a-fA-F-]{36})/);
-  if (!match) throw new Error(`planIdをURLから取得できませんでした: ${page.url()}`);
-  return match[1];
+  const r = await startGuestPlanViaApi(page, `L2制約E2E-${Date.now()}`);
+  return r.planId;
 }
 
 test('制約: ハード(共有)とソフト(秘匿・理由付き)を登録し、再読込後も保持され、無効化・削除できる', async ({ page }) => {

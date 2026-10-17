@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate P1] FR-025 持ち物 / FR-026 準備タスク・レディネス(SC-21/SC-22)のbrowser E2E。
@@ -24,23 +25,10 @@ async function axeViolations(page: Page, label: string): Promise<void> {
   }
 }
 
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function startGuestPlan(page: Page): Promise<{ planId: string; apiBase: string }> {
-  await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
-  await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await newPlanButton.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByPlaceholder('例: 東京旅行').fill(`P1準備E2E-${Date.now()}`);
-  await dialog.getByRole('button', { name: '作成' }).click();
-  await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
-  const match = page.url().match(/\/planner\/([0-9a-fA-F-]{36})/);
-  if (!match) throw new Error(`planIdをURLから取得できませんでした: ${page.url()}`);
-  return { planId: match[1], apiBase };
+  const r = await startGuestPlanViaApi(page, `P1準備E2E-${Date.now()}`);
+  return { planId: r.planId, apiBase: r.apiBase };
 }
 
 async function send(request: APIRequestContext, base: string, token: string, path: string, data: unknown) {

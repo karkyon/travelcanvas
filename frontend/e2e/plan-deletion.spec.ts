@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate B-012] プラン削除(論理削除 → 復元 / 完全削除)のbrowser E2E。
@@ -22,23 +23,10 @@ async function axeViolations(page: Page, label: string): Promise<void> {
   }
 }
 
+// [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
 async function startGuestPlan(page: Page, title: string): Promise<{ planId: string; apiBase: string }> {
-  await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
-  await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
-  await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
-  await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
-  await newPlanButton.click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByPlaceholder('例: 東京旅行').fill(title);
-  await dialog.getByRole('button', { name: '作成' }).click();
-  await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
-  const match = page.url().match(/\/planner\/([0-9a-fA-F-]{36})/);
-  if (!match) throw new Error(`planIdをURLから取得できませんでした: ${page.url()}`);
-  return { planId: match[1], apiBase };
+  const r = await startGuestPlanViaApi(page, title);
+  return { planId: r.planId, apiBase: r.apiBase };
 }
 
 async function send(request: APIRequestContext, base: string, token: string, method: 'post' | 'get', path: string,
@@ -80,7 +68,8 @@ test('プラン削除: 子データのあるプランを削除・復元・完全
   const deleted = page.waitForResponse(
     (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname.endsWith(`/travel-plans/${planId}`),
   );
-  await card.getByRole('button', { name: '削除' }).click();
+  // [Gate E1] 一覧のボタン名にプラン名が入った(「<名前>」を削除)。名前に「削除」を含むため完全一致で選ぶ
+  await card.getByRole('button', { name: `「${title}」を削除`, exact: true }).click();
   const deleteResponse = await deleted;
   expect(deleteResponse.status()).toBe(200);
   expect(await deleteResponse.json()).toMatchObject({ message: '旅行プランを削除しました' });
@@ -114,7 +103,7 @@ test('プラン削除: 子データのあるプランを削除・復元・完全
   const deletedAgain = page.waitForResponse(
     (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname.endsWith(`/travel-plans/${planId}`),
   );
-  await page.locator('.grid > *').filter({ hasText: title }).getByRole('button', { name: '削除' }).click();
+  await page.locator('.grid > *').filter({ hasText: title }).getByRole('button', { name: `「${title}」を削除`, exact: true }).click();
   expect((await deletedAgain).status()).toBe(200);
   await trash.getByRole('button', { name: '表示する' }).click();
   page.once('dialog', (d) => d.accept());

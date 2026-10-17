@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 
 type InputVariant = 'default' | 'error' | 'success';
 type InputSize = 'sm' | 'md' | 'lg';
@@ -27,9 +27,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   containerClassName = '',
   className = '',
   disabled,
+  id,
   ...props
 }, ref) => {
   const finalVariant = error ? 'error' : variant;
+  // [Gate E1] label を入力欄に結び付ける(以前は <label> に htmlFor が無く、読み上げで
+  // 何の入力欄か分からず、axe の label 規則にも違反していた)。id 指定があればそれを使う。
+  const generatedId = useId();
+  const inputId = id ?? `input-${generatedId}`;
+  const messageId = error || helperText ? `${inputId}-message` : undefined;
+  const describedBy = [props['aria-describedby'], messageId].filter(Boolean).join(' ') || undefined;
 
   const baseClasses = [
     'block w-full rounded-lg border transition-all duration-200',
@@ -85,7 +92,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   return (
     <div className={containerClasses}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
           {label}
         </label>
       )}
@@ -102,6 +109,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
           className={inputClasses}
           disabled={disabled}
           {...props}
+          id={inputId}
+          aria-invalid={error ? true : props['aria-invalid']}
+          aria-describedby={describedBy}
         />
         
         {rightIcon && (
@@ -112,17 +122,17 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
       </div>
       
       {(error || helperText) && (
-        <div className="mt-1">
+        <div className="mt-1" id={messageId}>
           {error && (
-            <p className="text-sm text-red-600 flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <p className="text-sm text-red-700 flex items-center" role="alert">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               {error}
             </p>
           )}
           {!error && helperText && (
-            <p className="text-sm text-gray-500">{helperText}</p>
+            <p className="text-sm text-gray-600">{helperText}</p>
           )}
         </div>
       )}

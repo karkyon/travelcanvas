@@ -3,11 +3,14 @@
  *
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
+import type { AxiosRequestConfig } from 'axios';
 import { NotificationsApi } from './notifications';
 import type { ApiResponse, Collaborator, CollaboratorRemoveResult, PublicSharedPlan, ShareLink } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
 import { collaborator, collaboratorRemoveResult, publicSharedPlan, shareLink } from '../decoders';
+
+const PUBLIC_SHARE_SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class ShareApi extends NotificationsApi {
   // [Gate #27 / A-009] getNotificationSettings/updateNotificationSettingsは
@@ -41,10 +44,13 @@ export class ShareApi extends NotificationsApi {
   // [Gate #30] 認証不要の公開共有リンク解決。未ログインでも呼び出せる
   // (this.clientはトークン未保持でもAuthorizationヘッダーを付けないだけで
   // 正常にリクエストできる)。
+  // [Gate E1] 合言葉が必要・誤りのとき backend は 401 を返す。共通エラー処理はこれを
+  // 「ログイン切れ」と扱い、トークンを捨てて /login へ移動していたため、合言葉の入力欄が
+  // 一度も表示されなかった。401・404 は PublicSharePage が自分で画面に示す。
   async resolvePublicShare(token: string, passcode?: string): Promise<ApiResponse<PublicSharedPlan>> {
     const response = await this.client.post(`/public/share/${token}/resolve`, {
       passcode: passcode || undefined,
-    });
+    }, PUBLIC_SHARE_SILENT);
     return apiOk<PublicSharedPlan>(decodeResponse(response.data, publicSharedPlan, 'POST /public/share/{token}/resolve'));
   }
 

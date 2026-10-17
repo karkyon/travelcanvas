@@ -44,9 +44,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  review_required: 'bg-amber-100 text-amber-700',
-  confirmed: 'bg-green-100 text-green-700',
-  rejected: 'bg-gray-100 text-gray-500',
+  review_required: 'bg-amber-100 text-amber-800',
+  confirmed: 'bg-green-100 text-green-800',
+  rejected: 'bg-gray-100 text-gray-700',
 };
 
 const FIELD_PATH_OPTIONS: { value: ImportFieldPath; label: string }[] = [
@@ -242,7 +242,7 @@ const ImportsPage: React.FC = () => {
             ← プランへ戻る
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">予約取込</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-600 mt-1">
             メール・確認書等の内容を手動で登録し、レビューのうえ予約として確定できます。
           </p>
         </div>
@@ -252,31 +252,41 @@ const ImportsPage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : jobs.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-500">
+        <Card padding="lg" className="text-center text-gray-600">
           取込ジョブがまだありません。「新規取込」から追加できます。
         </Card>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-3" aria-label="取込ジョブ">
           {jobs.map((j) => (
-            <Card key={j.id} padding="md" hover onClick={() => openDetail(j)} className="cursor-pointer">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-gray-900">取込ジョブ({formatDateTime(j.created_at)})</div>
-                  <div className="text-sm text-gray-500">provider: {j.provider}</div>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {STATUS_LABEL[j.status] ?? j.status}
-                </span>
-              </div>
-            </Card>
+            <li key={j.id}>
+              {/* [Gate E1] キーボードで開けるようにボタンにする(以前は <div onClick>) */}
+              <Card padding="none" hover>
+                <button
+                  type="button"
+                  onClick={() => openDetail(j)}
+                  aria-haspopup="dialog"
+                  className="w-full text-left p-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">取込ジョブ({formatDateTime(j.created_at)})</div>
+                      <div className="text-sm text-gray-600">provider: {j.provider}</div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                      {STATUS_LABEL[j.status] ?? j.status}
+                    </span>
+                  </div>
+                </button>
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {/* 新規取込ジョブ作成 */}
@@ -328,28 +338,28 @@ const ImportsPage: React.FC = () => {
                   <div className="text-sm font-medium text-gray-700 mb-2">抽出候補</div>
                   <div className="space-y-2 mb-3">
                     {selected.candidates.length === 0 && (
-                      <div className="text-sm text-gray-400">候補がまだ登録されていません</div>
+                      <div className="text-sm text-gray-600">候補がまだ登録されていません</div>
                     )}
                     {selected.candidates.map((c) => (
                       <div key={c.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
                         <div className="min-w-0">
                           <span className="font-medium">{c.field_path}</span>
-                          <span className="text-gray-500"> = </span>
+                          <span className="text-gray-600"> = </span>
                           <span className="truncate">{c.value}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={
                             c.review_status === 'accepted' ? 'text-xs text-green-700'
-                            : c.review_status === 'rejected' ? 'text-xs text-gray-400' : 'text-xs text-amber-700'
+                            : c.review_status === 'rejected' ? 'text-xs text-gray-600' : 'text-xs text-amber-800'
                           }>
                             {c.review_status === 'accepted' ? '承認済み' : c.review_status === 'rejected' ? '却下済み' : '未レビュー'}
                           </span>
                           {selected.status === 'review_required' && c.review_status === 'pending' && (
                             <>
-                              <button type="button" onClick={() => handleAccept(c.id)} className="text-green-600 hover:text-green-800" aria-label="承認">
+                              <button type="button" onClick={() => handleAccept(c.id)} className="text-green-700 hover:text-green-900" aria-label={`候補「${c.field_path}」を承認`}>
                                 <Check size={16} />
                               </button>
-                              <button type="button" onClick={() => handleReject(c.id)} className="text-red-500 hover:text-red-700" aria-label="却下">
+                              <button type="button" onClick={() => handleReject(c.id)} className="text-red-600 hover:text-red-800" aria-label={`候補「${c.field_path}」を却下`}>
                                 <X size={16} />
                               </button>
                             </>
@@ -362,8 +372,9 @@ const ImportsPage: React.FC = () => {
                   {selected.status === 'review_required' && (
                     <form onSubmit={handleAddCandidate} className="flex flex-wrap gap-2 items-end">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">項目</label>
+                        <label htmlFor="import-candidate-field" className="block text-xs text-gray-600 mb-1">項目</label>
                         <select
+                          id="import-candidate-field"
                           value={newFieldPath}
                           onChange={(e) => setNewFieldPath(e.target.value as ImportFieldPath)}
                           className="border rounded-lg px-2 py-1.5 text-sm"
@@ -374,13 +385,14 @@ const ImportsPage: React.FC = () => {
                         </select>
                       </div>
                       <Input
+                        aria-label="候補の値"
                         placeholder="値"
                         value={newValue}
                         onChange={(e) => setNewValue(e.target.value)}
                         containerClassName="flex-1 min-w-[160px]"
                       />
                       <Button type="submit" variant="outline" size="sm" loading={isAddingCandidate} disabled={!newValue.trim()}>
-                        追加
+                        候補を追加
                       </Button>
                     </form>
                   )}

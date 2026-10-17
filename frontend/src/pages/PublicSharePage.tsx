@@ -91,7 +91,7 @@ const PublicSharePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8 text-center">
-          <AlertCircle size={48} className="mx-auto mb-4 text-red-400" />
+          <AlertCircle size={48} className="mx-auto mb-4 text-red-400" aria-hidden="true" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">このリンクは無効です</h1>
           <p className="text-gray-600 text-sm">
             共有リンクが失効しているか、有効期限が切れているか、使用回数の上限に達しています。
@@ -106,27 +106,31 @@ const PublicSharePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8">
-          <Lock size={40} className="mx-auto mb-4 text-blue-500" />
+          <Lock size={40} className="mx-auto mb-4 text-blue-500" aria-hidden="true" />
           <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">パスコードが必要です</h1>
           <p className="text-gray-600 text-sm mb-6 text-center">
             このプランを閲覧するにはパスコードの入力が必要です。
           </p>
           <form onSubmit={handleSubmitPasscode} className="space-y-4">
+            <label htmlFor="public-share-passcode" className="sr-only">パスコード</label>
             <input
+              id="public-share-passcode"
               type="password"
               value={passcode}
               onChange={(e) => setPasscode(e.target.value)}
               placeholder="パスコード"
+              aria-invalid={passcodeError ? true : undefined}
+              aria-describedby={passcodeError ? 'public-share-passcode-error' : undefined}
               autoFocus
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             {passcodeError && (
-              <p className="text-sm text-red-600">{passcodeError}</p>
+              <p id="public-share-passcode-error" className="text-sm text-red-700" role="alert">{passcodeError}</p>
             )}
             <button
               type="submit"
               disabled={submitting || !passcode}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? '確認中...' : '閲覧する'}
             </button>
@@ -192,14 +196,14 @@ const PublicSharePage: React.FC = () => {
                     {day.events.map((ev, evIdx) => (
                       <li key={evIdx} className="text-sm text-gray-700 border-l-2 border-blue-200 pl-3">
                         {ev.local_start_time && (
-                          <span className="text-gray-400 mr-2">{ev.local_start_time}</span>
+                          <span className="text-gray-600 mr-2">{ev.local_start_time}</span>
                         )}
                         {ev.title || '(名称未設定のイベント)'}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-400">予定はまだ登録されていません</p>
+                  <p className="text-sm text-gray-600">予定はまだ登録されていません</p>
                 )}
               </div>
             ))}

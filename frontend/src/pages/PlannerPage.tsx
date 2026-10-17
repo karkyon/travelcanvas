@@ -892,44 +892,63 @@ const PlannerPage: React.FC = () => {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="プラン一覧">
             {plans.map((plan) => (
-              <Card key={plan.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="p-5" onClick={() => navigate(`/planner/${plan.id}`)}>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{plan.title}</h3>
-                  {plan.destination && (
-                    <p className="text-sm text-gray-600 mb-2">📍 {plan.destination}</p>
-                  )}
-                  <p className="text-xs text-gray-400">
-                    {plan.days?.length ?? 0}日間の日程
-                  </p>
-                </div>
-                <div className="px-5 pb-4 flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    loading={cloningPlanId === plan.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleClonePlan(plan.id, plan.title);
-                    }}
-                  >
-                    複製
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePlan(plan.id);
-                    }}
-                  >
-                    削除
-                  </Button>
-                </div>
-              </Card>
+              // [Gate E1] 各プランを名前付きの一覧項目にし、開く・複製・削除のボタン名にプラン名を含める
+              // (同じ「複製」「削除」が並ぶと読み上げで区別できない。以前はカード全体の <div onClick>
+              // でしか開けず、キーボードから開けなかった)。
+              <li key={plan.id} aria-label={plan.title}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <div className="p-5" onClick={() => navigate(`/planner/${plan.id}`)}>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      <button
+                        type="button"
+                        className="text-left rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        aria-label={`「${plan.title}」を開く`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/planner/${plan.id}`);
+                        }}
+                      >
+                        {plan.title}
+                      </button>
+                    </h3>
+                    {plan.destination && (
+                      <p className="text-sm text-gray-600 mb-2">📍 {plan.destination}</p>
+                    )}
+                    <p className="text-xs text-gray-600">
+                      {plan.days?.length ?? 0}日間の日程
+                    </p>
+                  </div>
+                  <div className="px-5 pb-4 flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      loading={cloningPlanId === plan.id}
+                      aria-label={`「${plan.title}」を複製`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClonePlan(plan.id, plan.title);
+                      }}
+                    >
+                      複製
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`「${plan.title}」を削除`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePlan(plan.id);
+                      }}
+                    >
+                      削除
+                    </Button>
+                  </div>
+                </Card>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
         <DeletedPlansSection refreshKey={trashRefreshKey} onRestored={() => loadPlans()} />
