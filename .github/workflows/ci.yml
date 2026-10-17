@@ -12,8 +12,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # [Gate S1] 判定(一致した文字列にダミーの印があるときだけ除外)の自己試験も行う
+      - name: Secret scanner self-test (ブロッキング)
+        run: python3 scripts/security/scan_secrets.py --self-test
+
       - name: Scan tracked files for secrets (ブロッキング)
         run: python3 scripts/security/scan_secrets.py
+
+  # [Gate S1] SEC-23 依存ライブラリの既知の脆弱性の検査。例外は scripts/security/dependency-allowlist.json
+  # (助言の ID 単位・理由・範囲・期限が必須。期限切れ・ブラウザへ届く依存の build-only 例外は失敗)。
+  dependency-audit:
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Audit checker self-test (ブロッキング)
+        run: python3 scripts/security/audit_deps.py self-test
+
+      - name: Install pip-audit (requirements-dev.txt の版)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "$(grep -E '^pip-audit==' backend/requirements-dev.txt)"
+
+      - name: Python dependencies (pip-audit, ブロッキング)
+        run: python scripts/security/audit_deps.py python
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Node dependencies (npm audit, ブロッキング)
+        run: python3 scripts/security/audit_deps.py node
 
   frontend:
     needs: secret-scan
@@ -100,10 +142,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpq-dev gcc g++ libjpeg-dev libpng-dev libgeos-dev libproj-dev
 
+      # [Gate S1] 実行時の依存(requirements.txt)と、試験・lint・監査の道具(requirements-dev.txt、版を固定)
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       # [Gate M9] 2026-09-13時点でリポジトリにflake8設定が皆無で
       # デフォルトmax-line-length=79実測2,112件(非blocking扱い)
@@ -111,9 +154,7 @@ jobs:
       # E203/W503除外、適用済み過去migrationを除外)現実的な
       # ルールセットへ改め、指摘0件まで解消したうえでblocking化する。
       - name: Lint (ブロッキング)
-        run: |
-          pip install flake8
-          flake8 app alembic scripts tests --count
+        run: flake8 app alembic scripts tests --count
 
       - name: Import smoke test (ブロッキング)
         run: python -c "from app.main import app; print('app import OK:', app.title if hasattr(app, \"title\") else app)"

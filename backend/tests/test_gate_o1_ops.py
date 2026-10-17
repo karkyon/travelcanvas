@@ -34,11 +34,11 @@ UTC = timezone.utc
 
 
 def test_database_name_and_replace_keep_credentials_and_params():
-    url = "postgresql://app:s3cr3t@postgres:5432/travelcanvas?sslmode=disable"
+    url = "postgresql://app:dummy-s3cr3t@postgres:5432/travelcanvas?sslmode=disable"
     assert opslib.database_name(url) == "travelcanvas"
     assert (
         opslib.replace_database(url, "travelcanvas_restore_drill")
-        == "postgresql://app:s3cr3t@postgres:5432/travelcanvas_restore_drill?sslmode=disable"
+        == "postgresql://app:dummy-s3cr3t@postgres:5432/travelcanvas_restore_drill?sslmode=disable"
     )
     with pytest.raises(ValueError):
         opslib.replace_database(url, "bad;name")
@@ -49,9 +49,9 @@ def test_database_name_and_replace_keep_credentials_and_params():
 
 
 def test_mask_url_hides_credentials_and_key_values():
-    s = "connect postgresql://travelcanvas_app:pw@postgres/x failed password=abc token=t1 ok"
+    s = "connect postgresql://travelcanvas_app:dummy-pw@postgres/x failed password=abc token=t1 ok"
     masked = opslib.mask_url(s)
-    assert "pw@" not in masked and "abc" not in masked and "t1" not in masked
+    assert "dummy-pw@" not in masked and "abc" not in masked and "t1" not in masked
     assert "postgresql://***@postgres/x" in masked
 
 
@@ -367,7 +367,7 @@ def test_drill_report_has_no_secrets():
         {
             "drill_id": "drill-1",
             "ok": False,
-            "errors": ["failed postgresql://u:pw@h/db password=x"],
+            "errors": ["failed postgresql://u:dummy-pw@h/db password=x"],
             "backup": {"backup_id": "tc-1", "database_sha256": "a" * 64},
             "restore": {"counts": {"ok": True}},
         }

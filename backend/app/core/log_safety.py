@@ -78,6 +78,86 @@ def redact(text: str) -> str:
     return text
 
 
+# [Gate S1] 構造化した値(extra=… の dict・list)を伏せる。
+# キーの名前が秘密を表すものは値を丸ごと伏せ、それ以外は文字列を redact する。深さ・件数に上限を置く。
+_SECRET_KEY_WORDS = frozenset({
+    "password", "passwd", "passcode", "passphrase", "pwd", "secret", "token", "apikey", "authorization", "cookie",
+    "credential", "credentials", "signature", "otp", "pin", "ciphertext", "cvv", "cvc", "iban", "mfa", "totp",
+})
+_SECRET_KEY_PAIRS = frozenset({
+    ("api", "key"), ("private", "key"), ("session", "id"), ("session", "key"), ("access", "key"),
+    ("confirmation", "number"), ("card", "number"), ("client", "secret"), ("recovery", "code"),
+})
+_KEY_SPLIT_RE = re.compile(r"[^a-z0-9]+")
+_CAMEL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _key_words(name: str) -> List[str]:
+    return [w for w in _KEY_SPLIT_RE.split(_CAMEL_RE.sub("_", name).lower()) if w]
+
+
+_MAX_DEPTH = 6
+_MAX_ITEMS = 200
+_SAFE_SCALARS = (bool, int, float)
+
+
+def is_secret_key(name: object) -> bool:
+    """キーの名前が秘密を表すか。単語に分けて判定する(mapping の pin、shipping の pin などは当たらない)。"""
+    if not isinstance(name, str) or not name:
+        return False
+    words = _key_words(name)
+    if any(w in _SECRET_KEY_WORDS for w in words):
+        return True
+    return any(pair in _SECRET_KEY_PAIRS for pair in zip(words, words[1:]))
+
+
+def redact_value(value: object, _depth: int = 0) -> object:
+    """dict・list・tuple・文字列を、秘密と個人情報を伏せた新しい値にする(元の値は変えない)。"""
+    if value is None or isinstance(value, _SAFE_SCALARS):
+        return value
+    if isinstance(value, str):
+        return redact(value)
+    if _depth >= _MAX_DEPTH:
+        return "<truncated>"
+    if isinstance(value, dict):
+        out = {}
+        for i, (k, v) in enumerate(value.items()):
+            if i >= _MAX_ITEMS:
+                out["<truncated>"] = len(value) - _MAX_ITEMS
+                break
+            key = str(k)
+            out[redact(key)] = "***" if is_secret_key(key) and v not in (None, "") else redact_value(v, _depth + 1)
+        return out
+    if isinstance(value, (list, tuple, set, frozenset)):
+        items = list(value)
+        out_list = [redact_value(v, _depth + 1) for v in items[:_MAX_ITEMS]]
+        if len(items) > _MAX_ITEMS:
+            out_list.append("<truncated>")
+        return out_list
+    if isinstance(value, numbers.Number):
+        return value
+    return redact(str(value))
+
+
+def safe_exception_text(exc_info) -> str:
+    """例外の型・本文・トレースバックを伏せた文字列(例外を出せない時も落ちない)。"""
+    try:
+        return redact("".join(traceback.format_exception(*exc_info)).rstrip("\n"))
+    except Exception:  # noqa: BLE001
+        etype = exc_info[0].__name__ if exc_info and exc_info[0] else "Exception"
+        return f"{etype}: <例外の文面を整形できませんでした>"
+
+
+def safe_exception_summary(exc_info) -> Dict[str, object]:
+    """構造化ログ用: 型・伏せた本文・伏せたトレースバック。"""
+    etype = exc_info[0].__name__ if exc_info and exc_info[0] else None
+    try:
+        message = redact(str(exc_info[1])) if exc_info and exc_info[1] is not None else None
+    except Exception:  # noqa: BLE001
+        message = "<例外の文面を整形できませんでした>"
+    return {"type": etype, "message": message, "traceback": safe_exception_text(exc_info).splitlines()}
+
+
 class _Redacted:
     """%s / %r で整形された時に、伏せた文字列を返す引数の包み。"""
 
@@ -105,22 +185,60 @@ def _safe_arg(value: object) -> object:
     return _Redacted(value)
 
 
+# 引数を前提に整形するロガー(uvicorn のアクセスログは record.args を自分で読む)。引数は残して1つずつ伏せる。
+ARGS_PRESERVING_LOGGERS = ("uvicorn.access",)
+UNFORMATTABLE_NOTE = " [ログの引数を整形できませんでした]"
+# extra=… でよく使う、構造化した値を入れる属性
+STRUCTURED_EXTRA_ATTRS = ("extra_data", "security_details", "details", "context", "payload", "data")
+_STANDARD_RECORD_ATTRS = frozenset(vars(logging.LogRecord("x", 0, "x", 0, "x", None, None)).keys()) | {
+    "message", "asctime", "taskName"}
+
+
+def _preserves_args(name: str) -> bool:
+    return any(name == p or name.startswith(p + ".") or name.endswith("." + p) for p in ARGS_PRESERVING_LOGGERS)
+
+
 def sanitize_record(record: logging.LogRecord) -> logging.LogRecord:
-    """LogRecord の本文・引数・例外の文面を伏せる。"""
-    if isinstance(record.msg, str):
-        record.msg = redact(record.msg)
-    elif record.msg is not None and not isinstance(record.msg, (int, float)):
-        record.msg = redact(str(record.msg))
+    """LogRecord の本文・引数・例外の文面を伏せる。
+
+    [Gate S1] 以前は本文を先に伏せていたため、``"password=%s"`` の ``%s`` まで伏せて引数と合わなくなり、
+    整形(getMessage)が TypeError になっていた(ログが欠け、標準の処理は生の引数を stderr に出す)。
+    今は先に本文と引数を整形してから伏せ、引数を空にする。整形できない記録は引数を捨てて印を付ける。
+    """
     args = record.args
-    if isinstance(args, tuple):
-        record.args = tuple(_safe_arg(a) for a in args)
-    elif isinstance(args, dict):
-        record.args = {k: _safe_arg(v) for k, v in args.items()}
+    if args and isinstance(record.msg, str) and not _preserves_args(record.name):
+        try:
+            formatted = record.msg % args
+        except Exception:  # noqa: BLE001 - 整形できない記録でも、生の引数を出さない
+            formatted = record.msg + UNFORMATTABLE_NOTE
+        record.msg = redact(formatted)
+        record.args = ()
+    else:
+        if isinstance(record.msg, str):
+            record.msg = redact(record.msg)
+        elif record.msg is not None and not isinstance(record.msg, (int, float)):
+            record.msg = redact(str(record.msg))
+        if isinstance(args, tuple):
+            record.args = tuple(_safe_arg(a) for a in args)
+        elif isinstance(args, dict):
+            record.args = {k: _safe_arg(v) for k, v in args.items()}
     if record.exc_info and record.exc_info[0] is not None and not record.exc_text:
-        record.exc_text = redact("".join(traceback.format_exception(*record.exc_info)).rstrip("\n"))
+        record.exc_text = safe_exception_text(record.exc_info)
     if record.stack_info:
         record.stack_info = redact(record.stack_info)
     return record
+
+
+def sanitize_extra(record: logging.LogRecord, keys: Iterable[str]) -> None:
+    """[Gate S1] extra=… で後から付いた属性を伏せる(記録の工場はその前に動くため、別に行う)。"""
+    for key in keys:
+        if key in _STANDARD_RECORD_ATTRS:
+            continue
+        value = record.__dict__.get(key)
+        if is_secret_key(key) and value not in (None, ""):
+            record.__dict__[key] = "***"
+        elif isinstance(value, (str, dict, list, tuple, set)):
+            record.__dict__[key] = redact_value(value)
 
 
 _INSTALLED = {"factory": None}
@@ -161,9 +279,24 @@ def install() -> None:
     logging.setLogRecordFactory(factory)
     _INSTALLED["factory"] = previous
 
+    # [Gate S1] extra=… は Logger.makeRecord が記録の工場の「後」で付けるため、工場では伏せられない
+    # (構造化ログの extra_data・security_details に入れたメール・パスワードがそのまま出ていた)。
+    original_make_record = logging.Logger.makeRecord
+    if not getattr(original_make_record, "__travelcanvas_redaction__", False):
+        def make_record(self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None):
+            record = original_make_record(self, name, level, fn, lno, msg, args, exc_info, func, extra, sinfo)
+            if extra:
+                sanitize_extra(record, extra.keys())
+            return record
+
+        make_record.__travelcanvas_redaction__ = True  # type: ignore[attr-defined]
+        make_record.__wrapped__ = original_make_record  # type: ignore[attr-defined]
+        logging.Logger.makeRecord = make_record  # type: ignore[method-assign]
+
 
 def installed() -> bool:
-    return bool(getattr(logging.getLogRecordFactory(), "__travelcanvas_redaction__", False))
+    return bool(getattr(logging.getLogRecordFactory(), "__travelcanvas_redaction__", False)) and bool(
+        getattr(logging.Logger.makeRecord, "__travelcanvas_redaction__", False))
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +388,10 @@ class LeakCollector(logging.Handler):
             text = self.format(record)
         except Exception:  # noqa: BLE001 - 整形できない記録も検査の対象にする
             text = "%s %s %r" % (record.levelname, record.name, record.msg)
+        # [Gate S1] 本文だけでなく、extra=… で付いた属性も検査する(構造化ログのフォーマッターが出力するため)
+        extras = {k: v for k, v in record.__dict__.items() if k not in _STANDARD_RECORD_ATTRS}
+        if extras:
+            text += " " + " ".join("%s=%r" % (k, v) for k, v in extras.items())
         self.records += 1
         for f in find_leaks(text, self.secrets, max_findings=5):
             f = dict(f)

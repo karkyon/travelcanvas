@@ -37,8 +37,8 @@ ALLOWLIST_PATHS = {
     "scripts/security/scan_secrets.py",
 }
 
-# 行内にこれらのいずれかが含まれる場合は、プレースホルダ/ダミー値の
-# 宣言・説明コメントとみなしスキップする。
+# 一致した文字列(例: 接続文字列の user:password@ の部分)にこれらのいずれかが含まれる場合は、
+# プレースホルダ/ダミー値とみなしスキップする([Gate S1] 以前は行全体で判定していた)。
 ALLOWLIST_LINE_TOKENS = (
     "change_this",
     "change-this",
@@ -50,6 +50,13 @@ ALLOWLIST_LINE_TOKENS = (
     "dummy",
     "<",  # <your-value-here> のようなプレースホルダ表記
 )
+
+
+def is_placeholder(matched: str) -> bool:
+    """一致した文字列(資格情報の部分)が、明示したダミー・プレースホルダか。"""
+    lowered = matched.lower()
+    return any(token in lowered for token in ALLOWLIST_LINE_TOKENS)
+
 
 SECRET_PATTERNS = [
     ("postgresql_credential_url", re.compile(r"postgres(?:ql)?://[^:\s]+:[^@\s]+@")),
@@ -84,16 +91,35 @@ def scan() -> list[str]:
         except OSError:
             continue
         for lineno, line in enumerate(text.splitlines(), start=1):
-            lowered = line.lower()
-            if any(token in lowered for token in ALLOWLIST_LINE_TOKENS):
-                continue
             for name, pattern in SECRET_PATTERNS:
-                if pattern.search(line):
+                for match in pattern.finditer(line):
+                    # [Gate S1] 以前は行のどこかに "example" や "<" があれば行全体を飛ばしていたため、
+                    # 同じ行の本物の資格情報を見逃し得た。一致した文字列そのものにダミーの印があるときだけ飛ばす。
+                    if is_placeholder(match.group(0)):
+                        continue
                     findings.append(f"{rel_path}:{lineno}: possible {name}")
+                    break
     return findings
 
 
+def self_test() -> int:
+    """[Gate S1] 判定の自己試験: ダミーの印が同じ行の別の場所にあっても、本物らしい資格情報は検出する。"""
+    def hits(line: str) -> bool:
+        return any(not is_placeholder(m.group(0)) for _, p in SECRET_PATTERNS for m in p.finditer(line))
+
+    assert hits("url = 'postgresql://app:Real-Looking-Pass1@db/x'  # see example.com")
+    assert hits("<b>postgresql://app:Real-Looking-Pass1@db/x</b>")
+    assert not hits("postgresql://app:dummy-pw@db/x")
+    assert not hits("postgresql://user:<password>@db/x")
+    assert not hits("DATABASE_URL=postgresql://travelcanvas_app:ci-only-not-a-real-secret@localhost/x")
+    assert hits('JWT_SECRET_KEY = "abcdefghijklmnop"')
+    print("secret scan: self-test ok")
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
     findings = scan()
     if findings:
         print("secret scan: possible tracked secrets found:")

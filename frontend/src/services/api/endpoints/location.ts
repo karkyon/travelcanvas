@@ -53,9 +53,9 @@ export class LocationApi extends MemoriesApi {
   }
 
   async deleteTrackPoints(planId: string, trackId: string, start: string, end: string): Promise<TrackPointsDeleteResult> {
-    const response = await this.client.delete(`/plans/${planId}/location-tracks/${trackId}/points`, {
-      ...SILENT, params: { start, end },
-    });
+    // [Gate S1] axios 1.20 で params の型が config の型引数から推論されるようになったため、型を明示する
+    const config: AxiosRequestConfig = { ...SILENT, params: { start, end } };
+    const response = await this.client.delete(`/plans/${planId}/location-tracks/${trackId}/points`, config);
     return decodeResponse(response.data, trackPointsDeleteResult, 'DELETE /plans/{plan_id}/location-tracks/{track_id}/points');
   }
 

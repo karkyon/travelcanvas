@@ -33,7 +33,7 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent
     ("GET /api/v1/plans/documents/download?token=abc.def123&x=1", "GET /api/v1/plans/documents/download?token=***&x=1"),
     ("/s/Zx9_kLm-QwErTy12", "/s/***"),
     ("User not found: taro.yamada+tc@example.co.jp", "User not found: <email>"),
-    ("db postgresql://travelcanvas_app:pw@postgres:5432/tc", "db postgresql://***@postgres:5432/tc"),
+    ("db postgresql://travelcanvas_app:dummy-pw@postgres:5432/tc", "db postgresql://***@postgres:5432/tc"),
     ("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig_abcdef", "Authorization: Bearer ***"),
     ("token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig_abcdef end", "token <jwt> end"),
     ("payload=b'gAAAAABlqx_" + "x" * 60 + "=='", "payload=b'<ciphertext>'"),
@@ -118,11 +118,11 @@ def test_factory_redacts_message_args_and_exceptions(captured):
     logger.info("count %d amount %.1f ok=%s", 3, Decimal("2.5"), True)
     logger.info(f"f-string user x@y.zz token=abc{uuid.uuid4().hex}")
     try:
-        raise RuntimeError("cannot reach postgresql://u:pw@db/x for owner@example.net")
+        raise RuntimeError("cannot reach postgresql://u:dummy-pw@db/x for owner@example.net")
     except RuntimeError:
         logger.exception("failed for %s", "zz@example.com")
     joined = "\n".join(handler.lines)
-    for leaked in ("a.b@example.com", "c@d.ee", "x@y.zz", "owner@example.net", "zz@example.com", "u:pw@"):
+    for leaked in ("a.b@example.com", "c@d.ee", "x@y.zz", "owner@example.net", "zz@example.com", "u:dummy-pw@"):
         assert leaked not in joined
     assert "count 3 amount 2.5 ok=True" in joined
     assert "<email>" in joined and "RuntimeError" in joined and "token=***" in joined

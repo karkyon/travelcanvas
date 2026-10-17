@@ -152,6 +152,15 @@ class Settings(BaseSettings):
     ENABLE_IMAGE_RECOGNITION: bool = False
     ENABLE_AI_OPTIMIZATION: bool = False
 
+    @field_validator("JWT_ALGORITHM")
+    @classmethod
+    def restrict_jwt_algorithm(cls, v: str) -> str:
+        """[Gate S1] 署名は共有の秘密(HMAC)だけを使う。none・公開鍵方式への切替や取り違えによる偽造を防ぐ。"""
+        value = (v or "").strip().upper()
+        if value not in ("HS256", "HS384", "HS512"):
+            raise ValueError("JWT_ALGORITHM は HS256 / HS384 / HS512 のいずれかにしてください")
+        return value
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v):

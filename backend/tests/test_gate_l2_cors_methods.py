@@ -7,6 +7,7 @@
 """
 import pytest
 
+from app.core.route_index import iter_routes
 from app.main import CORS_ALLOWED_METHODS, app
 
 _ORIGIN = "http://localhost:4173"
@@ -14,9 +15,10 @@ _ORIGIN = "http://localhost:4173"
 
 def _route_methods():
     methods = set()
-    for route in app.routes:
-        if getattr(route, "path", "").startswith("/api/v1"):
-            methods.update(m for m in (getattr(route, "methods", None) or ()) if m != "HEAD")
+    # [Gate S1] 新しい FastAPI では app.routes に取り込んだルーターが展開されないため、route_index で列挙する
+    for path, route_methods, _ in iter_routes(app):
+        if path.startswith("/api/v1"):
+            methods.update(m for m in route_methods if m != "HEAD")
     return methods
 
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
-from jose import jwt
+import jwt  # [Gate S1] python-jose(保守停止・未修正の脆弱性あり)から PyJWT へ
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import hashlib

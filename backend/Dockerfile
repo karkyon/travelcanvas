@@ -61,15 +61,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 FROM dependencies as development
 
 # 開発用追加パッケージ
-RUN pip install --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-cov \
-    black \
-    isort \
-    flake8 \
-    mypy \
-    pre-commit
+# [Gate S1] 以前は pytest・black・mypy 等を版を固定せずに入れていた(ビルドのたびに版が変わり、
+# 脆弱性の検査もできなかった)。試験・lint・監査の道具は requirements-dev.txt で版を固定する。
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # アプリケーションコードをコピー
 COPY . .

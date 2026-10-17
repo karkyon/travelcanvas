@@ -169,7 +169,10 @@ _REQUIRED_ROUTE_PREFIXES = ("/api/v1/auth", "/api/v1/travel-plans", "/api/v1/pla
 
 
 def _check_required_routers_registered() -> bool:
-    registered_paths = [getattr(r, "path", "") for r in app.routes]
+    # [Gate S1] 新しい FastAPI では app.routes に取り込んだルーターが展開されないため、route_index で列挙する
+    from app.core.route_index import route_paths
+
+    registered_paths = route_paths(app)
     for prefix in _REQUIRED_ROUTE_PREFIXES:
         if not any(p.startswith(prefix) for p in registered_paths):
             return False

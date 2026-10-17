@@ -12,6 +12,7 @@ import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import type { Readiness, ReadinessItem } from '@/services/api';
 import { READINESS_CATEGORY_LABEL, SEVERITY_LABEL, formatDue, readinessSummary } from './preparationModel';
+import { safeInternalPath } from '@/utils/safeNavigation';
 
 const SEVERITY_CLASS: Record<string, string> = {
   high: 'bg-red-100 text-red-800',
@@ -83,8 +84,8 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {item.link && (
-                      <Button variant="outline" size="sm" onClick={() => navigate(item.link as string)}>
+                    {safeInternalPath(item.link) && (
+                      <Button variant="outline" size="sm" onClick={() => navigate(safeInternalPath(item.link) as string)}>
                         開く
                       </Button>
                     )}

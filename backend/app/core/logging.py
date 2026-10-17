@@ -15,7 +15,6 @@ import logging
 import logging.handlers
 import json
 import time
-import traceback
 import sys
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
@@ -25,6 +24,7 @@ from contextvars import ContextVar
 
 # アプリケーションインポート
 from app.core.config import settings
+from app.core.log_safety import redact, redact_value, safe_exception_summary  # [Gate S1]
 
 
 # ==========================================
@@ -108,6 +108,13 @@ client_ip_var: ContextVar[Optional[str]] = ContextVar('client_ip', default=None)
 # カスタムフォーマッター
 # ==========================================
 
+# [Gate S1] extra_data で上書きさせない基本の項目
+_BASE_FIELDS = frozenset({
+    "timestamp", "level", "logger", "message", "module", "function", "line",
+    "request_id", "user_id", "session_id", "client_ip", "exception", "category",
+})
+
+
 class StructuredFormatter(logging.Formatter):
     """構造化ログフォーマッター"""
 
@@ -143,20 +150,26 @@ class StructuredFormatter(logging.Formatter):
             log_data["client_ip"] = client_ip_var.get()
 
         # 追加情報（extra）
+        # [Gate S1] 以前は extra_data をそのまま log_data に混ぜていた(伏せる処理の対象外で、入れ子のメール・
+        # パスワードが出た。timestamp・level 等の基本の項目も上書きできた)。伏せてから、基本の項目は上書きしない。
         if hasattr(record, 'extra_data'):
-            log_data.update(record.extra_data)
+            extra = redact_value(record.extra_data)
+            if isinstance(extra, dict):
+                for key, value in extra.items():
+                    if key not in _BASE_FIELDS:
+                        log_data[key] = value
+            elif extra is not None:
+                log_data["extra"] = extra
 
         # カテゴリ情報
         if hasattr(record, 'category'):
             log_data["category"] = record.category
 
         # エラー情報
-        if record.exc_info:
-            log_data["exception"] = {
-                "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
-                "message": str(record.exc_info[1]) if record.exc_info[1] else None,
-                "traceback": traceback.format_exception(*record.exc_info)
-            }
+        # [Gate S1] 以前は生の exc_info から本文・トレースバックを作り直しており、記録の工場で伏せた exc_text を
+        # 使っていなかった(例外の本文のメール等が出た)。伏せた形だけを使う。
+        if record.exc_info and record.exc_info[0] is not None:
+            log_data["exception"] = safe_exception_summary(record.exc_info)
 
         # パフォーマンス情報
         if hasattr(record, 'duration_ms'):
@@ -166,8 +179,9 @@ class StructuredFormatter(logging.Formatter):
             log_data["memory_usage"] = record.memory_usage
 
         # JSON形式 vs 人間可読形式
+        # [Gate S1] 最後に出力の文字列全体をもう一度伏せる(どの経路から入った値でも出さないための最後の防御)
         if self.json_format:
-            return json.dumps(log_data, ensure_ascii=False, default=str)
+            return redact(json.dumps(log_data, ensure_ascii=False, default=str))
         else:
             # 人間可読形式
             base_msg = f"{log_data['timestamp']} - {log_data['level']} - {log_data['logger']} - {log_data['message']}"
@@ -187,7 +201,7 @@ class StructuredFormatter(logging.Formatter):
             if 'exception' in log_data:
                 base_msg += f"\nException: {log_data['exception']['type']}: {log_data['exception']['message']}"
 
-            return base_msg
+            return redact(base_msg)
 
 
 class SecurityFormatter(StructuredFormatter):
@@ -217,15 +231,15 @@ class SecurityFormatter(StructuredFormatter):
         if request_id_var.get():
             log_data["request_id"] = request_id_var.get()
 
-        # セキュリティ詳細
+        # セキュリティ詳細([Gate S1] 伏せてから出す)
         if hasattr(record, 'security_details'):
-            log_data["details"] = record.security_details
+            log_data["details"] = redact_value(record.security_details)
 
         # リスク評価
         if hasattr(record, 'risk_score'):
             log_data["risk_score"] = record.risk_score
 
-        return json.dumps(log_data, ensure_ascii=False, default=str)
+        return redact(json.dumps(log_data, ensure_ascii=False, default=str))
 
 
 # ==========================================

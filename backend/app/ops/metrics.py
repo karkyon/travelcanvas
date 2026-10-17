@@ -125,8 +125,19 @@ registry = MetricsRegistry()
 
 
 def route_template(scope: dict) -> str:
-    """要求が当たったルートの型。当たらなかったら ``<unmatched>``。"""
+    """要求が当たったルートの型。当たらなかったら ``<unmatched>``。
+
+    [Gate S1] 新しい FastAPI では scope["route"].path が取り込み元のルーター内のパス(/api/v1 などの前置きを
+    含まない)になるため、アプリのルート一覧から完全なパスを引く。
+    """
     route = scope.get("route")
+    if route is None:
+        return UNMATCHED_ROUTE
+    from app.core.route_index import full_path_of
+
+    full = full_path_of(scope.get("app"), route)
+    if full:
+        return full
     path = getattr(route, "path", None)
     if isinstance(path, str) and path:
         return path

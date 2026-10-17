@@ -17,7 +17,8 @@ from enum import Enum
 
 from fastapi import Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+import jwt  # [Gate S1] python-jose(保守停止・未修正の脆弱性あり)から PyJWT へ
+from jwt import PyJWTError as JWTError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 import redis
