@@ -14,6 +14,7 @@
 import { decodeResponse } from '@/services/api/decode';
 import { todayResponse } from '@/services/api/decoders';
 import type { TodayEvent, TodayResponse } from '@/services/api';
+import { loadSnapshot, saveSnapshot, type OfflineSession } from '@/utils/offlineVault';
 
 export interface TodayView {
   /** 保存済みデータが「今日」(日程タイムゾーン基準)のものか。falseならNOW/NEXTは出さない。 */
@@ -113,6 +114,9 @@ export const TRANSPORT_LABELS: Record<string, { text: string; className: string 
 };
 
 // ===== オフライン表示用の保存(端末内のみ。失敗しても表示は継続する) =====
+// [Gate K1] 以前は localStorage に平文で保存していた(予定名・場所・時刻が端末に読める形で残った)。
+// 今は offlineVault で暗号化して IndexedDB に保存し、ログアウト後・失効後は開けない。
+// 古い平文の保存は、保存・読み込みのたびに消す。
 
 export interface TodayCache {
   payload: TodayResponse;
@@ -120,22 +124,30 @@ export interface TodayCache {
   offsetMs: number;
 }
 
-const cacheKey = (planId: string) => `travelcanvas:today:v1:${planId}`;
+const legacyCacheKey = (planId: string) => `travelcanvas:today:v1:${planId}`;
+const snapshotName = (planId: string) => `today:${planId}`;
 
-export function saveTodayCache(planId: string, payload: TodayResponse, offsetMs: number): void {
+function removeLegacyPlaintext(planId: string): void {
   try {
-    const value: TodayCache = { payload, savedAt: Date.now(), offsetMs };
-    window.localStorage.setItem(cacheKey(planId), JSON.stringify(value));
+    window.localStorage.removeItem(legacyCacheKey(planId));
   } catch {
-    // 保存できない環境(プライベートモード・容量超過等)では保存を諦める
+    // localStorage が使えない環境では何も残っていない
   }
 }
 
-export function loadTodayCache(planId: string): TodayCache | null {
+export async function saveTodayCache(
+  session: OfflineSession | null, planId: string, payload: TodayResponse, offsetMs: number,
+): Promise<boolean> {
+  removeLegacyPlaintext(planId);
+  return saveSnapshot(session, snapshotName(planId), { payload, savedAt: Date.now(), offsetMs } satisfies TodayCache);
+}
+
+export async function loadTodayCache(session: OfflineSession | null, planId: string): Promise<TodayCache | null> {
+  removeLegacyPlaintext(planId);
+  const snapshot = await loadSnapshot<Partial<TodayCache>>(session, snapshotName(planId));
+  if (!snapshot) return null;
   try {
-    const raw = window.localStorage.getItem(cacheKey(planId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<TodayCache>;
+    const parsed = snapshot.data;
     if (typeof parsed.savedAt !== 'number' || typeof parsed.offsetMs !== 'number') return null;
     const payload = decodeResponse(parsed.payload, todayResponse, 'today cache');
     return { payload, savedAt: parsed.savedAt, offsetMs: parsed.offsetMs };

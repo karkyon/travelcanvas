@@ -37,5 +37,7 @@ export * from './location';
 export * from './journey';
 export * from './atlas';
 export * from './memoryReplan';
+// [Gate K1] オフラインパックの鍵
+export * from './offlinePack';
 export * from './calendarImport';
 export * from './privacy';

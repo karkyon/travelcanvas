@@ -757,7 +757,10 @@ async def update_me(
         if update_data.preferences is not None:
             # 既存のpreferencesとマージ(通知設定だけ更新、等の部分更新に対応)
             merged = dict(current_user.preferences or {})
-            merged.update(update_data.preferences)
+            # [Gate K1] オフライン鍵の版(offline_pack_key)はサーバーだけが変える。利用者が送った値で
+            # 版を戻すと、失効した鍵が再び配られてしまうため、プロフィール更新では受け付けない。
+            client_prefs = {k: v for k, v in update_data.preferences.items() if k != "offline_pack_key"}
+            merged.update(client_prefs)
             current_user.preferences = merged
 
         db.commit()

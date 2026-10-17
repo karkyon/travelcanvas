@@ -2,14 +2,24 @@
  * [Gate L1b] 当日モードの端末側再計算(タイムゾーン・日跨ぎ・遅延・オフライン保存)。
  * fixtureは実backendの応答(services/api/__fixtures__/backendContractResponses.json)。
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import 'fake-indexeddb/auto';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fx from '@/services/api/__fixtures__/backendContractResponses.json';
 import type { TodayEvent, TodayResponse } from '@/services/api';
 import {
   computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, localDateIn, saveTodayCache,
 } from './todayModel';
+import { clearSnapshots, saveSnapshot } from '@/utils/offlineVault';
 
 const withTransport = fx.today_with_transport as TodayResponse;
+
+vi.mock('@/services/api', async () => ({
+  getOfflinePackKey: vi.fn(async () => ({
+    user_id: 'user-today', key_version: 1, key: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA',
+    algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-05-01T00:00:00Z',
+  })),
+}));
+const SESSION = { userId: 'user-today', sessionTag: 'login-1' };
 const at = (iso: string) => Date.parse(iso);
 
 function ev(id: string, start: string | null, end: string | null = null, extra: Partial<TodayEvent> = {}): TodayEvent {
@@ -105,24 +115,32 @@ describe('NOW/NEXTの再計算 (Gate L1b)', () => {
   });
 });
 
-describe('オフライン表示用の保存 (Gate L1b)', () => {
-  beforeEach(() => window.localStorage.clear());
-
-  it('保存した当日情報を検証して読み戻す', () => {
-    saveTodayCache('plan-1', withTransport, 1234);
-    const cached = loadTodayCache('plan-1');
-    expect(cached?.payload).toEqual(withTransport);
-    expect(cached?.offsetMs).toBe(1234);
-    expect(loadTodayCache('plan-2')).toBeNull();
+describe('オフライン表示用の保存 (Gate L1b / K1: 暗号化して保存)', () => {
+  beforeEach(async () => {
+    window.localStorage.clear();
+    await clearSnapshots();
   });
 
-  it('壊れた・形式不正な保存データは使わない', () => {
-    window.localStorage.setItem('travelcanvas:today:v1:p', '{not json');
-    expect(loadTodayCache('p')).toBeNull();
-    window.localStorage.setItem(
-      'travelcanvas:today:v1:p',
-      JSON.stringify({ payload: { ...withTransport, events: 'x' }, savedAt: 1, offsetMs: 0 })
-    );
-    expect(loadTodayCache('p')).toBeNull();
+  it('保存した当日情報を検証して読み戻す(プランごと・利用者ごと)', async () => {
+    expect(await saveTodayCache(SESSION, 'plan-1', withTransport, 1234)).toBe(true);
+    const cached = await loadTodayCache(SESSION, 'plan-1');
+    expect(cached?.payload).toEqual(withTransport);
+    expect(cached?.offsetMs).toBe(1234);
+    expect(await loadTodayCache(SESSION, 'plan-2')).toBeNull();
+    expect(await loadTodayCache(null, 'plan-1')).toBeNull();
+  });
+
+  it('平文では残さない(以前の localStorage の保存は消す)', async () => {
+    window.localStorage.setItem('travelcanvas:today:v1:plan-1', JSON.stringify({ payload: withTransport, savedAt: 1, offsetMs: 0 }));
+    await saveTodayCache(SESSION, 'plan-1', withTransport, 0);
+    expect(window.localStorage.getItem('travelcanvas:today:v1:plan-1')).toBeNull();
+    expect(JSON.stringify(Object.entries(window.localStorage))).not.toContain(withTransport.events[0]?.title ?? '京都');
+  });
+
+  it('形式不正な保存データは使わない', async () => {
+    await saveSnapshot(SESSION, 'today:p', { payload: { ...withTransport, events: 'x' }, savedAt: 1, offsetMs: 0 });
+    expect(await loadTodayCache(SESSION, 'p')).toBeNull();
+    await saveSnapshot(SESSION, 'today:q', { payload: withTransport });
+    expect(await loadTodayCache(SESSION, 'q')).toBeNull();
   });
 });

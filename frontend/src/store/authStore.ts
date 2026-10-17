@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api as apiService } from '@/services/api';
 import type { SessionUser } from '@/services/api';
+import { forgetOfflineKeys } from '@/utils/offlineVault';
 
 // [Gate A1] 認証処理をAPIクライアント(services/api)へ一本化した(B-002)。
 // 以前はこのファイルが独自のfetch()とAPI_BASE_URL解決を持ち、login/register/guest/
@@ -210,6 +211,8 @@ export const useAuthStore = create<AuthState>()(
         }
         apiService.clearAccessToken();
         apiService.setGuestMode(false);
+        // [Gate K1] 端末内のオフライン鍵を消す(保存したオフラインデータは、次にログインして鍵を受け取るまで開けない)
+        void forgetOfflineKeys();
         set({
           user: null,
           token: null,

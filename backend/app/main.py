@@ -9,6 +9,7 @@ from app.api.v1 import (
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
+    offline_pack,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -473,3 +474,5 @@ app.include_router(journey.router, prefix="/api/v1")
 app.include_router(atlas.router, prefix="/api/v1")
 # [Gate P17] FR-057 Memory Replan(過去の予定と実績から次の旅行への提案)。/plans/{plan_id}/memory-replan配下。
 app.include_router(memory_replan.router, prefix="/api/v1")
+# [Gate K1] B-008 オフラインパックの鍵の配布と失効(利用者ごと・版ごとに導出。DBには版だけ)。/offline-pack配下。
+app.include_router(offline_pack.router, prefix="/api/v1")

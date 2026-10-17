@@ -49,6 +49,11 @@ export const int: Decoder<number> = (v, path) =>
 export const nonNegativeInt: Decoder<number> = (v, path) =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fail(path, '0以上の整数');
 
+/** [Gate K1] 決まった数値(鍵のビット数など)だけを受け付ける */
+export const exactNumber =
+  <N extends number>(expected: N): Decoder<N> =>
+  (v, path) => (v === expected ? (v as N) : fail(path, `数値 ${expected}`));
+
 /** [Gate P2] 正規表現に一致する文字列(金額の文字列など)。 */
 export const matching =
   (re: RegExp, expected: string): Decoder<string> =>

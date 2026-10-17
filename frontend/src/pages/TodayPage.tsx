@@ -26,6 +26,7 @@ import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getToday } from '@/services/api';
 import type { TodayEvent, TodayResponse } from '@/services/api';
+import { currentOfflineSession } from '@/utils/offlineSession';
 import {
   TRANSPORT_LABELS, computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
@@ -150,15 +151,15 @@ const TodayPage: React.FC = () => {
       setIsStale(false);
       setError(null);
       setClock(fetchedAt);
-      saveTodayCache(planId, res, offsetMs);
+      // [Gate K1] 端末内の保存は暗号化する(失敗しても表示は続ける)
+      void saveTodayCache(currentOfflineSession(), planId, res, offsetMs);
     } catch (e: unknown) {
       // 取得に失敗しても、表示中または端末に保存済みの当日情報があればそれを表示し続ける
-      const fallback =
-        snapshotRef.current ??
-        (() => {
-          const cached = loadTodayCache(planId);
-          return cached ? { data: cached.payload, offsetMs: cached.offsetMs, fetchedAt: cached.savedAt } : null;
-        })();
+      let fallback = snapshotRef.current;
+      if (!fallback) {
+        const cached = await loadTodayCache(currentOfflineSession(), planId);
+        fallback = cached ? { data: cached.payload, offsetMs: cached.offsetMs, fetchedAt: cached.savedAt } : null;
+      }
       if (fallback) {
         snapshotRef.current = fallback;
         setSnapshot(fallback);

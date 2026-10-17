@@ -35,6 +35,7 @@ import {
   actualPutResult, carryOverResult, journeyReview,
   atlasResponse, atlasSettingsResult,
   memoryReplanApplyResult, memoryReplanResult,
+  offlinePackKey, offlinePackKeyRotated,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -294,6 +295,11 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['memory_replan', memoryReplanResult],
   ['memory_replan_applied', memoryReplanApplyResult],
   ['memory_replan_error_stale', object({ detail: object({ code: str, message: str }) })],
+  // [Gate K1] オフラインパックの鍵(B-008)
+  ['offline_pack_key', offlinePackKey],
+  ['offline_pack_key_rotated', offlinePackKeyRotated],
+  ['offline_pack_key_error_version', object({ detail: object({ code: str, message: str }) })],
+  ['offline_pack_key_error_if_match', object({ detail: object({ code: str, message: str }) })],
 ];
 
 describe('実backend応答の契約 (Gate M9-FE-C2b-2)', () => {

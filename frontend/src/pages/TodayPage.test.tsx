@@ -2,17 +2,28 @@
  * [Gate L1b] TodayPage: 日程タイムゾーンでの表示・遅延表示・オフライン表示。
  * 応答は実backendから採取したfixture(京都、Asia/Tokyo、NEXTへ向かう経路が遅延)。
  */
+import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import fx from '@/services/api/__fixtures__/backendContractResponses.json';
 import type { TodayResponse } from '@/services/api';
 
-const { getToday } = vi.hoisted(() => ({ getToday: vi.fn() }));
-vi.mock('@/services/api', () => ({ getToday }));
+const { getToday, getOfflinePackKey } = vi.hoisted(() => ({
+  getToday: vi.fn(),
+  getOfflinePackKey: vi.fn(async () => ({
+    user_id: 'user-today', key_version: 1, key: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA',
+    algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-05-01T00:00:00Z',
+  })),
+}));
+vi.mock('@/services/api', () => ({ getToday, getOfflinePackKey }));
+// [Gate K1] 当日画面の保存は利用者ごとの鍵で暗号化する(offlineVault)
+const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
+vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
 
 import TodayPage from './TodayPage';
 import { saveTodayCache } from './today/todayModel';
+import { clearSnapshots } from '@/utils/offlineVault';
 
 const data = fx.today_with_transport as TodayResponse;
 const PLAN = 'plan-l1b';
@@ -29,7 +40,8 @@ const renderPage = () =>
 const card = (label: string) => screen.getByText(label).closest('div.space-y-3') as HTMLElement;
 
 describe('TodayPage (Gate L1b)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearSnapshots();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(data.server_time));
     window.localStorage.clear();
@@ -80,7 +92,7 @@ describe('TodayPage (Gate L1b)', () => {
 
   it('通信できない場合は端末に保存した当日情報から現在時刻のNOW/NEXTを出し、最終取得時刻を明示する', async () => {
     // 11:00 JSTに取得・保存 → 15:30 JST(京都駅の予定中)にオフラインで開く
-    saveTodayCache(PLAN, data, 0);
+    expect(await saveTodayCache(SESSION, PLAN, data, 0)).toBe(true);
     vi.setSystemTime(new Date('2026-05-01T06:30:00Z'));
     getToday.mockRejectedValue(new Error('Network Error'));
     renderPage();
@@ -104,7 +116,7 @@ describe('TodayPage (Gate L1b)', () => {
   });
 
   it('保存済みの当日情報が別の日のものならNOW/NEXTを出さない', async () => {
-    saveTodayCache(PLAN, data, 0);
+    expect(await saveTodayCache(SESSION, PLAN, data, 0)).toBe(true);
     vi.setSystemTime(new Date('2026-05-02T01:00:00Z'));
     getToday.mockRejectedValue(new Error('Network Error'));
     renderPage();

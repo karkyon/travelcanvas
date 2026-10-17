@@ -2,17 +2,27 @@ import { useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from '@/router';
 import { useAuthStore } from '@/store/authStore';
+import { obtainOfflineKey } from '@/utils/offlineVault';
+import { currentOfflineSession } from '@/utils/offlineSession';
 import { Toaster } from 'react-hot-toast';
 import '@/styles/globals.css';
 
 function App() {
   const { initialize, isInitialized } = useAuthStore();
+  const sessionTag = useAuthStore((s) => (s.isGuest ? s.guestToken : s.token));
 
   useEffect(() => {
     // アプリ起動時に認証状態を初期化
     console.log('🚀 App初期化開始');
     initialize();
   }, [initialize]);
+
+  // [Gate K1] ログインしたら(ゲスト開始・トークン更新を含む)オフライン鍵を先に受け取って端末に置く。
+  // 後で通信できなくなっても、保存したオフラインデータを開けるようにするため。失敗しても何もしない。
+  useEffect(() => {
+    if (!isInitialized || !sessionTag) return;
+    void obtainOfflineKey(currentOfflineSession()).catch(() => undefined);
+  }, [isInitialized, sessionTag]);
 
   // 初期化中の表示
   // [Gate A1] 以前は `!isInitialized || isLoading` としており、ログイン・登録・ゲスト開始/昇格の

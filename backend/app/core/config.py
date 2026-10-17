@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     # エラーを返す(app/core/crypto.py参照)。
     LOOKUP_INDEX_KEY: Optional[str] = None
 
+    # [Gate K1] オフラインパック(端末内の暗号化保存)の鍵を利用者ごとに導出する元の秘密。
+    # 未設定なら ENCRYPTION_KEY から用途ラベル付きで導出する(app/services/offline_keys.py)。
+    # どちらも無い場合は鍵の配布APIだけが503を返す(他の機能は起動できる)。
+    # 注意: この値(未設定なら ENCRYPTION_KEY)を変えると、全員の端末のオフラインデータが読めなくなる。
+    OFFLINE_PACK_KEY_SECRET: Optional[str] = None
+
     # [Gate M5] FR-013文書ウォレットのObject Storage実連携。
     # 実クラウドストレージ(S3等)のAPIキーは未提供のため、
     # app/services/storage_backend.pyのLocalFilesystemBackend

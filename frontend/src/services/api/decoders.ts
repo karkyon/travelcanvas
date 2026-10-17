@@ -47,8 +47,11 @@ import type {
   ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
   AtlasCell, AtlasResponse,
   MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight,
+  OfflinePackKey, OfflinePackKeyRotated,
 } from './types';
-import { arrayOf, bool, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder } from './decode';
+import {
+  arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder,
+} from './decode';
 
 export interface RevisionResult {
   revision: number;
@@ -1732,4 +1735,20 @@ export const memoryReplanResult: Decoder<MemoryReplanResult> = object<MemoryRepl
 });
 export const memoryReplanApplyResult: Decoder<MemoryReplanApplyResult> = object<MemoryReplanApplyResult>({
   plan_id: str, plan_revision: int, applied: nonNegativeInt, proposal_id: str,
+});
+
+// ===== [Gate K1] オフラインパックの鍵(B-008) =====
+const offlineKeyFields = {
+  user_id: str,
+  key_version: int,
+  // 32バイトの base64url(パディングなし)は必ず43文字
+  key: matching(/^[A-Za-z0-9_-]{43}$/, '43文字の base64url'),
+  algorithm: oneOf('AES-256-GCM'),
+  key_bits: exactNumber(256),
+  issued_at: str,
+};
+export const offlinePackKey: Decoder<OfflinePackKey> = object<OfflinePackKey>(offlineKeyFields);
+export const offlinePackKeyRotated: Decoder<OfflinePackKeyRotated> = object<OfflinePackKeyRotated>({
+  ...offlineKeyFields,
+  previous_version: int,
 });

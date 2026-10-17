@@ -34,7 +34,7 @@ import {
   deleteOfflinePack,
   isOfflinePackAvailable,
 } from '@/utils/offlinePack';
-import { useAuthStore } from '@/store/authStore';
+import { currentOfflineSession } from '@/utils/offlineSession';
 import {
   LOCKED_RELATION_MESSAGE, UNDO_CONFLICT_MESSAGE, conflictCode, describeItemDeletion,
 } from '@/store/itemDeletionMessages';
@@ -230,15 +230,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     } catch (error) {
       console.error('Load plan error:', error);
 
-      const authState = useAuthStore.getState();
-      // [Gate #36] 執筆時点でGate #35(Guest Travel View)がまだmainへ
-      // マージされていないため、ゲスト用トークンには依存しない。
-      // マージ後はguestTokenも対象に含めるとゲストもオフライン保存できる。
-      const token = authState.token;
+      // [Gate K1] 鍵は backend が利用者ごとに配る(offlineVault)。ゲストも使える。
+      // 通信できない時は端末に置いた鍵で開く。
+      const session = currentOfflineSession();
 
-      if (token) {
+      if (session) {
         try {
-          const offlinePlan = await loadOfflinePack<TravelPlan>(planId, token);
+          const offlinePlan = await loadOfflinePack<TravelPlan>(planId, session);
           if (offlinePlan) {
             set({
               currentPlan: offlinePlan,
@@ -269,16 +267,15 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       return false;
     }
 
-    const authState = useAuthStore.getState();
-    // [Gate #36] 同上、guestTokenには依存しない(Gate #35マージ後に対応予定)。
-    const token = authState.token;
-    if (!token) {
-      toast.error('オフライン保存にはログインが必要です');
+    // [Gate K1] ゲストも保存できる(鍵は backend が利用者ごとに配る)
+    const session = currentOfflineSession();
+    if (!session) {
+      toast.error('オフライン保存にはログイン(またはゲストとして開始)が必要です');
       return false;
     }
 
     try {
-      await saveOfflinePack(currentPlan.id, currentPlan.title, currentPlan, token);
+      await saveOfflinePack(currentPlan.id, currentPlan.title, currentPlan, session);
       toast.success('オフラインで使えるように保存しました');
       return true;
     } catch (error) {

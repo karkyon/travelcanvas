@@ -23,9 +23,10 @@
 // [Gate P14] 旅の振り返り(FR-054・FR-053)を追加: ... → Location → Journey → CompleteTravelAPI
 // [Gate P15] Personal Travel Atlas(FR-052)を追加: ... → Journey → Atlas → CompleteTravelAPI
 // [Gate P17] Memory Replan(FR-057)を追加: ... → Atlas → MemoryReplan → CompleteTravelAPI
-import { MemoryReplanApi } from './endpoints/memoryReplan';
+// [Gate K1] オフラインパックの鍵(B-008)を追加: ... → MemoryReplan → OfflinePack → CompleteTravelAPI
+import { OfflinePackApi } from './endpoints/offlinePack';
 
-export class CompleteTravelAPI extends MemoryReplanApi {
+export class CompleteTravelAPI extends OfflinePackApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

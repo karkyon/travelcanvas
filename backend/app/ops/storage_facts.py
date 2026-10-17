@@ -18,7 +18,10 @@ from typing import Dict, List, Optional
 
 from app.ops.opslib import key_fingerprint, sha256_file
 
-KEY_NAMES = ("ENCRYPTION_KEY", "LOOKUP_INDEX_KEY", "DOCUMENT_DOWNLOAD_SIGNING_KEY", "JWT_SECRET_KEY")
+# [Gate K1] OFFLINE_PACK_KEY_SECRET を追加(変わると端末のオフラインデータが読めなくなるため、復元時に指紋を照合する)
+KEY_NAMES = (
+    "ENCRYPTION_KEY", "LOOKUP_INDEX_KEY", "DOCUMENT_DOWNLOAD_SIGNING_KEY", "JWT_SECRET_KEY", "OFFLINE_PACK_KEY_SECRET",
+)
 
 
 def storage_roots() -> Dict[str, str]:

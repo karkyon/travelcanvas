@@ -5,7 +5,9 @@ import {
   CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { api as apiService } from '@/services/api';
+import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
+import { forgetOfflineKeys, obtainOfflineKey } from '@/utils/offlineVault';
+import { currentOfflineSession } from '@/utils/offlineSession';
 import Button from '@/components/common/Button';
 import {
   listOfflinePacks,
@@ -425,10 +427,14 @@ const SettingsPage: React.FC = () => {
   const [offlinePacks, setOfflinePacks] = useState<OfflinePackSummary[]>([]);
   const [isLoadingPacks, setIsLoadingPacks] = useState(false);
 
+  const [isRevokingDevices, setIsRevokingDevices] = useState(false);
+  const [revokeStatus, setRevokeStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const refreshOfflinePacks = async () => {
     setIsLoadingPacks(true);
     try {
-      const packs = await listOfflinePacks();
+      // [Gate K1] この利用者のものだけを表示する(同じ端末で別の利用者が保存したものは出さない)
+      const packs = await listOfflinePacks(currentOfflineSession()?.userId);
       setOfflinePacks(packs);
     } catch (error) {
       console.error('Failed to list offline packs:', error);
@@ -456,6 +462,40 @@ const SettingsPage: React.FC = () => {
     await refreshOfflinePacks();
   };
 
+  // [Gate K1] B-008 失効: 鍵の版を上げ、これまでの鍵を全て無効にする。端末を無くした時などに使う。
+  // ほかの端末のデータは、その端末が次に鍵を受け取った時に消える(通信しないままの端末からは遠隔で消せない)。
+  const handleRevokeAllDevices = async () => {
+    if (!window.confirm(
+      '全ての端末に保存したオフラインデータを無効にします。この端末のデータも消え、元に戻せません。よろしいですか?',
+    )) {
+      return;
+    }
+    setIsRevokingDevices(true);
+    setRevokeStatus(null);
+    try {
+      const current = await getOfflinePackKey();
+      await rotateOfflinePackKey(current.key_version);
+      await forgetOfflineKeys();
+      await clearAllOfflinePacks();
+      await obtainOfflineKey(currentOfflineSession(), { refresh: true });
+      setRevokeStatus({
+        type: 'success',
+        text: '全ての端末のオフラインデータを無効にしました。ほかの端末のデータは、その端末が次に通信した時に消えます。',
+      });
+      await refreshOfflinePacks();
+    } catch (error) {
+      const status = (error as { response?: { status?: number } } | null)?.response?.status;
+      setRevokeStatus({
+        type: 'error',
+        text: status === 409
+          ? '別の端末で先に無効化されました。画面を読み込み直してください。'
+          : '無効にできませんでした。通信を確認して、もう一度お試しください。',
+      });
+    } finally {
+      setIsRevokingDevices(false);
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -466,34 +506,37 @@ const SettingsPage: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-2">オフラインデータ</h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-600 mb-4">
           プランナー画面の「オフラインで使う」で保存したプランがここに表示されます。
           この端末に暗号化して保存されており、7日間で自動的に失効します。
+          ログアウトすると、次にログインするまで開けなくなります。
         </p>
       </div>
 
       {isLoadingPacks ? (
-        <p className="text-sm text-gray-500">読み込み中...</p>
+        <p className="text-sm text-gray-600">読み込み中...</p>
       ) : offlinePacks.length === 0 ? (
-        <p className="text-sm text-gray-500">保存されているオフラインデータはありません。</p>
+        <p className="text-sm text-gray-600">保存されているオフラインデータはありません。</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" role="list" aria-label="保存したオフラインデータ">
           {offlinePacks.map((pack) => (
             <div
+              role="listitem"
               key={pack.planId}
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
             >
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 truncate">{pack.planTitle}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-600">
                   {formatBytes(pack.approxSizeBytes)} ・
                   {new Date(pack.expiresAt).toLocaleDateString('ja-JP')}まで有効
                 </p>
               </div>
               <button
                 onClick={() => handleDeletePack(pack.planId)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                 title="このオフラインデータを削除"
+                aria-label={`「${pack.planTitle}」のオフラインデータを削除`}
               >
                 <Trash2 size={16} />
               </button>
@@ -508,6 +551,26 @@ const SettingsPage: React.FC = () => {
           すべてのオフラインデータを削除
         </Button>
       )}
+
+      <section aria-labelledby="offline-revoke-heading" className="border-t pt-6">
+        <h3 id="offline-revoke-heading" className="text-base font-medium text-gray-900 mb-2">
+          端末を無くした時は
+        </h3>
+        <p className="text-sm text-gray-600 mb-3">
+          全ての端末に保存したオフラインデータを読めなくします。ほかの端末のデータは、その端末が次に通信した時に消えます。
+        </p>
+        <Button variant="danger" onClick={handleRevokeAllDevices} loading={isRevokingDevices}>
+          全ての端末のオフラインデータを無効にする
+        </Button>
+        {revokeStatus && (
+          <p
+            role={revokeStatus.type === 'error' ? 'alert' : 'status'}
+            className={`mt-3 text-sm ${revokeStatus.type === 'error' ? 'text-red-700' : 'text-green-800'}`}
+          >
+            {revokeStatus.text}
+          </p>
+        )}
+      </section>
     </div>
   );
 
@@ -597,7 +660,7 @@ const SettingsPage: React.FC = () => {
         <div className="mb-8">
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-blue-500 hover:text-blue-700 mb-4"
+            className="text-blue-700 hover:text-blue-900 mb-4"
           >
             ← ダッシュボードに戻る
           </button>
@@ -673,7 +736,7 @@ const SettingsPage: React.FC = () => {
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSaving ? (
                     <>

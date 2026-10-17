@@ -21,7 +21,8 @@
   "captured_at_head_p13": "Gate P13(FR-038 任意の位置軌跡)の実backend応答。account_deletion_previewへlocation_tracks件数を追加",
   "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答",
   "captured_at_head_p15": "Gate P15(FR-052 Personal Travel Atlas)の実backend応答",
-  "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答"
+  "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
+  "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -68,6 +69,7 @@
   "GET /api/v1/health",
   "GET /api/v1/notifications/",
   "GET /api/v1/notifications/unread-count",
+  "GET /api/v1/offline-pack/key",
   "GET /api/v1/optimization/{job_id}",
   "GET /api/v1/plans/documents/download",
   "GET /api/v1/plans/{plan_id}",
@@ -174,6 +176,7 @@
   "POST /api/v1/auth/register",
   "POST /api/v1/notifications/read-all",
   "POST /api/v1/notifications/{notification_id}/read",
+  "POST /api/v1/offline-pack/key/rotate",
   "POST /api/v1/optimization/{job_id}/apply",
   "POST /api/v1/optimization/{job_id}/cancel",
   "POST /api/v1/optimize-route",
