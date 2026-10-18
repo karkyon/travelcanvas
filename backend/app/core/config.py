@@ -118,6 +118,15 @@ class Settings(BaseSettings):
     RATE_LIMIT_REFRESH: int = 60
     # [Gate S3] 回数制限を Redis で数える時のキーの前置き(同じ Redis を使う別の環境と混ざらないように)
     RATE_LIMIT_NAMESPACE: str = "tc"
+    # [Gate S6] SEC-16/17 攻撃の兆候の自動検知と段階的な自動遮断(app/services/threat_guard.py、Runbook §3.9)。
+    # 接続元(IP)ごとに、ログインの失敗・無効なトークン・他人のデータへの 403/404 等を点数にして時間窓で合計する。
+    GUARD_ENABLED: bool = True
+    GUARD_WINDOW_SECONDS: int = 900      # 点数を合計する時間窓
+    GUARD_WARN_SCORE: int = 60           # 注意(監査・計数だけ)
+    GUARD_BLOCK_SCORE: int = 150         # 遮断(その接続元の API を一時的に 429)
+    GUARD_BLOCK_SECONDS: int = 900       # 最初の遮断の長さ
+    GUARD_REPEAT_MULTIPLIER: int = 4     # 24時間以内の再犯は前回のこの倍(上限24時間)
+    GUARD_TRUSTED_IPS: str = ""          # 数えない・止めない接続元(カンマ区切り。CIDR 可。監視・運用の機械)
 
     # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
     # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。

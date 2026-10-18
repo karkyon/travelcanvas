@@ -97,6 +97,13 @@ async def _reject(scope, send, limit: int) -> None:
     from app.ops import metrics as ops_metrics
 
     ops_metrics.registry.count_security_event("body_too_large")
+    # [Gate S6] 接続元の点数にも入れる(この応答は request_id のミドルウェアを通らないため、ここで数える)
+    from starlette.concurrency import run_in_threadpool
+
+    from app.services import threat_guard
+
+    if not threat_guard.is_exempt_path(scope.get("path", "")):
+        await run_in_threadpool(threat_guard.signal, scope, "body_too_large")
     body = json.dumps(
         {"detail": f"送信されたデータが大きすぎます(上限 {limit // (1024 * 1024)}MB)"}, ensure_ascii=False,
     ).encode("utf-8")

@@ -891,6 +891,12 @@ def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -
         metrics = opslib.parse_prometheus(body)
         snap["http_requests_total"] = opslib.metric_sum(metrics, "travelcanvas_http_requests_total")
         snap["http_5xx_total"] = opslib.metric_sum(metrics, "travelcanvas_http_requests_total", status="5xx")
+        # [Gate S6] SEC-18 攻撃の兆候
+        snap["security_events_total"] = opslib.metric_sum(metrics, "travelcanvas_security_events_total")
+        snap["guard_blocks_total"] = opslib.metric_sum(
+            metrics, "travelcanvas_security_events_total", kind="guard_block")
+        snap["audit_write_failed_total"] = opslib.metric_sum(
+            metrics, "travelcanvas_security_events_total", kind="audit_write_failed")
         snap["latency_buckets"] = {
             ("+Inf" if k == float("inf") else repr(k)): v
             for k, v in opslib.histogram_buckets(metrics, "travelcanvas_http_request_duration_seconds").items()

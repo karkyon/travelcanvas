@@ -57,7 +57,7 @@ from app.models.models import (
     User,
 )
 from app.ops import metrics as ops_metrics
-from app.services import malware_scan
+from app.services import malware_scan, threat_guard
 from app.services.audit_service import record_audit_event
 from app.services.storage_backend import (
     DownloadSigningNotConfigured,
@@ -326,6 +326,7 @@ def _scan_or_reject(content: bytes, request: Request, current_user: User, plan) 
                             detail="ファイルの安全確認ができないため、今は受け付けられません。しばらくしてから再試行してください。")
     if scan.infected:
         ops_metrics.registry.count_security_event("malware_rejected")
+        threat_guard.signal(request, "malware_rejected")  # [Gate S6]
         record_audit_event(
             action="upload_rejected_malware", resource_type="document", user_id=current_user.id,
             ip_address=_client_ip(request), user_agent=_user_agent(request),
@@ -341,6 +342,7 @@ def _scan_or_reject(content: bytes, request: Request, current_user: User, plan) 
 def _deny_download(request: Request, reason: str, resource_id=None, status_code: int = status.HTTP_403_FORBIDDEN,
                    detail: str = "この文書はダウンロードできません。もう一度画面から開いてください。"):
     ops_metrics.registry.count_security_event("download_denied")
+    threat_guard.signal(request, "download_denied")  # [Gate S6]
     record_audit_event(
         action="document_download_denied", resource_type="document", resource_id=resource_id,
         ip_address=_client_ip(request), user_agent=_user_agent(request), details={"reason": reason},

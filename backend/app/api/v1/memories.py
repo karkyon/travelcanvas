@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone as dt_timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
 from app.ops import metrics as ops_metrics
 from app.services import malware_scan
 from app.services import memories as mem
+from app.services import threat_guard
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
@@ -248,6 +249,7 @@ async def upload_memory(
     longitude: Optional[float] = Form(None),
     visibility: str = Form("private"),
     include_in_journal: bool = Form(True),
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
@@ -275,6 +277,8 @@ async def upload_memory(
         raise _bad("scan_unavailable", "ファイルの安全確認ができないため、今は受け付けられません", 503)
     if scan.infected:
         ops_metrics.registry.count_security_event("malware_rejected")
+        if request is not None:
+            threat_guard.signal(request, "malware_rejected")  # [Gate S6]
         record_audit_event(action="upload_rejected_malware", resource_type="memory", user_id=current_user.id,
                            details={"plan_id": str(plan.id), "engine": scan.engine})
         raise _bad("malware_found", "ファイルから有害なプログラムが見つかったため、受け付けませんでした", 422)

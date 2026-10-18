@@ -201,6 +201,36 @@ docker compose up -d --force-recreate backend
 `DOCUMENT_REQUIRE_CLEAN_SCAN=true` にすると、それ以前に受け取った未検査(not_scanned)の文書はダウンロードできなくなる(409)。
 必要な文書は取り直してもらうか、検査してから使う。
 
+### 3.9 不審な接続元の自動遮断(`guard_blocked` / `security_events_spike` / `audit_write_failed`)
+
+設計は `docs/adr/ADR-threat-guard.md`。接続元(IP)ごとに、失敗した要求を「怪しさの点数」にして15分の窓で合計する。
+1つ1つは普通の失敗(ログインの失敗・無効なトークン・他人のデータへの 403/404・期限切れ URL・別サイトからの操作・
+大きすぎる本文・ウイルス)でも、入口を変えながら続くと止まる。
+
+| 点数(15分) | 段階 | 起きること |
+|---|---|---|
+| 60 以上 | 注意 | 監査 `guard_warn`、`security_events_total{kind="guard_warn"}` |
+| 150 以上 | 遮断 | その接続元の `/api/*` を15分 429(`Retry-After` 付き)。監査 `ip_blocked`、監視 `guard_blocked` |
+| 24時間以内に再び | 再犯 | 前回の4倍(上限24時間) |
+
+`/health`・`/ready`・`/metrics` は止めない。成功した要求、ログインしていない画面の 401 は数えない。数は Redis(全プロセス共有、IP は sha256)。
+
+正規の利用者・社内の機械を止めてしまった時:
+
+```bash
+# 監査の ip_blocked で時刻を確かめ、問い合わせの IP を外す
+docker compose exec -T backend python -c "from app.services import threat_guard as g; g.reset('203.0.113.5')"
+# 全部外す(誤検知が広がった時)
+docker compose exec -T backend python -c "from app.services import threat_guard as g; print(g.reset_all())"
+```
+
+監視・運用の機械は `.env` の `GUARD_TRUSTED_IPS`(カンマ区切り、CIDR 可)に書くと数えない。止める時は `GUARD_ENABLED=false`
+(どちらも backend の作り直しが必要)。同じ NAT の後ろに多くの利用者がいる環境(社内・学校)で誤検知が続く時は、
+`GUARD_BLOCK_SCORE` を上げる。
+
+`security_events_spike`(前回から50件以上)は、遮断に至らない広く薄い攻撃・設定の誤りのどちらか。§3.7・§3.8 の `kind` を見て判断する。
+`audit_write_failed` は証跡が欠けているので最優先で DB を直す(§3.2)。
+
 ---
 
 ## 4. バックアップ
@@ -302,6 +332,9 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | `restore_drill_missing` / `restore_drill_stale` | 注意 | 復元演習の記録が無い / 8日より古い |
 | `metrics_unavailable` | 注意 | `/metrics` を取得できない |
 | `log_leak` | 注意 | 直近の `log-scan` で個人情報・秘密らしき値が見つかった(§3.6) |
+| `guard_blocked` | 注意 | 前回から、不審な接続元を自動で遮断した(§3.9) |
+| `security_events_spike` | 注意 | 前回から、セキュリティの拒否・検出が50件以上(§3.9) |
+| `audit_write_failed` | 異常 | 監査ログの書き込みに失敗した(§3.9) |
 
 `/metrics` は Prometheus のテキスト形式なので、将来 Prometheus・Grafana を入れる時もそのまま取り込める。
 
@@ -315,3 +348,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | 2026-10-17 | 2 | Gate O2: ログの個人情報の検査(`log-scan`、毎日 03:50、監視の `log_leak`、§3.6)。定期実行を登録済みの場合は `schedule install` をもう一度実行すると追加される |
 | 2026-10-18 | 3 | Gate S3: 回数制限の共有(Redis)と監視(§3.7) |
 | 2026-10-18 | 4 | Gate S4: 文書の配信条件・アップロードの上限・ウイルス検査(§3.8)と防御の計数 |
+| 2026-10-18 | 5 | Gate S6: 不審な接続元の自動遮断と、攻撃の兆候の監視(§3.9、§7) |

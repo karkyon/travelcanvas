@@ -538,6 +538,8 @@ DEFAULT_THRESHOLDS = {
     "disk_free_ratio": 0.10,
     "backup_max_age_hours": 26,
     "drill_max_age_days": 8,
+    # [Gate S6] SEC-18 前回の確認からの、セキュリティの出来事(拒否・検出)の件数
+    "security_events_count": 50,
 }
 
 
@@ -592,6 +594,21 @@ def evaluate_monitor(
             p95 = histogram_quantile(delta, 0.95)
             if p95 is not None and p95 > th["p95_seconds"]:
                 add("warning", "slow_responses", "応答時間の95%%点が約%.1f秒です" % p95)
+
+    # [Gate S6] SEC-18 攻撃の兆候(自動遮断・拒否の急増・監査の書き込み失敗)を通知する
+    if prev:
+        blocks = counter_delta(_num(snapshot.get("guard_blocks_total")) or 0.0, _num(prev.get("guard_blocks_total")))
+        if "guard_blocks_total" in snapshot and blocks >= 1:
+            add("warning", "guard_blocked", "前回の確認から、不審な接続元を %d 件自動で遮断しました(Runbook §3.9)" % blocks)
+        events = counter_delta(
+            _num(snapshot.get("security_events_total")) or 0.0, _num(prev.get("security_events_total")))
+        if "security_events_total" in snapshot and events >= th["security_events_count"]:
+            add("warning", "security_events_spike",
+                "前回の確認から、セキュリティの拒否・検出が %d 件ありました(攻撃の可能性。Runbook §3.9)" % events)
+        audit = counter_delta(
+            _num(snapshot.get("audit_write_failed_total")) or 0.0, _num(prev.get("audit_write_failed_total")))
+        if "audit_write_failed_total" in snapshot and audit >= 1:
+            add("critical", "audit_write_failed", "監査ログの書き込みに %d 回失敗しました(記録が欠けています)" % audit)
 
     free = _num(snapshot.get("disk_free_bytes"))
     total = _num(snapshot.get("disk_total_bytes"))

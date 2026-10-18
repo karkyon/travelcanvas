@@ -55,6 +55,21 @@ def _reset_rate_limiter():
     _rate_limiter.use_backend("memory")
 
 
+@pytest.fixture(autouse=True)
+def _guard_off_by_default(monkeypatch):
+    """[Gate S6] 攻撃の兆候の自動遮断(app/services/threat_guard.py)は、試験では既定で止める。
+    TestClient は全ての要求が同じ接続元('testclient')なので、権限の無い操作・存在しない ID を確かめる多くの試験の
+    401/403/404 が合計されて、関係のない試験が 429 になるため。遮断そのものは tests/test_gate_s6_threat_guard.py が
+    自分で有効にして確かめる。"""
+    from app.core.config import settings as _settings
+    from app.services import threat_guard as _guard
+
+    monkeypatch.setattr(_settings, "GUARD_ENABLED", False)
+    _guard.reset_all()
+    yield
+    _guard.reset_all()
+
+
 @pytest.fixture()
 def db_session():
     """トランザクション境界を持つテスト用DBセッション。テスト終了時に必ずロールバックする。"""

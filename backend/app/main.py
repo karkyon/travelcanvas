@@ -15,6 +15,8 @@ from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 from app.core.security_headers import apply_security_headers
 from app.core.body_limit import BodySizeLimitMiddleware
+from app.services import threat_guard
+from starlette.concurrency import run_in_threadpool
 import logging
 import time
 import uuid
@@ -80,6 +82,24 @@ async def request_id_middleware(request: Request, call_next):
     request.state.request_id = request_id
     # [Gate O1] 監視用の計測(ルートの型・状態の種類・所要時間)。実際のURLは記録しない。
     started = time.perf_counter()
+    # [Gate S6] SEC-16/17 遮断中の接続元からの API は、処理せずに 429 を返す(監視の入口は止めない)
+    path = request.url.path
+    guarded = not threat_guard.is_exempt_path(path)
+    client_ip = threat_guard.client_ip(request)
+    if guarded:
+        until = threat_guard.blocked_until(client_ip)
+        if until:
+            retry_after = max(1, int(until - time.time()))
+            blocked = JSONResponse(
+                status_code=429,
+                content={"detail": threat_guard.BLOCKED_DETAIL, "request_id": request_id},
+                headers={"Retry-After": str(retry_after)},
+            )
+            ops_metrics.registry.observe(
+                request.method, ops_metrics.route_template(request.scope), 429, time.perf_counter() - started)
+            blocked.headers["X-Request-ID"] = request_id
+            apply_security_headers(path, blocked.headers)
+            return blocked
     try:
         response = await call_next(request)
     except Exception:
@@ -90,6 +110,14 @@ async def request_id_middleware(request: Request, call_next):
         request.method, ops_metrics.route_template(request.scope), response.status_code,
         time.perf_counter() - started)
     response.headers["X-Request-ID"] = request_id
+    # [Gate S6] 失敗した応答を、接続元ごとの「怪しさの点数」にする(成功・監視の入口は数えない)
+    if guarded and response.status_code >= 400:
+        auth_header = request.headers.get("authorization") or ""
+        kind = threat_guard.classify_response(
+            request.method, path, response.status_code, auth_header.lower().startswith("bearer "))
+        if kind:
+            # 点数が閾値を越えた時は監査(DB)へ書くため、イベントループを止めないよう別スレッドで数える
+            await run_in_threadpool(threat_guard.signal, request, kind)
     # [Gate S2] SEC-03 セキュリティヘッダー(app/core/security_headers.py)
     apply_security_headers(request.url.path, response.headers)
     return response

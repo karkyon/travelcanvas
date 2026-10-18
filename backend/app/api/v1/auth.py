@@ -20,6 +20,7 @@ from app.core.auth import (
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
+from app.services import threat_guard
 
 router = APIRouter()
 
@@ -250,6 +251,7 @@ def _reject_cross_site(request: Request) -> None:
     record_audit_event(action="cross_site_request_blocked", resource_type="auth",
                        ip_address=request.client.host if request.client else None,
                        details={"path": request.url.path})
+    threat_guard.signal(request, "cross_site_blocked")  # [Gate S6]
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="この操作は許可されていない場所からは行えません")
 
 
