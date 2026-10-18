@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
   CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2
@@ -10,6 +10,7 @@ import { forgetOfflineKeys, obtainOfflineKey } from '@/utils/offlineVault';
 import { currentOfflineSession } from '@/utils/offlineSession';
 import Button from '@/components/common/Button';
 import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
+import MfaSection from '@/components/settings/MfaSection';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -29,7 +30,9 @@ interface SettingsTab {
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('profile');
+  // [Gate S11] ?tab=security で開く(管理者の画面の「多要素認証を設定する」から来た時)
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'profile');
   const [isSaving, setIsSaving] = useState(false);
   // [Gate #21] パスワード変更は「開発中」表示で無効化されていた。
   // backend/app/api/v1/auth.pyに/auth/change-passwordを新規実装したのに
@@ -459,6 +462,9 @@ const SettingsPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* [Gate S11] 多要素認証(認証アプリ)。管理者は必須 */}
+      <MfaSection />
 
       {/* [Gate S9] ログイン中の端末(新しい端末からのログインは通知でも知らせる) */}
       <ActiveSessionsSection />

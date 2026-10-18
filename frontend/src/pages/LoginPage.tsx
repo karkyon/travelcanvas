@@ -3,9 +3,74 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 
+/**
+ * [Gate S11] 多要素認証の2段目(パスワードが正しく、認証アプリの確認コードを待っている時)。
+ * 確認コード(6桁)の代わりに回復コード(xxxxx-xxxxx)も入力できる。
+ */
+const MfaLoginStep: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const { verifyMfa, cancelMfa, isLoading, error } = useAuthStore();
+  const [code, setCode] = useState('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    try {
+      await verifyMfa(code.trim());
+      onDone();
+    } catch {
+      setCode('');
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-6" aria-labelledby="mfa-login-heading">
+      <div>
+        <h3 id="mfa-login-heading" className="text-lg font-semibold text-gray-900 mb-2">確認コードの入力</h3>
+        <p className="text-sm text-gray-700">
+          認証アプリに表示されている6桁の確認コードを入力してください。端末が手元に無い時は、回復コードも使えます。
+        </p>
+      </div>
+      <div>
+        <label htmlFor="mfa-code" className="block text-sm font-medium text-gray-700 mb-2">確認コード</label>
+        <input
+          id="mfa-code"
+          name="mfa-code"
+          type="text"
+          inputMode="text"
+          autoComplete="one-time-code"
+          autoFocus
+          maxLength={32}
+          required
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">{error}</div>
+      )}
+      <button
+        type="submit"
+        disabled={isLoading || !code.trim()}
+        className="w-full flex justify-center py-3 px-4 rounded-xl shadow-lg text-sm font-medium text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+      >
+        確認してログイン
+      </button>
+      <button
+        type="button"
+        onClick={cancelMfa}
+        className="w-full text-sm text-blue-700 underline"
+      >
+        別のアカウントでログインする
+      </button>
+    </form>
+  );
+};
+
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError, pendingMfa } = useAuthStore();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -41,9 +106,13 @@ const LoginPage = () => {
     }
 
     try {
-      console.log('🔑 LoginPage: authStoreのloginを呼び出し中...');
-      await login(formData.email.trim(), formData.password);
-      
+      const result = await login(formData.email.trim(), formData.password);
+      if (result === 'mfa') {
+        // [Gate S11] 確認コードの入力へ(パスワードは画面から消す)
+        setFormData((prev) => ({ ...prev, password: '' }));
+        return;
+      }
+
       toast.success('ログインしました！');
       console.log('✅ LoginPage: ログイン成功、ダッシュボードへリダイレクト');
       navigate('/dashboard');
@@ -66,6 +135,9 @@ const LoginPage = () => {
               <p className="text-gray-600">Sign in to your account</p>
             </div>
             
+            {pendingMfa ? (
+              <MfaLoginStep onDone={() => { toast.success('ログインしました！'); navigate('/dashboard'); }} />
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -138,6 +210,7 @@ const LoginPage = () => {
                 </span>
               </div>
             </form>
+            )}
           </div>
         </div>
       </div>

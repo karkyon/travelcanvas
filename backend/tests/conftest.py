@@ -21,6 +21,21 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
+# [Gate S11] 試験だけで閉じる設定の既定値。CI の backend ジョブ(コンテナの .env が無い)でも、omega-dev2 の
+# コンテナ(.env あり)と同じ前提で全件が動くようにする。既に値がある時は上書きしない(setdefault)。
+# 以前は CI に ENCRYPTION_KEY・CORS_ORIGINS・文書の保存先が無く、34件が失敗して main の CI が赤いままだった。
+import tempfile as _tempfile  # noqa: E402
+
+for _name, _value in (
+    ("CORS_ORIGINS", "http://localhost:4173,http://127.0.0.1:4173"),
+    ("ENCRYPTION_KEY", "test-only-encryption-key-for-pytest-0123456789abcdef"),
+    ("LOOKUP_INDEX_KEY", "test-only-lookup-index-key-for-pytest-0123456789abcdef"),
+    ("DOCUMENT_DOWNLOAD_SIGNING_KEY", "test-only-download-signing-key-for-pytest-0123456789"),
+):
+    os.environ.setdefault(_name, _value)
+if "DOCUMENT_STORAGE_DIR" not in os.environ and not os.access("/app/uploads", os.W_OK):
+    os.environ["DOCUMENT_STORAGE_DIR"] = os.path.join(_tempfile.mkdtemp(prefix="tc-pytest-"), "documents")
+
 # 本番/開発DBを誤って対象にしないための安全確認
 _db_url = os.environ.get("DATABASE_URL", "")
 if "test" not in _db_url:

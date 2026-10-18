@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
     ForeignKey, UniqueConstraint, LargeBinary, Index, CheckConstraint, text,
-    Numeric,
+    Numeric, BigInteger,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum
@@ -112,6 +112,26 @@ class UserSession(Base):
 
     # リレーションシップ
     user = relationship("User", back_populates="sessions")
+
+
+class UserMfa(Base):
+    """[Gate S11] SEC-06 多要素認証(TOTP)の設定。1人1行。
+
+    totp_secret_ciphertext は ENCRYPTION_KEY で暗号化した秘密(base32)。confirmed_at が NULL の間は
+    設定の途中(認証アプリへの登録を確かめる前)で、ログインには使わない。回復コードはハッシュだけを持つ。"""
+    __tablename__ = "user_mfa"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    method = Column(String(8), nullable=False, default="totp", server_default="totp")
+    totp_secret_ciphertext = Column(LargeBinary, nullable=False)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    last_used_step = Column(BigInteger, nullable=True)
+    recovery_code_hashes = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    recovery_salt = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (CheckConstraint("method IN ('totp')", name="ck_user_mfa_method"),)
 
 
 class Travel(Base):

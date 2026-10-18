@@ -62,6 +62,9 @@ def production_problems(s) -> List[str]:
         if o == "*" or not o.startswith("https://") or "localhost" in o or "127.0.0.1" in o:
             problems.append("CORS_ORIGINS に https 以外・* ・localhost が含まれる")
             break
+    # [Gate S11] 本番で管理者の多要素認証を外さない
+    if not getattr(s, "ADMIN_MFA_REQUIRED", True):
+        problems.append("ADMIN_MFA_REQUIRED=false(管理者がパスワードだけで入れる)")
     # [Gate S4] 検査を必須にしたのに検査の仕組みが無いと、文書を1件も受け付けられない
     if getattr(s, "DOCUMENT_REQUIRE_CLEAN_SCAN", False) and getattr(s, "MALWARE_SCAN_BACKEND", "none") == "none":
         problems.append("DOCUMENT_REQUIRE_CLEAN_SCAN=true なのに MALWARE_SCAN_BACKEND=none")
@@ -140,6 +143,12 @@ class Settings(BaseSettings):
     CHALLENGE_TTL_SECONDS: int = 120
     CHALLENGE_ALWAYS: str = ""           # 点数に関わらず常に求める入口(カンマ区切り: login,register,guest,guest_upgrade)
     CHALLENGE_SECRET_KEY: str = ""       # 空なら JWT_SECRET_KEY から導出する
+
+    # [Gate S11] SEC-06 多要素認証(app/services/mfa.py、Runbook §8.6)。管理者の API は、TOTP を設定し、
+    # このセッションで ADMIN_MFA_MAX_AGE_HOURS 以内に確認コードを通した時だけ使える。
+    ADMIN_MFA_REQUIRED: bool = True
+    ADMIN_MFA_MAX_AGE_HOURS: int = 12
+    RATE_LIMIT_MFA: int = 10  # 確認コードの試行(利用者ごと・15分)。接続元ごとはこの3倍
 
     # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
     # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。

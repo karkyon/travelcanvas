@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { guestTokenFrom } from './support/guestPlan';
 
 /**
  * [Gate P16] FR-046 画像出力(CA-004)のbrowser E2E。画像は実ブラウザのcanvasで作る。
@@ -25,9 +26,10 @@ test('画像出力: しおりから機密を含めない画像(縦長・正方�
   await page.goto('/');
   const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
+  const guest = await guestResponse;
+  const apiBase = guest.url().replace(/\/auth\/guest$/, '');
+  const token = await guestTokenFrom(guest); // [Gate S11] 画面の遷移と競合しないよう応答から取る
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
   const send = async (path: string, data: unknown) => {
     const res = await context.request.post(`${apiBase}${path}`, {
       headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': `p16-e2e-${Date.now()}-${Math.random()}` }, data,

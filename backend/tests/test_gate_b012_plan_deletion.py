@@ -390,9 +390,13 @@ def test_soft_deleted_plan_is_hidden_everywhere(auth_client, make_user, db_sessi
     _act_as(owner)
 
 
-def test_admin_statistics_exclude_soft_deleted_plans(auth_client, db_session):
+def test_admin_statistics_exclude_soft_deleted_plans(auth_client, db_session, monkeypatch):
     client, owner = auth_client
     owner.is_superuser = True
+    # [Gate S11] 管理者の多要素認証は test_gate_s11_admin_mfa.py が確かめる。ここでは統計の中身だけを見る
+    from app.core.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "ADMIN_MFA_REQUIRED", False)
     db_session.flush()
 
     def total():

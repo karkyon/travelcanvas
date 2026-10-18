@@ -44,7 +44,8 @@ SIGNAL_WEIGHTS: Dict[str, int] = {
     "rate_limited": 3,
     "refresh_reuse": 25,
     "challenge_failed": 5,   # [Gate S7] 計算の確認の偽造・使い回し
-    "challenge_unsolved": 2,  # [Gate S7] 確認を求められても解かずに送り続ける(解かない攻撃も最後は遮断する)
+    "challenge_unsolved": 2,
+    "mfa_failed": 5,         # [Gate S11] 確認コード・再認証のパスワードの誤り、期限切れ・偽造の合図  # [Gate S7] 確認を求められても解かずに送り続ける(解かない攻撃も最後は遮断する)
 }
 
 BUCKET_SECONDS = 300

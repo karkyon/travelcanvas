@@ -20,6 +20,8 @@
 | バックアップが古い・無い(`backup_stale` / `backup_missing`) | `ops-state/logs/backup.log` | §4.1 |
 | データを壊した・消した | **何もせず §5 を読む** | §5 |
 | 更新後に不具合(コードを戻したい) | `tcops.py rollback-plan --to <commit>` | §6 |
+| 管理者が多要素認証の端末と回復コードをなくした | `tcops.py security mfa-status --email …` | §8.3 |
+| パッチが「CI が不合格」で止まった・main へ push できない | `python3 scripts/ops/ci_gate.py status` | §9 |
 
 終了コード: `monitor` は 0=異常なし、1=注意、2=異常。その他のコマンドは 0=成功、3=失敗。
 
@@ -416,9 +418,39 @@ python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵�
 | `METRICS_TOKEN` | 監視の取得に新しい値が要る | `.env` を替えて backend を作り直す(tcops は `.env` を読む) |
 | `ENCRYPTION_KEY`・`LOOKUP_INDEX_KEY` | **替えると保存済みの暗号化データが読めない** | 単純に替えない。鍵の版の切り替え(再暗号化)は別の Gate(SEC-F)。漏洩が疑われる時は DB とバックアップへの接続を止め、先に相談する |
 
+### 8.3 多要素認証(Gate S11、`docs/adr/ADR-admin-mfa.md`)
+
+- 管理者の画面・API は、多要素認証(認証アプリ)を設定し、そのセッションで12時間以内に確認コードを通した時だけ使える。
+  設定は 設定 → セキュリティ「多要素認証(認証アプリ)」(画面の案内: `/settings?tab=security`)。
+- 管理者を新しく作った時は、本人に最初のログインの後で設定してもらう(設定するまで管理者の画面には入れない)。
+- 端末と回復コードを両方なくした人は、**本人確認を別の手段で済ませてから**外す。外すとその人の全端末もログアウトする。
+
+```bash
+python3 scripts/ops/tcops.py security mfa-status --email admin@example.com
+python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes --reason "端末の紛失(本人確認済み)"
+```
+
+- 監視・監査: 監査ログの `mfa_failed`(確認コードの誤り)・`mfa_recovery_code_used`・`mfa_disabled`・`mfa_reset_by_operator`・
+  `admin_mfa_required`。誤りは自動遮断の点数(5点)になる(§3.9)。
+- 設定(`.env`): `ADMIN_MFA_REQUIRED`(既定 true。本番で false だと起動しない)、`ADMIN_MFA_MAX_AGE_HOURS`(既定 12)、
+  `RATE_LIMIT_MFA`(既定 10。利用者ごと15分)。
+
 ---
 
-## 9. 改訂履歴
+## 9. CI と main の保護(Gate S11)
+
+- main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
+  設定: `GITHUB_TOKEN=<管理者のトークン> python3 scripts/ops/ci_gate.py protect`(トークンが無いと画面での手順を表示する)。
+  確認: `python3 scripts/ops/ci_gate.py status`。
+- パッチの流れ: omega-dev2 で全試験に合格 → commit → `gate/<名前>` へ push → `ci_gate.py wait --sha <commit>` で CI の全ジョブの
+  合格を待つ(20分前後)→ 同じ commit を main へ push → `gate/<名前>` を消す。**CI が不合格なら main は変わらず、手元は元に戻る**
+  (`gate/<名前>` は調べるために残す)。GitHub の Actions の画面で落ちたジョブを確かめる。
+- GitHub に届かない時(`ci_gate.py wait` の終了コード 2)は main へ送らない。保護を設定する前に限り、`TC_SKIP_CI_WAIT=1` を付けて
+  パッチを実行すると従来どおり直接 main へ送る(保護の後は GitHub が拒否する)。
+
+---
+
+## 10. 改訂履歴
 
 | 日付 | 版 | 内容 |
 |---|---|---|
@@ -430,3 +462,4 @@ python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵�
 | 2026-10-18 | 6 | Gate S7: 怪しい接続元の入口に計算の確認(§3.10) |
 | 2026-10-18 | 7 | Gate S8: 侵害が疑われる時の手順と封じ込めの操作(§8)。改訂履歴は §9 へ |
 | 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
+| 2026-10-19 | 9 | Gate S11: 多要素認証(§8.3)、CI と main の保護・パッチの流れ(§9)。改訂履歴は §10 へ |

@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 import jwt  # [Gate S1] python-jose(保守停止・未修正の脆弱性あり)から PyJWT へ
 from app.core.password_policy import PasswordPolicyError, validate_password
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal, Union
 import hashlib
 import hmac
 import secrets
@@ -20,7 +20,7 @@ from app.core.auth import (
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
-from app.services import challenge, incident, login_alerts, threat_guard
+from app.services import challenge, incident, login_alerts, mfa, threat_guard
 
 router = APIRouter()
 
@@ -33,7 +33,8 @@ REFRESH_COOKIE_PATH = "/api/v1/auth"
 _REFRESH_PREV_KEY = "_refresh_prev_hash"
 _REFRESH_ROTATED_AT_KEY = "_refresh_rotated_at"
 REFRESH_REUSE_GRACE_SECONDS = 20
-_INTERNAL_DEVICE_INFO_KEYS = (_REFRESH_PREV_KEY, _REFRESH_ROTATED_AT_KEY)
+# [Gate S11] 多要素認証を通った時刻(app/services/mfa.py)も内部の値として一覧に出さない
+_INTERNAL_DEVICE_INFO_KEYS = (_REFRESH_PREV_KEY, _REFRESH_ROTATED_AT_KEY, mfa.SESSION_MFA_KEY)
 
 # パスワードハッシュ化
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -67,6 +68,15 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+
+class MfaChallengeResponse(BaseModel):
+    """[Gate S11] パスワードは正しいが、多要素認証(認証アプリの確認コード)がまだの時の POST /auth/login の応答。
+    この時点ではセッションも cookie も作らない。画面は mfa_token と確認コードを POST /auth/mfa/verify へ送る。"""
+    mfa_required: Literal[True] = True
+    mfa_token: str
+    methods: List[str]
+    expires_in: int
 
 
 class GuestSessionResponse(BaseModel):
@@ -532,7 +542,61 @@ async def register(
         )
 
 
-@router.post("/login", response_model=TokenResponse)
+def complete_login(db: Session, user: User, request: Request, response: Response, *, mfa_verified: bool,
+                   mfa_method: Optional[str] = None) -> TokenResponse:
+    """ログインの最後(セッション・cookie・アクセストークン・新しい端末の通知・監査)。
+    [Gate S11] パスワードだけのログインと、多要素認証の2段目(POST /auth/mfa/verify)の両方から使う。"""
+    client_ip = request.client.host if request.client else "unknown"
+    # [Gate #28] セッションを作成し、refresh tokenをhttpOnly cookieで発行する。
+    secret = _generate_refresh_secret()
+    device_info = login_alerts.session_device_info(request.headers.get("user-agent"))  # [Gate S9]
+    if mfa_verified:
+        device_info = dict(device_info or {})
+        device_info[mfa.SESSION_MFA_KEY] = datetime.now(timezone.utc).isoformat()
+    session = auth_manager.create_session(
+        user_id=user.id,
+        refresh_token_hash=_hash_refresh_secret(secret),
+        ip_address=client_ip,
+        device_info=device_info,
+        db=db,
+    )
+    _set_refresh_cookie(response, f"{session.id}.{secret}")
+    access_token = _access_token_for(user, session.id)
+    # [Gate S9] 過去90日に無い端末からのログインなら、本人に通知する(乗っ取りに早く気付けるように)
+    if login_alerts.notify_if_new_device(db, user, session, user_agent=request.headers.get("user-agent"),
+                                         ip=client_ip):
+        record_audit_event(action="login_new_device", resource_type="user", user_id=user.id,
+                           resource_id=user.id, ip_address=client_ip,
+                           details={"session_id": str(session.id)})
+
+    # [Gate R2-7] 監査ログ: ログイン成功
+    details: Dict[str, Any] = {"session_id": str(session.id)}
+    if mfa_verified:
+        details["mfa"] = mfa_method or "totp"
+    record_audit_event(
+        action="login_success",
+        resource_type="user",
+        user_id=user.id,
+        resource_id=user.id,
+        ip_address=client_ip,
+        user_agent=request.headers.get("user-agent", "")[:255],
+        details=details,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse(
+            id=str(user.id),
+            username=user.username,
+            email=user.email,
+            user_type=user.user_type,
+            is_verified=user.is_verified
+        )
+    )
+
+
+@router.post("/login", response_model=Union[TokenResponse, MfaChallengeResponse])
 async def login(
     login_data: UserLogin,
     request: Request,
@@ -591,46 +655,16 @@ async def login(
                 detail="アカウントが無効です"
             )
 
-        # [Gate #28] セッションを作成し、refresh tokenをhttpOnly cookieで発行する。
-        secret = _generate_refresh_secret()
-        session = auth_manager.create_session(
-            user_id=user.id,
-            refresh_token_hash=_hash_refresh_secret(secret),
-            ip_address=client_ip,
-            device_info=login_alerts.session_device_info(request.headers.get("user-agent")),  # [Gate S9]
-            db=db,
-        )
-        _set_refresh_cookie(response, f"{session.id}.{secret}")
-        access_token = _access_token_for(user, session.id)
-        # [Gate S9] 過去90日に無い端末からのログインなら、本人に通知する(乗っ取りに早く気付けるように)
-        if login_alerts.notify_if_new_device(db, user, session, user_agent=request.headers.get("user-agent"),
-                                             ip=client_ip):
-            record_audit_event(action="login_new_device", resource_type="user", user_id=user.id,
+        # [Gate S11] 多要素認証を設定している利用者は、ここではセッションを作らず確認コードを求める
+        if mfa.is_enabled(db, user.id):
+            mfa_token, _jti = mfa.issue_mfa_token(user.id)
+            record_audit_event(action="login_mfa_challenge", resource_type="user", user_id=user.id,
                                resource_id=user.id, ip_address=client_ip,
-                               details={"session_id": str(session.id)})
+                               user_agent=request.headers.get("user-agent", "")[:255])
+            return MfaChallengeResponse(mfa_token=mfa_token, methods=["totp", "recovery_code"],
+                                        expires_in=mfa.MFA_TOKEN_TTL_SECONDS)
 
-        # [Gate R2-7] 監査ログ: ログイン成功
-        record_audit_event(
-            action="login_success",
-            resource_type="user",
-            user_id=user.id,
-            resource_id=user.id,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent", "")[:255],
-            details={"session_id": str(session.id)},
-        )
-
-        return TokenResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user=UserResponse(
-                id=str(user.id),
-                username=user.username,
-                email=user.email,
-                user_type=user.user_type,
-                is_verified=user.is_verified
-            )
-        )
+        return complete_login(db, user, request, response, mfa_verified=False)
 
     except HTTPException:
         raise

@@ -19,20 +19,58 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
-from app.models.models import AuditLog, OptimizationResult, TravelPlan, User
+from app.core.auth import AuthResult, get_current_active_user, get_current_user
+from app.models.models import AuditLog, OptimizationResult, TravelPlan, User, UserSession
+from app.services import mfa
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-ADMIN_TYPES = {"admin", "super_admin"}
+ADMIN_TYPES = mfa.ADMIN_TYPES
 
 
-def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
-    """管理者権限を要求する依存関数。管理者以外は403を返す。"""
-    if current_user.user_type not in ADMIN_TYPES and not current_user.is_superuser:
+def _current_session(db: Session, auth) -> Optional[UserSession]:
+    sid = getattr(getattr(auth, "token_data", None), "session_id", None) or getattr(auth, "session_id", None)
+    if not sid:
+        return None
+    try:
+        return db.query(UserSession).filter(UserSession.id == uuid.UUID(str(sid)),
+                                            UserSession.is_active.is_(True)).first()
+    except ValueError:
+        return None
+
+
+def require_admin(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    auth=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """管理者権限を要求する依存関数。管理者以外は403を返す。
+
+    [Gate S11] SEC-06 管理者は多要素認証(TOTP)が必須。設定していない(mfa_enrollment_required)、
+    このセッションで ADMIN_MFA_MAX_AGE_HOURS 以内に確認コードを通していない(mfa_step_up_required)時も 403。
+    パスワードだけが漏れても、管理者の API(全利用者の一覧・アカウント停止・監査ログ)には届かない。"""
+    if not mfa.is_admin(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="管理者権限が必要です")
+    if not settings.ADMIN_MFA_REQUIRED:
+        return current_user
+    if not mfa.is_enabled(db, current_user.id):
+        record_audit_event(action="admin_mfa_required", resource_type="user", user_id=current_user.id,
+                           resource_id=current_user.id, ip_address=request.client.host if request.client else None,
+                           details={"reason": "not_enrolled"})
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
+            "code": "mfa_enrollment_required",
+            "message": "管理者の画面を使うには、設定 → セキュリティで多要素認証(認証アプリ)を有効にしてください",
+        })
+    session = _current_session(db, auth) if isinstance(auth, AuthResult) else None
+    if session is None or str(session.user_id) != str(current_user.id) or not mfa.admin_session_fresh(session):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
+            "code": "mfa_step_up_required",
+            "message": "管理者の画面を使うには、認証アプリの確認コードを入力してください",
+        })
     return current_user
 
 

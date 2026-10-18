@@ -26,7 +26,7 @@ import type {
   PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
   ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
-  AuthResponse, AuthUser, GuestSessionResponse, ActiveSession,
+  AuthResponse, AuthUser, GuestSessionResponse, ActiveSession, MfaChallenge, MfaRecoveryCodes, MfaSetup, MfaStatus,
   ConstraintValue, PlanConstraint,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
@@ -50,7 +50,8 @@ import type {
   OfflinePackKey, OfflinePackKeyRotated,
 } from './types';
 import {
-  arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder,
+  arrayOf, bool, exactNumber, int, isRecord, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str,
+  trueOnly, type Decoder,
 } from './decode';
 
 export interface RevisionResult {
@@ -622,6 +623,41 @@ export const authResponse: Decoder<AuthResponse> = object<AuthResponse>({
   access_token: str,
   token_type: str,
   user: authUser,
+});
+
+// [Gate S11] 多要素認証(backend app/api/v1/mfa.py、auth.py MfaChallengeResponse)
+export const mfaChallenge: Decoder<MfaChallenge> = object<MfaChallenge>({
+  mfa_required: trueOnly,
+  mfa_token: str,
+  methods: arrayOf(str),
+  expires_in: int,
+});
+
+/** POST /auth/login: 確認コードの入力待ち(mfa_required)か、ログイン完了か */
+export const loginResult: Decoder<AuthResponse | MfaChallenge> = (v, path) =>
+  isRecord(v) && v.mfa_required === true ? mfaChallenge(v, path) : authResponse(v, path);
+
+export const mfaStatus: Decoder<MfaStatus> = object<MfaStatus>({
+  enabled: bool,
+  pending: bool,
+  confirmed_at: nullable(str),
+  recovery_codes_remaining: nonNegativeInt,
+  is_admin: bool,
+  required: bool,
+  session_verified: bool,
+  session_verified_at: nullable(str),
+});
+
+export const mfaSetup: Decoder<MfaSetup> = object<MfaSetup>({
+  secret: matching(/^[A-Z2-7]{16,64}$/, 'base32 の秘密'),
+  otpauth_uri: matching(/^otpauth:\/\/totp\//, 'otpauth://totp/ で始まる URI'),
+  digits: int,
+  period: int,
+  algorithm: str,
+});
+
+export const mfaRecoveryCodes: Decoder<MfaRecoveryCodes> = object<MfaRecoveryCodes>({
+  recovery_codes: arrayOf(str),
 });
 
 // [Gate S9] ログイン中の端末(GET /auth/sessions)。device_info(User-Agent 全文)は画面で使わないので読まない

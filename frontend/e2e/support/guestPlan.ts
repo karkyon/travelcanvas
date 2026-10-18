@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 
 /**
  * [Gate E1] E2E のプラン作成を1か所にまとめる。
@@ -15,6 +15,14 @@ import type { Page } from '@playwright/test';
  */
 export type GuestPlan = { planId: string; apiBase: string; token: string };
 
+/** [Gate S11] POST /auth/guest の応答からゲストのアクセストークンを取る(画面の遷移と競合しない) */
+export async function guestTokenFrom(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => null)) as { access_token?: unknown } | null;
+  const token = body && typeof body.access_token === 'string' ? body.access_token : null;
+  if (!token) throw new Error(`ゲストの応答にアクセストークンがありません: ${response.status()}`);
+  return token;
+}
+
 export async function startGuestPlanViaApi(
   page: Page,
   title: string,
@@ -29,9 +37,10 @@ export async function startGuestPlanViaApi(
     throw new Error(`ゲストの開始に失敗しました: ${guest.status()} ${await guest.text().catch(() => '')}`);
   }
   const apiBase = guest.url().replace(/\/auth\/guest$/, '');
+  // [Gate S11] トークンは応答の本文から取る。以前は画面の遷移中に page.evaluate で localStorage を読み、
+  // 「Execution context was destroyed」で1回だけ失敗することがあった(S9 の preparation、再試行で合格)
+  const token = await guestTokenFrom(guest);
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
   const res = await page.request.post(`${apiBase}/travel-plans/`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { title },

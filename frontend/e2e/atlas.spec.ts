@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { guestTokenFrom } from './support/guestPlan';
 
 /**
  * [Gate P15] FR-052 Personal Travel Atlas(SC-41)のbrowser E2E。
@@ -25,9 +26,10 @@ test('旅の地図: 旅行を横断して訪れた区画を状態つきで示し
   await page.goto('/');
   const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
+  const guest = await guestResponse;
+  const apiBase = guest.url().replace(/\/auth\/guest$/, '');
+  const token = await guestTokenFrom(guest); // [Gate S11] 画面の遷移と競合しないよう応答から取る
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
   const send = async (method: 'post' | 'put', path: string, data: unknown) => {
     const res = await context.request[method](`${apiBase}${path}`, {
       headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': `p15-e2e-${Date.now()}-${Math.random()}` }, data,

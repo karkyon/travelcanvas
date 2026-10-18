@@ -11,18 +11,20 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
-const { getSessions, getCurrentUser } = vi.hoisted(() => ({
+const { getSessions, getCurrentUser, getMfaStatus } = vi.hoisted(() => ({
   getSessions: vi.fn(),
   getCurrentUser: vi.fn(),
+  getMfaStatus: vi.fn(),
 }));
 
 vi.mock('@/services/api', () => ({
   api: {
-    getSessions, getCurrentUser, revokeSession: vi.fn(), updateProfile: vi.fn(), changePassword: vi.fn(),
+    getSessions, getCurrentUser, getMfaStatus, revokeSession: vi.fn(), updateProfile: vi.fn(), changePassword: vi.fn(),
     setGuestMode: vi.fn(), setMemberSession: vi.fn(), setAccessToken: vi.fn(), clearAccessToken: vi.fn(),
   },
   getOfflinePackKey: vi.fn(),
   rotateOfflinePackKey: vi.fn(),
+  AuthApiError: class AuthApiError extends Error {},
 }));
 vi.mock('@/utils/offlinePack', () => ({
   listOfflinePacks: vi.fn(async () => []), deleteOfflinePack: vi.fn(), clearAllOfflinePacks: vi.fn(),
@@ -32,6 +34,10 @@ import SettingsPage from './SettingsPage';
 
 beforeEach(() => {
   getCurrentUser.mockResolvedValue({ data: { preferences: {} } });
+  getMfaStatus.mockResolvedValue({
+    enabled: false, pending: false, confirmed_at: null, recovery_codes_remaining: 0, is_admin: false,
+    required: false, session_verified: false, session_verified_at: null,
+  });
   getSessions.mockReset();
   getSessions.mockResolvedValue([{
     id: 's1', device_label: 'Chrome / Windows', network_label: '203.0.113.x', ip_address: null,

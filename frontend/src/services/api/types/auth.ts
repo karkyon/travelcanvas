@@ -51,6 +51,48 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+/**
+ * [Gate S11] パスワードは正しいが、多要素認証の確認コードがまだの時の POST /auth/login の応答
+ * (backend MfaChallengeResponse)。この時点ではセッションは作られていない。
+ */
+export interface MfaChallenge {
+  mfa_required: true;
+  mfa_token: string;
+  methods: string[];
+  expires_in: number;
+}
+
+/** [Gate S11] POST /auth/login の応答。ログイン完了か、確認コードの入力待ち。 */
+export type LoginResult = AuthResponse | MfaChallenge;
+
+/** [Gate S11] GET /auth/mfa(backend MfaStatus)。 */
+export interface MfaStatus {
+  enabled: boolean;
+  pending: boolean;
+  confirmed_at: string | null;
+  recovery_codes_remaining: number;
+  is_admin: boolean;
+  /** 管理者で、多要素認証が必須 */
+  required: boolean;
+  /** このセッションで確認コードを通した(管理者は ADMIN_MFA_MAX_AGE_HOURS 以内) */
+  session_verified: boolean;
+  session_verified_at: string | null;
+}
+
+/** [Gate S11] POST /auth/mfa/setup(1回だけ返る。保存しない) */
+export interface MfaSetup {
+  secret: string;
+  otpauth_uri: string;
+  digits: number;
+  period: number;
+  algorithm: string;
+}
+
+/** [Gate S11] POST /auth/mfa/enable・/recovery-codes(1回だけ返る。保存しない) */
+export interface MfaRecoveryCodes {
+  recovery_codes: string[];
+}
+
 /** [Gate S9] GET /auth/sessions の1件(backend SessionInfo)。ログイン中の端末。 */
 export interface ActiveSession {
   id: string;

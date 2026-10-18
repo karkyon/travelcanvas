@@ -418,7 +418,10 @@ async def quickdraft_problem_handler(request: Request, exc: QuickDraftProblemErr
 # 続け、障害の発見が遅れる致命的なfail-silentだったため、ここでは
 # 例外を握り潰さず、そのまま起動失敗として伝播させる(fail-fast)。
 from app.api.v1.auth import router as auth_router  # noqa: E402
+from app.api.v1 import mfa as mfa_api  # noqa: E402
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
+# [Gate S11] SEC-06 多要素認証(/api/v1/auth/mfa/*)
+app.include_router(mfa_api.router, prefix="/api/v1/auth")
 logger.info("Auth routes loaded successfully")
 
 logger.info("TravelCanvas API - Ready to start")

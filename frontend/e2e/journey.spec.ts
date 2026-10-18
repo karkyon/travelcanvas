@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { guestTokenFrom } from './support/guestPlan';
 
 /**
  * [Gate P14] FR-054 Plan-to-Memory・FR-053 旅の達成指標(SC-42 Journey Review)のbrowser E2E。
@@ -26,9 +27,10 @@ async function startGuest(page: Page): Promise<{ apiBase: string; token: string 
   await page.goto('/');
   const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
+  const guest = await guestResponse;
+  const apiBase = guest.url().replace(/\/auth\/guest$/, '');
+  const token = await guestTokenFrom(guest); // [Gate S11] 画面の遷移と競合しないよう応答から取る
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
   if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
   return { apiBase, token };
 }

@@ -9,6 +9,10 @@
     unblock-all                             全ての接続元の点数・遮断を消す
     revoke-sessions --email user@example.com [--reason "…"]
     revoke-sessions --all --yes [--reason "…"]   全員の全端末をログアウトさせる
+    mfa-status --email admin@example.com    [Gate S11] 多要素認証の設定の有無(回復コードの残り数)
+    mfa-reset --email admin@example.com --yes [--reason "…"]
+                                            [Gate S11] 端末と回復コードを両方なくした人の多要素認証を外す
+                                            (その人の全端末もログアウトさせる。本人確認は運用者が別の手段で行う)
 
 結果は1行の JSON(値に個人情報を含めない)。終了コード: 0=成功、2=使い方の誤り、3=失敗、4=効果が無い(共有できない)
 """
@@ -48,6 +52,41 @@ def _shared() -> bool:
         return False
 
 
+def _mfa_command(args) -> int:
+    """[Gate S11] 多要素認証の確認・解除(値に個人情報を含めない)。"""
+    from app.core.auth import auth_manager
+    from app.models.models import User, UserMfa
+    from app.services.audit_service import record_audit_event
+
+    if args.cmd == "mfa-reset" and not args.yes:
+        _print({"ok": False, "error": "多要素認証を外すには --yes も付けてください"})
+        return EXIT_USAGE
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == args.email).first()
+        if user is None:
+            _print({"ok": False, "error": "その利用者は見つかりません"})
+            return EXIT_FAIL
+        rec = db.query(UserMfa).filter(UserMfa.user_id == user.id).first()
+        if args.cmd == "mfa-status":
+            _print({"ok": True, "enabled": bool(rec and rec.confirmed_at),
+                    "pending": bool(rec and not rec.confirmed_at),
+                    "recovery_codes_remaining": len(rec.recovery_code_hashes or []) if rec else 0})
+            return EXIT_OK
+        if rec is None:
+            _print({"ok": True, "removed": False})
+            return EXIT_NO_EFFECT
+        db.delete(rec)
+        db.commit()
+        auth_manager.revoke_all_user_sessions(str(user.id), db)
+        record_audit_event(action="mfa_reset_by_operator", resource_type="user", user_id=None, resource_id=user.id,
+                           details={"reason": (args.reason or "")[:200], "sessions_revoked": True})
+        _print({"ok": True, "removed": True, "sessions_revoked": True})
+        return EXIT_OK
+    finally:
+        db.close()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="侵害が疑われる時の封じ込め(Runbook §9)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -65,7 +104,16 @@ def main(argv=None) -> int:
     p.add_argument("--all", action="store_true")
     p.add_argument("--yes", action="store_true", help="--all の確認")
     p.add_argument("--reason", default="")
+    p = sub.add_parser("mfa-status")
+    p.add_argument("--email", required=True)
+    p = sub.add_parser("mfa-reset")
+    p.add_argument("--email", required=True)
+    p.add_argument("--yes", action="store_true", help="外すことの確認")
+    p.add_argument("--reason", default="")
     args = parser.parse_args(argv)
+
+    if args.cmd in ("mfa-status", "mfa-reset"):
+        return _mfa_command(args)
 
     rate_limiter.use_backend("auto")
     shared = _shared()

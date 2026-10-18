@@ -2,9 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # [Gate S11] SEC-24 パッチは検証した commit をまず gate/<名前> へ送り、ここで全ジョブに合格してから
+    # 同じ commit を main へ送る(scripts/ops/ci_gate.py、Runbook §9)。main は必須の CI で保護する。
+    branches: [main, 'gate/**']
   pull_request:
     branches: [main]
+
+# 同じブランチへの古い実行は取り消す(main は取り消さない: 合格の記録を残すため)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # [Gate R0] tracked secret scanをCIでblocking化する。
@@ -171,6 +178,8 @@ jobs:
           alembic downgrade -1
           alembic upgrade head
 
+      # [Gate S11] 以前は CI に ENCRYPTION_KEY・CORS_ORIGINS・文書の保存先が無く、34件が失敗し続けていた
+      # (2026-09-17 以降 main の CI は赤のまま)。tests/conftest.py が試験だけの既定値を入れる。
       - name: pytest 全件 (ブロッキング)
         run: python -m pytest tests/ -v
 
@@ -212,6 +221,8 @@ jobs:
           # のみ通用する非秘密な固定値を注入する(本番/開発環境の値とは
           # 一切関係が無い)。
           DOCUMENT_DOWNLOAD_SIGNING_KEY=ci-only-dummy-download-signing-key-not-used-anywhere-else
+          # [Gate S11] 予約番号の盲検索(R3-13)。omega-dev2 の .env と同じく設定する(未設定だと予約の検索が 503)
+          LOOKUP_INDEX_KEY=ci-only-dummy-lookup-index-key-not-used-anywhere-else
           VITE_API_URL=http://localhost:8001
           EOF
 

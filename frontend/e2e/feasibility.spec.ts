@@ -26,9 +26,9 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 }
 
 // [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
-async function startGuestPlan(page: Page): Promise<{ planId: string; apiBase: string }> {
+async function startGuestPlan(page: Page): Promise<{ planId: string; apiBase: string; token: string }> {
   const r = await startGuestPlanViaApi(page, `L3検証E2E-${Date.now()}`);
-  return { planId: r.planId, apiBase: r.apiBase };
+  return { planId: r.planId, apiBase: r.apiBase, token: r.token };
 }
 
 async function send(request: APIRequestContext, base: string, token: string, path: string, data: unknown,
@@ -40,9 +40,7 @@ async function send(request: APIRequestContext, base: string, token: string, pat
 }
 
 test('実行可能性チェック: 違反・警告・検証不能を分けて表示し、結果を保存し、変更後は古い結果と示す', async ({ page, context }) => {
-  const { planId, apiBase } = await startGuestPlan(page);
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
+  const { planId, apiBase, token } = await startGuestPlan(page);
 
   // 旅程: 美術館(10:00-12:00) → タクシー20分 → 昼食(11:30開始、終了未定)、時刻未定の散策
   const day = await send(context.request, apiBase, token, `/plans/${planId}/days`,

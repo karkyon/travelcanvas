@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api as apiService, AuthApiError } from '@/services/api';
-import type { SessionUser } from '@/services/api';
+import type { AuthResponse, SessionUser } from '@/services/api';
 import { forgetOfflineKeys } from '@/utils/offlineVault';
 
 // [Gate A1] 認証処理をAPIクライアント(services/api)へ一本化した(B-002)。
@@ -41,7 +41,15 @@ interface AuthState {
   isGuest: boolean;
   guestToken: string | null;
   guestId: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  /**
+   * [Gate S11] 'mfa' の時は確認コードの入力待ち(pendingMfa)。verifyMfa で完了する。
+   * パスワードだけで完了した時は 'done'。
+   */
+  login: (email: string, password: string) => Promise<'done' | 'mfa'>;
+  /** [Gate S11] 多要素認証の入力待ち(保存しない。5分で期限切れ) */
+  pendingMfa: { token: string; expiresAt: number } | null;
+  verifyMfa: (code: string) => Promise<void>;
+  cancelMfa: () => void;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   /** [Gate P9] サーバーへ通信せずに、この端末のログイン状態だけを消す(アカウント削除後。セッションは失効済み) */
@@ -56,6 +64,7 @@ interface AuthState {
 }
 
 const LOGGED_OUT = {
+  pendingMfa: null,
   user: null,
   token: null,
   isAuthenticated: false,
@@ -82,7 +91,27 @@ function dropStoredMemberToken(isGuest: boolean): void {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // [Gate #10] apiServiceのaxiosクライアントにもトークンを同期する。
+      // これが無いと、ログイン後もspots/travel-plans等の認証必須APIが
+      // Authorizationヘッダー無しで送信され、常に401で失敗していた。
+      // [Gate S11] パスワードだけのログインと、多要素認証の2段目の両方で使う。
+      const applyMemberLogin = (data: AuthResponse) => {
+        apiService.setAccessToken(data.access_token);
+        apiService.setGuestMode(false);
+        apiService.setMemberSession(true);
+        set({
+          user: data.user,
+          token: data.access_token,
+          isAuthenticated: true,
+          isLoading: false,
+          isInitialized: true,
+          error: null,
+          pendingMfa: null,
+        });
+      };
+
+      return {
       user: null,
       token: null,
       isAuthenticated: false,
@@ -92,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
       isGuest: false,
       guestToken: null,
       guestId: null,
+      pendingMfa: null,
 
       restoreMemberSession: () => {
         if (restoring) return restoring;
@@ -206,26 +236,21 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, pendingMfa: null });
 
         try {
-          const data = await apiService.login({ email, password });
-
-          // [Gate #10] apiServiceのaxiosクライアントにもトークンを同期する。
-          // これが無いと、ログイン後もspots/travel-plans等の認証必須APIが
-          // Authorizationヘッダー無しで送信され、常に401で失敗していた。
-          apiService.setAccessToken(data.access_token);
-          apiService.setGuestMode(false);
-          apiService.setMemberSession(true);
-
-          set({
-            user: data.user,
-            token: data.access_token,
-            isAuthenticated: true,
-            isLoading: false,
-            isInitialized: true,
-            error: null,
-          });
+          const result = await apiService.login({ email, password });
+          if ('mfa_required' in result) {
+            // [Gate S11] パスワードは正しい。認証アプリの確認コードの入力を待つ(まだログインしていない)
+            set({
+              isLoading: false,
+              isInitialized: true,
+              pendingMfa: { token: result.mfa_token, expiresAt: Date.now() + result.expires_in * 1000 },
+            });
+            return 'mfa';
+          }
+          applyMemberLogin(result);
+          return 'done';
         } catch (error) {
           const message = errorMessage(error, 'ログインに失敗しました');
           console.error('❌ ログインエラー:', message);
@@ -237,6 +262,26 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
       },
+
+      verifyMfa: async (code: string) => {
+        const pending = get().pendingMfa;
+        if (!pending || pending.expiresAt <= Date.now()) {
+          set({ pendingMfa: null, error: '確認の期限が切れました。もう一度ログインしてください' });
+          throw new AuthApiError('確認の期限が切れました。もう一度ログインしてください', 401, 'mfa_token_invalid');
+        }
+        set({ isLoading: true, error: null });
+        try {
+          const data = await apiService.verifyMfaLogin(pending.token, code);
+          applyMemberLogin(data);
+        } catch (error) {
+          const message = errorMessage(error, '確認コードの確認に失敗しました');
+          const expired = error instanceof AuthApiError && (error.status === 401 || error.status === 429);
+          set({ isLoading: false, error: message, ...(expired ? { pendingMfa: null } : {}) });
+          throw error;
+        }
+      },
+
+      cancelMfa: () => set({ pendingMfa: null, error: null }),
 
       register: async (username: string, email: string, password: string) => {
         set({ isLoading: true, error: null });
@@ -362,7 +407,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
-    }),
+    };
+    },
     {
       name: 'auth-storage',
       // [Gate S5] 版1: 会員のアクセストークン(token)を保存しない。古い版が保存した token は読み込み時に捨てる

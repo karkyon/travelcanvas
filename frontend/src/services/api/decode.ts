@@ -62,6 +62,9 @@ export const matching =
 
 export const bool: Decoder<boolean> = (v, path) => (typeof v === 'boolean' ? v : fail(path, '真偽値'));
 
+/** [Gate S11] 値が true だけ(判別用の印。POST /auth/login の mfa_required) */
+export const trueOnly: Decoder<true> = (v, path) => (v === true ? true : fail(path, 'true'));
+
 /**
  * 列挙値(文字列リテラルの和型)。backendの許容値集合と一致させること
  * (backend側で値を追加した場合、ここへ追加するまでは形式不正として検出される)。

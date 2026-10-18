@@ -9,6 +9,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import AdminMfaGate from '@/components/admin/AdminMfaGate';
 
 // 認証が必要なルートを保護するコンポーネント
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -30,11 +31,13 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  if (user?.user_type !== 'admin') {
+  const isAdmin = user?.user_type === 'admin' || user?.user_type === 'super_admin' || user?.is_superuser === true;
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
-  return <>{children}</>;
+  // [Gate S11] 管理者の画面は多要素認証を通したセッションだけ(backend の require_admin と同じ条件)
+  return <AdminMfaGate>{children}</AdminMfaGate>;
 };
 
 // 認証済みユーザーのリダイレクト

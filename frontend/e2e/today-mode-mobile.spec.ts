@@ -54,9 +54,9 @@ const displayTime = (date: Date, timeZone: string) =>
   date.toLocaleTimeString('ja-JP', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
 
 // [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
-async function startGuestAndCreatePlan(page: Page, title: string): Promise<{ planId: string; apiBase: string }> {
+async function startGuestAndCreatePlan(page: Page, title: string): Promise<{ planId: string; apiBase: string; token: string }> {
   const r = await startGuestPlanViaApi(page, title);
-  return { planId: r.planId, apiBase: r.apiBase };
+  return { planId: r.planId, apiBase: r.apiBase, token: r.token };
 }
 
 class Api {
@@ -87,9 +87,7 @@ test.describe('当日モード (FR-029/030/032) mobile E2E', () => {
     });
 
     const suffix = Date.now().toString();
-    const { planId, apiBase } = await startGuestAndCreatePlan(page, `L1b当日E2E-${suffix}`);
-    const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-    if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
+    const { planId, apiBase, token } = await startGuestAndCreatePlan(page, `L1b当日E2E-${suffix}`);
     const api = new Api(context.request, apiBase, token);
 
     const now = new Date();

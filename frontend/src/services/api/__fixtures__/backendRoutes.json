@@ -22,7 +22,8 @@
   "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答",
   "captured_at_head_p15": "Gate P15(FR-052 Personal Travel Atlas)の実backend応答",
   "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
-  "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)"
+  "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)",
+  "captured_at_head_s11": "Gate S10 (+Gate S11 /auth/mfa/*)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -64,6 +65,7 @@
   "GET /api/v1/admin/users/{user_id}",
   "GET /api/v1/atlas",
   "GET /api/v1/auth/me",
+  "GET /api/v1/auth/mfa",
   "GET /api/v1/auth/sessions",
   "GET /api/v1/auth/test",
   "GET /api/v1/health",
@@ -172,6 +174,12 @@
   "POST /api/v1/auth/login",
   "POST /api/v1/auth/logout",
   "POST /api/v1/auth/logout-all",
+  "POST /api/v1/auth/mfa/disable",
+  "POST /api/v1/auth/mfa/enable",
+  "POST /api/v1/auth/mfa/recovery-codes",
+  "POST /api/v1/auth/mfa/setup",
+  "POST /api/v1/auth/mfa/step-up",
+  "POST /api/v1/auth/mfa/verify",
   "POST /api/v1/auth/refresh",
   "POST /api/v1/auth/register",
   "POST /api/v1/notifications/read-all",
@@ -243,6 +251,7 @@
   "POST /api/v1/quick-drafts/{draft_id}/promote",
   "POST /api/v1/search/candidates/{candidate_id}/adopt",
   "POST /api/v1/search/spots",
+  "POST /api/v1/security/csp-report",
   "POST /api/v1/spots/",
   "POST /api/v1/spots/{spot_id}/favorite",
   "POST /api/v1/spots/{spot_id}/visit",

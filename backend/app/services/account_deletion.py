@@ -204,6 +204,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     summary["spot_visits"] = db.query(UserSpotVisit).filter(UserSpotVisit.user_id == me).delete(
         synchronize_session=False)
     db.query(IdempotencyRecord).filter(IdempotencyRecord.user_id == me).delete(synchronize_session=False)
+    # [Gate S11] 多要素認証の秘密・回復コード(件数は応答に含めない。設定の有無も残さない)
+    from app.models.models import UserMfa
+
+    db.query(UserMfa).filter(UserMfa.user_id == me).delete(synchronize_session=False)
     summary["sessions"] = db.query(UserSession).filter(UserSession.user_id == me).delete(
         synchronize_session=False)
 

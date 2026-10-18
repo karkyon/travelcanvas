@@ -24,9 +24,9 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 }
 
 // [Gate E1] プランは API で作る(QuickDraft の回数制限に当たらないため)。e2e/support/guestPlan.ts
-async function startGuestPlan(page: Page, title: string): Promise<{ planId: string; apiBase: string }> {
+async function startGuestPlan(page: Page, title: string): Promise<{ planId: string; apiBase: string; token: string }> {
   const r = await startGuestPlanViaApi(page, title);
-  return { planId: r.planId, apiBase: r.apiBase };
+  return { planId: r.planId, apiBase: r.apiBase, token: r.token };
 }
 
 async function send(request: APIRequestContext, base: string, token: string, method: 'post' | 'get', path: string,
@@ -43,9 +43,7 @@ function planCard(page: Page, title: string) {
 
 test('プラン削除: 子データのあるプランを削除・復元・完全削除できる', async ({ page, context }) => {
   const title = `B012削除E2E-${Date.now()}`;
-  const { planId, apiBase } = await startGuestPlan(page, title);
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('ゲストのアクセストークンがlocalStorage(auth_token)にありません');
+  const { planId, apiBase, token } = await startGuestPlan(page, title);
 
   // 子データ: 日程・予定2件・予定に紐付いた予約・移動区間(いずれもB-012で削除を500にしていた)
   const day = await send(context.request, apiBase, token, 'post', `/plans/${planId}/days`,

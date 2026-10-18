@@ -37,6 +37,7 @@ import {
   memoryReplanApplyResult, memoryReplanResult,
   offlinePackKey, offlinePackKeyRotated,
   activeSession,
+  mfaChallenge, mfaRecoveryCodes, mfaSetup, mfaStatus,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -300,6 +301,13 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['memory_replan_error_stale', object({ detail: object({ code: str, message: str }) })],
   // [Gate K1] オフラインパックの鍵(B-008)
   ['offline_pack_key', offlinePackKey],
+  // [Gate S11] 多要素認証(/auth/mfa/*)。ログインの応答は、確認コード待ちとログイン完了のどちらも受理する
+  ['login_mfa_challenge', mfaChallenge],
+  ['mfa_verify', authResponse],
+  ['mfa_status_disabled', mfaStatus],
+  ['mfa_status_enabled', mfaStatus],
+  ['mfa_setup', mfaSetup],
+  ['mfa_recovery_codes', mfaRecoveryCodes],
   ['offline_pack_key_rotated', offlinePackKeyRotated],
   ['offline_pack_key_error_version', object({ detail: object({ code: str, message: str }) })],
   ['offline_pack_key_error_if_match', object({ detail: object({ code: str, message: str }) })],

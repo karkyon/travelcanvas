@@ -20,21 +20,27 @@ import axios, { type AxiosRequestConfig } from 'axios';
 import type { User } from '@/types';
 import { ApiCore, extractApiErrorDetailMessage } from '../core';
 import type {
-  ActiveSession, ApiResponse, AuthResponse, GuestSessionResponse, GuestUpgradeData, LoginCredentials, RegisterData,
+  ActiveSession, ApiResponse, AuthResponse, GuestSessionResponse, GuestUpgradeData, LoginCredentials, LoginResult,
+  MfaRecoveryCodes, MfaSetup, MfaStatus, RegisterData,
 } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { ApiDecodeError, decodeResponse } from '../decode';
-import { activeSession, authResponse, guestSessionResponse, user } from '../decoders';
+import {
+  activeSession, authResponse, guestSessionResponse, loginResult, mfaRecoveryCodes, mfaSetup, mfaStatus, user,
+} from '../decoders';
 import { arrayOf } from '../decode';
 
 /** 認証APIの失敗。messageはそのまま画面に表示してよい文言、statusはHTTPステータス(通信失敗時はnull)。 */
 export class AuthApiError extends Error {
   readonly status: number | null;
+  /** [Gate S11] backend の detail.code(mfa_invalid_code・mfa_token_invalid 等)。無ければ null */
+  readonly code: string | null;
 
-  constructor(message: string, status: number | null) {
+  constructor(message: string, status: number | null, code: string | null = null) {
     super(message);
     this.name = 'AuthApiError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -55,9 +61,14 @@ export function toAuthApiError(error: unknown, fallback: string): Error {
       return new AuthApiError('ネットワークエラーが発生しました。接続を確認してください。', null);
     }
     const body = error.response?.data as { detail?: unknown; message?: unknown } | undefined;
-    const detail = extractApiErrorDetailMessage(body?.detail);
+    // [Gate S11] 多要素認証は {code, message} の形の detail を返す
+    const raw = body?.detail as { code?: unknown; message?: unknown } | undefined;
+    const coded = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+    const code = coded && typeof coded.code === 'string' ? coded.code : null;
+    const detail = extractApiErrorDetailMessage(body?.detail)
+      ?? (coded && typeof coded.message === 'string' ? coded.message : null);
     const message = detail ?? (typeof body?.message === 'string' ? body.message : null);
-    return new AuthApiError(message ?? `${fallback}(HTTP ${status})`, status);
+    return new AuthApiError(message ?? `${fallback}(HTTP ${status})`, status, code);
   }
   return new AuthApiError(fallback, null);
 }
@@ -72,12 +83,87 @@ export class AuthApi extends ApiCore {
     }
   }
 
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+  /**
+   * [Gate S11] 多要素認証を設定している利用者は、パスワードが正しくても確認コードの入力待ち(mfa_required)が返る。
+   * その場合は verifyMfaLogin(mfa_token, 確認コード)でログインを完了する。
+   */
+  async login(credentials: LoginCredentials): Promise<LoginResult> {
     try {
       const response = await this.client.post('/auth/login', credentials, SILENT);
-      return decodeResponse(response.data, authResponse, 'POST /auth/login');
+      return decodeResponse(response.data, loginResult, 'POST /auth/login');
     } catch (error) {
       throw toAuthApiError(error, 'ログインに失敗しました');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/verify。ログインの2段目(認証アプリの確認コード、または回復コード)。 */
+  async verifyMfaLogin(mfaToken: string, code: string): Promise<AuthResponse> {
+    try {
+      const response = await this.client.post('/auth/mfa/verify', { mfa_token: mfaToken, code }, SILENT);
+      return decodeResponse(response.data, authResponse, 'POST /auth/mfa/verify');
+    } catch (error) {
+      throw toAuthApiError(error, '確認コードの確認に失敗しました');
+    }
+  }
+
+  /** [Gate S11] GET /auth/mfa。多要素認証の状態(管理者に必須か・このセッションが確認済みか)。 */
+  async getMfaStatus(): Promise<MfaStatus> {
+    try {
+      const response = await this.client.get('/auth/mfa', SILENT);
+      return decodeResponse(response.data, mfaStatus, 'GET /auth/mfa');
+    } catch (error) {
+      throw toAuthApiError(error, '多要素認証の状態を取得できませんでした');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/setup。秘密と otpauth URI(1回だけ返る。画面は保存しない)。 */
+  async setupMfa(currentPassword: string): Promise<MfaSetup> {
+    try {
+      const response = await this.client.post('/auth/mfa/setup', { current_password: currentPassword }, SILENT);
+      return decodeResponse(response.data, mfaSetup, 'POST /auth/mfa/setup');
+    } catch (error) {
+      throw toAuthApiError(error, '多要素認証の設定を始められませんでした');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/enable。登録を確かめて有効にする。回復コード(1回だけ返る)。 */
+  async enableMfa(code: string): Promise<MfaRecoveryCodes> {
+    try {
+      const response = await this.client.post('/auth/mfa/enable', { code }, SILENT);
+      return decodeResponse(response.data, mfaRecoveryCodes, 'POST /auth/mfa/enable');
+    } catch (error) {
+      throw toAuthApiError(error, '多要素認証を有効にできませんでした');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/disable。パスワード + 確認コード(または回復コード)。ほかの端末はログアウトする。 */
+  async disableMfa(currentPassword: string, code: string): Promise<void> {
+    try {
+      await this.client.post('/auth/mfa/disable', { current_password: currentPassword, code }, SILENT);
+    } catch (error) {
+      throw toAuthApiError(error, '多要素認証を無効にできませんでした');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/recovery-codes。回復コードを作り直す(古いものは使えなくなる)。 */
+  async regenerateRecoveryCodes(currentPassword: string, code: string): Promise<MfaRecoveryCodes> {
+    try {
+      const response = await this.client.post(
+        '/auth/mfa/recovery-codes', { current_password: currentPassword, code }, SILENT,
+      );
+      return decodeResponse(response.data, mfaRecoveryCodes, 'POST /auth/mfa/recovery-codes');
+    } catch (error) {
+      throw toAuthApiError(error, '回復コードを作り直せませんでした');
+    }
+  }
+
+  /** [Gate S11] POST /auth/mfa/step-up。ログイン中のこのセッションを確認済みにする(管理者の画面の前など)。 */
+  async stepUpMfa(code: string): Promise<MfaStatus> {
+    try {
+      const response = await this.client.post('/auth/mfa/step-up', { code }, SILENT);
+      return decodeResponse(response.data, mfaStatus, 'POST /auth/mfa/step-up');
+    } catch (error) {
+      throw toAuthApiError(error, '確認コードの確認に失敗しました');
     }
   }
 

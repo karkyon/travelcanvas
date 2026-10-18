@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { guestTokenFrom } from './support/guestPlan';
 
 /**
  * [Gate P17] FR-057 Memory Replan(CA-015)のbrowser E2E。
@@ -25,9 +26,10 @@ test('過去の旅からの提案: 傾向を根拠つきで示し、確認して
   await page.goto('/');
   const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
-  const apiBase = (await guestResponse).url().replace(/\/auth\/guest$/, '');
+  const guest = await guestResponse;
+  const apiBase = guest.url().replace(/\/auth\/guest$/, '');
+  const token = await guestTokenFrom(guest); // [Gate S11] 画面の遷移と競合しないよう応答から取る
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
   const send = async (method: 'get' | 'post' | 'put', path: string, data?: unknown, headers: Record<string, string> = {}) => {
     const res = await context.request[method](`${apiBase}${path}`, {
       headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': `p17-e2e-${Date.now()}-${Math.random()}`, ...headers }, data,
