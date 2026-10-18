@@ -14,6 +14,7 @@
 | `/ready` が 503(`migration_current` が false) | `docker compose exec -T backend alembic current` | §3.2 |
 | 5xx が増えた(`http_5xx`) | `docker compose logs --since 30m backend` | §3.3 |
 | ログに個人情報らしき値(`log_leak`) | `tcops.py log-scan --since 25h` | §3.6 |
+| ダウンロードが 403・アップロードが 413/422/503 | `/metrics` の `security_events` | §3.8 |
 | 応答が遅い(`slow_responses`) | `/metrics` のルート別の時間 | §3.4 |
 | ディスクが少ない(`disk_low`) | `df -h`、`tcops.py list` | §3.5 |
 | バックアップが古い・無い(`backup_stale` / `backup_missing`) | `ops-state/logs/backup.log` | §4.1 |
@@ -172,6 +173,34 @@ curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics 
 docker compose exec -T backend python -c "from app.utils import rate_limiter as r; print(r.reset_all())"
 ```
 
+### 3.8 文書のダウンロードが 403・アップロードが 413/422/503(防御が働いた)
+
+設計は `docs/adr/ADR-document-delivery-hardening.md`。防御が働いた数は `/metrics` で見られる(値・利用者は出ない)。
+
+```bash
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics | grep security_events
+```
+
+| `kind` | 意味 | 対応 |
+|---|---|---|
+| `download_denied` | 期限切れ・共有の取消・文書の変更・ログアウト後の URL | 正規の利用者なら画面からもう一度開けば取れる。急増は URL の使い回し・漏洩の疑い(監査 `document_download_denied` の reason を見る) |
+| `body_too_large` / `upload_too_large` | 上限を超える要求 | 急増は資源を使い切らせる攻撃の疑い。正規なら `API_MAX_BODY_BYTES`・`DOCUMENT_MAX_UPLOAD_SIZE_BYTES` を見直す |
+| `malware_rejected` | ウイルスとして拒否(保存していない) | 監査 `upload_rejected_malware` で利用者・プランを確認する |
+| `malware_scan_unavailable` | ClamAV に届かない | `docker compose --profile malware-scan ps clamav`。必須設定なら届くまでアップロードは 503 |
+| `audit_write_failed` | 監査ログを書けなかった | DB の状態(§3.2)。続くなら証跡が欠けているので最優先で直す |
+
+ウイルス検査(ClamAV)を使う時:
+
+```bash
+docker compose --profile malware-scan up -d clamav     # 初回は定義の取得に数分
+docker compose --profile malware-scan ps clamav        # healthy になるまで待つ
+# .env に MALWARE_SCAN_BACKEND=clamav(必要なら DOCUMENT_REQUIRE_CLEAN_SCAN=true)を書いてから
+docker compose up -d --force-recreate backend
+```
+
+`DOCUMENT_REQUIRE_CLEAN_SCAN=true` にすると、それ以前に受け取った未検査(not_scanned)の文書はダウンロードできなくなる(409)。
+必要な文書は取り直してもらうか、検査してから使う。
+
 ---
 
 ## 4. バックアップ
@@ -285,3 +314,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | 2026-10-16 | 1 | Gate O1 で新設(B-010) |
 | 2026-10-17 | 2 | Gate O2: ログの個人情報の検査(`log-scan`、毎日 03:50、監視の `log_leak`、§3.6)。定期実行を登録済みの場合は `schedule install` をもう一度実行すると追加される |
 | 2026-10-18 | 3 | Gate S3: 回数制限の共有(Redis)と監視(§3.7) |
+| 2026-10-18 | 4 | Gate S4: 文書の配信条件・アップロードの上限・ウイルス検査(§3.8)と防御の計数 |

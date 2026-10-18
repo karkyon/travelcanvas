@@ -333,10 +333,12 @@ class AuthManager:
 
         try:
             # JWT デコード
+            # [Gate S4] 期限(exp)の無いトークンは受け付けない(期限切れにならない偽造・発行ミスを防ぐ)
             payload = jwt.decode(
                 token,
                 settings.JWT_SECRET_KEY,
-                algorithms=[settings.JWT_ALGORITHM]
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"require": ["exp"]},
             )
 
             # 基本データ取得
@@ -447,8 +449,12 @@ class AuthManager:
 
     def verify_session(self, session_id: str, db: Session) -> Optional[UserSession]:
         """セッション検証(DBのみ。Redisキャッシュは使用しない)。"""
+        try:
+            session_uuid = session_id if isinstance(session_id, UUID) else UUID(str(session_id))
+        except (ValueError, TypeError):
+            return None
         return db.query(UserSession).filter(
-            UserSession.id == session_id,
+            UserSession.id == session_uuid,
             UserSession.is_active.is_(True),
             UserSession.expires_at > datetime.now(timezone.utc)
         ).first()
@@ -583,6 +589,10 @@ class AuthManager:
         token_data = self.verify_token(credentials.credentials)
         if not token_data:
             raise AuthenticationError("無効なトークンです")
+        # [Gate S4] API の呼び出しに使えるのはアクセストークンとゲストトークンだけ。
+        # 以前は種類を見ておらず、更新用(refresh)の JWT もアクセストークンとして通っていた。
+        if token_data.token_type not in (TokenType.ACCESS, TokenType.GUEST):
+            raise AuthenticationError("無効なトークンです")
 
         # ゲストユーザーの場合
         if token_data.is_guest:
@@ -597,8 +607,13 @@ class AuthManager:
             except (ValueError, TypeError):
                 raise AuthenticationError("無効なトークンです")
             # [Gate P9] 削除(無効化)されたゲストアカウントのトークンは受け付けない
-            row = db.query(User.is_active).filter(User.id == guest_user.id).first()
-            if row is not None and not row[0]:
+            # [Gate S4] ゲストは必ず users に行がある(POST /auth/guest が作る)。行が無い・会員へ昇格済み
+            # (user_type が guest でない)のトークンも拒否する。以前は行が無いと素通りで、昇格前の古い
+            # ゲストトークンでも同じ利用者として操作できた。
+            row = db.query(User.is_active, User.user_type).filter(User.id == guest_user.id).first()
+            if row is None or str(getattr(row[1], "value", row[1])) != UserType.GUEST.value:
+                raise AuthenticationError("無効なトークンです")
+            if not row[0]:
                 raise AuthenticationError("アカウントが無効です")
             guest_user.user_type = UserType.GUEST
             guest_user.is_active = True
@@ -619,11 +634,14 @@ class AuthManager:
         if not user.is_active:
             raise AuthenticationError("アカウントが無効です")
 
-        # セッション検証（セッションIDがある場合）
-        if token_data.session_id:
-            session = self.verify_session(token_data.session_id, db)
-            if not session:
-                raise AuthenticationError("セッションが無効です")
+        # セッション検証
+        # [Gate S4] 会員のアクセストークンは必ずセッションに結び付いている(ログイン・登録・更新で発行)。
+        # セッションの無いトークンはログアウト・全端末の失効が効かないので受け付けない。
+        if not token_data.session_id:
+            raise AuthenticationError("セッションが無効です")
+        session = self.verify_session(token_data.session_id, db)
+        if not session or str(session.user_id) != str(user.id):
+            raise AuthenticationError("セッションが無効です")
 
         return AuthResult(
             user=user,

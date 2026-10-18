@@ -19,6 +19,7 @@ import hmac
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -196,33 +197,91 @@ def _get_download_signing_key() -> bytes:
     return key.encode("utf-8")
 
 
-def issue_download_token(document_id, ttl_seconds: Optional[int] = None) -> Tuple[str, int]:
-    """[Gate M5] DOC-02 FR-013「期限付きURL」対応。document_id+有効期限を
-    HMAC署名したトークンを発行する。戻り値は(トークン, 有効期限unix秒)。"""
+_TOKEN_VERSION = "v2"
+
+
+def _sign(payload: str) -> str:
+    return hmac.new(_get_download_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+@dataclass(frozen=True)
+class DownloadGrant:
+    """[Gate S4] F08 ダウンロード URL に結び付けた条件。受け取り時に、今も同じ条件かを確かめる。"""
+    document_id: str
+    user_id: Optional[str]
+    revision: Optional[int]
+    session_id: Optional[str]
+    expires_at: int
+
+
+def issue_download_token(document_id, ttl_seconds: Optional[int] = None, *, user_id=None, revision=None,
+                         session_id=None) -> Tuple[str, int]:
+    """[Gate M5] DOC-02 FR-013「期限付きURL」対応。戻り値は(トークン, 有効期限unix秒)。
+
+    [Gate S4] F08 発行した利用者・文書の版(revision)・ログインのセッションを署名に含める。受け取り時に
+    その利用者が今も見られるか(共有の取消・分類の変更・ログアウトを反映)を確かめるため。
+    user_id を渡さない古い形のトークンは、受け取り口では拒否される(期限切れの確認など試験用)。"""
     ttl = ttl_seconds if ttl_seconds is not None else settings.DOCUMENT_DOWNLOAD_URL_TTL_SECONDS
     expires_at = int(time.time()) + ttl
-    payload = f"{document_id}.{expires_at}"
-    signature = hmac.new(_get_download_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
-    token = f"{payload}.{signature}"
-    return token, expires_at
+    if user_id is None:
+        payload = f"{document_id}.{expires_at}"
+        return f"{payload}.{_sign(payload)}", expires_at
+    parts = [
+        _TOKEN_VERSION, str(document_id), str(user_id), str(int(revision or 0)),
+        str(session_id) if session_id else "-", str(expires_at),
+    ]
+    payload = ".".join(parts)
+    return f"{payload}.{_sign(payload)}", expires_at
 
 
 def verify_download_token(token: str) -> str:
     """トークンを検証し、document_id(文字列)を返す。無効・期限切れの
     場合はDownloadTokenInvalidを送出する。"""
-    try:
-        document_id, expires_at_str, signature = token.split(".", 2)
-        expires_at = int(expires_at_str)
-    except (ValueError, AttributeError):
+    return read_download_grant(token, allow_unbound=True).document_id
+
+
+def read_download_grant(token: str, allow_unbound: bool = False) -> DownloadGrant:
+    """[Gate S4] 署名と期限を確かめ、結び付いた条件を返す。allow_unbound=False では古い形(利用者の無い)を拒否する。"""
+    if not isinstance(token, str) or len(token) > 512:
         raise DownloadTokenInvalid("トークンの形式が不正です")
-
-    payload = f"{document_id}.{expires_at_str}"
-    expected_signature = hmac.new(
-        _get_download_signing_key(), payload.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
-    if not hmac.compare_digest(signature, expected_signature):
+    payload, _, signature = token.rpartition(".")
+    if not payload or not signature:
+        raise DownloadTokenInvalid("トークンの形式が不正です")
+    if not hmac.compare_digest(signature, _sign(payload)):
         raise DownloadTokenInvalid("トークンの署名が一致しません")
-    if time.time() > expires_at:
+    fields = payload.split(".")
+    try:
+        if fields[0] == _TOKEN_VERSION and len(fields) == 6:
+            grant = DownloadGrant(
+                document_id=fields[1], user_id=fields[2], revision=int(fields[3]),
+                session_id=None if fields[4] == "-" else fields[4], expires_at=int(fields[5]),
+            )
+        elif len(fields) == 2:
+            grant = DownloadGrant(document_id=fields[0], user_id=None, revision=None, session_id=None,
+                                  expires_at=int(fields[1]))
+        else:
+            raise ValueError
+    except ValueError:
+        raise DownloadTokenInvalid("トークンの形式が不正です")
+    if time.time() > grant.expires_at:
         raise DownloadTokenInvalid("トークンの有効期限が切れています")
+    if grant.user_id is None and not allow_unbound:
+        raise DownloadTokenInvalid("古い形式のトークンです。もう一度ダウンロードしてください")
+    return grant
 
-    return document_id
+
+# ===== [Gate S4] F09 受け取りの上限 =====
+
+async def read_upload_limited(upload, max_bytes: int) -> bytes:
+    """アップロードを少しずつ読み、上限を超えた時点で FileTooLargeError にする(全部を読んでから測らない)。"""
+    chunks = []
+    total = 0
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise FileTooLargeError(f"ファイルサイズが上限({max_bytes}バイト)を超えています")
+        chunks.append(chunk)
+    return b"".join(chunks)

@@ -62,6 +62,9 @@ def production_problems(s) -> List[str]:
         if o == "*" or not o.startswith("https://") or "localhost" in o or "127.0.0.1" in o:
             problems.append("CORS_ORIGINS に https 以外・* ・localhost が含まれる")
             break
+    # [Gate S4] 検査を必須にしたのに検査の仕組みが無いと、文書を1件も受け付けられない
+    if getattr(s, "DOCUMENT_REQUIRE_CLEAN_SCAN", False) and getattr(s, "MALWARE_SCAN_BACKEND", "none") == "none":
+        problems.append("DOCUMENT_REQUIRE_CLEAN_SCAN=true なのに MALWARE_SCAN_BACKEND=none")
     return problems
 
 
@@ -178,7 +181,21 @@ class Settings(BaseSettings):
     # 未設定でもbackend全体は起動可能とし、ダウンロードURL発行時にのみ
     # 明確なエラーを返す(app/services/storage_backend.py参照)。
     DOCUMENT_DOWNLOAD_SIGNING_KEY: Optional[str] = None
-    DOCUMENT_DOWNLOAD_URL_TTL_SECONDS: int = 900  # 15分
+    # [Gate S4] 画面は URL を受け取ってすぐ開くので短くする(以前は15分)。URL が漏れても使える時間を縮める。
+    DOCUMENT_DOWNLOAD_URL_TTL_SECONDS: int = 120
+
+    # [Gate S4] F09 ウイルス検査(app/services/malware_scan.py)。none=外部の検査なし / clamav=clamd へ送る。
+    MALWARE_SCAN_BACKEND: str = "none"
+    CLAMAV_HOST: str = "clamav"
+    CLAMAV_PORT: int = 3310
+    MALWARE_SCAN_TIMEOUT_SECONDS: float = 30.0
+    # true にすると、検査できなかったファイルは受け付けず、clean と確認できた文書だけを配る
+    DOCUMENT_REQUIRE_CLEAN_SCAN: bool = False
+
+    # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
+    # 文書の上限 + 余白(multipart の区切り等)まで受ける。
+    API_MAX_BODY_BYTES: int = 2 * 1024 * 1024
+    UPLOAD_BODY_OVERHEAD_BYTES: int = 1024 * 1024
 
     # [Gate O1] 監視用の計測値(GET /metrics)を見るための合言葉。未設定の時は
     # 同じ機械・LAN(私設アドレス)からだけ見られる(app/ops/metrics.py)。
@@ -221,6 +238,15 @@ class Settings(BaseSettings):
         value = (v or "").strip().upper()
         if value not in ("HS256", "HS384", "HS512"):
             raise ValueError("JWT_ALGORITHM は HS256 / HS384 / HS512 のいずれかにしてください")
+        return value
+
+    @field_validator("MALWARE_SCAN_BACKEND")
+    @classmethod
+    def restrict_malware_scan_backend(cls, v: str) -> str:
+        """[Gate S4] 綴りの誤りで黙って検査なしにならないよう、知っている方式だけを受け付ける。"""
+        value = (v or "none").strip().lower()
+        if value not in ("none", "clamav"):
+            raise ValueError("MALWARE_SCAN_BACKEND は none / clamav のいずれかにしてください")
         return value
 
     @field_validator("CORS_ORIGINS", mode="before")

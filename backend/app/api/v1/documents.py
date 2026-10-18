@@ -29,6 +29,7 @@
 """
 import logging
 import re
+import uuid as uuid_module
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
 from urllib.parse import quote
@@ -38,7 +39,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user_or_guest
+from app.core.auth import auth_manager, get_current_session_id, get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
@@ -55,6 +56,8 @@ from app.models.models import (
     TravelEvent,
     User,
 )
+from app.ops import metrics as ops_metrics
+from app.services import malware_scan
 from app.services.audit_service import record_audit_event
 from app.services.storage_backend import (
     DownloadSigningNotConfigured,
@@ -66,10 +69,12 @@ from app.services.storage_backend import (
     get_storage_backend,
     issue_download_token,
     load_decrypted_file,
+    read_download_grant,
+    read_upload_limited,
     save_encrypted_file,
     validate_upload,
-    verify_download_token,
 )
+from app.core.config import settings
 
 router = APIRouter(prefix="/plans", tags=["documents"])
 logger = logging.getLogger("travelcanvas")
@@ -232,6 +237,16 @@ def _get_document_or_404(db: Session, plan_id, document_id, current_user: User) 
     return d
 
 
+def _require_servable(d: Document) -> None:
+    """[Gate S4] F09 感染・隔離の文書は配らない。検査を必須にしている時は clean と確認できた文書だけを配る。"""
+    if d.malware_status in (DocumentMalwareStatus.INFECTED.value, DocumentMalwareStatus.QUARANTINED.value):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="この文書は安全確認で問題が見つかったため、ダウンロードできません")
+    if settings.DOCUMENT_REQUIRE_CLEAN_SCAN and d.malware_status != DocumentMalwareStatus.CLEAN.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="この文書は安全確認が済んでいないため、ダウンロードできません")
+
+
 def _get_link_or_404(db: Session, document_id, link_id) -> DocumentLink:
     link = (
         db.query(DocumentLink)
@@ -301,6 +316,48 @@ def _validate_link_target_exists(db: Session, plan_id, entity_type: str, entity_
         )
 
 
+def _scan_or_reject(content: bytes, request: Request, current_user: User, plan) -> "malware_scan.ScanResult":
+    """[Gate S4] F09 保存の前にウイルス検査をする。感染していれば保存せずに拒否する
+    (隔離して残すより、そもそも受け取らない方が配信・復号の経路に乗らない)。"""
+    try:
+        scan = malware_scan.scan_upload(content)
+    except malware_scan.MalwareScanUnavailable:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="ファイルの安全確認ができないため、今は受け付けられません。しばらくしてから再試行してください。")
+    if scan.infected:
+        ops_metrics.registry.count_security_event("malware_rejected")
+        record_audit_event(
+            action="upload_rejected_malware", resource_type="document", user_id=current_user.id,
+            ip_address=_client_ip(request), user_agent=_user_agent(request),
+            details={"plan_id": str(plan.id), "engine": scan.engine},
+        )
+        raise HTTPException(status_code=422, detail="ファイルから有害なプログラムが見つかったため、受け付けませんでした")
+    if settings.DOCUMENT_REQUIRE_CLEAN_SCAN and scan.status != malware_scan.CLEAN:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="ファイルの安全確認ができないため、今は受け付けられません。しばらくしてから再試行してください。")
+    return scan
+
+
+def _deny_download(request: Request, reason: str, resource_id=None, status_code: int = status.HTTP_403_FORBIDDEN,
+                   detail: str = "この文書はダウンロードできません。もう一度画面から開いてください。"):
+    ops_metrics.registry.count_security_event("download_denied")
+    record_audit_event(
+        action="document_download_denied", resource_type="document", resource_id=resource_id,
+        ip_address=_client_ip(request), user_agent=_user_agent(request), details={"reason": reason},
+    )
+    raise HTTPException(status_code=status_code, detail=detail)
+
+
+_DOWNLOAD_HEADERS = {
+    # [Gate S4] 共有の端末・中継のキャッシュに残さない。中身を推測して画面として開かせない。
+    "Cache-Control": "no-store, private",
+    "Pragma": "no-cache",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 # ==========================================
 # エンドポイント: documents
 # ==========================================
@@ -354,14 +411,17 @@ async def upload_document(
             detail=f"classificationは次のいずれかである必要があります: {sorted(_VALID_CLASSIFICATIONS)}",
         )
 
-    content = await file.read()
-
+    # [Gate S4] F09 全部を読んでから大きさを測るのではなく、上限を超えた時点で止める
     try:
+        content = await read_upload_limited(file, settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
         ext, mime_type = validate_upload(file.filename or "", content)
     except FileTooLargeError as e:
+        ops_metrics.registry.count_security_event("upload_too_large")
         raise HTTPException(status_code=413, detail=str(e))
     except UnsupportedFileTypeError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+    scan = _scan_or_reject(content, request, current_user, plan)
 
     storage_key = generate_storage_key(plan.id, ext)
     backend = get_storage_backend()
@@ -412,7 +472,7 @@ async def upload_document(
         mime_type=mime_type,
         size=len(content),
         sha256=compute_sha256(content),
-        malware_status=DocumentMalwareStatus.NOT_SCANNED.value,
+        malware_status=scan.status,
         ocr_status=DocumentOcrStatus.NOT_REQUESTED.value,
     )
 
@@ -448,16 +508,22 @@ def get_document_download_url(
     document_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
+    session_id: Optional[str] = Depends(get_current_session_id),
 ):
     """[Gate M5] DOC-02 FR-013「期限付きURL」対応。ACL確認は本エンドポイント
     (通常のplan権限)でのみ行い、発行されたトークン自体は
     `GET /documents/download`で単独検証される(トークンにACL情報は
-    含めず、発行時点のACLチェックとTTLで安全性を担保する設計)。"""
+    含めず、発行時点のACLチェックとTTLで安全性を担保する設計)。
+
+    [Gate S4] F08 発行時の確認だけでは、共有を取り消した・分類を変えた・ログアウトした後も期限内は
+    URL で取れた。トークンに利用者・文書の版・セッションを結び付け、受け取り口で今の権限を確かめ直す。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     d = _get_document_or_404(db, plan.id, document_id, current_user)
+    _require_servable(d)
 
     try:
-        token, expires_at = issue_download_token(d.id)
+        token, expires_at = issue_download_token(
+            d.id, user_id=current_user.id, revision=d.revision, session_id=session_id)
     except DownloadSigningNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -482,33 +548,44 @@ def download_document(
     やstorage_key、filenameといった機微値はdetailsへ含めない
     (resource_id=document_idのみを記録し、再度検索可能な形に留める)。"""
     try:
-        document_id = verify_download_token(token)
+        grant = read_download_grant(token)
     except DownloadTokenInvalid as e:
-        record_audit_event(
-            action="document_download_denied",
-            resource_type="document",
-            ip_address=_client_ip(request),
-            user_agent=_user_agent(request),
-            details={"reason": "invalid_token"},
-        )
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        _deny_download(request, "invalid_token", detail=str(e))
     except DownloadSigningNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="ダウンロードURLが設定されていません(サーバー側のDOCUMENT_DOWNLOAD_SIGNING_KEY未設定)",
         )
 
-    d = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None)).first()
+    try:
+        document_uuid = uuid_module.UUID(grant.document_id)
+        user_uuid = uuid_module.UUID(grant.user_id)
+    except ValueError:
+        _deny_download(request, "invalid_token")
+    d = db.query(Document).filter(Document.id == document_uuid, Document.deleted_at.is_(None)).first()
     if d is None:
-        record_audit_event(
-            action="document_download_denied",
-            resource_type="document",
-            resource_id=document_id,
-            ip_address=_client_ip(request),
-            user_agent=_user_agent(request),
-            details={"reason": "not_found"},
-        )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文書が見つかりません")
+        _deny_download(request, "not_found", resource_id=document_uuid,
+                       status_code=status.HTTP_404_NOT_FOUND, detail="文書が見つかりません")
+
+    # [Gate S4] F08 発行後に変わっていないか・今もその利用者が見られるかを確かめ直す
+    if d.revision != grant.revision:
+        _deny_download(request, "stale_revision", resource_id=d.id)
+    holder = db.query(User).filter(User.id == user_uuid).first()
+    if holder is None or not holder.is_active:
+        _deny_download(request, "holder_inactive", resource_id=d.id)
+    if grant.session_id and auth_manager.verify_session(grant.session_id, db) is None:
+        _deny_download(request, "session_revoked", resource_id=d.id)
+    try:
+        require_plan_access(db, d.plan_id, holder, min_role="viewer")
+    except HTTPException:
+        _deny_download(request, "access_revoked", resource_id=d.id)
+    if not _document_visible_to(d, holder):
+        _deny_download(request, "access_revoked", resource_id=d.id)
+    try:
+        _require_servable(d)
+    except HTTPException:
+        _deny_download(request, "not_clean", resource_id=d.id, status_code=status.HTTP_409_CONFLICT,
+                       detail="この文書は安全確認が済んでいないため、ダウンロードできません")
 
     backend = get_storage_backend()
     try:
@@ -551,7 +628,7 @@ def download_document(
     return StreamingResponse(
         _iter(),
         media_type=d.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": _build_content_disposition(filename)},
+        headers={"Content-Disposition": _build_content_disposition(filename), **_DOWNLOAD_HEADERS},
     )
 
 

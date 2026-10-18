@@ -28,12 +28,15 @@ from app.core.crypto import EncryptionNotConfigured
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
+from app.ops import metrics as ops_metrics
+from app.services import malware_scan
 from app.services import memories as mem
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
 from app.services.storage_backend import (
-    compute_sha256, generate_storage_key, get_storage_backend, load_decrypted_file, save_encrypted_file,
+    FileTooLargeError, compute_sha256, generate_storage_key, get_storage_backend, load_decrypted_file,
+    read_upload_limited, save_encrypted_file,
 )
 
 logger = logging.getLogger(__name__)
@@ -254,12 +257,29 @@ async def upload_memory(
     _count_check(db, plan)
     f = _common_fields(db, plan, kind, body, event_id, day_id, occurred_at, place_name, latitude, longitude,
                        visibility)
-    content = await file.read()
+    # [Gate S4] F09 上限を超えた時点で読むのを止める。保存の前にウイルス検査をする。
+    try:
+        content = await read_upload_limited(file, settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
+    except FileTooLargeError:
+        ops_metrics.registry.count_security_event("upload_too_large")
+        limit_mb = settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
+        raise _bad("file_too_large", f"ファイルが大きすぎます(上限 {limit_mb}MB)", 413)
     try:
         ext, mime_type = mem.validate_media(kind, file.filename or "", content,
                                             settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
     except mem.MemoryInputError as e:
         raise _bad(e.code, str(e), 413 if e.code == "file_too_large" else 422)
+    try:
+        scan = malware_scan.scan_upload(content)
+    except malware_scan.MalwareScanUnavailable:
+        raise _bad("scan_unavailable", "ファイルの安全確認ができないため、今は受け付けられません", 503)
+    if scan.infected:
+        ops_metrics.registry.count_security_event("malware_rejected")
+        record_audit_event(action="upload_rejected_malware", resource_type="memory", user_id=current_user.id,
+                           details={"plan_id": str(plan.id), "engine": scan.engine})
+        raise _bad("malware_found", "ファイルから有害なプログラムが見つかったため、受け付けませんでした", 422)
+    if settings.DOCUMENT_REQUIRE_CLEAN_SCAN and scan.status != malware_scan.CLEAN:
+        raise _bad("scan_unavailable", "ファイルの安全確認ができないため、今は受け付けられません", 503)
     storage_key = generate_storage_key(plan.id, ext)
     backend = get_storage_backend()
     try:
@@ -362,6 +382,7 @@ def get_memory_media(plan_id: str, memory_id: str, db: Session = Depends(get_db)
     return Response(content=content, media_type=m.mime_type or "application/octet-stream", headers={
         "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
         "Content-Disposition": "inline",
+        "Content-Security-Policy": "default-src 'none'; sandbox",  # [Gate S4] 直接開かれても画面として動かさない
     })
 
 

@@ -43,6 +43,8 @@ class MetricsRegistry:
         # [Gate S3] 回数制限で拒否した数(制限の種類ごと)と、Redis に届かずプロセス内に下がった回数
         self._rate_limited: Dict[str, int] = {}
         self._rate_limiter_fallbacks = 0
+        # [Gate S4] 防御が働いた回数(種類ごと)。攻撃の兆候・監査の書き込み失敗を外から見張るため
+        self._security_events: Dict[str, int] = {}
 
     def reset(self) -> None:
         with self._lock:
@@ -54,6 +56,7 @@ class MetricsRegistry:
             self._started_at = time.time()
             self._rate_limited.clear()
             self._rate_limiter_fallbacks = 0
+            self._security_events.clear()
 
     def observe(self, method: str, route: str, status_code: int, seconds: float) -> None:
         method = method.upper() if method else "OTHER"
@@ -88,6 +91,19 @@ class MetricsRegistry:
         with self._lock:
             self._rate_limiter_fallbacks += 1
 
+    def count_security_event(self, kind: str) -> None:
+        """[Gate S4] 種類は固定の名前(body_too_large・malware_rejected・download_denied・cross_site_blocked・
+        audit_write_failed など)。利用者・IP・値は入れない。"""
+        kind = "".join(ch for ch in kind if ch.isalnum() or ch == "_")[:40] or "unknown"
+        with self._lock:
+            if kind not in self._security_events and len(self._security_events) >= 100:
+                kind = "other"
+            self._security_events[kind] = self._security_events.get(kind, 0) + 1
+
+    def security_event_count(self, kind: str) -> int:
+        with self._lock:
+            return self._security_events.get(kind, 0)
+
     def render(self, extra_gauges: Optional[Dict[str, float]] = None) -> str:
         with self._lock:
             requests = dict(self._requests)
@@ -98,6 +114,7 @@ class MetricsRegistry:
             started = self._started_at
             rate_limited = dict(self._rate_limited)
             fallbacks = self._rate_limiter_fallbacks
+            security_events = dict(self._security_events)
         lines = [
             "# HELP travelcanvas_http_requests_total HTTP requests by method, route template and status class.",
             "# TYPE travelcanvas_http_requests_total counter",
@@ -138,7 +155,11 @@ class MetricsRegistry:
             "# HELP travelcanvas_rate_limiter_fallback_total Times the shared (Redis) rate limiter was unreachable.",
             "# TYPE travelcanvas_rate_limiter_fallback_total counter",
             "travelcanvas_rate_limiter_fallback_total %d" % fallbacks,
+            "# HELP travelcanvas_security_events_total Times a security control rejected or flagged something.",
+            "# TYPE travelcanvas_security_events_total counter",
         ]
+        for kind, n in sorted(security_events.items()):
+            lines.append('travelcanvas_security_events_total{kind="%s"} %d' % (_escape(kind), n))
         for name, value in sorted((extra_gauges or {}).items()):
             lines.append("# TYPE %s gauge" % name)
             lines.append("%s %s" % (name, _fmt(float(value))))

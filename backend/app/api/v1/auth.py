@@ -14,7 +14,9 @@ import logging
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.auth import get_current_active_user, get_current_session_id, get_current_user_or_guest, auth_manager
+from app.core.auth import (
+    auth_manager, get_current_active_user, get_current_session_id, get_current_user_optional, get_current_user_or_guest,
+)
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
@@ -213,6 +215,61 @@ def _parse_refresh_cookie(raw: str):
     return session_id, secret
 
 
+def _set_refresh_cookie(response: Response, value: str) -> None:
+    """[Gate S4] 更新鍵の cookie。以前は APP_ENV が "production" ちょうどの時だけ Secure を付けており、
+    prod・staging では平文の HTTP でも送られ得た。本番相当の環境(settings.is_production)では必ず付ける。"""
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=value,
+        httponly=True,
+        secure=settings.is_production,
+        samesite="lax",
+        path=REFRESH_COOKIE_PATH,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+    )
+
+
+def _allowed_origins() -> List[str]:
+    origins = settings.CORS_ORIGINS
+    return list(origins) if isinstance(origins, list) else [origins]
+
+
+def _reject_cross_site(request: Request) -> None:
+    """[Gate S4] cookie だけで本人と分かる操作(更新・ログアウト)を、許可していない別のサイトから
+    呼ばせない(CSRF 対策)。SameSite=Lax に加え、ブラウザが付ける Origin / Sec-Fetch-Site を確かめる。
+    Origin の無い要求(curl・試験・同じ画面からの GET 等)はブラウザ外なので通す。"""
+    origin = request.headers.get("origin")
+    site = (request.headers.get("sec-fetch-site") or "").lower()
+    if origin and origin != "null":
+        host = request.headers.get("host", "")
+        same_host = origin.split("://", 1)[-1] == host
+        if origin in _allowed_origins() or same_host:
+            return
+    elif not origin and site != "cross-site":
+        return
+    record_audit_event(action="cross_site_request_blocked", resource_type="auth",
+                       ip_address=request.client.host if request.client else None,
+                       details={"path": request.url.path})
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="この操作は許可されていない場所からは行えません")
+
+
+def _session_from_refresh_cookie(request: Request, db: Session) -> Optional[UserSession]:
+    """[Gate S4] cookie の更新鍵が今のものと一致する時だけ、そのセッションを返す(ログアウト用。入れ替えはしない)。"""
+    session_id, secret = _parse_refresh_cookie(request.cookies.get(REFRESH_COOKIE_NAME) or "")
+    if not session_id or not secret:
+        return None
+    try:
+        session_uuid = uuid.UUID(str(session_id))
+    except ValueError:
+        return None
+    session = db.query(UserSession).filter(UserSession.id == session_uuid).first()
+    if session is None or not session.session_token:
+        return None
+    if not hmac.compare_digest(session.session_token, _hash_refresh_secret(secret)):
+        return None
+    return session
+
+
 def _access_token_for(user: User, session_id: str) -> str:
     return create_access_token(
         data={"sub": str(user.id), "username": user.username, "session_id": str(session_id)}
@@ -341,15 +398,7 @@ async def upgrade_guest_to_user(
             device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
             db=db,
         )
-        response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
-            value=f"{session.id}.{secret}",
-            httponly=True,
-            secure=settings.APP_ENV == "production",
-            samesite="lax",
-            path=REFRESH_COOKIE_PATH,
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-        )
+        _set_refresh_cookie(response, f"{session.id}.{secret}")
         access_token = _access_token_for(db_user, session.id)
 
         return TokenResponse(
@@ -433,15 +482,7 @@ async def register(
             device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
             db=db,
         )
-        response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
-            value=f"{session.id}.{secret}",
-            httponly=True,
-            secure=settings.APP_ENV == "production",
-            samesite="lax",
-            path=REFRESH_COOKIE_PATH,
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-        )
+        _set_refresh_cookie(response, f"{session.id}.{secret}")
         access_token = _access_token_for(new_user, session.id)
 
         return TokenResponse(
@@ -537,15 +578,7 @@ async def login(
             device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
             db=db,
         )
-        response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
-            value=f"{session.id}.{secret}",
-            httponly=True,
-            secure=settings.APP_ENV == "production",
-            samesite="lax",
-            path=REFRESH_COOKIE_PATH,
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-        )
+        _set_refresh_cookie(response, f"{session.id}.{secret}")
         access_token = _access_token_for(user, session.id)
 
         # [Gate R2-7] 監査ログ: ログイン成功
@@ -593,6 +626,7 @@ async def refresh_token_endpoint(
     tokenは1回しか使えない(使うたびに新しいものへ入れ替わる)。既に
     ローテーション済みの(=一度使われた)tokenが再送された場合は盗用の
     兆候とみなし、そのセッションを即座に失効させて401を返す。"""
+    _reject_cross_site(request)  # [Gate S4]
     # [Gate S3] refresh も回数を制限する(盗んだ token・推測した cookie の連続試行を抑える)
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"refresh:{client_ip}", settings.RATE_LIMIT_REFRESH, 60):
@@ -667,15 +701,7 @@ async def refresh_token_endpoint(
         session.expires_at = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         session.updated_at = now
         db.commit()
-        response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
-            value=f"{session.id}.{new_secret}",
-            httponly=True,
-            secure=settings.APP_ENV == "production",
-            samesite="lax",
-            path=REFRESH_COOKIE_PATH,
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-        )
+        _set_refresh_cookie(response, f"{session.id}.{new_secret}")
     else:
         db.commit()  # 行ロックを放す
     access_token = _access_token_for(user, session.id)
@@ -697,12 +723,24 @@ async def refresh_token_endpoint(
 async def logout(
     request: Request,
     response: Response,
-    session_id: Optional[str] = Depends(get_current_session_id),
     db: Session = Depends(get_db),
+    auth_result=Depends(get_current_user_optional),
 ):
-    """[Gate #28] 現在のセッションのみ失効させる。"""
-    if session_id:
-        auth_manager.revoke_session(session_id, db)
+    """[Gate #28] 現在のセッションのみ失効させる。
+
+    [Gate S4] 以前はアクセストークンが期限切れだと 401 になり、セッションも cookie も残った(画面上は
+    ログアウトしたのに、cookie の更新鍵でまた入れる)。アクセストークンが無効でも受け付け、
+    アクセストークンのセッションと、cookie の更新鍵が今も正しいセッションの両方を失効させる。"""
+    _reject_cross_site(request)
+    revoked = set()
+    token_data = getattr(auth_result, "token_data", None)
+    token_session = getattr(token_data, "session_id", None)
+    if token_session and not getattr(auth_result, "is_guest", False):
+        auth_manager.revoke_session(token_session, db)
+        revoked.add(str(token_session))
+    cookie_session = _session_from_refresh_cookie(request, db)
+    if cookie_session is not None and str(cookie_session.id) not in revoked:
+        auth_manager.revoke_session(str(cookie_session.id), db)
     response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
     return {"message": "ログアウトしました"}
 

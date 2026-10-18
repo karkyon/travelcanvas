@@ -103,7 +103,29 @@ services:
     networks:
       - travelcanvas_net
 
+  # [Gate S4] F09 ウイルス検査(任意)。`docker compose --profile malware-scan up -d clamav` で起動し、
+  # .env に MALWARE_SCAN_BACKEND=clamav を書いて backend を作り直す(Runbook §3.8)。
+  # 定義ファイルの取得に数分・メモリ約1.5GBを使うため、既定では起動しない。
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["malware-scan"]
+    restart: unless-stopped
+    volumes:
+      - travelcanvas_clamav:/var/lib/clamav
+    expose:
+      - "3310"
+    networks:
+      - travelcanvas_net
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
 volumes:
+  travelcanvas_clamav:
+    name: travelcanvas_clamav
   travelcanvas_pgdata:
     name: travelcanvas_pgdata
   travelcanvas_redisdata:

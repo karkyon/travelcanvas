@@ -14,6 +14,7 @@ from app.api.v1 import (
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 from app.core.security_headers import apply_security_headers
+from app.core.body_limit import BodySizeLimitMiddleware
 import logging
 import time
 import uuid
@@ -131,6 +132,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # 単体試験はHTTP層を差し替えるため検出できず、制約編集のbrowser E2Eで発覚した。
 # 全ルートのメソッドが許可されていることは tests/test_gate_l2_cors_methods.py で検査する。
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+# [Gate S4] 要求の本文の上限(app/core/body_limit.py)。CORS より内側に置き、413 にも CORS のヘッダーが付くようにする
+# (外側に置くと、画面からは「CORS で拒否」としか見えない)。
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

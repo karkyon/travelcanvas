@@ -61,6 +61,11 @@ def record_audit_event(
         session.commit()
     except Exception:  # noqa: BLE001 - 監査ログ失敗で本処理を止めない
         session.rollback()
+        # [Gate S4] F18 失敗を数える(/metrics の travelcanvas_security_events_total{kind="audit_write_failed"})。
+        # 黙って欠落し続けないよう、監視で警報にできる。
+        from app.ops import metrics as ops_metrics
+
+        ops_metrics.registry.count_security_event("audit_write_failed")
         logger.warning(
             "audit log write failed",
             extra={"extra_data": {"action": action, "resource_type": resource_type}},
