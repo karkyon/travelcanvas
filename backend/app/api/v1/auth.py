@@ -593,6 +593,11 @@ async def refresh_token_endpoint(
     tokenは1回しか使えない(使うたびに新しいものへ入れ替わる)。既に
     ローテーション済みの(=一度使われた)tokenが再送された場合は盗用の
     兆候とみなし、そのセッションを即座に失効させて401を返す。"""
+    # [Gate S3] refresh も回数を制限する(盗んだ token・推測した cookie の連続試行を抑える)
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"refresh:{client_ip}", settings.RATE_LIMIT_REFRESH, 60):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="試行回数が上限に達しました。しばらく待ってから再試行してください。")
     raw_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
     session_id, secret = _parse_refresh_cookie(raw_cookie) if raw_cookie else (None, None)
 

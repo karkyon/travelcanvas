@@ -35,6 +35,7 @@ from app.main import app  # noqa: E402
 from app.core.auth import get_current_user, AuthResult  # noqa: E402
 from app.models.models import User, UserType  # noqa: E402
 from app.api.v1.auth import hash_password  # noqa: E402
+from app.utils import rate_limiter as _rate_limiter  # noqa: E402
 from app.utils.rate_limiter import _rate_limit_storage  # noqa: E402
 
 
@@ -44,10 +45,14 @@ def _reset_rate_limiter():
     管理されており、DBトランザクションのロールバックでは戻らない。
     TestClientは常に同一の疑似IP('testclient')を使うため、これをテスト毎に
     クリアしないと、あるテストでの試行回数が別テストのレート制限判定に
-    漏れ出し、テスト同士が意図せず干渉してしまう。"""
+    漏れ出し、テスト同士が意図せず干渉してしまう。
+    [Gate S3] 本番は Redis で数えるが、試験は既定でプロセス内だけを使う(試験の間で数が残らず、CI の backend ジョブには
+    Redis が無いため)。Redis を使う試験(test_gate_s3_rate_limit.py)は自分で切り替えて、終わったら戻す。"""
+    _rate_limiter.use_backend("memory")
     _rate_limit_storage.clear()
     yield
     _rate_limit_storage.clear()
+    _rate_limiter.use_backend("memory")
 
 
 @pytest.fixture()

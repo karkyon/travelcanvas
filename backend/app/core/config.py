@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     # [Gate R2-2] anonymous device tokenでの匿名作成のため、IPベースの
     # レート制限を別途設ける(1時間あたり)。
     RATE_LIMIT_QUICKDRAFT_CREATE: int = 20
+    # [Gate S3] refresh token の利用(IP ごと・1分)。盗んだ token の連続試行・総当たりを抑える
+    RATE_LIMIT_REFRESH: int = 60
+    # [Gate S3] 回数制限を Redis で数える時のキーの前置き(同じ Redis を使う別の環境と混ざらないように)
+    RATE_LIMIT_NAMESPACE: str = "tc"
 
     # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
     # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。

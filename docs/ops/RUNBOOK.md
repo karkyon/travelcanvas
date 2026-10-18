@@ -153,6 +153,25 @@ cat ops-state/log_scan.json
 
 出てよいメールアドレス(運営の送信元など)がある場合は、`.env` の `OPS_LOG_ALLOWED_EMAILS` にカンマ区切りで書く。
 
+### 3.7 回数制限(429 が増えた・攻撃が疑われる)
+
+回数制限は Redis(`REDIS_URL`)で数え、全ての worker・コンテナが同じ数を見る(`backend/app/utils/rate_limiter.py`、
+設計は `docs/adr/ADR-shared-rate-limit.md`)。キーはハッシュで、メール・IP は Redis に残らない。
+
+```bash
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics | grep -E "rate_limit"
+```
+
+- `travelcanvas_rate_limited_total{kind="login_email"}` 等が急に増えた: 総当たり・パスワードリスト攻撃の疑い。
+  `kind`(login_email / login_ip / register / refresh / guest …)で、狙われている入口が分かる。
+- `travelcanvas_rate_limiter_fallback_total` が増えた: Redis に届かず、その間はコンテナごとの制限に下がっている
+  (制限は続くが緩む)。Redis の状態(`docker compose ps redis`)を確認する。
+- 正規の利用者が締め出された・E2E を続けて流したら 429 になった時は、制限だけを消せる(データは消えない):
+
+```bash
+docker compose exec -T backend python -c "from app.utils import rate_limiter as r; print(r.reset_all())"
+```
+
 ---
 
 ## 4. バックアップ
@@ -265,3 +284,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 |---|---|---|
 | 2026-10-16 | 1 | Gate O1 で新設(B-010) |
 | 2026-10-17 | 2 | Gate O2: ログの個人情報の検査(`log-scan`、毎日 03:50、監視の `log_leak`、§3.6)。定期実行を登録済みの場合は `schedule install` をもう一度実行すると追加される |
+| 2026-10-18 | 3 | Gate S3: 回数制限の共有(Redis)と監視(§3.7) |
