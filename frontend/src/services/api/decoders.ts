@@ -26,7 +26,7 @@ import type {
   PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
   ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
-  AuthResponse, AuthUser, GuestSessionResponse,
+  AuthResponse, AuthUser, GuestSessionResponse, ActiveSession,
   ConstraintValue, PlanConstraint,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
@@ -622,6 +622,18 @@ export const authResponse: Decoder<AuthResponse> = object<AuthResponse>({
   access_token: str,
   token_type: str,
   user: authUser,
+});
+
+// [Gate S9] ログイン中の端末(GET /auth/sessions)。device_info(User-Agent 全文)は画面で使わないので読まない
+export const activeSession: Decoder<ActiveSession> = object<ActiveSession>({
+  id: str,
+  device_label: str,
+  network_label: nullable(str),
+  ip_address: nullable(str),
+  created_at: str,
+  last_active_at: str,
+  expires_at: str,
+  is_current: bool,
 });
 
 export const guestSessionResponse: Decoder<GuestSessionResponse> = object<GuestSessionResponse>({

@@ -20,11 +20,12 @@ import axios, { type AxiosRequestConfig } from 'axios';
 import type { User } from '@/types';
 import { ApiCore, extractApiErrorDetailMessage } from '../core';
 import type {
-  ApiResponse, AuthResponse, GuestSessionResponse, GuestUpgradeData, LoginCredentials, RegisterData,
+  ActiveSession, ApiResponse, AuthResponse, GuestSessionResponse, GuestUpgradeData, LoginCredentials, RegisterData,
 } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { ApiDecodeError, decodeResponse } from '../decode';
-import { authResponse, guestSessionResponse, user } from '../decoders';
+import { activeSession, authResponse, guestSessionResponse, user } from '../decoders';
+import { arrayOf } from '../decode';
 
 /** 認証APIの失敗。messageはそのまま画面に表示してよい文言、statusはHTTPステータス(通信失敗時はnull)。 */
 export class AuthApiError extends Error {
@@ -146,6 +147,17 @@ export class AuthApi extends ApiCore {
   async updateProfile(data: Partial<User> & { current_password?: string }): Promise<ApiResponse<User>> {
     const response = await this.client.put('/auth/me', data);
     return apiOk<User>(decodeResponse(response.data, user, 'PUT /auth/me'));
+  }
+
+  /** [Gate S9] GET /auth/sessions。ログイン中の端末(この端末は is_current)。 */
+  async getSessions(): Promise<ActiveSession[]> {
+    const response = await this.client.get('/auth/sessions');
+    return decodeResponse(response.data, arrayOf(activeSession), 'GET /auth/sessions');
+  }
+
+  /** [Gate S9] DELETE /auth/sessions/{id}。ほかの端末をログアウトさせる(その端末のトークンは次の要求から使えない)。 */
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.client.delete(`/auth/sessions/${encodeURIComponent(sessionId)}`);
   }
 
   async changePassword(data: {

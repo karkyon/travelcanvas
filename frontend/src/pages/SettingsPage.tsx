@@ -9,6 +9,7 @@ import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/se
 import { forgetOfflineKeys, obtainOfflineKey } from '@/utils/offlineVault';
 import { currentOfflineSession } from '@/utils/offlineSession';
 import Button from '@/components/common/Button';
+import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -20,7 +21,9 @@ interface SettingsTab {
   id: string;
   name: string;
   icon: React.ReactNode;
-  component: React.ComponentType;
+  // [Gate S9] タブの中身を描く関数(部品ではない)。以前は <ActiveTabComponent /> で描いていたため、
+  // 描画のたびに別の部品として作り直され、入力欄が1文字ごとにフォーカスを失っていた(SettingsPage.test.tsx)
+  render: () => React.ReactElement;
 }
 
 const SettingsPage: React.FC = () => {
@@ -113,7 +116,7 @@ const SettingsPage: React.FC = () => {
   };
 
   // Profile Tab Component
-  const ProfileTab: React.FC = () => (
+  const ProfileTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">プロフィール情報</h3>
@@ -211,7 +214,7 @@ const SettingsPage: React.FC = () => {
   );
 
   // Notifications Tab Component
-  const NotificationsTab: React.FC = () => (
+  const NotificationsTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">通知設定</h3>
@@ -270,7 +273,7 @@ const SettingsPage: React.FC = () => {
   );
 
   // Preferences Tab Component
-  const PreferencesTab: React.FC = () => (
+  const PreferencesTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">表示設定</h3>
@@ -367,18 +370,20 @@ const SettingsPage: React.FC = () => {
   );
 
   // Security Tab Component
-  const SecurityTab: React.FC = () => (
+  const SecurityTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">パスワード変更</h3>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">
               現在のパスワード
             </label>
             <div className="relative">
               <input
+                id="current-password"
+                autoComplete="current-password"
                 type={showPasswords.current ? 'text' : 'password'}
                 value={passwordData.current_password}
                 onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
@@ -387,6 +392,7 @@ const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                aria-label={showPasswords.current ? '現在のパスワードを隠す' : '現在のパスワードを表示'}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 {showPasswords.current ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -395,11 +401,13 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
               新しいパスワード
             </label>
             <div className="relative">
               <input
+                id="new-password"
+                autoComplete="new-password"
                 type={showPasswords.new ? 'text' : 'password'}
                 value={passwordData.new_password}
                 onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
@@ -408,6 +416,7 @@ const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                aria-label={showPasswords.new ? '新しいパスワードを隠す' : '新しいパスワードを表示'}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -416,11 +425,13 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-700 mb-1">
               新しいパスワード（確認）
             </label>
             <div className="relative">
               <input
+                id="confirm-new-password"
+                autoComplete="new-password"
                 type={showPasswords.confirm ? 'text' : 'password'}
                 value={passwordData.confirm_password}
                 onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
@@ -429,6 +440,7 @@ const SettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                aria-label={showPasswords.confirm ? '確認のパスワードを隠す' : '確認のパスワードを表示'}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -447,6 +459,9 @@ const SettingsPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* [Gate S9] ログイン中の端末(新しい端末からのログインは通知でも知らせる) */}
+      <ActiveSessionsSection />
     </div>
   );
 
@@ -602,11 +617,11 @@ const SettingsPage: React.FC = () => {
   );
 
   const tabs: SettingsTab[] = [
-    { id: 'profile', name: 'プロフィール', icon: <User size={16} />, component: ProfileTab },
-    { id: 'notifications', name: '通知', icon: <Bell size={16} />, component: NotificationsTab },
-    { id: 'preferences', name: '設定', icon: <Settings size={16} />, component: PreferencesTab },
-    { id: 'security', name: 'セキュリティ', icon: <Shield size={16} />, component: SecurityTab },
-    { id: 'offline', name: 'オフライン', icon: <Download size={16} />, component: OfflineTab },
+    { id: 'profile', name: 'プロフィール', icon: <User size={16} />, render: ProfileTab },
+    { id: 'notifications', name: '通知', icon: <Bell size={16} />, render: NotificationsTab },
+    { id: 'preferences', name: '設定', icon: <Settings size={16} />, render: PreferencesTab },
+    { id: 'security', name: 'セキュリティ', icon: <Shield size={16} />, render: SecurityTab },
+    { id: 'offline', name: 'オフライン', icon: <Download size={16} />, render: OfflineTab },
   ];
 
   const handleSave = async () => {
@@ -690,7 +705,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const ActiveTabComponent = tabs.find(tab => tab.id === activeTab)?.component || ProfileTab;
+  const renderActiveTab = tabs.find(tab => tab.id === activeTab)?.render || ProfileTab;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -768,7 +783,7 @@ const SettingsPage: React.FC = () => {
           {/* メインコンテンツ */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-xl shadow-sm p-6">
-              <ActiveTabComponent />
+              {renderActiveTab()}
               
               {/* 保存ボタン */}
               <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">

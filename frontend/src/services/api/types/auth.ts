@@ -51,6 +51,18 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+/** [Gate S9] GET /auth/sessions の1件(backend SessionInfo)。ログイン中の端末。 */
+export interface ActiveSession {
+  id: string;
+  device_label: string;
+  network_label: string | null;
+  ip_address: string | null;
+  created_at: string;
+  last_active_at: string;
+  expires_at: string;
+  is_current: boolean;
+}
+
 /** POST /auth/guest の応答(backend GuestSessionResponse)。 */
 export interface GuestSessionResponse {
   access_token: string;

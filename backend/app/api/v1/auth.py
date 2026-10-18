@@ -20,7 +20,7 @@ from app.core.auth import (
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
-from app.services import challenge, incident, threat_guard
+from app.services import challenge, incident, login_alerts, threat_guard
 
 router = APIRouter()
 
@@ -128,13 +128,17 @@ class PasswordChange(BaseModel):
 
 
 class SessionInfo(BaseModel):
-    """[Gate #28] セッション(device/session)一覧表示用"""
+    """[Gate #28] セッション(device/session)一覧表示用
+    [Gate S9] 端末の名前(ブラウザ / OS)・丸めた接続元・最終利用を追加(設定の「ログイン中の端末」)"""
     id: str
     ip_address: Optional[str] = None
     device_info: Optional[Dict[str, Any]] = None
     created_at: datetime
     expires_at: datetime
     is_current: bool
+    device_label: str = "不明な端末"
+    network_label: Optional[str] = None
+    last_active_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -410,7 +414,7 @@ async def upgrade_guest_to_user(
             user_id=db_user.id,
             refresh_token_hash=_hash_refresh_secret(secret),
             ip_address=client_ip,
-            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            device_info=login_alerts.session_device_info(request.headers.get("user-agent")),  # [Gate S9]
             db=db,
         )
         _set_refresh_cookie(response, f"{session.id}.{secret}")
@@ -496,7 +500,7 @@ async def register(
             user_id=new_user.id,
             refresh_token_hash=_hash_refresh_secret(secret),
             ip_address=client_ip,
-            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            device_info=login_alerts.session_device_info(request.headers.get("user-agent")),  # [Gate S9]
             db=db,
         )
         _set_refresh_cookie(response, f"{session.id}.{secret}")
@@ -593,11 +597,17 @@ async def login(
             user_id=user.id,
             refresh_token_hash=_hash_refresh_secret(secret),
             ip_address=client_ip,
-            device_info={"user_agent": request.headers.get("user-agent", "")[:255]},
+            device_info=login_alerts.session_device_info(request.headers.get("user-agent")),  # [Gate S9]
             db=db,
         )
         _set_refresh_cookie(response, f"{session.id}.{secret}")
         access_token = _access_token_for(user, session.id)
+        # [Gate S9] 過去90日に無い端末からのログインなら、本人に通知する(乗っ取りに早く気付けるように)
+        if login_alerts.notify_if_new_device(db, user, session, user_agent=request.headers.get("user-agent"),
+                                             ip=client_ip):
+            record_audit_event(action="login_new_device", resource_type="user", user_id=user.id,
+                               resource_id=user.id, ip_address=client_ip,
+                               details={"session_id": str(session.id)})
 
         # [Gate R2-7] 監査ログ: ログイン成功
         record_audit_event(
@@ -800,6 +810,10 @@ async def list_sessions(
             created_at=s.created_at,
             expires_at=s.expires_at,
             is_current=(str(s.id) == str(current_session_id)),
+            device_label=str((s.device_info or {}).get("device")
+                             or login_alerts.device_label((s.device_info or {}).get("user_agent"))),
+            network_label=login_alerts.network_label(s.ip_address),
+            last_active_at=s.updated_at or s.created_at,
         )
         for s in sessions
     ]

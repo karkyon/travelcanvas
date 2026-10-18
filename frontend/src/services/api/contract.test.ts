@@ -36,6 +36,7 @@ import {
   atlasResponse, atlasSettingsResult,
   memoryReplanApplyResult, memoryReplanResult,
   offlinePackKey, offlinePackKeyRotated,
+  activeSession,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -116,6 +117,8 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['auth_login', authResponse],
   ['auth_guest', guestSessionResponse],
   ['auth_guest_upgrade', authResponse],
+  // ----- [Gate S9] ログイン中の端末
+  ['auth_sessions', arrayOf(activeSession)],
   // ----- [Gate L2] 制約(FR-016)。constraint_maskedは他のメンバーから見た秘匿制約
   ['constraint_shared', planConstraint],
   ['constraint_soft_between', planConstraint],

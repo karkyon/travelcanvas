@@ -24,7 +24,8 @@
   "captured_at_head_p14": "Gate P14(FR-054 Plan-to-Memory・FR-053 旅の達成指標)の実backend応答",
   "captured_at_head_p15": "Gate P15(FR-052 Personal Travel Atlas)の実backend応答",
   "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
-  "captured_at_head_k1": "Gate K1(B-008 オフラインパックの鍵)の実backend応答。鍵は試験専用の秘密(fixture-only)から導出した値で実環境の鍵ではない。issued_atは固定値へ置換"
+  "captured_at_head_k1": "Gate K1(B-008 オフラインパックの鍵)の実backend応答。鍵は試験専用の秘密(fixture-only)から導出した値で実環境の鍵ではない。issued_atは固定値へ置換",
+  "captured_at_head_s9": "Gate S9: auth_sessions(実 backend の GET /auth/sessions。id・時刻・接続元は固定値に置き換え)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -10747,5 +10748,35 @@
    "code": "if_match_required",
    "message": "If-Match に今の鍵の版(数字)を指定してください"
   }
- }
+ },
+ "auth_sessions": [
+  {
+   "id": "4c0f3a52-9d0e-4f7a-b8a1-2f6e1c9d7a01",
+   "ip_address": "203.0.113.57",
+   "device_info": {
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+    "device": "Firefox / Linux"
+   },
+   "created_at": "2026-10-18T01:00:00.000000Z",
+   "expires_at": "2026-11-17T01:00:00.000000Z",
+   "is_current": true,
+   "device_label": "Firefox / Linux",
+   "network_label": "203.0.113.x",
+   "last_active_at": "2026-10-18T01:00:00.000000Z"
+  },
+  {
+   "id": "7d2b8e14-3c5a-4b9f-a0e6-91f4c2d8b302",
+   "ip_address": "203.0.113.57",
+   "device_info": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "device": "Chrome / Windows"
+   },
+   "created_at": "2026-10-18T01:00:00.000000Z",
+   "expires_at": "2026-11-17T01:00:00.000000Z",
+   "is_current": false,
+   "device_label": "Chrome / Windows",
+   "network_label": "203.0.113.x",
+   "last_active_at": "2026-10-18T01:00:00.000000Z"
+  }
+ ]
 }
