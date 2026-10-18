@@ -96,7 +96,9 @@ describe('authStore: login/register (Gate A1)', () => {
     const state = useAuthStore.getState();
     expect(state).toMatchObject({ token: TOKEN, isAuthenticated: true, isLoading: false, error: null });
     expect(state.user).toEqual(fx.auth_login.user);
-    expect(localStorage.getItem('auth_token')).toBe(TOKEN);
+    // [Gate S5] 会員のアクセストークンは端末に保存しない(メモリだけ)
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expect(api.hasAccessToken()).toBe(true);
     expect(setGuestMode).toHaveBeenLastCalledWith(false);
     expect(fetchSpy).not.toHaveBeenCalled();
     expectNoSecretsLogged();
@@ -133,7 +135,7 @@ describe('authStore: login/register (Gate A1)', () => {
     await useAuthStore.getState().register('reg', EMAIL, PASSWORD);
 
     expect(useAuthStore.getState()).toMatchObject({ token: TOKEN, isAuthenticated: true, user: fx.auth_register.user });
-    expect(localStorage.getItem('auth_token')).toBe(TOKEN);
+    expect(localStorage.getItem('auth_token')).toBeNull();
     expectNoSecretsLogged();
   });
 
@@ -231,7 +233,7 @@ describe('authStore: checkAuth (Gate A1)', () => {
     expect(localStorage.getItem('auth_token')).toBeNull();
   });
 
-  it('トークンが無ければ通信しない', async () => {
+  it('ログインしていなければ(トークンも利用者も無い)通信しない', async () => {
     const calls = serve({});
     await useAuthStore.getState().checkAuth();
     expect(calls).toEqual([]);
@@ -250,5 +252,77 @@ describe('authStore: clearLocalSession (Gate P9)', () => {
       user: null, token: null, isAuthenticated: false, isGuest: false, guestToken: null, guestId: null,
     });
     expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+});
+
+
+describe('authStore: 会員のトークンを端末に保存しない (Gate S5 / F15)', () => {
+  const STORAGE_KEY = 'auth-storage';
+  const persisted = () => JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').state ?? {};
+
+  it('ログイン後に保存される内容にアクセストークンが無い', async () => {
+    serve({ '/auth/login': { ...fx.auth_login, access_token: TOKEN } });
+    await useAuthStore.getState().login(EMAIL, PASSWORD);
+    expect(persisted()).not.toHaveProperty('token');
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain(TOKEN);
+    expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+
+  it('ゲストのトークンは保存する(cookie の更新鍵が無いため)', async () => {
+    serve({ '/auth/guest': { ...fx.auth_guest, access_token: TOKEN } });
+    await useAuthStore.getState().startGuestSession();
+    expect(persisted()).toMatchObject({ guestToken: TOKEN, isGuest: true });
+    expect(localStorage.getItem('auth_token')).toBe(TOKEN);
+  });
+
+  it('再読込の後(利用者だけが残っている): cookie でトークンを取り直してから初期化を終える', async () => {
+    useAuthStore.setState({ user: fx.auth_login.user, isAuthenticated: true, token: null });
+    const calls = serve({ '/auth/refresh': { ...fx.auth_login, access_token: TOKEN } });
+    await useAuthStore.getState().initialize();
+    expect(calls).toEqual([
+      { url: '/auth/refresh', method: 'POST', data: undefined, config: { skipGlobalErrorHandler: true } },
+    ]);
+    expect(useAuthStore.getState()).toMatchObject({ token: TOKEN, isAuthenticated: true, isInitialized: true });
+    expect(api.hasAccessToken()).toBe(true);
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expectNoSecretsLogged();
+  });
+
+  it('cookie のログインが切れていれば(401)ログアウトした状態にする', async () => {
+    useAuthStore.setState({ user: fx.auth_login.user, isAuthenticated: true, token: null });
+    serve({ '/auth/refresh': axiosError(401, { detail: 'セッションが無効です。再度ログインしてください。' }) });
+    await useAuthStore.getState().initialize();
+    expect(useAuthStore.getState()).toMatchObject({ user: null, token: null, isAuthenticated: false, isInitialized: true });
+  });
+
+  it('通信できない時(オフライン)はログイン中のまま続ける(保存したデータを開けるように)', async () => {
+    useAuthStore.setState({ user: fx.auth_login.user, isAuthenticated: true, token: null });
+    const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
+    serve({ '/auth/refresh': new AxiosError('Network Error', 'ERR_NETWORK', config) });
+    await useAuthStore.getState().initialize();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: fx.auth_login.user, token: null, isAuthenticated: true, isInitialized: true,
+    });
+  });
+
+  it('同時に何度初期化しても、更新は1回だけ送る', async () => {
+    useAuthStore.setState({ user: fx.auth_login.user, isAuthenticated: true, token: null });
+    const calls = serve({ '/auth/refresh': { ...fx.auth_login, access_token: TOKEN } });
+    await Promise.all([useAuthStore.getState().initialize(), useAuthStore.getState().initialize()]);
+    expect(calls.filter((c) => c.url === '/auth/refresh')).toHaveLength(1);
+  });
+
+  it('以前の版が保存した会員のトークンは読み込み時に捨てる', async () => {
+    localStorage.setItem('auth_token', 'old-member-token');
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      state: { user: fx.auth_login.user, token: 'old-member-token', isAuthenticated: true, isGuest: false }, version: 0,
+    }));
+    serve({ '/auth/refresh': { ...fx.auth_login, access_token: TOKEN } });
+    await useAuthStore.persist.rehydrate();
+    expect(useAuthStore.getState().token).not.toBe('old-member-token');
+    await useAuthStore.getState().initialize();
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain('old-member-token');
+    expect(useAuthStore.getState().token).toBe(TOKEN);
   });
 });

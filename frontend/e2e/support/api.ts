@@ -35,7 +35,8 @@ export async function registerMember(page: Page, label: string): Promise<{ email
   if (!res.ok()) throw new Error(`会員登録に失敗しました: ${res.status()} ${await res.text().catch(() => '')}`);
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
   const apiBase = res.url().replace(/\/auth\/register$/, '');
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('会員のアクセストークンがlocalStorage(auth_token)にありません');
+  // [Gate S5] 会員のアクセストークンは端末に保存しないので、登録の応答から受け取る
+  const token = String((await res.json()).access_token ?? '');
+  if (!token) throw new Error('会員登録の応答にアクセストークンがありません');
   return { email, apiBase, token };
 }

@@ -9,12 +9,13 @@ import '@/styles/globals.css';
 
 function App() {
   const { initialize, isInitialized } = useAuthStore();
-  const sessionTag = useAuthStore((s) => (s.isGuest ? s.guestToken : s.token));
+  // [Gate S5] 会員のトークンはメモリだけ。再読込直後・通信できない時はトークンが無いので、利用者 ID で区別する
+  const sessionTag = useAuthStore((s) =>
+    s.isGuest ? s.guestToken : (s.token ?? (s.user && s.isAuthenticated ? `member:${String(s.user.id)}` : null)));
 
   useEffect(() => {
-    // アプリ起動時に認証状態を初期化
-    console.log('🚀 App初期化開始');
-    initialize();
+    // アプリ起動時に認証状態を初期化(会員は cookie でトークンを取り直す)
+    void initialize();
   }, [initialize]);
 
   // [Gate K1] ログインしたら(ゲスト開始・トークン更新を含む)オフライン鍵を先に受け取って端末に置く。

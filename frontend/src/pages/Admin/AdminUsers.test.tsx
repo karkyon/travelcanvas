@@ -11,7 +11,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
 // authStoreもapi(setGuestMode等)を参照するため、使われるメソッドだけを差し替える
-vi.mock('../../services/api', () => ({ api: { get: apiGet, setGuestMode: vi.fn(), setAuthToken: vi.fn(), clearAuthToken: vi.fn() } }));
+vi.mock('../../services/api', () => ({ api: { get: apiGet, setGuestMode: vi.fn(), setMemberSession: vi.fn(), setAuthToken: vi.fn(), clearAuthToken: vi.fn() } }));
 vi.mock('react-hot-toast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import AdminUsers from './AdminUsers';

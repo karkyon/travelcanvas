@@ -80,6 +80,19 @@ export class AuthApi extends ApiCore {
     }
   }
 
+  /**
+   * [Gate S5] POST /auth/refresh。cookie(httpOnly)の更新鍵で、会員のアクセストークンを取り直す(再読込の後など)。
+   * 失敗は AuthApiError(401=ログインが切れた、null=通信できない)。
+   */
+  async refreshSession(): Promise<AuthResponse> {
+    try {
+      const response = await this.client.post('/auth/refresh', undefined, SILENT);
+      return decodeResponse(response.data, authResponse, 'POST /auth/refresh');
+    } catch (error) {
+      throw toAuthApiError(error, 'ログインの確認に失敗しました');
+    }
+  }
+
   /** [Gate A1] POST /auth/guest。ログイン不要のゲストセッションを発行する。 */
   async startGuestSession(): Promise<GuestSessionResponse> {
     try {

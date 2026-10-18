@@ -14,7 +14,7 @@ const m = vi.hoisted(() => ({
 vi.mock('@/services/api', () => ({
   api: {
     createEvent: m.createEvent, updateEvent: m.updateEvent, deleteEvent: m.deleteEvent, syncOperations: m.syncOperations,
-    getPlan: m.getPlan, getPlanDetail: m.getPlanDetail, setGuestMode: vi.fn(), setAccessToken: vi.fn(),
+    getPlan: m.getPlan, getPlanDetail: m.getPlanDetail, setGuestMode: vi.fn(), setMemberSession: vi.fn(), setAccessToken: vi.fn(),
     clearAccessToken: vi.fn(),
   },
   travelAPI: {},

@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({ getSyncConflicts: vi.fn(), resolveSyncConflict: vi
 vi.mock('@/services/api', () => ({
   getSyncConflicts: m.getSyncConflicts, resolveSyncConflict: m.resolveSyncConflict,
   // planStore・authStoreが読み込み時に参照する
-  api: { setGuestMode: vi.fn(), setAccessToken: vi.fn(), clearAccessToken: vi.fn() },
+  api: { setGuestMode: vi.fn(), setMemberSession: vi.fn(), setAccessToken: vi.fn(), clearAccessToken: vi.fn() },
   travelAPI: {},
 }));
 

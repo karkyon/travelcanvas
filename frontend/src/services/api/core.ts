@@ -80,6 +80,31 @@ export function extractApiErrorDetailMessage(detail: unknown): string | null {
   return null;
 }
 
+// [Gate S5] localStorage が使えない環境(プライベートブラウズ・保存の無効化)でも止まらないようにする
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // 保存できなくても、この画面の間はメモリのトークンで動く
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // 何もしない
+  }
+}
+
 export class ApiCore {
   protected client: AxiosInstance;
   private accessToken: string | null = null;
@@ -89,6 +114,9 @@ export class ApiCore {
   // 個々のコンポーネント側のisGuestガード漏れがあっても、この層で
   // 強制リロードループを起こさないための多層防御。
   private isGuestSession: boolean = false;
+  // [Gate S5] 会員としてログインしている(アクセストークンはメモリだけに持つため、再読込直後や通信が戻った直後は
+  // トークンが無いことがある)。その間に 401 になったら、cookie の更新鍵で取り直す。
+  private isMemberSession: boolean = false;
 
   constructor() {
     this.client = axios.create({
@@ -172,7 +200,7 @@ export class ApiCore {
           originalRequest &&
           !originalRequest._retry &&
           !isAuthEndpoint &&
-          this.accessToken && // トークンを一度も持ったことが無ければログイン画面へ委ねる
+          (this.accessToken || this.isMemberSession) && // ログインしていなければログイン画面へ委ねる
           !this.isGuestSession // [Gate R2-8] guestはrefresh cookieを持たないため
           // refreshは常に失敗する。無駄なリクエストと、その失敗が結局
           // handleApiErrorの強制リダイレクトへ繋がることを避けるため
@@ -205,15 +233,26 @@ export class ApiCore {
     );
   }
 
+  // [Gate S5] F15 端末に保存するのはゲストのトークンだけ(ゲストには cookie の更新鍵が無く、再読込で続けるため)。
+  // 会員のアクセストークンはメモリだけに持ち、再読込では cookie(httpOnly。スクリプトから読めない)の更新鍵で取り直す。
+  // 以前は会員のトークンも localStorage に置いており、XSS・悪意ある拡張に読まれると期限まで使われ得た。
   private initializeTokens(): void {
-    this.accessToken = localStorage.getItem('auth_token') || 
-                     localStorage.getItem('access_token');
+    this.accessToken = readStorage('auth_token');
   }
 
-  protected setTokens(accessToken: string): void {
+  protected setTokens(accessToken: string, persist: boolean = false): void {
     this.accessToken = accessToken;
-    localStorage.setItem('auth_token', accessToken);
-    localStorage.setItem('access_token', accessToken);
+    if (persist) {
+      writeStorage('auth_token', accessToken);
+    } else {
+      removeStorage('auth_token');
+    }
+    removeStorage('access_token');
+  }
+
+  /** [Gate S5] 試験・状態確認用: トークンを持っているか(値は返さない) */
+  hasAccessToken(): boolean {
+    return !!this.accessToken;
   }
 
   // [Gate #10] authStore.tsは独自のfetch実装でログイン/登録を行っており、
@@ -221,8 +260,13 @@ export class ApiCore {
   // ログイン後もaxiosクライアントにAuthorizationヘッダーが一切付与されず、
   // 認証必須の全API(スポット作成・プラン作成・日程保存等)が常に401で
   // 静かに失敗していた実害バグ。authStore.tsから同期できるよう公開する。
-  setAccessToken(accessToken: string): void {
-    this.setTokens(accessToken);
+  setAccessToken(accessToken: string, options: { persist?: boolean } = {}): void {
+    this.setTokens(accessToken, options.persist === true);
+  }
+
+  /** [Gate S5] 会員としてログイン中か(トークンが無くても 401 で cookie から取り直す) */
+  setMemberSession(isMember: boolean): void {
+    this.isMemberSession = isMember;
   }
 
   clearAccessToken(): void {
@@ -238,10 +282,10 @@ export class ApiCore {
 
   protected clearTokens(): void {
     this.accessToken = null;
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    removeStorage('auth_token');
+    removeStorage('access_token');
+    removeStorage('refresh_token');
+    removeStorage('user');
   }
 
   private handleApiError(error: AxiosError): void {

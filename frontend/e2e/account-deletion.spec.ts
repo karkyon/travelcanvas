@@ -34,10 +34,12 @@ test('アカウント削除: 同意の変更・撤回、削除内容の確認、
   await page.locator('#confirmPassword').fill(PASSWORD);
   const registered = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/register'));
   await page.getByRole('button', { name: 'Create Account' }).click();
-  const apiBase = (await registered).url().replace(/\/auth\/register$/, '');
+  const registeredResponse = await registered;
+  const apiBase = registeredResponse.url().replace(/\/auth\/register$/, '');
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
-  const token = await page.evaluate(() => window.localStorage.getItem('auth_token'));
-  if (!token) throw new Error('アクセストークンがlocalStorage(auth_token)にありません');
+  // [Gate S5] 会員のアクセストークンは端末に保存しないので、登録の応答から受け取る
+  const token = String((await registeredResponse.json()).access_token ?? '');
+  if (!token) throw new Error('会員登録の応答にアクセストークンがありません');
   const auth = { Authorization: `Bearer ${token}` };
   const plan = await context.request.post(`${apiBase}/travel-plans/`, { headers: auth, data: { title: `P9削除E2E-${suffix}` } });
   expect(plan.status()).toBe(201);

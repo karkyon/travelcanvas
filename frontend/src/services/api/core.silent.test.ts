@@ -67,7 +67,9 @@ describe('skipGlobalErrorHandler (Gate A1)', () => {
 
     expect(toast.error).not.toHaveBeenCalled();
     expect(window.location.href).toBe('http://localhost/login');
-    expect(localStorage.getItem('auth_token')).toBe('member-token');
+    // [Gate S5] 会員のトークンは端末に保存しない(メモリだけ)。401 でも破棄しない
+    expect(core.hasAccessToken()).toBe(true);
+    expect(localStorage.getItem('auth_token')).toBeNull();
   });
 
   it('指定なしの401では従来どおり共通処理が動く(対照)', async () => {

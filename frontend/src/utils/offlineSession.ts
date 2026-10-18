@@ -17,8 +17,10 @@ export function currentOfflineSession(): CurrentOfflineSession | null {
   if (s.isGuest && s.guestId && s.guestToken) {
     return { userId: String(s.guestId), sessionTag: s.guestToken, legacyToken: s.guestToken };
   }
-  if (s.user?.id && s.token) {
-    return { userId: String(s.user.id), sessionTag: s.token, legacyToken: s.token };
+  // [Gate S5] 会員のトークンはメモリだけに持つ。再読込の後で通信できない時(オフライン)はトークンが無いが、
+  // 端末に置いた鍵で開けるよう、ログイン中なら利用者 ID で続ける
+  if (s.user?.id && (s.token || s.isAuthenticated)) {
+    return { userId: String(s.user.id), sessionTag: s.token ?? `member:${String(s.user.id)}`, legacyToken: s.token };
   }
   return null;
 }

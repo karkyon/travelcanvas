@@ -24,7 +24,7 @@ import App from './App';
 import { useAuthStore } from '@/store/authStore';
 
 beforeEach(() => {
-  useAuthStore.setState({ isInitialized: true, isLoading: false, initialize: () => undefined });
+  useAuthStore.setState({ isInitialized: true, isLoading: false, initialize: async () => undefined });
 });
 
 describe('App (Gate A1)', () => {

@@ -80,21 +80,33 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
   await page.locator('#password').fill(PASSWORD);
   const succeeded = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login'));
   await page.getByRole('button', { name: 'Sign in' }).click();
-  expect((await succeeded).status()).toBe(200);
+  const loginResponse = await succeeded;
+  expect(loginResponse.status()).toBe(200);
+  const accessToken = String((await loginResponse.json()).access_token);
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
   await expect(page.getByText(`ようこそ、${username}さん！`)).toBeVisible();
 
+  // [Gate S5] 会員のアクセストークンは端末(localStorage)に保存しない
   const { persisted, apiToken } = await readAuthState(page);
   expect(persisted.isAuthenticated).toBe(true);
   expect(persisted.isGuest).toBe(false);
-  expect(typeof persisted.token).toBe('string');
-  expect(apiToken).toBe(persisted.token);
+  expect(persisted.token).toBeUndefined();
+  expect(apiToken).toBeNull();
+  const storageDump = await page.evaluate(() => JSON.stringify(Object.entries(window.localStorage)));
+  expect(storageDump).not.toContain(accessToken);
+
+  // 再読込しても、cookie の更新鍵でログインが続く(トークンは取り直す)
+  const restored = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/refresh'));
+  await page.reload();
+  expect((await restored).status()).toBe(200);
+  await expect(page.getByText(`ようこそ、${username}さん！`)).toBeVisible({ timeout: 15_000 });
+  expect((await readAuthState(page)).apiToken).toBeNull();
 
   // 4. consoleへ秘匿値を出さない
   const logged = consoleLines.join('\n');
   expect(logged).not.toContain(PASSWORD);
   expect(logged).not.toContain(email);
-  expect(logged).not.toContain(String(persisted.token));
+  expect(logged).not.toContain(accessToken);
 });
 
 test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、そのアカウントでログインできる', async ({ page }) => {
@@ -125,14 +137,16 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
   await page.getByRole('button', { name: 'アカウントを作成' }).click();
   const upgradeResponse = await upgraded;
   expect(upgradeResponse.status()).toBe(200);
+  const memberToken = String((await upgradeResponse.json()).access_token);
   expect(upgradeResponse.request().headers()['authorization']).toBe(`Bearer ${String(asGuest.persisted.guestToken)}`);
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
   await expect(page.getByText(`ようこそ、${username}さん！`)).toBeVisible();
 
   const asMember = await readAuthState(page);
   expect(asMember.persisted).toMatchObject({ isGuest: false, guestToken: null, guestId: null, isAuthenticated: true });
-  expect(typeof asMember.persisted.token).toBe('string');
-  expect(asMember.apiToken).toBe(asMember.persisted.token);
+  // [Gate S5] 昇格後は会員なので、トークンを端末に保存しない(ゲストのトークンも消える)
+  expect(asMember.persisted.token).toBeUndefined();
+  expect(asMember.apiToken).toBeNull();
 
   // 3. 昇格したアカウントでログインできる
   await signOutLocally(page);
@@ -146,5 +160,5 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
   expect(logged).not.toContain(PASSWORD);
   expect(logged).not.toContain(email);
   expect(logged).not.toContain(String(asGuest.persisted.guestToken));
-  expect(logged).not.toContain(String(asMember.persisted.token));
+  expect(logged).not.toContain(memberToken);
 });

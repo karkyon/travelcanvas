@@ -36,6 +36,7 @@ vi.mock('@/services/api', () => ({
     // 含めておかないと、このファイルのテスト実行後に非同期で
     // "setGuestMode is not a function" が発生する。
     setGuestMode: vi.fn(),
+    setMemberSession: vi.fn(), // [Gate S5]
     setAccessToken: vi.fn(),
     clearAccessToken: vi.fn(),
   },
