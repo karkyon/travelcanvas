@@ -29,6 +29,13 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/package*.json ./
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
+# [Gate S2] `vite preview` が応答にセキュリティヘッダー(CSP 等)を付けるのは vite.config.ts の preview.headers。
+# 以前は実行用の段に vite.config.ts を入れておらず、設定なしで動いていた(ヘッダーが付かない)。
+# 設定が読む src/config/securityHeaders.ts も入れる。vite は設定を読む時に同じ場所へ一時ファイルを書くため、
+# /app を node の持ち物にする(root のままだと EACCES で起動しない)。
+COPY --from=build --chown=node:node /app/vite.config.ts ./vite.config.ts
+COPY --from=build --chown=node:node /app/src/config ./src/config
+RUN chown node:node /app
 
 USER node
 

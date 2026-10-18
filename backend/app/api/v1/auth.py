@@ -3,10 +3,13 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
 import jwt  # [Gate S1] python-jose(保守停止・未修正の脆弱性あり)から PyJWT へ
+from app.core.password_policy import PasswordPolicyError, validate_password
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 import hashlib
+import hmac
 import secrets
+import uuid
 import logging
 
 from app.core.database import get_db
@@ -22,6 +25,12 @@ logger = logging.getLogger("travelcanvas.auth")
 
 REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/v1/auth"
+# [Gate S2] 直前の refresh token のハッシュと入れ替えた時刻(UserSession.device_info の中。migration を避ける)。
+# 同じブラウザの複数タブが同時に refresh した時、この秒数の間だけ直前の token を「同時の正規の要求」として扱う。
+_REFRESH_PREV_KEY = "_refresh_prev_hash"
+_REFRESH_ROTATED_AT_KEY = "_refresh_rotated_at"
+REFRESH_REUSE_GRACE_SECONDS = 20
+_INTERNAL_DEVICE_INFO_KEYS = (_REFRESH_PREV_KEY, _REFRESH_ROTATED_AT_KEY)
 
 # パスワードハッシュ化
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -100,22 +109,19 @@ class UserDetailResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    """[Gate #20] プロフィール更新スキーマ。渡されたフィールドのみ更新する。"""
+    """[Gate #20] プロフィール更新スキーマ。渡されたフィールドのみ更新する。
+    [Gate S2] メールアドレスを変える時は current_password(再認証)が必要。"""
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     preferences: Optional[Dict[str, Any]] = None
+    current_password: Optional[str] = None
 
 
 class PasswordChange(BaseModel):
-    """[Gate #21] パスワード変更スキーマ"""
+    """[Gate #21] パスワード変更スキーマ。
+    [Gate S2] 規則の検査は登録・昇格と同じ _enforce_password_policy で行う(以前はここだけ8文字の検査があった)。"""
     current_password: str
     new_password: str
-
-    @validator('new_password')
-    def new_password_min_length(cls, v):
-        if len(v) < 8:
-            raise ValueError('新しいパスワードは8文字以上にしてください')
-        return v
 
 
 class SessionInfo(BaseModel):
@@ -131,6 +137,15 @@ class SessionInfo(BaseModel):
         from_attributes = True
 
 # ユーティリティ関数
+
+
+def _enforce_password_policy(password: str, *, email: Optional[str] = None, username: Optional[str] = None,
+                             extra_banned=()) -> None:
+    """[Gate S2] 登録・昇格・変更で同じ規則を強制する(app/core/password_policy.py)。400 と日本語の理由を返す。"""
+    try:
+        validate_password(password, email=email, username=username, extra_banned=extra_banned)
+    except PasswordPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 def hash_password(password: str) -> str:
@@ -160,6 +175,28 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 # 使用の度に新しいsecretへローテーションする。ハッシュが一致しない
 # (=既にローテーション済みの古いtokenが再送されてきた)場合は盗用の兆候と
 # みなし、そのセッションを即座に失効させる。
+
+def _within_refresh_grace(session: UserSession, presented_hash: str, now: datetime) -> bool:
+    info = session.device_info or {}
+    prev = info.get(_REFRESH_PREV_KEY)
+    rotated_at = info.get(_REFRESH_ROTATED_AT_KEY)
+    if not isinstance(prev, str) or not isinstance(rotated_at, str):
+        return False
+    if not hmac.compare_digest(prev, presented_hash):
+        return False
+    try:
+        rotated = datetime.fromisoformat(rotated_at)
+    except ValueError:
+        return False
+    return timedelta(0) <= now - rotated <= timedelta(seconds=REFRESH_REUSE_GRACE_SECONDS)
+
+
+def _public_device_info(info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """[Gate S2] セッション一覧に内部の値(直前の token のハッシュ等)を出さない。"""
+    if not info:
+        return info
+    return {k: v for k, v in info.items() if k not in _INTERNAL_DEVICE_INFO_KEYS}
+
 
 def _hash_refresh_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
@@ -266,6 +303,7 @@ async def upgrade_guest_to_user(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="試行回数が上限に達しました。しばらく待ってから再試行してください。"
         )
+    _enforce_password_policy(upgrade_data.password, email=upgrade_data.email, username=upgrade_data.username)
 
     try:
         existing_user = db.query(User).filter(
@@ -354,6 +392,7 @@ async def register(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="登録試行回数が上限に達しました。しばらく待ってから再試行してください。"
         )
+    _enforce_password_policy(user_data.password, email=user_data.email, username=user_data.username)
 
     try:
         # ユーザー重複チェック
@@ -564,42 +603,76 @@ async def refresh_token_endpoint(
     if not session_id or not secret:
         raise invalid
 
-    session = db.query(UserSession).filter(UserSession.id == session_id).first()
+    # [Gate S2] 以前は「読む→比べる→無条件に書き換える」で行ロックが無く、同じ refresh token の並列要求が
+    # 両方とも成功し得た(盗んだ token と正規の利用者が同時に使っても検知できない)。行ロック(SELECT … FOR UPDATE)
+    # の中で、検証・入れ替え・失効を1つのトランザクションで行う。
+    try:
+        session_uuid = uuid.UUID(str(session_id))
+    except ValueError:
+        raise invalid
+    session = db.query(UserSession).filter(UserSession.id == session_uuid).with_for_update().first()
     if not session:
+        db.rollback()
         raise invalid
 
     presented_hash = _hash_refresh_secret(secret)
+    now = datetime.now(timezone.utc)
 
-    if not session.is_active or (session.expires_at and session.expires_at <= datetime.now(timezone.utc)):
+    if not session.is_active or (session.expires_at and session.expires_at <= now):
+        db.rollback()
         response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
         raise invalid
 
-    if session.session_token != presented_hash:
-        # [Gate #28] 再利用検知: 既にローテーション済みのtokenが送られてきた。
-        # 盗用されたrefresh tokenが使われた可能性があるため、このセッション
-        # を即座に失効させる。
-        auth_manager.revoke_session(str(session.id), db)
-        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
-        logger.warning(f"refresh token reuse detected, session revoked: {session.id}")
-        raise invalid
+    rotate = True
+    if not hmac.compare_digest(session.session_token, presented_hash):
+        if _within_refresh_grace(session, presented_hash, now):
+            # [Gate S2] 同じブラウザの複数タブが同時に refresh した(先の要求が直前に入れ替えた)。
+            # 盗用ではないので失効させず、アクセストークンだけを発行する。cookie は先の応答が既に新しくしている。
+            rotate = False
+        else:
+            # [Gate #28] 再利用検知: 既にローテーション済みのtokenが送られてきた。
+            # 盗用されたrefresh tokenが使われた可能性があるため、このセッション
+            # を即座に失効させる。
+            session.is_active = False
+            session.updated_at = now
+            db.commit()
+            auth_manager.revoke_session(str(session.id), db)
+            response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+            logger.warning("refresh token reuse detected, session revoked: %s", session.id)
+            record_audit_event(action="refresh_token_reuse_detected", resource_type="session",
+                               user_id=session.user_id, resource_id=session.id)
+            raise invalid
 
     user = db.query(User).filter(User.id == session.user_id).first()
     if not user or not user.is_active:
+        session.is_active = False
+        session.updated_at = now
+        db.commit()
         auth_manager.revoke_session(str(session.id), db)
         response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
         raise invalid
 
-    new_secret = _generate_refresh_secret()
-    auth_manager.rotate_session_token(str(session.id), _hash_refresh_secret(new_secret), db)
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=f"{session.id}.{new_secret}",
-        httponly=True,
-        secure=settings.APP_ENV == "production",
-        samesite="lax",
-        path=REFRESH_COOKIE_PATH,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
-    )
+    if rotate:
+        new_secret = _generate_refresh_secret()
+        info = dict(session.device_info or {})
+        info[_REFRESH_PREV_KEY] = session.session_token
+        info[_REFRESH_ROTATED_AT_KEY] = now.isoformat()
+        session.device_info = info
+        session.session_token = _hash_refresh_secret(new_secret)
+        session.expires_at = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        session.updated_at = now
+        db.commit()
+        response.set_cookie(
+            key=REFRESH_COOKIE_NAME,
+            value=f"{session.id}.{new_secret}",
+            httponly=True,
+            secure=settings.APP_ENV == "production",
+            samesite="lax",
+            path=REFRESH_COOKIE_PATH,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        )
+    else:
+        db.commit()  # 行ロックを放す
     access_token = _access_token_for(user, session.id)
 
     return TokenResponse(
@@ -662,7 +735,7 @@ async def list_sessions(
         SessionInfo(
             id=str(s.id),
             ip_address=s.ip_address,
-            device_info=s.device_info,
+            device_info=_public_device_info(s.device_info),
             created_at=s.created_at,
             expires_at=s.expires_at,
             is_current=(str(s.id) == str(current_session_id)),
@@ -725,10 +798,33 @@ async def get_me(
 @router.put("/me", response_model=UserDetailResponse)
 async def update_me(
     update_data: UserUpdate,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
+    current_session_id: Optional[str] = Depends(get_current_session_id),
     db: Session = Depends(get_db)
 ):
-    """現在のユーザー情報を更新"""
+    """現在のユーザー情報を更新
+
+    [Gate S2] メールアドレスの変更は、乗っ取られたセッションから連絡先(=パスワード再設定の宛先)を奪われると
+    アカウントを取り戻せなくなるため、現在のパスワードによる再認証を必須にする。変更後は確認済みの状態を外し、
+    ほかの端末のセッションを失効させる(監査にはメールアドレスを残さない)。
+    """
+    email_changing = update_data.email is not None and update_data.email != current_user.email
+    if email_changing:
+        client_ip = request.client.host if request.client else "unknown"
+        if not check_rate_limit(f"reauth:{current_user.id}", settings.RATE_LIMIT_AUTH, 60):
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                                detail="確認の回数が上限に達しました。しばらく待ってから再試行してください。")
+        if not update_data.current_password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="メールアドレスを変更するには、現在のパスワードを入力してください")
+        if not current_user.hashed_password or not verify_password(update_data.current_password,
+                                                                   current_user.hashed_password):
+            record_audit_event(action="reauth_failed", resource_type="user", user_id=current_user.id,
+                               resource_id=current_user.id, ip_address=client_ip,
+                               details={"purpose": "email_change"})
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="現在のパスワードが正しくありません")
     try:
         if update_data.username is not None and update_data.username != current_user.username:
             existing = db.query(User).filter(
@@ -753,6 +849,7 @@ async def update_me(
                     detail="このメールアドレスは既に使用されています"
                 )
             current_user.email = update_data.email
+            current_user.is_verified = False
 
         if update_data.preferences is not None:
             # 既存のpreferencesとマージ(通知設定だけ更新、等の部分更新に対応)
@@ -765,6 +862,12 @@ async def update_me(
 
         db.commit()
         db.refresh(current_user)
+        if email_changing:
+            auth_manager.revoke_all_user_sessions(str(current_user.id), db, except_session_id=current_session_id)
+            record_audit_event(action="email_changed", resource_type="user", user_id=current_user.id,
+                               resource_id=current_user.id,
+                               ip_address=request.client.host if request.client else None,
+                               details={"other_sessions_revoked": True})
         return current_user
     except HTTPException:
         raise
@@ -795,6 +898,10 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="現在のパスワードが正しくありません"
         )
+    _enforce_password_policy(password_data.new_password, email=current_user.email, username=current_user.username)
+    if password_data.new_password == password_data.current_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="新しいパスワードは現在のパスワードと違うものにしてください")
 
     try:
         current_user.hashed_password = hash_password(password_data.new_password)

@@ -34,7 +34,12 @@ def test_refresh_rotates_token_and_issues_new_access_token(client):
     assert new_cookie != old_cookie
 
 
-def test_refresh_reuse_of_old_token_revokes_session(client):
+def test_refresh_reuse_of_old_token_revokes_session(client, monkeypatch):
+    # [Gate S2] 直前の token は、同じブラウザの複数タブの同時 refresh のため短い猶予の間だけ受け付ける。
+    # ここでは猶予を0にして「猶予を過ぎた再利用は盗用として失効させる」ことを確かめる(猶予内は test_gate_s2)。
+    import app.api.v1.auth as auth_api
+
+    monkeypatch.setattr(auth_api, "REFRESH_REUSE_GRACE_SECONDS", 0)
     _register(client)
     old_cookie = client.cookies.get("refresh_token")
 

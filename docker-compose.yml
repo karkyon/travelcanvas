@@ -91,8 +91,10 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     restart: unless-stopped
     environment:
-      # 参考値。実際にフロントエンドが使うのは上のbuild.argsでビルド時に埋め込まれた値。
-      VITE_API_URL: http://localhost:8001
+      # 画面が使う API はビルド時に埋め込まれた値(上の build.args)。
+      # [Gate S2] 起動時の値は vite preview が CSP の通信先(connect-src 等)に使うため、ビルド時と同じ値にする
+      # (以前は http://localhost:8001 固定で、.env の VITE_API_URL を変えると CSP が API への通信を止めた)。
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
       VITE_APP_NAME: TravelCanvas
     ports:
       - "4173:4173"

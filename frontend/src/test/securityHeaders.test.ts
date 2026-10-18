@@ -1,0 +1,62 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { apiOrigin, contentSecurityPolicy, securityHeaders } from '@/config/securityHeaders';
+
+describe('画面の応答ヘッダー (Gate S2)', () => {
+  it('API のオリジンだけを通信・画像・音声に許し、スクリプトに unsafe-inline を付けない', () => {
+    const csp = contentSecurityPolicy('https://api.travelcanvas.jp/api/v1');
+    expect(csp).toContain("connect-src 'self' https://api.travelcanvas.jp");
+    expect(csp).toContain("img-src 'self' data: blob: https://api.travelcanvas.jp");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    const script = csp.split('; ').find((d: string) => d.startsWith('script-src')) ?? '';
+    expect(script).not.toContain('unsafe-inline');
+    expect(script).not.toContain('unsafe-eval');
+    expect(csp).not.toContain('*.travelcanvas');
+  });
+
+  it('API の URL が無い・壊れている時は開発の既定にする', () => {
+    expect(apiOrigin(undefined)).toBe('http://localhost:8001');
+    expect(apiOrigin('not a url')).toBe('http://localhost:8001');
+  });
+
+  it('共有リンクのパスを外部へ送らない Referrer-Policy、埋め込み禁止、HSTS は本番だけ', () => {
+    const dev = securityHeaders('http://localhost:8001');
+    expect(dev['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
+    expect(dev['X-Frame-Options']).toBe('DENY');
+    expect(dev['X-Content-Type-Options']).toBe('nosniff');
+    expect(dev['Strict-Transport-Security']).toBeUndefined();
+    expect(securityHeaders('https://api.x.jp', true)['Strict-Transport-Security']).toMatch(/^max-age=31536000/);
+  });
+});
+
+describe('docker の frontend コンテナ (Gate S2)', () => {
+  // vite preview は vite.config.ts の preview.headers でヘッダーを付ける。実行用の段に設定が無いとヘッダーが付かない
+  // (omega-dev2 の E2E で発見。サンドボックスは docker を使わないため、ここで Dockerfile を確かめる)
+  const dockerfile = readFileSync(resolve(__dirname, '../../Dockerfile'), 'utf8');
+  const runtime = dockerfile.slice(dockerfile.lastIndexOf('FROM '));
+
+  it('実行用の段に vite の設定と、設定が読むヘッダーの定義を入れる', () => {
+    expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/vite\.config\.ts/);
+    expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/src\/config/);
+    expect(runtime).toContain('CMD ["npm", "run", "preview"]');
+  });
+
+  it('起動時の API の URL(CSP の通信先)をビルド時と同じ値にする(docker-compose.yml)', () => {
+    const compose = readFileSync(resolve(__dirname, '../../../docker-compose.yml'), 'utf8');
+    const frontend = compose.slice(compose.indexOf('\n  frontend:'), compose.indexOf('\n  clamav:') > 0
+      ? compose.indexOf('\n  clamav:') : undefined);
+    const values = [...frontend.matchAll(/^\s+VITE_API_URL: (.+)$/gm)].map((m) => m[1]?.trim());
+    expect(values).toHaveLength(2);
+    expect(values[0]).toBe('${VITE_API_URL:-http://localhost:8001}');
+    expect(values[1]).toBe(values[0]);
+  });
+
+  it('設定を読む時の一時ファイルを書けるよう、/app を node の持ち物にしてから USER node にする', () => {
+    const chown = runtime.search(/^RUN chown node:node \/app$/m);
+    const user = runtime.search(/^USER node$/m);
+    expect(chown).toBeGreaterThan(-1);
+    expect(user).toBeGreaterThan(chown);
+  });
+});

@@ -13,6 +13,7 @@ from app.api.v1 import (
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
+from app.core.security_headers import apply_security_headers
 import logging
 import time
 import uuid
@@ -61,8 +62,10 @@ app = FastAPI(
     title="TravelCanvas API",
     description="AI-powered travel planning application",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    # [Gate S2] 本番では API の一覧・試せる画面(Swagger/ReDoc/OpenAPI)を公開しない(攻撃面を減らす)
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 
@@ -86,6 +89,8 @@ async def request_id_middleware(request: Request, call_next):
         request.method, ops_metrics.route_template(request.scope), response.status_code,
         time.perf_counter() - started)
     response.headers["X-Request-ID"] = request_id
+    # [Gate S2] SEC-03 セキュリティヘッダー(app/core/security_headers.py)
+    apply_security_headers(request.url.path, response.headers)
     return response
 
 
@@ -99,7 +104,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     request_id = getattr(request.state, "request_id", "unknown")
     ops_metrics.registry.count_exception()
     logger.exception(f"[{request_id}] Unhandled exception on {request.method} {request.url.path}")
-    return JSONResponse(
+    error_response = JSONResponse(
         status_code=500,
         content={
             "detail": "サーバー内部でエラーが発生しました。しばらくしてから再試行してください。",
@@ -110,6 +115,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         # _cors_headers_for_origin()で同じ許可リストに基づき明示的に付与する。
         headers=_cors_headers_for_origin(request),
     )
+    apply_security_headers(request.url.path, error_response.headers)  # [Gate S2]
+    return error_response
 
 
 # CORS設定

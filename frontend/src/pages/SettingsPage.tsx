@@ -40,6 +40,9 @@ const SettingsPage: React.FC = () => {
     username: user?.username || '',
     bio: ''
   });
+  // [Gate S2] メールアドレスの変更には現在のパスワードでの再認証が必要(乗っ取られた端末から連絡先を奪わせない)
+  const [emailChangePassword, setEmailChangePassword] = useState('');
+  const emailChanging = !!profileData.email && profileData.email !== (user?.email || '');
   
   const [notificationSettings, setNotificationSettings] = useState({
     email_notifications: true,
@@ -131,10 +134,11 @@ const SettingsPage: React.FC = () => {
         {/* Form Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-full-name" className="block text-sm font-medium text-gray-700 mb-1">
               フルネーム
             </label>
             <input
+              id="profile-full-name"
               type="text"
               value={profileData.full_name}
               onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
@@ -143,10 +147,11 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-username" className="block text-sm font-medium text-gray-700 mb-1">
               ユーザー名
             </label>
             <input
+              id="profile-username"
               type="text"
               value={profileData.username}
               onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
@@ -155,22 +160,44 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1">
               メールアドレス
             </label>
             <input
+              id="profile-email"
               type="email"
               value={profileData.email}
               onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+
+          {emailChanging && (
+            <div className="md:col-span-2">
+              <label htmlFor="email-change-password" className="block text-sm font-medium text-gray-700 mb-1">
+                現在のパスワード(メールアドレスの変更に必要)
+              </label>
+              <input
+                id="email-change-password"
+                type="password"
+                autoComplete="current-password"
+                value={emailChangePassword}
+                onChange={(e) => setEmailChangePassword(e.target.value)}
+                aria-describedby="email-change-note"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p id="email-change-note" className="mt-1 text-xs text-gray-700">
+                変更すると、メールアドレスは未確認の状態になり、ほかの端末はログアウトされます。
+              </p>
+            </div>
+          )}
           
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-bio" className="block text-sm font-medium text-gray-700 mb-1">
               自己紹介
             </label>
             <textarea
+              id="profile-bio"
               value={profileData.bio}
               onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
               rows={3}
@@ -585,9 +612,14 @@ const SettingsPage: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await apiService.updateProfile({
+      if (emailChanging && !emailChangePassword) {
+        showMessage('メールアドレスを変更するには、現在のパスワードを入力してください', 'error');
+        return;
+      }
+      const saved = await apiService.updateProfile({
         username: profileData.username || undefined,
         email: profileData.email || undefined,
+        current_password: emailChanging ? emailChangePassword : undefined,
         preferences: {
           full_name: profileData.full_name,
           bio: profileData.bio,
@@ -595,7 +627,14 @@ const SettingsPage: React.FC = () => {
           ...preferences,
         },
       });
-      showMessage('設定を保存しました', 'success');
+      if (emailChanging) {
+        setEmailChangePassword('');
+        const current = useAuthStore.getState().user;
+        if (current) useAuthStore.setState({ user: { ...current, email: saved.data.email } });
+        showMessage('メールアドレスを変更しました。ほかの端末はログアウトされました', 'success');
+      } else {
+        showMessage('設定を保存しました', 'success');
+      }
     } catch (error) {
       console.error('設定保存エラー:', error);
       showMessage(
@@ -674,7 +713,7 @@ const SettingsPage: React.FC = () => {
 
         {/* メッセージ表示 */}
         {message && (
-          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
+          <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
             message.type === 'success' 
               ? 'bg-green-100 text-green-800 border border-green-200' 
               : 'bg-red-100 text-red-800 border border-red-200'

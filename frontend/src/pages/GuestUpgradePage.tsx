@@ -52,8 +52,10 @@ const GuestUpgradePage = () => {
       toast.error('パスワードが一致しません');
       return;
     }
-    if (formData.password.length < 6) {
-      toast.error('パスワードは6文字以上で入力してください');
+    // [Gate S2] サーバーの規則(app/core/password_policy.py)と同じ最小長。よく使われるもの・メールアドレスを
+    // 含むもの等はサーバーが理由つきで拒否し、その文をそのまま表示する。
+    if (formData.password.length < 8) {
+      toast.error('パスワードは8文字以上で入力してください');
       return;
     }
 
@@ -129,7 +131,11 @@ const GuestUpgradePage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   disabled={isLoading}
+                  aria-describedby="password-rule"
                 />
+                <p id="password-rule" className="mt-1 text-xs text-gray-700">
+                  8文字以上。よく使われるパスワードや、メールアドレス・ユーザー名を含むものは使えません。
+                </p>
               </div>
 
               <div>

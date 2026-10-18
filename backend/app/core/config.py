@@ -1,10 +1,68 @@
 from typing import List, Optional, Union
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pathlib import Path
 
 # プロジェクトルートのパスを取得
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
+
+# [Gate S2] 外部に公開する環境。ここでは本番向けの検査(production_problems)を通らないと起動しない。
+STRICT_ENVIRONMENTS = ("production", "prod", "staging")
+_WEAK_MARKERS = ("change", "dummy", "example", "ci-only", "sandbox", "placeholder", "your", "default",
+                 "password", "not-real", "test-only", "xxxx")
+MIN_SECRET_LENGTH = 32
+
+
+def _weak_secret(value: Optional[str]) -> Optional[str]:
+    """弱い秘密なら理由を返す(値そのものは返さない)。"""
+    if not value:
+        return "未設定"
+    if len(value) < MIN_SECRET_LENGTH:
+        return f"{MIN_SECRET_LENGTH}文字未満"
+    lowered = value.lower()
+    if any(marker in lowered for marker in _WEAK_MARKERS):
+        return "見本・試験用の値に見える"
+    if len(set(value)) < 10:
+        return "文字の種類が少なすぎる"
+    return None
+
+
+def production_problems(s) -> List[str]:
+    """本番で直すべき設定の一覧(値は含めない)。"""
+    problems: List[str] = []
+    if s.DEBUG:
+        problems.append("DEBUG=true(診断用のエンドポイントが開く)")
+    if getattr(s, "SQL_ECHO", False):
+        problems.append("SQL_ECHO=true")
+    keys = {
+        "JWT_SECRET_KEY": s.JWT_SECRET_KEY,
+        "ENCRYPTION_KEY": s.ENCRYPTION_KEY,
+        "LOOKUP_INDEX_KEY": s.LOOKUP_INDEX_KEY,
+        "DOCUMENT_DOWNLOAD_SIGNING_KEY": s.DOCUMENT_DOWNLOAD_SIGNING_KEY,
+    }
+    if s.OFFLINE_PACK_KEY_SECRET:
+        keys["OFFLINE_PACK_KEY_SECRET"] = s.OFFLINE_PACK_KEY_SECRET
+    for name, value in keys.items():
+        reason = _weak_secret(value)
+        if reason:
+            problems.append(f"{name} が弱い({reason})")
+    present = [(n, v) for n, v in keys.items() if v]
+    for i, (n1, v1) in enumerate(present):
+        for n2, v2 in present[i + 1:]:
+            if v1 == v2:
+                problems.append(f"{n1} と {n2} が同じ値(用途ごとに別の鍵にする)")
+    if not s.METRICS_TOKEN or len(s.METRICS_TOKEN) < 24:
+        problems.append("METRICS_TOKEN が未設定か24文字未満(/metrics を守れない)")
+    origins = s.CORS_ORIGINS if isinstance(s.CORS_ORIGINS, list) else [s.CORS_ORIGINS]
+    if not origins:
+        problems.append("CORS_ORIGINS が空")
+    for origin in origins:
+        o = str(origin).strip()
+        if o == "*" or not o.startswith("https://") or "localhost" in o or "127.0.0.1" in o:
+            problems.append("CORS_ORIGINS に https 以外・* ・localhost が含まれる")
+            break
+    return problems
 
 
 class Settings(BaseSettings):
@@ -175,6 +233,29 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         return v
+
+    @property
+    def is_production(self) -> bool:
+        """[Gate S2] 本番・ステージング(外部に公開する環境)か。"""
+        return (self.APP_ENV or "").strip().lower() in STRICT_ENVIRONMENTS
+
+    @property
+    def is_development(self) -> bool:
+        return (self.APP_ENV or "").strip().lower() in ("development", "dev", "local")
+
+    @model_validator(mode="after")
+    def refuse_unsafe_production(self):
+        """[Gate S2] 本番で危険な設定のまま起動しない(セキュリティ監査 F10)。
+
+        以前は DEBUG=True・APP_ENV=development が既定で、本番向けの検査が無かった。開発用の設定や弱い鍵を
+        そのまま公開環境へ持ち込むと、診断用のエンドポイント・SQL の値の出力・推測できる署名鍵が残る。
+        """
+        if self.is_production:
+            problems = production_problems(self)
+            if problems:
+                raise ValueError("本番(APP_ENV=%s)では次の設定を直すまで起動しません:\n  - %s"
+                                 % (self.APP_ENV, "\n  - ".join(problems)))
+        return self
 
     class Config:
         env_file = PROJECT_ROOT / ".env.local"  # 絶対パスを使用

@@ -129,7 +129,8 @@ export class AuthApi extends ApiCore {
     return apiOk<User>(decodeResponse(response.data, user, 'GET /auth/me'));
   }
 
-  async updateProfile(data: Partial<User>): Promise<ApiResponse<User>> {
+  // [Gate S2] メールアドレスを変える時は current_password(現在のパスワードでの再認証)が必要
+  async updateProfile(data: Partial<User> & { current_password?: string }): Promise<ApiResponse<User>> {
     const response = await this.client.put('/auth/me', data);
     return apiOk<User>(decodeResponse(response.data, user, 'PUT /auth/me'));
   }
