@@ -1,0 +1,128 @@
+"""[Gate S8] 侵害が疑われる時の封じ込め(backend のコンテナの中で実行する)。
+
+ホストからは ``python3 scripts/ops/tcops.py security <操作>`` で呼ぶ(Runbook §9)。
+
+    status                                  警戒モード・遮断中の接続元の数・回数制限の状態
+    lockdown on --minutes 60 [--close-signup] [--reason "…"]
+    lockdown off
+    unblock --ip 203.0.113.5                その接続元の点数・遮断を消す
+    unblock-all                             全ての接続元の点数・遮断を消す
+    revoke-sessions --email user@example.com [--reason "…"]
+    revoke-sessions --all --yes [--reason "…"]   全員の全端末をログアウトさせる
+
+結果は1行の JSON(値に個人情報を含めない)。終了コード: 0=成功、2=使い方の誤り、3=失敗、4=効果が無い(共有できない)
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.core.database import SessionLocal  # noqa: E402
+from app.services import incident, threat_guard  # noqa: E402
+from app.utils import rate_limiter  # noqa: E402
+
+EXIT_OK, EXIT_USAGE, EXIT_FAIL, EXIT_NO_EFFECT = 0, 2, 3, 4
+
+
+def _print(obj) -> None:
+    print(json.dumps(obj, ensure_ascii=False, sort_keys=True))
+
+
+def _blocked_count() -> int:
+    if not rate_limiter._redis_available():
+        return -1
+    try:
+        client = rate_limiter._client()
+        return sum(1 for _ in client.scan_iter(match=f"{rate_limiter.namespace()}:guard:b:*", count=500))
+    except Exception:  # noqa: BLE001
+        return -1
+
+
+def _shared() -> bool:
+    try:
+        rate_limiter._client().ping()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="侵害が疑われる時の封じ込め(Runbook §9)")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("status")
+    p = sub.add_parser("lockdown")
+    p.add_argument("action", choices=("on", "off"))
+    p.add_argument("--minutes", type=int, default=60)
+    p.add_argument("--close-signup", action="store_true")
+    p.add_argument("--reason", default="")
+    p = sub.add_parser("unblock")
+    p.add_argument("--ip", required=True)
+    sub.add_parser("unblock-all")
+    p = sub.add_parser("revoke-sessions")
+    p.add_argument("--email")
+    p.add_argument("--all", action="store_true")
+    p.add_argument("--yes", action="store_true", help="--all の確認")
+    p.add_argument("--reason", default="")
+    args = parser.parse_args(argv)
+
+    rate_limiter.use_backend("auto")
+    shared = _shared()
+
+    if args.cmd == "status":
+        state = incident.lockdown_state(fresh=True)
+        _print({
+            "redis_shared": shared,
+            "lockdown": bool(state),
+            "lockdown_until": state.get("until") if state else None,
+            "close_signup": bool(state and state.get("close_signup")),
+            "blocked_clients": _blocked_count(),
+            "guard_enabled": bool(threat_guard._enabled()),
+        })
+        return EXIT_OK
+
+    if args.cmd == "lockdown":
+        if not shared:
+            _print({"ok": False, "error": "Redis に届かないため、backend の全プロセスに伝えられません(Runbook §3.7)"})
+            return EXIT_NO_EFFECT
+        if args.action == "on":
+            state = incident.set_lockdown(args.minutes, close_signup=args.close_signup, reason=args.reason)
+            _print({"ok": True, "lockdown": True, "until": state["until"], "close_signup": state["close_signup"]})
+        else:
+            incident.clear_lockdown()
+            _print({"ok": True, "lockdown": False})
+        return EXIT_OK
+
+    if args.cmd == "unblock":
+        threat_guard.reset(args.ip)
+        _print({"ok": True, "unblocked": 1, "shared": shared})
+        return EXIT_OK if shared else EXIT_NO_EFFECT
+
+    if args.cmd == "unblock-all":
+        removed = threat_guard.reset_all()
+        _print({"ok": True, "removed_keys": removed, "shared": shared})
+        return EXIT_OK if shared else EXIT_NO_EFFECT
+
+    if args.cmd == "revoke-sessions":
+        if bool(args.email) == bool(args.all):
+            _print({"ok": False, "error": "--email か --all のどちらか一方を指定してください"})
+            return EXIT_USAGE
+        if args.all and not args.yes:
+            _print({"ok": False, "error": "全員をログアウトさせるには --yes も付けてください"})
+            return EXIT_USAGE
+        db = SessionLocal()
+        try:
+            count = incident.revoke_sessions(db, email=args.email, all_users=args.all, reason=args.reason)
+        except LookupError as error:
+            _print({"ok": False, "error": str(error)})
+            return EXIT_FAIL
+        finally:
+            db.close()
+        _print({"ok": True, "revoked_sessions": count, "scope": "all" if args.all else "user"})
+        return EXIT_OK
+    return EXIT_USAGE
+
+
+if __name__ == "__main__":
+    sys.exit(main())

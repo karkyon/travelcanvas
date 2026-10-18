@@ -127,6 +127,8 @@ class Settings(BaseSettings):
     GUARD_BLOCK_SECONDS: int = 900       # 最初の遮断の長さ
     GUARD_REPEAT_MULTIPLIER: int = 4     # 24時間以内の再犯は前回のこの倍(上限24時間)
     GUARD_TRUSTED_IPS: str = ""          # 数えない・止めない接続元(カンマ区切り。CIDR 可。監視・運用の機械)
+    # [Gate S8] 警戒モード(app/services/incident.py)の間は、注意・遮断の閾値をこの倍にする
+    GUARD_LOCKDOWN_FACTOR: float = 0.5
     # [Gate S7] SEC-07 段階的な計算の確認(app/services/challenge.py)。点数が CHALLENGE_SCORE 以上の接続元からの
     # ログイン・登録・ゲスト開始・昇格に、ブラウザが自動で解く計算を求める(難しさは点数 CHALLENGE_SCORE_STEP ごとに2倍)
     CHALLENGE_ENABLED: bool = True

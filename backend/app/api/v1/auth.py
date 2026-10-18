@@ -20,7 +20,7 @@ from app.core.auth import (
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
-from app.services import challenge, threat_guard
+from app.services import challenge, incident, threat_guard
 
 router = APIRouter()
 
@@ -235,6 +235,16 @@ def _allowed_origins() -> List[str]:
     return list(origins) if isinstance(origins, list) else [origins]
 
 
+def _refuse_if_signup_closed() -> None:
+    """[Gate S8] 警戒モードで新規登録・ゲスト開始を止めている間は 503(既存の利用者のログインは止めない)。"""
+    if incident.signup_closed():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="現在、新規登録とゲストの開始を一時停止しています。しばらくしてから再試行してください。",
+            headers={"Retry-After": "600"},
+        )
+
+
 def _reject_cross_site(request: Request) -> None:
     """[Gate S4] cookie だけで本人と分かる操作(更新・ログアウト)を、許可していない別のサイトから
     呼ばせない(CSRF 対策)。SameSite=Lax に加え、ブラウザが付ける Origin / Sec-Fetch-Site を確かめる。
@@ -294,6 +304,7 @@ async def create_guest_session(
     残る(定期クリーンアップは別Gateで対応。本パッチのスコープ外)。
     """
     challenge.require(request, "guest")  # [Gate S7] 怪しい接続元には計算の確認を求める
+    _refuse_if_signup_closed()  # [Gate S8]
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"guest:{client_ip}", settings.RATE_LIMIT_GUEST, 3600):
         raise HTTPException(
@@ -439,6 +450,7 @@ async def register(
     """新規ユーザー登録"""
 
     challenge.require(request, "register")  # [Gate S7]
+    _refuse_if_signup_closed()  # [Gate S8]
     # [Gate #28] IPベースのレート制限。ログインと同じ閾値を流用する。
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"register:{client_ip}", settings.RATE_LIMIT_AUTH, 60):

@@ -140,7 +140,10 @@ def required_difficulty(ip: Optional[str], kind: str) -> int:
     score = threat_guard.current_score(ip)
     start = int(getattr(settings, "CHALLENGE_SCORE", 30))
     if score < start:
-        return base if kind in always else 0
+        # [Gate S8] 警戒モードの間は、点数に関わらず全ての入口で求める
+        from app.services import incident
+
+        return base if (kind in always or incident.lockdown_active()) else 0
     step = max(1, int(getattr(settings, "CHALLENGE_SCORE_STEP", 30)))
     return min(MAX_DIFFICULTY, base + (score - start) // step)
 

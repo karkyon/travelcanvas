@@ -235,8 +235,10 @@ def record_signal(ip: Optional[str], signal: str, *, path: Optional[str] = None)
             _rl._mark_down(error)
     if score is None:
         score = _add_score_memory(key, weight, now)
-    warn = int(getattr(settings, "GUARD_WARN_SCORE", 60))
-    block = int(getattr(settings, "GUARD_BLOCK_SCORE", 150))
+    # [Gate S8] 警戒モードの間は閾値を下げる(既定は半分)
+    factor = _lockdown_factor()
+    warn = int(int(getattr(settings, "GUARD_WARN_SCORE", 60)) * factor)
+    block = int(int(getattr(settings, "GUARD_BLOCK_SCORE", 150)) * factor)
     if score >= block and blocked_until(ip, now) == 0.0:
         until, strikes = _block(key, now)
         _count("guard_block")
@@ -248,6 +250,15 @@ def record_signal(ip: Optional[str], signal: str, *, path: Optional[str] = None)
         _audit("guard_warn", {"score": score, "last_signal": signal})
         return "warn"
     return None
+
+
+def _lockdown_factor() -> float:
+    try:
+        from app.services import incident
+
+        return incident.guard_factor()
+    except Exception:  # noqa: BLE001
+        return 1.0
 
 
 def _audit(action: str, details: Dict[str, object]) -> None:

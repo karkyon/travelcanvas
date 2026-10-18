@@ -359,7 +359,46 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 
 ---
 
-## 8. 改訂履歴
+## 8. 侵害が疑われる時(インシデント対応)
+
+設計は `docs/adr/ADR-incident-response.md`。操作は全て監査ログに残る。結果は1行の JSON。
+
+```bash
+python3 scripts/ops/tcops.py security status
+python3 scripts/ops/tcops.py security lockdown on --minutes 120 --reason "パスワードリスト攻撃"
+python3 scripts/ops/tcops.py security lockdown on --minutes 60 --close-signup     # 新規登録・ゲスト開始も止める
+python3 scripts/ops/tcops.py security lockdown off
+python3 scripts/ops/tcops.py security unblock --ip 203.0.113.5
+python3 scripts/ops/tcops.py security unblock-all
+python3 scripts/ops/tcops.py security revoke-sessions --email user@example.com --reason "端末の紛失"
+python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵の漏洩の疑い"
+```
+
+終了コード: 0=成功、2=使い方の誤り、3=失敗(利用者が見つからない等)、4=効果が無い(Redis に届かず、backend の全プロセスに伝えられない。§3.7)。
+
+### 8.1 手順
+
+| 段階 | すること |
+|---|---|
+| 1. 気付く | 監視の `guard_blocked`・`security_events_spike`・`audit_write_failed`(§7)、利用者からの連絡、`log-scan`(§3.6) |
+| 2. 記録を守る | `python3 scripts/ops/tcops.py backup`(調査用。§4)。監査ログ(`audit_logs`)を消さない |
+| 3. 封じ込める | 攻撃が続いている → `lockdown on`(全員に計算の確認、遮断の閾値を半分)。登録の悪用 → `--close-signup`。特定の利用者の乗っ取り → `revoke-sessions --email` の後、本人にパスワードの変更を依頼 |
+| 4. 鍵を替える | 鍵の漏洩が疑われる時だけ(下の表) |
+| 5. 戻す | `lockdown off`、誤って止めた接続元は `unblock`。監視が落ち着いたことを確かめる |
+| 6. 振り返る | 時刻・影響・原因・対応・再発防止を記録する(`docs/ops/incidents/YYYY-MM-DD.md`) |
+
+### 8.2 鍵を替える時
+
+| 鍵(.env) | 替えた時に起きること | 手順 |
+|---|---|---|
+| `JWT_SECRET_KEY` | 全員のアクセストークンとゲストのトークンが無効(ゲストは作り直し) | 新しい値を書き、`docker compose up -d --force-recreate backend`。続けて `revoke-sessions --all --yes` |
+| `DOCUMENT_DOWNLOAD_SIGNING_KEY` | 発行済みの文書 URL が無効(画面から開き直せば取れる) | 新しい値を書いて backend を作り直す |
+| `METRICS_TOKEN` | 監視の取得に新しい値が要る | `.env` を替えて backend を作り直す(tcops は `.env` を読む) |
+| `ENCRYPTION_KEY`・`LOOKUP_INDEX_KEY` | **替えると保存済みの暗号化データが読めない** | 単純に替えない。鍵の版の切り替え(再暗号化)は別の Gate(SEC-F)。漏洩が疑われる時は DB とバックアップへの接続を止め、先に相談する |
+
+---
+
+## 9. 改訂履歴
 
 | 日付 | 版 | 内容 |
 |---|---|---|
@@ -369,3 +408,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | 2026-10-18 | 4 | Gate S4: 文書の配信条件・アップロードの上限・ウイルス検査(§3.8)と防御の計数 |
 | 2026-10-18 | 5 | Gate S6: 不審な接続元の自動遮断と、攻撃の兆候の監視(§3.9、§7) |
 | 2026-10-18 | 6 | Gate S7: 怪しい接続元の入口に計算の確認(§3.10) |
+| 2026-10-18 | 7 | Gate S8: 侵害が疑われる時の手順と封じ込めの操作(§8)。改訂履歴は §9 へ |

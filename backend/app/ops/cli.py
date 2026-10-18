@@ -1038,6 +1038,21 @@ def cmd_purge(ex: Executor) -> int:
     return EXIT_ERROR if failed else EXIT_OK
 
 
+SECURITY_SCRIPT = "scripts/security_incident.py"
+
+
+def cmd_security(ex: Executor, security_args: Sequence[str]) -> int:
+    """[Gate S8] backend のコンテナの中で封じ込めの操作をする(結果は1行の JSON)。"""
+    proc = ex.backend_python([SECURITY_SCRIPT] + list(security_args), check=False)
+    out = (proc.stdout or b"").decode("utf-8", "replace").strip()
+    err = (proc.stderr or b"").decode("utf-8", "replace").strip()
+    if out:
+        print(out)
+    if err and proc.returncode != 0:
+        log(err.splitlines()[-1])
+    return int(proc.returncode)
+
+
 def cmd_schedule(action: str, python: str) -> int:
     block = opslib.render_cron_block(str(REPO), python=python)
     if action == "print":
@@ -1089,6 +1104,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--service", action="append", dest="services", help="既定は backend")
     p.add_argument("--secrets-file", help="照合する秘密の値の一覧(1行1値、0600 推奨)")
     p.add_argument("--log-file", help="docker の代わりにこのファイルを検査する")
+    # [Gate S8] 侵害が疑われる時の封じ込め(Runbook §8)。backend のコンテナの中の scripts/security_incident.py に渡す
+    p = sub.add_parser("security", help="警戒モード・セッションの一斉失効・遮断の解除(Runbook §8)")
+    p.add_argument("security_args", nargs=argparse.REMAINDER)
     p = sub.add_parser("schedule")
     p.add_argument("action", choices=("print", "install", "remove"))
     p.add_argument("--python", default=sys.executable if sys.executable.startswith("/") else "/usr/bin/python3")
@@ -1101,6 +1119,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             plan = cmd_rollback_plan(args.to)
             print(opslib.dumps_json(plan))
             return EXIT_OK if plan["ok"] else EXIT_WARN
+        if args.cmd == "security":
+            return cmd_security(make_executor(args.mode), args.security_args)
         if args.cmd == "log-scan" and args.log_file:
             # ファイルを検査するだけなので、docker・DB への接続もバックアップの置き場所も要らない
             res = cmd_log_scan(Executor(), since=args.since, services=args.services or ["backend"],
