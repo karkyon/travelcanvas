@@ -174,6 +174,8 @@ app.add_middleware(
     # [Gate P5/P6] 書き出しの件数・ファイル名・内容のハッシュ(エクスポート)を画面で読めるようにする
     expose_headers=[
         "X-Export-Count", "X-Export-Skipped", "X-Export-Excluded", "Content-Disposition", "X-Content-SHA256",
+        # [Gate S7] 計算の確認(428)の問題を画面が読めるようにする
+        "X-TC-Challenge", "X-TC-Challenge-Difficulty", "X-TC-Challenge-Algorithm", "Retry-After",
     ],
 )
 

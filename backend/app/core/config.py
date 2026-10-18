@@ -127,6 +127,15 @@ class Settings(BaseSettings):
     GUARD_BLOCK_SECONDS: int = 900       # 最初の遮断の長さ
     GUARD_REPEAT_MULTIPLIER: int = 4     # 24時間以内の再犯は前回のこの倍(上限24時間)
     GUARD_TRUSTED_IPS: str = ""          # 数えない・止めない接続元(カンマ区切り。CIDR 可。監視・運用の機械)
+    # [Gate S7] SEC-07 段階的な計算の確認(app/services/challenge.py)。点数が CHALLENGE_SCORE 以上の接続元からの
+    # ログイン・登録・ゲスト開始・昇格に、ブラウザが自動で解く計算を求める(難しさは点数 CHALLENGE_SCORE_STEP ごとに2倍)
+    CHALLENGE_ENABLED: bool = True
+    CHALLENGE_SCORE: int = 30
+    CHALLENGE_SCORE_STEP: int = 30
+    CHALLENGE_BASE_DIFFICULTY: int = 16  # 先頭の 0 のビット数(16 で平均約6.5万回の計算)
+    CHALLENGE_TTL_SECONDS: int = 120
+    CHALLENGE_ALWAYS: str = ""           # 点数に関わらず常に求める入口(カンマ区切り: login,register,guest,guest_upgrade)
+    CHALLENGE_SECRET_KEY: str = ""       # 空なら JWT_SECRET_KEY から導出する
 
     # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
     # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。

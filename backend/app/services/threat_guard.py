@@ -43,6 +43,8 @@ SIGNAL_WEIGHTS: Dict[str, int] = {
     "malware_rejected": 25,
     "rate_limited": 3,
     "refresh_reuse": 25,
+    "challenge_failed": 5,   # [Gate S7] 計算の確認の偽造・使い回し
+    "challenge_unsolved": 2,  # [Gate S7] 確認を求められても解かずに送り続ける(解かない攻撃も最後は遮断する)
 }
 
 BUCKET_SECONDS = 300
@@ -168,6 +170,23 @@ def blocked_until(ip: Optional[str], now: Optional[float] = None) -> float:
         except Exception as error:  # noqa: BLE001
             _rl._mark_down(error)
     return _blocked_until_memory(key, now)
+
+
+def current_score(ip: Optional[str], now: Optional[float] = None) -> int:
+    """[Gate S7] 今の点数(数えない)。無効・信頼する接続元は 0。"""
+    if not _enabled() or is_trusted(ip):
+        return 0
+    now = _now() if now is None else now
+    key = _hash(ip)
+    buckets = _window_buckets(now)
+    if _use_redis():
+        try:
+            values = _rl._client().mget([f"{_ns()}:s:{key}:{b}" for b in buckets])
+            return sum(int(v or 0) for v in values)
+        except Exception as error:  # noqa: BLE001
+            _rl._mark_down(error)
+    with _mem_lock:
+        return sum(_mem_scores.get((key, b), 0) for b in buckets)
 
 
 def _block(key: str, now: float) -> Tuple[float, int]:

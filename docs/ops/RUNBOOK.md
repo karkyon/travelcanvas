@@ -231,6 +231,25 @@ docker compose exec -T backend python -c "from app.services import threat_guard 
 `security_events_spike`(前回から50件以上)は、遮断に至らない広く薄い攻撃・設定の誤りのどちらか。§3.7・§3.8 の `kind` を見て判断する。
 `audit_write_failed` は証跡が欠けているので最優先で DB を直す(§3.2)。
 
+### 3.10 ログイン・登録で計算の確認(428)が出る
+
+設計は `docs/adr/ADR-challenge.md`。§3.9 の点数が30以上の接続元からのログイン・登録・ゲスト開始・昇格には、
+画面が自動で解く計算を求める(利用者の操作は増えない。点数が高いほど時間がかかる)。
+
+```bash
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics | grep challenge
+```
+
+| `kind` | 意味 |
+|---|---|
+| `challenge_issued` | 確認を求めた |
+| `challenge_passed` | 正しく解いて通った(普通の利用者・解ける攻撃) |
+| `challenge_failed` | 偽造・誤り・使い回し(点数にも入る) |
+
+正規の利用者が「時間がかかる」と言う時は、その接続元の点数が高い(同じ NAT の後ろで失敗が続いている等)。
+§3.9 の `reset(ip)` で点数を消す。攻撃が続く時は `.env` の `CHALLENGE_ALWAYS=register,guest` 等で常に求める
+(backend の作り直しが必要)。止める時は `CHALLENGE_ENABLED=false`。
+
 ---
 
 ## 4. バックアップ
@@ -349,3 +368,4 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | 2026-10-18 | 3 | Gate S3: 回数制限の共有(Redis)と監視(§3.7) |
 | 2026-10-18 | 4 | Gate S4: 文書の配信条件・アップロードの上限・ウイルス検査(§3.8)と防御の計数 |
 | 2026-10-18 | 5 | Gate S6: 不審な接続元の自動遮断と、攻撃の兆候の監視(§3.9、§7) |
+| 2026-10-18 | 6 | Gate S7: 怪しい接続元の入口に計算の確認(§3.10) |

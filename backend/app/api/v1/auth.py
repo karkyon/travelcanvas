@@ -20,7 +20,7 @@ from app.core.auth import (
 from app.models.models import User, UserSession
 from app.utils.rate_limiter import check_rate_limit
 from app.services.audit_service import record_audit_event
-from app.services import threat_guard
+from app.services import challenge, threat_guard
 
 router = APIRouter()
 
@@ -293,6 +293,7 @@ async def create_guest_session(
     settings.GUEST_TOKEN_EXPIRE_HOURS経過後は誰にも到達不能な孤児行として
     残る(定期クリーンアップは別Gateで対応。本パッチのスコープ外)。
     """
+    challenge.require(request, "guest")  # [Gate S7] 怪しい接続元には計算の確認を求める
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"guest:{client_ip}", settings.RATE_LIMIT_GUEST, 3600):
         raise HTTPException(
@@ -356,6 +357,7 @@ async def upgrade_guest_to_user(
             detail="この操作はゲストセッションでのみ実行できます。"
         )
 
+    challenge.require(request, "guest_upgrade")  # [Gate S7]
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"guest_upgrade:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
         raise HTTPException(
@@ -436,6 +438,7 @@ async def register(
 ):
     """新規ユーザー登録"""
 
+    challenge.require(request, "register")  # [Gate S7]
     # [Gate #28] IPベースのレート制限。ログインと同じ閾値を流用する。
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"register:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
@@ -525,6 +528,7 @@ async def login(
     # [Gate #28] IPベース・メールアドレスベース両方でレート制限する
     # (単一IPからの複数アカウント総当り、単一アカウントへの分散総当り
     # の双方をある程度緩和する)。
+    challenge.require(request, "login")  # [Gate S7]
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(f"login_ip:{client_ip}", settings.RATE_LIMIT_AUTH, 60):
         raise HTTPException(

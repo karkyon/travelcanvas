@@ -9,6 +9,7 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 import { toast } from 'react-hot-toast';
 import type { MinimalHttpClient } from './types';
+import { solveChallenge } from '@/utils/challengeSolver';
 
 // [Gate A1] 呼び出し元が自分でエラーを画面へ伝える場合(ログイン・登録・ゲスト開始/昇格・
 // セッション確認)に、共通エラー処理(toast表示・401時のトークン破棄と/loginへの強制遷移)を
@@ -105,6 +106,21 @@ function removeStorage(key: string): void {
   }
 }
 
+// [Gate S7] SEC-07 計算の確認(428)。backend が付けた問題を読む
+interface ChallengeProblem {
+  token: string;
+  difficulty: number;
+}
+
+function readChallenge(error: AxiosError): ChallengeProblem | null {
+  if (error.response?.status !== 428) return null;
+  const headers = (error.response.headers ?? {}) as Record<string, unknown>;
+  const token = headers['x-tc-challenge'];
+  const difficulty = Number(headers['x-tc-challenge-difficulty']);
+  if (typeof token !== 'string' || !token || !Number.isInteger(difficulty)) return null;
+  return { token, difficulty };
+}
+
 export class ApiCore {
   protected client: AxiosInstance;
   private accessToken: string | null = null;
@@ -190,7 +206,24 @@ export class ApiCore {
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
-        const originalRequest = error.config as (typeof error.config & { _retry?: boolean }) | undefined;
+        const originalRequest = error.config as
+          (typeof error.config & { _retry?: boolean; _challengeTried?: boolean }) | undefined;
+
+        // [Gate S7] SEC-07 怪しい接続元と判定された時は、ログイン・登録・ゲスト開始に計算の確認が要る(428)。
+        // 利用者の操作を増やさないよう、ここで解いて同じ要求を1回だけ送り直す(解の形式は challengeSolver.ts)。
+        const problem = readChallenge(error);
+        if (problem && originalRequest && !originalRequest._challengeTried) {
+          originalRequest._challengeTried = true;
+          try {
+            const solution = await solveChallenge(problem.token, problem.difficulty);
+            originalRequest.headers = originalRequest.headers || {};
+            (originalRequest.headers as Record<string, string>)['X-TC-Challenge'] = problem.token;
+            (originalRequest.headers as Record<string, string>)['X-TC-Challenge-Solution'] = solution;
+            return this.client.request(originalRequest);
+          } catch {
+            // 解けない(難しすぎる・形式が不正)時は、通常の失敗として扱う
+          }
+        }
         const url = originalRequest?.url || '';
         const isAuthEndpoint =
           url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh');
