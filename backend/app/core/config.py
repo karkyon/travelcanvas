@@ -118,6 +118,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_REFRESH: int = 60
     # [Gate S3] 回数制限を Redis で数える時のキーの前置き(同じ Redis を使う別の環境と混ざらないように)
     RATE_LIMIT_NAMESPACE: str = "tc"
+    # [Gate S10] CSP 違反の報告の受け取り(接続元ごと・1分)。だれでも送れるため数を絞る
+    RATE_LIMIT_CSP_REPORT: int = 60
     # [Gate S6] SEC-16/17 攻撃の兆候の自動検知と段階的な自動遮断(app/services/threat_guard.py、Runbook §3.9)。
     # 接続元(IP)ごとに、ログインの失敗・無効なトークン・他人のデータへの 403/404 等を点数にして時間窓で合計する。
     GUARD_ENABLED: bool = True

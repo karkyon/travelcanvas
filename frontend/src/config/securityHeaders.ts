@@ -17,6 +17,25 @@ export function apiOrigin(apiUrl: string | undefined): string {
   }
 }
 
+/** [Gate S10] API の基底 URL(services/api/core.ts の resolveApiBaseUrl と同じ規則。末尾に /api/v1) */
+export function apiBaseUrl(apiUrl: string | undefined): string {
+  const trimmed = (apiUrl || 'http://localhost:8001').replace(/\/+$/, '');
+  const base = trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
+  try {
+    return new URL(base).toString().replace(/\/+$/, '');
+  } catch {
+    return 'http://localhost:8001/api/v1';
+  }
+}
+
+/**
+ * [Gate S10] CSP の違反をブラウザに報告させる先(backend app/api/v1/security_reports.py)。
+ * report-to(Reporting API)はまとめて遅れて送られ、report-uri より優先されるため、report-uri だけを使う。
+ */
+export function cspReportUrl(apiUrl: string | undefined): string {
+  return `${apiBaseUrl(apiUrl)}/security/csp-report`;
+}
+
 export function contentSecurityPolicy(apiUrl: string | undefined): string {
   const api = apiOrigin(apiUrl);
   const directives: Record<string, string[]> = {
@@ -34,6 +53,7 @@ export function contentSecurityPolicy(apiUrl: string | undefined): string {
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
     'frame-ancestors': ["'none'"],
+    'report-uri': [cspReportUrl(apiUrl)],
   };
   return Object.entries(directives).map(([k, v]) => `${k} ${v.join(' ')}`).join('; ');
 }

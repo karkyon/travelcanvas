@@ -9,7 +9,7 @@ from app.api.v1 import (
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
-    offline_pack,
+    offline_pack, security_reports,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -457,6 +457,8 @@ app.include_router(public_share.router, prefix="/api/v1")
 app.include_router(search.router, prefix="/api/v1")
 # [Gate #26] notifications.pyも新規実装。通知一覧・既読管理のエンドポイント。
 app.include_router(notifications.router, prefix="/api/v1")
+# [Gate S10] ブラウザからの CSP 違反の報告(認証なし・数えるだけ)
+app.include_router(security_reports.router, prefix="/api/v1")
 # [Gate #29] /plans: travel_days/travel_events正規テーブルを正本とする新API。
 # 既存の/travel-plans(itinerary JSONベース)と並行稼働する(metadata CRUDのみ)。
 app.include_router(plans.router, prefix="/api/v1")

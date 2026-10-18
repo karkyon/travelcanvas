@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { apiOrigin, contentSecurityPolicy, securityHeaders } from '@/config/securityHeaders';
+import { apiBaseUrl, apiOrigin, contentSecurityPolicy, cspReportUrl, securityHeaders } from '@/config/securityHeaders';
 
 describe('画面の応答ヘッダー (Gate S2)', () => {
   it('API のオリジンだけを通信・画像・音声に許し、スクリプトに unsafe-inline を付けない', () => {
@@ -14,6 +14,16 @@ describe('画面の応答ヘッダー (Gate S2)', () => {
     expect(script).not.toContain('unsafe-inline');
     expect(script).not.toContain('unsafe-eval');
     expect(csp).not.toContain('*.travelcanvas');
+  });
+
+  it('CSP の違反を API の報告口へ送らせる(report-uri。/api/v1 の付け方は API クライアントと同じ) (Gate S10)', () => {
+    expect(cspReportUrl('https://api.travelcanvas.jp')).toBe('https://api.travelcanvas.jp/api/v1/security/csp-report');
+    expect(cspReportUrl('https://api.travelcanvas.jp/api/v1/')).toBe('https://api.travelcanvas.jp/api/v1/security/csp-report');
+    expect(cspReportUrl(undefined)).toBe('http://localhost:8001/api/v1/security/csp-report');
+    expect(apiBaseUrl('not a url')).toBe('http://localhost:8001/api/v1');
+    expect(contentSecurityPolicy('http://localhost:8001')).toContain(
+      'report-uri http://localhost:8001/api/v1/security/csp-report');
+    expect(contentSecurityPolicy('http://localhost:8001')).not.toContain('report-to');
   });
 
   it('API の URL が無い・壊れている時は開発の既定にする', () => {

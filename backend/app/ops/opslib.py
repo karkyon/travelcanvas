@@ -540,6 +540,8 @@ DEFAULT_THRESHOLDS = {
     "drill_max_age_days": 8,
     # [Gate S6] SEC-18 前回の確認からの、セキュリティの出来事(拒否・検出)の件数
     "security_events_count": 50,
+    # [Gate S10] 前回の確認からの、ブラウザからの CSP 違反の報告の件数
+    "csp_violations_count": 20,
 }
 
 
@@ -607,6 +609,12 @@ def evaluate_monitor(
                 "前回の確認から、セキュリティの拒否・検出が %d 件ありました(攻撃の可能性。Runbook §3.9)" % events)
         audit = counter_delta(
             _num(snapshot.get("audit_write_failed_total")) or 0.0, _num(prev.get("audit_write_failed_total")))
+        csp = counter_delta(
+            _num(snapshot.get("csp_violations_total")) or 0.0, _num(prev.get("csp_violations_total")))
+        if "csp_violations_total" in snapshot and csp >= th["csp_violations_count"]:
+            add("warning", "csp_violations",
+                "前回の確認から、画面の CSP 違反の報告が %d 件ありました(スクリプトの差し込み・画面の不具合の可能性。"
+                "Runbook §3.11)" % csp)
         if "audit_write_failed_total" in snapshot and audit >= 1:
             add("critical", "audit_write_failed", "監査ログの書き込みに %d 回失敗しました(記録が欠けています)" % audit)
 

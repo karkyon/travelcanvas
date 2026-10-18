@@ -250,6 +250,25 @@ curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics 
 §3.9 の `reset(ip)` で点数を消す。攻撃が続く時は `.env` の `CHALLENGE_ALWAYS=register,guest` 等で常に求める
 (backend の作り直しが必要)。止める時は `CHALLENGE_ENABLED=false`。
 
+### 3.11 画面の CSP 違反の報告(`csp_violations`)
+
+設計は `docs/adr/ADR-csp-reporting.md`。画面の CSP(Gate S2)がブラウザで読み込み・実行を止めると、ブラウザが
+`/api/v1/security/csp-report` へ報告し、backend は数だけを記録する(止めた先のオリジンと指示はログに WARNING で出る。
+URL のパス・画面の URL・スクリプトの断片は残さない)。
+
+```bash
+curl -s -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8001/metrics | grep 'kind="csp'
+docker compose logs --since 1h backend | grep "CSP violation"
+```
+
+| 様子 | 考えられること | 対応 |
+|---|---|---|
+| 多くの利用者で同じ指示・同じ読み込み先 | 画面の更新で CSP に無い読み込み先を使った(画面の不具合) | `frontend/src/config/securityHeaders.ts` に足すか、読み込みをやめる |
+| `script-src` で見知らぬ外部のオリジン | スクリプトの差し込み(XSS)の試み、改ざんされたネットワーク | 該当の画面・入力を調べる。§8 の手順 |
+| `chrome-extension:` 等 | 利用者のブラウザの拡張機能 | 対応不要 |
+
+報告はだれでも送れるため、数だけが急に増える時は偽の報告の可能性もある(自動遮断の点数には入れていない)。
+
 ---
 
 ## 4. バックアップ
@@ -354,6 +373,7 @@ migration の downgrade が実データの上で通ることは、毎週の復�
 | `guard_blocked` | 注意 | 前回から、不審な接続元を自動で遮断した(§3.9) |
 | `security_events_spike` | 注意 | 前回から、セキュリティの拒否・検出が50件以上(§3.9) |
 | `audit_write_failed` | 異常 | 監査ログの書き込みに失敗した(§3.9) |
+| `csp_violations` | 注意 | 前回から、画面の CSP 違反の報告が20件以上(§3.11) |
 
 `/metrics` は Prometheus のテキスト形式なので、将来 Prometheus・Grafana を入れる時もそのまま取り込める。
 
@@ -409,3 +429,4 @@ python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵�
 | 2026-10-18 | 5 | Gate S6: 不審な接続元の自動遮断と、攻撃の兆候の監視(§3.9、§7) |
 | 2026-10-18 | 6 | Gate S7: 怪しい接続元の入口に計算の確認(§3.10) |
 | 2026-10-18 | 7 | Gate S8: 侵害が疑われる時の手順と封じ込めの操作(§8)。改訂履歴は §9 へ |
+| 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
