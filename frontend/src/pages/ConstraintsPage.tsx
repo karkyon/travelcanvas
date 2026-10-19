@@ -26,6 +26,7 @@ import {
 } from '@/services/api';
 import type { ConstraintType, NormalizedDay, PlanConstraint, ValidationRunDetail } from '@/services/api';
 import FeasibilityPanel from './constraints/FeasibilityPanel';
+import PrivateProfilePanel from './constraints/PrivateProfilePanel';
 import { CONSTRAINT_STATUS_LABEL, constraintStatus } from './constraints/validationModel';
 import {
   OPERATOR_OPTIONS, TYPE_OPTIONS, UNIT_OPTIONS, applyTypePreset, describeCondition, describeScope, emptyForm,
@@ -245,6 +246,9 @@ const ConstraintsPage: React.FC = () => {
               {c.privacy_level === 'private' && (
                 <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">自分だけ(秘匿)</span>
               )}
+              {c.from_profile && (
+                <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">非公開の条件から</span>
+              )}
               {!c.is_active && <span className="text-xs px-2 py-0.5 rounded bg-gray-200">無効</span>}
               {renderStatus(c)}
             </div>
@@ -255,7 +259,8 @@ const ConstraintsPage: React.FC = () => {
             <div className="text-xs text-gray-500 mt-1">適用範囲: {describeScope(c)}</div>
             {c.reason && <div className="text-xs text-gray-500 mt-1">理由(自分だけに表示): {c.reason}</div>}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          {/* [Gate C1] 非公開の条件(プロフィール)から作った制約は、設定で変えるか適用をやめる */}
+          {!c.from_profile && <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => handleToggle(c)}
@@ -269,7 +274,7 @@ const ConstraintsPage: React.FC = () => {
             <button type="button" onClick={() => handleDelete(c)} className="text-gray-400 hover:text-red-600 p-1" aria-label={`${c.title}を削除`}>
               <Trash2 size={16} />
             </button>
-          </div>
+          </div>}
         </div>
       </Card>
     );
@@ -293,6 +298,8 @@ const ConstraintsPage: React.FC = () => {
           制約を追加
         </Button>
       </div>
+
+      {planId && <PrivateProfilePanel planId={planId} onChanged={() => void load()} />}
 
       <FeasibilityPanel
         run={latestRun}

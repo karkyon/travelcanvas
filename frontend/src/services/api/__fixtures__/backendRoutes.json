@@ -24,7 +24,8 @@
   "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
   "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)",
   "captured_at_head_s11": "Gate S10 (+Gate S11 /auth/mfa/*)",
-  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling)"
+  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling)",
+  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -45,6 +46,7 @@
   "DELETE /api/v1/plans/{plan_id}/packing-items/{item_id}",
   "DELETE /api/v1/plans/{plan_id}/polls/{poll_id}",
   "DELETE /api/v1/plans/{plan_id}/preparation-tasks/{task_id}",
+  "DELETE /api/v1/plans/{plan_id}/presence/{client_id}",
   "DELETE /api/v1/plans/{plan_id}/reservations/{reservation_id}",
   "DELETE /api/v1/plans/{plan_id}/reservations/{reservation_id}/events/{link_id}",
   "DELETE /api/v1/plans/{plan_id}/reservations/{reservation_id}/participants/{participant_id}",
@@ -113,6 +115,7 @@
   "GET /api/v1/plans/{plan_id}/polls",
   "GET /api/v1/plans/{plan_id}/polls/{poll_id}",
   "GET /api/v1/plans/{plan_id}/preparation-tasks",
+  "GET /api/v1/plans/{plan_id}/private-profile",
   "GET /api/v1/plans/{plan_id}/readiness",
   "GET /api/v1/plans/{plan_id}/replans/{replan_id}",
   "GET /api/v1/plans/{plan_id}/reservations",
@@ -135,6 +138,7 @@
   "GET /api/v1/privacy/account-deletion",
   "GET /api/v1/privacy/consents",
   "GET /api/v1/privacy/data-export",
+  "GET /api/v1/privacy/private-profile",
   "GET /api/v1/privacy/retention",
   "GET /api/v1/search/places/{place_id}",
   "GET /api/v1/spots/",
@@ -231,6 +235,7 @@
   "POST /api/v1/plans/{plan_id}/polls",
   "POST /api/v1/plans/{plan_id}/polls/{poll_id}/votes/{vote_id}/resolution",
   "POST /api/v1/plans/{plan_id}/preparation-tasks",
+  "POST /api/v1/plans/{plan_id}/presence",
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/apply",
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/reject",
   "POST /api/v1/plans/{plan_id}/reservations",
@@ -277,7 +282,9 @@
   "PUT /api/v1/plans/{plan_id}/location-settings",
   "PUT /api/v1/plans/{plan_id}/location-tracks/{track_id}/sampling",
   "PUT /api/v1/plans/{plan_id}/polls/{poll_id}/votes",
+  "PUT /api/v1/plans/{plan_id}/private-profile",
   "PUT /api/v1/privacy/consents",
+  "PUT /api/v1/privacy/private-profile",
   "PUT /api/v1/spots/{spot_id}",
   "PUT /api/v1/travel-plans/{plan_id}",
   "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}"

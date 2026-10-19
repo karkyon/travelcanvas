@@ -19,6 +19,8 @@ import type { SyncOperationInput } from './types';
 import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput } from './types';
 import type { AreaCellInput, TrackMode, TrackPoint, TrackPrecision, TrackSamplingInput, TripLocationMode } from './types';
 import type { ActualInput } from './types';
+import type { PrivateProfileItemInput } from './types';
+import type { PresenceInput } from './endpoints/collab';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
@@ -431,3 +433,14 @@ export const getOfflinePackKey = () => api.getOfflinePackKey();
 export const rotateOfflinePackKey = (currentVersion: number) => api.rotateOfflinePackKey(currentVersion);
 
 export default api;
+
+// ===== [Gate C1] 共同編集(FR-020)・秘匿プロフィール(FR-023)
+export type { PresenceInput } from './endpoints/collab';
+export const postPresence = (planId: string, input: PresenceInput) => api.postPresence(planId, input);
+export const leavePresence = (planId: string, clientId: string) => api.leavePresence(planId, clientId);
+export const getPrivateProfile = () => api.getPrivateProfile();
+export const putPrivateProfile = (items: PrivateProfileItemInput[], revision: number) =>
+  api.putPrivateProfile(items, revision);
+export const getPlanPrivateProfile = (planId: string) => api.getPlanPrivateProfile(planId);
+export const putPlanPrivateProfile = (planId: string, applied: boolean) => api.putPlanPrivateProfile(planId, applied);
+

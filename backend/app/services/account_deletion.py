@@ -208,6 +208,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     summary["spot_visits"] = db.query(UserSpotVisit).filter(UserSpotVisit.user_id == me).delete(
         synchronize_session=False)
     db.query(IdempotencyRecord).filter(IdempotencyRecord.user_id == me).delete(synchronize_session=False)
+    # [Gate C1] 秘匿プロフィール・適用の記録・プロフィールから作った秘匿制約
+    from app.services import private_profile as _pp
+
+    _pp.delete_for_user(db, me)
     # [Gate S11] 多要素認証の秘密・回復コード(件数は応答に含めない。設定の有無も残さない)
     from app.models.models import UserMfa
 

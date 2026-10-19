@@ -47,6 +47,11 @@ const setupMocks = () => {
     checkOfflineAvailability,
   });
   useAuthStore.setState({ isAuthenticated: true, isGuest: false });
+  // [Gate C1] 共同編集の知らせ(この試験の対象外。通信しない)
+  vi.spyOn(api, 'postPresence').mockResolvedValue({
+    plan_id: 'plan-1', revision: 0, viewers: [], changes: [], poll_seconds: 15, ttl_seconds: 40,
+  });
+  vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
   const getRoutePreview = vi
     .spyOn(api, 'getRoutePreview')
     .mockResolvedValue({ legs: [] } as unknown as Awaited<ReturnType<typeof api.getRoutePreview>>);

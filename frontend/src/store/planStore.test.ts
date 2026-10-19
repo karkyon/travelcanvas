@@ -309,10 +309,12 @@ describe('updateScheduleItem 409競合', () => {
       data: { id: PLAN_ID, title: 'テストプラン', revision: 5, days: [{ id: DAY_ID, local_date: '2026-10-01', timezone_id: 'UTC', sort_order: 0, events: [] }] },
     });
 
-    await usePlanStore.getState().updateScheduleItem('event-1', { title: '新しいタイトル' });
+    const result = await usePlanStore.getState().updateScheduleItem('event-1', { title: '新しいタイトル' });
 
     // ロールバック後、reloadによりrevisionが最新化されている
     expect(usePlanStore.getState().currentPlan?.revision).toBe(5);
+    // [Gate C1] 呼出側(編集画面)が入力を残して違いを示せるよう、競合したことを返す
+    expect(result).toBe('conflict');
   });
 });
 

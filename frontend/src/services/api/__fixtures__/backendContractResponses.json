@@ -27,7 +27,8 @@
   "captured_at_head_k1": "Gate K1(B-008 オフラインパックの鍵)の実backend応答。鍵は試験専用の秘密(fixture-only)から導出した値で実環境の鍵ではない。issued_atは固定値へ置換",
   "captured_at_head_s9": "Gate S9: auth_sessions(実 backend の GET /auth/sessions。id・時刻・接続元は固定値に置き換え)",
   "captured_at_head_s11": "Gate S10 (+Gate S11 多要素認証 /auth/mfa/*。秘密・トークン・回復コードは見本の値に置き換え)",
-  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)"
+  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)",
+  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile・constraint from_profile)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -11086,6 +11087,347 @@
    "visited_cells": 2,
    "revisit_rate": 0.0,
    "algorithm_version": "atlas-v1"
+  }
+ },
+ "presence_alone": {
+  "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+  "revision": 3,
+  "viewers": [
+   {
+    "user_id": "00000000-0000-4000-8000-00000000c101",
+    "label": "あなた",
+    "role": "owner",
+    "is_self": true,
+    "devices": 1,
+    "seen_at": "2026-10-19T01:11:39.957844+00:00",
+    "editing": null
+   }
+  ],
+  "changes": [],
+  "poll_seconds": 15,
+  "ttl_seconds": 40
+ },
+ "presence_with_editor_and_change": {
+  "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+  "revision": 4,
+  "viewers": [
+   {
+    "user_id": "00000000-0000-4000-8000-00000000c101",
+    "label": "あなた",
+    "role": "owner",
+    "is_self": true,
+    "devices": 1,
+    "seen_at": "2026-10-19T01:11:40.030793+00:00",
+    "editing": null
+   },
+   {
+    "user_id": "00000000-0000-4000-8000-00000000c102",
+    "label": "capeditord01d",
+    "role": "editor",
+    "is_self": false,
+    "devices": 1,
+    "seen_at": "2026-10-19T01:11:39.977730+00:00",
+    "editing": {
+     "kind": "event",
+     "id": "08e0e4cb-7f7f-4232-8b6e-83af78d4f955",
+     "label": "清水寺(朝)"
+    }
+   }
+  ],
+  "changes": [
+   {
+    "revision": 4,
+    "actor_label": "capeditord01d",
+    "is_self": false,
+    "source": "manual",
+    "undone": false,
+    "count": 1,
+    "items": [
+     {
+      "entity_type": "travel_event",
+      "action": "update",
+      "label": "清水寺(朝)"
+     }
+    ],
+    "at": "2026-10-19T01:11:39.336379+00:00"
+   }
+  ],
+  "poll_seconds": 5,
+  "ttl_seconds": 40
+ },
+ "private_profile_empty": {
+  "revision": 0,
+  "items": [],
+  "readable": true,
+  "kinds": [
+   {
+    "kind": "earliest_start",
+    "label": "開始が早すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "latest_end",
+    "label": "終わりが遅すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "daily_travel_max",
+    "label": "1日の移動の上限",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours",
+     "km"
+    ]
+   },
+   {
+    "kind": "meal_interval_max",
+    "label": "食事の間隔",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours"
+    ]
+   },
+   {
+    "kind": "trip_budget_max",
+    "label": "旅行の予算の上限",
+    "value_type": "number",
+    "units": [
+     "JPY",
+     "USD",
+     "EUR"
+    ]
+   },
+   {
+    "kind": "avoid_text",
+    "label": "避けたいこと",
+    "value_type": "text",
+    "units": []
+   },
+   {
+    "kind": "avoid_transport",
+    "label": "避けたい移動手段",
+    "value_type": "text",
+    "units": []
+   }
+  ],
+  "max_items": 20,
+  "applied_plans": []
+ },
+ "private_profile_saved": {
+  "revision": 1,
+  "items": [
+   {
+    "id": "e3c00540-0fe4-4dfe-87ba-5ace345d52da",
+    "kind": "earliest_start",
+    "label": "朝はゆっくりしたい",
+    "hardness": "hard",
+    "value": "11:00",
+    "unit": null
+   },
+   {
+    "id": "66e35a55-9c94-4f2a-a4cd-62807ab6c349",
+    "kind": "trip_budget_max",
+    "label": "予算",
+    "hardness": "soft",
+    "value": 80000,
+    "unit": "JPY"
+   }
+  ],
+  "readable": true,
+  "kinds": [
+   {
+    "kind": "earliest_start",
+    "label": "開始が早すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "latest_end",
+    "label": "終わりが遅すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "daily_travel_max",
+    "label": "1日の移動の上限",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours",
+     "km"
+    ]
+   },
+   {
+    "kind": "meal_interval_max",
+    "label": "食事の間隔",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours"
+    ]
+   },
+   {
+    "kind": "trip_budget_max",
+    "label": "旅行の予算の上限",
+    "value_type": "number",
+    "units": [
+     "JPY",
+     "USD",
+     "EUR"
+    ]
+   },
+   {
+    "kind": "avoid_text",
+    "label": "避けたいこと",
+    "value_type": "text",
+    "units": []
+   },
+   {
+    "kind": "avoid_transport",
+    "label": "避けたい移動手段",
+    "value_type": "text",
+    "units": []
+   }
+  ],
+  "max_items": 20,
+  "applied_plans": []
+ },
+ "plan_private_profile_off": {
+  "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+  "applied": false,
+  "profile_items": 2,
+  "applied_constraints": 0,
+  "profile_revision": 1
+ },
+ "plan_private_profile_applied": {
+  "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+  "applied": true,
+  "profile_items": 2,
+  "applied_constraints": 2,
+  "profile_revision": 1
+ },
+ "private_profile_with_plans": {
+  "revision": 1,
+  "items": [
+   {
+    "id": "e3c00540-0fe4-4dfe-87ba-5ace345d52da",
+    "kind": "earliest_start",
+    "label": "朝はゆっくりしたい",
+    "hardness": "hard",
+    "value": "11:00",
+    "unit": null
+   },
+   {
+    "id": "66e35a55-9c94-4f2a-a4cd-62807ab6c349",
+    "kind": "trip_budget_max",
+    "label": "予算",
+    "hardness": "soft",
+    "value": 80000,
+    "unit": "JPY"
+   }
+  ],
+  "readable": true,
+  "kinds": [
+   {
+    "kind": "earliest_start",
+    "label": "開始が早すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "latest_end",
+    "label": "終わりが遅すぎない",
+    "value_type": "time",
+    "units": []
+   },
+   {
+    "kind": "daily_travel_max",
+    "label": "1日の移動の上限",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours",
+     "km"
+    ]
+   },
+   {
+    "kind": "meal_interval_max",
+    "label": "食事の間隔",
+    "value_type": "number",
+    "units": [
+     "minutes",
+     "hours"
+    ]
+   },
+   {
+    "kind": "trip_budget_max",
+    "label": "旅行の予算の上限",
+    "value_type": "number",
+    "units": [
+     "JPY",
+     "USD",
+     "EUR"
+    ]
+   },
+   {
+    "kind": "avoid_text",
+    "label": "避けたいこと",
+    "value_type": "text",
+    "units": []
+   },
+   {
+    "kind": "avoid_transport",
+    "label": "避けたい移動手段",
+    "value_type": "text",
+    "units": []
+   }
+  ],
+  "max_items": 20,
+  "applied_plans": [
+   {
+    "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+    "title": "C1 fixture"
+   }
+  ]
+ },
+ "constraint_from_profile": {
+  "id": "0995f17f-f91b-48a8-add0-03ef7b53e6eb",
+  "plan_id": "00000000-0000-4000-8000-00000000c1a0",
+  "is_mine": true,
+  "hardness": "hard",
+  "privacy_level": "private",
+  "scope_type": "member",
+  "is_active": true,
+  "created_at": "2026-10-19T01:11:39.336379+00:00",
+  "from_profile": true,
+  "visibility": "full",
+  "title": "朝はゆっくりしたい",
+  "constraint_type": "preference",
+  "operator": "after",
+  "value": {
+   "value": "11:00",
+   "value_to": null,
+   "unit": null
+  },
+  "weight": null,
+  "scope_id": "00000000-0000-4000-8000-00000000c102",
+  "scope_label": "capeditord01d",
+  "scope_missing": false,
+  "active_from": null,
+  "active_to": null,
+  "reason": null,
+  "has_reason": false,
+  "revision": 1,
+  "updated_at": null
+ },
+ "private_profile_error_empty": {
+  "detail": {
+   "code": "profile_empty",
+   "message": "非公開の条件がまだありません。設定 → 非公開の条件 で登録してください"
   }
  }
 }

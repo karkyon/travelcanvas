@@ -424,6 +424,8 @@ def _to_response(db: Session, c: PlanConstraint, viewer: User) -> Dict[str, Any]
         base.update({k: None for k in _MASKED_KEYS})
         base.update({"visibility": "masked", "scope_missing": False, "has_reason": False})
         return base
+    # [Gate C1] FR-023 秘匿プロフィールから作った制約(本人にだけ示す。他人には上の伏せた形だけ)
+    base["from_profile"] = bool(c.profile_item_id)
 
     if c.privacy_level == "private":
         data = decrypt_private_payload(c)
@@ -494,7 +496,14 @@ def _require_if_match(c: PlanConstraint, if_match: Optional[str]) -> None:
         )
 
 
+PROFILE_MANAGED_MESSAGE = ("非公開の条件(プロフィール)から適用した制約です。設定の「非公開の条件」で変えるか、"
+                           "この旅行への適用をやめてください")
+
+
 def _require_write(c: PlanConstraint, role: str, user: User) -> None:
+    if c.profile_item_id and c.owner_user_id == user.id:
+        # [Gate C1] プロフィールの変更で作り直すため、制約の画面からは変えない
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=PROFILE_MANAGED_MESSAGE)
     if c.privacy_level == "private":
         if c.owner_user_id != user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="秘匿制約は作成者本人のみ変更できます")

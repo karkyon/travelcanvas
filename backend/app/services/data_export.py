@@ -100,7 +100,7 @@ PLAN_TABLES = (
     m.Poll, m.PollOption, m.Vote, m.Comment,
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
     m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
-    m.EventActual, m.TripLocationSetting, m.LocationAreaCell,
+    m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink,
 )
 
 
@@ -220,6 +220,9 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     # [Gate P13] 位置の軌跡は本人の分だけ(点は復号して含める)。他の人の軌跡は所有者にも出さない
     t["location_tracks"] = own_location_tracks(db, plan, me)
     # [Gate L5] この旅行の位置の扱い(本人の分だけ)
+    # [Gate C1] 秘匿プロフィールの適用(本人の分だけ。項目の中身はアカウントの書き出しの private_profile)
+    t["private_profile_links"] = [row(x) for x in db.query(m.PrivateProfileLink).filter(
+        m.PrivateProfileLink.plan_id == plan.id, m.PrivateProfileLink.user_id == me).all()]
     t["location_settings"] = [row(x) for x in db.query(m.TripLocationSetting).filter(
         m.TripLocationSetting.plan_id == plan.id, m.TripLocationSetting.user_id == me).all()]
     # [Gate P14] 予定の実績(行った/行かなかった・到着と出発)

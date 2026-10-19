@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
-  Star, Phone, ExternalLink, Navigation, AlertTriangle 
+  Star, Phone, ExternalLink, AlertTriangle 
 } from 'lucide-react';
 
 interface ScheduleItemProps {
@@ -288,16 +288,15 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             </div>
           )}
 
-          {/* Address */}
-          <div className="mb-3">
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin size={14} className="text-gray-400" />
-              <span className="text-gray-600">{address}</span>
-              <button className="text-blue-500 hover:text-blue-700">
-                <Navigation size={14} />
-              </button>
+          {/* Address。[Gate C1] 押しても何も起きない「経路」ボタン(名前も無い)を外した */}
+          {address && (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin size={14} className="text-gray-400" aria-hidden="true" />
+                <span className="text-gray-600">{address}</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           {(notes || isEditing) && (

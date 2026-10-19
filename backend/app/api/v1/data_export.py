@@ -102,6 +102,16 @@ def export_plan(plan_id: str, request: Request, db: Session = Depends(get_db),
     return _file(payload, f"travelcanvas-plan-{now.strftime('%Y%m%d')}.json")
 
 
+def _private_profile(db: Session, user: User):
+    from app.services import private_profile as pp
+
+    row = pp.get_profile(db, user.id)
+    if row is None:
+        return None
+    return {"revision": row.revision, "items": pp.decrypt_items(row),
+            "applied_plan_ids": [str(x) for x in pp.linked_plan_ids(db, user.id)]}
+
+
 @privacy_router.get("/data-export")
 def export_account(request: Request, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
@@ -118,6 +128,8 @@ def export_account(request: Request, db: Session = Depends(get_db),
         memberships=[{"plan_id": str(p.id), "title": p.title, "role": roles.get(p.id)} for p in member_plans],
         contributions=[dx.contributions(db, p, current_user.id) for p in member_plans],
         notifications=[dx.row(n) for n in notifications],
+        # [Gate C1] 秘匿プロフィール(本人だけ。復号した項目)
+        private_profile=_private_profile(db, current_user),
     )
     _audit(request, current_user, "account_data_exported", "user", current_user.id,
            {"owned_plans": len(owned), "member_plans": len(member_plans)})

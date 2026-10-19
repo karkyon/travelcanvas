@@ -437,6 +437,12 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 
 ---
 
+## 8.4 共同編集の「開いている人」(Gate C1)
+
+- 旅行を開いている端末の知らせは Redis(`<名前空間>:presence:<旅行の ID>`、40秒で無効、キーは120秒で消える)に置く。
+  Redis が止まっても各プロセスの中で続く(他のプロセスの端末は見えなくなるだけで、編集・保存は止まらない)。
+- 持つのは利用者の ID・端末の印・編集中の予定の ID・時刻だけ(予定の内容・座標なし)。消してよい(次の知らせで戻る)。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。

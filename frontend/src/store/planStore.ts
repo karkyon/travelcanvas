@@ -42,6 +42,9 @@ import {
   applyResults, deviceId, enqueue, isNetworkError, loadConflictCount, loadQueue, saveConflictCount, toPayload,
 } from '@/utils/syncQueue';
 
+// [Gate C1] 予定の保存の結果(FR-020: 競合したら呼出側が入力を残して違いを示す)
+export type ItemSaveResult = 'saved' | 'queued' | 'conflict' | 'failed';
+
 // [Gate P11] 通信できない時に端末へ溜めたことの案内
 export const OFFLINE_SAVED_MESSAGE = '通信できないため、この変更を端末に保存しました。通信が戻ると自動で送ります';
 
@@ -98,7 +101,8 @@ interface PlanState {
     candidateId: string,
     fallbackTitle?: string
   ) => Promise<void>;
-  updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<void>;
+  /** [Gate C1] 保存の結果(conflict = 他の変更と競合し、最新を読み直した。入力は呼出側に残す) */
+  updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<ItemSaveResult>;
   /**
    * [Gate B-013] 成否と、外した紐付け等の案内文(無ければnull)を返す。失敗時は内部で
    * ロールバックとエラー表示を済ませる(例外は投げない)ため、呼び出し側は ok を見て
@@ -673,10 +677,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // スケジュールアイテム更新
   updateScheduleItem: async (itemId: string, item: Partial<ScheduleItem>) => {
     const state = get();
-    if (!state.currentPlan) return;
+    if (!state.currentPlan) return 'failed';
     if (state.currentPlan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
-      return;
+      return 'failed';
     }
 
     const plan = state.currentPlan;
@@ -718,6 +722,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           },
         };
       });
+      return 'saved';
     } catch (error) {
       if (isNetworkError(error)) {
         // [Gate P11] 画面の変更はそのまま残し、変更を端末に溜める(編集を始めた版=今の画面の版)
@@ -733,11 +738,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         if (queued) {
           get().refreshSyncState(plan.id);
           toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
-          return;
+          return 'queued';
         }
       }
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
+      const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
+      return status === 409 && conflictCode(error) !== 'locked_relation' ? 'conflict' : 'failed';
     }
   },
 

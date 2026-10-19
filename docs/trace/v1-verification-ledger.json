@@ -9,7 +9,8 @@
    "security": "その機能の秘匿・暗号化・監査・回数制限の試験が1件以上(cross_cutting.security に加えて)",
    "ops": "機能の横断の運用の証拠(cross_cutting.ops: 全表の復元演習・ルートの型別の監視・ログの漏れの検査・Runbook)",
    "scope": "DOC-10 で「(部分)」の機能は対象にしない(未達の能力が残るため)"
-  }
+  },
+  "updated_c1": "Gate C1: FR-023 を追加(秘匿プロフィール。E2E collaboration.spec.ts)。FR-020 は INTEGRATED(部分)のため対象外"
  },
  "cross_cutting": {
   "authz": [
@@ -208,6 +209,26 @@
     "backend/tests/test_share.py::test_share_token_is_not_stored_in_plaintext",
     "backend/tests/test_share.py::test_public_resolve_redacts_sensitive_itinerary_fields"
    ],
+   "status": "VERIFIED"
+  },
+  "FR-023": {
+   "title": "秘匿プロフィール・制約",
+   "e2e": [
+    "frontend/e2e/collaboration.spec.ts",
+    "frontend/e2e/constraints.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_c1_collaboration.py::test_profile_applied_to_trip_is_private_and_drives_feasibility",
+    "backend/tests/test_gate_s4_authz_matrix.py::test_unrelated_user_cannot_reach_others_plan"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_c1_collaboration.py::test_private_profile_is_encrypted_and_versioned"
+   ],
+   "security": [
+    "backend/tests/test_gate_c1_collaboration.py::test_private_profile_is_encrypted_and_versioned",
+    "backend/tests/test_gate_c1_collaboration.py::test_profile_export_and_account_deletion"
+   ],
+   "gate": "C1",
    "status": "VERIFIED"
   },
   "FR-025": {

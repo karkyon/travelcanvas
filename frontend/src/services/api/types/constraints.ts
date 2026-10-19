@@ -48,6 +48,8 @@ export interface PlanConstraint {
   has_reason: boolean;
   revision: number | null;
   updated_at: string | null;
+  /** [Gate C1] 自分の秘匿プロフィールから作った制約(本人にだけ付く。制約の画面からは変えられない) */
+  from_profile?: boolean;
 }
 
 export interface ConstraintValueInput {

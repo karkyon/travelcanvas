@@ -38,7 +38,7 @@ import {
   offlinePackKey, offlinePackKeyRotated,
   activeSession,
   mfaChallenge, mfaRecoveryCodes, mfaSetup, mfaStatus,
-  areaCellsUploadResult, locationSettings,
+  areaCellsUploadResult, locationSettings, presenceState, privateProfile, planPrivateProfile,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -292,6 +292,16 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['location_track_detail_areas', locationTrackDetail],
   ['area_cells_uploaded', areaCellsUploadResult],
   ['atlas_with_areas', atlasResponse],
+  // [Gate C1] 共同編集(FR-020)・秘匿プロフィール(FR-023)
+  ['presence_alone', presenceState],
+  ['presence_with_editor_and_change', presenceState],
+  ['private_profile_empty', privateProfile],
+  ['private_profile_saved', privateProfile],
+  ['private_profile_with_plans', privateProfile],
+  ['plan_private_profile_off', planPrivateProfile],
+  ['plan_private_profile_applied', planPrivateProfile],
+  ['constraint_from_profile', planConstraint],
+  ['private_profile_error_empty', object({ detail: object({ code: str, message: str }) })],
   // [Gate P14] 旅の振り返り(FR-054・FR-053)
   ['journey_empty', journeyReview],
   ['journey_with_suggestions', journeyReview],

@@ -184,10 +184,10 @@ const PlanMap: React.FC<PlanMapProps> = ({
           {routePreview.total_distance_km != null && routePreview.total_duration_minutes != null ? (
             <span>
               この日の移動概算: 約{routePreview.total_distance_km}km・約{Math.round(routePreview.total_duration_minutes)}分
-              <span className="text-gray-400">(直線距離ベースの概算、確定値ではありません)</span>
+              <span className="text-gray-600">(直線距離ベースの概算、確定値ではありません)</span>
             </span>
           ) : (
-            <span className="text-gray-400">一部区間の移動概算は算出できません(位置情報不明の地点を含みます)</span>
+            <span className="text-gray-600">一部区間の移動概算は算出できません(位置情報不明の地点を含みます)</span>
           )}
         </div>
       )}

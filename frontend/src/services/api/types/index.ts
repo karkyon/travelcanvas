@@ -41,3 +41,5 @@ export * from './memoryReplan';
 export * from './offlinePack';
 export * from './calendarImport';
 export * from './privacy';
+// [Gate C1] 共同編集・秘匿プロフィール
+export * from './collab';

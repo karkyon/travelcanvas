@@ -1592,6 +1592,8 @@ class PlanConstraint(Base):
     is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     active_from = Column(DateTime(timezone=True), nullable=True)
     active_to = Column(DateTime(timezone=True), nullable=True)
+    # [Gate C1] FR-023 秘匿プロフィールから作った制約の印(プロフィールの項目の ID)。プロフィールの変更で作り直す
+    profile_item_id = Column(String(36), nullable=True)
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -2565,3 +2567,26 @@ class EventActual(Base):
             name="ck_event_actuals_time_order",
         ),
     )
+
+
+class UserPrivateProfile(Base):
+    """[Gate C1] FR-023 秘匿プロフィール。利用者ごとの非公開の条件を1つの暗号文だけで持つ(平文の列を持たない)。
+
+    中身は app/services/private_profile.py の項目の一覧。本人だけが読み書きでき、運用管理者の画面・API にも出さない。"""
+    __tablename__ = "user_private_profiles"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    items_ciphertext = Column(LargeBinary, nullable=False)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class PrivateProfileLink(Base):
+    """[Gate C1] FR-023 秘匿プロフィールを適用している旅行(旅行・利用者)。適用中の旅行には、プロフィールの
+    項目ごとに秘匿制約(constraints.profile_item_id)を作り、プロフィールの変更で作り直す。"""
+    __tablename__ = "private_profile_links"
+
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

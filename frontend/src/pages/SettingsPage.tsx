@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
@@ -11,6 +11,7 @@ import { currentOfflineSession } from '@/utils/offlineSession';
 import Button from '@/components/common/Button';
 import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import MfaSection from '@/components/settings/MfaSection';
+import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -628,6 +629,8 @@ const SettingsPage: React.FC = () => {
     { id: 'preferences', name: '設定', icon: <Settings size={16} />, render: PreferencesTab },
     { id: 'security', name: 'セキュリティ', icon: <Shield size={16} />, render: SecurityTab },
     { id: 'offline', name: 'オフライン', icon: <Download size={16} />, render: OfflineTab },
+    // [Gate C1] FR-023 秘匿プロフィール(本人だけ)
+    { id: 'conditions', name: '非公開の条件', icon: <Lock size={16} />, render: () => <PrivateProfileSection /> },
   ];
 
   const handleSave = async () => {
@@ -791,8 +794,8 @@ const SettingsPage: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm p-6">
               {renderActiveTab()}
               
-              {/* 保存ボタン */}
-              <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
+              {/* 保存ボタン([Gate C1] 非公開の条件のタブは自分の保存ボタンを持つため出さない) */}
+              {activeTab !== 'conditions' && <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
@@ -810,7 +813,7 @@ const SettingsPage: React.FC = () => {
                     </>
                   )}
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         </div>

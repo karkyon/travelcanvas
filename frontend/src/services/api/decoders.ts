@@ -28,6 +28,7 @@ import type {
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
   AuthResponse, AuthUser, GuestSessionResponse, ActiveSession, MfaChallenge, MfaRecoveryCodes, MfaSetup, MfaStatus,
   ConstraintValue, PlanConstraint,
+  PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
   CollaboratorRemoveResult, DeletionImpact, ItemDeleteResult, LockedRelationDetail, RouteOptionDeleteResult,
@@ -720,6 +721,7 @@ export const planConstraint: Decoder<PlanConstraint> = object<PlanConstraint>({
   has_reason: bool,
   revision: nullable(int),
   updated_at: nullable(str),
+  from_profile: optional(bool),
 });
 
 // ----- [Gate L3] 実行可能性検証(FR-017)。backend/app/api/v1/validation.py の応答。
@@ -1847,3 +1849,66 @@ export const offlinePackKeyRotated: Decoder<OfflinePackKeyRotated> = object<Offl
   ...offlineKeyFields,
   previous_version: int,
 });
+
+// ----- [Gate C1] FR-020 共同編集(backend/app/api/v1/presence.py)
+// 版(revision)を誤ると「他の人が変更しました」の判定を誤るため、数値と役割を厳密に検査する。
+const memberRole = oneOf('owner', 'editor', 'viewer');
+const presenceViewer: Decoder<PresenceViewer> = object<PresenceViewer>({
+  user_id: str,
+  label: str,
+  role: memberRole,
+  is_self: bool,
+  devices: nonNegativeInt,
+  seen_at: str,
+  editing: nullable(object({ kind: oneOf('event'), id: str, label: str })),
+});
+const presenceChange: Decoder<PresenceChange> = object<PresenceChange>({
+  revision: nonNegativeInt,
+  actor_label: str,
+  is_self: bool,
+  source: str,
+  undone: bool,
+  count: nonNegativeInt,
+  items: arrayOf(object({ entity_type: str, action: str, label: nullable(str) })),
+  at: nullable(str),
+});
+export const presenceState: Decoder<PresenceState> = object<PresenceState>({
+  plan_id: str,
+  revision: nonNegativeInt,
+  viewers: arrayOf(presenceViewer),
+  changes: arrayOf(presenceChange),
+  poll_seconds: nonNegativeInt,
+  ttl_seconds: nonNegativeInt,
+});
+
+// ----- [Gate C1] FR-023 秘匿プロフィール(backend/app/api/v1/private_profile.py)
+const profileKind = oneOf(
+  'earliest_start', 'latest_end', 'daily_travel_max', 'meal_interval_max', 'trip_budget_max', 'avoid_text',
+  'avoid_transport',
+);
+const profileValue: Decoder<string | number> = (v, path) =>
+  typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)) ? v : str(v, path);
+const privateProfileItem: Decoder<PrivateProfileItem> = object<PrivateProfileItem>({
+  id: str,
+  kind: profileKind,
+  label: str,
+  hardness: oneOf('hard', 'soft'),
+  value: profileValue,
+  unit: nullable(str),
+});
+export const privateProfile: Decoder<PrivateProfile> = object<PrivateProfile>({
+  revision: nonNegativeInt,
+  items: arrayOf(privateProfileItem),
+  readable: bool,
+  kinds: arrayOf(object({ kind: profileKind, label: str, value_type: oneOf('time', 'number', 'text'), units: arrayOf(str) })),
+  max_items: nonNegativeInt,
+  applied_plans: arrayOf(object({ plan_id: str, title: nullable(str) })),
+});
+export const planPrivateProfile: Decoder<PlanPrivateProfile> = object<PlanPrivateProfile>({
+  plan_id: str,
+  applied: bool,
+  profile_items: nonNegativeInt,
+  applied_constraints: nonNegativeInt,
+  profile_revision: nonNegativeInt,
+});
+

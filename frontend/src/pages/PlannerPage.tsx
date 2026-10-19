@@ -31,6 +31,10 @@ import SyncStatusBar from '@/components/planner/SyncStatusBar';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
+import PresenceBar from '@/components/planner/PresenceBar';
+import { usePlanPresence } from '@/hooks/usePlanPresence';
+import { othersEditing } from '@/utils/presence';
+import { FIELD_LABEL, detectConflict, mergeMine, type EditConflict, type EditFields } from '@/utils/editConflict';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -111,45 +115,79 @@ const PlannerPage: React.FC = () => {
   // [Gate #18] DayView.tsxのonItemClick/onItemEdit/onItemDeleteがどこからも
   // 渡されておらず、日程に追加したスケジュールアイテムをクリックしても編集も
   // 削除も一切できなかった。編集モーダルとstoreへの実際の保存処理を実装する。
+  // [Gate C1] 以前は終了時刻・場所・費用・メモを入力しても保存の通信に載らず、黙って捨てていた(場所は address、
+  // メモは description として保存する。終了時刻・費用は予定の項目に無いため、この画面からは外した。費用は「予算・費用」)。
   const [editingItem, setEditingItem] = useState<ScheduleItemType | null>(null);
-  const [editForm, setEditForm] = useState<{
-    title: string;
-    start_time: string;
-    end_time: string;
-    location_name: string;
-    cost: string;
-    notes: string;
-  }>({ title: '', start_time: '', end_time: '', location_name: '', cost: '', notes: '' });
+  const emptyEdit: EditFields = { title: '', start_time: '', location_name: '', notes: '' };
+  const [editForm, setEditForm] = useState<EditFields>(emptyEdit);
+  // [Gate C1] FR-020 編集を始めた時の内容(競合した時に「相手が変えた/自分が変えた」を出すため)
+  const [editOriginal, setEditOriginal] = useState<EditFields>(emptyEdit);
+  const [editConflict, setEditConflict] = useState<EditConflict | null>(null);
   const [isSavingItem, setIsSavingItem] = useState(false);
+  const [isReloadingPlan, setIsReloadingPlan] = useState(false);
+
+  const fieldsOf = (item: ScheduleItemType): EditFields => ({
+    title: item.title,
+    start_time: item.start_time || '',
+    location_name: item.location_name || item.address || '',
+    notes: item.notes || item.description || '',
+  });
 
   const openEditItem = (item: ScheduleItemType) => {
     setEditingItem(item);
-    setEditForm({
-      title: item.title,
-      start_time: item.start_time || '',
-      end_time: item.end_time || '',
-      location_name: item.location_name || '',
-      cost: item.cost !== undefined ? String(item.cost) : '',
-      notes: item.notes || '',
-    });
+    setEditForm(fieldsOf(item));
+    setEditOriginal(fieldsOf(item));
+    setEditConflict(null);
+  };
+
+  const closeEditItem = () => {
+    setEditingItem(null);
+    setEditConflict(null);
+  };
+
+  const saveFields = async (itemId: string, fields: EditFields, original: EditFields) => {
+    setIsSavingItem(true);
+    try {
+      const result = await updateScheduleItem(itemId, {
+        title: fields.title,
+        start_time: fields.start_time || undefined,
+        address: fields.location_name || undefined,
+        description: fields.notes || undefined,
+      });
+      if (result === 'conflict') {
+        // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
+        const latestItem = usePlanStore.getState().currentPlan?.days.flatMap((d) => d.events).find((e) => e.id === itemId);
+        setEditConflict(detectConflict(original, fields, latestItem ? fieldsOf(latestItem) : null));
+        return;
+      }
+      if (result !== 'failed') closeEditItem();
+    } finally {
+      setIsSavingItem(false);
+    }
   };
 
   const handleSaveEditItem = async () => {
     if (!editingItem) return;
-    setIsSavingItem(true);
-    try {
-      await updateScheduleItem(editingItem.id, {
-        title: editForm.title,
-        start_time: editForm.start_time || undefined,
-        end_time: editForm.end_time || undefined,
-        location_name: editForm.location_name || undefined,
-        cost: editForm.cost ? Number(editForm.cost) : undefined,
-        notes: editForm.notes || undefined,
-      });
-      setEditingItem(null);
-    } finally {
-      setIsSavingItem(false);
-    }
+    await saveFields(editingItem.id, editForm, editOriginal);
+  };
+
+  // 競合した後: 最新の内容に、自分が変えた項目だけを重ねて保存する
+  const handleSaveMergedEdit = async () => {
+    if (!editingItem || !editConflict?.latest) return;
+    const merged = mergeMine(editOriginal, editForm, editConflict.latest);
+    const latest = editConflict.latest;
+    setEditForm(merged);
+    setEditOriginal(latest);
+    setEditConflict(null);
+    await saveFields(editingItem.id, merged, latest);
+  };
+
+  // 競合した後: 自分の入力を捨てて、最新の内容から編集し直す
+  const handleEditFromLatest = () => {
+    if (!editConflict?.latest) return;
+    setEditForm(editConflict.latest);
+    setEditOriginal(editConflict.latest);
+    setEditConflict(null);
   };
 
   const handleDeleteItem = async (itemId: string) => {
@@ -455,6 +493,22 @@ const PlannerPage: React.FC = () => {
     }
   };
 
+  // [Gate C1] FR-020 同じ旅行を開いている人・編集中・他の人の変更(オフラインのデータを表示している間は止める)
+  const presencePlanId = planId && currentPlan?.id === planId && !isOfflineData ? planId : null;
+  const presence = usePlanPresence(presencePlanId, currentPlan?.revision, editingItem?.id ?? null);
+  const editingOthers = othersEditing(presence.viewers, editingItem?.id);
+
+  const handleReloadPlan = async () => {
+    if (!planId) return;
+    setIsReloadingPlan(true);
+    try {
+      await loadPlan(planId);
+    } finally {
+      setIsReloadingPlan(false);
+      presence.refresh();
+    }
+  };
+
   // ===== 詳細画面(日程編集) =====
   if (planId) {
     if (isLoading && !currentPlan) {
@@ -640,6 +694,16 @@ const PlannerPage: React.FC = () => {
 
           <SyncStatusBar planId={currentPlan.id} />
 
+          <PresenceBar
+            viewers={presence.viewers}
+            changes={presence.changes}
+            remoteRevision={presence.remoteRevision}
+            localRevision={currentPlan.revision}
+            offline={presence.offline}
+            onReload={handleReloadPlan}
+            isReloading={isReloadingPlan}
+          />
+
           <PlanHeader plan={currentPlan} className="mb-6" onDelete={() => navigate('/planner')} />
 
           <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mb-6" />
@@ -799,43 +863,64 @@ const PlannerPage: React.FC = () => {
           ) : null}
         </div>
 
-        {/* スケジュールアイテム編集モーダル(Gate #18) */}
-        <Modal isOpen={!!editingItem} onClose={() => setEditingItem(null)} title="スポットを編集">
+        {/* スケジュールアイテム編集モーダル(Gate #18)。[Gate C1] 共同編集の競合を示す */}
+        <Modal isOpen={!!editingItem} onClose={closeEditItem} title="スポットを編集">
           <Modal.Body>
             <div className="space-y-4">
+              {editingOthers.length > 0 && !editConflict && (
+                <p role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+                  {editingOthers.map((v) => `${v.label}さん`).join('・')}もこの予定を編集中です。先に保存された方が通り、
+                  あとから保存した方には違いを示します(黙って上書きしません)。
+                </p>
+              )}
+              {editConflict && (
+                <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-900 space-y-2"
+                  data-testid="edit-conflict">
+                  {editConflict.deleted ? (
+                    <p className="font-medium">この予定は、保存する前にほかの人が削除しました。</p>
+                  ) : (
+                    <>
+                      <p className="font-medium">保存する前に、ほかの人がこの予定を変更しました。あなたの入力は残っています。</p>
+                      {editConflict.theirs.length > 0 ? (
+                        <ul className="list-disc ml-5">
+                          {editConflict.theirs.map((k) => (
+                            <li key={k}>
+                              {FIELD_LABEL[k]}: ほかの人の値「{editConflict.latest?.[k] || '(空)'}」
+                              {editConflict.both.includes(k) && <span>/ あなたの値「{editForm[k] || '(空)'}」</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>ほかの人が変えた項目はこの画面の項目にはありません(日程・並び順などの変更です)。</p>
+                      )}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button size="sm" variant="primary" onClick={handleSaveMergedEdit} loading={isSavingItem}
+                          disabled={editConflict.mine.length === 0}>
+                          自分の変更を最新の内容に重ねて保存
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleEditFromLatest}>最新の内容で編集し直す</Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <Input
                 label="タイトル"
                 value={editForm.title}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
                 fullWidth
               />
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="開始時刻"
-                  type="time"
-                  value={editForm.start_time}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                  fullWidth
-                />
-                <Input
-                  label="終了時刻"
-                  type="time"
-                  value={editForm.end_time}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, end_time: e.target.value }))}
-                  fullWidth
-                />
-              </div>
+              <Input
+                label="開始時刻"
+                type="time"
+                value={editForm.start_time}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
+                fullWidth
+              />
               <Input
                 label="場所"
                 value={editForm.location_name}
                 onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
-                fullWidth
-              />
-              <Input
-                label="費用(円)"
-                type="number"
-                value={editForm.cost}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, cost: e.target.value }))}
                 fullWidth
               />
               <Input
@@ -847,17 +932,19 @@ const PlannerPage: React.FC = () => {
             </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="outline" onClick={() => setEditingItem(null)}>
-              キャンセル
+            <Button variant="outline" onClick={closeEditItem}>
+              {editConflict?.deleted ? '閉じる' : 'キャンセル'}
             </Button>
-            <Button
-              variant="primary"
-              onClick={handleSaveEditItem}
-              loading={isSavingItem}
-              disabled={!editForm.title.trim()}
-            >
-              保存
-            </Button>
+            {!editConflict && (
+              <Button
+                variant="primary"
+                onClick={handleSaveEditItem}
+                loading={isSavingItem}
+                disabled={!editForm.title.trim()}
+              >
+                保存
+              </Button>
+            )}
           </Modal.Footer>
         </Modal>
       </div>
