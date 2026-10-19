@@ -51,15 +51,18 @@ test('位置の記録: 同意してから暗号化保存で記録し、送信・
   await expect(page.getByRole('heading', { name: '位置の記録', level: 1 })).toBeVisible();
   const start = page.getByRole('region', { name: '記録を始める' });
 
-  // 1. 同意
+  // 1. 同意(位置の扱いを選ぶまでは始められない)
   await expect(start.getByRole('button', { name: '記録を始める' })).toBeDisabled();
   await start.getByRole('button', { name: '位置情報の利用に同意する' }).click();
   await expect(page.getByRole('status')).toHaveText('位置情報の利用に同意しました');
-  await expect(start.getByRole('button', { name: '記録を始める' })).toBeEnabled();
+  await expect(start.getByRole('button', { name: '記録を始める' })).toBeDisabled();
   await axeViolations(page, '位置の記録(開始前)');
 
-  // 2. 記録
-  await start.getByLabel(/暗号化してサーバーへ/).check();
+  // 2. 記録([Gate L5] 保存先は旅行ごとの「位置の扱い」で選ぶ)
+  const settings = page.getByRole('region', { name: 'この旅行での位置の扱い' });
+  await settings.getByLabel(/暗号化してサーバーへ/).check();
+  await settings.getByRole('button', { name: '位置の扱いを保存' }).click();
+  await expect(page.getByRole('status')).toHaveText('位置の扱いを保存しました');
   await start.getByLabel('精度').selectOption('high');
   await start.getByRole('button', { name: '記録を始める' }).click();
   const panel = page.getByRole('region', { name: '記録中の軌跡' });

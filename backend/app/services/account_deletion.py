@@ -193,6 +193,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     # [Gate P13] 位置の軌跡は本人だけのもの。所有する旅行の分も含めてすぐ消す(点は外部キーの連鎖で消える)
     summary["location_tracks"] = db.query(LocationTrack).filter(LocationTrack.user_id == me).delete(
         synchronize_session=False)
+    # [Gate L5] 旅行ごとの位置の扱い(区画は軌跡の削除で連鎖して消える)
+    from app.models.models import TripLocationSetting
+
+    db.query(TripLocationSetting).filter(TripLocationSetting.user_id == me).delete(synchronize_session=False)
     # [Gate P11] 同期の受領記録は端末から送った予定の内容を含むため、本人の分を消す
     summary["sync_operations"] = db.query(SyncOperation).filter(SyncOperation.user_id == me).delete(
         synchronize_session=False)

@@ -38,6 +38,7 @@ import {
   offlinePackKey, offlinePackKeyRotated,
   activeSession,
   mfaChallenge, mfaRecoveryCodes, mfaSetup, mfaStatus,
+  areaCellsUploadResult, locationSettings,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -281,6 +282,16 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['location_points_uploaded', trackPointsUploadResult],
   ['location_points_deleted', trackPointsDeleteResult],
   ['location_track_error_consent', object({ detail: object({ code: str, message: str }) })],
+  // [Gate L5] 旅行ごとの位置の扱い・訪問地域(区画)・記録の観測値
+  ['location_settings_unset', locationSettings],
+  ['location_settings_saved', locationSettings],
+  ['location_settings_off', locationSettings],
+  ['location_track_areas_started', locationTrack],
+  ['location_track_sampling', locationTrack],
+  ['location_tracks_areas_active', locationTrackList],
+  ['location_track_detail_areas', locationTrackDetail],
+  ['area_cells_uploaded', areaCellsUploadResult],
+  ['atlas_with_areas', atlasResponse],
   // [Gate P14] 旅の振り返り(FR-054・FR-053)
   ['journey_empty', journeyReview],
   ['journey_with_suggestions', journeyReview],

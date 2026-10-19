@@ -100,7 +100,7 @@ PLAN_TABLES = (
     m.Poll, m.PollOption, m.Vote, m.Comment,
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
     m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
-    m.EventActual,
+    m.EventActual, m.TripLocationSetting, m.LocationAreaCell,
 )
 
 
@@ -219,6 +219,9 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["memories"] = [row(x) for x in q(m.Memory).all() if x.author_user_id == me or x.visibility == "members"]
     # [Gate P13] 位置の軌跡は本人の分だけ(点は復号して含める)。他の人の軌跡は所有者にも出さない
     t["location_tracks"] = own_location_tracks(db, plan, me)
+    # [Gate L5] この旅行の位置の扱い(本人の分だけ)
+    t["location_settings"] = [row(x) for x in db.query(m.TripLocationSetting).filter(
+        m.TripLocationSetting.plan_id == plan.id, m.TripLocationSetting.user_id == me).all()]
     # [Gate P14] 予定の実績(行った/行かなかった・到着と出発)
     t["event_actuals"] = [row(x) for x in q(m.EventActual).all()]
     return t
@@ -235,7 +238,9 @@ def own_location_tracks(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> List[
         points.sort(key=lambda p: p.get("t", ""))
         pts = [{"recorded_at": p.get("t"), "latitude": p.get("lat"), "longitude": p.get("lng"),
                 "accuracy_m": p.get("acc")} for p in points]
-        out.append(row(tr, {"points": pts}))
+        # [Gate L5] 「訪問地域だけ同期」の区画
+        cells = [row(c) for c in db.query(m.LocationAreaCell).filter(m.LocationAreaCell.track_id == tr.id).all()]
+        out.append(row(tr, {"points": pts, "area_cells": cells}))
     return out
 
 

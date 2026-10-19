@@ -26,6 +26,7 @@
  * [Gate P15] Personal Travel Atlas(FR-052)
  * [Gate P17] Memory Replan(FR-057)
  * [Gate K1] オフラインパックの鍵(B-008): getOfflinePackKey/rotateOfflinePackKey(export・メソッド)
+ * [Gate L5] 位置の扱い・訪問地域・記録の観測値の4関数(export・メソッド)
  * [Gate S11] 多要素認証(SEC-06)の7メソッド(getMfaStatus/setupMfa/enableMfa/disableMfa/regenerateRecoveryCodes/
  *   stepUpMfa/verifyMfaLogin)
  */
@@ -51,14 +52,15 @@ const EXPECTED_EXPORTS = [
   'getBookletExports', 'getBranch', 'getBranches', 'getBudgets', 'getCollaborators', 'getComments',
   'getConsents', 'getConstraints', 'getDeletedPlans', 'getDocument', 'getDocumentDownloadUrl',
   'getDocumentLinks', 'getDocuments', 'getExpenses', 'getFinanceSettings', 'getFinanceSummary',
-  'getImportJob', 'getImportJobs', 'getJourney', 'getLocationTrack', 'getLocationTracks', 'getMemories',
-  'getMemoryMedia', 'getMemoryReplan', 'getOfflinePackKey', 'getOptimizationCandidates', 'getPackingItems',
-  'getPackingSuggestions', 'getPlanMembers', 'getPolls', 'getPreparationTasks', 'getReadiness', 'getReplan',
-  'getReservation', 'getReservationEventLinks', 'getReservationParticipants', 'getReservations',
-  'getRetentionInfo', 'getRouteOption', 'getRouteOptions', 'getSegment', 'getSegments', 'getSettlements',
-  'getShareSettings', 'getSpotCategories', 'getSpots', 'getSyncConflicts', 'getTickets', 'getToday',
-  'getValidationRun', 'getValidationRuns', 'inviteCollaborator', 'listMyInvitations', 'notificationsAPI',
-  'previewBooklet', 'previewCalendarImport', 'purgePlan', 'putEventActual', 'putVotes',
+  'getImportJob', 'getImportJobs', 'getJourney', 'getLocationSettings', 'getLocationTrack',
+  'getLocationTracks', 'getMemories', 'getMemoryMedia', 'getMemoryReplan', 'getOfflinePackKey',
+  'getOptimizationCandidates', 'getPackingItems', 'getPackingSuggestions', 'getPlanMembers', 'getPolls',
+  'getPreparationTasks', 'getReadiness', 'getReplan', 'getReservation', 'getReservationEventLinks',
+  'getReservationParticipants', 'getReservations', 'getRetentionInfo', 'getRouteOption', 'getRouteOptions',
+  'getSegment', 'getSegments', 'getSettlements', 'getShareSettings', 'getSpotCategories', 'getSpots',
+  'getSyncConflicts', 'getTickets', 'getToday', 'getValidationRun', 'getValidationRuns',
+  'inviteCollaborator', 'listMyInvitations', 'notificationsAPI', 'previewBooklet', 'previewCalendarImport',
+  'purgePlan', 'putEventActual', 'putLocationSettings', 'putTrackSampling', 'putVotes',
   'rejectExtractionCandidate', 'rejectImportJob', 'rejectReplan', 'removeCollaborator', 'resolveDownloadUrl',
   'resolvePublicShare', 'resolveSyncConflict', 'resolveVote', 'restorePlan', 'revealReservation',
   'revealTicket', 'revokeBookletExport', 'revokeShareLink', 'rotateOfflinePackKey', 'runValidation',
@@ -67,7 +69,7 @@ const EXPECTED_EXPORTS = [
   'updateBudget', 'updateComment', 'updateConsents', 'updateConstraint', 'updateExpense',
   'updateFinanceSettings', 'updateMemory', 'updatePackingItem', 'updatePoll', 'updatePreparationTask',
   'updateReservation', 'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment',
-  'updateShareSettings', 'uploadDocument', 'uploadMemory', 'uploadTrackPoints',
+  'updateShareSettings', 'uploadAreaCells', 'uploadDocument', 'uploadMemory', 'uploadTrackPoints',
 ];
 
 const EXPECTED_METHODS = [
@@ -91,8 +93,8 @@ const EXPECTED_METHODS = [
   'getComments', 'getConsents', 'getConstraints', 'getCurrentUser', 'getDeletedPlans', 'getDocument',
   'getDocumentDownloadUrl', 'getDocumentLinks', 'getDocuments', 'getExpenses', 'getFinanceSettings',
   'getFinanceSummary', 'getImportJob', 'getImportJobs', 'getInsertionPreview', 'getJourney',
-  'getLocationTrack', 'getLocationTracks', 'getMemories', 'getMemoryMedia', 'getMemoryReplan',
-  'getMfaStatus', 'getNotifications', 'getOfflinePackKey', 'getOptimizationCandidates',
+  'getLocationSettings', 'getLocationTrack', 'getLocationTracks', 'getMemories', 'getMemoryMedia',
+  'getMemoryReplan', 'getMfaStatus', 'getNotifications', 'getOfflinePackKey', 'getOptimizationCandidates',
   'getOptimizationProposal', 'getPackingItems', 'getPackingSuggestions', 'getPlace', 'getPlan',
   'getPlanDetail', 'getPlanMembers', 'getPlans', 'getPolls', 'getPreparationTasks', 'getReadiness',
   'getReplan', 'getReservation', 'getReservationEventLinks', 'getReservationParticipants', 'getReservations',
@@ -102,19 +104,20 @@ const EXPECTED_METHODS = [
   'handleApiError', 'hasAccessToken', 'healthCheck', 'initializeTokens', 'inviteCollaborator',
   'listMyInvitations', 'login', 'logout', 'markAllNotificationsAsRead', 'markNotificationAsRead',
   'moveEvent', 'planFromApi', 'planToApi', 'post', 'previewBooklet', 'previewCalendarImport',
-  'promoteQuickDraft', 'purgePlan', 'put', 'putEventActual', 'putVotes', 'refreshSession',
-  'regenerateRecoveryCodes', 'register', 'rejectExtractionCandidate', 'rejectImportJob', 'rejectReplan',
-  'removeCollaborator', 'resolvePublicShare', 'resolveSyncConflict', 'resolveVote', 'restorePlan',
-  'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeSession', 'revokeShareLink',
-  'rotateOfflinePackKey', 'runValidation', 'searchByImage', 'searchByVoice', 'searchSpots', 'setAccessToken',
-  'setGuestMode', 'setHttpClientForTesting', 'setMemberSession', 'setTokens', 'setupInterceptors',
-  'setupMfa', 'startGuestSession', 'startLocationTrack', 'stepUpMfa', 'syncOperations', 'testConnection',
-  'undoLastPlanChange', 'updateAlert', 'updateAtlasSettings', 'updateBranch', 'updateBranchContent',
-  'updateBudget', 'updateComment', 'updateConsents', 'updateConstraint', 'updateDay', 'updateEvent',
-  'updateExpense', 'updateFinanceSettings', 'updateMemory', 'updatePackingItem', 'updatePlan', 'updatePoll',
-  'updatePreparationTask', 'updateProfile', 'updateReservation', 'updateReservationEventLink',
-  'updateRouteLeg', 'updateRouteOption', 'updateSegment', 'updateShareSettings', 'upgradeGuest',
-  'uploadDocument', 'uploadMemory', 'uploadTrackPoints', 'verifyMfaLogin',
+  'promoteQuickDraft', 'purgePlan', 'put', 'putEventActual', 'putLocationSettings', 'putTrackSampling',
+  'putVotes', 'refreshSession', 'regenerateRecoveryCodes', 'register', 'rejectExtractionCandidate',
+  'rejectImportJob', 'rejectReplan', 'removeCollaborator', 'resolvePublicShare', 'resolveSyncConflict',
+  'resolveVote', 'restorePlan', 'revealReservation', 'revealTicket', 'revokeBookletExport', 'revokeSession',
+  'revokeShareLink', 'rotateOfflinePackKey', 'runValidation', 'searchByImage', 'searchByVoice',
+  'searchSpots', 'setAccessToken', 'setGuestMode', 'setHttpClientForTesting', 'setMemberSession',
+  'setTokens', 'setupInterceptors', 'setupMfa', 'startGuestSession', 'startLocationTrack', 'stepUpMfa',
+  'syncOperations', 'testConnection', 'undoLastPlanChange', 'updateAlert', 'updateAtlasSettings',
+  'updateBranch', 'updateBranchContent', 'updateBudget', 'updateComment', 'updateConsents',
+  'updateConstraint', 'updateDay', 'updateEvent', 'updateExpense', 'updateFinanceSettings', 'updateMemory',
+  'updatePackingItem', 'updatePlan', 'updatePoll', 'updatePreparationTask', 'updateProfile',
+  'updateReservation', 'updateReservationEventLink', 'updateRouteLeg', 'updateRouteOption', 'updateSegment',
+  'updateShareSettings', 'upgradeGuest', 'uploadAreaCells', 'uploadDocument', 'uploadMemory',
+  'uploadTrackPoints', 'verifyMfaLogin',
 ];
 
 const EXPECTED_GROUP_KEYS: Record<string, string[]> = {

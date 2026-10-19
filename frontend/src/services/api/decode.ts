@@ -62,6 +62,10 @@ export const matching =
 
 export const bool: Decoder<boolean> = (v, path) => (typeof v === 'boolean' ? v : fail(path, '真偽値'));
 
+/** [Gate L5] 0〜1 の数値(電池の残量・割合) */
+export const unitInterval: Decoder<number> = (v, path) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : fail(path, '0〜1 の数値');
+
 /** [Gate S11] 値が true だけ(判別用の印。POST /auth/login の mfa_required) */
 export const trueOnly: Decoder<true> = (v, path) => (v === true ? true : fail(path, 'true'));
 

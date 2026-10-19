@@ -26,7 +26,8 @@
   "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
   "captured_at_head_k1": "Gate K1(B-008 オフラインパックの鍵)の実backend応答。鍵は試験専用の秘密(fixture-only)から導出した値で実環境の鍵ではない。issued_atは固定値へ置換",
   "captured_at_head_s9": "Gate S9: auth_sessions(実 backend の GET /auth/sessions。id・時刻・接続元は固定値に置き換え)",
-  "captured_at_head_s11": "Gate S10 (+Gate S11 多要素認証 /auth/mfa/*。秘密・トークン・回復コードは見本の値に置き換え)"
+  "captured_at_head_s11": "Gate S10 (+Gate S11 多要素認証 /auth/mfa/*。秘密・トークン・回復コードは見本の値に置き換え)",
+  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -10028,7 +10029,8 @@
   "in_trip_period": true,
   "active_track_id": null,
   "can_start": false,
-  "max_points_per_request": 500
+  "max_points_per_request": 500,
+  "trip_mode": null
  },
  "location_track_error_consent": {
   "detail": {
@@ -10046,7 +10048,8 @@
   "in_trip_period": true,
   "active_track_id": null,
   "can_start": true,
-  "max_points_per_request": 500
+  "max_points_per_request": 500,
+  "trip_mode": null
  },
  "location_track_started": {
   "id": "38e08d0f-6139-403a-bb4c-0dc989ffe5b0",
@@ -10061,7 +10064,8 @@
   "point_count": 0,
   "revision": 1,
   "created_at": "2026-10-15T22:23:52.212904+00:00",
-  "updated_at": null
+  "updated_at": null,
+  "sampling": null
  },
  "location_points_uploaded": {
   "accepted": 3,
@@ -10106,7 +10110,9 @@
     "longitude": 135.785,
     "accuracy_m": 9.5
    }
-  ]
+  ],
+  "sampling": null,
+  "cells": []
  },
  "location_tracks_active": {
   "tracks": [
@@ -10123,7 +10129,8 @@
     "point_count": 3,
     "revision": 1,
     "created_at": "2026-10-15T22:23:52.212904+00:00",
-    "updated_at": "2026-10-15T22:23:52.212904+00:00"
+    "updated_at": "2026-10-15T22:23:52.212904+00:00",
+    "sampling": null
    }
   ],
   "location_consent": true,
@@ -10134,7 +10141,8 @@
   "in_trip_period": true,
   "active_track_id": "38e08d0f-6139-403a-bb4c-0dc989ffe5b0",
   "can_start": false,
-  "max_points_per_request": 500
+  "max_points_per_request": 500,
+  "trip_mode": "synced"
  },
  "location_track_paused": {
   "id": "38e08d0f-6139-403a-bb4c-0dc989ffe5b0",
@@ -10149,7 +10157,8 @@
   "point_count": 3,
   "revision": 2,
   "created_at": "2026-10-15T22:23:52.212904+00:00",
-  "updated_at": "2026-10-15T22:23:52.212904+00:00"
+  "updated_at": "2026-10-15T22:23:52.212904+00:00",
+  "sampling": null
  },
  "location_points_deleted": {
   "removed": 1,
@@ -10169,7 +10178,8 @@
   "point_count": 2,
   "revision": 4,
   "created_at": "2026-10-15T22:23:52.212904+00:00",
-  "updated_at": "2026-10-15T22:23:52.212904+00:00"
+  "updated_at": "2026-10-15T22:23:52.212904+00:00",
+  "sampling": null
  },
  "journey_empty": {
   "plan_id": "17b05649-cba7-4d7c-91ff-8623cbb51c53",
@@ -10839,6 +10849,243 @@
    "email": "fixture@example.com",
    "user_type": "registered",
    "is_verified": false
+  }
+ },
+ "location_settings_unset": {
+  "mode": null,
+  "revision": 0,
+  "updated_at": null
+ },
+ "location_settings_saved": {
+  "mode": "areas_only",
+  "revision": 1,
+  "updated_at": "2026-10-18T21:31:21.983320+00:00",
+  "stopped_tracks": 0
+ },
+ "location_track_areas_started": {
+  "id": "11d2507d-c527-49bd-a6a2-daeca8e21fc2",
+  "plan_id": "00000000-0000-4000-8000-000000000005",
+  "mode": "areas_only",
+  "precision": "standard",
+  "status": "recording",
+  "stopped_reason": null,
+  "started_at": "2026-11-01T01:00:00+00:00",
+  "auto_stop_at": "2026-11-02T15:00:00+00:00",
+  "stopped_at": null,
+  "point_count": 0,
+  "revision": 1,
+  "sampling": null,
+  "created_at": "2026-10-18T21:31:21.983320+00:00",
+  "updated_at": null
+ },
+ "area_cells_uploaded": {
+  "added": 2,
+  "updated": 0,
+  "rejected": {
+   "invalid": 1
+  },
+  "cell_count": 2,
+  "status": "recording"
+ },
+ "location_track_sampling": {
+  "id": "11d2507d-c527-49bd-a6a2-daeca8e21fc2",
+  "plan_id": "00000000-0000-4000-8000-000000000005",
+  "mode": "areas_only",
+  "precision": "standard",
+  "status": "recording",
+  "stopped_reason": null,
+  "started_at": "2026-11-01T01:00:00+00:00",
+  "auto_stop_at": "2026-11-02T15:00:00+00:00",
+  "stopped_at": null,
+  "point_count": 0,
+  "revision": 1,
+  "sampling": {
+   "battery_end": 0.71,
+   "reported_at": "2026-11-01T01:00:00+00:00",
+   "battery_used": 0.11,
+   "kept_samples": 40,
+   "missed_ratio": 0.1042,
+   "tier_seconds": {
+    "moving": 900,
+    "stationary": 1500
+   },
+   "battery_start": 0.82,
+   "manual_points": 1,
+   "missed_samples": 5,
+   "max_gap_seconds": 420,
+   "expected_samples": 48
+  },
+  "created_at": "2026-10-18T21:31:21.983320+00:00",
+  "updated_at": "2026-10-18T21:31:21.983320+00:00"
+ },
+ "location_tracks_areas_active": {
+  "tracks": [
+   {
+    "id": "11d2507d-c527-49bd-a6a2-daeca8e21fc2",
+    "plan_id": "dc356ece-2f62-4b1e-afe6-f2a2421cab6a",
+    "mode": "areas_only",
+    "precision": "standard",
+    "status": "recording",
+    "stopped_reason": null,
+    "started_at": "2026-11-01T01:00:00+00:00",
+    "auto_stop_at": "2026-11-02T15:00:00+00:00",
+    "stopped_at": null,
+    "point_count": 0,
+    "revision": 1,
+    "sampling": {
+     "battery_end": 0.71,
+     "reported_at": "2026-11-01T01:00:00+00:00",
+     "battery_used": 0.11,
+     "kept_samples": 40,
+     "missed_ratio": 0.1042,
+     "tier_seconds": {
+      "moving": 900,
+      "stationary": 1500
+     },
+     "battery_start": 0.82,
+     "manual_points": 1,
+     "missed_samples": 5,
+     "max_gap_seconds": 420,
+     "expected_samples": 48
+    },
+    "created_at": "2026-10-18T21:31:21.983320+00:00",
+    "updated_at": "2026-10-18T21:31:21.983320+00:00"
+   }
+  ],
+  "location_consent": true,
+  "trip_period": {
+   "start": "2026-10-31T15:00:00+00:00",
+   "end": "2026-11-02T15:00:00+00:00"
+  },
+  "in_trip_period": true,
+  "active_track_id": "11d2507d-c527-49bd-a6a2-daeca8e21fc2",
+  "can_start": false,
+  "max_points_per_request": 500,
+  "trip_mode": "areas_only"
+ },
+ "location_track_detail_areas": {
+  "id": "11d2507d-c527-49bd-a6a2-daeca8e21fc2",
+  "plan_id": "00000000-0000-4000-8000-000000000005",
+  "mode": "areas_only",
+  "precision": "standard",
+  "status": "recording",
+  "stopped_reason": null,
+  "started_at": "2026-11-01T01:00:00+00:00",
+  "auto_stop_at": "2026-11-02T15:00:00+00:00",
+  "stopped_at": null,
+  "point_count": 0,
+  "revision": 1,
+  "sampling": {
+   "battery_end": 0.71,
+   "reported_at": "2026-11-01T01:00:00+00:00",
+   "battery_used": 0.11,
+   "kept_samples": 40,
+   "missed_ratio": 0.1042,
+   "tier_seconds": {
+    "moving": 900,
+    "stationary": 1500
+   },
+   "battery_start": 0.82,
+   "manual_points": 1,
+   "missed_samples": 5,
+   "max_gap_seconds": 420,
+   "expected_samples": 48
+  },
+  "created_at": "2026-10-18T21:31:21.983320+00:00",
+  "updated_at": "2026-10-18T21:31:21.983320+00:00",
+  "distance_m": 0,
+  "cells": [
+   {
+    "key": "0.1:34.9:135.7",
+    "first_at": "2026-11-01T01:00:00+00:00",
+    "last_at": "2026-11-01T01:45:00+00:00",
+    "dwell_seconds": 2400,
+    "samples": 4,
+    "state": "STAYED"
+   },
+   {
+    "key": "0.1:35.0:135.7",
+    "first_at": "2026-11-01T01:50:00+00:00",
+    "last_at": "2026-11-01T02:02:00+00:00",
+    "dwell_seconds": 700,
+    "samples": 4,
+    "state": "VISITED"
+   }
+  ],
+  "points": []
+ },
+ "location_settings_off": {
+  "mode": "off",
+  "revision": 2,
+  "updated_at": "2026-11-01T01:00:00+00:00",
+  "stopped_tracks": 1
+ },
+ "atlas_with_areas": {
+  "precision": "region",
+  "year": null,
+  "years": [
+   2026
+  ],
+  "plans": [
+   {
+    "plan_id": "dc356ece-2f62-4b1e-afe6-f2a2421cab6a",
+    "title": "L5 fixture",
+    "excluded": false,
+    "observations": 2,
+    "is_owner": true
+   }
+  ],
+  "cells": [
+   {
+    "key": "0.1:34.9:135.7",
+    "lat_min": 34.9,
+    "lat_max": 35.0,
+    "lng_min": 135.7,
+    "lng_max": 135.8,
+    "state": "STAYED",
+    "first_at": "2026-11-01T01:00:00+00:00",
+    "last_at": "2026-11-01T01:00:00+00:00",
+    "trips": [
+     {
+      "plan_id": "dc356ece-2f62-4b1e-afe6-f2a2421cab6a",
+      "title": "L5 fixture"
+     }
+    ],
+    "evidence": {
+     "area": 1
+    }
+   },
+   {
+    "key": "0.1:35.0:135.7",
+    "lat_min": 35.0,
+    "lat_max": 35.1,
+    "lng_min": 135.7,
+    "lng_max": 135.8,
+    "state": "VISITED",
+    "first_at": "2026-11-01T01:50:00+00:00",
+    "last_at": "2026-11-01T01:50:00+00:00",
+    "trips": [
+     {
+      "plan_id": "dc356ece-2f62-4b1e-afe6-f2a2421cab6a",
+      "title": "L5 fixture"
+     }
+    ],
+    "evidence": {
+     "area": 1
+    }
+   }
+  ],
+  "summary": {
+   "cells": 2,
+   "by_state": {
+    "STAYED": 1,
+    "VISITED": 1,
+    "PASS_THROUGH": 0,
+    "PLANNED": 0
+   },
+   "visited_cells": 2,
+   "revisit_rate": 0.0,
+   "algorithm_version": "atlas-v1"
   }
  }
 }

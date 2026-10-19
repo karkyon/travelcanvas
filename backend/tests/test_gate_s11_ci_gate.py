@@ -86,3 +86,51 @@ def test_protect_without_token_prints_ui_steps(ci_gate, monkeypatch, capsys):
 
 def test_wait_rejects_bad_sha(ci_gate):
     assert ci_gate.cmd_wait("main", 10, 10) == ci_gate.EXIT_UNREACHABLE
+
+
+# ---------------------------------------------------------------- [Gate L5-r2] 再実行・落ちた内容の表示
+
+
+def test_latest_run_prefers_higher_id_even_before_it_starts(ci_gate):
+    old = dict(_run("e2e", conclusion="failure", started="2026-10-19T00:00:00Z"), id=10)
+    queued = dict(_run("e2e", status="queued", conclusion=None, started=None), id=11)
+    states = ci_gate.summarize([old, queued])
+    assert states["e2e"] == ("queued", None)
+
+
+def test_rerunnable_only_when_e2e_alone_failed(ci_gate):
+    ok = {n: ("completed", "success") for n in ci_gate.REQUIRED_CHECKS}
+    assert ci_gate.rerunnable(ok) is False
+    assert ci_gate.rerunnable(dict(ok, e2e=("completed", "failure"))) is True
+    assert ci_gate.rerunnable(dict(ok, e2e=("completed", "failure"), backend=("completed", "failure"))) is False
+    assert ci_gate.rerunnable(dict(ok, backend=("completed", "failure"))) is False
+    assert ci_gate.rerunnable(dict(ok, frontend=("completed", "skipped"), e2e=("completed", "skipped"))) is False
+
+
+def test_log_excerpt_picks_playwright_failures(ci_gate):
+    log = "\n".join([
+        "2026-10-18T23:03:00.0000000Z Running 45 tests using 1 worker",
+        "2026-10-18T23:03:01.0000000Z   \x1b[32m✓\x1b[39m   1 [chromium] › e2e/a11y.spec.ts:20:3 › ok (1.2s)",
+        "2026-10-18T23:03:05.0000000Z   ✘  2 [chromium] › e2e/x.spec.ts:9:1 › 壊れた試験 (3.1s)",
+        "2026-10-18T23:04:00.0000000Z   1) [chromium] › e2e/x.spec.ts:9:1 › 壊れた試験 ───",
+        "2026-10-18T23:04:00.0000000Z     Error: expect(locator).toHaveText(expected) failed",
+        "2026-10-18T23:04:00.0000000Z     Expected: \"A\"",
+        "2026-10-18T23:04:01.0000000Z   1 failed",
+        "2026-10-18T23:04:01.0000000Z     [chromium] › e2e/x.spec.ts:9:1 › 壊れた試験",
+        "2026-10-18T23:04:01.0000000Z   44 passed (2.1m)",
+    ])
+    out = ci_gate.log_excerpt(log)
+    joined = "\n".join(out)
+    assert "1) [chromium] › e2e/x.spec.ts:9:1" in joined and "Error: expect(locator)" in joined
+    assert "1 failed" in joined and "44 passed" in joined and "\x1b" not in joined
+    assert not any(line.startswith("2026-") for line in out)
+    assert ci_gate.log_excerpt("a\nb")[0].startswith("(Playwright の失敗の行が見つかりません")
+
+
+def test_workflow_pins_runner_and_playwright_reports_to_github(ci_gate):
+    import yaml
+
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    assert {job["runs-on"] for job in workflow["jobs"].values()} == {"ubuntu-24.04"}
+    config = (ROOT / "frontend" / "playwright.config.ts").read_text(encoding="utf-8")
+    assert "['github']" in config

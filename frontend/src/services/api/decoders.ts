@@ -44,6 +44,7 @@ import type {
   SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
   JournalDraft, JournalMemory, MemoryList, TravelMemory,
   LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
+  AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling,
   ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
   AtlasCell, AtlasResponse,
   MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight,
@@ -51,7 +52,7 @@ import type {
 } from './types';
 import {
   arrayOf, bool, exactNumber, int, isRecord, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str,
-  trueOnly, type Decoder,
+  trueOnly, unitInterval, type Decoder,
 } from './decode';
 
 export interface RevisionResult {
@@ -1617,18 +1618,62 @@ export const journalDraft: Decoder<JournalDraft> = object<JournalDraft>({
 });
 
 // ===== [Gate P13] 任意の位置軌跡(FR-038) =====
+// [Gate L5] FR-056 端末の記録の観測値(座標を含まない)
+const ratio = unitInterval;
+const tierSeconds = object({
+  moving_fast: optional(nonNegativeInt), moving: optional(nonNegativeInt), stationary: optional(nonNegativeInt),
+  low_power: optional(nonNegativeInt),
+});
+const trackSampling: Decoder<TrackSampling> = object<TrackSampling>({
+  battery_start: optional(ratio),
+  battery_end: optional(ratio),
+  charging_seen: optional(bool),
+  expected_samples: nonNegativeInt,
+  kept_samples: nonNegativeInt,
+  missed_samples: nonNegativeInt,
+  manual_points: nonNegativeInt,
+  max_gap_seconds: nonNegativeInt,
+  tier_seconds: tierSeconds,
+  missed_ratio: nullable(ratio),
+  battery_used: nullable(ratio),
+  reported_at: str,
+});
+const tripLocationMode = oneOf('off', 'device_only', 'areas_only', 'synced');
+const areaCellKey = matching(/^0\.1:-?\d{1,2}\.\d:-?\d{1,3}\.\d$/, '0.1度の区画の印');
+const areaCell: Decoder<AreaCell> = object<AreaCell>({
+  key: areaCellKey,
+  first_at: str,
+  last_at: str,
+  dwell_seconds: nonNegativeInt,
+  samples: nonNegativeInt,
+  state: oneOf('STAYED', 'VISITED', 'PASS_THROUGH'),
+});
+export const locationSettings: Decoder<LocationSettings> = object<LocationSettings>({
+  mode: nullable(tripLocationMode),
+  revision: nonNegativeInt,
+  updated_at: nullable(str),
+  stopped_tracks: optional(nonNegativeInt),
+});
+export const areaCellsUploadResult: Decoder<AreaCellsUploadResult> = object<AreaCellsUploadResult>({
+  added: nonNegativeInt,
+  updated: nonNegativeInt,
+  rejected: object({ invalid: optional(nonNegativeInt), outside_period: optional(nonNegativeInt) }),
+  cell_count: nonNegativeInt,
+  status: oneOf('recording', 'paused', 'stopped'),
+});
 const trackFields = {
   id: str,
   plan_id: str,
-  mode: oneOf('device_only', 'synced'),
+  mode: oneOf('device_only', 'areas_only', 'synced'),
   precision: oneOf('high', 'standard', 'low'),
   status: oneOf('recording', 'paused', 'stopped'),
-  stopped_reason: nullable(oneOf('user', 'trip_ended', 'consent_withdrawn')),
+  stopped_reason: nullable(oneOf('user', 'trip_ended', 'consent_withdrawn', 'mode_off')),
   started_at: str,
   auto_stop_at: str,
   stopped_at: nullable(str),
   point_count: nonNegativeInt,
   revision: int,
+  sampling: nullable(trackSampling),
   created_at: nullable(str),
   updated_at: nullable(str),
 };
@@ -1641,11 +1686,13 @@ export const locationTrackList: Decoder<LocationTrackList> = object<LocationTrac
   active_track_id: nullable(str),
   can_start: bool,
   max_points_per_request: nonNegativeInt,
+  trip_mode: nullable(tripLocationMode),
 });
 export const locationTrackDetail: Decoder<LocationTrackDetail> = object<LocationTrackDetail>({
   ...trackFields,
   distance_m: num,
   points: arrayOf(object({ recorded_at: str, latitude: num, longitude: num, accuracy_m: nullable(num) })),
+  cells: arrayOf(areaCell),
 });
 export const trackPointsUploadResult: Decoder<TrackPointsUploadResult> = object<TrackPointsUploadResult>({
   accepted: nonNegativeInt,
@@ -1732,7 +1779,7 @@ const atlasCell: Decoder<AtlasCell> = object<AtlasCell>({
   trips: arrayOf(object({ plan_id: str, title: str })),
   evidence: object({
     actual: optional(nonNegativeInt), memory: optional(nonNegativeInt), track: optional(nonNegativeInt),
-    planned: optional(nonNegativeInt),
+    planned: optional(nonNegativeInt), area: optional(nonNegativeInt),
   }),
 });
 export const atlasResponse: Decoder<AtlasResponse> = object<AtlasResponse>({

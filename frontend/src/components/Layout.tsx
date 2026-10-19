@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
+import RecordingIndicator from './location/RecordingIndicator';
 
 const PageLoading = () => (
   <div role="status" aria-live="polite" className="flex justify-center items-center py-24">
@@ -13,6 +14,8 @@ const Layout = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
+      {/* [Gate L5] 位置の記録中であることを全ての画面で示す(CA-014) */}
+      <RecordingIndicator />
       <main>
         {/* [Gate M9-FE-C3] ページはルート単位で遅延読込するため、読込中はヘッダーを
             残したまま本文領域にだけ読込表示を出す。 */}

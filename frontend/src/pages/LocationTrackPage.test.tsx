@@ -11,13 +11,18 @@ import { loadLocalPoints } from '@/utils/trackRecorder';
 const m = vi.hoisted(() => ({
   getLocationTracks: vi.fn(), startLocationTrack: vi.fn(), getLocationTrack: vi.fn(), changeLocationTrack: vi.fn(),
   uploadTrackPoints: vi.fn(), deleteTrackPoints: vi.fn(), deleteLocationTrack: vi.fn(), updateConsents: vi.fn(),
+  getLocationSettings: vi.fn(), putLocationSettings: vi.fn(), putTrackSampling: vi.fn(), uploadAreaCells: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ ...m }));
 
 import LocationTrackPage from './LocationTrackPage';
+import { useTrackingStore } from '@/store/trackingStore';
 
 type Success = (pos: GeolocationPosition) => void;
-const geo = { success: null as Success | null, watchPosition: vi.fn(), clearWatch: vi.fn() };
+const geo = {
+  success: null as Success | null, watchPosition: vi.fn(), clearWatch: vi.fn(), getCurrentPosition: vi.fn(),
+  once: null as Success | null,
+};
 
 const active = fx.location_tracks_active as LocationTrackList;
 const track = active.tracks[0]!;
@@ -43,8 +48,14 @@ beforeEach(() => {
   geo.success = null;
   geo.watchPosition.mockReset().mockImplementation((s: Success) => { geo.success = s; return 7; });
   geo.clearWatch.mockReset();
+  geo.once = null;
+  geo.getCurrentPosition.mockReset().mockImplementation((s: Success) => { geo.once = s; });
   Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
   window.confirm = vi.fn(() => true);
+  m.getLocationSettings.mockResolvedValue(fx.location_settings_unset);
+  m.putTrackSampling.mockResolvedValue(fx.location_track_sampling);
+  sessionStorage.clear();
+  useTrackingStore.setState({ active: null });
 });
 
 describe('LocationTrackPage (Gate P13)', () => {
@@ -59,16 +70,71 @@ describe('LocationTrackPage (Gate P13)', () => {
     expect(geo.watchPosition).not.toHaveBeenCalled();
   });
 
-  it('保存先と精度を選んで始める(既定は「この端末だけ」)', async () => {
+  it('[Gate L5] 旅行ごとの位置の扱いを選んでから始める(未選択・「記録しない」では始められない)', async () => {
     m.getLocationTracks.mockResolvedValue(fx.location_tracks_empty);
+    m.putLocationSettings.mockResolvedValue({ mode: 'synced', revision: 1, updated_at: null, stopped_tracks: 0 });
     m.startLocationTrack.mockResolvedValue(fx.location_track_started);
     renderPage();
-    const start = await screen.findByRole('region', { name: '記録を始める' });
-    expect(within(start).getByLabelText(/この端末だけ/)).toBeChecked();
-    fireEvent.click(within(start).getByLabelText(/暗号化してサーバーへ/));
+    const settings = await screen.findByRole('region', { name: 'この旅行での位置の扱い' });
+    const start = screen.getByRole('region', { name: '記録を始める' });
+    expect(within(settings).getByText('まだ選んでいません(位置は記録していません)')).toBeInTheDocument();
+    expect(within(start).getByRole('button', { name: '記録を始める' })).toBeDisabled();
+    fireEvent.click(within(settings).getByLabelText(/暗号化してサーバーへ/));
+    m.getLocationTracks.mockResolvedValue({ ...fx.location_tracks_empty, trip_mode: 'synced' });
+    fireEvent.click(within(settings).getByRole('button', { name: '位置の扱いを保存' }));
+    await waitFor(() => expect(m.putLocationSettings).toHaveBeenCalledWith('p1', 'synced', 0));
+    await waitFor(() => expect(within(start).getByRole('button', { name: '記録を始める' })).toBeEnabled());
     fireEvent.change(within(start).getByLabelText('精度'), { target: { value: 'high' } });
     fireEvent.click(within(start).getByRole('button', { name: '記録を始める' }));
-    await waitFor(() => expect(m.startLocationTrack).toHaveBeenCalledWith('p1', 'synced', 'high'));
+    await waitFor(() => expect(m.startLocationTrack).toHaveBeenCalledWith('p1', null, 'high'));
+  });
+
+  it('[Gate L5] 訪問地域だけ同期: 座標は端末に置き、区画だけを送る。観測値も送る', async () => {
+    m.getLocationTracks.mockResolvedValue(fx.location_tracks_areas_active);
+    m.uploadAreaCells.mockResolvedValue(fx.area_cells_uploaded);
+    m.changeLocationTrack.mockResolvedValue(fx.location_track_stopped);
+    const areas = fx.location_tracks_areas_active.tracks[0]!;
+    renderPage();
+    const panel = await screen.findByRole('region', { name: '記録中の軌跡' });
+    expect(within(panel).getByText(/訪問地域だけ同期/)).toBeInTheDocument();
+    await waitFor(() => expect(geo.watchPosition).toHaveBeenCalled());
+    act(() => {
+      geo.success!(position(0, 34.9948));
+      geo.success!(position(70, 34.9958));
+    });
+    expect(loadLocalPoints(areas.id)).toHaveLength(2);
+    fireEvent.click(within(panel).getByRole('button', { name: '今すぐ送る' }));
+    await waitFor(() => expect(m.uploadAreaCells).toHaveBeenCalled());
+    const cells = m.uploadAreaCells.mock.calls[0]![2] as Array<Record<string, unknown>>;
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.key).toBe('0.1:34.9:135.7');
+    expect(JSON.stringify(cells)).not.toContain('34.9948');
+    expect(m.uploadTrackPoints).not.toHaveBeenCalled();
+    expect(await within(panel).findByText(/送った区画: 2件/)).toBeInTheDocument();
+    // 記録中であることを、ほかの画面にも示す状態になっている
+    expect(useTrackingStore.getState().active).toMatchObject({ planId: 'p1', trackId: areas.id, capturing: true });
+    fireEvent.click(within(panel).getByRole('button', { name: '記録を止める' }));
+    await waitFor(() => expect(m.putTrackSampling).toHaveBeenCalled());
+    const sampling = m.putTrackSampling.mock.calls[0]![2];
+    // サーバーにあった観測値(40件)に、この画面で残した2件を足して送る
+    expect(sampling).toMatchObject({ kept_samples: 42 });
+    expect(JSON.stringify(sampling)).not.toMatch(/latitude|longitude/);
+  });
+
+  it('[Gate L5] 電池が少ないと省電力の段階になり、間隔をあけて1回ずつ取る。手動で記録できる', async () => {
+    Object.defineProperty(navigator, 'getBattery', {
+      value: async () => ({ level: 0.12, charging: false }), configurable: true,
+    });
+    m.getLocationTracks.mockResolvedValue(deviceOnly);
+    renderPage();
+    const panel = await screen.findByRole('region', { name: '記録中の軌跡' });
+    expect(await within(panel).findByText('取得の間隔: 電池が少ないため省電力')).toBeInTheDocument();
+    expect(within(panel).getByText('電池: 12%')).toBeInTheDocument();
+    await waitFor(() => expect(geo.getCurrentPosition).toHaveBeenCalled());
+    fireEvent.click(within(panel).getByRole('button', { name: '今の場所を記録' }));
+    act(() => geo.once!(position(0, 34.9948)));
+    expect(loadLocalPoints(track.id)).toHaveLength(1);
+    Object.defineProperty(navigator, 'getBattery', { value: undefined, configurable: true });
   });
 
   it('暗号化してサーバーへ: 取得した位置を溜め、「今すぐ送る」でbatch_id付きで送る', async () => {
@@ -96,6 +162,7 @@ describe('LocationTrackPage (Gate P13)', () => {
     m.changeLocationTrack.mockResolvedValue(fx.location_track_stopped);
     renderPage();
     const panel = await screen.findByRole('region', { name: '記録中の軌跡' });
+    expect(within(panel).queryByRole('button', { name: '今すぐ送る' })).toBeNull();
     await waitFor(() => expect(geo.watchPosition).toHaveBeenCalled());
     act(() => geo.success!(position(0, 34.9948)));
     expect(loadLocalPoints(track.id)).toHaveLength(1);

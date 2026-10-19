@@ -17,7 +17,7 @@ import type { AlertCreateData, AlertUpdateData } from './types';
 import type { OptimizationTravelMode } from './types';
 import type { SyncOperationInput } from './types';
 import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput } from './types';
-import type { TrackMode, TrackPoint, TrackPrecision } from './types';
+import type { AreaCellInput, TrackMode, TrackPoint, TrackPrecision, TrackSamplingInput, TripLocationMode } from './types';
 import type { ActualInput } from './types';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
@@ -391,7 +391,7 @@ export const createJournalDraft = (planId: string, options: JournalOptions) => a
 
 // ===== [Gate P13] 任意の位置軌跡(FR-038) =====
 export const getLocationTracks = (planId: string) => api.getLocationTracks(planId);
-export const startLocationTrack = (planId: string, mode: TrackMode, precision: TrackPrecision) =>
+export const startLocationTrack = (planId: string, mode: TrackMode | null, precision: TrackPrecision) =>
   api.startLocationTrack(planId, mode, precision);
 export const getLocationTrack = (planId: string, trackId: string) => api.getLocationTrack(planId, trackId);
 export const changeLocationTrack = (planId: string, trackId: string, action: 'pause' | 'resume' | 'stop', revision: number) =>
@@ -401,6 +401,14 @@ export const uploadTrackPoints = (planId: string, trackId: string, batchId: stri
 export const deleteTrackPoints = (planId: string, trackId: string, start: string, end: string) =>
   api.deleteTrackPoints(planId, trackId, start, end);
 export const deleteLocationTrack = (planId: string, trackId: string) => api.deleteLocationTrack(planId, trackId);
+// [Gate L5] FR-055 Local-first Location・FR-056 適応型GPS
+export const getLocationSettings = (planId: string) => api.getLocationSettings(planId);
+export const putLocationSettings = (planId: string, mode: TripLocationMode, revision: number) =>
+  api.putLocationSettings(planId, mode, revision);
+export const uploadAreaCells = (planId: string, trackId: string, cells: AreaCellInput[]) =>
+  api.uploadAreaCells(planId, trackId, cells);
+export const putTrackSampling = (planId: string, trackId: string, sampling: TrackSamplingInput) =>
+  api.putTrackSampling(planId, trackId, sampling);
 
 // ===== [Gate P14] 旅の振り返り(FR-054・FR-053) =====
 export const getJourney = (planId: string) => api.getJourney(planId);

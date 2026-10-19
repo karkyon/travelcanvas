@@ -2450,16 +2450,62 @@ class LocationTrack(Base):
     stopped_at = Column(DateTime(timezone=True), nullable=True)
     point_count = Column(Integer, nullable=False, default=0, server_default="0")
     revision = Column(Integer, nullable=False, default=1, server_default="1")
+    # [Gate L5] 端末の記録の観測値(電池・欠測率・取得の間隔の内訳。座標を含まない。app/services/location_tracks.py)
+    sampling = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
-        CheckConstraint("mode IN ('device_only','synced')", name="ck_location_tracks_mode"),
+        # [Gate L5] areas_only = 生の座標は端末だけに置き、集計した訪問地域(区画)だけを同期する
+        CheckConstraint("mode IN ('device_only','areas_only','synced')", name="ck_location_tracks_mode"),
         CheckConstraint("precision IN ('high','standard','low')", name="ck_location_tracks_precision"),
         CheckConstraint("status IN ('recording','paused','stopped')", name="ck_location_tracks_status"),
         CheckConstraint("(status = 'stopped') = (stopped_at IS NOT NULL)", name="ck_location_tracks_stopped_at"),
         CheckConstraint("mode = 'synced' OR point_count = 0", name="ck_location_tracks_device_only_points"),
         Index("ix_location_tracks_plan_user", "plan_id", "user_id"),
+    )
+
+
+class TripLocationSetting(Base):
+    """[Gate L5] FR-055 旅行ごと・利用者ごとの位置の扱い(DOC-15 CA-013)。
+
+    off=記録しない / device_only=この端末だけ / areas_only=訪問地域だけ同期 / synced=暗号化してサーバーへ。
+    行が無い時は「まだ選んでいない」(記録は始まっていない。初期値は OFF)。"""
+    __tablename__ = "trip_location_settings"
+
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    mode = Column(String(11), nullable=False)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("mode IN ('off','device_only','areas_only','synced')", name="ck_trip_location_settings_mode"),
+    )
+
+
+class LocationAreaCell(Base):
+    """[Gate L5] FR-055「訪問地域だけ同期」の区画(0.1度 ≒ 11km)。端末が生の座標から集計した結果だけを持つ。"""
+    __tablename__ = "location_area_cells"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    track_id = Column(UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    cell_key = Column(String(24), nullable=False)
+    first_at = Column(DateTime(timezone=True), nullable=False)
+    last_at = Column(DateTime(timezone=True), nullable=False)
+    dwell_seconds = Column(Integer, nullable=False, default=0, server_default="0")
+    samples = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("track_id", "cell_key", name="uq_location_area_cells_track_cell"),
+        CheckConstraint("last_at >= first_at", name="ck_location_area_cells_time_order"),
+        CheckConstraint("dwell_seconds >= 0 AND samples >= 0", name="ck_location_area_cells_nonnegative"),
+        Index("ix_location_area_cells_plan_user", "plan_id", "user_id"),
     )
 
 

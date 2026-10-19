@@ -13,10 +13,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# [Gate L5-r2] ubuntu-latest は 2026-10-19 から Ubuntu 26 へ順次移る。移行中に E2E の結果が揺れたため、24.04 に固定する
+# (移すときは別の Gate で全ジョブを確かめてから)。
 jobs:
   # [Gate R0] tracked secret scanをCIでblocking化する。
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       # [Gate S1] 判定(一致した文字列にダミーの印があるときだけ除外)の自己試験も行う
@@ -30,7 +32,7 @@ jobs:
   # (助言の ID 単位・理由・範囲・期限が必須。期限切れ・ブラウザへ届く依存の build-only 例外は失敗)。
   dependency-audit:
     needs: secret-scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +68,7 @@ jobs:
 
   frontend:
     needs: secret-scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -106,7 +108,7 @@ jobs:
         run: npm test -- --run
 
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: secret-scan
     defaults:
       run:
@@ -196,7 +198,7 @@ jobs:
   # →promote→reload後の永続化確認までを本物のブラウザ(chromium)で検証する。
   e2e:
     needs: [frontend, backend]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

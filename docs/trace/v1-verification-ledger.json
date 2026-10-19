@@ -1,0 +1,440 @@
+{
+ "_meta": {
+  "gate": "V1",
+  "description": "DOC-10 の VERIFIED(E2E・権限・競合・セキュリティ・運用を検証)の判定の証拠。backend/tests/test_gate_v1_verification_ledger.py が、参照した試験のファイル・関数・E2E の spec が実在することを CI で確かめる(消したり名前を変えると落ちる)。",
+  "criteria": {
+   "e2e": "実ブラウザの E2E(Playwright。axe-core の WCAG 2.1 AA 検査を含む)が1本以上",
+   "authz": "全ルートの認可の網羅試験(cross_cutting.authz)に加え、その機能の役割・他人の拒否の試験が1件以上",
+   "conflict": "If-Match・409・同時の要求・古い入力の検出の試験が1件以上。書き込みの無い機能は理由を書いて対象外(conflict_na)",
+   "security": "その機能の秘匿・暗号化・監査・回数制限の試験が1件以上(cross_cutting.security に加えて)",
+   "ops": "機能の横断の運用の証拠(cross_cutting.ops: 全表の復元演習・ルートの型別の監視・ログの漏れの検査・Runbook)",
+   "scope": "DOC-10 で「(部分)」の機能は対象にしない(未達の能力が残るため)"
+  }
+ },
+ "cross_cutting": {
+  "authz": [
+   "backend/tests/test_gate_s4_authz_matrix.py::test_every_private_route_requires_credentials",
+   "backend/tests/test_gate_s4_authz_matrix.py::test_unrelated_user_cannot_reach_others_plan"
+  ],
+  "security": [
+   "backend/tests/test_zz_log_leak_scan.py::test_no_personal_data_or_secrets_in_logs"
+  ],
+  "ops": [
+   "backend/tests/test_gate_o1_ops.py::test_decrypt_check_detects_undecryptable_values",
+   "backend/tests/test_gate_o1_ops.py::test_metrics_registry_render_and_cardinality",
+   "backend/tests/test_gate_o1_ops.py::test_evaluate_monitor_healthy_and_problems"
+  ],
+  "ops_docs": [
+   "docs/ops/RUNBOOK.md",
+   "docs/ops/drills/gate-o1-drill.md"
+  ]
+ },
+ "features": {
+  "FR-001": {
+   "title": "ゲスト旅行開始",
+   "e2e": [
+    "frontend/e2e/quickdraft-flow.spec.ts",
+    "frontend/e2e/a11y.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate35_guest.py::test_guest_cannot_access_another_guests_plan",
+    "backend/tests/test_gate_r1_guest_normalized_api.py::test_guest_cannot_reach_another_guests_normalized_plan"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_r1_guest_normalized_api.py::test_guest_can_update_and_delete_day_and_event_with_if_match"
+   ],
+   "security": [
+    "backend/tests/test_gate35_guest.py::test_guest_token_invalid_signature_rejected",
+    "backend/tests/test_gate35_guest.py::test_travel_plan_endpoints_reject_missing_token"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-002": {
+   "title": "ゲスト昇格",
+   "e2e": [
+    "frontend/e2e/auth-flows.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate35_guest.py::test_upgrade_rejects_non_guest_user"
+   ],
+   "conflict": [
+    "backend/tests/test_gate35_guest.py::test_upgrade_rejects_duplicate_email"
+   ],
+   "conflict_note": "同じメール・名前の取り合いを拒否(DBの一意制約)",
+   "security": [
+    "backend/tests/test_gate_s2_auth_hardening.py::test_guest_upgrade_enforces_the_same_policy"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-003": {
+   "title": "認証・セッション",
+   "e2e": [
+    "frontend/e2e/auth-flows.spec.ts",
+    "frontend/e2e/active-sessions.spec.ts",
+    "frontend/e2e/mfa.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_sessions.py::test_cannot_delete_another_users_session",
+    "backend/tests/test_gate_s11_admin_mfa.py::test_admin_api_requires_enrolled_and_fresh_mfa"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_s2_auth_hardening.py::test_parallel_refresh_with_the_same_token_rotates_once"
+   ],
+   "security": [
+    "backend/tests/test_sessions.py::test_refresh_reuse_of_old_token_revokes_session",
+    "backend/tests/test_gate_s11_admin_mfa.py::test_enroll_login_with_code_and_session_marked"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-006": {
+   "title": "NOW/NEXT",
+   "e2e": [
+    "frontend/e2e/today-mode-mobile.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_l1_today_mode.py::test_other_user_without_access_gets_403"
+   ],
+   "conflict": [],
+   "conflict_na": "読み取りだけの投影(書き込みが無い)",
+   "security": [
+    "backend/tests/test_gate_s4_authz_matrix.py::test_unrelated_user_cannot_reach_others_plan",
+    "backend/tests/test_gate_l1b_today_timezone.py::test_invalid_timezone_falls_back_to_utc"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-010": {
+   "title": "予約管理",
+   "e2e": [
+    "frontend/e2e/reservations.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_r3_0_reservation.py::test_viewer_collaborator_cannot_create_but_can_list",
+    "backend/tests/test_gate_r3_0_reservation.py::test_other_user_without_access_gets_403"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_r3_0_reservation.py::test_update_requires_if_match_and_bumps_revision"
+   ],
+   "security": [
+    "backend/tests/test_gate_r3_0_reservation.py::test_create_and_get_reservation_masks_confirmation_number",
+    "backend/tests/test_gate_r3_0_reservation.py::test_reveal_returns_plaintext_and_calls_audit_logger"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-012": {
+   "title": "QR・チケット",
+   "e2e": [
+    "frontend/e2e/reservations.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_r3_5_tickets.py::test_viewer_forbidden_from_reveal_with_default_share_policy",
+    "backend/tests/test_gate_r3_5_tickets.py::test_other_user_without_access_gets_403"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_r3_5_tickets.py::test_update_ticket_bumps_revision_with_if_match"
+   ],
+   "security": [
+    "backend/tests/test_gate_r3_5_tickets.py::test_create_ticket_masks_payload",
+    "backend/tests/test_gate_r3_5_tickets.py::test_reveal_ticket_owner_succeeds_and_audits"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-013": {
+   "title": "文書ウォレット",
+   "e2e": [
+    "frontend/e2e/document-wallet.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_m5_object_storage.py::test_upload_requires_editor_role",
+    "backend/tests/test_gate_m7_document_hardening.py::test_restricted_document_hidden_from_non_owner_editor"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_r3_6_documents.py::test_update_document_with_if_match"
+   ],
+   "security": [
+    "backend/tests/test_gate_m5_object_storage.py::test_uploaded_file_is_encrypted_at_rest",
+    "backend/tests/test_gate_m5_object_storage.py::test_download_with_tampered_token_rejected"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-016": {
+   "title": "制約",
+   "e2e": [
+    "frontend/e2e/constraints.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_l2_constraints.py::test_permission_matrix"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_l2_constraints.py::test_update_requires_if_match_and_bumps_revision"
+   ],
+   "security": [
+    "backend/tests/test_gate_l2_constraints.py::test_private_constraint_is_stored_only_as_ciphertext",
+    "backend/tests/test_gate_l2_constraints.py::test_audit_details_never_contain_constraint_text"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-017": {
+   "title": "実行可能性",
+   "e2e": [
+    "frontend/e2e/feasibility.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_l3_validation.py::test_permissions_viewer_can_run_stranger_cannot"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_l3_validation.py::test_list_and_get_and_staleness"
+   ],
+   "conflict_note": "入力の変更で古い結果と示す",
+   "security": [
+    "backend/tests/test_gate_l3_validation.py::test_private_constraint_findings_never_contain_the_constraint_value"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-021": {
+   "title": "共有・権限",
+   "e2e": [
+    "frontend/e2e/share-clone.spec.ts",
+    "frontend/e2e/document-wallet.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_share.py::test_accepted_viewer_can_read_but_not_write",
+    "backend/tests/test_share.py::test_accepted_editor_can_write_but_not_delete_or_manage_share",
+    "backend/tests/test_share.py::test_removed_collaborator_loses_access_immediately"
+   ],
+   "conflict": [
+    "backend/tests/test_share.py::test_concurrent_resolve_never_exceeds_max_uses"
+   ],
+   "security": [
+    "backend/tests/test_share.py::test_share_token_is_not_stored_in_plaintext",
+    "backend/tests/test_share.py::test_public_resolve_redacts_sensitive_itinerary_fields"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-025": {
+   "title": "持ち物",
+   "e2e": [
+    "frontend/e2e/preparation.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p1_preparation.py::test_viewer_cannot_create_shared_but_can_create_personal",
+    "backend/tests/test_gate_p1_preparation.py::test_outsider_cannot_access"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p1_preparation.py::test_update_requires_if_match_and_detects_conflict"
+   ],
+   "security": [
+    "backend/tests/test_gate_p1_preparation.py::test_personal_item_is_encrypted_and_invisible_to_others"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-026": {
+   "title": "レディネス",
+   "e2e": [
+    "frontend/e2e/preparation.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p1_preparation.py::test_assigned_viewer_can_only_change_status",
+    "backend/tests/test_gate_p1_preparation.py::test_outsider_cannot_access"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p1_preparation.py::test_update_requires_if_match_and_detects_conflict"
+   ],
+   "security": [
+    "backend/tests/test_gate_p1_preparation.py::test_create_shared_item_with_assignee_and_audit_without_name"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-028": {
+   "title": "立替・精算",
+   "e2e": [
+    "frontend/e2e/expenses.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p2_finance.py::test_viewer_cannot_write_expenses",
+    "backend/tests/test_gate_p2_finance.py::test_outsider_and_purge"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p2_finance.py::test_update_recomputes_shares_with_if_match"
+   ],
+   "security": [
+    "backend/tests/test_gate_p2_finance.py::test_budgets_and_private_member_budget"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-029": {
+   "title": "当日モード",
+   "e2e": [
+    "frontend/e2e/today-mode-mobile.spec.ts",
+    "frontend/e2e/replan.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_l1_today_mode.py::test_other_user_without_access_gets_403"
+   ],
+   "conflict": [],
+   "conflict_na": "読み取りだけの投影(変更は再計画 FR-031 の承認で行う)",
+   "security": [
+    "backend/tests/test_gate_s4_authz_matrix.py::test_unrelated_user_cannot_reach_others_plan"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-031": {
+   "title": "安全な再計画",
+   "e2e": [
+    "frontend/e2e/replan.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p10_replans.py::test_permissions"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p10_replans.py::test_stale_and_conflict_do_not_touch_plan"
+   ],
+   "security": [
+    "backend/tests/test_gate_p10_replans.py::test_replan_apply_notify_and_undo"
+   ],
+   "security_note": "承認まで不変・通知本文に予定名を書かない",
+   "status": "VERIFIED"
+  },
+  "FR-032": {
+   "title": "Offline Pack",
+   "e2e": [
+    "frontend/e2e/offline-pack.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_k1_offline_keys.py::test_each_user_gets_a_different_key",
+    "backend/tests/test_gate_k1_offline_keys.py::test_inactive_or_missing_user_gets_404"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_k1_offline_keys.py::test_rotate_requires_if_match_and_checks_version"
+   ],
+   "security": [
+    "backend/tests/test_gate_k1_offline_keys.py::test_profile_update_cannot_reset_the_key_version",
+    "backend/tests/test_gate_k1_offline_keys.py::test_rotate_is_audited_with_versions_only"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-033": {
+   "title": "Offline同期",
+   "e2e": [
+    "frontend/e2e/offline-sync.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p11_sync.py::test_permissions_and_isolation"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p11_sync.py::test_field_level_conflicts_and_resolution"
+   ],
+   "security": [
+    "backend/tests/test_gate_p11_sync.py::test_offline_create_update_delete_with_temp_id_and_replay",
+    "backend/tests/test_gate_p11_sync.py::test_deleted_locked_related_and_rejections"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-034": {
+   "title": "しおり生成",
+   "e2e": [
+    "frontend/e2e/booklet.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p4_booklet.py::test_outsider_cannot_access",
+    "backend/tests/test_gate_p4_booklet.py::test_sensitive_includes_owner_only"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p4_booklet.py::test_export_versions_snapshot_and_stale"
+   ],
+   "conflict_note": "版の固定と古い版の表示",
+   "security": [
+    "backend/tests/test_gate_p4_booklet.py::test_preview_default_is_whitelisted_and_masked",
+    "backend/tests/test_gate_p4_booklet.py::test_sensitive_export_guard_watermark_and_creator_only"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-038": {
+   "title": "位置軌跡",
+   "e2e": [
+    "frontend/e2e/location-track.spec.ts",
+    "frontend/e2e/location-local-first.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p13_location_tracks.py::test_tracks_are_private_to_the_recorder",
+    "backend/tests/test_gate_l5_local_first_location.py::test_areas_only_accepts_cells_not_points"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_l5_local_first_location.py::test_trip_mode_controls_recording"
+   ],
+   "security": [
+    "backend/tests/test_gate_p13_location_tracks.py::test_synced_points_encrypted_idempotent_and_lifecycle",
+    "backend/tests/test_gate_p13_location_tracks.py::test_auto_stop_and_consent_withdrawal"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-043": {
+   "title": "Quick Plan",
+   "e2e": [
+    "frontend/e2e/quickdraft-flow.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_r2_3_quickdraft_promote.py::test_promote_wrong_device_token_returns_403"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_r2_5_concurrency.py::test_concurrent_claim_same_key_only_one_claims_immediately",
+    "backend/tests/test_gate_r2_2_quickdraft_create.py::test_reusing_key_with_different_payload_returns_409"
+   ],
+   "security": [
+    "backend/tests/test_gate_r2_2_quickdraft_create.py::test_invalid_device_token_returns_401",
+    "backend/tests/test_gate_r2_2_quickdraft_create.py::test_fault_injection_failure_leaves_no_orphan_draft_and_marks_idempotency_failed"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-044": {
+   "title": "Guest Travel View",
+   "e2e": [
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_share.py::test_public_resolve_requires_correct_passcode",
+    "backend/tests/test_share.py::test_public_resolve_revoked_token_returns_404"
+   ],
+   "conflict": [
+    "backend/tests/test_share.py::test_concurrent_resolve_never_exceeds_max_uses"
+   ],
+   "security": [
+    "backend/tests/test_share.py::test_public_resolve_is_rate_limited_per_ip",
+    "backend/tests/test_share.py::test_public_resolve_sets_no_store_cache_control"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-047": {
+   "title": "旅程複製",
+   "e2e": [
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate39_plan_clone.py::test_clone_other_users_plan_rejected"
+   ],
+   "conflict": [],
+   "conflict_na": "新しいプランを作るだけで、元のプランの行を書き換えない(E2E で元が変わらないことを確認)",
+   "security": [
+    "backend/tests/test_gate39_plan_clone.py::test_clone_copies_days_and_events_and_resets_locked",
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "security_note": "予約・券は写さない(E2E)",
+   "status": "VERIFIED"
+  },
+  "FR-053": {
+   "title": "旅の達成指標",
+   "e2e": [
+    "frontend/e2e/journey.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p14_journey.py::test_carry_over_and_permissions"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p14_journey.py::test_record_actuals_without_touching_plan"
+   ],
+   "security": [
+    "backend/tests/test_gate_p14_journey.py::test_suggestions_use_only_own_track_and_visible_memories"
+   ],
+   "status": "VERIFIED"
+  }
+ }
+}

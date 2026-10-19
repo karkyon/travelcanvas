@@ -17,7 +17,7 @@ export interface AtlasCell {
   first_at: string | null;
   last_at: string | null;
   trips: Array<{ plan_id: string; title: string }>;
-  evidence: Partial<Record<'actual' | 'memory' | 'track' | 'planned', number>>;
+  evidence: Partial<Record<'actual' | 'memory' | 'track' | 'planned' | 'area', number>>;
 }
 
 export interface AtlasResponse {

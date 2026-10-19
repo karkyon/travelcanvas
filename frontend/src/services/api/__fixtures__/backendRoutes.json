@@ -23,7 +23,8 @@
   "captured_at_head_p15": "Gate P15(FR-052 Personal Travel Atlas)の実backend応答",
   "captured_at_head_p17": "Gate P17(FR-057 Memory Replan)の実backend応答",
   "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)",
-  "captured_at_head_s11": "Gate S10 (+Gate S11 /auth/mfa/*)"
+  "captured_at_head_s11": "Gate S10 (+Gate S11 /auth/mfa/*)",
+  "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -100,6 +101,7 @@
   "GET /api/v1/plans/{plan_id}/imports",
   "GET /api/v1/plans/{plan_id}/imports/{job_id}",
   "GET /api/v1/plans/{plan_id}/journey",
+  "GET /api/v1/plans/{plan_id}/location-settings",
   "GET /api/v1/plans/{plan_id}/location-tracks",
   "GET /api/v1/plans/{plan_id}/location-tracks/{track_id}",
   "GET /api/v1/plans/{plan_id}/members",
@@ -219,6 +221,7 @@
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/reject",
   "POST /api/v1/plans/{plan_id}/journey/events/{event_id}/carry-over",
   "POST /api/v1/plans/{plan_id}/location-tracks",
+  "POST /api/v1/plans/{plan_id}/location-tracks/{track_id}/area-cells",
   "POST /api/v1/plans/{plan_id}/location-tracks/{track_id}/points",
   "POST /api/v1/plans/{plan_id}/memories",
   "POST /api/v1/plans/{plan_id}/memories/journal-draft",
@@ -271,6 +274,8 @@
   "PUT /api/v1/plans/{plan_id}/events/{event_id}",
   "PUT /api/v1/plans/{plan_id}/finance-settings",
   "PUT /api/v1/plans/{plan_id}/journey/events/{event_id}",
+  "PUT /api/v1/plans/{plan_id}/location-settings",
+  "PUT /api/v1/plans/{plan_id}/location-tracks/{track_id}/sampling",
   "PUT /api/v1/plans/{plan_id}/polls/{poll_id}/votes",
   "PUT /api/v1/privacy/consents",
   "PUT /api/v1/spots/{spot_id}",

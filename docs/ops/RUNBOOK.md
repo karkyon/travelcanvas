@@ -445,6 +445,11 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 - パッチの流れ: omega-dev2 で全試験に合格 → commit → `gate/<名前>` へ push → `ci_gate.py wait --sha <commit>` で CI の全ジョブの
   合格を待つ(20分前後)→ 同じ commit を main へ push → `gate/<名前>` を消す。**CI が不合格なら main は変わらず、手元は元に戻る**
   (`gate/<名前>` は調べるために残す)。GitHub の Actions の画面で落ちたジョブを確かめる。
+- [Gate L5-r2] CI が不合格の時、`ci_gate.py wait` は落ちたジョブの注記(Playwright の失敗は `github` の reporter で注記になる)と
+  ログの要点を表示し、ログの全体を一時ファイル(`/tmp/travelcanvas-ci-<commit>-<ジョブ>.log`)に残す。後から見るには
+  `python3 scripts/ops/ci_gate.py failures --sha <commit>`。落ちたのが **e2e だけ**なら、内容を表示したうえで **1回だけ**再実行し、
+  再実行で合格したら「不安定」と表示して合格にする(表示した1回目の失敗は次の Gate で直す)。ほかのジョブの不合格は再実行しない。
+- CI の実行環境は `ubuntu-24.04` に固定する(`ubuntu-latest` は 2026-10-19 から Ubuntu 26 へ順次移る。移行中に E2E が揺れた)。
 - GitHub に届かない時(`ci_gate.py wait` の終了コード 2)は main へ送らない。保護を設定する前に限り、`TC_SKIP_CI_WAIT=1` を付けて
   パッチを実行すると従来どおり直接 main へ送る(保護の後は GitHub が拒否する)。
 

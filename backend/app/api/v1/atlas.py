@@ -20,7 +20,8 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
 from app.models.models import (
-    EventActual, LocationPointBatch, LocationTrack, Memory, PlanCollaborator, TravelDay, TravelEvent, TravelPlan, User,
+    EventActual, LocationAreaCell, LocationPointBatch, LocationTrack, Memory, PlanCollaborator, TravelDay, TravelEvent,
+    TravelPlan, User,
 )
 from app.services import atlas as at
 from app.services import location_tracks as lt
@@ -93,6 +94,12 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
                                 "state": "PASS_THROUGH", "kind": "track", "at": datetime.fromisoformat(p["t"])})
         except EncryptionNotConfigured:
             pass
+    # [Gate L5] 「訪問地域だけ同期」の区画(端末で集計した 0.1度の区画と滞在時間。生の座標は無い)
+    for c in db.query(LocationAreaCell).filter(LocationAreaCell.plan_id == plan.id,
+                                               LocationAreaCell.user_id == user.id).all():
+        lat, lng = lt.cell_center(c.cell_key)
+        obs.append({"lat": lat, "lng": lng, "plan_id": str(plan.id), "plan_title": title,
+                    "state": lt.area_state(c.dwell_seconds), "kind": "area", "at": c.first_at})
     return obs
 
 
