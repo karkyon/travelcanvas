@@ -28,7 +28,8 @@
   "captured_at_head_s9": "Gate S9: auth_sessions(実 backend の GET /auth/sessions。id・時刻・接続元は固定値に置き換え)",
   "captured_at_head_s11": "Gate S10 (+Gate S11 多要素認証 /auth/mfa/*。秘密・トークン・回復コードは見本の値に置き換え)",
   "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)",
-  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile・constraint from_profile)"
+  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile・constraint from_profile)",
+  "captured_at_head_a2": "Gate C1 4775f95 (+Gate A2 admin: is_admin/is_self/mfa_enabled・sessions_revoked・actions・IP の末尾を伏せる)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -11428,6 +11429,110 @@
   "detail": {
    "code": "profile_empty",
    "message": "非公開の条件がまだありません。設定 → 非公開の条件 で登録してください"
+  }
+ },
+ "admin_stats": {
+  "users": {
+   "total_users": 2,
+   "active_users": 2,
+   "verified_users": 2,
+   "new_users_30d": 2,
+   "user_types": {
+    "guest": 0,
+    "registered": 1,
+    "premium": 0,
+    "admin": 1
+   }
+  },
+  "travel_plans": {
+   "total_plans": 0,
+   "active_plans": 0,
+   "completed_plans": 0,
+   "draft_plans": 0,
+   "average_duration_days": 0.0,
+   "popular_destinations": []
+  },
+  "timestamp": "2026-10-19T02:44:03.939483+00:00"
+ },
+ "admin_users": {
+  "users": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000a2",
+    "username": "target",
+    "email": "target@example.com",
+    "user_type": "registered",
+    "is_active": true,
+    "is_verified": true,
+    "is_admin": false,
+    "is_self": false,
+    "created_at": "2026-10-19T02:44:03.520779+00:00",
+    "travel_plans_count": 0
+   }
+  ],
+  "pagination": {
+   "page": 1,
+   "page_size": 20,
+   "total_count": 1,
+   "total_pages": 1,
+   "has_next": false,
+   "has_prev": false
+  }
+ },
+ "admin_user_detail": {
+  "id": "00000000-0000-4000-8000-0000000000a2",
+  "username": "target",
+  "email": "target@example.com",
+  "user_type": "registered",
+  "is_active": true,
+  "is_verified": true,
+  "is_admin": false,
+  "is_self": false,
+  "mfa_enabled": false,
+  "created_at": "2026-10-19T02:44:03.520779+00:00",
+  "statistics": {
+   "account_age_days": 0,
+   "total_plans": 0,
+   "completed_plans": 0,
+   "optimization_usage": 0
+  }
+ },
+ "admin_manage_suspend": {
+  "success": true,
+  "updated_count": 1,
+  "sessions_revoked": 0
+ },
+ "admin_manage_error_self": {
+  "detail": {
+   "code": "self_target",
+   "message": "自分自身のアカウントはこの画面から操作できません"
+  }
+ },
+ "admin_audit_logs": {
+  "actions": [
+   "capture_a2"
+  ],
+  "audit_logs": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000a9",
+    "user_id": "00000000-0000-4000-8000-0000000000a1",
+    "action": "capture_a2",
+    "resource_type": "user",
+    "resource_id": "00000000-0000-4000-8000-0000000000a2",
+    "ip_address": "203.0.113.x",
+    "user_agent": "Mozilla/5.0",
+    "details": {
+     "target_user_id": "00000000-0000-4000-8000-0000000000a2"
+    },
+    "created_at": "2026-10-19T02:44:03.520779+00:00"
+   }
+  ],
+  "pagination": {
+   "page": 1,
+   "page_size": 20,
+   "total_count": 1,
+   "total_pages": 1,
+   "has_next": false,
+   "has_prev": false
   }
  }
 }

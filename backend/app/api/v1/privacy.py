@@ -62,7 +62,7 @@ class AccountDeletionRequest(BaseModel):
 def delete_account(payload: AccountDeletionRequest, request: Request, response: Response,
                    db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     user = _db_user(db, current_user)
-    if user.is_superuser or user.role == "admin":
+    if user.is_superuser or user.role == "admin" or str(user.user_type or "") in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail={
             "code": "admin_account", "message": "管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください"})
     if not check_rate_limit(f"account_delete:{user.id}", DELETE_ATTEMPTS_PER_HOUR, 3600):

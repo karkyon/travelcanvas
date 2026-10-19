@@ -20,6 +20,7 @@ import type { JournalOptions, MemoryInput, MemoryUpdateInput, MemoryUploadInput 
 import type { AreaCellInput, TrackMode, TrackPoint, TrackPrecision, TrackSamplingInput, TripLocationMode } from './types';
 import type { ActualInput } from './types';
 import type { PrivateProfileItemInput } from './types';
+import type { AdminUserAction, AdminUsersQuery, AuditLogQuery } from './types';
 import type { PresenceInput } from './endpoints/collab';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
@@ -443,4 +444,11 @@ export const putPrivateProfile = (items: PrivateProfileItemInput[], revision: nu
   api.putPrivateProfile(items, revision);
 export const getPlanPrivateProfile = (planId: string) => api.getPlanPrivateProfile(planId);
 export const putPlanPrivateProfile = (planId: string, applied: boolean) => api.putPlanPrivateProfile(planId, applied);
+
+// ===== [Gate A2] 管理・監査(FR-040)
+export const getAdminStats = () => api.getAdminStats();
+export const getAdminUsers = (query: AdminUsersQuery = {}) => api.getAdminUsers(query);
+export const getAdminUser = (userId: string) => api.getAdminUser(userId);
+export const manageAdminUsers = (action: AdminUserAction, userIds: string[]) => api.manageAdminUsers(action, userIds);
+export const getAuditLogs = (query: AuditLogQuery = {}) => api.getAuditLogs(query);
 

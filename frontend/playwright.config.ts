@@ -15,6 +15,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // [Gate A2] 全体の前に接続元の点数を消す(e2e/global-setup.ts)
+  globalSetup: './e2e/global-setup.ts',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

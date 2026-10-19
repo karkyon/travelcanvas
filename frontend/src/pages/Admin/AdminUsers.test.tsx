@@ -10,8 +10,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
-// authStoreもapi(setGuestMode等)を参照するため、使われるメソッドだけを差し替える
-vi.mock('../../services/api', () => ({ api: { get: apiGet, setGuestMode: vi.fn(), setMemberSession: vi.fn(), setAuthToken: vi.fn(), clearAuthToken: vi.fn() } }));
+// [Gate A2] 一覧の取得(getAdminUsers)だけを差し替え、残りは本物を使う。以前は api を一部(のちに空の関数)だけで
+// 差し替えていたため、authStore の再水和(タイマー)の restoreMemberSession が、差し替えに無い AuthApiError を
+// instanceof に使って未処理の例外になり、vitest が「Errors 1」で失敗した(CI の frontend ジョブ)
+vi.mock('../../services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/api')>()),
+  getAdminUsers: apiGet,
+}));
 vi.mock('react-hot-toast', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import AdminUsers from './AdminUsers';
@@ -23,10 +28,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 describe('AdminUsers search debounce (Gate M9-FE-B3)', () => {
   beforeEach(() => {
     apiGet.mockReset().mockResolvedValue({
-      data: {
-        users: [],
-        pagination: { page: 1, page_size: 20, total_count: 0, total_pages: 0, has_next: false, has_prev: false },
-      },
+      users: [],
+      pagination: { page: 1, page_size: 20, total_count: 0, total_pages: 0, has_next: false, has_prev: false },
     });
     useAuthStore.setState({
       isAuthenticated: true,
@@ -44,7 +47,7 @@ describe('AdminUsers search debounce (Gate M9-FE-B3)', () => {
     await sleep(700); // デバウンス時間を超えて待っても追加取得しない
     expect(apiGet).toHaveBeenCalledTimes(1);
 
-    const input = screen.getByPlaceholderText(/ユーザー名、メールアドレスで検索/);
+    const input = screen.getByPlaceholderText(/ユーザー名、メールアドレス、IDで検索/);
     fireEvent.change(input, { target: { value: 'a' } });
     fireEvent.change(input, { target: { value: 'al' } });
     fireEvent.change(input, { target: { value: 'ali' } });
@@ -55,8 +58,11 @@ describe('AdminUsers search debounce (Gate M9-FE-B3)', () => {
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2), { timeout: 2000 });
     await sleep(700);
     expect(apiGet).toHaveBeenCalledTimes(2);
-    const lastUrl = apiGet.mock.calls[1]![0] as string;
-    expect(lastUrl).toContain('search=ali');
-    expect(lastUrl).toContain('page=1');
+    expect(apiGet.mock.calls[1]![0]).toMatchObject({ search: 'ali', page: 1 });
+  });
+
+  it('ログイン状態の復元(再水和のタイマーと同じ処理)が、差し替えの中でも例外を出さない (Gate A2)', async () => {
+    useAuthStore.setState({ token: null } as never);
+    await expect(useAuthStore.getState().initialize()).resolves.toBeUndefined();
   });
 });

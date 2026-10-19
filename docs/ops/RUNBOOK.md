@@ -443,6 +443,17 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
   Redis が止まっても各プロセスの中で続く(他のプロセスの端末は見えなくなるだけで、編集・保存は止まらない)。
 - 持つのは利用者の ID・端末の印・編集中の予定の ID・時刻だけ(予定の内容・座標なし)。消してよい(次の知らせで戻る)。
 
+## 8.5 管理者の権限(Gate A2)
+
+- 管理者の権限は画面・API からは付けられない。運用者がサーバーの中で付ける・外す:
+  `docker compose exec -T backend python scripts/security_incident.py grant-admin --email a@example.com --yes --reason "…"`
+  / `revoke-admin`。どちらもその人の全端末をログアウトさせ、監査ログ(`admin_role_granted` / `admin_role_revoked`、
+  対象の ID と理由だけ)に残す。ゲスト・停止中の人には付けられない。
+- 付けられた人は、次に管理者の画面を開く時に多要素認証の設定を求められる(§8.3)。
+- 管理者の画面から、自分自身・ほかの管理者は停止できない(管理者を止める時は先に revoke-admin)。停止した人の端末は
+  すぐログアウトされる。管理者が一覧・詳細・監査ログを見たことも監査に残る。
+- E2E(`frontend/e2e/admin.spec.ts`)は試験用の会員に grant-admin し、終わったら revoke-admin する。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。

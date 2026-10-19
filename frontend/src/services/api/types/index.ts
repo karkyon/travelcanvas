@@ -43,3 +43,5 @@ export * from './calendarImport';
 export * from './privacy';
 // [Gate C1] 共同編集・秘匿プロフィール
 export * from './collab';
+// [Gate A2] 管理・監査
+export * from './admin';

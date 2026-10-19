@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { registerAccount } from './support/api';
 import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
@@ -140,16 +141,9 @@ async function createGuestPlan(page: Page, titleSuffix: string): Promise<string>
 // そもそも招待対象になれない)。/registerはメール確認を要求せず登録直後に
 // 認証済みとしてログインされる(RegisterPage参照)ため、E2E内で使い捨て
 // アカウントをその場で作成する。
+// [Gate A2] 登録は共通の手順(計算の確認・回数制限の待ち合わせ。e2e/support/api.ts)を通す
 async function registerUser(page: Page, label: string): Promise<{ email: string }> {
-  const suffix = `${Date.now()}-${label}-${Math.floor(Math.random() * 100000)}`;
-  const email = `m10r1e2e-${suffix}@example.com`;
-  await page.goto('/register');
-  await page.locator('#username').fill(`m10r1e2e${suffix}`.replace(/[^a-zA-Z0-9]/g, '').slice(0, 30));
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill('Gate-M10-R1-TestPass-1');
-  await page.locator('#confirmPassword').fill('Gate-M10-R1-TestPass-1');
-  await page.getByRole('button', { name: 'Create Account' }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+  const { email } = await registerAccount(page, { prefix: 'm10r1e2e', label, password: 'Gate-M10-R1-TestPass-1' });
   return { email };
 }
 

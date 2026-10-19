@@ -14,37 +14,14 @@ import React from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../services/api';
+import { getAdminStats } from '../../services/api';
+import { apiErrorMessage } from '../../utils/apiError';
+import type { AdminSystemStats } from '../../services/api';
 import { toast } from 'react-hot-toast';
 
-interface SystemStats {
-  users: {
-    total_users: number;
-    active_users: number;
-    verified_users: number;
-    new_users_30d: number;
-    user_types: {
-      guest: number;
-      registered: number;
-      premium: number;
-      admin: number;
-    };
-  };
-  travel_plans: {
-    total_plans: number;
-    active_plans: number;
-    completed_plans: number;
-    draft_plans: number;
-    average_duration_days: number;
-    popular_destinations: Array<{
-      destination: string;
-      count: number;
-    }>;
-  };
-  timestamp: string;
-}
+// [Gate A2] 応答の形は services/api の adminSystemStats で検査する
+type SystemStats = AdminSystemStats;
 
 interface MetricCardProps {
   title: string;
@@ -69,9 +46,9 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, icon, c
       <div className="flex items-center space-x-3">
         <div className="text-2xl">{icon}</div>
         <div>
-          <p className="text-sm font-medium opacity-75">{title}</p>
+          <p className="text-sm font-medium">{title}</p>
           <p className="text-2xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</p>
-          {subtitle && <p className="text-sm opacity-60">{subtitle}</p>}
+          {subtitle && <p className="text-sm">{subtitle}</p>}
         </div>
       </div>
     </Card>
@@ -84,16 +61,9 @@ const AdminDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = React.useState(false);
   const [lastRefresh, setLastRefresh] = React.useState<Date>(new Date());
 
-  const { user } = useAuthStore();
   const navigate = useNavigate();
-
-  // 権限チェック
-  React.useEffect(() => {
-    if (user?.user_type !== 'admin') {
-      toast.error('管理者権限が必要です');
-      navigate('/');
-    }
-  }, [user, navigate]);
+  // [Gate A2] 管理者の判定は AdminRoute(router/guards.tsx: admin・super_admin・is_superuser)と backend が行う。
+  // 以前はここでも user_type === 'admin' だけを見ていたため、is_superuser の管理者を追い返していた
 
   // システム統計の取得
   const fetchStats = React.useCallback(async (isRefresh = false) => {
@@ -104,16 +74,14 @@ const AdminDashboard: React.FC = () => {
         setLoading(true);
       }
 
-      const response = await api.get<SystemStats>('/admin/stats/system');
-      setStats(response.data);
+      setStats(await getAdminStats());
       setLastRefresh(new Date());
 
       if (isRefresh) {
         toast.success('統計データを更新しました');
       }
     } catch (error) {
-      console.error('Failed to fetch system stats:', error);
-      toast.error('統計データの取得に失敗しました');
+      toast.error(apiErrorMessage(error, '統計データの取得に失敗しました'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -135,7 +103,7 @@ const AdminDashboard: React.FC = () => {
   if (!stats) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">統計データを取得できませんでした</p>
+        <p className="text-gray-700">統計データを取得できませんでした</p>
         <Button onClick={() => fetchStats()} className="mt-4">
           再試行
         </Button>
@@ -177,7 +145,7 @@ const AdminDashboard: React.FC = () => {
           <MetricCard
             title="アクティブユーザー"
             value={stats.users.active_users}
-            subtitle="is_active=trueのユーザー数"
+            subtitle="停止していないユーザー"
             icon="✨"
             color="green"
           />
@@ -219,7 +187,7 @@ const AdminDashboard: React.FC = () => {
       <Card className="p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">🌍 人気デスティネーション</h3>
         {stats.travel_plans.popular_destinations.length === 0 ? (
-          <p className="text-sm text-gray-500">デスティネーションが設定されたプランがまだありません</p>
+          <p className="text-sm text-gray-700">デスティネーションが設定されたプランがまだありません</p>
         ) : (
           <div className="space-y-3">
             {stats.travel_plans.popular_destinations.map((dest, index) => (
@@ -246,8 +214,16 @@ const AdminDashboard: React.FC = () => {
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
           >
-            <span className="text-2xl mb-2">👥</span>
+            <span className="text-2xl mb-2" aria-hidden="true">👥</span>
             <span className="text-sm">ユーザー管理</span>
+          </Button>
+          <Button
+            onClick={() => navigate('/admin/audit-logs')}
+            variant="outline"
+            className="flex flex-col items-center p-4 h-auto"
+          >
+            <span className="text-2xl mb-2" aria-hidden="true">📜</span>
+            <span className="text-sm">監査ログ</span>
           </Button>
         </div>
       </Card>

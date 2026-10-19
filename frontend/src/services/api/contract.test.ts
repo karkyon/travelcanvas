@@ -39,6 +39,7 @@ import {
   activeSession,
   mfaChallenge, mfaRecoveryCodes, mfaSetup, mfaStatus,
   areaCellsUploadResult, locationSettings, presenceState, privateProfile, planPrivateProfile,
+  adminSystemStats, adminUsersPage, adminUserDetail, adminManageResult, auditLogPage,
 } from './decoders';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
@@ -292,6 +293,13 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['location_track_detail_areas', locationTrackDetail],
   ['area_cells_uploaded', areaCellsUploadResult],
   ['atlas_with_areas', atlasResponse],
+  // [Gate A2] 管理・監査(FR-040)
+  ['admin_stats', adminSystemStats],
+  ['admin_users', adminUsersPage],
+  ['admin_user_detail', adminUserDetail],
+  ['admin_manage_suspend', adminManageResult],
+  ['admin_audit_logs', auditLogPage],
+  ['admin_manage_error_self', object({ detail: object({ code: str, message: str }) })],
   // [Gate C1] 共同編集(FR-020)・秘匿プロフィール(FR-023)
   ['presence_alone', presenceState],
   ['presence_with_editor_and_change', presenceState],

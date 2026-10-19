@@ -28,6 +28,34 @@ from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+# [Gate A2] 一覧の検索の LIKE の特殊文字(%・_・\)を文字として扱う
+_LIKE_ESCAPE = str.maketrans({"%": "\\%", "_": "\\_", "\\": "\\\\"})
+
+
+def _like(term: str) -> str:
+    return f"%{term.translate(_LIKE_ESCAPE)}%"
+
+
+def mask_ip(ip: Optional[str]) -> Optional[str]:
+    """[Gate A2] 監査ログの接続元は、運用者にも末尾を伏せて見せる(IPv4 は最後の区切り、IPv6 は前の3区切りだけ)。"""
+    if not ip:
+        return None
+    if ":" in ip:
+        parts = [p for p in ip.split(":") if p]
+        return ":".join(parts[:3]) + "::x" if parts else "::x"
+    parts = ip.split(".")
+    if len(parts) == 4:
+        return ".".join(parts[:3] + ["x"])
+    return "x"
+
+
+def _audit_admin(request: Request, admin: User, action: str, resource_id=None, details=None) -> None:
+    """[Gate A2] 管理者が利用者の情報を見た・変えたことを残す(検索語・メールアドレスは残さない)。"""
+    record_audit_event(action=action, resource_type="admin", user_id=admin.id, resource_id=resource_id,
+                       ip_address=request.client.host if request.client else None,
+                       user_agent=request.headers.get("user-agent", "")[:255], details=details or {})
+
+
 ADMIN_TYPES = mfa.ADMIN_TYPES
 
 
@@ -141,6 +169,7 @@ async def get_system_stats(
 
 @router.get("/users")
 async def list_users(
+    request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
@@ -155,8 +184,13 @@ async def list_users(
     query = db.query(User)
 
     if search:
-        like = f"%{search}%"
-        query = query.filter(or_(User.username.ilike(like), User.email.ilike(like)))
+        term = search.strip()[:100]
+        try:
+            # [Gate A2] 利用者の ID でも探せる(ゲストは名前・メールアドレスを持たない。問い合わせは ID で来ることがある)
+            query = query.filter(User.id == uuid.UUID(term))
+        except ValueError:
+            like = _like(term)
+            query = query.filter(or_(User.username.ilike(like, escape="\\"), User.email.ilike(like, escape="\\")))
 
     if user_type:
         query = query.filter(User.user_type == user_type)
@@ -188,6 +222,8 @@ async def list_users(
         plan_counts = dict(rows)
 
     total_pages = math.ceil(total_count / page_size) if total_count else 0
+    _audit_admin(request, admin, "admin_users_listed",
+                 details={"page": page, "searched": bool(search), "result_count": len(users)})
 
     return {
         "users": [
@@ -198,6 +234,8 @@ async def list_users(
                 "user_type": u.user_type,
                 "is_active": u.is_active,
                 "is_verified": u.is_verified,
+                "is_admin": mfa.is_admin(u),
+                "is_self": u.id == admin.id,
                 "created_at": u.created_at.isoformat() if u.created_at else None,
                 "travel_plans_count": plan_counts.get(u.id, 0),
             }
@@ -217,6 +255,7 @@ async def list_users(
 @router.get("/users/{user_id}")
 async def get_user_detail(
     user_id: uuid.UUID,
+    request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -246,6 +285,7 @@ async def get_user_detail(
                 optimization_usage += 1
 
     account_age_days = (datetime.now(timezone.utc) - user.created_at).days if user.created_at else 0
+    _audit_admin(request, admin, "admin_user_viewed", resource_id=user.id)
 
     return {
         "id": str(user.id),
@@ -254,6 +294,9 @@ async def get_user_detail(
         "user_type": user.user_type,
         "is_active": user.is_active,
         "is_verified": user.is_verified,
+        "is_admin": mfa.is_admin(user),
+        "is_self": user.id == admin.id,
+        "mfa_enabled": mfa.is_enabled(db, user.id),
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "statistics": {
             "account_age_days": account_age_days,
@@ -287,13 +330,28 @@ async def manage_users(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不正なユーザーIDです")
 
+    if len(target_ids) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="一度に操作できるのは100人までです")
     users = db.query(User).filter(User.id.in_(target_ids)).all()
     if not users:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="対象ユーザーが見つかりません")
+    # [Gate A2] 自分自身・ほかの管理者は画面から停止・認証の切り替えをしない(締め出し・乗っ取った管理者による
+    # 管理者の停止を防ぐ)。管理者の権限は運用者が scripts/security_incident.py で変える
+    if any(u.id == admin.id for u in users):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "self_target", "message": "自分自身のアカウントはこの画面から操作できません"})
+    if any(mfa.is_admin(u) for u in users):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "admin_target", "message": "ほかの管理者はこの画面から操作できません(運用の手順で権限を外してから)"})
 
+    revoked = 0
     for u in users:
         if action == "suspend":
             u.is_active = False
+            # [Gate A2] 停止した人の端末をすぐログアウトさせる(発行済みのトークンを残さない)
+            revoked += db.query(UserSession).filter(
+                UserSession.user_id == u.id, UserSession.is_active.is_(True)).update(
+                {UserSession.is_active: False}, synchronize_session=False)
         elif action == "unsuspend":
             u.is_active = True
         elif action == "verify":
@@ -319,11 +377,12 @@ async def manage_users(
             details={"target_user_id": str(u.id)},
         )
 
-    return {"success": True, "updated_count": len(users)}
+    return {"success": True, "updated_count": len(users), "sessions_revoked": int(revoked)}
 
 
 @router.get("/audit-logs")
 async def list_audit_logs(
+    request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
@@ -331,6 +390,9 @@ async def list_audit_logs(
     action: Optional[str] = None,
     resource_type: Optional[str] = None,
     user_id: Optional[str] = None,
+    resource_id: Optional[str] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
 ):
     """監査ログ一覧(Gate R2-7、DOC-11監査要件に対応)。
 
@@ -349,6 +411,16 @@ async def list_audit_logs(
             query = query.filter(AuditLog.user_id == uuid.UUID(user_id))
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不正なuser_idです")
+    # [Gate A2] 対象(利用者・旅行等)・期間での絞り込み
+    if resource_id:
+        try:
+            query = query.filter(AuditLog.resource_id == uuid.UUID(resource_id))
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不正なresource_idです")
+    if since:
+        query = query.filter(AuditLog.created_at >= since)
+    if until:
+        query = query.filter(AuditLog.created_at < until)
 
     total_count = query.count()
     logs = (
@@ -358,8 +430,13 @@ async def list_audit_logs(
         .all()
     )
     total_pages = math.ceil(total_count / page_size) if total_count else 0
+    actions = [a for (a,) in db.query(AuditLog.action).distinct().order_by(AuditLog.action).limit(300).all() if a]
+    _audit_admin(request, admin, "admin_audit_logs_viewed",
+                 details={"page": page,
+                          "filtered": bool(action or resource_type or user_id or resource_id or since or until)})
 
     return {
+        "actions": actions,
         "audit_logs": [
             {
                 "id": str(log.id),
@@ -367,8 +444,9 @@ async def list_audit_logs(
                 "action": log.action,
                 "resource_type": log.resource_type,
                 "resource_id": str(log.resource_id) if log.resource_id else None,
-                "ip_address": log.ip_address,
-                "user_agent": log.user_agent,
+                # [Gate A2] 接続元は末尾を伏せる。端末の種類は先頭だけ
+                "ip_address": mask_ip(log.ip_address),
+                "user_agent": (log.user_agent or "")[:120] or None,
                 "details": log.details,
                 "created_at": log.created_at.isoformat() if log.created_at else None,
             }

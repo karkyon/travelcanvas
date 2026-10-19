@@ -26,7 +26,7 @@ const EXPECTED_ROUTE_PATHS = [
   '/planner/:planId/calendar-import', '/planner/:planId/alerts', '/planner/:planId/replans/:replanId',
   '/planner/:planId/sync', '/planner/:planId/memories', '/planner/:planId/track', '/planner/:planId/journey', '/planner/:planId/memory-replan', '/search',
   '/search/(index)', '/search/settings', '/search/spots', '/spots', '/spots/(index)', '/spots/search',
-  '/spots/register', '/settings', '/settings/data', '/atlas', '/profile', '/admin', '/admin/(index)', '/admin/users', '/notifications',
+  '/spots/register', '/settings', '/settings/data', '/atlas', '/profile', '/admin', '/admin/(index)', '/admin/users', '/admin/audit-logs', '/notifications',
   '/share/:planId', '/s/:token', '/optimization', '/404', '/*',
 ];
 

@@ -30,7 +30,9 @@ export async function startGuestPlanViaApi(
 ): Promise<GuestPlan> {
   const open = options.open ?? true;
   await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
+  // [Gate A2] 接続元の点数が高い時は最初の応答が計算の確認(428)になり、画面が自動で解いて送り直す。最後の応答を待つ
+  const guestResponse = page.waitForResponse(
+    (r) => /\/auth\/guest$/.test(new URL(r.url()).pathname) && r.status() !== 428, { timeout: 90_000 });
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   const guest = await guestResponse;
   if (!guest.ok()) {

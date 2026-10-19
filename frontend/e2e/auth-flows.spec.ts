@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { registerAccount } from './support/api';
 
 /**
  * [Gate A1] FR-003 認証の一本化(B-002)のbrowser E2E。
@@ -45,18 +46,8 @@ async function signOutLocally(page: Page): Promise<void> {
 
 test('ログイン: 誤ったパスワードでは画面に留まりエラーを表示し、正しいパスワードでダッシュボードへ進む', async ({ page }) => {
   const consoleLines = collectConsole(page);
-  const suffix = uniqueSuffix('login');
-  const username = `a1login${suffix}`.slice(0, 30);
-  const email = `a1-login-${suffix}@example.com`;
-
-  // 1. 使い捨てアカウントを画面から登録する(登録直後はログイン済みになる)
-  await page.goto('/register');
-  await page.locator('#username').fill(username);
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill(PASSWORD);
-  await page.locator('#confirmPassword').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Create Account' }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+  // 1. 使い捨てアカウントを画面から登録する(登録直後はログイン済みになる。[Gate A2] 共通の手順を通す)
+  const { email, username } = await registerAccount(page, { prefix: 'a1login', password: PASSWORD });
 
   await signOutLocally(page);
 
@@ -66,7 +57,7 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
   });
   await page.locator('#email').fill(email);
   await page.locator('#password').fill('wrong-password-1');
-  const failed = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login'));
+  const failed = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.status() !== 428, { timeout: 90_000 });
   await page.getByRole('button', { name: 'Sign in' }).click();
   expect((await failed).status()).toBe(401);
 
@@ -78,7 +69,7 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
 
   // 3. 正しいパスワード: ダッシュボードへ進み、状態とAPIクライアントのトークンが一致する
   await page.locator('#password').fill(PASSWORD);
-  const succeeded = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login'));
+  const succeeded = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.status() !== 428, { timeout: 90_000 });
   await page.getByRole('button', { name: 'Sign in' }).click();
   const loginResponse = await succeeded;
   expect(loginResponse.status()).toBe(200);
@@ -96,7 +87,7 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
   expect(storageDump).not.toContain(accessToken);
 
   // 再読込しても、cookie の更新鍵でログインが続く(トークンは取り直す)
-  const restored = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/refresh'));
+  const restored = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/refresh') && r.status() !== 428, { timeout: 90_000 });
   await page.reload();
   expect((await restored).status()).toBe(200);
   await expect(page.getByText(`ようこそ、${username}さん！`)).toBeVisible({ timeout: 15_000 });
@@ -117,7 +108,7 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
 
   // 1. ゲスト開始
   await page.goto('/');
-  const guest = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest'));
+  const guest = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest') && r.status() !== 428, { timeout: 90_000 });
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   expect((await guest).status()).toBe(201);
   await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
@@ -133,7 +124,7 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(PASSWORD);
   await page.locator('#confirmPassword').fill(PASSWORD);
-  const upgraded = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest/upgrade'));
+  const upgraded = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest/upgrade') && r.status() !== 428, { timeout: 90_000 });
   await page.getByRole('button', { name: 'アカウントを作成' }).click();
   const upgradeResponse = await upgraded;
   expect(upgradeResponse.status()).toBe(200);

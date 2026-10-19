@@ -13,6 +13,11 @@
     mfa-reset --email admin@example.com --yes [--reason "…"]
                                             [Gate S11] 端末と回復コードを両方なくした人の多要素認証を外す
                                             (その人の全端末もログアウトさせる。本人確認は運用者が別の手段で行う)
+    grant-admin --email a@example.com --yes [--reason "…"]
+                                            [Gate A2] 管理者の権限を付ける(その人の全端末をログアウト。次に管理者の画面を
+                                            開く時に多要素認証の設定を求める)
+    revoke-admin --email a@example.com --yes [--reason "…"]
+                                            [Gate A2] 管理者の権限を外す(その人の全端末をログアウト)
 
 結果は1行の JSON(値に個人情報を含めない)。終了コード: 0=成功、2=使い方の誤り、3=失敗、4=効果が無い(共有できない)
 """
@@ -87,6 +92,25 @@ def _mfa_command(args) -> int:
         db.close()
 
 
+def _admin_command(args) -> int:
+    """[Gate A2] 管理者の権限の付与・取り消し(app/services/admin_roles.py)。"""
+    from app.services import admin_roles
+
+    if not args.yes:
+        _print({"ok": False, "error": "管理者の権限を変えるには --yes も付けてください"})
+        return EXIT_USAGE
+    db = SessionLocal()
+    try:
+        fn = admin_roles.grant_admin if args.cmd == "grant-admin" else admin_roles.revoke_admin
+        _print(fn(db, args.email, args.reason))
+        return EXIT_OK
+    except admin_roles.AdminRoleError as e:
+        _print({"ok": False, "error": str(e)})
+        return EXIT_FAIL
+    finally:
+        db.close()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="侵害が疑われる時の封じ込め(Runbook §9)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -110,10 +134,17 @@ def main(argv=None) -> int:
     p.add_argument("--email", required=True)
     p.add_argument("--yes", action="store_true", help="外すことの確認")
     p.add_argument("--reason", default="")
+    for name in ("grant-admin", "revoke-admin"):
+        p = sub.add_parser(name)
+        p.add_argument("--email", required=True)
+        p.add_argument("--yes", action="store_true", help="権限を変えることの確認")
+        p.add_argument("--reason", default="")
     args = parser.parse_args(argv)
 
     if args.cmd in ("mfa-status", "mfa-reset"):
         return _mfa_command(args)
+    if args.cmd in ("grant-admin", "revoke-admin"):
+        return _admin_command(args)
 
     rate_limiter.use_backend("auto")
     shared = _shared()

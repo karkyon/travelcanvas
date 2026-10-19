@@ -28,6 +28,8 @@ import type {
   TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
   AuthResponse, AuthUser, GuestSessionResponse, ActiveSession, MfaChallenge, MfaRecoveryCodes, MfaSetup, MfaStatus,
   ConstraintValue, PlanConstraint,
+  AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry,
+  AuditLogPage,
   PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem,
   ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
   DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
@@ -1910,5 +1912,49 @@ export const planPrivateProfile: Decoder<PlanPrivateProfile> = object<PlanPrivat
   profile_items: nonNegativeInt,
   applied_constraints: nonNegativeInt,
   profile_revision: nonNegativeInt,
+});
+
+// ----- [Gate A2] 管理・監査(backend/app/api/v1/admin.py)
+const adminPagination: Decoder<AdminPagination> = object<AdminPagination>({
+  page: nonNegativeInt, page_size: nonNegativeInt, total_count: nonNegativeInt, total_pages: nonNegativeInt,
+  has_next: bool, has_prev: bool,
+});
+export const adminSystemStats: Decoder<AdminSystemStats> = object<AdminSystemStats>({
+  users: object({
+    total_users: nonNegativeInt, active_users: nonNegativeInt, verified_users: nonNegativeInt, new_users_30d: nonNegativeInt,
+    user_types: object({ guest: nonNegativeInt, registered: nonNegativeInt, premium: nonNegativeInt, admin: nonNegativeInt }),
+  }),
+  travel_plans: object({
+    total_plans: nonNegativeInt, active_plans: nonNegativeInt, completed_plans: nonNegativeInt, draft_plans: nonNegativeInt,
+    average_duration_days: num,
+    popular_destinations: arrayOf(object({ destination: str, count: nonNegativeInt })),
+  }),
+  timestamp: str,
+});
+const adminUserFields = {
+  id: str, username: nullable(str), email: nullable(str), user_type: str, is_active: bool, is_verified: bool,
+  is_admin: bool, is_self: bool, created_at: nullable(str),
+};
+const adminUserRow: Decoder<AdminUserRow> = object<AdminUserRow>({ ...adminUserFields, travel_plans_count: nonNegativeInt });
+export const adminUsersPage: Decoder<AdminUsersPage> = object<AdminUsersPage>({
+  users: arrayOf(adminUserRow), pagination: adminPagination,
+});
+export const adminUserDetail: Decoder<AdminUserDetail> = object<AdminUserDetail>({
+  ...adminUserFields,
+  mfa_enabled: bool,
+  statistics: object({
+    account_age_days: nonNegativeInt, total_plans: nonNegativeInt, completed_plans: nonNegativeInt,
+    optimization_usage: nonNegativeInt,
+  }),
+});
+export const adminManageResult: Decoder<AdminManageResult> = object<AdminManageResult>({
+  success: bool, updated_count: nonNegativeInt, sessions_revoked: nonNegativeInt,
+});
+const auditLogEntry: Decoder<AuditLogEntry> = object<AuditLogEntry>({
+  id: str, user_id: nullable(str), action: str, resource_type: nullable(str), resource_id: nullable(str),
+  ip_address: nullable(str), user_agent: nullable(str), details: nullable(record), created_at: nullable(str),
+});
+export const auditLogPage: Decoder<AuditLogPage> = object<AuditLogPage>({
+  actions: arrayOf(str), audit_logs: arrayOf(auditLogEntry), pagination: adminPagination,
 });
 

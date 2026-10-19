@@ -15,22 +15,16 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { useAuthStore } from '../../store/authStore';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../../services/api';
+import { getAdminUser, getAdminUsers, manageAdminUsers } from '../../services/api';
+import { apiErrorMessage } from '../../utils/apiError';
+import type { AdminUserAction, AdminUserRow } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { USER_TYPES } from '../../config/constants';
 
-interface AdminUser {
-  id: string;
-  username: string;
-  email: string;
-  user_type: string;
-  is_active: boolean;
-  is_verified: boolean;
-  created_at: string;
-  travel_plans_count: number;
-}
+// [Gate A2] 応答の形は services/api の adminUsersPage で検査する
+type AdminUser = AdminUserRow;
+
+const errorText = apiErrorMessage;
 
 interface UserStatistics {
   account_age_days: number;
@@ -67,32 +61,33 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
   const fetchUserDetails = async (userId: string) => {
     try {
       setLoading(true);
-      const response = await api.get<{ statistics?: UserStatistics }>(`/admin/users/${userId}`);
-      setStatistics(response.data.statistics ?? null);
+      const detail = await getAdminUser(userId);
+      setStatistics(detail.statistics);
     } catch (error) {
-      console.error('Failed to fetch user details:', error);
-      toast.error('ユーザー詳細の取得に失敗しました');
+      toast.error(errorText(error, 'ユーザー詳細の取得に失敗しました'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUserAction = async (action: string) => {
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const [confirming, setConfirming] = React.useState(false);
+
+  const handleUserAction = async (action: AdminUserAction) => {
     if (!user) return;
 
     try {
       setLoading(true);
-      await api.post('/admin/users/manage', {
-        action,
-        user_ids: [user.id],
-      });
-
-      toast.success('操作が完了しました');
+      setActionError(null);
+      const result = await manageAdminUsers(action, [user.id]);
+      toast.success(action === 'suspend'
+        ? `アカウントを停止しました${result.sessions_revoked > 0 ? `(ログイン中の端末${result.sessions_revoked}台をログアウトさせました)` : ''}`
+        : '操作が完了しました');
       onUserUpdated();
       onClose();
     } catch (error) {
-      console.error('User action failed:', error);
-      toast.error('操作に失敗しました');
+      // [Gate A2] 自分自身・ほかの管理者は操作できない(409)等の理由を画面に出す
+      setActionError(errorText(error, '操作に失敗しました'));
     } finally {
       setLoading(false);
     }
@@ -162,7 +157,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">登録日:</span>
-                  <p className="text-gray-900">{new Date(user.created_at).toLocaleString('ja-JP')}</p>
+                  <p className="text-gray-900">{user.created_at ? new Date(user.created_at).toLocaleString('ja-JP') : '—'}</p>
                 </div>
               </div>
             </div>
@@ -193,13 +188,30 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
             )}
 
             {/* アクションボタン */}
+            {actionError && <p role="alert" className="text-sm text-red-700">{actionError}</p>}
+            {(user.is_self || user.is_admin) && (
+              <p className="text-sm text-gray-700">
+                {user.is_self ? '自分自身のアカウントは' : 'ほかの管理者は'}この画面から停止・認証の切り替えができません。
+              </p>
+            )}
+            {confirming && (
+              <div role="alertdialog" aria-label="アカウント停止の確認" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                <p>このアカウントを停止しますか? ログイン中の端末はすぐにログアウトされます。</p>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="danger" onClick={() => { setConfirming(false); void handleUserAction('suspend'); }}>
+                    停止する
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirming(false)}>やめる</Button>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3 pt-4 border-t">
               {user.is_active ? (
                 <Button
-                  onClick={() => handleUserAction('suspend')}
+                  onClick={() => setConfirming(true)}
                   variant="outline"
-                  className="text-red-600 border-red-300 hover:bg-red-50"
-                  disabled={loading}
+                  className="text-red-700 border-red-300 hover:bg-red-50"
+                  disabled={loading || user.is_self || user.is_admin}
                 >
                   ⏸️ アカウント停止
                 </Button>
@@ -207,23 +219,23 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                 <Button
                   onClick={() => handleUserAction('unsuspend')}
                   variant="outline"
-                  className="text-green-600 border-green-300 hover:bg-green-50"
-                  disabled={loading}
+                  className="text-green-700 border-green-300 hover:bg-green-50"
+                  disabled={loading || user.is_self || user.is_admin}
                 >
                   ▶️ アカウント復活
                 </Button>
               )}
 
               {user.is_verified ? (
-                <Button onClick={() => handleUserAction('unverify')} variant="outline" disabled={loading}>
+                <Button onClick={() => handleUserAction('unverify')} variant="outline" disabled={loading || user.is_self || user.is_admin}>
                   📧 認証解除
                 </Button>
               ) : (
                 <Button
                   onClick={() => handleUserAction('verify')}
                   variant="outline"
-                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                  disabled={loading}
+                  className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                  disabled={loading || user.is_self || user.is_admin}
                 >
                   ✅ 手動認証
                 </Button>
@@ -266,45 +278,21 @@ const AdminUsers: React.FC = () => {
   // 下のデバウンスeffectで500ms後に反映する。
   const [searchInput, setSearchInput] = React.useState('');
 
-  const { user: currentUser } = useAuthStore();
-  const navigate = useNavigate();
-
-  // 権限チェック
-  React.useEffect(() => {
-    if (currentUser?.user_type !== 'admin') {
-      toast.error('管理者権限が必要です');
-      navigate('/');
-    }
-  }, [currentUser, navigate]);
+  // [Gate A2] 管理者の判定は AdminRoute と backend が行う(以前は user_type === 'admin' だけを見ていた)
 
   // ユーザー一覧の取得
   const fetchUsers = React.useCallback(async () => {
     try {
       setLoading(true);
 
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        page_size: pagination.page_size.toString(),
-        sort_by: filters.sort_by,
-        sort_order: filters.sort_order,
+      const res = await getAdminUsers({
+        page: pagination.page, page_size: pagination.page_size, sort_by: filters.sort_by, sort_order: filters.sort_order,
+        search: filters.search || undefined, user_type: filters.user_type || undefined, status: filters.status || undefined,
       });
-
-      if (filters.search) params.append('search', filters.search);
-      if (filters.user_type) params.append('user_type', filters.user_type);
-      if (filters.status) params.append('status', filters.status);
-
-      const response = await api.get<{
-        users?: AdminUser[];
-        pagination?: Partial<{
-          page: number; page_size: number; total_count: number;
-          total_pages: number; has_next: boolean; has_prev: boolean;
-        }>;
-      }>(`/admin/users?${params.toString()}`);
-      setUsers(response.data.users ?? []);
-      setPagination((prev) => ({ ...prev, ...response.data.pagination }));
+      setUsers(res.users);
+      setPagination((prev) => ({ ...prev, ...res.pagination }));
     } catch (error) {
-      console.error('Failed to fetch users:', error);
-      toast.error('ユーザー一覧の取得に失敗しました');
+      toast.error(errorText(error, 'ユーザー一覧の取得に失敗しました'));
     } finally {
       setLoading(false);
     }
@@ -371,13 +359,15 @@ const AdminUsers: React.FC = () => {
           <div className="md:col-span-2">
             <Input
               type="text"
-              placeholder="🔍 ユーザー名、メールアドレスで検索..."
+              aria-label="ユーザー名・メールアドレス・IDで検索"
+              placeholder="🔍 ユーザー名、メールアドレス、IDで検索..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
 
           <select
+            aria-label="ユーザータイプ"
             value={filters.user_type}
             onChange={(e) => setFilters((prev) => ({ ...prev, user_type: e.target.value }))}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -390,6 +380,7 @@ const AdminUsers: React.FC = () => {
           </select>
 
           <select
+            aria-label="ステータス"
             value={filters.status}
             onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -402,6 +393,7 @@ const AdminUsers: React.FC = () => {
           </select>
 
           <select
+            aria-label="並び順"
             value={`${filters.sort_by}-${filters.sort_order}`}
             onChange={(e) => {
               const [sort_by, sort_order] = e.target.value.split('-');
@@ -433,22 +425,22 @@ const AdminUsers: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       ユーザー
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       タイプ
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       ステータス
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       プラン数
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       登録日
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                       アクション
                     </th>
                   </tr>
@@ -459,7 +451,7 @@ const AdminUsers: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
+                          <div className="text-sm text-gray-600">{user.email}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -496,8 +488,8 @@ const AdminUsers: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {user.travel_plans_count}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(user.created_at).toLocaleDateString('ja-JP')}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString('ja-JP') : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Button onClick={() => handleUserClick(user)} variant="outline" size="sm">

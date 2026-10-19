@@ -100,7 +100,15 @@ class Settings(BaseSettings):
     PASSWORD_MAX_LENGTH: int = 128
 
     # Redis設定
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # [Gate A2] REDIS_URL が無い時は REDIS_HOST・REDIS_PORT・REDIS_PASSWORD・REDIS_DB から作る(resolve_redis_url)。
+    # 以前は REDIS_URL だけを読み、無ければ localhost を使っていた。docker-compose は backend に REDIS_HOST=redis を渡すが、
+    # CI の .env には REDIS_URL が無いため、CI の backend は Redis に届かず回数制限・怪しさの点数・共同編集の知らせを
+    # プロセスの中だけで数えていた(運用の道具から消せず、E2E が CI でだけ落ちた)。
+    REDIS_URL: Optional[str] = None
+    REDIS_HOST: Optional[str] = None
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_DB: int = 0
     REDIS_MAX_CONNECTIONS: int = 10
     REDIS_RETRY_ON_TIMEOUT: bool = True
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 5
@@ -303,6 +311,17 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return (self.APP_ENV or "").strip().lower() in ("development", "dev", "local")
+
+    @model_validator(mode="after")
+    def resolve_redis_url(self):
+        """[Gate A2] REDIS_URL が無い(空)時だけ、REDIS_HOST 等から作る。REDIS_URL があればそのまま使う。"""
+        if not (self.REDIS_URL or "").strip():
+            from urllib.parse import quote
+
+            host = (self.REDIS_HOST or "").strip() or "localhost"
+            auth = ":%s@" % quote(self.REDIS_PASSWORD, safe="") if self.REDIS_PASSWORD else ""
+            self.REDIS_URL = "redis://%s%s:%d/%d" % (auth, host, int(self.REDIS_PORT), int(self.REDIS_DB))
+        return self
 
     @model_validator(mode="after")
     def refuse_unsafe_production(self):

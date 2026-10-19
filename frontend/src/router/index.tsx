@@ -32,6 +32,7 @@ const ProfilePage = lazyPage(() => import('@/pages/ProfilePage'));
 // ここでインポート・ルート登録されておらず、画面として一度も到達できなかった。
 const AdminDashboard = lazyPage(() => import('@/pages/Admin/AdminDashboard'));
 const AdminUsers = lazyPage(() => import('@/pages/Admin/AdminUsers'));
+const AdminAuditLogs = lazyPage(() => import('@/pages/Admin/AdminAuditLogs'));
 const NotificationsPage = lazyPage(() => import('@/pages/NotificationsPage'));
 const OptimizationSelectPage = lazyPage(() => import('@/pages/OptimizationSelectPage'));
 const ReservationsPage = lazyPage(() => import('@/pages/ReservationsPage'));
@@ -491,6 +492,15 @@ export const router = createBrowserRouter([
             element: (
               <AdminRoute>
                 <AdminUsers />
+              </AdminRoute>
+            ),
+          },
+          // [Gate A2] FR-040 監査ログ(SC-32)
+          {
+            path: 'audit-logs',
+            element: (
+              <AdminRoute>
+                <AdminAuditLogs />
               </AdminRoute>
             ),
           },

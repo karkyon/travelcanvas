@@ -92,7 +92,7 @@ test('多要素認証: 設定して有効にすると、次のログインでは
     await page2.goto('/login');
     await page2.locator('#email').fill(member.email);
     await page2.locator('#password').fill(PASSWORD);
-    const loginResponse = page2.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login'));
+    const loginResponse = page2.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/login') && r.status() !== 428, { timeout: 90_000 });
     await page2.getByRole('button', { name: 'Sign in' }).click();
     const login = await loginResponse;
     expect(await login.json()).toMatchObject({ mfa_required: true });
@@ -105,7 +105,7 @@ test('多要素認証: 設定して有効にすると、次のログインでは
 
     // 4. 次の区切りの確認コードでログインを完了する
     const step = await waitForNextStep(enabledStep);
-    const verified = page2.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/mfa/verify'));
+    const verified = page2.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/mfa/verify') && r.status() !== 428, { timeout: 90_000 });
     await codeInput.fill(totp(secret, step));
     await page2.getByRole('button', { name: '確認してログイン' }).click();
     expect((await verified).status()).toBe(200);

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { registerAccount } from './support/api';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -26,20 +27,8 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 
 test('アカウント削除: 同意の変更・撤回、削除内容の確認、パスワード確認後に削除でき、元のトークンは使えない', async ({ page, context }) => {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
-  const email = `p9-delete-${suffix}@example.com`;
-  await page.goto('/register');
-  await page.locator('#username').fill(`p9del${suffix}`.slice(0, 30));
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill(PASSWORD);
-  await page.locator('#confirmPassword').fill(PASSWORD);
-  const registered = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/register'));
-  await page.getByRole('button', { name: 'Create Account' }).click();
-  const registeredResponse = await registered;
-  const apiBase = registeredResponse.url().replace(/\/auth\/register$/, '');
-  await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
-  // [Gate S5] 会員のアクセストークンは端末に保存しないので、登録の応答から受け取る
-  const token = String((await registeredResponse.json()).access_token ?? '');
-  if (!token) throw new Error('会員登録の応答にアクセストークンがありません');
+  // [Gate A2] 登録は共通の手順(計算の確認・回数制限の待ち合わせ。e2e/support/api.ts)を通す
+  const { apiBase, token } = await registerAccount(page, { prefix: 'p9del', password: PASSWORD });
   const auth = { Authorization: `Bearer ${token}` };
   const plan = await context.request.post(`${apiBase}/travel-plans/`, { headers: auth, data: { title: `P9削除E2E-${suffix}` } });
   expect(plan.status()).toBe(201);
