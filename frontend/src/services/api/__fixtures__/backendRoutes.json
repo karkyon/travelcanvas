@@ -25,7 +25,8 @@
   "captured_at_head_k1": "Gate E1 (+Gate K1 offline-pack key/rotate)",
   "captured_at_head_s11": "Gate S10 (+Gate S11 /auth/mfa/*)",
   "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling)",
-  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile)"
+  "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile)",
+  "captured_at_head_v2": "Gate A2 43b737a (+Gate V2 /plans/{plan_id}/visits)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -135,6 +136,7 @@
   "GET /api/v1/plans/{plan_id}/today",
   "GET /api/v1/plans/{plan_id}/validation-runs",
   "GET /api/v1/plans/{plan_id}/validation-runs/{run_id}",
+  "GET /api/v1/plans/{plan_id}/visits",
   "GET /api/v1/privacy/account-deletion",
   "GET /api/v1/privacy/consents",
   "GET /api/v1/privacy/data-export",
@@ -173,6 +175,7 @@
   "PATCH /api/v1/plans/{plan_id}/route-options/{option_id}",
   "PATCH /api/v1/plans/{plan_id}/route-options/{option_id}/legs/{leg_id}",
   "PATCH /api/v1/plans/{plan_id}/segments/{segment_id}",
+  "PATCH /api/v1/plans/{plan_id}/visits/{event_id}",
   "POST /api/v1/admin/users/manage",
   "POST /api/v1/auth/change-password",
   "POST /api/v1/auth/guest",
@@ -253,6 +256,8 @@
   "POST /api/v1/plans/{plan_id}/sync/conflicts/{operation_id}/resolve",
   "POST /api/v1/plans/{plan_id}/undo",
   "POST /api/v1/plans/{plan_id}/validation-runs",
+  "POST /api/v1/plans/{plan_id}/visits/assess",
+  "POST /api/v1/plans/{plan_id}/visits/device-results",
   "POST /api/v1/privacy/account-deletion",
   "POST /api/v1/public/share/{token}/resolve",
   "POST /api/v1/quick-drafts",

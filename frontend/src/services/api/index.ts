@@ -21,6 +21,7 @@ import type { AreaCellInput, TrackMode, TrackPoint, TrackPrecision, TrackSamplin
 import type { ActualInput } from './types';
 import type { PrivateProfileItemInput } from './types';
 import type { AdminUserAction, AdminUsersQuery, AuditLogQuery } from './types';
+import type { DeviceVisitMetrics, VisitAction } from './types';
 import type { PresenceInput } from './endpoints/collab';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
@@ -451,4 +452,12 @@ export const getAdminUsers = (query: AdminUsersQuery = {}) => api.getAdminUsers(
 export const getAdminUser = (userId: string) => api.getAdminUser(userId);
 export const manageAdminUsers = (action: AdminUserAction, userIds: string[]) => api.manageAdminUsers(action, userIds);
 export const getAuditLogs = (query: AuditLogQuery = {}) => api.getAuditLogs(query);
+
+// ===== [Gate V2] 訪問の地図の層・訪問判定・訂正(FR-049〜051)
+export const getVisits = (planId: string) => api.getVisits(planId);
+export const assessVisits = (planId: string) => api.assessVisits(planId);
+export const postDeviceVisitResults = (planId: string, results: Array<{ event_id: string; metrics: DeviceVisitMetrics }>) =>
+  api.postDeviceVisitResults(planId, results);
+export const correctVisit = (planId: string, eventId: string, action: VisitAction, revision?: number) =>
+  api.correctVisit(planId, eventId, action, revision);
 

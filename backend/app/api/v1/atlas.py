@@ -23,7 +23,9 @@ from app.models.models import (
     EventActual, LocationAreaCell, LocationPointBatch, LocationTrack, Memory, PlanCollaborator, TravelDay, TravelEvent,
     TravelPlan, User,
 )
+from app.api.v1 import visits as visits_api
 from app.services import atlas as at
+from app.services import visit_assessment as va
 from app.services import location_tracks as lt
 from app.services.audit_service import record_audit_event
 
@@ -61,6 +63,15 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
     days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
     events = {e.id: e for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()}
     actuals = {a.event_id: a for a in db.query(EventActual).filter(EventActual.plan_id == plan.id).all()}
+    # [Gate V2] FR-051 地点単位の除外: 本人が地図から隠した予定・「行っていない」と直した予定は Atlas に出さない。
+    # 隠した予定の場所の半径の中の軌跡の点・記録も出さない
+    excluded_events = visits_api.hidden_event_ids(db, plan.id, user.id)
+    hidden_only = visits_api.hidden_only_event_ids(db, plan.id, user.id)
+    hidden_places = [(e.latitude, e.longitude, va.radius_for(e.event_type)) for eid, e in events.items()
+                     if eid in hidden_only and e.latitude is not None and e.longitude is not None]
+
+    def in_hidden_place(lat: float, lng: float) -> bool:
+        return any(va._haversine_m(hl, hg, lat, lng) <= r for hl, hg, r in hidden_places)
 
     def day_time(day_id) -> Optional[datetime]:
         d = days.get(day_id)
@@ -69,7 +80,7 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
     window = lt.trip_window([(d.local_date, d.timezone_id) for d in days.values()], plan.start_date, plan.end_date)
     upcoming = bool(window and window[1] > now)
     for eid, e in events.items():
-        if e.latitude is None or e.longitude is None:
+        if e.latitude is None or e.longitude is None or eid in excluded_events:
             continue
         a = actuals.get(eid)
         base = {"lat": e.latitude, "lng": e.longitude, "plan_id": str(plan.id), "plan_title": title}
@@ -82,6 +93,8 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
             obs.append({**base, "state": "PLANNED", "kind": "planned", "at": None, "year_at": day_time(e.day_id)})
     for mm in db.query(Memory).filter(Memory.plan_id == plan.id, Memory.author_user_id == user.id,
                                       Memory.latitude.isnot(None)).all():
+        if mm.event_id in excluded_events or in_hidden_place(mm.latitude, mm.longitude):
+            continue
         obs.append({"lat": mm.latitude, "lng": mm.longitude, "plan_id": str(plan.id), "plan_title": title,
                     "state": "VISITED", "kind": "memory", "at": mm.occurred_at or mm.created_at})
     track_ids = [t[0] for t in db.query(LocationTrack.id).filter(
@@ -90,6 +103,8 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
         try:
             for b in db.query(LocationPointBatch).filter(LocationPointBatch.track_id.in_(track_ids)).all():
                 for p in lt.decode(decrypt_payload(b.points_ciphertext)):
+                    if in_hidden_place(p["lat"], p["lng"]):
+                        continue
                     obs.append({"lat": p["lat"], "lng": p["lng"], "plan_id": str(plan.id), "plan_title": title,
                                 "state": "PASS_THROUGH", "kind": "track", "at": datetime.fromisoformat(p["t"])})
         except EncryptionNotConfigured:

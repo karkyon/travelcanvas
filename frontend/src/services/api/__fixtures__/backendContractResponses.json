@@ -29,7 +29,8 @@
   "captured_at_head_s11": "Gate S10 (+Gate S11 多要素認証 /auth/mfa/*。秘密・トークン・回復コードは見本の値に置き換え)",
   "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)",
   "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile・constraint from_profile)",
-  "captured_at_head_a2": "Gate C1 4775f95 (+Gate A2 admin: is_admin/is_self/mfa_enabled・sessions_revoked・actions・IP の末尾を伏せる)"
+  "captured_at_head_a2": "Gate C1 4775f95 (+Gate A2 admin: is_admin/is_self/mfa_enabled・sessions_revoked・actions・IP の末尾を伏せる)",
+  "captured_at_head_v2": "Gate A2 43b737a (+Gate V2 visits: 訪問の地図の層・判定・訂正。ID・日時は固定値へ置換)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -11533,6 +11534,696 @@
    "total_pages": 1,
    "has_next": false,
    "has_prev": false
+  }
+ },
+ "visits_empty": {
+  "plan_id": "00000000-0000-4000-8000-0000000000b1",
+  "title": "訪問の判定",
+  "items": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e1",
+    "title": "清水寺",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "radius_m": 200,
+    "layer_state": "PLANNED",
+    "assessment": null
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e2",
+    "title": "京都駅",
+    "event_type": "transportation",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9858,
+    "longitude": 135.7588,
+    "radius_m": 300,
+    "layer_state": "PLANNED",
+    "assessment": null
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e3",
+    "title": "大阪城",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.6873,
+    "longitude": 135.5262,
+    "radius_m": 200,
+    "layer_state": "PLANNED",
+    "assessment": null
+   }
+  ],
+  "counts": {
+   "VERIFIED": 0,
+   "STAYED": 0,
+   "VISITED": 0,
+   "PASS_THROUGH": 0,
+   "PLANNED": 3,
+   "HIDDEN": 0
+  },
+  "events_without_location": 0,
+  "needs_confirmation": 0,
+  "tracks": {
+   "synced": 0,
+   "device": 0
+  },
+  "rules": {
+   "algorithm_version": "visit-v1",
+   "max_accuracy_m": 100.0,
+   "visit_min_points": 2,
+   "visit_min_seconds": 120,
+   "stay_min_seconds": 600,
+   "pass_speed_kmh": 15.0,
+   "weights": {
+    "distance": 0.35,
+    "dwell": 0.25,
+    "accuracy": 0.15,
+    "evidence": 0.25
+   },
+   "high": 0.8,
+   "review": 0.5,
+   "radius_m": {
+    "restaurant": 50,
+    "meeting": 75,
+    "shopping": 100,
+    "other": 100,
+    "activity": 150,
+    "entertainment": 150,
+    "accommodation": 150,
+    "sightseeing": 200,
+    "free_time": 300,
+    "transportation": 300
+   },
+   "default_radius_m": 100
+  }
+ },
+ "visits_assessed": {
+  "plan_id": "00000000-0000-4000-8000-0000000000b1",
+  "title": "訪問の判定",
+  "items": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e1",
+    "title": "清水寺",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "radius_m": 200,
+    "layer_state": "STAYED",
+    "assessment": {
+     "state": "LIKELY_VISIT",
+     "auto_state": "LIKELY_VISIT",
+     "confidence": 0.7,
+     "level": "review",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 1.0,
+       "accuracy": 0.9,
+       "distance": 0.89,
+       "evidence": 0.0
+      },
+      "stayed": true,
+      "evidence": [],
+      "radius_m": 200,
+      "speed_kmh": 0.0,
+      "auto_source": "auto",
+      "points_valid": 9,
+      "dwell_seconds": 720,
+      "points_inside": 7,
+      "strong_evidence": [
+       "gps_stay"
+      ],
+      "median_accuracy_m": 10.0,
+      "median_distance_m": 22.2,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "auto",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": null,
+     "revision": 1,
+     "needs_confirmation": true,
+     "differs_from_auto": false
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e2",
+    "title": "京都駅",
+    "event_type": "transportation",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9858,
+    "longitude": 135.7588,
+    "radius_m": 300,
+    "layer_state": "PASS_THROUGH",
+    "assessment": {
+     "state": "PASS_THROUGH",
+     "auto_state": "PASS_THROUGH",
+     "confidence": 0.21,
+     "level": "candidate",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 0.05,
+       "accuracy": 0.88,
+       "distance": 0.18,
+       "evidence": 0.0
+      },
+      "stayed": false,
+      "evidence": [],
+      "radius_m": 300,
+      "speed_kmh": 59.0,
+      "auto_source": "auto",
+      "pass_reason": "fast",
+      "points_valid": 9,
+      "dwell_seconds": 30,
+      "points_inside": 2,
+      "strong_evidence": [],
+      "median_accuracy_m": 12.0,
+      "median_distance_m": 246.0,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "auto",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": null,
+     "revision": 1,
+     "needs_confirmation": true,
+     "differs_from_auto": false
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e3",
+    "title": "大阪城",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.6873,
+    "longitude": 135.5262,
+    "radius_m": 200,
+    "layer_state": "PLANNED",
+    "assessment": null
+   }
+  ],
+  "counts": {
+   "VERIFIED": 0,
+   "STAYED": 1,
+   "VISITED": 0,
+   "PASS_THROUGH": 1,
+   "PLANNED": 1,
+   "HIDDEN": 0
+  },
+  "events_without_location": 0,
+  "needs_confirmation": 2,
+  "tracks": {
+   "synced": 1,
+   "device": 0
+  },
+  "rules": {
+   "algorithm_version": "visit-v1",
+   "max_accuracy_m": 100.0,
+   "visit_min_points": 2,
+   "visit_min_seconds": 120,
+   "stay_min_seconds": 600,
+   "pass_speed_kmh": 15.0,
+   "weights": {
+    "distance": 0.35,
+    "dwell": 0.25,
+    "accuracy": 0.15,
+    "evidence": 0.25
+   },
+   "high": 0.8,
+   "review": 0.5,
+   "radius_m": {
+    "restaurant": 50,
+    "meeting": 75,
+    "shopping": 100,
+    "other": 100,
+    "activity": 150,
+    "entertainment": 150,
+    "accommodation": 150,
+    "sightseeing": 200,
+    "free_time": 300,
+    "transportation": 300
+   },
+   "default_radius_m": 100
+  },
+  "result": {
+   "created": 2,
+   "changed": 0,
+   "unchanged": 0,
+   "skipped": 1
+  }
+ },
+ "visit_corrected_confirm": {
+  "event_id": "00000000-0000-4000-8000-0000000000e1",
+  "assessment": {
+   "state": "VERIFIED_VISIT",
+   "auto_state": "LIKELY_VISIT",
+   "confidence": 0.7,
+   "level": "review",
+   "reasons": {
+    "basis": "gps",
+    "scores": {
+     "dwell": 1.0,
+     "accuracy": 0.9,
+     "distance": 0.89,
+     "evidence": 0.0
+    },
+    "stayed": true,
+    "evidence": [],
+    "radius_m": 200,
+    "speed_kmh": 0.0,
+    "auto_source": "auto",
+    "points_valid": 9,
+    "dwell_seconds": 720,
+    "points_inside": 7,
+    "strong_evidence": [
+     "gps_stay"
+    ],
+    "median_accuracy_m": 10.0,
+    "median_distance_m": 22.2,
+    "points_low_accuracy": 0
+   },
+   "algorithm_version": "visit-v1",
+   "source": "user",
+   "hidden": false,
+   "assessed_at": "2026-11-01T01:00:00+00:00",
+   "corrected_at": "2026-11-01T01:00:00+00:00",
+   "revision": 2,
+   "needs_confirmation": false,
+   "differs_from_auto": true
+  },
+  "layer_state": "VERIFIED"
+ },
+ "visit_corrected_reject_new": {
+  "event_id": "00000000-0000-4000-8000-0000000000e3",
+  "assessment": {
+   "state": "REJECTED",
+   "auto_state": null,
+   "confidence": null,
+   "level": null,
+   "reasons": {},
+   "algorithm_version": "visit-v1",
+   "source": "user",
+   "hidden": false,
+   "assessed_at": "2026-11-01T01:00:00+00:00",
+   "corrected_at": "2026-11-01T01:00:00+00:00",
+   "revision": 1,
+   "needs_confirmation": false,
+   "differs_from_auto": false
+  },
+  "layer_state": "PLANNED"
+ },
+ "visit_reset_removed": {
+  "event_id": "00000000-0000-4000-8000-0000000000e3",
+  "assessment": null,
+  "layer_state": "PLANNED"
+ },
+ "visits_reassessed": {
+  "plan_id": "00000000-0000-4000-8000-0000000000b1",
+  "title": "訪問の判定",
+  "items": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e1",
+    "title": "清水寺",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "radius_m": 200,
+    "layer_state": "VERIFIED",
+    "assessment": {
+     "state": "VERIFIED_VISIT",
+     "auto_state": "LIKELY_VISIT",
+     "confidence": 0.7,
+     "level": "review",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 1.0,
+       "accuracy": 0.9,
+       "distance": 0.89,
+       "evidence": 0.0
+      },
+      "stayed": true,
+      "evidence": [],
+      "radius_m": 200,
+      "speed_kmh": 0.0,
+      "auto_source": "auto",
+      "points_valid": 9,
+      "dwell_seconds": 720,
+      "points_inside": 7,
+      "strong_evidence": [
+       "gps_stay"
+      ],
+      "median_accuracy_m": 10.0,
+      "median_distance_m": 22.2,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "user",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": "2026-11-01T01:00:00+00:00",
+     "revision": 2,
+     "needs_confirmation": false,
+     "differs_from_auto": true
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e2",
+    "title": "京都駅",
+    "event_type": "transportation",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9858,
+    "longitude": 135.7588,
+    "radius_m": 300,
+    "layer_state": "PASS_THROUGH",
+    "assessment": {
+     "state": "PASS_THROUGH",
+     "auto_state": "PASS_THROUGH",
+     "confidence": 0.21,
+     "level": "candidate",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 0.05,
+       "accuracy": 0.88,
+       "distance": 0.18,
+       "evidence": 0.0
+      },
+      "stayed": false,
+      "evidence": [],
+      "radius_m": 300,
+      "speed_kmh": 59.0,
+      "auto_source": "auto",
+      "pass_reason": "fast",
+      "points_valid": 9,
+      "dwell_seconds": 30,
+      "points_inside": 2,
+      "strong_evidence": [],
+      "median_accuracy_m": 12.0,
+      "median_distance_m": 246.0,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "auto",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": null,
+     "revision": 1,
+     "needs_confirmation": true,
+     "differs_from_auto": false
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e3",
+    "title": "大阪城",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.6873,
+    "longitude": 135.5262,
+    "radius_m": 200,
+    "layer_state": "PLANNED",
+    "assessment": null
+   }
+  ],
+  "counts": {
+   "VERIFIED": 1,
+   "STAYED": 0,
+   "VISITED": 0,
+   "PASS_THROUGH": 1,
+   "PLANNED": 1,
+   "HIDDEN": 0
+  },
+  "events_without_location": 0,
+  "needs_confirmation": 1,
+  "tracks": {
+   "synced": 1,
+   "device": 0
+  },
+  "rules": {
+   "algorithm_version": "visit-v1",
+   "max_accuracy_m": 100.0,
+   "visit_min_points": 2,
+   "visit_min_seconds": 120,
+   "stay_min_seconds": 600,
+   "pass_speed_kmh": 15.0,
+   "weights": {
+    "distance": 0.35,
+    "dwell": 0.25,
+    "accuracy": 0.15,
+    "evidence": 0.25
+   },
+   "high": 0.8,
+   "review": 0.5,
+   "radius_m": {
+    "restaurant": 50,
+    "meeting": 75,
+    "shopping": 100,
+    "other": 100,
+    "activity": 150,
+    "entertainment": 150,
+    "accommodation": 150,
+    "sightseeing": 200,
+    "free_time": 300,
+    "transportation": 300
+   },
+   "default_radius_m": 100
+  },
+  "result": {
+   "created": 0,
+   "changed": 0,
+   "unchanged": 2,
+   "skipped": 1
+  }
+ },
+ "visits_device": {
+  "plan_id": "00000000-0000-4000-8000-0000000000b1",
+  "title": "訪問の判定",
+  "items": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e1",
+    "title": "清水寺",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "radius_m": 200,
+    "layer_state": "VERIFIED",
+    "assessment": {
+     "state": "VERIFIED_VISIT",
+     "auto_state": "LIKELY_VISIT",
+     "confidence": 0.7,
+     "level": "review",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 1.0,
+       "accuracy": 0.9,
+       "distance": 0.89,
+       "evidence": 0.0
+      },
+      "stayed": true,
+      "evidence": [],
+      "radius_m": 200,
+      "speed_kmh": 0.0,
+      "auto_source": "auto",
+      "points_valid": 9,
+      "dwell_seconds": 720,
+      "points_inside": 7,
+      "strong_evidence": [
+       "gps_stay"
+      ],
+      "median_accuracy_m": 10.0,
+      "median_distance_m": 22.2,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "user",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": "2026-11-01T01:00:00+00:00",
+     "revision": 2,
+     "needs_confirmation": false,
+     "differs_from_auto": true
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e2",
+    "title": "京都駅",
+    "event_type": "transportation",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.9858,
+    "longitude": 135.7588,
+    "radius_m": 300,
+    "layer_state": "PASS_THROUGH",
+    "assessment": {
+     "state": "PASS_THROUGH",
+     "auto_state": "PASS_THROUGH",
+     "confidence": 0.21,
+     "level": "candidate",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 0.05,
+       "accuracy": 0.88,
+       "distance": 0.18,
+       "evidence": 0.0
+      },
+      "stayed": false,
+      "evidence": [],
+      "radius_m": 300,
+      "speed_kmh": 59.0,
+      "auto_source": "auto",
+      "pass_reason": "fast",
+      "points_valid": 9,
+      "dwell_seconds": 30,
+      "points_inside": 2,
+      "strong_evidence": [],
+      "median_accuracy_m": 12.0,
+      "median_distance_m": 246.0,
+      "points_low_accuracy": 0
+     },
+     "algorithm_version": "visit-v1",
+     "source": "auto",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": null,
+     "revision": 1,
+     "needs_confirmation": true,
+     "differs_from_auto": false
+    }
+   },
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000e3",
+    "title": "大阪城",
+    "event_type": "sightseeing",
+    "day_id": "00000000-0000-4000-8000-0000000000b2",
+    "date": "2026-11-01",
+    "planned_time": "10:00",
+    "latitude": 34.6873,
+    "longitude": 135.5262,
+    "radius_m": 200,
+    "layer_state": "STAYED",
+    "assessment": {
+     "state": "LIKELY_VISIT",
+     "auto_state": "LIKELY_VISIT",
+     "confidence": 0.69,
+     "level": "review",
+     "reasons": {
+      "basis": "gps",
+      "scores": {
+       "dwell": 1.0,
+       "accuracy": 0.92,
+       "distance": 0.88,
+       "evidence": 0.0
+      },
+      "stayed": true,
+      "evidence": [],
+      "radius_m": 200,
+      "speed_kmh": 0.3,
+      "auto_source": "device",
+      "points_valid": 8,
+      "dwell_seconds": 900,
+      "points_inside": 7,
+      "strong_evidence": [
+       "gps_stay"
+      ],
+      "median_accuracy_m": 8.0,
+      "median_distance_m": 25.0,
+      "points_low_accuracy": 1
+     },
+     "algorithm_version": "visit-v1",
+     "source": "device",
+     "hidden": false,
+     "assessed_at": "2026-11-01T01:00:00+00:00",
+     "corrected_at": null,
+     "revision": 1,
+     "needs_confirmation": true,
+     "differs_from_auto": false
+    }
+   }
+  ],
+  "counts": {
+   "VERIFIED": 1,
+   "STAYED": 1,
+   "VISITED": 0,
+   "PASS_THROUGH": 1,
+   "PLANNED": 0,
+   "HIDDEN": 0
+  },
+  "events_without_location": 0,
+  "needs_confirmation": 2,
+  "tracks": {
+   "synced": 1,
+   "device": 0
+  },
+  "rules": {
+   "algorithm_version": "visit-v1",
+   "max_accuracy_m": 100.0,
+   "visit_min_points": 2,
+   "visit_min_seconds": 120,
+   "stay_min_seconds": 600,
+   "pass_speed_kmh": 15.0,
+   "weights": {
+    "distance": 0.35,
+    "dwell": 0.25,
+    "accuracy": 0.15,
+    "evidence": 0.25
+   },
+   "high": 0.8,
+   "review": 0.5,
+   "radius_m": {
+    "restaurant": 50,
+    "meeting": 75,
+    "shopping": 100,
+    "other": 100,
+    "activity": 150,
+    "entertainment": 150,
+    "accommodation": 150,
+    "sightseeing": 200,
+    "free_time": 300,
+    "transportation": 300
+   },
+   "default_radius_m": 100
+  },
+  "result": {
+   "created": 1,
+   "changed": 0,
+   "unchanged": 0,
+   "skipped": 0
+  }
+ },
+ "visit_error_conflict": {
+  "detail": {
+   "code": "revision_conflict",
+   "message": "判定が別の画面で更新されています(現在のrevision: 2)"
   }
  }
 }

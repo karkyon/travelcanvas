@@ -9,6 +9,7 @@
  * - 旅行ごとに位置の扱いを選ぶ: 記録しない / この端末だけ / 訪問地域だけ同期(生の座標は端末だけ)/ 暗号化してサーバーへ
  * - 移動の速さ・止まっているか・電池の残量に応じて位置を取る頻度を変える(utils/adaptiveSampler.ts)。省電力・手動の記録
  * - 記録の観測値(電池の消費・欠測率)を軌跡に残す。ほかの画面でも記録中であることを示す(RecordingIndicator)
+ * [Gate V2] FR-051 保護エリア(自宅・職場など。CA-009): この端末の中だけに置き、中で取れた位置は保存も送信もしない
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -32,6 +33,7 @@ import {
   readBattery, resumeSnapshot, saveStatsSnapshot, stationaryForMs, type BatteryState, type MotionState, type TierSetting,
 } from '@/utils/adaptiveSampler';
 import { aggregateAreaCells, chunkCells } from '@/utils/areaCells';
+import { ZONE_RADII, addZone, inProtectedZone, loadZones, removeZone, type ProtectedZone } from '@/utils/protectedZones';
 import { useTrackingStore } from '@/store/trackingStore';
 
 const MODE_LABEL: Record<TrackMode, string> = {
@@ -110,6 +112,13 @@ const LocationTrackPage: React.FC = () => {
   const [details, setDetails] = useState<Record<string, { points: TrackPoint[]; distance: number; cells: AreaCell[] }>>({});
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
+  // [Gate V2] 保護エリア(この端末だけ)
+  const [zones, setZones] = useState<ProtectedZone[]>(() => loadZones());
+  const [zoneLabel, setZoneLabel] = useState('');
+  const [zoneRadius, setZoneRadius] = useState<number>(ZONE_RADII[1]);
+  const [zoneSkipped, setZoneSkipped] = useState(0);
+  const zonesRef = useRef<ProtectedZone[]>(zones);
+  zonesRef.current = zones;
   const lastPoint = useRef<TrackPoint | null>(null);
   const flushing = useRef(false);
   const stats = useRef<{ trackId: string; stats: SamplingStats } | null>(null);
@@ -240,9 +249,14 @@ const LocationTrackPage: React.FC = () => {
       setGeoError(null);
       const p = toTrackPoint(pos);
       motion = addFix(motion, p);
-      const kept = manual
+      let kept = manual
         ? (p.accuracy_m === null || p.accuracy_m <= MAX_ACCURACY_M)
         : keepWithTier(lastPoint.current, p, current, MAX_ACCURACY_M);
+      // [Gate V2] 保護エリアの中の位置は保存も送信もしない(件数だけ数える)
+      if (kept && inProtectedZone(p, zonesRef.current)) {
+        kept = false;
+        setZoneSkipped((n) => n + 1);
+      }
       st.fix(Date.parse(p.recorded_at), kept, manual);
       saveStatsSnapshot(track.id, st.snapshot());
       if (kept) {
@@ -400,6 +414,25 @@ const LocationTrackPage: React.FC = () => {
     }, '軌跡を削除しました', '軌跡を削除できませんでした');
   };
 
+  const addCurrentZone = () => {
+    if (!('geolocation' in navigator)) {
+      setError('このブラウザは位置情報の取得に対応していません');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const r = addZone({ label: zoneLabel || '保護エリア', latitude: pos.coords.latitude, longitude: pos.coords.longitude,
+        radius_m: zoneRadius });
+      setZones(r.zones);
+      if (r.ok) {
+        setZoneLabel('');
+        setMessage(`保護エリア「${r.zones[r.zones.length - 1]!.label}」を追加しました(この端末だけ)`);
+      } else {
+        setError(r.reason ?? '保護エリアを追加できませんでした');
+      }
+    }, () => setError('位置を取得できませんでした。ブラウザで位置情報の利用を許可してください'),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 });
+  };
+
   const saveTripMode = () => {
     if (!tripMode) return;
     run(async () => {
@@ -448,6 +481,45 @@ const LocationTrackPage: React.FC = () => {
               </fieldset>
               <Button size="sm" variant="outline" disabled={busy || !tripMode || tripMode === savedMode}
                 onClick={saveTripMode}>位置の扱いを保存</Button>
+            </section>
+          </Card>
+
+          <Card padding="md" className="mt-6">
+            <section aria-label="保護エリア" className="space-y-3">
+              <h2 className="font-semibold text-gray-900">保護エリア(自宅・職場など)</h2>
+              <p className="text-sm text-gray-800">
+                保護エリアの中で取れた位置は、どの記録の方法でも保存・送信しません。保護エリアはこの端末だけに保存し、サーバーへは送りません
+                (ほかの端末では設定し直してください)。
+              </p>
+              {zones.length > 0 ? (
+                <ul className="space-y-1">
+                  {zones.map((z) => (
+                    <li key={z.id} className="flex items-center gap-2 text-sm text-gray-900">
+                      <span>{z.label}(半径{z.radius_m}m)</span>
+                      <Button size="sm" variant="ghost" aria-label={`保護エリア「${z.label}」を削除`}
+                        onClick={() => { setZones(removeZone(z.id)); setMessage(`保護エリア「${z.label}」を削除しました`); }}>
+                        削除
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-gray-700">保護エリアはありません。</p>}
+              {zoneSkipped > 0 && (
+                <p className="text-sm text-gray-800">保護エリアの中だったため記録しなかった位置: {zoneSkipped}件</p>
+              )}
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-sm text-gray-800">名前
+                  <input className="ml-1 border rounded px-2 py-1 text-gray-900" value={zoneLabel} maxLength={40}
+                    onChange={(e) => setZoneLabel(e.target.value)} placeholder="自宅" />
+                </label>
+                <label className="text-sm text-gray-800">半径
+                  <select className="ml-1 border rounded px-2 py-1 text-gray-900" value={zoneRadius}
+                    onChange={(e) => setZoneRadius(Number(e.target.value))}>
+                    {ZONE_RADII.map((r) => <option key={r} value={r}>{r}m</option>)}
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" disabled={busy} onClick={addCurrentZone}>今いる場所を保護エリアにする</Button>
+              </div>
             </section>
           </Card>
 

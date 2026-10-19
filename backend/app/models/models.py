@@ -2569,6 +2569,50 @@ class EventActual(Base):
     )
 
 
+class VisitAssessment(Base):
+    """[Gate V2] FR-049〜051 訪問の判定(DOC-15 CA-007〜009、DOC-14「v5.1 訪問判定」。app/services/visit_assessment.py)。
+
+    旅行・予定・本人ごとに1行。本人の位置の軌跡(または端末で計算した数値)と証拠(写真・予約・手動の記録)から
+    自動で判定し(source=auto/device)、本人が確定・通過・取消・非表示で直す(source=user)。本人が直した状態は
+    判定をやり直しても上書きしない(auto_state に最新の自動の判定を残す)。予定・実績は変えない。
+    根拠(reasons)に座標を入れない。本人以外(旅行の所有者を含む)には見せない。
+    予定には外部キーを張らない(B-013 の個別削除を妨げないため。予定が消えた判定は出さない)。"""
+    __tablename__ = "visit_assessments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    event_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    state = Column(String(14), nullable=False)
+    auto_state = Column(String(14), nullable=True)
+    confidence = Column(Float, nullable=True)
+    reasons = Column(JSONB, nullable=True)
+    algorithm_version = Column(String(16), nullable=False)
+    source = Column(String(6), nullable=False)
+    hidden = Column(Boolean, nullable=False, default=False, server_default="false")
+    assessed_at = Column(DateTime(timezone=True), nullable=False)
+    corrected_at = Column(DateTime(timezone=True), nullable=True)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "event_id", "user_id", name="uq_visit_assessments_plan_event_user"),
+        CheckConstraint(
+            "state IN ('VERIFIED_VISIT','LIKELY_VISIT','PASS_THROUGH','PLANNED_ONLY','MANUAL','REJECTED')",
+            name="ck_visit_assessments_state"),
+        CheckConstraint(
+            "auto_state IS NULL OR auto_state IN "
+            "('VERIFIED_VISIT','LIKELY_VISIT','PASS_THROUGH','PLANNED_ONLY','MANUAL','REJECTED')",
+            name="ck_visit_assessments_auto_state"),
+        CheckConstraint("source IN ('auto','device','user')", name="ck_visit_assessments_source"),
+        CheckConstraint("confidence IS NULL OR (confidence >= 0 AND confidence <= 1)",
+                        name="ck_visit_assessments_confidence"),
+        Index("ix_visit_assessments_plan_user", "plan_id", "user_id"),
+        Index("ix_visit_assessments_user", "user_id"),
+    )
+
+
 class UserPrivateProfile(Base):
     """[Gate C1] FR-023 秘匿プロフィール。利用者ごとの非公開の条件を1つの暗号文だけで持つ(平文の列を持たない)。
 

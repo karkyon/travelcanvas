@@ -595,6 +595,13 @@ const PlannerPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/visits`)}
+            >
+              🗺️ 訪問の地図
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/planner/${currentPlan.id}/memory-replan`)}
             >
               💡 過去の旅からの提案

@@ -26,9 +26,10 @@
 // [Gate K1] オフラインパックの鍵(B-008)を追加: ... → MemoryReplan → OfflinePack → CompleteTravelAPI
 // [Gate C1] 共同編集・秘匿プロフィール(FR-020・FR-023)を追加: ... → OfflinePack → Collab → CompleteTravelAPI
 // [Gate A2] 管理・監査(FR-040)を追加: ... → Collab → Admin → CompleteTravelAPI
-import { AdminApi } from './endpoints/admin';
+// [Gate V2] 訪問の地図の層・訪問判定・訂正(FR-049〜051)を追加: ... → Admin → Visits → CompleteTravelAPI
+import { VisitsApi } from './endpoints/visits';
 
-export class CompleteTravelAPI extends AdminApi {
+export class CompleteTravelAPI extends VisitsApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

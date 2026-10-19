@@ -57,6 +57,8 @@ const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
 const MemoriesPage = lazyPage(() => import('@/pages/MemoriesPage'));
 const LocationTrackPage = lazyPage(() => import('@/pages/LocationTrackPage'));
 const JourneyPage = lazyPage(() => import('@/pages/JourneyPage'));
+// [Gate V2] 訪問の地図(FR-049〜051)
+const VisitsPage = lazyPage(() => import('@/pages/VisitsPage'));
 const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
 const MemoryReplanPage = lazyPage(() => import('@/pages/MemoryReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
@@ -363,6 +365,16 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <JourneyPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 🗺️ [Gate V2] 訪問の地図(FR-049 Visited Area Layer・FR-050 訪問判定・FR-051 訪問訂正・Privacy除外)。
+      {
+        path: 'planner/:planId/visits',
+        element: (
+          <ProtectedRoute>
+            <VisitsPage />
           </ProtectedRoute>
         ),
       },

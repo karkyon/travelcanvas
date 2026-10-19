@@ -20,6 +20,7 @@
  * fixture: __fixtures__/backendContractResponses.json。
  */
 import type { User } from '@/types';
+import type { VisitAssessment, VisitCorrectionResult, VisitItem, VisitsOverview } from './types/visits';
 import type {
   AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, NormalizedDay, NormalizedEvent,
   NormalizedPlanDetail, Notification, OptimizationProposal, PlaceDetail, PromoteQuickDraftResult,
@@ -1958,3 +1959,61 @@ export const auditLogPage: Decoder<AuditLogPage> = object<AuditLogPage>({
   actions: arrayOf(str), audit_logs: arrayOf(auditLogEntry), pagination: adminPagination,
 });
 
+// ===== [Gate V2] 訪問の地図の層・訪問判定・訂正(FR-049〜051) =====
+const visitState = oneOf('VERIFIED_VISIT', 'LIKELY_VISIT', 'PASS_THROUGH', 'PLANNED_ONLY', 'MANUAL', 'REJECTED');
+const visitLayerState = oneOf('VERIFIED', 'STAYED', 'VISITED', 'PASS_THROUGH', 'PLANNED', 'HIDDEN');
+// 根拠は表示用の自由な形(backend で座標を含めないことを保証する)。オブジェクトであることだけを確かめる
+const visitReasons = (v: unknown, path: string) => record(v === null ? {} : v, path) as VisitAssessment['reasons'];
+const visitAssessment: Decoder<VisitAssessment> = object<VisitAssessment>({
+  state: visitState,
+  auto_state: nullable(visitState),
+  confidence: nullable(unitInterval),
+  level: nullable(oneOf('high', 'review', 'candidate')),
+  reasons: visitReasons,
+  algorithm_version: str,
+  source: oneOf('auto', 'device', 'user'),
+  hidden: bool,
+  assessed_at: nullable(str),
+  corrected_at: nullable(str),
+  revision: int,
+  needs_confirmation: bool,
+  differs_from_auto: bool,
+});
+const visitItem: Decoder<VisitItem> = object<VisitItem>({
+  event_id: str,
+  title: str,
+  event_type: str,
+  day_id: str,
+  date: str,
+  planned_time: nullable(str),
+  latitude: num,
+  longitude: num,
+  radius_m: nonNegativeInt,
+  layer_state: visitLayerState,
+  assessment: nullable(visitAssessment),
+});
+export const visitsOverview: Decoder<VisitsOverview> = object<VisitsOverview>({
+  plan_id: str,
+  title: str,
+  items: arrayOf(visitItem),
+  counts: object({
+    VERIFIED: nonNegativeInt, STAYED: nonNegativeInt, VISITED: nonNegativeInt, PASS_THROUGH: nonNegativeInt,
+    PLANNED: nonNegativeInt, HIDDEN: nonNegativeInt,
+  }),
+  events_without_location: nonNegativeInt,
+  needs_confirmation: nonNegativeInt,
+  tracks: object({ synced: nonNegativeInt, device: nonNegativeInt }),
+  rules: object<VisitsOverview['rules']>({
+    algorithm_version: str, max_accuracy_m: num, visit_min_points: nonNegativeInt, visit_min_seconds: nonNegativeInt,
+    stay_min_seconds: nonNegativeInt, pass_speed_kmh: num, high: unitInterval, review: unitInterval,
+    default_radius_m: nonNegativeInt, radius_m: record as Decoder<Record<string, number>>,
+  }),
+  result: optional(object({
+    created: nonNegativeInt, changed: nonNegativeInt, unchanged: nonNegativeInt, skipped: nonNegativeInt,
+  })),
+});
+export const visitCorrectionResult: Decoder<VisitCorrectionResult> = object<VisitCorrectionResult>({
+  event_id: str,
+  assessment: nullable(visitAssessment),
+  layer_state: visitLayerState,
+});

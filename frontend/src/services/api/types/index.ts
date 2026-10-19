@@ -45,3 +45,4 @@ export * from './privacy';
 export * from './collab';
 // [Gate A2] 管理・監査
 export * from './admin';
+export * from './visits';

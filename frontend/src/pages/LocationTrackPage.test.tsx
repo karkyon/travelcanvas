@@ -196,4 +196,31 @@ describe('LocationTrackPage (Gate P13)', () => {
     expect(window.confirm).toHaveBeenCalled();
     await waitFor(() => expect(loadLocalPoints(track.id)).toEqual([])); // 端末の座標も消す
   });
+
+  it('[Gate V2] 保護エリア: 端末だけに保存し、中で取れた位置は記録しない', async () => {
+    m.getLocationTracks.mockResolvedValue(fx.location_tracks_active);
+    renderPage();
+    const zones = await screen.findByRole('region', { name: '保護エリア' });
+    expect(within(zones).getByText('保護エリアはありません。')).toBeInTheDocument();
+    fireEvent.change(within(zones).getByLabelText('名前'), { target: { value: '自宅' } });
+    fireEvent.change(within(zones).getByLabelText('半径'), { target: { value: '200' } });
+    const before = geo.getCurrentPosition.mock.calls.length;
+    fireEvent.click(within(zones).getByRole('button', { name: '今いる場所を保護エリアにする' }));
+    await waitFor(() => expect(geo.getCurrentPosition.mock.calls.length).toBe(before + 1));
+    const ok = geo.getCurrentPosition.mock.calls[before]![0] as Success;
+    act(() => ok(position(0, 34.9948)));
+    expect(await within(zones).findByText('自宅(半径200m)')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('tc.protectedZones.v1')!)).toHaveLength(1);
+    const panel = screen.getByRole('region', { name: '記録中の軌跡' });
+    await waitFor(() => expect(geo.watchPosition).toHaveBeenCalled());
+    const pendingBefore = within(panel).getByText(/未送信: \d+件/).textContent;
+    act(() => geo.success!(position(30, 34.9949)));
+    expect(await within(zones).findByText('保護エリアの中だったため記録しなかった位置: 1件')).toBeInTheDocument();
+    expect(within(panel).getByText(/未送信: \d+件/).textContent).toBe(pendingBefore);
+    // 保護エリアの外の位置は記録する
+    act(() => geo.success!(position(120, 35.0100)));
+    await waitFor(() => expect(within(panel).getByText(/未送信: \d+件/).textContent).not.toBe(pendingBefore));
+    fireEvent.click(within(zones).getByRole('button', { name: '保護エリア「自宅」を削除' }));
+    expect(await within(zones).findByText('保護エリアはありません。')).toBeInTheDocument();
+  });
 });

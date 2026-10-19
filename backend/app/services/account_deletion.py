@@ -197,6 +197,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     from app.models.models import TripLocationSetting
 
     db.query(TripLocationSetting).filter(TripLocationSetting.user_id == me).delete(synchronize_session=False)
+    # [Gate V2] 訪問の判定(本人だけのもの。所有する旅行の分も含めてすぐ消す)
+    from app.models.models import VisitAssessment
+
+    db.query(VisitAssessment).filter(VisitAssessment.user_id == me).delete(synchronize_session=False)
     # [Gate P11] 同期の受領記録は端末から送った予定の内容を含むため、本人の分を消す
     summary["sync_operations"] = db.query(SyncOperation).filter(SyncOperation.user_id == me).delete(
         synchronize_session=False)

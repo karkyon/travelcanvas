@@ -387,6 +387,10 @@ def delete_points(plan_id: str, track_id: str, start: datetime = Query(...), end
     if removed:
         t.point_count -= removed
         t.revision += 1
+        # [Gate V2] 消した点を元にした自動の訪問の判定も消す(削除の伝播。本人の訂正の状態は残す)
+        from app.api.v1.visits import invalidate_auto
+
+        invalidate_auto(db, plan.id, current_user.id)
     db.commit()
     _audit("location_track.points_delete", current_user, t, {"removed": removed})
     return {"removed": removed, "point_count": t.point_count, "revision": t.revision}
@@ -398,6 +402,11 @@ def delete_track(plan_id: str, track_id: str, db: Session = Depends(get_db),
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     t = _get_own(db, plan, track_id, current_user)
     _audit("location_track.delete", current_user, t, {"points": t.point_count})
+    if t.mode == "synced":
+        # [Gate V2] この軌跡を元にした自動の訪問の判定も消す(削除の伝播)
+        from app.api.v1.visits import invalidate_auto
+
+        invalidate_auto(db, plan.id, current_user.id)
     db.delete(t)
     db.commit()
     return Response(status_code=204)
