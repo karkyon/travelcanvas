@@ -14,6 +14,10 @@
         トークンが無い時は、GitHub の画面での設定手順を表示して 3 で終わる。
     python3 scripts/ops/ci_gate.py status
         いまの main の保護の設定を表示する(トークンが要る)
+    python3 scripts/ops/ci_gate.py export --out docs/ops/evidence/branch-protection.json
+        [Gate G1] CI-01 main の保護の設定を、監査の記録として JSON に書き出す(トークン・URL は含めない)
+    python3 scripts/ops/ci_gate.py enable-vuln-reporting
+        [Gate G1] REP-02 非公開の脆弱性の報告(Private vulnerability reporting)を有効にする(SECURITY.md)
 
 パッチの流れ(docs/ops/RUNBOOK.md §9):
     検証 → commit → `gate/<名前>` へ push → この道具で CI の合格を待つ → 同じ commit を main へ push → gate ブランチを消す
@@ -440,6 +444,78 @@ def cmd_status() -> int:
     return EXIT_OK if not problems else EXIT_FAILED
 
 
+def protection_evidence(protection: dict, repo: str, captured_at: str, repo_info: Optional[dict] = None,
+                        vuln_reporting: Optional[bool] = None) -> dict:
+    """[Gate G1] CI-01 保護の設定の監査の記録(GitHub の応答から、判断に要る項目だけを取り出す)。"""
+    rsc = protection.get("required_status_checks") or {}
+    checks = sorted({c.get("context") for c in rsc.get("checks") or [] if c.get("context")}
+                    | set(rsc.get("contexts") or []))
+
+    def enabled(name: str) -> bool:
+        return bool((protection.get(name) or {}).get("enabled"))
+
+    out = {
+        "repo": repo,
+        "branch": "main",
+        "captured_at": captured_at,
+        "required_status_checks": checks,
+        "strict": bool(rsc.get("strict")),
+        "enforce_admins": enabled("enforce_admins"),
+        "required_linear_history": enabled("required_linear_history"),
+        "allow_force_pushes": enabled("allow_force_pushes"),
+        "allow_deletions": enabled("allow_deletions"),
+        "required_pull_request_reviews": bool(protection.get("required_pull_request_reviews")),
+        "problems": protection_problems(protection),
+        "meets_policy": not protection_problems(protection),
+    }
+    if repo_info:
+        out["visibility"] = repo_info.get("visibility") or ("private" if repo_info.get("private") else "public")
+    if vuln_reporting is not None:
+        out["private_vulnerability_reporting"] = vuln_reporting
+    return out
+
+
+def cmd_export(out_path: str) -> int:
+    import datetime
+
+    repo, tok = repo_slug(), token()
+    if not tok:
+        log("GitHub のトークンがありません(保護の設定は公開されていないため、記録には要ります)")
+        return EXIT_NO_TOKEN
+    status, body = request("GET", "/repos/%s/branches/main/protection" % repo, tok=tok)
+    if status != 200 or not isinstance(body, dict):
+        log("保護の設定を取得できませんでした(HTTP %s)" % status)
+        return EXIT_FAILED if status == 404 else EXIT_UNREACHABLE
+    _, info = request("GET", "/repos/%s" % repo, tok=tok)
+    pvr_status, pvr = request("GET", "/repos/%s/private-vulnerability-reporting" % repo, tok=tok)
+    vuln = bool(pvr.get("enabled")) if pvr_status == 200 and isinstance(pvr, dict) else None
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    record = protection_evidence(body, repo, now, info if isinstance(info, dict) else None, vuln)
+    path = Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(record, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+    log("main の保護の設定を記録しました: %s(%s)" % (path, "求める設定を満たす" if record["meets_policy"]
+                                                    else " / ".join(record["problems"])))
+    return EXIT_OK if record["meets_policy"] else EXIT_FAILED
+
+
+def cmd_enable_vuln_reporting() -> int:
+    repo, tok = repo_slug(), token()
+    if not tok:
+        log("GitHub のトークンがありません。画面: https://github.com/%s/settings/security_analysis → "
+            "Private vulnerability reporting を Enable" % repo)
+        return EXIT_NO_TOKEN
+    status, _ = request("PUT", "/repos/%s/private-vulnerability-reporting" % repo, tok=tok)
+    if status in (200, 204):
+        log("非公開の脆弱性の報告を有効にしました(SECURITY.md)")
+        return EXIT_OK
+    log("有効にできませんでした(HTTP %s)。画面: https://github.com/%s/settings/security_analysis" % (status, repo))
+    return EXIT_NO_TOKEN if status in (401, 403, 404) else EXIT_FAILED
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="CI の合格の待ち合わせと main の保護(Runbook §9)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -453,6 +529,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = sub.add_parser("protect")
     p.add_argument("--dry-run", action="store_true")
     sub.add_parser("status")
+    p = sub.add_parser("export")
+    p.add_argument("--out", default=str(REPO / "docs" / "ops" / "evidence" / "branch-protection.json"))
+    sub.add_parser("enable-vuln-reporting")
     args = parser.parse_args(argv)
     if args.cmd == "wait":
         return cmd_wait(args.sha, args.timeout, max(10, args.interval), max(0, min(1, args.reruns)))
@@ -460,6 +539,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_failures(args.sha)
     if args.cmd == "protect":
         return cmd_protect(args.dry_run)
+    if args.cmd == "export":
+        return cmd_export(args.out)
+    if args.cmd == "enable-vuln-reporting":
+        return cmd_enable_vuln_reporting()
     return cmd_status()
 
 

@@ -11,6 +11,7 @@ LOOKUP_INDEX_KEY が未設定のあいだに作られた予約・同行者は、
 
     python -m app.ops.backfill_lookup_index          # 実行して件数を JSON で表示
     python -m app.ops.backfill_lookup_index --check  # 鍵があるかだけを確かめる(終了コード 0/2)
+    python -m app.ops.backfill_lookup_index --all    # [Gate G1] LOOKUP_INDEX_KEY を替えた後: 全ての索引を作り直す
 """
 import json
 import sys
@@ -41,42 +42,49 @@ def _plain(ciphertext: Optional[bytes]) -> Optional[str]:
         return ""
 
 
-def backfill(db: Session) -> Dict[str, int]:
+def backfill(db: Session, recompute: bool = False) -> Dict[str, int]:
+    """``recompute=True``(--all)は、既にある索引も今の LOOKUP_INDEX_KEY で作り直す(鍵を替えた後)。"""
     from app.models.models import Reservation, ReservationParticipant
 
     if not key_configured():
         raise LookupIndexNotConfigured("LOOKUP_INDEX_KEY が設定されていません")
     out = {"reservations_filled": 0, "participants_filled": 0, "undecryptable": 0}
-    rows = db.query(Reservation).filter(
-        Reservation.confirmation_number_ciphertext.isnot(None),
-        (Reservation.confirmation_number_lookup_hash.is_(None))
-        | (Reservation.confirmation_number_suffix_lookup_hash.is_(None)),
-    ).all()
+    query = db.query(Reservation).filter(Reservation.confirmation_number_ciphertext.isnot(None))
+    if not recompute:
+        query = query.filter(
+            (Reservation.confirmation_number_lookup_hash.is_(None))
+            | (Reservation.confirmation_number_suffix_lookup_hash.is_(None)))
+    rows = query.all()
     for r in rows:
         raw = _plain(r.confirmation_number_ciphertext)
         if raw == "":
             out["undecryptable"] += 1
             continue
         changed = False
-        if r.confirmation_number_lookup_hash is None:
-            r.confirmation_number_lookup_hash = compute_lookup_hash(raw)
-            changed = True
-        if r.confirmation_number_suffix_lookup_hash is None:
+        if recompute or r.confirmation_number_lookup_hash is None:
+            full = compute_lookup_hash(raw)
+            changed = changed or full != r.confirmation_number_lookup_hash
+            r.confirmation_number_lookup_hash = full
+        if recompute or r.confirmation_number_suffix_lookup_hash is None:
             suffix = compute_suffix_lookup_hash(raw)
-            if suffix:
+            if suffix or recompute:
+                changed = changed or suffix != r.confirmation_number_suffix_lookup_hash
                 r.confirmation_number_suffix_lookup_hash = suffix
-                changed = True
         out["reservations_filled"] += int(changed)
-    people = db.query(ReservationParticipant).filter(
-        ReservationParticipant.name_ciphertext.isnot(None), ReservationParticipant.name_lookup_hash.is_(None)).all()
+    pq = db.query(ReservationParticipant).filter(ReservationParticipant.name_ciphertext.isnot(None))
+    if not recompute:
+        pq = pq.filter(ReservationParticipant.name_lookup_hash.is_(None))
+    people = pq.all()
     for p in people:
         raw = _plain(p.name_ciphertext)
         if raw == "":
             out["undecryptable"] += 1
             continue
         if raw:
-            p.name_lookup_hash = compute_participant_name_lookup_hash(raw)
-            out["participants_filled"] += 1
+            new = compute_participant_name_lookup_hash(raw)
+            if new != p.name_lookup_hash:
+                p.name_lookup_hash = new
+                out["participants_filled"] += 1
     db.flush()
     return out
 
@@ -92,7 +100,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     db = SessionLocal()
     try:
         try:
-            result = backfill(db)
+            result = backfill(db, recompute="--all" in args)
         except LookupIndexNotConfigured:
             print(json.dumps({"error": "LOOKUP_INDEX_KEY が設定されていません", "ok": False}, ensure_ascii=False))
             return 2

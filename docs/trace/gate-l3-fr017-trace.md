@@ -30,4 +30,4 @@
 | 17 | 画面: 未検証/問題なし/検証不能/失敗の区別 | SC-15 | IMPLEMENTED | F `ConstraintsPage.test.tsx`(実行可能性チェック); E |
 | 18 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe: 未検証・結果表示) |
 | 19 | 実backend応答との契約 | Gate C2b方式 | IMPLEMENTED | fixture `validation_run_*`(5種); F `contract.test.ts`, `c2b3.test.ts`(URL実在) |
-| 20 | 最適化への制約反映 | FR-018 | NOT STARTED | Gate L4 |
+| 20 | 最適化への制約反映 | FR-018 | NOT STARTED | Gate L4 ※ **SUPERSEDED BY Gate L4 `28d21c3`(最適化の入力に接続済み)** |

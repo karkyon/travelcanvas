@@ -66,6 +66,22 @@ jobs:
       - name: Node dependencies (npm audit, ブロッキング)
         run: python3 scripts/security/audit_deps.py node
 
+      # [Gate G1] CI-02 依存の一覧(SBOM、CycloneDX)を commit ごとに残す
+      - name: Frontend SBOM (CycloneDX)
+        working-directory: frontend
+        run: |
+          mkdir -p ../ci-results
+          npm sbom --sbom-format cyclonedx --omit dev > ../ci-results/frontend-sbom.cdx.json
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: ci-results/
+          retention-days: 90
+          if-no-files-found: warn
+
   frontend:
     needs: secret-scan
     runs-on: ubuntu-24.04
@@ -104,6 +120,10 @@ jobs:
       - name: Build (ブロッキング)
         run: npx vite build
 
+      # [Gate G1] DEP-05 bundle の上限(最初に読む JS 450kB・gzip 150kB、1つの塊 500kB)
+      - name: Bundle budget (ブロッキング)
+        run: python3 ../scripts/ci/check_bundle_budget.py --dist dist
+
       - name: Unit tests (ブロッキング)
         run: npm test -- --run
 
@@ -138,7 +158,10 @@ jobs:
       DATABASE_URL: postgresql://travelcanvas_app:ci-only-not-a-real-secret@localhost:5432/travelcanvas_test
       JWT_SECRET_KEY: ci-only-dummy-jwt-secret-not-used-anywhere-else
     steps:
+      # [Gate G1] GOV-01 DOC-10 の基準 commit が履歴にあるかを確かめるため、履歴を全部取る
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -182,8 +205,21 @@ jobs:
 
       # [Gate S11] 以前は CI に ENCRYPTION_KEY・CORS_ORIGINS・文書の保存先が無く、34件が失敗し続けていた
       # (2026-09-17 以降 main の CI は赤のまま)。tests/conftest.py が試験だけの既定値を入れる。
+      # [Gate G1] CI-02 結果を JUnit で残し、GOV-03 VERIFIED の証拠(台帳が参照する試験)がこの実行で合格したかを照合する
       - name: pytest 全件 (ブロッキング)
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -v --junitxml=../ci-results/backend-junit.xml
+
+      - name: VERIFIED の証拠の合格の照合 (ブロッキング)
+        run: python3 ../scripts/ci/check_ledger_results.py backend --junit ../ci-results/backend-junit.xml
+
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-junit-${{ github.sha }}
+          path: ci-results/
+          retention-days: 30
+          if-no-files-found: warn
 
       # 注意: `mypy`による型チェックは引き続き意図的に含めていない。
       # backend/pyproject.toml に poetry ベースの別依存定義が存在するが、
@@ -274,16 +310,25 @@ jobs:
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
+          PLAYWRIGHT_JUNIT_OUTPUT: e2e-results/junit.xml
           CI: 'true'
         run: npx playwright test
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      # [Gate G1] GOV-03 VERIFIED の E2E の証拠(spec ごと)がこの実行で合格したかを照合する
+      - name: VERIFIED の E2E の証拠の照合 (ブロッキング)
+        run: python3 scripts/ci/check_ledger_results.py e2e --junit frontend/e2e-results/junit.xml
+
+      # [Gate G1] CI-02 E2E の結果(JUnit・HTML の報告)を合否に関わらず残す
+      - name: Upload Playwright results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: frontend/playwright-report/
-          retention-days: 7
+          name: playwright-${{ github.sha }}
+          path: |
+            frontend/playwright-report/
+            frontend/e2e-results/
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Dump container logs on failure
         if: failure()

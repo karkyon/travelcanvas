@@ -28,7 +28,7 @@
 | 16 | If-Match/revision | - | ✓ | - | - | ✓ | ✓ | ✗ | ✗ | IMPLEMENTED | `_require_if_match`再利用; `test_patch_requires_if_match` |
 | 17 | Undo対応 | - | - | - | - | - | - | ✗ | ✗ | NOT STARTED | route_option/route_legのChangeItemはUndoループ未対応(ADR §8参照) |
 | 18 | frontend型定義・UI | - | - | - | - | ✓ | - | ✓ | ✗ | IMPLEMENTED | `api.ts` RouteOption型/CRUD client; `RouteOptionsPage.tsx`(一覧・作成・削除・採用); `api.test.ts` RouteOption API client(6ケース) |
-| 19 | E2E | - | - | - | - | - | - | - | ✗ | NOT STARTED | 未着手(次Gate) |
+| 19 | E2E | - | - | - | - | - | - | - | ✗ | NOT STARTED | 未着手(次Gate) ※ **SUPERSEDED BY Gate B-013(e2e item-deletion で経路候補の削除を確認。編集・Undo の E2E は残り)** |
 
 ## 総括
 

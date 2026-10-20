@@ -30,4 +30,4 @@
 | 18 | 全ルートの認可(資格情報なし・他人・ゲスト) | SEC-10 | IMPLEMENTED | M 全5件(251ルート) |
 | 19 | 設定の綴り誤り・矛盾を拒否 | F10 | IMPLEMENTED | B `test_scan_settings_are_validated` |
 | 20 | 本物の ClamAV での受入 | F09 | PARTIAL | compose の `malware-scan` プロファイルを用意。omega-dev2 での起動は任意(Runbook §3.8) |
-| 21 | 異常の自動検知・段階的な対応 | SEC-16/17 | NOT STARTED | 次の Gate |
+| 21 | 異常の自動検知・段階的な対応 | SEC-16/17 | NOT STARTED | 次の Gate ※ **SUPERSEDED BY Gate S6 `36eb943`(自動遮断)** |

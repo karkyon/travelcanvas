@@ -18,6 +18,6 @@
 | 6 | 内容のハッシュ(確認用) | — | IMPLEMENTED | B(全エクスポート試験); F `p6dataExport.test.ts`; E |
 | 7 | バックアップ・監査の残存期間の説明 | FR-039、DOC-02 §5 | IMPLEMENTED | B `test_retention_info`; F; E |
 | 8 | 旅行の削除 | FR-039 | IMPLEMENTED(B-012) | 既存 |
-| 9 | アカウント単位の削除・同意撤回・訂正 | FR-039 | NOT STARTED | ADR §3 |
+| 9 | アカウント単位の削除・同意撤回・訂正 | FR-039 | NOT STARTED | ADR §3 ※ **SUPERSEDED BY Gate P9(アカウント削除・同意の撤回は実装。訂正は残り)** |
 | 10 | URL実在・契約 | Gate C2b方式 | IMPLEMENTED | F `c2b3.test.ts`, `contract.test.ts`(retention_info) |
 | 11 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe) |

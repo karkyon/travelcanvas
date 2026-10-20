@@ -205,3 +205,15 @@ backend/.gate*_deps-py*/
 # [Gate O1] 運用: バックアップ(個人データを含む)と監視・演習の状態(scripts/ops/tcops.py)
 /backups/
 /ops-state/
+
+# [Gate G1] REP-01 Redis のダンプ・DB のファイル・鍵(scripts/security/scan_secrets.py が追跡を拒否する)
+*.rdb
+*.sqlite
+*.sqlite3
+*.pem
+*.p12
+*.pfx
+
+# [Gate G1] CI・パッチの試験結果(JUnit・SBOM)
+ci-results/
+frontend/e2e-results/

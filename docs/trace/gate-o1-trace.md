@@ -28,4 +28,4 @@
 | 18 | Runbook(障害対応・復元・rollback の手順) | B-010 | IMPLEMENTED | `docs/ops/RUNBOOK.md` |
 | 19 | バックアップの別機械・クラウドへの複製 | B-010 | NOT STARTED | ADR §4 |
 | 20 | SLO・外部監視サービス・Prometheus/Grafana | DOC-07 | NOT STARTED | ADR §4(`/metrics` の形式は対応) |
-| 21 | 保存ファイルの中身の復号確認 | DOC-11 | NOT STARTED | ADR §4 |
+| 21 | 保存ファイルの中身の復号確認 | DOC-11 | NOT STARTED | ADR §4 ※ **SUPERSEDED BY Gate G1(`tcops.py keys status` が保存ファイルを鍵ごとに数え、読めない物を報告)** |

@@ -10,7 +10,7 @@
 | R2-2 | `POST /v1/quick-drafts` | API/DB/SEC | IMPLEMENTED | HEAD `2cdefe6`。backend 159/159成功、独立clone再検証済み |
 | R2-3 | `POST /v1/quick-drafts/{id}/promote` | API/DB/SEC | IMPLEMENTED | HEAD `f4ff2ca`。backend 166/166成功、独立clone再検証済み |
 | R2-4 | frontend `createQuickPlan()`置換 | Frontend | IMPLEMENTED | HEAD `cfc0832`。独立clone再検証済み |
-| R2-5 | retention purge・真の並行性テスト | Backend | PARTIAL | HEAD `76c1c7c`。backend 177/177成功だがE2E/CI blocking/accessibility/audit・metric基盤が未達(詳細は下表) |
+| R2-5 | retention purge・真の並行性テスト | Backend | PARTIAL | HEAD `76c1c7c`。backend 177/177成功だがE2E/CI blocking/accessibility/audit・metric基盤が未達(詳細は下表) ※ **SUPERSEDED BY Gate R2-6・R2-7(E2E と CI の blocking、a11y・監査を追加)** |
 | R2-6 | Playwright browser E2E + CIへのE2E blocking追加 | Frontend/CI | IMPLEMENTED | 下表参照。この完了をもってR2-5未達4項目のうち2件(E2E・CI blocking)を解消。残る2件(accessibility試験、audit/metric基盤)が揃うまでFR-043/G1はVERIFIEDと判定しない |
 | R2-7 | accessibility試験 + audit/metric基盤 | Frontend/Backend/DB | IMPLEMENTED | HEAD未確定(次回パッチ適用時に独立clone再検証予定)。下表参照。この完了をもってR2-5未達4項目が全て解消。FR-043/G1はVERIFIED判定の前提条件を満たす(DOC-10更新は別途) |
 

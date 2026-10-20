@@ -30,7 +30,7 @@ E = `frontend/e2e/visits.spec.ts`。画面 `/planner/:planId/visits`(訪問の�
 | 3 | 色だけに依存しない(形・記号・文字) | IMPLEMENTED | ✓/◆/●/◌/○、線の種類、一覧の文字。axe(E) |
 | 4 | 地図が使えない時の代わり(一覧) | IMPLEMENTED | 一覧で同じ内容。外部の地図サービスに頼らない略図 |
 | 5 | 状態ごとの表示の切り替え | IMPLEMENTED | U・E |
-| 6 | CANDIDATE(候補) | NOT STARTED | 候補箱(FR-007)が未実装のため層に無い |
+| 6 | CANDIDATE(候補) | NOT STARTED | 候補箱(FR-007)が未実装のため層に無い ※ **SUPERSEDED BY Gate C2(候補箱 FR-007 は実装済み。層への表示だけが残り。理由の記述が古い)** |
 | 7 | 実際の地図タイルの上への表示 | NOT STARTED | 地図の提供元の接続(MapView は Google Maps のキーが必要)が未整備 |
 
 → INTEGRATED(部分、E2E有)。

@@ -32,6 +32,6 @@ E = `frontend/e2e/mfa.spec.ts`。
 | 17 | passkey(WebAuthn) | NOT STARTED | ADR の限界 |
 | 18 | CI の backend の失敗(34件)を解消 | IMPLEMENTED | `tests/conftest.py` の試験だけの既定値。CI と同じ構成(Python 3.12・PostgreSQL 16・.env なし)で全件合格 |
 | 19 | 必須の CI の一覧が ci.yml と一致・gate/** でも CI が走る・合否の判定 | IMPLEMENTED | C |
-| 20 | main の保護(必須の CI・管理者にも適用・強制 push と削除の禁止) | PARTIAL | `scripts/ops/ci_gate.py protect`。設定には管理者の GitHub のトークンが要る(無ければ画面の手順を表示) |
+| 20 | main の保護(必須の CI・管理者にも適用・強制 push と削除の禁止) | PARTIAL | `scripts/ops/ci_gate.py protect`。設定には管理者の GitHub のトークンが要る(無ければ画面の手順を表示) ※ **SUPERSEDED BY Gate H1 `16f1aa9`(パッチ実行時に保護を設定。G1 で設定の記録 `ci_gate.py export`)** |
 | 21 | パッチは CI に合格した commit だけを main へ送る | IMPLEMENTED | Gate S11 のパッチ(gate/s11 → `ci_gate.py wait` → main) |
 | 22 | E2E の不安定(遷移中の localStorage の読み取り) | IMPLEMENTED | `e2e/support/guestPlan.ts` の `guestTokenFrom`(応答の本文から取る)。9本の spec を置き換え |

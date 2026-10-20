@@ -1,0 +1,22 @@
+{
+ "allow_deletions": false,
+ "allow_force_pushes": false,
+ "branch": "main",
+ "captured_at": "2026-10-20T23:46:30Z",
+ "enforce_admins": true,
+ "meets_policy": true,
+ "private_vulnerability_reporting": true,
+ "problems": [],
+ "repo": "karkyon/travelcanvas",
+ "required_linear_history": true,
+ "required_pull_request_reviews": false,
+ "required_status_checks": [
+  "backend",
+  "dependency-audit",
+  "e2e",
+  "frontend",
+  "secret-scan"
+ ],
+ "strict": true,
+ "visibility": "public"
+}

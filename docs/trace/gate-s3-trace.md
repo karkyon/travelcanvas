@@ -18,4 +18,4 @@
 | 7 | refresh の回数制限 | SEC-12 | IMPLEMENTED | B `test_refresh_is_rate_limited` |
 | 8 | 自分の名前空間だけを消せる | 運用 | IMPLEMENTED | B `test_reset_all_only_touches_its_namespace`、Runbook §3.7 |
 | 9 | E2E が Redis の制限で通ること | — | IMPLEMENTED | サンドボックスで E2E 40件(Redis 使用、予備への切替 0) |
-| 10 | 異常の自動検知・段階的な対応 | SEC-16/17 | NOT STARTED | 次の Gate |
+| 10 | 異常の自動検知・段階的な対応 | SEC-16/17 | NOT STARTED | 次の Gate ※ **SUPERSEDED BY Gate S6 `36eb943`(自動遮断)** |

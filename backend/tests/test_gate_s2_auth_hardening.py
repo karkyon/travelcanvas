@@ -230,6 +230,10 @@ GOOD = {
     "LOOKUP_INDEX_KEY": "Lk8Hq3Vx6Nb1Wt9Rm4Cs7Jy2Gd5Pf0Za-c",
     "DOCUMENT_DOWNLOAD_SIGNING_KEY": "Ds4Mk9Qw2Vr7Bn1Xj6Lt3Hc8Yg5Pf0Ea-d",
     "METRICS_TOKEN": "Mt5Kx8Rq2Wn7Vb3Lj9Hs4Cd1Gy6",
+    # [Gate G1] 本番ではオフラインパックの鍵を ENCRYPTION_KEY から分ける。前の鍵・計算の確認の鍵は環境変数に左右されないよう明示する
+    "OFFLINE_PACK_KEY_SECRET": "Op6Wr1Nk8Tz3Qv5Bx2Jm9Lh4Cs7Gd0Fa-e",
+    "ENCRYPTION_KEYS_PREVIOUS": "",
+    "CHALLENGE_SECRET_KEY": "",
     "DEBUG": False,
     "CORS_ORIGINS": "https://app.travelcanvas.jp",
     # [Gate H1] omega の backend コンテナには .env の TC_PUBLIC_HOSTS が環境変数で入る。試験の設定では明示的に空にする
@@ -254,6 +258,10 @@ def test_production_settings_pass_when_safe():
     ({"ENCRYPTION_KEY": None}, "ENCRYPTION_KEY"),
     ({"LOOKUP_INDEX_KEY": GOOD["ENCRYPTION_KEY"]}, "同じ値"),
     ({"METRICS_TOKEN": None}, "METRICS_TOKEN"),
+    ({"OFFLINE_PACK_KEY_SECRET": None}, "OFFLINE_PACK_KEY_SECRET"),
+    ({"ENCRYPTION_KEYS_PREVIOUS": "short"}, "ENCRYPTION_KEYS_PREVIOUS"),
+    ({"METRICS_TOKEN": GOOD["JWT_SECRET_KEY"]}, "同じ値"),
+    ({"ENCRYPTION_KEYS_PREVIOUS": GOOD["LOOKUP_INDEX_KEY"]}, "同じ値"),
     ({"CORS_ORIGINS": "http://localhost:4173"}, "CORS_ORIGINS"),
     ({"CORS_ORIGINS": "*"}, "CORS_ORIGINS"),
 ])

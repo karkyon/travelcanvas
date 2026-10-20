@@ -68,6 +68,27 @@ SECRET_PATTERNS = [
 ]
 
 
+# [Gate G1] REP-01 中身に関係なく追跡してはいけないファイル(Redis のダンプ・DB のファイル・鍵・証明書・.env)。
+# 以前は backend/dump.rdb(Redis の保存ファイル)が追跡されていた。今は空だが、セッション・遮断の情報が入った版を
+# 誤って commit し得る。.env.example(見本)だけは許す。
+FORBIDDEN_PATH_PATTERNS = [
+    ("redis_dump", re.compile(r"(^|/)[^/]*\.rdb$", re.I)),
+    ("database_file", re.compile(r"(^|/)[^/]*\.(sqlite3?|db|dump)$", re.I)),
+    ("private_key_file", re.compile(r"(^|/)[^/]*\.(pem|key|p12|pfx|jks|keystore)$", re.I)),
+    ("ssh_private_key", re.compile(r"(^|/)id_(rsa|dsa|ecdsa|ed25519)$")),
+    ("dotenv", re.compile(r"(^|/)\.env(\.(?!example$)[^/]+)?$")),
+    ("htpasswd", re.compile(r"(^|/)\.htpasswd$")),
+]
+
+
+def forbidden_path(rel_path: str):
+    """追跡してはいけないファイルなら、その種類の名前を返す。"""
+    for name, pattern in FORBIDDEN_PATH_PATTERNS:
+        if pattern.search(rel_path):
+            return name
+    return None
+
+
 def tracked_files() -> list[str]:
     result = subprocess.run(
         ["git", "ls-files", "-z"],
@@ -81,6 +102,10 @@ def tracked_files() -> list[str]:
 def scan() -> list[str]:
     findings = []
     for rel_path in tracked_files():
+        kind = forbidden_path(rel_path)
+        if kind:
+            findings.append(f"{rel_path}: tracked {kind} file (git rm --cached して .gitignore へ)")
+            continue
         if rel_path in ALLOWLIST_PATHS:
             continue
         path = REPO_ROOT / rel_path
@@ -113,6 +138,13 @@ def self_test() -> int:
     assert not hits("postgresql://user:<password>@db/x")
     assert not hits("DATABASE_URL=postgresql://travelcanvas_app:ci-only-not-a-real-secret@localhost/x")
     assert hits('JWT_SECRET_KEY = "abcdefghijklmnop"')
+    # [Gate G1] 追跡してはいけないファイルの名前
+    for bad in ("backend/dump.rdb", "dump.RDB", ".env", "backend/.env", ".env.local", ".env.production",
+                "certs/server.key", "tls/site.pem", "db.sqlite3", "data/app.db", "backup.dump", "id_ed25519"):
+        assert forbidden_path(bad), bad
+    for ok in (".env.example", "docs/env.md", "src/keys.ts", "backend/app/core/key_inventory.py",
+               "frontend/src/environment.ts", "dump.rdb.md"):
+        assert not forbidden_path(ok), ok
     print("secret scan: self-test ok")
     return 0
 

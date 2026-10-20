@@ -24,4 +24,4 @@
 | 12 | 画面の CSP 等。主な画面で違反0 | SEC-03 | IMPLEMENTED | F; E `画面と API の応答に…` |
 | 13 | production build で source map を公開しない | SEC-03 | IMPLEMENTED | `vite.config.ts`(dist に .map なし) |
 | 14 | 未使用の IP 位置取得(外部送信)を削除 | DOC-11 | IMPLEMENTED | `utils/geolocation.ts` 削除 |
-| 15 | 管理者 MFA・CAPTCHA・共有のレート制限 | SEC-06/07/12 | NOT STARTED | 次の Gate |
+| 15 | 管理者 MFA・CAPTCHA・共有のレート制限 | SEC-06/07/12 | NOT STARTED | 次の Gate ※ **SUPERSEDED BY Gate S3(共有の回数制限)・S7(計算の確認)・S11(管理者の多要素認証)** |

@@ -25,4 +25,4 @@
 | 14 | 実backend応答との契約 | Gate C2b方式 | IMPLEMENTED | fixture `plan_soft_deleted`・`deleted_plan_list(_empty)`・`plan_restored`・`plan_purged`; F `contract.test.ts`、`b012planTrash.test.ts`、`c2b3.test.ts` |
 | 15 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe: 最近削除したプランを開いた一覧) |
 | 16 | 暗号鍵破棄を含む削除 | DOC-02 §5 | NOT STARTED | KMS未導入(行は物理削除される) |
-| 17 | 個別削除の同種500(予定・日程・共同編集者) | B-013 | NOT STARTED | 別Gate(ADR §4) |
+| 17 | 個別削除の同種500(予定・日程・共同編集者) | B-013 | NOT STARTED | 別Gate(ADR §4) ※ **SUPERSEDED BY Gate B-013 `2e06249`(解消。docs/trace/gate-b013-trace.md)** |

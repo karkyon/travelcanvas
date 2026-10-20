@@ -21,7 +21,7 @@ E = `frontend/e2e/location-local-first.spec.ts`・`location-track.spec.ts`。
 | 7 | 書き出し・時間帯の削除・軌跡の削除・アカウント削除で扱う | IMPLEMENTED | B 同上、`account_deletion.py` |
 | 8 | AI入力から正確な位置を除外(013)| NOT STARTED | AI 未使用(対象なし) |
 | 9 | 速度・停止・電池・精度で取得頻度を変える(014)| IMPLEMENTED | U `adaptiveSampler`(段階の判定・間引き)、`LocationTrackPage`(省電力で間隔の取得へ切替)、E |
-| 10 | geofence・significant-location-change・写真EXIF(014)| NOT STARTED | ブラウザに無い / EXIF は別 Gate |
+| 10 | geofence・significant-location-change・写真EXIF(014)| NOT STARTED | ブラウザに無い / EXIF は別 Gate ※ **SUPERSEDED BY Gate Q1(写真の撮影情報の除去は実装。geofence 等はブラウザに無いため残り)** |
 | 11 | 手動記録(014)| IMPLEMENTED | U、E |
 | 12 | 記録中をアプリ内で常時明示(014)| IMPLEMENTED | U `RecordingIndicator`、E |
 | 13 | 低電力モード・一時停止・旅行終了時の自動停止(014)| IMPLEMENTED | U・E(省電力)、P13(一時停止・自動停止) |

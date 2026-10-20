@@ -28,4 +28,4 @@
 | 15 | 依存の検査を CI で止める(例外は理由・期限つき) | SEC-23 | IMPLEMENTED | CI `dependency-audit`、S `audit_deps.py self-test` |
 | 16 | 画面内の移動先をアプリ内のパスに限る | GHSA-wrjc | IMPLEMENTED | F `safeNavigation.test.ts`、準備状況の「開く」 |
 | 17 | vite・tailwind・vitest・react-router のメジャー更新 | SEC-23 | NOT STARTED | ADR §3(期限 2026-12-31) |
-| 18 | main ブランチの保護 | SEC-24 | NOT STARTED | GitHub の設定(ADR §3) |
+| 18 | main ブランチの保護 | SEC-24 | NOT STARTED | GitHub の設定(ADR §3) ※ **SUPERSEDED BY Gate S11・H1(必須の CI・管理者にも適用で保護済み。G1 で設定を docs/ops/evidence/ に記録)** |

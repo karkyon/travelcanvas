@@ -22,6 +22,7 @@
 | 更新後に不具合(コードを戻したい) | `tcops.py rollback-plan --to <commit>` | §6 |
 | 管理者が多要素認証の端末と回復コードをなくした | `tcops.py security mfa-status --email …` | §8.3 |
 | パッチが「CI が不合格」で止まった・main へ push できない | `python3 scripts/ops/ci_gate.py status` | §9 |
+| 暗号化の鍵を替えたい・鍵の漏洩が疑われる | `tcops.py keys check`・`tcops.py keys status` | §8.2、`docs/ops/KEY-INVENTORY.md` |
 
 終了コード: `monitor` は 0=異常なし、1=注意、2=異常。その他のコマンドは 0=成功、3=失敗。
 
@@ -416,7 +417,10 @@ python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵�
 | `JWT_SECRET_KEY` | 全員のアクセストークンとゲストのトークンが無効(ゲストは作り直し) | 新しい値を書き、`docker compose up -d --force-recreate backend`。続けて `revoke-sessions --all --yes` |
 | `DOCUMENT_DOWNLOAD_SIGNING_KEY` | 発行済みの文書 URL が無効(画面から開き直せば取れる) | 新しい値を書いて backend を作り直す |
 | `METRICS_TOKEN` | 監視の取得に新しい値が要る | `.env` を替えて backend を作り直す(tcops は `.env` を読む) |
-| `ENCRYPTION_KEY`・`LOOKUP_INDEX_KEY` | **替えると保存済みの暗号化データが読めない** | 単純に替えない。鍵の版の切り替え(再暗号化)は別の Gate(SEC-F)。漏洩が疑われる時は DB とバックアップへの接続を止め、先に相談する |
+| `ENCRYPTION_KEY` | [Gate G1] 版の切り替え(前の鍵を `ENCRYPTION_KEYS_PREVIOUS` に残して掛け直す)ので読めなくならない | **`docs/ops/KEY-INVENTORY.md` §2 の手順だけで行う**。`tcops.py keys status` → `keys rekey` → `previous_keys_removable: true` を確かめてから前の鍵を外す。漏洩が疑われる時は、切り替えの後に前の鍵を外すまでを急ぐ(外すまでは漏れた鍵で読める) |
+| `LOOKUP_INDEX_KEY` | 索引を作り直すまで予約番号・同行者名の検索で見つからない | 新しい値を書いて backend を作り直し、`docker compose exec -T backend python -m app.ops.backfill_lookup_index --all` |
+
+鍵の一覧・用途・使い回しの点検は `docs/ops/KEY-INVENTORY.md` と `python3 scripts/ops/tcops.py keys check`(値は出さない)。
 
 ### 8.3 多要素認証(Gate S11、`docs/adr/ADR-admin-mfa.md`)
 
@@ -485,3 +489,4 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 | 2026-10-18 | 7 | Gate S8: 侵害が疑われる時の手順と封じ込めの操作(§8)。改訂履歴は §9 へ |
 | 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
 | 2026-10-19 | 9 | Gate S11: 多要素認証(§8.3)、CI と main の保護・パッチの流れ(§9)。改訂履歴は §10 へ |
+| 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

@@ -12,13 +12,23 @@ ENCRYPTION_KEYはSettings上Optionalとした(config.py参照)。既存の必須
 omega-dev2の.envに未設定の場合にbackend全体が起動不能になる
 (QuickDraftという新機能1つのために既存の全APIを道連れにする)ため、
 未設定時はQuickDraft関連の呼び出し時にのみ明確なエラーを返す設計とする。
+
+[Gate G1] SEC-F1 鍵の版の切り替え(docs/ops/KEY-INVENTORY.md・Runbook §8.2):
+- ``ENCRYPTION_KEY`` は「今の鍵」(新しく暗号化する時はこれだけを使う)。
+- ``ENCRYPTION_KEYS_PREVIOUS`` (カンマ区切り)は「前の鍵」。復号だけに使う(retired)。
+  ここから外した鍵は失効(revoked)し、その鍵の暗号文は読めなくなる。
+- 鍵の版は、鍵から作る指紋(``key_id``、SHA-256 の先頭12桁)で表す。値は表示・保存しない。
+- 既存の暗号文の書式(Fernet)は変えない。どの鍵の暗号文かは、各鍵で検証して判定する(``key_id_of``)。
+  そのため DB の変更(migration)は要らない。
+- 前の鍵の暗号文を今の鍵へ掛け直すのは ``python -m app.ops.rekey run``(途中で止めても再開できる)。
 """
 import base64
 import hashlib
 import hmac
 from functools import lru_cache
+from typing import List, Optional, Tuple
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from app.core.config import settings
 
@@ -31,17 +41,84 @@ class LookupIndexNotConfigured(RuntimeError):
     """[Gate R3-13] LOOKUP_INDEX_KEY が.envに設定されていない場合に送出する。"""
 
 
+def key_id(secret: Optional[str]) -> Optional[str]:
+    """[Gate G1] 鍵の版の名前(指紋)。運用の道具(app/ops/opslib.key_fingerprint)と同じ式。値そのものは出さない。"""
+    if not secret:
+        return None
+    return hashlib.sha256(("travelcanvas-key-fingerprint:" + secret).encode("utf-8")).hexdigest()[:12]
+
+
+def _fernet_for(secret: str) -> Fernet:
+    # 任意長の文字列を、Fernetが要求する32byte urlsafe base64 keyへ決定的に導出する。
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest()))
+
+
+def parse_previous_keys(raw: Optional[str]) -> List[str]:
+    """[Gate G1] ENCRYPTION_KEYS_PREVIOUS(カンマ区切り。前後の空白は無視・空の要素と重複は捨てる)。"""
+    out: List[str] = []
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if part and part not in out:
+            out.append(part)
+    return out
+
+
 @lru_cache(maxsize=1)
-def _get_fernet() -> Fernet:
+def _keyring() -> Tuple[Tuple[str, Fernet], ...]:
+    """[Gate G1] (key_id, Fernet) の並び。先頭が今の鍵、続いて前の鍵(設定の順)。"""
     key = getattr(settings, "ENCRYPTION_KEY", None)
     if not key:
         raise EncryptionNotConfigured(
             "ENCRYPTION_KEY が設定されていません。QuickDraft機能を有効にするには "
             ".env へ ENCRYPTION_KEY を設定してください。"
         )
-    # 任意長の文字列を、Fernetが要求する32byte urlsafe base64 keyへ決定的に導出する。
-    derived = base64.urlsafe_b64encode(hashlib.sha256(key.encode("utf-8")).digest())
-    return Fernet(derived)
+    ring = [(key_id(key), _fernet_for(key))]
+    for old in parse_previous_keys(getattr(settings, "ENCRYPTION_KEYS_PREVIOUS", None)):
+        if old == key:
+            continue
+        ring.append((key_id(old), _fernet_for(old)))
+    return tuple(ring)  # type: ignore[return-value]
+
+
+@lru_cache(maxsize=1)
+def _get_fernet() -> MultiFernet:
+    """暗号化は先頭(今の鍵)、復号は全ての鍵を順に試す。"""
+    return MultiFernet([f for _, f in _keyring()])
+
+
+def active_key_id() -> str:
+    return _keyring()[0][0]
+
+
+def keyring_ids() -> List[str]:
+    """[Gate G1] 今の鍵・前の鍵の版(指紋)。先頭が今の鍵。"""
+    return [kid for kid, _ in _keyring()]
+
+
+def key_id_of(ciphertext: bytes) -> Optional[str]:
+    """[Gate G1] この暗号文がどの鍵で作られたか(どの鍵でも検証できなければ None = 壊れている・失効した鍵)。"""
+    token = bytes(ciphertext)
+    for kid, f in _keyring():
+        try:
+            f.decrypt(token)
+            return kid
+        except InvalidToken:
+            continue
+    return None
+
+
+def reencrypt(ciphertext: bytes) -> Tuple[bytes, Optional[str], bool]:
+    """[Gate G1] 前の鍵の暗号文を今の鍵で掛け直す。戻り値: (新しい暗号文, 元の鍵の版, 掛け直したか)。
+
+    今の鍵の暗号文はそのまま返す(何度実行しても同じ結果)。どの鍵でも読めない暗号文は ValueError。
+    中身(平文)は呼び出し側へ返さない。"""
+    token = bytes(ciphertext)
+    kid = key_id_of(token)
+    if kid is None:
+        raise ValueError("どの鍵でも復号できない暗号文です")
+    if kid == active_key_id():
+        return token, kid, False
+    return _get_fernet().rotate(token), kid, True
 
 
 @lru_cache(maxsize=1)
@@ -61,6 +138,7 @@ def _get_lookup_index_key() -> bytes:
 def reset_cache_for_tests() -> None:
     """テストでENCRYPTION_KEY/LOOKUP_INDEX_KEYの有無を切り替える際にキャッシュを
     破棄するためのヘルパー。アプリケーション本体からは呼ばない。"""
+    _keyring.cache_clear()
     _get_fernet.cache_clear()
     _get_lookup_index_key.cache_clear()
 

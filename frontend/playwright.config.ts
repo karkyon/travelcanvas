@@ -1,4 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
+
+type PlaywrightReporters = Exclude<PlaywrightTestConfig['reporter'], string | undefined>;
 
 /**
  * [Gate R2-6] QuickDraft browser E2E設定。
@@ -24,7 +26,12 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   // CI では落ちた試験を GitHub の注記(annotations)にも出す。ログを開けない所からも ci_gate.py が API で読める
-  reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
+  // [Gate G1] GOV-03 PLAYWRIGHT_JUNIT_OUTPUT があれば結果を JUnit でも書く(CI が VERIFIED の証拠の合格を照合する。
+  // scripts/ci/check_ledger_results.py)
+  reporter: [
+    ...(process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : [['list']]),
+    ...(process.env.PLAYWRIGHT_JUNIT_OUTPUT ? [['junit', { outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT }]] : []),
+  ] as PlaywrightReporters,
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4173',
     trace: 'retain-on-failure',

@@ -18,5 +18,5 @@
 | 6 | 権限(viewer以上)・部外者403・監査に内容なし | DOC-06 | IMPLEMENTED | B `test_permissions`, `test_ics_calendar`, `test_gpx_and_kml` |
 | 7 | URL実在・クライアント | Gate C2b方式 | IMPLEMENTED | F `c2b3.test.ts`, `p5itineraryExport.test.ts` |
 | 8 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe) |
-| 9 | ICS/GPX/KML/CSVの取込(差分確認後に適用) | FR-036 | NOT STARTED | ADR §3 |
+| 9 | ICS/GPX/KML/CSVの取込(差分確認後に適用) | FR-036 | NOT STARTED | ADR §3 ※ **SUPERSEDED BY Gate P8(ICS の取込は実装。GPX/KML/CSV の取込だけが残り)** |
 | 10 | Google/Apple Calendarとの直接連携 | FR-036 | NOT STARTED | ADR §3 |

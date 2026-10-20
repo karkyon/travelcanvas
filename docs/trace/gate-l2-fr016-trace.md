@@ -28,8 +28,8 @@
 | 15 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe: 空画面・追加ダイアログ・登録後) |
 | 16 | 実backend応答との契約 | Gate C2b方式 | IMPLEMENTED | fixture `constraint_*`(9種); F `contract.test.ts`, `c2b3.test.ts`(URL実在) |
 | 17 | 旅程が制約を満たすかの検証 | FR-017 | IMPLEMENTED(Gate L3) | `docs/trace/gate-l3-fr017-trace.md` |
-| 18 | 最適化への制約反映 | FR-018 | NOT STARTED | Gate L4 |
-| 19 | 秘匿プロフィール(予算・健康等)と「満たす/満たさない」表示 | FR-023 | PARTIAL | 秘匿の保存・非表示(L2)、制約ごとの充足表示(L3)。プロフィール単位の秘匿情報は未実装 |
+| 18 | 最適化への制約反映 | FR-018 | NOT STARTED | Gate L4 ※ **SUPERSEDED BY Gate L4 `28d21c3`(最適化の入力に接続済み)** |
+| 19 | 秘匿プロフィール(予算・健康等)と「満たす/満たさない」表示 | FR-023 | PARTIAL | 秘匿の保存・非表示(L2)、制約ごとの充足表示(L3)。プロフィール単位の秘匿情報は未実装 ※ **SUPERSEDED BY Gate C1(秘匿プロフィールを実装、FR-023 VERIFIED)** |
 
 ## 同Gateで修正した既存不具合
 

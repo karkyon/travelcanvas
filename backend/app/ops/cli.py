@@ -1055,6 +1055,24 @@ def cmd_security(ex: Executor, security_args: Sequence[str]) -> int:
     return int(proc.returncode)
 
 
+def cmd_keys(ex: Executor, action: str, extra: Sequence[str]) -> int:
+    """[Gate G1] SEC-F1/F2 鍵の点検・鍵ごとの件数・掛け直し(backend のコンテナの中。結果は1行の JSON、値は出さない)。"""
+    if action == "check":
+        module = ["-m", "app.ops.keys", "check"]
+    elif action == "status":
+        module = ["-m", "app.ops.rekey", "status"] + list(extra)
+    else:
+        module = ["-m", "app.ops.rekey", "run"] + list(extra)
+    proc = ex.backend_python(module, check=False)
+    out = (proc.stdout or b"").decode("utf-8", "replace").strip()
+    err = (proc.stderr or b"").decode("utf-8", "replace").strip()
+    if out:
+        print(out)
+    if err and proc.returncode != 0:
+        log(err.splitlines()[-1])
+    return int(proc.returncode)
+
+
 def cmd_schedule(action: str, python: str) -> int:
     block = opslib.render_cron_block(str(REPO), python=python)
     if action == "print":
@@ -1109,6 +1127,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # [Gate S8] 侵害が疑われる時の封じ込め(Runbook §8)。backend のコンテナの中の scripts/security_incident.py に渡す
     p = sub.add_parser("security", help="警戒モード・セッションの一斉失効・遮断の解除(Runbook §8)")
     p.add_argument("security_args", nargs=argparse.REMAINDER)
+    # [Gate G1] 暗号化の鍵の版の切り替え(docs/ops/KEY-INVENTORY.md・Runbook §8.2)
+    p = sub.add_parser("keys", help="鍵の点検(check)・鍵ごとの件数(status)・前の鍵の暗号文の掛け直し(rekey)")
+    p.add_argument("action", choices=("check", "status", "rekey"))
+    p.add_argument("keys_args", nargs=argparse.REMAINDER)
     p = sub.add_parser("schedule")
     p.add_argument("action", choices=("print", "install", "remove"))
     p.add_argument("--python", default=sys.executable if sys.executable.startswith("/") else "/usr/bin/python3")
@@ -1123,6 +1145,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return EXIT_OK if plan["ok"] else EXIT_WARN
         if args.cmd == "security":
             return cmd_security(make_executor(args.mode), args.security_args)
+        if args.cmd == "keys":
+            return cmd_keys(make_executor(args.mode), args.action, args.keys_args)
         if args.cmd == "log-scan" and args.log_file:
             # ファイルを検査するだけなので、docker・DB への接続もバックアップの置き場所も要らない
             res = cmd_log_scan(Executor(), since=args.since, services=args.services or ["backend"],

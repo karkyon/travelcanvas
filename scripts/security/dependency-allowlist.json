@@ -70,15 +70,18 @@
    "package": "vite",
    "ids": [
     "GHSA-4w7w-66w2-5vf9",
+    "GHSA-587h-7wmj-h5pm",
+    "GHSA-698v-4r3x-3vcv",
     "GHSA-93m4-6634-74q7",
     "GHSA-c27g-q93r-2cwf",
     "GHSA-fx2h-pf6j-xcff",
     "GHSA-g4jq-h2w9-997c",
     "GHSA-jqfw-vq24-v9c3",
+    "GHSA-r825-w8mm-5pxw",
     "GHSA-v6wh-96g9-6wx3"
    ],
    "scope": "build-only",
-   "reason": "開発サーバー・ビルド・`vite preview` の脆弱性(Windows のパス・dev server の fs 制限・launch-editor)。本番の画面配信は静的ファイルに限り、`vite preview` は使わない方針(SEC-D で nginx 等の静的配信へ移す)。修正は vite 6/7 以降(メジャー更新)のため別 Gate で移行する",
+   "reason": "開発サーバー・ビルド・`vite preview` の脆弱性(Windows のパス・dev server の fs 制限・launch-editor)。本番の画面配信は静的ファイルに限り、`vite preview` は使わない方針(SEC-D で nginx 等の静的配信へ移す)。修正は vite 6/7 以降(メジャー更新)のため別 Gate で移行する。[Gate G1] 2026-10-21 公表の launch-editor の3件(GHSA-587h-7wmj-h5pm・GHSA-698v-4r3x-3vcv・GHSA-r825-w8mm-5pxw)も同じ扱い: エディタを開く `/__open-in-editor` は開発サーバー(vite の _createServer)だけが登録し、`vite preview` には無い(omega の preview で要求しても画面の index.html が返るだけであることを確認)",
    "expires": "2026-12-31"
   },
   {

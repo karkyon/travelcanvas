@@ -48,11 +48,19 @@ def production_problems(s) -> List[str]:
         reason = _weak_secret(value)
         if reason:
             problems.append(f"{name} が弱い({reason})")
-    present = [(n, v) for n, v in keys.items() if v]
-    for i, (n1, v1) in enumerate(present):
-        for n2, v2 in present[i + 1:]:
-            if v1 == v2:
-                problems.append(f"{n1} と {n2} が同じ値(用途ごとに別の鍵にする)")
+    # [Gate G1] SEC-F2 用途ごとの鍵の取り違え・使い回しの検出は app/core/key_inventory.py に集める
+    from app.core.key_inventory import reuse_problems
+
+    problems.extend(reuse_problems(s))
+    previous = [v.strip() for v in (getattr(s, "ENCRYPTION_KEYS_PREVIOUS", None) or "").split(",") if v.strip()]
+    for i, value in enumerate(previous, start=1):
+        reason = _weak_secret(value)
+        if reason:
+            problems.append(f"ENCRYPTION_KEYS_PREVIOUS の{i}番目が弱い({reason})")
+    # [Gate G1] オフラインパックの鍵を ENCRYPTION_KEY から導出したままだと、暗号化の鍵を替えた時に
+    # 全員の端末のオフラインデータが読めなくなる(鍵の用途が分かれていない)
+    if not (getattr(s, "OFFLINE_PACK_KEY_SECRET", None) or "").strip():
+        problems.append("OFFLINE_PACK_KEY_SECRET が未設定(ENCRYPTION_KEY から導出され、鍵を替えるとオフラインデータが読めなくなる)")
     if not s.METRICS_TOKEN or len(s.METRICS_TOKEN) < 24:
         problems.append("METRICS_TOKEN が未設定か24文字未満(/metrics を守れない)")
     origins = s.CORS_ORIGINS if isinstance(s.CORS_ORIGINS, list) else [s.CORS_ORIGINS]
@@ -173,6 +181,10 @@ class Settings(BaseSettings):
     # ため、未設定時はQuickDraft関連呼び出し時にのみ明確なエラーを返す設計
     # とする(backend/app/core/crypto.py参照)。
     ENCRYPTION_KEY: Optional[str] = None
+    # [Gate G1] SEC-F1 前の鍵(カンマ区切り)。復号だけに使う。鍵を替える時は、今の ENCRYPTION_KEY をここへ移し、
+    # 新しい鍵を ENCRYPTION_KEY に入れて `tcops.py keys rekey` で掛け直す。全件が今の鍵になったら外す(失効)。
+    # 手順は docs/ops/KEY-INVENTORY.md・Runbook §8.2。
+    ENCRYPTION_KEYS_PREVIOUS: Optional[str] = None
 
     # [Gate R3-13] confirmation_number等の暗号化フィールドに対する盲検索
     # (blind index)用のHMAC鍵。DOC-08 §19「Lookup: HMAC blind index、用途別key」

@@ -17,4 +17,4 @@
 | 6 | 危ない・効果の無い操作を拒む(全員の失効の確認、Redis 無し) | IMPLEMENTED | B `test_script_refuses_unsafe_or_ineffective_use` |
 | 7 | 運用のコマンドから backend のコンテナへ渡す | IMPLEMENTED | B `test_tcops_passes_security_commands_into_the_backend` |
 | 8 | 手順・鍵の替え方 | IMPLEMENTED | Runbook §8 |
-| 9 | 暗号化の鍵の版の切り替え | NOT STARTED | SEC-F(DB の変更が要る) |
+| 9 | 暗号化の鍵の版の切り替え | NOT STARTED | SEC-F(DB の変更が要る) ※ **SUPERSEDED BY Gate G1(SEC-F1。DB の変更なしで実装。docs/ops/KEY-INVENTORY.md)** |

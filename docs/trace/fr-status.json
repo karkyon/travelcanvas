@@ -1,0 +1,479 @@
+{
+ "_meta": {
+  "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
+  "revision": "v5.1-r13",
+  "weights": {
+   "SPECIFIED": 0.0,
+   "IMPLEMENTED": 0.4,
+   "INTEGRATED": 0.7,
+   "VERIFIED": 0.9,
+   "RELEASED": 1.0
+  }
+ },
+ "features": {
+  "FR-001": {
+   "title": "ゲスト旅行開始",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#35・R1・R2",
+   "gaps": "KPI、回復UX"
+  },
+  "FR-002": {
+   "title": "ゲスト昇格",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "G1・A1",
+   "gaps": "全所有物の移管のE2E、重複統合"
+  },
+  "FR-003": {
+   "title": "認証・セッション",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "A1・S2・S5・S7・S9・S11",
+   "gaps": "メールの確認、passkey"
+  },
+  "FR-004": {
+   "title": "旅行CRUD",
+   "status": "INTEGRATED",
+   "partial": false,
+   "e2e": "一部",
+   "gates": "B-012",
+   "gaps": "定期実行の継続記録、複数端末の同時編集のE2E"
+  },
+  "FR-005": {
+   "title": "日・イベント",
+   "status": "INTEGRATED",
+   "partial": false,
+   "e2e": "一部",
+   "gates": "B-013",
+   "gaps": "日跨ぎ、影響のプレビュー、DnDの実ブラウザE2E"
+  },
+  "FR-006": {
+   "title": "NOW/NEXT",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "L1・L1b",
+   "gaps": "実機mobile、夜行便のE2E"
+  },
+  "FR-007": {
+   "title": "候補箱",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "C2",
+   "gaps": "画像・音声からの候補(OCR・音声認識)、候補への投票、URLの題名・画像の取得"
+  },
+  "FR-008": {
+   "title": "場所の一元管理",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "C2",
+   "gaps": "例外日・祝日・最終入場、ジオコードの確認、入口の別地点、複数の出典の比較"
+  },
+  "FR-009": {
+   "title": "情報内検索・コマンドパレット",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "C3",
+   "gaps": "`>` のコマンド"
+  },
+  "FR-010": {
+   "title": "予約管理",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "R3・E1",
+   "gaps": "外部予約サービスとの同期、取消期限の通知"
+  },
+  "FR-011": {
+   "title": "予約取込",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "R3-7・R3-9・E1",
+   "gaps": "メール・OCRによる自動抽出"
+  },
+  "FR-012": {
+   "title": "QR・チケット",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "R3-5・R3-11・E1",
+   "gaps": "バーコードの描画、オフライン表示"
+  },
+  "FR-013": {
+   "title": "文書ウォレット",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "R3-6・M5〜M10・S4",
+   "gaps": "本番の Object Storage・ClamAV の常時運用・KMS"
+  },
+  "FR-014": {
+   "title": "移動区間",
+   "status": "INTEGRATED",
+   "partial": false,
+   "e2e": "一部",
+   "gates": "M1・M2・B-014",
+   "gaps": "外部の交通(時刻表・運賃)、区間の編集・UndoのE2E"
+  },
+  "FR-015": {
+   "title": "経路比較",
+   "status": "INTEGRATED",
+   "partial": false,
+   "e2e": "一部",
+   "gates": "M3・M4・M8",
+   "gaps": "経路の外部provider、route option の Undo・E2E"
+  },
+  "FR-016": {
+   "title": "制約",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "L2",
+   "gaps": "制約の変更の Undo"
+  },
+  "FR-017": {
+   "title": "実行可能性",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "L3",
+   "gaps": "時刻表の照合、標準滞在時間、休憩の自動判定"
+  },
+  "FR-018": {
+   "title": "説明可能最適化",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "L4",
+   "gaps": "公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間"
+  },
+  "FR-019": {
+   "title": "What-if",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P7",
+   "gaps": "予約・移動・費用の分岐、移動時間・制約・費用差の比較"
+  },
+  "FR-020": {
+   "title": "共同編集",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "C1",
+   "gaps": "カーソル・WebSocket の即時配信"
+  },
+  "FR-021": {
+   "title": "共有・権限",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#25・#30・E1",
+   "gaps": "所有者の移譲"
+  },
+  "FR-022": {
+   "title": "合意形成",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P3",
+   "gaps": "決定した候補の予定への反映、締切"
+  },
+  "FR-023": {
+   "title": "秘匿プロフィール・制約",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "L2・C1",
+   "gaps": "—"
+  },
+  "FR-024": {
+   "title": "コメント・通知",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P3",
+   "gaps": "予定・予約・費用単位のコメント画面、リマインド、メール通知"
+  },
+  "FR-025": {
+   "title": "持ち物",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P1",
+   "gaps": "薬の時刻通知・天候連動"
+  },
+  "FR-026": {
+   "title": "レディネス",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P1",
+   "gaps": "予算との連動"
+  },
+  "FR-027": {
+   "title": "予算・費用",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P2",
+   "gaps": "予算の版、為替の自動取得、他通貨の予約額の合計"
+  },
+  "FR-028": {
+   "title": "立替・精算",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P2",
+   "gaps": "領収書を紐付ける画面"
+  },
+  "FR-029": {
+   "title": "当日モード",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "L1・P10",
+   "gaps": "外部状況の自動取得"
+  },
+  "FR-030": {
+   "title": "外部状況",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P10",
+   "gaps": "外部provider(運行情報・天気・警報・休業)"
+  },
+  "FR-031": {
+   "title": "安全な再計画",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P10",
+   "gaps": "代替移動手段の探索、プッシュ通知"
+  },
+  "FR-032": {
+   "title": "Offline Pack",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#36・K1",
+   "gaps": "サーバー側のパック、通信しない端末の遠隔消去"
+  },
+  "FR-033": {
+   "title": "Offline同期",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P11",
+   "gaps": "予定以外のオフライン編集、機密値の変更時の再認証"
+  },
+  "FR-034": {
+   "title": "しおり生成",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P4",
+   "gaps": "冊子の面付"
+  },
+  "FR-035": {
+   "title": "安全な印刷・公開",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P4",
+   "gaps": "サーバー側の PDF・ダウンロード URL"
+  },
+  "FR-036": {
+   "title": "Calendar/Map IO",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P5・P8",
+   "gaps": "外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込"
+  },
+  "FR-037": {
+   "title": "写真・旅行記",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P12・Q1",
+   "gaps": "旅行記の公開URL、顔の検査、MEMORY MAP、記録の Undo"
+  },
+  "FR-038": {
+   "title": "位置軌跡",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P13・L5",
+   "gaps": "バックグラウンドの記録、現在地の共有"
+  },
+  "FR-039": {
+   "title": "輸出・削除",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P6・P9",
+   "gaps": "猶予つきのアカウント削除、所有者の移譲、出典つきの訂正"
+  },
+  "FR-040": {
+   "title": "管理・監査",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "A2・S11",
+   "gaps": "サポート閲覧(同意・期限)、共有の失効・ジョブ・容量の管理画面"
+  },
+  "FR-041": {
+   "title": "組織・B2B",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "B1",
+   "gaps": "ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち)"
+  },
+  "FR-042": {
+   "title": "API・埋込",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "B1",
+   "gaps": "書き込みの API、鍵の切り替え、自動の再送・dead-letter、埋め込み"
+  },
+  "FR-043": {
+   "title": "Quick Plan",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#38・R2",
+   "gaps": "—"
+  },
+  "FR-044": {
+   "title": "Guest Travel View",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#35・#41・E1",
+   "gaps": "詳しい表示・複製の説明"
+  },
+  "FR-045": {
+   "title": "安全な共有ポリシー",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "F45",
+   "gaps": "同行者(メンバー)向けの項目単位の規則"
+  },
+  "FR-046": {
+   "title": "画像・PDFの出力",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P4・P16",
+   "gaps": "サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査"
+  },
+  "FR-047": {
+   "title": "旅程複製",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "#39・R3-12・E1",
+   "gaps": "—"
+  },
+  "FR-048": {
+   "title": "Offline Travel Pack(端末)",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "#36・P11・K1",
+   "gaps": "予定以外のオフライン編集、通信しない端末の遠隔消去"
+  },
+  "FR-049": {
+   "title": "Visited Area Layer",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "V2",
+   "gaps": "候補の層、地図タイルの上への表示"
+  },
+  "FR-050": {
+   "title": "訪問判定・信頼度",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "V2",
+   "gaps": "—"
+  },
+  "FR-051": {
+   "title": "訪問訂正・除外",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "V2・Q1",
+   "gaps": "共有・公開での出発・帰着地点のぼかし"
+  },
+  "FR-052": {
+   "title": "Personal Travel Atlas",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P15",
+   "gaps": "国・都道府県・市区町村・テーマ別(逆ジオコーディング)、地点単位の公開範囲"
+  },
+  "FR-053": {
+   "title": "旅の達成指標",
+   "status": "VERIFIED",
+   "partial": false,
+   "e2e": "✓",
+   "gates": "P14",
+   "gaps": "—"
+  },
+  "FR-054": {
+   "title": "予定と実績",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P14",
+   "gaps": "予定経路と GPS 軌跡の比較"
+  },
+  "FR-055": {
+   "title": "Local-first Location",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "L5",
+   "gaps": "端末のバックグラウンド記録、端末内の点の暗号化"
+  },
+  "FR-056": {
+   "title": "適応型GPS",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "L5",
+   "gaps": "OS の geofence、電池の計測"
+  },
+  "FR-057": {
+   "title": "Memory Replan",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "P17",
+   "gaps": "同行者属性・移動手段の傾向"
+  },
+  "FR-058": {
+   "title": "Entitlement・料金",
+   "status": "SPECIFIED",
+   "partial": false,
+   "e2e": "✗",
+   "gates": "—",
+   "gaps": "価格・有料の範囲の製品判断待ち(決まるまで実装しない)"
+  }
+ }
+}
