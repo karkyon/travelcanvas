@@ -1,5 +1,6 @@
 /**
- * [Gate S7] 計算の確認(428)を APIクライアントが自動で解いて、同じ要求を1回だけ送り直すこと。
+ * [Gate S7] 計算の確認(428)を APIクライアントが自動で解いて、同じ要求を送り直すこと。
+ * [Gate Q1] 送り直しに新しい問題が返った時は、合計3回まで解き直す。
  * 実際の axios の経路(adapter だけ差し替え)で確かめる。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -66,12 +67,34 @@ describe('計算の確認 (Gate S7)', () => {
     expect(seen[1]?.body).toBe(seen[0]?.body);
   });
 
-  it('送り直しても 428 なら、それ以上は繰り返さずに失敗を返す', async () => {
+  it('送り直しに同じ問題が返ったら、それ以上は繰り返さずに失敗を返す', async () => {
     const core = new TestCore();
     const seen = install(core, (config) => challenge(config));
 
     await expect(core.http.post('/auth/guest', undefined, { skipGlobalErrorHandler: true })).rejects.toBeInstanceOf(AxiosError);
     expect(seen).toHaveLength(2);
+  });
+
+  it('[Gate Q1] 送り直しに新しい問題が返ったら(点数が上がった・期限切れ)、解き直して通る', async () => {
+    const core = new TestCore();
+    const second = 'eyJ0ZXN0IjoyfQ.c2lnbmF0dXJl';
+    const seen = install(core, (config, n) => {
+      if (n === 1) return challenge(config);
+      if (n === 2) return challenge(config, second, '9');
+      return { access_token: 'ok' };
+    });
+    const res = await core.http.post('/auth/register', { email: 'a@example.com' }, { skipGlobalErrorHandler: true });
+    expect(res.data).toEqual({ access_token: 'ok' });
+    expect(seen.map((s) => s.token)).toEqual([undefined, TOKEN, second]);
+    expect(solutionOk(second, String(seen[2]?.solution), 9)).toBe(true);
+    expect(seen[2]?.body).toBe(seen[0]?.body);
+  });
+
+  it('[Gate Q1] 新しい問題が続いても、解くのは合計3回までで失敗を返す', async () => {
+    const core = new TestCore();
+    const seen = install(core, (config, n) => challenge(config, `eyJ0ZXN0IjoxfQ.c2lnbmF0dXJl${n}`, '8'));
+    await expect(core.http.post('/auth/login', {}, { skipGlobalErrorHandler: true })).rejects.toBeInstanceOf(AxiosError);
+    expect(seen).toHaveLength(4);
   });
 
   it('問題が不正(難しすぎる・形式が違う)なら解かずに失敗を返す', async () => {

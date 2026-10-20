@@ -35,12 +35,16 @@ from app.services import threat_guard
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
+from app.services import image_metadata
 from app.services.storage_backend import (
     FileTooLargeError, compute_sha256, generate_storage_key, get_storage_backend, load_decrypted_file,
     read_upload_limited, save_encrypted_file,
 )
 
 logger = logging.getLogger(__name__)
+# [Gate Q1] 保存した写真の MIME から、撮影情報を取り除く時の形式を決める
+MIME_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+
 router = APIRouter(prefix="/plans", tags=["memories"])
 
 
@@ -284,6 +288,12 @@ async def upload_memory(
         raise _bad("malware_found", "ファイルから有害なプログラムが見つかったため、受け付けませんでした", 422)
     if settings.DOCUMENT_REQUIRE_CLEAN_SCAN and scan.status != malware_scan.CLEAN:
         raise _bad("scan_unavailable", "ファイルの安全確認ができないため、今は受け付けられません", 503)
+    if kind == "photo":
+        # [Gate Q1] 撮影情報(撮影位置・機種・撮影日時)を取り除いてから保存する(向きは画素に反映する)
+        try:
+            content, _stripped = image_metadata.strip(ext, content)
+        except image_metadata.MetadataUnremovable:
+            raise _bad("metadata_unremovable", "写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません", 422)
     storage_key = generate_storage_key(plan.id, ext)
     backend = get_storage_backend()
     try:
@@ -383,6 +393,13 @@ def get_memory_media(plan_id: str, memory_id: str, db: Session = Depends(get_db)
         raise HTTPException(status_code=404, detail="ファイルが見つかりません")
     except EncryptionNotConfigured:
         raise _bad("encryption_not_configured", "ファイルの暗号化が設定されていません(サーバー側の設定)", 503)
+    if m.kind == "photo":
+        # [Gate Q1] Q1 より前に保存した写真には撮影情報が残っているため、配信の時にも取り除く
+        ext = MIME_EXT.get(m.mime_type or "", "")
+        try:
+            content, _stripped = image_metadata.strip(ext, content)
+        except image_metadata.MetadataUnremovable:
+            raise _bad("metadata_unremovable", "この写真は撮影情報(撮影位置など)を取り除けないため表示できません", 422)
     return Response(content=content, media_type=m.mime_type or "application/octet-stream", headers={
         "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
         "Content-Disposition": "inline",

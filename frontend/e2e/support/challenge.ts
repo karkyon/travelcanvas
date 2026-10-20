@@ -27,17 +27,21 @@ export function solve(token: string, difficulty: number): string {
   throw new Error('計算の確認を解けませんでした');
 }
 
-/** POST し、428(計算の確認)なら解いて1回だけ送り直す */
+/** POST し、428(計算の確認)なら解いて送り直す。[Gate Q1] 送り直しに新しい問題が返ったら合計3回まで解き直す(画面と同じ) */
 export async function postSolvingChallenge(
   request: APIRequestContext, url: string, options: { headers?: Record<string, string>; data?: unknown } = {},
 ): Promise<APIResponse> {
-  const first = await request.post(url, options);
-  if (first.status() !== 428) return first;
-  const token = first.headers()['x-tc-challenge'];
-  const difficulty = Number(first.headers()['x-tc-challenge-difficulty']);
-  if (!token || !Number.isInteger(difficulty)) return first;
-  return request.post(url, {
-    ...options,
-    headers: { ...(options.headers ?? {}), 'X-TC-Challenge': token, 'X-TC-Challenge-Solution': solve(token, difficulty) },
-  });
+  let res = await request.post(url, options);
+  const tried: string[] = [];
+  while (res.status() === 428 && tried.length < 3) {
+    const token = res.headers()['x-tc-challenge'];
+    const difficulty = Number(res.headers()['x-tc-challenge-difficulty']);
+    if (!token || !Number.isInteger(difficulty) || tried.includes(token)) return res;
+    tried.push(token);
+    res = await request.post(url, {
+      ...options,
+      headers: { ...(options.headers ?? {}), 'X-TC-Challenge': token, 'X-TC-Challenge-Solution': solve(token, difficulty) },
+    });
+  }
+  return res;
 }

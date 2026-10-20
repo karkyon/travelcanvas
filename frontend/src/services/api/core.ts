@@ -112,6 +112,13 @@ interface ChallengeProblem {
   difficulty: number;
 }
 
+/**
+ * [Gate Q1] 送り直しにも 428 が返ることがある: 問題を出した後に接続元の点数が上がった(too_easy)、解く間に問題の期限が
+ * 切れた(expired)。その時は新しい問題を解き直す(以前は1回で諦め、ログイン・登録が失敗になった。V2 の CI の zz)。
+ * 解く回数は合計 MAX_CHALLENGE_ATTEMPTS 回まで。同じ問題が返ってきた時は解き直さない(終わらない繰り返しの防止)。
+ */
+export const MAX_CHALLENGE_ATTEMPTS = 3;
+
 function readChallenge(error: AxiosError): ChallengeProblem | null {
   if (error.response?.status !== 428) return null;
   const headers = (error.response.headers ?? {}) as Record<string, unknown>;
@@ -207,13 +214,15 @@ export class ApiCore {
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as
-          (typeof error.config & { _retry?: boolean; _challengeTried?: boolean }) | undefined;
+          (typeof error.config & { _retry?: boolean; _challengeTokens?: string[] }) | undefined;
 
         // [Gate S7] SEC-07 怪しい接続元と判定された時は、ログイン・登録・ゲスト開始に計算の確認が要る(428)。
-        // 利用者の操作を増やさないよう、ここで解いて同じ要求を1回だけ送り直す(解の形式は challengeSolver.ts)。
+        // 利用者の操作を増やさないよう、ここで解いて同じ要求を送り直す(解の形式は challengeSolver.ts)。
+        // [Gate Q1] 送り直しに新しい問題が返った時は、合計 MAX_CHALLENGE_ATTEMPTS 回まで解き直す
         const problem = readChallenge(error);
-        if (problem && originalRequest && !originalRequest._challengeTried) {
-          originalRequest._challengeTried = true;
+        const tried = originalRequest?._challengeTokens ?? [];
+        if (problem && originalRequest && tried.length < MAX_CHALLENGE_ATTEMPTS && !tried.includes(problem.token)) {
+          originalRequest._challengeTokens = [...tried, problem.token];
           try {
             const solution = await solveChallenge(problem.token, problem.difficulty);
             originalRequest.headers = originalRequest.headers || {};

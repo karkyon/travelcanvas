@@ -60,13 +60,25 @@ test('怪しい接続元でも、画面のログイン・登録は自動の計�
   expect(solvedHeaders[0]).toBeUndefined();
   expect(solvedHeaders[solvedHeaders.length - 1]).toMatch(/^\d+$/);
 
-  // 3. 別の新しい会員の登録も、同じように自動で通る
+  // 3. 別の新しい会員の登録も、同じように自動で通る。
+  // [Gate Q1] 解いて送り直す間に接続元の点数が上がっても通る(V2 の CI で起きた状況を必ず作る): 解を付けた送り直しの直前に、
+  // 偽のトークンで点数を30上げる → サーバーは「問題が易しすぎる」と新しい問題を返す → 画面が解き直して通る(428, 428, 200)
   await page.context().clearCookies();
   await page.evaluate(() => window.localStorage.clear());
   const suffix = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
   const registerStatuses: number[] = [];
   page.on('response', (r) => {
     if (new URL(r.url()).pathname.endsWith('/auth/register')) registerStatuses.push(r.status());
+  });
+  let bumped = false;
+  await page.route('**/auth/register', async (route) => {
+    if (!bumped && route.request().headers()['x-tc-challenge-solution']) {
+      bumped = true;
+      for (let i = 0; i < 10; i++) {
+        await page.request.get(`${member.apiBase}/auth/me`, { headers: { Authorization: `Bearer forged.bump${i}.token` } });
+      }
+    }
+    await route.continue();
   });
   await page.goto('/register');
   await page.locator('#username').fill(`s7chal${suffix}`.slice(0, 30));
@@ -76,4 +88,6 @@ test('怪しい接続元でも、画面のログイン・登録は自動の計�
   await page.getByRole('button', { name: 'Create Account' }).click();
   await page.waitForURL(/\/dashboard$/, { timeout: 100_000 });
   expectSolvedSequence(registerStatuses);
+  expect(bumped).toBe(true);
+  expect(registerStatuses).toEqual([428, 428, 200]);
 });

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { registerAccount } from './support/api';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { settleForAxe } from './support/axe';
 
 /**
  * [Gate P9] FR-039 アカウントの削除と同意の撤回(SC-29)のbrowser E2E。
@@ -16,6 +17,7 @@ import AxeBuilder from '@axe-core/playwright';
 const PASSWORD = 'Gate-P9-TestPass-1';
 
 async function axeViolations(page: Page, label: string): Promise<void> {
+  await settleForAxe(page);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   if (results.violations.length > 0) {
     const summary = results.violations

@@ -62,7 +62,7 @@ E = `frontend/e2e/visits.spec.ts`。画面 `/planner/:planId/visits`(訪問の�
 | 4 | 地点単位の除外 | IMPLEMENTED | 「地図から隠す」: 地図・Atlas に出さない。Atlas は隠した場所の半径の中の軌跡・記録も除く。B・E |
 | 5 | 保護エリア(自宅・職場)を端末側で設定 | IMPLEMENTED | 記録の画面。端末(localStorage)だけに保存。中で取れた位置は保存・送信しない。U |
 | 6 | 公開時に出発・帰着地点をぼかす | NOT APPLICABLE(現時点) | 位置の軌跡・訪問の判定・Atlas を公開・共有する機能が無い(本人だけ) |
-| 7 | 写真 EXIF を同じ公開 Policy で除去 | NOT STARTED | 写真の記録(P12)は元のファイルのまま保存しており、EXIF(撮影位置を含むことがある)を除いていない。メンバーに公開した写真から撮影位置が分かりうる。次の Gate で対応する |
+| 7 | 写真 EXIF を同じ公開 Policy で除去 | IMPLEMENTED(Gate Q1) | 保存の時と配信の時に撮影情報を取り除く。`docs/trace/gate-q1-trace.md` |
 | 8 | 修正前後を監査し、生位置を監査ログへ複製しない | IMPLEMENTED | visit.correct(操作・前後の状態だけ)。予定名・座標を残さない。B |
 
 → INTEGRATED(部分、E2E有)。

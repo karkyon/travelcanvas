@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { settleForAxe } from './support/axe';
 
 /**
  * [Gate R2-7] docs/trace/gate-r2-trace.md の R2-5行が「未達」としていた
@@ -24,6 +25,7 @@ test.describe('アクセシビリティ (axe-core)', () => {
       timeout: 15_000,
     });
 
+    await settleForAxe(page);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
@@ -51,6 +53,7 @@ test.describe('アクセシビリティ (axe-core)', () => {
       .getByRole('button', { name: /新しいプラン/ })
       .waitFor({ state: 'visible', timeout: 15_000 });
 
+    await settleForAxe(page);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
