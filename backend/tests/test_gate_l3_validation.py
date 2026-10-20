@@ -615,7 +615,8 @@ def test_undecryptable_private_constraint_is_reported_as_unverified(auth_client,
 def test_opening_hours_from_database(auth_client, db_session):
     client, _user = auth_client
     plan_id, day_id = _plan_with_day(client)
-    place = Place(name="テスト寺", latitude=35.0, longitude=135.7)
+    # [Gate C2] 予定に付けられるのは見られる場所だけ(試験の利用者が作った場所にする)
+    place = Place(name="テスト寺", latitude=35.0, longitude=135.7, created_by=_user.id)
     db_session.add(place)
     db_session.commit()
     db_session.add(OpeningHours(place_id=place.id, day_of_week=0, open_time="09:00", close_time="17:00"))

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.models.models import FieldSource, Place, SearchCandidate, SourceRecord, User
+from app.services import place_access
 from app.services.search_provider import search_all_providers
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -115,7 +116,9 @@ async def adopt_candidate(
     """候補を正規のPlaceへ採用する。フィールドごとの出典を
     FieldSourceとして記録し、候補が持つSourceRecordをPlaceにも
     紐づける(source継承)。"""
-    candidate = db.query(SearchCandidate).filter(SearchCandidate.id == candidate_id).first()
+    # [Gate C2] 以前は他の人の検索結果も ID だけで採用できた(IDOR)。本人の検索結果だけを採用できる
+    candidate = db.query(SearchCandidate).filter(SearchCandidate.id == candidate_id,
+                                                 SearchCandidate.searched_by_user_id == current_user.id).first()
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候補が見つかりません")
 
@@ -191,9 +194,8 @@ async def get_place(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    place = db.query(Place).filter(Place.id == place_id).first()
-    if not place:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Placeが見つかりません")
+    # [Gate C2] 以前は ID を知っていれば誰の場所でも見られた(IDOR)。作った人と、使っている旅行のメンバーだけ(見られなければ 404)
+    place = place_access.get_viewable(db, place_id, current_user)
 
     field_sources = db.query(FieldSource).filter(FieldSource.place_id == place.id).all()
     return {

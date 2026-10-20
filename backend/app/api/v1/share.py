@@ -19,6 +19,12 @@
 本Gateで /invitations/{id}/accept・/decline を追加し、`app.core.plan_access`
 経由でcollaboratorの実アクセスを可能にした。また共有トークンの平文DB保存
 (監査指摘)を修正し、失効・使用回数上限・パスコードにも対応した。
+
+[Gate F45] FR-045(CA-003)項目単位の共有の規則。作成・更新で見せる項目(fields / preset)を受け取り、
+機密(CONFIDENTIAL)は acknowledge_confidential が無いと保存しない。RESTRICTED は 422 で拒む
+(app/services/share_policy.py)。所有者は発行前(POST /{plan_id}/share-preview)と発行後
+(GET /{plan_id}/share/{share_id}/preview)に、閲覧者に見える内容を使用回数を消費せずに確認できる。
+発行・変更・失効・削除を監査へ記録する(トークン・合言葉・内容は残さず、項目名と設定の有無だけ)。
 """
 import hashlib
 import secrets
@@ -32,9 +38,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.core.plan_access import require_plan_access
-from app.models.models import Notification, PlanCollaborator, PlanShareLink, ShareAccessLog, TravelPlan, User
-from app.services import plan_item_deletion
+from app.models.models import (
+    Document, Notification, PlanCollaborator, PlanShareLink, Reservation, ShareAccessLog, Ticket, TravelEvent,
+    TravelPlan, User,
+)
+from app.services import plan_item_deletion, share_policy
 from app.services.audit_service import record_audit_event
+from app.api.v1.public_share import build_public_view
 
 router = APIRouter(prefix="/travel-plans", tags=["share"])
 
@@ -96,6 +106,69 @@ def _share_link_to_dict(share: PlanShareLink, raw_token: Optional[str] = None, d
         "revoked_at": share.revoked_at.isoformat() if share.revoked_at else None,
         "is_active": not (share.revoked_at or is_expired or is_exhausted),
         "created_at": share.created_at.isoformat() if share.created_at else None,
+        # [Gate F45] 見せる項目(NULL の既存リンクは標準)
+        "fields": share_policy.fields_of(share.policy),
+    }
+
+
+def _resolve_policy(payload: dict) -> dict:
+    try:
+        return share_policy.resolve(payload)
+    except share_policy.SharePolicyError as e:
+        raise HTTPException(status_code=422, detail=e.detail())
+
+
+def _audit_share(action: str, request: Request, user: User, share: PlanShareLink, extra: Optional[dict] = None) -> None:
+    """[Gate F45] 監査にはトークン・合言葉・プランの内容を残さず、項目名と設定の有無だけを残す。"""
+    details = {
+        "plan_id": str(share.plan_id),
+        "permission": share.permission,
+        "fields": share_policy.fields_of(share.policy),
+        "has_passcode": share.passcode_hash is not None,
+        "has_expiry": share.expires_at is not None,
+        "max_uses": share.max_uses,
+    }
+    details.update(extra or {})
+    record_audit_event(
+        action=action,
+        resource_type="plan_share_link",
+        user_id=user.id,
+        resource_id=share.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent", "")[:255],
+        details=details,
+    )
+
+
+def _withheld(db: Session, plan_id, fields: list) -> dict:
+    """[Gate F45] 所有者のプレビュー用: 閲覧者に見せない情報の件数(内容は返さない)。"""
+    reservations = (
+        db.query(Reservation).filter(Reservation.plan_id == plan_id, Reservation.deleted_at.is_(None)).all()
+    )
+    tickets = (
+        db.query(Ticket).join(Reservation, Ticket.reservation_id == Reservation.id)
+        .filter(Reservation.plan_id == plan_id, Reservation.deleted_at.is_(None), Ticket.deleted_at.is_(None))
+        .count()
+    )
+    documents = db.query(Document).filter(Document.plan_id == plan_id, Document.deleted_at.is_(None)).count()
+    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan_id).all()
+    return {
+        "reservations": 0 if "reservation_summary" in fields else len(reservations),
+        "confirmation_numbers": sum(1 for r in reservations if r.confirmation_number_ciphertext is not None),
+        "tickets": tickets,
+        "documents": documents,
+        "exact_locations": sum(1 for e in events if e.latitude is not None and e.longitude is not None),
+        "event_addresses": 0 if "event_address" in fields else sum(1 for e in events if e.address),
+        "event_notes": 0 if "event_notes" in fields else sum(1 for e in events if e.description),
+    }
+
+
+def _preview(db: Session, plan: TravelPlan, fields: list, permission: str) -> dict:
+    return {
+        "fields": list(fields),
+        "view": build_public_view(db, plan, fields, permission),
+        "withheld": _withheld(db, plan.id, fields),
+        "catalog": share_policy.catalog(),
     }
 
 
@@ -117,6 +190,7 @@ def _collaborator_to_dict(collab: PlanCollaborator) -> dict:
 @router.post("/{plan_id}/share")
 async def create_share_link(
     plan_id: uuid.UUID,
+    request: Request,
     payload: dict = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -147,6 +221,7 @@ async def create_share_link(
 
     passcode = payload.get("passcode")
     passcode_hash = _hash_token(passcode) if passcode else None
+    policy = _resolve_policy(payload)
 
     raw_token = secrets.token_urlsafe(24)
     share = PlanShareLink(
@@ -158,12 +233,47 @@ async def create_share_link(
         expires_at=expires_at,
         max_uses=max_uses,
         passcode_hash=passcode_hash,
+        policy=policy,
     )
     db.add(share)
     db.commit()
     db.refresh(share)
+    _audit_share("share_link_created", request, current_user, share)
 
     return _share_link_to_dict(share, raw_token=raw_token)
+
+
+@router.post("/{plan_id}/share-preview")
+async def preview_share_policy(
+    plan_id: uuid.UUID,
+    payload: Optional[dict] = Body(None),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """[Gate F45] 発行前の共有前プレビュー(所有者のみ)。リンクは作らず、閲覧者に見える内容と、
+    見せない情報の件数を返す。入力の検証は発行と同じ(機密は確認が必要、RESTRICTED は 422)。"""
+    plan = _get_owned_plan(db, plan_id, current_user)
+    payload = payload or {}
+    policy = _resolve_policy(payload)
+    permission = payload.get("permission", "view")
+    if permission not in ("view", "edit"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="permissionはview/editのいずれかです")
+    return _preview(db, plan, policy["fields"], permission)
+
+
+@router.get("/{plan_id}/share/{share_id}/preview")
+async def preview_share_link(
+    plan_id: uuid.UUID,
+    share_id: uuid.UUID,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """[Gate F45] 発行済みリンクで閲覧者に見える内容(所有者のみ)。使用回数を消費せず、閲覧記録も残さない。"""
+    plan = _get_owned_plan(db, plan_id, current_user)
+    share = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
+    if not share:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
+    return _preview(db, plan, share_policy.fields_of(share.policy), share.permission)
 
 
 @router.get("/{plan_id}/share")
@@ -181,6 +291,7 @@ async def list_share_links(
 async def update_share_link(
     plan_id: uuid.UUID,
     share_id: uuid.UUID,
+    request: Request,
     payload: dict = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -220,8 +331,14 @@ async def update_share_link(
         # 空文字/nullで保護を解除できるようにする。
         share.passcode_hash = _hash_token(payload["passcode"]) if payload["passcode"] else None
 
+    if share_policy.has_policy_input(payload):
+        share.policy = _resolve_policy(payload)
+
     db.commit()
     db.refresh(share)
+    _audit_share("share_link_updated", request, current_user, share,
+                 {"changed": sorted(k for k in payload if k in (
+                     "permission", "expires_at", "max_uses", "passcode", "fields", "preset"))})
     return _share_link_to_dict(share)
 
 
@@ -229,6 +346,7 @@ async def update_share_link(
 async def revoke_share_link(
     plan_id: uuid.UUID,
     share_id: uuid.UUID,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -242,6 +360,7 @@ async def revoke_share_link(
     share.revoked_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(share)
+    _audit_share("share_link_revoked", request, current_user, share)
     return _share_link_to_dict(share)
 
 
@@ -249,6 +368,7 @@ async def revoke_share_link(
 async def delete_share_link(
     plan_id: uuid.UUID,
     share_id: uuid.UUID,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -257,6 +377,7 @@ async def delete_share_link(
     if not share:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
 
+    _audit_share("share_link_deleted", request, current_user, share)
     db.delete(share)
     db.commit()
     return {"success": True}

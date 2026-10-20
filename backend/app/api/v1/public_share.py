@@ -34,6 +34,11 @@ tokenの生値はDBに一切保存せずSHA-256ハッシュのみで照合する
   (ホワイトリスト方式)。
 - 公開投影の形は固定スキーマ(`days: [{date, title, events: [...]}]`)
   であり、任意dictの再帰下降が不要になる。
+
+[Gate F45] FR-045(CA-003)項目単位の共有の規則。リンクごとの policy(app/services/share_policy.py)で
+説明・日程の見出し・時刻(INTERNAL)と住所・メモ・予約の概要(CONFIDENTIAL、明示の確認つき)を出し分ける。
+許可されていない項目はキーごと出さない。RESTRICTED(予約番号・チケット・文書・連絡先・正確な位置・支払い)は
+どの policy でも出力候補に無い。所有者の共有前プレビュー(share.py)も同じ build_public_view を使う。
 """
 import hashlib
 from datetime import datetime, timezone
@@ -46,7 +51,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import PlanShareLink, ShareAccessLog, TravelDay, TravelEvent, TravelPlan
+from app.models.models import PlanShareLink, Reservation, ShareAccessLog, TravelDay, TravelEvent, TravelPlan
+from app.services import share_policy
 from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/public/share", tags=["public-share"])
@@ -69,28 +75,36 @@ class ResolveShareRequest(BaseModel):
     passcode: Optional[str] = None
 
 
-def _public_event(event: TravelEvent) -> Dict[str, Any]:
+def _public_event(event: TravelEvent, fields: Optional[List[str]] = None) -> Dict[str, Any]:
     """[Gate #34] イベントの公開投影。ホワイトリストされたフィールドのみ。
-    address/latitude/longitude(正確な位置)、spot_id/place_id/day_id/
-    plan_id(内部ID)、description(自由記述、機密混入の恐れ)は既定で
-    含めない。"""
-    return {
+    latitude/longitude(正確な位置)、spot_id/place_id/day_id/plan_id(内部ID)は
+    どの policy でも含めない。[Gate F45] 時刻は event_times、住所の文字列は event_address、
+    説明(メモ)は event_notes が許可された時だけ出す。"""
+    allowed = share_policy.fields_of(None) if fields is None else fields
+    show_time = "event_times" in allowed
+    out: Dict[str, Any] = {
         "title": event.title,
         "event_type": event.event_type,
-        "local_start_time": event.local_start_time,
-        "is_all_day": event.is_all_day,
+        "local_start_time": event.local_start_time if show_time else None,
+        "is_all_day": bool(event.is_all_day) if show_time else False,
     }
+    if "event_address" in allowed and event.address:
+        out["address"] = event.address
+    if "event_notes" in allowed and event.description:
+        out["notes"] = event.description
+    return out
 
 
-def _public_day(day: TravelDay, events: List[TravelEvent]) -> Dict[str, Any]:
+def _public_day(day: TravelDay, events: List[TravelEvent], fields: Optional[List[str]] = None) -> Dict[str, Any]:
+    allowed = share_policy.fields_of(None) if fields is None else fields
     return {
         "date": day.local_date.isoformat() if day.local_date else None,
-        "title": day.title,
-        "events": [_public_event(e) for e in events],
+        "title": day.title if "day_titles" in allowed else None,
+        "events": [_public_event(e, allowed) for e in events],
     }
 
 
-def _build_public_days(db: Session, plan_id) -> List[Dict[str, Any]]:
+def _build_public_days(db: Session, plan_id, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     days = (
         db.query(TravelDay)
         .filter(TravelDay.plan_id == plan_id)
@@ -110,7 +124,58 @@ def _build_public_days(db: Session, plan_id) -> List[Dict[str, Any]]:
     for e in events:
         events_by_day.setdefault(e.day_id, []).append(e)
 
-    return [_public_day(d, events_by_day.get(d.id, [])) for d in days]
+    return [_public_day(d, events_by_day.get(d.id, []), fields) for d in days]
+
+
+def _local_time_text(value: Optional[datetime], tz_name: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        local = value.astimezone(ZoneInfo(tz_name)) if tz_name else value
+    except Exception:
+        local = value
+    return local.strftime("%Y-%m-%d %H:%M")
+
+
+def _public_reservations(db: Session, plan_id) -> List[Dict[str, Any]]:
+    """[Gate F45] 予約の概要(CONFIDENTIAL)。種類・施設名・日時・状態だけ。予約番号(伏せた形も)・PIN・
+    予約者名・連絡先・URL・金額・メモ・内部IDは出さない。"""
+    rows = (
+        db.query(Reservation)
+        .filter(Reservation.plan_id == plan_id, Reservation.deleted_at.is_(None))
+        .order_by(Reservation.start_at.asc().nullslast(), Reservation.created_at.asc())
+        .all()
+    )
+    return [
+        {
+            "type": r.type,
+            "provider_name": r.provider_name,
+            "status": r.status,
+            "start": _local_time_text(r.start_at, r.timezone_id),
+            "end": _local_time_text(r.end_at, r.timezone_id),
+        }
+        for r in rows
+    ]
+
+
+def build_public_view(db: Session, plan: TravelPlan, fields: List[str], permission: str) -> Dict[str, Any]:
+    """公開閲覧と所有者の共有前プレビューで共通の投影。"""
+    view: Dict[str, Any] = {
+        "plan_id": str(plan.id),
+        "title": plan.title,
+        "description": plan.description if "plan_description" in fields else None,
+        "destination": plan.destination,
+        "start_date": plan.start_date.isoformat() if plan.start_date else None,
+        "end_date": plan.end_date.isoformat() if plan.end_date else None,
+        "days": _build_public_days(db, plan.id, fields),
+        "permission": permission,
+        "can_edit": False,
+        "fields": list(fields),
+    }
+    if "reservation_summary" in fields:
+        view["reservations"] = _public_reservations(db, plan.id)
+    return view
 
 
 def _client_ip(request: Request) -> str:
@@ -193,7 +258,7 @@ async def resolve_share_token(
             (PlanShareLink.max_uses.is_(None)) | (PlanShareLink.use_count < PlanShareLink.max_uses),
         )
         .values(use_count=PlanShareLink.use_count + 1)
-        .returning(PlanShareLink.plan_id, PlanShareLink.permission)
+        .returning(PlanShareLink.plan_id, PlanShareLink.permission, PlanShareLink.policy)
     )
     result_row = db.execute(stmt).first()
     db.commit()
@@ -204,7 +269,7 @@ async def resolve_share_token(
         _log_access(db, share_id=share.id, token_hash=token_hash, ip=ip, result="invalid")
         _invalid_link()
 
-    plan_id, permission = result_row
+    plan_id, permission, policy = result_row
 
     # [Gate B-012] 論理削除済みプランの共有は無効(削除時にリンクも失効させているが二重に防ぐ)
     plan = db.query(TravelPlan).filter(TravelPlan.id == plan_id, TravelPlan.deleted_at.is_(None)).first()
@@ -216,14 +281,5 @@ async def resolve_share_token(
 
     # [Gate #34] 公開ビューは正規化テーブル(travel_days/travel_events)
     # から固定スキーマで構築する。旧`plan.itinerary`は一切参照しない。
-    return {
-        "plan_id": str(plan.id),
-        "title": plan.title,
-        "description": plan.description,
-        "destination": plan.destination,
-        "start_date": plan.start_date.isoformat() if plan.start_date else None,
-        "end_date": plan.end_date.isoformat() if plan.end_date else None,
-        "days": _build_public_days(db, plan.id),
-        "permission": permission,
-        "can_edit": False,
-    }
+    # [Gate F45] リンクの policy で見せる項目を出し分ける。
+    return build_public_view(db, plan, share_policy.fields_of(policy), permission)

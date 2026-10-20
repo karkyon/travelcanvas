@@ -27,9 +27,12 @@
 // [Gate C1] 共同編集・秘匿プロフィール(FR-020・FR-023)を追加: ... → OfflinePack → Collab → CompleteTravelAPI
 // [Gate A2] 管理・監査(FR-040)を追加: ... → Collab → Admin → CompleteTravelAPI
 // [Gate V2] 訪問の地図の層・訪問判定・訂正(FR-049〜051)を追加: ... → Admin → Visits → CompleteTravelAPI
-import { VisitsApi } from './endpoints/visits';
+// [Gate C2] 候補箱・場所の一元管理(FR-007・FR-008)を追加: ... → Visits → Candidates → CompleteTravelAPI
+// [Gate C3] 情報内検索・コマンドパレット(FR-009)を追加: ... → Candidates → PlanSearch → CompleteTravelAPI
+// [Gate B1] 組織・B2B・外部連携の管理(FR-041・FR-042)を追加: ... → PlanSearch → Organizations → CompleteTravelAPI
+import { OrganizationsApi } from './endpoints/organizations';
 
-export class CompleteTravelAPI extends VisitsApi {
+export class CompleteTravelAPI extends OrganizationsApi {
   // [Gate #34b] 旧ジョブ型最適化API(POST .../optimize でjob_idを発行し、
   // GET /optimization/{job_id} でポーリングする方式)を呼び出す4メソッドは、
   // Gate #34aでバックエンド側の対応エンドポイントが410 Goneへ廃止された

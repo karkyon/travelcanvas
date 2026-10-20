@@ -30,7 +30,11 @@
   "captured_at_head_l5": "Gate S11 (+Gate L5 location-settings/area-cells/sampling。既存の位置の fixture に trip_mode・sampling・cells を追加)",
   "captured_at_head_c1": "Gate L5 1fa667e (+Gate C1 presence・private-profile・constraint from_profile)",
   "captured_at_head_a2": "Gate C1 4775f95 (+Gate A2 admin: is_admin/is_self/mfa_enabled・sessions_revoked・actions・IP の末尾を伏せる)",
-  "captured_at_head_v2": "Gate A2 43b737a (+Gate V2 visits: 訪問の地図の層・判定・訂正。ID・日時は固定値へ置換)"
+  "captured_at_head_v2": "Gate A2 43b737a (+Gate V2 visits: 訪問の地図の層・判定・訂正。ID・日時は固定値へ置換)",
+  "captured_at_head_c2": "Gate Q1 (+Gate C2 候補箱・場所。ID・日時は固定値へ置換)",
+  "captured_at_head_c3": "Gate C2 (+Gate C3 情報内検索。ID・日付は固定値へ置換)",
+  "captured_at_head_f45": "Gate C3 (+Gate F45 共有リンクの項目単位の規則: share_*・public_share*・share_preview*。ID・日時は固定値へ置換)",
+  "captured_at_head_b1": "Gate F45 (+Gate B1 組織・配布・閲覧確認・外部連携の管理。ID・日時・メールアドレス・秘密は固定値へ置換)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -697,45 +701,44 @@
   "title": "契約fixture旅行"
  },
  "public_share": {
-  "can_edit": false,
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
+  "title": "京都の旅",
+  "description": "説明",
+  "destination": "京都",
+  "start_date": "2026-11-10T00:00:00+00:00",
+  "end_date": "2026-11-12T00:00:00+00:00",
   "days": [
    {
     "date": "2026-11-10",
+    "title": "1日目",
     "events": [
      {
+      "title": "清水寺",
       "event_type": "activity",
-      "is_all_day": false,
       "local_start_time": "09:00",
-      "title": "清水寺"
+      "is_all_day": false
      },
      {
+      "title": "伏見稲荷",
       "event_type": "sightseeing",
-      "is_all_day": false,
       "local_start_time": null,
-      "title": "伏見稲荷"
-     },
-     {
-      "event_type": "activity",
-      "is_all_day": false,
-      "local_start_time": null,
-      "title": "嵐山"
+      "is_all_day": false
      }
-    ],
-    "title": "1日目"
+    ]
    },
    {
     "date": "2026-11-11",
-    "events": [],
-    "title": null
+    "title": null,
+    "events": []
    }
   ],
-  "description": "説明",
-  "destination": "京都",
-  "end_date": "2026-11-12T00:00:00+00:00",
   "permission": "view",
-  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-  "start_date": "2026-11-10T00:00:00+00:00",
-  "title": "契約fixture旅行"
+  "can_edit": false,
+  "fields": [
+   "plan_description",
+   "day_titles",
+   "event_times"
+  ]
  },
  "quickdraft_promoted": {
   "end_date": "2026-09-27T00:00:00+00:00",
@@ -1318,96 +1321,126 @@
   "updated_at": "2026-09-25T09:49:07.619000Z"
  },
  "share_created": {
-  "created_at": "2026-09-25T22:47:05.446003+00:00",
-  "expires_at": null,
-  "has_passcode": false,
-  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
-  "is_active": true,
-  "last_accessed_at": null,
-  "max_uses": null,
-  "permission": "view",
-  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-  "revoked_at": null,
-  "token_prefix": "S1-NeOui",
+  "id": "00000000-0000-4000-8000-0000000000f2",
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
   "url": "/s/FIXTURE_PLACEHOLDER",
-  "use_count": 0
+  "token_prefix": "0LGBaVba",
+  "permission": "view",
+  "has_passcode": false,
+  "max_uses": null,
+  "use_count": 0,
+  "last_accessed_at": null,
+  "expires_at": null,
+  "revoked_at": null,
+  "is_active": true,
+  "created_at": "2026-10-20T03:00:00+00:00",
+  "fields": [
+   "plan_description",
+   "day_titles",
+   "event_times"
+  ]
  },
  "share_created_full": {
-  "created_at": "2026-09-25T22:47:05.446003+00:00",
-  "expires_at": "2027-01-01T00:00:00+00:00",
-  "has_passcode": true,
-  "id": "6e83c5e0-3a3e-47de-bcd5-65b538434ff2",
-  "is_active": true,
-  "last_accessed_at": null,
-  "max_uses": 5,
-  "permission": "edit",
-  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-  "revoked_at": null,
-  "token_prefix": "pYFF2qik",
+  "id": "00000000-0000-4000-8000-0000000000f3",
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
   "url": "/s/FIXTURE_PLACEHOLDER",
-  "use_count": 0
+  "token_prefix": "i31MiFMG",
+  "permission": "edit",
+  "has_passcode": true,
+  "max_uses": 5,
+  "use_count": 0,
+  "last_accessed_at": null,
+  "expires_at": "2027-01-01T00:00:00+00:00",
+  "revoked_at": null,
+  "is_active": true,
+  "created_at": "2026-10-20T03:00:00+00:00",
+  "fields": [
+   "event_address",
+   "event_notes",
+   "reservation_summary"
+  ]
  },
  "share_list": [
   {
-   "created_at": "2026-09-25T22:47:05.446003+00:00",
-   "expires_at": null,
-   "has_passcode": false,
-   "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
-   "is_active": true,
-   "last_accessed_at": null,
-   "max_uses": null,
-   "permission": "view",
-   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-   "revoked_at": null,
-   "token_prefix": "S1-NeOui",
+   "id": "00000000-0000-4000-8000-0000000000f2",
+   "plan_id": "00000000-0000-4000-8000-0000000000f1",
    "url": null,
-   "use_count": 0
+   "token_prefix": "0LGBaVba",
+   "permission": "view",
+   "has_passcode": false,
+   "max_uses": null,
+   "use_count": 0,
+   "last_accessed_at": null,
+   "expires_at": null,
+   "revoked_at": null,
+   "is_active": true,
+   "created_at": "2026-10-20T03:00:00+00:00",
+   "fields": [
+    "plan_description",
+    "day_titles",
+    "event_times"
+   ]
   },
   {
-   "created_at": "2026-09-25T22:47:05.446003+00:00",
-   "expires_at": "2027-01-01T00:00:00+00:00",
-   "has_passcode": true,
-   "id": "6e83c5e0-3a3e-47de-bcd5-65b538434ff2",
-   "is_active": true,
-   "last_accessed_at": null,
-   "max_uses": 5,
-   "permission": "edit",
-   "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-   "revoked_at": null,
-   "token_prefix": "pYFF2qik",
+   "id": "00000000-0000-4000-8000-0000000000f3",
+   "plan_id": "00000000-0000-4000-8000-0000000000f1",
    "url": null,
-   "use_count": 0
+   "token_prefix": "i31MiFMG",
+   "permission": "edit",
+   "has_passcode": true,
+   "max_uses": 5,
+   "use_count": 0,
+   "last_accessed_at": null,
+   "expires_at": "2027-01-01T00:00:00+00:00",
+   "revoked_at": null,
+   "is_active": true,
+   "created_at": "2026-10-20T03:00:00+00:00",
+   "fields": [
+    "event_address",
+    "event_notes",
+    "reservation_summary"
+   ]
   }
  ],
  "share_revoked": {
-  "created_at": "2026-09-25T22:47:05.446003+00:00",
-  "expires_at": null,
-  "has_passcode": false,
-  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
-  "is_active": false,
-  "last_accessed_at": null,
-  "max_uses": 10,
-  "permission": "view",
-  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-  "revoked_at": "2026-09-25T22:47:06.278060+00:00",
-  "token_prefix": "S1-NeOui",
+  "id": "00000000-0000-4000-8000-0000000000f2",
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
   "url": null,
-  "use_count": 1
+  "token_prefix": "0LGBaVba",
+  "permission": "view",
+  "has_passcode": false,
+  "max_uses": 10,
+  "use_count": 1,
+  "last_accessed_at": null,
+  "expires_at": null,
+  "revoked_at": "2026-10-20T03:05:00+00:00",
+  "is_active": false,
+  "created_at": "2026-10-20T03:00:00+00:00",
+  "fields": [
+   "plan_description",
+   "day_titles",
+   "event_times"
+  ]
  },
  "share_updated": {
-  "created_at": "2026-09-25T22:47:05.446003+00:00",
-  "expires_at": null,
-  "has_passcode": false,
-  "id": "f898bb9b-32dd-4281-b0e7-09f94714c7e4",
-  "is_active": true,
-  "last_accessed_at": null,
-  "max_uses": 10,
-  "permission": "view",
-  "plan_id": "f041d7c2-04e3-4ba8-9afa-e62a0d48471a",
-  "revoked_at": null,
-  "token_prefix": "S1-NeOui",
+  "id": "00000000-0000-4000-8000-0000000000f2",
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
   "url": null,
-  "use_count": 0
+  "token_prefix": "0LGBaVba",
+  "permission": "view",
+  "has_passcode": false,
+  "max_uses": 10,
+  "use_count": 0,
+  "last_accessed_at": null,
+  "expires_at": null,
+  "revoked_at": null,
+  "is_active": true,
+  "created_at": "2026-10-20T03:00:00+00:00",
+  "fields": [
+   "plan_description",
+   "day_titles",
+   "event_times"
+  ]
  },
  "ticket": {
   "barcode_format": "QR_CODE",
@@ -12224,6 +12257,1480 @@
   "detail": {
    "code": "revision_conflict",
    "message": "判定が別の画面で更新されています(現在のrevision: 2)"
+  }
+ },
+ "candidates_empty": {
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "items": [],
+  "counts": {
+   "open": 0,
+   "scheduled": 0,
+   "dismissed": 0
+  },
+  "duplicate_pairs": 0,
+  "can_edit": true
+ },
+ "candidate_created": {
+  "id": "00000000-0000-4000-8000-0000000000c3",
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "items": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000c3",
+    "title": "kiyomizudera.or.jp",
+    "note": "朝が空いている",
+    "source_kind": "url",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "source_label": "kiyomizudera.or.jp",
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "priority": 1,
+    "status": "open",
+    "status_label": "候補",
+    "scheduled_event_id": null,
+    "merged_into_id": null,
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 1,
+    "duplicates": [],
+    "merged_from": []
+   }
+  ],
+  "counts": {
+   "open": 1,
+   "scheduled": 0,
+   "dismissed": 0
+  },
+  "duplicate_pairs": 0
+ },
+ "candidates_duplicates": {
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "items": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000c3",
+    "title": "kiyomizudera.or.jp",
+    "note": "朝が空いている",
+    "source_kind": "url",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "source_label": "kiyomizudera.or.jp",
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "priority": 1,
+    "status": "open",
+    "status_label": "候補",
+    "scheduled_event_id": null,
+    "merged_into_id": null,
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 1,
+    "duplicates": [
+     {
+      "id": "00000000-0000-4000-8000-0000000000c4",
+      "title": "kiyomizudera.or.jp",
+      "reasons": [
+       "same_name",
+       "nearby"
+      ]
+     }
+    ],
+    "merged_from": []
+   },
+   {
+    "id": "00000000-0000-4000-8000-0000000000c4",
+    "title": "kiyomizudera.or.jp",
+    "note": null,
+    "source_kind": "manual",
+    "source_url": null,
+    "source_label": null,
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9951,
+    "longitude": 135.785,
+    "priority": 2,
+    "status": "open",
+    "status_label": "候補",
+    "scheduled_event_id": null,
+    "merged_into_id": null,
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 1,
+    "duplicates": [
+     {
+      "id": "00000000-0000-4000-8000-0000000000c3",
+      "title": "kiyomizudera.or.jp",
+      "reasons": [
+       "same_name",
+       "nearby"
+      ]
+     }
+    ],
+    "merged_from": []
+   }
+  ],
+  "counts": {
+   "open": 2,
+   "scheduled": 0,
+   "dismissed": 0
+  },
+  "duplicate_pairs": 1,
+  "can_edit": true
+ },
+ "candidates_merged": {
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "items": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000c3",
+    "title": "kiyomizudera.or.jp",
+    "note": "朝が空いている",
+    "source_kind": "url",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "source_label": "kiyomizudera.or.jp",
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "priority": 1,
+    "status": "open",
+    "status_label": "候補",
+    "scheduled_event_id": null,
+    "merged_into_id": null,
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 1,
+    "duplicates": [],
+    "merged_from": [
+     {
+      "id": "00000000-0000-4000-8000-0000000000c4",
+      "title": "kiyomizudera.or.jp",
+      "source_url": null,
+      "provider": null
+     }
+    ]
+   },
+   {
+    "id": "00000000-0000-4000-8000-0000000000c4",
+    "title": "kiyomizudera.or.jp",
+    "note": null,
+    "source_kind": "manual",
+    "source_url": null,
+    "source_label": null,
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9951,
+    "longitude": 135.785,
+    "priority": 2,
+    "status": "dismissed",
+    "status_label": "見送り",
+    "scheduled_event_id": null,
+    "merged_into_id": "00000000-0000-4000-8000-0000000000c3",
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 2,
+    "duplicates": [],
+    "merged_from": []
+   }
+  ],
+  "counts": {
+   "open": 1,
+   "scheduled": 0,
+   "dismissed": 1
+  },
+  "duplicate_pairs": 0
+ },
+ "candidate_scheduled": {
+  "event_id": "00000000-0000-4000-8000-0000000000c6",
+  "place_id": "00000000-0000-4000-8000-0000000000c5",
+  "plan_revision": 3,
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "items": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000c3",
+    "title": "kiyomizudera.or.jp",
+    "note": "朝が空いている",
+    "source_kind": "url",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "source_label": "kiyomizudera.or.jp",
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": "00000000-0000-4000-8000-0000000000c5",
+    "category": null,
+    "address": null,
+    "latitude": 34.9948,
+    "longitude": 135.785,
+    "priority": 1,
+    "status": "scheduled",
+    "status_label": "予定に配置済み",
+    "scheduled_event_id": "00000000-0000-4000-8000-0000000000c6",
+    "merged_into_id": null,
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 2,
+    "duplicates": [],
+    "merged_from": [
+     {
+      "id": "00000000-0000-4000-8000-0000000000c4",
+      "title": "kiyomizudera.or.jp",
+      "source_url": null,
+      "provider": null
+     }
+    ]
+   },
+   {
+    "id": "00000000-0000-4000-8000-0000000000c4",
+    "title": "kiyomizudera.or.jp",
+    "note": null,
+    "source_kind": "manual",
+    "source_url": null,
+    "source_label": null,
+    "provider": null,
+    "retrieved_at": null,
+    "place_id": null,
+    "category": null,
+    "address": null,
+    "latitude": 34.9951,
+    "longitude": 135.785,
+    "priority": 2,
+    "status": "dismissed",
+    "status_label": "見送り",
+    "scheduled_event_id": null,
+    "merged_into_id": "00000000-0000-4000-8000-0000000000c3",
+    "created_by": "taro",
+    "created_at": "2026-10-20T01:00:00+00:00",
+    "revision": 2,
+    "duplicates": [],
+    "merged_from": []
+   }
+  ],
+  "counts": {
+   "open": 0,
+   "scheduled": 1,
+   "dismissed": 1
+  },
+  "duplicate_pairs": 0
+ },
+ "place_info": {
+  "id": "00000000-0000-4000-8000-0000000000c5",
+  "name": "kiyomizudera.or.jp",
+  "aliases": [],
+  "category": null,
+  "address": null,
+  "latitude": 34.9948,
+  "longitude": 135.785,
+  "phone": null,
+  "website": null,
+  "entrance_note": null,
+  "floor": null,
+  "reservation_required": null,
+  "price_range": null,
+  "accessibility_note": null,
+  "closed_days": null,
+  "note": null,
+  "opening_hours": [],
+  "sources": {
+   "longitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "latitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "name": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   }
+  },
+  "events": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000c6",
+    "plan_id": "00000000-0000-4000-8000-0000000000c1",
+    "plan_title": "候補箱",
+    "title": "kiyomizudera.or.jp",
+    "date": "2026-11-01",
+    "local_start_time": "09:00"
+   }
+  ],
+  "revision": 1,
+  "can_edit": true,
+  "updated_at": "2026-10-20T01:00:00+00:00"
+ },
+ "place_updated": {
+  "id": "00000000-0000-4000-8000-0000000000c5",
+  "name": "kiyomizudera.or.jp",
+  "aliases": [
+   "音羽山清水寺"
+  ],
+  "category": null,
+  "address": null,
+  "latitude": 34.9948,
+  "longitude": 135.785,
+  "phone": "075-551-1234",
+  "website": null,
+  "entrance_note": "仁王門から",
+  "floor": null,
+  "reservation_required": false,
+  "price_range": null,
+  "accessibility_note": null,
+  "closed_days": null,
+  "note": null,
+  "opening_hours": [],
+  "sources": {
+   "longitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "latitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "name": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "reservation_required": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "aliases": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "entrance_note": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "phone": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   }
+  },
+  "events": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000c6",
+    "plan_id": "00000000-0000-4000-8000-0000000000c1",
+    "plan_title": "候補箱",
+    "title": "kiyomizudera.or.jp",
+    "date": "2026-11-01",
+    "local_start_time": "09:00"
+   }
+  ],
+  "revision": 2,
+  "can_edit": true,
+  "updated_at": "2026-10-20T01:00:00+00:00"
+ },
+ "place_hours": {
+  "id": "00000000-0000-4000-8000-0000000000c5",
+  "name": "kiyomizudera.or.jp",
+  "aliases": [
+   "音羽山清水寺"
+  ],
+  "category": null,
+  "address": null,
+  "latitude": 34.9948,
+  "longitude": 135.785,
+  "phone": "075-551-1234",
+  "website": null,
+  "entrance_note": "仁王門から",
+  "floor": null,
+  "reservation_required": false,
+  "price_range": null,
+  "accessibility_note": null,
+  "closed_days": null,
+  "note": null,
+  "opening_hours": [
+   {
+    "day_of_week": 0,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 1,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 2,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 3,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 4,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 5,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   },
+   {
+    "day_of_week": 6,
+    "open_time": "06:00",
+    "close_time": "18:00"
+   }
+  ],
+  "sources": {
+   "longitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "latitude": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "name": {
+    "provider": "url",
+    "label": "登録した URL",
+    "source_url": "https://www.kiyomizudera.or.jp/",
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "reservation_required": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "aliases": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "entrance_note": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "phone": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   },
+   "opening_hours": {
+    "provider": "user",
+    "label": "利用者の入力",
+    "source_url": null,
+    "retrieved_at": "2026-10-20T01:00:00+00:00"
+   }
+  },
+  "events": [
+   {
+    "event_id": "00000000-0000-4000-8000-0000000000c6",
+    "plan_id": "00000000-0000-4000-8000-0000000000c1",
+    "plan_title": "候補箱",
+    "title": "kiyomizudera.or.jp",
+    "date": "2026-11-01",
+    "local_start_time": "09:00"
+   }
+  ],
+  "revision": 3,
+  "can_edit": true,
+  "updated_at": "2026-10-20T01:00:00+00:00"
+ },
+ "plan_places": {
+  "plan_id": "00000000-0000-4000-8000-0000000000c1",
+  "places": [
+   {
+    "id": "00000000-0000-4000-8000-0000000000c5",
+    "name": "kiyomizudera.or.jp",
+    "category": null,
+    "address": null,
+    "phone": "075-551-1234",
+    "has_opening_hours": true,
+    "event_count": 1
+   }
+  ]
+ },
+ "candidate_error_conflict": {
+  "detail": {
+   "code": "revision_conflict",
+   "message": "候補が他の人の変更で更新されています(現在のrevision: 2)"
+  }
+ },
+ "search_plan_query": {
+  "plan_id": "00000000-0000-4000-8000-0000000000d1",
+  "query": "清水",
+  "filter": null,
+  "filter_label": null,
+  "categories": [
+   {
+    "category": "event",
+    "label": "予定",
+    "count": 1,
+    "results": [
+     {
+      "category": "event",
+      "id": "00000000-0000-4000-8000-0000000000d3",
+      "title": "清水寺",
+      "subtitle": "京都市東山区",
+      "when": "2026-11-01 10:00",
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+     }
+    ]
+   },
+   {
+    "category": "candidate",
+    "label": "候補",
+    "count": 1,
+    "results": [
+     {
+      "category": "candidate",
+      "id": "00000000-0000-4000-8000-0000000000d6",
+      "title": "清水坂の茶店",
+      "subtitle": null,
+      "when": null,
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1/candidates"
+     }
+    ]
+   }
+  ],
+  "total": 2
+ },
+ "search_plan_today": {
+  "plan_id": "00000000-0000-4000-8000-0000000000d1",
+  "query": "",
+  "filter": "today",
+  "filter_label": "今日",
+  "categories": [
+   {
+    "category": "day",
+    "label": "日程",
+    "count": 1,
+    "results": [
+     {
+      "category": "day",
+      "id": "00000000-0000-4000-8000-0000000000d2",
+      "title": "2026-11-01 東山",
+      "subtitle": null,
+      "when": null,
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+     }
+    ]
+   },
+   {
+    "category": "event",
+    "label": "予定",
+    "count": 2,
+    "results": [
+     {
+      "category": "event",
+      "id": "00000000-0000-4000-8000-0000000000d3",
+      "title": "清水寺",
+      "subtitle": "京都市東山区",
+      "when": "2026-11-01 10:00",
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+     },
+     {
+      "category": "event",
+      "id": "00000000-0000-4000-8000-0000000000d4",
+      "title": "祇園の宿",
+      "subtitle": null,
+      "when": "2026-11-01 18:00",
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+     }
+    ]
+   }
+  ],
+  "total": 3
+ },
+ "search_plan_suffix": {
+  "plan_id": "00000000-0000-4000-8000-0000000000d1",
+  "query": "5678",
+  "filter": "reservation",
+  "filter_label": "予約",
+  "categories": [
+   {
+    "category": "reservation",
+    "label": "予約",
+    "count": 1,
+    "results": [
+     {
+      "category": "reservation",
+      "id": "00000000-0000-4000-8000-0000000000d5",
+      "title": "祇園の宿 本館",
+      "subtitle": "宿泊・********5678",
+      "when": null,
+      "badge": "予約番号の末尾に一致",
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1/reservations"
+     }
+    ]
+   }
+  ],
+  "total": 1
+ },
+ "search_everything": {
+  "query": "京都",
+  "filter": null,
+  "filter_label": null,
+  "categories": [
+   {
+    "category": "event",
+    "label": "予定",
+    "count": 1,
+    "results": [
+     {
+      "category": "event",
+      "id": "00000000-0000-4000-8000-0000000000d3",
+      "title": "清水寺",
+      "subtitle": "京都市東山区",
+      "when": "2026-11-01 10:00",
+      "badge": null,
+      "plan_id": "00000000-0000-4000-8000-0000000000d1",
+      "plan_title": "京都の旅",
+      "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+     }
+    ]
+   }
+  ],
+  "total": 1,
+  "plans": [
+   {
+    "plan_id": "00000000-0000-4000-8000-0000000000d1",
+    "title": "京都の旅",
+    "link": "/planner/00000000-0000-4000-8000-0000000000d1"
+   }
+  ],
+  "searched_plans": 1
+ },
+ "search_error_empty": {
+  "detail": {
+   "code": "invalid_field",
+   "message": "検索語を入れるか、絞り込みを選んでください"
+  }
+ },
+ "share_policy_error": {
+  "detail": {
+   "code": "confidential_needs_ack",
+   "message": "機密の項目を共有するには、URLを知る人なら誰でも見られることを確認してください",
+   "fields": [
+    "event_address",
+    "event_notes",
+    "reservation_summary"
+   ]
+  }
+ },
+ "share_preview": {
+  "fields": [
+   "plan_description",
+   "day_titles",
+   "event_times"
+  ],
+  "view": {
+   "plan_id": "00000000-0000-4000-8000-0000000000f1",
+   "title": "京都の旅",
+   "description": "説明",
+   "destination": "京都",
+   "start_date": "2026-11-10T00:00:00+00:00",
+   "end_date": "2026-11-12T00:00:00+00:00",
+   "days": [
+    {
+     "date": "2026-11-10",
+     "title": "1日目",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "activity",
+       "local_start_time": "09:00",
+       "is_all_day": false
+      },
+      {
+       "title": "伏見稲荷",
+       "event_type": "sightseeing",
+       "local_start_time": null,
+       "is_all_day": false
+      }
+     ]
+    },
+    {
+     "date": "2026-11-11",
+     "title": null,
+     "events": []
+    }
+   ],
+   "permission": "view",
+   "can_edit": false,
+   "fields": [
+    "plan_description",
+    "day_titles",
+    "event_times"
+   ]
+  },
+  "withheld": {
+   "reservations": 1,
+   "confirmation_numbers": 1,
+   "tickets": 0,
+   "documents": 0,
+   "exact_locations": 1,
+   "event_addresses": 1,
+   "event_notes": 1
+  },
+  "catalog": {
+   "fields": [
+    {
+     "key": "plan_description",
+     "classification": "internal",
+     "label": "旅行の説明",
+     "description": "旅行プランの説明文"
+    },
+    {
+     "key": "day_titles",
+     "classification": "internal",
+     "label": "日程の見出し",
+     "description": "「1日目」「東山散策」などの日ごとの見出し"
+    },
+    {
+     "key": "event_times",
+     "classification": "internal",
+     "label": "予定の時刻",
+     "description": "各予定の開始時刻と終日の印"
+    },
+    {
+     "key": "event_address",
+     "classification": "confidential",
+     "label": "予定の住所",
+     "description": "予定に登録した住所の文字列(緯度経度・現在地は含めない)"
+    },
+    {
+     "key": "event_notes",
+     "classification": "confidential",
+     "label": "予定のメモ",
+     "description": "予定の説明・メモ欄。予約番号や電話番号を書いていないか確認してください"
+    },
+    {
+     "key": "reservation_summary",
+     "classification": "confidential",
+     "label": "予約の概要",
+     "description": "予約の種類・施設名・日時・状態(予約番号・PIN・予約者名・連絡先・金額は含めない)"
+    }
+   ],
+   "restricted": [
+    {
+     "key": "confirmation_numbers",
+     "label": "予約番号・PIN"
+    },
+    {
+     "key": "tickets",
+     "label": "チケット・QR・バーコード"
+    },
+    {
+     "key": "documents",
+     "label": "旅券・保険・領収書などの文書"
+    },
+    {
+     "key": "contacts",
+     "label": "連絡先・予約者名・参加者のメールアドレス"
+    },
+    {
+     "key": "exact_location",
+     "label": "正確な位置(緯度経度)・現在地・GPSの軌跡"
+    },
+    {
+     "key": "payments",
+     "label": "支払い・費用・予算"
+    }
+   ],
+   "always": [
+    "旅行名",
+    "目的地",
+    "期間",
+    "予定名",
+    "予定の種類"
+   ],
+   "presets": {
+    "minimal": [],
+    "standard": [
+     "plan_description",
+     "day_titles",
+     "event_times"
+    ],
+    "all": [
+     "plan_description",
+     "day_titles",
+     "event_times"
+    ]
+   }
+  }
+ },
+ "share_preview_link": {
+  "fields": [
+   "event_address",
+   "event_notes",
+   "reservation_summary"
+  ],
+  "view": {
+   "plan_id": "00000000-0000-4000-8000-0000000000f1",
+   "title": "京都の旅",
+   "description": null,
+   "destination": "京都",
+   "start_date": "2026-11-10T00:00:00+00:00",
+   "end_date": "2026-11-12T00:00:00+00:00",
+   "days": [
+    {
+     "date": "2026-11-10",
+     "title": null,
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "activity",
+       "local_start_time": null,
+       "is_all_day": false,
+       "address": "京都市東山区清水1",
+       "notes": "入口は仁王門"
+      },
+      {
+       "title": "伏見稲荷",
+       "event_type": "sightseeing",
+       "local_start_time": null,
+       "is_all_day": false
+      }
+     ]
+    },
+    {
+     "date": "2026-11-11",
+     "title": null,
+     "events": []
+    }
+   ],
+   "permission": "edit",
+   "can_edit": false,
+   "fields": [
+    "event_address",
+    "event_notes",
+    "reservation_summary"
+   ],
+   "reservations": [
+    {
+     "type": "accommodation",
+     "provider_name": "祇園の宿 本館",
+     "status": "confirmed",
+     "start": "2026-11-10 15:00",
+     "end": null
+    }
+   ]
+  },
+  "withheld": {
+   "reservations": 0,
+   "confirmation_numbers": 1,
+   "tickets": 0,
+   "documents": 0,
+   "exact_locations": 1,
+   "event_addresses": 0,
+   "event_notes": 0
+  },
+  "catalog": {
+   "fields": [
+    {
+     "key": "plan_description",
+     "classification": "internal",
+     "label": "旅行の説明",
+     "description": "旅行プランの説明文"
+    },
+    {
+     "key": "day_titles",
+     "classification": "internal",
+     "label": "日程の見出し",
+     "description": "「1日目」「東山散策」などの日ごとの見出し"
+    },
+    {
+     "key": "event_times",
+     "classification": "internal",
+     "label": "予定の時刻",
+     "description": "各予定の開始時刻と終日の印"
+    },
+    {
+     "key": "event_address",
+     "classification": "confidential",
+     "label": "予定の住所",
+     "description": "予定に登録した住所の文字列(緯度経度・現在地は含めない)"
+    },
+    {
+     "key": "event_notes",
+     "classification": "confidential",
+     "label": "予定のメモ",
+     "description": "予定の説明・メモ欄。予約番号や電話番号を書いていないか確認してください"
+    },
+    {
+     "key": "reservation_summary",
+     "classification": "confidential",
+     "label": "予約の概要",
+     "description": "予約の種類・施設名・日時・状態(予約番号・PIN・予約者名・連絡先・金額は含めない)"
+    }
+   ],
+   "restricted": [
+    {
+     "key": "confirmation_numbers",
+     "label": "予約番号・PIN"
+    },
+    {
+     "key": "tickets",
+     "label": "チケット・QR・バーコード"
+    },
+    {
+     "key": "documents",
+     "label": "旅券・保険・領収書などの文書"
+    },
+    {
+     "key": "contacts",
+     "label": "連絡先・予約者名・参加者のメールアドレス"
+    },
+    {
+     "key": "exact_location",
+     "label": "正確な位置(緯度経度)・現在地・GPSの軌跡"
+    },
+    {
+     "key": "payments",
+     "label": "支払い・費用・予算"
+    }
+   ],
+   "always": [
+    "旅行名",
+    "目的地",
+    "期間",
+    "予定名",
+    "予定の種類"
+   ],
+   "presets": {
+    "minimal": [],
+    "standard": [
+     "plan_description",
+     "day_titles",
+     "event_times"
+    ],
+    "all": [
+     "plan_description",
+     "day_titles",
+     "event_times"
+    ]
+   }
+  }
+ },
+ "public_share_confidential": {
+  "plan_id": "00000000-0000-4000-8000-0000000000f1",
+  "title": "京都の旅",
+  "description": null,
+  "destination": "京都",
+  "start_date": "2026-11-10T00:00:00+00:00",
+  "end_date": "2026-11-12T00:00:00+00:00",
+  "days": [
+   {
+    "date": "2026-11-10",
+    "title": null,
+    "events": [
+     {
+      "title": "清水寺",
+      "event_type": "activity",
+      "local_start_time": null,
+      "is_all_day": false,
+      "address": "京都市東山区清水1",
+      "notes": "入口は仁王門"
+     },
+     {
+      "title": "伏見稲荷",
+      "event_type": "sightseeing",
+      "local_start_time": null,
+      "is_all_day": false
+     }
+    ]
+   },
+   {
+    "date": "2026-11-11",
+    "title": null,
+    "events": []
+   }
+  ],
+  "permission": "edit",
+  "can_edit": false,
+  "fields": [
+   "event_address",
+   "event_notes",
+   "reservation_summary"
+  ],
+  "reservations": [
+   {
+    "type": "accommodation",
+    "provider_name": "祇園の宿 本館",
+    "status": "confirmed",
+    "start": "2026-11-10 15:00",
+    "end": null
+   }
+  ]
+ },
+ "org_created": {
+  "id": "00000000-0000-4000-8000-0000000b0002",
+  "name": "東山中学校",
+  "brand_color": "#1d4ed8",
+  "role": "owner",
+  "member_count": 1,
+  "created_at": "2026-10-20T05:00:00+00:00"
+ },
+ "org_member_added": {
+  "id": "00000000-0000-4000-8000-0000000b0008",
+  "user_id": "00000000-0000-4000-8000-0000000b000b",
+  "username": "hogosha",
+  "email": "hogosha@example.com",
+  "role": "member",
+  "created_at": "2026-10-20T05:00:00+00:00"
+ },
+ "org_list": [
+  {
+   "id": "00000000-0000-4000-8000-0000000b0002",
+   "name": "東山中学校",
+   "brand_color": "#1d4ed8",
+   "role": "owner",
+   "member_count": 2,
+   "created_at": "2026-10-20T05:00:00+00:00"
+  }
+ ],
+ "org_members": [
+  {
+   "id": "00000000-0000-4000-8000-0000000b000a",
+   "user_id": "00000000-0000-4000-8000-0000000b0003",
+   "username": "sensei",
+   "email": "sensei@example.com",
+   "role": "owner",
+   "created_at": "2026-10-20T05:00:00+00:00"
+  },
+  {
+   "id": "00000000-0000-4000-8000-0000000b0008",
+   "user_id": "00000000-0000-4000-8000-0000000b000b",
+   "username": "hogosha",
+   "email": "hogosha@example.com",
+   "role": "member",
+   "created_at": "2026-10-20T05:00:00+00:00"
+  }
+ ],
+ "org_error_last_owner": {
+  "detail": {
+   "code": "last_owner",
+   "message": "組織には owner が1人以上必要です"
+  }
+ },
+ "distribution_published": {
+  "id": "00000000-0000-4000-8000-0000000b0004",
+  "organization_id": "00000000-0000-4000-8000-0000000b0002",
+  "title": "修学旅行",
+  "version": 1,
+  "change_note": "初版",
+  "published_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": null,
+  "my_ack_version": null,
+  "acknowledged": false,
+  "ack_status": {
+   "members": 2,
+   "acknowledged_latest": 0,
+   "pending": 2
+  },
+  "snapshot": {
+   "days": [
+    {
+     "date": "2026-11-03",
+     "title": "1日目",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "activity",
+       "is_all_day": false,
+       "local_start_time": "10:00"
+      }
+     ],
+     "timezone_id": "Asia/Tokyo"
+    }
+   ],
+   "title": "修学旅行",
+   "end_date": "2026-11-04T00:00:00+00:00",
+   "start_date": "2026-11-03T00:00:00+00:00",
+   "description": "持ち物は前日に確認",
+   "destination": "京都"
+  }
+ },
+ "distribution_list_admin": [
+  {
+   "id": "00000000-0000-4000-8000-0000000b0004",
+   "organization_id": "00000000-0000-4000-8000-0000000b0002",
+   "title": "修学旅行",
+   "version": 1,
+   "change_note": "初版",
+   "published_at": "2026-10-20T05:00:00+00:00",
+   "revoked_at": null,
+   "my_ack_version": null,
+   "acknowledged": false,
+   "ack_status": {
+    "members": 2,
+    "acknowledged_latest": 0,
+    "pending": 2
+   }
+  }
+ ],
+ "org_detail_member": {
+  "id": "00000000-0000-4000-8000-0000000b0002",
+  "name": "東山中学校",
+  "brand_color": "#1d4ed8",
+  "role": "member",
+  "member_count": 2,
+  "created_at": "2026-10-20T05:00:00+00:00"
+ },
+ "distribution_list_member": [
+  {
+   "id": "00000000-0000-4000-8000-0000000b0004",
+   "organization_id": "00000000-0000-4000-8000-0000000b0002",
+   "title": "修学旅行",
+   "version": 1,
+   "change_note": "初版",
+   "published_at": "2026-10-20T05:00:00+00:00",
+   "revoked_at": null,
+   "my_ack_version": null,
+   "acknowledged": false,
+   "ack_status": null
+  }
+ ],
+ "distribution_ack": {
+  "id": "00000000-0000-4000-8000-0000000b0004",
+  "organization_id": "00000000-0000-4000-8000-0000000b0002",
+  "title": "修学旅行",
+  "version": 1,
+  "change_note": "初版",
+  "published_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": null,
+  "my_ack_version": 1,
+  "acknowledged": true,
+  "ack_status": null
+ },
+ "distribution_forked": {
+  "plan_id": "00000000-0000-4000-8000-0000000b0000",
+  "title": "修学旅行",
+  "version": 1
+ },
+ "distribution_revised": {
+  "id": "00000000-0000-4000-8000-0000000b0004",
+  "organization_id": "00000000-0000-4000-8000-0000000b0002",
+  "title": "修学旅行",
+  "version": 2,
+  "change_note": "午後を追加",
+  "published_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": null,
+  "my_ack_version": null,
+  "acknowledged": false,
+  "ack_status": {
+   "members": 2,
+   "acknowledged_latest": 0,
+   "pending": 2
+  },
+  "snapshot": {
+   "days": [
+    {
+     "date": "2026-11-03",
+     "title": "1日目",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "activity",
+       "is_all_day": false,
+       "local_start_time": "10:00"
+      },
+      {
+       "title": "金閣寺",
+       "event_type": "activity",
+       "is_all_day": false,
+       "local_start_time": "14:00"
+      }
+     ],
+     "timezone_id": "Asia/Tokyo"
+    }
+   ],
+   "title": "修学旅行",
+   "end_date": "2026-11-04T00:00:00+00:00",
+   "start_date": "2026-11-03T00:00:00+00:00",
+   "description": "持ち物は前日に確認",
+   "destination": "京都"
+  },
+  "changes": {
+   "events_added": 1,
+   "events_removed": 0,
+   "events_changed": 0,
+   "days_before": 1,
+   "days_after": 1
+  }
+ },
+ "distribution_acks": {
+  "version": 2,
+  "members": [
+   {
+    "member_id": "00000000-0000-4000-8000-0000000b000a",
+    "username": "sensei",
+    "role": "owner",
+    "acked_version": null,
+    "acked_at": null
+   },
+   {
+    "member_id": "00000000-0000-4000-8000-0000000b0008",
+    "username": "hogosha",
+    "role": "member",
+    "acked_version": 1,
+    "acked_at": "2026-10-20T05:00:00+00:00"
+   }
+  ],
+  "acknowledged_latest": 0,
+  "pending": 2
+ },
+ "distribution_detail": {
+  "id": "00000000-0000-4000-8000-0000000b0004",
+  "organization_id": "00000000-0000-4000-8000-0000000b0002",
+  "title": "修学旅行",
+  "version": 2,
+  "change_note": "午後を追加",
+  "published_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": null,
+  "my_ack_version": 1,
+  "acknowledged": false,
+  "ack_status": null,
+  "snapshot": {
+   "days": [
+    {
+     "date": "2026-11-03",
+     "title": "1日目",
+     "events": [
+      {
+       "title": "清水寺",
+       "event_type": "activity",
+       "is_all_day": false,
+       "local_start_time": "10:00"
+      },
+      {
+       "title": "金閣寺",
+       "event_type": "activity",
+       "is_all_day": false,
+       "local_start_time": "14:00"
+      }
+     ],
+     "timezone_id": "Asia/Tokyo"
+    }
+   ],
+   "title": "修学旅行",
+   "end_date": "2026-11-04T00:00:00+00:00",
+   "start_date": "2026-11-03T00:00:00+00:00",
+   "description": "持ち物は前日に確認",
+   "destination": "京都"
+  }
+ },
+ "distribution_error_stale": {
+  "detail": {
+   "code": "stale_version",
+   "message": "配布が改訂されています。最新版を確認してください"
+  }
+ },
+ "api_client_created": {
+  "id": "00000000-0000-4000-8000-0000000b0009",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": "tcs_FIXTURE_PLACEHOLDER",
+  "scopes": [
+   "distributions:read"
+  ],
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": null
+ },
+ "api_clients": {
+  "clients": [
+   {
+    "id": "00000000-0000-4000-8000-0000000b0009",
+    "name": "旅行会社の連携",
+    "client_id": "tcc_0123456789abcdef01234567",
+    "client_secret": null,
+    "scopes": [
+     "distributions:read"
+    ],
+    "created_at": "2026-10-20T05:00:00+00:00",
+    "last_used_at": null,
+    "revoked_at": null
+   }
+  ],
+  "scopes": {
+   "distributions:read": "配布する旅程(写し)の一覧と内容を読む",
+   "acknowledgements:read": "配布の閲覧確認の件数を読む(誰が確認したかは含まない)"
+  }
+ },
+ "api_client_revoked": {
+  "id": "00000000-0000-4000-8000-0000000b0009",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": null,
+  "scopes": [
+   "distributions:read"
+  ],
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": "2026-10-20T05:00:00+00:00"
+ },
+ "webhook_created": {
+  "id": "00000000-0000-4000-8000-0000000b0001",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": "whsec_FIXTURE_PLACEHOLDER",
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": null
+ },
+ "webhooks": {
+  "webhooks": [
+   {
+    "id": "00000000-0000-4000-8000-0000000b0001",
+    "url": "https://hooks.example.com/travelcanvas",
+    "events": [
+     "distribution.published",
+     "distribution.revised"
+    ],
+    "secret": null,
+    "created_at": "2026-10-20T05:00:00+00:00",
+    "revoked_at": null
+   }
+  ],
+  "events": {
+   "distribution.published": "配布を始めた",
+   "distribution.revised": "配布の版を上げた",
+   "distribution.revoked": "配布をやめた",
+   "distribution.acknowledged": "メンバーが最新版を確認した(件数だけ)"
+  }
+ },
+ "webhook_ping": {
+  "id": "00000000-0000-4000-8000-0000000b0005",
+  "event_id": "00000000-0000-4000-8000-0000000b0006",
+  "event_type": "ping",
+  "status": "delivered",
+  "attempts": 1,
+  "last_status_code": 200,
+  "last_error": null,
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "delivered_at": "2026-10-20T05:00:00+00:00"
+ },
+ "webhook_deliveries": [
+  {
+   "id": "00000000-0000-4000-8000-0000000b0005",
+   "event_id": "00000000-0000-4000-8000-0000000b0006",
+   "event_type": "ping",
+   "status": "delivered",
+   "attempts": 1,
+   "last_status_code": 200,
+   "last_error": null,
+   "created_at": "2026-10-20T05:00:00+00:00",
+   "delivered_at": "2026-10-20T05:00:00+00:00"
+  },
+  {
+   "id": "00000000-0000-4000-8000-0000000b000c",
+   "event_id": "00000000-0000-4000-8000-0000000b0007",
+   "event_type": "ping",
+   "status": "failed",
+   "attempts": 1,
+   "last_status_code": 500,
+   "last_error": "http_status",
+   "created_at": "2026-10-20T05:00:00+00:00",
+   "delivered_at": null
+  }
+ ],
+ "webhook_redelivered": {
+  "id": "00000000-0000-4000-8000-0000000b000c",
+  "event_id": "00000000-0000-4000-8000-0000000b0007",
+  "event_type": "ping",
+  "status": "delivered",
+  "attempts": 2,
+  "last_status_code": 200,
+  "last_error": null,
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "delivered_at": "2026-10-20T05:00:00+00:00"
+ },
+ "webhook_revoked": {
+  "id": "00000000-0000-4000-8000-0000000b0001",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": null,
+  "created_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": "2026-10-20T05:00:00+00:00"
+ },
+ "distribution_revoked": {
+  "id": "00000000-0000-4000-8000-0000000b0004",
+  "organization_id": "00000000-0000-4000-8000-0000000b0002",
+  "title": "修学旅行",
+  "version": 2,
+  "change_note": "午後を追加",
+  "published_at": "2026-10-20T05:00:00+00:00",
+  "revoked_at": "2026-10-20T05:00:00+00:00",
+  "my_ack_version": null,
+  "acknowledged": false,
+  "ack_status": {
+   "members": 2,
+   "acknowledged_latest": 0,
+   "pending": 2
   }
  }
 }

@@ -46,6 +46,7 @@ PUBLIC_ROUTES = {
     ("GET", "/api/v1/spots/categories/list"): "固定の分類一覧(利用者のデータを含まない)",
     ("POST", "/api/v1/security/csp-report"): "[Gate S10] ブラウザが自動で送る CSP 違反の報告(数えるだけ・回数制限あり・返す中身なし)",
     ("POST", "/api/v1/auth/mfa/verify"): "[Gate S11] ログインの2段目(5分だけ有効な署名つきの合図 + 確認コード。回数制限あり)",
+    ("POST", "/api/v1/oauth/token"): "[Gate B1] OAuth 2.0 client_credentials のトークン発行(クライアントの秘密で認証する。回数制限あり)",
 }
 
 # 廃止して 410 Gone を返すだけのルート(中身の処理に入らない)

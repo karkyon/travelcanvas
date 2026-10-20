@@ -21,6 +21,15 @@
  */
 import type { User } from '@/types';
 import type { VisitAssessment, VisitCorrectionResult, VisitItem, VisitsOverview } from './types/visits';
+import type { CandidateList, PlaceInfo, PlanCandidateItem, PlanPlaces } from './types/candidates';
+import type { SearchHit, SearchResults } from './types/planSearch';
+import type {
+  AckStatus, DistributionAckList, DistributionSnapshot, ForkResult, Organization, OrgApiClient, OrgApiClientList,
+  OrgDistribution, OrgMember, OrgWebhook, OrgWebhookDelivery, OrgWebhookList,
+} from './types/organizations';
+import type {
+  PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld,
+} from './types/share';
 import type {
   AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, NormalizedDay, NormalizedEvent,
   NormalizedPlanDetail, Notification, OptimizationProposal, PlaceDetail, PromoteQuickDraftResult,
@@ -524,6 +533,11 @@ export const placeDetail: Decoder<PlaceDetail> = object<PlaceDetail>({
 
 // ===== [Gate M9-FE-C2b-3] 共有・招待・公開共有 =====
 
+// [Gate F45] FR-045 共有リンクで選べる項目
+const shareFieldKey = oneOf<ShareFieldKey>(
+  'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary',
+);
+
 export const shareLink: Decoder<ShareLink> = object<ShareLink>({
   id: str,
   plan_id: str,
@@ -538,6 +552,7 @@ export const shareLink: Decoder<ShareLink> = object<ShareLink>({
   revoked_at: optional(nullable(str)),
   is_active: bool,
   created_at: str,
+  fields: arrayOf(shareFieldKey),
 });
 
 export const collaborator: Decoder<Collaborator> = object<Collaborator>({
@@ -558,6 +573,16 @@ const publicSharedEvent: Decoder<PublicSharedEvent> = object<PublicSharedEvent>(
   event_type: str,
   local_start_time: optional(nullable(str)),
   is_all_day: bool,
+  address: optional(str),
+  notes: optional(str),
+});
+
+const publicSharedReservation: Decoder<PublicSharedReservation> = object<PublicSharedReservation>({
+  type: str,
+  provider_name: optional(nullable(str)),
+  status: str,
+  start: optional(nullable(str)),
+  end: optional(nullable(str)),
 });
 
 const publicSharedDay: Decoder<PublicSharedDay> = object<PublicSharedDay>({
@@ -576,6 +601,30 @@ export const publicSharedPlan: Decoder<PublicSharedPlan> = object<PublicSharedPl
   days: arrayOf(publicSharedDay),
   permission: oneOf('view', 'edit'),
   can_edit: bool,
+  fields: optional(arrayOf(shareFieldKey)),
+  reservations: optional(arrayOf(publicSharedReservation)),
+});
+
+// [Gate F45] 所有者の共有前プレビュー
+const sharePresetFields = arrayOf(shareFieldKey);
+export const sharePreview: Decoder<SharePreview> = object<SharePreview>({
+  fields: arrayOf(shareFieldKey),
+  view: publicSharedPlan,
+  withheld: object<ShareWithheld>({
+    reservations: nonNegativeInt, confirmation_numbers: nonNegativeInt, tickets: nonNegativeInt,
+    documents: nonNegativeInt, exact_locations: nonNegativeInt, event_addresses: nonNegativeInt,
+    event_notes: nonNegativeInt,
+  }),
+  catalog: object<SharePolicyCatalog>({
+    fields: arrayOf(object<ShareFieldInfo>({
+      key: shareFieldKey, classification: oneOf('internal', 'confidential'), label: str, description: str,
+    })),
+    restricted: arrayOf(object<{ key: string; label: string }>({ key: str, label: str })),
+    always: arrayOf(str),
+    presets: object<SharePolicyCatalog['presets']>({
+      minimal: sharePresetFields, standard: sharePresetFields, all: sharePresetFields,
+    }),
+  }),
 });
 
 // ===== [Gate M9-FE-C2b-3] 通知・認証 =====
@@ -2016,4 +2065,149 @@ export const visitCorrectionResult: Decoder<VisitCorrectionResult> = object<Visi
   event_id: str,
   assessment: nullable(visitAssessment),
   layer_state: visitLayerState,
+});
+
+// ===== [Gate C2] 候補箱(FR-007)・場所の一元管理(FR-008) =====
+const candidateStatus = oneOf('open', 'scheduled', 'dismissed');
+const planCandidateItem: Decoder<PlanCandidateItem> = object<PlanCandidateItem>({
+  id: str, title: str, note: nullable(str), source_kind: oneOf('url', 'text', 'manual', 'search'),
+  source_url: nullable(str), source_label: nullable(str), provider: nullable(str), retrieved_at: nullable(str),
+  place_id: nullable(str), category: nullable(str), address: nullable(str), latitude: nullable(num),
+  longitude: nullable(num), priority: int, status: candidateStatus, status_label: str,
+  scheduled_event_id: nullable(str), merged_into_id: nullable(str), created_by: str, created_at: nullable(str),
+  revision: int,
+  duplicates: arrayOf(object({
+    id: str, title: str,
+    reasons: arrayOf(oneOf('same_provider_id', 'same_name', 'nearby', 'same_address', 'same_url')),
+  })),
+  merged_from: arrayOf(object({ id: str, title: str, source_url: nullable(str), provider: nullable(str) })),
+});
+export const candidateList: Decoder<CandidateList> = object<CandidateList>({
+  plan_id: str,
+  items: arrayOf(planCandidateItem),
+  counts: object({ open: nonNegativeInt, scheduled: nonNegativeInt, dismissed: nonNegativeInt }),
+  duplicate_pairs: nonNegativeInt,
+  can_edit: optional(bool),
+  id: optional(str),
+  event_id: optional(str),
+  place_id: optional(str),
+  plan_revision: optional(int),
+});
+const sourceInfo = object({ provider: str, label: str, source_url: nullable(str), retrieved_at: nullable(str) });
+export const placeInfo: Decoder<PlaceInfo> = object<PlaceInfo>({
+  id: str, name: str, aliases: arrayOf(str), category: nullable(str), address: nullable(str),
+  latitude: nullable(num), longitude: nullable(num), phone: nullable(str), website: nullable(str),
+  entrance_note: nullable(str), floor: nullable(str), reservation_required: nullable(bool),
+  price_range: nullable(str), accessibility_note: nullable(str), closed_days: nullable(str), note: nullable(str),
+  opening_hours: arrayOf(object({ day_of_week: int, open_time: str, close_time: str })),
+  sources: ((v: unknown, path: string) => {
+    const r = record(v, path);
+    for (const k of Object.keys(r)) sourceInfo(r[k], `${path}.${k}`);
+    return r;
+  }) as Decoder<PlaceInfo['sources']>,
+  events: arrayOf(object({
+    event_id: str, plan_id: str, plan_title: str, title: str, date: nullable(str), local_start_time: nullable(str),
+  })),
+  revision: int, can_edit: bool, updated_at: nullable(str),
+});
+export const planPlaces: Decoder<PlanPlaces> = object<PlanPlaces>({
+  plan_id: str,
+  places: arrayOf(object({
+    id: str, name: str, category: nullable(str), address: nullable(str), phone: nullable(str),
+    has_opening_hours: bool, event_count: nonNegativeInt,
+  })),
+});
+
+// ===== [Gate C3] 情報内検索・コマンドパレット(FR-009) =====
+const searchCategory = oneOf('day', 'event', 'place', 'candidate', 'reservation', 'ticket', 'document', 'expense',
+  'member', 'memory');
+const searchFilter = oneOf('today', 'reservation', 'ticket', 'hotel', 'emergency');
+// 移動先は画面の中の経路だけを受け付ける(外部の URL・javascript: を流し込ませない)
+const internalLink: Decoder<string> = matching(/^\/planner\/[0-9a-f-]{36}(\/[a-z-]+(\/[0-9a-f-]{36})?)?$/, '画面の中の経路');
+const searchHit: Decoder<SearchHit> = object<SearchHit>({
+  category: searchCategory, id: str, title: str, subtitle: nullable(str), when: nullable(str), badge: nullable(str),
+  plan_id: str, plan_title: str, link: internalLink,
+});
+export const searchResults: Decoder<SearchResults> = object<SearchResults>({
+  plan_id: optional(str),
+  query: str,
+  filter: nullable(searchFilter),
+  filter_label: nullable(str),
+  categories: arrayOf(object({ category: searchCategory, label: str, count: nonNegativeInt, results: arrayOf(searchHit) })),
+  total: nonNegativeInt,
+  plans: optional(arrayOf(object({ plan_id: str, title: str, link: internalLink }))),
+  searched_plans: optional(nonNegativeInt),
+});
+
+
+// ===== [Gate B1] 組織・B2B(FR-041)・外部連携の管理(FR-042) =====
+
+const orgRole = oneOf('owner', 'admin', 'member');
+// 説明の一覧(スコープ・できごと → 日本語の説明)
+const stringMap: Decoder<Record<string, string>> = (v, path) =>
+  Object.fromEntries(Object.entries(record(v, path)).map(([k, x]) => [k, str(x, `${path}.${k}`)]));
+const brandColor = nullable(matching(/^#[0-9a-f]{6}$/i, '#RRGGBB'));
+
+export const organization: Decoder<Organization> = object<Organization>({
+  id: str, name: str, brand_color: brandColor, role: orgRole, member_count: nonNegativeInt, created_at: nullable(str),
+});
+
+export const orgMember: Decoder<OrgMember> = object<OrgMember>({
+  id: str, user_id: str, username: nullable(str), email: nullable(str), role: orgRole, created_at: nullable(str),
+});
+
+const distributionSnapshot: Decoder<DistributionSnapshot> = object<DistributionSnapshot>({
+  title: str, description: nullable(str), destination: nullable(str), start_date: nullable(str), end_date: nullable(str),
+  days: arrayOf(object<DistributionSnapshot['days'][number]>({
+    date: str, timezone_id: str, title: nullable(str),
+    events: arrayOf(object<DistributionSnapshot['days'][number]['events'][number]>({
+      title: str, event_type: str, local_start_time: nullable(str), is_all_day: bool,
+    })),
+  })),
+});
+
+const ackStatus: Decoder<AckStatus> = object<AckStatus>({
+  members: nonNegativeInt, acknowledged_latest: nonNegativeInt, pending: nonNegativeInt,
+});
+
+export const orgDistribution: Decoder<OrgDistribution> = object<OrgDistribution>({
+  id: str, organization_id: str, title: str, version: int, change_note: nullable(str), published_at: nullable(str),
+  revoked_at: nullable(str), my_ack_version: nullable(int), acknowledged: bool, ack_status: nullable(ackStatus),
+  snapshot: optional(distributionSnapshot),
+  changes: optional(object<NonNullable<OrgDistribution['changes']>>({
+    events_added: nonNegativeInt, events_removed: nonNegativeInt, events_changed: nonNegativeInt,
+    days_before: nonNegativeInt, days_after: nonNegativeInt,
+  })),
+});
+
+export const distributionAckList: Decoder<DistributionAckList> = object<DistributionAckList>({
+  version: int,
+  members: arrayOf(object<DistributionAckList['members'][number]>({
+    member_id: str, username: nullable(str), role: orgRole, acked_version: nullable(int), acked_at: nullable(str),
+  })),
+  acknowledged_latest: nonNegativeInt, pending: nonNegativeInt,
+});
+
+export const forkResult: Decoder<ForkResult> = object<ForkResult>({ plan_id: str, title: str, version: int });
+
+const orgApiScope = oneOf('distributions:read', 'acknowledgements:read');
+export const orgApiClient: Decoder<OrgApiClient> = object<OrgApiClient>({
+  id: str, name: str, client_id: str, client_secret: nullable(str), scopes: arrayOf(orgApiScope),
+  created_at: nullable(str), last_used_at: nullable(str), revoked_at: nullable(str),
+});
+export const orgApiClientList: Decoder<OrgApiClientList> = object<OrgApiClientList>({
+  clients: arrayOf(orgApiClient), scopes: stringMap,
+});
+
+const orgWebhookEvent = oneOf('distribution.published', 'distribution.revised', 'distribution.revoked', 'distribution.acknowledged');
+export const orgWebhook: Decoder<OrgWebhook> = object<OrgWebhook>({
+  id: str, url: str, events: arrayOf(orgWebhookEvent), secret: nullable(str), created_at: nullable(str),
+  revoked_at: nullable(str),
+});
+export const orgWebhookList: Decoder<OrgWebhookList> = object<OrgWebhookList>({
+  webhooks: arrayOf(orgWebhook), events: stringMap,
+});
+export const orgWebhookDelivery: Decoder<OrgWebhookDelivery> = object<OrgWebhookDelivery>({
+  id: str, event_id: str, event_type: str, status: oneOf('pending', 'delivered', 'failed'), attempts: nonNegativeInt,
+  last_status_code: nullable(int), last_error: nullable(str), created_at: nullable(str), delivered_at: nullable(str),
 });

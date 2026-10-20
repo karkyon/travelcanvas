@@ -59,6 +59,13 @@ const LocationTrackPage = lazyPage(() => import('@/pages/LocationTrackPage'));
 const JourneyPage = lazyPage(() => import('@/pages/JourneyPage'));
 // [Gate V2] 訪問の地図(FR-049〜051)
 const VisitsPage = lazyPage(() => import('@/pages/VisitsPage'));
+// [Gate C2] 候補箱・場所の詳細(FR-007・FR-008)
+const CandidatesPage = lazyPage(() => import('@/pages/CandidatesPage'));
+// [Gate B1] 組織・B2B(FR-041)
+const OrganizationsPage = lazyPage(() => import('@/pages/OrganizationsPage'));
+const OrganizationPage = lazyPage(() => import('@/pages/OrganizationPage'));
+const DistributionPage = lazyPage(() => import('@/pages/DistributionPage'));
+const PlacePage = lazyPage(() => import('@/pages/PlacePage'));
 const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
 const MemoryReplanPage = lazyPage(() => import('@/pages/MemoryReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
@@ -375,6 +382,50 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <VisitsPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // 🏢 [Gate B1] 組織・配布・閲覧確認・外部連携(FR-041・FR-042)。会員だけ(backend がゲストを 401 にする)
+      {
+        path: 'organizations',
+        element: (
+          <ProtectedRoute>
+            <OrganizationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'organizations/:orgId',
+        element: (
+          <ProtectedRoute>
+            <OrganizationPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'organizations/:orgId/distributions/:distId',
+        element: (
+          <ProtectedRoute>
+            <DistributionPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // ⭐ [Gate C2] 候補箱(FR-007)・場所の詳細(FR-008)。
+      {
+        path: 'planner/:planId/candidates',
+        element: (
+          <ProtectedRoute>
+            <CandidatesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'planner/:planId/places/:placeId',
+        element: (
+          <ProtectedRoute>
+            <PlacePage />
           </ProtectedRoute>
         ),
       },

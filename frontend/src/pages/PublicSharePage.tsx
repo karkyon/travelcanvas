@@ -8,13 +8,17 @@
  *
  * 管理画面(SharePage.tsx, /share/:planId)とは意図的にpath自体を分離して
  * いる(監査指摘: 管理画面と公開画面のroute衝突解消)。
+ *
+ * [Gate F45] 本文は components/share/SharedPlanView(所有者の共有前プレビューと共通)で表示する。
+ * 所有者がリンクごとに選んだ項目だけが backend から届く(FR-045)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Lock, MapPin, Calendar, AlertCircle, Share2 } from 'lucide-react';
+import { Lock, AlertCircle, Share2 } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { resolvePublicShare } from '../services/api';
 import type { PublicSharedPlan } from '../services/api';
+import SharedPlanView from '../components/share/SharedPlanView';
 
 type LoadState = 'loading' | 'ok' | 'needs_passcode' | 'invalid';
 
@@ -142,77 +146,24 @@ const PublicSharePage: React.FC = () => {
 
   if (!plan) return null;
 
-  // [Gate #41] Gate #34a以降、backendはdaysをplanオブジェクト直下に返す
-  // (itinerary.daysではない)。以前はここが常に空配列になっていたバグを修正。
-  const days = plan.days || [];
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-2">
           <div className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-            <Lock size={12} />
+            <Lock size={12} aria-hidden="true" />
             共有リンクによる閲覧専用ビュー
           </div>
           <button
             onClick={handleShare}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
           >
-            <Share2 size={14} />
+            <Share2 size={14} aria-hidden="true" />
             共有
           </button>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">{plan.title}</h1>
-        <div className="flex flex-wrap items-center gap-4 text-gray-600 text-sm mb-6">
-          {plan.destination && (
-            <span className="flex items-center gap-1">
-              <MapPin size={16} />
-              {plan.destination}
-            </span>
-          )}
-          {(plan.start_date || plan.end_date) && (
-            <span className="flex items-center gap-1">
-              <Calendar size={16} />
-              {plan.start_date ? new Date(plan.start_date).toLocaleDateString('ja-JP') : '未定'}
-              {' 〜 '}
-              {plan.end_date ? new Date(plan.end_date).toLocaleDateString('ja-JP') : '未定'}
-            </span>
-          )}
-        </div>
-
-        {plan.description && (
-          <p className="text-gray-700 mb-8 whitespace-pre-wrap">{plan.description}</p>
-        )}
-
-        {days.length > 0 ? (
-          <div className="space-y-4">
-            {days.map((day, idx) => (
-              <div key={idx} className="bg-white rounded-xl shadow-sm p-5">
-                <h2 className="font-semibold text-gray-900 mb-2">
-                  {day.title || (day.date ? new Date(day.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }) : `${idx + 1}日目`)}
-                </h2>
-                {day.events.length > 0 ? (
-                  <ul className="space-y-2">
-                    {day.events.map((ev, evIdx) => (
-                      <li key={evIdx} className="text-sm text-gray-700 border-l-2 border-blue-200 pl-3">
-                        {ev.local_start_time && (
-                          <span className="text-gray-600 mr-2">{ev.local_start_time}</span>
-                        )}
-                        {ev.title || '(名称未設定のイベント)'}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-600">予定はまだ登録されていません</p>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
-            まだ日程が登録されていません
-          </div>
-        )}
+        {/* [Gate #41] days は plan 直下(itinerary.days ではない) */}
+        <SharedPlanView plan={plan} titleLevel={1} />
       </div>
     </div>
   );

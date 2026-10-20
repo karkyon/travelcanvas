@@ -72,7 +72,8 @@ def test_verified_features_have_every_kind_of_evidence():
 
 def test_partial_features_are_not_listed_as_verified():
     """DOC-10 で「(部分)」の機能(未達の能力が残る)を VERIFIED にしない。"""
-    partial = {"FR-011", "FR-018", "FR-019", "FR-020", "FR-022", "FR-024", "FR-027", "FR-030", "FR-035", "FR-036",
-               "FR-037", "FR-039", "FR-046", "FR-048", "FR-052", "FR-054", "FR-055", "FR-056", "FR-057"}
+    partial = {"FR-007", "FR-008", "FR-011", "FR-018", "FR-019", "FR-020", "FR-022", "FR-024", "FR-027", "FR-030",
+               "FR-035", "FR-036", "FR-037", "FR-039", "FR-040", "FR-041", "FR-042", "FR-045", "FR-046", "FR-048",
+               "FR-049", "FR-051", "FR-052", "FR-054", "FR-055", "FR-056", "FR-057"}
     verified = {fr for fr, f in _ledger()["features"].items() if f["status"] == "VERIFIED"}
     assert not (verified & partial), sorted(verified & partial)

@@ -10,7 +10,8 @@
    "ops": "機能の横断の運用の証拠(cross_cutting.ops: 全表の復元演習・ルートの型別の監視・ログの漏れの検査・Runbook)",
    "scope": "DOC-10 で「(部分)」の機能は対象にしない(未達の能力が残るため)"
   },
-  "updated_c1": "Gate C1: FR-023 を追加(秘匿プロフィール。E2E collaboration.spec.ts)。FR-020 は INTEGRATED(部分)のため対象外"
+  "updated_c1": "Gate C1: FR-023 を追加(秘匿プロフィール。E2E collaboration.spec.ts)。FR-020 は INTEGRATED(部分)のため対象外",
+  "updated_f45b1": "Gate F45・B1(r12): FR-009(情報内検索。E2E search.spec.ts。読み取りだけのため競合は対象外)と FR-050(訪問判定・信頼度。E2E visits.spec.ts)を追加。FR-007/008(C2)・FR-040(A2)・FR-041/042(B1)・FR-045(F45)・FR-049/051(V2)は(部分)のため対象外"
  },
  "cross_cutting": {
   "authz": [
@@ -100,6 +101,22 @@
    "security": [
     "backend/tests/test_gate_s4_authz_matrix.py::test_unrelated_user_cannot_reach_others_plan",
     "backend/tests/test_gate_l1b_today_timezone.py::test_invalid_timezone_falls_back_to_utc"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-009": {
+   "title": "情報内検索・コマンドパレット",
+   "e2e": [
+    "frontend/e2e/search.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_c3_search.py::test_plan_search"
+   ],
+   "conflict": [],
+   "conflict_na": "読み取りだけ(検索は書き込みが無い)",
+   "security": [
+    "backend/tests/test_gate_c3_search.py::test_restricted_memory_and_upload_documents_hidden",
+    "backend/tests/test_gate_c3_search.py::test_search_does_not_log_query"
    ],
    "status": "VERIFIED"
   },
@@ -439,6 +456,24 @@
     "frontend/e2e/share-clone.spec.ts"
    ],
    "security_note": "予約・券は写さない(E2E)",
+   "status": "VERIFIED"
+  },
+  "FR-050": {
+   "title": "訪問判定・信頼度",
+   "e2e": [
+    "frontend/e2e/visits.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_v2_visits.py::test_visit_flow"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_v2_visits.py::test_visit_flow"
+   ],
+   "conflict_note": "訂正は If-Match、古い revision は 409",
+   "security": [
+    "backend/tests/test_gate_v2_visits.py::test_clean_metrics_rejects_coordinates_and_inconsistency",
+    "backend/tests/test_gate_v2_visits.py::test_device_results_and_evidence"
+   ],
    "status": "VERIFIED"
   },
   "FR-053": {

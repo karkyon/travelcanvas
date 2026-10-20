@@ -22,6 +22,9 @@ import type { ActualInput } from './types';
 import type { PrivateProfileItemInput } from './types';
 import type { AdminUserAction, AdminUsersQuery, AuditLogQuery } from './types';
 import type { DeviceVisitMetrics, VisitAction } from './types';
+import type { CandidateInput, CandidatePatch, OpeningHoursItem, PlacePatch } from './types';
+import type { SearchFilter } from './types';
+import type { SharePolicyInput } from './types';
 import type { PresenceInput } from './endpoints/collab';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
@@ -91,10 +94,13 @@ export const notificationsAPI = {
 // 実装はGate #28で行う。
 
 export const shareAPI = {
-  createShareLink: (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number }) =>
+  createShareLink: (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number } & SharePolicyInput) =>
     api.createShareLink(planId, shareData),
+  previewSharePolicy: (planId: string, policy: SharePolicyInput & { permission?: 'view' | 'edit' }) =>
+    api.previewSharePolicy(planId, policy),
+  previewShareLink: (planId: string, shareId: string) => api.previewShareLink(planId, shareId),
   getShareSettings: (planId: string) => api.getShareSettings(planId),
-  updateShareSettings: (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null }) =>
+  updateShareSettings: (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null } & SharePolicyInput) =>
     api.updateShareSettings(planId, shareId, data),
   revokeShareLink: (planId: string, shareId: string) => api.revokeShareLink(planId, shareId),
   deleteShareLink: (planId: string, shareId: string) => api.deleteShareLink(planId, shareId),
@@ -118,10 +124,14 @@ export const createSpot = (data: CreateSpotData) => api.createSpot(data);
 export const getSpotCategories = () => api.getSpotCategories();
 export const testConnection = () => api.testConnection();
 
-export const createShareLink = (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number }) =>
+export const createShareLink = (planId: string, shareData: { permission: 'view' | 'edit'; expires_at?: string; passcode?: string; max_uses?: number } & SharePolicyInput) =>
   api.createShareLink(planId, shareData);
+// [Gate F45] FR-045 共有前プレビュー
+export const previewSharePolicy = (planId: string, policy: SharePolicyInput & { permission?: 'view' | 'edit' }) =>
+  api.previewSharePolicy(planId, policy);
+export const previewShareLink = (planId: string, shareId: string) => api.previewShareLink(planId, shareId);
 export const getShareSettings = (planId: string) => api.getShareSettings(planId);
-export const updateShareSettings = (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null }) =>
+export const updateShareSettings = (planId: string, shareId: string, data: { permission?: 'view' | 'edit'; expires_at?: string; passcode?: string | null; max_uses?: number | null } & SharePolicyInput) =>
   api.updateShareSettings(planId, shareId, data);
 export const revokeShareLink = (planId: string, shareId: string) => api.revokeShareLink(planId, shareId);
 export const deleteShareLink = (planId: string, shareId: string) => api.deleteShareLink(planId, shareId);
@@ -461,3 +471,26 @@ export const postDeviceVisitResults = (planId: string, results: Array<{ event_id
 export const correctVisit = (planId: string, eventId: string, action: VisitAction, revision?: number) =>
   api.correctVisit(planId, eventId, action, revision);
 
+// ===== [Gate C2] 候補箱(FR-007)・場所の一元管理(FR-008)
+export const getCandidates = (planId: string) => api.getCandidates(planId);
+export const createCandidate = (planId: string, input: CandidateInput) => api.createCandidate(planId, input);
+export const createCandidateFromSearch = (planId: string, searchCandidateId: string, priority?: number) =>
+  api.createCandidateFromSearch(planId, searchCandidateId, priority);
+export const updateCandidate = (planId: string, candidateId: string, patch: CandidatePatch, revision: number) =>
+  api.updateCandidate(planId, candidateId, patch, revision);
+export const deleteCandidate = (planId: string, candidateId: string) => api.deleteCandidate(planId, candidateId);
+export const scheduleCandidate = (
+  planId: string, candidateId: string, input: { day_id: string; local_start_time?: string | null; event_type?: string },
+  revision: number,
+) => api.scheduleCandidate(planId, candidateId, input, revision);
+export const mergeCandidate = (planId: string, candidateId: string, intoId: string, revision: number) =>
+  api.mergeCandidate(planId, candidateId, intoId, revision);
+export const getPlaceInfo = (placeId: string) => api.getPlaceInfo(placeId);
+export const updatePlace = (placeId: string, patch: PlacePatch, revision: number) => api.updatePlace(placeId, patch, revision);
+export const putOpeningHours = (placeId: string, hours: OpeningHoursItem[], revision: number) =>
+  api.putOpeningHours(placeId, hours, revision);
+export const getPlanPlaces = (planId: string) => api.getPlanPlaces(planId);
+
+// ===== [Gate C3] 情報内検索・コマンドパレット(FR-009)
+export const searchPlan = (planId: string, q: string, filter: SearchFilter | null = null) => api.searchPlan(planId, q, filter);
+export const searchEverything = (q: string, filter: SearchFilter | null = null) => api.searchEverything(q, filter);

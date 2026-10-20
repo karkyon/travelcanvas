@@ -9,7 +9,8 @@ from app.api.v1 import (
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
-    offline_pack, security_reports, presence, private_profile, visits,
+    offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
+    organizations, org_external,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -524,6 +525,12 @@ app.include_router(journey.router, prefix="/api/v1")
 app.include_router(atlas.router, prefix="/api/v1")
 # [Gate V2] FR-049〜051 訪問の地図の層・訪問の判定と信頼度・訂正と非表示(本人だけ)。/plans/{plan_id}/visits配下。
 app.include_router(visits.router, prefix="/api/v1")
+# [Gate C2] FR-007 候補箱(/plans/{plan_id}/candidates)・FR-008 場所の一元管理(/places・/plans/{plan_id}/places)。
+app.include_router(candidates.router, prefix="/api/v1")
+app.include_router(places.router, prefix="/api/v1")
+# [Gate C3] FR-009 情報内検索・コマンドパレット(/plans/{plan_id}/search・/search/everything)。
+app.include_router(plan_search.plan_router, prefix="/api/v1")
+app.include_router(plan_search.global_router, prefix="/api/v1")
 # [Gate P17] FR-057 Memory Replan(過去の予定と実績から次の旅行への提案)。/plans/{plan_id}/memory-replan配下。
 app.include_router(memory_replan.router, prefix="/api/v1")
 # [Gate K1] B-008 オフラインパックの鍵の配布と失効(利用者ごと・版ごとに導出。DBには版だけ)。/offline-pack配下。
@@ -533,3 +540,13 @@ app.include_router(presence.router, prefix="/api/v1")
 # [Gate C1] FR-023 秘匿プロフィール(本人だけ)。/privacy/private-profile・/plans/{plan_id}/private-profile。
 app.include_router(private_profile.profile_router, prefix="/api/v1")
 app.include_router(private_profile.plan_router, prefix="/api/v1")
+# [Gate B1] FR-041 組織・B2B / FR-042 外部連携(OAuth client_credentials・Webhook)
+app.include_router(organizations.router, prefix="/api/v1")
+app.include_router(org_external.router, prefix="/api/v1")
+
+
+@app.exception_handler(org_external.ApiError)
+async def _org_api_error(request: Request, exc: org_external.ApiError):
+    response = org_external.api_error_response(exc)
+    apply_security_headers(request.url.path, response.headers)
+    return response

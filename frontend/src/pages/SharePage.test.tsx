@@ -7,11 +7,12 @@ import userEvent from '@testing-library/user-event';
 import fx from './../services/api/__fixtures__/backendContractResponses.json';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
-const { getShareSettings, getCollaborators, resolvePublicShare, removeCollaborator } = vi.hoisted(() => ({
+const { getShareSettings, getCollaborators, resolvePublicShare, removeCollaborator, previewSharePolicy } = vi.hoisted(() => ({
   getShareSettings: vi.fn(),
   getCollaborators: vi.fn(),
   resolvePublicShare: vi.fn(),
   removeCollaborator: vi.fn(),
+  previewSharePolicy: vi.fn(),
 }));
 
 vi.mock('../services/api', () => ({
@@ -22,12 +23,19 @@ vi.mock('../services/api', () => ({
   revokeShareLink: vi.fn(),
   inviteCollaborator: vi.fn(),
   removeCollaborator,
+  // [Gate F45] 共有前プレビュー
+  previewSharePolicy,
+  previewShareLink: vi.fn(),
 }));
 
 import SharePage from './SharePage';
 import PublicSharePage from './PublicSharePage';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+beforeEach(() => {
+  previewSharePolicy.mockReset().mockResolvedValue(fx.share_preview);
+});
 
 describe('SharePage (Gate M9-FE-B3)', () => {
   beforeEach(() => {

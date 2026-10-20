@@ -21,8 +21,10 @@ def _create_day(client, plan_id, local_date="2026-12-01"):
     return res.json()["id"]
 
 
-def _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201, address="大阪市中央区"):
-    place = Place(id=uuid.uuid4(), name=name, category="landmark", latitude=lat, longitude=lon, address=address)
+def _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201, address="大阪市中央区", owner=None):
+    # [Gate C2] 場所は作った人(またはその場所を使う旅行のメンバー)だけが予定に付けられる。試験の利用者が作った場所にする
+    place = Place(id=uuid.uuid4(), name=name, category="landmark", latitude=lat, longitude=lon, address=address,
+                  created_by=owner.id if owner else None)
     db_session.add(place)
     db_session.commit()
     db_session.refresh(place)
@@ -33,7 +35,7 @@ def test_create_event_with_place_id_inherits_place_fields(auth_client, db_sessio
     client, _user = auth_client
     plan_id = _create_plan(client)
     day_id = _create_day(client, plan_id)
-    place = _make_place(db_session)
+    place = _make_place(db_session, owner=_user)
 
     res = client.post(
         f"/api/v1/plans/{plan_id}/events",
@@ -52,7 +54,7 @@ def test_create_event_with_place_id_and_explicit_title_keeps_explicit_title(auth
     client, _user = auth_client
     plan_id = _create_plan(client)
     day_id = _create_day(client, plan_id)
-    place = _make_place(db_session)
+    place = _make_place(db_session, owner=_user)
 
     res = client.post(
         f"/api/v1/plans/{plan_id}/events",
@@ -78,8 +80,8 @@ def test_route_preview_computes_legs_between_known_coordinates(auth_client, db_s
     client, _user = auth_client
     plan_id = _create_plan(client)
     day_id = _create_day(client, plan_id)
-    place_a = _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201)
-    place_b = _make_place(db_session, name="通天閣", lat=34.652432, lon=135.506156)
+    place_a = _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201, owner=_user)
+    place_b = _make_place(db_session, name="通天閣", lat=34.652432, lon=135.506156, owner=_user)
 
     for place in (place_a, place_b):
         res = client.post(
@@ -125,7 +127,7 @@ def test_insertion_preview_does_not_persist_anything(auth_client, db_session):
     client, _user = auth_client
     plan_id = _create_plan(client)
     day_id = _create_day(client, plan_id)
-    place = _make_place(db_session, name="通天閣", lat=34.652432, lon=135.506156)
+    place = _make_place(db_session, name="通天閣", lat=34.652432, lon=135.506156, owner=_user)
 
     before_count = db_session.query(TravelEvent).filter(TravelEvent.day_id == day_id).count()
 
@@ -148,8 +150,8 @@ def test_insertion_preview_shows_added_distance_when_inserting_between_events(au
     client, _user = auth_client
     plan_id = _create_plan(client)
     day_id = _create_day(client, plan_id)
-    place_a = _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201)
-    place_far = _make_place(db_session, name="遠い場所", lat=35.681236, lon=139.767125)
+    place_a = _make_place(db_session, name="大阪城", lat=34.687315, lon=135.526201, owner=_user)
+    place_far = _make_place(db_session, name="遠い場所", lat=35.681236, lon=139.767125, owner=_user)
 
     res_a = client.post(
         f"/api/v1/plans/{plan_id}/events", json={"day_id": day_id, "title": "", "place_id": str(place_a.id)}

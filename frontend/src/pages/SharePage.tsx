@@ -1,4 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * SharePage - プラン共有・権限設定(/share/:planId)。
+ *
+ * [Gate F45] FR-045(CA-003)項目単位の共有の規則:
+ * - 共有リンクごとに閲覧者へ見せる項目を選ぶ(最小限・標準・すべて(機密を除く)、または1つずつ)
+ * - 機密の項目(住所・メモ・予約の概要)は1つずつ選び、「URLを知る人なら誰でも見られる」ことの確認が要る
+ * - 予約番号・チケット・文書・連絡先・正確な位置・支払いはどの設定でも見せない(一覧で示す)
+ * - 発行前・発行後に「閲覧者に見える内容」をこの画面で確認できる(使用回数を消費しない。以前の
+ *   「共有前プレビューを開く」は実際のURLを開くため回数を1回使っていた)
+ */
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Link, QrCode, Mail, Copy, Eye, Edit3, Shield,
@@ -11,11 +21,24 @@ import {
   revokeShareLink,
   inviteCollaborator,
   getCollaborators,
-  removeCollaborator
+  removeCollaborator,
+  previewSharePolicy,
+  previewShareLink,
 } from '../services/api';
-import type { ShareLink, Collaborator } from '../services/api';
+import type { ShareLink, Collaborator, ShareFieldKey, SharePolicyCatalog, SharePreset, SharePreview, ShareWithheld } from '../services/api';
+import { errorDetailMessage } from '../utils/apiErrorDetail';
+import SharedPlanView from '../components/share/SharedPlanView';
 import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
 import LocalQrCode from '../components/share/LocalQrCode';
+
+const PRESET_BUTTONS: Array<{ value: SharePreset; label: string }> = [
+  { value: 'minimal', label: '最小限' }, { value: 'standard', label: '標準' }, { value: 'all', label: 'すべて(機密を除く)' },
+];
+const STANDARD_FIELDS: ShareFieldKey[] = ['plan_description', 'day_titles', 'event_times'];
+const WITHHELD_LABEL: Array<[keyof ShareWithheld, string]> = [
+  ['confirmation_numbers', '予約番号'], ['tickets', 'チケット・QR'], ['documents', '文書'],
+  ['exact_locations', '正確な位置'], ['reservations', '予約'], ['event_addresses', '予定の住所'], ['event_notes', '予定のメモ'],
+];
 
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -25,6 +48,7 @@ const SharePage: React.FC = () => {
   // [Gate #30] 生の共有URLはDBに保存されないため、作成直後のこの1回しか
   // 表示できない。一覧を再取得してもここには戻ってこない。
   const [justCreatedUrl, setJustCreatedUrl] = useState<string | null>(null);
+  const [justCreated, setJustCreated] = useState<ShareLink | null>(null);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,6 +62,26 @@ const SharePage: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
   const [inviteMessage, setInviteMessage] = useState('');
+  // [Gate F45] 見せる項目と共有前プレビュー
+  const [catalog, setCatalog] = useState<SharePolicyCatalog | null>(null);
+  const [fields, setFields] = useState<ShareFieldKey[]>(STANDARD_FIELDS);
+  const [ackConfidential, setAckConfidential] = useState(false);
+  const [preview, setPreview] = useState<SharePreview | null>(null);
+  const [previewOf, setPreviewOf] = useState<string | null>(null); // null=発行前の設定、文字列=リンクの token_prefix
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewSeq = useRef(0);
+  const previewHeading = useRef<HTMLHeadingElement>(null);
+
+  const confidentialKeys = useMemo(
+    () => new Set((catalog?.fields ?? []).filter((f) => f.classification === 'confidential').map((f) => f.key)),
+    [catalog],
+  );
+  const selectedConfidential = fields.filter((k) => confidentialKeys.has(k));
+  const needsAck = selectedConfidential.length > 0 && !ackConfidential;
+  const labelOf = useCallback(
+    (k: ShareFieldKey) => catalog?.fields.find((f) => f.key === k)?.label ?? k,
+    [catalog],
+  );
 
   // [Gate M9-FE-B3] planIdにのみ依存するuseCallbackとし、effectの依存を正しく
   // 宣言する(発火条件は従来どおりplanId変化時のみ)。
@@ -68,6 +112,56 @@ const SharePage: React.FC = () => {
     }
   }, [planId, loadShareSettings, loadCollaborators]);
 
+  // [Gate F45] 発行前の設定で閲覧者に見える内容。機密を選んで確認していない間は取得しない(backend も 422 で拒む)
+  useEffect(() => {
+    if (!planId || needsAck) return;
+    const id = ++previewSeq.current;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await previewSharePolicy(planId, {
+          fields, acknowledge_confidential: fields.some((k) => confidentialKeys.has(k)) ? true : undefined,
+        });
+        if (id !== previewSeq.current) return;
+        const loaded = res.catalog;
+        setCatalog((cur) => cur ?? loaded);
+        setPreview(res);
+        setPreviewOf(null);
+        setPreviewError(null);
+      } catch (error) {
+        if (id === previewSeq.current) setPreviewError(errorDetailMessage(error, '閲覧者に見える内容を取得できませんでした'));
+      }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [planId, fields, needsAck, confidentialKeys]);
+
+  const toggleField = (key: ShareFieldKey) => {
+    setFields((cur) => {
+      const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+      if (!next.some((k) => confidentialKeys.has(k))) setAckConfidential(false);
+      return next;
+    });
+  };
+
+  const applyPreset = (preset: SharePreset) => {
+    setFields(catalog?.presets[preset] ?? (preset === 'minimal' ? [] : STANDARD_FIELDS));
+    setAckConfidential(false);
+  };
+
+  const showLinkPreview = async (share: ShareLink) => {
+    previewSeq.current += 1; // 発行前の設定の取得結果で上書きしない
+    try {
+      const res = await previewShareLink(planId!, share.id);
+      const loaded = res.catalog;
+      setCatalog((cur) => cur ?? loaded);
+      setPreview(res);
+      setPreviewOf(share.token_prefix);
+      setPreviewError(null);
+      window.setTimeout(() => previewHeading.current?.focus(), 0);
+    } catch (error) {
+      setPreviewError(errorDetailMessage(error, '閲覧者に見える内容を取得できませんでした'));
+    }
+  };
+
   const handleCreateShare = async () => {
     setIsSaving(true);
     try {
@@ -76,15 +170,18 @@ const SharePage: React.FC = () => {
         expires_at: expiryDate ? `${expiryDate}T23:59:59Z` : undefined,
         passcode: sharePasscode || undefined,
         max_uses: maxUses ? Number(maxUses) : undefined,
+        fields,
+        acknowledge_confidential: selectedConfidential.length > 0 ? ackConfidential : undefined,
       });
 
       setJustCreatedUrl(response.data.url ? `${window.location.origin}${response.data.url}` : null);
+      setJustCreated(response.data);
       setSharePasscode('');
       setMaxUses('');
       await loadShareSettings();
       setMessage({ text: '共有リンクを作成しました(URLは今だけ表示されます。必ずコピーしてください)', type: 'success' });
     } catch (error) {
-      setMessage({ text: '共有リンクの作成に失敗しました', type: 'error' });
+      setMessage({ text: errorDetailMessage(error, '共有リンクの作成に失敗しました'), type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -265,18 +362,16 @@ const SharePage: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* [Gate #41 / CA-002] 「所有者が共有プレビューで公開内容を
-                      事前確認できる」受入条件への対応。生成直後のURLは今だけ
-                      有効なため、この場ですぐ確認・共有できるようにする。 */}
+                  {/* [Gate #41 / CA-002] 所有者が共有プレビューで公開内容を事前確認できる。
+                      [Gate F45] 実際のURLを開くと使用回数を1回使うため、この画面のプレビューで確かめる */}
                   <div className="flex gap-2 pt-1">
-                    <a
-                      href={justCreatedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => justCreated && showLinkPreview(justCreated)}
                       className="flex-1 text-center px-3 py-2 border border-blue-300 text-blue-800 rounded-lg hover:bg-blue-100 text-sm"
                     >
-                      共有前プレビューを開く
-                    </a>
+                      閲覧者に見える内容を確認
+                    </button>
                     <button
                       onClick={async () => {
                         if (navigator.share) {
@@ -320,7 +415,19 @@ const SharePage: React.FC = () => {
                             ? ` ・ 最終閲覧 ${new Date(share.last_accessed_at).toLocaleString('ja-JP')}`
                             : ' ・ 未閲覧'}
                         </div>
+                        <div className="text-gray-700 text-xs">
+                          見せる項目: {share.fields.length > 0 ? share.fields.map(labelOf).join('・') : '最小限(旅行名・期間・予定名だけ)'}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => showLinkPreview(share)}
+                        className="p-2 text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                        aria-label={`共有リンク「...${share.token_prefix}」で見える内容を確認`}
+                        title="見える内容を確認"
+                      >
+                        <Eye size={16} aria-hidden="true" />
+                      </button>
                       {!share.revoked_at && (
                         <button
                           onClick={() => handleRevokeShare(share.id)}
@@ -408,12 +515,72 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* [Gate F45] FR-045 閲覧者に見せる項目 */}
+                <fieldset className="border border-gray-200 rounded-lg p-4">
+                  <legend className="px-1 text-sm font-medium text-gray-800">閲覧者に見せる項目</legend>
+                  <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="まとめて選ぶ">
+                    {PRESET_BUTTONS.map((p) => (
+                      <button key={p.value} type="button" onClick={() => applyPreset(p.value)}
+                        className="text-sm px-3 py-1 rounded-full border border-gray-300 text-gray-800 hover:bg-gray-100">
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-700 mb-2">
+                    いつも見せる: {(catalog?.always ?? ['旅行名', '目的地', '期間', '予定名', '予定の種類']).join('・')}
+                  </p>
+                  {catalog ? (
+                    <>
+                      <ul className="space-y-2">
+                        {catalog.fields.filter((f) => f.classification === 'internal').map((f) => (
+                          <li key={f.key}>
+                            <label className="flex items-start gap-2 text-sm text-gray-800">
+                              <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggleField(f.key)}
+                                aria-describedby={`share-field-${f.key}`} className="mt-1" />
+                              <span>{f.label}<span id={`share-field-${f.key}`} className="block text-xs text-gray-700">{f.description}</span></span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-3 text-sm font-medium text-amber-900">機密の項目(必要なものだけ1つずつ選んでください)</p>
+                      <ul className="space-y-2 mt-1">
+                        {catalog.fields.filter((f) => f.classification === 'confidential').map((f) => (
+                          <li key={f.key}>
+                            <label className="flex items-start gap-2 text-sm text-gray-800">
+                              <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggleField(f.key)}
+                                aria-describedby={`share-field-${f.key}`} className="mt-1" />
+                              <span>{f.label}(機密)<span id={`share-field-${f.key}`} className="block text-xs text-gray-700">{f.description}</span></span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                      {selectedConfidential.length > 0 && (
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                          <p className="text-sm text-amber-900">
+                            URLを知っている人なら誰でも「{selectedConfidential.map(labelOf).join('・')}」を見られます。
+                            転送やスクリーンショットで広がることがあります。
+                          </p>
+                          <label className="mt-2 flex items-start gap-2 text-sm text-gray-900">
+                            <input type="checkbox" checked={ackConfidential} onChange={(e) => setAckConfidential(e.target.checked)} className="mt-1" />
+                            機密の項目を見せることを確認しました
+                          </label>
+                        </div>
+                      )}
+                      <p className="mt-3 text-xs text-gray-700">
+                        どの設定でも見せない: {catalog.restricted.map((r) => r.label).join('・')}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-700">項目を読み込み中です…</p>
+                  )}
+                </fieldset>
               </div>
 
               <div className="mt-6">
                 <button
                   onClick={handleCreateShare}
-                  disabled={isSaving}
+                  disabled={isSaving || needsAck}
                   className="w-full px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? '作成中...' : '共有リンクを発行'}
@@ -535,6 +702,34 @@ const SharePage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* [Gate F45] 共有前プレビュー(閲覧者に見える内容。使用回数を消費しない) */}
+        <section className="mt-8 bg-white rounded-xl shadow-sm p-6" aria-labelledby="share-preview-heading">
+          <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+            <Eye size={20} aria-hidden="true" />
+            閲覧者に見える内容
+          </h2>
+          <p className="text-sm text-gray-700 mb-4" aria-live="polite">
+            {previewOf ? `発行済みのリンク「...${previewOf}」で見える内容です。` : '今の設定で発行すると見える内容です。'}
+            確認しても使用回数は減りません。
+          </p>
+          {previewError && <p role="alert" className="text-sm text-red-800 mb-3">{previewError}</p>}
+          {!previewOf && needsAck && (
+            <p className="text-sm text-amber-900 mb-3">機密の項目を見せることを確認すると、見える内容を表示します。</p>
+          )}
+          {preview && (
+            <>
+              {WITHHELD_LABEL.some(([k]) => preview.withheld[k] > 0) && (
+                <p className="text-sm text-gray-800 mb-4">
+                  見せない情報: {WITHHELD_LABEL.filter(([k]) => preview.withheld[k] > 0).map(([k, label]) => `${label} ${preview.withheld[k]}件`).join('・')}
+                </p>
+              )}
+              <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+                <SharedPlanView plan={preview.view} titleLevel={3} />
+              </div>
+            </>
+          )}
+        </section>
 
         {/* 注意事項 */}
         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

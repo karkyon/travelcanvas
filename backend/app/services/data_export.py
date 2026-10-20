@@ -101,6 +101,7 @@ PLAN_TABLES = (
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
     m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
+    m.PlanCandidate,
 )
 
 
@@ -229,6 +230,8 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["event_actuals"] = [row(x) for x in q(m.EventActual).all()]
     # [Gate V2] 訪問の判定(本人の分だけ。根拠に座標は無い)
     t["visit_assessments"] = [row(x) for x in q(m.VisitAssessment).filter(m.VisitAssessment.user_id == me).all()]
+    # [Gate C2] 候補箱(旅行の共有データ)
+    t["plan_candidates"] = [row(x) for x in q(m.PlanCandidate).all()]
     return t
 
 

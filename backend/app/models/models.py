@@ -238,6 +238,9 @@ class PlanShareLink(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # [Gate F45] FR-045 項目単位の共有の規則({"version":1,"fields":[...],"preset":...})。
+    # NULL は本Gate以前のリンク(=標準の項目)。app/services/share_policy.py が正本。
+    policy = Column(JSONB, nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="share_links")
@@ -690,6 +693,18 @@ class Place(Base):
         UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True
     )
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # [Gate C2] FR-008 場所の一元管理(DOC-02 FR-008、DOC-04 SC-09)。項目ごとの出典は field_sources
+    aliases = Column(JSONB, nullable=True)            # 別名の一覧
+    phone = Column(String(40), nullable=True)
+    website = Column(String(2000), nullable=True)
+    entrance_note = Column(String(500), nullable=True)  # 入口(駅の改札・施設の入口・ロビー・駐車場など)
+    floor = Column(String(40), nullable=True)
+    reservation_required = Column(Boolean, nullable=True)  # NULL = 分からない
+    price_range = Column(String(40), nullable=True)
+    accessibility_note = Column(String(1000), nullable=True)
+    closed_days = Column(String(200), nullable=True)
+    note = Column(String(2000), nullable=True)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -2613,6 +2628,49 @@ class VisitAssessment(Base):
     )
 
 
+class PlanCandidate(Base):
+    """[Gate C2] FR-007 候補箱(DOC-02 FR-007・FC-019/023、DOC-04 SC-08、DOC-14 §7.1/7.2)。
+
+    旅行ごとの未確定の候補。出典(source_kind・source_url・provider)・登録した人・登録の時刻を持つ。
+    予定に配置しても候補は消さず(status=scheduled・scheduled_event_id)、予定が消えれば候補に戻す(読む時に判定)。
+    重複は自動で消さず、利用者が統合する(merged_into_id)。URL はサーバーから取りに行かない(SSRF を起こさない)。
+    予定には外部キーを張らない(B-013 の個別削除を妨げないため)。"""
+    __tablename__ = "plan_candidates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    note = Column(String(2000), nullable=True)
+    source_kind = Column(String(8), nullable=False)
+    source_url = Column(String(2000), nullable=True)
+    provider = Column(String(40), nullable=True)
+    external_id = Column(String(200), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=True)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="SET NULL"), nullable=True)
+    category = Column(String(50), nullable=True)
+    address = Column(String(500), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    priority = Column(Integer, nullable=False, default=2, server_default="2")
+    status = Column(String(9), nullable=False, default="open", server_default="open")
+    scheduled_event_id = Column(UUID(as_uuid=True), nullable=True)
+    merged_into_id = Column(UUID(as_uuid=True), nullable=True)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("source_kind IN ('url','text','manual','search')", name="ck_plan_candidates_source_kind"),
+        CheckConstraint("status IN ('open','scheduled','dismissed')", name="ck_plan_candidates_status"),
+        CheckConstraint("priority BETWEEN 1 AND 3", name="ck_plan_candidates_priority"),
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="ck_plan_candidates_location_pair"),
+        CheckConstraint("(status = 'scheduled') = (scheduled_event_id IS NOT NULL)",
+                        name="ck_plan_candidates_scheduled"),
+        Index("ix_plan_candidates_plan", "plan_id", "status"),
+    )
+
+
 class UserPrivateProfile(Base):
     """[Gate C1] FR-023 秘匿プロフィール。利用者ごとの非公開の条件を1つの暗号文だけで持つ(平文の列を持たない)。
 
@@ -2634,3 +2692,140 @@ class PrivateProfileLink(Base):
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ==========================================================================
+# [Gate B1] FR-041 組織・B2B(最小形)/ FR-042 API・Webhook(最小形)
+# ==========================================================================
+# 組織は配布する旅程(配布版の写し)の境界。組織の管理者でも、メンバー個人の旅行は見られない
+# (DOC-03 §24)。配布版は元の旅行から「標準の共有項目」だけを写した snapshot で、予約・番号・住所・
+# メモ・位置を含めない。外部連携は組織単位の API クライアント(OAuth 2.0 client_credentials、
+# スコープつき短命トークン)と、署名つき Webhook(HMAC-SHA256)。正本は app/services/organizations.py・
+# app/services/org_api.py。
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(100), nullable=False)
+    brand_color = Column(String(7), nullable=True)  # "#RRGGBB"
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(6), nullable=False, default="member", server_default="member")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", name="uq_organization_members_org_user"),
+        CheckConstraint("role IN ('owner','admin','member')", name="ck_organization_members_role"),
+    )
+
+
+class OrgDistribution(Base):
+    """配布する旅程。版を上げるたびに snapshot を作り直す(過去の版の確認は残る)。"""
+    __tablename__ = "org_distributions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
+                             nullable=False, index=True)
+    source_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String(200), nullable=False)
+    version = Column(Integer, nullable=False, default=1, server_default="1")
+    snapshot = Column(JSONB, nullable=False)
+    change_note = Column(String(500), nullable=True)
+    published_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class OrgDistributionAck(Base):
+    """閲覧確認(どの版を確認したか)。"""
+    __tablename__ = "org_distribution_acks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    distribution_id = Column(UUID(as_uuid=True), ForeignKey("org_distributions.id", ondelete="CASCADE"),
+                             nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    version = Column(Integer, nullable=False)
+    acked_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("distribution_id", "user_id", "version", name="uq_org_distribution_acks_once"),
+    )
+
+
+class OrgApiClient(Base):
+    """FR-042 組織の外部連携(OAuth 2.0 client_credentials)。秘密はハッシュだけを持つ。"""
+    __tablename__ = "org_api_clients"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
+                             nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    client_id = Column(String(40), nullable=False, unique=True, index=True)
+    secret_hash = Column(String(64), nullable=False)
+    scopes = Column(JSONB, nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class OrgApiToken(Base):
+    """短命のアクセストークン(ハッシュだけを持つ)。"""
+    __tablename__ = "org_api_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False,
+                       index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    scopes = Column(JSONB, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class OrgWebhook(Base):
+    """FR-042 署名つき Webhook。署名の鍵は暗号化して持つ(送るたびに署名に使うため)。"""
+    __tablename__ = "org_webhooks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
+                             nullable=False, index=True)
+    url = Column(String(2000), nullable=False)
+    secret_ciphertext = Column(LargeBinary, nullable=False)
+    events = Column(JSONB, nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class OrgWebhookDelivery(Base):
+    """送信の記録(再送できるよう本文を持つ。本文に個人・秘密の値は入れない)。"""
+    __tablename__ = "org_webhook_deliveries"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    webhook_id = Column(UUID(as_uuid=True), ForeignKey("org_webhooks.id", ondelete="CASCADE"), nullable=False,
+                        index=True)
+    event_id = Column(UUID(as_uuid=True), nullable=False)
+    event_type = Column(String(40), nullable=False)
+    payload = Column(JSONB, nullable=False)
+    status = Column(String(9), nullable=False, default="pending", server_default="pending")
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    last_status_code = Column(Integer, nullable=True)
+    last_error = Column(String(40), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','delivered','failed')", name="ck_org_webhook_deliveries_status"),
+    )

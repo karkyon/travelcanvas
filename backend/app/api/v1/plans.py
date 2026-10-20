@@ -40,6 +40,7 @@ from app.models.models import (
     IdempotencyRecord, User, Place, TravelSegment, RouteOption, RouteLeg,
     Reservation, Ticket,
 )
+from app.services import place_access
 from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
 from app.services import plan_item_deletion
@@ -670,7 +671,8 @@ async def create_event(
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="place_idの形式が不正です")
         place = db.query(Place).filter(Place.id == place_uuid).first()
-        if not place:
+        # [Gate C2] 見られない場所(他の人が作り、自分の旅行で使っていない)は付けられない(存在を区別せず 404)
+        if not place or not place_access.can_view(db, place, current_user):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定したPlaceが見つかりません")
         title = title or place.name
         address = address if address is not None else place.address

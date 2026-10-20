@@ -216,6 +216,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     from app.services import private_profile as _pp
 
     _pp.delete_for_user(db, me)
+    # [Gate B1] 組織の所属・閲覧確認(最後の owner なら admin を owner にし、誰もいなければ組織と外部連携を止める)
+    from app.services import organizations as _orgs
+
+    summary["organization_memberships"] = _orgs.on_user_deleted(db, me)
     # [Gate S11] 多要素認証の秘密・回復コード(件数は応答に含めない。設定の有無も残さない)
     from app.models.models import UserMfa
 

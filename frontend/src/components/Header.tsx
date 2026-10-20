@@ -11,11 +11,13 @@ import {
   Calendar,
   Zap,
   Brain,
-  LogOut
+  LogOut,
+  Building2
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
+import CommandPalette from './CommandPalette';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -259,6 +261,9 @@ const Header: React.FC = () => {
             })}
           </nav>
 
+          {/* [Gate C3] 情報内検索・コマンドパレット(Ctrl+K) */}
+          <CommandPalette />
+
           {/* AI検索クイックアクセス（デスクトップ） */}
           <div className="hidden lg:flex items-center space-x-3">
             <Link
@@ -333,6 +338,17 @@ const Header: React.FC = () => {
                     <User size={16} className="inline mr-2" />
                     プロフィール
                   </Link>
+                  {/* [Gate B1] 組織(FR-041)。ゲストは使えない */}
+                  {user?.user_type !== 'guest' && (
+                    <Link
+                      to="/organizations"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      <Building2 size={16} className="inline mr-2" aria-hidden="true" />
+                      組織
+                    </Link>
+                  )}
                   <Link
                     to="/settings"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

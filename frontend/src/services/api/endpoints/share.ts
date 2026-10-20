@@ -5,10 +5,12 @@
  */
 import type { AxiosRequestConfig } from 'axios';
 import { NotificationsApi } from './notifications';
-import type { ApiResponse, Collaborator, CollaboratorRemoveResult, PublicSharedPlan, ShareLink } from '../types';
+import type {
+  ApiResponse, Collaborator, CollaboratorRemoveResult, PublicSharedPlan, ShareLink, SharePolicyInput, SharePreview,
+} from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { collaborator, collaboratorRemoveResult, publicSharedPlan, shareLink } from '../decoders';
+import { collaborator, collaboratorRemoveResult, publicSharedPlan, shareLink, sharePreview } from '../decoders';
 
 const PUBLIC_SHARE_SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -54,12 +56,13 @@ export class ShareApi extends NotificationsApi {
     return apiOk<PublicSharedPlan>(decodeResponse(response.data, publicSharedPlan, 'POST /public/share/{token}/resolve'));
   }
 
+  // [Gate F45] FR-045 見せる項目(preset / fields / acknowledge_confidential)も送れる
   async createShareLink(planId: string, shareData: {
     permission: 'view' | 'edit';
     expires_at?: string;
     passcode?: string;
     max_uses?: number;
-  }): Promise<ApiResponse<ShareLink>> {
+  } & SharePolicyInput): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post(`/travel-plans/${planId}/share`, shareData);
     return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'POST /travel-plans/{plan_id}/share'));
   }
@@ -74,9 +77,21 @@ export class ShareApi extends NotificationsApi {
     expires_at?: string;
     passcode?: string | null;
     max_uses?: number | null;
-  }): Promise<ApiResponse<ShareLink>> {
+  } & SharePolicyInput): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.put(`/travel-plans/${planId}/share/${shareId}`, data);
     return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'PUT /travel-plans/{plan_id}/share/{share_id}'));
+  }
+
+  // [Gate F45] 共有前プレビュー(所有者のみ)。リンクを作らず、閲覧者に見える内容と見せない情報の件数を返す
+  async previewSharePolicy(planId: string, policy: SharePolicyInput & { permission?: 'view' | 'edit' }): Promise<SharePreview> {
+    const response = await this.client.post(`/travel-plans/${planId}/share-preview`, policy);
+    return decodeResponse(response.data, sharePreview, 'POST /travel-plans/{plan_id}/share-preview');
+  }
+
+  // [Gate F45] 発行済みリンクで閲覧者に見える内容(所有者のみ。使用回数を消費しない)
+  async previewShareLink(planId: string, shareId: string): Promise<SharePreview> {
+    const response = await this.client.get(`/travel-plans/${planId}/share/${shareId}/preview`);
+    return decodeResponse(response.data, sharePreview, 'GET /travel-plans/{plan_id}/share/{share_id}/preview');
   }
 
   async deleteShareLink(planId: string, shareId: string): Promise<ApiResponse<void>> {
