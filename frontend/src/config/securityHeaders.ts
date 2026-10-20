@@ -9,6 +9,43 @@
  * 'unsafe-inline' は style だけ(通知の部品が <style> を差し込むため)。script には付けない。
  * Referrer-Policy は strict-origin-when-cross-origin(共有リンク /s/<token> のパスを外部へ送らない)。
  */
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/** 要求の Host ヘッダー(例 `omega-dev2:4173`・`[::1]:4173`)から名前だけを取り出す。読めなければ undefined */
+export function hostnameOf(host: string | undefined | null): string | undefined {
+  if (!host) return undefined;
+  try {
+    return new URL(`http://${host}`).hostname || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * [Gate H1] 設定の API の URL が localhost(開発・CI の既定)で、画面を別の名前(omega-dev2・LAN の IP)で開いた時は、
+ * API も同じ名前に向ける(ポートと方式はそのまま)。以前は画面を他の PC から開くと、ブラウザがその PC 自身の
+ * localhost:8001 を呼んで何も動かなかった。設定が localhost 以外(本番のドメイン)なら変えない。
+ */
+export function apiUrlForHost(apiUrl: string | undefined, pageHost: string | undefined | null): string {
+  const raw = apiUrl || 'http://localhost:8001';
+  const name = hostnameOf(pageHost);
+  if (!name || LOOPBACK.has(name)) return raw;
+  try {
+    const u = new URL(raw);
+    if (!LOOPBACK.has(u.hostname)) return raw;
+    u.hostname = name;
+    return u.toString().replace(/\/+$/, '');
+  } catch {
+    return raw;
+  }
+}
+
+/** [Gate H1] vite preview が受け付ける名前(localhost に加えて .env の TC_PUBLIC_HOSTS。IP は vite が常に受け付ける) */
+export function allowedHosts(publicHosts: string | undefined): string[] {
+  const extra = (publicHosts || '').split(',').map((h) => h.trim()).filter((h) => /^[A-Za-z0-9.-]+$/.test(h));
+  return Array.from(new Set(['localhost', '127.0.0.1', ...extra]));
+}
+
 export function apiOrigin(apiUrl: string | undefined): string {
   try {
     return new URL(apiUrl || 'http://localhost:8001').origin;

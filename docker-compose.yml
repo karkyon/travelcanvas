@@ -96,6 +96,9 @@ services:
       # (以前は http://localhost:8001 固定で、.env の VITE_API_URL を変えると CSP が API への通信を止めた)。
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
       VITE_APP_NAME: TravelCanvas
+      # [Gate H1] 画面を開いてよい名前(omega-dev2・LAN の IP 等、カンマ区切り)。backend は .env から同じ値を読み、
+      # その名前の :4173 を CORS に足す。画面は開いた名前の :8001 を API にする
+      TC_PUBLIC_HOSTS: ${TC_PUBLIC_HOSTS:-}
     ports:
       - "4173:4173"
     depends_on:

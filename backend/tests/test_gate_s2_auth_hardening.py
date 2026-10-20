@@ -232,6 +232,8 @@ GOOD = {
     "METRICS_TOKEN": "Mt5Kx8Rq2Wn7Vb3Lj9Hs4Cd1Gy6",
     "DEBUG": False,
     "CORS_ORIGINS": "https://app.travelcanvas.jp",
+    # [Gate H1] omega の backend コンテナには .env の TC_PUBLIC_HOSTS が環境変数で入る。試験の設定では明示的に空にする
+    "TC_PUBLIC_HOSTS": "",
 }
 
 

@@ -245,8 +245,8 @@ def _set_refresh_cookie(response: Response, value: str) -> None:
 
 
 def _allowed_origins() -> List[str]:
-    origins = settings.CORS_ORIGINS
-    return list(origins) if isinstance(origins, list) else [origins]
+    # [Gate H1] CORS と同じ一覧(TC_PUBLIC_HOSTS の :4173 を含む)
+    return settings.cors_allowed_origins
 
 
 def _refuse_if_signup_closed() -> None:

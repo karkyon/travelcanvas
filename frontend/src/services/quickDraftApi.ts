@@ -14,6 +14,7 @@
  * (既存のthis.clientをそのまま使う)を用いる。
  */
 import axios from 'axios';
+import { apiUrlForHost } from '@/config/securityHeaders';
 
 export interface QuickDraftEventInput {
   title: string;
@@ -70,10 +71,11 @@ function resolveApiBaseUrl(): string {
   // 'http://localhost:8001'へフォールバックしてしまう不整合があった
   // (omega-dev2では既定値と実際のbackendアドレスが偶然一致するため、
   // これまで症状が表面化していなかった)。api.ts と同じ優先順位に揃える。
-  const raw =
-    import.meta.env.VITE_API_BASE_URL ||
-    import.meta.env.VITE_API_URL ||
-    'http://localhost:8001';
+  // [Gate H1] 画面を別の名前(omega-dev2・LAN の IP)で開いた時は API も同じ名前へ(services/api/core.ts と同じ規則)
+  const raw = apiUrlForHost(
+    import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8001',
+    typeof window !== 'undefined' ? window.location.host : undefined,
+  );
   const trimmed = raw.replace(/\/+$/, '');
   return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
 }

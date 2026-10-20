@@ -10,6 +10,7 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } f
 import { toast } from 'react-hot-toast';
 import type { MinimalHttpClient } from './types';
 import { solveChallenge } from '@/utils/challengeSolver';
+import { apiUrlForHost } from '@/config/securityHeaders';
 
 // [Gate A1] 呼び出し元が自分でエラーを画面へ伝える場合(ログイン・登録・ゲスト開始/昇格・
 // セッション確認)に、共通エラー処理(toast表示・401時のトークン破棄と/loginへの強制遷移)を
@@ -37,10 +38,13 @@ interface ApiErrorResponseBody {
 // 常に下記フォールバックの廃止済み旧サーバー(192.168.1.248)が使われていた実害バグ。
 // さらにVITE_API_URLの値自体に/api/v1が含まれておらず二重に壊れていた。
 // Dockerfile/docker-compose.yml側もビルドARGを正しく受け取るよう修正済み(同Gate)。
+// [Gate H1] 設定が localhost で、画面を別の名前(omega-dev2・LAN の IP)で開いた時は API も同じ名前に向ける
+// (config/securityHeaders.ts apiUrlForHost。CSP の通信先も同じ規則で作る)。
 function resolveApiBaseUrl(): string {
-  const raw = import.meta.env.VITE_API_BASE_URL ||
+  const configured = import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_API_URL ||
     'http://localhost:8001';
+  const raw = apiUrlForHost(configured, typeof window !== 'undefined' ? window.location.host : undefined);
   const trimmed = raw.replace(/\/+$/, '');
   return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;
 }

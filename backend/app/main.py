@@ -28,9 +28,8 @@ logger = logging.getLogger("travelcanvas")
 
 # [Gate M10 CORS調査] CORSMiddlewareへ渡す許可オリジン一覧。以下の
 # unhandled_exception_handlerでも同じ一覧を参照する(単一の真実源)。
-_ALLOWED_CORS_ORIGINS = (
-    settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
-)
+# [Gate H1] TC_PUBLIC_HOSTS(omega-dev2 等)の :4173 も含む(config.Settings.cors_allowed_origins)
+_ALLOWED_CORS_ORIGINS = settings.cors_allowed_origins
 
 
 def _cors_headers_for_origin(request: Request) -> dict:

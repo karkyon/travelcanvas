@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional, Union
 from pydantic_settings import BaseSettings
 from pydantic import field_validator, model_validator
@@ -62,6 +63,9 @@ def production_problems(s) -> List[str]:
         if o == "*" or not o.startswith("https://") or "localhost" in o or "127.0.0.1" in o:
             problems.append("CORS_ORIGINS に https 以外・* ・localhost が含まれる")
             break
+    # [Gate H1] 本番では http の追加の名前を許さない(https の CORS_ORIGINS だけにする)
+    if (getattr(s, "TC_PUBLIC_HOSTS", "") or "").strip():
+        problems.append("TC_PUBLIC_HOSTS が設定されている(http の画面を許す。本番では CORS_ORIGINS に https で書く)")
     # [Gate S11] 本番で管理者の多要素認証を外さない
     if not getattr(s, "ADMIN_MFA_REQUIRED", True):
         problems.append("ADMIN_MFA_REQUIRED=false(管理者がパスワードだけで入れる)")
@@ -246,6 +250,9 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000"
     ]
+    # [Gate H1] 画面を開いてよい名前(omega-dev2・LAN の IP 等、カンマ区切り)。各名前の http://<名前>:4173 を
+    # CORS の許可に足す(docker-compose.yml の CORS_ORIGINS は localhost だけで、他の PC から開くと API を呼べなかった)
+    TC_PUBLIC_HOSTS: str = ""
 
     # アプリケーション設定
     DEBUG: bool = True
@@ -302,6 +309,19 @@ class Settings(BaseSettings):
         elif isinstance(v, list):
             return v
         return v
+
+    @property
+    def cors_allowed_origins(self) -> List[str]:
+        """CORS・CSRF の確認で許すオリジン(CORS_ORIGINS + TC_PUBLIC_HOSTS の :4173)。"""
+        base = self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else [self.CORS_ORIGINS]
+        out = [str(o).strip() for o in base if str(o).strip()]
+        for host in (self.TC_PUBLIC_HOSTS or "").split(","):
+            host = host.strip()
+            if host and re.fullmatch(r"[A-Za-z0-9.-]+", host):
+                origin = f"http://{host}:4173"
+                if origin not in out:
+                    out.append(origin)
+        return out
 
     @property
     def is_production(self) -> bool:
