@@ -416,14 +416,14 @@ const SegmentsPage: React.FC = () => {
                 <div className="flex gap-1 text-xs">
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded ${form.from_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    className={`px-2 py-0.5 rounded-sm ${form.from_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
                     onClick={() => setForm({ ...form, from_type: 'event' })}
                   >
                     イベント
                   </button>
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded flex items-center gap-1 ${form.from_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.from_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
                     onClick={() => setForm({ ...form, from_type: 'place' })}
                     disabled={placeOptions.length === 0}
                   >
@@ -462,14 +462,14 @@ const SegmentsPage: React.FC = () => {
                 <div className="flex gap-1 text-xs">
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded ${form.to_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    className={`px-2 py-0.5 rounded-sm ${form.to_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
                     onClick={() => setForm({ ...form, to_type: 'event' })}
                   >
                     イベント
                   </button>
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded flex items-center gap-1 ${form.to_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
+                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.to_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-400'}`}
                     onClick={() => setForm({ ...form, to_type: 'place' })}
                     disabled={placeOptions.length === 0}
                   >

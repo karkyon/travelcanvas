@@ -17,7 +17,7 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link 
               to="/" 
-              className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent hover:from-blue-700 hover:to-cyan-700 transition-all"
+              className="text-2xl font-bold bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent hover:from-blue-700 hover:to-cyan-700 transition-all"
             >
               🧳 TravelCanvas
             </Link>
@@ -60,7 +60,7 @@ const Navbar = () => {
                 </Link>
                 <Link 
                   to="/register" 
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                  className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
                 >
                   新規登録
                 </Link>

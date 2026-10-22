@@ -47,6 +47,30 @@ services:
       retries: 5
       start_period: 5s
 
+  # [Gate G2] SEC-F4 migration と DB の権限の設定だけを行う一回きりの処理(終わると止まる)。所有者(.env の DATABASE_URL)
+  # の資格情報を持つのはこのサービスだけ。backend はこれが成功してから起動し、表の読み書きだけのロール(tc_app)で接続する
+  # (backend/app/ops/db_roles.py、docs/adr/ADR-db-roles.md)。
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      PYTHONDONTWRITEBYTECODE: "1"
+      TC_DB_APP_PASSWORD: ${DB_APP_PASSWORD:?DB_APP_PASSWORD must be set in .env (Gate G2)}
+    command: ["sh", "-c", "alembic upgrade head && python -m app.ops.db_roles apply"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - travelcanvas_net
+
   backend:
     build:
       context: ./backend
@@ -62,6 +86,11 @@ services:
       REDIS_PORT: "6379"
       CORS_ORIGINS: http://localhost:4173,http://127.0.0.1:4173
       API_CORS_ORIGINS: http://localhost:4173,http://127.0.0.1:4173
+      # [Gate G2] SEC-F4 アプリは tc_app(表の読み書きだけ。表を作る・変える・消すはできない)で接続する。
+      # .env の DATABASE_URL(所有者)・DB_PASSWORD・DB_APP_PASSWORD はこのコンテナへ渡さない(空で上書きする)
+      DATABASE_URL: ${APP_DATABASE_URL:?APP_DATABASE_URL must be set in .env (Gate G2)}
+      DB_PASSWORD: ""
+      DB_APP_PASSWORD: ""
     ports:
       - "8001:8000"
     depends_on:
@@ -69,6 +98,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - travelcanvas_uploads:/app/uploads
       - ./backend:/app

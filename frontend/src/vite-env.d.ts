@@ -67,6 +67,7 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_HTTPS_REDIRECT: string
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Vite の ImportMeta へ型を足す宣言の結合
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }

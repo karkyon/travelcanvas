@@ -32,7 +32,7 @@ function IssueItem({ issue }: { issue: ValidationIssue }) {
   return (
     <li className="py-2 border-b last:border-b-0">
       <div className="flex items-start gap-2">
-        <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${SEVERITY_BADGE[issue.severity]}`}>
+        <span className={`text-xs px-2 py-0.5 rounded-sm shrink-0 ${SEVERITY_BADGE[issue.severity]}`}>
           {issue.kind === 'unverified' ? '検証不能' : SEVERITY_LABEL[issue.severity]}
         </span>
         <div className="min-w-0 text-sm">
@@ -94,7 +94,7 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
           </Button>
         </div>
 
-        {error && <div className="mt-3 p-2 rounded bg-red-50 text-red-700 text-sm" role="alert">{error}</div>}
+        {error && <div className="mt-3 p-2 rounded-sm bg-red-50 text-red-700 text-sm" role="alert">{error}</div>}
 
         {!run ? (
           <div className="mt-3 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm" role="note">
@@ -104,7 +104,7 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
         ) : (
           <div className="mt-3" data-testid="feasibility-result">
             {run.is_stale && (
-              <div className="mb-3 p-2 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm" role="status">
+              <div className="mb-3 p-2 rounded-sm border border-amber-300 bg-amber-50 text-amber-900 text-sm" role="status">
                 検証した後に旅程・制約・予約・移動のいずれかが変更されています。結果が古い可能性があるため、再検証してください。
               </div>
             )}
@@ -114,9 +114,9 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
             </div>
             {run.status === 'completed' && (
               <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
-                <div className="rounded bg-red-50 p-2"><dt className="text-xs text-red-800">エラー</dt><dd className="text-lg font-semibold text-red-800">{run.counts.error}</dd></div>
-                <div className="rounded bg-amber-50 p-2"><dt className="text-xs text-amber-900">警告</dt><dd className="text-lg font-semibold text-amber-900">{run.counts.warning}</dd></div>
-                <div className="rounded bg-slate-100 p-2"><dt className="text-xs text-slate-800">検証できなかった</dt><dd className="text-lg font-semibold text-slate-800">{run.counts.unverified}</dd></div>
+                <div className="rounded-sm bg-red-50 p-2"><dt className="text-xs text-red-800">エラー</dt><dd className="text-lg font-semibold text-red-800">{run.counts.error}</dd></div>
+                <div className="rounded-sm bg-amber-50 p-2"><dt className="text-xs text-amber-900">警告</dt><dd className="text-lg font-semibold text-amber-900">{run.counts.warning}</dd></div>
+                <div className="rounded-sm bg-slate-100 p-2"><dt className="text-xs text-slate-800">検証できなかった</dt><dd className="text-lg font-semibold text-slate-800">{run.counts.unverified}</dd></div>
               </dl>
             )}
             {split && (

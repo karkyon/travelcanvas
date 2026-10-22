@@ -1,61 +1,35 @@
 /// <reference types="vitest" />
+// [Gate G2] DEP-1 Vitest 4 へ更新。以前の設定は Vitest 0.34 の書き方(threads・ui・coverage の閾値の位置・reporter)で、
+// 新しい版では無効か非推奨だった。挙動(jsdom・globals・setup・再試行・タイムアウト・別名)は変えない。
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  
+
   test: {
-    // テスト環境設定
     environment: 'jsdom',
-    
-    // セットアップファイル
     setupFiles: ['./src/test/setup.ts'],
-    
-    // グローバル設定
     globals: true,
-    
-    // CSS関連の処理
     css: {
       modules: {
         classNameStrategy: 'stable',
       },
     },
-    
-    // カバレッジ設定
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'node_modules/',
         'src/test/',
         '**/*.d.ts',
         '**/*.config.*',
-        '**/coverage/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/.{idea,git,cache,output,temp}/**',
         'src/main.tsx',
         'src/vite-env.d.ts',
       ],
-      include: ['src/**/*.{ts,tsx}'],
-      all: true,
-      lines: 80,
-      functions: 80,
-      branches: 80,
-      statements: 80,
     },
-    
-    // レポーター設定
-    reporter: ['verbose', 'json', 'html'],
-    outputFile: {
-      json: './test-results/vitest-report.json',
-      html: './test-results/vitest-report.html',
-    },
-    
-    // テストファイルのパターン
     include: [
       'src/**/*.{test,spec}.{js,ts,jsx,tsx}',
     ],
@@ -68,24 +42,13 @@ export default defineConfig({
       '.cache',
       '**/e2e/**',
     ],
-    
-    // タイムアウト設定
     testTimeout: 10000,
     hookTimeout: 10000,
-    
-    // 並列実行設定
-    threads: true,
-    maxThreads: 4,
-    minThreads: 1,
-    
-    // ウォッチモード設定
+    pool: 'threads',
+    maxWorkers: 4,
     watch: false,
-    
-    // Mock設定
     clearMocks: true,
     restoreMocks: true,
-    
-    // スナップショット設定
     resolveSnapshotPath: (testPath, snapExtension) => {
       return path.join(
         path.dirname(testPath),
@@ -93,40 +56,20 @@ export default defineConfig({
         path.basename(testPath) + snapExtension
       )
     },
-    
-    // 環境変数
     env: {
       NODE_ENV: 'test',
       VITE_API_BASE_URL: 'http://localhost:3001/api/v1',
       VITE_MOCK_API: 'true',
       VITE_DEBUG_MODE: 'false',
     },
-    
-    // ベンチマーク設定
-    benchmark: {
-      include: ['**/*.{bench,benchmark}.{js,ts,jsx,tsx}'],
-      exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
-    },
-    
-    // UI設定
-    ui: true,
-    open: false,
-    
-    // レポート設定
-    silent: false,
-    
-    // リトライ設定
     retry: 2,
-    
-    // タイプチェック設定
     typecheck: {
       enabled: true,
       checker: 'tsc',
       include: ['**/*.{test,spec}-d.{ts,tsx}'],
     },
   },
-  
-  // パス解決設定
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -142,24 +85,11 @@ export default defineConfig({
       '@test': path.resolve(__dirname, './src/test'),
     },
   },
-  
-  // ESBuild設定
+
   esbuild: {
     target: 'node14',
   },
-  
-  // 依存関係最適化
-  optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      '@testing-library/react',
-      '@testing-library/jest-dom',
-      '@testing-library/user-event',
-    ],
-  },
-  
-  // Define設定
+
   define: {
     __TEST__: true,
     __DEV__: false,

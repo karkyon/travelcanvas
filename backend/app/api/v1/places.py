@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access, resolve_plan_role
+from app.core.plan_access import require_plan_access
 from app.models.models import (
     FieldSource, OpeningHours, Place, PlanCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan, TravelSegment,
     User,
@@ -85,7 +85,7 @@ def _sources(db: Session, place: Place) -> Dict[str, Dict[str, Any]]:
 def _detail(db: Session, place: Place, user: User) -> Dict[str, Any]:
     plans = {p.id: p for p in db.query(TravelPlan).filter(
         TravelPlan.id.in_(place_access.referencing_plan_ids(db, place.id)), TravelPlan.deleted_at.is_(None)).all()}
-    visible = {pid for pid, p in plans.items() if resolve_plan_role(db, p, user)}
+    visible = {pid for pid, p in plans.items() if place_access.role_with_location(db, p, user)}
     events = []
     if visible:
         days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id.in_(visible)).all()}

@@ -29,6 +29,7 @@ from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     ChangeSet, EventReservation, Expense, Notification, PlanAlert, PlanFinanceSettings, Replan, Reservation,
     RouteLeg, RouteOption, TravelDay, TravelEvent, TravelPlan, TravelSegment, User,
@@ -308,10 +309,12 @@ def _replan_response(db: Session, plan: TravelPlan, r: Replan, user: User, role:
                             if alert is not None and (str(alert.event_id) == e["source_event_id"])}
                            | ({str(alert.day_id)} if alert is not None and alert.day_id else set()))
     candidates = []
+    # [Gate G2] FR-045 費用を隠した参加者には、費用の影響(支払い済みの額)を出さない
+    hide_costs = "costs" in member_policy.hidden_for(db, plan, role, user)
     for c in r.candidates:
         if c.get("available"):
             ev = rp.evaluate(r.base_snapshot, c, affected_days or [d["id"] for d in r.base_snapshot["days"]])
-            cost = _cost_impact(db, plan, [x["event_id"] for x in ev["lost"]])
+            cost = None if hide_costs else _cost_impact(db, plan, [x["event_id"] for x in ev["lost"]])
         else:
             ev = {"changes": [], "lost": [], "protected": [], "metrics": {
                 "changed_count": 0, "lost_count": 0, "protected_count": 0, "max_delay_minutes": 0,

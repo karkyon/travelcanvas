@@ -5,7 +5,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY . .
+# [Gate G2 v2] 以前は `COPY . .` で文脈を全部写していた。.dockerignore は .gitignore の対象で
+# リポジトリに無く、omega-dev2 では手元の node_modules(試験のために手元で npm ci した、前の版の依存)が
+# 上の npm ci で入れた物に上書きされ、依存の版が混ざって build が失敗した(Tailwind CSS 3 の
+# tailwindcss が Tailwind CSS 4 の @import 'tailwindcss' に読まれた)。build に要る物だけを写す。
+# .env* は以前と同じく Vite の設定(VITE_*)を読ませるため(無ければ何も写らない)。
+COPY index.html vite.config.ts postcss.config.js tsconfig.json tsconfig.node.json .env* ./
+COPY public ./public
+COPY src ./src
 
 # [Gate #8] VITE_API_URLはViteの静的ビルド時に import.meta.env として埋め込まれるため、
 # コンテナ起動時のenvironment:では反映されない。docker-compose.ymlのbuild.args経由で

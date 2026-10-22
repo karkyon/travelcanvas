@@ -26,6 +26,13 @@ vi.mock('../services/api', () => ({
   // [Gate F45] 共有前プレビュー
   previewSharePolicy,
   previewShareLink: vi.fn(),
+  // [Gate G2] FR-045 参加者に見せない項目の設定(この画面の試験では閲覧者として何も出さない)
+  getMemberPolicy: vi.fn().mockResolvedValue({
+    plan_id: 'p', role: 'viewer', my_hidden: [], catalog: { version: 1, categories: [], presets: {} },
+  }),
+  putMemberPolicy: vi.fn(),
+  putMemberOverride: vi.fn(),
+  extractApiErrorDetailMessage: () => null,
 }));
 
 import SharePage from './SharePage';

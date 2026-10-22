@@ -70,7 +70,7 @@ const OrganizationsPage: React.FC = () => {
           ) : (
             <ul className="space-y-3">
               {orgs.map((o) => (
-                <li key={o.id} className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between border-l-8"
+                <li key={o.id} className="bg-white rounded-xl shadow-xs p-4 flex items-center justify-between border-l-8"
                   style={{ borderLeftColor: o.brand_color ?? '#9ca3af' }}>
                   <div>
                     <p className="font-semibold text-gray-900">{o.name}</p>
@@ -86,7 +86,7 @@ const OrganizationsPage: React.FC = () => {
           )}
         </section>
 
-        <section aria-labelledby="org-create-heading" className="bg-white rounded-xl shadow-sm p-6">
+        <section aria-labelledby="org-create-heading" className="bg-white rounded-xl shadow-xs p-6">
           <h2 id="org-create-heading" className="text-lg font-semibold text-gray-900 mb-3">組織を作る</h2>
           <form onSubmit={create} className="space-y-4">
             <div>
@@ -97,7 +97,7 @@ const OrganizationsPage: React.FC = () => {
             <div>
               <label htmlFor="org-color" className="block text-sm font-medium text-gray-800 mb-1">ブランドの色</label>
               <input id="org-color" type="color" value={color} onChange={(e) => setColor(e.target.value)}
-                className="h-10 w-20 border border-gray-300 rounded" />
+                className="h-10 w-20 border border-gray-300 rounded-sm" />
             </div>
             <button type="submit" disabled={busy || !name.trim()}
               className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50">

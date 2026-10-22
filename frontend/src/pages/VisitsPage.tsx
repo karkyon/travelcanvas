@@ -197,7 +197,7 @@ const VisitsPage: React.FC = () => {
               <Card className="mt-4 p-2">
                 <svg
                   viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-                  className="w-full h-auto bg-slate-50 rounded"
+                  className="w-full h-auto bg-slate-50 rounded-sm"
                   role="img"
                   aria-label={`訪問の地図(略図)。表示中 ${mapItems.length}件。内容は下の一覧と同じです`}
                 >
@@ -244,11 +244,11 @@ const VisitsPage: React.FC = () => {
                             <span aria-hidden="true">{LAYER_SYMBOL[it.layer_state]} </span>{LAYER_LABEL[it.layer_state]}
                           </span>
                           {a?.needs_confirmation && !a.hidden && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-900">確認してください</span>
+                            <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-100 text-amber-900">確認してください</span>
                           )}
                         </div>
                         {a ? (
-                          <dl className="mt-2 text-sm text-gray-800 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+                          <dl className="mt-2 text-sm text-gray-800 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                             <dt className="text-gray-700">判定</dt>
                             <dd>{STATE_LABEL[a.state]}{a.hidden ? '(地図と Atlas から隠しています)' : ''}</dd>
                             <dt className="text-gray-700">信頼度</dt>

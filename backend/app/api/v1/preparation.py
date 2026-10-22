@@ -44,7 +44,7 @@ from app.models.models import (
     TravelSegment,
     User,
 )
-from app.services import packing_suggestions, readiness
+from app.services import member_policy, packing_suggestions, readiness
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 
@@ -557,10 +557,13 @@ def _get_task_or_404(db: Session, plan: TravelPlan, task_id: str) -> Preparation
     return t
 
 
-def _related_label(db: Session, plan: TravelPlan, related_type: Optional[str], related_id, viewer: User):
+def _related_label(db: Session, plan: TravelPlan, related_type: Optional[str], related_id, viewer: User,
+                   hidden=member_policy.EMPTY):
     """(label, missing)。関連先が削除済み・別プランならmissing=True。"""
     if not related_type or not related_id:
         return None, False
+    if member_policy.related_hidden(hidden, related_type):  # [Gate G2] FR-045 隠された予約・文書の名前は出さない
+        return "非表示の項目", False
     if related_type == "event":
         ev = db.query(TravelEvent).filter(TravelEvent.id == related_id, TravelEvent.plan_id == plan.id).first()
         return (ev.title, False) if ev else (None, True)
@@ -586,7 +589,8 @@ def _related_label(db: Session, plan: TravelPlan, related_type: Optional[str], r
 def _task_response(db: Session, plan: TravelPlan, t: PreparationTask, viewer: User, role: str,
                    members: Set[uuid.UUID], names: Dict[uuid.UUID, str]) -> Dict[str, Any]:
     is_member = t.assignee_user_id in members if t.assignee_user_id else False
-    label, missing = _related_label(db, plan, t.related_type, t.related_id, viewer)
+    hidden = member_policy.hidden_for(db, plan, role, viewer)
+    label, missing = _related_label(db, plan, t.related_type, t.related_id, viewer, hidden)
     due = t.due_at
     if due is not None and due.tzinfo is None:
         due = due.replace(tzinfo=dt_timezone.utc)
@@ -627,11 +631,13 @@ def _task_names(db: Session, tasks: List[PreparationTask]) -> Dict[uuid.UUID, st
 
 
 def _validate_related(db: Session, plan: TravelPlan, related_type: Optional[str], related_id: Optional[str],
-                      viewer: User):
+                      viewer: User, hidden=member_policy.EMPTY):
     if related_type is None and related_id is None:
         return None, None
     if related_type is None or related_id is None:
         raise HTTPException(status_code=422, detail="related_typeとrelated_idは両方指定してください")
+    if member_policy.related_hidden(hidden, related_type):
+        raise member_policy.hidden_error("reservations" if related_type == "reservation" else "documents")
     rid = _parse_uuid(related_id, "related_id")
     _label, missing = _related_label(db, plan, related_type, rid, viewer)
     if missing:
@@ -669,14 +675,16 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     members = member_user_ids(db, plan)
     assignee = _resolve_assignee(payload.assignee_user_id, members)
-    related_type, related_id = _validate_related(db, plan, payload.related_type, payload.related_id, current_user)
+    related_type, related_id = _validate_related(db, plan, payload.related_type, payload.related_id, current_user,
+                                                 hidden)
 
     key = _strip_or_none(payload.readiness_key)
     if key is not None:
-        current = readiness.compute(db, plan, current_user, decrypt_personal=_decrypt_personal)
+        current = member_policy.filter_readiness(
+            readiness.compute(db, plan, current_user, decrypt_personal=_decrypt_personal), hidden)
         match = next((i for i in current["items"] if i["key"] == key), None)
         if match is None or not match["convertible"]:
             raise HTTPException(status_code=422, detail="指定された準備状況の項目は現在ありません(既に対応済みの可能性があります)")
@@ -791,5 +799,6 @@ def get_readiness(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    return readiness.compute(db, plan, current_user, decrypt_personal=_decrypt_personal)
+    plan, _role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    return member_policy.filter_readiness(
+        readiness.compute(db, plan, current_user, decrypt_personal=_decrypt_personal), hidden)

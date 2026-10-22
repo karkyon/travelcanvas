@@ -5,6 +5,9 @@
 - 編集できる: 場所を使っている全ての旅行を編集できる人(どこにも使われていなければ作った人)。
   共有の場所を、編集の権限が無い旅行の分まで書き換えさせないため
 存在を区別させないよう、見られない場所は 404 にする。
+
+[Gate G2] FR-045 所有者が「予定の住所・位置」を隠した参加者には、その旅行は見る・編集する理由にならない
+(場所の住所・座標から、隠した予定の位置が分かってしまうため)。
 """
 import uuid
 from typing import Optional, Set
@@ -32,17 +35,26 @@ def _plans(db: Session, ids: Set[uuid.UUID]):
     return db.query(TravelPlan).filter(TravelPlan.id.in_(ids), TravelPlan.deleted_at.is_(None)).all()
 
 
+def role_with_location(db: Session, plan: TravelPlan, user: User) -> Optional[str]:
+    from app.services import member_policy  # 循環 import を避ける
+
+    role = resolve_plan_role(db, plan, user)
+    if role and "event_address" in member_policy.hidden_for(db, plan, role, user):
+        return None
+    return role
+
+
 def can_view(db: Session, place: Place, user: User) -> bool:
     if place.created_by is not None and place.created_by == user.id:
         return True
-    return any(resolve_plan_role(db, p, user) for p in _plans(db, referencing_plan_ids(db, place.id)))
+    return any(role_with_location(db, p, user) for p in _plans(db, referencing_plan_ids(db, place.id)))
 
 
 def can_edit(db: Session, place: Place, user: User) -> bool:
     plans = _plans(db, referencing_plan_ids(db, place.id))
     if not plans:
         return place.created_by is not None and place.created_by == user.id
-    return all(_RANK.get(resolve_plan_role(db, p, user) or "", 0) >= _RANK["editor"] for p in plans)
+    return all(_RANK.get(role_with_location(db, p, user) or "", 0) >= _RANK["editor"] for p in plans)
 
 
 def get_viewable(db: Session, place_id, user: User) -> Place:

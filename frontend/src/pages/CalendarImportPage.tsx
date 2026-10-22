@@ -103,7 +103,7 @@ const CalendarImportPage: React.FC = () => {
             {preview.candidates.length === 0 ? <p className="text-sm text-gray-700 mt-2">予定がありません。</p> : (
               <ul className="mt-3 space-y-2" aria-label="取り込み案">
                 {preview.candidates.map((c) => (
-                  <li key={c.index} className={`border rounded p-2 text-sm ${c.action === 'skip' ? 'bg-gray-50' : ''}`}>
+                  <li key={c.index} className={`border rounded-sm p-2 text-sm ${c.action === 'skip' ? 'bg-gray-50' : ''}`}>
                     {selectable(c) ? (
                       <label className="flex items-start gap-2">
                         <input type="checkbox" className="mt-1" checked={selected.has(c.index)}
@@ -113,7 +113,7 @@ const CalendarImportPage: React.FC = () => {
                             return next;
                           })} />
                         <span>
-                          <span className={`text-xs px-1.5 rounded mr-1 ${c.action === 'create' ? 'bg-green-100 text-green-900' : 'bg-blue-100 text-blue-900'}`}>
+                          <span className={`text-xs px-1.5 rounded-sm mr-1 ${c.action === 'create' ? 'bg-green-100 text-green-900' : 'bg-blue-100 text-blue-900'}`}>
                             {c.action === 'create' ? '追加' : '変更'}
                           </span>
                           <span className="font-medium">{c.title}</span>
@@ -125,7 +125,7 @@ const CalendarImportPage: React.FC = () => {
                       </label>
                     ) : (
                       <p>
-                        <span className="text-xs px-1.5 rounded mr-1 bg-gray-200 text-gray-900">取り込まない</span>
+                        <span className="text-xs px-1.5 rounded-sm mr-1 bg-gray-200 text-gray-900">取り込まない</span>
                         <span className="font-medium">{c.title}</span>
                         <span className="block text-xs text-gray-700">{describeWhen(c)} ・ {c.reason ? SKIP_REASON_TEXT[c.reason] : ''}</span>
                       </p>

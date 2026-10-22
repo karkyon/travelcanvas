@@ -51,4 +51,6 @@ export interface NormalizedPlanDetail {
   title: string;
   revision: number;
   days: NormalizedDay[];
+  /** [Gate G2] FR-045 所有者があなたに見せない設定にした項目(MemberFieldKey)。所有者・規則の無い旅行は空 */
+  hidden_fields?: string[];
 }

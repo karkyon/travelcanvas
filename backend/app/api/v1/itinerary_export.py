@@ -12,6 +12,9 @@
 X-Export-Excluded(利用者の選択で除外した件数)を返す。監査には形式・選択・件数だけを記録する。
 
 外部からの取込(差分確認後の適用)は今回の範囲外(ADR-itinerary-export.md)。
+
+[Gate G2] FR-045 所有者が「予定の住所・位置」を隠した参加者: ICS・CSV に住所を入れない(選んでも無視)、
+GPX・KML は 403。「予約」を隠した参加者: 予約の種類を使わない。
 """
 from datetime import datetime, timezone as dt_timezone
 from typing import Dict, List, Optional
@@ -22,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     EventReservation, Place, Reservation, Spot, TravelDay, TravelEvent, TravelPlan, TravelSegment, User,
 )
@@ -44,7 +47,7 @@ def _now() -> datetime:
     return datetime.now(dt_timezone.utc)
 
 
-def _collect(db: Session, plan: TravelPlan):
+def _collect(db: Session, plan: TravelPlan, hidden=member_policy.EMPTY):
     days = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id)
             .order_by(TravelDay.local_date.asc(), TravelDay.sort_order.asc()).all())
     order = {d.id: i for i, d in enumerate(days)}
@@ -57,20 +60,21 @@ def _collect(db: Session, plan: TravelPlan):
     places = {p.id: p for p in db.query(Place).filter(Place.id.in_(place_ids)).all()} if place_ids else {}
     spots = {s.id: s for s in db.query(Spot).filter(Spot.id.in_(spot_ids)).all()} if spot_ids else {}
 
-    reservations = (db.query(Reservation)
-                    .filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None)).all())
+    reservations = [] if "reservations" in hidden else (
+        db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None)).all())
     res_by_id = {r.id: r for r in reservations}
     linked: Dict[object, List[Reservation]] = {}
     for r in reservations:
         if r.event_id:
             linked.setdefault(r.event_id, []).append(r)
-    if events:
+    if events and reservations:
         for er in db.query(EventReservation).filter(EventReservation.event_id.in_([e.id for e in events])).all():
             r = res_by_id.get(er.reservation_id)
             if r is not None and r not in linked.setdefault(er.event_id, []):
                 linked[er.event_id].append(r)
 
     out: List[ix.ExportEvent] = []
+    hide_place = "event_address" in hidden
     for e in events:
         d = day_by_id[e.day_id]
         src = places.get(e.place_id) if e.place_id else None
@@ -85,9 +89,10 @@ def _collect(db: Session, plan: TravelPlan):
             id=str(e.id), title=e.title, event_type=e.event_type, local_date=d.local_date,
             timezone_id=d.timezone_id, start=start, end=end, is_all_day=e.is_all_day,
             local_start_time=e.local_start_time, place_name=getattr(src, "name", None),
-            address=e.address or getattr(src, "address", None),
-            latitude=e.latitude if e.latitude is not None else getattr(src, "latitude", None),
-            longitude=e.longitude if e.longitude is not None else getattr(src, "longitude", None),
+            address=None if hide_place else (e.address or getattr(src, "address", None)),
+            latitude=None if hide_place else (e.latitude if e.latitude is not None else getattr(src, "latitude", None)),
+            longitude=None if hide_place else (
+                e.longitude if e.longitude is not None else getattr(src, "longitude", None)),
             locked=e.locked,
             is_accommodation=e.event_type in ix.ACCOMMODATION_TYPES or "accommodation" in res_types,
             reservation_types=sorted(set(res_types)),
@@ -142,8 +147,9 @@ def _counts(count: int, skipped: int = 0, excluded: int = 0) -> Dict[str, str]:
 @router.get("/{plan_id}/exports/calendar.ics")
 def export_ics(plan_id: str, request: Request, include_addresses: bool = Query(False),
                db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
-    plan, _ = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    days, events, segs = _collect(db, plan)
+    plan, _, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    include_addresses = include_addresses and "event_address" not in hidden
+    days, events, segs = _collect(db, plan, hidden)
     timed_segs = [s for s in segs if s.departure is not None]
     body = ix.build_ics(plan.title, days[0].timezone_id if days else None, plan.revision, events, segs,
                         include_addresses, _now())
@@ -154,8 +160,8 @@ def export_ics(plan_id: str, request: Request, include_addresses: bool = Query(F
 
 def _geo(fmt: str, plan_id: str, request: Request, precision: str, exclude_accommodation: bool, db: Session,
          user: User) -> Response:
-    plan, _ = require_plan_access(db, plan_id, user, min_role="viewer")
-    _, events, _ = _collect(db, plan)
+    plan, _, hidden = member_policy.require_access(db, plan_id, user, "viewer", "event_address")
+    _, events, _ = _collect(db, plan, hidden)
     points, no_location, lodging = ix.waypoints(events, precision, exclude_accommodation)
     body = ix.build_gpx(plan.title, points, precision, _now()) if fmt == "gpx" else \
         ix.build_kml(plan.title, points, precision)
@@ -181,8 +187,9 @@ def export_kml(plan_id: str, request: Request, precision: str = Query("approx", 
 @router.get("/{plan_id}/exports/itinerary.csv")
 def export_csv(plan_id: str, request: Request, include_addresses: bool = Query(False),
                db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
-    plan, _ = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    _, events, _ = _collect(db, plan)
+    plan, _, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    include_addresses = include_addresses and "event_address" not in hidden
+    _, events, _ = _collect(db, plan, hidden)
 
     def local_hm(dt: datetime, tz: str) -> str:
         return dt.astimezone(zone_for(tz)).strftime("%H:%M")

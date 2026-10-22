@@ -40,7 +40,7 @@ from app.models.models import (
     IdempotencyRecord, User, Place, TravelSegment, RouteOption, RouteLeg,
     Reservation, Ticket,
 )
-from app.services import place_access
+from app.services import member_policy, place_access
 from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
 from app.services import plan_item_deletion
@@ -153,6 +153,8 @@ class PlanDetailResponse(BaseModel):
     title: str
     revision: int
     days: List[DayWithEvents]
+    # [Gate G2] FR-045 所有者があなたに見せない設定にした項目(app/services/member_policy.py のカテゴリ名)
+    hidden_fields: List[str] = []
 
     @field_validator("id", mode="before")
     @classmethod
@@ -164,6 +166,19 @@ class PlanDetailResponse(BaseModel):
 
 
 # ===== 共通ヘルパー =====
+
+def _event_out(e, hidden) -> dict:
+    """[Gate G2] FR-045 予定の応答。隠す項目(予定のメモ・住所と位置)は値を返さない。"""
+    return member_policy.mask_event_dict(EventResponse.model_validate(e).model_dump(mode="json"), hidden)
+
+
+def _plan_hidden(db: Session, plan_id, user: User, min_role: str, *categories: str):
+    """(plan, 隠す項目)。categories のどれかが隠されていれば 403。"""
+    plan, role = require_plan_access(db, plan_id, user, min_role=min_role)
+    hidden = member_policy.hidden_for(db, plan, role, user)
+    member_policy.require_visible(hidden, *categories)
+    return plan, hidden
+
 
 def _get_owned_plan(db: Session, plan_id: str, user: User, min_role: str = "editor") -> TravelPlan:
     """[Gate #30] 名称は既存のまま維持しているが、実体は
@@ -355,7 +370,7 @@ async def get_plan_detail(
     のみでETagヘッダーは設定されていなかった(説明とコードが矛盾していた)。
     ボディでのrevision取得は今のフロントエンド実装で十分機能するため
     そのまま維持しつつ、ETagヘッダーも合わせて設定し実態と説明を一致させる。"""
-    plan = _get_owned_plan(db, plan_id, current_user, min_role="viewer")
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "viewer")
     response.headers["ETag"] = f'"{plan.revision}"'
     days = (
         db.query(TravelDay)
@@ -371,10 +386,11 @@ async def get_plan_detail(
             DayWithEvents(
                 id=str(day.id), local_date=day.local_date, timezone_id=day.timezone_id,
                 title=day.title, notes=day.notes, sort_order=day.sort_order,
-                events=[EventResponse.model_validate(e) for e in sorted(day.events, key=lambda e: e.sort_order)],
+                events=[_event_out(e, hidden) for e in sorted(day.events, key=lambda e: e.sort_order)],
             )
             for day in days
         ],
+        hidden_fields=member_policy.ordered(hidden),
     )
 
 
@@ -419,7 +435,7 @@ class TodayResponse(BaseModel):
     events: List[TodayEventResponse] = []
 
 
-def _today_event_responses(db: Session, timed_events) -> dict:
+def _today_event_responses(db: Session, timed_events, hidden=member_policy.EMPTY) -> dict:
     """TimedEventの一覧をTodayEventResponseへ変換する(予約・チケット・
     移動区間・経路区間をまとめて取得し、予定ごとのN+1クエリを避ける)。"""
     if not timed_events:
@@ -475,11 +491,16 @@ def _today_event_responses(db: Session, timed_events) -> dict:
             departure_at = seg.planned_departure_at or (min(leg_departures) if leg_departures else None)
             transport_mode = seg.mode
             transport_status = today_mode.aggregate_realtime_status([leg.realtime_status for leg in legs])
+        # [Gate G2] FR-045 隠す項目は当日モードにも出さない
+        hide_place = "event_address" in hidden
+        if "reservations" in hidden:
+            reservation = None
         out[e.id] = TodayEventResponse(
             id=str(e.id), title=e.title, event_type=e.event_type,
             start_at=t.start, end_at=e.end_at, local_start_time=e.local_start_time,
-            address=e.address, latitude=e.latitude, longitude=e.longitude,
-            has_ticket=reservation is not None and reservation.id in ticketed,
+            address=None if hide_place else e.address, latitude=None if hide_place else e.latitude,
+            longitude=None if hide_place else e.longitude,
+            has_ticket=reservation is not None and reservation.id in ticketed and "tickets" not in hidden,
             reservation_id=str(reservation.id) if reservation is not None else None,
             time_source=t.time_source, departure_at=departure_at,
             transport_mode=transport_mode, transport_status=transport_status,
@@ -511,13 +532,13 @@ async def get_today(
     予定一覧を返すことを追加した。外部providerからの遅延情報の取得自体は
     本Gateのスコープ外である。
     """
-    plan = _get_owned_plan(db, plan_id, current_user, min_role="viewer")
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "viewer")
 
     days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()
     now_utc = today_mode.utcnow()
     selection = today_mode.select_today(days, now_utc)
 
-    responses = _today_event_responses(db, selection.events)
+    responses = _today_event_responses(db, selection.events, hidden)
     now_event = responses[selection.now_event.event.id] if selection.now_event else None
     next_event = responses[selection.next_event.event.id] if selection.next_event else None
 
@@ -648,7 +669,9 @@ async def create_event(
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
-    plan = _get_owned_plan(db, plan_id, current_user)
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "editor")
+    member_policy.require_writable(hidden, [k for k, v in event_data.model_dump(exclude_unset=True).items()
+                                            if v not in (None, "")])
 
     cached = _check_idempotency(db, current_user, "POST /plans/events", idempotency_key)
     if cached:
@@ -697,7 +720,7 @@ async def create_event(
     )
     db.refresh(new_event)
 
-    response = EventResponse.model_validate(new_event).model_dump(mode="json")
+    response = _event_out(new_event, hidden)
     _store_idempotency(db, current_user, "POST /plans/events", idempotency_key, 201, response)
     return response
 
@@ -711,7 +734,10 @@ async def update_event(
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
-    plan = _get_owned_plan(db, plan_id, current_user)
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "editor")
+    # [Gate G2] FR-045 隠した項目: 空のまま送り返された分は変えない。値を入れて変えようとしたら 403
+    update_data = member_policy.drop_unseen(hidden, event_data.model_dump(exclude_unset=True))
+    member_policy.require_writable(hidden, update_data.keys())
     _require_if_match(plan, if_match)
 
     event = db.query(TravelEvent).filter(TravelEvent.id == event_id, TravelEvent.plan_id == plan.id).first()
@@ -726,7 +752,6 @@ async def update_event(
         )
 
     before = _event_to_dict(event)
-    update_data = event_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(event, field, value)
     db.flush()
@@ -736,7 +761,7 @@ async def update_event(
         before_json=before, after_json=_event_to_dict(event),
     )
     db.refresh(event)
-    return event
+    return _event_out(event, hidden)
 
 
 @router.delete("/{plan_id}/events/{event_id}")
@@ -786,7 +811,7 @@ async def move_event(
     db: Session = Depends(get_db),
 ):
     """同日内の並べ替え、または別日への移動。ロックされたイベントは移動不可。"""
-    plan = _get_owned_plan(db, plan_id, current_user)
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "editor")
     _require_if_match(plan, if_match)
 
     cached = _check_idempotency(db, current_user, "POST /plans/events/move", idempotency_key)
@@ -820,7 +845,7 @@ async def move_event(
     )
     db.refresh(event)
 
-    response = EventResponse.model_validate(event).model_dump(mode="json")
+    response = _event_out(event, hidden)
     _store_idempotency(db, current_user, "POST /plans/events/move", idempotency_key, 200, response)
     return response
 
@@ -1257,7 +1282,8 @@ async def get_route_preview(
 ):
     """指定日の現在のイベント順序に基づき、区間ごとの概算移動距離・時間を
     返す(閲覧のみ、viewer可)。"""
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    # [Gate G2] FR-045 経路・距離は位置から計算するため、位置を隠された人には返さない
+    plan, _hidden = _plan_hidden(db, plan_id, current_user, "viewer", "event_address")
     day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
     if not day:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
@@ -1310,7 +1336,8 @@ async def preview_insertion(
     """候補(place_idまたは直接座標)を指定日の特定位置へ挿入した場合の
     移動時間・距離の変化を、何も確定させずに試算する(viewer可、DBへの
     書き込みは一切行わない)。"""
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    # [Gate G2] FR-045 経路・距離は位置から計算するため、位置を隠された人には返さない
+    plan, _hidden = _plan_hidden(db, plan_id, current_user, "viewer", "event_address")
     day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
     if not day:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
@@ -1472,7 +1499,8 @@ async def create_optimization_proposal(
     """指定日のイベント順序を最近傍法で並べ替える提案を計算する
     (閲覧のみ、viewer可、DBへは一切書き込まない)。lockedなイベントは
     固定し、座標の無いイベントは並べ替え対象外として保持する。"""
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    # [Gate G2] FR-045 経路・距離は位置から計算するため、位置を隠された人には返さない
+    plan, _hidden = _plan_hidden(db, plan_id, current_user, "viewer", "event_address")
     day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
     if not day:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
@@ -1548,7 +1576,7 @@ async def apply_optimization_proposal(
     複数イベントの並べ替えを単一のChangeSetとして記録し、1回のUndoで
     全体を戻せるようにする。lockedなイベントの並び順が含まれていても
     その位置がずれていなければ影響しない(locked自体は動かない設計)。"""
-    plan = _get_owned_plan(db, plan_id, current_user)
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "editor", "event_address")
     _require_if_match(plan, if_match)
 
     day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
@@ -1591,5 +1619,5 @@ async def apply_optimization_proposal(
     db.refresh(day)
     return DayWithEvents(
         **DayResponse.model_validate(day).model_dump(mode="json"),
-        events=[EventResponse.model_validate(e).model_dump(mode="json") for e in updated_events],
+        events=[_event_out(e, hidden) for e in updated_events],
     )

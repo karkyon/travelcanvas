@@ -45,6 +45,7 @@ import type {
   ReservationEventLink, NormalizedDay, NormalizedEvent,
   Ticket, TicketCreateData,
 } from '@/services/api';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
   { value: 'accommodation', label: '宿泊', icon: <Building2 size={16} /> },
@@ -185,7 +186,7 @@ const ReservationsPage: React.FC = () => {
       const data = await getReservations(planId);
       setReservations(data);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約一覧の取得に失敗しました');
+      setError(errorDetailMessage(e, '予約一覧の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
@@ -277,7 +278,7 @@ const ReservationsPage: React.FC = () => {
       setCreateForm(EMPTY_FORM);
       await loadReservations();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約の作成に失敗しました');
+      setError(errorDetailMessage(e, '予約の作成に失敗しました'));
     } finally {
       setIsSaving(false);
     }
@@ -291,7 +292,7 @@ const ReservationsPage: React.FC = () => {
       if (selected?.id === reservation.id) closeDetail();
       await loadReservations();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約の削除に失敗しました');
+      setError(errorDetailMessage(e, '予約の削除に失敗しました'));
     }
   };
 
@@ -302,7 +303,7 @@ const ReservationsPage: React.FC = () => {
       const result = await revealReservation(planId, selected.id);
       setRevealed({ confirmation_number: result.confirmation_number, pin: result.pin });
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '予約番号の開示に失敗しました(権限が必要です)');
+      setError(errorDetailMessage(e, '予約番号の開示に失敗しました(権限が必要です)'));
     } finally {
       setIsRevealing(false);
     }
@@ -320,7 +321,7 @@ const ReservationsPage: React.FC = () => {
       setNewParticipantSeat('');
       await loadParticipants(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '参加者の追加に失敗しました');
+      setError(errorDetailMessage(e, '参加者の追加に失敗しました'));
     }
   };
 
@@ -330,7 +331,7 @@ const ReservationsPage: React.FC = () => {
       await deleteReservationParticipant(planId, selected.id, participant.id);
       await loadParticipants(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '参加者の削除に失敗しました');
+      setError(errorDetailMessage(e, '参加者の削除に失敗しました'));
     }
   };
 
@@ -350,7 +351,7 @@ const ReservationsPage: React.FC = () => {
       setIsAddLinkOpen(false);
       await loadEventLinks(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの追加に失敗しました');
+      setError(errorDetailMessage(e, 'イベント紐付けの追加に失敗しました'));
     } finally {
       setIsAddingLink(false);
     }
@@ -362,7 +363,7 @@ const ReservationsPage: React.FC = () => {
       await updateReservationEventLink(planId, selected.id, link.id, { is_locked: !link.is_locked });
       await loadEventLinks(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの更新に失敗しました');
+      setError(errorDetailMessage(e, 'イベント紐付けの更新に失敗しました'));
     }
   };
 
@@ -372,7 +373,7 @@ const ReservationsPage: React.FC = () => {
       await deleteReservationEventLink(planId, selected.id, link.id);
       await loadEventLinks(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'イベント紐付けの解除に失敗しました(ロック中の可能性があります)');
+      setError(errorDetailMessage(e, 'イベント紐付けの解除に失敗しました(ロック中の可能性があります)'));
     }
   };
 
@@ -411,7 +412,7 @@ const ReservationsPage: React.FC = () => {
       setIsAddTicketOpen(false);
       await loadTickets(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの追加に失敗しました');
+      setError(errorDetailMessage(e, 'チケットの追加に失敗しました'));
     } finally {
       setIsAddingTicket(false);
     }
@@ -424,7 +425,7 @@ const ReservationsPage: React.FC = () => {
       await deleteTicket(planId, selected.id, ticket.id, ticket.revision);
       await loadTickets(selected);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの削除に失敗しました');
+      setError(errorDetailMessage(e, 'チケットの削除に失敗しました'));
     }
   };
 
@@ -434,7 +435,7 @@ const ReservationsPage: React.FC = () => {
       const result = await revealTicket(planId, selected.id, ticket.id);
       setRevealedTickets((prev) => ({ ...prev, [ticket.id]: result.payload }));
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'チケットの表示に失敗しました(権限が必要な場合があります)');
+      setError(errorDetailMessage(e, 'チケットの表示に失敗しました(権限が必要な場合があります)'));
     }
   };
 
@@ -484,7 +485,7 @@ const ReservationsPage: React.FC = () => {
                   type="button"
                   onClick={() => openDetail(r)}
                   aria-haspopup="dialog"
-                  className="w-full text-left p-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="w-full text-left p-4 rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -708,7 +709,7 @@ const ReservationsPage: React.FC = () => {
                       {eventLinks.map((link) => (
                         <div
                           key={link.id}
-                          className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2"
+                          className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <CalendarDays size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
@@ -810,7 +811,7 @@ const ReservationsPage: React.FC = () => {
                         <div className="text-sm text-gray-600">チケットが登録されていません</div>
                       )}
                       {tickets.map((t) => (
-                        <div key={t.id} className="text-sm bg-gray-50 rounded px-3 py-2">
+                        <div key={t.id} className="text-sm bg-gray-50 rounded-sm px-3 py-2">
                           <div className="flex items-center justify-between">
                             <div>
                               <span className="font-medium">{t.ticket_type}</span>
@@ -912,7 +913,7 @@ const ReservationsPage: React.FC = () => {
                         <div className="text-sm text-gray-600">参加者が登録されていません</div>
                       )}
                       {participants.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
+                        <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2">
                           <span>{p.name}{p.seat ? `(座席: ${p.seat})` : ''}</span>
                           <button
                             type="button"

@@ -34,7 +34,8 @@
   "captured_at_head_c2": "Gate Q1 (+Gate C2 候補箱・場所。ID・日時は固定値へ置換)",
   "captured_at_head_c3": "Gate C2 (+Gate C3 情報内検索。ID・日付は固定値へ置換)",
   "captured_at_head_f45": "Gate C3 (+Gate F45 共有リンクの項目単位の規則: share_*・public_share*・share_preview*。ID・日時は固定値へ置換)",
-  "captured_at_head_b1": "Gate F45 (+Gate B1 組織・配布・閲覧確認・外部連携の管理。ID・日時・メールアドレス・秘密は固定値へ置換)"
+  "captured_at_head_b1": "Gate F45 (+Gate B1 組織・配布・閲覧確認・外部連携の管理。ID・日時・メールアドレス・秘密は固定値へ置換)",
+  "captured_at_head_g2": "sandbox G2: 外部連携の秘密・鍵の切り替え・dead の送信、サポート閲覧・運用の要約、同行者向けの項目の規則"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -13594,7 +13595,10 @@
   ],
   "created_at": "2026-10-20T05:00:00+00:00",
   "last_used_at": null,
-  "revoked_at": null
+  "revoked_at": null,
+  "secret_version": 1,
+  "secret_rotated_at": null,
+  "previous_secret_valid_until": null
  },
  "api_clients": {
   "clients": [
@@ -13608,7 +13612,10 @@
     ],
     "created_at": "2026-10-20T05:00:00+00:00",
     "last_used_at": null,
-    "revoked_at": null
+    "revoked_at": null,
+    "secret_version": 1,
+    "secret_rotated_at": null,
+    "previous_secret_valid_until": null
    }
   ],
   "scopes": {
@@ -13626,7 +13633,10 @@
   ],
   "created_at": "2026-10-20T05:00:00+00:00",
   "last_used_at": null,
-  "revoked_at": "2026-10-20T05:00:00+00:00"
+  "revoked_at": "2026-10-20T05:00:00+00:00",
+  "secret_version": 1,
+  "secret_rotated_at": null,
+  "previous_secret_valid_until": null
  },
  "webhook_created": {
   "id": "00000000-0000-4000-8000-0000000b0001",
@@ -13637,7 +13647,10 @@
   ],
   "secret": "whsec_FIXTURE_PLACEHOLDER",
   "created_at": "2026-10-20T05:00:00+00:00",
-  "revoked_at": null
+  "revoked_at": null,
+  "secret_version": 1,
+  "previous_secret_valid_until": null,
+  "disabled_reason": null
  },
  "webhooks": {
   "webhooks": [
@@ -13650,7 +13663,10 @@
     ],
     "secret": null,
     "created_at": "2026-10-20T05:00:00+00:00",
-    "revoked_at": null
+    "revoked_at": null,
+    "secret_version": 1,
+    "previous_secret_valid_until": null,
+    "disabled_reason": null
    }
   ],
   "events": {
@@ -13669,7 +13685,9 @@
   "last_status_code": 200,
   "last_error": null,
   "created_at": "2026-10-20T05:00:00+00:00",
-  "delivered_at": "2026-10-20T05:00:00+00:00"
+  "delivered_at": "2026-10-20T05:00:00+00:00",
+  "next_attempt_at": null,
+  "max_attempts": 6
  },
  "webhook_deliveries": [
   {
@@ -13681,7 +13699,9 @@
    "last_status_code": 200,
    "last_error": null,
    "created_at": "2026-10-20T05:00:00+00:00",
-   "delivered_at": "2026-10-20T05:00:00+00:00"
+   "delivered_at": "2026-10-20T05:00:00+00:00",
+   "next_attempt_at": null,
+   "max_attempts": 6
   },
   {
    "id": "00000000-0000-4000-8000-0000000b000c",
@@ -13692,7 +13712,9 @@
    "last_status_code": 500,
    "last_error": "http_status",
    "created_at": "2026-10-20T05:00:00+00:00",
-   "delivered_at": null
+   "delivered_at": null,
+   "next_attempt_at": null,
+   "max_attempts": 6
   }
  ],
  "webhook_redelivered": {
@@ -13704,7 +13726,9 @@
   "last_status_code": 200,
   "last_error": null,
   "created_at": "2026-10-20T05:00:00+00:00",
-  "delivered_at": "2026-10-20T05:00:00+00:00"
+  "delivered_at": "2026-10-20T05:00:00+00:00",
+  "next_attempt_at": null,
+  "max_attempts": 6
  },
  "webhook_revoked": {
   "id": "00000000-0000-4000-8000-0000000b0001",
@@ -13715,7 +13739,10 @@
   ],
   "secret": null,
   "created_at": "2026-10-20T05:00:00+00:00",
-  "revoked_at": "2026-10-20T05:00:00+00:00"
+  "revoked_at": "2026-10-20T05:00:00+00:00",
+  "secret_version": 1,
+  "previous_secret_valid_until": null,
+  "disabled_reason": null
  },
  "distribution_revoked": {
   "id": "00000000-0000-4000-8000-0000000b0004",
@@ -13732,5 +13759,678 @@
    "acknowledged_latest": 0,
    "pending": 2
   }
+ },
+ "api_client_rotated": {
+  "id": "00000000-0000-4000-8000-0000000c0001",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": "tcs_FIXTURE_PLACEHOLDER",
+  "scopes": [
+   "distributions:read",
+   "distributions:write"
+  ],
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": null,
+  "secret_version": 2,
+  "secret_rotated_at": "2026-10-21T05:00:00+00:00",
+  "previous_secret_valid_until": "2026-10-21T05:00:00+00:00"
+ },
+ "api_client_retired": {
+  "id": "00000000-0000-4000-8000-0000000c0001",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": null,
+  "scopes": [
+   "distributions:read",
+   "distributions:write"
+  ],
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": null,
+  "secret_version": 2,
+  "secret_rotated_at": "2026-10-21T05:00:00+00:00",
+  "previous_secret_valid_until": null,
+  "tokens_revoked": 0
+ },
+ "webhook_rotated": {
+  "id": "00000000-0000-4000-8000-0000000c0002",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": "whsec_FIXTURE_PLACEHOLDER",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": null,
+  "secret_version": 2,
+  "previous_secret_valid_until": "2026-10-21T05:00:00+00:00",
+  "disabled_reason": null
+ },
+ "webhook_retired": {
+  "id": "00000000-0000-4000-8000-0000000c0002",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": null,
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": null,
+  "secret_version": 2,
+  "previous_secret_valid_until": null,
+  "disabled_reason": null
+ },
+ "support_grant_created": {
+  "id": "00000000-0000-4000-8000-0000000c0005",
+  "plan_id": "00000000-0000-4000-8000-0000000c0006",
+  "plan_title": "修学旅行B1",
+  "scope": "plan",
+  "purpose": "予約が表示されない件の調査",
+  "ticket_ref": "T-1001",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "expires_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": null,
+  "state": "active",
+  "access_count": 0,
+  "last_accessed_at": null
+ },
+ "admin_support_grants": {
+  "grants": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c0005",
+    "plan_title": "修学旅行B1",
+    "scope": "plan",
+    "purpose": "予約が表示されない件の調査",
+    "ticket_ref": "T-1001",
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "expires_at": "2026-10-21T05:00:00+00:00",
+    "revoked_at": null,
+    "state": "active",
+    "access_count": 0,
+    "last_accessed_at": null,
+    "user_label": "hanako",
+    "user_id": "00000000-0000-4000-8000-0000000c0007",
+    "own": false
+   },
+   {
+    "id": "00000000-0000-4000-8000-0000000c0008",
+    "plan_title": null,
+    "scope": "account",
+    "purpose": "ログインの件",
+    "ticket_ref": null,
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "expires_at": "2026-10-21T05:00:00+00:00",
+    "revoked_at": null,
+    "state": "active",
+    "access_count": 0,
+    "last_accessed_at": null,
+    "user_label": "hanako",
+    "user_id": "00000000-0000-4000-8000-0000000c0007",
+    "own": false
+   }
+  ]
+ },
+ "admin_support_view_plan": {
+  "grant": {
+   "id": "00000000-0000-4000-8000-0000000c0005",
+   "plan_title": "修学旅行B1",
+   "scope": "plan",
+   "purpose": "予約が表示されない件の調査",
+   "ticket_ref": "T-1001",
+   "created_at": "2026-10-21T05:00:00+00:00",
+   "expires_at": "2026-10-21T05:00:00+00:00",
+   "revoked_at": null,
+   "state": "active",
+   "access_count": 1,
+   "last_accessed_at": null,
+   "user_label": "hanako",
+   "user_id": "00000000-0000-4000-8000-0000000c0007"
+  },
+  "read_only": true,
+  "plan": {
+   "id": "00000000-0000-4000-8000-0000000c0006",
+   "title": "修学旅行B1",
+   "destination": "京都",
+   "status": "draft",
+   "start_date": null,
+   "end_date": null,
+   "revision": 3,
+   "deleted": false,
+   "days": [
+    {
+     "id": "00000000-0000-4000-8000-0000000c0009",
+     "local_date": "2026-11-03",
+     "title": "1日目",
+     "timezone_id": "Asia/Tokyo",
+     "events": [
+      {
+       "id": "00000000-0000-4000-8000-0000000c000a",
+       "title": "清水寺B1",
+       "event_type": "activity",
+       "local_start_time": "10:00",
+       "is_all_day": false,
+       "locked": false,
+       "has_address": true,
+       "has_notes": true,
+       "has_location": true
+      }
+     ]
+    }
+   ],
+   "reservations": [
+    {
+     "id": "00000000-0000-4000-8000-0000000c000b",
+     "type": "accommodation",
+     "status": "confirmed",
+     "provider_name": "宿B1",
+     "start_at": null,
+     "end_at": null,
+     "confirmation_number": "伏せています"
+    }
+   ],
+   "documents_by_classification": {},
+   "collaborators": 0
+  }
+ },
+ "admin_support_view_account": {
+  "grant": {
+   "id": "00000000-0000-4000-8000-0000000c0008",
+   "plan_title": null,
+   "scope": "account",
+   "purpose": "ログインの件",
+   "ticket_ref": null,
+   "created_at": "2026-10-21T05:00:00+00:00",
+   "expires_at": "2026-10-21T05:00:00+00:00",
+   "revoked_at": null,
+   "state": "active",
+   "access_count": 1,
+   "last_accessed_at": null,
+   "user_label": "hanako",
+   "user_id": "00000000-0000-4000-8000-0000000c0007"
+  },
+  "read_only": true,
+  "account": {
+   "username": "hanako",
+   "user_type": "registered",
+   "is_active": true,
+   "created_at": "2026-10-21T05:00:00+00:00",
+   "plans": [
+    {
+     "id": "00000000-0000-4000-8000-0000000c0006",
+     "title": "修学旅行B1",
+     "status": "draft",
+     "start_date": null,
+     "end_date": null,
+     "deleted": false,
+     "days": 1,
+     "events": 1
+    }
+   ]
+  }
+ },
+ "admin_operations": {
+  "share_links": {
+   "active": 1,
+   "active_edit": 0,
+   "without_expiry": 1
+  },
+  "webhooks": {
+   "pending": 0,
+   "failed": 0,
+   "dead": 1,
+   "delivered": 0
+  },
+  "storage": {
+   "database_bytes": 12345678,
+   "documents": 0,
+   "document_bytes": 0
+  },
+  "purge": {
+   "plans_pending": 0,
+   "plans_due": 0,
+   "documents_pending": 0
+  },
+  "support_grants": {
+   "active": 2
+  },
+  "timestamp": "2026-10-21T05:00:00+00:00"
+ },
+ "admin_share_links": {
+  "share_links": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c000c",
+    "plan_id": "00000000-0000-4000-8000-0000000c0006",
+    "token_prefix": "abcd1234",
+    "permission": "view",
+    "has_passcode": false,
+    "use_count": 0,
+    "max_uses": null,
+    "expires_at": null,
+    "created_at": "2026-10-21T05:00:00+00:00"
+   }
+  ]
+ },
+ "admin_share_link_revoked": {
+  "id": "00000000-0000-4000-8000-0000000c000c",
+  "revoked_at": "2026-10-21T05:00:00+00:00"
+ },
+ "support_grants": {
+  "grants": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c0005",
+    "plan_id": "00000000-0000-4000-8000-0000000c0006",
+    "plan_title": "修学旅行B1",
+    "scope": "plan",
+    "purpose": "予約が表示されない件の調査",
+    "ticket_ref": "T-1001",
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "expires_at": "2026-10-21T05:00:00+00:00",
+    "revoked_at": null,
+    "state": "active",
+    "access_count": 1,
+    "last_accessed_at": "2026-10-21T05:00:00+00:00"
+   },
+   {
+    "id": "00000000-0000-4000-8000-0000000c0008",
+    "plan_id": null,
+    "plan_title": null,
+    "scope": "account",
+    "purpose": "ログインの件",
+    "ticket_ref": null,
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "expires_at": "2026-10-21T05:00:00+00:00",
+    "revoked_at": null,
+    "state": "active",
+    "access_count": 1,
+    "last_accessed_at": "2026-10-21T05:00:00+00:00"
+   }
+  ],
+  "limits": {
+   "min_hours": 1,
+   "max_hours": 72,
+   "default_hours": 24,
+   "max_active": 5,
+   "purpose_max": 200
+  },
+  "requires_password": true
+ },
+ "support_grant_revoked": {
+  "id": "00000000-0000-4000-8000-0000000c0005",
+  "plan_id": "00000000-0000-4000-8000-0000000c0006",
+  "plan_title": "修学旅行B1",
+  "scope": "plan",
+  "purpose": "予約が表示されない件の調査",
+  "ticket_ref": "T-1001",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "expires_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": "2026-10-21T05:00:00+00:00",
+  "state": "revoked",
+  "access_count": 1,
+  "last_accessed_at": "2026-10-21T05:00:00+00:00"
+ },
+ "member_policy_owner": {
+  "plan_id": "00000000-0000-4000-8000-0000000c0006",
+  "role": "owner",
+  "catalog": {
+   "version": 1,
+   "categories": [
+    {
+     "key": "event_notes",
+     "label": "予定のメモ",
+     "description": "予定の説明・メモ欄",
+     "implies": []
+    },
+    {
+     "key": "event_address",
+     "label": "予定の住所・位置",
+     "description": "予定の住所・緯度経度(地図の位置・経路・GPX/KML の出力も含む)",
+     "implies": []
+    },
+    {
+     "key": "reservations",
+     "label": "予約",
+     "description": "予約の一覧・詳細(隠すとチケットと予約番号も隠れます)",
+     "implies": [
+      "tickets",
+      "reservation_secrets"
+     ]
+    },
+    {
+     "key": "reservation_secrets",
+     "label": "予約番号・PIN の表示",
+     "description": "伏せた予約番号・PIN を表示する操作",
+     "implies": []
+    },
+    {
+     "key": "tickets",
+     "label": "チケット・QR",
+     "description": "チケット・QR・バーコード",
+     "implies": []
+    },
+    {
+     "key": "documents",
+     "label": "文書",
+     "description": "旅券・保険・領収書などの文書",
+     "implies": []
+    },
+    {
+     "key": "costs",
+     "label": "費用・予算・精算",
+     "description": "予算・支出・精算・費用の集計",
+     "implies": []
+    }
+   ],
+   "presets": {
+    "none": [],
+    "recommended_viewer": [
+     "reservation_secrets",
+     "tickets",
+     "documents",
+     "costs"
+    ],
+    "itinerary_only": [
+     "event_notes",
+     "reservations",
+     "reservation_secrets",
+     "tickets",
+     "documents",
+     "costs"
+    ]
+   }
+  },
+  "roles": {
+   "editor": [],
+   "viewer": [
+    "event_notes",
+    "reservations",
+    "reservation_secrets",
+    "tickets"
+   ]
+  },
+  "configured": true,
+  "members": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c000d",
+    "email": "member@example.com",
+    "role": "viewer",
+    "status": "accepted",
+    "hidden": null,
+    "effective_hidden": [
+     "event_notes",
+     "reservations",
+     "reservation_secrets",
+     "tickets"
+    ]
+   }
+  ],
+  "my_hidden": []
+ },
+ "member_policy_viewer": {
+  "plan_id": "00000000-0000-4000-8000-0000000c0006",
+  "role": "viewer",
+  "catalog": {
+   "version": 1,
+   "categories": [
+    {
+     "key": "event_notes",
+     "label": "予定のメモ",
+     "description": "予定の説明・メモ欄",
+     "implies": []
+    },
+    {
+     "key": "event_address",
+     "label": "予定の住所・位置",
+     "description": "予定の住所・緯度経度(地図の位置・経路・GPX/KML の出力も含む)",
+     "implies": []
+    },
+    {
+     "key": "reservations",
+     "label": "予約",
+     "description": "予約の一覧・詳細(隠すとチケットと予約番号も隠れます)",
+     "implies": [
+      "tickets",
+      "reservation_secrets"
+     ]
+    },
+    {
+     "key": "reservation_secrets",
+     "label": "予約番号・PIN の表示",
+     "description": "伏せた予約番号・PIN を表示する操作",
+     "implies": []
+    },
+    {
+     "key": "tickets",
+     "label": "チケット・QR",
+     "description": "チケット・QR・バーコード",
+     "implies": []
+    },
+    {
+     "key": "documents",
+     "label": "文書",
+     "description": "旅券・保険・領収書などの文書",
+     "implies": []
+    },
+    {
+     "key": "costs",
+     "label": "費用・予算・精算",
+     "description": "予算・支出・精算・費用の集計",
+     "implies": []
+    }
+   ],
+   "presets": {
+    "none": [],
+    "recommended_viewer": [
+     "reservation_secrets",
+     "tickets",
+     "documents",
+     "costs"
+    ],
+    "itinerary_only": [
+     "event_notes",
+     "reservations",
+     "reservation_secrets",
+     "tickets",
+     "documents",
+     "costs"
+    ]
+   }
+  },
+  "my_hidden": [
+   "event_notes",
+   "reservations",
+   "reservation_secrets",
+   "tickets"
+  ]
+ },
+ "plan_detail_member_hidden": {
+  "id": "00000000-0000-4000-8000-0000000c0006",
+  "title": "修学旅行B1",
+  "revision": 3,
+  "days": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c0009",
+    "local_date": "2026-11-03",
+    "timezone_id": "Asia/Tokyo",
+    "title": "1日目",
+    "notes": null,
+    "sort_order": 0,
+    "events": [
+     {
+      "id": "00000000-0000-4000-8000-0000000c000a",
+      "day_id": "00000000-0000-4000-8000-0000000c0009",
+      "title": "清水寺B1",
+      "description": null,
+      "event_type": "activity",
+      "start_at": null,
+      "end_at": null,
+      "local_start_time": "10:00",
+      "is_all_day": false,
+      "address": "京都市東山区B1",
+      "latitude": 34.99,
+      "longitude": 135.78,
+      "locked": false,
+      "sort_order": 0,
+      "place_id": null
+     }
+    ]
+   }
+  ],
+  "hidden_fields": [
+   "event_notes",
+   "reservations",
+   "reservation_secrets",
+   "tickets"
+  ]
+ },
+ "g2_api_client_created": {
+  "id": "00000000-0000-4000-8000-0000000c0001",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": "tcs_FIXTURE_PLACEHOLDER",
+  "scopes": [
+   "distributions:read",
+   "distributions:write"
+  ],
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": null,
+  "secret_version": 1,
+  "secret_rotated_at": null,
+  "previous_secret_valid_until": null
+ },
+ "g2_api_clients": {
+  "clients": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c0001",
+    "name": "旅行会社の連携",
+    "client_id": "tcc_0123456789abcdef01234567",
+    "client_secret": null,
+    "scopes": [
+     "distributions:read",
+     "distributions:write"
+    ],
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "last_used_at": null,
+    "revoked_at": null,
+    "secret_version": 2,
+    "secret_rotated_at": "2026-10-21T05:00:00+00:00",
+    "previous_secret_valid_until": "2026-10-21T05:00:00+00:00"
+   }
+  ],
+  "scopes": {
+   "distributions:read": "配布する旅程(写し)の一覧と内容を読む",
+   "distributions:write": "配布の題名・お知らせの変更、改訂(元の旅行から写し直す)、停止(個人の旅行・予約は書き換えない)",
+   "acknowledgements:read": "配布の閲覧確認の件数を読む(誰が確認したかは含まない)"
+  }
+ },
+ "g2_api_client_revoked": {
+  "id": "00000000-0000-4000-8000-0000000c0001",
+  "name": "旅行会社の連携",
+  "client_id": "tcc_0123456789abcdef01234567",
+  "client_secret": null,
+  "scopes": [
+   "distributions:read",
+   "distributions:write"
+  ],
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "last_used_at": null,
+  "revoked_at": "2026-10-21T05:00:00+00:00",
+  "secret_version": 2,
+  "secret_rotated_at": "2026-10-21T05:00:00+00:00",
+  "previous_secret_valid_until": null
+ },
+ "g2_webhook_created": {
+  "id": "00000000-0000-4000-8000-0000000c0002",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": "whsec_FIXTURE_PLACEHOLDER",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": null,
+  "secret_version": 1,
+  "previous_secret_valid_until": null,
+  "disabled_reason": null
+ },
+ "g2_webhooks": {
+  "webhooks": [
+   {
+    "id": "00000000-0000-4000-8000-0000000c0002",
+    "url": "https://hooks.example.com/travelcanvas",
+    "events": [
+     "distribution.published",
+     "distribution.revised"
+    ],
+    "secret": null,
+    "created_at": "2026-10-21T05:00:00+00:00",
+    "revoked_at": null,
+    "secret_version": 2,
+    "previous_secret_valid_until": "2026-10-21T05:00:00+00:00",
+    "disabled_reason": null
+   }
+  ],
+  "events": {
+   "distribution.published": "配布を始めた",
+   "distribution.revised": "配布の版を上げた",
+   "distribution.revoked": "配布をやめた",
+   "distribution.acknowledged": "メンバーが最新版を確認した(件数だけ)"
+  }
+ },
+ "g2_webhook_ping": {
+  "id": "00000000-0000-4000-8000-0000000c0003",
+  "event_id": "00000000-0000-4000-8000-0000000c0004",
+  "event_type": "ping",
+  "status": "failed",
+  "attempts": 1,
+  "last_status_code": 500,
+  "last_error": "http_status",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "delivered_at": null,
+  "next_attempt_at": "2026-10-21T05:00:00+00:00",
+  "max_attempts": 6
+ },
+ "g2_webhook_deliveries": [
+  {
+   "id": "00000000-0000-4000-8000-0000000c0003",
+   "event_id": "00000000-0000-4000-8000-0000000c0004",
+   "event_type": "ping",
+   "status": "dead",
+   "attempts": 6,
+   "last_status_code": 500,
+   "last_error": "http_status",
+   "created_at": "2026-10-21T05:00:00+00:00",
+   "delivered_at": null,
+   "next_attempt_at": null,
+   "max_attempts": 6
+  }
+ ],
+ "g2_webhook_redelivered": {
+  "id": "00000000-0000-4000-8000-0000000c0003",
+  "event_id": "00000000-0000-4000-8000-0000000c0004",
+  "event_type": "ping",
+  "status": "dead",
+  "attempts": 7,
+  "last_status_code": 500,
+  "last_error": "http_status",
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "delivered_at": null,
+  "next_attempt_at": null,
+  "max_attempts": 6
+ },
+ "g2_webhook_revoked": {
+  "id": "00000000-0000-4000-8000-0000000c0002",
+  "url": "https://hooks.example.com/travelcanvas",
+  "events": [
+   "distribution.published",
+   "distribution.revised"
+  ],
+  "secret": null,
+  "created_at": "2026-10-21T05:00:00+00:00",
+  "revoked_at": "2026-10-21T05:00:00+00:00",
+  "secret_version": 2,
+  "previous_secret_valid_until": null,
+  "disabled_reason": null
  }
 }

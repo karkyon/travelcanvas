@@ -100,7 +100,7 @@ describe('VisitDetector', () => {
     emitPosition(35.6812, 139.7671, 10, t0 + 4 * 60 * 1000);
 
     expect(onSuggestion).toHaveBeenCalledTimes(1);
-    const suggestion = onSuggestion.mock.calls[0][0];
+    const suggestion = onSuggestion.mock.calls[0]![0];
     expect(suggestion.eventId).toBe('event-1');
     expect(suggestion.confidence).toBeGreaterThan(0);
   });

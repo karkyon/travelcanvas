@@ -24,7 +24,7 @@ const DiffCells: React.FC<{ d: BudgetDiff; currency: string }> = ({ d, currency 
     <td className="px-2 py-1 text-right">{formatMoney(d.actual, currency)}</td>
     <td className="px-2 py-1 text-right">
       {d.remaining == null ? '—' : formatMoney(d.remaining, currency)}
-      {d.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-800">超過</span>}
+      {d.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded-sm bg-red-100 text-red-800">超過</span>}
     </td>
   </>
 );
@@ -62,7 +62,7 @@ const SummaryPanel: React.FC<Props> = ({ summary, budgets, canEdit, onEditBudget
             <dt className="text-gray-700">残り</dt>
             <dd className="text-right">
               {summary.total.remaining == null ? '—' : formatMoney(summary.total.remaining, cur)}
-              {summary.total.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-800">超過</span>}
+              {summary.total.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded-sm bg-red-100 text-red-800">超過</span>}
             </dd>
             <dt className="text-gray-700">予約額(参考)</dt><dd className="text-right">{formatMoney(summary.reserved.total, cur)}</dd>
             <dt className="text-gray-700">うち税/手数料/返金</dt>
@@ -84,7 +84,7 @@ const SummaryPanel: React.FC<Props> = ({ summary, budgets, canEdit, onEditBudget
               <dt className="text-gray-700">残り</dt>
               <dd className="text-right">
                 {summary.my_budget.remaining == null ? '—' : formatMoney(summary.my_budget.remaining, cur)}
-                {summary.my_budget.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-800">超過</span>}
+                {summary.my_budget.over && <span className="ml-1 text-xs px-1.5 py-0.5 rounded-sm bg-red-100 text-red-800">超過</span>}
               </dd>
             </dl>
           ) : (

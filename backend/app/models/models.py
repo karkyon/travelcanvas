@@ -186,6 +186,8 @@ class TravelPlan(Base):
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # [Gate G2] FR-045 参加者(編集者・閲覧者)に隠す項目の、役割ごとの既定。NULL は何も隠さない(本Gate以前と同じ)
+    member_field_policy = Column(JSONB, nullable=True)
     # [Gate B-012] 2段階削除。DELETEで論理削除(deleted_at)し、purge_after(既定30日後)を
     # 過ぎたらapp/services/plan_deletion.pyの完全削除で子データごと物理削除する。
     # 論理削除中はrequire_plan_access等で存在しないもの(404)として扱う。
@@ -260,6 +262,9 @@ class PlanCollaborator(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # [Gate #30] 招待された側がaccept/declineした日時。pending中はNULL。
     decided_at = Column(DateTime(timezone=True), nullable=True)
+    # [Gate G2] FR-045 この参加者だけに適用する項目の規則({"version":1,"hidden":[...]})。
+    # NULL は役割の既定(travel_plans.member_field_policy)に従う。app/services/member_policy.py が正本。
+    field_policy = Column(JSONB, nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="collaborators")
@@ -2779,6 +2784,11 @@ class OrgApiClient(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # [Gate G2] 秘密の切り替え: 猶予の間は前の秘密でもトークンを取れる(ハッシュだけ)
+    previous_secret_hash = Column(String(64), nullable=True)
+    previous_secret_expires_at = Column(DateTime(timezone=True), nullable=True)
+    secret_version = Column(Integer, nullable=False, default=1, server_default="1")
+    secret_rotated_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class OrgApiToken(Base):
@@ -2807,6 +2817,12 @@ class OrgWebhook(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # [Gate G2] 署名の鍵の切り替え: 猶予の間は新旧の両方で署名する(受け手が切り替える時間を取る)
+    previous_secret_ciphertext = Column(LargeBinary, nullable=True)
+    previous_secret_expires_at = Column(DateTime(timezone=True), nullable=True)
+    secret_version = Column(Integer, nullable=False, default=1, server_default="1")
+    # 受け手が 410 Gone を返した等で自動で止めた理由
+    disabled_reason = Column(String(40), nullable=True)
 
 
 class OrgWebhookDelivery(Base):
@@ -2825,7 +2841,46 @@ class OrgWebhookDelivery(Base):
     last_error = Column(String(40), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     delivered_at = Column(DateTime(timezone=True), nullable=True)
+    # [Gate G2] 自動の再送: 次に送る時刻(失敗のたびに間隔を伸ばす)。上限に達したら dead(手で送り直せる)
+    next_attempt_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        CheckConstraint("status IN ('pending','delivered','failed')", name="ck_org_webhook_deliveries_status"),
+        CheckConstraint("status IN ('pending','delivered','failed','dead')", name="ck_org_webhook_deliveries_status"),
+        Index("ix_org_webhook_deliveries_due", "status", "next_attempt_at"),
     )
+
+
+class SupportGrant(Base):
+    """[Gate G2] FR-040 サポート閲覧の許可(利用者本人が作る。目的・期限つき・読み取りだけ・閲覧は全て監査)。
+
+    plan_id が NULL ならアカウントの概要と旅行の一覧、あれば1つの旅行の中身(機密・個人の値は伏せる)を見られる。"""
+    __tablename__ = "support_grants"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    purpose = Column(String(200), nullable=False)
+    ticket_ref = Column(String(40), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    access_count = Column(Integer, nullable=False, default=0, server_default="0")
+    last_accessed_at = Column(DateTime(timezone=True), nullable=True)
+    last_accessed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class OrgApiIdempotency(Base):
+    """[Gate G2] FR-042 外部 API の書き込みの Idempotency-Key(クライアントごと)。同じキーの再送は同じ応答を返す。"""
+    __tablename__ = "org_api_idempotency"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False)
+    key = Column(String(100), nullable=False)
+    route = Column(String(120), nullable=False)
+    payload_hash = Column(String(64), nullable=False)
+    response_status = Column(Integer, nullable=False)
+    response_json = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (UniqueConstraint("client_id", "key", name="uq_org_api_idempotency_client_key"),)

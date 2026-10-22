@@ -85,6 +85,14 @@ def _guard_off_by_default(monkeypatch):
     _guard.reset_all()
 
 
+@pytest.fixture(autouse=True)
+def _metrics_token_from_env_is_ignored(monkeypatch):
+    """[Gate G2] .env に METRICS_TOKEN がある環境(omega-dev2 の本番相当の設定)でも、/metrics の試験が同じに動くようにする。
+    METRICS_TOKEN の試験は、それぞれ自分で設定する(monkeypatch はこの後に効く)。"""
+    from app.core.config import settings as _settings
+    monkeypatch.setattr(_settings, "METRICS_TOKEN", None, raising=False)
+
+
 @pytest.fixture()
 def db_session():
     """トランザクション境界を持つテスト用DBセッション。テスト終了時に必ずロールバックする。"""

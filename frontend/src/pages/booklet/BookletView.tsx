@@ -49,13 +49,13 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo }) => {
   const compact = b.density === 'compact';
   const cur = b.costs?.base_currency ?? 'JPY';
   return (
-    <article className={`booklet-root relative max-w-3xl mx-auto border shadow-sm ${compact ? 'p-4 text-sm' : 'p-8'} ${style.root} ${style.box}`}
+    <article className={`booklet-root relative max-w-3xl mx-auto border shadow-xs ${compact ? 'p-4 text-sm' : 'p-8'} ${style.root} ${style.box}`}
       aria-label="しおり" data-testid="booklet" data-theme={b.theme}>
       {exportInfo?.watermark_text && (
         <div className="booklet-watermark" data-text={exportInfo.watermark_text} aria-hidden="true" data-testid="booklet-watermark" />
       )}
 
-      <div className={`text-xs border rounded p-2 mb-4 ${style.box}`} data-testid="booklet-stamp">
+      <div className={`text-xs border rounded-sm p-2 mb-4 ${style.box}`} data-testid="booklet-stamp">
         <p>
           {exportInfo ? `第${exportInfo.version_no}版` : 'プレビュー(保存されていません)'}
           {` ・ 作成 ${formatDateTime(b.generated_at)}`}

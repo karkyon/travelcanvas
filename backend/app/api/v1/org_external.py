@@ -7,18 +7,28 @@
 - 外部 API は読み取りだけで、組織の配布版の写しだけを返す(個人の旅行・予約・メンバーの個人情報は返さない)。
 - 回数制限: トークンは接続元ごと1分20回、外部 API はクライアントごと1分120回。応答は no-store。
 - 監査: クライアント ID と経路の型だけ(トークン・秘密・内容は残さない)。
+
+[Gate G2] 書き込み(scope distributions:write):
+- `PATCH /ext/distributions/{id}`(題名・お知らせ)・`POST …/revise`(元の旅行から写し直して版を上げる)・
+  `POST …/revoke`(配布をやめる)。
+- `Idempotency-Key` が必須(同じキーの再送は同じ応答を返し、`Idempotent-Replayed: true` を付ける。経路・本文が違えば 422)。
+- 版を変える操作は `If-Match: "<版>"` が必須(無ければ 428、違えば 412)。読み取りの応答は `ETag` を返す。
+- 個人の旅行・予約・メンバーの個人情報は外部から書き換えられない。
 """
 import base64
 import binascii
+import json
+import re
 import uuid
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.models import Organization, OrgApiClient, OrgDistribution
+from app.models.models import Organization, OrgApiClient, OrgDistribution, TravelPlan
 from app.ops.metrics import route_template
 from app.services import org_api, organizations as orgs
 from app.services.audit_service import record_audit_event
@@ -151,10 +161,165 @@ async def ext_list(ctx=Depends(require_scope("distributions:read")), db: Session
                                  "distributions": [_ext_dist(d) for d in rows]}, headers=NO_STORE)
 
 
+def _etag(d: OrgDistribution) -> str:
+    return '"%d"' % d.version
+
+
 @router.get("/ext/distributions/{dist_id}")
 async def ext_get(dist_id: uuid.UUID, ctx=Depends(require_scope("distributions:read")), db: Session = Depends(get_db)):
     _client, org = ctx
-    return JSONResponse(content=_ext_dist(_get(db, org, dist_id), with_snapshot=True), headers=NO_STORE)
+    d = _get(db, org, dist_id)
+    return JSONResponse(content=_ext_dist(d, with_snapshot=True), headers={**NO_STORE, "ETag": _etag(d)})
+
+
+# ---------- [Gate G2] 書き込み ----------
+
+_IDEM_KEY = re.compile(r"^[A-Za-z0-9._:-]{8,100}$")
+_IF_MATCH = re.compile(r'^(?:W/)?"?(\d{1,9})"?$')
+
+
+async def _json_body(request: Request) -> Dict[str, Any]:
+    raw = await request.body()
+    if not raw:
+        return {}
+    ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if ctype != "application/json":
+        raise ApiError(415, "unsupported_media_type")
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        raise ApiError(400, "invalid_json")
+    if not isinstance(body, dict):
+        raise ApiError(400, "invalid_json")
+    return body
+
+
+def _require_version(request: Request, d: OrgDistribution) -> None:
+    h = (request.headers.get("if-match") or "").strip()
+    if not h:
+        raise ApiError(428, "if_match_required")
+    m = _IF_MATCH.match(h)
+    if not m or int(m.group(1)) != d.version:
+        raise ApiError(412, "version_mismatch")
+
+
+class _Write:
+    """Idempotency-Key の確認・記録(同じキーの再送は保存した応答をそのまま返す)。"""
+
+    def __init__(self, request: Request, db: Session, client: OrgApiClient, route: str, body: Dict[str, Any]):
+        key = (request.headers.get("idempotency-key") or "").strip()
+        if not _IDEM_KEY.match(key):
+            raise ApiError(400, "idempotency_key_required")
+        self.db, self.client, self.key, self.route = db, client, key, route
+        self.hash = org_api.payload_hash({"route": route, "body": body, "if_match": request.headers.get("if-match")})
+        try:
+            self.cached = org_api.idempotency_lookup(db, client, key, route, self.hash)
+        except ValueError:
+            raise ApiError(422, "idempotency_key_reused")
+
+    def replay(self) -> Optional[JSONResponse]:
+        if not self.cached:
+            return None
+        return JSONResponse(status_code=self.cached.response_status, content=self.cached.response_json,
+                            headers={**NO_STORE, "Idempotent-Replayed": "true"})
+
+    def finish(self, status: int, content: Dict[str, Any], headers: Optional[Dict[str, str]] = None) -> JSONResponse:
+        org_api.idempotency_store(self.db, self.client, self.key, self.route, self.hash, status, content)
+        try:
+            self.db.commit()
+        except IntegrityError:
+            # 同じキーの要求が同時に来た: 先に確定した方の応答を返す(処理は二重にしない)
+            self.db.rollback()
+            rec = org_api.idempotency_lookup(self.db, self.client, self.key, self.route, self.hash)
+            if rec is None:
+                raise ApiError(409, "conflict")
+            return JSONResponse(status_code=rec.response_status, content=rec.response_json,
+                                headers={**NO_STORE, "Idempotent-Replayed": "true"})
+        return JSONResponse(status_code=status, content=content, headers={**NO_STORE, **(headers or {})})
+
+
+def _audit_write(request: Request, client: OrgApiClient, org: Organization, action: str, d: OrgDistribution) -> None:
+    record_audit_event(action=action, resource_type="organization", resource_id=org.id,
+                       ip_address=request.client.host if request.client else None,
+                       details={"api_client": client.client_id, "distribution_id": str(d.id), "version": d.version})
+
+
+@router.patch("/ext/distributions/{dist_id}")
+async def ext_update(dist_id: uuid.UUID, request: Request, ctx=Depends(require_scope("distributions:write")),
+                     db: Session = Depends(get_db)):
+    client, org = ctx
+    body = await _json_body(request)
+    w = _Write(request, db, client, "PATCH /ext/distributions/{id}:%s" % dist_id, body)
+    if w.replay():
+        return w.replay()
+    d = _get(db, org, dist_id)
+    _require_version(request, d)
+    unknown = sorted(set(body) - {"title", "change_note"})
+    if unknown or not body:
+        raise ApiError(422, "invalid_fields")
+    if "title" in body:
+        title = body["title"]
+        if not isinstance(title, str) or not title.strip() or len(title) > 200:
+            raise ApiError(422, "invalid_title")
+        d.title = title.strip()
+    if "change_note" in body:
+        try:
+            d.change_note = orgs.clean_note(body["change_note"])
+        except Exception:  # noqa: BLE001 - 形式の誤りは 422(内容は返さない)
+            raise ApiError(422, "invalid_change_note")
+    _audit_write(request, client, org, "org_api_distribution_updated", d)
+    return w.finish(200, _ext_dist(d), {"ETag": _etag(d)})
+
+
+@router.post("/ext/distributions/{dist_id}/revise")
+async def ext_revise(dist_id: uuid.UUID, request: Request, background: BackgroundTasks,
+                     ctx=Depends(require_scope("distributions:write")), db: Session = Depends(get_db)):
+    client, org = ctx
+    body = await _json_body(request)
+    w = _Write(request, db, client, "POST /ext/distributions/{id}/revise:%s" % dist_id, body)
+    if w.replay():
+        return w.replay()
+    d = _get(db, org, dist_id)
+    _require_version(request, d)
+    if set(body) - {"change_note"}:
+        raise ApiError(422, "invalid_fields")
+    plan = None
+    if d.source_plan_id is not None:
+        plan = db.query(TravelPlan).filter(TravelPlan.id == d.source_plan_id, TravelPlan.deleted_at.is_(None)).first()
+    if plan is None:
+        raise ApiError(409, "source_plan_gone")
+    try:
+        note = orgs.clean_note(body.get("change_note"))
+    except Exception:  # noqa: BLE001
+        raise ApiError(422, "invalid_change_note")
+    new = orgs.build_snapshot(db, plan)
+    changes = orgs.snapshot_changes(d.snapshot or {}, new)
+    d.snapshot, d.version, d.change_note, d.published_at = new, d.version + 1, note, orgs.now()
+    ids = org_api.enqueue(db, org.id, "distribution.revised", {"distribution_id": str(d.id), "version": d.version})
+    _audit_write(request, client, org, "org_api_distribution_revised", d)
+    res = w.finish(200, {**_ext_dist(d), "changes": changes}, {"ETag": _etag(d)})
+    background.add_task(org_api.deliver_pending, ids)
+    return res
+
+
+@router.post("/ext/distributions/{dist_id}/revoke")
+async def ext_revoke(dist_id: uuid.UUID, request: Request, background: BackgroundTasks,
+                     ctx=Depends(require_scope("distributions:write")), db: Session = Depends(get_db)):
+    client, org = ctx
+    body = await _json_body(request)
+    w = _Write(request, db, client, "POST /ext/distributions/{id}/revoke:%s" % dist_id, body)
+    if w.replay():
+        return w.replay()
+    d = _get(db, org, dist_id)
+    _require_version(request, d)
+    if body:
+        raise ApiError(422, "invalid_fields")
+    d.revoked_at = orgs.now()
+    ids = org_api.enqueue(db, org.id, "distribution.revoked", {"distribution_id": str(d.id), "version": d.version})
+    _audit_write(request, client, org, "org_api_distribution_revoked", d)
+    res = w.finish(200, {"id": str(d.id), "version": d.version, "revoked": True})
+    background.add_task(org_api.deliver_pending, ids)
+    return res
 
 
 @router.get("/ext/distributions/{dist_id}/acknowledgements")

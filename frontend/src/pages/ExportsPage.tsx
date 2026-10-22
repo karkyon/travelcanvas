@@ -120,7 +120,7 @@ const ExportsPage: React.FC = () => {
               </label>
             </fieldset>
             {precision === 'exact' && (
-              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded p-2 mt-1" role="note">
+              <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-sm p-2 mt-1" role="note">
                 正確な位置を含むファイルを共有すると、訪問先や行動が特定されるおそれがあります。
               </p>
             )}

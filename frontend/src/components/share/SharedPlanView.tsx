@@ -53,7 +53,7 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
       {days.length > 0 ? (
         <div className="space-y-4">
           {days.map((day, idx) => (
-            <section key={idx} className="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+            <section key={idx} className="bg-white rounded-xl shadow-xs p-5 border border-gray-100">
               <Heading level={titleLevel + 1} className="font-semibold text-gray-900 mb-2">
                 {dayHeading(day.date, day.title, idx)}
               </Heading>
@@ -75,11 +75,11 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-700">まだ日程が登録されていません</div>
+        <div className="bg-white rounded-xl shadow-xs p-8 text-center text-gray-700">まだ日程が登録されていません</div>
       )}
 
       {reservations && (
-        <section className="mt-6 bg-white rounded-xl shadow-sm p-5 border border-gray-100" aria-label="予約の概要">
+        <section className="mt-6 bg-white rounded-xl shadow-xs p-5 border border-gray-100" aria-label="予約の概要">
           <Heading level={titleLevel + 1} className="font-semibold text-gray-900 mb-2">予約の概要</Heading>
           {reservations.length > 0 ? (
             <ul className="space-y-2">

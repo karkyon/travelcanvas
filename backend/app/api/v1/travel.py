@@ -31,8 +31,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
-from app.models.models import TravelPlan, TravelDay, TravelEvent, User
-from app.services import plan_deletion
+from app.models.models import PlanCollaborator, TravelPlan, TravelDay, TravelEvent, User
+from app.services import member_policy, plan_deletion
 from app.services.audit_service import record_audit_event
 from app.schemas.travel_plan import (
     TravelPlanCreate,
@@ -103,6 +103,20 @@ async def create_travel_plan(
         )
 
 
+def _member_view(db: Session, plan: TravelPlan, user: User, role: Optional[str] = None) -> TravelPlanResponse:
+    """[Gate G2] FR-045 参加者に隠す項目: 費用 → 予算(budget)を返さない。予定のメモ・住所 → 旧形式の
+    itinerary(自由形式の JSON。メモ・住所を含みうる)を返さない。所有者には全て返す。"""
+    out = TravelPlanResponse.model_validate(plan)
+    if plan.user_id == user.id:
+        return out
+    hidden = member_policy.hidden_for(db, plan, role or "viewer", user)
+    if "costs" in hidden:
+        out.budget = None
+    if hidden & {"event_notes", "event_address"}:
+        out.itinerary = None
+    return out
+
+
 @router.get("/", response_model=TravelPlanListResponse)
 async def get_travel_plans(
     current_user: User = Depends(get_current_user_or_guest),
@@ -134,7 +148,9 @@ async def get_travel_plans(
         .all()
     )
 
-    return {"plans": plans, "total": total}
+    roles = dict(db.query(PlanCollaborator.plan_id, PlanCollaborator.role).filter(
+        PlanCollaborator.user_id == current_user.id, PlanCollaborator.status == "accepted").all())
+    return {"plans": [_member_view(db, p, current_user, roles.get(p.id)) for p in plans], "total": total}
 
 
 # [Gate #27 / A-011] /test/ping は /{plan_id}(UUID型パスパラメータ)より前に
@@ -239,8 +255,8 @@ async def get_travel_plan(
     db: Session = Depends(get_db),
 ):
     """旅行プラン詳細取得(owner/editor/viewerいずれでも閲覧可能)"""
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    return plan
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    return _member_view(db, plan, current_user, role)
 
 
 @router.put("/{plan_id}", response_model=TravelPlanResponse)
@@ -255,10 +271,12 @@ async def update_travel_plan(
     [Gate #34] itineraryフィールドが含まれる場合は422で拒否する
     (day/eventの正本は/plans/*のみ)。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
 
     update_data = plan_data.dict(exclude_unset=True)
     _reject_itinerary_write(update_data)
+    if "budget" in update_data:
+        member_policy.require_visible(member_policy.hidden_for(db, plan, role, current_user), "costs")
 
     for field, value in update_data.items():
         setattr(plan, field, value)
@@ -266,7 +284,7 @@ async def update_travel_plan(
     try:
         db.commit()
         db.refresh(plan)
-        return plan
+        return _member_view(db, plan, current_user, role)
     except HTTPException:
         raise
     except Exception:

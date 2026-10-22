@@ -34,7 +34,7 @@ from app.core.crypto import (
     encrypt_payload,
 )
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy  # [Gate G2] FR-045 同行者向けの項目の規則
 from app.models.models import (
     EventReservation,
     Reservation,
@@ -358,7 +358,7 @@ def create_reservation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
 
     r = Reservation(
         plan_id=plan.id,
@@ -430,7 +430,7 @@ def list_reservations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
 
     rows = (
         db.query(Reservation)
@@ -466,7 +466,7 @@ def search_reservations(
     `{reservation_id}`より前に定義し、"search"がUUIDとして誤って解釈
     されないようにする。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
 
     has_exact = bool(confirmation_number and confirmation_number.strip())
     has_suffix = bool(confirmation_number_suffix and confirmation_number_suffix.strip())
@@ -527,7 +527,7 @@ def get_reservation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     return _to_response(r)
 
@@ -542,7 +542,7 @@ def update_reservation(
     current_user: User = Depends(get_current_user_or_guest),
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     _require_if_match(r, if_match)
 
@@ -618,7 +618,7 @@ def delete_reservation(
     current_user: User = Depends(get_current_user_or_guest),
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     _require_if_match(r, if_match)
 
@@ -651,7 +651,8 @@ def reveal_reservation(
     (viewerへは既定非公開。DOC-02 FR-021「予約番号・実位置・RESTRICTED
     資料は既定非公開」の方針に整合)。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor",
+                                                        "reservations", "reservation_secrets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     confirmation_number = None
@@ -757,7 +758,7 @@ def create_participant(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     p = ReservationParticipant(
@@ -786,7 +787,7 @@ def list_participants(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     rows = (
@@ -820,7 +821,7 @@ def search_participants(
     `/{reservation_id}/participants/{participant_id}`(3segments)と
     一致しないため、定義順に関わらず衝突しない。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
 
     if not name or not name.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="nameは必須です")
@@ -860,7 +861,7 @@ def update_participant(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     p = _get_participant_or_404(db, r.id, participant_id)
 
@@ -899,7 +900,7 @@ def delete_participant(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     p = _get_participant_or_404(db, r.id, participant_id)
 
@@ -993,7 +994,7 @@ def create_event_link(
     紐付け先イベントは同一planに属している必要がある(他planのイベントを
     誤って紐付けないため)。同一(event_id, reservation_id)の重複は409。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     event = (
@@ -1040,7 +1041,7 @@ def list_event_links(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     rows = (
@@ -1064,7 +1065,7 @@ def update_event_link(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     link = _get_event_link_or_404(db, r.id, link_id)
 
@@ -1092,7 +1093,7 @@ def delete_event_link(
     持たない。ただしis_locked=Trueのリンクは、確定済み予定として誤操作から
     保護するため解除不可とする)。
     """
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     link = _get_event_link_or_404(db, r.id, link_id)
 
@@ -1240,7 +1241,7 @@ def create_ticket(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     t = Ticket(
@@ -1288,7 +1289,7 @@ def list_tickets(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
 
     rows = (
@@ -1311,7 +1312,7 @@ def get_ticket(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     t = _get_ticket_or_404(db, r.id, ticket_id)
     return _to_ticket_response(t)
@@ -1331,7 +1332,7 @@ def update_ticket(
     current_user: User = Depends(get_current_user_or_guest),
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     t = _get_ticket_or_404(db, r.id, ticket_id)
     _require_if_match(t, if_match)
@@ -1384,7 +1385,7 @@ def delete_ticket(
     current_user: User = Depends(get_current_user_or_guest),
     if_match: Optional[str] = Header(None, alias="If-Match"),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     t = _get_ticket_or_404(db, r.id, ticket_id)
     _require_if_match(t, if_match)
@@ -1423,7 +1424,7 @@ def reveal_ticket(
     """
     # まずviewer以上でプラン自体へのアクセスを確認してからticketのshare_policyを見る
     # (存在有無を漏らさないため、権限判定の前にオブジェクトを読む)。
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations", "tickets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
     t = _get_ticket_or_404(db, r.id, ticket_id)
 

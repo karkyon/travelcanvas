@@ -101,7 +101,7 @@ const ActiveSessionsSection: React.FC = () => {
                 <p className="font-medium text-gray-900">
                   {s.device_label}
                   {s.is_current && (
-                    <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800">この端末</span>
+                    <span className="ml-2 rounded-sm bg-blue-100 px-2 py-0.5 text-xs text-blue-800">この端末</span>
                   )}
                 </p>
                 <p className="text-xs text-gray-700">
@@ -115,7 +115,7 @@ const ActiveSessionsSection: React.FC = () => {
                   onClick={() => void revoke(s)}
                   disabled={busyId !== null}
                   aria-label={`「${s.device_label}」(ログイン ${formatDateTime(s.created_at)})をログアウトさせる`}
-                  className="rounded border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="rounded-sm border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
                 >
                   ログアウトさせる
                 </button>
@@ -129,7 +129,7 @@ const ActiveSessionsSection: React.FC = () => {
           type="button"
           onClick={() => void revokeOthers()}
           disabled={busyId !== null}
-          className="mt-3 rounded border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+          className="mt-3 rounded-sm border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
         >
           この端末以外をすべてログアウト
         </button>

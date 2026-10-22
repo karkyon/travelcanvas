@@ -125,7 +125,7 @@ describe('Button Component', () => {
     render(<Button ref={ref}>Button</Button>)
 
     expect(ref).toHaveBeenCalled()
-    expect(ref.mock.calls[0][0]).toBeInstanceOf(HTMLButtonElement)
+    expect(ref.mock.calls[0]?.[0]).toBeInstanceOf(HTMLButtonElement)
   })
 
   it('supports custom className', () => {

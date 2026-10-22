@@ -362,7 +362,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 onChange={(e) => setEditedPlan(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="プランの詳細説明を入力してください"
                 rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -423,7 +423,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                   type="text"
                   placeholder="タグを入力してEnterキーを押してください"
                   onKeyDown={handleTagInput}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>

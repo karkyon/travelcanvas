@@ -694,6 +694,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "20 4 * * 0 cd %s && %s drill --from-latest >> %s/drill.log 2>&1" % (repo_dir, tool, log),
         "# 毎日 03:50 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(B-009)",
         "50 3 * * * cd %s && %s log-scan --since 25h >> %s/log-scan.log 2>&1" % (repo_dir, tool, log),
+        "# [Gate G2] 5分ごと Webhook の失敗した送信の自動の再送(上限に達したら dead)",
+        "*/5 * * * * cd %s && %s jobs webhook-retry >> %s/webhook-retry.log 2>&1" % (repo_dir, tool, log),
         "# 5分ごとの監視(状態が変わった時だけ通知)",
         "*/5 * * * * cd %s && %s monitor --quiet >> %s/monitor.log 2>&1" % (repo_dir, tool, log),
         CRON_END,

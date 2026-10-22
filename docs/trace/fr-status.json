@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r13",
+  "revision": "v5.1-r14",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -165,11 +165,11 @@
   },
   "FR-020": {
    "title": "共同編集",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "C1",
-   "gaps": "カーソル・WebSocket の即時配信"
+   "gates": "C1・G2",
+   "gaps": "文字単位の同時編集(CRDT)は対象外(版の競合を検出する方式)"
   },
   "FR-021": {
    "title": "共有・権限",
@@ -325,11 +325,11 @@
   },
   "FR-040": {
    "title": "管理・監査",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "A2・S11",
-   "gaps": "サポート閲覧(同意・期限)、共有の失効・ジョブ・容量の管理画面"
+   "gates": "A2・S11・G2",
+   "gaps": "濫用の自動検知の画面(FC-097。検知は S6 の運用の道具)"
   },
   "FR-041": {
    "title": "組織・B2B",
@@ -344,8 +344,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "B1",
-   "gaps": "書き込みの API、鍵の切り替え、自動の再送・dead-letter、埋め込み"
+   "gates": "B1・G2",
+   "gaps": "埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ)"
   },
   "FR-043": {
    "title": "Quick Plan",
@@ -365,11 +365,11 @@
   },
   "FR-045": {
    "title": "安全な共有ポリシー",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "F45",
-   "gaps": "同行者(メンバー)向けの項目単位の規則"
+   "gates": "F45・G2",
+   "gaps": "—"
   },
   "FR-046": {
    "title": "画像・PDFの出力",

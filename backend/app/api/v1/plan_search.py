@@ -25,7 +25,7 @@ from app.models.models import (
     Document, DocumentClassification, Expense, Memory, Place, PlanCandidate, PlanCollaborator, Reservation, Ticket,
     TravelDay, TravelEvent, TravelPlan, User,
 )
-from app.services import place_access
+from app.services import member_policy, place_access
 from app.services import plan_search as ps
 from app.utils.rate_limiter import check_rate_limit
 
@@ -83,6 +83,14 @@ def _search_plan(db: Session, plan: TravelPlan, user: User, q: str, filt: Option
     base = f"/planner/{pid}"
     allowed = set(ps.FILTER_CATEGORIES[filt]) if filt else set(ps.CATEGORIES)
     out: Dict[str, List[Dict[str, Any]]] = {c: [] for c in allowed}
+    # [Gate G2] FR-045 所有者が隠した項目は、結果にも件数にも出さない(照合にも使わない)
+    hidden = member_policy.hidden_for(db, plan, resolve_plan_role(db, plan, user), user)
+    for cat, key in (("reservation", "reservations"), ("ticket", "tickets"), ("document", "documents"),
+                     ("expense", "costs"), ("place", "event_address")):
+        if key in hidden:
+            allowed.discard(cat)
+    ev_addr = (lambda e: None) if "event_address" in hidden else (lambda e: e.address)
+    ev_note = (lambda e: None) if "event_notes" in hidden else (lambda e: e.description)
     days = db.query(TravelDay).filter(TravelDay.plan_id == pid).all()
     days_by_id = {d.id: d for d in days}
     plan_today = _local_today(days[0].timezone_id if days else None, now)
@@ -106,19 +114,19 @@ def _search_plan(db: Session, plan: TravelPlan, user: User, q: str, filt: Option
             if e.day_id not in days_by_id:
                 continue
             if filt == "today":
-                matched = ps.score(toks, e.title, [e.address, e.description]) if toks else 50
+                matched = ps.score(toks, e.title, [ev_addr(e), ev_note(e)]) if toks else 50
                 s = matched if e.day_id in today_ids else 0
             elif filt == "hotel":
-                matched = ps.score(toks, e.title, [e.address]) if toks else 50
+                matched = ps.score(toks, e.title, [ev_addr(e)]) if toks else 50
                 s = matched if e.event_type in ps.HOTEL_EVENT_TYPES else 0
             elif filt == "emergency":
-                s = 50 if ps.emergency_text(e.title, e.description) and (not toks or ps.score(toks, e.title)) else 0
+                s = 50 if ps.emergency_text(e.title, ev_note(e)) and (not toks or ps.score(toks, e.title)) else 0
             elif target_day:
                 s = 90 if days_by_id[e.day_id].local_date == target_day else 0
             else:
-                s = ps.score(toks, e.title, [e.address, e.description])
+                s = ps.score(toks, e.title, [ev_addr(e), ev_note(e)])
             if s:
-                out["event"].append(_hit("event", s, e.id, e.title, plan, base, e.address,
+                out["event"].append(_hit("event", s, e.id, e.title, plan, base, ev_addr(e),
                                          when(e.day_id, e.local_start_time)))
     if "place" in allowed:
         place_ids = {r[0] for r in db.query(TravelEvent.place_id).filter(
@@ -145,7 +153,7 @@ def _search_plan(db: Session, plan: TravelPlan, user: User, q: str, filt: Option
                 out["candidate"].append(_hit("candidate", s, c.id, c.title, plan, f"{base}/candidates", c.address))
     if "reservation" in allowed:
         suffix_hash = None
-        if q and filt == "reservation" and ps.is_suffix_query(q):
+        if q and filt == "reservation" and ps.is_suffix_query(q) and "reservation_secrets" not in hidden:
             try:
                 suffix_hash = compute_suffix_lookup_hash(q)
             except Exception:  # noqa: BLE001 - 索引の鍵が無い環境では末尾検索をしない

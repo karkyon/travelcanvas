@@ -14,12 +14,14 @@ interface Props {
   remoteRevision: number | null;
   localRevision: number | undefined;
   offline: boolean;
+  /** [Gate G2] 即時の通知につながっている(他の人の変更がすぐ届く) */
+  live?: boolean;
   onReload: () => void;
   isReloading?: boolean;
 }
 
 const PresenceBar: React.FC<Props> = ({
-  viewers, changes, remoteRevision, localRevision, offline, onReload, isReloading = false,
+  viewers, changes, remoteRevision, localRevision, offline, live = false, onReload, isReloading = false,
 }) => {
   const others = viewers.filter((v) => !v.is_self);
   const remote = othersChanges(changes);
@@ -31,6 +33,7 @@ const PresenceBar: React.FC<Props> = ({
       {others.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
           <span className="font-medium">この旅行を開いている人:</span>
+          {live && <span className="text-xs text-green-800" data-testid="presence-live">(変更はすぐに届きます)</span>}
           <ul className="flex flex-wrap gap-2" aria-label="開いている人の一覧">
             {others.map((v) => (
               <li key={v.user_id} className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-indigo-900">

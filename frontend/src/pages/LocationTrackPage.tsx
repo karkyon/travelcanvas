@@ -85,7 +85,7 @@ const TrackSketch: React.FC<{ points: TrackPoint[]; label: string }> = ({ points
   const span = Math.max(maxLat - minLat, maxLng - minLng) || 1;
   const xy = points.map((p) => `${(((p.longitude - minLng) / span) * 180 + 10).toFixed(1)},${(190 - ((p.latitude - minLat) / span) * 180).toFixed(1)}`);
   return (
-    <svg viewBox="0 0 200 200" width="160" height="160" role="img" aria-label={label} className="border border-gray-200 rounded bg-gray-50">
+    <svg viewBox="0 0 200 200" width="160" height="160" role="img" aria-label={label} className="border border-gray-200 rounded-sm bg-gray-50">
       <polyline points={xy.join(' ')} fill="none" stroke="#1d4ed8" strokeWidth="3" strokeLinejoin="round" />
     </svg>
   );
@@ -509,11 +509,11 @@ const LocationTrackPage: React.FC = () => {
               )}
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-sm text-gray-800">名前
-                  <input className="ml-1 border rounded px-2 py-1 text-gray-900" value={zoneLabel} maxLength={40}
+                  <input className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={zoneLabel} maxLength={40}
                     onChange={(e) => setZoneLabel(e.target.value)} placeholder="自宅" />
                 </label>
                 <label className="text-sm text-gray-800">半径
-                  <select className="ml-1 border rounded px-2 py-1 text-gray-900" value={zoneRadius}
+                  <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={zoneRadius}
                     onChange={(e) => setZoneRadius(Number(e.target.value))}>
                     {ZONE_RADII.map((r) => <option key={r} value={r}>{r}m</option>)}
                   </select>
@@ -605,7 +605,7 @@ const LocationTrackPage: React.FC = () => {
                 )}
                 <label className="block text-sm text-gray-800">
                   精度
-                  <select className="block mt-1 border rounded px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as TrackPrecision)}>
+                  <select className="block mt-1 border rounded-sm px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as TrackPrecision)}>
                     {(['high', 'standard', 'low'] as TrackPrecision[]).map((p) => (
                       <option key={p} value={p}>{`${PRECISION[p].label}(${PRECISION[p].description})`}</option>
                     ))}
@@ -662,10 +662,10 @@ const LocationTrackPage: React.FC = () => {
                               <legend className="text-sm text-gray-800">時間帯を指定して消す</legend>
                               <div className="flex flex-wrap gap-2 items-end">
                                 <label className="text-sm text-gray-800">開始
-                                  <input type="datetime-local" className="block border rounded px-2 py-1" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
+                                  <input type="datetime-local" className="block border rounded-sm px-2 py-1" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
                                 </label>
                                 <label className="text-sm text-gray-800">終了
-                                  <input type="datetime-local" className="block border rounded px-2 py-1" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
+                                  <input type="datetime-local" className="block border rounded-sm px-2 py-1" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
                                 </label>
                                 <Button size="sm" variant="outline" disabled={busy} onClick={() => removeRange(t)}>この時間帯を消す</Button>
                               </div>

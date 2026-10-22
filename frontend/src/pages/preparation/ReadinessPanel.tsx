@@ -51,7 +51,7 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
           {(Object.keys(READINESS_CATEGORY_LABEL) as Array<keyof typeof READINESS_CATEGORY_LABEL>)
             .filter((c) => readiness.counts.by_category[c] > 0)
             .map((c) => (
-              <li key={c} className="text-sm px-2 py-1 rounded bg-gray-100 text-gray-800">
+              <li key={c} className="text-sm px-2 py-1 rounded-sm bg-gray-100 text-gray-800">
                 {READINESS_CATEGORY_LABEL[c]} {readiness.counts.by_category[c]}件
               </li>
             ))}
@@ -66,10 +66,10 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded ${SEVERITY_CLASS[item.severity]}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-sm ${SEVERITY_CLASS[item.severity]}`}>
                         {SEVERITY_LABEL[item.severity]}
                       </span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800">
+                      <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">
                         {READINESS_CATEGORY_LABEL[item.category]}
                       </span>
                       <span className="font-medium text-gray-900">{item.title}</span>

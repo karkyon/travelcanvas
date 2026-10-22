@@ -42,7 +42,7 @@ const SyncStatusBar: React.FC<{ planId: string }> = ({ planId }) => {
             type="button"
             onClick={() => syncPending(planId)}
             disabled={isSyncing}
-            className="flex items-center gap-1 px-3 py-1 rounded border border-amber-800 text-amber-900 disabled:opacity-50"
+            className="flex items-center gap-1 px-3 py-1 rounded-sm border border-amber-800 text-amber-900 disabled:opacity-50"
           >
             <RefreshCw size={14} aria-hidden="true" />
             {isSyncing ? '送信中' : '今すぐ同期'}
@@ -58,7 +58,7 @@ const SyncStatusBar: React.FC<{ planId: string }> = ({ planId }) => {
           <button
             type="button"
             onClick={() => navigate(`/planner/${planId}/sync`)}
-            className="px-3 py-1 rounded border border-red-800 text-red-900"
+            className="px-3 py-1 rounded-sm border border-red-800 text-red-900"
           >
             競合を確認する
           </button>

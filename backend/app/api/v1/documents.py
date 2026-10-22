@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import auth_manager, get_current_session_id, get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     Document,
     DocumentClassification,
@@ -75,6 +75,9 @@ from app.services.storage_backend import (
     validate_upload,
 )
 from app.core.config import settings
+
+# [Gate G2] FR-045 所有者が「documents」を隠した参加者には、この機能の全ての API が 403
+require_plan_access = member_policy.guarded("documents")
 
 router = APIRouter(prefix="/plans", tags=["documents"])
 logger = logging.getLogger("travelcanvas")

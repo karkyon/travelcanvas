@@ -171,8 +171,8 @@ const BranchesPage: React.FC = () => {
                         <div>
                           <p className="font-medium text-gray-900">
                             {b.title}
-                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-800">{SCENARIO_LABEL[b.scenario_type]}</span>
-                            <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-900">{STATE_LABEL[b.state]}</span>
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded-sm bg-gray-100 text-gray-800">{SCENARIO_LABEL[b.scenario_type]}</span>
+                            <span className="ml-1 text-xs px-1.5 py-0.5 rounded-sm bg-blue-50 text-blue-900">{STATE_LABEL[b.state]}</span>
                           </p>
                           <p className="text-xs text-gray-700 mt-1">
                             {b.created_by_name} ・ 追加{b.summary.added} 外す{b.summary.removed} 変更{b.summary.updated}

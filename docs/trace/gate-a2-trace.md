@@ -18,8 +18,8 @@ U = vitest、E = `frontend/e2e/admin.spec.ts`。
 | 8 | 管理者の閲覧・操作の監査 | IMPLEMENTED | 一覧・詳細・監査ログを見たことを残す(検索語・メールアドレスは残さない)。B |
 | 9 | 検索の LIKE の特殊文字 | IMPLEMENTED | `%`・`_` を文字として扱う(以前は `%` で全件が当たった)。B |
 | 10 | 応答の形の検査 | IMPLEMENTED | 管理者の5つの API を decoder で検査(以前は型の付いていない取得)。U `a2admin.test`・contract |
-| 11 | サポート閲覧(同意・目的・時間制限) | NOT STARTED | — |
-| 12 | 共有の失効・外部連携障害・ジョブ・容量の管理画面 | NOT STARTED | 運用の道具(tcops.py monitor・/metrics)にはあるが、管理者の画面には無い |
+| 11 | サポート閲覧(同意・目的・時間制限) | NOT STARTED | — ※ **SUPERSEDED BY Gate G2(本人の許可・目的・1〜72時間・読み取り専用・監査・本人への知らせ。gate-g2-trace.md #G2-40)** |
+| 12 | 共有の失効・外部連携障害・ジョブ・容量の管理画面 | NOT STARTED | 運用の道具(tcops.py monitor・/metrics)にはあるが、管理者の画面には無い ※ **SUPERSEDED BY Gate G2(管理者の「運用とサポート」画面。gate-g2-trace.md #G2-40)** |
 
 → INTEGRATED(部分、E2E有)。
 

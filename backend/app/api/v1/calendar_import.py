@@ -22,10 +22,13 @@ from app.api.v1 import plans as plans_api
 from app.api.v1.branches import _apply_time
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import TravelDay, TravelEvent, TravelPlan, User
 from app.services import calendar_import as ci
 from app.services.audit_service import record_audit_event
+
+# [Gate G2] FR-045 所有者が「event_address・event_notes」のどれかを隠した参加者には、この機能の API は 403
+require_plan_access = member_policy.guarded("event_address", "event_notes")
 
 router = APIRouter(prefix="/plans", tags=["calendar-import"])
 MAX_APPLY = 500

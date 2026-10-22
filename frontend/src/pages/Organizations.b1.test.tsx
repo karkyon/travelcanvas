@@ -15,6 +15,8 @@ const m = vi.hoisted(() => ({
   pingOrgWebhook: vi.fn(), getOrgWebhookDeliveries: vi.fn(), redeliverOrgWebhook: vi.fn(),
   getDistribution: vi.fn(), getDistributionAcks: vi.fn(), acknowledgeDistribution: vi.fn(), forkDistribution: vi.fn(),
   reviseDistribution: vi.fn(), revokeDistribution: vi.fn(),
+  rotateOrgApiClientSecret: vi.fn(), retireOrgApiClientPrevious: vi.fn(), rotateOrgWebhookSecret: vi.fn(),
+  retireOrgWebhookPrevious: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ default: m, api: m }));
 
@@ -125,6 +127,38 @@ describe('組織の画面 (Gate B1)', () => {
     expect(within(log).getByText(/失敗\(500\)/)).toBeInTheDocument();
     await userEvent.click(within(log).getByRole('button', { name: '送り直す' }));
     await waitFor(() => expect(m.redeliverOrgWebhook).toHaveBeenCalledWith(ORG, fx.webhook_created.id, fx.webhook_deliveries[1]!.id));
+  });
+});
+
+describe('外部連携の秘密・鍵の切り替え (Gate G2 FR-042)', () => {
+  it('秘密を猶予つきで切り替え(新しい秘密は1回だけ表示)、前の秘密をすぐ失効する。dead の送信は送り直せる', async () => {
+    m.getOrganization.mockResolvedValue(admin);
+    const rotated = fx.api_client_rotated;
+    m.getOrgApiClients.mockResolvedValue({ ...fx.g2_api_clients });
+    m.rotateOrgApiClientSecret.mockResolvedValue(rotated);
+    m.retireOrgApiClientPrevious.mockResolvedValue(fx.api_client_retired);
+    m.getOrgWebhooks.mockResolvedValue({ ...fx.g2_webhooks });
+    m.rotateOrgWebhookSecret.mockResolvedValue(fx.webhook_rotated);
+    m.getOrgWebhookDeliveries.mockResolvedValue(fx.g2_webhook_deliveries);
+    m.redeliverOrgWebhook.mockResolvedValue(fx.g2_webhook_redelivered);
+    at(`/organizations/${ORG}`);
+    const name = fx.g2_api_clients.clients[0]!.name;
+    expect(await screen.findByText(/前の秘密は .* まで使えます/)).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText(/切り替えの猶予/));
+    await userEvent.type(screen.getByLabelText(/切り替えの猶予/), '48');
+    await userEvent.click(screen.getByRole('button', { name: `API クライアント「${name}」の秘密を切り替える` }));
+    await waitFor(() => expect(m.rotateOrgApiClientSecret).toHaveBeenCalledWith(ORG, fx.g2_api_clients.clients[0]!.id, 48));
+    expect(await screen.findByLabelText('client_secret')).toHaveValue('tcs_FIXTURE_PLACEHOLDER');
+    await userEvent.click(screen.getByRole('button', { name: `API クライアント「${name}」の前の秘密をすぐ失効する` }));
+    await waitFor(() => expect(m.retireOrgApiClientPrevious).toHaveBeenCalledWith(ORG, fx.g2_api_clients.clients[0]!.id, true));
+    const hook = fx.g2_webhooks.webhooks[0]!;
+    await userEvent.click(screen.getByRole('button', { name: `Webhook「${hook.url}」の署名の鍵を切り替える` }));
+    await waitFor(() => expect(m.rotateOrgWebhookSecret).toHaveBeenCalledWith(ORG, hook.id, 48));
+    await userEvent.click(screen.getByRole('button', { name: `Webhook「${hook.url}」の送信の記録` }));
+    const log = await screen.findByRole('list', { name: /送信の記録/ });
+    expect(within(log).getByText(/送り直しの上限に達しました/)).toBeInTheDocument();
+    await userEvent.click(within(log).getByRole('button', { name: '送り直す' }));
+    await waitFor(() => expect(m.redeliverOrgWebhook).toHaveBeenCalled());
   });
 });
 

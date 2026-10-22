@@ -74,7 +74,8 @@ export interface ForkResult {
   version: number;
 }
 
-export type OrgApiScope = 'distributions:read' | 'acknowledgements:read';
+/** [Gate G2] distributions:write(題名・お知らせの変更・改訂・停止)を追加 */
+export type OrgApiScope = 'distributions:read' | 'distributions:write' | 'acknowledgements:read';
 
 export interface OrgApiClient {
   id: string;
@@ -86,6 +87,13 @@ export interface OrgApiClient {
   created_at: string | null;
   last_used_at: string | null;
   revoked_at: string | null;
+  /** [Gate G2] 秘密の版(切り替えるたびに1つ上がる) */
+  secret_version: number;
+  secret_rotated_at: string | null;
+  /** [Gate G2] 前の秘密でもトークンを取れる期限(無ければ null) */
+  previous_secret_valid_until: string | null;
+  /** retire-previous の応答だけ: 失効させたトークンの数 */
+  tokens_revoked?: number;
 }
 
 export interface OrgApiClientList {
@@ -103,6 +111,10 @@ export interface OrgWebhook {
   secret: string | null;
   created_at: string | null;
   revoked_at: string | null;
+  /** [Gate G2] 署名の鍵の版・前の鍵でも署名する期限・自動で止めた理由(receiver_gone: 受け手が 410 を返した) */
+  secret_version: number;
+  previous_secret_valid_until: string | null;
+  disabled_reason: string | null;
 }
 
 export interface OrgWebhookList {
@@ -114,10 +126,14 @@ export interface OrgWebhookDelivery {
   id: string;
   event_id: string;
   event_type: string;
-  status: 'pending' | 'delivered' | 'failed';
+  /** [Gate G2] dead: 自動の再送の上限に達した(手で送り直せる) */
+  status: 'pending' | 'delivered' | 'failed' | 'dead';
   attempts: number;
   last_status_code: number | null;
   last_error: string | null;
   created_at: string | null;
   delivered_at: string | null;
+  /** [Gate G2] 次に自動で送る時刻(pending・failed の間だけ) */
+  next_attempt_at: string | null;
+  max_attempts: number;
 }

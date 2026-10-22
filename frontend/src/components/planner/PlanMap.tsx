@@ -166,7 +166,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
                   <p className="text-gray-500 text-xs">{candidate.provider}経由の候補</p>
                   {onAddCandidateToItinerary && candidate.candidate_id && (
                     <button
-                      className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                      className="px-2 py-1 bg-blue-500 text-white rounded-sm text-xs hover:bg-blue-600"
                       onClick={() => onAddCandidateToItinerary(candidate.candidate_id!, candidate.name)}
                     >
                       旅程に追加

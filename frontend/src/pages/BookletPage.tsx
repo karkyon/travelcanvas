@@ -166,7 +166,7 @@ const BookletPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div>
                   <label htmlFor="booklet-density" className="block text-sm font-medium text-gray-800">密度</label>
-                  <select id="booklet-density" className="w-full border rounded px-2 py-1" value={options.density}
+                  <select id="booklet-density" className="w-full border rounded-sm px-2 py-1" value={options.density}
                     onChange={(e) => setOptions((o) => ({ ...o, density: e.target.value as BookletOptions['density'] }))}>
                     <option value="normal">標準</option>
                     <option value="compact">詰める</option>
@@ -174,7 +174,7 @@ const BookletPage: React.FC = () => {
                 </div>
                 <div>
                   <label htmlFor="booklet-format" className="block text-sm font-medium text-gray-800">主な用途</label>
-                  <select id="booklet-format" className="w-full border rounded px-2 py-1" value={options.format}
+                  <select id="booklet-format" className="w-full border rounded-sm px-2 py-1" value={options.format}
                     onChange={(e) => setOptions((o) => ({ ...o, format: e.target.value as BookletOptions['format'] }))}>
                     <option value="print">印刷・PDF</option>
                     <option value="web">Web表示</option>
@@ -215,10 +215,10 @@ const BookletPage: React.FC = () => {
                 </div>
               </fieldset>
               {sensitive && (
-                <div className="mt-3 p-2 rounded border border-amber-300 bg-amber-50 text-amber-900 text-sm" role="note" data-testid="sensitive-warning">
+                <div className="mt-3 p-2 rounded-sm border border-amber-300 bg-amber-50 text-amber-900 text-sm" role="note" data-testid="sensitive-warning">
                   <p>機密情報を含む版には、作成者名の透かしと有効期限を印字します。印刷物やPDFは紛失・転送に注意し、期限後は破棄してください。</p>
                   <label htmlFor="booklet-valid-until" className="block mt-2 font-medium">有効期限(90日以内)</label>
-                  <input id="booklet-valid-until" type="date" className="border rounded px-2 py-1 bg-white text-gray-900" value={validUntil}
+                  <input id="booklet-valid-until" type="date" className="border rounded-sm px-2 py-1 bg-white text-gray-900" value={validUntil}
                     onChange={(e) => setValidUntil(e.target.value)} />
                 </div>
               )}
@@ -236,10 +236,10 @@ const BookletPage: React.FC = () => {
               {exportsList.length === 0 ? <p className="text-sm text-gray-700">まだ版はありません。</p> : (
                 <ul className="space-y-2 text-sm" aria-label="作成した版">
                   {exportsList.map((x) => (
-                    <li key={x.id} className="border rounded p-2" data-testid={`booklet-export-${x.version_no}`}>
+                    <li key={x.id} className="border rounded-sm p-2" data-testid={`booklet-export-${x.version_no}`}>
                       <p className="font-medium">
-                        第{x.version_no}版 <span className="ml-1 text-xs px-1.5 rounded bg-gray-100 text-gray-800">{EXPORT_STATE_LABEL[x.state]}</span>
-                        {x.is_stale && x.state === 'active' && <span className="ml-1 text-xs px-1.5 rounded bg-amber-100 text-amber-900">旅程が更新済み</span>}
+                        第{x.version_no}版 <span className="ml-1 text-xs px-1.5 rounded-sm bg-gray-100 text-gray-800">{EXPORT_STATE_LABEL[x.state]}</span>
+                        {x.is_stale && x.state === 'active' && <span className="ml-1 text-xs px-1.5 rounded-sm bg-amber-100 text-amber-900">旅程が更新済み</span>}
                       </p>
                       <p className="text-xs text-gray-700">
                         {formatDateTime(x.created_at)} ・ {x.created_by_name}{x.is_mine ? '(自分)' : ''} ・ {describeIncludes(x.includes)}

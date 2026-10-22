@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     Budget,
     Document,
@@ -51,6 +51,9 @@ from app.services import finance
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
+
+# [Gate G2] FR-045 所有者が「costs」を隠した参加者には、この機能の全ての API が 403
+require_plan_access = member_policy.guarded("costs")
 
 router = APIRouter(prefix="/plans", tags=["finance"])
 

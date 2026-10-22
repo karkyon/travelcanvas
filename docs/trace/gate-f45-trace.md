@@ -29,7 +29,7 @@ CA-002「表示項目選択」「所有者が共有プレビューで公開内�
 | 6 | 所有者以外は使えない | IMPLEMENTED | プレビューは owner 以外 403/404。B |
 | 7 | 監査(共有の発行・変更・失効・削除) | IMPLEMENTED | `share_link_created/updated/revoked/deleted`。details は項目名・権限・合言葉/期限の有無・回数上限・変えた設定の名前だけ(トークン・合言葉・プランの内容を残さない。B で検査)。閲覧は従来どおり ShareAccessLog |
 | 8 | 公開閲覧の画面 | IMPLEMENTED | `components/share/SharedPlanView`(公開閲覧とプレビューで共通)。住所・メモ・予約の概要は届いた時だけ表示、見出しが無ければ日付。axe 違反0。U・E |
-| 9 | URL共有・同行者共有・公開画像・PDF ごとに別の Policy | PARTIAL | URL 共有は本Gate。PDF・画像(しおり)は FR-035 の出力ごとの選択(予約番号・住所・電話・参加者、既定で除外)が既にある。同行者(メンバー)は役割(閲覧者/編集者)で制御し、項目単位の規則は未対応 |
+| 9 | URL共有・同行者共有・公開画像・PDF ごとに別の Policy | PARTIAL | URL 共有は本Gate。PDF・画像(しおり)は FR-035 の出力ごとの選択(予約番号・住所・電話・参加者、既定で除外)が既にある。同行者(メンバー)は役割(閲覧者/編集者)で制御し、項目単位の規則は未対応 ※ **SUPERSEDED BY Gate G2(同行者向けの項目の規則 app/services/member_policy.py。gate-g2-trace.md #G2-45)** |
 | 10 | QR/バーコードの Reveal に再認証 | NOT IN SCOPE | 共有リンクでは QR を見せない(RESTRICTED)。本人の Reveal は既存の reveal API |
 
 → INTEGRATED(E2E有)。#9 は同行者向けの項目単位の規則が残る(PARTIAL)。

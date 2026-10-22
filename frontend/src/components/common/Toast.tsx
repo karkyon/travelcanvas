@@ -159,7 +159,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
     >
       <div className="p-4">
         <div className="flex items-start">
-          <div className={`flex-shrink-0 ${style.iconColor}`}>
+          <div className={`shrink-0 ${style.iconColor}`}>
             {style.icon}
           </div>
           
@@ -176,7 +176,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
             {toast.action && (
               <div className="mt-3">
                 <button
-                  className="text-sm font-medium underline hover:no-underline focus:outline-none"
+                  className="text-sm font-medium underline hover:no-underline focus:outline-hidden"
                   onClick={toast.action.onClick}
                 >
                   {toast.action.label}
@@ -186,9 +186,9 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
           </div>
           
           {toast.closable && (
-            <div className="ml-4 flex-shrink-0">
+            <div className="ml-4 shrink-0">
               <button
-                className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
+                className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-hidden focus:text-gray-600 transition-colors"
                 onClick={handleClose}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

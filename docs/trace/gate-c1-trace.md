@@ -15,7 +15,7 @@ B = backend `tests/test_gate_c1_collaboration.py`、U = vitest、E = `frontend/e
 | 6 | 削除競合を検出する | IMPLEMENTED | 相手が消した予定は「保存する前にほかの人が削除しました」。U `PlannerPage.collab.test` |
 | 7 | 参加者だけ・名前にメールを出さない・外れた人は数えない | IMPLEMENTED | B `test_presence_access_and_hygiene`(403・422・TTL・外れた人・消えた予定) |
 | 8 | Redis で全プロセス共有・届かない時はプロセス内 | IMPLEMENTED | B `test_presence_in_redis_is_shared_and_expires`(Redis に届く環境だけ) |
-| 9 | カーソルの表示・即時の配信(WebSocket) | NOT STARTED | ADR §1(問い合わせを選んだ理由) |
+| 9 | カーソルの表示・即時の配信(WebSocket) | NOT STARTED | ADR §1(問い合わせを選んだ理由) ※ **SUPERSEDED BY Gate G2(Server-Sent Events の即時の通知 `GET /plans/{id}/events/stream`。gate-g2-trace.md #G2-20)** |
 
 → INTEGRATED(部分、E2E有)。
 

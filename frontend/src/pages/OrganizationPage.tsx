@@ -7,6 +7,8 @@
  * - メンバー(管理者): 会員のメールアドレスで足す・役割(オーナーだけ変えられる)・外す。最後のオーナーは外せない
  * - 外部連携(管理者): API クライアント(OAuth 2.0 client_credentials。秘密は作った時だけ表示)、
  *   Webhook(https だけ。署名の鍵は作った時だけ表示)・接続の確かめ・送信の記録と送り直し
+ * - [Gate G2] FR-042 秘密・署名の鍵の切り替え(新しい値は1回だけ表示。前の値は猶予の間だけ通る/署名に使う)・
+ *   前の値の即時の失効・送り直しの上限に達した送信(dead)の手の送り直し・受け手が 410 を返して止まった Webhook の表示
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -20,9 +22,13 @@ import type { TravelPlan } from '@/types';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { fmtDateTime, isOrgAdmin, myAckLabel, ROLE_LABEL } from '@/utils/organizations';
 
-const sectionClass = 'bg-white rounded-xl shadow-sm p-6 mb-6';
+const sectionClass = 'bg-white rounded-xl shadow-xs p-6 mb-6';
 const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg';
 const btn = 'px-3 py-2 rounded-lg text-sm disabled:opacity-50';
+// [Gate G2] 送信の状態の表示(dead: 自動の再送の上限に達した。手で送り直せる)
+const DELIVERY_LABEL: Record<OrgWebhookDelivery['status'], string> = {
+  pending: '送信待ち', delivered: '届いた', failed: '失敗', dead: '送り直しの上限に達しました',
+};
 
 const OrganizationPage: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
@@ -43,6 +49,8 @@ const OrganizationPage: React.FC = () => {
   const [newHook, setNewHook] = useState<{ url: string; events: OrgWebhookEvent[] }>({ url: '', events: ['distribution.published', 'distribution.revised'] });
   const [createdHook, setCreatedHook] = useState<OrgWebhook | null>(null);
   const [deliveries, setDeliveries] = useState<Record<string, OrgWebhookDelivery[]>>({});
+  // [Gate G2] 秘密・鍵の切り替えの猶予(時間)
+  const [graceHours, setGraceHours] = useState(24);
 
   const admin = isOrgAdmin(org?.role);
 
@@ -193,7 +201,7 @@ const OrganizationPage: React.FC = () => {
                           <select id={`role-${m.id}`} value={m.role} disabled={busy}
                             onChange={(e) => run(() => api.changeOrgMemberRole(orgId, m.id, e.target.value as OrgRole),
                               '役割を変えました', '役割を変えられませんでした')}
-                            className="px-2 py-1 border border-gray-300 rounded">
+                            className="px-2 py-1 border border-gray-300 rounded-sm">
                             {(['owner', 'admin', 'member'] as OrgRole[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                           </select>
                         </>
@@ -246,12 +254,22 @@ const OrganizationPage: React.FC = () => {
               <h3 className="font-semibold text-gray-900 mb-2">API クライアント</h3>
               {createdClient?.client_secret && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-lg" role="status">
-                  <p className="text-sm text-amber-900 font-medium">秘密は今だけ表示されます。安全な場所に控えてください。</p>
+                  <p className="text-sm text-amber-900 font-medium">
+                    秘密は今だけ表示されます。安全な場所に控えてください。{createdClient.secret_version > 1 ? `(版 ${createdClient.secret_version})` : ''}
+                  </p>
                   <p className="text-sm text-gray-900 mt-1">client_id: <code>{createdClient.client_id}</code></p>
                   <label htmlFor="client-secret" className="block text-sm text-gray-900 mt-1">client_secret</label>
                   <input id="client-secret" readOnly value={createdClient.client_secret} className={`${inputClass} font-mono text-sm`} />
                 </div>
               )}
+              <div className="mb-3">
+                <label htmlFor="grace-hours" className="block text-sm font-medium text-gray-800 mb-1">
+                  切り替えの猶予(時間)— この間は前の秘密・鍵も使えます(0〜168)
+                </label>
+                <input id="grace-hours" type="number" min={0} max={168} value={graceHours}
+                  onChange={(e) => setGraceHours(Math.max(0, Math.min(168, Number(e.target.value) || 0)))}
+                  className={`${inputClass} max-w-[8rem]`} />
+              </div>
               <ul className="space-y-2 mb-3">
                 {clients?.clients.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-200 rounded-lg p-3 text-sm">
@@ -259,13 +277,32 @@ const OrganizationPage: React.FC = () => {
                       <p className="font-medium text-gray-900">{c.name}{c.revoked_at ? '(止めました)' : ''}</p>
                       <p className="text-gray-700"><code>{c.client_id}</code>・{c.scopes.join(' ')}
                         {c.last_used_at ? `・最後の利用 ${fmtDateTime(c.last_used_at)}` : '・未使用'}</p>
+                      <p className="text-gray-700">秘密の版 {c.secret_version}
+                        {c.secret_rotated_at ? `・切り替え ${fmtDateTime(c.secret_rotated_at)}` : ''}
+                        {c.previous_secret_valid_until ? `・前の秘密は ${fmtDateTime(c.previous_secret_valid_until)} まで使えます` : ''}</p>
                     </div>
                     {!c.revoked_at && (
-                      <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」を止める`}
-                        onClick={() => run(() => api.revokeOrgApiClient(orgId, c.id), 'API クライアントを止めました', '止められませんでした')}
-                        className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}>
-                        止める
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」の秘密を切り替える`}
+                          onClick={() => run(async () => setCreatedClient(await api.rotateOrgApiClientSecret(orgId, c.id, graceHours)),
+                            null, '秘密を切り替えられませんでした')}
+                          className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}>
+                          秘密を切り替える
+                        </button>
+                        {c.previous_secret_valid_until && (
+                          <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」の前の秘密をすぐ失効する`}
+                            onClick={() => run(() => api.retireOrgApiClientPrevious(orgId, c.id, true),
+                              '前の秘密と、発行済みのトークンを失効しました', '失効できませんでした')}
+                            className={`${btn} border border-amber-400 text-amber-900 hover:bg-amber-50`}>
+                            前の秘密をすぐ失効
+                          </button>
+                        )}
+                        <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」を止める`}
+                          onClick={() => run(() => api.revokeOrgApiClient(orgId, c.id), 'API クライアントを止めました', '止められませんでした')}
+                          className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}>
+                          止める
+                        </button>
+                      </div>
                     )}
                   </li>
                 ))}
@@ -315,6 +352,11 @@ const OrganizationPage: React.FC = () => {
                       <div>
                         <p className="font-medium text-gray-900 break-all">{h.url}{h.revoked_at ? '(止めました)' : ''}</p>
                         <p className="text-gray-700">{h.events.map((ev) => hooks.events[ev] ?? ev).join('・')}</p>
+                        <p className="text-gray-700">署名の鍵の版 {h.secret_version}
+                          {h.previous_secret_valid_until ? `・${fmtDateTime(h.previous_secret_valid_until)} まで前の鍵でも署名します` : ''}</p>
+                        {h.disabled_reason === 'receiver_gone' && (
+                          <p className="text-red-800">受け手が「もう無い」(410)と返したため、自動で止めました。</p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         {!h.revoked_at && (
@@ -335,6 +377,22 @@ const OrganizationPage: React.FC = () => {
                           送信の記録
                         </button>
                         {!h.revoked_at && (
+                          <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                            aria-label={`Webhook「${h.url}」の署名の鍵を切り替える`}
+                            onClick={() => run(async () => setCreatedHook(await api.rotateOrgWebhookSecret(orgId, h.id, graceHours)),
+                              null, '署名の鍵を切り替えられませんでした')}>
+                            鍵を切り替える
+                          </button>
+                        )}
+                        {!h.revoked_at && h.previous_secret_valid_until && (
+                          <button type="button" disabled={busy} className={`${btn} border border-amber-400 text-amber-900 hover:bg-amber-50`}
+                            aria-label={`Webhook「${h.url}」の前の鍵での署名をやめる`}
+                            onClick={() => run(() => api.retireOrgWebhookPrevious(orgId, h.id), '前の鍵での署名をやめました',
+                              'やめられませんでした')}>
+                            前の鍵をやめる
+                          </button>
+                        )}
+                        {!h.revoked_at && (
                           <button type="button" disabled={busy} className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}
                             aria-label={`Webhook「${h.url}」を止める`}
                             onClick={() => run(() => api.revokeOrgWebhook(orgId, h.id), 'Webhook を止めました', '止められませんでした')}>
@@ -349,10 +407,11 @@ const OrganizationPage: React.FC = () => {
                         {deliveries[h.id]!.map((d) => (
                           <li key={d.id} className="flex items-center justify-between gap-2 text-gray-800">
                             <span>
-                              {d.event_type}・{d.status === 'delivered' ? '届いた' : d.status === 'failed' ? '失敗' : '送信待ち'}
-                              {d.last_status_code ? `(${d.last_status_code})` : d.last_error ? `(${d.last_error})` : ''}・{d.attempts}回・{fmtDateTime(d.created_at)}
+                              {d.event_type}・{DELIVERY_LABEL[d.status]}
+                              {d.last_status_code ? `(${d.last_status_code})` : d.last_error ? `(${d.last_error})` : ''}・{d.attempts}/{d.max_attempts}回・{fmtDateTime(d.created_at)}
+                              {d.next_attempt_at ? `・次の自動の再送 ${fmtDateTime(d.next_attempt_at)}` : ''}
                             </span>
-                            {d.status === 'failed' && !h.revoked_at && (
+                            {(d.status === 'failed' || d.status === 'dead') && !h.revoked_at && (
                               <button type="button" disabled={busy} className="text-blue-800 underline"
                                 onClick={() => run(async () => {
                                   await api.redeliverOrgWebhook(orgId, h.id, d.id);

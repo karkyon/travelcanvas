@@ -197,7 +197,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   type="text"
                   value={editData.title}
                   onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                  className="border-b border-blue-400 bg-transparent focus:outline-none"
+                  className="border-b border-blue-400 bg-transparent focus:outline-hidden"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : title}
@@ -230,7 +230,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
 
           {/* Travel Info */}
           {travelMethod && travelTime && (
-            <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mb-2">
+            <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-sm mb-2">
               <span>{getTravelMethodIcon(travelMethod)}</span>
               <span>移動: {formatDuration(travelTime)}</span>
               {travelCost && <span>• {formatCurrency(travelCost)}</span>}
@@ -250,7 +250,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               setIsEditing(true);
             }}
-            className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
+            className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
             title="編集"
           >
             <Edit3 size={14} />
@@ -260,7 +260,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onShare?.(id);
             }}
-            className="p-1 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded transition-colors"
+            className="p-1 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
             title="共有"
           >
             <Share2 size={14} />
@@ -270,7 +270,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onDelete?.(id);
             }}
-            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
             title="削除"
           >
             <Trash2 size={14} />
@@ -306,7 +306,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                 <textarea
                   value={editData.notes}
                   onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                  className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-2 text-sm border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={2}
                   placeholder="メモを追加..."
                 />
@@ -358,13 +358,13 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             <div className="flex gap-2 mt-4">
               <button
                 onClick={handleSaveEdit}
-                className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                className="px-3 py-1 bg-blue-500 text-white text-sm rounded-sm hover:bg-blue-600"
               >
                 保存
               </button>
               <button
                 onClick={handleCancelEdit}
-                className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                className="px-3 py-1 bg-gray-500 text-white text-sm rounded-sm hover:bg-gray-600"
               >
                 キャンセル
               </button>

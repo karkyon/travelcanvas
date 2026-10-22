@@ -11,16 +11,17 @@
 
 | trace | 題 | NOT STARTED | PARTIAL | SUPERSEDED |
 |---|---|---|---|---|
-| [gate-a2-trace.md](gate-a2-trace.md) | Gate A2 トレース(FR-040 管理・監査)と E2E の安定化 | 2 | 0 | 0 |
+| [gate-a2-trace.md](gate-a2-trace.md) | Gate A2 トレース(FR-040 管理・監査)と E2E の安定化 | 0 | 0 | 2 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |
-| [gate-b1-trace.md](gate-b1-trace.md) | Gate B1 トレース(FR-041 組織・B2B / FR-042 API・Webhook の最小形) | 3 | 2 | 0 |
-| [gate-c1-trace.md](gate-c1-trace.md) | Gate C1 トレース(FR-020 共同編集・FR-023 秘匿プロフィール) | 1 | 0 | 0 |
+| [gate-b1-trace.md](gate-b1-trace.md) | Gate B1 トレース(FR-041 組織・B2B / FR-042 API・Webhook の最小形) | 2 | 1 | 3 |
+| [gate-c1-trace.md](gate-c1-trace.md) | Gate C1 トレース(FR-020 共同編集・FR-023 秘匿プロフィール) | 0 | 0 | 1 |
 | [gate-c2-trace.md](gate-c2-trace.md) | Gate C2 トレース(FR-007 候補箱・FR-008 場所の一元管理) | 5 | 0 | 0 |
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
-| [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 1 | 0 |
-| [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 5 | 1 | 1 |
+| [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
+| [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 4 | 1 | 2 |
+| [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
@@ -78,7 +79,6 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間 |
 | FR-019 | What-if | INTEGRATED(部分) | 予約・移動・費用の分岐、移動時間・制約・費用差の比較 |
-| FR-020 | 共同編集 | INTEGRATED(部分) | カーソル・WebSocket の即時配信 |
 | FR-022 | 合意形成 | INTEGRATED(部分) | 決定した候補の予定への反映、締切 |
 | FR-024 | コメント・通知 | INTEGRATED(部分) | 予定・予約・費用単位のコメント画面、リマインド、メール通知 |
 | FR-027 | 予算・費用 | INTEGRATED(部分) | 予算の版、為替の自動取得、他通貨の予約額の合計 |
@@ -87,10 +87,8 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-036 | Calendar/Map IO | INTEGRATED(部分) | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
 | FR-037 | 写真・旅行記 | INTEGRATED(部分) | 旅行記の公開URL、顔の検査、MEMORY MAP、記録の Undo |
 | FR-039 | 輸出・削除 | INTEGRATED(部分) | 猶予つきのアカウント削除、所有者の移譲、出典つきの訂正 |
-| FR-040 | 管理・監査 | INTEGRATED(部分) | サポート閲覧(同意・期限)、共有の失効・ジョブ・容量の管理画面 |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち) |
-| FR-042 | API・埋込 | INTEGRATED(部分) | 書き込みの API、鍵の切り替え、自動の再送・dead-letter、埋め込み |
-| FR-045 | 安全な共有ポリシー | INTEGRATED(部分) | 同行者(メンバー)向けの項目単位の規則 |
+| FR-042 | API・埋込 | INTEGRATED(部分) | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |
 | FR-048 | Offline Travel Pack(端末) | INTEGRATED(部分) | 予定以外のオフライン編集、通信しない端末の遠隔消去 |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | 候補の層、地図タイルの上への表示 |

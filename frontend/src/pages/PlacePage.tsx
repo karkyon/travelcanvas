@@ -139,10 +139,10 @@ const PlacePage: React.FC = () => {
                   <div key={f.key}>
                     <label className="block text-sm text-gray-800">{f.label}
                       {f.long ? (
-                        <textarea className="mt-1 w-full border rounded px-2 py-1 text-gray-900" rows={2} value={form[f.key]}
+                        <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" rows={2} value={form[f.key]}
                           disabled={!place.can_edit} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
                       ) : (
-                        <input className="mt-1 w-full border rounded px-2 py-1 text-gray-900" value={form[f.key]}
+                        <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form[f.key]}
                           disabled={!place.can_edit} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
                       )}
                     </label>
@@ -154,11 +154,11 @@ const PlacePage: React.FC = () => {
                   </div>
                 ))}
                 <label className="block text-sm text-gray-800">別名(「、」区切り)
-                  <input className="mt-1 w-full border rounded px-2 py-1 text-gray-900" value={form.aliases}
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.aliases}
                     disabled={!place.can_edit} onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
                 </label>
                 <label className="block text-sm text-gray-800">予約
-                  <select className="ml-2 border rounded px-2 py-1 text-gray-900" value={form.reservation_required}
+                  <select className="ml-2 border rounded-sm px-2 py-1 text-gray-900" value={form.reservation_required}
                     disabled={!place.can_edit}
                     onChange={(e) => setForm({ ...form, reservation_required: e.target.value as Form['reservation_required'] })}>
                     <option value="">分からない</option>
@@ -182,17 +182,17 @@ const PlacePage: React.FC = () => {
                 {hours.map((h, i) => (
                   <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-gray-800">
                     <label>曜日
-                      <select className="ml-1 border rounded px-2 py-1 text-gray-900" value={h.day_of_week} disabled={!place.can_edit}
+                      <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.day_of_week} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, day_of_week: Number(e.target.value) } : x)))}>
                         {DAYS.map((d, k) => <option key={k} value={k}>{d}</option>)}
                       </select>
                     </label>
                     <label>開く
-                      <input type="time" className="ml-1 border rounded px-2 py-1 text-gray-900" value={h.open_time} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.open_time} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, open_time: e.target.value } : x)))} />
                     </label>
                     <label>閉じる
-                      <input type="time" className="ml-1 border rounded px-2 py-1 text-gray-900" value={h.close_time} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.close_time} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, close_time: e.target.value } : x)))} />
                     </label>
                     {h.close_time < h.open_time && <span>(日をまたぐ)</span>}

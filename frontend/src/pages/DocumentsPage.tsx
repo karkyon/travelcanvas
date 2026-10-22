@@ -22,6 +22,7 @@ import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl } from '@/services/api';
 import type { TravelDocument, DocumentClassification } from '@/services/api';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 const CLASSIFICATION_OPTIONS: { value: DocumentClassification; label: string }[] = [
   { value: 'public', label: '公開' },
@@ -65,7 +66,7 @@ const DocumentsPage: React.FC = () => {
       const data = await getDocuments(planId);
       setDocuments(data);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '文書一覧の取得に失敗しました');
+      setError(errorDetailMessage(e, '文書一覧の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +112,7 @@ const DocumentsPage: React.FC = () => {
       await deleteDocument(planId, doc.id, doc.revision);
       await loadDocuments();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '文書の削除に失敗しました');
+      setError(errorDetailMessage(e, '文書の削除に失敗しました'));
     }
   };
 

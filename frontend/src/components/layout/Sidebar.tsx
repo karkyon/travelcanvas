@@ -23,7 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* デスクトップサイドバー */}
       <div className={`
-        hidden lg:flex lg:flex-shrink-0 transition-all duration-300 ease-in-out
+        hidden lg:flex lg:shrink-0 transition-all duration-300 ease-in-out
         ${isOpen ? 'lg:w-64' : 'lg:w-0'}
       `}>
         <div className={`

@@ -261,6 +261,9 @@ jobs:
           DOCUMENT_DOWNLOAD_SIGNING_KEY=ci-only-dummy-download-signing-key-not-used-anywhere-else
           # [Gate S11] 予約番号の盲検索(R3-13)。omega-dev2 の .env と同じく設定する(未設定だと予約の検索が 503)
           LOOKUP_INDEX_KEY=ci-only-dummy-lookup-index-key-not-used-anywhere-else
+          # [Gate G2] SEC-F4 backend は表の読み書きだけのロール(tc_app)で接続する。migrate サービスがロールを作る
+          DB_APP_PASSWORD=ci-only-dummy-app-role-password-0123456789
+          APP_DATABASE_URL=postgresql://tc_app:ci-only-dummy-app-role-password-0123456789@postgres:5432/travelcanvas
           VITE_API_URL=http://localhost:8001
           EOF
 
@@ -279,8 +282,12 @@ jobs:
           docker compose logs backend
           exit 1
 
-      - name: Alembic upgrade head (コンテナ内)
-        run: docker compose exec -T backend alembic upgrade head
+      # [Gate G2] SEC-F4 migration は compose の migrate サービス(所有者の資格情報)が backend の起動前に流す。
+      # backend は tc_app で接続し、表を作る・変える・消す・migration の版を書き換えることができないことを確かめる
+      - name: DB の権限の分離の確認 (ブロッキング)
+        run: |
+          docker compose logs migrate | tail -5
+          docker compose exec -T backend python -m app.ops.db_roles check --expect-app
 
       - name: Wait for frontend
         run: |

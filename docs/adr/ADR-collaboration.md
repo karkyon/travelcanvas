@@ -50,3 +50,14 @@
 
 `a9d4e7c2f8b3`: `user_private_profiles`・`private_profile_links`(plan_id は ON DELETE CASCADE)、`constraints.profile_item_id`。
 downgrade はプロフィールから作った秘匿制約を削除済みにしてから列・表を消す。
+
+## 追記: 即時の通知(Gate G2、2026-10-21)
+
+- 問い合わせ(ポーリング)に加えて、`GET /plans/{id}/events/stream`(Server-Sent Events。サーバーから画面へ一方向に送り続ける
+  HTTP の仕組み)で「版が上がった(revision)」「開いている人・編集中の予定が変わった(presence)」をその場で知らせる。
+  画面は知らせを受けたらすぐ `POST /presence` で中身を取る(送る内容は従来の問い合わせと同じ。通知には予定の内容を載せない)。
+- WebSocket ではなく SSE にした理由: 片方向で足りる・HTTP のまま認証(Authorization)・CORS・CSP・回数制限がそのまま使える・
+  途中の機器を選ばない。EventSource はヘッダーを付けられないため、画面は fetch で読む(`frontend/src/utils/sse.ts`)。
+- 接続は45秒で閉じ、`Last-Event-ID`(知っている版)でつなぎ直す。旅行を見られなくなると `access_lost` で閉じる。
+  1人あたり4本まで。つながっている間の問い合わせの間隔は20秒(開いていることを知らせ続けるため0にしない)。
+- 文字単位の同時編集(CRDT)は対象外。同じ予定の同時の保存は従来どおり版の競合(409)で止め、黙って上書きしない。

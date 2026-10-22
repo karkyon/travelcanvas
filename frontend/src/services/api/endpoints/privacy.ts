@@ -4,11 +4,16 @@
  * [Gate P9] backend/app/api/v1/privacy.py。/privacy/account-deletion・/privacy/consents。
  * 削除は取り消せないため、確認の文字と(登録ユーザーは)パスワードを送る。
  * 失敗は各画面が理由を表示するため、共通エラー処理(toast・401時の/login遷移)を通さない(auth.tsと同じ)。
+ * [Gate G2] FR-040 サポートへの閲覧の許可(/privacy/support-grants。本人だけが作る・取り消す。パスワードで本人確認)。
  */
 import type { AxiosRequestConfig } from 'axios';
 import { CalendarImportApi } from './calendarImport';
-import type { AccountDeletionPreview, AccountDeletionResult, ConsentPurpose, ConsentState } from '../types';
+import type {
+  AccountDeletionPreview, AccountDeletionResult, ConsentPurpose, ConsentState, SupportGrant, SupportGrantInput,
+  SupportGrantList,
+} from '../types';
 import { decodeResponse } from '../decode';
+import type { G2Types } from '../decodersG2';
 import { accountDeletionPreview, accountDeletionResult, consentState } from '../decoders';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
@@ -33,5 +38,23 @@ export class PrivacyApi extends CalendarImportApi {
     const body = password ? { confirmation, password } : { confirmation };
     const response = await this.client.post('/privacy/account-deletion', body, SILENT);
     return decodeResponse(response.data, accountDeletionResult, 'POST /privacy/account-deletion');
+  }
+
+  /** [Gate G2] 応答の検証(decoder は使う時に読み込む。最初に読む JS を小さく保つため) */
+  protected async g2<K extends keyof G2Types>(req: Promise<{ data: unknown }>, key: K): Promise<G2Types[K]> {
+    const [response, { decodeG2 }] = await Promise.all([req, import('../decodersG2')]);
+    return decodeG2(key, response.data);
+  }
+
+  getSupportGrants(): Promise<SupportGrantList> {
+    return this.g2(this.client.get('/privacy/support-grants', SILENT), 'supportGrantList');
+  }
+
+  createSupportGrant(input: SupportGrantInput): Promise<SupportGrant> {
+    return this.g2(this.client.post('/privacy/support-grants', input, SILENT), 'supportGrant');
+  }
+
+  revokeSupportGrant(grantId: string): Promise<SupportGrant> {
+    return this.g2(this.client.post(`/privacy/support-grants/${grantId}/revoke`, {}, SILENT), 'supportGrant');
   }
 }

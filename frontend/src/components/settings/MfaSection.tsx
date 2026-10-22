@@ -207,7 +207,7 @@ const MfaSection: React.FC = () => {
           <LocalQrCode value={setup.otpauth_uri} size={180} label="認証アプリに登録する QR コード" />
           <div>
             <p className="text-sm font-medium text-gray-700">手入力用のキー</p>
-            <code className="block break-all rounded bg-gray-100 px-2 py-1 text-sm text-gray-900" data-testid="mfa-secret"
+            <code className="block break-all rounded-sm bg-gray-100 px-2 py-1 text-sm text-gray-900" data-testid="mfa-secret"
               data-secret={setup.secret}>
               {groupSecret(setup.secret)}
             </code>
@@ -231,7 +231,7 @@ const MfaSection: React.FC = () => {
             端末をなくした時に、確認コードの代わりに1回ずつ使えます。この画面を閉じると二度と表示されません。
             印刷するか、パスワード管理アプリなどの安全な場所に保存してください。
           </p>
-          <ul className="grid grid-cols-2 gap-1 rounded bg-gray-100 p-3 font-mono text-sm text-gray-900"
+          <ul className="grid grid-cols-2 gap-1 rounded-sm bg-gray-100 p-3 font-mono text-sm text-gray-900"
             data-testid="mfa-recovery-codes">
             {codes.map((c) => <li key={c}>{c}</li>)}
           </ul>

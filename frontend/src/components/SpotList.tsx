@@ -169,7 +169,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             {categories.map(cat => (
               <option key={cat.value} value={cat.value}>
@@ -222,11 +222,11 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                   </h3>
                   
                   <div className="flex items-center space-x-2 mb-2">
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-sm">
                       {getCategoryLabel(spot.category)}
                     </span>
                     {spot.price_range && (
-                      <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                      <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-sm">
                         {spot.price_range}
                       </span>
                     )}

@@ -22,9 +22,17 @@ export default defineConfig(({ mode }) => {
     },
   }],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      // [Gate G2] DEP-1 React Router 7 の package.json は開発版だけを指す(警告の文言・検査を含む)。
+      // build(vite build)では同じ版の本番用(dist/production)を使う。開発サーバー・vitest は開発版のまま
+      ...(mode === 'production'
+        ? [
+          { find: /^react-router$/, replacement: path.resolve(__dirname, 'node_modules/react-router/dist/production/index.mjs') },
+          { find: /^react-router\/dom$/, replacement: path.resolve(__dirname, 'node_modules/react-router/dist/production/dom-export.mjs') },
+        ]
+        : []),
+    ],
   },
   server: {
     host: '0.0.0.0',
@@ -49,6 +57,7 @@ export default defineConfig(({ mode }) => {
     // [Gate S2] 以前は常に source map を出し、配信先から元のソース一式を取得できた。
     // 調査で必要な時だけ VITE_SOURCEMAP=true で作る
     sourcemap: env.VITE_SOURCEMAP === 'true',
+    minify: 'terser',
   },
   }
 })

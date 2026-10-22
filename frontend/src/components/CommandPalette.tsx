@@ -21,11 +21,16 @@ const FILTERS: Array<{ value: SearchFilter; label: string }> = [
 ];
 const DEBOUNCE_MS = 250;
 
-const CommandPalette: React.FC = () => {
+interface Props {
+  /** [Gate G2] 読み込み中に Ctrl+K・ボタンで開くよう求められていた時は、開いた状態で始める(CommandPaletteLauncher) */
+  defaultOpen?: boolean;
+}
+
+const CommandPalette: React.FC<Props> = ({ defaultOpen = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPlan = planIdFromPath(location.pathname);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<SearchFilter | null>(null);
   const [scope, setScope] = useState<'plan' | 'all'>('plan');
@@ -125,10 +130,10 @@ const CommandPalette: React.FC = () => {
         aria-haspopup="dialog" aria-label="検索(Ctrl+K)">
         <Search size={16} aria-hidden="true" />
         <span className="hidden lg:inline text-sm">検索</span>
-        <kbd className="hidden lg:inline text-xs text-gray-700 border border-gray-300 rounded px-1">Ctrl K</kbd>
+        <kbd className="hidden lg:inline text-xs text-gray-700 border border-gray-300 rounded-sm px-1">Ctrl K</kbd>
       </button>
       {open && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-20 px-4"
+        <div className="fixed inset-0 z-60 bg-black/40 flex items-start justify-center pt-20 px-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div role="dialog" aria-modal="true" aria-label="検索" className="w-full max-w-2xl bg-white rounded-xl shadow-2xl">
             <div className="p-3 border-b border-gray-200">
@@ -170,7 +175,7 @@ const CommandPalette: React.FC = () => {
                   <ul>
                     {planHits.map((p) => (
                       <li key={p.plan_id}>
-                        <button type="button" className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-gray-900"
+                        <button type="button" className="w-full text-left px-3 py-2 rounded-sm hover:bg-gray-100 text-gray-900"
                           onClick={() => go(p.link)}>{p.title}</button>
                       </li>
                     ))}
@@ -190,10 +195,10 @@ const CommandPalette: React.FC = () => {
                         return (
                           <li key={`${h.category}-${h.id}`} id={`cp-${h.category}-${h.id}`} role="option" aria-selected={i === active}
                             onMouseEnter={() => setActive(i)} onClick={() => go(h.link)}
-                            className={`px-3 py-2 rounded cursor-pointer ${i === active ? 'bg-indigo-50' : ''}`}>
+                            className={`px-3 py-2 rounded-sm cursor-pointer ${i === active ? 'bg-indigo-50' : ''}`}>
                             <div className="flex flex-wrap items-baseline gap-2">
                               <span className="font-medium text-gray-900">{h.title}</span>
-                              {h.badge && <span className="text-xs px-1.5 rounded bg-amber-100 text-amber-900">{h.badge}</span>}
+                              {h.badge && <span className="text-xs px-1.5 rounded-sm bg-amber-100 text-amber-900">{h.badge}</span>}
                               {h.when && <span className="text-xs text-gray-700">{h.when}</span>}
                               {effectiveScope === 'all' && <span className="text-xs text-gray-700">{h.plan_title}</span>}
                             </div>

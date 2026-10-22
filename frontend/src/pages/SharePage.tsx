@@ -29,6 +29,7 @@ import type { ShareLink, Collaborator, ShareFieldKey, SharePolicyCatalog, ShareP
 import { errorDetailMessage } from '../utils/apiErrorDetail';
 import SharedPlanView from '../components/share/SharedPlanView';
 import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
+import MemberPolicyPanel from '@/components/share/MemberPolicyPanel';
 import LocalQrCode from '../components/share/LocalQrCode';
 
 const PRESET_BUTTONS: Array<{ value: SharePreset; label: string }> = [
@@ -263,11 +264,11 @@ const SharePage: React.FC = () => {
   const getStatusBadge = (status: Collaborator['status']) => {
     switch (status) {
       case 'accepted':
-        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">参加済み</span>;
+        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-sm">参加済み</span>;
       case 'pending':
-        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">招待中</span>;
+        return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-sm">招待中</span>;
       case 'declined':
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">辞退</span>;
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-sm">辞退</span>;
       default:
         return null;
     }
@@ -275,12 +276,12 @@ const SharePage: React.FC = () => {
 
   const getShareStatusBadge = (share: ShareLink) => {
     if (share.revoked_at) {
-      return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">失効済み</span>;
+      return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-sm">失効済み</span>;
     }
     if (!share.is_active) {
-      return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">無効(期限切れ/上限到達)</span>;
+      return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-sm">無効(期限切れ/上限到達)</span>;
     }
-    return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">有効</span>;
+    return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-sm">有効</span>;
   };
 
   if (isLoading) {
@@ -326,7 +327,7 @@ const SharePage: React.FC = () => {
           {/* 左列: 共有設定 */}
           <div className="space-y-6">
             {/* URL共有 */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-xl shadow-xs p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Link size={20} />
                 URL共有
@@ -422,7 +423,7 @@ const SharePage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => showLinkPreview(share)}
-                        className="p-2 text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                        className="p-2 text-blue-800 hover:bg-blue-50 rounded-sm transition-colors"
                         aria-label={`共有リンク「...${share.token_prefix}」で見える内容を確認`}
                         title="見える内容を確認"
                       >
@@ -431,7 +432,7 @@ const SharePage: React.FC = () => {
                       {!share.revoked_at && (
                         <button
                           onClick={() => handleRevokeShare(share.id)}
-                          className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
+                          className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded-sm transition-colors"
                           title="失効させる"
                           aria-label={`共有リンク「...${share.token_prefix}」を失効させる`}
                         >
@@ -452,7 +453,7 @@ const SharePage: React.FC = () => {
             </div>
 
             {/* 新規共有リンクの設定 */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-xl shadow-xs p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Settings size={20} />
                 新しい共有リンクを発行
@@ -592,7 +593,7 @@ const SharePage: React.FC = () => {
           {/* 右列: コラボレーター管理 */}
           <div className="space-y-6">
             {/* メール招待 */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-xl shadow-xs p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Mail size={20} />
                 メール招待
@@ -653,7 +654,7 @@ const SharePage: React.FC = () => {
             </div>
 
             {/* コラボレーター一覧 */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-xl shadow-xs p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Users size={20} />
                 コラボレーター ({collaborators.length})
@@ -683,7 +684,7 @@ const SharePage: React.FC = () => {
 
                       <button
                         onClick={() => handleRemoveCollaborator(collaborator.id)}
-                        className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
+                        className="p-2 text-red-700 hover:text-red-900 hover:bg-red-50 rounded-sm transition-colors"
                         title="削除"
                         aria-label={`${collaborator.email} を削除`}
                       >
@@ -700,11 +701,14 @@ const SharePage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* [Gate G2] FR-045 参加者に見せない項目(所有者だけに表示) */}
+            <MemberPolicyPanel planId={planId!} reloadKey={collaborators.length} />
           </div>
         </div>
 
         {/* [Gate F45] 共有前プレビュー(閲覧者に見える内容。使用回数を消費しない) */}
-        <section className="mt-8 bg-white rounded-xl shadow-sm p-6" aria-labelledby="share-preview-heading">
+        <section className="mt-8 bg-white rounded-xl shadow-xs p-6" aria-labelledby="share-preview-heading">
           <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
             <Eye size={20} aria-hidden="true" />
             閲覧者に見える内容

@@ -30,6 +30,7 @@ import {
   rejectImportJob,
 } from '@/services/api';
 import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 const STATUS_LABEL: Record<string, string> = {
   uploaded: 'アップロード済み',
@@ -103,7 +104,7 @@ const ImportsPage: React.FC = () => {
       const data = await getImportJobs(planId);
       setJobs(data);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '取込ジョブ一覧の取得に失敗しました');
+      setError(errorDetailMessage(e, '取込ジョブ一覧の取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +121,7 @@ const ImportsPage: React.FC = () => {
       const detail = await getImportJob(planId, job.id);
       setSelected(detail);
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブ詳細の取得に失敗しました');
+      setError(errorDetailMessage(e, 'ジョブ詳細の取得に失敗しました'));
     } finally {
       setIsDetailLoading(false);
     }
@@ -149,7 +150,7 @@ const ImportsPage: React.FC = () => {
       setConsentGiven(false);
       await loadJobs();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの作成に失敗しました');
+      setError(errorDetailMessage(e, 'ジョブの作成に失敗しました'));
     } finally {
       setIsCreating(false);
     }
@@ -167,7 +168,7 @@ const ImportsPage: React.FC = () => {
       setNewValue('');
       await refreshDetail();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の追加に失敗しました');
+      setError(errorDetailMessage(e, '候補の追加に失敗しました'));
     } finally {
       setIsAddingCandidate(false);
     }
@@ -179,7 +180,7 @@ const ImportsPage: React.FC = () => {
       await acceptExtractionCandidate(planId, selected.id, candidateId);
       await refreshDetail();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の承認に失敗しました');
+      setError(errorDetailMessage(e, '候補の承認に失敗しました'));
     }
   };
 
@@ -189,7 +190,7 @@ const ImportsPage: React.FC = () => {
       await rejectExtractionCandidate(planId, selected.id, candidateId);
       await refreshDetail();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '候補の却下に失敗しました');
+      setError(errorDetailMessage(e, '候補の却下に失敗しました'));
     }
   };
 
@@ -205,7 +206,7 @@ const ImportsPage: React.FC = () => {
         navigate(`/planner/${planId}/reservations`);
       }
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの確定に失敗しました(acceptされた候補にtypeが必要です)');
+      setError(errorDetailMessage(e, 'ジョブの確定に失敗しました(acceptされた候補にtypeが必要です)'));
     } finally {
       setIsConfirming(false);
     }
@@ -219,7 +220,7 @@ const ImportsPage: React.FC = () => {
       await loadJobs();
       closeDetail();
     } catch (e) {
-      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'ジョブの却下に失敗しました');
+      setError(errorDetailMessage(e, 'ジョブの却下に失敗しました'));
     }
   };
 
@@ -271,7 +272,7 @@ const ImportsPage: React.FC = () => {
                   type="button"
                   onClick={() => openDetail(j)}
                   aria-haspopup="dialog"
-                  className="w-full text-left p-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="w-full text-left p-4 rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -341,7 +342,7 @@ const ImportsPage: React.FC = () => {
                       <div className="text-sm text-gray-600">候補がまだ登録されていません</div>
                     )}
                     {selected.candidates.map((c) => (
-                      <div key={c.id} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-2">
+                      <div key={c.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2">
                         <div className="min-w-0">
                           <span className="font-medium">{c.field_path}</span>
                           <span className="text-gray-600"> = </span>

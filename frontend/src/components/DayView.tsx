@@ -259,7 +259,7 @@ const DayView: React.FC<DayViewProps> = ({
               {/* ドロップゾーン */}
               {dragState.isDragging && (
                 <div
-                  className="h-2 rounded bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
+                  className="h-2 rounded-sm bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.currentTarget.classList.add('opacity-100');
@@ -314,7 +314,7 @@ const DayView: React.FC<DayViewProps> = ({
         {/* 最後のドロップゾーン */}
         {dragState.isDragging && day.events.length > 0 && (
           <div
-            className="h-2 rounded bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
+            className="h-2 rounded-sm bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
             onDragOver={(e) => {
               e.preventDefault();
               e.currentTarget.classList.add('opacity-100');

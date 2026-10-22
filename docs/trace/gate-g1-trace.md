@@ -23,7 +23,7 @@ B2 = `backend/tests/test_gate_g1_doc10.py`、B3 = `backend/tests/test_gate_g1_ci
 | 13 | SEC-F2 | 鍵の一覧(用途・切り替え方・影響)、用途を越えた同じ値・弱い鍵の検出、起動時の検査 | IMPLEMENTED | `app/core/key_inventory.py`、`docs/ops/KEY-INVENTORY.md`、`tcops.py keys check`、本番の起動の拒否。B1 `test_reuse_problems_*`・`test_key_inventory_document_lists_every_key`・`test_production_requires_separate_offline_pack_key` |
 | 14 | SEC-F2 | `LOOKUP_INDEX_KEY` を替えた後の索引の作り直し | IMPLEMENTED | `backfill_lookup_index --all`。B1 `test_lookup_index_rebuild_after_key_change` |
 | 15 | SEC-F3 | KMS / Secret Manager | NOT STARTED | 本番環境(PROD)と同時 |
-| 16 | SEC-F4 | DB の権限の分離 | NOT STARTED | 次の Gate |
+| 16 | SEC-F4 | DB の権限の分離 | NOT STARTED | 次の Gate ※ **SUPERSEDED BY Gate G2(tc_app・tc_backup・tc_readonly_monitor、compose の migrate。gate-g2-trace.md #SEC-F4)** |
 | 17 | SEC-F5 | 鍵の破棄による削除 | NOT STARTED | ADR-key-rotation §3 |
 | 18 | CI-01 | main の保護の設定を監査の記録として保存 | IMPLEMENTED | `ci_gate.py export` → `docs/ops/evidence/branch-protection.json`(トークンのある omega-dev2 のパッチが作る)。B3 `test_protection_evidence_records_policy_without_secrets`・`test_recorded_branch_protection_meets_policy` |
 | 19 | CI-02 | JUnit・E2E の報告・SBOM を合否に関わらず保存 | IMPLEMENTED | `.github/workflows/ci.yml`(upload-artifact、30〜90日)。B3 `test_workflow_keeps_results_and_checks_evidence` |

@@ -10,7 +10,7 @@ from app.api.v1 import (
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
-    organizations, org_external,
+    organizations, org_external, admin_support, member_policy,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -452,6 +452,10 @@ app.include_router(travel.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 # [Gate #24] admin.pyも同様にinclude_routerされておらず、/admin/*は一切到達不能だった。
 app.include_router(admin.router, prefix="/api/v1")
+# [Gate G2] FR-040 サポート閲覧(本人の許可つき・読み取り専用・監査)と運用の要約
+app.include_router(admin_support.router, prefix="/api/v1")
+# [Gate G2] FR-045 同行者向けの項目の規則
+app.include_router(member_policy.router, prefix="/api/v1")
 # [Gate #30] 認証不要の共有トークン解決API。share.router(owner専用管理API)
 # とはpath prefixレベルで完全に分離している(/public/share vs /travel-plans)。
 app.include_router(public_share.router, prefix="/api/v1")

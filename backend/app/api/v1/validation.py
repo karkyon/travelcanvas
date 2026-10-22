@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import PlanConstraint, TravelPlan, User, ValidationIssue, ValidationRun
 from app.services import feasibility
 from app.services.constraint_evaluation import decrypt_private_payload, load_constraints_for_evaluation
@@ -161,12 +161,23 @@ def _shared_titles(db: Session, run: ValidationRun) -> Dict[uuid.UUID, Optional[
     }
 
 
-def _counts(run: ValidationRun) -> Dict[str, int]:
-    return {"error": run.error_count, "warning": run.warning_count, "info": run.info_count,
-            "unverified": run.unverified_count}
+def _visible_issues(run: ValidationRun, hidden) -> List[ValidationIssue]:
+    """[Gate G2] FR-045 隠された予約・費用から作られた問題は出さない(件数にも数えない)。"""
+    return [i for i in run.issues if not member_policy.validation_issue_hidden(hidden, i.code, i.entity_type)]
 
 
-def _summary(run: ValidationRun, viewer: User, current_fingerprint: str) -> Dict[str, Any]:
+def _counts(run: ValidationRun, hidden=member_policy.EMPTY) -> Dict[str, int]:
+    if not (hidden & {"reservations", "costs"}):
+        return {"error": run.error_count, "warning": run.warning_count, "info": run.info_count,
+                "unverified": run.unverified_count}
+    issues = _visible_issues(run, hidden)
+    return {"error": sum(1 for i in issues if i.kind == "violation" and i.severity == "ERROR"),
+            "warning": sum(1 for i in issues if i.kind == "violation" and i.severity == "WARNING"),
+            "info": sum(1 for i in issues if i.kind == "violation" and i.severity == "INFO"),
+            "unverified": sum(1 for i in issues if i.kind == "unverified")}
+
+
+def _summary(run: ValidationRun, viewer: User, current_fingerprint: str, hidden=member_policy.EMPTY) -> Dict[str, Any]:
     return {
         "id": str(run.id),
         "plan_id": str(run.plan_id),
@@ -177,7 +188,7 @@ def _summary(run: ValidationRun, viewer: User, current_fingerprint: str) -> Dict
         "started_at": _iso(run.started_at),
         "finished_at": _iso(run.finished_at),
         "created_by_me": run.created_by_user_id == viewer.id,
-        "counts": _counts(run),
+        "counts": _counts(run, hidden),
     }
 
 
@@ -207,7 +218,8 @@ def _issue_response(issue: ValidationIssue, viewer: User, shared: Dict[uuid.UUID
     }
 
 
-def _detail(db: Session, run: ValidationRun, viewer: User, current_fingerprint: str) -> Dict[str, Any]:
+def _detail(db: Session, run: ValidationRun, viewer: User, current_fingerprint: str,
+            hidden=member_policy.EMPTY) -> Dict[str, Any]:
     shared = _shared_titles(db, run)
     private = _private_titles(db, run, viewer)
     summary = run.summary_json or {}
@@ -224,10 +236,10 @@ def _detail(db: Session, run: ValidationRun, viewer: User, current_fingerprint: 
             "constraint_title": (private.get(cid) if is_mine else None) if is_private else shared.get(cid),
         })
     return {
-        **_summary(run, viewer, current_fingerprint),
+        **_summary(run, viewer, current_fingerprint, hidden),
         "unchecked": dict(summary.get("unchecked", {})),
         "constraint_results": results,
-        "issues": [_issue_response(i, viewer, shared, private) for i in run.issues],
+        "issues": [_issue_response(i, viewer, shared, private) for i in _visible_issues(run, hidden)],
     }
 
 
@@ -239,9 +251,9 @@ def create_validation_run(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     run = _run_validation(db, plan, current_user)
-    return _detail(db, run, current_user, feasibility.compute_fingerprint(db, plan))
+    return _detail(db, run, current_user, feasibility.compute_fingerprint(db, plan), hidden)
 
 
 @router.get("/{plan_id}/validation-runs", response_model=List[dict])
@@ -251,7 +263,7 @@ def list_validation_runs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     fingerprint = feasibility.compute_fingerprint(db, plan)
     runs = (
         db.query(ValidationRun)
@@ -260,7 +272,7 @@ def list_validation_runs(
         .limit(limit)
         .all()
     )
-    return [_summary(r, current_user, fingerprint) for r in runs]
+    return [_summary(r, current_user, fingerprint, hidden) for r in runs]
 
 
 @router.get("/{plan_id}/validation-runs/{run_id}", response_model=dict)
@@ -270,9 +282,9 @@ def get_validation_run(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     rid = _parse_uuid(run_id, "検証結果が見つかりません")
     run = db.query(ValidationRun).filter(ValidationRun.id == rid, ValidationRun.plan_id == plan.id).first()
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="検証結果が見つかりません")
-    return _detail(db, run, current_user, feasibility.compute_fingerprint(db, plan))
+    return _detail(db, run, current_user, feasibility.compute_fingerprint(db, plan), hidden)

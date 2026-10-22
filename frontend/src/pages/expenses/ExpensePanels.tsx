@@ -41,7 +41,7 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      {e.kind === 'refund' && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">返金</span>}
+                      {e.kind === 'refund' && <span className="text-xs px-2 py-0.5 rounded-sm bg-green-100 text-green-800">返金</span>}
                       <span className="font-medium text-gray-900">{e.title}</span>
                       <span className="text-sm text-gray-800">
                         {e.kind === 'refund' ? '-' : ''}{formatMoney(e.amount, e.currency)}
@@ -49,7 +49,7 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
                       {e.currency !== e.base_currency && (
                         e.is_converted
                           ? <span className="text-xs text-gray-700">(≒ {formatMoney(e.base_amount, e.base_currency)}、レート {e.fx_rate})</span>
-                          : <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-900">未換算(集計に含まれません)</span>
+                          : <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-100 text-amber-900">未換算(集計に含まれません)</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-700 mt-0.5">
@@ -129,7 +129,7 @@ export const SettlementPanel: React.FC<SettlementProps> = ({ summary, settlement
         ) : (
           <ul className="space-y-2" aria-label="精算案">
             {summary.transfers.map((t) => (
-              <li key={`${t.from_user_id}-${t.to_user_id}`} className="flex flex-wrap items-center justify-between gap-2 p-2 border rounded">
+              <li key={`${t.from_user_id}-${t.to_user_id}`} className="flex flex-wrap items-center justify-between gap-2 p-2 border rounded-sm">
                 <span className="text-sm">{t.from_name} → {t.to_name}: {formatMoney(t.amount, cur)}</span>
                 <Button variant="outline" size="sm" onClick={() => onRecord(t)}>支払いを記録</Button>
               </li>
@@ -145,7 +145,7 @@ export const SettlementPanel: React.FC<SettlementProps> = ({ summary, settlement
         ) : (
           <ul className="space-y-2" aria-label="精算の記録">
             {settlements.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-2 border rounded">
+              <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-2 border rounded-sm">
                 <span className="text-sm">
                   {s.from_name} → {s.to_name}: {formatMoney(s.amount, s.currency)}{s.settled_on ? `(${s.settled_on})` : ''}
                 </span>

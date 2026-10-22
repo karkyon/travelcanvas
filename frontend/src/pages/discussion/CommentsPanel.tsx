@@ -74,12 +74,12 @@ const CommentItem: React.FC<{
     <div>
       <p className="text-xs text-gray-700">
         {c.author_name}{c.is_mine ? '(自分)' : ''}{c.edited_at ? '・編集済み' : ''}
-        {c.status === 'resolved' && <span className="ml-1 px-1.5 rounded bg-green-100 text-green-900">解決済み</span>}
+        {c.status === 'resolved' && <span className="ml-1 px-1.5 rounded-sm bg-green-100 text-green-900">解決済み</span>}
       </p>
       {editing ? (
         <div className="space-y-1">
           <label htmlFor={`edit-${c.id}`} className="sr-only">コメントの編集</label>
-          <textarea id={`edit-${c.id}`} className="w-full border rounded px-2 py-1" rows={2} maxLength={2000}
+          <textarea id={`edit-${c.id}`} className="w-full border rounded-sm px-2 py-1" rows={2} maxLength={2000}
             value={text} onChange={(e) => setText(e.target.value)} />
           <div className="flex gap-1">
             <Button variant="primary" size="sm" onClick={async () => { if (await onEdit(c, text.trim())) setEditing(false); }}>保存</Button>

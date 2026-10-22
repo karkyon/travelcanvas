@@ -36,7 +36,9 @@ import {
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return extractApiErrorDetailMessage(detail) ?? fallback;
+  // [Gate G2] {code, message}(所有者が見せない設定にした項目の 403 等)は message を出す
+  const message = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as { message?: unknown }).message : null;
+  return extractApiErrorDetailMessage(detail) ?? (typeof message === 'string' && message ? message : fallback);
 }
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
@@ -209,7 +211,7 @@ const ConstraintsPage: React.FC = () => {
     if (!c.is_active) return null;
     const st = constraintStatus(latestRun, c.id);
     return (
-      <span className={`text-xs px-2 py-0.5 rounded ${STATUS_BADGE_CLASS[st]}`} data-testid={`constraint-status-${c.id}`}>
+      <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE_CLASS[st]}`} data-testid={`constraint-status-${c.id}`}>
         検証: {CONSTRAINT_STATUS_LABEL[st]}{latestRun?.is_stale && st !== 'not_checked' ? '(古い結果)' : ''}
       </span>
     );
@@ -222,8 +224,8 @@ const ConstraintsPage: React.FC = () => {
           <div className="flex items-center gap-2 text-gray-600">
             <Lock size={16} aria-hidden="true" />
             <span>他のメンバーの秘匿制約</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-200">{c.hardness === 'hard' ? 'ハード' : 'ソフト'}</span>
-            {!c.is_active && <span className="text-xs px-2 py-0.5 rounded bg-gray-200">無効</span>}
+            <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">{c.hardness === 'hard' ? 'ハード' : 'ソフト'}</span>
+            {!c.is_active && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">無効</span>}
             {renderStatus(c)}
           </div>
           <p className="text-xs text-gray-500 mt-1">内容は作成した本人にだけ表示されます(旅程の判定には使われます)。</p>
@@ -244,12 +246,12 @@ const ConstraintsPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium text-gray-900">{c.title}</span>
               {c.privacy_level === 'private' && (
-                <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">自分だけ(秘匿)</span>
+                <span className="text-xs px-2 py-0.5 rounded-sm bg-purple-100 text-purple-800">自分だけ(秘匿)</span>
               )}
               {c.from_profile && (
-                <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">非公開の条件から</span>
+                <span className="text-xs px-2 py-0.5 rounded-sm bg-indigo-100 text-indigo-800">非公開の条件から</span>
               )}
-              {!c.is_active && <span className="text-xs px-2 py-0.5 rounded bg-gray-200">無効</span>}
+              {!c.is_active && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">無効</span>}
               {renderStatus(c)}
             </div>
             <div className="text-sm text-gray-600 mt-1">
@@ -264,7 +266,7 @@ const ConstraintsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => handleToggle(c)}
-              className="text-xs px-2 py-1 border rounded hover:bg-gray-50"
+              className="text-xs px-2 py-1 border rounded-sm hover:bg-gray-50"
             >
               {c.is_active ? '無効にする' : '有効にする'}
             </button>
@@ -342,7 +344,7 @@ const ConstraintsPage: React.FC = () => {
         <form onSubmit={handleSubmit} noValidate>
           <Modal.Body>
             <div className="space-y-4">
-              {formError && <div className="p-2 rounded bg-red-50 text-red-700 text-sm" role="alert">{formError}</div>}
+              {formError && <div className="p-2 rounded-sm bg-red-50 text-red-700 text-sm" role="alert">{formError}</div>}
 
               <div>
                 <label htmlFor="constraint-title" className="block text-sm font-medium text-gray-700 mb-1">題名</label>

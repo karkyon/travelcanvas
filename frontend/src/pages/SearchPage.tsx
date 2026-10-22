@@ -370,7 +370,7 @@ const SearchPage: React.FC = () => {
         </div>
 
         {/* 検索タイプ選択 */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-xl shadow-xs p-6 mb-8">
           <div className="flex flex-wrap gap-4 mb-6">
             <button
               onClick={() => setSearchType('text')}
@@ -468,7 +468,7 @@ const SearchPage: React.FC = () => {
                         <img
                           src={URL.createObjectURL(file)}
                           alt={`Analyzed ${index + 1}`}
-                          className="w-full h-16 object-cover rounded border"
+                          className="w-full h-16 object-cover rounded-sm border"
                         />
                         <button
                           onClick={() => removeUploadedImage(index)}
@@ -556,9 +556,9 @@ const SearchPage: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {searchResults.map((spot, index) => (
-                <div key={spot.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 relative">
+                <div key={spot.id} className="bg-white rounded-xl shadow-xs hover:shadow-md transition-shadow p-6 relative">
                   {/* AIランキングバッジ */}
-                  <div className="absolute -top-2 -left-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                  <div className="absolute -top-2 -left-2 bg-linear-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
                     {index + 1}
                   </div>
                   
@@ -588,12 +588,12 @@ const SearchPage: React.FC = () => {
                     {/* AI信頼度表示 */}
                     <div className="flex flex-col items-end gap-1">
                       {spot.ai_confidence && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
                           AI信頼度: {Math.round(spot.ai_confidence * 100)}%
                         </span>
                       )}
                       {spot.ai_relevance_score && (
-                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-sm">
                           関連度: {spot.ai_relevance_score}
                         </span>
                       )}
@@ -636,7 +636,7 @@ const SearchPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => addSpotToPlan(spot)}
-                      className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs rounded hover:from-blue-600 hover:to-purple-700 transition-colors"
+                      className="px-3 py-1 bg-linear-to-r from-blue-500 to-purple-600 text-white text-xs rounded-sm hover:from-blue-600 hover:to-purple-700 transition-colors"
                     >
                       プランに追加
                     </button>

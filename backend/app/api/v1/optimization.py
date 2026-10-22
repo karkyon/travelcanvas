@@ -26,7 +26,7 @@ from app.api.v1 import branches as branches_api
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     ChangeSet, EventReservation, PlanConstraint, Reservation, TravelDay, TravelEvent, TravelPlan, User,
 )
@@ -34,6 +34,9 @@ from app.services import feasibility
 from app.services import optimizer as opt
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import load_constraints_for_evaluation
+
+# [Gate G2] FR-045 所有者が「event_address」のどれかを隠した参加者には、この機能の API は 403
+require_plan_access = member_policy.guarded("event_address")
 
 router = APIRouter(prefix="/plans", tags=["optimization"])
 

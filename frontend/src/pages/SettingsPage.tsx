@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
@@ -12,6 +12,7 @@ import Button from '@/components/common/Button';
 import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import MfaSection from '@/components/settings/MfaSection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
+import SupportAccessSection from '@/components/settings/SupportAccessSection';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -243,7 +244,7 @@ const SettingsPage: React.FC = () => {
                       ...notificationSettings,
                       [key]: e.target.checked
                     })}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
                   />
                   <span className="ml-2 text-sm text-gray-700">{label}</span>
                 </label>
@@ -262,7 +263,7 @@ const SettingsPage: React.FC = () => {
                     ...notificationSettings,
                     push_notifications: e.target.checked
                   })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
                 />
                 <span className="ml-2 text-sm text-gray-700">プッシュ通知を有効にする</span>
               </label>
@@ -631,6 +632,8 @@ const SettingsPage: React.FC = () => {
     { id: 'offline', name: 'オフライン', icon: <Download size={16} />, render: OfflineTab },
     // [Gate C1] FR-023 秘匿プロフィール(本人だけ)
     { id: 'conditions', name: '非公開の条件', icon: <Lock size={16} />, render: () => <PrivateProfileSection /> },
+    // [Gate G2] FR-040 サポートへの閲覧の許可(本人が目的・期限つきで許可する)
+    { id: 'support', name: 'サポート', icon: <LifeBuoy size={16} />, render: () => <SupportAccessSection /> },
   ];
 
   const handleSave = async () => {
@@ -750,7 +753,7 @@ const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* サイドバー */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-xl shadow-xs p-4">
               <nav className="space-y-1">
                 {tabs.map((tab) => (
                   <button
@@ -791,7 +794,7 @@ const SettingsPage: React.FC = () => {
 
           {/* メインコンテンツ */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-white rounded-xl shadow-xs p-6">
               {renderActiveTab()}
               
               {/* 保存ボタン([Gate C1] 非公開の条件のタブは自分の保存ボタンを持つため出さない) */}

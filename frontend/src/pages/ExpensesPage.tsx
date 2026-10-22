@@ -38,7 +38,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return extractApiErrorDetailMessage(detail) ?? fallback;
+  // [Gate G2] {code, message}(所有者が見せない設定にした項目の 403 等)は message を出す
+  const message = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as { message?: unknown }).message : null;
+  return extractApiErrorDetailMessage(detail) ?? (typeof message === 'string' && message ? message : fallback);
 }
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
@@ -315,7 +317,7 @@ const ExpensesPage: React.FC = () => {
           <form onSubmit={submitBudget} noValidate>
             <Modal.Body>
               <div className="space-y-4">
-                {formError && <div className="p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+                {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
                 <p className="text-sm text-gray-800">{BUDGET_KIND_LABEL[budgetForm.kind]}</p>
                 {budgetForm.kind === 'category' && (
                   <div>
@@ -355,7 +357,7 @@ const ExpensesPage: React.FC = () => {
           <form onSubmit={submitExpense} noValidate>
             <Modal.Body>
               <div className="space-y-4">
-                {formError && <div className="p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+                {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
                 <div>
                   <label htmlFor="expense-title" className="block text-sm font-medium text-gray-800 mb-1">内容</label>
                   <input id="expense-title" className={inputClass} maxLength={200} value={expenseForm.title}
@@ -436,16 +438,16 @@ const ExpensesPage: React.FC = () => {
                     <div className="space-y-2">
                       {Object.entries(expenseForm.participants).map(([id, p]) => (
                         <div key={id} className="flex flex-wrap items-center gap-2 text-sm">
-                          <label className="flex items-center gap-1 min-w-[10rem]">
+                          <label className="flex items-center gap-1 min-w-40">
                             <input type="checkbox" checked={p.selected} onChange={(e) => updateParticipant(id, { selected: e.target.checked })} />
                             {nameOf(id)}
                           </label>
                           {expenseForm.split_method === 'ratio' && p.selected && (
-                            <input aria-label={`${nameOf(id)}の比率`} inputMode="decimal" className="border rounded px-2 py-1 w-24"
+                            <input aria-label={`${nameOf(id)}の比率`} inputMode="decimal" className="border rounded-sm px-2 py-1 w-24"
                               value={p.weight} onChange={(e) => updateParticipant(id, { weight: e.target.value })} />
                           )}
                           {expenseForm.split_method === 'amount' && p.selected && (
-                            <input aria-label={`${nameOf(id)}の負担額`} inputMode="decimal" className="border rounded px-2 py-1 w-32"
+                            <input aria-label={`${nameOf(id)}の負担額`} inputMode="decimal" className="border rounded-sm px-2 py-1 w-32"
                               value={p.amount} onChange={(e) => updateParticipant(id, { amount: e.target.value })} />
                           )}
                         </div>

@@ -211,6 +211,8 @@ export interface TravelPlan {
   // 正規化APIから読み込んだプランのみ設定される(旧/travel-plans経由の
   // データには存在しない)。
   revision?: number;
+  /** [Gate G2] FR-045 所有者があなたに見せない設定にした項目(参加者だけ。所有者は空) */
+  hidden_fields?: string[];
 }
 
 export interface CreatePlanData {

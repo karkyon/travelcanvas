@@ -6,10 +6,11 @@
  * ロジックは変更していない。
  */
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import AdminMfaGate from '@/components/admin/AdminMfaGate';
+// [Gate G2] DEP-05 管理者の多要素認証の確認は管理者の画面でだけ使うため、その時に読み込む
+const AdminMfaGate = lazy(() => import('@/components/admin/AdminMfaGate'));
 
 // 認証が必要なルートを保護するコンポーネント
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -37,7 +38,11 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // [Gate S11] 管理者の画面は多要素認証を通したセッションだけ(backend の require_admin と同じ条件)
-  return <AdminMfaGate>{children}</AdminMfaGate>;
+  return (
+    <Suspense fallback={null}>
+      <AdminMfaGate>{children}</AdminMfaGate>
+    </Suspense>
+  );
 };
 
 // 認証済みユーザーのリダイレクト

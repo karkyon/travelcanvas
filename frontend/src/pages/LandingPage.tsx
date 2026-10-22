@@ -21,13 +21,13 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-cyan-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-8">
             <span className="text-blue-600">🧳 TravelCanvas</span>
             <br />
-            <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
               AI旅行プランナー
             </span>
           </h1>
@@ -40,7 +40,7 @@ const LandingPage = () => {
           <div className="space-y-4 sm:space-y-0 sm:space-x-6 sm:flex sm:justify-center">
             <Link
               to="/register"
-              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg transform transition-all duration-200 hover:scale-105"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 text-base font-medium rounded-xl text-white bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg transform transition-all duration-200 hover:scale-105"
             >
               今すぐ始める
             </Link>

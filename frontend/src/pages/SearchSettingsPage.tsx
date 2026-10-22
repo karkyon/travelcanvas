@@ -160,7 +160,7 @@ const SearchSettingsPage: React.FC = () => {
 
         <div className="space-y-8">
           {/* 地理的設定 */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-xs p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <MapPin size={24} className="text-green-500" />
               旅行エリア設定
@@ -201,7 +201,7 @@ const SearchSettingsPage: React.FC = () => {
           </div>
 
           {/* 趣味・志向設定 */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-xs p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <Heart size={24} className="text-red-500" />
               趣味・志向設定
@@ -232,7 +232,7 @@ const SearchSettingsPage: React.FC = () => {
           </div>
 
           {/* 検索設定 */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-xs p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">
               🔍 検索詳細設定
             </h2>

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     EventActual, EventReservation, LocationPointBatch, LocationTrack, Memory, TravelDay, TravelEvent, TravelPlan, User,
     VisitAssessment,
@@ -33,6 +33,9 @@ from app.models.models import (
 from app.services import location_tracks as lt
 from app.services import visit_assessment as va
 from app.services.audit_service import record_audit_event
+
+# [Gate G2] FR-045 所有者が「event_address」のどれかを隠した参加者には、この機能の API は 403
+require_plan_access = member_policy.guarded("event_address")
 
 router = APIRouter(prefix="/plans", tags=["visits"])
 

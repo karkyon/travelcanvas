@@ -52,10 +52,10 @@ const Card: React.FC<CardProps> & {
   ];
 
   const variantClasses = {
-    default: 'border-gray-200 shadow-sm',
+    default: 'border-gray-200 shadow-xs',
     outlined: 'border-gray-300 shadow-none',
     elevated: 'border-gray-100 shadow-lg shadow-gray-200/50',
-    gradient: 'border-none bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-200/50'
+    gradient: 'border-none bg-linear-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-200/50'
   };
 
   const paddingClasses = {
@@ -112,7 +112,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
           )}
         </div>
         {action && (
-          <div className="ml-4 flex-shrink-0">
+          <div className="ml-4 shrink-0">
             {action}
           </div>
         )}

@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import decrypt_payload, encrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import BookletExport, TravelPlan, User
 from app.services import booklet
 from app.services.audit_service import record_audit_event
@@ -134,6 +134,13 @@ def _audit(action: str, request: Request, user: User, resource_id, plan_id, deta
     )
 
 
+def _guard_hidden(opts: booklet.Options, hidden) -> None:
+    """[Gate G2] FR-045 所有者が隠した項目の章は作れない(予約・連絡先・注意事項・費用・地図)。"""
+    blocked = member_policy.booklet_blocked_sections(hidden, opts.sections)
+    if blocked:
+        raise member_policy.hidden_error(member_policy.BOOKLET_SECTION_CATEGORY[blocked[0]])
+
+
 def _guard_sensitive(opts: booklet.Options, role: str) -> None:
     if opts.contains_sensitive and role != "owner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
@@ -200,11 +207,12 @@ def _audit_flags(opts: booklet.Options) -> Dict[str, Any]:
 @router.post("/{plan_id}/booklet/preview", response_model=dict)
 def preview(plan_id: str, payload: OptionsIn, request: Request, response: Response, db: Session = Depends(get_db),
             current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     opts = payload.to_options()
+    _guard_hidden(opts, hidden)
     _guard_sensitive(opts, role)
     response.headers["Cache-Control"] = "no-store"
-    result = booklet.build(db, plan, current_user, opts)
+    result = member_policy.redact_booklet(booklet.build(db, plan, current_user, opts), hidden)
     if opts.contains_sensitive:
         _audit("booklet_preview_sensitive", request, current_user, None, plan.id, _audit_flags(opts))
     return result
@@ -213,7 +221,7 @@ def preview(plan_id: str, payload: OptionsIn, request: Request, response: Respon
 @router.get("/{plan_id}/booklet-exports", response_model=List[dict])
 def list_exports(plan_id: str, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     rows = (db.query(BookletExport).filter(BookletExport.plan_id == plan.id)
             .order_by(BookletExport.version_no.desc()).all())
     names = member_names(db, {r.created_by_user_id for r in rows})
@@ -224,8 +232,9 @@ def list_exports(plan_id: str, db: Session = Depends(get_db),
 @router.post("/{plan_id}/booklet-exports", status_code=201, response_model=dict)
 def create_export(plan_id: str, payload: ExportCreate, request: Request, response: Response,
                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     opts = payload.to_options()
+    _guard_hidden(opts, hidden)
     _guard_sensitive(opts, role)
     now = _now()
     valid_until = _aware(payload.valid_until)
@@ -245,7 +254,7 @@ def create_export(plan_id: str, payload: ExportCreate, request: Request, respons
     last = db.query(func.max(BookletExport.version_no)).filter(BookletExport.plan_id == plan.id).scalar() or 0
     creator_name = member_names(db, {current_user.id}).get(current_user.id, "ゲスト")
     watermark = f"{creator_name} 専用・持出注意" if opts.contains_sensitive else None
-    snapshot = booklet.build(db, plan, current_user, opts, now=now)
+    snapshot = member_policy.redact_booklet(booklet.build(db, plan, current_user, opts, now=now), hidden)
     e = BookletExport(
         id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, version_no=last + 1,
         format=opts.format, theme=opts.theme, density=opts.density,
@@ -269,7 +278,7 @@ def create_export(plan_id: str, payload: ExportCreate, request: Request, respons
 @router.get("/{plan_id}/booklet-exports/{export_id}", response_model=dict)
 def get_export(plan_id: str, export_id: str, request: Request, response: Response, db: Session = Depends(get_db),
                current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     e = _get_export(db, plan, export_id)
     now = _now()
     state = _state(e, now)
@@ -281,7 +290,8 @@ def get_export(plan_id: str, export_id: str, request: Request, response: Respons
         raise HTTPException(status_code=403, detail={
             "code": "sensitive_creator_only", "message": "機密情報を含む版は作成者だけが表示できます",
         })
-    snapshot = json.loads(decrypt_payload(e.snapshot_ciphertext).decode("utf-8"))
+    snapshot = member_policy.redact_booklet(json.loads(decrypt_payload(e.snapshot_ciphertext).decode("utf-8")),
+                                            hidden)
     snapshot["current_revision"] = plan.revision
     snapshot["is_stale"] = e.input_revision != plan.revision
     if snapshot["is_stale"] and "stale_revision" not in snapshot.get("warnings", []):
@@ -296,7 +306,7 @@ def get_export(plan_id: str, export_id: str, request: Request, response: Respons
 @router.delete("/{plan_id}/booklet-exports/{export_id}", response_model=dict)
 def revoke_export(plan_id: str, export_id: str, request: Request, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     e = _get_export(db, plan, export_id)
     if e.created_by_user_id != current_user.id and role != "owner":
         raise HTTPException(status_code=403, detail="この版を失効できるのは作成者か所有者だけです")

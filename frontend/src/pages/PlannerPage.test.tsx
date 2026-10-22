@@ -32,10 +32,10 @@ const makePlan = (days: string[], title = 'trip'): TravelPlan =>
   }) as unknown as TravelPlan;
 
 const setupMocks = () => {
-  const loadPlan = vi.fn<[string], Promise<void>>().mockResolvedValue(undefined);
-  const loadPlans = vi.fn<[], Promise<void>>().mockResolvedValue(undefined);
-  const clearCurrentPlan = vi.fn<[], void>();
-  const checkOfflineAvailability = vi.fn<[string], Promise<boolean>>().mockResolvedValue(false);
+  const loadPlan = vi.fn<(planId: string) => Promise<void>>().mockResolvedValue(undefined);
+  const loadPlans = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  const clearCurrentPlan = vi.fn<() => void>();
+  const checkOfflineAvailability = vi.fn<(planId: string) => Promise<boolean>>().mockResolvedValue(false);
   usePlanStore.setState({
     plans: [],
     currentPlan: null,
@@ -52,6 +52,11 @@ const setupMocks = () => {
     plan_id: 'plan-1', revision: 0, viewers: [], changes: [], poll_seconds: 15, ttl_seconds: 40,
   });
   vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
+  // [Gate G2] 即時の通知は使わない(ポーリングだけ)。同行者向けの項目の規則: 何も隠されていない
+  vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
+  vi.spyOn(api, 'getMemberPolicy').mockResolvedValue({
+    plan_id: 'plan-1', role: 'owner', my_hidden: [], catalog: { version: 1, categories: [], presets: {} },
+  });
   const getRoutePreview = vi
     .spyOn(api, 'getRoutePreview')
     .mockResolvedValue({ legs: [] } as unknown as Awaited<ReturnType<typeof api.getRoutePreview>>);

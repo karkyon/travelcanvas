@@ -33,6 +33,8 @@ const ProfilePage = lazyPage(() => import('@/pages/ProfilePage'));
 const AdminDashboard = lazyPage(() => import('@/pages/Admin/AdminDashboard'));
 const AdminUsers = lazyPage(() => import('@/pages/Admin/AdminUsers'));
 const AdminAuditLogs = lazyPage(() => import('@/pages/Admin/AdminAuditLogs'));
+// [Gate G2] FR-040 運用とサポート閲覧
+const AdminSupport = lazyPage(() => import('@/pages/Admin/AdminSupport'));
 const NotificationsPage = lazyPage(() => import('@/pages/NotificationsPage'));
 const OptimizationSelectPage = lazyPage(() => import('@/pages/OptimizationSelectPage'));
 const ReservationsPage = lazyPage(() => import('@/pages/ReservationsPage'));
@@ -567,6 +569,15 @@ export const router = createBrowserRouter([
               </AdminRoute>
             ),
           },
+          // [Gate G2] FR-040 運用の要約・共有リンクの停止・サポート閲覧
+          {
+            path: 'support',
+            element: (
+              <AdminRoute>
+                <AdminSupport />
+              </AdminRoute>
+            ),
+          },
         ],
       },
       
@@ -632,22 +643,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
-], {
-  // 🚀 React Router v7 Future Flags の設定
-  // [Gate #7j] インストール済みのreact-router-dom@6.30.1にはv7_startTransitionフラグが
-  // 存在しない(@remix-run/router FutureConfig型を確認済み、他5項目は有効)ため除去。
-  future: {
-    // 相対パス処理の改善
-    v7_relativeSplatPath: true,
-    // フェッチャーの永続化
-    v7_fetcherPersist: true,
-    // フォームメソッドの正規化
-    v7_normalizeFormMethod: true,
-    // 部分的ハイドレーションの対応
-    v7_partialHydration: true,
-    // アクションエラー時の再検証スキップ
-    v7_skipActionErrorRevalidation: true,
-  }
-});
+],
+// [Gate G2] DEP-1 React Router 7 へ更新(以前の v7_* の future flags は v7 の既定の動作になったため外した)
+);
 
 export default router;

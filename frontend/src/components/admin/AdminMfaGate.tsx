@@ -66,7 +66,7 @@ const AdminMfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="text-xl font-bold text-gray-900 mb-3">管理者の確認</h1>
         {!status.enabled ? (
           <>

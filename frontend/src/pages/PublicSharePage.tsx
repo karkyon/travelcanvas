@@ -94,7 +94,7 @@ const PublicSharePage: React.FC = () => {
   if (state === 'invalid') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8 text-center">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-xs p-8 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400" aria-hidden="true" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">このリンクは無効です</h1>
           <p className="text-gray-600 text-sm">
@@ -109,7 +109,7 @@ const PublicSharePage: React.FC = () => {
   if (state === 'needs_passcode') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-xs p-8">
           <Lock size={40} className="mx-auto mb-4 text-blue-500" aria-hidden="true" />
           <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">パスコードが必要です</h1>
           <p className="text-gray-600 text-sm mb-6 text-center">

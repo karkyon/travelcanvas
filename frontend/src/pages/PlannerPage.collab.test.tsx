@@ -40,6 +40,11 @@ function setup() {
   useAuthStore.setState({ isAuthenticated: true, isGuest: false });
   vi.spyOn(api, 'getRoutePreview').mockResolvedValue({ legs: [] } as unknown as Awaited<ReturnType<typeof api.getRoutePreview>>);
   vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
+  // [Gate G2] 即時の通知は使わない(ポーリングだけ)。同行者向けの項目の規則: 何も隠されていない
+  vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
+  vi.spyOn(api, 'getMemberPolicy').mockResolvedValue({
+    plan_id: 'plan-1', role: 'owner', my_hidden: [], catalog: { version: 1, categories: [], presets: {} },
+  });
   vi.spyOn(api, 'postPresence').mockResolvedValue({
     plan_id: 'plan-1', revision: 4, poll_seconds: 5, ttl_seconds: 40,
     viewers: [

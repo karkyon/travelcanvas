@@ -78,7 +78,7 @@ const OptimizationSelectPage: React.FC = () => {
         )}
 
         {!error && plans.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-6 text-center">
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
             <p className="text-gray-600 mb-4">
               最適化できる旅行プランがまだありません。まずはプランを作成してください。
             </p>
@@ -97,7 +97,7 @@ const OptimizationSelectPage: React.FC = () => {
                 <button
                   key={plan.id}
                   onClick={() => navigate(`/planner/${plan.id}`)}
-                  className="w-full flex items-center justify-between bg-white rounded-lg shadow p-4 text-left hover:shadow-md transition-shadow"
+                  className="w-full flex items-center justify-between bg-white rounded-lg shadow-sm p-4 text-left hover:shadow-md transition-shadow"
                 >
                   <div>
                     <p className="font-semibold text-gray-900">{plan.title}</p>

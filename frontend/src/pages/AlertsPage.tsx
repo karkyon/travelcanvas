@@ -40,7 +40,7 @@ const AlertCard: React.FC<{
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium text-gray-900">
-            <span className="mr-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">{alert.kind_label}</span>
+            <span className="mr-2 text-xs px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-900">{alert.kind_label}</span>
             {target}
             {alert.delay_minutes !== null && <span className="ml-2 text-sm text-gray-800">約{alert.delay_minutes}分の遅れ</span>}
           </p>
@@ -51,7 +51,7 @@ const AlertCard: React.FC<{
           {alert.is_stale && active && (
             <p className="text-xs text-red-800 mt-1">取得から3時間以上たった情報です。最新の状況を確認してください</p>
           )}
-          {alert.note && <p className="text-sm text-gray-800 mt-1 break-words">{alert.note}</p>}
+          {alert.note && <p className="text-sm text-gray-800 mt-1 wrap-break-word">{alert.note}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {alert.latest_replan_id && (

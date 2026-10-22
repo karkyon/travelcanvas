@@ -20,6 +20,7 @@ from app.models.models import (
 )
 from app.services import org_api, organizations as orgs
 from app.services.audit_service import record_audit_event
+from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 bad = orgs.bad
@@ -355,10 +356,18 @@ async def fork_distribution(org_id: uuid.UUID, dist_id: uuid.UUID, request: Requ
 
 # ===== 外部連携: API クライアント =====
 
+def _previous_until(expires_at) -> Optional[str]:
+    return _iso(expires_at) if expires_at is not None and expires_at > orgs.now() else None
+
+
 def _client_dict(c: OrgApiClient, secret: Optional[str] = None) -> Dict[str, Any]:
     return {"id": str(c.id), "name": c.name, "client_id": c.client_id, "client_secret": secret,
             "scopes": list(c.scopes or []), "created_at": _iso(c.created_at), "last_used_at": _iso(c.last_used_at),
-            "revoked_at": _iso(c.revoked_at)}
+            "revoked_at": _iso(c.revoked_at),
+            # [Gate G2] 秘密の切り替え: 版・前の秘密が通る期限(過ぎていれば null)
+            "secret_version": int(c.secret_version or 1), "secret_rotated_at": _iso(c.secret_rotated_at),
+            "previous_secret_valid_until": (_previous_until(c.previous_secret_expires_at)
+                                            if c.previous_secret_hash else None)}
 
 
 @router.get("/{org_id}/api-clients")
@@ -394,6 +403,53 @@ async def create_api_client(org_id: uuid.UUID, request: Request, payload: Option
     return _client_dict(c, secret)
 
 
+def _get_client(db: Session, org: Organization, client_uuid) -> OrgApiClient:
+    c = db.query(OrgApiClient).filter(OrgApiClient.id == client_uuid, OrgApiClient.organization_id == org.id).first()
+    if not c:
+        raise bad("api_client_not_found", "連携が見つかりません", 404)
+    return c
+
+
+def _grace(p: Dict[str, Any]) -> int:
+    try:
+        return org_api.clean_grace_hours(p.get("grace_hours"))
+    except ValueError:
+        raise bad("invalid_grace", f"前の秘密を使える時間は0〜{org_api.MAX_GRACE_HOURS}時間の整数で指定してください")
+
+
+@router.post("/{org_id}/api-clients/{client_uuid}/rotate-secret")
+async def rotate_api_client_secret(org_id: uuid.UUID, client_uuid: uuid.UUID, request: Request,
+                                   payload: Optional[dict] = Body(None),
+                                   user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """[Gate G2] 秘密を作り直す(新しい秘密は1回だけ返す)。前の秘密は grace_hours(既定24時間)の間だけ通る。"""
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    c = _get_client(db, org, client_uuid)
+    if c.revoked_at is not None:
+        raise bad("api_client_revoked", "止めた連携の秘密は作り直せません", 409)
+    grace = _grace(_payload(payload))
+    secret = org_api.rotate_client_secret(c, grace)
+    db.commit()
+    _audit("org_api_client_secret_rotated", request, user, org.id,
+           {"api_client": c.client_id, "secret_version": c.secret_version, "grace_hours": grace})
+    return _client_dict(c, secret)
+
+
+@router.post("/{org_id}/api-clients/{client_uuid}/retire-previous")
+async def retire_api_client_previous(org_id: uuid.UUID, client_uuid: uuid.UUID, request: Request,
+                                     payload: Optional[dict] = Body(None),
+                                     user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """[Gate G2] 猶予を待たずに前の秘密を失効する。revoke_tokens=true なら発行済みのトークンも失効する。"""
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    c = _get_client(db, org, client_uuid)
+    p = _payload(payload)
+    revoke_tokens = p.get("revoke_tokens") is True
+    removed = org_api.retire_previous_client_secret(db, c, revoke_tokens)
+    db.commit()
+    _audit("org_api_client_previous_retired", request, user, org.id,
+           {"api_client": c.client_id, "tokens_revoked": int(removed)})
+    return {**_client_dict(c), "tokens_revoked": int(removed)}
+
+
 @router.post("/{org_id}/api-clients/{client_uuid}/revoke")
 async def revoke_api_client(org_id: uuid.UUID, client_uuid: uuid.UUID, request: Request,
                             user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
@@ -411,13 +467,20 @@ async def revoke_api_client(org_id: uuid.UUID, client_uuid: uuid.UUID, request: 
 
 def _hook_dict(h: OrgWebhook, secret: Optional[str] = None) -> Dict[str, Any]:
     return {"id": str(h.id), "url": h.url, "events": list(h.events or []), "secret": secret,
-            "created_at": _iso(h.created_at), "revoked_at": _iso(h.revoked_at)}
+            "created_at": _iso(h.created_at), "revoked_at": _iso(h.revoked_at),
+            # [Gate G2] 署名の鍵の版・前の鍵でも署名する期限・自動で止めた理由(受け手が 410 を返した等)
+            "secret_version": int(h.secret_version or 1),
+            "previous_secret_valid_until": (_previous_until(h.previous_secret_expires_at)
+                                            if h.previous_secret_ciphertext else None),
+            "disabled_reason": h.disabled_reason}
 
 
 def _delivery_dict(d: OrgWebhookDelivery) -> Dict[str, Any]:
     return {"id": str(d.id), "event_id": str(d.event_id), "event_type": d.event_type, "status": d.status,
             "attempts": d.attempts, "last_status_code": d.last_status_code, "last_error": d.last_error,
-            "created_at": _iso(d.created_at), "delivered_at": _iso(d.delivered_at)}
+            "created_at": _iso(d.created_at), "delivered_at": _iso(d.delivered_at),
+            "next_attempt_at": _iso(d.next_attempt_at) if d.status in ("pending", "failed") else None,
+            "max_attempts": org_api.MAX_ATTEMPTS}
 
 
 def _get_hook(db: Session, org: Organization, hook_id) -> OrgWebhook:
@@ -473,6 +536,35 @@ async def revoke_webhook(org_id: uuid.UUID, hook_id: uuid.UUID, request: Request
     return _hook_dict(h)
 
 
+@router.post("/{org_id}/webhooks/{hook_id}/rotate-secret")
+async def rotate_webhook_secret(org_id: uuid.UUID, hook_id: uuid.UUID, request: Request,
+                                payload: Optional[dict] = Body(None),
+                                user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """[Gate G2] 署名の鍵を作り直す(新しい鍵は1回だけ返す)。grace_hours の間は新旧の両方で署名する。"""
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    h = _get_hook(db, org, hook_id)
+    if h.revoked_at is not None:
+        raise bad("webhook_revoked", "止めた Webhook の鍵は作り直せません", 409)
+    grace = _grace(_payload(payload))
+    secret = org_api.rotate_webhook_secret(h, grace)
+    db.commit()
+    _audit("org_webhook_secret_rotated", request, user, org.id,
+           {"webhook_id": str(h.id), "secret_version": h.secret_version, "grace_hours": grace})
+    return _hook_dict(h, secret)
+
+
+@router.post("/{org_id}/webhooks/{hook_id}/retire-previous")
+async def retire_webhook_previous(org_id: uuid.UUID, hook_id: uuid.UUID, request: Request,
+                                  user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """[Gate G2] 猶予を待たずに前の鍵での署名をやめる。"""
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    h = _get_hook(db, org, hook_id)
+    org_api.retire_previous_webhook_secret(h)
+    db.commit()
+    _audit("org_webhook_previous_retired", request, user, org.id, {"webhook_id": str(h.id)})
+    return _hook_dict(h)
+
+
 @router.post("/{org_id}/webhooks/{hook_id}/ping")
 async def ping_webhook(org_id: uuid.UUID, hook_id: uuid.UUID, user: User = Depends(get_current_active_user),
                        db: Session = Depends(get_db)):
@@ -513,8 +605,11 @@ async def redeliver(org_id: uuid.UUID, hook_id: uuid.UUID, delivery_id: uuid.UUI
         raise bad("delivery_not_found", "送信の記録が見つかりません", 404)
     if d.status == "delivered":
         raise bad("already_delivered", "届いた送信は送り直せません", 409)
-    if d.attempts >= org_api.MAX_ATTEMPTS:
-        raise bad("too_many_attempts", f"送り直しは{org_api.MAX_ATTEMPTS}回までです", 409)
+    if h.revoked_at is not None:
+        raise bad("webhook_revoked", "止めた Webhook には送れません", 409)
+    # [Gate G2] dead(自動の再送の上限に達した)も手で送り直せる。手の送り直しは組織ごと1分10回まで
+    if not check_rate_limit(f"org_redeliver:{org.id}", 10, 60):
+        raise bad("rate_limited", "送り直しが多すぎます。しばらく待ってください", 429)
     org_api.deliver(db, d)
     db.commit()
     return _delivery_dict(d)

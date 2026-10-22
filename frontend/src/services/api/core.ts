@@ -9,7 +9,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 import { toast } from 'react-hot-toast';
 import type { MinimalHttpClient } from './types';
-import { solveChallenge } from '@/utils/challengeSolver';
 import { apiUrlForHost } from '@/config/securityHeaders';
 
 // [Gate A1] 呼び出し元が自分でエラーを画面へ伝える場合(ログイン・登録・ゲスト開始/昇格・
@@ -228,6 +227,8 @@ export class ApiCore {
         if (problem && originalRequest && tried.length < MAX_CHALLENGE_ATTEMPTS && !tried.includes(problem.token)) {
           originalRequest._challengeTokens = [...tried, problem.token];
           try {
+            // [Gate G2] DEP-05 計算の確認はまれなため、必要な時だけ読み込む
+            const { solveChallenge } = await import('@/utils/challengeSolver');
             const solution = await solveChallenge(problem.token, problem.difficulty);
             originalRequest.headers = originalRequest.headers || {};
             (originalRequest.headers as Record<string, string>)['X-TC-Challenge'] = problem.token;
@@ -271,7 +272,11 @@ export class ApiCore {
           }
         }
 
-        if (!originalRequest?.skipGlobalErrorHandler) {
+        // [Gate G2] FR-045 所有者が見せない設定にした項目(403 member_field_hidden)は想定どおりの状態のため、
+        // 共通のトースト「アクセス権限がありません」を出さない(各画面が理由を示す。旅程の画面は上部の知らせ)
+        const hiddenByOwner = error.response?.status === 403 &&
+          (error.response.data as { detail?: { code?: unknown } } | undefined)?.detail?.code === 'member_field_hidden';
+        if (!originalRequest?.skipGlobalErrorHandler && !hiddenByOwner) {
           this.handleApiError(error);
         }
         return Promise.reject(error);
@@ -294,6 +299,14 @@ export class ApiCore {
       removeStorage('auth_token');
     }
     removeStorage('access_token');
+  }
+
+  /**
+   * [Gate G2] FR-020 即時の通知(Server-Sent Events)は axios ではなく fetch で読む(応答を少しずつ読むため)。
+   * その要求に付ける Authorization の値(トークンが無ければ null。会員は cookie の更新鍵で取り直した後の値)
+   */
+  protected bearerHeader(): string | null {
+    return this.accessToken ? `Bearer ${this.accessToken}` : null;
   }
 
   /** [Gate S5] 試験・状態確認用: トークンを持っているか(値は返さない) */

@@ -30,7 +30,7 @@ const RouteErrorBoundary = () => {
 
   return (
     <div role="alert" className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow p-8 text-center">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8 text-center">
         <h1 className="text-xl font-bold text-gray-900 mb-2">{title}</h1>
         <p className="text-gray-600 mb-6">{message}</p>
         <div className="flex justify-center gap-3">

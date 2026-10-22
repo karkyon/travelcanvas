@@ -47,6 +47,20 @@ describe('docker の frontend コンテナ (Gate S2)', () => {
   const dockerfile = readFileSync(resolve(__dirname, '../../Dockerfile'), 'utf8');
   const runtime = dockerfile.slice(dockerfile.lastIndexOf('FROM '));
 
+  it('build の段は文脈を丸ごと写さない(手元の node_modules で依存が混ざらない。Gate G2 v2)', () => {
+    // omega-dev2 では .dockerignore が無く(.gitignore の対象)、`COPY . .` が手元の古い node_modules で
+    // コンテナの npm ci の結果を上書きして build が失敗した
+    const build = dockerfile.slice(0, dockerfile.lastIndexOf('FROM '));
+    const copies = [...build.matchAll(/^COPY (.+)$/gm)].map((m) => m[1]!.trim());
+    const sources = copies.flatMap((c) => c.split(/\s+/).slice(0, -1));
+    expect(sources.filter((src) => src === '.' || src === './' || src.includes('node_modules'))).toEqual([]);
+    for (const need of ['package*.json', 'index.html', 'vite.config.ts', 'postcss.config.js', 'tsconfig.json',
+      'tsconfig.node.json', 'public', 'src']) {
+      expect(sources).toContain(need);
+    }
+    expect(build.indexOf('RUN npm ci')).toBeLessThan(build.indexOf('COPY src ./src'));
+  });
+
   it('実行用の段に vite の設定と、設定が読むヘッダーの定義を入れる', () => {
     expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/vite\.config\.ts/);
     expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/src\/config/);

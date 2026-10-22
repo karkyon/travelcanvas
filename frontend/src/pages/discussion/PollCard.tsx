@@ -93,24 +93,24 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
           )}
         </div>
 
-        {error && <div className="mt-2 p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
+        {error && <div className="mt-2 p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 
         <ul className="mt-3 space-y-3" aria-label={`${poll.title}の選択肢`}>
           {poll.options.map((o) => {
             const d = drafts[o.id] ?? { value: '', reason: '', alternative: '' };
             const needsReason = d.value === 'concern' || d.value === 'veto';
             return (
-              <li key={o.id} className="border rounded p-3" data-testid={`poll-option-${o.id}`}>
+              <li key={o.id} className="border rounded-sm p-3" data-testid={`poll-option-${o.id}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-gray-900">{o.label}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${STATE_CLASS[o.state]}`}>{OPTION_STATE_LABEL[o.state]}</span>
-                  {o.is_leading && !o.is_decided && <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-900">最有力</span>}
-                  {o.is_decided && <span className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white">決定</span>}
+                  <span className={`text-xs px-2 py-0.5 rounded-sm ${STATE_CLASS[o.state]}`}>{OPTION_STATE_LABEL[o.state]}</span>
+                  {o.is_leading && !o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-100 text-blue-900">最有力</span>}
+                  {o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-600 text-white">決定</span>}
                   {o.event_missing && <span className="text-xs text-gray-700">(元の予定は削除されています)</span>}
                 </div>
                 <p className="text-xs text-gray-700 mt-1">{describeCounts(o)}</p>
                 {o.votes.filter((v) => v.value === 'concern' || v.value === 'veto').map((v) => (
-                  <div key={v.id} className="mt-2 text-sm bg-amber-50 border border-amber-200 rounded p-2">
+                  <div key={v.id} className="mt-2 text-sm bg-amber-50 border border-amber-200 rounded-sm p-2">
                     <p>
                       <span className="font-medium">{VOTE_LABEL[v.value]}</span>
                       {v.name ? `(${v.name}${v.is_mine ? '・自分' : ''})` : v.is_mine ? '(自分)' : '(匿名)'}: {v.reason}
@@ -130,7 +130,7 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div>
                       <label htmlFor={`vote-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}へのあなたの回答`}</label>
-                      <select id={`vote-${o.id}`} className="w-full border rounded px-2 py-1 text-sm" value={d.value}
+                      <select id={`vote-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" value={d.value}
                         onChange={(e) => update(o.id, { value: e.target.value as AnswerDraft['value'] })}>
                         <option value="">未回答</option>
                         {VOTE_OPTIONS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
@@ -139,14 +139,14 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
                     {needsReason && (
                       <div>
                         <label htmlFor={`reason-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}の理由`}</label>
-                        <input id={`reason-${o.id}`} className="w-full border rounded px-2 py-1 text-sm" maxLength={500}
+                        <input id={`reason-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={500}
                           value={d.reason} onChange={(e) => update(o.id, { reason: e.target.value })} />
                       </div>
                     )}
                     {d.value === 'veto' && (
                       <div>
                         <label htmlFor={`alt-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}の代替案`}</label>
-                        <input id={`alt-${o.id}`} className="w-full border rounded px-2 py-1 text-sm" maxLength={200}
+                        <input id={`alt-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={200}
                           value={d.alternative} onChange={(e) => update(o.id, { alternative: e.target.value })} />
                       </div>
                     )}

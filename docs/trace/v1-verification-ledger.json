@@ -491,6 +491,66 @@
     "backend/tests/test_gate_p14_journey.py::test_suggestions_use_only_own_track_and_visible_memories"
    ],
    "status": "VERIFIED"
+  },
+  "FR-020": {
+   "title": "共同編集",
+   "e2e": [
+    "frontend/e2e/collaboration.spec.ts",
+    "frontend/e2e/realtime-collab.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_c1_collaboration.py::test_presence_access_and_hygiene",
+    "backend/tests/test_gate_g2_realtime.py::test_stream_access_rules_and_limit"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_c1_collaboration.py::test_presence_viewers_editing_and_changes",
+    "backend/tests/test_gate_g2_realtime.py::test_stream_ready_revision_presence_and_reconnect"
+   ],
+   "security": [
+    "backend/tests/test_gate_c1_collaboration.py::test_presence_access_and_hygiene",
+    "backend/tests/test_gate_g2_realtime.py::test_stream_access_rules_and_limit"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-040": {
+   "title": "管理・監査",
+   "e2e": [
+    "frontend/e2e/admin.spec.ts",
+    "frontend/e2e/support-access.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_a2_admin.py::test_non_admin_gets_nothing",
+    "backend/tests/test_gate_g2_support_access.py::test_admin_cannot_view_own_grant",
+    "backend/tests/test_gate_g2_support_access.py::test_admin_views_masked_projection_with_audit_and_notice"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g2_support_access.py::test_owner_creates_and_revokes_with_reauth",
+    "backend/tests/test_gate_a2_admin.py::test_suspend_logs_out_and_guards_self_and_admins"
+   ],
+   "security": [
+    "backend/tests/test_gate_g2_support_access.py::test_admin_views_masked_projection_with_audit_and_notice",
+    "backend/tests/test_gate_g2_support_access.py::test_operations_summary_and_share_link_revoke"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-045": {
+   "title": "安全な共有ポリシー",
+   "e2e": [
+    "frontend/e2e/share-policy.spec.ts",
+    "frontend/e2e/member-policy.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_g2_member_policy.py::test_policy_settings_owner_only_and_expand",
+    "backend/tests/test_gate_g2_member_policy.py::test_viewer_sees_nothing_hidden_on_any_route"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g2_member_policy.py::test_editor_cannot_write_or_read_hidden_fields"
+   ],
+   "security": [
+    "backend/tests/test_gate_g2_member_policy.py::test_viewer_sees_nothing_hidden_on_any_route",
+    "backend/tests/test_gate_g2_member_policy.py::test_validation_hides_budget_and_reservation_issues"
+   ],
+   "status": "VERIFIED"
   }
  }
 }

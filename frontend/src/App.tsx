@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { router } from '@/router';
 import { useAuthStore } from '@/store/authStore';
-import { obtainOfflineKey } from '@/utils/offlineVault';
-import { currentOfflineSession } from '@/utils/offlineSession';
 import { Toaster } from 'react-hot-toast';
 import '@/styles/globals.css';
 
@@ -22,7 +20,10 @@ function App() {
   // 後で通信できなくなっても、保存したオフラインデータを開けるようにするため。失敗しても何もしない。
   useEffect(() => {
     if (!isInitialized || !sessionTag) return;
-    void obtainOfflineKey(currentOfflineSession()).catch(() => undefined);
+    // [Gate G2] DEP-05 最初に読む JS を小さくするため、オフラインの鍵の処理は必要になってから読み込む
+    void Promise.all([import('@/utils/offlineVault'), import('@/utils/offlineSession')])
+      .then(([vault, session]) => vault.obtainOfflineKey(session.currentOfflineSession()))
+      .catch(() => undefined);
   }, [isInitialized, sessionTag]);
 
   // 初期化中の表示
@@ -35,7 +36,7 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-linear-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">TC</span>
           </div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -47,12 +48,8 @@ function App() {
 
   return (
     <div className="App">
-      <RouterProvider 
-        router={router}
-        future={{
-          v7_startTransition: true
-        }}
-      />
+      {/* [Gate G2] React Router 7: startTransition は既定の動作(future flag は不要) */}
+      <RouterProvider router={router} />
       <Toaster 
         position="top-right"
         toastOptions={{

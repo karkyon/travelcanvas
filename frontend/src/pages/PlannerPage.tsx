@@ -33,6 +33,7 @@ import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 import PresenceBar from '@/components/planner/PresenceBar';
 import { usePlanPresence } from '@/hooks/usePlanPresence';
+import MemberPolicyNotice from '@/components/planner/MemberPolicyNotice';
 import { othersEditing } from '@/utils/presence';
 import { FIELD_LABEL, detectConflict, mergeMine, type EditConflict, type EditFields } from '@/utils/editConflict';
 
@@ -708,12 +709,15 @@ const PlannerPage: React.FC = () => {
 
           <SyncStatusBar planId={currentPlan.id} />
 
+          <MemberPolicyNotice planId={currentPlan.id} />
+
           <PresenceBar
             viewers={presence.viewers}
             changes={presence.changes}
             remoteRevision={presence.remoteRevision}
             localRevision={currentPlan.revision}
             offline={presence.offline}
+            live={presence.live}
             onReload={handleReloadPlan}
             isReloading={isReloadingPlan}
           />
@@ -826,7 +830,7 @@ const PlannerPage: React.FC = () => {
                 {Math.round(visitSuggestion.dwellMs / 60000)}分ほど滞在したようです(信頼度
                 {Math.round(visitSuggestion.confidence * 100)}%)。訪問済みにしますか?
               </span>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 shrink-0">
                 <Button size="sm" variant="primary" onClick={handleConfirmVisitSuggestion}>
                   訪問済みにする
                 </Button>
@@ -931,18 +935,23 @@ const PlannerPage: React.FC = () => {
                 onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
                 fullWidth
               />
-              <Input
-                label="場所"
-                value={editForm.location_name}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
-                fullWidth
-              />
-              <Input
-                label="メモ"
-                value={editForm.notes}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                fullWidth
-              />
+              {/* [Gate G2] FR-045 所有者が見せない設定にした項目は入力を出さない */}
+              {!currentPlan?.hidden_fields?.includes('event_address') && (
+                <Input
+                  label="場所"
+                  value={editForm.location_name}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
+                  fullWidth
+                />
+              )}
+              {!currentPlan?.hidden_fields?.includes('event_notes') && (
+                <Input
+                  label="メモ"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  fullWidth
+                />
+              )}
             </div>
           </Modal.Body>
           <Modal.Footer>
@@ -1004,7 +1013,7 @@ const PlannerPage: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
                       <button
                         type="button"
-                        className="text-left rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                        className="text-left rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
                         aria-label={`「${plan.title}」を開く`}
                         onClick={(e) => {
                           e.stopPropagation();

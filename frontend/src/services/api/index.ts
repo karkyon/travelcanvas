@@ -26,6 +26,7 @@ import type { CandidateInput, CandidatePatch, OpeningHoursItem, PlacePatch } fro
 import type { SearchFilter } from './types';
 import type { SharePolicyInput } from './types';
 import type { PresenceInput } from './endpoints/collab';
+import type { MemberFieldKey, PlanStreamEvent, SupportGrantInput } from './types';
 import type { AtlasPrecision } from './types';
 import type { BudgetCreateData, ExpenseCreateData, ExpenseUpdateData, SettlementCreateData } from './types';
 import type { PackingItemCreateData, PackingItemUpdateData, PackingSuggestionConditions, PreparationTaskCreateData, PreparationTaskUpdateData } from './types';
@@ -494,3 +495,21 @@ export const getPlanPlaces = (planId: string) => api.getPlanPlaces(planId);
 // ===== [Gate C3] 情報内検索・コマンドパレット(FR-009)
 export const searchPlan = (planId: string, q: string, filter: SearchFilter | null = null) => api.searchPlan(planId, q, filter);
 export const searchEverything = (q: string, filter: SearchFilter | null = null) => api.searchEverything(q, filter);
+
+// ===== [Gate G2] 即時の共同編集(FR-020)・同行者向けの項目の規則(FR-045)・サポート閲覧と運用の要約(FR-040)
+export const streamPlanEvents = (planId: string, knownRevision: number | undefined,
+  onEvent: (event: PlanStreamEvent) => void, signal?: AbortSignal) =>
+  api.streamPlanEvents(planId, knownRevision, onEvent, signal);
+export const getMemberPolicy = (planId: string) => api.getMemberPolicy(planId);
+export const putMemberPolicy = (planId: string, roles: { editor: MemberFieldKey[]; viewer: MemberFieldKey[] }) =>
+  api.putMemberPolicy(planId, roles);
+export const putMemberOverride = (planId: string, collaboratorId: string, hidden: MemberFieldKey[] | null) =>
+  api.putMemberOverride(planId, collaboratorId, hidden);
+export const getSupportGrants = () => api.getSupportGrants();
+export const createSupportGrant = (input: SupportGrantInput) => api.createSupportGrant(input);
+export const revokeSupportGrant = (grantId: string) => api.revokeSupportGrant(grantId);
+export const getAdminSupportGrants = (includeInactive = false) => api.getAdminSupportGrants(includeInactive);
+export const viewAdminSupportGrant = (grantId: string) => api.viewAdminSupportGrant(grantId);
+export const getAdminOperations = () => api.getAdminOperations();
+export const getAdminShareLinks = () => api.getAdminShareLinks();
+export const revokeAdminShareLink = (linkId: string, reason: string) => api.revokeAdminShareLink(linkId, reason);

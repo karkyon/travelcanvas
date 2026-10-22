@@ -87,7 +87,7 @@ const PackingPanel: React.FC<Props> = (props) => {
         {suggestions && (
           <div className="mt-4 space-y-3" data-testid="packing-suggestions">
             {suggestions.unverified.map((u) => (
-              <p key={u.code} className="text-sm text-gray-800 bg-white border rounded p-2">{u.message}</p>
+              <p key={u.code} className="text-sm text-gray-800 bg-white border rounded-sm p-2">{u.message}</p>
             ))}
             {suggestions.add.length === 0 && suggestions.remove.length === 0 && suggestions.change.length === 0 && (
               <p className="text-sm text-gray-700">追加・見直しの候補はありません。</p>
@@ -95,12 +95,12 @@ const PackingPanel: React.FC<Props> = (props) => {
             {suggestions.add.length > 0 && (
               <ul className="space-y-2" aria-label="追加の候補">
                 {suggestions.add.map((s) => (
-                  <li key={s.key} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded p-2">
+                  <li key={s.key} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-sm p-2">
                     <div className="min-w-0">
                       <span className="font-medium text-gray-900">{s.name}</span>
                       <span className="text-sm text-gray-700"> ×{s.quantity}</span>
-                      {s.is_required && <span className="ml-2 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800">必須</span>}
-                      {s.scope === 'personal' && <span className="ml-2 text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">自分だけ</span>}
+                      {s.is_required && <span className="ml-2 text-xs px-2 py-0.5 rounded-sm bg-red-100 text-red-800">必須</span>}
+                      {s.scope === 'personal' && <span className="ml-2 text-xs px-2 py-0.5 rounded-sm bg-purple-100 text-purple-800">自分だけ</span>}
                       <p className="text-xs text-gray-700">{s.reason}</p>
                     </div>
                     {(s.scope === 'personal' || canEdit) && (
@@ -115,7 +115,7 @@ const PackingPanel: React.FC<Props> = (props) => {
             {suggestions.change.length > 0 && (
               <ul className="space-y-2" aria-label="数量の見直し">
                 {suggestions.change.map((c) => (
-                  <li key={c.item_id} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded p-2">
+                  <li key={c.item_id} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-sm p-2">
                     <div>
                       <span className="font-medium text-gray-900">{c.name}</span>
                       <span className="text-sm text-gray-700"> {c.current_quantity} → {c.suggested_quantity}</span>
@@ -133,7 +133,7 @@ const PackingPanel: React.FC<Props> = (props) => {
             {suggestions.remove.length > 0 && (
               <ul className="space-y-2" aria-label="不要かもしれない持ち物">
                 {suggestions.remove.map((r) => (
-                  <li key={r.item_id} className="bg-white border rounded p-2">
+                  <li key={r.item_id} className="bg-white border rounded-sm p-2">
                     <span className="font-medium text-gray-900">{r.name}</span>
                     <p className="text-xs text-gray-700">{r.reason}</p>
                   </li>
@@ -162,7 +162,7 @@ const PackingPanel: React.FC<Props> = (props) => {
                           {item.scope === 'personal' && <Lock size={14} aria-label="自分だけの持ち物" />}
                           <span className="font-medium text-gray-900">{item.name ?? '(内容を表示できません)'}</span>
                           <span className="text-sm text-gray-700">×{item.quantity}</span>
-                          {item.is_required && <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-800">必須</span>}
+                          {item.is_required && <span className="text-xs px-2 py-0.5 rounded-sm bg-red-100 text-red-800">必須</span>}
                         </div>
                         <p className="text-xs text-gray-700 mt-0.5">
                           {categoryLabel(item.category)}
@@ -174,7 +174,7 @@ const PackingPanel: React.FC<Props> = (props) => {
                         <label className="sr-only" htmlFor={`packing-status-${item.id}`}>{`${item.name ?? '持ち物'}の状態`}</label>
                         <select
                           id={`packing-status-${item.id}`}
-                          className="border rounded px-2 py-1 text-sm"
+                          className="border rounded-sm px-2 py-1 text-sm"
                           value={item.status}
                           disabled={!canChangeStatus(item)}
                           onChange={(e) => props.onStatusChange(item, e.target.value as PackingStatus)}

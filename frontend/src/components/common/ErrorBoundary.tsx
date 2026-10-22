@@ -237,7 +237,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
       // デフォルトエラーUI
       return (
-        <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-linear-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
           <Card className="max-w-2xl w-full p-8 text-center">
             <div className="mb-6">
               <div className="text-6xl mb-4">🚨</div>
@@ -249,7 +249,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 以下の方法で問題を解決できる可能性があります。
               </p>
               <p className="text-sm text-gray-500">
-                エラーID: <code className="bg-gray-100 px-2 py-1 rounded">{errorId}</code>
+                エラーID: <code className="bg-gray-100 px-2 py-1 rounded-sm">{errorId}</code>
               </p>
             </div>
 
@@ -296,7 +296,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-medium text-gray-800">エラーメッセージ:</h4>
-                    <pre className="bg-white p-2 rounded text-sm text-red-600 overflow-auto">
+                    <pre className="bg-white p-2 rounded-sm text-sm text-red-600 overflow-auto">
                       {error.message}
                     </pre>
                   </div>
@@ -304,7 +304,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   {error.stack && (
                     <div>
                       <h4 className="font-medium text-gray-800">スタックトレース:</h4>
-                      <pre className="bg-white p-2 rounded text-xs text-gray-600 overflow-auto max-h-40">
+                      <pre className="bg-white p-2 rounded-sm text-xs text-gray-600 overflow-auto max-h-40">
                         {error.stack}
                       </pre>
                     </div>
@@ -313,7 +313,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   {errorInfo?.componentStack && (
                     <div>
                       <h4 className="font-medium text-gray-800">コンポーネントスタック:</h4>
-                      <pre className="bg-white p-2 rounded text-xs text-gray-600 overflow-auto max-h-40">
+                      <pre className="bg-white p-2 rounded-sm text-xs text-gray-600 overflow-auto max-h-40">
                         {errorInfo.componentStack}
                       </pre>
                     </div>

@@ -17,7 +17,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
-import CommandPalette from './CommandPalette';
+import CommandPaletteLauncher from './CommandPaletteLauncher';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -122,13 +122,13 @@ const Header: React.FC = () => {
   // 認証されていないユーザーには最小限のヘッダーを表示
   if (!isAuthenticated && isAuthRequired()) {
     return (
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* ロゴのみ */}
             <div className="flex items-center">
               <Link to="/login" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">TC</span>
                 </div>
                 <span className="text-xl font-bold text-gray-900">
@@ -147,7 +147,7 @@ const Header: React.FC = () => {
               </Link>
               <Link
                 to="/register"
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+                className="bg-linear-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
               >
                 新規登録
               </Link>
@@ -161,13 +161,13 @@ const Header: React.FC = () => {
   // 認証されていないユーザーがパブリックページにいる場合も最小限のヘッダー
   if (!isAuthenticated) {
     return (
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* ロゴ */}
             <div className="flex items-center">
               <Link to="/login" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">TC</span>
                 </div>
                 <span className="text-xl font-bold text-gray-900">
@@ -186,7 +186,7 @@ const Header: React.FC = () => {
               </Link>
               <Link
                 to="/register"
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+                className="bg-linear-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
               >
                 新規登録
               </Link>
@@ -199,7 +199,7 @@ const Header: React.FC = () => {
 
   // 認証済みユーザー向けのフルヘッダー
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
       {/* [Gate #35] ゲストセッション中は常時表示するアカウント登録の案内バー。
           データが消えるわけではないが、端末やブラウザを変えると失われるため、
           目立つ位置で「保存」を促す。 */}
@@ -216,7 +216,7 @@ const Header: React.FC = () => {
           {/* ロゴ */}
           <div className="flex items-center">
             <Link to="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">TC</span>
               </div>
               <span className="text-xl font-bold text-gray-900 hidden sm:block">
@@ -247,7 +247,7 @@ const Header: React.FC = () => {
                   
                   {/* NEW バッジ */}
                   {item.isNew && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                    <span className="absolute -top-1 -right-1 bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
                       NEW
                     </span>
                   )}
@@ -262,7 +262,7 @@ const Header: React.FC = () => {
           </nav>
 
           {/* [Gate C3] 情報内検索・コマンドパレット(Ctrl+K) */}
-          <CommandPalette />
+          <CommandPaletteLauncher />
 
           {/* AI検索クイックアクセス（デスクトップ） */}
           <div className="hidden lg:flex items-center space-x-3">
@@ -277,7 +277,7 @@ const Header: React.FC = () => {
             {/* クイック検索ボタン */}
             <Link
               to="/search"
-              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2 shadow-sm hover:shadow-md transform hover:scale-105"
+              className="bg-linear-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2 shadow-xs hover:shadow-md transform hover:scale-105"
             >
               <Search size={16} />
               <span className="font-medium">AI検索</span>
@@ -310,7 +310,7 @@ const Header: React.FC = () => {
                 }}
                 className="flex items-center space-x-2 p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                   <User size={16} className="text-white" />
                 </div>
                 <span className="hidden sm:block font-medium">
@@ -364,7 +364,7 @@ const Header: React.FC = () => {
                   >
                     <Brain size={16} className="inline mr-2" />
                     AI検索設定
-                    <span className="ml-2 bg-gradient-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    <span className="ml-2 bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       NEW
                     </span>
                   </Link>
@@ -423,7 +423,7 @@ const Header: React.FC = () => {
                       <div className="flex items-center space-x-1">
                         <Zap size={16} className="text-yellow-500 animate-pulse" />
                         {item.isNew && (
-                          <span className="bg-gradient-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                          <span className="bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
                             NEW
                           </span>
                         )}
@@ -437,7 +437,7 @@ const Header: React.FC = () => {
               <div className="px-2 pt-2 border-t border-gray-200">
                 <Link
                   to="/search"
-                  className="flex items-center space-x-3 px-4 py-3 text-base font-medium bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg mb-2 hover:from-blue-600 hover:to-purple-700 transition-all"
+                  className="flex items-center space-x-3 px-4 py-3 text-base font-medium bg-linear-to-r from-blue-500 to-purple-600 text-white rounded-lg mb-2 hover:from-blue-600 hover:to-purple-700 transition-all"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <Search size={20} />
@@ -452,7 +452,7 @@ const Header: React.FC = () => {
                 >
                   <Settings size={20} />
                   <span>AI検索設定</span>
-                  <span className="ml-auto bg-gradient-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  <span className="ml-auto bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                     NEW
                   </span>
                 </Link>

@@ -40,7 +40,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return extractApiErrorDetailMessage(detail) ?? fallback;
+  // [Gate G2] {code, message}(所有者が見せない設定にした項目の 403 等)は message を出す
+  const message = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as { message?: unknown }).message : null;
+  return extractApiErrorDetailMessage(detail) ?? (typeof message === 'string' && message ? message : fallback);
 }
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
@@ -367,7 +369,7 @@ const PreparationPage: React.FC = () => {
         <form onSubmit={submitPacking} noValidate>
           <Modal.Body>
             <div className="space-y-4">
-              {formError && <div className="p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+              {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
               <div>
                 <label htmlFor="packing-name" className="block text-sm font-medium text-gray-800 mb-1">名前</label>
                 <input id="packing-name" className={inputClass} maxLength={120} value={packingForm.name}
@@ -443,7 +445,7 @@ const PreparationPage: React.FC = () => {
         <form onSubmit={submitTask} noValidate>
           <Modal.Body>
             <div className="space-y-4">
-              {formError && <div className="p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+              {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
               {taskReadinessKey && (
                 <p className="text-sm text-gray-700">準備状況の項目からタスクを作ります。完了にすると、その項目は対応済みになります。</p>
               )}
@@ -458,7 +460,7 @@ const PreparationPage: React.FC = () => {
                   onChange={(e) => updateTask('completion_criteria', e.target.value)} placeholder="例: 現地通貨を受け取った" />
               </div>
               <div className="flex gap-3 flex-wrap">
-                <div className="flex-1 min-w-[12rem]">
+                <div className="flex-1 min-w-48">
                   <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-800 mb-1">担当</label>
                   <select id="task-assignee" className={inputClass} value={taskForm.assignee_user_id}
                     onChange={(e) => updateTask('assignee_user_id', e.target.value)}>
@@ -466,7 +468,7 @@ const PreparationPage: React.FC = () => {
                     {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.name}{m.is_me ? '(自分)' : ''}</option>)}
                   </select>
                 </div>
-                <div className="flex-1 min-w-[12rem]">
+                <div className="flex-1 min-w-48">
                   <label htmlFor="task-due" className="block text-sm font-medium text-gray-800 mb-1">期限(任意)</label>
                   <input id="task-due" type="datetime-local" className={inputClass} value={taskForm.due_local}
                     onChange={(e) => updateTask('due_local', e.target.value)} />

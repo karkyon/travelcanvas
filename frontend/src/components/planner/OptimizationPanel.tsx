@@ -139,7 +139,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
   if (!day) return null;
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${className}`}>
+    <div className={`bg-white rounded-xl shadow-xs border border-gray-200 ${className}`}>
       <button
         type="button"
         className="w-full flex items-center justify-between p-4 text-left"
@@ -172,7 +172,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
 
           {error && (
             <div role="alert" className="flex items-start gap-2 text-sm text-red-800 bg-red-50 rounded-lg p-3">
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}

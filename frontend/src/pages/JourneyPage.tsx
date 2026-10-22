@@ -154,7 +154,7 @@ const JourneyPage: React.FC = () => {
               ) : (
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {metricRows(data.metrics).map((r) => (
-                    <div key={r.label} className="p-2 rounded bg-gray-50">
+                    <div key={r.label} className="p-2 rounded-sm bg-gray-50">
                       <dt className="text-sm text-gray-700">{r.label}</dt>
                       <dd className="text-xl font-semibold text-gray-900">{r.value}</dd>
                       <dd className="text-xs text-gray-700">{r.help}</dd>
@@ -182,7 +182,7 @@ const JourneyPage: React.FC = () => {
                       <Card padding="md" className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-gray-900">{`${e.planned_time ? `${e.planned_time} ` : ''}${e.title}`}</span>
-                          <span className="px-2 py-0.5 rounded text-sm bg-gray-100 text-gray-800" data-testid="actual-status">
+                          <span className="px-2 py-0.5 rounded-sm text-sm bg-gray-100 text-gray-800" data-testid="actual-status">
                             {status === 'visited' ? '行った' : status === 'skipped' ? '行かなかった' : '未記録'}
                           </span>
                           {e.start_diff_minutes !== null && <span className="text-sm text-gray-700">{diffLabel(e.start_diff_minutes)}</span>}
@@ -233,11 +233,11 @@ const JourneyPage: React.FC = () => {
                           <fieldset className="flex flex-wrap items-end gap-2">
                             <legend className="text-sm text-gray-800">{`到着と出発(${d.timezone_id})`}</legend>
                             <label className="text-sm text-gray-800">到着
-                              <input type="time" className="block border rounded px-2 py-1" value={t.start}
+                              <input type="time" className="block border rounded-sm px-2 py-1" value={t.start}
                                 onChange={(ev) => setTimes((s) => ({ ...s, [e.event_id]: { ...t, start: ev.target.value } }))} />
                             </label>
                             <label className="text-sm text-gray-800">出発
-                              <input type="time" className="block border rounded px-2 py-1" value={t.end}
+                              <input type="time" className="block border rounded-sm px-2 py-1" value={t.end}
                                 onChange={(ev) => setTimes((s) => ({ ...s, [e.event_id]: { ...t, end: ev.target.value } }))} />
                             </label>
                             <Button size="sm" variant="outline" disabled={busy} onClick={() => saveTimes(e, d.date, d.timezone_id)}>時刻を保存</Button>
@@ -254,7 +254,7 @@ const JourneyPage: React.FC = () => {
                               ) : (
                                 <>
                                   <label className="text-sm text-gray-800">旅行
-                                    <select className="block border rounded px-2 py-1" value={c.planId} onChange={(ev) => chooseCarryPlan(e, ev.target.value)}>
+                                    <select className="block border rounded-sm px-2 py-1" value={c.planId} onChange={(ev) => chooseCarryPlan(e, ev.target.value)}>
                                       <option value="">選んでください</option>
                                       {c.plans.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
                                     </select>
@@ -262,7 +262,7 @@ const JourneyPage: React.FC = () => {
                                   {c.planId && (
                                     c.days.length === 0 ? <p className="text-sm text-gray-700">その旅行には日程がありません。</p> : (
                                       <label className="text-sm text-gray-800">日
-                                        <select className="block border rounded px-2 py-1" value={c.dayId}
+                                        <select className="block border rounded-sm px-2 py-1" value={c.dayId}
                                           onChange={(ev) => setCarry((s) => ({ ...s, [e.event_id]: { ...c, dayId: ev.target.value } }))}>
                                           {c.days.map((day) => <option key={day.id} value={day.id}>{day.local_date}</option>)}
                                         </select>

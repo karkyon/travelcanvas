@@ -30,6 +30,7 @@ import { currentOfflineSession } from '@/utils/offlineSession';
 import {
   TRANSPORT_LABELS, computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 // [Gate L1] DOC-04 §16に準拠し、当日画面は一定間隔で自動更新する
 // (旅行者がアプリを開いたままにする想定のため、明示的なreloadを要求しない)。
@@ -81,7 +82,7 @@ const EventCard: React.FC<{
         )}
       </div>
       <div>
-        <div className="text-3xl font-bold text-gray-900 break-words">{event.title}</div>
+        <div className="text-3xl font-bold text-gray-900 wrap-break-word">{event.title}</div>
         <div className="text-xl text-gray-600 mt-1">
           {formatTimeInZone(event.start_at, timeZone)}
           {event.end_at && ` 〜 ${formatTimeInZone(event.end_at, timeZone)}`}
@@ -90,7 +91,7 @@ const EventCard: React.FC<{
           <div className="text-lg text-gray-700 mt-1">出発 {formatTimeInZone(event.departure_at, timeZone)}</div>
         )}
         {event.address && (
-          <div className="text-lg text-gray-600 mt-1 break-words">{event.address}</div>
+          <div className="text-lg text-gray-600 mt-1 wrap-break-word">{event.address}</div>
         )}
       </div>
       <div className="flex flex-wrap gap-2 pt-2">
@@ -166,8 +167,7 @@ const TodayPage: React.FC = () => {
         setIsStale(true);
         setError(null);
       } else {
-        const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-        setError(typeof detail === 'string' && detail ? detail : '当日情報の取得に失敗しました');
+        setError(errorDetailMessage(e, '当日情報の取得に失敗しました'));
       }
       setClock(Date.now());
     } finally {

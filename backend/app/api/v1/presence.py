@@ -4,24 +4,35 @@
 - POST   /plans/{plan_id}/presence             : この端末で旅行を開いていることを知らせ、同じ旅行を開いている人・
                                                  編集中の予定・知っている版より後の変更(誰が何を)を受け取る
 - DELETE /plans/{plan_id}/presence/{client_id} : 画面を閉じた(この端末の知らせを消す)
+- GET    /plans/{plan_id}/events/stream         : [Gate G2] 即時の通知(Server-Sent Events。サーバーから画面へ一方向に
+                                                 送り続ける仕組み)。版が上がった(revision)・開いている人や編集中の
+                                                 予定が変わった(presence)を、その場で知らせる。画面は知らせを受けたら
+                                                 すぐ POST presence で中身を取りに行く(ポーリングの間隔を待たない)。
+                                                 STREAM_SECONDS で接続を閉じ、画面は Last-Event-ID(知っている版)を付けて
+                                                 つなぎ直す。旅行を見られなくなった時は access_lost を送って閉じる。
+                                                 1人あたりの同時の接続は MAX_STREAMS_PER_USER まで(超えると 429)
 
 閲覧者以上(旅行を見られる人)だけが使える。他の人の名前は利用者名(メールアドレスは出さない。ゲストは「ゲスト」)。
 変更は ChangeSet(予定・日の変更の記録)から作る。予定の題名は旅行の参加者が見られる情報のため、そのまま出す。
 同じ予定を2人が編集した時は、先に保存した方が通り、後の保存は版の不一致(409)で止まる(黙って上書きしない)。
 """
+import asyncio
+import json
 import re
+import threading
 import time
 import uuid
 from datetime import datetime, timezone as dt_timezone
 from typing import Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.database import SessionLocal, get_db
+from app.core.plan_access import require_plan_access, resolve_plan_role
 from app.models.models import ChangeSet, PlanCollaborator, TravelEvent, TravelPlan, User
 from app.services import presence as pr
 
@@ -176,3 +187,120 @@ def leave(plan_id: str, client_id: str, db: Session = Depends(get_db),
     if re.match(CLIENT_ID_PATTERN, client_id):
         pr.leave(str(plan.id), f"{current_user.id}:{client_id}")
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# [Gate G2] FR-020 即時の共同編集の通知(Server-Sent Events)
+# ---------------------------------------------------------------------------
+STREAM_SECONDS = 45
+STREAM_TICK_SECONDS = 1.0
+STREAM_HEARTBEAT_SECONDS = 15
+MAX_STREAMS_PER_USER = 4
+
+# 利用者ごとの接続の印と始めた時刻。始まる前に切れた接続(finally が走らない)も、時間で数えなくなる
+_streams: Dict[str, Dict[str, float]] = {}
+_streams_lock = threading.Lock()
+
+
+def _session_factory():
+    """接続の間に何度も読むため、要求ごとの DB セッション(get_db)とは別に短いセッションを使う(試験で差し替える)。"""
+    return SessionLocal()
+
+
+def _presence_signature(plan_id: str, now: float) -> str:
+    """開いている人(利用者)と編集中の予定の組。変わった時だけ presence を送る(端末の知らせの時刻では変えない)。"""
+    parts = sorted({f"{e.get('user_id')}:{(e.get('editing') or {}).get('id') or ''}"
+                    for e in pr.entries(plan_id, now)})
+    return "|".join(parts)
+
+
+def _poll_state(plan_uuid: uuid.UUID, user_id) -> Optional[int]:
+    """(DB) いまの版。旅行が消された・見られなくなった時は None。"""
+    db = _session_factory()
+    try:
+        plan = db.query(TravelPlan).filter(TravelPlan.id == plan_uuid, TravelPlan.deleted_at.is_(None)).first()
+        if plan is None:
+            return None
+        user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+        if user is None or resolve_plan_role(db, plan, user) is None:
+            return None
+        return int(plan.revision)
+    finally:
+        db.close()
+
+
+def _sse(event: str, data: dict, event_id: Optional[int] = None) -> str:
+    head = f"id: {event_id}\n" if event_id is not None else ""
+    return f"{head}event: {event}\ndata: {json.dumps(data, separators=(',', ':'), ensure_ascii=False)}\n\n"
+
+
+def _stream_open(user_key: str) -> Optional[str]:
+    now = time.monotonic()
+    with _streams_lock:
+        mine = {k: t for k, t in _streams.get(user_key, {}).items() if now - t < STREAM_SECONDS + 30}
+        if len(mine) >= MAX_STREAMS_PER_USER:
+            _streams[user_key] = mine
+            return None
+        token = uuid.uuid4().hex
+        mine[token] = now
+        _streams[user_key] = mine
+        return token
+
+
+def _stream_close(user_key: str, token: str) -> None:
+    with _streams_lock:
+        mine = _streams.get(user_key) or {}
+        mine.pop(token, None)
+        if not mine:
+            _streams.pop(user_key, None)
+
+
+async def _event_stream(plan_uuid: uuid.UUID, user_id, start_revision: int, known: Optional[int], user_key: str,
+                        token: str):
+    plan_key = str(plan_uuid)
+    try:
+        last_rev = start_revision
+        sig = _presence_signature(plan_key, time.time())
+        yield "retry: 3000\n\n"
+        yield _sse("ready", {"revision": start_revision, "stream_seconds": STREAM_SECONDS}, start_revision)
+        if known is not None and known < start_revision:
+            yield _sse("revision", {"revision": start_revision, "known_revision": known}, start_revision)
+        started = time.monotonic()
+        last_beat = started
+        while time.monotonic() - started < STREAM_SECONDS:
+            await asyncio.sleep(STREAM_TICK_SECONDS)
+            rev = await asyncio.to_thread(_poll_state, plan_uuid, user_id)
+            if rev is None:
+                yield _sse("access_lost", {"reason": "plan_unavailable"})
+                return
+            if rev != last_rev:
+                yield _sse("revision", {"revision": rev, "known_revision": last_rev}, rev)
+                last_rev = rev
+            new_sig = _presence_signature(plan_key, time.time())
+            if new_sig != sig:
+                sig = new_sig
+                yield _sse("presence", {"people": len({p.split(':')[0] for p in sig.split('|') if p})}, last_rev)
+            if time.monotonic() - last_beat >= STREAM_HEARTBEAT_SECONDS:
+                last_beat = time.monotonic()
+                yield ": keep-alive\n\n"
+        yield _sse("reconnect", {"revision": last_rev}, last_rev)
+    finally:
+        _stream_close(user_key, token)
+
+
+@router.get("/{plan_id}/events/stream")
+def event_stream(plan_id: str, last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+                 known_revision: Optional[int] = Query(None, ge=0), db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    known = known_revision
+    if last_event_id is not None and last_event_id.strip().isdigit():
+        known = int(last_event_id.strip())
+    user_key = str(current_user.id)
+    token = _stream_open(user_key)
+    if token is None:
+        raise HTTPException(status_code=429, detail={
+            "code": "too_many_streams", "message": "同時に開いている画面が多すぎます。使っていない画面を閉じてください"})
+    gen = _event_stream(plan.id, current_user.id, int(plan.revision), known, user_key, token)
+    return StreamingResponse(gen, media_type="text/event-stream", headers={
+        "Cache-Control": "no-store", "X-Accel-Buffering": "no", "Connection": "keep-alive"})

@@ -31,7 +31,7 @@ const CandidateCard: React.FC<{
     <section aria-label={`案${c.id}`}>
       <h2 className="text-lg font-bold text-gray-900">
         {`案${c.id}: ${c.label}`}
-        {applied && <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-900">適用した案</span>}
+        {applied && <span className="ml-2 text-xs px-1.5 py-0.5 rounded-sm bg-green-100 text-green-900">適用した案</span>}
       </h2>
       <p className="text-sm text-gray-700 mt-1">{c.description}</p>
       {!c.available ? (
@@ -69,7 +69,7 @@ const CandidateCard: React.FC<{
             )}
           </div>
           {c.warnings.length > 0 && (
-            <ul className="text-sm text-amber-900 bg-amber-50 rounded p-2 list-disc pl-6" aria-label={`案${c.id}の注意`}>
+            <ul className="text-sm text-amber-900 bg-amber-50 rounded-sm p-2 list-disc pl-6" aria-label={`案${c.id}の注意`}>
               {c.warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
           )}

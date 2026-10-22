@@ -127,19 +127,19 @@ const CandidatesPage: React.FC = () => {
               <form aria-label="候補を追加" onSubmit={add} className="space-y-3">
                 <h2 className="text-lg font-semibold text-gray-900">候補を追加</h2>
                 <label className="block text-sm text-gray-800">名前
-                  <input className="mt-1 w-full border rounded px-2 py-1 text-gray-900" value={form.title} maxLength={200}
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.title} maxLength={200}
                     onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 </label>
                 <label className="block text-sm text-gray-800">URL(任意)
-                  <input className="mt-1 w-full border rounded px-2 py-1 text-gray-900" value={form.source_url} inputMode="url"
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.source_url} inputMode="url"
                     onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://" />
                 </label>
                 <label className="block text-sm text-gray-800">メモ(任意)
-                  <textarea className="mt-1 w-full border rounded px-2 py-1 text-gray-900" value={form.note} maxLength={2000}
+                  <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.note} maxLength={2000}
                     rows={2} onChange={(e) => setForm({ ...form, note: e.target.value })} />
                 </label>
                 <label className="block text-sm text-gray-800">優先度
-                  <select className="ml-2 border rounded px-2 py-1 text-gray-900" value={form.priority}
+                  <select className="ml-2 border rounded-sm px-2 py-1 text-gray-900" value={form.priority}
                     onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}>
                     {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
                   </select>
@@ -169,7 +169,7 @@ const CandidatesPage: React.FC = () => {
                   <article aria-labelledby={headingId}>
                     <div className="flex flex-wrap items-baseline gap-2">
                       <h3 id={headingId} className="font-semibold text-gray-900">{c.title}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
                       <span className="text-xs text-gray-700">優先度 {PRIORITY_LABEL[c.priority]}</span>
                     </div>
                     <p className="text-sm text-gray-700 mt-1">
@@ -201,13 +201,13 @@ const CandidatesPage: React.FC = () => {
                         {c.status === 'open' && (
                           <>
                             <label className="text-sm text-gray-800">日
-                              <select className="ml-1 border rounded px-2 py-1 text-gray-900" value={s.day_id}
+                              <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={s.day_id}
                                 onChange={(e) => setScheduling((x) => ({ ...x, [c.id]: { ...s, day_id: e.target.value } }))}>
                                 {days.map((d) => <option key={d.id} value={d.id}>{d.local_date}{d.title ? ` ${d.title}` : ''}</option>)}
                               </select>
                             </label>
                             <label className="text-sm text-gray-800">時刻
-                              <input type="time" className="ml-1 border rounded px-2 py-1 text-gray-900" value={s.time}
+                              <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={s.time}
                                 onChange={(e) => setScheduling((x) => ({ ...x, [c.id]: { ...s, time: e.target.value } }))} />
                             </label>
                             <Button size="sm" disabled={busy || days.length === 0} onClick={() => schedule(c)}

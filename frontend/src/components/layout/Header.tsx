@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, user }) => {
 
   return (
     <>
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* 左側: ロゴとナビゲーション */}
@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, user }) => {
               {onMenuClick && (
                 <button
                   onClick={onMenuClick}
-                  className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                  className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-500"
                 >
                   <span className="sr-only">メニューを開く</span>
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

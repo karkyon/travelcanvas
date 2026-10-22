@@ -276,36 +276,36 @@ const MemoriesPage: React.FC = () => {
                 {kind === 'video' && (
                   <label className="block text-sm text-gray-800">
                     動画のURL(https)
-                    <input type="url" className="block w-full mt-1 border rounded px-2 py-1" value={videoUrl}
+                    <input type="url" className="block w-full mt-1 border rounded-sm px-2 py-1" value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://" />
                   </label>
                 )}
                 <label className="block text-sm text-gray-800">
                   {kind === 'note' ? 'メモの内容' : 'メモの内容(任意)'}
-                  <textarea className="block w-full mt-1 border rounded px-2 py-1" rows={3} maxLength={5000} value={body}
+                  <textarea className="block w-full mt-1 border rounded-sm px-2 py-1" rows={3} maxLength={5000} value={body}
                     onChange={(e) => setBody(e.target.value)} />
                 </label>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <label className="block text-sm text-gray-800">
                     予定
-                    <select className="block w-full mt-1 border rounded px-2 py-1" value={eventId} onChange={(e) => setEventId(e.target.value)}>
+                    <select className="block w-full mt-1 border rounded-sm px-2 py-1" value={eventId} onChange={(e) => setEventId(e.target.value)}>
                       <option value="">(予定に紐付けない)</option>
                       {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.label}</option>)}
                     </select>
                   </label>
                   <label className="block text-sm text-gray-800">
                     日時(任意)
-                    <input type="datetime-local" className="block w-full mt-1 border rounded px-2 py-1" value={occurredAt}
+                    <input type="datetime-local" className="block w-full mt-1 border rounded-sm px-2 py-1" value={occurredAt}
                       onChange={(e) => setOccurredAt(e.target.value)} />
                   </label>
                   <label className="block text-sm text-gray-800">
                     場所の名前(任意)
-                    <input type="text" className="block w-full mt-1 border rounded px-2 py-1" maxLength={200} value={placeName}
+                    <input type="text" className="block w-full mt-1 border rounded-sm px-2 py-1" maxLength={200} value={placeName}
                       onChange={(e) => setPlaceName(e.target.value)} />
                   </label>
                   <label className="block text-sm text-gray-800">
                     公開範囲
-                    <select className="block w-full mt-1 border rounded px-2 py-1" value={visibility}
+                    <select className="block w-full mt-1 border rounded-sm px-2 py-1" value={visibility}
                       onChange={(e) => setVisibility(e.target.value as MemoryVisibility)}>
                       <option value="private">自分だけ</option>
                       <option value="members">旅行のメンバー</option>
@@ -333,7 +333,7 @@ const MemoriesPage: React.FC = () => {
                       <Card padding="md" className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2 text-sm">
                           <span className="font-medium text-gray-900">{KIND_LABEL[m.kind]}</span>
-                          <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-800">{VISIBILITY_LABEL[m.visibility]}</span>
+                          <span className="px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">{VISIBILITY_LABEL[m.visibility]}</span>
                           {!m.by_me && <span className="text-gray-700">{`${m.author_name}さんの記録`}</span>}
                           {!m.include_in_journal && <span className="text-gray-700">旅行記に使わない</span>}
                           {m.size !== null && <span className="text-gray-700">{formatSize(m.size)}</span>}
@@ -352,7 +352,7 @@ const MemoriesPage: React.FC = () => {
                           <div className="space-y-2">
                             <label className="block text-sm text-gray-800">
                               メモを編集
-                              <textarea className="block w-full mt-1 border rounded px-2 py-1" rows={3} maxLength={5000}
+                              <textarea className="block w-full mt-1 border rounded-sm px-2 py-1" rows={3} maxLength={5000}
                                 value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                             </label>
                             <div className="flex gap-2">
@@ -422,7 +422,7 @@ const MemoriesPage: React.FC = () => {
                     <ul aria-label="公開前の確認" className="space-y-1">
                       {draft.checks.map((c, i) => (
                         <li key={`${c.code}-${c.memory_id ?? i}`}
-                          className={`text-sm p-2 rounded ${c.severity === 'warning' ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-800'}`}>
+                          className={`text-sm p-2 rounded-sm ${c.severity === 'warning' ? 'bg-amber-50 text-amber-900' : 'bg-gray-50 text-gray-800'}`}>
                           {`${c.severity === 'warning' ? '要確認' : 'お知らせ'}: ${c.message}`}
                         </li>
                       ))}
@@ -430,7 +430,7 @@ const MemoriesPage: React.FC = () => {
                   )}
                   <label className="block text-sm text-gray-800">
                     下書き(Markdown)
-                    <textarea readOnly className="block w-full mt-1 border rounded px-2 py-1 font-mono text-sm" rows={12}
+                    <textarea readOnly className="block w-full mt-1 border rounded-sm px-2 py-1 font-mono text-sm" rows={12}
                       value={draft.markdown} />
                   </label>
                   <div className="flex gap-2">

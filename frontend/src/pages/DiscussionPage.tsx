@@ -27,7 +27,9 @@ type Tab = 'polls' | 'comments';
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
-  return extractApiErrorDetailMessage(detail) ?? fallback;
+  // [Gate G2] {code, message}(所有者が見せない設定にした項目の 403 等)は message を出す
+  const message = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as { message?: unknown }).message : null;
+  return extractApiErrorDetailMessage(detail) ?? (typeof message === 'string' && message ? message : fallback);
 }
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
@@ -207,7 +209,7 @@ const DiscussionPage: React.FC = () => {
           <form onSubmit={submitPoll} noValidate>
             <Modal.Body>
               <div className="space-y-4">
-                {formError && <div className="p-2 rounded bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+                {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
                 <div>
                   <label htmlFor="poll-title" className="block text-sm font-medium text-gray-800 mb-1">題名</label>
                   <input id="poll-title" className={inputClass} maxLength={200} value={pollForm.title}

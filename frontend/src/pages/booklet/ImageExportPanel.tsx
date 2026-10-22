@@ -64,13 +64,13 @@ const ImageExportPanel: React.FC<Props> = ({ planId, options }) => {
         </div>
         <div className="flex flex-wrap gap-3">
           <label className="text-sm text-gray-800">範囲
-            <select className="block mt-1 border rounded px-2 py-1" value={scope} onChange={(e) => setScope(e.target.value)}>
+            <select className="block mt-1 border rounded-sm px-2 py-1" value={scope} onChange={(e) => setScope(e.target.value)}>
               <option value="trip">旅行全体</option>
               {days.map((d) => <option key={d.date} value={d.date}>{`${d.date}の1日`}</option>)}
             </select>
           </label>
           <label className="text-sm text-gray-800">形式
-            <select className="block mt-1 border rounded px-2 py-1" value={format} onChange={(e) => setFormat(e.target.value as CardFormat)}>
+            <select className="block mt-1 border rounded-sm px-2 py-1" value={format} onChange={(e) => setFormat(e.target.value as CardFormat)}>
               {(Object.keys(FORMATS) as CardFormat[]).map((f) => <option key={f} value={f}>{FORMATS[f].label}</option>)}
             </select>
           </label>
@@ -83,7 +83,7 @@ const ImageExportPanel: React.FC<Props> = ({ planId, options }) => {
           <ul className="space-y-3" aria-label="作った画像">
             {images.map((src, i) => (
               <li key={src.slice(-32) + i} className="space-y-1">
-                <img src={src} alt={`${title}の画像(${i + 1}/${images.length})`} className="w-40 border border-gray-300 rounded" />
+                <img src={src} alt={`${title}の画像(${i + 1}/${images.length})`} className="w-40 border border-gray-300 rounded-sm" />
                 <Button size="sm" variant="outline" onClick={() => saveDataUrl(src, fileName(title, scope, i + 1, images.length))}>
                   {`画像を保存(${i + 1}/${images.length})`}
                 </Button>

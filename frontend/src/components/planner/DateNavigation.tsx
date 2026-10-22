@@ -151,7 +151,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
         {canScrollLeft && (
           <button
             onClick={() => scroll('left')}
-            className="absolute left-0 top-0 z-10 h-full px-2 bg-gradient-to-r from-white via-white to-transparent hover:from-gray-50 transition-colors"
+            className="absolute left-0 top-0 z-10 h-full px-2 bg-linear-to-r from-white via-white to-transparent hover:from-gray-50 transition-colors"
           >
             <ChevronLeft size={16} className="text-gray-600" />
           </button>
@@ -161,7 +161,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
         {canScrollRight && (
           <button
             onClick={() => scroll('right')}
-            className="absolute right-0 top-0 z-10 h-full px-2 bg-gradient-to-l from-white via-white to-transparent hover:from-gray-50 transition-colors"
+            className="absolute right-0 top-0 z-10 h-full px-2 bg-linear-to-l from-white via-white to-transparent hover:from-gray-50 transition-colors"
           >
             <ChevronRight size={16} className="text-gray-600" />
           </button>
@@ -180,7 +180,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
               data-day={day.index}
               onClick={() => handleDayClick(day.index)}
               className={`
-                relative flex-shrink-0 min-w-[90px] p-3 rounded-lg border-2 transition-all duration-200
+                relative shrink-0 min-w-[90px] p-3 rounded-lg border-2 transition-all duration-200
                 ${day.isActive 
                   ? 'border-blue-500 bg-blue-50 shadow-md transform scale-105' 
                   : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'

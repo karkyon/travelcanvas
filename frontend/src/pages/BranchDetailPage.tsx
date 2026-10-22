@@ -148,32 +148,32 @@ const BranchDetailPage: React.FC = () => {
                 {dayItems.length === 0 ? <p className="text-sm text-gray-700 mt-1">予定はありません。</p> : (
                   <ul className="mt-2 space-y-2">
                     {dayItems.map((it) => (
-                      <li key={it.key} className={`border rounded p-2 ${it.removed ? 'bg-gray-50' : ''}`} data-testid={`branch-item-${it.key}`}>
+                      <li key={it.key} className={`border rounded-sm p-2 ${it.removed ? 'bg-gray-50' : ''}`} data-testid={`branch-item-${it.key}`}>
                         <div className="grid gap-2 sm:grid-cols-[6rem_1fr_9rem] items-end">
                           <div>
                             <label htmlFor={`time-${it.key}`} className="block text-xs text-gray-800">開始時刻</label>
-                            <input id={`time-${it.key}`} type="time" className="w-full border rounded px-2 py-1 text-sm"
+                            <input id={`time-${it.key}`} type="time" className="w-full border rounded-sm px-2 py-1 text-sm"
                               value={it.local_start_time ?? ''} disabled={!editable || it.removed}
                               onChange={(e) => edit(it.key, { local_start_time: e.target.value || null })} />
                           </div>
                           <div>
                             <label htmlFor={`title-${it.key}`} className="block text-xs text-gray-800">予定名</label>
-                            <input id={`title-${it.key}`} className={`w-full border rounded px-2 py-1 text-sm ${it.removed ? 'line-through' : ''}`}
+                            <input id={`title-${it.key}`} className={`w-full border rounded-sm px-2 py-1 text-sm ${it.removed ? 'line-through' : ''}`}
                               maxLength={200} value={it.title} disabled={!editable || it.removed}
                               onChange={(e) => edit(it.key, { title: e.target.value })} />
                           </div>
                           <div>
                             <label htmlFor={`day-${it.key}`} className="block text-xs text-gray-800">日付</label>
-                            <select id={`day-${it.key}`} className="w-full border rounded px-2 py-1 text-sm" value={it.day_id}
+                            <select id={`day-${it.key}`} className="w-full border rounded-sm px-2 py-1 text-sm" value={it.day_id}
                               disabled={!editable || it.removed} onChange={(e) => edit(it.key, { day_id: e.target.value })}>
                               {detail.days.map((d) => <option key={d.id} value={d.id}>{d.local_date}</option>)}
                             </select>
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
-                          {it.locked && <span className="px-1.5 rounded bg-gray-200 text-gray-900">確定済み</span>}
-                          {it.source_event_id === null && <span className="px-1.5 rounded bg-green-100 text-green-900">追加</span>}
-                          {it.removed && <span className="px-1.5 rounded bg-red-100 text-red-800">外す</span>}
+                          {it.locked && <span className="px-1.5 rounded-sm bg-gray-200 text-gray-900">確定済み</span>}
+                          {it.source_event_id === null && <span className="px-1.5 rounded-sm bg-green-100 text-green-900">追加</span>}
+                          {it.removed && <span className="px-1.5 rounded-sm bg-red-100 text-red-800">外す</span>}
                           {it.note && <span className="text-amber-900">{it.note}</span>}
                           {editable && it.source_event_id !== null && (
                             <Button variant="ghost" size="sm" onClick={() => edit(it.key, { removed: !it.removed })}>

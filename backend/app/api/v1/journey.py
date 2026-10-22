@@ -24,6 +24,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     EventActual, LocationPointBatch, LocationTrack, Memory, TravelDay, TravelEvent, TravelPlan, User,
 )
@@ -218,7 +219,7 @@ def delete_actual(plan_id: str, event_id: str, db: Session = Depends(get_db),
 @router.post("/{plan_id}/journey/events/{event_id}/carry-over", status_code=201)
 def carry_over(plan_id: str, event_id: str, body: CarryOverInput, db: Session = Depends(get_db),
                current_user: User = Depends(get_current_user_or_guest)):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, _role, src_hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     ev = _get_event(db, plan, event_id)
     a = db.query(EventActual).filter(EventActual.plan_id == plan.id, EventActual.event_id == ev.id).first()
     if a and a.status == "visited":
@@ -231,9 +232,13 @@ def carry_over(plan_id: str, event_id: str, body: CarryOverInput, db: Session = 
         raise _bad("day_not_found", "戻し先の日が見つかりません")
     max_sort = db.query(TravelEvent).filter(TravelEvent.day_id == day.id).count()
     # 場所・種類・メモだけを写す(時刻・予約・確定ロック・費用は写さない)
-    new_event = TravelEvent(plan_id=target.id, day_id=day.id, place_id=ev.place_id, title=ev.title,
-                            description=ev.description, event_type=ev.event_type, address=ev.address,
-                            latitude=ev.latitude, longitude=ev.longitude, sort_order=max_sort)
+    # [Gate G2] FR-045 元の旅行で隠されている項目(メモ・住所と位置)は写さない
+    hide_place = "event_address" in src_hidden
+    new_event = TravelEvent(plan_id=target.id, day_id=day.id, place_id=None if hide_place else ev.place_id,
+                            title=ev.title, description=None if "event_notes" in src_hidden else ev.description,
+                            event_type=ev.event_type, address=None if hide_place else ev.address,
+                            latitude=None if hide_place else ev.latitude,
+                            longitude=None if hide_place else ev.longitude, sort_order=max_sort)
     db.add(new_event)
     db.flush()
     revision = plans_api._record_change_and_bump_revision(

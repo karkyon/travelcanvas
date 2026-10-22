@@ -21,6 +21,15 @@
 同じ値・弱い鍵・`OFFLINE_PACK_KEY_SECRET` の未設定で起動しない。開発環境でも
 `python3 scripts/ops/tcops.py keys check` で同じ点検ができる(値は出さない)。
 
+### 1.1 DB のロールのパスワード(Gate G2 SEC-F4)
+
+| 値 | 用途 | 切り替え方 |
+|---|---|---|
+| `DB_PASSWORD`(`DATABASE_URL` に含む) | DB の所有者(migration・ロールの設定・運用の道具だけ。backend には渡さない) | postgres の `ALTER ROLE` と `.env` を同時に |
+| `DB_APP_PASSWORD`(`APP_DATABASE_URL` に含む) | アプリのロール `tc_app`(表の読み書きだけ) | `.env` の2つを直して `docker compose up -d --force-recreate migrate backend`(Runbook §8.6) |
+
+`tc_backup`・`tc_readonly_monitor` はパスワードを持たない(postgres のコンテナの中だけで使う)。
+
 ## 2. 暗号化の鍵の版の切り替え(`ENCRYPTION_KEY`)
 
 暗号文の書式(Fernet)は変えないので、DB の変更は要らない。どの鍵の暗号文かは、各鍵で検証して判定する。

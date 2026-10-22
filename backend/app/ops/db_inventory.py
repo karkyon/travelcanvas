@@ -23,7 +23,8 @@ from app.ops.opslib import database_name, replace_database
 
 
 def engine_for(database: Optional[str]) -> Engine:
-    url = os.environ.get("DATABASE_URL", "")
+    # [Gate G2] SEC-F4 運用の道具は所有者の接続(OPS_DATABASE_URL。tcops がその実行のときだけ渡す)を優先する
+    url = os.environ.get("OPS_DATABASE_URL") or os.environ.get("DATABASE_URL", "")
     if not url:
         raise SystemExit("DATABASE_URL が設定されていません")
     if database:

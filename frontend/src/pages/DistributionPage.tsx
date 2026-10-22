@@ -88,7 +88,7 @@ const DistributionPage: React.FC = () => {
         {notice && <p role="status" className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 border border-green-200">{notice}</p>}
 
         {!dist.revoked_at && (
-          <section className="mt-4 bg-white rounded-xl shadow-sm p-4" aria-label="確認と複製">
+          <section className="mt-4 bg-white rounded-xl shadow-xs p-4" aria-label="確認と複製">
             <p className="text-gray-900 mb-3">あなたの確認: {myAckLabel(dist)}</p>
             <div className="flex flex-wrap gap-2">
               {!dist.acknowledged && (
@@ -120,7 +120,7 @@ const DistributionPage: React.FC = () => {
         )}
 
         {admin && acks && (
-          <section className="mt-8 bg-white rounded-xl shadow-sm p-6" aria-labelledby="acks-heading">
+          <section className="mt-8 bg-white rounded-xl shadow-xs p-6" aria-labelledby="acks-heading">
             <h2 id="acks-heading" className="text-lg font-semibold text-gray-900 mb-2">確認の状況</h2>
             <p className="text-gray-800 mb-3">最新版(版{acks.version})を確認 {acks.acknowledged_latest}人・未確認 {acks.pending}人</p>
             <ul className="space-y-1 mb-6">

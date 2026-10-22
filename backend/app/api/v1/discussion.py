@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     Comment,
     Expense,
@@ -633,7 +634,9 @@ def list_comments(
     target_id: Optional[str] = Query(None),
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    if member_policy.comment_target_hidden(hidden, target_type):
+        raise member_policy.hidden_error(member_policy.COMMENT_TARGET_CATEGORY[target_type])
     q = db.query(Comment).filter(Comment.plan_id == plan.id)
     if target_type is not None:
         if target_type not in TARGET_TYPES:
@@ -643,7 +646,8 @@ def list_comments(
             q = q.filter(Comment.target_id.is_(None))
         elif target_id is not None:
             q = q.filter(Comment.target_id == _parse_uuid(target_id, "target_id"))
-    rows = q.all()
+    # [Gate G2] FR-045 隠された予約・費用へのコメントは出さない
+    rows = [c for c in q.all() if not member_policy.comment_target_hidden(hidden, c.target_type)]
     # 削除済みでも返信のある親はスレッドの形を保つために残す
     parents_with_replies = {c.parent_id for c in rows if c.parent_id and c.deleted_at is None}
     rows = [c for c in rows if c.deleted_at is None or c.id in parents_with_replies]
@@ -657,7 +661,9 @@ def create_comment(
     plan_id: str, payload: CommentCreate, request: Request,
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    if member_policy.comment_target_hidden(hidden, payload.target_type):
+        raise member_policy.hidden_error(member_policy.COMMENT_TARGET_CATEGORY[payload.target_type])
     target_id = None
     if payload.target_type == "plan":
         if payload.target_id is not None:
@@ -703,9 +709,11 @@ def update_comment(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     cid = _parse_uuid(comment_id, "comment_id")
     c = db.query(Comment).filter(Comment.id == cid, Comment.plan_id == plan.id, Comment.deleted_at.is_(None)).first()
+    if c is not None and member_policy.comment_target_hidden(hidden, c.target_type):
+        c = None  # [Gate G2] FR-045 隠された対象へのコメントは無いものとして扱う
     if not c:
         raise HTTPException(status_code=404, detail="コメントが見つかりません")
     data = payload.model_dump(exclude_unset=True)
@@ -736,9 +744,11 @@ def delete_comment(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     cid = _parse_uuid(comment_id, "comment_id")
     c = db.query(Comment).filter(Comment.id == cid, Comment.plan_id == plan.id, Comment.deleted_at.is_(None)).first()
+    if c is not None and member_policy.comment_target_hidden(hidden, c.target_type):
+        c = None  # [Gate G2] FR-045 隠された対象へのコメントは無いものとして扱う
     if not c:
         raise HTTPException(status_code=404, detail="コメントが見つかりません")
     if c.author_user_id != current_user.id and role not in ("owner", "editor"):

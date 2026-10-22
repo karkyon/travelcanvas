@@ -112,14 +112,14 @@ const DummyMap: React.FC<{
       
       {/* ロケーション一覧 */}
       <div className="absolute bottom-4 left-4 right-4 max-h-32 overflow-y-auto">
-        <div className="bg-white rounded-lg shadow-sm p-3">
+        <div className="bg-white rounded-lg shadow-xs p-3">
           <h4 className="text-sm font-semibold text-gray-700 mb-2">スポット一覧</h4>
           <div className="space-y-1">
             {locations.map((location, index) => (
               <button
                 key={location.id}
                 onClick={() => onLocationClick?.(location)}
-                className="w-full text-left p-2 text-xs bg-gray-50 hover:bg-blue-50 rounded flex items-center gap-2"
+                className="w-full text-left p-2 text-xs bg-gray-50 hover:bg-blue-50 rounded-sm flex items-center gap-2"
               >
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] ${
                   location.isCurrent ? 'bg-orange-500' : location.isVisited ? 'bg-green-500' : 'bg-blue-500'
@@ -400,7 +400,7 @@ const MapView: React.FC<MapViewProps> = ({
             </button>
             <button
               onClick={handleResetView}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
             >
               <RotateCcw size={12} />
               リセット

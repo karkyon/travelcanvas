@@ -77,7 +77,7 @@ const AccountDeletionCard: React.FC<{ onDeleted: () => void }> = ({ onDeleted })
               <div className="mt-3">
                 <label htmlFor="delete-password" className="block text-sm font-medium text-gray-800">現在のパスワード</label>
                 <input id="delete-password" type="password" autoComplete="current-password" value={password}
-                  onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full max-w-sm border rounded px-2 py-1" />
+                  onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full max-w-sm border rounded-sm px-2 py-1" />
               </div>
             )}
             <div className="mt-3">
@@ -85,7 +85,7 @@ const AccountDeletionCard: React.FC<{ onDeleted: () => void }> = ({ onDeleted })
                 確認のため「{preview.confirmation_text}」と入力してください
               </label>
               <input id="delete-confirmation" type="text" value={confirmation} autoComplete="off"
-                onChange={(e) => setConfirmation(e.target.value)} className="mt-1 w-full max-w-sm border rounded px-2 py-1" />
+                onChange={(e) => setConfirmation(e.target.value)} className="mt-1 w-full max-w-sm border rounded-sm px-2 py-1" />
             </div>
             <div className="mt-3 flex gap-2">
               <button type="submit" disabled={!canDelete(preview, confirmation, password) || busy !== null}

@@ -24,13 +24,13 @@ U = vitest(`services/api/b1organizations.test.ts`・`pages/Organizations.b1.test
 | # | 要件 | 状態 | 証拠 |
 |---|---|---|---|
 | 1 | OAuth スコープ | IMPLEMENTED | client_credentials(RFC 6749 §4.4、Basic/本文)。秘密は作成時だけ表示・DB はハッシュ。1時間の不透明トークン(ハッシュ)。スコープ `distributions:read`・`acknowledgements:read`、要求で絞れる。誤りは RFC の error 形式(invalid_client 401・invalid_scope・unsupported_grant_type)、不足は 403 insufficient_scope。期限切れ・クライアントの停止で即無効。B・E |
-| 2 | 限定操作 | PARTIAL | 読み取りだけ(配布の一覧・写し・確認の件数)。旅行・予定・場所・予約の書き込みは無い(個人データを外部へ出さない方針の最小形) |
+| 2 | 限定操作 | PARTIAL | 読み取りだけ(配布の一覧・写し・確認の件数)。旅行・予定・場所・予約の書き込みは無い(個人データを外部へ出さない方針の最小形) ※ **SUPERSEDED BY Gate G2(配布の書き込みの API(distributions:write、Idempotency-Key・If-Match)。gate-g2-trace.md #G2-42)** |
 | 3 | Webhook 署名 | IMPLEMENTED | `X-TravelCanvas-Signature: t=…,v1=HMAC-SHA256(secret, "t.本文")`、`X-TravelCanvas-Event-Id`(受け手の冪等化)。鍵は作成時だけ表示・暗号化して保存。受け手の検証の見本 `verify_signature`(期限300秒)。B |
 | 4 | Webhook の安全 | IMPLEMENTED | https だけ・資格情報入りの URL・localhost・内部の IP(直書き)は登録を拒否、送る直前の名前解決で内部のアドレスなら送らない(SSRF)、リダイレクトを追わない、5秒で打ち切り。本文は ID・版・件数だけ(個人・秘密の値なし。B で検査) |
-| 5 | 再送・記録 | IMPLEMENTED | 送信の記録(状態・回数・応答コード)、失敗は5回まで送り直し、接続の確かめ(ping)。自動の再送の予定・dead-letter の隔離は無い(PARTIAL) |
+| 5 | 再送・記録 | IMPLEMENTED | 送信の記録(状態・回数・応答コード)、失敗は5回まで送り直し、接続の確かめ(ping)。自動の再送の予定・dead-letter の隔離は無い(PARTIAL) ※ **SUPERSEDED BY Gate G2(1・5・30分・2・6時間の自動の再送と dead、410 で停止。gate-g2-trace.md #G2-42)** |
 | 6 | レート制限 | IMPLEMENTED | トークンは接続元ごと1分20回、外部 API はクライアントごと1分120回(429)。B |
 | 7 | 監査 | IMPLEMENTED | トークンの発行・外部 API の呼び出しをクライアント ID と経路の型だけで記録(トークン・秘密は残さない。B) |
-| 8 | 鍵の切り替え(secret rotation) | NOT STARTED | 作り直して古いものを止める運用で代える |
+| 8 | 鍵の切り替え(secret rotation) | NOT STARTED | 作り直して古いものを止める運用で代える ※ **SUPERSEDED BY Gate G2(秘密・署名の鍵の猶予つきの切り替え。gate-g2-trace.md #G2-42)** |
 | 9 | 埋め込み | NOT STARTED | — |
 
 → FR-041 INTEGRATED(部分)、FR-042 INTEGRATED(部分)(E2E 有)。

@@ -18,8 +18,7 @@ import {
   collaborator, insertionPreview, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail,
   notification, optimizationProposal, placeDetail, promoteQuickDraftResult, publicSharedPlan, routePreview,
   shareLink, sharePreview, unreadCount,
-  organization, orgMember, orgDistribution, distributionAckList, forkResult, orgApiClient, orgApiClientList, orgWebhook,
-  orgWebhookList, orgWebhookDelivery, user, authResponse, guestSessionResponse, planConstraint, revisionResult,
+  user, authResponse, guestSessionResponse, planConstraint, revisionResult,
   validationRunDetail, validationRunSummary, deletedPlanSummary, planDeleteResult, planPurgeResult,
   collaboratorRemoveResult, itemDeleteResult, lockedRelationError, routeOptionDeleteResult, undoConflictError,
   packingItem, packingSuggestions, planMember, preparationTask, readiness,
@@ -43,6 +42,13 @@ import {
   areaCellsUploadResult, locationSettings, presenceState, privateProfile, planPrivateProfile,
   adminSystemStats, adminUsersPage, adminUserDetail, adminManageResult, auditLogPage,
 } from './decoders';
+import {
+  supportGrant, supportGrantList, adminSupportGrant, supportView, adminOperations, adminShareLink, memberPolicy,
+} from './decodersG2';
+import {
+  organization, orgMember, orgDistribution, distributionAckList, forkResult, orgApiClient, orgApiClientList, orgWebhook,
+  orgWebhookList, orgWebhookDelivery,
+} from './decodersOrg';
 import { api } from './index';
 import type { MinimalHttpClient } from './types';
 
@@ -139,6 +145,32 @@ const CASES: Array<[keyof typeof fx, Decoder<unknown>]> = [
   ['webhook_deliveries', arrayOf(orgWebhookDelivery)],
   ['webhook_redelivered', orgWebhookDelivery],
   ['webhook_revoked', orgWebhook],
+  // [Gate G2] FR-042 秘密・署名の鍵の切り替え / FR-040 サポート閲覧・運用の要約 / FR-045 同行者向けの項目の規則
+  ['g2_api_client_created', orgApiClient],
+  ['g2_api_clients', orgApiClientList],
+  ['g2_api_client_revoked', orgApiClient],
+  ['g2_webhook_created', orgWebhook],
+  ['g2_webhooks', orgWebhookList],
+  ['g2_webhook_ping', orgWebhookDelivery],
+  ['g2_webhook_deliveries', arrayOf(orgWebhookDelivery)],
+  ['g2_webhook_redelivered', orgWebhookDelivery],
+  ['g2_webhook_revoked', orgWebhook],
+  ['api_client_rotated', orgApiClient],
+  ['api_client_retired', orgApiClient],
+  ['webhook_rotated', orgWebhook],
+  ['webhook_retired', orgWebhook],
+  ['support_grant_created', supportGrant],
+  ['support_grants', supportGrantList],
+  ['support_grant_revoked', supportGrant],
+  ['admin_support_grants', object({ grants: arrayOf(adminSupportGrant) })],
+  ['admin_support_view_plan', supportView],
+  ['admin_support_view_account', supportView],
+  ['admin_operations', adminOperations],
+  ['admin_share_links', object({ share_links: arrayOf(adminShareLink) })],
+  ['admin_share_link_revoked', object({ id: str, revoked_at: str })],
+  ['member_policy_owner', memberPolicy],
+  ['member_policy_viewer', memberPolicy],
+  ['plan_detail_member_hidden', normalizedPlanDetail],
   ['collaborator_invited', collaborator],
   ['collaborator_invited_unknown_user', collaborator],
   ['collaborator_list', arrayOf(collaborator)],

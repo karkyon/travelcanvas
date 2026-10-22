@@ -79,13 +79,13 @@ const AtlasPage: React.FC = () => {
 
       <div className="mt-4 flex flex-wrap gap-4">
         <label className="text-sm text-gray-800">区画の大きさ
-          <select className="block mt-1 border rounded px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as AtlasPrecision)}>
+          <select className="block mt-1 border rounded-sm px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as AtlasPrecision)}>
             <option value="region">約11km(0.1度)</option>
             <option value="area">約110km(1度)</option>
           </select>
         </label>
         <label className="text-sm text-gray-800">年
-          <select className="block mt-1 border rounded px-2 py-1" value={year ?? ''} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
+          <select className="block mt-1 border rounded-sm px-2 py-1" value={year ?? ''} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
             <option value="">すべて</option>
             {(data?.years ?? []).map((y) => <option key={y} value={y}>{`${y}年`}</option>)}
           </select>
@@ -111,7 +111,7 @@ const AtlasPage: React.FC = () => {
               </ul>
               {data.cells.length > 0 && (
                 <svg viewBox={`0 0 ${sketch.width} ${sketch.height}`} width="100%" style={{ maxWidth: 360 }} role="img"
-                  aria-label={`訪れた地域の略図(区画${data.cells.length}件。内容は下の一覧と同じ)`} className="border border-gray-200 rounded bg-white">
+                  aria-label={`訪れた地域の略図(区画${data.cells.length}件。内容は下の一覧と同じ)`} className="border border-gray-200 rounded-sm bg-white">
                   {sketch.rects.map((r) => (
                     <rect key={r.key} x={r.x} y={r.y} width={Math.max(r.w, 2)} height={Math.max(r.h, 2)} fill={r.fill} stroke="#374151" strokeWidth="0.5">
                       <title>{r.title}</title>

@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r13** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-20  
+> 文書ID: DOC-10 / 版: **v5.1-r14** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-21  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,9 +14,9 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `16f1aa9`(Gate H1。この版を入れる Gate G1 の commit はこの直後) |
-| Alembic head | `e6b4c8d2f3a5`(単一の head。G1 は migration なし) |
-| 基準の試験の実測(omega-dev2、H1 のパッチ実行時) | pytest 994 passed・13 skipped / Vitest 666 / Playwright E2E 52(失敗0・不安定0)/ ログの検査 2,287 行で漏れ0 |
+| 基準commit | `4bb0240`(Gate G1。この版を入れる Gate G2 の commit はこの直後) |
+| Alembic head | `f3c9e5b7a2d1`(単一の head。G2 で `f1a7c3e9b2d4` → `f2b8d4a1c6e3` → `f3c9e5b7a2d1`) |
+| 基準の試験の実測(サンドボックス、G2 の予行) | pytest 1,064 passed・6 skipped / Vitest 677 / Playwright E2E 56(失敗0)。backend は表の読み書きだけのロール(tc_app)で動かした |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -63,13 +63,13 @@
 | 見方 | 値 |
 |---|---|
 | コードがある機能(IMPLEMENTED 以上) | 57/58 = 98% |
-| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 27) |
-| VERIFIED | 26/58 = 45% |
+| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 24) |
+| VERIFIED | 29/58 = 50% |
 | RELEASED | 0/58 = 0% |
-| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約77.8% |
+| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約78.8% |
 | 未着手(SPECIFIED 以下) | FR-058 |
 
-VERIFIED の一覧: 001/002/003/006/009/010/012/013/016/017/021/023/025/026/028/029/031/032/033/034/038/043/044/047/050/053。
+VERIFIED の一覧: 001/002/003/006/009/010/012/013/016/017/020/021/023/025/026/028/029/031/032/033/034/038/040/043/044/045/047/050/053。
 <!-- /generated:summary -->
 
 ## 3. 親機能のトレーサビリティ(全58 FR)
@@ -99,7 +99,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-017 | 実行可能性 | VERIFIED | ✓ | L3 | 時刻表の照合、標準滞在時間、休憩の自動判定 |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | ✓ | L4 | 公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間 |
 | FR-019 | What-if | INTEGRATED(部分) | ✓ | P7 | 予約・移動・費用の分岐、移動時間・制約・費用差の比較 |
-| FR-020 | 共同編集 | INTEGRATED(部分) | ✓ | C1 | カーソル・WebSocket の即時配信 |
+| FR-020 | 共同編集 | VERIFIED | ✓ | C1・G2 | 文字単位の同時編集(CRDT)は対象外(版の競合を検出する方式) |
 | FR-021 | 共有・権限 | VERIFIED | ✓ | #25・#30・E1 | 所有者の移譲 |
 | FR-022 | 合意形成 | INTEGRATED(部分) | ✓ | P3 | 決定した候補の予定への反映、締切 |
 | FR-023 | 秘匿プロフィール・制約 | VERIFIED | ✓ | L2・C1 | — |
@@ -119,12 +119,12 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1 | 旅行記の公開URL、顔の検査、MEMORY MAP、記録の Undo |
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
 | FR-039 | 輸出・削除 | INTEGRATED(部分) | ✓ | P6・P9 | 猶予つきのアカウント削除、所有者の移譲、出典つきの訂正 |
-| FR-040 | 管理・監査 | INTEGRATED(部分) | ✓ | A2・S11 | サポート閲覧(同意・期限)、共有の失効・ジョブ・容量の管理画面 |
+| FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2 | 濫用の自動検知の画面(FC-097。検知は S6 の運用の道具) |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | ✓ | B1 | ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち) |
-| FR-042 | API・埋込 | INTEGRATED(部分) | ✓ | B1 | 書き込みの API、鍵の切り替え、自動の再送・dead-letter、埋め込み |
+| FR-042 | API・埋込 | INTEGRATED(部分) | ✓ | B1・G2 | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-043 | Quick Plan | VERIFIED | ✓ | #38・R2 | — |
 | FR-044 | Guest Travel View | VERIFIED | ✓ | #35・#41・E1 | 詳しい表示・複製の説明 |
-| FR-045 | 安全な共有ポリシー | INTEGRATED(部分) | ✓ | F45 | 同行者(メンバー)向けの項目単位の規則 |
+| FR-045 | 安全な共有ポリシー | VERIFIED | ✓ | F45・G2 | — |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | ✓ | P4・P16 | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |
 | FR-047 | 旅程複製 | VERIFIED | ✓ | #39・R3-12・E1 | — |
 | FR-048 | Offline Travel Pack(端末) | INTEGRATED(部分) | ✓ | #36・P11・K1 | 予定以外のオフライン編集、通信しない端末の遠隔消去 |
@@ -214,7 +214,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r10 | 2026-10-18 | `501de35` | E1・K1・S1、セキュリティ整理(§6) |
 | r11 | 2026-10-19 | `5b3ff04` | S2〜S10 の適用 |
 | r12 | 2026-10-20 | `af7de3d` | L5・V1・C1・A2・S11・V2・Q1・C2・C3・F45・B1(VERIFIED 26)。追補として資料室にあった |
-| **r13** | 2026-10-20 | `16f1aa9` | **本書をリポジトリの正本にした(r12 の追補と r11 の本体を統合)。状態の機械が読む正本 `fr-status.json`、CI の照合(表・集計・ledger・migration head・基準 commit)。H1・G1 を反映。FR の状態の遷移なし** |
+| r13 | 2026-10-20 | `16f1aa9` | 本書をリポジトリの正本にした(r12 の追補と r11 の本体を統合)。状態の機械が読む正本 `fr-status.json`、CI の照合(表・集計・ledger・migration head・基準 commit)。H1・G1 を反映。FR の状態の遷移なし |
+| **r14** | 2026-10-21 | `4bb0240` | **Gate G2: DB の権限の分離(SEC-F4)・依存のメジャー更新(DEP-1)。FR-020(即時の通知)・FR-040(サポート閲覧・運用の要約)・FR-045(同行者向けの項目の規則)を VERIFIED、FR-042(書き込みの API・鍵の切り替え・自動の再送)は INTEGRATED(部分)のまま(埋め込みが残る)。`docs/trace/gate-g2-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

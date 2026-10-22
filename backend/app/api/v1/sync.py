@@ -24,7 +24,7 @@ from app.api.v1 import branches as branches_api
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import ChangeItem, ChangeSet, SyncOperation, TravelDay, TravelEvent, TravelPlan, User
 from app.services import sync as sy
 from app.services.audit_service import record_audit_event
@@ -173,10 +173,12 @@ CODE_MESSAGES = {
     "base_revision_required": "編集を始めた版(base_revision)が必要です",
     "no_change": "変更はありませんでした",
     "already_deleted": "既に削除されています",
+    "member_field_hidden": "見せない設定の項目は変更できません(旅行の所有者に依頼してください)",
 }
 
 
-def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn) -> Dict[str, Any]:
+def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn,
+             hidden=member_policy.EMPTY) -> Dict[str, Any]:
     existing = (db.query(SyncOperation)
                 .filter(SyncOperation.user_id == user.id, SyncOperation.operation_id == uuid.UUID(op.operation_id))
                 .first())
@@ -195,6 +197,12 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         fields = sy.clean_fields(op.fields, op.action) if op.action != "delete" else {}
     except sy.SyncError as e:
         return reject(e.code, str(e))
+    # [Gate G2] FR-045 所有者が隠した項目(予定のメモ・住所と位置)は、端末からの変更も受け付けない
+    fields = member_policy.drop_unseen(hidden, fields)
+    blocked = member_policy.forbidden_write_fields(hidden, fields)
+    if blocked:
+        return reject("member_field_hidden", "見せない設定の項目は変更できません(旅行の所有者に依頼してください)",
+                      fields={k: v for k, v in fields.items() if k not in blocked})
 
     if op.action == "create":
         day = db.query(TravelDay).filter(TravelDay.id == uuid.UUID(fields["day_id"]),
@@ -233,7 +241,8 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         conflicts = sy.field_conflicts(at_base, current, fields)
         if conflicts:
             conflict = {"fields": conflicts, "mine": {f: fields[f] for f in conflicts},
-                        "server": {f: current[f] for f in conflicts}, "server_deleted": False,
+                        "server": member_policy.mask_event_dict({f: current[f] for f in conflicts}, hidden),
+                        "server_deleted": False,
                         "title": ev.title}
             row = _store(db, plan, user, device_id, op, "conflicted", "changed_on_server", entity_id=target_id,
                          conflict=conflict, fields=fields)
@@ -266,7 +275,8 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
     current = sy.comparable(plans_api._event_to_dict(ev))
     changed = sy.changed_since_base(at_base, current)
     if changed:
-        conflict = {"fields": changed, "mine": None, "server": {f: current[f] for f in changed},
+        conflict = {"fields": changed, "mine": None,
+                    "server": member_policy.mask_event_dict({f: current[f] for f in changed}, hidden),
                     "server_deleted": False, "deleted_by_me": True, "title": ev.title}
         row = _store(db, plan, user, device_id, op, "conflicted", "changed_on_server", entity_id=target_id,
                      conflict=conflict)
@@ -298,11 +308,11 @@ def _audit(action: str, request: Request, user: User, plan: TravelPlan, details:
 @router.post("/{plan_id}/sync", response_model=dict)
 def sync_operations(plan_id: str, payload: SyncRequest, request: Request, db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_user_or_guest)):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     ids = [op.operation_id for op in payload.operations]
     if len(set(ids)) != len(ids):
         raise HTTPException(status_code=422, detail="同じoperation_idが重複しています")
-    results = [_process(db, plan, current_user, payload.device_id, op) for op in payload.operations]
+    results = [_process(db, plan, current_user, payload.device_id, op, hidden) for op in payload.operations]
     db.refresh(plan)
     applied, replayed, conflicted, rejected = sy.summarize(results)
     _audit("sync_received", request, current_user, plan,
@@ -318,7 +328,7 @@ def sync_operations(plan_id: str, payload: SyncRequest, request: Request, db: Se
 @router.get("/{plan_id}/sync/conflicts", response_model=dict)
 def list_conflicts(plan_id: str, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
-    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     rows = (db.query(SyncOperation)
             .filter(SyncOperation.plan_id == plan.id, SyncOperation.user_id == current_user.id,
                     SyncOperation.status == "conflicted")
@@ -326,7 +336,8 @@ def list_conflicts(plan_id: str, db: Session = Depends(get_db),
     out = []
     for r in rows:
         ev = _event(db, plan, r.entity_id) if r.entity_id else None
-        current = sy.comparable(plans_api._event_to_dict(ev)) if ev is not None else None
+        current = member_policy.mask_event_dict(sy.comparable(plans_api._event_to_dict(ev)), hidden) \
+            if ev is not None else None
         out.append({
             "operation_id": str(r.operation_id), "action": r.action, "code": r.code,
             "message": CODE_MESSAGES.get(r.code), "entity_id": str(r.entity_id) if r.entity_id else None,
@@ -341,7 +352,7 @@ def list_conflicts(plan_id: str, db: Session = Depends(get_db),
 def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, request: Request,
                      db: Session = Depends(get_db), if_match: Optional[str] = Header(None, alias="If-Match"),
                      current_user: User = Depends(get_current_user_or_guest)):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     if not sy.is_uuid(operation_id):
         raise HTTPException(status_code=404, detail="競合が見つかりません")
     r = (db.query(SyncOperation)

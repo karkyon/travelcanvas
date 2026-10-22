@@ -128,7 +128,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
             <select
               value={formData.category}
               onChange={(e) => handleInputChange('category', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {categories.map(cat => (
                 <option key={cat.value} value={cat.value}>
@@ -148,7 +148,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="スポットの詳細説明..."
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
@@ -201,7 +201,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
             <select
               value={formData.price_range}
               onChange={(e) => handleInputChange('price_range', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               <option value="">選択してください</option>
               <option value="$">$ (リーズナブル)</option>

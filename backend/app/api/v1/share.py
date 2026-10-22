@@ -42,7 +42,7 @@ from app.models.models import (
     Document, Notification, PlanCollaborator, PlanShareLink, Reservation, ShareAccessLog, Ticket, TravelEvent,
     TravelPlan, User,
 )
-from app.services import plan_item_deletion, share_policy
+from app.services import member_policy, plan_item_deletion, share_policy
 from app.services.audit_service import record_audit_event
 from app.api.v1.public_share import build_public_view
 
@@ -182,6 +182,8 @@ def _collaborator_to_dict(collab: PlanCollaborator) -> dict:
         "name": None,
         "status": collab.status,
         "decided_at": collab.decided_at.isoformat() if collab.decided_at else None,
+        # [Gate G2] FR-045 この参加者だけの項目の規則(null は役割の既定に従う)
+        "field_policy_hidden": member_policy.member_override(collab),
     }
 
 

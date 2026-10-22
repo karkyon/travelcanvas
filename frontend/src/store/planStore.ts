@@ -223,6 +223,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         ...meta,
         days: detail ? detail.days.map(mapDay) : meta.days,
         revision: detail?.revision,
+        hidden_fields: detail?.hidden_fields ?? [],
       };
 
       set({
@@ -694,17 +695,21 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ currentPlan: updatedPlan });
 
     try {
+      // [Gate G2] FR-045 見せない設定の項目は送らない(空で上書きしない。backend も空は変えない扱い)
+      const hidden = new Set(plan.hidden_fields ?? []);
+      const hideNotes = hidden.has('event_notes');
+      const hidePlace = hidden.has('event_address');
       const updated = await apiService.updateEvent(
         plan.id,
         itemId,
         {
           title: item.title,
-          description: item.description,
+          description: hideNotes ? undefined : item.description,
           event_type: item.category,
           local_start_time: item.start_time,
-          address: item.address,
-          latitude: item.latitude,
-          longitude: item.longitude,
+          address: hidePlace ? undefined : item.address,
+          latitude: hidePlace ? undefined : item.latitude,
+          longitude: hidePlace ? undefined : item.longitude,
         },
         plan.revision!
       );

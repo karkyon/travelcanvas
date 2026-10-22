@@ -68,9 +68,13 @@ def read_dotenv_value(name: str) -> Optional[str]:
     if os.environ.get(name):
         return os.environ[name]
     path = REPO / ".env"
-    if not path.is_file():
+    try:
+        if not path.is_file():
+            return None
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:  # 読めない(別の利用者・権限)時は無いものとして扱う
         return None
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -132,7 +136,8 @@ class Executor:
 
     @staticmethod
     def describe(argv: Sequence[str]) -> str:
-        words = [a for a in argv if not a.startswith("-")]
+        # [Gate G2] 環境変数の指定(KEY=値。接続文字列を含み得る)は表示しない
+        words = [a for a in argv if not a.startswith("-") and "=" not in a]
         return " ".join(words[:6])
 
     # 以下を各実行先で実装する
@@ -181,8 +186,18 @@ class Executor:
 
 _URL_SNIPPET = (
     "import os; from app.ops.opslib import replace_database; "
-    "print(replace_database(os.environ['DATABASE_URL'], os.environ['OPS_TARGET_DB']))"
+    "print(replace_database(os.environ.get('OPS_DATABASE_URL') or os.environ['DATABASE_URL'], "
+    "os.environ['OPS_TARGET_DB']))"
 )
+
+
+def owner_database_url() -> Optional[str]:
+    """[Gate G2] SEC-F4 運用の道具が使う所有者(migration を流すロール)の接続文字列(.env の DATABASE_URL)。
+
+    backend のコンテナには、アプリのロール(tc_app。表の読み書きだけ)の接続文字列しか渡していない。復元先の DB の点検・
+    復元先での migration の往復・バックアップの件数の数え方は所有者の権限が要るため、運用の道具がホストの .env から
+    読んで、その実行のときだけ渡す(値は表示・保存しない)。"""
+    return read_dotenv_value("DATABASE_URL")
 
 
 class ComposeExecutor(Executor):
@@ -193,9 +208,21 @@ class ComposeExecutor(Executor):
 
     def exec_args(self, service: str, env: Optional[Mapping[str, str]] = None) -> List[str]:
         args = self.compose + ["exec", "-T"]
-        for k, v in (env or {}).items():
+        for k, v in dict(env or {}).items():
             args += ["-e", "%s=%s" % (k, v)]
+        if service == "backend" and owner_database_url():
+            # [Gate G2] 運用の道具は所有者の権限で DB を点検する(アプリのロールは表を読み書きするだけ)。
+            # 資格情報をコマンドの引数(ps で見える)に書かないよう、名前だけを渡し、値は docker compose の
+            # 環境変数から引き継がせる(run が入れる)
+            args += ["-e", "OPS_DATABASE_URL"]
         return args + [service]
+
+    def run(self, argv, *, env=None, **kw):  # type: ignore[override]
+        full = dict(env or {})
+        owner = owner_database_url()
+        if owner and "OPS_DATABASE_URL" in list(argv):
+            full.setdefault("OPS_DATABASE_URL", owner)
+        return super().run(argv, env=full, **kw)
 
     def backend_python(self, module_args, *, extra_env=None, target_db=None, check=True):
         env = dict(extra_env or {})
@@ -222,8 +249,13 @@ class ComposeExecutor(Executor):
         return self.run(self.exec_args("postgres") + ["sh", "-c", script], **kw)
 
     def pg_dump(self, database, out_path):
+        # [Gate G2] SEC-F4 バックアップは読み取りだけのロール(tc_backup)で取る。まだ無い(権限の分離の前)時は所有者で取る
         self._pg(
-            'exec pg_dump -U "$POSTGRES_USER" -d %s -Fc -Z 6 --no-owner --no-privileges' % shlex.quote(database),
+            'R=$(psql -U "$POSTGRES_USER" -d %s -tAc '
+            '"SELECT 1 FROM pg_roles WHERE rolname=\'tc_backup\'" 2>/dev/null); '
+            'if [ "$R" = "1" ]; then U=tc_backup; else U="$POSTGRES_USER"; fi; '
+            'exec pg_dump -U "$U" -d %s -Fc -Z 6 --no-owner --no-privileges'
+            % (shlex.quote(database), shlex.quote(database)),
             stdout_path=out_path,
             timeout=7200,
         )
@@ -1040,6 +1072,24 @@ def cmd_purge(ex: Executor) -> int:
     return EXIT_ERROR if failed else EXIT_OK
 
 
+JOBS = {
+    # [Gate G2] FR-042 Webhook の自動の再送
+    "webhook-retry": ["-m", "app.ops.webhook_retry"],
+}
+
+
+def cmd_jobs(ex: Executor, name: str) -> int:
+    """[Gate G2] 定期の処理を backend のコンテナの中で1回だけ動かす(結果は件数だけの1行の JSON)。"""
+    proc = ex.backend_python(JOBS[name], check=False)
+    out = (proc.stdout or b"").decode("utf-8", "replace").strip()
+    err = (proc.stderr or b"").decode("utf-8", "replace").strip()
+    if out:
+        print(out.splitlines()[-1])
+    if err and proc.returncode != 0:
+        log(err.splitlines()[-1])
+    return int(proc.returncode)
+
+
 SECURITY_SCRIPT = "scripts/security_incident.py"
 
 
@@ -1119,6 +1169,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("monitor")
     p.add_argument("--quiet", action="store_true", help="状態が変わった時だけ表示する")
     sub.add_parser("purge")
+    p = sub.add_parser("jobs", help="定期の処理を1回動かす(webhook-retry)")
+    p.add_argument("job", choices=sorted(JOBS))
     p = sub.add_parser("log-scan", help="コンテナのログに個人情報・秘密が出ていないかの検査(B-009)")
     p.add_argument("--since", default="25h", help="25h・30m のような長さ、または UTC の日時")
     p.add_argument("--service", action="append", dest="services", help="既定は backend")
@@ -1147,6 +1199,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return cmd_security(make_executor(args.mode), args.security_args)
         if args.cmd == "keys":
             return cmd_keys(make_executor(args.mode), args.action, args.keys_args)
+        if args.cmd == "jobs":
+            return cmd_jobs(make_executor(args.mode), args.job)
         if args.cmd == "log-scan" and args.log_file:
             # ファイルを検査するだけなので、docker・DB への接続もバックアップの置き場所も要らない
             res = cmd_log_scan(Executor(), since=args.since, services=args.services or ["backend"],

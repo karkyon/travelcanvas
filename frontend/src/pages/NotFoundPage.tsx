@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 const NotFoundPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
       <div className="text-center">
         <div className="mb-8">
           <h1 className="text-9xl font-bold text-blue-600">404</h1>

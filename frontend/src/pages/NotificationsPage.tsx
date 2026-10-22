@@ -220,7 +220,7 @@ const NotificationsPage: React.FC = () => {
                       e.stopPropagation();
                       handleMarkAsRead(notification.id);
                     }}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors shrink-0"
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded-sm transition-colors shrink-0"
                     title="既読にする"
                   >
                     <Check size={16} />

@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.services import member_policy
 from app.models.models import (
     Document,
     ExtractionCandidate,
@@ -39,6 +39,9 @@ from app.models.models import (
     User,
 )
 from app.services.audit_service import record_audit_event
+
+# [Gate G2] FR-045 所有者が「reservations・documents」のどれかを隠した参加者には、この機能の API は 403
+require_plan_access = member_policy.guarded("reservations", "documents")
 
 router = APIRouter(prefix="/plans", tags=["imports"])
 

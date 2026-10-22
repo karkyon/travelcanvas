@@ -56,6 +56,7 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | 毎週日曜 04:20 | 最新バックアップの復元演習(別DBへ復元 → 件数・保存ファイル・復号・migration 往復) |
 | 毎日 03:50 | 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(`log-scan`) |
 | 5分ごと | 監視(状態が変わった時だけ記録・通知) |
+| 5分ごと | [Gate G2] Webhook の自動の再送(`tcops.py jobs webhook-retry`。1・5・30分・2・6時間の間隔、6回で dead) |
 
 ログは `ops-state/logs/*.log`、演習の記録は `ops-state/drills/`(どちらも git の対象外)。
 
@@ -458,6 +459,42 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
   すぐログアウトされる。管理者が一覧・詳細・監査ログを見たことも監査に残る。
 - E2E(`frontend/e2e/admin.spec.ts`)は試験用の会員に grant-admin し、終わったら revoke-admin する。
 
+## 8.6 DB の権限の分離(Gate G2 SEC-F4、`docs/adr/ADR-db-roles.md`)
+
+- backend は **`tc_app`(表の読み書きだけ)**で接続する。表を作る・変える・消す、migration の版の書き換えはできない。
+  migration とロールの設定は compose の `migrate` サービス(所有者 = `.env` の `DATABASE_URL`)が backend の起動前に1回だけ行う
+  (`alembic upgrade head && python -m app.ops.db_roles apply`)。backend は `migrate` が成功してから起動する。
+- `.env` に必要な値(初回はパッチが作る。値は出さない):
+  - `DB_APP_PASSWORD`: `tc_app` のパスワード(24文字以上。ほかの鍵・DB のパスワードと同じ値にしない)
+  - `APP_DATABASE_URL`: `postgresql://tc_app:<DB_APP_PASSWORD>@postgres:5432/<DB 名>`(backend へはこれだけを渡す。
+    `DATABASE_URL`・`DB_PASSWORD`・`DB_APP_PASSWORD` は backend のコンテナでは空にする)
+- 他のロール: `tc_backup`(読むだけ。`tcops.py backup` の pg_dump が使う)、`tc_readonly_monitor`(pg_monitor と migration の版を読むだけ)。
+  どちらもパスワードを持たない(postgres のコンテナの中からだけ使う)。
+- 確認: `docker compose exec -T backend python -m app.ops.db_roles check --expect-app`(`least_privilege: true`・`app_ready: true`)。
+  運用の道具(`tcops.py`)は所有者の URL を引数ではなく環境変数で渡す(`ps` に資格情報を出さない)。
+- `tc_app` のパスワードを替える: `.env` の `DB_APP_PASSWORD` と `APP_DATABASE_URL` を同じ値に直し、
+  `docker compose up -d --force-recreate migrate backend`(migrate が `ALTER ROLE` し直す)。
+- 元に戻す(緊急): `.env` の `APP_DATABASE_URL` を所有者の URL にすると、権限の分離の前と同じ動きになる(推奨しない)。
+
+## 8.7 サポート閲覧と運用の要約(Gate G2 FR-040、`docs/adr/ADR-support-access.md`)
+
+- サポートの担当者は、利用者本人が「設定 → サポート」で作った許可(目的・1〜72時間・旅行1つかアカウントの概要)がある時だけ、
+  管理者の画面「運用とサポート」(`/admin/support`)から読み取り専用で見られる。住所・メモの本文・位置・予約番号・文書の中身は
+  出ない。閲覧のたびに監査(`support_grant_accessed`)と本人への知らせ。管理者が自分の許可を見ることはできない。
+- 問い合わせの対応: 利用者に許可を作ってもらい、問い合わせ番号を許可に書いてもらうと、一覧で見分けられる。終わったら
+  利用者に取り消してもらう(期限が来れば自動で終わる)。
+- 運用の要約: 有効な共有リンク(編集できる・期限の無いもの)・Webhook の失敗と dead・DB と文書の容量・削除待ち。
+  不正な利用が疑われる共有リンクは、理由を書いて止める(所有者に知らせ、監査に残る)。
+
+## 8.8 共同編集の即時の通知と同行者向けの項目の規則(Gate G2 FR-020・FR-045)
+
+- 即時の通知 `GET /plans/{id}/events/stream`(Server-Sent Events)は、各端末が45秒ごとにつなぎ直す。1人あたり4本まで(超えると 429)。
+  backend の DB への問い合わせは接続ごとに1秒に1回(版の確認だけ)。途中の機器(リバースプロキシ)を置く時は、
+  この経路の応答の溜め込み(buffering)を止める(backend は `X-Accel-Buffering: no` を返す)。つながらない時は従来の問い合わせ
+  (5〜20秒ごと)で動き続ける。
+- 同行者向けの項目の規則は旅行の所有者が共有の画面で決める(運用者の操作は無い)。問い合わせ「予約が見えない」の時は、
+  所有者の設定(役割の既定・1人ずつの設定)を確かめてもらう。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
@@ -489,4 +526,5 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 | 2026-10-18 | 7 | Gate S8: 侵害が疑われる時の手順と封じ込めの操作(§8)。改訂履歴は §9 へ |
 | 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
 | 2026-10-19 | 9 | Gate S11: 多要素認証(§8.3)、CI と main の保護・パッチの流れ(§9)。改訂履歴は §10 へ |
+| 2026-10-21 | 11 | Gate G2: DB の権限の分離(§8.6)、Webhook の自動の再送の定期実行(§2.1)、サポート閲覧と運用の要約(§8.7)、即時の通知と同行者向けの項目の規則(§8.8) |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

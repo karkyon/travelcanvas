@@ -258,7 +258,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                   {searchHistory.map((item, index) => (
                     <button
                       key={index}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded-sm"
                       onClick={() => handleSuggestionClick(item)}
                     >
                       🕐 {item}
@@ -423,7 +423,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                     type="checkbox"
                     checked={filters.openNow}
                     onChange={(e) => setFilters(prev => ({ ...prev, openNow: e.target.checked }))}
-                    className="rounded border-gray-300"
+                    className="rounded-sm border-gray-300"
                   />
                   <span className="text-sm text-gray-700">現在営業中のみ</span>
                 </label>
