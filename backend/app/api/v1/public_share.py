@@ -39,20 +39,30 @@ tokenの生値はDBに一切保存せずSHA-256ハッシュのみで照合する
 説明・日程の見出し・時刻(INTERNAL)と住所・メモ・予約の概要(CONFIDENTIAL、明示の確認つき)を出し分ける。
 許可されていない項目はキーごと出さない。RESTRICTED(予約番号・チケット・文書・連絡先・正確な位置・支払い)は
 どの policy でも出力候補に無い。所有者の共有前プレビュー(share.py)も同じ build_public_view を使う。
+
+[Gate G4] COL-05 Guest Travel View(app/services/share_view.py):
+- GET  /{token}/info  : 使用回数を使わない確認(合言葉が要るか・見える項目/見えない項目・期限・複製できるか)。旅行の中身は返さない
+- POST /{token}/resolve の応答に view_token(一時トークン)・policy の説明・allow_clone を足す
+- GET  /{token}/view  : X-Share-View の一時トークンで見直す(使用回数を使わない。失効・期限・合言葉の変更で即無効)
+- POST /{token}/clone : ログインした人が、許可された項目だけを自分の新しい旅行へ複製する(所有者が allow_clone にした時だけ)
+[Gate G4] FC-097 POST /{token}/report: 濫用の通報(app/services/abuse.py。無効なリンクでも同じ応答)。
 """
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import PlanShareLink, Reservation, ShareAccessLog, TravelDay, TravelEvent, TravelPlan
-from app.services import share_policy
+from app.core.auth import get_current_active_user
+from app.models.models import User
+from app.services import abuse, share_policy, share_view
+from app.services.audit_service import record_audit_event
 from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/public/share", tags=["public-share"])
@@ -187,7 +197,7 @@ def _log_access(db: Session, *, share_id, token_hash: str, ip: str, result: str)
     db.commit()
 
 
-def _invalid_link():
+def _invalid_link() -> NoReturn:
     # 存在しない/失効済み/期限切れ/使用回数上限のいずれも同一の404で応答し、
     # 有効なtokenが存在するかどうかを外部から推測できないようにする。
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="この共有リンクは無効です",
@@ -282,4 +292,112 @@ async def resolve_share_token(
     # [Gate #34] 公開ビューは正規化テーブル(travel_days/travel_events)
     # から固定スキーマで構築する。旧`plan.itinerary`は一切参照しない。
     # [Gate F45] リンクの policy で見せる項目を出し分ける。
-    return build_public_view(db, plan, share_policy.fields_of(policy), permission)
+    view = build_public_view(db, plan, share_policy.fields_of(policy), permission)
+    # [Gate G4] COL-05 見直し・複製は一時トークンで(使用回数を使わない)
+    view.update(share_view.issue(share))
+    view["allow_clone"] = bool(share.allow_clone)
+    view["policy_explained"] = share_view.explain(share)
+    return view
+
+
+def _active_share(db: Session, token: str) -> Any:
+    share: Any = db.query(PlanShareLink).filter(PlanShareLink.token_hash == _hash_token(token)).first()
+    now = datetime.now(timezone.utc)
+    if share is None or share.revoked_at is not None or (share.expires_at is not None and share.expires_at <= now):
+        return None
+    return share
+
+
+def _limit(request: Request, name: str, limit: int, window: int = 60) -> None:
+    if not check_rate_limit(f"{name}:{_client_ip(request)}", limit, window):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="リクエストが多すぎます。しばらく待ってから再試行してください。", headers=PUBLIC_HEADERS)
+
+
+@router.get("/{token}/info")
+async def share_info(token: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    """[Gate G4] COL-05 開く前の確認(使用回数を使わない・中身を返さない)。"""
+    response.headers.update(PUBLIC_HEADERS)
+    _limit(request, "public_share_resolve", settings.RATE_LIMIT_PUBLIC_SHARE)
+    share = _active_share(db, token)
+    if share is None or (share.max_uses is not None and share.use_count >= share.max_uses):
+        _invalid_link()
+    return {
+        "needs_passcode": share.passcode_hash is not None,
+        "expires_at": share.expires_at.isoformat() if share.expires_at else None,
+        "remaining_uses": None if share.max_uses is None else max(0, share.max_uses - share.use_count),
+        "allow_clone": bool(share.allow_clone),
+        "policy_explained": share_view.explain(share),
+    }
+
+
+def _viewable(db: Session, token: str, view_token: Optional[str]):
+    share = _active_share(db, token)
+    if share is None:
+        _invalid_link()
+    try:
+        share_view.verify(view_token, share)
+    except share_view.ViewTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, headers=PUBLIC_HEADERS, detail={
+            "code": "share_view_expired", "message": "閲覧の時間が過ぎました。もう一度リンクを開いてください"})
+    plan = db.query(TravelPlan).filter(TravelPlan.id == share.plan_id, TravelPlan.deleted_at.is_(None)).first()
+    if plan is None:
+        _invalid_link()
+    return share, plan
+
+
+@router.get("/{token}/view")
+async def share_view_again(token: str, request: Request, response: Response, db: Session = Depends(get_db),
+                           x_share_view: Optional[str] = Header(None, alias="X-Share-View")):
+    """[Gate G4] COL-05 一時トークンで見直す(使用回数を使わない)。"""
+    response.headers.update(PUBLIC_HEADERS)
+    _limit(request, "public_share_view", 120)
+    share, plan = _viewable(db, token, x_share_view)
+    view = build_public_view(db, plan, share_policy.fields_of(share.policy), share.permission)
+    view["allow_clone"] = bool(share.allow_clone)
+    view["policy_explained"] = share_view.explain(share)
+    return view
+
+
+class CloneInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/{token}/clone", status_code=201)
+async def share_clone(token: str, request: Request, response: Response, body: CloneInput = CloneInput(),
+                      db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
+                      x_share_view: Optional[str] = Header(None, alias="X-Share-View")):
+    """[Gate G4] COL-05 許可された項目だけを自分の新しい旅行へ複製する。"""
+    response.headers.update(PUBLIC_HEADERS)
+    _limit(request, "public_share_clone", 10, 3600)
+    share, plan = _viewable(db, token, x_share_view)
+    if not share.allow_clone:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, headers=PUBLIC_HEADERS, detail={
+            "code": "clone_not_allowed", "message": "この共有では複製が許されていません"})
+    title = (body.title or "").strip() or None
+    new = share_view.clone_plan(db, plan, share, current_user, title)
+    db.commit()
+    record_audit_event(action="share_cloned", resource_type="plan", user_id=current_user.id, resource_id=new.id,
+                       details={"share_id": str(share.id), "fields": share_policy.fields_of(share.policy)})
+    return {"plan_id": str(new.id), "link": "/planner/%s" % new.id, "message": "自分の旅行として複製しました"}
+
+
+class ReportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(..., pattern="^(phishing|malware|spam|scraping|privacy|other)$")
+    note: Optional[str] = Field(None, max_length=500)
+
+
+@router.post("/{token}/report", status_code=202)
+async def share_report(token: str, body: ReportInput, request: Request, response: Response,
+                       db: Session = Depends(get_db)):
+    """[Gate G4] FC-097 濫用の通報。無効なリンクでも同じ応答にする(有効なリンクかを推測させない)。"""
+    response.headers.update(PUBLIC_HEADERS)
+    _limit(request, "public_share_report", abuse.REPORT_LIMIT, 3600)
+    share = db.query(PlanShareLink).filter(PlanShareLink.token_hash == _hash_token(token)).first()
+    result = abuse.file_report(db, share, body.reason, body.note, _client_ip(request))
+    if result["recorded"] and share is not None:
+        record_audit_event(action="share_abuse_reported", resource_type="share_link", resource_id=share.id,
+                           details={"reason": body.reason, "auto_revoked": result["auto_revoked"]})
+    return {"message": "通報を受け付けました。ありがとうございます"}

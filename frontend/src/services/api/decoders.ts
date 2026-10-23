@@ -2096,7 +2096,15 @@ export const placeInfo: Decoder<PlaceInfo> = object<PlaceInfo>({
   latitude: nullable(num), longitude: nullable(num), phone: nullable(str), website: nullable(str),
   entrance_note: nullable(str), floor: nullable(str), reservation_required: nullable(bool),
   price_range: nullable(str), accessibility_note: nullable(str), closed_days: nullable(str), note: nullable(str),
-  opening_hours: arrayOf(object({ day_of_week: int, open_time: str, close_time: str })),
+  opening_hours: arrayOf(object({ day_of_week: int, open_time: str, close_time: str, last_entry: optional(nullable(str)), last_order: optional(nullable(str)) })),
+  // [Gate G4] MAP-02 例外の日・入口・出典の違い(以前の応答には無い)
+  special_hours: optional(arrayOf(object({ local_date: str, kind: oneOf('closed', 'open'), open_time: nullable(str), close_time: nullable(str), last_entry: nullable(str), last_order: nullable(str), note: nullable(str) }))),
+  entrances: optional(arrayOf(object({ id: optional(str), label: str, latitude: nullable(num), longitude: nullable(num), note: nullable(str), accessible: nullable(bool) }))),
+  source_history: optional(((v: unknown, path: string) => {
+    const r = record(v, path);
+    for (const k of Object.keys(r)) arrayOf(object({ value: nullable(str), provider: str, label: str, source_url: nullable(str), retrieved_at: nullable(str) }))(r[k], `${path}.${k}`);
+    return r;
+  }) as Decoder<NonNullable<PlaceInfo['source_history']>>),
   sources: ((v: unknown, path: string) => {
     const r = record(v, path);
     for (const k of Object.keys(r)) sourceInfo(r[k], `${path}.${k}`);

@@ -30,7 +30,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -131,6 +131,20 @@ class HoursInfo:
     day_of_week: int  # 0=月 ... 6=日
     open_time: Optional[str]
     close_time: Optional[str]
+    last_entry: Optional[str] = None  # [Gate G4] MAP-02
+    last_order: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SpecialHoursInfo:
+    """[Gate G4] MAP-02 日付ごとの例外の営業(曜日の営業時間より優先)。"""
+    local_date: date
+    kind: str  # closed / open
+    open_time: Optional[str]
+    close_time: Optional[str]
+    last_entry: Optional[str] = None
+    last_order: Optional[str] = None
+    note: Optional[str] = None
 
 
 @dataclass
@@ -141,6 +155,7 @@ class Snapshot:
     reservations: Dict[uuid.UUID, ReservationInfo]
     links: List[LinkInfo]
     opening_hours: Dict[uuid.UUID, List[HoursInfo]]  # place_id -> 曜日ごと
+    special_hours: Dict[uuid.UUID, List[SpecialHoursInfo]] = field(default_factory=dict)  # [Gate G4]
 
 
 # ============================================================ 出力
@@ -223,12 +238,23 @@ def load_snapshot(db: Session, plan: TravelPlan) -> Snapshot:
     place_ids = {e.place_id for e in events if e.place_id}
     hours: Dict[uuid.UUID, List[HoursInfo]] = {}
     if place_ids:
-        for h in db.query(OpeningHours).filter(OpeningHours.place_id.in_(list(place_ids))).all():
-            hours.setdefault(h.place_id, []).append(HoursInfo(h.day_of_week, h.open_time, h.close_time))
+        opening: List[Any] = db.query(OpeningHours).filter(OpeningHours.place_id.in_(list(place_ids))).all()
+        for h in opening:
+            hours.setdefault(h.place_id, []).append(HoursInfo(h.day_of_week, h.open_time, h.close_time,
+                                                              h.last_entry, h.last_order))
+    special: Dict[uuid.UUID, List[SpecialHoursInfo]] = {}
+    if place_ids:
+        from app.models.models import PlaceSpecialHours
+
+        special_rows: List[Any] = db.query(PlaceSpecialHours).filter(
+            PlaceSpecialHours.place_id.in_(list(place_ids))).all()
+        for sp in special_rows:
+            special.setdefault(sp.place_id, []).append(SpecialHoursInfo(
+                sp.local_date, sp.kind, sp.open_time, sp.close_time, sp.last_entry, sp.last_order, sp.note))
 
     return Snapshot(
         days=sorted(days.values(), key=lambda d: d.local_date), events=events, segments=segments,
-        reservations=reservations, links=links, opening_hours=hours,
+        reservations=reservations, links=links, opening_hours=hours, special_hours=special,
     )
 
 
@@ -245,6 +271,14 @@ def compute_fingerprint(db: Session, plan: TravelPlan) -> str:
             parts.append(f"l:{link.id}:{link.relation_type}:{link.updated_at or link.created_at}")
     for s in db.query(TravelSegment.id, TravelSegment.revision).filter(TravelSegment.plan_id == plan.id):
         parts.append(f"s:{s[0]}:{s[1]}")
+    # [Gate G4] MAP-02 場所の営業時間・例外の日が変われば結果は古い(場所の revision が上がる)
+    from app.models.models import Place
+
+    place_ids = [r[0] for r in db.query(TravelEvent.place_id).filter(TravelEvent.plan_id == plan.id,
+                                                                     TravelEvent.place_id.isnot(None)).distinct()]
+    if place_ids:
+        for pid, rev in db.query(Place.id, Place.revision).filter(Place.id.in_(place_ids)):
+            parts.append(f"p:{pid}:{rev}")
     return hashlib.sha256("\n".join(sorted(parts)).encode("utf-8")).hexdigest()
 
 
@@ -426,48 +460,62 @@ def _check_reservations(snap: Snapshot, res: EvaluationResult) -> None:
             ))
 
 
-def _in_hours(t: time, open_t: time, close_t: time) -> bool:
-    if close_t <= open_t:  # 深夜営業(日を跨ぐ)
-        return t >= open_t or t < close_t
-    return open_t <= t < close_t
-
-
 def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: EvaluationResult) -> None:
+    """[Gate G4] MAP-02 その日の実際の営業時間(例外の日 → 曜日 → 前の日から続く深夜営業、app/services/place_hours.py)。
+    以前は曜日の最初の区切りだけを見ていた(昼休みのある店・深夜営業・臨時休業を正しく判定できなかった)。"""
+    from app.services import place_hours
+
     for e in timed:
         if e.place_id is None:
             continue
-        rows = snap.opening_hours.get(e.place_id)
-        if not rows:
+        weekly = snap.opening_hours.get(e.place_id) or []
+        special = snap.special_hours.get(e.place_id) or []
+        local_start = _local(e.start, e.day).replace(tzinfo=None)
+        dh = place_hours.day_hours(local_start.date(), weekly, special)
+        if dh.source == "unknown":
             res.count("opening_hours_unknown")
             continue
-        local_start = _local(e.start, e.day)
-        weekday = local_start.weekday()
-        today = [h for h in rows if h.day_of_week == weekday]
-        if not today:
+        if dh.closed or not dh.windows:
+            special_day = dh.source == "special"
             res.findings.append(Finding(
-                code="CLOSED_ON_DAY", kind="violation", severity="ERROR",
-                message=f"「{e.title}」の場所は{local_start:%m/%d}の曜日が休業日として登録されています",
+                code="CLOSED_ON_DATE" if special_day else "CLOSED_ON_DAY", kind="violation", severity="ERROR",
+                message=(f"「{e.title}」の場所は{local_start:%m/%d}が臨時休業として登録されています"
+                         + (f"({dh.note})" if dh.note else "")) if special_day else
+                f"「{e.title}」の場所は{local_start:%m/%d}の曜日が休業日として登録されています",
                 entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
-                evidence={"weekday": weekday}, suggestion={"action": "move_to_other_day"},
+                evidence={"weekday": local_start.weekday(), "source": dh.source, "date": dh.local_date.isoformat()},
+                suggestion={"action": "move_to_other_day"},
             ))
             continue
-        h = today[0]
-        open_t, close_t = parse_local_time(h.open_time), parse_local_time(h.close_time)
-        if open_t is None or close_t is None:
-            res.count("opening_hours_unknown")
-            continue
-        start_ok = _in_hours(local_start.time(), open_t, close_t)
-        end_ok = True
-        if e.end is not None:
-            local_end = _local(e.end, e.day)
-            if close_t > open_t:
-                end_ok = local_end.date() == local_start.date() and local_end.time() <= close_t
-        if not (start_ok and end_ok):
+        local_end = _local(e.end, e.day).replace(tzinfo=None) if e.end is not None else None
+        win = next((w for w in dh.windows if w.start <= local_start < w.end), None)
+        if win is None or (local_end is not None and local_end > win.end):
+            label = "・".join(w.label for w in dh.windows)
             res.findings.append(Finding(
                 code="OUTSIDE_OPENING_HOURS", kind="violation", severity="ERROR",
-                message=f"「{e.title}」は営業時間({h.open_time}〜{h.close_time})外です",
+                message=f"「{e.title}」は営業時間({label})外です"
+                        + ("(この日だけの営業時間)" if dh.source == "special" else ""),
                 entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
-                evidence={"open": h.open_time, "close": h.close_time, "start": _iso(e.start), "end": _iso(e.end)},
+                evidence={"windows": [w.label for w in dh.windows], "source": dh.source,
+                          "start": _iso(e.start), "end": _iso(e.end),
+                          "open": dh.windows[0].label.split("〜")[0], "close": dh.windows[-1].label.split("〜")[-1]},
+                suggestion={"action": "move_event_into_hours"},
+            ))
+            continue
+        if win.last_entry is not None and local_start > win.last_entry:
+            res.findings.append(Finding(
+                code="AFTER_LAST_ENTRY", kind="violation", severity="ERROR",
+                message=f"「{e.title}」は最終入場({win.last_entry:%H:%M})より後に着く予定です",
+                entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
+                evidence={"last_entry": win.last_entry.strftime("%H:%M"), "start": _iso(e.start)},
+                suggestion={"action": "move_event_into_hours"},
+            ))
+        if win.last_order is not None and e.event_type == "dining" and local_start > win.last_order:
+            res.findings.append(Finding(
+                code="AFTER_LAST_ORDER", kind="violation", severity="WARNING",
+                message=f"「{e.title}」はラストオーダー({win.last_order:%H:%M})より後に着く予定です",
+                entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
+                evidence={"last_order": win.last_order.strftime("%H:%M"), "start": _iso(e.start)},
                 suggestion={"action": "move_event_into_hours"},
             ))
 

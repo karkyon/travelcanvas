@@ -4,11 +4,13 @@
  * - 合意状態は色だけでなく文字(合意/懸念あり/不可あり/回答待ち)で示す。
  * - 懸念・不可は理由(と代替案)を表示し、本人か編集者が「解決済み」にできる(FC-066)。
  * - 匿名の投票は回答者が3人未満の間は件数を出さない(FC-067)。未回答者は表示する。
+ * - [Gate G4] COL-02 決定の状態(回答中・締切・定足数に届かない・決定・旅程に反映済み)、定足数、同点、候補箱の候補、
+ *   決定を旅程へ反映する・反映を元に戻す。
  */
 import React, { useState } from 'react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
-import type { Poll } from '@/services/api';
+import type { Poll, PollG4, PollOptionG4 } from '@/services/api';
 import { formatDue } from '../preparation/preparationModel';
 import {
   OPTION_STATE_LABEL, POLL_STATE_LABEL, VETO_POLICY_LABEL, VOTE_LABEL, VOTE_OPTIONS, answersToPayload, describeCounts,
@@ -30,9 +32,16 @@ interface Props {
   onDecide: (poll: Poll, optionId: string) => void;
   onToggleClosed: (poll: Poll) => void;
   onDelete: (poll: Poll) => void;
+  onAdopt?: (poll: Poll) => void;
+  onUndoAdopt?: (poll: Poll) => void;
 }
 
-const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, onToggleClosed, onDelete }) => {
+const PHASE_LABEL: Record<string, string> = {
+  voting: '回答中', closed: '締切', no_quorum: '定足数に届いていません', decided: '決定', adopted: '旅程に反映済み',
+};
+
+const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecide, onToggleClosed, onDelete, onAdopt, onUndoAdopt }) => {
+  const poll = p0 as Omit<Poll, 'options'> & PollG4 & { options: Array<Poll['options'][number] & PollOptionG4> };
   const [drafts, setDrafts] = useState<Record<string, AnswerDraft>>(() => draftsFromPoll(poll));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -76,6 +85,17 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
               {` ・ ${VETO_POLICY_LABEL[poll.veto_policy]}`}
               {poll.is_anonymous && ' ・ 匿名'}
             </p>
+            {poll.phase && (
+              <p className="text-xs mt-1" data-testid={`poll-phase-${poll.id}`}>
+                <span className="px-2 py-0.5 rounded-sm bg-indigo-100 text-indigo-900">状態: {PHASE_LABEL[poll.phase] ?? poll.phase}</span>
+                {poll.quorum ? <span className="ml-2 text-gray-700">回答 {poll.responders ?? 0}人 / 定足数 {poll.quorum}人</span> : null}
+                {poll.closed_reason === 'deadline' && <span className="ml-2 text-gray-700">締切の日時で締め切りました</span>}
+                {poll.adopted_by_name && <span className="ml-2 text-gray-700">{poll.adopted_by_name}さんが反映</span>}
+              </p>
+            )}
+            {(poll.tied_option_ids?.length ?? 0) > 1 && poll.phase !== 'adopted' && !poll.decided_option_id && (
+              <p className="text-xs text-amber-900 mt-1" role="note">最有力が同点です。話し合って、編集者が1つに決めてください(自動では決めません)。</p>
+            )}
             {poll.description && <p className="text-sm text-gray-800 mt-1">{poll.description}</p>}
             {poll.unanswered.length > 0 && (
               <p className="text-xs text-gray-700 mt-1" data-testid={`poll-unanswered-${poll.id}`}>
@@ -84,11 +104,21 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
             )}
           </div>
           {poll.can_manage && (
-            <div className="flex gap-1 shrink-0">
-              <Button variant="ghost" size="sm" onClick={() => onToggleClosed(poll)}>
-                {poll.status === 'closed' ? '再開する' : '締め切る'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onDelete(poll)}>削除</Button>
+            <div className="flex flex-wrap gap-1 shrink-0">
+              {poll.can_adopt && onAdopt && (
+                <Button variant="primary" size="sm" onClick={() => onAdopt(poll)}>旅程に反映</Button>
+              )}
+              {poll.phase === 'adopted' && onUndoAdopt && (
+                <Button variant="outline" size="sm" onClick={() => onUndoAdopt(poll)}>反映を元に戻す</Button>
+              )}
+              {poll.phase !== 'adopted' && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => onToggleClosed(poll)}>
+                    {poll.status === 'closed' ? '再開する' : '締め切る'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(poll)}>削除</Button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -107,6 +137,8 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
                   {o.is_leading && !o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-100 text-blue-900">最有力</span>}
                   {o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-600 text-white">決定</span>}
                   {o.event_missing && <span className="text-xs text-gray-700">(元の予定は削除されています)</span>}
+                  {o.candidate_id && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">候補箱{o.candidate_missing ? '(削除済み)' : ''}</span>}
+                  {o.is_tied && <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-100 text-amber-900">同点</span>}
                 </div>
                 <p className="text-xs text-gray-700 mt-1">{describeCounts(o)}</p>
                 {o.votes.filter((v) => v.value === 'concern' || v.value === 'veto').map((v) => (
@@ -152,7 +184,8 @@ const PollCard: React.FC<Props> = ({ poll, onSubmitVotes, onResolve, onDecide, o
                     )}
                   </div>
                 )}
-                {poll.can_manage && !o.is_decided && o.state !== 'blocked' && o.responders > 0 && (
+                {poll.can_manage && !o.is_decided && o.state !== 'blocked' && o.responders > 0 && poll.phase !== 'adopted'
+                  && poll.quorum_met !== false && (
                   <Button variant="outline" size="sm" className="mt-2" onClick={() => onDecide(poll, o.id)}>
                     これに決定
                   </Button>

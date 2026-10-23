@@ -51,3 +51,4 @@ export * from './planSearch';
 export * from './organizations';
 // [Gate G2] サポート閲覧・運用の要約・同行者向けの項目の規則・即時の通知
 export * from './support';
+export * from './g4';

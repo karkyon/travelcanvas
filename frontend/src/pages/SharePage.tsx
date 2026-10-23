@@ -58,6 +58,8 @@ const SharePage: React.FC = () => {
   // フォーム状態
   const [permission, setPermission] = useState<'view' | 'edit'>('view');
   const [sharePasscode, setSharePasscode] = useState('');
+  // [Gate G4] COL-05 受け取った人が許可された項目だけを自分の旅行へ複製してよい(既定は不可)
+  const [allowClone, setAllowClone] = useState(false);
   const [expiryDate, setExpiryDate] = useState('');
   const [maxUses, setMaxUses] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -173,12 +175,14 @@ const SharePage: React.FC = () => {
         max_uses: maxUses ? Number(maxUses) : undefined,
         fields,
         acknowledge_confidential: selectedConfidential.length > 0 ? ackConfidential : undefined,
+        ...(allowClone ? { allow_clone: true } : {}),
       });
 
       setJustCreatedUrl(response.data.url ? `${window.location.origin}${response.data.url}` : null);
       setJustCreated(response.data);
       setSharePasscode('');
       setMaxUses('');
+      setAllowClone(false);
       await loadShareSettings();
       setMessage({ text: '共有リンクを作成しました(URLは今だけ表示されます。必ずコピーしてください)', type: 'success' });
     } catch (error) {
@@ -419,6 +423,17 @@ const SharePage: React.FC = () => {
                         <div className="text-gray-700 text-xs">
                           見せる項目: {share.fields.length > 0 ? share.fields.map(labelOf).join('・') : '最小限(旅行名・期間・予定名だけ)'}
                         </div>
+                        {(() => {
+                          // [Gate G4] COL-05 複製の可否 / FC-097 管理者・自動の対応で止めた理由
+                          const g4 = share as typeof share & { allow_clone?: boolean; revoked_reason?: string | null };
+                          return (
+                            <div className="text-gray-700 text-xs">
+                              {g4.allow_clone && '受け取った人が複製できます'}
+                              {g4.revoked_reason === 'abuse_auto' && '問題の報告が続いたため自動で止めました(サポートへ連絡できます)'}
+                              {g4.revoked_reason === 'admin_abuse' && '管理者が利用の規則により止めました'}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <button
                         type="button"
@@ -488,6 +503,11 @@ const SharePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input type="checkbox" checked={allowClone} onChange={(e) => setAllowClone(e.target.checked)} />
+                  受け取った人が、共有した項目だけを自分の旅行として複製できるようにする
+                </label>
 
                 <div>
                   <label htmlFor="share-expiry" className="block text-sm font-medium text-gray-700 mb-2">

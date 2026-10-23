@@ -70,7 +70,8 @@ export interface PollCreateData {
   deadline_at?: string;
   veto_policy?: VetoPolicy;
   is_anonymous?: boolean;
-  options: Array<{ label?: string; event_id?: string }>;
+  quorum?: number;
+  options: Array<{ label?: string; event_id?: string; candidate_id?: string }>;
 }
 
 export interface PollUpdateData {

@@ -304,7 +304,8 @@ const ExpensesPage: React.FC = () => {
           {tab === 'expenses' && (
             <ExpenseListPanel expenses={expenses} canEdit={canEdit} onAdd={() => openExpense({ mode: 'create' })}
               onEdit={(x) => openExpense({ mode: 'edit', expense: x })} onDelete={removeExpense}
-              onRefund={(x) => openExpense({ mode: 'refund', of: x })} />
+              onRefund={(x) => openExpense({ mode: 'refund', of: x })}
+              onComment={(x) => navigate(`/planner/${planId}/discussion?target=expense&id=${x.id}`)} />
           )}
           {tab === 'settlement' && (
             <SettlementPanel summary={summary} settlements={settlements} onRecord={recordTransfer} onUndo={undoSettlement} />

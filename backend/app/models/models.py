@@ -243,6 +243,10 @@ class PlanShareLink(Base):
     # [Gate F45] FR-045 項目単位の共有の規則({"version":1,"fields":[...],"preset":...})。
     # NULL は本Gate以前のリンク(=標準の項目)。app/services/share_policy.py が正本。
     policy = Column(JSONB, nullable=True)
+    # [Gate G4] COL-05 受け取った人が、許可された項目だけを自分の旅行へ複製してよい(所有者が選ぶ。既定は不可)
+    allow_clone = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # [Gate G4] FC-097 失効の理由(owner / admin_abuse など。所有者の失効は NULL のまま)
+    revoked_reason = Column(String(16), nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="share_links")
@@ -281,6 +285,9 @@ class Notification(Base):
     title = Column(String, nullable=False)
     message = Column(Text, nullable=True)
     related_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    # [Gate G4] COL-03 コメントの対象(予定・予約・費用・投票)へ移るため。本文は入れない
+    target_type = Column(String(12), nullable=True)
+    target_id = Column(UUID(as_uuid=True), nullable=True)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -767,6 +774,9 @@ class OpeningHours(Base):
     day_of_week = Column(Integer, nullable=False)  # 0=月 ... 6=日
     open_time = Column(String, nullable=True)  # "09:00"
     close_time = Column(String, nullable=True)  # "18:00"
+    # [Gate G4] MAP-02 最終入場・ラストオーダー("HH:MM"。無ければ閉じる時刻まで)
+    last_entry = Column(String(5), nullable=True)
+    last_order = Column(String(5), nullable=True)
     source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -780,6 +790,50 @@ class OpeningHours(Base):
 # ・いつ・どの結果(成功/失効/期限切れ/上限到達/パスコード誤り/レート制限)
 # でアクセスしたかを追跡できるようにし、不正利用の調査を可能にする。
 # tokenの生値は記録しない(token_hashのみ)。
+
+class PlaceSpecialHours(Base):
+    """[Gate G4] MAP-02 日付ごとの例外の営業(臨時休業・祝日・年末年始・特別営業)。その日は曜日の営業時間より優先する。
+
+    kind = closed(その日は休み。時刻なし)/ open(その日だけの営業時間。1日に3つまで)。"""
+    __tablename__ = "place_special_hours"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
+    local_date = Column(Date, nullable=False)
+    kind = Column(String(8), nullable=False)
+    open_time = Column(String(5), nullable=True)
+    close_time = Column(String(5), nullable=True)
+    last_entry = Column(String(5), nullable=True)
+    last_order = Column(String(5), nullable=True)
+    note = Column(String(200), nullable=True)
+    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True,
+                              index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('closed', 'open')", name="ck_place_special_hours_kind"),
+        CheckConstraint("(kind = 'closed') = (open_time IS NULL AND close_time IS NULL)",
+                        name="ck_place_special_hours_times"),
+        Index("ix_place_special_hours_place_date", "place_id", "local_date"),
+    )
+
+
+class PlaceEntrance(Base):
+    """[Gate G4] MAP-02 入口(正面・裏口・駐車場・駅の出口など)。地点(座標)を別に持てる。"""
+    __tablename__ = "place_entrances"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = Column(String(100), nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    note = Column(String(300), nullable=True)
+    accessible = Column(Boolean, nullable=True)  # 段差なしで入れるか(NULL = 分からない)
+    sort_order = Column(Integer, nullable=False, default=0)
+    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True,
+                              index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class ShareAccessLog(Base):
     """公開共有リンクへのアクセス試行監査ログ"""
@@ -2074,6 +2128,14 @@ class Poll(Base):
     is_anonymous = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     decided_option_id = Column(UUID(as_uuid=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
+    # [Gate G4] COL-02 決定に要る回答者の数(NULL は制限なし)・締切の理由・締切前の知らせ・採用(予定への反映)
+    quorum = Column(Integer, nullable=True)
+    closed_reason = Column(String(10), nullable=True)  # manual / deadline / decided
+    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+    adopted_at = Column(DateTime(timezone=True), nullable=True)
+    adopted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    adopted_change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"),
+                                   nullable=True)
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -2103,6 +2165,8 @@ class PollOption(Base):
     poll_id = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
     label = Column(String(200), nullable=False)
     event_id = Column(UUID(as_uuid=True), nullable=True)
+    # [Gate G4] COL-02 候補箱の候補を選択肢にする(採用すると予定に置く)
+    candidate_id = Column(UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="SET NULL"), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -2930,3 +2994,112 @@ class OrgApiIdempotency(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
     __table_args__ = (UniqueConstraint("client_id", "key", name="uq_org_api_idempotency_client_key"),)
+
+
+# ==========================================================================
+# [Gate G4] MAP-03 / COL-03 / FC-097
+
+class CommandRun(Base):
+    """[Gate G4] MAP-03 検索のコマンド(``>予定を追加`` 等)の実行の記録。
+
+    Idempotency-Key ごとに1件(同じキーの再送は同じ結果を返し、二重に作らない)。元に戻す時は change_set_id
+    (予定・日程)か target(候補)を使う。題名などの入力値は response_json(実行した本人だけに返す)にだけ残し、監査には残さない。"""
+    __tablename__ = "command_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    command = Column(String(32), nullable=False)
+    idempotency_key = Column(String(100), nullable=False)
+    target_type = Column(String(24), nullable=True)
+    target_id = Column(UUID(as_uuid=True), nullable=True)
+    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
+                           index=True)
+    status = Column(String(8), nullable=False, default="executed", server_default="executed")
+    response_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    undone_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_command_runs_user_key"),
+        CheckConstraint("status IN ('executed', 'undone')", name="ck_command_runs_status"),
+    )
+
+
+class NotificationPreference(Base):
+    """[Gate G4] COL-03 通知の設定。plan_id が NULL の行は全体の既定、旅行ごとの行がそれより優先する。
+
+    level: all(すべて)/ mentions(自分へのメンション・自分の投稿への返信だけ)/ none(作らない)。
+    email_digest: daily なら、読んでいない通知を1日1回メールでまとめて送る(本文は件数と旅行名だけ)。"""
+    __tablename__ = "notification_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    level = Column(String(10), nullable=False, default="all", server_default="all")
+    email_digest = Column(String(8), nullable=False, default="off", server_default="off")
+    last_digest_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("level IN ('all', 'mentions', 'none')", name="ck_notification_preferences_level"),
+        CheckConstraint("email_digest IN ('off', 'daily')", name="ck_notification_preferences_digest"),
+        Index("uq_notification_preferences_user_plan", "user_id", "plan_id", unique=True,
+              postgresql_where=text("plan_id IS NOT NULL")),
+        Index("uq_notification_preferences_user_global", "user_id", unique=True,
+              postgresql_where=text("plan_id IS NULL")),
+    )
+
+
+class EmailOutbox(Base):
+    """[Gate G4] COL-03 送るメールの記録(送信の失敗は指数的に間を空けて再送し、上限で dead にする)。
+
+    本文に予約番号・コメントの本文・位置は入れない(件数・旅行名・画面への案内だけ)。"""
+    __tablename__ = "email_outbox"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(24), nullable=False)
+    subject = Column(String(200), nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String(8), nullable=False, default="pending", server_default="pending")
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_error = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'sent', 'failed', 'dead')", name="ck_email_outbox_status"),
+        Index("ix_email_outbox_due", "next_attempt_at", postgresql_where=text("status IN ('pending', 'failed')")),
+    )
+
+
+class AbuseReport(Base):
+    """[Gate G4] FC-097 公開の共有への通報(phishing・malware・spam・scraping 等)と、自動の検知、管理者の対応。
+
+    通報した人は特定しない(接続元の sha256 だけ。同じ人の連続の通報を数えるため)。"""
+    __tablename__ = "abuse_reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True,
+                      index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    source = Column(String(8), nullable=False, default="report", server_default="report")
+    reason = Column(String(10), nullable=False)
+    note = Column(String(500), nullable=True)
+    reporter_hash = Column(String(64), nullable=True)
+    status = Column(String(10), nullable=False, default="open", server_default="open")
+    handled_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                index=True)
+    handled_at = Column(DateTime(timezone=True), nullable=True)
+    resolution = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("reason IN ('phishing', 'malware', 'spam', 'scraping', 'privacy', 'other')",
+                        name="ck_abuse_reports_reason"),
+        CheckConstraint("source IN ('report', 'auto')", name="ck_abuse_reports_source"),
+        CheckConstraint("status IN ('open', 'dismissed', 'actioned')", name="ck_abuse_reports_status"),
+        Index("ix_abuse_reports_status_created", "status", "created_at"),
+    )

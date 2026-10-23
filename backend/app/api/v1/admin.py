@@ -461,3 +461,42 @@ async def list_audit_logs(
             "has_prev": page > 1,
         },
     }
+
+
+# ===== [Gate G4] FC-097 濫用への対応(公開の共有への通報・自動の検知・失効)
+
+@router.get("/abuse")
+async def list_abuse_reports(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    status_filter: Optional[str] = Query(default="open", alias="status", pattern="^(open|dismissed|actioned|all)$"),
+):
+    """通報と自動の検知の一覧(app/services/abuse.py)。旅行の中身は出さない(題名・所有者の ID・共有の状態だけ)。"""
+    from app.services import abuse
+
+    return abuse.list_reports(db, None if status_filter == "all" else status_filter)
+
+
+@router.post("/abuse/{report_id}/action")
+async def act_on_abuse_report(
+    report_id: uuid.UUID,
+    request: Request,
+    payload: dict = Body(...),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """対応: dismiss(却下)・revoke_share(共有を失効させ、所有者に知らせる)・restore_share(濫用の対応で止めた共有を戻す)。"""
+    from app.services import abuse
+
+    action = payload.get("action")
+    note = payload.get("note")
+    if note is not None and (not isinstance(note, str) or len(note) > 500):
+        raise HTTPException(status_code=422, detail="noteは500文字までの文字列です")
+    try:
+        r = abuse.act(db, report_id, admin, str(action or ""), note)
+    except abuse.AbuseActionError as e:
+        raise HTTPException(status_code=e.status_code, detail={"code": e.code, "message": str(e)})
+    record_audit_event(action="admin_abuse_" + str(action), resource_type="abuse_report", user_id=admin.id,
+                       resource_id=r.id, ip_address=request.client.host if request.client else None,
+                       details={"reason": r.reason, "share_id": str(r.share_id) if r.share_id else None})
+    return {"id": str(r.id), "status": r.status, "message": "対応を記録しました"}

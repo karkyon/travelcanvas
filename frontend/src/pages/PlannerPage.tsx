@@ -876,6 +876,7 @@ const PlannerPage: React.FC = () => {
                 }}
                 onItemEdit={openEditItem}
                 onItemDelete={handleDeleteItem}
+                onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
               />
             </>
           ) : null}

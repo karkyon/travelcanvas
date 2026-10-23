@@ -1141,6 +1141,12 @@ def cmd_purge(ex: Executor) -> int:
 JOBS = {
     # [Gate G2] FR-042 Webhook の自動の再送
     "webhook-retry": ["-m", "app.ops.webhook_retry"],
+    # [Gate G4] COL-02 投票の締切(締切前の知らせ・締め)
+    "poll-deadlines": ["-m", "app.ops.poll_deadlines"],
+    # [Gate G4] COL-03 通知のまとめのメール・送信待ちのメールの送信と再送
+    "email-outbox": ["-m", "app.ops.email_outbox"],
+    # [Gate G4] FC-097 濫用の自動の検知
+    "abuse-scan": ["-m", "app.ops.abuse_scan"],
 }
 
 

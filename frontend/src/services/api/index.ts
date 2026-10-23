@@ -490,6 +490,7 @@ export const getPlaceInfo = (placeId: string) => api.getPlaceInfo(placeId);
 export const updatePlace = (placeId: string, patch: PlacePatch, revision: number) => api.updatePlace(placeId, patch, revision);
 export const putOpeningHours = (placeId: string, hours: OpeningHoursItem[], revision: number) =>
   api.putOpeningHours(placeId, hours, revision);
+export type { DayHours, PlaceEntrance, SpecialHoursItem, SourceHistoryItem } from './types/candidates';
 export const getPlanPlaces = (planId: string) => api.getPlanPlaces(planId);
 
 // ===== [Gate C3] 情報内検索・コマンドパレット(FR-009)

@@ -57,6 +57,9 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | 毎日 03:50 | 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(`log-scan`) |
 | 5分ごと | 監視(状態が変わった時だけ記録・通知) |
 | 5分ごと | [Gate G2] Webhook の自動の再送(`tcops.py jobs webhook-retry`。1・5・30分・2・6時間の間隔、6回で dead) |
+| 15分ごと | [Gate G4] 投票の締切(`tcops.py jobs poll-deadlines`。締切の24時間前に未回答の人へ知らせ、締切で締めて結果を知らせる。決定は人が行う) |
+| 5分ごと | [Gate G4] 通知のまとめのメールと送信待ちのメール(`tcops.py jobs email-outbox`。送信の設定が無ければ何もしない。失敗は5分から6時間まで間を空けて6回で dead) |
+| 毎時 25分 | [Gate G4] 濫用の自動の検知(`tcops.py jobs abuse-scan`。1時間に50以上の接続元から開かれた共有・合言葉の失敗20回・1日に50個の共有・感染した文書を管理者の一覧へ) |
 
 ログは `ops-state/logs/*.log`、演習の記録は `ops-state/drills/`(どちらも git の対象外)。
 
@@ -73,6 +76,8 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | `OPS_BACKEND_URL` | `http://127.0.0.1:8001` | 監視する backend |
 | `METRICS_TOKEN` | なし | 設定すると `/metrics` に `Authorization: Bearer` が必要。未設定時は私設アドレス(LAN・同じ機械)からだけ見える |
 | `OPS_ALERT_WEBHOOK_URL` | なし | §2.2 |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USE_TLS` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `EMAIL_FROM` | なし / 587 / true / なし / なし / なし | [Gate G4] 通知のまとめのメール(§8.10)。`SMTP_HOST` と `EMAIL_FROM` が無ければメールは送らない(画面に「使えません」と出る) |
+| `SHARE_VIEW_SIGNING_KEY` / `SHARE_VIEW_TTL_SECONDS` | `JWT_SECRET_KEY` から導出 / 7200 | [Gate G4] 共有の閲覧の一時トークン(§8.10、KEY-INVENTORY) |
 
 ### 2.4 手で行うこと
 
@@ -511,6 +516,23 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
   `docker compose logs backend | grep <番号>` でサーバーのログを探す。エラーの一覧は `docs/spec/error-catalog.md`。
 - **性能**: GitHub の `perf` の workflow が毎晩、予定 10,000 件・通知 100,000 件で主な API の p95・SQL の数(N+1)・索引の使用を
   確かめる(`backend/tests/test_gate_g3_perf.py`、結果は Actions の成果物 `perf-*`)。
+
+## 8.10 検索のコマンド・合意の採用・通知・ゲストの閲覧・濫用への対応(Gate G4)
+
+- **検索のコマンド**(`>予定を追加 11/3 10:00 清水寺` 等): Enter は確認の表示だけ。「実行する」で1回だけ実行し(Idempotency-Key)、
+  実行の記録は `command_runs`。「元に戻す」は本人だけ、その後に別の変更が無い時だけ(あれば 409 `undo_not_latest`)。
+- **投票の決定の採用**: 決定した選択肢を旅程に反映する前に内容を確かめる(何も変えない)。反映は1つの変更セット(source=decision)。
+  定足数に届かない投票は決定できない(409 `quorum_not_met`)。採用した後は決定の変更・再開・削除をしない(先に「反映を元に戻す」)。
+  締切は 15分ごとの `poll-deadlines` が締める。手で動かす: `python3 scripts/ops/tcops.py jobs poll-deadlines`。
+- **通知の設定**: 利用者ごと(全体・旅行ごと)に「すべて・自分あてだけ・受け取らない」。メールのまとめ(1日1回)は SMTP の設定がある時だけ。
+  送信待ちの件数: `docker compose exec -T postgres psql -U <所有者> -d <DB> -c "SELECT status, count(*) FROM email_outbox GROUP BY 1"`。
+  `dead` が増えた時は SMTP の設定・提供元の障害を確かめ、直したら `UPDATE email_outbox SET status='failed', attempts=0, next_attempt_at=now() WHERE status='dead'`
+  で送り直す(本文に予約番号・コメントの本文・位置は入っていない)。
+- **ゲストの閲覧**: リンクを開く前の確認(`/info`)と、開いた後の見直し(一時トークン、既定2時間)は使用回数を使わない。
+  共有の失効・期限切れ・合言葉の変更で一時トークンはすぐ使えない。複製は所有者が「複製できる」にした共有だけ・許した項目だけ。
+- **濫用への対応**(FC-097): 管理者の画面「濫用への対応」(`/admin/abuse`)。通報が24時間に別々の3人から(詐欺・有害)来た共有は
+  自動で止まり(`revoked_reason=abuse_auto`)、所有者に知らせる。管理者は内容を確かめて「却下」「共有を止める」「共有を戻す」。
+  対応は監査(`admin_abuse_*`)に残る。旅行の中身を確かめる時は、本人の同意のサポート閲覧(§8.7)を使う。
 
 ## 9. CI と main の保護(Gate S11)
 

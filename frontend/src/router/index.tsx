@@ -35,6 +35,8 @@ const AdminUsers = lazyPage(() => import('@/pages/Admin/AdminUsers'));
 const AdminAuditLogs = lazyPage(() => import('@/pages/Admin/AdminAuditLogs'));
 // [Gate G2] FR-040 運用とサポート閲覧
 const AdminSupport = lazyPage(() => import('@/pages/Admin/AdminSupport'));
+// [Gate G4] FC-097 濫用への対応
+const AdminAbuse = lazyPage(() => import('@/pages/Admin/AdminAbuse'));
 const NotificationsPage = lazyPage(() => import('@/pages/NotificationsPage'));
 const OptimizationSelectPage = lazyPage(() => import('@/pages/OptimizationSelectPage'));
 const ReservationsPage = lazyPage(() => import('@/pages/ReservationsPage'));
@@ -575,6 +577,15 @@ export const router = createBrowserRouter([
             element: (
               <AdminRoute>
                 <AdminSupport />
+              </AdminRoute>
+            ),
+          },
+          // [Gate G4] FC-097 濫用への対応(通報・自動の検知・共有の停止)
+          {
+            path: 'abuse',
+            element: (
+              <AdminRoute>
+                <AdminAbuse />
               </AdminRoute>
             ),
           },

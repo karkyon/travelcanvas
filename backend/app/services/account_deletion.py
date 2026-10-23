@@ -230,6 +230,13 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     summary["data_keys_destroyed"] = data_keys.destroy(db, "user", me, "account_deletion")
     summary["sessions"] = db.query(UserSession).filter(UserSession.user_id == me).delete(
         synchronize_session=False)
+    # [Gate G4] 検索のコマンドの記録(入力した予定の名前を含む)・通知の設定・送信待ちのメール(宛先は本人)
+    from app.models.models import CommandRun, EmailOutbox, NotificationPreference
+
+    db.query(CommandRun).filter(CommandRun.user_id == me).delete(synchronize_session=False)
+    db.query(NotificationPreference).filter(NotificationPreference.user_id == me).delete(synchronize_session=False)
+    summary["email_outbox"] = db.query(EmailOutbox).filter(EmailOutbox.user_id == me).delete(
+        synchronize_session=False)
 
     user.username = deleted_name(me)
     user.email = None

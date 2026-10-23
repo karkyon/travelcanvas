@@ -6,7 +6,7 @@
  * - 精算: メンバーごとの支払・負担・差額と、送金回数の少ない精算案。案から精算を記録でき、記録は取り消せる。
  */
 import React from 'react';
-import { Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { MessageSquare, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import type { Expense, FinanceSummary, FinanceTransfer, Settlement } from '@/services/api';
@@ -19,9 +19,11 @@ interface ExpenseListProps {
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
   onRefund: (e: Expense) => void;
+  /** [Gate G4] COL-03 この費用へのコメント */
+  onComment?: (e: Expense) => void;
 }
 
-export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit, onAdd, onEdit, onDelete, onRefund }) => {
+export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit, onAdd, onEdit, onDelete, onRefund, onComment }) => {
   const titleOf = new Map(expenses.map((e) => [e.id, e.title]));
   return (
     <div className="space-y-4">
@@ -59,6 +61,11 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
                     </p>
                     <p className="text-xs text-gray-700">負担: {describeShares(e)}</p>
                   </div>
+                  {onComment && (
+                    <button type="button" onClick={() => onComment(e)} className="text-gray-600 hover:text-indigo-700 p-1 shrink-0" aria-label="この支出へのコメント">
+                      <MessageSquare size={16} />
+                    </button>
+                  )}
                   {canEdit && (
                     <div className="flex items-center gap-1 shrink-0">
                       {e.kind === 'expense' && (

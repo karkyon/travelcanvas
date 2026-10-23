@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r14",
+  "revision": "v5.1-r16",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -72,16 +72,16 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "C2",
-   "gaps": "例外日・祝日・最終入場、ジオコードの確認、入口の別地点、複数の出典の比較"
+   "gates": "C2・G4",
+   "gaps": "ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる)"
   },
   "FR-009": {
    "title": "情報内検索・コマンドパレット",
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "C3",
-   "gaps": "`>` のコマンド"
+   "gates": "C3・G4",
+   "gaps": "利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1)"
   },
   "FR-010": {
    "title": "予約管理",
@@ -181,11 +181,11 @@
   },
   "FR-022": {
    "title": "合意形成",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "P3",
-   "gaps": "決定した候補の予定への反映、締切"
+   "gates": "P3・G4",
+   "gaps": "利用の計測、本番での確認(RELEASE-1)"
   },
   "FR-023": {
    "title": "秘匿プロフィール・制約",
@@ -200,8 +200,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P3",
-   "gaps": "予定・予約・費用単位のコメント画面、リマインド、メール通知"
+   "gates": "P3・G4",
+   "gaps": "メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる)"
   },
   "FR-025": {
    "title": "持ち物",
@@ -328,8 +328,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "A2・S11・G2",
-   "gaps": "濫用の自動検知の画面(FC-097。検知は S6 の運用の道具)"
+   "gates": "A2・S11・G2・G4",
+   "gaps": "管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1)"
   },
   "FR-041": {
    "title": "組織・B2B",
@@ -360,8 +360,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "#35・#41・E1",
-   "gaps": "詳しい表示・複製の説明"
+   "gates": "#35・#41・E1・G4",
+   "gaps": "モバイルの実機での確認(UX-03)、本番での確認(RELEASE-1)"
   },
   "FR-045": {
    "title": "安全な共有ポリシー",

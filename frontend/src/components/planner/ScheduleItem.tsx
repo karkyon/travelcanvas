@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { safeExternalUrl, safeTelHref } from '@/utils/safeNavigation';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
-  Star, Phone, ExternalLink, AlertTriangle 
+  Star, Phone, ExternalLink, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 
 interface ScheduleItemProps {
@@ -38,6 +38,8 @@ interface ScheduleItemProps {
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onShare?: (id: string) => void;
+  /** [Gate G4] COL-03 この予定へのコメントを開く */
+  onComment?: (id: string) => void;
   isDragging?: boolean;
   dragRef?: React.RefObject<HTMLDivElement>;
   style?: React.CSSProperties;
@@ -68,6 +70,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   contactInfo,
   onUpdate,
   onDelete,
+  onComment,
   onEdit: _onEdit,
   onShare,
   isDragging = false,
@@ -256,6 +259,20 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           >
             <Edit3 size={14} />
           </button>
+          {onComment && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComment(id);
+              }}
+              className="p-1 text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-sm transition-colors"
+              title="コメント"
+              aria-label="この予定へのコメント"
+            >
+              <MessageSquare size={14} />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

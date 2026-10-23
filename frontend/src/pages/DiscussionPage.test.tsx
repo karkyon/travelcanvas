@@ -23,12 +23,21 @@ const m = vi.hoisted(() => ({
   createComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
+  getCandidates: vi.fn(),
+  getPlanDetail: vi.fn(),
+  adoptionPreview: vi.fn(),
+  adoptPoll: vi.fn(),
+  undoAdoptPoll: vi.fn(),
 }));
 
 vi.mock('@/services/api', async () => {
   const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
-  return { extractApiErrorDetailMessage: actual.extractApiErrorDetailMessage, ...m };
+  return { extractApiErrorDetailMessage: actual.extractApiErrorDetailMessage, ...m, api: { getPlanDetail: m.getPlanDetail } };
 });
+vi.mock('@/services/api/g4', () => ({
+  adoptionPreview: m.adoptionPreview, adoptPoll: m.adoptPoll, undoAdoptPoll: m.undoAdoptPoll,
+  getNotificationSettings: vi.fn(), putPlanNotificationLevel: vi.fn(), deletePlanNotificationLevel: vi.fn(),
+}));
 
 import DiscussionPage from './DiscussionPage';
 
@@ -38,9 +47,9 @@ const members: PlanMember[] = [
   { user_id: 'u2', name: '花子', role: 'editor', is_me: false },
 ];
 
-function renderPage() {
+function renderPage(path = '/planner/p1/discussion') {
   return render(
-    <MemoryRouter initialEntries={['/planner/p1/discussion']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/planner/:planId/discussion" element={<DiscussionPage />} />
       </Routes>
@@ -58,6 +67,9 @@ beforeEach(() => {
   m.createPoll.mockResolvedValue(fx.poll_created);
   m.createComment.mockResolvedValue(fx.comment_created);
   window.confirm = vi.fn(() => true);
+  m.getCandidates.mockResolvedValue({ plan_id: 'p1', items: [], counts: {}, duplicate_pairs: 0 });
+  m.getPlanDetail.mockResolvedValue({ success: true, data: { id: 'p1', title: 't', revision: 7,
+    days: [{ id: 'd1', local_date: '2026-11-03', title: null, events: [] }] } });
 });
 
 describe('DiscussionPage (Gate P3)', () => {
@@ -130,5 +142,71 @@ describe('DiscussionPage (Gate P3)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'コメントする' }));
     await waitFor(() => expect(m.createComment).toHaveBeenCalledWith('p1', { body: '予約番号は 12345678 です', mentions: ['u2'] }));
     expect((fx.comment_created as PlanComment).sensitive_warning).toBe(true);
+  });
+
+  it('[G4] 定足数・候補箱の候補を選択肢にして作成する', async () => {
+    m.getCandidates.mockResolvedValue({ plan_id: 'p1', counts: {}, duplicate_pairs: 0, items: [
+      { id: 'c1', title: '錦市場', status: 'open', merged_into_id: null },
+      { id: 'c2', title: '見送り', status: 'dismissed', merged_into_id: null }] });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: '投票を作成' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('題名'), { target: { value: '昼' } });
+    fireEvent.click(await within(dialog).findByLabelText('錦市場'));
+    expect(within(dialog).queryByLabelText('見送り')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText(/定足数/), { target: { value: '0' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('定足数は1〜100');
+    fireEvent.change(within(dialog).getByLabelText(/定足数/), { target: { value: '2' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
+    await waitFor(() => expect(m.createPoll).toHaveBeenCalledWith('p1', {
+      title: '昼', options: [{ candidate_id: 'c1' }], veto_policy: 'block', is_anonymous: false, quorum: 2,
+    }));
+  });
+
+  it('[G4] 決定を確かめてから旅程に反映し、反映を元に戻せる', async () => {
+    const yakiniku = voted.options[1]!;
+    const decided = { ...voted, can_manage: true, decided_option_id: yakiniku.id, phase: 'decided', can_adopt: true,
+      quorum: 2, responders: 3, quorum_met: true,
+      options: voted.options.map((o) => (o.id === yakiniku.id ? { ...o, is_decided: true, candidate_id: 'c1' } : o)) };
+    m.getPolls.mockResolvedValue([decided]);
+    m.adoptionPreview.mockResolvedValue({ poll_id: voted.id, option_id: yakiniku.id, option_label: yakiniku.label,
+      kind: 'schedule_candidate', effects: ['候補「焼肉」を 11/03 の予定にします'], problems: [], can_adopt: true,
+      undoable: true, plan_revision: 7 });
+    m.adoptPoll.mockResolvedValue({ poll: decided, plan_revision: 8, message: 'ok' });
+    const first = renderPage();
+    const card = await screen.findByRole('region', { name: voted.title });
+    expect(within(card).getByTestId(`poll-phase-${voted.id}`)).toHaveTextContent('決定');
+    expect(within(card).getByTestId(`poll-phase-${voted.id}`)).toHaveTextContent('定足数 2人');
+    fireEvent.click(within(card).getByRole('button', { name: '旅程に反映' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: '反映する' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(/開始の時刻/), { target: { value: '12:00' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '反映の内容を確かめる' }));
+    expect(await within(dialog).findByRole('region', { name: '反映の内容' })).toHaveTextContent('11/03 の予定');
+    expect(m.adoptionPreview).toHaveBeenCalledWith('p1', voted.id, { day_id: 'd1', local_start_time: '12:00', remove_others: false });
+    fireEvent.click(within(dialog).getByRole('button', { name: '反映する' }));
+    await waitFor(() => expect(m.adoptPoll).toHaveBeenCalledWith('p1', voted.id,
+      { day_id: 'd1', local_start_time: '12:00', remove_others: false }, 7));
+    expect(await screen.findByRole('status')).toHaveTextContent('旅程に反映しました');
+
+    m.getPolls.mockResolvedValue([{ ...decided, phase: 'adopted', can_adopt: false }]);
+    m.undoAdoptPoll.mockResolvedValue({ poll: decided, plan_revision: 9, message: 'ok' });
+    first.unmount();
+    renderPage();
+    const again = await screen.findByRole('region', { name: voted.title });
+    fireEvent.click(await within(again).findByRole('button', { name: '反映を元に戻す' }));
+    await waitFor(() => expect(m.undoAdoptPoll).toHaveBeenCalledWith('p1', voted.id, 7));
+  });
+
+  it('[G4] ?target= でその予定へのコメントを開き、対象つきで投稿する', async () => {
+    renderPage('/planner/p1/discussion?target=event&id=e1');
+    expect(await screen.findByRole('note')).toHaveTextContent('この予定へのコメント');
+    expect(m.getComments).toHaveBeenCalledWith('p1', { type: 'event', id: 'e1' });
+    const box = screen.getAllByRole('textbox')[0]!;
+    fireEvent.change(box, { target: { value: '集合は駅で' } });
+    fireEvent.click(screen.getByRole('button', { name: 'コメントする' }));
+    await waitFor(() => expect(m.createComment).toHaveBeenCalledWith('p1', expect.objectContaining({
+      body: '集合は駅で', target_type: 'event', target_id: 'e1' })));
   });
 });

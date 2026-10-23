@@ -30,3 +30,54 @@ export interface SearchResults {
   plans?: Array<{ plan_id: string; title: string; link: string }>;
   searched_plans?: number;
 }
+
+// ===== [Gate G4] MAP-03 検索のコマンド(backend/app/api/v1/commands.py)
+export type CommandKind = 'mutate' | 'navigate' | 'run';
+
+export interface CommandDef {
+  name: string;
+  label: string;
+  kind: CommandKind;
+  usage: string;
+  undoable: boolean;
+  allowed: boolean;
+  aliases: string[];
+}
+
+export interface CommandList {
+  commands: CommandDef[];
+  plan_revision: number;
+}
+
+export interface CommandPreview {
+  command: string;
+  label: string;
+  kind: CommandKind;
+  args: Record<string, unknown>;
+  undoable: boolean;
+  allowed: boolean;
+  reason: string | null;
+  needs_confirmation: boolean;
+  summary: string[];
+  problem: { code: string; message: string } | null;
+  link: string | null;
+  plan_revision: number;
+}
+
+export interface CommandResult {
+  run_id: string;
+  status: 'executed' | 'undone';
+  command: string;
+  label: string;
+  undoable: boolean;
+  message: string;
+  link: string | null;
+  plan_revision: number;
+}
+
+export interface CommandUndoResult {
+  run_id: string;
+  status: 'undone';
+  plan_revision: number;
+  message: string;
+}

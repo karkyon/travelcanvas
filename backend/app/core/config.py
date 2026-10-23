@@ -172,6 +172,20 @@ class Settings(BaseSettings):
     CHALLENGE_ALWAYS: str = ""           # 点数に関わらず常に求める入口(カンマ区切り: login,register,guest,guest_upgrade)
     CHALLENGE_SECRET_KEY: str = ""       # 空なら JWT_SECRET_KEY から導出する
 
+    # [Gate G4] COL-05 共有の閲覧の一時トークン(合言葉を通した後、使用回数を消費せずに見直す・複製する)の署名。
+    # 空なら JWT_SECRET_KEY から導出する。SHARE_VIEW_TTL_SECONDS の間だけ有効(共有が失効したら即無効)
+    SHARE_VIEW_SIGNING_KEY: str = ""
+    SHARE_VIEW_TTL_SECONDS: int = 2 * 3600
+
+    # [Gate G4] COL-03 メール(通知のまとめ)の送信。SMTP_HOST と EMAIL_FROM が無ければメールを送らない
+    # (画面に「メールは使えません」と出す)。送信は email_outbox に記録し、失敗は間を空けて再送する
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USE_TLS: bool = True
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM: str = ""
+
     # [Gate S11] SEC-06 多要素認証(app/services/mfa.py、Runbook §8.6)。管理者の API は、TOTP を設定し、
     # このセッションで ADMIN_MFA_MAX_AGE_HOURS 以内に確認コードを通した時だけ使える。
     ADMIN_MFA_REQUIRED: bool = True

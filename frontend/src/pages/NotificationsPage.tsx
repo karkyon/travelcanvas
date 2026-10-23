@@ -3,6 +3,7 @@
  *
  * [Gate #26] Header.tsxの通知ベルアイコンは常に導線があったが、遷移先は
  * 「開発中です」の固定表示だった。実際のnotifications APIに接続する。
+ * [Gate G4] COL-03 通知の設定・読んでいない通知のまとめ、通知から対象(予定・予約・費用へのコメント、投票)へ移る。
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +14,8 @@ import Card from '@/components/common/Card';
 import { notificationsAPI, listMyInvitations, acceptInvitation, declineInvitation } from '@/services/api';
 import type { Notification, Collaborator } from '@/services/api';
 import { toast } from 'react-hot-toast';
+import NotificationSettingsPanel from '@/components/notifications/NotificationSettingsPanel';
+import { safeInternalPath } from '@/utils/safeNavigation';
 
 const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
@@ -105,7 +108,10 @@ const NotificationsPage: React.FC = () => {
     if (!notification.is_read) {
       handleMarkAsRead(notification.id);
     }
-    if (notification.related_plan_id) {
+    // [Gate G4] 対象への移動先はサーバーの値。アプリの中のパスだけを通す
+    const link = safeInternalPath((notification as Notification & { link?: string | null }).link ?? '');
+    if (link) navigate(link);
+    else if (notification.related_plan_id) {
       navigate(`/planner/${notification.related_plan_id}`);
     }
   };
@@ -131,6 +137,8 @@ const NotificationsPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      <NotificationSettingsPanel />
 
       {!invitationsLoading && invitations.length > 0 && (
         <div className="mb-6">

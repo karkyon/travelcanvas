@@ -17,6 +17,8 @@
 | `JWT_SECRET_KEY` | ログインのトークンの署名 | 侵害が疑われる時(Runbook §8) | 全員が再ログイン | ○ |
 | `OFFLINE_PACK_KEY_SECRET` | オフラインパックの鍵の元(未設定なら `ENCRYPTION_KEY` から導出) | 原則替えない | 全員の端末のオフラインデータの取り直し | ○(`ENCRYPTION_KEY` と分ける) |
 | `CHALLENGE_SECRET_KEY` | 計算の確認の問題の署名(未設定なら `JWT_SECRET_KEY` から導出) | いつでも | 出題中の問題(既定2分)が無効 | — |
+| `SHARE_VIEW_SIGNING_KEY` | [Gate G4] 共有の閲覧の一時トークンの署名(未設定なら `JWT_SECRET_KEY` から導出) | いつでも | 閲覧中の人(既定2時間)はリンクを開き直す(使用回数を1回使う) | — |
+| `SMTP_PASSWORD` | [Gate G4] 通知のまとめのメールを送る SMTP の認証(`SMTP_HOST`・`EMAIL_FROM` が無ければメールは送らない) | 提供元と .env を同時に | 替えるまで送れず、送信待ちが再送を続ける(上限で dead) | — |
 | `METRICS_TOKEN` | 監視の計測値(`/metrics`)を見る合言葉 | 監視の道具と同時に | 替えるまで監視が 401 | ○ |
 
 **使い回しの禁止:** 上の鍵どうし、および DB のパスワードで同じ値を使わない。本番(`APP_ENV=production`)は

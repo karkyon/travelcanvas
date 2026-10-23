@@ -77,3 +77,34 @@ def poll_state(states: Dict[Hashable, dict], is_closed: bool, decided: Optional[
     if all(s["state"] == "blocked" for s in states.values()):
         return "blocked"
     return "needs_discussion"
+
+
+# ===== [Gate G4] COL-02 決定の状態遷移(締切・定足数・同票・採用)
+#
+#   voting(回答中)─締切(手で/期限)→ closed ─決定→ decided ─採用(予定に反映。変更セット)→ adopted
+#        ↑ 再開(採用前だけ)            │ 定足数に届かない → no_quorum(決定できない。再開して回答を集める)
+#   決定を変える・再開する・回答を変えるのは採用の前だけ(採用後は「採用を元に戻す」が先)
+
+def tied_leaders(states: Dict[Hashable, dict], order: List[Hashable]) -> List[Hashable]:
+    """最有力が同点で2つ以上ある時、その選択肢(不成立・回答なしは除く)。1つだけなら空。"""
+    candidates = [oid for oid in order if states[oid]["state"] != "blocked" and states[oid]["responders"]]
+    if not candidates:
+        return []
+    best = max(states[oid]["score"] for oid in candidates)
+    top = [oid for oid in candidates if states[oid]["score"] == best]
+    return top if len(top) > 1 else []
+
+
+def quorum_met(responders: int, quorum: Optional[int]) -> bool:
+    return quorum is None or responders >= quorum
+
+
+def phase(is_closed: bool, decided: Optional[Hashable], adopted: bool, responders: int,
+          quorum: Optional[int]) -> str:
+    if adopted:
+        return "adopted"
+    if decided is not None:
+        return "decided"
+    if not is_closed:
+        return "voting"
+    return "closed" if quorum_met(responders, quorum) else "no_quorum"

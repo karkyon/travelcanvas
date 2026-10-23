@@ -23,6 +23,7 @@
  *   行わない)。
  */
 import { create } from 'zustand';
+import { PLAN_MUTATED_EVENT } from '@/utils/commandPalette';
 import { TravelPlan, ScheduleItem, DaySchedule, EventCategory } from '@/types';
 import { api as apiService, travelAPI } from '@/services/api';
 import type { SpotResult, NormalizedDay, NormalizedEvent } from '@/services/api';
@@ -1020,3 +1021,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     });
   },
 }));
+
+// [Gate G4] MAP-03 検索のコマンド(CommandPalette)で旅程を変えた時、開いている旅程なら読み直す
+if (typeof window !== 'undefined') {
+  window.addEventListener(PLAN_MUTATED_EVENT, (e) => {
+    const planId = (e as CustomEvent<{ planId?: string }>).detail?.planId;
+    const st = usePlanStore.getState();
+    if (planId && st.currentPlan?.id === planId) void st.loadPlan(planId);
+  });
+}

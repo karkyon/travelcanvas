@@ -188,7 +188,10 @@ def test_owner_preview_matches_public_and_does_not_consume(auth_client, make_use
     assert link["use_count"] == 0 and link["last_accessed_at"] is None
     public = _resolve(client, created["url"]).json()
     view = after.json()["view"]
-    assert {k: v for k, v in view.items()} == public
+    # [Gate G4] COL-05 公開の応答だけに一時トークン・説明・複製の可否が付く(中身はプレビューと同じ)
+    g4_keys = {"view_token", "view_expires_in", "allow_clone", "policy_explained"}
+    assert g4_keys <= set(public)
+    assert {k: v for k, v in view.items()} == {k: v for k, v in public.items() if k not in g4_keys}
     assert _resolve(client, created["url"]).status_code == 404  # 上限1回(プレビューは数えていない)
 
     # 所有者以外は使えない

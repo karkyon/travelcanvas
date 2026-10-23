@@ -30,7 +30,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -108,6 +108,9 @@ def _share_link_to_dict(share: PlanShareLink, raw_token: Optional[str] = None, d
         "created_at": share.created_at.isoformat() if share.created_at else None,
         # [Gate F45] 見せる項目(NULL の既存リンクは標準)
         "fields": share_policy.fields_of(share.policy),
+        # [Gate G4] COL-05 受け取った人が許可された項目だけを自分の旅行へ複製してよいか / FC-097 失効の理由
+        "allow_clone": bool(share.allow_clone),
+        "revoked_reason": share.revoked_reason,
     }
 
 
@@ -224,6 +227,9 @@ async def create_share_link(
     passcode = payload.get("passcode")
     passcode_hash = _hash_token(passcode) if passcode else None
     policy = _resolve_policy(payload)
+    allow_clone = payload.get("allow_clone", False)
+    if not isinstance(allow_clone, bool):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allow_cloneは真偽値です")
 
     raw_token = secrets.token_urlsafe(24)
     share = PlanShareLink(
@@ -236,6 +242,7 @@ async def create_share_link(
         max_uses=max_uses,
         passcode_hash=passcode_hash,
         policy=policy,
+        allow_clone=allow_clone,
     )
     db.add(share)
     db.commit()
@@ -272,7 +279,7 @@ async def preview_share_link(
 ):
     """[Gate F45] 発行済みリンクで閲覧者に見える内容(所有者のみ)。使用回数を消費せず、閲覧記録も残さない。"""
     plan = _get_owned_plan(db, plan_id, current_user)
-    share = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
+    share: Any = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
     if not share:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
     return _preview(db, plan, share_policy.fields_of(share.policy), share.permission)
@@ -299,7 +306,7 @@ async def update_share_link(
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
-    share = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
+    share: Any = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
     if not share:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
 
@@ -336,11 +343,16 @@ async def update_share_link(
     if share_policy.has_policy_input(payload):
         share.policy = _resolve_policy(payload)
 
+    if "allow_clone" in payload:
+        if not isinstance(payload["allow_clone"], bool):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allow_cloneは真偽値です")
+        share.allow_clone = payload["allow_clone"]
+
     db.commit()
     db.refresh(share)
     _audit_share("share_link_updated", request, current_user, share,
                  {"changed": sorted(k for k in payload if k in (
-                     "permission", "expires_at", "max_uses", "passcode", "fields", "preset"))})
+                     "permission", "expires_at", "max_uses", "passcode", "fields", "preset", "allow_clone"))})
     return _share_link_to_dict(share)
 
 
@@ -355,11 +367,12 @@ async def revoke_share_link(
     """[Gate #30] ownerが共有リンクを即時失効させる。削除(DELETE)と異なり
     レコード自体は監査目的で残す。"""
     plan = _get_owned_plan(db, plan_id, current_user)
-    share = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
+    share: Any = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
     if not share:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
 
     share.revoked_at = datetime.now(timezone.utc)
+    share.revoked_reason = share.revoked_reason or "owner"
     db.commit()
     db.refresh(share)
     _audit_share("share_link_revoked", request, current_user, share)
@@ -375,7 +388,7 @@ async def delete_share_link(
     db: Session = Depends(get_db),
 ):
     plan = _get_owned_plan(db, plan_id, current_user)
-    share = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
+    share: Any = db.query(PlanShareLink).filter(PlanShareLink.id == share_id, PlanShareLink.plan_id == plan.id).first()
     if not share:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="共有リンクが見つかりません")
 

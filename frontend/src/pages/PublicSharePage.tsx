@@ -11,13 +11,21 @@
  *
  * [Gate F45] 本文は components/share/SharedPlanView(所有者の共有前プレビューと共通)で表示する。
  * 所有者がリンクごとに選んだ項目だけが backend から届く(FR-045)。
+ *
+ * [Gate G4] COL-05 Guest Travel View:
+ * - 開く前に確認(info)だけを読む(使用回数を使わない)。合言葉が要るか・見える項目・見えない項目を示す
+ * - 開いた後は一時トークン(画面の中だけに持つ。保存しない)で「最新を読み込む」(使用回数を使わない)
+ * - 所有者が許した共有だけ、ログインした人は許された項目を自分の旅行へ複製できる
+ * [Gate G4] FC-097 「問題を報告」(詐欺・有害・迷惑・大量の自動の閲覧・個人の情報・その他)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Lock, AlertCircle, Share2 } from 'lucide-react';
+import { Lock, AlertCircle, Share2, Flag, Copy, RefreshCw } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { resolvePublicShare } from '../services/api';
-import type { PublicSharedPlan } from '../services/api';
+import type { AbuseReason, GuestShareView, ShareInfo } from '../services/api';
+import { cloneShare, getShareInfo, getShareView, reportShare } from '../services/api/g4';
+import { errorDetailMessage } from '../utils/apiErrorDetail';
 import SharedPlanView from '../components/share/SharedPlanView';
 
 type LoadState = 'loading' | 'ok' | 'needs_passcode' | 'invalid';
@@ -25,7 +33,14 @@ type LoadState = 'loading' | 'ok' | 'needs_passcode' | 'invalid';
 const PublicSharePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = useState<LoadState>('loading');
-  const [plan, setPlan] = useState<PublicSharedPlan | null>(null);
+  const [plan, setPlan] = useState<GuestShareView | null>(null);
+  const [info, setInfo] = useState<ShareInfo | null>(null);
+  const [viewToken, setViewToken] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reason, setReason] = useState<AbuseReason>('phishing');
+  const [reportNote, setReportNote] = useState('');
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +50,9 @@ const PublicSharePage: React.FC = () => {
     if (!token) return;
     try {
       const response = await resolvePublicShare(token, withPasscode);
-      setPlan(response.data);
+      const view = response.data as GuestShareView;
+      setPlan(view);
+      setViewToken(view.view_token ?? null);
       setState('ok');
     } catch (error) {
       const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
@@ -50,9 +67,75 @@ const PublicSharePage: React.FC = () => {
     }
   }, [token]);
 
+  // [Gate G4] 先に確認だけ読む(使用回数を使わない)。合言葉が要る時は入力を待ち、要らない時だけ開く
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!token) return;
+    let alive = true;
+    getShareInfo(token).then((i) => {
+      if (!alive) return;
+      setInfo(i);
+      if (i.needs_passcode) setState('needs_passcode');
+      else void load();
+    }).catch((error) => {
+      if (!alive) return;
+      const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
+      if (status === 404) setState('invalid');
+      else void load(); // 確認だけ失敗した時は、以前と同じく開いて確かめる
+    });
+    return () => { alive = false; };
+  }, [token, load]);
+
+  const reload = async () => {
+    if (!token || !viewToken) return;
+    setActionError(null);
+    try {
+      setPlan({ ...(await getShareView(token, viewToken)), view_token: viewToken });
+      setNotice('最新の内容を読み込みました');
+    } catch (e) {
+      const status = (e as { response?: { status?: number } } | null | undefined)?.response?.status;
+      if (status === 404) setState('invalid');
+      else setActionError(errorDetailMessage(e, '読み込めませんでした。もう一度リンクを開いてください'));
+    }
+  };
+
+  const clone = async () => {
+    if (!token || !viewToken) return;
+    setActionError(null);
+    try {
+      const r = await cloneShare(token, viewToken);
+      setNotice(`${r.message}。旅行の一覧から開けます`);
+    } catch (e) {
+      const status = (e as { response?: { status?: number } } | null | undefined)?.response?.status;
+      // ログインしていない(この画面はログインを求めない)時は、ログインしてから開き直すよう案内する
+      setActionError(status === 401 ? '複製するには、ログインしてからこのリンクを開き直してください'
+        : errorDetailMessage(e, '複製できませんでした'));
+    }
+  };
+
+  const report = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setActionError(null);
+    try {
+      await reportShare(token, reason, reportNote.trim() || undefined);
+      setReportOpen(false);
+      setReportNote('');
+      setNotice('問題の報告を受け付けました。ありがとうございます');
+    } catch (err) {
+      setActionError(errorDetailMessage(err, '報告を送れませんでした'));
+    }
+  };
+
+  const explained = plan?.policy_explained ?? info?.policy_explained ?? null;
+  const policyPanel = explained ? (
+    <details className="mt-4 text-sm text-gray-800 bg-white rounded-lg border p-3">
+      <summary className="cursor-pointer font-medium">この共有で見える情報</summary>
+      <p className="mt-2">いつも見える: {explained.always.join('・')}</p>
+      {explained.shown.length > 0 && <p>共有された項目: {explained.shown.map((x) => x.label).join('・')}</p>}
+      {explained.hidden.length > 0 && <p>共有されていない項目: {explained.hidden.map((x) => x.label).join('・')}</p>}
+      <p>どの共有でも見えない: {explained.never.join('・')}</p>
+    </details>
+  ) : null;
 
   const handleSubmitPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +198,9 @@ const PublicSharePage: React.FC = () => {
           <p className="text-gray-600 text-sm mb-6 text-center">
             このプランを閲覧するにはパスコードの入力が必要です。
           </p>
+          {info?.expires_at && (
+            <p className="text-xs text-gray-700 mb-4 text-center">有効期限: {new Date(info.expires_at).toLocaleString('ja-JP')}</p>
+          )}
           <form onSubmit={handleSubmitPasscode} className="space-y-4">
             <label htmlFor="public-share-passcode" className="sr-only">パスコード</label>
             <input
@@ -139,6 +225,7 @@ const PublicSharePage: React.FC = () => {
               {submitting ? '確認中...' : '閲覧する'}
             </button>
           </form>
+          {policyPanel}
         </div>
       </div>
     );
@@ -162,8 +249,52 @@ const PublicSharePage: React.FC = () => {
             共有
           </button>
         </div>
+        {notice && <p role="status" className="mb-2 p-2 rounded-sm bg-green-50 text-green-900 text-sm">{notice}</p>}
+        {actionError && <p role="alert" className="mb-2 p-2 rounded-sm bg-red-50 text-red-800 text-sm">{actionError}</p>}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {viewToken && (
+            <button type="button" onClick={() => void reload()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+              <RefreshCw size={14} aria-hidden="true" />最新を読み込む
+            </button>
+          )}
+          {plan.allow_clone && viewToken && (
+            <button type="button" onClick={() => void clone()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+              <Copy size={14} aria-hidden="true" />自分の旅行として複製
+            </button>
+          )}
+        </div>
         {/* [Gate #41] days は plan 直下(itinerary.days ではない) */}
         <SharedPlanView plan={plan} titleLevel={1} />
+        {policyPanel}
+        <div className="mt-6 text-sm">
+          {!reportOpen ? (
+            <button type="button" onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1 text-gray-700 underline">
+              <Flag size={14} aria-hidden="true" />問題を報告
+            </button>
+          ) : (
+            <form onSubmit={report} aria-label="問題を報告" className="bg-white border rounded-lg p-3 space-y-2">
+              <label className="block text-gray-800">問題の種類
+                <select className="ml-2 border rounded-sm px-2 py-1" value={reason} onChange={(e) => setReason(e.target.value as AbuseReason)}>
+                  <option value="phishing">詐欺・なりすまし(ログインや支払いを求める)</option>
+                  <option value="malware">有害なファイル・リンク</option>
+                  <option value="spam">迷惑な宣伝</option>
+                  <option value="privacy">個人の情報が公開されている</option>
+                  <option value="other">その他</option>
+                </select>
+              </label>
+              <label className="block text-gray-800">詳しく(任意)
+                <textarea className="mt-1 w-full border rounded-sm px-2 py-1" rows={2} maxLength={500} value={reportNote}
+                  onChange={(e) => setReportNote(e.target.value)} />
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" className="px-3 py-1.5 rounded-sm bg-gray-800 text-white">報告する</button>
+                <button type="button" className="px-3 py-1.5 rounded-sm border" onClick={() => setReportOpen(false)}>やめる</button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

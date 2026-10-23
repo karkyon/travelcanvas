@@ -72,6 +72,49 @@ export interface OpeningHoursItem {
   day_of_week: number;
   open_time: string;
   close_time: string;
+  /** [Gate G4] MAP-02 最終入場・ラストオーダー(HH:MM。無ければ閉じる時刻まで) */
+  last_entry?: string | null;
+  last_order?: string | null;
+}
+
+/** [Gate G4] MAP-02 日付ごとの例外の営業(臨時休業・特別営業。その日は曜日の営業時間より優先) */
+export interface SpecialHoursItem {
+  local_date: string;
+  kind: 'closed' | 'open';
+  open_time: string | null;
+  close_time: string | null;
+  last_entry: string | null;
+  last_order: string | null;
+  note: string | null;
+}
+
+/** [Gate G4] MAP-02 入口ごとの地点 */
+export interface PlaceEntrance {
+  id?: string;
+  label: string;
+  latitude: number | null;
+  longitude: number | null;
+  note: string | null;
+  accessible: boolean | null;
+}
+
+/** [Gate G4] MAP-02 出典ごとの値(値が出典で違う項目だけ) */
+export interface SourceHistoryItem {
+  value: string | null;
+  provider: string;
+  label: string;
+  source_url: string | null;
+  retrieved_at: string | null;
+}
+
+/** [Gate G4] MAP-02 その日の実際の営業時間 */
+export interface DayHours {
+  date: string;
+  source: 'special' | 'weekly' | 'unknown';
+  closed: boolean;
+  note: string | null;
+  windows: Array<{ open: string; close: string; crosses_midnight: boolean; last_entry: string | null; last_order: string | null; source: string }>;
+  summary: string;
 }
 
 export interface PlaceInfo {
@@ -92,6 +135,9 @@ export interface PlaceInfo {
   closed_days: string | null;
   note: string | null;
   opening_hours: OpeningHoursItem[];
+  special_hours?: SpecialHoursItem[];
+  entrances?: PlaceEntrance[];
+  source_history?: Record<string, SourceHistoryItem[]>;
   sources: Record<string, FieldSourceInfo>;
   events: Array<{ event_id: string; plan_id: string; plan_title: string; title: string; date: string | null; local_start_time: string | null }>;
   revision: number;
@@ -99,7 +145,7 @@ export interface PlaceInfo {
   updated_at: string | null;
 }
 
-export type PlacePatch = Partial<Omit<PlaceInfo, 'id' | 'opening_hours' | 'sources' | 'events' | 'revision' | 'can_edit' | 'updated_at'>>;
+export type PlacePatch = Partial<Omit<PlaceInfo, 'id' | 'opening_hours' | 'special_hours' | 'entrances' | 'source_history' | 'sources' | 'events' | 'revision' | 'can_edit' | 'updated_at'>>;
 
 export interface PlanPlaces {
   plan_id: string;

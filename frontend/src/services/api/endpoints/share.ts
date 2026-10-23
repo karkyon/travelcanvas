@@ -62,6 +62,8 @@ export class ShareApi extends NotificationsApi {
     expires_at?: string;
     passcode?: string;
     max_uses?: number;
+    /** [Gate G4] COL-05 受け取った人が許可された項目だけを複製してよい */
+    allow_clone?: boolean;
   } & SharePolicyInput): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post(`/travel-plans/${planId}/share`, shareData);
     return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'POST /travel-plans/{plan_id}/share'));

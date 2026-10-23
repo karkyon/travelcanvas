@@ -102,6 +102,7 @@ PLAN_TABLES = (
     m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
     m.PlanCandidate, m.SupportGrant,
+    m.CommandRun, m.NotificationPreference, m.AbuseReport,
 )
 
 
@@ -234,6 +235,14 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["plan_candidates"] = [row(x) for x in q(m.PlanCandidate).all()]
     # [Gate G2] FR-040 この旅行についてのサポートへの閲覧の許可(書き出す人が作った分だけ)
     t["support_grants"] = [row(x) for x in q(m.SupportGrant).filter(m.SupportGrant.user_id == me).all()]
+    # [Gate G4] MAP-03 検索のコマンドの実行の記録・COL-03 この旅行の通知の設定(どちらも本人の分だけ)
+    t["command_runs"] = [row(x) for x in q(m.CommandRun).filter(m.CommandRun.user_id == me).all()]
+    t["notification_preferences"] = [row(x) for x in q(m.NotificationPreference).filter(
+        m.NotificationPreference.user_id == me).all()]
+    # [Gate G4] FC-097 この旅行への濫用の通報(理由・状態・日時だけ。通報した人を推測できる値・本文は含めない)
+    t["abuse_reports"] = [{"id": str(x.id), "source": x.source, "reason": x.reason, "status": x.status,
+                           "created_at": x.created_at.isoformat() if x.created_at else None}
+                          for x in q(m.AbuseReport).all()]
     return t
 
 

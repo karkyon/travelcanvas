@@ -13,6 +13,13 @@
 - コメントの編集: 本人。解決済みにする・削除: 本人または editor以上
 
 匿名の投票は、回答者が3人未満の間は件数を出さず、誰がどう回答したかは本人以外に出さない(FC-067)。
+
+[Gate G4] COL-02 決定の状態遷移(app/services/consensus.phase): 回答中 → 締切(手で・期限。期限は tcops jobs poll-deadlines が
+締めて知らせる)→ 決定 → 採用(予定へ反映。app/api/v1/decisions.py)。定足数(quorum)に届かない投票は決定できない。同点の
+最有力は tied_option_ids で示し、自動では決めない(編集者が選ぶ)。採用した後は、決定の変更・再開・回答の変更をしない
+(先に採用を元に戻す)。選択肢は候補箱の候補(candidate_id)にもできる。
+[Gate G4] COL-03 通知は利用者の設定(app/services/notify.py)に従う。メンション・返信は「自分あて」。対象(予約・費用)を
+見られない人はメンションできない(通知から対象の存在を漏らさない)。通知には対象(target_type・target_id)を付ける。
 コメントに予約番号・PIN・旅券番号らしき文字列があれば sensitive_warning で知らせる(EX-011。保存は止めない)。
 メンションした相手と投票の作成時のメンバーには通知を作るが、通知本文にコメント本文は入れない(FR-024)。
 """
@@ -32,7 +39,8 @@ from app.services import member_policy
 from app.models.models import (
     Comment,
     Expense,
-    Notification,
+    PlanCandidate,
+    PlanCollaborator,
     Poll,
     PollOption,
     Reservation,
@@ -42,6 +50,7 @@ from app.models.models import (
     Vote,
 )
 from app.services import consensus
+from app.services import notify
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
@@ -91,6 +100,7 @@ class OptionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: Optional[str] = Field(None, max_length=200)
     event_id: Optional[str] = None
+    candidate_id: Optional[str] = None  # [Gate G4] COL-02 候補箱の候補
 
 
 class PollCreate(BaseModel):
@@ -100,6 +110,7 @@ class PollCreate(BaseModel):
     deadline_at: Optional[datetime] = None
     veto_policy: str = "block"
     is_anonymous: bool = False
+    quorum: Optional[int] = Field(None, ge=1, le=100)  # [Gate G4] COL-02 決定に要る回答者の数
     options: List[OptionIn]
 
     @field_validator("title")
@@ -132,6 +143,7 @@ class PollUpdate(BaseModel):
     deadline_at: Optional[datetime] = None
     status: Optional[str] = None
     decided_option_id: Optional[str] = None
+    quorum: Optional[int] = Field(None, ge=1, le=100)
 
     @field_validator("status")
     @classmethod
@@ -244,10 +256,27 @@ def _audit(action: str, resource_type: str, request: Request, user: User, resour
     )
 
 
-def _notify(db: Session, plan: TravelPlan, user_ids, ntype: str, title: str, message: str) -> None:
-    for uid in user_ids:
-        db.add(Notification(id=uuid.uuid4(), user_id=uid, type=ntype, title=title, message=message,
-                            related_plan_id=plan.id))
+def _notify(db: Session, plan: TravelPlan, user_ids, ntype: str, title: str, message: str,
+            target_type: Optional[str] = None, target_id=None, direct_ids=()) -> None:
+    """[Gate G4] COL-03 利用者の通知の設定に従って作る(app/services/notify.py)。"""
+    notify.deliver(db, plan, user_ids, ntype, title, message, target_type=target_type, target_id=target_id,
+                   direct_ids=direct_ids)
+
+
+def _can_see_target(db: Session, plan: TravelPlan, user_id: Any, target_type: str) -> bool:
+    """[Gate G4] COL-03 その人がコメントの対象(予約・費用)を見られるか(FR-045 の項目の規則)。"""
+    if target_type not in member_policy.COMMENT_TARGET_CATEGORY:
+        return True
+    if user_id == plan.user_id:
+        return True
+    collab: Any = db.query(PlanCollaborator).filter(PlanCollaborator.plan_id == plan.id,
+                                                    PlanCollaborator.user_id == user_id,
+                                                    PlanCollaborator.status == "accepted").first()
+    if collab is None:
+        return False
+    user = db.query(User).filter(User.id == user_id).first()
+    hidden = member_policy.hidden_for(db, plan, collab.role, user)
+    return not member_policy.comment_target_hidden(hidden, target_type)
 
 
 # ===== 投票 =====
@@ -256,7 +285,7 @@ def _polls_query(db: Session, plan: TravelPlan):
     return db.query(Poll).filter(Poll.plan_id == plan.id, Poll.deleted_at.is_(None))
 
 
-def _get_poll(db: Session, plan: TravelPlan, poll_id: str) -> Poll:
+def _get_poll(db: Session, plan: TravelPlan, poll_id: str) -> Any:
     try:
         pid = uuid.UUID(str(poll_id))
     except (ValueError, TypeError):
@@ -272,7 +301,7 @@ def _is_closed(p: Poll) -> bool:
     return p.status == "closed" or (deadline is not None and deadline <= _now())
 
 
-def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: str, members: Set[uuid.UUID],
+def _poll_response(db: Session, plan: TravelPlan, p: Any, viewer: User, role: str, members: Set[uuid.UUID],
                    names: Dict[uuid.UUID, str]) -> dict:
     votes = db.query(Vote).filter(Vote.poll_id == p.id).all()
     by_option: Dict[uuid.UUID, List[Vote]] = {}
@@ -287,6 +316,7 @@ def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: s
             members, p.veto_policy, closed,
         )
     leading = consensus.leading_option(states, [o.id for o in p.options])
+    tied = consensus.tied_leaders(states, [o.id for o in p.options])
     decided = p.decided_option_id if any(o.id == p.decided_option_id for o in p.options) else None
     all_responders = {v.user_id for v in votes}
     show_counts = not p.is_anonymous or len(all_responders) >= consensus.ANONYMITY_THRESHOLD
@@ -299,6 +329,11 @@ def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: s
         if o.event_id:
             ev = db.query(TravelEvent).filter(TravelEvent.id == o.event_id, TravelEvent.plan_id == plan.id).first()
             ev_label, ev_missing = (ev.title, False) if ev else (None, True)
+        cand_label, cand_missing = None, False
+        if o.candidate_id:
+            cand = db.query(PlanCandidate).filter(PlanCandidate.id == o.candidate_id,
+                                                  PlanCandidate.plan_id == plan.id).first()
+            cand_label, cand_missing = (cand.title, False) if cand else (None, True)
         vote_rows = []
         for v in sorted(by_option.get(o.id, []), key=lambda x: (x.created_at or _now(), str(x.id))):
             mine = v.user_id == viewer.id
@@ -323,6 +358,10 @@ def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: s
             "event_id": str(o.event_id) if o.event_id else None,
             "event_label": ev_label,
             "event_missing": ev_missing,
+            "candidate_id": str(o.candidate_id) if o.candidate_id else None,
+            "candidate_label": cand_label,
+            "candidate_missing": cand_missing,
+            "is_tied": o.id in tied,
             "state": st["state"],
             "score": st["score"] if show_counts else None,
             "counts": st["counts"] if show_counts else None,
@@ -351,6 +390,15 @@ def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: s
         "is_anonymous": p.is_anonymous,
         "counts_hidden": not show_counts,
         "state": consensus.poll_state(states, closed, decided),
+        "phase": consensus.phase(closed, decided, p.adopted_at is not None, len(all_responders), p.quorum),
+        "quorum": p.quorum,
+        "responders": len(all_responders),
+        "quorum_met": consensus.quorum_met(len(all_responders), p.quorum),
+        "tied_option_ids": [str(t) for t in tied],
+        "closed_reason": p.closed_reason,
+        "adopted_at": _iso(p.adopted_at),
+        "adopted_by_name": names.get(p.adopted_by_user_id) if p.adopted_by_user_id else None,
+        "can_adopt": can_manage and decided is not None and p.adopted_at is None,
         "decided_option_id": str(decided) if decided else None,
         "created_by_name": names.get(p.created_by_user_id),
         "can_manage": can_manage,
@@ -361,7 +409,7 @@ def _poll_response(db: Session, plan: TravelPlan, p: Poll, viewer: User, role: s
     }
 
 
-def _poll_names(db: Session, polls: List[Poll], members: Set[uuid.UUID]) -> Dict[uuid.UUID, str]:
+def _poll_names(db: Session, polls: List[Any], members: Set[uuid.UUID]) -> Dict[uuid.UUID, str]:
     ids = set(members)
     poll_ids = [p.id for p in polls]
     if poll_ids:
@@ -370,6 +418,7 @@ def _poll_names(db: Session, polls: List[Poll], members: Set[uuid.UUID]) -> Dict
             if rid:
                 ids.add(rid)
     ids.update(p.created_by_user_id for p in polls)
+    ids.update(p.adopted_by_user_id for p in polls if p.adopted_by_user_id)
     return member_names(db, ids)
 
 
@@ -402,11 +451,27 @@ def create_poll(
         raise HTTPException(status_code=422, detail=f"選択肢は1〜{MAX_OPTIONS}個にしてください")
     p = Poll(id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, title=payload.title,
              description=_strip_or_none(payload.description), deadline_at=payload.deadline_at, status="open",
-             veto_policy=payload.veto_policy, is_anonymous=payload.is_anonymous)
+             veto_policy=payload.veto_policy, is_anonymous=payload.is_anonymous, quorum=payload.quorum)
     labels = set()
+    candidates_seen: Set[Any] = set()
     for i, o in enumerate(payload.options):
         event_id = None
+        candidate_id = None
         label = _strip_or_none(o.label)
+        if o.event_id and o.candidate_id:
+            raise HTTPException(status_code=422, detail="選択肢は予定か候補のどちらか1つにしてください")
+        if o.candidate_id:
+            candidate_id = _parse_uuid(o.candidate_id, "candidate_id")
+            cand = db.query(PlanCandidate).filter(PlanCandidate.id == candidate_id,
+                                                  PlanCandidate.plan_id == plan.id).first()
+            if not cand:
+                raise HTTPException(status_code=422, detail="選択肢の候補がこのプランの候補箱に見つかりません")
+            if cand.status == "dismissed" or cand.merged_into_id is not None:
+                raise HTTPException(status_code=422, detail="見送った・まとめた候補は選択肢にできません")
+            if candidate_id in candidates_seen:
+                raise HTTPException(status_code=422, detail="同じ候補が2回あります")
+            candidates_seen.add(candidate_id)
+            label = label or cand.title
         if o.event_id:
             event_id = _parse_uuid(o.event_id, "event_id")
             ev = db.query(TravelEvent).filter(TravelEvent.id == event_id, TravelEvent.plan_id == plan.id).first()
@@ -418,11 +483,14 @@ def create_poll(
         if label in labels:
             raise HTTPException(status_code=422, detail="同じ名前の選択肢があります")
         labels.add(label)
-        p.options.append(PollOption(id=uuid.uuid4(), label=label, event_id=event_id, sort_order=i))
+        p.options.append(PollOption(id=uuid.uuid4(), label=label, event_id=event_id, candidate_id=candidate_id,
+                                    sort_order=i))
     db.add(p)
+    db.flush()
     members = member_user_ids(db, plan)
     _notify(db, plan, members - {current_user.id}, "poll_created", f"「{plan.title}」で投票が始まりました",
-            f"{current_user.username or 'ゲスト'}さんが投票を作成しました。回答してください。")
+            f"{current_user.username or 'ゲスト'}さんが投票を作成しました。回答してください。",
+            target_type="poll", target_id=p.id)
     db.commit()
     db.refresh(p)
     _audit("poll_created", "poll", request, current_user, p.id, plan.id,
@@ -440,6 +508,11 @@ def update_poll(
     p = _get_poll(db, plan, poll_id)
     _require_if_match(p.revision, if_match, "投票")
     data = payload.model_dump(exclude_unset=True)
+    if p.adopted_at is not None and any(k in data for k in ("status", "decided_option_id", "deadline_at", "quorum")):
+        raise HTTPException(status_code=409, detail={"code": "poll_adopted",
+                                                     "message": "予定に採用した投票は変えられません(先に採用を元に戻してください)"})
+    if "quorum" in data:
+        p.quorum = data["quorum"]
     if "title" in data:
         title = (data["title"] or "").strip()
         if not title:
@@ -452,6 +525,14 @@ def update_poll(
     if "status" in data and data["status"] is not None and data["status"] != p.status:
         p.status = data["status"]
         p.closed_at = _now() if p.status == "closed" else None
+        p.closed_reason = "manual" if p.status == "closed" else None
+        if p.status == "open":
+            # 再開: 期限が過ぎたままでは回答できないので、先の期限か期限なしにする。決定は外す
+            deadline = _aware(p.deadline_at)
+            if deadline is not None and deadline <= _now():
+                raise HTTPException(status_code=422, detail="再開する時は、締切を先の日時にするか外してください")
+            p.decided_option_id = None
+            p.reminder_sent_at = None
     if "decided_option_id" in data:
         if data["decided_option_id"] is None:
             p.decided_option_id = None
@@ -460,6 +541,11 @@ def update_poll(
             if not any(o.id == oid for o in p.options):
                 raise HTTPException(status_code=422, detail="決定する選択肢がこの投票にありません")
             members = member_user_ids(db, plan)
+            responders = {r[0] for r in db.query(Vote.user_id).filter(Vote.poll_id == p.id).all()}
+            if not consensus.quorum_met(len(responders), p.quorum):
+                raise HTTPException(status_code=409, detail={
+                    "code": "quorum_not_met",
+                    "message": "回答者が定足数(%d人)に届いていないため、決定できません(今 %d人)" % (p.quorum, len(responders))})
             votes = db.query(Vote).filter(Vote.option_id == oid).all()
             st = consensus.option_state([consensus.VoteView(v.user_id, v.value, v.resolved_at is not None)
                                          for v in votes], members, p.veto_policy, True)
@@ -469,6 +555,7 @@ def update_poll(
             if p.status != "closed":
                 p.status = "closed"
                 p.closed_at = _now()
+                p.closed_reason = "decided"
     p.revision += 1
     db.commit()
     db.refresh(p)
@@ -486,6 +573,9 @@ def delete_poll(
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
     p = _get_poll(db, plan, poll_id)
     _require_if_match(p.revision, if_match, "投票")
+    if p.adopted_at is not None:
+        raise HTTPException(status_code=409, detail={"code": "poll_adopted",
+                                                     "message": "予定に採用した投票は消せません(先に採用を元に戻してください)"})
     p.deleted_at = _now()
     p.revision += 1
     db.commit()
@@ -500,7 +590,7 @@ def put_votes(
 ):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     p = _get_poll(db, plan, poll_id)
-    if _is_closed(p):
+    if _is_closed(p) or p.decided_option_id is not None:
         raise HTTPException(status_code=409, detail="この投票は締め切られています")
     option_ids = {o.id for o in p.options}
     seen = set()
@@ -677,7 +767,7 @@ def create_comment(
     parent_id = None
     if payload.parent_id is not None:
         parent_id = _parse_uuid(payload.parent_id, "parent_id")
-        parent = db.query(Comment).filter(Comment.id == parent_id, Comment.plan_id == plan.id).first()
+        parent: Any = db.query(Comment).filter(Comment.id == parent_id, Comment.plan_id == plan.id).first()
         if not parent or parent.deleted_at is not None:
             raise HTTPException(status_code=422, detail="返信先のコメントが見つかりません")
         if parent.target_type != payload.target_type or parent.target_id != target_id:
@@ -688,14 +778,27 @@ def create_comment(
         uid = _parse_uuid(raw, "mentions")
         if uid not in members:
             raise HTTPException(status_code=422, detail="メンションできるのはこのプランのメンバーだけです")
+        if not _can_see_target(db, plan, uid, payload.target_type):
+            raise HTTPException(status_code=422, detail={"code": "mention_target_hidden",
+                                                         "message": "その人はこの対象を見られないため、メンションできません"})
         if str(uid) not in mentions:
             mentions.append(str(uid))
     c = Comment(id=uuid.uuid4(), plan_id=plan.id, author_user_id=current_user.id, target_type=payload.target_type,
                 target_id=target_id, parent_id=parent_id, body=payload.body, mentions=mentions or None, status="open")
     db.add(c)
     notify_ids = {uuid.UUID(u) for u in mentions} - {current_user.id}
+    target_for_notice = ("plan", None) if payload.target_type == "plan" else (payload.target_type, target_id)
     _notify(db, plan, notify_ids, "comment_mention", f"「{plan.title}」のコメントでメンションされました",
-            f"{current_user.username or 'ゲスト'}さんがあなたをメンションしました。旅行プランで確認してください。")
+            f"{current_user.username or 'ゲスト'}さんがあなたをメンションしました。旅行プランで確認してください。",
+            target_type=target_for_notice[0], target_id=target_for_notice[1], direct_ids=notify_ids)
+    # [Gate G4] COL-03 返信は、返信先を書いた人へ(自分あて)。メンションと二重にしない
+    if parent_id is not None:
+        author = parent.author_user_id
+        if author != current_user.id and author not in notify_ids and author in members and \
+                _can_see_target(db, plan, author, payload.target_type):
+            _notify(db, plan, {author}, "comment_reply", f"「{plan.title}」であなたのコメントに返信がありました",
+                    f"{current_user.username or 'ゲスト'}さんが返信しました。旅行プランで確認してください。",
+                    target_type=target_for_notice[0], target_id=target_for_notice[1], direct_ids={author})
     db.commit()
     db.refresh(c)
     _audit("comment_created", "comment", request, current_user, c.id, plan.id,

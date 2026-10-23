@@ -23,6 +23,7 @@
 | [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 4 | 1 | 2 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
+| [gate-g4-trace.md](gate-g4-trace.md) | Gate G4 トレース(機能: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
@@ -74,14 +75,13 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-004 | 旅行CRUD | INTEGRATED | 定期実行の継続記録、複数端末の同時編集のE2E |
 | FR-005 | 日・イベント | INTEGRATED | 日跨ぎ、影響のプレビュー、DnDの実ブラウザE2E |
 | FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、候補への投票、URLの題名・画像の取得 |
-| FR-008 | 場所の一元管理 | INTEGRATED(部分) | 例外日・祝日・最終入場、ジオコードの確認、入口の別地点、複数の出典の比較 |
+| FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-011 | 予約取込 | INTEGRATED(部分) | メール・OCRによる自動抽出 |
 | FR-014 | 移動区間 | INTEGRATED | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間 |
 | FR-019 | What-if | INTEGRATED(部分) | 予約・移動・費用の分岐、移動時間・制約・費用差の比較 |
-| FR-022 | 合意形成 | INTEGRATED(部分) | 決定した候補の予定への反映、締切 |
-| FR-024 | コメント・通知 | INTEGRATED(部分) | 予定・予約・費用単位のコメント画面、リマインド、メール通知 |
+| FR-024 | コメント・通知 | INTEGRATED(部分) | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
 | FR-027 | 予算・費用 | INTEGRATED(部分) | 予算の版、為替の自動取得、他通貨の予約額の合計 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | 外部provider(運行情報・天気・警報・休業) |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | サーバー側の PDF・ダウンロード URL |

@@ -505,6 +505,12 @@ const ReservationsPage: React.FC = () => {
                     </span>
                   </div>
                 </button>
+                {/* [Gate G4] COL-03 この予約へのコメント */}
+                <div className="px-4 pb-3">
+                  <button type="button" className="text-sm text-indigo-800 underline"
+                    onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
+                  >この予約へのコメント</button>
+                </div>
               </Card>
             </li>
           ))}

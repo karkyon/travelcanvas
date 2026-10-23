@@ -6,21 +6,32 @@
  * - 入力と同時に(止まってから250ms)日程・予定・場所・候補・予約・チケット・文書・費用・メンバー・記録を分類ごとに出す
  * - 固定の絞り込み: 今日・予約・チケット・ホテル・緊急。予約番号の末尾(4文字)は「予約」に絞った時だけ探す(結果は伏せた番号)
  * - ↑↓で選び Enter で開く。Esc で閉じ、開く前の場所へフォーカスを戻す(WAI-ARIA の combobox + listbox)
+ * - [Gate G4] MAP-03 「>」から始めるとコマンド(>予定を追加 11/3 10:00 清水寺 等。backend/app/api/v1/commands.py)。
+ *   検索と操作を分ける: Enter は確認の表示まで(何も変えない)。「実行する」を押した時だけ実行し(Idempotency-Key・旅行の revision)、
+ *   結果から「元に戻す」ができる。閲覧だけの人には理由を示して実行させない。画面を開くコマンドは確認なしで移る
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { searchEverything, searchPlan } from '@/services/api';
-import type { SearchFilter, SearchHit, SearchResults } from '@/services/api';
+import { executeCommand, getCommands, previewCommand, undoCommand } from '@/services/api/g4';
+import type { CommandDef, CommandPreview, CommandResult, SearchFilter, SearchHit, SearchResults } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeInternalPath } from '@/utils/safeNavigation';
-import { planIdFromPath } from '@/utils/commandPalette';
+import { PLAN_MUTATED_EVENT, planIdFromPath } from '@/utils/commandPalette';
 
 const FILTERS: Array<{ value: SearchFilter; label: string }> = [
   { value: 'today', label: '今日' }, { value: 'reservation', label: '予約' }, { value: 'ticket', label: 'チケット' },
   { value: 'hotel', label: 'ホテル' }, { value: 'emergency', label: '緊急' },
 ];
 const DEBOUNCE_MS = 250;
+
+const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+  ? crypto.randomUUID() : `cmd_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+/** 「>」の後の本文 */
+const commandBody = (text: string) => text.trim().replace(/^>/, '').trim();
+const matchesAlias = (c: CommandDef, body: string) =>
+  c.aliases.some((a) => body === a || body.startsWith(`${a} `) || body.startsWith(`${a}\u3000`));
 
 interface Props {
   /** [Gate G2] 読み込み中に Ctrl+K・ボタンで開くよう求められていた時は、開いた状態で始める(CommandPaletteLauncher) */
@@ -41,6 +52,13 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
+  const [commands, setCommands] = useState<CommandDef[] | null>(null);
+  const [preview, setPreview] = useState<CommandPreview | null>(null);
+  const [confirmKey, setConfirmKey] = useState('');
+  const [result, setResult] = useState<CommandResult | null>(null);
+  const [cmdMessage, setCmdMessage] = useState<string | null>(null);
+  const [cmdError, setCmdError] = useState<string | null>(null);
+  const [cmdBusy, setCmdBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const seq = useRef(0);
@@ -83,8 +101,22 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
+  const commandMode = q.trimStart().startsWith('>');
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || !commandMode || !currentPlan || commands) return;
+    let alive = true;
+    getCommands(currentPlan).then((r) => { if (alive) setCommands(r.commands); })
+      .catch((e) => { if (alive) setCmdError(errorDetailMessage(e, 'コマンドの一覧を読めませんでした')); });
+    return () => { alive = false; };
+  }, [open, commandMode, currentPlan, commands]);
+
+  useEffect(() => {
+    setCommands(null); // 旅行が変われば役割も変わる
+  }, [currentPlan]);
+
+  useEffect(() => {
+    if (!open || commandMode) return;
     const query = q.trim();
     if (!query && !filter) {
       setData(null);
@@ -108,9 +140,90 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
       }
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [q, filter, open, effectiveScope, currentPlan]);
+  }, [q, filter, open, effectiveScope, currentPlan, commandMode]);
 
-  const flat: SearchHit[] = useMemo(() => (data?.categories ?? []).flatMap((c) => c.results), [data]);
+  const flat: SearchHit[] = useMemo(
+    () => (commandMode ? [] : (data?.categories ?? []).flatMap((c) => c.results)), [data, commandMode]);
+  const body = commandBody(q);
+  const suggestions: CommandDef[] = useMemo(() => {
+    if (!commandMode || !commands) return [];
+    const head = body.split(/[ \u3000]/)[0] ?? '';
+    return commands.filter((c) => !head || matchesAlias(c, body) || c.aliases.some((a) => a.startsWith(head)) || c.label.startsWith(head));
+  }, [commandMode, commands, body]);
+
+  // 開いている旅程の画面に読み直させる(store/planStore.ts が受け取る。この画面から store を読み込まない)
+  // コマンドの一覧が画面にある時だけ、入力欄から一覧を指す(確認の表示中・旅行の外では一覧が無い)
+  const commandListShown = commandMode && !!currentPlan && !preview;
+
+  const reloadPlan = (planId: string) => {
+    window.dispatchEvent(new CustomEvent(PLAN_MUTATED_EVENT, { detail: { planId } }));
+  };
+
+  const runPreview = async (text: string) => {
+    if (!currentPlan) return;
+    setCmdError(null);
+    setCmdMessage(null);
+    setCmdBusy(true);
+    try {
+      const pv = await previewCommand(currentPlan, text);
+      if (!pv.needs_confirmation && pv.link) {
+        go(pv.link); // 画面を開くだけ(何も変えない)
+        return;
+      }
+      setConfirmKey(newKey()); // 確認ごとに1つ(2回押しても二重に作らない)
+      setPreview(pv);
+    } catch (e) {
+      setPreview(null);
+      setCmdError(errorDetailMessage(e, 'コマンドを読み取れませんでした'));
+    } finally {
+      setCmdBusy(false);
+    }
+  };
+
+  const runExecute = async () => {
+    if (!currentPlan || !preview) return;
+    setCmdBusy(true);
+    setCmdError(null);
+    try {
+      const res = await executeCommand(currentPlan, q, preview.plan_revision, confirmKey);
+      setResult(res);
+      setPreview(null);
+      setCmdMessage(res.message);
+      reloadPlan(currentPlan);
+    } catch (e) {
+      setCmdError(errorDetailMessage(e, '実行できませんでした'));
+    } finally {
+      setCmdBusy(false);
+    }
+  };
+
+  const runUndo = async () => {
+    if (!currentPlan || !result) return;
+    setCmdBusy(true);
+    setCmdError(null);
+    try {
+      const res = await undoCommand(currentPlan, result.run_id, result.plan_revision);
+      setResult(null);
+      setCmdMessage(res.message);
+      reloadPlan(currentPlan);
+    } catch (e) {
+      setCmdError(errorDetailMessage(e, '元に戻せませんでした'));
+    } finally {
+      setCmdBusy(false);
+    }
+  };
+
+  const pickSuggestion = (c: CommandDef) => {
+    const alias = c.aliases[0] ?? c.label;
+    if (c.kind === 'mutate') {
+      setQ(`>${alias} `);
+      setPreview(null);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    } else {
+      setQ(`>${alias}`);
+      void runPreview(`>${alias}`);
+    }
+  };
   const planHits = data?.plans ?? [];
 
   const go = (link: string) => {
@@ -121,6 +234,26 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
   };
 
   const onInputKey = (e: React.KeyboardEvent) => {
+    if (commandMode) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (preview) setPreview(null);
+        else close();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActive((a) => Math.min(a + 1, Math.max(0, suggestions.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive((a) => Math.max(0, a - 1));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        // Enter は確認まで(実行は「実行する」を押した時だけ)
+        if (commands?.some((c) => matchesAlias(c, body))) void runPreview(q);
+        else if (suggestions[active]) pickSuggestion(suggestions[active]!);
+        else void runPreview(q);
+      }
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActive((a) => Math.min(a + 1, Math.max(0, flat.length - 1)));
@@ -151,12 +284,16 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
           onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div role="dialog" aria-modal="true" aria-label="検索" className="w-full max-w-2xl bg-white rounded-xl shadow-2xl">
             <div className="p-3 border-b border-gray-200">
-              <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onInputKey} maxLength={100}
-                role="combobox" aria-expanded={flat.length > 0} aria-controls="command-palette-results"
-                aria-activedescendant={flat[active] ? `cp-${flat[active]!.category}-${flat[active]!.id}` : undefined}
-                aria-label="検索語" placeholder="店名・住所・日付(明日・11/3)・予約番号の末尾…"
+              <input ref={inputRef} value={q} onChange={(e) => { setQ(e.target.value); setPreview(null); setActive(0); }}
+                onKeyDown={onInputKey} maxLength={commandMode ? 300 : 100}
+                role="combobox" aria-expanded={commandMode ? commandListShown && suggestions.length > 0 : flat.length > 0}
+                aria-controls={commandMode ? (commandListShown ? 'command-palette-commands' : undefined) : 'command-palette-results'}
+                aria-activedescendant={commandMode
+                  ? (commandListShown && suggestions[active] ? `cmd-${suggestions[active]!.name}` : undefined)
+                  : (flat[active] ? `cp-${flat[active]!.category}-${flat[active]!.id}` : undefined)}
+                aria-label="検索語" placeholder="店名・住所・日付(明日・11/3)・予約番号の末尾…「>」でコマンド"
                 className="w-full px-3 py-2 text-base text-gray-900 border border-gray-300 rounded-lg" />
-              <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="絞り込み">
+              {!commandMode && <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="絞り込み">
                 {FILTERS.map((f) => (
                   <button key={f.value} type="button" aria-pressed={filter === f.value}
                     onClick={() => setFilter((cur) => (cur === f.value ? null : f.value))}
@@ -170,9 +307,71 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
                     すべての旅行
                   </label>
                 )}
-              </div>
+              </div>}
             </div>
-            <div className="max-h-[60vh] overflow-y-auto p-2">
+            {commandMode && (
+              <div className="max-h-[60vh] overflow-y-auto p-2">
+                <p className="sr-only" role="status" aria-live="polite">{cmdBusy ? '処理中' : (cmdMessage ?? '')}</p>
+                {!currentPlan && (
+                  <p className="p-3 text-sm text-gray-800">コマンドは、旅行を開いている時だけ使えます。</p>
+                )}
+                {cmdError && <p role="alert" className="p-3 text-sm text-red-800">{cmdError}</p>}
+                {currentPlan && !preview && (
+                  <>
+                    <p className="px-2 pb-1 text-xs text-gray-700">
+                      コマンドは Enter で確認を表示し、「実行する」を押した時だけ変更します。
+                    </p>
+                    <ul id="command-palette-commands" role="listbox" aria-label="コマンド">
+                      {suggestions.map((c, i) => (
+                        <li key={c.name} id={`cmd-${c.name}`} role="option" aria-selected={i === active} aria-disabled={!c.allowed}
+                          onMouseEnter={() => setActive(i)} onClick={() => pickSuggestion(c)}
+                          className={`px-3 py-2 rounded-sm cursor-pointer ${i === active ? 'bg-indigo-50' : ''}`}>
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <span className="font-medium text-gray-900">{c.label}</span>
+                            {!c.allowed && <span className="text-xs px-1.5 rounded-sm bg-gray-200 text-gray-800">閲覧だけのため使えません</span>}
+                          </div>
+                          <div className="text-sm text-gray-700">例: &gt;{c.usage}</div>
+                        </li>
+                      ))}
+                    </ul>
+                    {commands && suggestions.length === 0 && (
+                      <p className="p-3 text-sm text-gray-700">合うコマンドがありません。「&gt;」だけを入れると一覧を表示します。</p>
+                    )}
+                  </>
+                )}
+                {preview && (
+                  <section aria-label="コマンドの確認" className="p-3">
+                    <h3 className="font-semibold text-gray-900">{preview.label}</h3>
+                    <ul className="mt-1 list-disc ml-5 text-sm text-gray-900">
+                      {preview.summary.map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                    {preview.undoable && <p className="mt-1 text-xs text-gray-700">実行した後に「元に戻す」ができます。</p>}
+                    {preview.problem && <p role="alert" className="mt-2 text-sm text-red-800">{preview.problem.message}</p>}
+                    {!preview.allowed && preview.reason && <p role="alert" className="mt-2 text-sm text-red-800">{preview.reason}</p>}
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" disabled={cmdBusy || !preview.allowed || !!preview.problem} onClick={() => void runExecute()}
+                        className="px-3 py-1.5 rounded-sm bg-indigo-700 text-white text-sm disabled:opacity-50">実行する</button>
+                      <button type="button" onClick={() => { setPreview(null); inputRef.current?.focus(); }}
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">やめる</button>
+                    </div>
+                  </section>
+                )}
+                {cmdMessage && !preview && (
+                  <div className="p-3 flex flex-wrap items-center gap-2" aria-label="コマンドの結果">
+                    <span className="text-sm text-gray-900">{cmdMessage}</span>
+                    {result?.undoable && (
+                      <button type="button" disabled={cmdBusy} onClick={() => void runUndo()}
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">元に戻す</button>
+                    )}
+                    {result?.link && (
+                      <button type="button" onClick={() => go(result.link!)}
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">開く</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {!commandMode && <div className="max-h-[60vh] overflow-y-auto p-2">
               <p className="sr-only" role="status" aria-live="polite">
                 {loading ? '検索中' : data ? `${data.total}件見つかりました` : ''}
               </p>
@@ -224,7 +423,7 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
                   </li>
                 ))}
               </ul>
-            </div>
+            </div>}
           </div>
         </div>
       )}

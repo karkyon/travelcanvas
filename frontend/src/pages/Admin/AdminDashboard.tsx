@@ -233,6 +233,14 @@ const AdminDashboard: React.FC = () => {
             <span className="text-2xl mb-2" aria-hidden="true">🛟</span>
             <span className="text-sm">運用とサポート</span>
           </Button>
+          <Button
+            onClick={() => navigate('/admin/abuse')}
+            variant="outline"
+            className="flex flex-col items-center p-4 h-auto"
+          >
+            <span className="text-2xl mb-2" aria-hidden="true">🚩</span>
+            <span className="text-sm">濫用への対応</span>
+          </Button>
         </div>
       </Card>
     </div>

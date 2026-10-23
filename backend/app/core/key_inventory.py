@@ -89,6 +89,23 @@ KEYS: List[Dict[str, object]] = [
         "derived_from_when_unset": "JWT_SECRET_KEY",
     },
     {
+        "name": "SHARE_VIEW_SIGNING_KEY",
+        "purpose": "[Gate G4] 共有の閲覧の一時トークン(合言葉を通した後の見直し・複製)の署名",
+        "kind": "signing",
+        "rotation": "いつでも替えられる",
+        "impact": "閲覧中の人(既定2時間)はもう一度リンクを開く(使用回数を1回使う)",
+        "required_in_production": False,
+        "derived_from_when_unset": "JWT_SECRET_KEY",
+    },
+    {
+        "name": "SMTP_PASSWORD",
+        "purpose": "[Gate G4] 通知のまとめのメールを送る SMTP の認証",
+        "kind": "credential",
+        "rotation": "メールの提供元で替え、同時に .env を替える",
+        "impact": "替えるまでメールが送れず、送信待ち(email_outbox)が再送を続ける(上限で dead)",
+        "required_in_production": False,
+    },
+    {
         "name": "METRICS_TOKEN",
         "purpose": "監視の計測値(/metrics)を見る合言葉",
         "kind": "token",

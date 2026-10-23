@@ -21,4 +21,5 @@ export class PlanSearchApi extends CandidatesApi {
     const response = await this.client.get('/search/everything', { params: params(q, filter), skipGlobalErrorHandler: true });
     return decodeResponse(response.data, searchResults, 'GET /search/everything');
   }
+
 }

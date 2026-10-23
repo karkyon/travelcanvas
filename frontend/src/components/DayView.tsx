@@ -17,6 +17,8 @@ interface DayViewProps {
   onItemClick?: (item: ScheduleItemType) => void;
   onItemEdit?: (item: ScheduleItemType) => void;
   onItemDelete?: (itemId: string) => void;
+  /** [Gate G4] COL-03 予定へのコメントを開く */
+  onItemComment?: (item: ScheduleItemType) => void;
   className?: string;
 }
 
@@ -28,6 +30,7 @@ const DayView: React.FC<DayViewProps> = ({
   onItemClick,
   onItemEdit,
   onItemDelete,
+  onItemComment,
   className = ''
 }) => {
   const { addNewScheduleItem, deleteScheduleItem } = usePlan();
@@ -305,6 +308,7 @@ const DayView: React.FC<DayViewProps> = ({
                   contactInfo={event.contact_info as { website?: string; phone?: string } | undefined}
                   onEdit={() => onItemEdit?.(event)}
                   onDelete={() => handleDeleteItem(event.id)}
+                  onComment={onItemComment ? () => onItemComment(event) : undefined}
                 />
               </div>
             </div>
