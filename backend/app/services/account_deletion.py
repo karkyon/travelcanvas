@@ -224,6 +224,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     from app.models.models import UserMfa
 
     db.query(UserMfa).filter(UserMfa.user_id == me).delete(synchronize_session=False)
+    # [Gate G3] SEC-F5 利用者のデータ鍵(秘匿プロフィール・位置の軌跡)を破棄する。所有する旅行の鍵は、旅行の完全削除で破棄する
+    from app.services import data_keys
+
+    summary["data_keys_destroyed"] = data_keys.destroy(db, "user", me, "account_deletion")
     summary["sessions"] = db.query(UserSession).filter(UserSession.user_id == me).delete(
         synchronize_session=False)
 

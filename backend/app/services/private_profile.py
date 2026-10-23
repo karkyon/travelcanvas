@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, user_subject
 from app.models.models import PlanConstraint, PrivateProfileLink, UserPrivateProfile
 
 MAX_ITEMS = 20
@@ -119,9 +119,11 @@ def constraint_spec(item: Dict[str, Any], user_id: uuid.UUID) -> Dict[str, Any]:
 
 # ---------------------------------------------------------------- 保存
 
-def _encrypt(items: List[Dict[str, Any]]) -> bytes:
+def _encrypt(items: List[Dict[str, Any]], user_id) -> bytes:
     try:
-        return encrypt_payload(json.dumps({"v": 1, "items": items}, ensure_ascii=False).encode("utf-8"))
+        # [Gate G3] SEC-F5 利用者のデータ鍵(アカウントの削除で鍵を破棄する)
+        return encrypt_payload(json.dumps({"v": 1, "items": items}, ensure_ascii=False).encode("utf-8"),
+                               user_subject(user_id))
     except EncryptionNotConfigured:
         raise _bad("encryption_unavailable", "暗号化が設定されていないため保存できません", 503)
 
@@ -148,10 +150,10 @@ def save_profile(db: Session, user_id, items: List[Dict[str, Any]], expected_rev
     if expected_revision != current:
         raise _bad("revision_mismatch", "ほかの画面で変更されました。読み込み直してください", 409)
     if row is None:
-        row = UserPrivateProfile(user_id=user_id, items_ciphertext=_encrypt(items), revision=1)
+        row = UserPrivateProfile(user_id=user_id, items_ciphertext=_encrypt(items, user_id), revision=1)
         db.add(row)
     else:
-        row.items_ciphertext = _encrypt(items)
+        row.items_ciphertext = _encrypt(items, user_id)
         row.revision += 1
     db.flush()
     return row

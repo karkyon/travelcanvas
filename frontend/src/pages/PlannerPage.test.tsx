@@ -22,7 +22,8 @@ import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
 import type { TravelPlan } from '@/types';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// [Gate G3] DEP-04 待つ間の画面の更新を act の中で行う
+const sleep = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 
 const makePlan = (days: string[], title = 'trip'): TravelPlan =>
   ({
@@ -52,6 +53,8 @@ const setupMocks = () => {
     plan_id: 'plan-1', revision: 0, viewers: [], changes: [], poll_seconds: 15, ttl_seconds: 40,
   });
   vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
+  // 一覧画面の「削除済み」(この試験の対象外。通信しない)
+  vi.spyOn(api, 'getDeletedPlans').mockResolvedValue([]);
   // [Gate G2] 即時の通知は使わない(ポーリングだけ)。同行者向けの項目の規則: 何も隠されていない
   vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
   vi.spyOn(api, 'getMemberPolicy').mockResolvedValue({

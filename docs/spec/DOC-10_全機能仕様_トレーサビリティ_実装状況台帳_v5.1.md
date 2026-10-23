@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r14** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-21  
+> 文書ID: DOC-10 / 版: **v5.1-r15** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-22  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,9 +14,9 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `4bb0240`(Gate G1。この版を入れる Gate G2 の commit はこの直後) |
-| Alembic head | `f3c9e5b7a2d1`(単一の head。G2 で `f1a7c3e9b2d4` → `f2b8d4a1c6e3` → `f3c9e5b7a2d1`) |
-| 基準の試験の実測(サンドボックス、G2 の予行) | pytest 1,064 passed・6 skipped / Vitest 677 / Playwright E2E 56(失敗0)。backend は表の読み書きだけのロール(tc_app)で動かした |
+| 基準commit | `f327971`(Gate G2。この版を入れる Gate G3 の commit はこの直後) |
+| Alembic head | `a4c8e2f6b1d3`(単一の head。G3 でデータ鍵・多要素認証の解除の申請・外部キーの索引) |
+| 基準の試験の実測(サンドボックス、G3 の予行) | backend pytest 1,094 合格・7 飛ばし(コンテナと同じ予行では 1,081 合格)/ frontend vitest 703 合格・標準エラー 0 バイト / E2E 58 合格(本番用の配信 static-server.mjs で実行)/ 性能 TC_PERF=1(予定 10,000・通知 100,000)で全ての p95 が上限以下・旅行の詳細の SQL 3回(以前 367回) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -159,7 +159,11 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | CI | 5ジョブが blocking(secret-scan / dependency-audit / frontend / backend / e2e)。**G1: pytest と E2E の結果(JUnit)を保存し、VERIFIED の証拠の合格を照合。frontend の bundle の上限(main 450kB・gzip 150kB)** | `.github/workflows/ci.yml`、`scripts/ci/` |
 | main の保護 | 必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴(H1 で設定)。**G1: 設定を `docs/ops/evidence/branch-protection.json` に記録** | `scripts/ops/ci_gate.py export` |
 | 秘密の検査 | 追跡中のファイルの中身と、**G1: ファイルの種類(.env・鍵・Redis のダンプ・DB のファイル)**。`backend/dump.rdb` を追跡から外した | `scripts/security/scan_secrets.py` |
-| 依存の脆弱性 | pip-audit 0件。npm audit は期限付きの例外(2026-12-31) | `scripts/security/audit_deps.py` |
+| 依存の脆弱性 | pip-audit 0件。npm audit 0件(G2 で例外 0 件) | `scripts/security/audit_deps.py` |
+| 試験の品質(G3) | 単体試験の標準エラー 0 行・本物の通信の禁止・再試行なし(vitest)。E2E の flaky を別に数え issue 化。coverage・migration の構造の差分・mypy の基準(増やさない) | `scripts/ci/`、`backend/mypy-baseline.txt` |
+| 性能(G3) | 外部キーの索引の欠落 0・主な API の SQL の数が件数で増えない(N+1)・主な問い合わせの索引の使用。毎晩、予定 10,000・通知 100,000 で p95 | `backend/tests/test_gate_g3_perf.py`、`.github/workflows/perf.yml` |
+| 画面の配信(G3) | `vite preview` をやめ、依存なしの本番用の配信(CSP・キャッシュ・圧縮・SPA) | `frontend/server/static-server.mjs` |
+| エラーの説明(G3) | 全てのエラーの応答に問い合わせ番号・再試行の可否・code。一覧はコードから生成 | `docs/spec/error-catalog.md` |
 | 運用 | バックアップ・別DBへの復元演習・監視・ログの漏れの検査・封じ込め・**G1: 鍵の点検と版の切り替え(`tcops.py keys`)** | `docs/ops/RUNBOOK.md`、`docs/ops/KEY-INVENTORY.md` |
 
 ## 6. セキュリティ(SEC)の状況
@@ -172,9 +176,9 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | SEC-F1 暗号化の鍵の版の切り替え(前の鍵での復号・今の鍵での暗号化・掛け直し・失効) | **実装済み** | **G1** | 定期の切り替えの演習の記録 |
 | SEC-F2 鍵の一覧・用途の分離・使い回しの検出 | **実装済み** | **G1** | — |
 | SEC-F3 KMS / Secret Manager | 未着手 | — | 本番環境(GCP)と同時 |
-| SEC-F4 DB の権限の分離(migration 用と実行用) | 未着手 | 次の Gate | — |
-| SEC-F5 鍵の破棄による削除(cryptographic erasure) | 未着手 | — | 利用者・旅行ごとのデータ鍵 |
-| SEC-F6 TOTP の秘密の保護 | 部分(G1 の版の切り替えの対象。二者の承認は未) | S11・G1 | mfa-reset の二者承認 |
+| SEC-F4 DB の権限の分離(migration 用と実行用) | **実装済み** | G2 | — |
+| SEC-F5 鍵の破棄による削除(cryptographic erasure) | **実装済み**(旅行・利用者ごとのデータ鍵、バックアップの鍵の写しからも消す) | **G3** | KMS(SEC-F3)へ KEK を移す |
+| SEC-F6 TOTP の秘密の保護 | **実装済み**(版つきの MFA_KEY、解除は申請と承認の二者) | S11・G1・**G3** | — |
 | 本番の入口(HTTPS・WAF・外部監視・別系統のバックアップ・侵入試験) | 未着手 | — | PROD-01〜09 |
 
 ## 7. リリース台帳
@@ -193,13 +197,13 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 
 | 順 | Gate | 内容 | migration | 外部の判断 |
 |---|---|---|---|---|
-| 1 | **G1(本版)** | DOC-10 の正本化・trace の整理・`dump.rdb`・公開範囲の方針・鍵の版の切り替え・鍵の一覧・CI の証拠の保存と照合・bundle の上限 | なし | なし |
-| 2 | SEC-F4 | DB の権限の分離(`tc_migrator`・`tc_app`・`tc_readonly_monitor`・`tc_backup`) | 権限の DDL | なし |
-| 3 | DEP-1 | React Router 7・Vite・Vitest・Tailwind の更新、試験の警告0 | なし | なし |
-| 4 | PROD-1 | 本番の画面の配信(preview をやめる)・HTTPS・WAF・private origin | なし | GCP の project・domain |
-| 5 | PROD-2 | Cloud SQL・Redis・GCS・ClamAV・別系統のバックアップ・外部監視 | 場合により | GCP の費用 |
-| 6 | MAP-P / OCR-P | 地図・経路・ジオコード・OCR の提供元 | cache 等 | 契約・API キー |
-| 7 | COL-2 / ADM-B2B | 即時の共同編集・同行者向けの項目規則・サポート閲覧・組織の容量・API の書き込み | あり | 組織の料金 |
+| 1 | G1(済) | DOC-10 の正本化・trace の整理・`dump.rdb`・公開範囲の方針・鍵の版の切り替え・鍵の一覧・CI の証拠の保存と照合・bundle の上限 | なし | なし |
+| 2 | G2(済) | DB の権限の分離・依存のメジャー更新・即時の共同編集・サポート閲覧・同行者向けの項目の規則・外部 API の書き込み | あり | なし |
+| 3 | **G3(本版)** | 画面の移動先・本番用の配信・試験の警告・鍵の破棄による削除・TOTP の鍵・CI の証拠・型・flaky・性能・エラーの説明 | あり | なし |
+| 4 | G4 | 検索のコマンド・場所の例外日と入口・合意の決定・対象ごとのコメント・ゲストの閲覧の複製・濫用の検知の画面 | あり | なし |
+| 5 | G5 | 予算の版と為替の記録・精算の取消と端数・使用量の上限・組織のロゴ・オフラインの端末の鍵と同期・位置の共有の丸め・記録の公開 | あり | なし |
+| 6 | PROD-1・2 | HTTPS・WAF・private origin・Cloud SQL・Redis・GCS・ClamAV・別系統のバックアップ・外部監視・KMS | 場合により | GCP の project・domain・費用 |
+| 7 | MAP-P / OCR-P | 地図・経路・ジオコード・OCR・天気・メールの提供元 | cache 等 | 契約・API キー |
 | 8 | BILL-1 | FR-058 料金 | あり | **利用者の決定が必須** |
 | 9 | V3 → RELEASE-1 | (部分)の再監査と VERIFIED への昇格 → staging・負荷・DR・侵入試験・β | なし | 運用の承認 |
 
@@ -215,7 +219,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r11 | 2026-10-19 | `5b3ff04` | S2〜S10 の適用 |
 | r12 | 2026-10-20 | `af7de3d` | L5・V1・C1・A2・S11・V2・Q1・C2・C3・F45・B1(VERIFIED 26)。追補として資料室にあった |
 | r13 | 2026-10-20 | `16f1aa9` | 本書をリポジトリの正本にした(r12 の追補と r11 の本体を統合)。状態の機械が読む正本 `fr-status.json`、CI の照合(表・集計・ledger・migration head・基準 commit)。H1・G1 を反映。FR の状態の遷移なし |
-| **r14** | 2026-10-21 | `4bb0240` | **Gate G2: DB の権限の分離(SEC-F4)・依存のメジャー更新(DEP-1)。FR-020(即時の通知)・FR-040(サポート閲覧・運用の要約)・FR-045(同行者向けの項目の規則)を VERIFIED、FR-042(書き込みの API・鍵の切り替え・自動の再送)は INTEGRATED(部分)のまま(埋め込みが残る)。`docs/trace/gate-g2-trace.md`** |
+| r14 | 2026-10-21 | `4bb0240` | Gate G2: DB の権限の分離(SEC-F4)・依存のメジャー更新(DEP-1)。FR-020(即時の通知)・FR-040(サポート閲覧・運用の要約)・FR-045(同行者向けの項目の規則)を VERIFIED、FR-042(書き込みの API・鍵の切り替え・自動の再送)は INTEGRATED(部分)のまま(埋め込みが残る)。`docs/trace/gate-g2-trace.md` |
+| **r15** | 2026-10-22 | `f327971` | **Gate G3: 画面の移動先の検査(DEP-02)・本番用の配信(DEP-03)・試験の警告0(DEP-04)・鍵の破棄による削除(SEC-F5)・TOTP の鍵と解除の二者の確認(SEC-F6)・CI の証拠・型・flaky・性能(CI-02〜05)・エラーの説明(UX-04)。§6 の SEC-F4 を G2 で実装済みに直した。FR の状態の遷移なし。`docs/trace/gate-g3-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

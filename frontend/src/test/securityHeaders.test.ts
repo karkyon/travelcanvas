@@ -61,10 +61,15 @@ describe('docker の frontend コンテナ (Gate S2)', () => {
     expect(build.indexOf('RUN npm ci')).toBeLessThan(build.indexOf('COPY src ./src'));
   });
 
-  it('実行用の段に vite の設定と、設定が読むヘッダーの定義を入れる', () => {
-    expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/vite\.config\.ts/);
-    expect(runtime).toMatch(/COPY --from=build [^\n]*\/app\/src\/config/);
-    expect(runtime).toContain('CMD ["npm", "run", "preview"]');
+  it('実行用の段は本番用の配信(vite preview ではない)と build の結果だけ(Gate G3 DEP-03)', () => {
+    expect(runtime).toContain('CMD ["node", "server/static-server.mjs"]');
+    const code = runtime.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+    expect(code).not.toMatch(/preview/);
+    expect(code).not.toMatch(/node_modules/);
+    expect(runtime).toMatch(/COPY --from=build --chown=node:node \/app\/dist \.\/dist/);
+    expect(runtime).toMatch(/COPY --from=build --chown=node:node \/app\/server \.\/server/);
+    // ヘッダーの定義は画面と同じ関数から作る
+    expect(dockerfile).toMatch(/esbuild src\/config\/securityHeaders\.ts [^\n]*--outfile=server\/securityHeaders\.mjs/);
   });
 
   it('起動時の API の URL(CSP の通信先)をビルド時と同じ値にする(docker-compose.yml)', () => {
@@ -77,10 +82,7 @@ describe('docker の frontend コンテナ (Gate S2)', () => {
     expect(values[1]).toBe(values[0]);
   });
 
-  it('設定を読む時の一時ファイルを書けるよう、/app を node の持ち物にしてから USER node にする', () => {
-    const chown = runtime.search(/^RUN chown node:node \/app$/m);
-    const user = runtime.search(/^USER node$/m);
-    expect(chown).toBeGreaterThan(-1);
-    expect(user).toBeGreaterThan(chown);
+  it('node(root でない利用者)で動かす', () => {
+    expect(runtime).toMatch(/^USER node$/m);
   });
 });

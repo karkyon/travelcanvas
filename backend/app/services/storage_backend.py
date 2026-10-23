@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from app.core.config import settings
-from app.core.crypto import decrypt_payload, encrypt_payload
+from app.core.crypto import decrypt_payload, encrypt_payload, plan_subject
 from app.utils.validators import ALLOWED_DOCUMENT_EXTENSIONS, ALLOWED_IMAGE_EXTENSIONS
 
 # [Gate M5] DOC-02 FR-013の対象文書種別(予約確認書/旅券写し/保険/ビザ/
@@ -176,7 +176,8 @@ def save_encrypted_file(backend: StorageBackend, storage_key: str, content: byte
     """[Gate M5] ファイル内容をFernet暗号化してから保存する。
     ENCRYPTION_KEY未設定の場合はEncryptionNotConfiguredを送出する
     (呼び出し側でHTTPExceptionへ変換する)。"""
-    ciphertext = encrypt_payload(content)
+    # [Gate G3] SEC-F5 保存の名前は「旅行のID/…」。その旅行のデータ鍵で暗号化する(旅行の完全削除で鍵を破棄する)
+    ciphertext = encrypt_payload(content, plan_subject(storage_key.split("/", 1)[0]))
     backend.save(storage_key, ciphertext)
 
 

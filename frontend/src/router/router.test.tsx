@@ -79,9 +79,14 @@ describe('router (Gate M9-FE-C3)', () => {
       { initialEntries: ['/'] }
     );
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // [Gate G3] DEP-04 React(開発版)が投げ直す想定した例外を、jsdom が「捕まえていない例外」として出力しないよう捕まえる
+    const swallow = (e: ErrorEvent) => e.preventDefault();
+    window.addEventListener('error', swallow);
     render(<RouterProvider router={memory} />);
     expect(await screen.findByText('画面を読み込めませんでした')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '再読み込み' })).toBeInTheDocument();
+    expect(errorSpy).toHaveBeenCalled();
+    window.removeEventListener('error', swallow);
     errorSpy.mockRestore();
   });
 
@@ -94,9 +99,14 @@ describe('router (Gate M9-FE-C3)', () => {
       { initialEntries: ['/'] }
     );
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // [Gate G3] DEP-04 React(開発版)が投げ直す想定した例外を、jsdom が「捕まえていない例外」として出力しないよう捕まえる
+    const swallow = (e: ErrorEvent) => e.preventDefault();
+    window.addEventListener('error', swallow);
     render(<RouterProvider router={memory} />);
     expect(await screen.findByText('予期しないエラーが発生しました')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'ホームへ' })).toHaveAttribute('href', '/');
+    expect(errorSpy).toHaveBeenCalled();
+    window.removeEventListener('error', swallow);
     errorSpy.mockRestore();
   });
 });

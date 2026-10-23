@@ -72,12 +72,12 @@ def _keyring() -> Tuple[Tuple[str, Fernet], ...]:
             "ENCRYPTION_KEY が設定されていません。QuickDraft機能を有効にするには "
             ".env へ ENCRYPTION_KEY を設定してください。"
         )
-    ring = [(key_id(key), _fernet_for(key))]
+    ring = [(str(key_id(key)), _fernet_for(key))]
     for old in parse_previous_keys(getattr(settings, "ENCRYPTION_KEYS_PREVIOUS", None)):
         if old == key:
             continue
-        ring.append((key_id(old), _fernet_for(old)))
-    return tuple(ring)  # type: ignore[return-value]
+        ring.append((str(key_id(old)), _fernet_for(old)))
+    return tuple(ring)
 
 
 @lru_cache(maxsize=1)
@@ -96,8 +96,33 @@ def keyring_ids() -> List[str]:
 
 
 def key_id_of(ciphertext: bytes) -> Optional[str]:
-    """[Gate G1] この暗号文がどの鍵で作られたか(どの鍵でも検証できなければ None = 壊れている・失効した鍵)。"""
+    """[Gate G1] この暗号文がどの鍵で作られたか(どの鍵でも検証できなければ None = 壊れている・失効した鍵)。
+
+    [Gate G3] データ鍵の暗号文(tc2:dek:)は、データ鍵が読めれば今の鍵の版を返す(データ鍵を包む鍵の切り替えは
+    data_keys の行を掛け直すので、値そのものは掛け直さない)。破棄したデータ鍵なら None。
+    TOTP の鍵の暗号文(tc2:mfa:)は ``"mfa:" + 版`` を返す。"""
     token = bytes(ciphertext)
+    env = parse_envelope(token)
+    if env is not None:
+        kind, ref, body = env
+        if kind == "dek":
+            from app.services import data_keys
+
+            try:
+                data_keys.key_for(ref).decrypt(body)
+            except (data_keys.DataKeyDestroyed, InvalidToken, ValueError):
+                return None
+            return active_key_id()
+        if kind == "mfa":
+            for kid, f in _mfa_keyring():
+                if kid == ref:
+                    try:
+                        f.decrypt(body)
+                        return "mfa:" + kid
+                    except InvalidToken:
+                        return None
+            return None
+        return None
     for kid, f in _keyring():
         try:
             f.decrypt(token)
@@ -116,6 +141,10 @@ def reencrypt(ciphertext: bytes) -> Tuple[bytes, Optional[str], bool]:
     kid = key_id_of(token)
     if kid is None:
         raise ValueError("どの鍵でも復号できない暗号文です")
+    if kid.startswith("mfa:"):
+        if kid == "mfa:" + _mfa_keyring()[0][0]:
+            return token, kid, False
+        return encrypt_mfa(decrypt_payload(token)), kid, True
     if kid == active_key_id():
         return token, kid, False
     return _get_fernet().rotate(token), kid, True
@@ -141,6 +170,10 @@ def reset_cache_for_tests() -> None:
     _keyring.cache_clear()
     _get_fernet.cache_clear()
     _get_lookup_index_key.cache_clear()
+    _mfa_keyring.cache_clear()
+    from app.services import data_keys
+
+    data_keys.reset_cache()
 
 
 def normalize_lookup_value(raw: str) -> str:
@@ -201,12 +234,100 @@ def compute_participant_name_lookup_hash(raw: str) -> str:
     return mac.hexdigest()
 
 
-def encrypt_payload(plaintext: bytes) -> bytes:
+# ---------------------------------------------------------------------------
+# [Gate G3] 暗号文の封筒(envelope)。``tc2:<種類>:<鍵の参照>:<Fernet の暗号文>``
+#   dek: 旅行・利用者ごとのデータ鍵(app/services/data_keys.py。鍵の破棄による削除、SEC-F5)
+#   mfa: TOTP の秘密を包む鍵(MFA_KEY・MFA_KEYS_PREVIOUS。版つき、SEC-F6)
+# 封筒の無い暗号文は以前と同じ ENCRYPTION_KEY(と前の鍵)の Fernet。
+# ---------------------------------------------------------------------------
+ENVELOPE_PREFIX = b"tc2:"
+
+
+def parse_envelope(token: bytes) -> Optional[Tuple[str, str, bytes]]:
+    if not token.startswith(ENVELOPE_PREFIX):
+        return None
+    parts = token[len(ENVELOPE_PREFIX):].split(b":", 2)
+    if len(parts) != 3:
+        return None
+    try:
+        return parts[0].decode("ascii"), parts[1].decode("ascii"), parts[2]
+    except UnicodeDecodeError:
+        return None
+
+
+def plan_subject(plan_id):
+    """[Gate G3] 旅行のデータ鍵で暗号化する対象(ID が無ければ None = ENCRYPTION_KEY だけ)。"""
+    from app.services.data_keys import subject
+
+    return subject("plan", plan_id)
+
+
+def user_subject(user_id):
+    """[Gate G3] 利用者のデータ鍵で暗号化する対象。"""
+    from app.services.data_keys import subject
+
+    return subject("user", user_id)
+
+
+def encrypt_payload(plaintext: bytes, subject=None) -> bytes:
+    """暗号化する。``subject``(plan_subject・user_subject)を渡すと、その対象のデータ鍵で暗号化する
+    (対象を消すと鍵を破棄し、バックアップからも読めなくなる)。渡さなければ ENCRYPTION_KEY。"""
+    if subject is not None:
+        _get_fernet()  # ENCRYPTION_KEY が無ければ EncryptionNotConfigured(以前と同じ)
+        from app.services import data_keys
+
+        dek_id, f = data_keys.active_key(subject)
+        return ENVELOPE_PREFIX + b"dek:" + dek_id.encode("ascii") + b":" + f.encrypt(plaintext)
     return _get_fernet().encrypt(plaintext)
 
 
 def decrypt_payload(ciphertext: bytes) -> bytes:
+    token = bytes(ciphertext)
+    env = parse_envelope(token)
     try:
-        return _get_fernet().decrypt(ciphertext)
+        if env is not None:
+            kind, ref, body = env
+            if kind == "dek":
+                from app.services import data_keys
+
+                return data_keys.key_for(ref).decrypt(body)
+            if kind == "mfa":
+                ring = dict(_mfa_keyring())
+                f = ring.get(ref)
+                if f is None:
+                    raise ValueError("TOTP の鍵(MFA_KEY)の版が見つかりません")
+                return f.decrypt(body)
+            raise ValueError("暗号文の種類が不明です")
+        return _get_fernet().decrypt(token)
     except InvalidToken as e:
         raise ValueError("payload_ciphertextの復号に失敗しました") from e
+
+
+@lru_cache(maxsize=1)
+def _mfa_keyring() -> Tuple[Tuple[str, Fernet], ...]:
+    """[Gate G3] SEC-F6 TOTP の秘密を包む鍵(今の鍵が先頭)。MFA_KEY が無ければ空。"""
+    key = getattr(settings, "MFA_KEY", None)
+    if not key:
+        return tuple()
+    ring = [(str(key_id(key)), _fernet_for("travelcanvas-mfa-kek:" + key))]
+    for old in parse_previous_keys(getattr(settings, "MFA_KEYS_PREVIOUS", None)):
+        if old != key:
+            ring.append((str(key_id(old)), _fernet_for("travelcanvas-mfa-kek:" + old)))
+    return tuple(ring)
+
+
+def mfa_key_configured() -> bool:
+    return bool(_mfa_keyring())
+
+
+def mfa_keyring_ids() -> List[str]:
+    return [kid for kid, _ in _mfa_keyring()]
+
+
+def encrypt_mfa(plaintext: bytes) -> bytes:
+    """[Gate G3] SEC-F6 TOTP の秘密の暗号化。MFA_KEY があれば今の版で(封筒つき)、無ければ以前と同じ ENCRYPTION_KEY。"""
+    ring = _mfa_keyring()
+    if not ring:
+        return _get_fernet().encrypt(plaintext)
+    kid, f = ring[0]
+    return ENVELOPE_PREFIX + b"mfa:" + kid.encode("ascii") + b":" + f.encrypt(plaintext)

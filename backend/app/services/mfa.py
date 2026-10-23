@@ -130,9 +130,10 @@ def otpauth_uri(secret_b32: str, account: str) -> str:
 
 
 def encrypt_secret(secret_b32: str) -> bytes:
-    from app.core.crypto import encrypt_payload
+    """[Gate G3] SEC-F6 MFA_KEY(版つき、データの暗号化の鍵とは別)があればそれで包む。無ければ ENCRYPTION_KEY。"""
+    from app.core.crypto import encrypt_mfa
 
-    return encrypt_payload(secret_b32.encode("ascii"))
+    return encrypt_mfa(secret_b32.encode("ascii"))
 
 
 def decrypt_secret(ciphertext: bytes) -> str:

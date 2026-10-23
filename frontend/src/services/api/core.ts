@@ -10,6 +10,7 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError, AxiosRequestConfig } f
 import { toast } from 'react-hot-toast';
 import type { MinimalHttpClient } from './types';
 import { apiUrlForHost } from '@/config/securityHeaders';
+import { errorSupportId } from '@/utils/apiErrorDetail';
 
 // [Gate A1] 呼び出し元が自分でエラーを画面へ伝える場合(ログイン・登録・ゲスト開始/昇格・
 // セッション確認)に、共通エラー処理(toast表示・401時のトークン破棄と/loginへの強制遷移)を
@@ -386,9 +387,13 @@ export class ApiCore {
         case 500:
         case 502:
         case 503:
-        case 504:
+        case 504: {
           message = 'サーバーエラーが発生しました。しばらくお待ちください。';
+          // [Gate G3] UX-04 問い合わせ番号(サーバーのログを探す鍵)を添える
+          const supportId = errorSupportId(error);
+          if (supportId) message += `(問い合わせ番号: ${supportId})`;
           break;
+        }
         default:
           if (error.response?.data && typeof error.response.data === 'object') {
             const apiError = error.response.data as ApiErrorResponseBody;

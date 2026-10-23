@@ -30,6 +30,23 @@ KEYS: List[Dict[str, object]] = [
         "multi": True,
     },
     {
+        "name": "MFA_KEY",
+        "purpose": "多要素認証(TOTP)の秘密を包む鍵(データの暗号化の鍵とは別。Gate G3 SEC-F6)",
+        "kind": "encryption",
+        "rotation": "版の切り替え: 今の値を MFA_KEYS_PREVIOUS へ移し、新しい値を入れて `tcops.py keys rekey`。全件が新しい鍵になったら前の鍵を外す",
+        "impact": "前の鍵を外す前に掛け直しが終わっていないと、その人は確認コードでログインできない(回復コードか mfa-reset)",
+        "required_in_production": True,
+    },
+    {
+        "name": "MFA_KEYS_PREVIOUS",
+        "purpose": "前の TOTP の鍵(復号だけ)。鍵の切り替えの途中だけ置く",
+        "kind": "encryption",
+        "rotation": "掛け直しが終わったら外す(失効)",
+        "impact": "外した鍵で包んだ TOTP の秘密は読めない",
+        "required_in_production": False,
+        "multi": True,
+    },
+    {
         "name": "LOOKUP_INDEX_KEY",
         "purpose": "暗号化した値の完全一致・末尾の検索の索引(HMAC の盲索引)",
         "kind": "hmac",
@@ -128,7 +145,7 @@ def reuse_problems(s) -> List[str]:
                 continue
             if other == name:
                 continue
-            if {other, name} == {"ENCRYPTION_KEY", "ENCRYPTION_KEYS_PREVIOUS"}:
+            if {other, name} in ({"ENCRYPTION_KEY", "ENCRYPTION_KEYS_PREVIOUS"}, {"MFA_KEY", "MFA_KEYS_PREVIOUS"}):
                 continue
             problems.append(f"{other} と {name} が同じ値(用途ごとに別の鍵にする)")
     return problems

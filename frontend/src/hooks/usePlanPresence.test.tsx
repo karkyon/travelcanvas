@@ -3,7 +3,7 @@
  * 失敗しても続け、閉じると知らせを消す。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import { api } from '@/services/api';
 import type { PresenceState } from '@/services/api';
 import { usePlanPresence } from './usePlanPresence';
@@ -19,6 +19,8 @@ describe('usePlanPresence (Gate C1)', () => {
     vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
   });
   afterEach(() => {
+    // [Gate G3] DEP-04 差し替えを戻す前に閉じる(閉じる時の知らせ(leavePresence)が本物の通信にならない)
+    cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

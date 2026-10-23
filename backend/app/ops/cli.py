@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 # このファイルは backend/app/ops/cli.py。リポジトリ直下は3つ上(ホストで実行する前提)。
 REPO = Path(os.environ.get("OPS_REPO_DIR") or Path(__file__).resolve().parents[3])
@@ -148,6 +148,8 @@ class Executor:
         extra_env: Optional[Mapping[str, str]] = None,
         target_db: Optional[str] = None,
         check: bool = True,
+        stdin_path: Optional[str] = None,
+        stdout_path: Optional[str] = None,
     ) -> subprocess.CompletedProcess:
         raise NotImplementedError
 
@@ -224,18 +226,20 @@ class ComposeExecutor(Executor):
             full.setdefault("OPS_DATABASE_URL", owner)
         return super().run(argv, env=full, **kw)
 
-    def backend_python(self, module_args, *, extra_env=None, target_db=None, check=True):
+    def backend_python(self, module_args, *, extra_env=None, target_db=None, check=True, stdin_path=None,
+                       stdout_path=None):
         env = dict(extra_env or {})
         # pycache をバインドマウント先(./backend)へ書かない(コンテナは非rootで書けないことがある)
         env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+        io = {"stdin_path": stdin_path, "stdout_path": stdout_path}
         if target_db:
             env["OPS_TARGET_DB"] = target_db
             inner = 'DATABASE_URL="$(python -c %s)" exec python %s' % (
                 shlex.quote(_URL_SNIPPET),
                 " ".join(shlex.quote(a) for a in module_args),
             )
-            return self.run(self.exec_args("backend", env) + ["sh", "-c", inner], check=check)
-        return self.run(self.exec_args("backend", env) + ["python"] + list(module_args), check=check)
+            return self.run(self.exec_args("backend", env) + ["sh", "-c", inner], check=check, **io)
+        return self.run(self.exec_args("backend", env) + ["python"] + list(module_args), check=check, **io)
 
     def backend_alembic(self, args, target_db):
         inner = 'DATABASE_URL="$(python -c %s)" exec alembic %s' % (
@@ -254,7 +258,7 @@ class ComposeExecutor(Executor):
             'R=$(psql -U "$POSTGRES_USER" -d %s -tAc '
             '"SELECT 1 FROM pg_roles WHERE rolname=\'tc_backup\'" 2>/dev/null); '
             'if [ "$R" = "1" ]; then U=tc_backup; else U="$POSTGRES_USER"; fi; '
-            'exec pg_dump -U "$U" -d %s -Fc -Z 6 --no-owner --no-privileges'
+            'exec pg_dump -U "$U" -d %s -Fc -Z 6 --no-owner --no-privileges --exclude-table-data=public.data_keys'
             % (shlex.quote(database), shlex.quote(database)),
             stdout_path=out_path,
             timeout=7200,
@@ -341,12 +345,14 @@ class LocalExecutor(Executor):
     def _url(self, name: str) -> str:
         return opslib.replace_database(self.url, name)
 
-    def backend_python(self, module_args, *, extra_env=None, target_db=None, check=True):
+    def backend_python(self, module_args, *, extra_env=None, target_db=None, check=True, stdin_path=None,
+                       stdout_path=None):
         env = dict(extra_env or {})
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         if target_db:
             env["DATABASE_URL"] = self._url(target_db)
-        return self.run([self.python] + list(module_args), env=env, cwd=self.backend_dir, check=check)
+        return self.run([self.python] + list(module_args), env=env, cwd=self.backend_dir, check=check,
+                        stdin_path=stdin_path, stdout_path=stdout_path)
 
     def backend_alembic(self, args, target_db):
         alembic = str(Path(self.python).with_name("alembic"))
@@ -354,7 +360,8 @@ class LocalExecutor(Executor):
 
     def pg_dump(self, database, out_path):
         self.run(
-            ["pg_dump", "-d", self._url(database), "-Fc", "-Z", "6", "--no-owner", "--no-privileges"],
+            ["pg_dump", "-d", self._url(database), "-Fc", "-Z", "6", "--no-owner", "--no-privileges",
+             "--exclude-table-data=public.data_keys"],
             stdout_path=out_path,
             timeout=7200,
         )
@@ -529,7 +536,9 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
     db_path = dest / opslib.backup_file_name(bid, "database")
     up_path = dest / opslib.backup_file_name(bid, "uploads")
     man_path = dest / opslib.backup_file_name(bid, "manifest")
-    partial = [dest / ("." + db_path.name + ".partial"), dest / ("." + up_path.name + ".partial")]
+    keys_path = dest / opslib.backup_file_name(bid, "keys")
+    partial = [dest / ("." + db_path.name + ".partial"), dest / ("." + up_path.name + ".partial"),
+               dest / ("." + keys_path.name + ".partial")]
     old_umask = os.umask(0o077)
     try:
         ex.pg_dump(live, str(partial[0]))
@@ -537,16 +546,25 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
         if entries < 1:
             raise OpsError("ダンプの目次が空です")
         ex.uploads_archive(str(source_facts["uploads_root"]), str(partial[1]))
+        # [Gate G3] SEC-F5 データ鍵は DB のダンプに入れず、別のファイルへ写す(破棄した鍵は後で全ての世代から消す)
+        has_keys = "data_keys" in (before.get("tables") or {})  # type: ignore[operator]
+        if has_keys:
+            ex.backend_python(["-m", "app.ops.key_escrow", "export"], stdout_path=str(partial[2]))
         archived = archive_listing(str(partial[1]))
         after = inventory(ex, live)
-        files_cmp = opslib.compare_file_listings(source_facts.get("files") or {}, archived)  # type: ignore[arg-type]
+        files_cmp: Dict[str, Any] = dict(opslib.compare_file_listings(
+            cast(Dict[str, Any], source_facts.get("files") or {}), archived))
         if not files_cmp["ok"]:
             raise OpsError(
                 "保存ファイルのアーカイブが元と一致しません(欠落 %d、内容違い %d)" % (len(files_cmp["missing"]), len(files_cmp["changed"]))
-            )  # type: ignore[arg-type]
+            )
         os.replace(str(partial[0]), str(db_path))
         os.replace(str(partial[1]), str(up_path))
-        for p in (db_path, up_path):
+        written = [db_path, up_path]
+        if has_keys:
+            os.replace(str(partial[2]), str(keys_path))
+            written.append(keys_path)
+        for p in written:
             os.chmod(str(p), 0o600)
         manifest = opslib.build_manifest(
             backup_id=bid,
@@ -554,7 +572,8 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
             git_commit=git_commit(),
             alembic_revision=before.get("alembic_revision"),  # type: ignore[arg-type]
             source_database=live,
-            files={"database": file_info(db_path), "uploads": file_info(up_path)},
+            files=dict({"database": file_info(db_path), "uploads": file_info(up_path)},
+                       **({"keys": file_info(keys_path)} if has_keys else {})),
             table_counts=before.get("tables") or {},  # type: ignore[arg-type]
             upload_files=archived,
             key_fingerprints=source_facts.get("key_fingerprints") or {},  # type: ignore[arg-type]
@@ -568,7 +587,7 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
         }
         write_json_atomic(man_path, manifest)
     except BaseException:
-        for p in partial + [db_path, up_path, man_path]:
+        for p in partial + [db_path, up_path, man_path, keys_path]:
             if p.exists():
                 p.unlink()
         raise
@@ -594,8 +613,51 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
         "バックアップが完了しました: %s(DB %d バイト、保存ファイル %d 件、%s 秒)"
         % (bid, result["database_size"], result["upload_count"], result["duration_seconds"])
     )
+    if has_keys:
+        cmd_purge_escrow(ex, dest)
     if prune:
         cmd_prune(dest, dry_run=False)
+    return result
+
+
+def cmd_purge_escrow(ex: Executor, dest: Path) -> Dict[str, object]:
+    """[Gate G3] SEC-F5 破棄したデータ鍵を、全ての世代のバックアップの鍵の写しから消す(目録のハッシュも直す)。"""
+    proc = ex.backend_python(["-m", "app.ops.key_escrow", "destroyed-ids"], check=False)
+    if proc.returncode != 0:
+        raise OpsError("破棄したデータ鍵の一覧を取れませんでした")
+    destroyed: List[str] = list(cast(List[str], ex.json_from(proc).get("ids") or []))
+    removed_total = 0
+    rewritten = 0
+    for bid in opslib.backup_ids_in(os.listdir(str(dest))):
+        kp = dest / opslib.backup_file_name(bid, "keys")
+        if not kp.is_file() or not destroyed:
+            continue
+        lines, removed = opslib.purge_escrow_lines(
+            kp.read_text(encoding="utf-8").splitlines(), destroyed)  # type: ignore[arg-type]
+        if not removed:
+            continue
+        tmp = kp.with_name("." + kp.name + ".partial")
+        old_umask = os.umask(0o077)
+        try:
+            tmp.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+            os.chmod(str(tmp), 0o600)
+            manifest = load_manifest(dest, bid)
+            files: Dict[str, Any] = dict(cast(Dict[str, Any], manifest.get("files") or {}))
+            files["keys"] = file_info(tmp)
+            files["keys"]["name"] = kp.name
+            manifest["files"] = files
+            manifest["keys_purged_at"] = now_utc().isoformat()
+            os.replace(str(tmp), str(kp))
+            write_json_atomic(dest / opslib.backup_file_name(bid, "manifest"), manifest)
+        finally:
+            os.umask(old_umask)
+            if tmp.exists():
+                tmp.unlink()
+        removed_total += removed
+        rewritten += 1
+    result: Dict[str, object] = {"ok": True, "destroyed_keys": len(destroyed), "removed_from_backups": removed_total,
+                                 "backups_rewritten": rewritten}
+    log("鍵の写しの整理: 破棄した鍵 %d、写しから消した数 %d(%d 世代)" % (len(destroyed), removed_total, rewritten))
     return result
 
 
@@ -609,7 +671,7 @@ def load_manifest(dest: Path, bid: str) -> Dict[str, object]:
 def cmd_verify_one(dest: Path, bid: str) -> List[str]:
     manifest = load_manifest(dest, bid)
     actual: Dict[str, Dict[str, object]] = {}
-    for role in ("database", "uploads"):
+    for role in ("database", "uploads", "keys"):
         path = dest / opslib.backup_file_name(bid, role)
         if path.is_file():
             actual[role] = file_info(path)
@@ -633,7 +695,7 @@ def cmd_prune(dest: Path, dry_run: bool) -> List[str]:
         keep_min=int(os.environ.get("OPS_KEEP_MIN", "3")),
     )
     for bid in victims:
-        for role in ("database", "uploads", "manifest"):
+        for role in ("database", "uploads", "keys", "manifest"):
             p = dest / opslib.backup_file_name(bid, role)
             if p.exists() and not dry_run:
                 p.unlink()
@@ -661,6 +723,10 @@ def cmd_restore(
     started = time.time()
     ex.recreate_database(target)
     ex.pg_restore(target, str(dest / opslib.backup_file_name(bid, "database")))
+    # [Gate G3] SEC-F5 データ鍵は鍵の写しから入れる(破棄した鍵は中身が無いため、その暗号文は読めないまま)
+    keys_file = dest / opslib.backup_file_name(bid, "keys")
+    if keys_file.is_file():
+        ex.backend_python(["-m", "app.ops.key_escrow", "import"], target_db=target, stdin_path=str(keys_file))
     restored = inventory(ex, target, storage_keys=True)
     counts = opslib.compare_table_counts(
         manifest.get("table_counts") or {},
@@ -1111,6 +1177,9 @@ def cmd_keys(ex: Executor, action: str, extra: Sequence[str]) -> int:
         module = ["-m", "app.ops.keys", "check"]
     elif action == "status":
         module = ["-m", "app.ops.rekey", "status"] + list(extra)
+    elif action == "convert":
+        # [Gate G3] SEC-F5 データ鍵の暗号文へ移す(--to envelope)・戻す(--to legacy)
+        module = ["-m", "app.ops.rekey", "convert"] + list(extra)
     else:
         module = ["-m", "app.ops.rekey", "run"] + list(extra)
     proc = ex.backend_python(module, check=False)
@@ -1181,7 +1250,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("security_args", nargs=argparse.REMAINDER)
     # [Gate G1] 暗号化の鍵の版の切り替え(docs/ops/KEY-INVENTORY.md・Runbook §8.2)
     p = sub.add_parser("keys", help="鍵の点検(check)・鍵ごとの件数(status)・前の鍵の暗号文の掛け直し(rekey)")
-    p.add_argument("action", choices=("check", "status", "rekey"))
+    p.add_argument("action", choices=("check", "status", "rekey", "convert", "purge-escrow"))
     p.add_argument("keys_args", nargs=argparse.REMAINDER)
     p = sub.add_parser("schedule")
     p.add_argument("action", choices=("print", "install", "remove"))
@@ -1197,6 +1266,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return EXIT_OK if plan["ok"] else EXIT_WARN
         if args.cmd == "security":
             return cmd_security(make_executor(args.mode), args.security_args)
+        if args.cmd == "keys" and args.action == "purge-escrow":
+            print(opslib.dumps_json(cmd_purge_escrow(make_executor(args.mode), backup_dir(args.backup_dir))))
+            return EXIT_OK
         if args.cmd == "keys":
             return cmd_keys(make_executor(args.mode), args.action, args.keys_args)
         if args.cmd == "jobs":

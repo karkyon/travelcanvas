@@ -229,15 +229,20 @@ describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
   });
 
   it('QuickDraft作成自体が失敗した場合はnullを返し、promoteを試みない', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mockedCreateQuickDraft.mockRejectedValue(new Error('network error'));
 
     const result = await usePlanStore.getState().createQuickPlan({ destination: '失敗テスト' });
 
     expect(result).toBeNull();
     expect(mockedTravelApi.promoteQuickDraft).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it('promoteが失敗した場合もnullを返す', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mockedGetStoredDeviceToken.mockReturnValue('stored-device-token');
     mockedCreateQuickDraft.mockResolvedValue({
       id: 'draft-1', revision: 1, status: 'ACTIVE', expires_at: '2099-01-01T00:00:00Z',
@@ -248,6 +253,7 @@ describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
     const result = await usePlanStore.getState().createQuickPlan({ destination: '失敗テスト2' });
 
     expect(result).toBeNull();
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 
@@ -280,6 +286,8 @@ describe('addScheduleItem', () => {
   });
 
   it('失敗時は追加前の状態へロールバックする', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await seedLoadedPlan(1);
     mockedApi.createEvent.mockRejectedValue(new Error('network error'));
 
@@ -287,6 +295,7 @@ describe('addScheduleItem', () => {
 
     const plan = usePlanStore.getState().currentPlan!;
     expect(plan.days[0]?.events).toHaveLength(0);
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 
@@ -361,6 +370,8 @@ describe('undoLastChange', () => {
   });
 
   it('取り消せる変更が無い場合(404)はプランを再読み込みしない', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await seedLoadedPlan(2);
     mockedApi.undoLastPlanChange.mockRejectedValue({ response: { status: 404 } });
 
@@ -368,11 +379,14 @@ describe('undoLastChange', () => {
 
     // getPlanDetailはseedLoadedPlan時の1回のみ(undo後の再読み込みは発生しない)
     expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 
 describe('deletePlan (Gate B-012)', () => {
   it('成功すると一覧と表示中のプランから外し、失敗は呼出元へ伝える(成功と誤表示しない)', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const mocked = apiService as unknown as { deletePlan: ReturnType<typeof vi.fn> };
     usePlanStore.setState({ plans: [{ id: 'p1' }, { id: 'p2' }] as never, currentPlan: { id: 'p1' } as never });
     mocked.deletePlan.mockResolvedValueOnce({ success: true, message: '' });
@@ -383,6 +397,7 @@ describe('deletePlan (Gate B-012)', () => {
     mocked.deletePlan.mockRejectedValueOnce(new Error('500'));
     await expect(usePlanStore.getState().deletePlan('p2')).rejects.toThrow('500');
     expect(usePlanStore.getState().plans.map((p) => p.id)).toEqual(['p2']);
+    expect(consoleError).toHaveBeenCalled();
   });
 });
 
@@ -451,6 +466,8 @@ describe('個別削除 (Gate B-013)', () => {
   });
 
   it('Undoが関連データの変更で断られた場合(undo_conflict)は理由を伝えて再読み込みする', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await seedLoadedPlan(6);
     mockedApi.undoLastPlanChange.mockRejectedValue({
       response: { status: 409, data: { detail: { code: 'undo_conflict', message: 'x', conflicts: [] } } },
@@ -458,5 +475,6 @@ describe('個別削除 (Gate B-013)', () => {
     await usePlanStore.getState().undoLastChange();
     expect((await toastMock()).error).toHaveBeenCalledWith(expect.stringContaining('何も変更していません'));
     expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(2);
+    expect(consoleError).toHaveBeenCalled();
   });
 });

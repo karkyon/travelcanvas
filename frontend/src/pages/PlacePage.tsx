@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getPlaceInfo, putOpeningHours, updatePlace } from '@/services/api';
 import type { OpeningHoursItem, PlaceInfo, PlacePatch } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeTelHref } from '@/utils/safeNavigation';
 
 const DAYS = ['月', '火', '水', '木', '金', '土', '日'];
 type TextKey = 'name' | 'address' | 'phone' | 'website' | 'entrance_note' | 'floor' | 'price_range' |
@@ -109,8 +110,9 @@ const PlacePage: React.FC = () => {
   };
 
   const call = () => {
-    if (place?.phone && window.confirm(`${place.name}(${place.phone})に電話をかけますか?`)) {
-      window.location.href = `tel:${place.phone.replace(/[^\d+]/g, '')}`;
+    const tel = safeTelHref(place?.phone);
+    if (place && tel && window.confirm(`${place.name}(${place.phone})に電話をかけますか?`)) {
+      window.location.href = tel;
     }
   };
 

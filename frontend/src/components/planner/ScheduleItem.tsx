@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { safeExternalUrl, safeTelHref } from '@/utils/safeNavigation';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, AlertTriangle 
@@ -319,9 +320,9 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {/* Contact & Booking Info */}
           {(contactInfo || bookingInfo) && (
             <div className="flex flex-wrap gap-4 mb-3">
-              {contactInfo?.website && (
+              {safeExternalUrl(contactInfo?.website) && (
                 <a
-                  href={contactInfo.website}
+                  href={safeExternalUrl(contactInfo?.website) ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-sm text-blue-500 hover:text-blue-700"
@@ -330,18 +331,18 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   公式サイト
                 </a>
               )}
-              {contactInfo?.phone && (
+              {contactInfo?.phone && safeTelHref(contactInfo.phone) && (
                 <a
-                  href={`tel:${contactInfo.phone}`}
+                  href={safeTelHref(contactInfo.phone) ?? undefined}
                   className="flex items-center gap-1 text-sm text-green-500 hover:text-green-700"
                 >
                   <Phone size={14} />
                   {contactInfo.phone}
                 </a>
               )}
-              {bookingInfo?.url && (
+              {safeExternalUrl(bookingInfo?.url) && (
                 <a
-                  href={bookingInfo.url}
+                  href={safeExternalUrl(bookingInfo?.url) ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-sm text-purple-500 hover:text-purple-700"

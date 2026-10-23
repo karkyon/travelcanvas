@@ -2869,6 +2869,52 @@ class SupportGrant(Base):
     last_accessed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
+class DataKey(Base):
+    """[Gate G3] SEC-F5 旅行ごと・利用者ごとのデータ鍵(app/services/data_keys.py が正本)。
+
+    wrapped_key_ciphertext は ENCRYPTION_KEY で包んだ鍵。破棄すると NULL になり、その鍵で暗号化した値は
+    DB・バックアップのどちらからも読めなくなる(バックアップの鍵の写しも消す: app/ops/key_escrow.py)。"""
+    __tablename__ = "data_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_type = Column(String(8), nullable=False)
+    subject_id = Column(UUID(as_uuid=True), nullable=False)
+    wrapped_key_ciphertext = Column(LargeBinary, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    destroyed_at = Column(DateTime(timezone=True), nullable=True)
+    destroy_reason = Column(String(40), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("subject_type IN ('plan', 'user')", name="ck_data_keys_subject_type"),
+        CheckConstraint("(destroyed_at IS NULL) = (wrapped_key_ciphertext IS NOT NULL)",
+                        name="ck_data_keys_destroyed_has_no_key"),
+        Index("ix_data_keys_subject", "subject_type", "subject_id"),
+        Index("uq_data_keys_active", "subject_type", "subject_id", unique=True,
+              postgresql_where=text("destroyed_at IS NULL")),
+    )
+
+
+class MfaResetRequest(Base):
+    """[Gate G3] SEC-F6 多要素認証の解除の申請と承認(scripts/security_incident.py の mfa-reset-request・mfa-reset)。"""
+    __tablename__ = "mfa_reset_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    target_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason = Column(String(200), nullable=False)
+    status = Column(String(12), nullable=False, default="pending", server_default="pending")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    approved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    single_operator = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'approved', 'cancelled', 'expired')",
+                        name="ck_mfa_reset_requests_status"),
+    )
+
+
 class OrgApiIdempotency(Base):
     """[Gate G2] FR-042 外部 API の書き込みの Idempotency-Key(クライアントごと)。同じキーの再送は同じ応答を返す。"""
     __tablename__ = "org_api_idempotency"

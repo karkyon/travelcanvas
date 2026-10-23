@@ -49,9 +49,12 @@ describe('AtlasPage (Gate P15)', () => {
     const plans = await screen.findByRole('region', { name: 'Atlasに含める旅行' });
     const box = within(plans).getByRole('checkbox', { name: /京都2027/ });
     expect(box).toBeChecked();
+    // 保存の後の読み直しは、除いた旅行を excluded で返す
+    const excludedId = region.plans[1]!.plan_id;
+    m.getAtlas.mockResolvedValue({ ...region, plans: region.plans.map((p) => (p.plan_id === excludedId ? { ...p, excluded: true } : p)) });
     fireEvent.click(box);
-    await waitFor(() => expect(m.updateAtlasSettings).toHaveBeenCalledWith([region.plans[1]!.plan_id]));
-    expect(box).not.toBeChecked(); // 押した直後に切り替わる
+    expect(box).not.toBeChecked(); // 押した直後に切り替わる(保存の前)
+    await waitFor(() => expect(m.updateAtlasSettings).toHaveBeenCalledWith([excludedId]));
     expect(await screen.findByText('Atlasから除きました')).toBeInTheDocument();
   });
 

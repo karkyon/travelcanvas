@@ -2,7 +2,7 @@
  * [Gate M9-FE-B3] SharePage / PublicSharePage の読込effect発火回数を固定する回帰テスト。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import fx from './../services/api/__fixtures__/backendContractResponses.json';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -38,7 +38,8 @@ vi.mock('../services/api', () => ({
 import SharePage from './SharePage';
 import PublicSharePage from './PublicSharePage';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// [Gate G3] DEP-04 待つ間の画面の更新を act の中で行う
+const sleep = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 
 beforeEach(() => {
   previewSharePolicy.mockReset().mockResolvedValue(fx.share_preview);

@@ -13,6 +13,7 @@ RUN npm ci
 COPY index.html vite.config.ts postcss.config.js tsconfig.json tsconfig.node.json .env* ./
 COPY public ./public
 COPY src ./src
+COPY server ./server
 
 # [Gate #8] VITE_API_URLはViteの静的ビルド時に import.meta.env として埋め込まれるため、
 # コンテナ起動時のenvironment:では反映されない。docker-compose.ymlのbuild.args経由で
@@ -20,30 +21,22 @@ COPY src ./src
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npx vite build
+# [Gate G3] DEP-03 本番用の配信(server/static-server.mjs)が使う応答ヘッダーの定義を、画面と同じ
+# src/config/securityHeaders.ts から作る(依存のパッケージなしで動く ES module)
+RUN npx esbuild src/config/securityHeaders.ts --format=esm --platform=node --target=node20 --outfile=server/securityHeaders.mjs
 
 FROM node:24-alpine AS runtime
 
 WORKDIR /app
 
-# [Gate R2-6] 以前はここで`--chown`を指定しておらずCOPY --from=buildが
-# root:rootで全ファイルをコピーしていた。直後のUSER nodeでnode(uid 1000)
-# ユーザーへ切り替えると、root所有のツリーを`npm run preview`(package.json
-# 読込)が読めずEACCES: permission deniedでコンテナが起動不能になっていた
-# (`docker compose up -d --build`でfrontendコンテナを実際に再作成した際に
-# 初めて顕在化。以前のGate検証はtsc/build/vitestのみでフルスタック起動を
-# 伴わなかったため未発見だった)。COPY時点でnode:nodeへ所有権を渡すことで
-# 解消する。
-COPY --from=build --chown=node:node /app/package*.json ./
+# [Gate G3] DEP-03 以前の実行の段は `vite preview`(開発用の確認の道具)で配信し、node_modules(開発用の依存を含む)を
+# 丸ごと入れていた。今は Node の標準の部品だけで動く配信(server/static-server.mjs)と build の結果(dist)だけを入れる。
+# 応答ヘッダー(CSP 等)・受け付ける名前(TC_PUBLIC_HOSTS)・API の向き先は以前と同じ規則(src/config/securityHeaders.ts)。
+# [Gate R2-6] root の持ち物のままだと USER node で読めないため、写す時に node の持ち物にする。
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/node_modules ./node_modules
-# [Gate S2] `vite preview` が応答にセキュリティヘッダー(CSP 等)を付けるのは vite.config.ts の preview.headers。
-# 以前は実行用の段に vite.config.ts を入れておらず、設定なしで動いていた(ヘッダーが付かない)。
-# 設定が読む src/config/securityHeaders.ts も入れる。vite は設定を読む時に同じ場所へ一時ファイルを書くため、
-# /app を node の持ち物にする(root のままだと EACCES で起動しない)。
-COPY --from=build --chown=node:node /app/vite.config.ts ./vite.config.ts
-COPY --from=build --chown=node:node /app/src/config ./src/config
-RUN chown node:node /app
+COPY --from=build --chown=node:node /app/server ./server
 
+ENV NODE_ENV=production
 USER node
 
 EXPOSE 4173
@@ -51,4 +44,4 @@ EXPOSE 4173
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
     CMD wget -qO- http://127.0.0.1:4173 || exit 1
 
-CMD ["npm", "run", "preview"]
+CMD ["node", "server/static-server.mjs"]

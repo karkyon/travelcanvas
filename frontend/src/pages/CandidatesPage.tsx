@@ -16,6 +16,7 @@ import api, {
 } from '@/services/api';
 import type { CandidateList, NormalizedDay, PlanCandidateItem } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeExternalUrl } from '@/utils/safeNavigation';
 
 const REASON_LABEL: Record<string, string> = {
   same_provider_id: '同じ提供元の場所', same_name: '同じ名前', nearby: '100m以内', same_address: '同じ住所', same_url: '同じURL',
@@ -174,8 +175,9 @@ const CandidatesPage: React.FC = () => {
                     </div>
                     <p className="text-sm text-gray-700 mt-1">
                       {c.created_by} が {fmt(c.created_at)} に追加
-                      {c.source_url && (
-                        <>・出典 <a className="text-indigo-800 underline" href={c.source_url} target="_blank" rel="noopener noreferrer nofollow">{c.source_label}</a></>
+                      {c.source_url && (safeExternalUrl(c.source_url)
+                        ? <>・出典 <a className="text-indigo-800 underline" href={safeExternalUrl(c.source_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow">{c.source_label}</a></>
+                        : <>・出典 {c.source_label}</>
                       )}
                       {c.provider && `・${c.provider}${c.retrieved_at ? `(${fmt(c.retrieved_at)}取得)` : ''}`}
                     </p>

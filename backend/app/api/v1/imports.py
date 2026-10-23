@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
@@ -309,7 +309,7 @@ def create_candidate(
     _require_review_required(j)
 
     try:
-        ciphertext = encrypt_payload(payload.value.encode("utf-8"))
+        ciphertext = encrypt_payload(payload.value.encode("utf-8"), plan_subject(plan.id))
     except EncryptionNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -481,7 +481,8 @@ def confirm_import_job(
     # [Gate R3-8] holder_name/contact_phoneは暗号化列のみへ書き込む。
     if fields.get("holder_name"):
         try:
-            r.holder_name_ciphertext = encrypt_payload(str(fields["holder_name"]).encode("utf-8"))
+            r.holder_name_ciphertext = encrypt_payload(str(fields["holder_name"]).encode("utf-8"),
+                                                       plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -490,7 +491,8 @@ def confirm_import_job(
 
     if fields.get("contact_phone"):
         try:
-            r.contact_phone_ciphertext = encrypt_payload(str(fields["contact_phone"]).encode("utf-8"))
+            r.contact_phone_ciphertext = encrypt_payload(str(fields["contact_phone"]).encode("utf-8"),
+                                                         plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -499,7 +501,8 @@ def confirm_import_job(
 
     if "confirmation_number" in fields:
         try:
-            r.confirmation_number_ciphertext = encrypt_payload(str(fields["confirmation_number"]).encode("utf-8"))
+            r.confirmation_number_ciphertext = encrypt_payload(str(fields["confirmation_number"]).encode("utf-8"),
+                                                               plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -510,7 +513,7 @@ def confirm_import_job(
 
     if "pin" in fields:
         try:
-            r.pin_ciphertext = encrypt_payload(str(fields["pin"]).encode("utf-8"))
+            r.pin_ciphertext = encrypt_payload(str(fields["pin"]).encode("utf-8"), plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

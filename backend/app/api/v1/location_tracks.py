@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, user_subject
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
@@ -336,7 +336,7 @@ def upload_points(plan_id: str, track_id: str, body: PointsUpload, db: Session =
         raise _bad("track_full", f"1つの軌跡の点は{lt.MAX_POINTS_PER_TRACK}件までです。新しく記録を始めてください", 409)
     if accepted:
         try:
-            cipher = encrypt_payload(lt.encode(accepted))
+            cipher = encrypt_payload(lt.encode(accepted), user_subject(t.user_id))
         except EncryptionNotConfigured:
             raise _bad("encryption_not_configured", "暗号化が設定されていません(サーバー側の設定)", 503)
         db.add(LocationPointBatch(track_id=t.id, batch_id=body.batch_id, points_ciphertext=cipher,
@@ -376,13 +376,13 @@ def delete_points(plan_id: str, track_id: str, start: datetime = Query(...), end
             continue
         removed += n
         if keep:
-            b.points_ciphertext = encrypt_payload(lt.encode(keep))
+            b.points_ciphertext = encrypt_payload(lt.encode(keep), user_subject(t.user_id))
             b.point_count = len(keep)
             b.first_at = datetime.fromisoformat(keep[0]["t"])
             b.last_at = datetime.fromisoformat(keep[-1]["t"])
         else:
             # 再送(同じbatch_id)で消した点が戻らないよう、まとまりの行は空にして残す
-            b.points_ciphertext = encrypt_payload(lt.encode([]))
+            b.points_ciphertext = encrypt_payload(lt.encode([]), user_subject(t.user_id))
             b.point_count = 0
     if removed:
         t.point_count -= removed

@@ -23,6 +23,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl } from '@/services/api';
 import type { TravelDocument, DocumentClassification } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeExternalUrl, safeInternalPath } from '@/utils/safeNavigation';
 
 const CLASSIFICATION_OPTIONS: { value: DocumentClassification; label: string }[] = [
   { value: 'public', label: '公開' },
@@ -122,7 +123,9 @@ const DocumentsPage: React.FC = () => {
     setError(null);
     try {
       const { url } = await getDocumentDownloadUrl(planId, doc.id);
-      const target = resolveDownloadUrl(url);
+      // [Gate G3] DEP-02 http(s) かアプリ内のパスだけ(javascript: 等は開かない)
+      const target = safeExternalUrl(resolveDownloadUrl(url)) ?? safeInternalPath(resolveDownloadUrl(url));
+      if (!target) throw new Error('unsafe download url');
       // [Gate M10 v23] window.open(url, '_blank', 'noopener,noreferrer')で
       // 新規タブを開く方式は、クリックというユーザー操作からURL取得の
       // await完了までの非同期な間隔により、Chromiumがユーザー操作起因の

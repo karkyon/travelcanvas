@@ -31,6 +31,8 @@ export default defineConfig({
   reporter: [
     ...(process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : [['list']]),
     ...(process.env.PLAYWRIGHT_JUNIT_OUTPUT ? [['junit', { outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT }]] : []),
+    // [Gate G3] CI-04 再試行で通った試験(flaky)を別に数える(scripts/ci/e2e_flaky_report.py)
+    ...(process.env.PLAYWRIGHT_JSON_OUTPUT ? [['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT }]] : []),
   ] as PlaywrightReporters,
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4173',

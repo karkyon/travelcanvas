@@ -62,12 +62,9 @@ export default defineConfig({
       VITE_MOCK_API: 'true',
       VITE_DEBUG_MODE: 'false',
     },
-    retry: 2,
-    typecheck: {
-      enabled: true,
-      checker: 'tsc',
-      include: ['**/*.{test,spec}-d.{ts,tsx}'],
-    },
+    // [Gate G3] DEP-04・CI-04 以前は retry: 2 で、落ちた試験を黙って2回まで再実行していた(本当の競合を隠す)。
+    // 再試行はしない。型の試験(*.test-d.ts)は無いため typecheck の実験的な機能も使わない(型は tsc --noEmit で検査)
+    retry: 0,
   },
 
   resolve: {

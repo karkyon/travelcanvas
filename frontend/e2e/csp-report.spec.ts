@@ -21,7 +21,8 @@ test('CSP で止めたスクリプトの実行を、ブラウザが backend へ�
     const el = document.createElement('script');
     el.textContent = 'window.__cspInjected = true;';
     document.head.appendChild(el);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // 差し込んだスクリプトは(許されていれば)その場で動く。次の描画まで待てば十分(固定の待ち時間は使わない。Gate G3 CI-04)
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
     return (window as unknown as { __cspInjected?: boolean }).__cspInjected === true;
   });
   expect(executed).toBe(false);

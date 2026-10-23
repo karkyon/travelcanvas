@@ -128,6 +128,10 @@ def purge_plan(
     try:
         db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
         db.execute(delete(TravelPlan).where(TravelPlan.id == plan_id))
+        # [Gate G3] SEC-F5 旅行のデータ鍵を破棄する(データの削除と同時に確定。バックアップに残った暗号文も読めなくなる)
+        from app.services import data_keys
+
+        counts["data_keys_destroyed"] = data_keys.destroy(db, "plan", plan_id, "plan_purge")
         db.commit()
     except Exception:
         db.rollback()

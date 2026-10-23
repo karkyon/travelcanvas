@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
@@ -318,9 +318,10 @@ def put_settings(
 
 # ===== 予算 =====
 
-def _encrypt_amount(amount: Decimal) -> bytes:
+def _encrypt_amount(amount: Decimal, plan_id) -> bytes:
     try:
-        return encrypt_payload(json.dumps({"amount": str(amount)}).encode("utf-8"))
+        # [Gate G3] SEC-F5 旅行のデータ鍵
+        return encrypt_payload(json.dumps({"amount": str(amount)}).encode("utf-8"), plan_subject(plan_id))
     except EncryptionNotConfigured:
         raise HTTPException(status_code=503, detail="個人の予算の暗号化が設定されていません(サーバー側のENCRYPTION_KEY未設定)")
 
@@ -412,7 +413,7 @@ def create_budget(
         note=_strip_or_none(payload.note),
     )
     if payload.kind == "member":
-        b.amount_ciphertext = _encrypt_amount(payload.amount)
+        b.amount_ciphertext = _encrypt_amount(payload.amount, plan.id)
     else:
         b.amount = payload.amount
     db.add(b)
@@ -440,7 +441,7 @@ def update_budget(
             raise HTTPException(status_code=422, detail="amountにnullは指定できません")
         _check_minor(data["amount"], base, "予算")
         if b.kind == "member":
-            b.amount_ciphertext = _encrypt_amount(data["amount"])
+            b.amount_ciphertext = _encrypt_amount(data["amount"], plan.id)
         else:
             b.amount = data["amount"]
     if "note" in data:

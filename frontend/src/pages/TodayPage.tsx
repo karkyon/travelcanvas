@@ -31,6 +31,7 @@ import {
   TRANSPORT_LABELS, computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeExternalUrl } from '@/utils/safeNavigation';
 
 // [Gate L1] DOC-04 §16に準拠し、当日画面は一定間隔で自動更新する
 // (旅行者がアプリを開いたままにする想定のため、明示的なreloadを要求しない)。
@@ -40,7 +41,7 @@ const TICK_INTERVAL_MS = 15_000;
 
 function mapUrl(event: TodayEvent): string | null {
   if (event.latitude == null || event.longitude == null) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`;
+  return safeExternalUrl(`https://www.google.com/maps/search/?api=1&query=${Number(event.latitude)},${Number(event.longitude)}`);
 }
 
 function deviceTimeZone(): string | null {
@@ -100,7 +101,7 @@ const EventCard: React.FC<{
             variant="primary"
             size="lg"
             icon={<MapPin size={20} />}
-            onClick={() => window.open(map, '_blank', 'noopener,noreferrer')}
+            onClick={() => window.open(safeExternalUrl(map) ?? undefined, '_blank', 'noopener,noreferrer')}
           >
             地図
           </Button>

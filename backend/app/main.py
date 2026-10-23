@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from functools import lru_cache
@@ -15,6 +18,7 @@ from app.api.v1 import (
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
 from app.core.security_headers import apply_security_headers
+from app.core import error_catalog
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.services import threat_guard
 from starlette.concurrency import run_in_threadpool
@@ -135,10 +139,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.exception(f"[{request_id}] Unhandled exception on {request.method} {request.url.path}")
     error_response = JSONResponse(
         status_code=500,
-        content={
-            "detail": "サーバー内部でエラーが発生しました。しばらくしてから再試行してください。",
-            "request_id": request_id,
-        },
+        # [Gate G3] UX-04 エラーの応答の決まり(app/core/error_catalog.py): code・retry を足す。例外の文は出さない
+        content=error_catalog.envelope(error_catalog.INTERNAL_ERROR_MESSAGE, 500, request_id)
+        | {"code": error_catalog.INTERNAL_ERROR_CODE},
         # [Gate M10 CORS調査] このハンドラはCORSMiddlewareの外側で実行される
         # ため、CORSMiddleware自体はこのレスポンスにヘッダーを付与できない。
         # _cors_headers_for_origin()で同じ許可リストに基づき明示的に付与する。
@@ -352,13 +355,35 @@ async def not_found_handler(request, exc):
     # spots.py/travel.py等、404を意図的に返す全routeに影響していた
     # 既存バグ)。Starletteの既定detailの時だけ汎用メッセージにする。
     detail = getattr(exc, "detail", None)
+    request_id = getattr(request.state, "request_id", None)
     if detail and detail != "Not Found":
         # [Gate P4] route側が付けたヘッダー(公開共有の X-Robots-Tag 等)を落とさない
-        return JSONResponse(status_code=404, content={"detail": detail}, headers=getattr(exc, "headers", None))
+        return JSONResponse(status_code=404, content=error_catalog.envelope(detail, 404, request_id),
+                            headers=getattr(exc, "headers", None))
     return JSONResponse(
         status_code=404,
-        content={"detail": f"Endpoint not found: {request.url.path}"}
+        content=error_catalog.envelope(f"Endpoint not found: {request.url.path}", 404, request_id),
     )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """[Gate G3] UX-04 全ての HTTP のエラーの応答に問い合わせ番号(request_id)・再試行の可否(retry)・code を足す
+    (detail はそのまま)。2xx・3xx(本文の無い応答)はそのまま返す。"""
+    status = int(exc.status_code)
+    headers = getattr(exc, "headers", None)
+    if status < 400 or status in (204, 304):
+        return Response(status_code=status, headers=headers)
+    body = error_catalog.envelope(exc.detail, status, getattr(request.state, "request_id", None))
+    return JSONResponse(status_code=status, content=body, headers=headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """[Gate G3] UX-04 入力の検証の誤り(422)。detail は以前と同じ FastAPI の一覧(値の input は出さない)。"""
+    errors = [{k: v for k, v in e.items() if k not in ("input", "ctx", "url")} for e in exc.errors()]
+    body = error_catalog.envelope(jsonable_encoder(errors), 422, getattr(request.state, "request_id", None))
+    return JSONResponse(status_code=422, content=body)
 
 # [Gate #27] app/core/exceptions.py には AuthenticationError/AuthorizationError/
 # ValidationError等の統一例外クラス一式が定義されていたが、これらを捕捉する

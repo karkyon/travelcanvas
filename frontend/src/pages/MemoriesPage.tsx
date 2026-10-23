@@ -17,6 +17,7 @@ import api, {
 } from '@/services/api';
 import type { JournalDraft, MemoryKind, MemoryList, MemoryVisibility, NormalizedDay, TravelMemory } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeExternalUrl } from '@/utils/safeNavigation';
 import {
   AUDIO_EXTENSIONS, KIND_LABEL, PHOTO_EXTENSIONS, VISIBILITY_LABEL, eventLabel, fileProblem, formatSize,
   groupMemories, journalFileName, videoUrlProblem,
@@ -343,8 +344,8 @@ const MemoriesPage: React.FC = () => {
                           <MemoryMedia planId={planId} memory={m}
                             alt={`${KIND_LABEL[m.kind]}${m.body ? `: ${m.body.slice(0, 40)}` : ''}`} />
                         )}
-                        {m.video_url && (
-                          <a href={m.video_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-800 underline break-all">
+                        {safeExternalUrl(m.video_url) && (
+                          <a href={safeExternalUrl(m.video_url) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-800 underline break-all">
                             動画を開く(外部のサイト)
                           </a>
                         )}

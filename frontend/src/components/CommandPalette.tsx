@@ -13,6 +13,7 @@ import { Search } from 'lucide-react';
 import { searchEverything, searchPlan } from '@/services/api';
 import type { SearchFilter, SearchHit, SearchResults } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { safeInternalPath } from '@/utils/safeNavigation';
 import { planIdFromPath } from '@/utils/commandPalette';
 
 const FILTERS: Array<{ value: SearchFilter; label: string }> = [
@@ -24,9 +25,11 @@ const DEBOUNCE_MS = 250;
 interface Props {
   /** [Gate G2] 読み込み中に Ctrl+K・ボタンで開くよう求められていた時は、開いた状態で始める(CommandPaletteLauncher) */
   defaultOpen?: boolean;
+  /** [Gate G3] Ctrl+K を自分で受け取り始めた時に呼ぶ(CommandPaletteLauncher がそれまで代わりに受け取る) */
+  onLive?: () => void;
 }
 
-const CommandPalette: React.FC<Props> = ({ defaultOpen = false }) => {
+const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPlan = planIdFromPath(location.pathname);
@@ -68,6 +71,15 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false }) => {
   }, [open, close, openPalette]);
 
   useEffect(() => {
+    onLive?.();
+  }, [onLive]);
+
+  // 受け取りの切り替えの間に Launcher が受け取った「開く」も反映する
+  useEffect(() => {
+    if (defaultOpen) openPalette();
+  }, [defaultOpen, openPalette]);
+
+  useEffect(() => {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
@@ -103,7 +115,9 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false }) => {
 
   const go = (link: string) => {
     close();
-    navigate(link);
+    // [Gate G3] DEP-02 検索の結果の移動先はサーバーの値。アプリ内のパスだけを通す
+    const target = safeInternalPath(link);
+    if (target) navigate(target);
   };
 
   const onInputKey = (e: React.KeyboardEvent) => {

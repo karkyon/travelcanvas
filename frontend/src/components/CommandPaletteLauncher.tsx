@@ -24,6 +24,9 @@ const Placeholder: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
 const CommandPaletteLauncher: React.FC = () => {
   const [ready, setReady] = useState(false);
   const [pendingOpen, setPendingOpen] = useState(false);
+  // [Gate G3] 検索の画面が自分で Ctrl+K を受け取れるようになるまで(読み込み後の描画の待ち=Suspense の間も)、ここで受け取る。
+  // 以前は読み込みが終わった瞬間にここの受け取りを外していたため、描画の待ちの間に押された Ctrl+K が失われた
+  const [paletteLive, setPaletteLive] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -32,7 +35,7 @@ const CommandPaletteLauncher: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (ready) return undefined;
+    if (paletteLive) return undefined;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -41,13 +44,13 @@ const CommandPaletteLauncher: React.FC = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready]);
+  }, [paletteLive]);
 
   const placeholder = <Placeholder onOpen={() => setPendingOpen(true)} />;
   if (!ready && !pendingOpen) return placeholder;
   return (
     <Suspense fallback={placeholder}>
-      <CommandPalette defaultOpen={pendingOpen} />
+      <CommandPalette defaultOpen={pendingOpen} onLive={() => setPaletteLive(true)} />
     </Suspense>
   );
 };

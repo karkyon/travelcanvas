@@ -124,8 +124,29 @@ jobs:
       - name: Bundle budget (ブロッキング)
         run: python3 ../scripts/ci/check_bundle_budget.py --dist dist
 
+      # [Gate G3] DEP-04 試験の出力に想定外のエラー・警告を残さない(標準エラー 0 行)。CI-02 結果(JUnit)と
+      # coverage を残す。再試行はしない(vitest.config.ts の retry: 0)
       - name: Unit tests (ブロッキング)
-        run: npm test -- --run
+        run: |
+          mkdir -p ../ci-results
+          npm test -- --run --coverage --coverage.reporter=text-summary --coverage.reporter=cobertura \
+            --coverage.reportsDirectory=../ci-results/frontend-coverage \
+            --reporter=default --reporter=junit --outputFile.junit=../ci-results/vitest-junit.xml \
+            2> ../ci-results/vitest-stderr.txt
+          python3 ../scripts/ci/check_test_output.py ../ci-results/vitest-stderr.txt
+
+      - name: Unit tests の要約
+        if: always()
+        run: python3 ../scripts/ci/junit_summary.py --title "frontend vitest" ../ci-results/vitest-junit.xml
+
+      - name: Upload frontend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-tests-${{ github.sha }}
+          path: ci-results/
+          retention-days: 30
+          if-no-files-found: warn
 
   backend:
     runs-on: ubuntu-24.04
@@ -197,17 +218,33 @@ jobs:
           python3 ../scripts/ops/tcops.py --help > /dev/null
           python3 ../scripts/ops/tcops.py schedule print | grep -q "travelcanvas ops"
 
-      - name: Alembic upgrade -> downgrade -> upgrade (ブロッキング)
+      # [Gate G3] CI-02 migration の前後の DB の構造(schema)を写して差分を残す。往復(下げて上げる)の後の構造が
+      # 最初の head と同じであることも確かめる(downgrade の書き漏れを検出)
+      - name: Alembic upgrade -> downgrade -> upgrade・構造の差分 (ブロッキング)
         run: |
+          mkdir -p ../ci-results
           alembic upgrade head
+          python -m app.ops.schema_snapshot > ../ci-results/schema-head.txt
           alembic downgrade -1
+          python -m app.ops.schema_snapshot > ../ci-results/schema-previous.txt
           alembic upgrade head
+          python -m app.ops.schema_snapshot > ../ci-results/schema-head-again.txt
+          python -m app.ops.schema_snapshot --diff ../ci-results/schema-previous.txt ../ci-results/schema-head.txt > ../ci-results/migration-schema-diff.txt
+          diff -u ../ci-results/schema-head.txt ../ci-results/schema-head-again.txt
+
+      # [Gate G3] CI-03 型の検査。既存の誤りは backend/mypy-baseline.txt の基準まで(増えたら失敗)
+      - name: Type-check mypy (ブロッキング・基準より増やさない)
+        run: python3 ../scripts/ci/check_mypy_baseline.py
 
       # [Gate S11] 以前は CI に ENCRYPTION_KEY・CORS_ORIGINS・文書の保存先が無く、34件が失敗し続けていた
       # (2026-09-17 以降 main の CI は赤のまま)。tests/conftest.py が試験だけの既定値を入れる。
       # [Gate G1] CI-02 結果を JUnit で残し、GOV-03 VERIFIED の証拠(台帳が参照する試験)がこの実行で合格したかを照合する
       - name: pytest 全件 (ブロッキング)
-        run: python -m pytest tests/ -v --junitxml=../ci-results/backend-junit.xml
+        run: python -m pytest tests/ -v --junitxml=../ci-results/backend-junit.xml --cov=app --cov-report=term:skip-covered --cov-report=xml:../ci-results/backend-coverage.xml
+
+      - name: pytest の要約
+        if: always()
+        run: python3 ../scripts/ci/junit_summary.py --title "backend pytest" ../ci-results/backend-junit.xml
 
       - name: VERIFIED の証拠の合格の照合 (ブロッキング)
         run: python3 ../scripts/ci/check_ledger_results.py backend --junit ../ci-results/backend-junit.xml
@@ -221,11 +258,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      # 注意: `mypy`による型チェックは引き続き意図的に含めていない。
-      # backend/pyproject.toml に poetry ベースの別依存定義が存在するが、
-      # 実際にDockerfileが使用するのは requirements.txt (pip) であり、
-      # pyproject.tomlは重複・未整理のまま放置されている(別途整理が必要、
-      # Gate #31.5D以降のスコープ)。
+      # [Gate G3] CI-03 mypy は上の「Type-check mypy」で行う(backend/mypy.ini・mypy-baseline.txt)。
 
   # [Gate R2-6] docs/trace/gate-r2-trace.md のR2-5行が「未達」としていた
   # 「Playwright browser E2E」「CIへのE2E blocking追加」を満たすジョブ。
@@ -235,6 +268,10 @@ jobs:
   e2e:
     needs: [frontend, backend]
     runs-on: ubuntu-24.04
+    # [Gate G3] CI-04 flaky の issue を作るため(他は読むだけ)
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -318,8 +355,16 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4173
           PLAYWRIGHT_JUNIT_OUTPUT: e2e-results/junit.xml
+          PLAYWRIGHT_JSON_OUTPUT: e2e-results/report.json
           CI: 'true'
         run: npx playwright test
+
+      # [Gate G3] CI-04 再試行で通った試験(flaky)を合格とは別に数え、spec ごとに issue へ残す(合格の扱いのまま放置しない)
+      - name: E2E の再試行(flaky)の記録
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/e2e_flaky_report.py frontend/e2e-results/report.json --issue
 
       # [Gate G1] GOV-03 VERIFIED の E2E の証拠(spec ごと)がこの実行で合格したかを照合する
       - name: VERIFIED の E2E の証拠の照合 (ブロッキング)

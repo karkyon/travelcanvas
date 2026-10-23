@@ -78,6 +78,8 @@ BACKUP_FILE_SUFFIXES = {
     "database": ".db.dump",
     "uploads": ".uploads.tar.gz",
     "manifest": ".manifest.json",
+    # [Gate G3] SEC-F5 データ鍵の写し(DB のダンプには含めない。破棄した鍵は全ての世代から消す)
+    "keys": ".keys.jsonl",
 }
 
 
@@ -165,7 +167,8 @@ def manifest_problems(manifest: Mapping[str, object], actual: Mapping[str, Mappi
     expected_files = manifest.get("files") or {}
     if not isinstance(expected_files, dict):
         return ["manifest の files が不正です"]
-    for role in ("database", "uploads"):
+    roles = ["database", "uploads"] + (["keys"] if expected_files.get("keys") else [])
+    for role in roles:
         exp = expected_files.get(role)
         got = actual.get(role)
         if not exp:
@@ -690,6 +693,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "10 3 * * * cd %s && %s backup --prune >> %s/backup.log 2>&1" % (repo_dir, tool, log),
         "# 毎日 03:40 猶予期間を過ぎた削除済みデータの完全削除(旅行・文書・QuickDraft)",
         "40 3 * * * cd %s && %s purge >> %s/purge.log 2>&1" % (repo_dir, tool, log),
+        "# [Gate G3] 毎日 03:45 破棄したデータ鍵を全ての世代のバックアップの鍵の写しから消す(鍵の破棄による削除)",
+        "45 3 * * * cd %s && %s keys purge-escrow >> %s/purge.log 2>&1" % (repo_dir, tool, log),
         "# 毎週日曜 04:20 最新バックアップの復元演習(別DBへ復元して件数・復号・migrationの往復を確認)",
         "20 4 * * 0 cd %s && %s drill --from-latest >> %s/drill.log 2>&1" % (repo_dir, tool, log),
         "# 毎日 03:50 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(B-009)",
@@ -858,3 +863,27 @@ def render_drill_report(result: Mapping[str, object]) -> str:
 
 def dumps_json(obj: object) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=1, sort_keys=True, default=str)
+
+
+# ---------------------------------------------------------------------------
+# [Gate G3] SEC-F5 データ鍵の写し(<ID>.keys.jsonl)から、破棄した鍵の中身を消す(標準ライブラリだけ)
+# ---------------------------------------------------------------------------
+
+
+def purge_escrow_lines(lines: Iterable[str], destroyed: Iterable[str]) -> Tuple[List[str], int]:
+    """戻り値: (書き直した行, 消した鍵の数)。破棄した鍵は {"wrapped": null, "destroyed": true} の記録だけにする。"""
+    import uuid as _uuid
+
+    gone = {str(_uuid.UUID(str(i))) for i in destroyed}
+    out: List[str] = []
+    removed = 0
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        obj = json.loads(line)
+        if str(_uuid.UUID(str(obj["id"]))) in gone and not obj.get("destroyed"):
+            obj = dict(obj, wrapped=None, destroyed=True)
+            removed += 1
+        out.append(json.dumps(obj, ensure_ascii=False, sort_keys=True))
+    return out, removed

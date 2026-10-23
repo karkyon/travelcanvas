@@ -57,6 +57,14 @@ def production_problems(s) -> List[str]:
         reason = _weak_secret(value)
         if reason:
             problems.append(f"ENCRYPTION_KEYS_PREVIOUS の{i}番目が弱い({reason})")
+    # [Gate G3] SEC-F6 TOTP の秘密はデータの暗号化の鍵と別の鍵で包む
+    mfa_key = (getattr(s, "MFA_KEY", None) or "").strip()
+    if not mfa_key:
+        problems.append("MFA_KEY が未設定(TOTP の秘密が ENCRYPTION_KEY だけで守られている)")
+    else:
+        reason = _weak_secret(mfa_key)
+        if reason:
+            problems.append(f"MFA_KEY が弱い({reason})")
     # [Gate G1] オフラインパックの鍵を ENCRYPTION_KEY から導出したままだと、暗号化の鍵を替えた時に
     # 全員の端末のオフラインデータが読めなくなる(鍵の用途が分かれていない)
     if not (getattr(s, "OFFLINE_PACK_KEY_SECRET", None) or "").strip():
@@ -185,6 +193,11 @@ class Settings(BaseSettings):
     # 新しい鍵を ENCRYPTION_KEY に入れて `tcops.py keys rekey` で掛け直す。全件が今の鍵になったら外す(失効)。
     # 手順は docs/ops/KEY-INVENTORY.md・Runbook §8.2。
     ENCRYPTION_KEYS_PREVIOUS: Optional[str] = None
+    # [Gate G3] SEC-F6 TOTP(多要素認証)の秘密を包む鍵(データの暗号化の鍵とは別)。未設定なら以前と同じく
+    # ENCRYPTION_KEY で暗号化する。切り替えは ENCRYPTION_KEY と同じ(今の値を MFA_KEYS_PREVIOUS へ移して
+    # `tcops.py keys rekey`)。docs/ops/KEY-INVENTORY.md
+    MFA_KEY: Optional[str] = None
+    MFA_KEYS_PREVIOUS: Optional[str] = None
 
     # [Gate R3-13] confirmation_number等の暗号化フィールドに対する盲検索
     # (blind index)用のHMAC鍵。DOC-08 §19「Lookup: HMAC blind index、用途別key」

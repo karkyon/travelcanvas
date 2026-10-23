@@ -10,9 +10,12 @@
     revoke-sessions --email user@example.com [--reason "…"]
     revoke-sessions --all --yes [--reason "…"]   全員の全端末をログアウトさせる
     mfa-status --email admin@example.com    [Gate S11] 多要素認証の設定の有無(回復コードの残り数)
-    mfa-reset --email admin@example.com --yes [--reason "…"]
-                                            [Gate S11] 端末と回復コードを両方なくした人の多要素認証を外す
-                                            (その人の全端末もログアウトさせる。本人確認は運用者が別の手段で行う)
+    mfa-reset-request --email user@example.com --requested-by admin-a@example.com --reason "…"
+                                            [Gate G3] SEC-F6 端末と回復コードを両方なくした人の多要素認証の解除を申請する
+                                            (本人確認は運用者が別の手段で行い、方法を理由に書く。24時間で期限切れ)
+    mfa-reset --request <申請のID> --approved-by admin-b@example.com --yes
+                                            [Gate G3] 申請した人とは別の管理者が承認して解除する(その人の全端末をログアウト、
+                                            本人へ知らせる)。対象の本人は申請も承認もできない
     grant-admin --email a@example.com --yes [--reason "…"]
                                             [Gate A2] 管理者の権限を付ける(その人の全端末をログアウト。次に管理者の画面を
                                             開く時に多要素認証の設定を求める)
@@ -59,13 +62,31 @@ def _shared() -> bool:
 
 def _mfa_command(args) -> int:
     """[Gate S11] 多要素認証の確認・解除(値に個人情報を含めない)。"""
-    from app.core.auth import auth_manager
     from app.models.models import User, UserMfa
-    from app.services.audit_service import record_audit_event
 
     if args.cmd == "mfa-reset" and not args.yes:
         _print({"ok": False, "error": "多要素認証を外すには --yes も付けてください"})
         return EXIT_USAGE
+    if args.cmd in ("mfa-reset", "mfa-reset-request"):
+        # [Gate G3] SEC-F6 申請と承認(二者の確認)。以前の「--email だけで外す」は使えない
+        from app.services import mfa_reset
+
+        if args.cmd == "mfa-reset" and not (args.request and args.approved_by):
+            _print({"ok": False, "error": "先に mfa-reset-request で申請し、別の管理者が --request <ID> --approved-by で承認してください"})
+            return EXIT_USAGE
+        db = SessionLocal()
+        try:
+            if args.cmd == "mfa-reset-request":
+                _print(mfa_reset.request_reset(db, target_email=args.email, requested_by=args.requested_by,
+                                               reason=args.reason))
+            else:
+                _print(mfa_reset.approve_reset(db, request_id=args.request, approved_by=args.approved_by))
+            return EXIT_OK
+        except mfa_reset.MfaResetError as e:
+            _print({"ok": False, "error": str(e)})
+            return EXIT_FAIL
+        finally:
+            db.close()
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == args.email).first()
@@ -78,16 +99,7 @@ def _mfa_command(args) -> int:
                     "pending": bool(rec and not rec.confirmed_at),
                     "recovery_codes_remaining": len(rec.recovery_code_hashes or []) if rec else 0})
             return EXIT_OK
-        if rec is None:
-            _print({"ok": True, "removed": False})
-            return EXIT_NO_EFFECT
-        db.delete(rec)
-        db.commit()
-        auth_manager.revoke_all_user_sessions(str(user.id), db)
-        record_audit_event(action="mfa_reset_by_operator", resource_type="user", user_id=None, resource_id=user.id,
-                           details={"reason": (args.reason or "")[:200], "sessions_revoked": True})
-        _print({"ok": True, "removed": True, "sessions_revoked": True})
-        return EXIT_OK
+        return EXIT_USAGE
     finally:
         db.close()
 
@@ -130,8 +142,14 @@ def main(argv=None) -> int:
     p.add_argument("--reason", default="")
     p = sub.add_parser("mfa-status")
     p.add_argument("--email", required=True)
+    p = sub.add_parser("mfa-reset-request")
+    p.add_argument("--email", required=True, help="解除する人")
+    p.add_argument("--requested-by", required=True, help="申請する管理者")
+    p.add_argument("--reason", required=True, help="理由(本人確認の方法を含む)")
     p = sub.add_parser("mfa-reset")
-    p.add_argument("--email", required=True)
+    p.add_argument("--request", help="申請の ID(mfa-reset-request の結果)")
+    p.add_argument("--approved-by", help="承認する管理者(申請した人とは別)")
+    p.add_argument("--email", help="(使えません。以前の形)")
     p.add_argument("--yes", action="store_true", help="外すことの確認")
     p.add_argument("--reason", default="")
     for name in ("grant-admin", "revoke-admin"):
@@ -141,7 +159,7 @@ def main(argv=None) -> int:
         p.add_argument("--reason", default="")
     args = parser.parse_args(argv)
 
-    if args.cmd in ("mfa-status", "mfa-reset"):
+    if args.cmd in ("mfa-status", "mfa-reset", "mfa-reset-request"):
         return _mfa_command(args)
     if args.cmd in ("grant-admin", "revoke-admin"):
         return _admin_command(args)

@@ -30,7 +30,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user, get_current_user_or_guest
@@ -372,8 +372,11 @@ async def get_plan_detail(
     そのまま維持しつつ、ETagヘッダーも合わせて設定し実態と説明を一致させる。"""
     plan, hidden = _plan_hidden(db, plan_id, current_user, "viewer")
     response.headers["ETag"] = f'"{plan.revision}"'
+    # [Gate G3] CI-05 以前は日ごとに予定を読み直していた(日数に比例して SQL が増える N+1。365日で約370回)。
+    # 予定はまとめて1回で読む
     days = (
         db.query(TravelDay)
+        .options(selectinload(TravelDay.events))
         .filter(TravelDay.plan_id == plan.id)
         .order_by(TravelDay.sort_order, TravelDay.local_date)
         .all()

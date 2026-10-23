@@ -5,7 +5,7 @@
  * および読込失敗toastで再読込ループが起きないことを確認する。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 
 const { getSpots, getCategories, getFavorites, getVisits } = vi.hoisted(() => ({
   getSpots: vi.fn(),
@@ -21,7 +21,8 @@ vi.mock('../services/spotApi', () => ({
 import SpotList from './SpotList';
 import { ToastProvider } from './common/Toast';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// [Gate G3] DEP-04 待つ間の画面の更新を act の中で行う
+const sleep = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 
 describe('SpotList (Gate M9-FE-B3)', () => {
   beforeEach(() => {

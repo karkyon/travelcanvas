@@ -40,7 +40,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.auth import auth_manager, get_current_session_id, get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
@@ -482,7 +482,8 @@ async def upload_document(
     )
 
     try:
-        d.original_filename_ciphertext = encrypt_payload((file.filename or "unknown").encode("utf-8"))
+        d.original_filename_ciphertext = encrypt_payload((file.filename or "unknown").encode("utf-8"),
+                                                         plan_subject(plan.id))
     except EncryptionNotConfigured:
         backend.delete(storage_key)
         raise HTTPException(
@@ -687,7 +688,7 @@ def update_document(
         raw = data.pop("original_filename")
         if raw:
             try:
-                d.original_filename_ciphertext = encrypt_payload(raw.encode("utf-8"))
+                d.original_filename_ciphertext = encrypt_payload(raw.encode("utf-8"), plan_subject(plan.id))
             except EncryptionNotConfigured:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

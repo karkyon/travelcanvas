@@ -33,8 +33,11 @@ for _name, _value in (
     ("DOCUMENT_DOWNLOAD_SIGNING_KEY", "test-only-download-signing-key-for-pytest-0123456789"),
 ):
     os.environ.setdefault(_name, _value)
-if "DOCUMENT_STORAGE_DIR" not in os.environ and not os.access("/app/uploads", os.W_OK):
-    os.environ["DOCUMENT_STORAGE_DIR"] = os.path.join(_tempfile.mkdtemp(prefix="tc-pytest-"), "documents")
+# [Gate G3] 試験の保存ファイルは、いつも一時の場所へ書く(以前は backend コンテナの中で /app/uploads、つまり本番の
+# 保存の場所(travelcanvas_uploads)へ書いていた。G3 からは試験DBのデータ鍵で暗号化されるため、本番の鍵の点検で
+# 「読めない保存ファイル」になる)。別の場所を使う時だけ TC_TEST_DOCUMENT_STORAGE_DIR で指定する
+os.environ["DOCUMENT_STORAGE_DIR"] = os.environ.get("TC_TEST_DOCUMENT_STORAGE_DIR") or os.path.join(
+    _tempfile.mkdtemp(prefix="tc-pytest-"), "documents")
 
 # 本番/開発DBを誤って対象にしないための安全確認
 _db_url = os.environ.get("DATABASE_URL", "")
@@ -91,6 +94,29 @@ def _metrics_token_from_env_is_ignored(monkeypatch):
     METRICS_TOKEN の試験は、それぞれ自分で設定する(monkeypatch はこの後に効く)。"""
     from app.core.config import settings as _settings
     monkeypatch.setattr(_settings, "METRICS_TOKEN", None, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _data_keys_per_test():
+    """[Gate G3] SEC-F5 データ鍵は要求の取り消しとは別に確定する(app/services/data_keys.py)。試験の間で鍵の行・記憶を残さない
+    (試験ごとに ENCRYPTION_KEY が違うことがあり、前の試験の鍵が後の試験の点検で「読めない」に数えられるため)。"""
+    from sqlalchemy import text as _text
+    from app.services import data_keys as _dk
+
+    _dk.reset_cache()
+    try:
+        with engine.connect() as conn:
+            started = conn.execute(_text("SELECT clock_timestamp()")).scalar()
+    except Exception:  # noqa: BLE001 - DB の無い試験
+        started = None
+    yield
+    _dk.reset_cache()
+    if started is not None:
+        try:
+            with engine.begin() as conn:
+                conn.execute(_text("DELETE FROM data_keys WHERE created_at >= :t"), {"t": started})
+        except Exception:  # noqa: BLE001 - 表の無い DB(migration の試験の途中)
+            pass
 
 
 @pytest.fixture()

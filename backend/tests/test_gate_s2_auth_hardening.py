@@ -233,6 +233,9 @@ GOOD = {
     # [Gate G1] 本番ではオフラインパックの鍵を ENCRYPTION_KEY から分ける。前の鍵・計算の確認の鍵は環境変数に左右されないよう明示する
     "OFFLINE_PACK_KEY_SECRET": "Op6Wr1Nk8Tz3Qv5Bx2Jm9Lh4Cs7Gd0Fa-e",
     "ENCRYPTION_KEYS_PREVIOUS": "",
+    # [Gate G3] SEC-F6 TOTP の秘密を包む鍵(データの暗号化の鍵とは別)
+    "MFA_KEY": "Mf2Qz7Lp4Wv9Tk1Nx6Hr3Bc8Js5Gd0Ya-f",
+    "MFA_KEYS_PREVIOUS": "",
     "CHALLENGE_SECRET_KEY": "",
     "DEBUG": False,
     "CORS_ORIGINS": "https://app.travelcanvas.jp",
@@ -262,6 +265,9 @@ def test_production_settings_pass_when_safe():
     ({"ENCRYPTION_KEYS_PREVIOUS": "short"}, "ENCRYPTION_KEYS_PREVIOUS"),
     ({"METRICS_TOKEN": GOOD["JWT_SECRET_KEY"]}, "同じ値"),
     ({"ENCRYPTION_KEYS_PREVIOUS": GOOD["LOOKUP_INDEX_KEY"]}, "同じ値"),
+    ({"MFA_KEY": None}, "MFA_KEY"),
+    ({"MFA_KEY": "short"}, "MFA_KEY"),
+    ({"MFA_KEY": GOOD["ENCRYPTION_KEY"]}, "同じ値"),
     ({"CORS_ORIGINS": "http://localhost:4173"}, "CORS_ORIGINS"),
     ({"CORS_ORIGINS": "*"}, "CORS_ORIGINS"),
 ])

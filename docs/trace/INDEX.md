@@ -22,6 +22,7 @@
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
 | [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 4 | 1 | 2 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
+| [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |

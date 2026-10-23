@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
@@ -259,9 +259,11 @@ def _names(db: Session, ids) -> Dict[uuid.UUID, str]:
 
 # ===== 個人の持ち物の暗号化 =====
 
-def _encrypt_personal(name: str, note: Optional[str]) -> bytes:
+def _encrypt_personal(name: str, note: Optional[str], plan_id) -> bytes:
     try:
-        return encrypt_payload(json.dumps({"name": name, "note": note}, ensure_ascii=False).encode("utf-8"))
+        # [Gate G3] SEC-F5 旅行のデータ鍵
+        return encrypt_payload(json.dumps({"name": name, "note": note}, ensure_ascii=False).encode("utf-8"),
+                               plan_subject(plan_id))
     except EncryptionNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -421,7 +423,7 @@ def create_packing_item(
         suggestion_key=key,
     )
     if payload.scope == "personal":
-        item.payload_ciphertext = _encrypt_personal(payload.name, note)
+        item.payload_ciphertext = _encrypt_personal(payload.name, note, plan.id)
     else:
         item.name = payload.name
         item.note = note
@@ -472,7 +474,7 @@ def update_packing_item(
             if not name:
                 raise HTTPException(status_code=422, detail="nameを入力してください")
             note = _strip_or_none(data["note"]) if "note" in data else current.get("note")
-            item.payload_ciphertext = _encrypt_personal(name, note)
+            item.payload_ciphertext = _encrypt_personal(name, note, plan.id)
     else:
         if "name" in data:
             name = data["name"].strip()

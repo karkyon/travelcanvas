@@ -63,10 +63,13 @@ describe('planStore オフライン編集 (Gate P11)', () => {
   });
 
   it('サーバーが答えた失敗(409など)は溜めずに元へ戻す', async () => {
+    // [Gate G3] DEP-04 失敗の経路は store が console.error へ記録する(想定した出力として捕まえる)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     m.updateEvent.mockRejectedValue({ response: { status: 403 } });
     await usePlanStore.getState().updateScheduleItem('e1', { title: '金閣寺' });
     expect(loadQueue('p1')).toEqual([]);
     expect(usePlanStore.getState().currentPlan!.days[0]!.events[0]!.title).toBe('清水寺');
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it('溜めた操作を送り、結果に応じて外し、競合の件数を覚えてプランを読み直す', async () => {

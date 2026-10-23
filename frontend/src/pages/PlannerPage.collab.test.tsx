@@ -4,7 +4,7 @@
  * また、編集画面の「場所」「メモ」が保存の通信に載る(以前は黙って捨てていた)。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ScheduleItem } from '@/types';
 
@@ -67,6 +67,8 @@ function setup() {
 
 describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
   afterEach(() => {
+    // [Gate G3] DEP-04 差し替えを戻す前に閉じる(閉じる時の知らせが本物の通信にならない)
+    cleanup();
     vi.restoreAllMocks();
   });
 

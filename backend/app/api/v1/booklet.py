@@ -29,7 +29,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import decrypt_payload, encrypt_payload
+from app.core.crypto import decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import BookletExport, TravelPlan, User
@@ -261,7 +261,8 @@ def create_export(plan_id: str, payload: ExportCreate, request: Request, respons
         sections=booklet.normalize_sections(opts.sections), includes=dict(opts.includes),
         contains_sensitive=opts.contains_sensitive, watermark_text=watermark, valid_until=valid_until,
         input_revision=plan.revision, policy_version=booklet.POLICY_VERSION,
-        snapshot_ciphertext=encrypt_payload(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")),
+        snapshot_ciphertext=encrypt_payload(json.dumps(snapshot, ensure_ascii=False).encode("utf-8"),
+                                            plan_subject(plan.id)),
         status="active",
     )
     db.add(e)

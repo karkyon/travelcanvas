@@ -10,6 +10,8 @@
 |---|---|---|---|---|
 | `ENCRYPTION_KEY` | データの暗号化(全ての `*_ciphertext` 列と保存ファイル。予約番号・チケット・秘匿制約・位置・文書・TOTP の秘密・Webhook の鍵) | 版の切り替え(§2) | 掛け直しが終わる前に前の鍵を外すと、その暗号文が読めない | ○ |
 | `ENCRYPTION_KEYS_PREVIOUS` | 前の暗号化の鍵(復号だけ。カンマ区切り)。切り替えの途中だけ置く | 掛け直しが終わったら外す(失効) | 外した鍵の暗号文は読めない | — |
+| `MFA_KEY` | [Gate G3] SEC-F6 多要素認証(TOTP)の秘密を包む鍵(データの暗号化の鍵とは別。未設定なら `ENCRYPTION_KEY`) | 版の切り替え(§2 と同じ手順。前の値は `MFA_KEYS_PREVIOUS`) | 掛け直しが終わる前に前の鍵を外すと、その人は確認コードでログインできない(回復コード・§3.1 の解除) | ○ |
+| `MFA_KEYS_PREVIOUS` | 前の TOTP の鍵(復号だけ。カンマ区切り) | 掛け直しが終わったら外す | 外した鍵の暗号文は読めない | — |
 | `LOOKUP_INDEX_KEY` | 暗号化した値の検索の索引(HMAC の盲索引。予約番号・同行者名) | 替えたら索引を作り直す(`python -m app.ops.backfill_lookup_index --all`) | 作り直すまで検索で見つからない | ○ |
 | `DOCUMENT_DOWNLOAD_SIGNING_KEY` | 文書の期限付きダウンロード URL の署名 | いつでも | 発行済みの URL(既定2分)が無効 | ○ |
 | `JWT_SECRET_KEY` | ログインのトークンの署名 | 侵害が疑われる時(Runbook §8) | 全員が再ログイン | ○ |
@@ -57,3 +59,30 @@
 - 鍵管理サービス(Cloud KMS / Secret Manager)への移行(SEC-F3)。今は `.env` にある。
 - 利用者・旅行ごとのデータ鍵と、鍵の破棄による削除(cryptographic erasure、SEC-F5)。
 - DB の権限の分離(SEC-F4)。
+
+
+## 3. データ鍵(DEK)と鍵の破棄による削除(Gate G3・SEC-F5)
+
+- 旅行の中身(予約番号・名義・電話・チケット・秘匿制約・持ち物・予算・しおり・文書の名前と中身・取り込みの候補・旅の記録の
+  ファイル)は**旅行ごとのデータ鍵**、秘匿プロフィール・位置の軌跡は**利用者ごとのデータ鍵**で暗号化する
+  (暗号文は `tc2:dek:<鍵のID>:…`)。データ鍵は `ENCRYPTION_KEY` で包んで `data_keys` に持つ。
+- `ENCRYPTION_KEY` を切り替えた時の掛け直し(§2)は、`data_keys` の行(包んだ鍵)を包み直す。データの暗号文は触らない。
+- 旅行の完全削除・アカウントの削除で、その対象のデータ鍵を**破棄**する(包んだ鍵を消し、破棄した日時と理由だけを残す)。
+- バックアップの DB(pg_dump)には `data_keys` の行を入れず、鍵の写し `<ID>.keys.jsonl` を別に置く。破棄した鍵は
+  `tcops.py keys purge-escrow`(毎日 03:45、バックアップの直後にも実行)が**全ての世代の写しから消す**。
+  そのため、古いバックアップを復元しても、破棄した鍵の暗号文は読めない(点検では `erased` に数える。失敗ではない)。
+- 外部へ写したバックアップ(別の機械・別のリージョン)を持つ時は、`keys purge-escrow` の後に鍵の写しも写し直す。
+- このGateより前の暗号文(ENCRYPTION_KEY だけのもの)は `tcops.py keys convert --to envelope` でデータ鍵へ移す
+  (パッチが実行する)。前のコードへ戻す時は先に `--to legacy` で戻す(パッチの戻しが行う)。
+
+### 3.1 多要素認証の解除(二者の確認、SEC-F6)
+
+端末と回復コードを両方なくした人の多要素認証の解除は、管理者 A の申請と、別の管理者 B の承認で行う。対象の本人は申請も承認もできない。
+
+```
+python3 scripts/ops/tcops.py security mfa-reset-request --email user@example.com --requested-by a@example.com --reason "端末の紛失(電話で本人確認)"
+python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approved-by b@example.com --yes
+```
+
+申請は24時間で期限切れ。承認すると対象の全端末をログアウトし、本人へ知らせ、監査に申請者・承認者・理由を残す。
+管理者が1人しかいない環境に限り、申請した人が承認できる(監査に `single_operator` と残る)。

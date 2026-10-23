@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
-from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload
+from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import PlanConstraint, TravelDay, TravelEvent, TravelPlan, User
@@ -339,9 +339,10 @@ def _scope_label(db: Session, c: PlanConstraint):
 
 # ===== 暗号化 =====
 
-def _encrypt_json(data: Dict[str, Any], label: str) -> bytes:
+def _encrypt_json(data: Dict[str, Any], label: str, plan_id) -> bytes:
     try:
-        return encrypt_payload(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        # [Gate G3] SEC-F5 旅行のデータ鍵で暗号化する(旅行の完全削除で鍵を破棄する)
+        return encrypt_payload(json.dumps(data, ensure_ascii=False).encode("utf-8"), plan_subject(plan_id))
     except EncryptionNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -349,11 +350,11 @@ def _encrypt_json(data: Dict[str, Any], label: str) -> bytes:
         )
 
 
-def _encrypt_reason(reason: Optional[str]) -> Optional[bytes]:
+def _encrypt_reason(reason: Optional[str], plan_id) -> Optional[bytes]:
     if reason is None or not reason.strip():
         return None
     try:
-        return encrypt_payload(reason.strip().encode("utf-8"))
+        return encrypt_payload(reason.strip().encode("utf-8"), plan_subject(plan_id))
     except EncryptionNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -373,7 +374,7 @@ def _decrypt_reason(c: PlanConstraint) -> Optional[str]:
 def _store_payload(c: PlanConstraint, privacy_level: str, title: str, value: Dict[str, Any]) -> None:
     c.privacy_level = privacy_level
     if privacy_level == "private":
-        c.value_ciphertext = _encrypt_json({"title": title, "value": value}, "秘匿制約")
+        c.value_ciphertext = _encrypt_json({"title": title, "value": value}, "秘匿制約", c.plan_id)
         c.title = None
         c.value_json = None
     else:
@@ -586,7 +587,7 @@ def create_constraint(
         is_active=payload.is_active,
         active_from=payload.active_from,
         active_to=payload.active_to,
-        reason_ciphertext=_encrypt_reason(payload.reason),
+        reason_ciphertext=_encrypt_reason(payload.reason, plan.id),
     )
     _store_payload(c, payload.privacy_level, payload.title, value)
     db.add(c)
@@ -659,7 +660,7 @@ def update_constraint(
     c.active_from = active_from
     c.active_to = active_to
     if "reason" in data:
-        c.reason_ciphertext = _encrypt_reason(data["reason"])
+        c.reason_ciphertext = _encrypt_reason(data["reason"], plan.id)
     _store_payload(c, new_privacy, title, value)
     c.revision += 1
     db.commit()

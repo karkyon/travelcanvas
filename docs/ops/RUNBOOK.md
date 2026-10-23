@@ -285,6 +285,7 @@ docker compose logs --since 1h backend | grep "CSP violation"
 |---|---|
 | `<id>.db.dump` | 運用中の DB の `pg_dump -Fc`(postgres コンテナの中で実行。パスワードを使わない) |
 | `<id>.uploads.tar.gz` | 保存ファイル(文書・写真・音声。backend の `/app/uploads`) |
+| `<id>.keys.jsonl` | [Gate G3] データ鍵の写し(`data_keys` の行。ENCRYPTION_KEY で包んだまま)。DB のダンプには入れない。破棄した鍵は中身を消した記録だけ(`keys purge-escrow`、KEY-INVENTORY §3) |
 | `<id>.manifest.json` | 目録: 各ファイルのサイズと SHA-256、表ごとの件数(取得の直前・直後)、保存ファイルの一覧とハッシュ、alembic の版、commit、鍵の指紋(鍵の値は含まない) |
 
 目録は最後に書く。目録の無いバックアップ(途中で止まったもの)は一覧に出ず、使われない。作成直後に目録とファイルを照合し、合わなければ失敗として消す。
@@ -432,7 +433,9 @@ python3 scripts/ops/tcops.py security revoke-sessions --all --yes --reason "鍵�
 
 ```bash
 python3 scripts/ops/tcops.py security mfa-status --email admin@example.com
-python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes --reason "端末の紛失(本人確認済み)"
+# [Gate G3] 申請(管理者 A)と承認(別の管理者 B)。対象の本人は申請も承認もできない(KEY-INVENTORY §3.1)
+python3 scripts/ops/tcops.py security mfa-reset-request --email admin@example.com --requested-by a@example.com --reason "端末の紛失(本人確認済み)"
+python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approved-by b@example.com --yes
 ```
 
 - 監視・監査: 監査ログの `mfa_failed`(確認コードの誤り)・`mfa_recovery_code_used`・`mfa_disabled`・`mfa_reset_by_operator`・
@@ -495,6 +498,20 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 - 同行者向けの項目の規則は旅行の所有者が共有の画面で決める(運用者の操作は無い)。問い合わせ「予約が見えない」の時は、
   所有者の設定(役割の既定・1人ずつの設定)を確かめてもらう。
 
+## 8.9 画面の配信・データ鍵・エラーの問い合わせ番号・性能(Gate G3)
+
+- **画面の配信**: frontend のコンテナは `node server/static-server.mjs`(Node の標準の部品だけの配信。`vite preview` ではない)。
+  応答ヘッダー(CSP 等)・受け付ける名前(`TC_PUBLIC_HOSTS`)・API の向き先は以前と同じ。`/assets/` は1年のキャッシュ、
+  `index.html` は no-cache、文字のファイルは gzip。許していない名前で開くと 403(`Blocked request`)。
+- **データ鍵**(KEY-INVENTORY §3): 旅行・利用者ごとの鍵。旅行の完全削除・アカウントの削除で破棄し、毎日 03:45 の
+  `tcops.py keys purge-escrow` が全ての世代のバックアップの鍵の写しから消す。復元の演習で `erased`(消した値)が数えられるのは正常。
+  コードを前の版へ戻す時は、先に `python3 scripts/ops/tcops.py keys convert --to legacy`(戻す前のコードで)。
+- **多要素認証の解除**は申請と承認の二者(KEY-INVENTORY §3.1、§8.3)。
+- **エラーの問い合わせ番号**: 画面の「問い合わせ番号: xxxxxxxx」は応答の `request_id`(`X-Request-ID`)の先頭8文字。
+  `docker compose logs backend | grep <番号>` でサーバーのログを探す。エラーの一覧は `docs/spec/error-catalog.md`。
+- **性能**: GitHub の `perf` の workflow が毎晩、予定 10,000 件・通知 100,000 件で主な API の p95・SQL の数(N+1)・索引の使用を
+  確かめる(`backend/tests/test_gate_g3_perf.py`、結果は Actions の成果物 `perf-*`)。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
@@ -527,4 +544,5 @@ python3 scripts/ops/tcops.py security mfa-reset --email admin@example.com --yes 
 | 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
 | 2026-10-19 | 9 | Gate S11: 多要素認証(§8.3)、CI と main の保護・パッチの流れ(§9)。改訂履歴は §10 へ |
 | 2026-10-21 | 11 | Gate G2: DB の権限の分離(§8.6)、Webhook の自動の再送の定期実行(§2.1)、サポート閲覧と運用の要約(§8.7)、即時の通知と同行者向けの項目の規則(§8.8) |
+| 2026-10-22 | 12 | Gate G3: 画面の本番用の配信・データ鍵と鍵の破棄による削除・バックアップの鍵の写し(§4.1・§8.9)、TOTP の鍵と解除の二者の確認(§8.3)、エラーの問い合わせ番号・性能の検査(§8.9)。定期実行を登録済みなら `schedule install` をもう一度実行すると `keys purge-escrow` が足される |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

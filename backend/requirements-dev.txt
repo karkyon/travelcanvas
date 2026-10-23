@@ -16,8 +16,11 @@ markdown-it-py==4.2.0
 mccabe==0.7.0
 mdurl==0.1.2
 msgpack==1.2.3
+mypy==1.18.2
+mypy-extensions==1.1.0
 packageurl-python==0.17.6
 packaging==26.3
+pathspec==1.1.1
 pip==26.2.1
 pip-api==0.0.35
 pip-audit==2.10.1

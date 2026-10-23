@@ -56,7 +56,7 @@ export async function registerAccount(
     const text = res.ok() ? '' : await res.text().catch(() => '');
     if (res.status() === 429 && text.includes('登録試行回数') && attempt < 2) {
       test.info().setTimeout(test.info().timeout + RATE_WINDOW_MS + 15_000);
-      await page.waitForTimeout(RATE_WINDOW_MS);
+      await page.waitForTimeout(RATE_WINDOW_MS); // allow-fixed-wait: サーバーの回数制限の時間窓が過ぎるのを待つ(画面から観測できない)
       continue;
     }
     if (!res.ok()) throw new Error(`会員登録に失敗しました: ${res.status()} ${text}`);

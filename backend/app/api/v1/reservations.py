@@ -32,6 +32,7 @@ from app.core.crypto import (
     compute_suffix_lookup_hash,
     decrypt_payload,
     encrypt_payload,
+    plan_subject,
 )
 from app.core.database import get_db
 from app.services import member_policy  # [Gate G2] FR-045 同行者向けの項目の規則
@@ -195,12 +196,13 @@ def _decrypt_or_none(ciphertext: Optional[bytes]) -> Optional[str]:
         return None
 
 
-def _encrypt_or_raise(raw: Optional[str], field_label: str) -> Optional[bytes]:
-    """[Gate R3-8] 暗号化ヘルパー。rawがNone/空文字ならNoneを返す(暗号化しない)。"""
+def _encrypt_or_raise(raw: Optional[str], field_label: str, plan_id) -> Optional[bytes]:
+    """[Gate R3-8] 暗号化ヘルパー。rawがNone/空文字ならNoneを返す(暗号化しない)。
+    [Gate G3] SEC-F5 旅行のデータ鍵で暗号化する。"""
     if not raw:
         return None
     try:
-        return encrypt_payload(raw.encode("utf-8"))
+        return encrypt_payload(raw.encode("utf-8"), plan_subject(plan_id))
     except EncryptionNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -380,12 +382,13 @@ def create_reservation(
     )
     # [Gate R3-8] holder_name/contact_phoneは暗号化列のみへ書き込む
     # (旧平文列は後方互換のためモデルに残すが、新規行では常にNULLのまま)。
-    r.holder_name_ciphertext = _encrypt_or_raise(payload.holder_name, "名義")
-    r.contact_phone_ciphertext = _encrypt_or_raise(payload.contact_phone, "連絡先電話番号")
+    r.holder_name_ciphertext = _encrypt_or_raise(payload.holder_name, "名義", plan.id)
+    r.contact_phone_ciphertext = _encrypt_or_raise(payload.contact_phone, "連絡先電話番号", plan.id)
 
     if payload.confirmation_number:
         try:
-            r.confirmation_number_ciphertext = encrypt_payload(payload.confirmation_number.encode("utf-8"))
+            r.confirmation_number_ciphertext = encrypt_payload(payload.confirmation_number.encode("utf-8"),
+                                                               plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -399,7 +402,7 @@ def create_reservation(
 
     if payload.pin:
         try:
-            r.pin_ciphertext = encrypt_payload(payload.pin.encode("utf-8"))
+            r.pin_ciphertext = encrypt_payload(payload.pin.encode("utf-8"), plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -552,7 +555,7 @@ def update_reservation(
         raw = data.pop("confirmation_number")
         if raw:
             try:
-                r.confirmation_number_ciphertext = encrypt_payload(raw.encode("utf-8"))
+                r.confirmation_number_ciphertext = encrypt_payload(raw.encode("utf-8"), plan_subject(plan.id))
             except EncryptionNotConfigured:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -571,7 +574,7 @@ def update_reservation(
         raw = data.pop("pin")
         if raw:
             try:
-                r.pin_ciphertext = encrypt_payload(raw.encode("utf-8"))
+                r.pin_ciphertext = encrypt_payload(raw.encode("utf-8"), plan_subject(plan.id))
             except EncryptionNotConfigured:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -582,11 +585,11 @@ def update_reservation(
 
     if "holder_name" in data:
         raw = data.pop("holder_name")
-        r.holder_name_ciphertext = _encrypt_or_raise(raw, "名義")
+        r.holder_name_ciphertext = _encrypt_or_raise(raw, "名義", plan.id)
 
     if "contact_phone" in data:
         raw = data.pop("contact_phone")
-        r.contact_phone_ciphertext = _encrypt_or_raise(raw, "連絡先電話番号")
+        r.contact_phone_ciphertext = _encrypt_or_raise(raw, "連絡先電話番号", plan.id)
 
     for field, value in data.items():
         setattr(r, field, value)
@@ -767,9 +770,9 @@ def create_participant(
     )
     # [Gate R3-8] name/seat/special_requestは暗号化列のみへ書き込む
     # (旧平文列は後方互換のためモデルに残すが、新規行では常にNULLのまま)。
-    p.name_ciphertext = _encrypt_or_raise(payload.name, "参加者氏名")
-    p.seat_ciphertext = _encrypt_or_raise(payload.seat, "座席")
-    p.special_request_ciphertext = _encrypt_or_raise(payload.special_request, "特別リクエスト")
+    p.name_ciphertext = _encrypt_or_raise(payload.name, "参加者氏名", plan.id)
+    p.seat_ciphertext = _encrypt_or_raise(payload.seat, "座席", plan.id)
+    p.special_request_ciphertext = _encrypt_or_raise(payload.special_request, "特別リクエスト", plan.id)
     p.name_lookup_hash = _compute_participant_name_lookup_hash_or_none(payload.name)
     db.add(p)
     db.commit()
@@ -869,16 +872,16 @@ def update_participant(
 
     if "name" in data:
         raw = data.pop("name")
-        p.name_ciphertext = _encrypt_or_raise(raw, "参加者氏名")
+        p.name_ciphertext = _encrypt_or_raise(raw, "参加者氏名", plan.id)
         p.name_lookup_hash = _compute_participant_name_lookup_hash_or_none(raw)
 
     if "seat" in data:
         raw = data.pop("seat")
-        p.seat_ciphertext = _encrypt_or_raise(raw, "座席")
+        p.seat_ciphertext = _encrypt_or_raise(raw, "座席", plan.id)
 
     if "special_request" in data:
         raw = data.pop("special_request")
-        p.special_request_ciphertext = _encrypt_or_raise(raw, "特別リクエスト")
+        p.special_request_ciphertext = _encrypt_or_raise(raw, "特別リクエスト", plan.id)
 
     for field, value in data.items():
         setattr(p, field, value)
@@ -1258,7 +1261,7 @@ def create_ticket(
 
     if payload.payload:
         try:
-            t.payload_ciphertext = encrypt_payload(payload.payload.encode("utf-8"))
+            t.payload_ciphertext = encrypt_payload(payload.payload.encode("utf-8"), plan_subject(plan.id))
         except EncryptionNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -1343,7 +1346,7 @@ def update_ticket(
         raw = data.pop("payload")
         if raw:
             try:
-                t.payload_ciphertext = encrypt_payload(raw.encode("utf-8"))
+                t.payload_ciphertext = encrypt_payload(raw.encode("utf-8"), plan_subject(plan.id))
             except EncryptionNotConfigured:
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

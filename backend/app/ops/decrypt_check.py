@@ -36,13 +36,15 @@ def _quote(name: str) -> str:
 
 
 def check(database: Optional[str], sample: int = 5) -> Dict[str, object]:
-    from app.core.crypto import decrypt_payload  # 鍵(設定)を読むので、ここで import する
+    from app.core.crypto import decrypt_payload, parse_envelope  # 鍵(設定)を読むので、ここで import する
+    from app.services import data_keys
+    from app.services.data_keys import DataKeyDestroyed
 
     if sample < 1 or sample > 100:
         raise SystemExit("--sample は1〜100にしてください")
     engine = engine_for(database)
     columns: List[Dict[str, object]] = []
-    decrypted = failed = 0
+    decrypted = failed = erased = 0
     try:
         with engine.connect() as conn:
             for col in encrypted_columns(conn):
@@ -51,14 +53,29 @@ def check(database: Optional[str], sample: int = 5) -> Dict[str, object]:
                     _quote(col["table"]),
                     _quote(col["column"]),
                 )
-                ok = ng = 0
+                ok = ng = gone = 0
                 for (value,) in conn.execute(text(sql), {"n": sample}):
                     try:
-                        decrypt_payload(bytes(value))
+                        if col["table"] == "data_keys":
+                            # [Gate G3] データ鍵そのもの(ENCRYPTION_KEY で包んだ鍵)
+                            from app.core.crypto import _get_fernet
+
+                            _get_fernet().decrypt(bytes(value))
+                        else:
+                            decrypt_payload(bytes(value))
                         ok += 1
+                    except DataKeyDestroyed:
+                        # [Gate G3] SEC-F5 破棄したデータ鍵の暗号文は「消した」(erased)。鍵の記録が無い物は失敗
+                        env = parse_envelope(bytes(value))
+                        if env and data_keys.key_state(env[1]) == "destroyed":
+                            gone += 1
+                        else:
+                            ng += 1
                     except Exception:
                         ng += 1
-                columns.append({"table": col["table"], "column": col["column"], "decrypted": ok, "failed": ng})
+                columns.append({"table": col["table"], "column": col["column"], "decrypted": ok, "failed": ng,
+                                "erased": gone})
+                erased += gone
                 decrypted += ok
                 failed += ng
     finally:
@@ -69,6 +86,7 @@ def check(database: Optional[str], sample: int = 5) -> Dict[str, object]:
         "columns_with_data": sum(1 for c in columns if c["decrypted"] or c["failed"]),
         "decrypted": decrypted,
         "failed": failed,
+        "erased": erased,
         "failed_columns": ["%s.%s" % (c["table"], c["column"]) for c in columns if c["failed"]],
     }
 
