@@ -9,6 +9,7 @@
  *   Webhook(https だけ。署名の鍵は作った時だけ表示)・接続の確かめ・送信の記録と送り直し
  * - [Gate G2] FR-042 秘密・署名の鍵の切り替え(新しい値は1回だけ表示。前の値は猶予の間だけ通る/署名に使う)・
  *   前の値の即時の失効・送り直しの上限に達した送信(dead)の手の送り直し・受け手が 410 を返して止まった Webhook の表示
+ * - [Gate G5] ORG-01 ロゴ(メンバー全員に表示)・席の上限・独自のドメインの確認、BILL-02 組織の使用量(OrgBrandingPanel)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -21,6 +22,18 @@ import type {
 import type { TravelPlan } from '@/types';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { fmtDateTime, isOrgAdmin, myAckLabel, ROLE_LABEL } from '@/utils/organizations';
+import OrgBrandingPanel from './organization/OrgBrandingPanel';
+import OrgLogo from './organization/OrgLogo';
+
+/** [Gate G5] 組織の応答の ORG-01 の項目(古い応答に無くても動く) */
+function branding(org: Organization): { hasLogo: boolean; logoVersion: string | null; seatLimit: number | null } {
+  const o = org as unknown as { has_logo?: unknown; logo_version?: unknown; seat_limit?: unknown };
+  return {
+    hasLogo: o.has_logo === true,
+    logoVersion: typeof o.logo_version === 'string' ? o.logo_version : null,
+    seatLimit: typeof o.seat_limit === 'number' ? o.seat_limit : null,
+  };
+}
 
 const sectionClass = 'bg-white rounded-xl shadow-xs p-6 mb-6';
 const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg';
@@ -112,7 +125,10 @@ const OrganizationPage: React.FC = () => {
       <div className="h-2" style={{ backgroundColor: org.brand_color ?? '#9ca3af' }} aria-hidden="true" />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Link to="/organizations" className="text-blue-800 hover:underline">← 組織の一覧</Link>
-        <h1 className="text-3xl font-bold text-gray-900 mt-2">{org.name}</h1>
+        <div className="flex items-center gap-3 mt-2">
+          {branding(org).hasLogo && <OrgLogo orgId={orgId} version={branding(org).logoVersion} />}
+          <h1 className="text-3xl font-bold text-gray-900">{org.name}</h1>
+        </div>
         <p className="text-gray-700 mb-6">{ROLE_LABEL[org.role]}・メンバー {org.member_count}人</p>
         {error && <p role="alert" className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 border border-red-200">{error}</p>}
         {notice && <p role="status" className="mb-4 p-3 rounded-lg bg-green-50 text-green-900 border border-green-200">{notice}</p>}
@@ -149,6 +165,9 @@ const OrganizationPage: React.FC = () => {
 
         {admin && (
           <>
+            <OrgBrandingPanel orgId={orgId} isOwner={org.role === 'owner'} hasLogo={branding(org).hasLogo}
+              logoVersion={branding(org).logoVersion} seatLimit={branding(org).seatLimit} memberCount={org.member_count}
+              onChanged={load} />
             <section className={sectionClass} aria-labelledby="publish-heading">
               <h2 id="publish-heading" className="text-lg font-semibold text-gray-900 mb-2">旅程を配布する</h2>
               <p className="text-sm text-gray-700 mb-3">

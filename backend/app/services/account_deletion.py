@@ -237,6 +237,11 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     db.query(NotificationPreference).filter(NotificationPreference.user_id == me).delete(synchronize_session=False)
     summary["email_outbox"] = db.query(EmailOutbox).filter(EmailOutbox.user_id == me).delete(
         synchronize_session=False)
+    # [Gate G5] BILL-02 本人の使用量の記録
+    from app.models.models import UsageCounter
+
+    db.query(UsageCounter).filter(UsageCounter.subject_type == "user", UsageCounter.subject_id == me).delete(
+        synchronize_session=False)
 
     user.username = deleted_name(me)
     user.email = None

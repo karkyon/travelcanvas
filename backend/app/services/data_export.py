@@ -103,6 +103,7 @@ PLAN_TABLES = (
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
     m.PlanCandidate, m.SupportGrant,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
+    m.FxRate, m.BudgetVersion,
 )
 
 
@@ -243,6 +244,9 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["abuse_reports"] = [{"id": str(x.id), "source": x.source, "reason": x.reason, "status": x.status,
                            "created_at": x.created_at.isoformat() if x.created_at else None}
                           for x in q(m.AbuseReport).all()]
+    # [Gate G5] FIN-01 為替の記録・予算の版(金額と出典。メンバー全員が見られる値)
+    t["fx_rates"] = [row(x) for x in q(m.FxRate).all()]
+    t["budget_versions"] = [row(x) for x in q(m.BudgetVersion).all()]
     return t
 
 

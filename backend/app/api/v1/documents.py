@@ -57,7 +57,7 @@ from app.models.models import (
     User,
 )
 from app.ops import metrics as ops_metrics
-from app.services import malware_scan, threat_guard
+from app.services import malware_scan, threat_guard, usage
 from app.services.audit_service import record_audit_event
 from app.services.storage_backend import (
     DownloadSigningNotConfigured,
@@ -427,6 +427,7 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=str(e))
 
     scan = _scan_or_reject(content, request, current_user, plan)
+    usage.charge(db, "user", plan.user_id, "upload_bytes", len(content))  # [Gate G5] BILL-02(旅行の所有者に数える)
 
     storage_key = generate_storage_key(plan.id, ext)
     backend = get_storage_backend()

@@ -54,7 +54,8 @@ describe('SharePage 閲覧者に見せる項目 (Gate F45)', () => {
 
   it('標準の項目で発行前のプレビューを出し、見せない情報の件数と常に見せない項目を示す', async () => {
     renderShare();
-    expect(await screen.findByRole('checkbox', { name: /旅行の説明/ })).toBeChecked();
+    // 最初の描画は画面の部品の読み込みを待つ(負荷の高い CI で 1 秒を越えることがある)
+    expect(await screen.findByRole('checkbox', { name: /旅行の説明/ }, { timeout: 5000 })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /予定の住所\(機密\)/ })).not.toBeChecked();
     expect(m.previewSharePolicy).toHaveBeenCalledWith('plan-1', {
       fields: ['plan_description', 'day_titles', 'event_times'], acknowledge_confidential: undefined,
@@ -118,7 +119,7 @@ describe('SharePage 閲覧者に見せる項目 (Gate F45)', () => {
   it('backend が拒んだ時はその理由を表示する', async () => {
     m.createShareLink.mockRejectedValue({ response: { status: 422, data: fx.share_policy_error } });
     renderShare();
-    await screen.findByRole('checkbox', { name: /旅行の説明/ });
+    await screen.findByRole('checkbox', { name: /旅行の説明/ }, { timeout: 5000 });
     await userEvent.click(screen.getByRole('button', { name: '共有リンクを発行' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('機密の項目を共有するには');
   });

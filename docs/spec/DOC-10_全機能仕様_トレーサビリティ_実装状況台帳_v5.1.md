@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r16** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-22  
+> 文書ID: DOC-10 / 版: **v5.1-r17** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-23  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,9 +14,9 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `f327971`(Gate G2。この後に Gate G3、この版を入れる Gate G4 の commit が順に続く。G3 の commit の値は適用した環境で決まるため、確定した最後の commit を基準にする) |
-| Alembic head | `b5d9f3a7c2e4`(単一の head。G3 `a4c8e2f6b1d3` の後、G4 で場所の例外の日・入口・コマンドの記録・合意の採用・通知の設定とメールの送信待ち・濫用の通報) |
-| 基準の試験の実測(サンドボックス、G4 の予行) | backend pytest 1,137 合格・7 飛ばし / frontend vitest 717 合格・標準エラー 0 行 / E2E 62 合格(本番用の配信 static-server.mjs で実行)/ mypy の誤り 1,401 件(基準を越えない)/ 最初に読む JS 448.51 kB(上限 450 kB) |
+| 基準commit | `f327971`(Gate G2。この後に Gate G3・G4、この版を入れる Gate G5 の commit が順に続く。G3・G4 の commit の値は適用した環境で決まるため、確定した最後の commit を基準にする) |
+| Alembic head | `c6e0a4b8d3f5`(単一の head。G4 `b5d9f3a7c2e4` の後、G5 で為替の記録・予算の版・支出の取消・端数の規則と締め・精算の冪等・使用量・組織のロゴ・ドメイン・席) |
+| 基準の試験の実測(サンドボックス、G5 の予行) | backend pytest 1,154 合格・7 飛ばし / frontend vitest 732 合格・標準エラー 0 行 / E2E 65 合格(本番用の配信 static-server.mjs で実行)/ mypy の誤り 1,393 件(基準を越えない)/ 最初に読む JS 448.58 kB(上限 450 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -63,13 +63,13 @@
 | 見方 | 値 |
 |---|---|
 | コードがある機能(IMPLEMENTED 以上) | 57/58 = 98% |
-| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 23) |
-| VERIFIED | 30/58 = 52% |
+| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 22) |
+| VERIFIED | 31/58 = 53% |
 | RELEASED | 0/58 = 0% |
-| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約79.1% |
+| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約79.5% |
 | 未着手(SPECIFIED 以下) | FR-058 |
 
-VERIFIED の一覧: 001/002/003/006/009/010/012/013/016/017/020/021/022/023/025/026/028/029/031/032/033/034/038/040/043/044/045/047/050/053。
+VERIFIED の一覧: 001/002/003/006/009/010/012/013/016/017/020/021/022/023/025/026/027/028/029/031/032/033/034/038/040/043/044/045/047/050/053。
 <!-- /generated:summary -->
 
 ## 3. 親機能のトレーサビリティ(全58 FR)
@@ -106,8 +106,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-024 | コメント・通知 | INTEGRATED(部分) | ✓ | P3・G4 | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
 | FR-025 | 持ち物 | VERIFIED | ✓ | P1 | 薬の時刻通知・天候連動 |
 | FR-026 | レディネス | VERIFIED | ✓ | P1 | 予算との連動 |
-| FR-027 | 予算・費用 | INTEGRATED(部分) | ✓ | P2 | 予算の版、為替の自動取得、他通貨の予約額の合計 |
-| FR-028 | 立替・精算 | VERIFIED | ✓ | P2 | 領収書を紐付ける画面 |
+| FR-027 | 予算・費用 | VERIFIED | ✓ | P2・G5 | 為替の自動取得(外部の提供元。決まるまで出典つきの手入力の記録)、本番での確認(RELEASE-1) |
+| FR-028 | 立替・精算 | VERIFIED | ✓ | P2・G5 | 本番での確認(RELEASE-1) |
 | FR-029 | 当日モード | VERIFIED | ✓ | L1・P10 | 外部状況の自動取得 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | ✓ | P10 | 外部provider(運行情報・天気・警報・休業) |
 | FR-031 | 安全な再計画 | VERIFIED | ✓ | P10 | 代替移動手段の探索、プッシュ通知 |
@@ -120,7 +120,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
 | FR-039 | 輸出・削除 | INTEGRATED(部分) | ✓ | P6・P9 | 猶予つきのアカウント削除、所有者の移譲、出典つきの訂正 |
 | FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2・G4 | 管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1) |
-| FR-041 | 組織・B2B | INTEGRATED(部分) | ✓ | B1 | ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち) |
+| FR-041 | 組織・B2B | INTEGRATED(部分) | ✓ | B1・G5 | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | ✓ | B1・G2 | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-043 | Quick Plan | VERIFIED | ✓ | #38・R2 | — |
 | FR-044 | Guest Travel View | VERIFIED | ✓ | #35・#41・E1・G4 | モバイルの実機での確認(UX-03)、本番での確認(RELEASE-1) |
@@ -137,7 +137,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-055 | Local-first Location | INTEGRATED(部分) | ✓ | L5 | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | ✓ | L5 | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | INTEGRATED(部分) | ✓ | P17 | 同行者属性・移動手段の傾向 |
-| FR-058 | Entitlement・料金 | SPECIFIED | ✗ | — | 価格・有料の範囲の製品判断待ち(決まるまで実装しない) |
+| FR-058 | Entitlement・料金 | SPECIFIED | ✗ | — | 価格・有料の範囲の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。料金・支払いは決まるまで実装しない) |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -221,7 +221,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r13 | 2026-10-20 | `16f1aa9` | 本書をリポジトリの正本にした(r12 の追補と r11 の本体を統合)。状態の機械が読む正本 `fr-status.json`、CI の照合(表・集計・ledger・migration head・基準 commit)。H1・G1 を反映。FR の状態の遷移なし |
 | r14 | 2026-10-21 | `4bb0240` | Gate G2: DB の権限の分離(SEC-F4)・依存のメジャー更新(DEP-1)。FR-020(即時の通知)・FR-040(サポート閲覧・運用の要約)・FR-045(同行者向けの項目の規則)を VERIFIED、FR-042(書き込みの API・鍵の切り替え・自動の再送)は INTEGRATED(部分)のまま(埋め込みが残る)。`docs/trace/gate-g2-trace.md` |
 | r15 | 2026-10-22 | `f327971` | Gate G3: 画面の移動先の検査(DEP-02)・本番用の配信(DEP-03)・試験の警告0(DEP-04)・鍵の破棄による削除(SEC-F5)・TOTP の鍵と解除の二者の確認(SEC-F6)・CI の証拠・型・flaky・性能(CI-02〜05)・エラーの説明(UX-04)。§6 の SEC-F4 を G2 で実装済みに直した。FR の状態の遷移なし。`docs/trace/gate-g3-trace.md` |
-| **r16** | 2026-10-22 | `f327971`+G3 | **Gate G4: 場所の例外の日・最終入場・ラストオーダー・入口・出典の違い(MAP-02)・検索のコマンド(MAP-03)・合意の決定の採用・締切・定足数・同点(COL-02)・対象ごとのコメント・通知の設定・メールのまとめと再送(COL-03)・ゲストの閲覧の確認・一時トークン・複製(COL-05)・濫用への対応(FC-097)。FR-022 を VERIFIED。FR-008・FR-024 は外部の提供元(地図・メール)が残るため(部分)のまま。`docs/trace/gate-g4-trace.md`** |
+| r16 | 2026-10-22 | `f327971`+G3 | Gate G4: 場所の例外の日・最終入場・ラストオーダー・入口・出典の違い(MAP-02)・検索のコマンド(MAP-03)・合意の決定の採用・締切・定足数・同点(COL-02)・対象ごとのコメント・通知の設定・メールのまとめと再送(COL-03)・ゲストの閲覧の確認・一時トークン・複製(COL-05)・濫用への対応(FC-097)。FR-022 を VERIFIED。FR-008・FR-024 は外部の提供元(地図・メール)が残るため(部分)のまま。`docs/trace/gate-g4-trace.md` |
+| **r17** | 2026-10-23 | `f327971`+G3+G4 | **Gate G5: 為替の記録(出典・基準日)・予算の版(当初・更新・確定・実績)・確定した予約額の換算と換算できない通貨の別表示(FIN-01)・支出の取消・端数の規則・精算の締め・領収書の選択・精算の冪等(FIN-02)・使用量の上限(soft/hard・管理者の上書き。BILL-02)・組織のロゴ・独自のドメインの確認・席の上限(ORG-01)。FR-027 を VERIFIED。FR-041 は料金(FR-058)が残るため(部分)のまま。`docs/trace/gate-g5-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

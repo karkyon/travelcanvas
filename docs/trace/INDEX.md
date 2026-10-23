@@ -24,6 +24,7 @@
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-g4-trace.md](gate-g4-trace.md) | Gate G4 トレース(機能: 外部の判断の要らない残り) | 1 | 1 | 0 |
+| [gate-g5-trace.md](gate-g5-trace.md) | Gate G5 トレース(機能: 費用・使用量・組織) | 2 | 1 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
@@ -82,13 +83,12 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間 |
 | FR-019 | What-if | INTEGRATED(部分) | 予約・移動・費用の分岐、移動時間・制約・費用差の比較 |
 | FR-024 | コメント・通知 | INTEGRATED(部分) | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
-| FR-027 | 予算・費用 | INTEGRATED(部分) | 予算の版、為替の自動取得、他通貨の予約額の合計 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | 外部provider(運行情報・天気・警報・休業) |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | サーバー側の PDF・ダウンロード URL |
 | FR-036 | Calendar/Map IO | INTEGRATED(部分) | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
 | FR-037 | 写真・旅行記 | INTEGRATED(部分) | 旅行記の公開URL、顔の検査、MEMORY MAP、記録の Undo |
 | FR-039 | 輸出・削除 | INTEGRATED(部分) | 猶予つきのアカウント削除、所有者の移譲、出典つきの訂正 |
-| FR-041 | 組織・B2B | INTEGRATED(部分) | ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち) |
+| FR-041 | 組織・B2B | INTEGRATED(部分) | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |
 | FR-048 | Offline Travel Pack(端末) | INTEGRATED(部分) | 予定以外のオフライン編集、通信しない端末の遠隔消去 |
@@ -99,7 +99,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | INTEGRATED(部分) | 同行者属性・移動手段の傾向 |
-| FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲の製品判断待ち(決まるまで実装しない) |
+| FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。料金・支払いは決まるまで実装しない) |
 
 ## 3. 棚卸しの規則
 

@@ -24,7 +24,7 @@ from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import RouteOption, RouteLeg, TravelSegment, User
-from app.services import plan_item_deletion
+from app.services import plan_item_deletion, usage
 from app.services.quickdraft_idempotency import (
     claim_or_get_cached,
     finalize_success,
@@ -372,6 +372,7 @@ def create_route_option(
 
     try:
         with db.begin_nested():
+            usage.charge(db, "user", plan.user_id, "route_requests")  # [Gate G5] BILL-02
             _validate_endpoint_shape(
                 payload.from_event_id, payload.from_place_id, payload.to_event_id, payload.to_place_id
             )

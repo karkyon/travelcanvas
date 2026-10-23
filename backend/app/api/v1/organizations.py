@@ -8,17 +8,18 @@
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Request, Response, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_active_user
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    Organization, OrganizationMember, OrgApiClient, OrgDistribution, OrgDistributionAck, OrgWebhook,
-    OrgWebhookDelivery, User,
+    Organization, OrganizationDomain, OrganizationMember, OrganizationSeatEvent, OrgApiClient, OrgDistribution,
+    OrgDistributionAck, OrgWebhook, OrgWebhookDelivery, User,
 )
-from app.services import org_api, organizations as orgs
+from app.services import malware_scan, org_api, org_branding, organizations as orgs, usage
 from app.services.audit_service import record_audit_event
 from app.utils.rate_limiter import check_rate_limit
 
@@ -39,11 +40,22 @@ def _iso(v):
 
 
 def _org_dict(db: Session, org: Organization, m: OrganizationMember) -> Dict[str, Any]:
+    verified = [d.domain for d in db.query(OrganizationDomain).filter(
+        OrganizationDomain.organization_id == org.id, OrganizationDomain.status == "verified")
+        .order_by(OrganizationDomain.domain.asc()).all()]
     return {
         "id": str(org.id), "name": org.name, "brand_color": org.brand_color, "role": m.role,
         "member_count": db.query(OrganizationMember).filter(OrganizationMember.organization_id == org.id).count(),
         "created_at": _iso(org.created_at),
+        # [Gate G5] ORG-01 ロゴ(有無と版。画像は /logo)・席の上限・確認済みのドメイン
+        "has_logo": org.logo_sha256 is not None, "logo_version": org.logo_sha256[:12] if org.logo_sha256 else None,
+        "seat_limit": org.seat_limit, "verified_domains": verified,
     }
+
+
+def _lock_org(db: Session, org: Organization) -> None:
+    """席の数え方を直列にする(同時の追加で上限を越えない)。"""
+    db.query(Organization.id).filter(Organization.id == org.id).with_for_update().first()
 
 
 def _member_dict(m: OrganizationMember, u: Optional[User]) -> Dict[str, Any]:
@@ -160,8 +172,14 @@ async def add_member(org_id: uuid.UUID, request: Request, payload: Optional[dict
         raise bad("user_not_found", "このメールアドレスの会員が見つかりません。先に会員登録してもらってください", 404)
     if orgs.membership(db, org.id, target):
         raise bad("already_member", "すでにメンバーです", 409)
+    # [Gate G5] ORG-01 席の上限
+    _lock_org(db, org)
+    if org.seat_limit is not None and org_branding.seat_count(db, org.id) >= org.seat_limit:
+        raise bad("seat_limit_reached", f"席の上限({org.seat_limit}人)に達しています。上限を見直すか、メンバーを外してください",
+                  409)
     mm = OrganizationMember(id=uuid.uuid4(), organization_id=org.id, user_id=target.id, role=role)
     db.add(mm)
+    org_branding.record_seat(db, org.id, "join", target.id, user.id)
     db.commit()
     _audit("organization_member_added", request, user, org.id, {"member_id": str(mm.id), "role": role})
     return _member_dict(mm, target)
@@ -207,10 +225,201 @@ async def remove_member(org_id: uuid.UUID, member_id: uuid.UUID, request: Reques
         OrgDistributionAck.user_id == mm.user_id,
         OrgDistributionAck.distribution_id.in_(db.query(OrgDistribution.id).filter(
             OrgDistribution.organization_id == org.id))).delete(synchronize_session=False)
+    removed_user = mm.user_id
     db.delete(mm)
+    org_branding.record_seat(db, org.id, "leave", removed_user, user.id)
     db.commit()
     _audit("organization_member_removed", request, user, org.id, {"member_id": str(member_id), "self": leaving})
     return {"success": True}
+
+
+# ===== [Gate G5] ORG-01 ロゴ・席・ドメイン・使用量 =====
+
+def _branding_fail(e: org_branding.BrandingError):
+    raise bad(e.code, str(e), e.status_code)
+
+
+@router.get("/{org_id}/logo")
+async def get_logo(org_id: uuid.UUID, user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user)
+    data = db.query(Organization.logo_png).filter(Organization.id == org.id).scalar()
+    if not data or not org.logo_sha256:
+        raise bad("logo_not_found", "ロゴはまだありません", 404)
+    return Response(content=bytes(data), media_type="image/png", headers={
+        "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox", "ETag": f'"{org.logo_sha256}"',
+        "Content-Disposition": "inline; filename=logo.png"})
+
+
+@router.put("/{org_id}/logo")
+async def put_logo(org_id: uuid.UUID, request: Request, file: UploadFile = File(...),
+                   user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org_row, m = orgs.require_org(db, org_id, user, "admin")
+    org: Any = org_row
+    content = await file.read(org_branding.MAX_LOGO_BYTES + 1)
+    try:
+        if len(content) > org_branding.MAX_LOGO_BYTES:
+            raise org_branding.BrandingError("logo_too_large", f"ロゴは{org_branding.MAX_LOGO_BYTES // 1024}KBまでです",
+                                             413)
+        try:
+            scan = malware_scan.scan_upload(content)
+        except malware_scan.MalwareScanUnavailable:
+            raise org_branding.BrandingError("scan_unavailable", "画像の安全確認ができないため、今は受け付けられません", 503)
+        if scan.infected:
+            raise org_branding.BrandingError("logo_rejected", "画像から有害なプログラムが見つかったため、受け付けませんでした")
+        png, sha = org_branding.sanitize_logo(content)
+    except org_branding.BrandingError as e:
+        _branding_fail(e)
+    org.logo_png, org.logo_sha256, org.logo_updated_at = png, sha, orgs.now()
+    db.commit()
+    _audit("organization_logo_updated", request, user, org.id, {"bytes": len(png)})
+    return _org_dict(db, org, m)
+
+
+@router.delete("/{org_id}/logo")
+async def delete_logo(org_id: uuid.UUID, request: Request, user: User = Depends(get_current_active_user),
+                      db: Session = Depends(get_db)):
+    org_row, m = orgs.require_org(db, org_id, user, "admin")
+    org: Any = org_row
+    org.logo_png, org.logo_sha256, org.logo_updated_at = None, None, orgs.now()
+    db.commit()
+    _audit("organization_logo_removed", request, user, org.id)
+    return _org_dict(db, org, m)
+
+
+@router.get("/{org_id}/seats")
+async def get_seats(org_id: uuid.UUID, user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    events = (db.query(OrganizationSeatEvent).filter(OrganizationSeatEvent.organization_id == org.id)
+              .order_by(OrganizationSeatEvent.created_at.desc(), OrganizationSeatEvent.id.desc()).limit(20).all())
+    used = org_branding.seat_count(db, org.id)
+    return {"seat_limit": org.seat_limit, "seats_used": used,
+            "seats_remaining": None if org.seat_limit is None else max(org.seat_limit - used, 0),
+            "events": [{"event": e.event, "seats_after": e.seats_after, "created_at": _iso(e.created_at)}
+                       for e in events]}
+
+
+@router.put("/{org_id}/seat-limit")
+async def put_seat_limit(org_id: uuid.UUID, request: Request, payload: Optional[dict] = Body(None),
+                         user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org_row, m = orgs.require_org(db, org_id, user, "owner")
+    org: Any = org_row
+    p = _payload(payload)
+    if "seat_limit" not in p:
+        raise bad("invalid_seat_limit", "席の上限(1以上の整数、上限なしは null)を指定してください")
+    limit = p.get("seat_limit")
+    if limit is not None and (not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100000):
+        raise bad("invalid_seat_limit", "席の上限は1〜100000の整数か、上限なし(null)です")
+    _lock_org(db, org)
+    used = org_branding.seat_count(db, org.id)
+    if limit is not None and limit < used:
+        raise bad("seat_limit_below_members", f"今のメンバー({used}人)より少なくはできません。先にメンバーを外してください", 409)
+    org.seat_limit = limit
+    org_branding.record_seat(db, org.id, "limit", None, user.id)
+    db.commit()
+    _audit("organization_seat_limit_changed", request, user, org.id, {"seat_limit": limit})
+    return _org_dict(db, org, m)
+
+
+def _domain_dict(d: Any) -> Dict[str, Any]:
+    return {"id": str(d.id), "domain": d.domain, "status": d.status,
+            "txt_name": org_branding.txt_name(d.domain), "txt_value": org_branding.txt_value(d.token),
+            "verified_at": _iso(d.verified_at), "last_checked_at": _iso(d.last_checked_at), "last_error": d.last_error,
+            "created_at": _iso(d.created_at)}
+
+
+def _get_domain(db: Session, org: Organization, domain_id) -> Any:
+    d = db.query(OrganizationDomain).filter(OrganizationDomain.id == domain_id,
+                                            OrganizationDomain.organization_id == org.id).first()
+    if not d:
+        raise bad("domain_not_found", "ドメインが見つかりません", 404)
+    return d
+
+
+@router.get("/{org_id}/domains")
+async def list_domains(org_id: uuid.UUID, user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    rows = (db.query(OrganizationDomain).filter(OrganizationDomain.organization_id == org.id)
+            .order_by(OrganizationDomain.created_at.asc()).all())
+    return [_domain_dict(d) for d in rows]
+
+
+@router.post("/{org_id}/domains", status_code=201)
+async def add_domain(org_id: uuid.UUID, request: Request, payload: Optional[dict] = Body(None),
+                     user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    try:
+        domain = org_branding.clean_domain(_payload(payload).get("domain"))
+    except org_branding.BrandingError as e:
+        _branding_fail(e)
+    existing = db.query(OrganizationDomain).filter(OrganizationDomain.organization_id == org.id,
+                                                   OrganizationDomain.domain == domain).first()
+    if existing and existing.status != "revoked":
+        raise bad("domain_exists", "このドメインは登録済みです", 409)
+    active = db.query(OrganizationDomain).filter(OrganizationDomain.organization_id == org.id,
+                                                 OrganizationDomain.status != "revoked").count()
+    if active >= org_branding.MAX_DOMAINS:
+        raise bad("too_many_domains", f"登録できるドメインは{org_branding.MAX_DOMAINS}件までです", 409)
+    d: Any
+    if existing:
+        d = existing
+        d.status, d.token, d.verified_at, d.last_error, d.last_checked_at = (
+            "pending", org_branding.new_token(), None, None, None)
+    else:
+        d = OrganizationDomain(id=uuid.uuid4(), organization_id=org.id, domain=domain,
+                               token=org_branding.new_token(), status="pending", created_by_user_id=user.id)
+        db.add(d)
+    db.commit()
+    _audit("organization_domain_added", request, user, org.id, {"domain_id": str(d.id)})
+    return _domain_dict(d)
+
+
+@router.post("/{org_id}/domains/{domain_id}/verify")
+async def verify_domain(org_id: uuid.UUID, domain_id: uuid.UUID, request: Request,
+                        user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    d = _get_domain(db, org, domain_id)
+    if d.status == "revoked":
+        raise bad("domain_revoked", "取り消したドメインは確認できません。もう一度登録してください", 409)
+    if not check_rate_limit(f"org_domain_verify:{org.id}", 20, 3600):
+        raise bad("rate_limited", "確認が多すぎます。しばらく待ってください", 429)
+    ok, err = org_branding.check_txt(d.domain, d.token)
+    d.last_checked_at = orgs.now()
+    if not ok:
+        d.status, d.last_error = ("failed" if d.status != "verified" else d.status), err
+        db.commit()
+        _audit("organization_domain_check_failed", request, user, org.id, {"domain_id": str(d.id), "reason": err})
+        return _domain_dict(d)
+    taken = db.query(OrganizationDomain.id).filter(OrganizationDomain.domain == d.domain,
+                                                   OrganizationDomain.status == "verified",
+                                                   OrganizationDomain.id != d.id).first()
+    if taken:
+        raise bad("domain_taken", "このドメインは別の組織で確認済みです", 409)
+    d.status, d.verified_at, d.last_error = "verified", d.verified_at or orgs.now(), None
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise bad("domain_taken", "このドメインは別の組織で確認済みです", 409)
+    _audit("organization_domain_verified", request, user, org.id, {"domain_id": str(d.id)})
+    return _domain_dict(d)
+
+
+@router.delete("/{org_id}/domains/{domain_id}")
+async def revoke_domain(org_id: uuid.UUID, domain_id: uuid.UUID, request: Request,
+                        user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    d = _get_domain(db, org, domain_id)
+    d.status = "revoked"
+    db.commit()
+    _audit("organization_domain_revoked", request, user, org.id, {"domain_id": str(d.id)})
+    return _domain_dict(d)
+
+
+@router.get("/{org_id}/usage")
+async def org_usage(org_id: uuid.UUID, user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    org, _m = orgs.require_org(db, org_id, user, "admin")
+    return usage.summary(db, "org", org.id)
 
 
 # ===== 配布 =====
@@ -245,6 +454,7 @@ async def publish_distribution(org_id: uuid.UUID, request: Request, background: 
                         published_at=orgs.now())
     db.add(d)
     db.flush()
+    usage.charge(db, "org", org.id, "distributions")  # [Gate G5] BILL-02
     ids = org_api.enqueue(db, org.id, "distribution.published", {"distribution_id": str(d.id), "version": 1})
     db.commit()
     background.add_task(org_api.deliver_pending, ids)

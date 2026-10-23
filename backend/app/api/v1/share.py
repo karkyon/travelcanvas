@@ -42,7 +42,7 @@ from app.models.models import (
     Document, Notification, PlanCollaborator, PlanShareLink, Reservation, ShareAccessLog, Ticket, TravelEvent,
     TravelPlan, User,
 )
-from app.services import member_policy, plan_item_deletion, share_policy
+from app.services import member_policy, plan_item_deletion, share_policy, usage
 from app.services.audit_service import record_audit_event
 from app.api.v1.public_share import build_public_view
 
@@ -244,6 +244,7 @@ async def create_share_link(
         policy=policy,
         allow_clone=allow_clone,
     )
+    usage.charge(db, "user", plan.user_id, "share_links")  # [Gate G5] BILL-02
     db.add(share)
     db.commit()
     db.refresh(share)

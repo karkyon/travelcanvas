@@ -13,7 +13,7 @@ from app.api.v1 import (
     validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
-    organizations, org_external, admin_support, member_policy, commands, decisions,
+    organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -562,6 +562,10 @@ app.include_router(plan_search.plan_router, prefix="/api/v1")
 app.include_router(commands.router, prefix="/api/v1")
 # [Gate G4] COL-02 投票の決定の採用(旅程へ反映・確認・元に戻す。/plans/{plan_id}/polls/{poll_id}/adopt)。
 app.include_router(decisions.router, prefix="/api/v1")
+# [Gate G5] FIN-01・FIN-02 為替の記録・予算の版・支出の取消・精算の締め(/plans/{plan_id}/fx-rates 等)
+app.include_router(finance_ledger.router, prefix="/api/v1")
+# [Gate G5] BILL-02 自分の使用量(/usage)
+app.include_router(usage.router, prefix="/api/v1")
 app.include_router(plan_search.global_router, prefix="/api/v1")
 # [Gate P17] FR-057 Memory Replan(過去の予定と実績から次の旅行への提案)。/plans/{plan_id}/memory-replan配下。
 app.include_router(memory_replan.router, prefix="/api/v1")

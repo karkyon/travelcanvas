@@ -113,6 +113,10 @@ export interface ExpenseCreateData {
   note?: string;
   kind?: 'expense' | 'refund';
   refund_of_expense_id?: string;
+  /** [Gate G5] FIN-01 記録した為替で換算する(fx_rate と同時には指定しない) */
+  fx_rate_id?: string;
+  /** [Gate G5] FIN-02 領収書(この旅行の文書) */
+  receipt_document_id?: string;
 }
 
 /** 変更する項目だけを送る。nullは値を消す(税・手数料・換算レート・日付・メモ・負担者=全員均等)。 */

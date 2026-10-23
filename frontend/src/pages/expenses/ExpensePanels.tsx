@@ -6,10 +6,11 @@
  * - 精算: メンバーごとの支払・負担・差額と、送金回数の少ない精算案。案から精算を記録でき、記録は取り消せる。
  */
 import React from 'react';
-import { MessageSquare, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Ban, MessageSquare, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import type { Expense, FinanceSummary, FinanceTransfer, Settlement } from '@/services/api';
+import type { ExpenseFlags } from '@/services/api/types/g5';
 import { categoryLabel, describeNet, describeShares, formatMoney } from './financeModel';
 
 interface ExpenseListProps {
@@ -21,9 +22,14 @@ interface ExpenseListProps {
   onRefund: (e: Expense) => void;
   /** [Gate G4] COL-03 この費用へのコメント */
   onComment?: (e: Expense) => void;
+  /** [Gate G5] FIN-02 取消の状態(支出の ID ごと)と取消の操作 */
+  flags?: Record<string, ExpenseFlags>;
+  onVoid?: (e: Expense) => void;
 }
 
-export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit, onAdd, onEdit, onDelete, onRefund, onComment }) => {
+export const ExpenseListPanel: React.FC<ExpenseListProps> = ({
+  expenses, canEdit, onAdd, onEdit, onDelete, onRefund, onComment, flags, onVoid,
+}) => {
   const titleOf = new Map(expenses.map((e) => [e.id, e.title]));
   return (
     <div className="space-y-4">
@@ -37,13 +43,16 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
         <Card padding="lg" className="text-center text-gray-700">支出はまだありません。</Card>
       ) : (
         <ul className="space-y-2" aria-label="支出">
-          {expenses.map((e) => (
+          {expenses.map((e) => {
+            const voided = flags?.[e.id]?.is_voided === true;
+            return (
             <li key={e.id}>
-              <Card padding="sm">
+              <Card padding="sm" className={voided ? 'opacity-75' : undefined}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {e.kind === 'refund' && <span className="text-xs px-2 py-0.5 rounded-sm bg-green-100 text-green-800">返金</span>}
+                      {voided && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200 text-gray-900">取消済み(集計に含まれません)</span>}
                       <span className="font-medium text-gray-900">{e.title}</span>
                       <span className="text-sm text-gray-800">
                         {e.kind === 'refund' ? '-' : ''}{formatMoney(e.amount, e.currency)}
@@ -60,14 +69,22 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
                       {e.refunded_amount && Number(e.refunded_amount) > 0 && ` ・ 返金済み ${formatMoney(e.refunded_amount, e.currency)}`}
                     </p>
                     <p className="text-xs text-gray-700">負担: {describeShares(e)}</p>
+                    {voided && flags?.[e.id]?.void_reason && (
+                      <p className="text-xs text-gray-700">取り消した理由: {flags[e.id]!.void_reason}</p>
+                    )}
                   </div>
                   {onComment && (
                     <button type="button" onClick={() => onComment(e)} className="text-gray-600 hover:text-indigo-700 p-1 shrink-0" aria-label="この支出へのコメント">
                       <MessageSquare size={16} />
                     </button>
                   )}
-                  {canEdit && (
+                  {canEdit && !voided && (
                     <div className="flex items-center gap-1 shrink-0">
+                      {onVoid && (
+                        <button type="button" onClick={() => onVoid(e)} className="text-gray-600 hover:text-amber-700 p-1" aria-label={`${e.title}を取り消す`}>
+                          <Ban size={16} />
+                        </button>
+                      )}
                       {e.kind === 'expense' && (
                         <button type="button" onClick={() => onRefund(e)} className="text-gray-600 hover:text-green-700 p-1" aria-label={`${e.title}の返金を登録`}>
                           <Undo2 size={16} />
@@ -84,7 +101,8 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({ expenses, canEdit
                 </div>
               </Card>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

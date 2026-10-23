@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
-from app.services import member_policy
+from app.services import member_policy, usage
 from app.models.models import (
     Document,
     ExtractionCandidate,
@@ -236,6 +236,7 @@ def create_import_job(
         status=ImportJobStatus.REVIEW_REQUIRED.value,
         consent_given=True,
     )
+    usage.charge(db, "user", plan.user_id, "imports")  # [Gate G5] BILL-02
     db.add(j)
     db.commit()
     db.refresh(j)

@@ -500,3 +500,56 @@ async def act_on_abuse_report(
                        resource_id=r.id, ip_address=request.client.host if request.client else None,
                        details={"reason": r.reason, "share_id": str(r.share_id) if r.share_id else None})
     return {"id": str(r.id), "status": r.status, "message": "対応を記録しました"}
+
+
+# ===== [Gate G5] BILL-02 使用量の確認と上限の上書き(理由つき。監査に残す)
+
+@router.get("/usage")
+async def admin_usage(
+    subject_type: str = Query(..., pattern="^(user|org)$"),
+    subject_id: uuid.UUID = Query(...),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from app.services import usage
+
+    return usage.summary(db, subject_type, subject_id)
+
+
+@router.put("/usage/override")
+async def admin_usage_override(
+    request: Request,
+    payload: dict = Body(...),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """今月の上限を上書きする(limit=null で既定に戻す)。理由(reason)は上書きの時に必須。"""
+    from app.services import usage
+
+    subject_type, metric = payload.get("subject_type"), payload.get("metric")
+    if subject_type not in usage.SUBJECTS or metric not in usage.METRICS:
+        raise HTTPException(status_code=422, detail={"code": "invalid_usage_key",
+                                                     "message": "subject_type・metric の値が正しくありません"})
+    try:
+        subject_id = uuid.UUID(str(payload.get("subject_id")))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "invalid_usage_key",
+                                                     "message": "subject_id が正しくありません"})
+    limit = payload.get("limit")
+    reason = payload.get("reason")
+    valid_int = isinstance(limit, int) and not isinstance(limit, bool)
+    if limit is not None and (not valid_int or not 0 <= limit <= usage.MAX_LIMIT):
+        raise HTTPException(status_code=422, detail={"code": "invalid_usage_limit",
+                                                     "message": "上限は0以上の整数か、既定に戻す null です"})
+    if limit is not None and (not isinstance(reason, str) or not reason.strip() or len(reason) > 200):
+        raise HTTPException(status_code=422, detail={"code": "usage_reason_required",
+                                                     "message": "上書きの理由を200文字までで入力してください"})
+    usage.set_override(db, subject_type, subject_id, metric, limit, str(reason).strip() if limit is not None else None,
+                       admin.id)
+    db.commit()
+    record_audit_event(action="admin_usage_override", resource_type=subject_type, user_id=admin.id,
+                       resource_id=subject_id,
+                       ip_address=request.client.host if request.client else None,
+                       user_agent=request.headers.get("user-agent", "")[:255],
+                       details={"metric": metric, "limit": limit})
+    return usage.summary(db, subject_type, subject_id)

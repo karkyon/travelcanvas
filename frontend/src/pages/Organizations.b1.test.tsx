@@ -19,6 +19,13 @@ const m = vi.hoisted(() => ({
   retireOrgWebhookPrevious: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ default: m, api: m }));
+// [Gate G5] ロゴ・席・ドメイン・使用量(この試験では空)
+vi.mock('@/services/api/g5', () => ({
+  getOrgDomains: vi.fn(async () => []),
+  getOrgSeats: vi.fn(async () => ({ seat_limit: null, seats_used: 1, seats_remaining: null, events: [] })),
+  getOrgUsage: vi.fn(async () => ({ subject_type: 'org', subject_id: 'o', period: '2026-10', metrics: [] })),
+  getOrgLogoUrl: vi.fn(async () => 'blob:x'),
+}));
 
 import OrganizationsPage from './OrganizationsPage';
 import OrganizationPage from './OrganizationPage';

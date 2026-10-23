@@ -29,7 +29,7 @@ from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
 from app.ops import metrics as ops_metrics
-from app.services import malware_scan
+from app.services import malware_scan, usage
 from app.services import memories as mem
 from app.services import threat_guard
 from app.services.audit_service import record_audit_event
@@ -294,6 +294,7 @@ async def upload_memory(
             content, _stripped = image_metadata.strip(ext, content)
         except image_metadata.MetadataUnremovable:
             raise _bad("metadata_unremovable", "写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません", 422)
+    usage.charge(db, "user", plan.user_id, "upload_bytes", len(content))  # [Gate G5] BILL-02(旅行の所有者に数える)
     storage_key = generate_storage_key(plan.id, ext)
     backend = get_storage_backend()
     try:

@@ -27,12 +27,21 @@ const m = vi.hoisted(() => ({
   deleteExpense: vi.fn(),
   createSettlement: vi.fn(),
   deleteSettlement: vi.fn(),
+  getDocuments: vi.fn(),
 }));
 
 vi.mock('@/services/api', async () => {
   const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
   return { extractApiErrorDetailMessage: actual.extractApiErrorDetailMessage, ...m };
 });
+
+// [Gate G5] 取消の状態・為替の記録・精算の記録(Idempotency-Key つき)
+const g5 = vi.hoisted(() => ({
+  getExpenseFlags: vi.fn(), getFxRates: vi.fn(), recordSettlement: vi.fn(), voidExpense: vi.fn(),
+  getFinanceSettingsG5: vi.fn(), getBudgetVersions: vi.fn(), createFxRate: vi.fn(), createBudgetVersion: vi.fn(),
+  lockFinance: vi.fn(), unlockFinance: vi.fn(), putRoundingPolicy: vi.fn(),
+}));
+vi.mock('@/services/api/g5', () => ({ ...g5 }));
 
 import ExpensesPage from './ExpensesPage';
 
@@ -55,6 +64,10 @@ function renderPage() {
 
 beforeEach(() => {
   for (const fn of Object.values(m)) fn.mockReset();
+  for (const fn of Object.values(g5)) fn.mockReset();
+  g5.getExpenseFlags.mockResolvedValue([]);
+  g5.getFxRates.mockResolvedValue([]);
+  m.getDocuments.mockResolvedValue([]);
   m.getPlanMembers.mockResolvedValue(members);
   m.getFinanceSettings.mockResolvedValue(fx.finance_settings_updated);
   m.getFinanceSummary.mockResolvedValue(summary);
@@ -122,7 +135,7 @@ describe('ExpensesPage (Gate P2)', () => {
   });
 
   it('精算: 差額と精算案を示し、案から支払いを記録できる。精算済みなら完了と表示する', async () => {
-    m.createSettlement.mockResolvedValue(fx.settlement_created);
+    g5.recordSettlement.mockResolvedValue(undefined);
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: '精算' }));
     const balances = await screen.findByTestId('finance-balances');
@@ -130,9 +143,10 @@ describe('ExpensesPage (Gate P2)', () => {
     expect(balances).toHaveTextContent('1,749円 支払う');
     const first = summary.transfers[0]!;
     fireEvent.click(screen.getAllByRole('button', { name: '支払いを記録' })[0]!);
-    await waitFor(() => expect(m.createSettlement).toHaveBeenCalledWith('p1', {
+    await waitFor(() => expect(g5.recordSettlement).toHaveBeenCalledWith('p1', {
       from_user_id: first.from_user_id, to_user_id: first.to_user_id, amount: first.amount,
-    }));
+    }, expect.any(String)));
+    expect(g5.recordSettlement.mock.calls[0]![2].length).toBeGreaterThan(8);
   });
 
   it('精算済み・予算の保存エラー表示', async () => {

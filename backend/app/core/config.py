@@ -186,6 +186,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = ""
 
+    # [Gate G5] BILL-02 使用量の上限(app/services/usage.py)。空なら既定。JSON で {"user": {"imports": 500}, "org": {...}}
+    # のように指標ごとに上書きする(指標: upload_bytes・imports・route_requests・share_links・distributions)
+    USAGE_LIMITS: str = ""
+
     # [Gate S11] SEC-06 多要素認証(app/services/mfa.py、Runbook §8.6)。管理者の API は、TOTP を設定し、
     # このセッションで ADMIN_MFA_MAX_AGE_HOURS 以内に確認コードを通した時だけ使える。
     ADMIN_MFA_REQUIRED: bool = True

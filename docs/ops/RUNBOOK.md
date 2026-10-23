@@ -78,6 +78,7 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | `OPS_ALERT_WEBHOOK_URL` | なし | §2.2 |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USE_TLS` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `EMAIL_FROM` | なし / 587 / true / なし / なし / なし | [Gate G4] 通知のまとめのメール(§8.10)。`SMTP_HOST` と `EMAIL_FROM` が無ければメールは送らない(画面に「使えません」と出る) |
 | `SHARE_VIEW_SIGNING_KEY` / `SHARE_VIEW_TTL_SECONDS` | `JWT_SECRET_KEY` から導出 / 7200 | [Gate G4] 共有の閲覧の一時トークン(§8.10、KEY-INVENTORY) |
+| `USAGE_LIMITS` | なし(既定の上限) | [Gate G5] 使用量の上限の上書き(JSON。例 `{"user": {"imports": 500}}`。§8.11) |
 
 ### 2.4 手で行うこと
 
@@ -534,6 +535,26 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
   自動で止まり(`revoked_reason=abuse_auto`)、所有者に知らせる。管理者は内容を確かめて「却下」「共有を止める」「共有を戻す」。
   対応は監査(`admin_abuse_*`)に残る。旅行の中身を確かめる時は、本人の同意のサポート閲覧(§8.7)を使う。
 
+## 8.11 費用の記録・使用量の上限・組織のロゴとドメイン(Gate G5)
+
+- **為替の記録**: 旅行ごとに「1 外貨 = いくら(基準通貨)」を出典・基準日つきで手で記録する(外部の為替の提供元にはつながない)。
+  支出は記録を選んで換算し、後で記録を足しても過去の支出の換算は変わらない。予約額は最新の記録で換算し、記録の無い通貨は別に示す。
+- **予算の版**: 当初(1つだけ)・更新・確定(確定した予約)・実績を、その時点の写しとして `budget_versions` に残す(変えない)。
+- **取消と締め**: 支出の取消は理由つきで、行を消さずに集計・精算から外す。精算を締める(`plan_finance_settings.locked_at`)と、
+  支出・精算・基準通貨・端数の規則が 409 `finance_locked` になる。締めの解除は旅行の所有者だけ・理由つき(監査 `finance_unlocked`)。
+- **使用量の上限**(BILL-02): 利用者・組織ごと、月(UTC)ごとに `usage_counters` で数える(アップロードの量・取込・移動の候補の作成・
+  共有リンク・組織の配布)。上限を越える要求は 429 `quota_exceeded` で断り、何も変えない。8割を越えると画面に注意が出る。
+  既定は `app/services/usage.py` の `DEFAULT_LIMITS`、全体の変更は `USAGE_LIMITS`(§2.3)、1人・1組織だけの今月の変更は
+  管理者の画面(管理 → 使用量と上限。理由が必須、監査 `admin_usage_override`)。今の数を見る:
+  `docker compose exec -T postgres psql -U <所有者> -d <DB> -c "SELECT subject_type, metric, period, used, override_limit FROM usage_counters ORDER BY updated_at DESC LIMIT 20"`。
+- **組織のロゴ**: 受け取った画像はウイルス検査の後、512 ピクセル以内の PNG に作り直して DB(`organizations.logo_png`)に置く
+  (撮影情報は残らない。保存ファイルではないので鍵の点検の対象外)。
+- **独自のドメイン**: 登録すると TXT `_travelcanvas.<ドメイン>` に置く値(`travelcanvas-verify=…`)を示す。「確認する」で backend が
+  DNS を引く(backend から外の DNS に届く必要がある。届かない時は `last_error=dns_error:…`)。確認済みのドメインは1つの組織だけ。
+  組織を閉じると取り消す。
+- **席の上限**: owner が設定する(空欄は上限なし)。上限に達するとメンバーを足せない(409 `seat_limit_reached`)。参加・脱退・上限の変更は
+  `organization_seat_events` に残る。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
@@ -566,5 +587,7 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 | 2026-10-18 | 8 | Gate S10: 画面の CSP 違反の報告と監視(§3.11、§7) |
 | 2026-10-19 | 9 | Gate S11: 多要素認証(§8.3)、CI と main の保護・パッチの流れ(§9)。改訂履歴は §10 へ |
 | 2026-10-21 | 11 | Gate G2: DB の権限の分離(§8.6)、Webhook の自動の再送の定期実行(§2.1)、サポート閲覧と運用の要約(§8.7)、即時の通知と同行者向けの項目の規則(§8.8) |
+| 2026-10-22 | 13 | Gate G4: 検索のコマンド・合意の採用・通知の設定とメールのまとめ・ゲストの閲覧・濫用への対応(§8.10)、定期実行 poll-deadlines・email-outbox・abuse-scan(§2.1) |
+| 2026-10-23 | 14 | Gate G5: 為替の記録・予算の版・支出の取消・精算の締め・使用量の上限・組織のロゴ・独自のドメイン・席の上限(§8.11、`USAGE_LIMITS` §2.3) |
 | 2026-10-22 | 12 | Gate G3: 画面の本番用の配信・データ鍵と鍵の破棄による削除・バックアップの鍵の写し(§4.1・§8.9)、TOTP の鍵と解除の二者の確認(§8.3)、エラーの問い合わせ番号・性能の検査(§8.9)。定期実行を登録済みなら `schedule install` をもう一度実行すると `keys purge-escrow` が足される |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

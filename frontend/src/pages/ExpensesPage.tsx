@@ -5,6 +5,8 @@
  *   - 概要(FR-027): 旅行全体・カテゴリ別・日別・自分の予算と実績の差異、予約額(参考)
  *   - 支出(FR-027/028): 支出・返金の登録。外貨は換算レート、分担は均等・比率・金額・負担なし
  *   - 精算(FR-028): メンバーごとの差額、送金回数の少ない精算案、精算の記録・取消
+ *   - [Gate G5] 記録: 為替の記録・予算の版・端数の規則・精算の締め(LedgerPanel)。支出は記録した為替・領収書(文書)を
+ *     選べ、取り消せる(消さずに集計から外す)。精算の記録は Idempotency-Key つき(送り直しても二重にならない)。
  * 変更のたびに全てを読み直す(集計・差額は支出・予算・精算から算出されるため)。
  * 権限はbackendが判定し、拒否された場合は理由を表示する。
  */
@@ -14,27 +16,37 @@ import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import {
-  createBudget, createExpense, createSettlement, deleteBudget, deleteExpense, deleteSettlement,
-  extractApiErrorDetailMessage, getBudgets, getExpenses, getFinanceSettings, getFinanceSummary, getPlanMembers,
-  getSettlements, updateBudget, updateExpense, updateFinanceSettings,
+  createBudget, createExpense, deleteBudget, deleteExpense, deleteSettlement,
+  extractApiErrorDetailMessage, getBudgets, getDocuments, getExpenses, getFinanceSettings, getFinanceSummary,
+  getPlanMembers, getSettlements, updateBudget, updateExpense, updateFinanceSettings,
 } from '@/services/api';
 import type {
   Budget, BudgetKind, Expense, ExpenseCategory, FinanceSettings, FinanceSummary, FinanceTransfer, PlanMember,
-  Settlement,
+  Settlement, TravelDocument,
 } from '@/services/api';
+import { getExpenseFlags, getFxRates, recordSettlement, voidExpense } from '@/services/api/g5';
+import type { ExpenseFlags, FxRate } from '@/services/api/types/g5';
 import SummaryPanel from './expenses/SummaryPanel';
 import { ExpenseListPanel, SettlementPanel } from './expenses/ExpensePanels';
+import LedgerPanel from './expenses/LedgerPanel';
 import {
   BUDGET_KIND_LABEL, CATEGORY_OPTIONS, CURRENCY_OPTIONS, SPLIT_OPTIONS, emptyExpenseForm, expenseFormFromExpense,
   expenseFormToPayload, isValidAmount, minorDigits, type ExpenseForm,
 } from './expenses/financeModel';
 
-type Tab = 'summary' | 'expenses' | 'settlement';
+type Tab = 'summary' | 'expenses' | 'settlement' | 'ledger';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'summary', label: '概要' },
   { id: 'expenses', label: '支出' },
   { id: 'settlement', label: '精算' },
+  { id: 'ledger', label: '記録' },
 ];
+
+/** [Gate G5] 精算の記録の Idempotency-Key */
+function newKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  return c?.randomUUID ? c.randomUUID() : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
@@ -74,9 +86,18 @@ const ExpensesPage: React.FC = () => {
   const [expenseForm, setExpenseForm] = useState<ExpenseForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // [Gate G5] 取消の状態・為替の記録・領収書の候補・取消の理由の入力
+  const [flags, setFlags] = useState<Record<string, ExpenseFlags>>({});
+  const [rates, setRates] = useState<FxRate[]>([]);
+  const [documents, setDocuments] = useState<TravelDocument[]>([]);
+  const [extra, setExtra] = useState<{ fx_rate_id: string; receipt_document_id: string }>({ fx_rate_id: '', receipt_document_id: '' });
+  const [voidTarget, setVoidTarget] = useState<Expense | null>(null);
+  const [voidReason, setVoidReason] = useState('');
 
   const me = useMemo(() => members.find((m) => m.is_me) ?? null, [members]);
-  const canEdit = me?.role === 'owner' || me?.role === 'editor';
+  const canEditPlan = me?.role === 'owner' || me?.role === 'editor';
+  const locked = typeof (settings as { locked_at?: unknown } | null)?.locked_at === 'string';
+  const canEdit = canEditPlan && !locked;
   const base = settings?.base_currency ?? 'JPY';
   const currencyLocked = expenses.length > 0 || budgets.length > 0 || settlements.length > 0;
 
@@ -97,6 +118,15 @@ const ExpensesPage: React.FC = () => {
       setError(errorMessage(e, '費用の取得に失敗しました'));
     } finally {
       setIsLoading(false);
+    }
+    // [Gate G5] 取消の状態・為替の記録(読めなくても支出・精算の表示は続ける)
+    try {
+      const [f, r] = await Promise.all([getExpenseFlags(planId), getFxRates(planId)]);
+      setFlags(Object.fromEntries(f.map((x) => [x.id, x])));
+      setRates(r);
+    } catch {
+      setFlags({});
+      setRates([]);
     }
   }, [planId]);
 
@@ -180,6 +210,14 @@ const ExpensesPage: React.FC = () => {
   const openExpense = (mode: ExpenseMode) => {
     setFormError(null);
     setExpenseMode(mode);
+    const source = mode.mode === 'edit' ? mode.expense : null;
+    setExtra({
+      fx_rate_id: (source && flags[source.id]?.fx_rate_id) || '',
+      receipt_document_id: source?.receipt_document_id ?? '',
+    });
+    if (planId) {
+      getDocuments(planId).then(setDocuments).catch(() => setDocuments([]));
+    }
     if (mode.mode === 'edit') {
       setExpenseForm(expenseFormFromExpense(mode.expense, members));
     } else if (mode.mode === 'refund') {
@@ -193,7 +231,9 @@ const ExpensesPage: React.FC = () => {
   const submitExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planId || !expenseForm || !expenseMode) return;
-    const result = expenseFormToPayload(expenseForm, base);
+    const rateId = expenseForm.currency !== base
+      && rates.some((r) => r.id === extra.fx_rate_id && r.currency === expenseForm.currency) ? extra.fx_rate_id : '';
+    const result = expenseFormToPayload(rateId ? { ...expenseForm, fx_rate: '' } : expenseForm, base);
     if (!result.ok) {
       setFormError(result.error);
       return;
@@ -209,14 +249,22 @@ const ExpensesPage: React.FC = () => {
           participants: d.participants ?? null,
           tax_amount: d.tax_amount ?? null,
           fee_amount: d.fee_amount ?? null,
-          fx_rate: d.fx_rate ?? null,
+          fx_rate: rateId ? null : d.fx_rate ?? null,
+          fx_rate_id: rateId || null,
+          receipt_document_id: extra.receipt_document_id || null,
           local_date: d.local_date ?? null,
           note: d.note ?? null,
         }, expenseMode.expense.revision);
-      } else if (expenseMode.mode === 'refund') {
-        await createExpense(planId, { ...result.data, kind: 'refund', refund_of_expense_id: expenseMode.of.id });
       } else {
-        await createExpense(planId, result.data);
+        const more = {
+          ...(rateId ? { fx_rate_id: rateId } : {}),
+          ...(extra.receipt_document_id ? { receipt_document_id: extra.receipt_document_id } : {}),
+        };
+        if (expenseMode.mode === 'refund') {
+          await createExpense(planId, { ...result.data, ...more, kind: 'refund', refund_of_expense_id: expenseMode.of.id });
+        } else {
+          await createExpense(planId, { ...result.data, ...more });
+        }
       }
       setExpenseMode(null);
       await load();
@@ -233,11 +281,30 @@ const ExpensesPage: React.FC = () => {
     void run(() => deleteExpense(planId, x.id, x.revision), '支出の削除に失敗しました');
   };
 
+  // [Gate G5] FIN-02 取消(理由つき。消さずに集計・精算から外す)
+  const submitVoid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planId || !voidTarget) return;
+    const target = voidTarget;
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      await voidExpense(planId, target.id, voidReason.trim(), target.revision);
+      setVoidTarget(null);
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, '支出を取り消せませんでした'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // ----- 精算
   const recordTransfer = (t: FinanceTransfer) => {
     if (!planId) return;
     if (!window.confirm(`${t.from_name}さんから${t.to_name}さんへの支払いを記録しますか?`)) return;
-    void run(() => createSettlement(planId, { from_user_id: t.from_user_id, to_user_id: t.to_user_id, amount: t.amount }),
+    const key = newKey();
+    void run(() => recordSettlement(planId, { from_user_id: t.from_user_id, to_user_id: t.to_user_id, amount: t.amount }, key),
       '精算の記録に失敗しました');
   };
 
@@ -295,6 +362,11 @@ const ExpensesPage: React.FC = () => {
       </div>
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
+      {locked && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-900 text-sm" role="status">
+          精算を締めています。支出・精算を変えるには、所有者が「記録」タブで締めを解除してください。
+        </div>
+      )}
 
       {isLoading || !summary ? (
         isLoading ? <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div> : null
@@ -305,10 +377,15 @@ const ExpensesPage: React.FC = () => {
             <ExpenseListPanel expenses={expenses} canEdit={canEdit} onAdd={() => openExpense({ mode: 'create' })}
               onEdit={(x) => openExpense({ mode: 'edit', expense: x })} onDelete={removeExpense}
               onRefund={(x) => openExpense({ mode: 'refund', of: x })}
-              onComment={(x) => navigate(`/planner/${planId}/discussion?target=expense&id=${x.id}`)} />
+              onComment={(x) => navigate(`/planner/${planId}/discussion?target=expense&id=${x.id}`)}
+              flags={flags} onVoid={(x) => { setFormError(null); setVoidReason(''); setVoidTarget(x); }} />
           )}
           {tab === 'settlement' && (
             <SettlementPanel summary={summary} settlements={settlements} onRecord={recordTransfer} onUndo={undoSettlement} />
+          )}
+          {tab === 'ledger' && (
+            <LedgerPanel planId={planId} canEdit={canEditPlan} isOwner={me?.role === 'owner'} baseCurrency={base}
+              currencies={[...new Set([base, ...CURRENCY_OPTIONS])]} onChanged={() => { void load(); }} />
           )}
         </div>
       )}
@@ -385,7 +462,19 @@ const ExpensesPage: React.FC = () => {
                     </select>
                   </div>
                 </div>
-                {expenseForm.currency !== base && (
+                {expenseForm.currency !== base && rates.some((r) => r.currency === expenseForm.currency) && (
+                  <div>
+                    <label htmlFor="expense-fx-record" className="block text-sm font-medium text-gray-800 mb-1">記録した為替</label>
+                    <select id="expense-fx-record" className={inputClass} value={extra.fx_rate_id}
+                      onChange={(e) => setExtra({ ...extra, fx_rate_id: e.target.value })}>
+                      <option value="">使わない(下にレートを入力)</option>
+                      {rates.filter((r) => r.currency === expenseForm.currency).map((r) => (
+                        <option key={r.id} value={r.id}>{`1 ${r.currency} = ${r.rate} ${r.base_currency}(${r.rate_date}・${r.source})`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {expenseForm.currency !== base && !(extra.fx_rate_id && rates.some((r) => r.id === extra.fx_rate_id && r.currency === expenseForm.currency)) && (
                   <div>
                     <label htmlFor="expense-rate" className="block text-sm font-medium text-gray-800 mb-1">
                       換算レート(1 {expenseForm.currency} = ? {base})
@@ -457,6 +546,20 @@ const ExpensesPage: React.FC = () => {
                   </fieldset>
                 )}
                 <div>
+                  <label htmlFor="expense-receipt" className="block text-sm font-medium text-gray-800 mb-1">領収書(任意)</label>
+                  <select id="expense-receipt" className={inputClass} value={extra.receipt_document_id}
+                    onChange={(e) => setExtra({ ...extra, receipt_document_id: e.target.value })}>
+                    <option value="">なし</option>
+                    {extra.receipt_document_id && !documents.some((d) => d.id === extra.receipt_document_id) && (
+                      <option value={extra.receipt_document_id}>選んでいる文書</option>
+                    )}
+                    {documents.map((d) => (
+                      <option key={d.id} value={d.id}>{d.original_filename ?? d.document_type ?? `文書 ${d.id.slice(0, 8)}`}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-700 mt-1">「文書」に登録した領収書を選べます。</p>
+                </div>
+                <div>
                   <label htmlFor="expense-note" className="block text-sm font-medium text-gray-800 mb-1">メモ(任意)</label>
                   <input id="expense-note" className={inputClass} maxLength={500} value={expenseForm.note}
                     onChange={(e) => updateExp('note', e.target.value)} />
@@ -466,6 +569,30 @@ const ExpensesPage: React.FC = () => {
             <Modal.Footer>
               <Button variant="ghost" type="button" onClick={() => setExpenseMode(null)}>キャンセル</Button>
               <Button variant="primary" type="submit" loading={isSaving}>保存</Button>
+            </Modal.Footer>
+          </form>
+        )}
+      </Modal>
+
+      <Modal isOpen={voidTarget !== null} onClose={() => setVoidTarget(null)} title="支出の取消" size="md">
+        {voidTarget && (
+          <form onSubmit={submitVoid} noValidate>
+            <Modal.Body>
+              <div className="space-y-3">
+                {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+                <p className="text-sm text-gray-800">
+                  「{voidTarget.title}」を取り消します。記録は残り、合計・精算からは外れます(元には戻せません)。
+                </p>
+                <div>
+                  <label htmlFor="void-reason" className="block text-sm font-medium text-gray-800 mb-1">取り消す理由</label>
+                  <input id="void-reason" className={inputClass} maxLength={200} value={voidReason}
+                    onChange={(e) => setVoidReason(e.target.value)} placeholder="例: 二重に登録した" />
+                </div>
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="ghost" type="button" onClick={() => setVoidTarget(null)}>やめる</Button>
+              <Button variant="primary" type="submit" loading={isSaving} disabled={!voidReason.trim()}>取り消す</Button>
             </Modal.Footer>
           </form>
         )}

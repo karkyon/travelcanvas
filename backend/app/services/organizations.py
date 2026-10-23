@@ -198,6 +198,10 @@ def on_user_deleted(db: Session, user_id) -> int:
         db.delete(m)
     db.query(OrgDistributionAck).filter(OrgDistributionAck.user_id == user_id).delete(synchronize_session=False)
     db.flush()
+    from app.services import org_branding
+
+    for org_id in org_ids:
+        org_branding.record_seat(db, org_id, "leave", None, None)  # [Gate G5] 席の記録(退会した人は残さない)
     t = now()
     for org_id in org_ids:
         if owner_count(db, org_id):
@@ -211,6 +215,12 @@ def on_user_deleted(db: Session, user_id) -> int:
         org = db.query(Organization).filter(Organization.id == org_id).first()
         if org and org.deleted_at is None:
             org.deleted_at = t
+        # [Gate G5] 閉じた組織の確認済みドメインを取り消す(別の組織が確認できるように)
+        from app.models.models import OrganizationDomain
+
+        db.query(OrganizationDomain).filter(OrganizationDomain.organization_id == org_id,
+                                            OrganizationDomain.status != "revoked") \
+            .update({OrganizationDomain.status: "revoked"}, synchronize_session=False)
         db.query(OrgApiClient).filter(OrgApiClient.organization_id == org_id, OrgApiClient.revoked_at.is_(None)) \
             .update({OrgApiClient.revoked_at: t}, synchronize_session=False)
         db.query(OrgWebhook).filter(OrgWebhook.organization_id == org_id, OrgWebhook.revoked_at.is_(None)) \

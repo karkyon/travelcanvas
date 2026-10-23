@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
@@ -13,6 +13,7 @@ import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import MfaSection from '@/components/settings/MfaSection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
 import SupportAccessSection from '@/components/settings/SupportAccessSection';
+import UsageSection from '@/components/settings/UsageSection';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -634,6 +635,8 @@ const SettingsPage: React.FC = () => {
     { id: 'conditions', name: '非公開の条件', icon: <Lock size={16} />, render: () => <PrivateProfileSection /> },
     // [Gate G2] FR-040 サポートへの閲覧の許可(本人が目的・期限つきで許可する)
     { id: 'support', name: 'サポート', icon: <LifeBuoy size={16} />, render: () => <SupportAccessSection /> },
+    // [Gate G5] BILL-02 今月の使用量と上限
+    { id: 'usage', name: '使用量', icon: <Gauge size={16} />, render: () => <UsageSection /> },
   ];
 
   const handleSave = async () => {

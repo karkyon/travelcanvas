@@ -63,24 +63,25 @@ function App() {
             fontSize: '14px',
             fontWeight: '500',
           },
+          // [Gate G5] 白の文字と背景のコントラストを WCAG 2.1 AA(4.5:1)以上にする(以前の #10b981・#ef4444 は不足)
           success: {
             style: {
-              background: '#10b981',
+              background: '#047857',
               color: '#fff',
             },
             iconTheme: {
               primary: '#fff',
-              secondary: '#10b981',
+              secondary: '#047857',
             },
           },
           error: {
             style: {
-              background: '#ef4444',
+              background: '#b91c1c',
               color: '#fff',
             },
             iconTheme: {
               primary: '#fff',
-              secondary: '#ef4444',
+              secondary: '#b91c1c',
             },
           },
           loading: {

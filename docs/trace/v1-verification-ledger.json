@@ -12,7 +12,8 @@
   },
   "updated_c1": "Gate C1: FR-023 を追加(秘匿プロフィール。E2E collaboration.spec.ts)。FR-020 は INTEGRATED(部分)のため対象外",
   "updated_f45b1": "Gate F45・B1(r12): FR-009(情報内検索。E2E search.spec.ts。読み取りだけのため競合は対象外)と FR-050(訪問判定・信頼度。E2E visits.spec.ts)を追加。FR-007/008(C2)・FR-040(A2)・FR-041/042(B1)・FR-045(F45)・FR-049/051(V2)は(部分)のため対象外",
-  "updated_g4": "Gate G4(r16): FR-022(合意形成。決定の採用・締切・定足数・同点。E2E gate-g4.spec.ts・discussion.spec.ts)を追加。FR-009 は書き込み(コマンド)ができたため競合の試験を足した。FR-040(濫用への対応)・FR-044(確認・一時トークン・複製)の証拠を足した。FR-008(地図の提供元)・FR-024(メールの提供元)は(部分)のため対象外"
+  "updated_g4": "Gate G4(r16): FR-022(合意形成。決定の採用・締切・定足数・同点。E2E gate-g4.spec.ts・discussion.spec.ts)を追加。FR-009 は書き込み(コマンド)ができたため競合の試験を足した。FR-040(濫用への対応)・FR-044(確認・一時トークン・複製)の証拠を足した。FR-008(地図の提供元)・FR-024(メールの提供元)は(部分)のため対象外",
+  "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま"
  },
  "cross_cutting": {
   "authz": [
@@ -580,6 +581,26 @@
    "security": [
     "backend/tests/test_gate_p3_discussion.py::test_anonymous_poll_hides_individuals_until_threshold",
     "backend/tests/test_gate_g4_decisions_comments.py::test_deadline_sweep_reminds_then_closes"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-027": {
+   "title": "予算・費用",
+   "e2e": [
+    "frontend/e2e/expenses.spec.ts",
+    "frontend/e2e/gate-g5.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p2_finance.py::test_outsider_and_purge",
+    "backend/tests/test_gate_g5_finance.py::test_ledger_routes_need_membership"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g5_finance.py::test_finance_lock_freezes_changes",
+    "backend/tests/test_gate_g5_finance.py::test_settlement_idempotency_key"
+   ],
+   "security": [
+    "backend/tests/test_gate_p2_finance.py::test_budgets_and_private_member_budget",
+    "backend/tests/test_gate_g5_finance.py::test_void_keeps_row_but_leaves_totals"
    ],
    "status": "VERIFIED"
   }

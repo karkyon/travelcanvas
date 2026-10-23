@@ -10,7 +10,7 @@ from sqlalchemy import (
     Numeric, BigInteger,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred, relationship
 from sqlalchemy.sql import func
 from enum import Enum
 
@@ -1928,11 +1928,69 @@ class PlanFinanceSettings(Base):
     )
     base_currency = Column(String(3), nullable=False, default="JPY")
     revision = Column(Integer, nullable=False, default=1, server_default="1")
+    # [Gate G5] FIN-02 端数の規則と精算の締め
+    rounding_mode = Column(String(8), nullable=False, default="half_up", server_default="half_up")
+    remainder_to = Column(String(8), nullable=False, default="largest", server_default="largest")
+    locked_at = Column(DateTime(timezone=True), nullable=True)
+    locked_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("base_currency ~ '^[A-Z]{3}$'", name="ck_plan_finance_settings_currency"),
+        CheckConstraint("rounding_mode IN ('half_up', 'down', 'up')", name="ck_plan_finance_settings_rounding"),
+        CheckConstraint("remainder_to IN ('largest', 'payer', 'first')", name="ck_plan_finance_settings_remainder"),
+        Index("ix_fk_plan_finance_settings_locked_by_user_id", "locked_by_user_id"),
+    )
+
+
+class FxRate(Base):
+    """[Gate G5] FIN-01 為替レートの記録(1 currency あたりの base_currency 額)。出典・取得時刻・基準日を持ち、
+    支出は使ったレートを fx_rate_id で指す(後でレートを足しても過去の換算は変わらない)。"""
+    __tablename__ = "fx_rates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    currency = Column(String(3), nullable=False)
+    base_currency = Column(String(3), nullable=False)
+    rate = Column(Numeric(18, 8), nullable=False)
+    rate_date = Column(Date, nullable=False)
+    source = Column(String(100), nullable=False)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("rate > 0", name="ck_fx_rates_rate"),
+        CheckConstraint("currency ~ '^[A-Z]{3}$' AND base_currency ~ '^[A-Z]{3}$' AND currency <> base_currency",
+                        name="ck_fx_rates_currency"),
+        Index("ix_fx_rates_lookup", "plan_id", "currency", "base_currency", "rate_date"),
+    )
+
+
+class BudgetVersion(Base):
+    """[Gate G5] FIN-01 予算の版(当初 initial・更新 revised・確定 committed・実績 actual)。作った時点の写しで、上書きしない。
+
+    lines は [{key, label, amount}](基準通貨)、unconverted は換算できなかった金額の通貨ごとの合計
+    (基準通貨の合計に混ぜない)。"""
+    __tablename__ = "budget_versions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(9), nullable=False)
+    label = Column(String(100), nullable=False)
+    base_currency = Column(String(3), nullable=False)
+    total_amount = Column(Numeric(18, 2), nullable=False)
+    lines = Column(JSON, nullable=False)
+    unconverted = Column(JSON, nullable=True)
+    note = Column(String(200), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('initial', 'revised', 'committed', 'actual')", name="ck_budget_versions_kind"),
     )
 
 
@@ -2016,6 +2074,11 @@ class Expense(Base):
     related_id = Column(UUID(as_uuid=True), nullable=True)
     receipt_document_id = Column(UUID(as_uuid=True), nullable=True)
     note = Column(String(500), nullable=True)
+    # [Gate G5] FIN-01 使ったレートの記録、FIN-02 取消(消さずに集計から外す)
+    fx_rate_id = Column(UUID(as_uuid=True), ForeignKey("fx_rates.id", ondelete="SET NULL"), nullable=True)
+    voided_at = Column(DateTime(timezone=True), nullable=True)
+    void_reason = Column(String(200), nullable=True)
+    voided_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -2046,7 +2109,10 @@ class Expense(Base):
             name="ck_expenses_related_type",
         ),
         CheckConstraint("(related_type IS NULL) = (related_id IS NULL)", name="ck_expenses_related_pair"),
+        CheckConstraint("(voided_at IS NULL) = (void_reason IS NULL)", name="ck_expenses_void"),
         Index("ix_expenses_plan_deleted", "plan_id", "deleted_at"),
+        Index("ix_fk_expenses_fx_rate_id", "fx_rate_id"),
+        Index("ix_fk_expenses_voided_by_user_id", "voided_by_user_id"),
     )
 
 
@@ -2089,6 +2155,7 @@ class Settlement(Base):
     currency = Column(String(3), nullable=False)
     settled_on = Column(Date, nullable=True)
     note = Column(String(200), nullable=True)
+    idempotency_key = Column(String(100), nullable=True)  # [Gate G5] FIN-02 二重の記録の防止
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -2099,6 +2166,8 @@ class Settlement(Base):
         CheckConstraint("from_user_id <> to_user_id", name="ck_settlements_parties"),
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_settlements_currency"),
         Index("ix_settlements_plan_deleted", "plan_id", "deleted_at"),
+        Index("uq_settlements_idempotency", "plan_id", "created_by_user_id", "idempotency_key", unique=True,
+              postgresql_where=text("idempotency_key IS NOT NULL")),
     )
 
 
@@ -2778,10 +2847,91 @@ class Organization(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(100), nullable=False)
     brand_color = Column(String(7), nullable=True)  # "#RRGGBB"
+    # [Gate G5] ORG-01 ロゴ(検査して作り直した PNG だけ。一覧では読まない)・席の上限(NULL は上限なし)
+    logo_png = deferred(Column(LargeBinary, nullable=True))  # type: ignore[var-annotated]
+    logo_sha256 = Column(String(64), nullable=True)
+    logo_updated_at = Column(DateTime(timezone=True), nullable=True)
+    seat_limit = Column(Integer, nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("seat_limit IS NULL OR seat_limit >= 1", name="ck_organizations_seat_limit"),
+    )
+
+
+class OrganizationDomain(Base):
+    """[Gate G5] ORG-01 独自のドメインの所有の確認(DNS の TXT `_travelcanvas.<domain>` に token を置く)。
+    確認済みのドメインは1つの組織だけ(uq_organization_domains_verified)。"""
+    __tablename__ = "organization_domains"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False,
+                             index=True)
+    domain = Column(String(253), nullable=False)
+    token = Column(String(64), nullable=False)
+    status = Column(String(8), nullable=False, default="pending", server_default="pending")
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(String(100), nullable=True)
+    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'verified', 'failed', 'revoked')",
+                        name="ck_organization_domains_status"),
+        UniqueConstraint("organization_id", "domain", name="uq_organization_domains_org_domain"),
+        Index("uq_organization_domains_verified", "domain", unique=True, postgresql_where=text("status = 'verified'")),
+    )
+
+
+class OrganizationSeatEvent(Base):
+    """[Gate G5] ORG-01 席の記録(参加・脱退・上限の変更。seats_after はその後の席の数)。"""
+    __tablename__ = "organization_seat_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False,
+                             index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    event = Column(String(8), nullable=False)
+    seats_after = Column(Integer, nullable=False)
+    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("event IN ('join', 'leave', 'limit')", name="ck_organization_seat_events_event"),
+    )
+
+
+class UsageCounter(Base):
+    """[Gate G5] BILL-02 使用量(利用者 user・組織 org ごと、指標ごと、月 period=YYYY-MM ごと)。
+
+    上限の確認と加算は1つの UPDATE ... WHERE used + n <= limit で行い、同時の要求でも上限を越えない。
+    override_limit は管理者の上書き(理由つき・監査に残す)。"""
+    __tablename__ = "usage_counters"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_type = Column(String(4), nullable=False)
+    subject_id = Column(UUID(as_uuid=True), nullable=False)
+    metric = Column(String(24), nullable=False)
+    period = Column(String(7), nullable=False)
+    used = Column(BigInteger, nullable=False, default=0, server_default="0")
+    override_limit = Column(BigInteger, nullable=True)
+    override_reason = Column(String(200), nullable=True)
+    override_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                 index=True)
+    warned_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("subject_type", "subject_id", "metric", "period", name="uq_usage_counters_key"),
+        CheckConstraint("subject_type IN ('user', 'org')", name="ck_usage_counters_subject"),
+        CheckConstraint("used >= 0", name="ck_usage_counters_used"),
+        CheckConstraint("period ~ '^[0-9]{4}-[0-9]{2}$'", name="ck_usage_counters_period"),
+    )
 
 
 class OrganizationMember(Base):

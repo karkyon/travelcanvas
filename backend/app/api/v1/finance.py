@@ -11,6 +11,13 @@
                                      : メンバー間の精算記録(基準通貨)
 - GET /finance-summary               : 予算と実績の差異(全体・カテゴリ別・日別・個人)、予約額、メンバーごとの差額と精算案
 
+[Gate G5] FIN-01・FIN-02(為替の記録・予算の版・取消・締めの API は app/api/v1/finance_ledger.py):
+- 支出は fx_rate_id(記録した為替)で換算できる。端数は旅行ごとの規則(rounding_mode・remainder_to)に従う
+- 取り消した支出(voided_at)は一覧に残し、集計・精算・返金の合計から外す。取り消した支出は変更できない
+- 精算を締めた(locked_at)旅行は、支出・精算・基準通貨・端数の規則を変えられない(409 finance_locked)
+- 精算の記録は Idempotency-Key(任意)で同じ要求の二重の記録を防ぐ(同じ内容なら最初の記録を返す)
+- 予約額は、記録した為替があれば基準通貨へ換算し、無い通貨は通貨ごとの合計として別に示す(合計に混ぜない)
+
 権限:
 - 閲覧: viewer以上(個人の予算は本人だけ)
 - 予算(個人以外)・支出・基準通貨: editor以上。個人の予算は本人(viewer可)
@@ -27,7 +34,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
@@ -39,6 +48,7 @@ from app.models.models import (
     Document,
     Expense,
     ExpenseShare,
+    FxRate,
     PlanFinanceSettings,
     Reservation,
     Settlement,
@@ -99,12 +109,28 @@ def _currency(v: str) -> str:
 
 class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    base_currency: str
+    base_currency: Optional[str] = None
+    rounding_mode: Optional[str] = None  # [Gate G5] FIN-02
+    remainder_to: Optional[str] = None
 
     @field_validator("base_currency")
     @classmethod
     def _v(cls, v):
-        return _currency(v)
+        return None if v is None else _currency(v)
+
+    @field_validator("rounding_mode")
+    @classmethod
+    def _v_round(cls, v):
+        if v is not None and v not in finance.ROUNDING_MODES:
+            raise ValueError(f"rounding_mode must be one of {sorted(finance.ROUNDING_MODES)}")
+        return v
+
+    @field_validator("remainder_to")
+    @classmethod
+    def _v_rem(cls, v):
+        if v is not None and v not in finance.REMAINDER_RULES:
+            raise ValueError(f"remainder_to must be one of {list(finance.REMAINDER_RULES)}")
+        return v
 
 
 class BudgetCreate(BaseModel):
@@ -164,6 +190,7 @@ class ExpenseCreate(BaseModel):
     note: Optional[str] = Field(None, max_length=500)
     kind: str = "expense"
     refund_of_expense_id: Optional[str] = None
+    fx_rate_id: Optional[str] = None  # [Gate G5] FIN-01 記録した為替で換算する
 
     @field_validator("title")
     @classmethod
@@ -258,6 +285,27 @@ def _base_currency(db: Session, plan: TravelPlan) -> str:
     return s.base_currency if s else DEFAULT_CURRENCY
 
 
+def _policy(db: Session, plan: TravelPlan):
+    """[Gate G5] FIN-02 端数の規則 (rounding_mode, remainder_to)。"""
+    s = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
+    return (s.rounding_mode, s.remainder_to) if s else ("half_up", "largest")
+
+
+def assert_unlocked(db: Session, plan: TravelPlan) -> None:
+    """[Gate G5] FIN-02 精算を締めた旅行の支出・精算・設定は変えない。"""
+    s = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
+    if s is not None and s.locked_at is not None:
+        raise HTTPException(status_code=409, detail={
+            "code": "finance_locked",
+            "message": "精算を締めているため変更できません。所有者が締めを解除してから変更してください"})
+
+
+def latest_rate(db: Session, plan: TravelPlan, currency: str, base: str) -> Optional[FxRate]:
+    return (db.query(FxRate).filter(FxRate.plan_id == plan.id, FxRate.currency == currency,
+                                    FxRate.base_currency == base)
+            .order_by(FxRate.rate_date.desc(), FxRate.retrieved_at.desc(), FxRate.created_at.desc()).first())
+
+
 MAX_AMOUNT = Decimal("9999999999999999")  # Numeric(18,2) に収まる上限
 
 
@@ -277,7 +325,10 @@ def _check_minor(amount: Optional[Decimal], currency: str, label: str) -> None:
 def _settings_response(db: Session, plan: TravelPlan) -> dict:
     s = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
     return {"plan_id": str(plan.id), "base_currency": s.base_currency if s else DEFAULT_CURRENCY,
-            "revision": s.revision if s else 0, "is_default": s is None}
+            "revision": s.revision if s else 0, "is_default": s is None,
+            "rounding_mode": s.rounding_mode if s else "half_up", "remainder_to": s.remainder_to if s else "largest",
+            "locked_at": _iso(s.locked_at) if s else None,
+            "locked_by_user_id": str(s.locked_by_user_id) if s and s.locked_by_user_id else None}
 
 
 @router.get("/{plan_id}/finance-settings", response_model=dict)
@@ -293,10 +344,12 @@ def put_settings(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
-    s = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
+    s: Any = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
     _require_if_match(s.revision if s else 0, if_match, "基準通貨")
+    assert_unlocked(db, plan)
     current = s.base_currency if s else DEFAULT_CURRENCY
-    if payload.base_currency != current:
+    new_base = payload.base_currency or current
+    if new_base != current:
         in_use = (
             db.query(Expense.id).filter(Expense.plan_id == plan.id, Expense.deleted_at.is_(None)).first()
             or db.query(Budget.id).filter(Budget.plan_id == plan.id, Budget.deleted_at.is_(None)).first()
@@ -305,14 +358,19 @@ def put_settings(
         if in_use:
             raise HTTPException(status_code=409, detail="支出・予算・精算があるため基準通貨は変更できません(換算レートが変わるため)")
     if s is None:
-        s = PlanFinanceSettings(plan_id=plan.id, base_currency=payload.base_currency, revision=1)
+        s = PlanFinanceSettings(plan_id=plan.id, base_currency=new_base, revision=1,
+                                rounding_mode="half_up", remainder_to="largest")
         db.add(s)
     else:
-        s.base_currency = payload.base_currency
+        s.base_currency = new_base
         s.revision += 1
+    if payload.rounding_mode is not None:
+        s.rounding_mode = payload.rounding_mode
+    if payload.remainder_to is not None:
+        s.remainder_to = payload.remainder_to
     db.commit()
     _audit("finance_settings_updated", "plan", request, current_user, plan.id, plan.id,
-           {"base_currency": payload.base_currency})
+           {"base_currency": new_base, "rounding_mode": s.rounding_mode, "remainder_to": s.remainder_to})
     return _settings_response(db, plan)
 
 
@@ -477,6 +535,11 @@ def _expenses_query(db: Session, plan: TravelPlan):
     return db.query(Expense).filter(Expense.plan_id == plan.id, Expense.deleted_at.is_(None))
 
 
+def _active_expenses_query(db: Session, plan: TravelPlan):
+    """[Gate G5] 集計・精算・返金の合計に使う支出(取り消した支出を除く)。"""
+    return _expenses_query(db, plan).filter(Expense.voided_at.is_(None))
+
+
 def _get_expense(db: Session, plan: TravelPlan, expense_id: str) -> Expense:
     try:
         eid = uuid.UUID(str(expense_id))
@@ -542,12 +605,15 @@ def _expense_response(db: Session, plan: TravelPlan, e: Expense, base: str, memb
         "receipt_missing": receipt_missing,
         "note": e.note, "revision": e.revision,
         "created_at": _iso(e.created_at), "updated_at": _iso(e.updated_at),
+        # [Gate G5] FIN-01 使った為替の記録、FIN-02 取消
+        "fx_rate_id": str(e.fx_rate_id) if e.fx_rate_id else None,
+        "is_voided": e.voided_at is not None, "voided_at": _iso(e.voided_at), "void_reason": e.void_reason,
     }
 
 
 def _refunded_totals(db: Session, plan: TravelPlan) -> Dict[uuid.UUID, Decimal]:
     out: Dict[uuid.UUID, Decimal] = {}
-    for r in _expenses_query(db, plan).filter(Expense.kind == "refund").all():
+    for r in _active_expenses_query(db, plan).filter(Expense.kind == "refund").all():
         out[r.refund_of_expense_id] = out.get(r.refund_of_expense_id, Decimal(0)) + r.amount
     return out
 
@@ -570,6 +636,19 @@ def _apply_expense(db: Session, plan: TravelPlan, e: Expense, data: Dict[str, An
         if data.get(key) is not None and data[key] > data["amount"]:
             raise HTTPException(status_code=422, detail=f"{label}は金額以下にしてください")
     rate = data.get("fx_rate")
+    rounding, remainder_to = _policy(db, plan)
+    fx_row: Any = None
+    if data.get("fx_rate_id"):
+        # [Gate G5] FIN-01 記録した為替(出典・基準日つき)で換算する
+        fx_row = db.query(FxRate).filter(FxRate.id == _parse_uuid(data["fx_rate_id"], "fx_rate_id"),
+                                         FxRate.plan_id == plan.id).first()
+        if fx_row is None:
+            raise HTTPException(status_code=422, detail="為替の記録がこの旅行に見つかりません")
+        if currency == base or fx_row.currency != currency or fx_row.base_currency != base:
+            raise HTTPException(status_code=422, detail="為替の記録の通貨が支出の通貨・基準通貨と合いません")
+        if rate is not None and rate != fx_row.rate:
+            raise HTTPException(status_code=422, detail="fx_rateとfx_rate_idは同時に指定できません(どちらか一方)")
+        rate = fx_row.rate
     if currency == base:
         if rate is not None and rate != Decimal(1):
             raise HTTPException(status_code=422, detail="基準通貨の支出に換算レートは指定できません")
@@ -590,11 +669,11 @@ def _apply_expense(db: Session, plan: TravelPlan, e: Expense, data: Dict[str, An
                 raise HTTPException(status_code=422, detail="負担者はこのプランのメンバーから選んでください")
             participants.append(finance.Participant(uid, p.get("weight"), p.get("amount")))
     try:
-        shares = finance.split(data["amount"], currency, data["split_method"], participants, payer)
+        shares = finance.split(data["amount"], currency, data["split_method"], participants, payer, remainder_to)
     except finance.FinanceError as err:
         _fail(err)
 
-    base_amount = finance.convert(data["amount"], rate, base) if rate is not None else None
+    base_amount = finance.convert(data["amount"], rate, base, rounding) if rate is not None else None
     base_shares = finance.split_base(base_amount, base, shares) if base_amount is not None else [None] * len(shares)
 
     related_type = data.get("related_type")
@@ -622,8 +701,12 @@ def _apply_expense(db: Session, plan: TravelPlan, e: Expense, data: Dict[str, An
     e.tax_amount = data.get("tax_amount")
     e.fee_amount = data.get("fee_amount")
     e.fx_rate = rate
-    e.fx_source = None if currency == base else _strip_or_none(data.get("fx_source"))
-    e.fx_date = None if currency == base else data.get("fx_date")
+    e.fx_rate_id = fx_row.id if fx_row is not None else None  # type: ignore[assignment]
+    if fx_row is not None:
+        e.fx_source, e.fx_date = fx_row.source, fx_row.rate_date
+    else:
+        e.fx_source = None if currency == base else _strip_or_none(data.get("fx_source"))
+        e.fx_date = None if currency == base else data.get("fx_date")
     e.base_amount = base_amount
     e.paid_by_user_id = payer
     e.split_method = data["split_method"]
@@ -664,6 +747,7 @@ def create_expense(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
+    assert_unlocked(db, plan)
     base = _base_currency(db, plan)
     members = member_user_ids(db, plan)
     data = payload.model_dump()
@@ -679,13 +763,18 @@ def create_expense(
         refund_of = _get_expense(db, plan, payload.refund_of_expense_id)
         if refund_of.kind != "expense":
             raise HTTPException(status_code=422, detail="返金の元には支出を指定してください")
+        if refund_of.voided_at is not None:
+            raise HTTPException(status_code=422, detail="取り消した支出には返金を登録できません")
         if data["currency"] != refund_of.currency:
             raise HTTPException(status_code=422, detail="返金は元の支出と同じ通貨で入力してください")
         already = _refunded_totals(db, plan).get(refund_of.id, Decimal(0))
         if already + payload.amount > refund_of.amount:
             raise HTTPException(status_code=422, detail="返金の合計が元の支出額を超えます")
-        if payload.fx_rate is None and refund_of.fx_rate is not None:
-            data["fx_rate"] = refund_of.fx_rate
+        if payload.fx_rate is None and payload.fx_rate_id is None and refund_of.fx_rate is not None:
+            if refund_of.fx_rate_id is not None:
+                data["fx_rate_id"] = str(refund_of.fx_rate_id)
+            else:
+                data["fx_rate"] = refund_of.fx_rate
         if payload.participants is None and payload.split_method == "equal" and refund_of.shares:
             # 既定では元の支出の負担割合で返金を分ける
             data["split_method"] = "ratio"
@@ -719,6 +808,10 @@ def update_expense(
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
     e = _get_expense(db, plan, expense_id)
     _require_if_match(e.revision, if_match, "支出")
+    assert_unlocked(db, plan)
+    if e.voided_at is not None:
+        raise HTTPException(status_code=409, detail={"code": "expense_voided",
+                                                     "message": "取り消した支出は変更できません"})
     forbidden = {"kind", "refund_of_expense_id"} & set(payload)
     if forbidden:
         raise HTTPException(status_code=422, detail="支出と返金の種別・返金元は変更できません")
@@ -737,9 +830,14 @@ def update_expense(
         "related_type": e.related_type, "related_id": str(e.related_id) if e.related_id else None,
         "receipt_document_id": str(e.receipt_document_id) if e.receipt_document_id else None,
         "note": e.note,
+        "fx_rate_id": str(e.fx_rate_id) if e.fx_rate_id else None,
     }
+    if e.fx_rate_id is not None:
+        current["fx_rate"] = None  # 記録した為替は fx_rate_id から読み直す
     if "currency" in payload and "fx_rate" not in payload:
         current["fx_rate"] = None  # 通貨を変えたら以前のレートは引き継がない
+    if ("currency" in payload or "fx_rate" in payload) and "fx_rate_id" not in payload:
+        current["fx_rate_id"] = None
     try:
         merged = ExpenseCreate.model_validate({**current, **payload}).model_dump()
     except ValidationError as err:
@@ -779,6 +877,7 @@ def delete_expense(
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
     e = _get_expense(db, plan, expense_id)
     _require_if_match(e.revision, if_match, "支出")
+    assert_unlocked(db, plan)
     if e.kind == "expense" and _expenses_query(db, plan).filter(Expense.refund_of_expense_id == e.id).first():
         raise HTTPException(status_code=409, detail="返金が登録されている支出は削除できません(先に返金を削除してください)")
     e.deleted_at = _now()
@@ -818,9 +917,18 @@ def list_settlements(plan_id: str, db: Session = Depends(get_db),
 @router.post("/{plan_id}/settlements", status_code=201, response_model=dict)
 def create_settlement(
     plan_id: str, payload: SettlementCreate, request: Request,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    assert_unlocked(db, plan)
+    key = (idempotency_key or "").strip() or None
+    if key is not None and (len(key) > 100 or not key.isprintable()):
+        raise HTTPException(status_code=422, detail="Idempotency-Keyは100文字までの印字できる文字です")
+    if key is not None:
+        replay = _settlement_replay(db, plan, current_user, key, payload)
+        if replay is not None:
+            return replay
     base = _base_currency(db, plan)
     from_id = _parse_uuid(payload.from_user_id, "from_user_id")
     to_id = _parse_uuid(payload.to_user_id, "to_user_id")
@@ -837,12 +945,36 @@ def create_settlement(
     _check_minor(payload.amount, base, "精算額")
     s = Settlement(id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, from_user_id=from_id,
                    to_user_id=to_id, amount=payload.amount, currency=base, settled_on=payload.settled_on,
-                   note=_strip_or_none(payload.note))
+                   note=_strip_or_none(payload.note), idempotency_key=key)
     db.add(s)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 同じ Idempotency-Key の要求が同時に届いた(先に記録した方を返す)
+        db.rollback()
+        replay = _settlement_replay(db, plan, current_user, key, payload) if key else None
+        if replay is None:
+            raise
+        return replay
     db.refresh(s)
     _audit("settlement_created", "settlement", request, current_user, s.id, plan.id)
     return _settlement_response(s, member_names(db, {from_id, to_id}))
+
+
+def _settlement_replay(db: Session, plan: TravelPlan, user: User, key: str, payload: SettlementCreate):
+    """[Gate G5] FIN-02 同じ Idempotency-Key の記録があれば、同じ内容なら最初の記録(200)、違えば 409。"""
+    prev: Any = db.query(Settlement).filter(Settlement.plan_id == plan.id, Settlement.created_by_user_id == user.id,
+                                            Settlement.idempotency_key == key).first()
+    if prev is None:
+        return None
+    same = (str(prev.from_user_id) == str(payload.from_user_id).lower() and
+            str(prev.to_user_id) == str(payload.to_user_id).lower() and prev.amount == payload.amount)
+    if not same:
+        raise HTTPException(status_code=409, detail={"code": "idempotency_key_reused",
+                                                     "message": "このIdempotency-Keyは別の内容の精算に使われています"})
+    body = _settlement_response(prev, member_names(db, {prev.from_user_id, prev.to_user_id}))
+    body["replayed"] = True
+    return JSONResponse(status_code=200, content=body)
 
 
 @router.delete("/{plan_id}/settlements/{settlement_id}", response_model=dict)
@@ -862,6 +994,7 @@ def delete_settlement(
     if role not in ("owner", "editor") and s.created_by_user_id != current_user.id:
         raise HTTPException(status_code=403, detail="精算を取り消せるのは記録した人か編集者です")
     _require_if_match(s.revision, if_match, "精算")
+    assert_unlocked(db, plan)
     s.deleted_at = _now()
     s.revision += 1
     db.commit()
@@ -877,7 +1010,10 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="viewer")
     base = _base_currency(db, plan)
     members = member_user_ids(db, plan)
-    expenses = _expenses_query(db, plan).all()
+    expenses = _active_expenses_query(db, plan).all()
+    voided = _expenses_query(db, plan).filter(Expense.voided_at.isnot(None)).count()
+    rounding, _remainder = _policy(db, plan)
+    settings_row = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
     settlements = [s for s in _settlements_query(db, plan).all() if s.currency == base]
 
     views = []
@@ -890,9 +1026,9 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
             continue
         sign = -1 if e.kind == "refund" else 1
         if e.tax_amount is not None:
-            tax += sign * finance.to_minor(finance.convert(e.tax_amount, e.fx_rate, base), base)
+            tax += sign * finance.to_minor(finance.convert(e.tax_amount, e.fx_rate, base, rounding), base)
         if e.fee_amount is not None:
-            fee += sign * finance.to_minor(finance.convert(e.fee_amount, e.fx_rate, base), base)
+            fee += sign * finance.to_minor(finance.convert(e.fee_amount, e.fx_rate, base, rounding), base)
         views.append(finance.ExpenseView(
             kind=e.kind, category=e.category, local_date=e.local_date.isoformat() if e.local_date else None,
             paid_by=e.paid_by_user_id, base_minor=finance.to_minor(e.base_amount, base), tax_minor=0, fee_minor=0,
@@ -945,19 +1081,7 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
         my_budget = {"id": str(my_budget_row.id), **diff_row(amount, my_owed),
                      "visibility": "full" if amount is not None else "unavailable"}
 
-    reserved_minor = 0
-    reserved_unconverted = 0
-    for r in db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None)).all():
-        if r.total_amount is None or r.status not in ACTIVE_RESERVATION:
-            continue
-        if r.currency != base:
-            reserved_unconverted += 1
-            continue
-        try:
-            reserved_minor += finance.to_minor(Decimal(str(r.total_amount)).quantize(
-                Decimal(1).scaleb(-finance.minor_digits(base))), base)
-        except finance.FinanceError:
-            reserved_unconverted += 1
+    reserved = reserved_amounts(db, plan, base, rounding)
 
     member_rows = []
     for uid, row in bal.items():
@@ -978,7 +1102,12 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
         "base_currency": base,
         "total": diff_row(total_budget, actual_total),
         "tax_total": money(tax), "fee_total": money(fee), "refund_total": money(refund_total),
-        "reserved": {"total": money(reserved_minor), "unconverted": reserved_unconverted},
+        "reserved": {"total": money(reserved["minor"]), "unconverted": reserved["unconverted"],
+                     "converted_with_rates": reserved["converted"],
+                     "unconverted_by_currency": reserved["unconverted_by_currency"]},
+        "voided_expenses": voided,
+        "rounding_mode": rounding,
+        "locked": settings_row is not None and settings_row.locked_at is not None,
         "by_category": by_category,
         "by_day": by_day_rows,
         "undated_actual": money(undated),
@@ -988,3 +1117,38 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
         "transfers": transfers,
         "is_settled": all(r["net"] == 0 for r in bal.values()),
     }
+
+
+def reserved_amounts(db: Session, plan: TravelPlan, base: str, rounding: str = "half_up",
+                     statuses=ACTIVE_RESERVATION) -> Dict[str, Any]:
+    """[Gate G5] FIN-01 予約額の合計(基準通貨・最小単位)。外貨は記録した為替の最新で換算し、為替の無い通貨は
+    通貨ごとの合計として別に返す(基準通貨の合計に混ぜない)。"""
+    minor = converted = unconverted = 0
+    by_currency: Dict[str, Decimal] = {}
+    by_type: Dict[str, int] = {}
+    rows: List[Any] = db.query(Reservation).filter(Reservation.plan_id == plan.id,
+                                                   Reservation.deleted_at.is_(None)).all()
+    for r in rows:
+        if r.total_amount is None or r.status not in statuses:
+            continue
+        amount = Decimal(str(r.total_amount))
+        cur = (r.currency or "").upper()
+        try:
+            if cur == base:
+                value = finance.to_minor(amount.quantize(Decimal(1).scaleb(-finance.minor_digits(base))), base)
+            else:
+                rate: Any = latest_rate(db, plan, cur, base) if len(cur) == 3 else None
+                if rate is None:
+                    raise finance.FinanceError("no rate")
+                value = finance.to_minor(finance.convert(amount, rate.rate, base, rounding), base)
+                converted += 1
+        except (finance.FinanceError, InvalidOperation):
+            unconverted += 1
+            label = cur or "不明"
+            by_currency[label] = by_currency.get(label, Decimal(0)) + amount
+            continue
+        minor += value
+        by_type[r.type or "other"] = by_type.get(r.type or "other", 0) + value
+    return {"minor": minor, "converted": converted, "unconverted": unconverted,
+            "unconverted_by_currency": {k: _plain(v) for k, v in sorted(by_currency.items())},
+            "by_type": by_type}

@@ -8,12 +8,17 @@
 - 換算: 利用者が入力したレート(1 外貨 = rate 基準通貨)で基準通貨の最小単位へ四捨五入する。
   レートの無い外貨の支出は換算せず、集計・精算から除外して件数で示す(EX-013)。
 - 精算: 各メンバーの差額(受け取るべき額が正)から、送金回数の少ない組み合わせ(大きい債務者→大きい債権者の順)を作る。
+- [Gate G5] FIN-02 端数の規則(旅行ごと): 換算の丸め(rounding: half_up 四捨五入・down 切り捨て・up 切り上げ)と、
+  分担で割り切れない最小単位を誰に配るか(remainder_to: largest 切り捨てた量の大きい順・payer 支払った人・first 入力順)。
+  既定は half_up・largest(以前と同じ結果)。
 """
 from dataclasses import dataclass
-from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 from typing import Dict, Hashable, List, Optional, Sequence, Tuple
 
 ALGORITHM_VERSION = "finance-v1"
+ROUNDING_MODES = {"half_up": ROUND_HALF_UP, "down": ROUND_DOWN, "up": ROUND_UP}
+REMAINDER_RULES = ("largest", "payer", "first")
 
 # ISO 4217 の小数桁が0の主な通貨。3桁の通貨(KWD等)は金額列(小数2桁)で表せないため扱わない。
 ZERO_DECIMAL = {
@@ -52,9 +57,11 @@ def fmt(amount: Optional[Decimal], currency: str) -> Optional[str]:
     return str(Decimal(amount).quantize(Decimal(1).scaleb(-digits)))
 
 
-def convert(amount: Decimal, rate: Decimal, base_currency: str) -> Decimal:
+def convert(amount: Decimal, rate: Decimal, base_currency: str, rounding: str = "half_up") -> Decimal:
     digits = minor_digits(base_currency)
-    return (amount * rate).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
+    if rounding not in ROUNDING_MODES:
+        raise FinanceError(f"不明な丸め方です: {rounding}")
+    return (amount * rate).quantize(Decimal(1).scaleb(-digits), rounding=ROUNDING_MODES[rounding])
 
 
 @dataclass(frozen=True)
@@ -72,23 +79,35 @@ class ShareResult:
     weight: Optional[Decimal]
 
 
-def _allocate(total_minor: int, weights: Sequence[Decimal]) -> List[Tuple[int, int]]:
-    """total_minor を weights の比で整数に配る。(配った額, 端数として上乗せした最小単位数) のリスト。"""
+def _allocate(total_minor: int, weights: Sequence[Decimal], remainder_to: str = "largest",
+              payer_index: Optional[int] = None) -> List[Tuple[int, int]]:
+    """total_minor を weights の比で整数に配る。(配った額, 端数として上乗せした最小単位数) のリスト。
+
+    remainder_to: largest(切り捨てた量の大きい順、同じなら入力順)・first(入力順)・payer(支払った人に全部。
+    支払った人が負担者にいなければ largest)。"""
     wsum = sum(weights)
     if wsum <= 0:
         raise FinanceError("分担の比率の合計が0です")
+    if remainder_to not in REMAINDER_RULES:
+        raise FinanceError(f"不明な端数の配り方です: {remainder_to}")
     raw = [Decimal(total_minor) * w / wsum for w in weights]
     floors = [int(r.to_integral_value(rounding=ROUND_DOWN)) for r in raw]
     remainder = total_minor - sum(floors)
-    order = sorted(range(len(weights)), key=lambda i: (-(raw[i] - floors[i]), i))
     extra = [0] * len(weights)
-    for i in order[:remainder]:
-        extra[i] = 1
+    if remainder_to == "payer" and payer_index is not None and remainder > 0:
+        extra[payer_index] = remainder
+        return [(floors[i] + extra[i], extra[i]) for i in range(len(weights))]
+    if remainder_to == "first":
+        order = [i for i in range(len(weights)) if weights[i] > 0]
+    else:
+        order = sorted(range(len(weights)), key=lambda i: (-(raw[i] - floors[i]), i))
+    for k in range(remainder):
+        extra[order[k % len(order)]] += 1
     return [(floors[i] + extra[i], extra[i]) for i in range(len(weights))]
 
 
 def split(amount: Decimal, currency: str, method: str, participants: Sequence[Participant],
-          payer: Hashable) -> List[ShareResult]:
+          payer: Hashable, remainder_to: str = "largest") -> List[ShareResult]:
     total = to_minor(amount, currency)
     if method == "none":
         return [ShareResult(payer, total, 0, None)]
@@ -97,8 +116,9 @@ def split(amount: Decimal, currency: str, method: str, participants: Sequence[Pa
     ids = [p.user_id for p in participants]
     if len(set(ids)) != len(ids):
         raise FinanceError("同じ負担者が重複しています")
+    payer_index = ids.index(payer) if payer in ids else None
     if method == "equal":
-        alloc = _allocate(total, [Decimal(1)] * len(participants))
+        alloc = _allocate(total, [Decimal(1)] * len(participants), remainder_to, payer_index)
         return [ShareResult(p.user_id, a, e, None) for p, (a, e) in zip(participants, alloc)]
     if method == "ratio":
         weights = []
@@ -106,7 +126,7 @@ def split(amount: Decimal, currency: str, method: str, participants: Sequence[Pa
             if p.weight is None or p.weight <= 0:
                 raise FinanceError("比率で分ける場合は、全員に0より大きい比率を指定してください")
             weights.append(p.weight)
-        alloc = _allocate(total, weights)
+        alloc = _allocate(total, weights, remainder_to, payer_index)
         return [ShareResult(p.user_id, a, e, p.weight) for p, (a, e) in zip(participants, alloc)]
     if method == "amount":
         shares = []

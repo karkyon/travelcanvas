@@ -19,6 +19,7 @@ import { getAdminStats } from '../../services/api';
 import { apiErrorMessage } from '../../utils/apiError';
 import type { AdminSystemStats } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import AdminUsagePanel from './AdminUsagePanel';
 
 // [Gate A2] 応答の形は services/api の adminSystemStats で検査する
 type SystemStats = AdminSystemStats;
@@ -243,6 +244,9 @@ const AdminDashboard: React.FC = () => {
           </Button>
         </div>
       </Card>
+
+      {/* [Gate G5] BILL-02 使用量と上限の上書き */}
+      <AdminUsagePanel />
     </div>
   );
 };

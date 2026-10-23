@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r16",
+  "revision": "v5.1-r17",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -221,19 +221,19 @@
   },
   "FR-027": {
    "title": "予算・費用",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "P2",
-   "gaps": "予算の版、為替の自動取得、他通貨の予約額の合計"
+   "gates": "P2・G5",
+   "gaps": "為替の自動取得(外部の提供元。決まるまで出典つきの手入力の記録)、本番での確認(RELEASE-1)"
   },
   "FR-028": {
    "title": "立替・精算",
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P2",
-   "gaps": "領収書を紐付ける画面"
+   "gates": "P2・G5",
+   "gaps": "本番での確認(RELEASE-1)"
   },
   "FR-029": {
    "title": "当日モード",
@@ -336,8 +336,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "B1",
-   "gaps": "ロゴ・独自ドメイン、組織の料金・容量(FR-058 待ち)"
+   "gates": "B1・G5",
+   "gaps": "組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1)"
   },
   "FR-042": {
    "title": "API・埋込",
@@ -473,7 +473,7 @@
    "partial": false,
    "e2e": "✗",
    "gates": "—",
-   "gaps": "価格・有料の範囲の製品判断待ち(決まるまで実装しない)"
+   "gaps": "価格・有料の範囲の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。料金・支払いは決まるまで実装しない)"
   }
  }
 }

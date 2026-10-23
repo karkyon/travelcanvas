@@ -122,7 +122,9 @@ def test_settings_default_and_change_guarded(auth_client):
     client, _ = auth_client
     p = _plan(client)
     assert client.get(f"/api/v1/plans/{p}/finance-settings").json() == {
-        "plan_id": p, "base_currency": "JPY", "revision": 0, "is_default": True}
+        "plan_id": p, "base_currency": "JPY", "revision": 0, "is_default": True,
+        # [Gate G5] FIN-02 端数の規則・精算の締め
+        "rounding_mode": "half_up", "remainder_to": "largest", "locked_at": None, "locked_by_user_id": None}
     assert client.put(f"/api/v1/plans/{p}/finance-settings", json={"base_currency": "USD"}).status_code == 428
     res = client.put(f"/api/v1/plans/{p}/finance-settings", json={"base_currency": "USD"}, headers={"If-Match": "0"})
     assert res.status_code == 200 and res.json()["base_currency"] == "USD" and res.json()["revision"] == 1
@@ -324,7 +326,9 @@ def test_summary_budget_vs_actual(auth_client, make_user, db_session):
     days = {d["local_date"]: d for d in s["by_day"]}
     assert days["2026-11-01"]["over"] is False and days["2026-11-02"]["actual"] == "2000"
     assert s["undated_actual"] == "600" and s["fee_total"] == "200"
-    assert s["reserved"] == {"total": "12000", "unconverted": 1}
+    # [Gate G5] FIN-01 為替の記録が無い外貨の予約は、通貨ごとの合計として別に示す
+    assert s["reserved"] == {"total": "12000", "unconverted": 1, "converted_with_rates": 0,
+                             "unconverted_by_currency": {"USD": "300"}}
     assert s["my_budget"]["budget"] == "3000" and s["my_budget"]["actual"] == "3300" and s["my_budget"]["over"] is True
 
 
