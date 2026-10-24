@@ -10,10 +10,17 @@
  * - 失効(版を上げる)すると、次に鍵を受け取った時に、それより古い版で暗号化したデータを端末から消す。
  * - 暗号文には利用者 ID と鍵の版を付け(AES-GCM の追加認証データにも入れる)、別の利用者・失効した版では開かない。
  *
+ * - [Gate G6] OFF-01 鍵は端末ごと(device_id。syncQueue.deviceId)。設定から1台だけを失効でき、失効した端末は次に通信した時に
+ *   410 を受け取り、その利用者の保存したデータと鍵を消す(他の端末はそのまま)。鍵には期限(既定30日)があり、
+ *   期限を過ぎた端末の鍵は、通信して受け取り直すまで使わない。端末の鍵で暗号化した物には端末の ID も付ける。
+ *   端末の ID は IndexedDB(meta の device_id)にも置く。ログアウトや localStorage の消去の後も同じ端末として鍵を受け取り直し、
+ *   保存したデータを開ける(以前の利用者ごとの鍵と同じ振る舞い)。失効した端末は ID を作り直す(次は新しい端末として登録する)。
+ *
  * 限界: 同じブラウザで動くスクリプト(XSS・悪意ある拡張)は鍵を「使う」ことができる。ここで守れるのは、
  * IndexedDB のファイルのコピー・ログアウト後の端末・失効後の端末から読まれることまで。
  */
 import { getOfflinePackKey } from '@/services/api';
+import { deviceId } from './syncQueue';
 
 export const OFFLINE_DB_NAME = 'travelcanvas-offline';
 const DB_VERSION = 2;
@@ -34,19 +41,79 @@ export interface OfflineKey {
   userId: string;
   version: number;
   key: CryptoKey;
+  /** [Gate G6] 端末の鍵の時だけ */
+  deviceId?: string;
 }
 
 export interface SealedFields {
   format: typeof SEALED_FORMAT;
   userId: string;
   keyVersion: number;
+  /** [Gate G6] 端末の鍵で暗号化した時の端末の ID(追加認証データにも入れる) */
+  deviceId?: string;
   iv: ArrayBuffer;
   ciphertext: ArrayBuffer;
 }
 
-type StoredKey = { key: string; userId: string; version: number; cryptoKey: CryptoKey; savedAt: number };
+type StoredKey = {
+  key: string; userId: string; version: number; cryptoKey: CryptoKey; savedAt: number; deviceId?: string; expiresAt?: number;
+};
 
 let memo: (OfflineKey & { sessionTag: string; at: number }) | null = null;
+
+const DEVICE_RECORD = 'device_id';
+const DEVICE_STORAGE_KEY = 'tc_device_id';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const newUuid = (): string => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : deviceId());
+
+function rememberInLocalStorage(id: string): void {
+  try {
+    localStorage.setItem(DEVICE_STORAGE_KEY, id);
+  } catch {
+    // 使えない環境では IndexedDB の値だけを使う
+  }
+}
+
+/**
+ * [Gate G6] この端末の ID(オフラインの鍵・同期の操作で使う)。IndexedDB の値を正とし、localStorage(同期の操作の ID)にも写す。
+ * どちらにも無ければ作る。UUID の形でない値(localStorage が使えない時の仮の値)は使わない。
+ */
+export async function offlineDeviceId(): Promise<string> {
+  try {
+    const rec = await idbGet<{ key: string; value?: unknown }>(META_STORE, DEVICE_RECORD);
+    if (rec && typeof rec.value === 'string' && UUID_RE.test(rec.value)) {
+      rememberInLocalStorage(rec.value);
+      return rec.value;
+    }
+  } catch {
+    // IndexedDB が使えない: localStorage の値を使う
+  }
+  const fromStorage = deviceId();
+  const id = UUID_RE.test(fromStorage) ? fromStorage : newUuid();
+  rememberInLocalStorage(id);
+  try {
+    await idbPut(META_STORE, { key: DEVICE_RECORD, value: id });
+  } catch {
+    // 置けない環境では次も localStorage の値を使う
+  }
+  return id;
+}
+
+/** [Gate G6] 端末の ID を作り直す(この端末を失効した後。次に鍵を受け取る時は新しい端末として登録する) */
+export async function resetOfflineDeviceId(): Promise<void> {
+  try {
+    localStorage.removeItem(DEVICE_STORAGE_KEY);
+  } catch {
+    // 何もしない
+  }
+  try {
+    await idbDelete(META_STORE, DEVICE_RECORD);
+  } catch {
+    // 何もしない
+  }
+}
 
 export function openOfflineDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -122,7 +189,8 @@ const statusOf = (error: unknown) => (error as { response?: { status?: number } 
 async function storedKeyFor(userId: string): Promise<OfflineKey | null> {
   try {
     const stored = await idbGet<StoredKey>(META_STORE, KEY_PREFIX + userId);
-    return stored ? { userId: stored.userId, version: stored.version, key: stored.cryptoKey } : null;
+    if (!stored || (stored.expiresAt && Date.now() > stored.expiresAt)) return null; // 期限切れの鍵は使わない
+    return { userId: stored.userId, version: stored.version, key: stored.cryptoKey, deviceId: stored.deviceId };
   } catch {
     return null;
   }
@@ -136,20 +204,22 @@ export async function obtainOfflineKey(session: OfflineSession | null, options: 
   if (!session) return null;
   if (!options.refresh && memo && memo.userId === session.userId && memo.sessionTag === session.sessionTag
       && Date.now() - memo.at < MEMO_TTL_MS) {
-    return { userId: memo.userId, version: memo.version, key: memo.key };
+    return { userId: memo.userId, version: memo.version, key: memo.key, deviceId: memo.deviceId };
   }
   try {
-    const issued = await getOfflinePackKey();
+    const issued = await getOfflinePackKey(await offlineDeviceId());
     if (issued.user_id !== session.userId) return null; // 別の利用者の鍵は使わない
     const cryptoKey = await crypto.subtle.importKey(
       'raw', base64UrlToBytes(issued.key) as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'],
     );
-    const result: OfflineKey = { userId: issued.user_id, version: issued.key_version, key: cryptoKey };
+    const result: OfflineKey = { userId: issued.user_id, version: issued.key_version, key: cryptoKey, deviceId: issued.device_id };
     try {
+      const expiresAt = issued.expires_at ? Date.parse(issued.expires_at) : NaN;
       await idbPut(META_STORE, {
         key: KEY_PREFIX + result.userId, userId: result.userId, version: result.version, cryptoKey, savedAt: Date.now(),
+        deviceId: result.deviceId, expiresAt: Number.isFinite(expiresAt) ? expiresAt : undefined,
       } satisfies StoredKey);
-      await purgeRevoked(result.userId, result.version);
+      await purgeRevoked(result.userId, result.version, result.deviceId);
     } catch {
       // 端末に置けない環境でも、この画面の間は使える
     }
@@ -157,6 +227,13 @@ export async function obtainOfflineKey(session: OfflineSession | null, options: 
     return result;
   } catch (error) {
     const status = statusOf(error);
+    if (status === 410) {
+      // [Gate G6] この端末は失効した: この利用者の保存したデータと鍵を消す(他の端末は影響を受けない)
+      await forgetKeyFor(session.userId);
+      await purgeRevoked(session.userId, Number.MAX_SAFE_INTEGER);
+      await resetOfflineDeviceId();
+      return null;
+    }
     if (status === 404 || status === 401) {
       // 無効化された利用者・ログインが切れた: 端末の鍵も使わない
       await forgetKeyFor(session.userId);
@@ -196,16 +273,20 @@ export function resetOfflineKeyMemoForTesting(): void {
   memo = null;
 }
 
-const aad = (userId: string, version: number) => new TextEncoder().encode(`travelcanvas/offline/v2|${userId}|${version}`);
+const aad = (userId: string, version: number, device?: string) =>
+  new TextEncoder().encode(`travelcanvas/offline/v2|${userId}|${version}${device ? `|${device}` : ''}`);
 
 export async function seal(key: OfflineKey, data: unknown): Promise<SealedFields> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify(data));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad(key.userId, key.version) as BufferSource },
+    { name: 'AES-GCM', iv: iv as BufferSource, additionalData: aad(key.userId, key.version, key.deviceId) as BufferSource },
     key.key, plaintext,
   );
-  return { format: SEALED_FORMAT, userId: key.userId, keyVersion: key.version, iv: iv.buffer as ArrayBuffer, ciphertext };
+  return {
+    format: SEALED_FORMAT, userId: key.userId, keyVersion: key.version, deviceId: key.deviceId, iv: iv.buffer as ArrayBuffer,
+    ciphertext,
+  };
 }
 
 export function isSealed(value: unknown): value is SealedFields {
@@ -215,10 +296,12 @@ export function isSealed(value: unknown): value is SealedFields {
 
 /** 別の利用者・別の版のものは開かない(null)。改ざん・鍵違いも null */
 export async function unseal<T>(record: SealedFields, key: OfflineKey): Promise<T | null> {
-  if (!isSealed(record) || record.userId !== key.userId || record.keyVersion !== key.version) return null;
+  if (!isSealed(record) || record.userId !== key.userId || record.keyVersion !== key.version
+      || record.deviceId !== key.deviceId) return null;
   try {
     const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: record.iv as BufferSource, additionalData: aad(record.userId, record.keyVersion) as BufferSource },
+      { name: 'AES-GCM', iv: record.iv as BufferSource,
+        additionalData: aad(record.userId, record.keyVersion, record.deviceId) as BufferSource },
       key.key, record.ciphertext,
     );
     return JSON.parse(new TextDecoder().decode(plaintext)) as T;
@@ -227,13 +310,14 @@ export async function unseal<T>(record: SealedFields, key: OfflineKey): Promise<
   }
 }
 
-/** 失効した版(今の版より古い)で暗号化した、この利用者のデータを端末から消す */
-export async function purgeRevoked(userId: string, currentVersion: number): Promise<number> {
+/** 失効した版(今の版より古い)・別の鍵(端末の鍵に替わる前の利用者の鍵)で暗号化した、この利用者のデータを端末から消す */
+export async function purgeRevoked(userId: string, currentVersion: number, currentDevice?: string): Promise<number> {
   let removed = 0;
   for (const store of [PACKS_STORE, SNAPSHOTS_STORE]) {
     const records = await idbGetAll<SealedFields & { planId?: string; key?: string }>(store);
     for (const r of records) {
-      if (isSealed(r) && r.userId === userId && r.keyVersion < currentVersion) {
+      if (isSealed(r) && r.userId === userId
+          && (r.keyVersion < currentVersion || (currentDevice !== undefined && r.deviceId !== currentDevice))) {
         await idbDelete(store, (store === PACKS_STORE ? r.planId : r.key) as IDBValidKey);
         removed += 1;
       }
@@ -265,7 +349,7 @@ export async function loadSnapshot<T>(session: OfflineSession | null, name: stri
     if (!record) return null;
     const key = await obtainOfflineKey(session);
     if (!key) return null;
-    if (record.keyVersion < key.version) {
+    if (record.keyVersion < key.version || record.deviceId !== key.deviceId) {
       await idbDelete(SNAPSHOTS_STORE, record.key);
       return null;
     }

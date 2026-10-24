@@ -519,6 +519,14 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       // を取りに行く。
       await get().loadPlan(plan.id);
     } catch (error) {
+      // [Gate G6] OFF-02 通信できない時は日程の作成を端末に溜める(この日程への予定の追加も仮のIDのまま溜められる)
+      if (isNetworkError(error) && enqueue(plan.id, {
+        entity_type: 'day', action: 'create', temp_id: tempId, label: localDate, fields: { local_date: localDate },
+      })) {
+        get().refreshSyncState(plan.id);
+        toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+        return;
+      }
       set({ currentPlan: plan });
       console.error('Add day error:', error);
       toast.error('日程の追加に失敗しました');
@@ -829,6 +837,15 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       }
       set((s) => (s.currentPlan ? { currentPlan: { ...s.currentPlan, revision } } : s));
     } catch (error) {
+      // [Gate G6] OFF-02 通信できない時は並びを端末に溜める(送る時にサーバーの予定の集まりと違えば競合として知らせる)
+      if (isNetworkError(error) && enqueue(plan.id, {
+        entity_type: 'order', action: 'reorder', base_revision: plan.revision, label: `${day.date} の並び`,
+        fields: { day_id: day.id, order: reorderedEvents.map((e) => e.id) },
+      })) {
+        get().refreshSyncState(plan.id);
+        toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+        return;
+      }
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
     }

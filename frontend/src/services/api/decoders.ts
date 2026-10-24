@@ -1577,7 +1577,8 @@ export const syncConflictList: Decoder<SyncConflictList> = object<SyncConflictLi
   plan_revision: int,
   conflicts: arrayOf(object({
     operation_id: str,
-    action: oneOf('create', 'update', 'delete'),
+    action: oneOf('create', 'update', 'delete', 'reorder'),
+    entity_type: optional(oneOf('event', 'day', 'order', 'reservation')),
     code: nullable(str),
     message: nullable(str),
     entity_id: nullable(str),
@@ -1624,7 +1625,7 @@ export const memoryList: Decoder<MemoryList> = object<MemoryList>({
   can_create: bool,
   max_upload_bytes: nonNegativeInt,
 });
-const journalMemory: Decoder<JournalMemory> = object<JournalMemory>({
+export const journalMemory: Decoder<JournalMemory> = object<JournalMemory>({
   id: str,
   kind: memoryKind,
   body: nullable(str),
@@ -1892,6 +1893,9 @@ const offlineKeyFields = {
   algorithm: oneOf('AES-256-GCM'),
   key_bits: exactNumber(256),
   issued_at: str,
+  // [Gate G6] OFF-01 端末ごとの鍵(device_id を付けて受け取った時だけ)
+  device_id: optional(str),
+  expires_at: optional(str),
 };
 export const offlinePackKey: Decoder<OfflinePackKey> = object<OfflinePackKey>(offlineKeyFields);
 export const offlinePackKeyRotated: Decoder<OfflinePackKeyRotated> = object<OfflinePackKeyRotated>({

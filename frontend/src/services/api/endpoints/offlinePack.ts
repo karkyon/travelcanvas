@@ -14,8 +14,9 @@ import { offlinePackKey, offlinePackKeyRotated } from '../decoders';
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class OfflinePackApi extends MemoryReplanApi {
-  async getOfflinePackKey(): Promise<OfflinePackKey> {
-    const response = await this.client.get('/offline-pack/key', SILENT);
+  async getOfflinePackKey(deviceId?: string): Promise<OfflinePackKey> {
+    // [Gate G6] OFF-01 端末ごとの鍵(端末を失効すると、その端末だけ 410)
+    const response = await this.client.get('/offline-pack/key', deviceId ? { ...SILENT, params: { device_id: deviceId } } : SILENT);
     return decodeResponse(response.data, offlinePackKey, 'GET /offline-pack/key');
   }
 

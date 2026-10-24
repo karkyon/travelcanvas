@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
-import { guestTokenFrom } from './support/guestPlan';
+import { guestTokenFrom, waitForGuestResponse } from './support/guestPlan';
 
 /**
  * [Gate P16] FR-046 画像出力(CA-004)のbrowser E2E。画像は実ブラウザのcanvasで作る。
@@ -26,7 +26,7 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 
 test('画像出力: しおりから機密を含めない画像(縦長・正方形)を端末で作り、保存できる', async ({ page, context }) => {
   await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
+  const guestResponse = waitForGuestResponse(page);
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   const guest = await guestResponse;
   const apiBase = guest.url().replace(/\/auth\/guest$/, '');

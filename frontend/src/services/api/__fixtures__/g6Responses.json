@@ -1,0 +1,419 @@
+{
+ "_meta": {
+  "description": "[Gate G6] 実backend(FastAPI + PostgreSQL 16)へ TestClient で呼び出して採取した応答(鍵の値・公開のURLは伏せた)。decodersG6 がこれらを受理することを固定する。"
+ },
+ "offline_key_device": {
+  "user_id": "ff7ffd79-3de6-4a24-aedb-4054dfdb385a",
+  "key_version": 1,
+  "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "algorithm": "AES-256-GCM",
+  "key_bits": 256,
+  "issued_at": "2026-10-23T04:58:20.869961+00:00",
+  "device_id": "11111111-2222-4333-8444-555555555555",
+  "device": "2226482c-bc9f-4eed-b669-40df5ce06a18",
+  "expires_at": "2026-11-22T04:58:20.862716+00:00"
+ },
+ "offline_devices": {
+  "devices": [
+   {
+    "id": "2226482c-bc9f-4eed-b669-40df5ce06a18",
+    "label": "ブラウザ",
+    "created_at": "2026-10-23T04:58:20.240990+00:00",
+    "last_key_at": "2026-10-23T04:58:20.862716+00:00",
+    "revoked_at": null,
+    "is_current": true
+   }
+  ],
+  "max_devices": 10
+ },
+ "offline_device_revoked": {
+  "id": "2226482c-bc9f-4eed-b669-40df5ce06a18",
+  "label": "ブラウザ",
+  "created_at": "2026-10-23T04:58:20.240990+00:00",
+  "last_key_at": "2026-10-23T04:58:20.862716+00:00",
+  "revoked_at": "2026-10-23T04:58:20.890709+00:00",
+  "is_current": false
+ },
+ "privacy_zone": {
+  "id": "5e15b015-7efc-4c56-9e93-a7dc783cdea7",
+  "label": "自宅",
+  "radius_m": 300,
+  "latitude": 35.0116,
+  "longitude": 135.7681,
+  "readable": true,
+  "created_at": "2026-10-23T04:58:20.240990+00:00"
+ },
+ "privacy_zones": {
+  "zones": [
+   {
+    "id": "5e15b015-7efc-4c56-9e93-a7dc783cdea7",
+    "label": "自宅",
+    "radius_m": 300,
+    "latitude": 35.0116,
+    "longitude": 135.7681,
+    "readable": true,
+    "created_at": "2026-10-23T04:58:20.240990+00:00"
+   }
+  ],
+  "max_zones": 10,
+  "radius_range": [
+   100,
+   5000
+  ]
+ },
+ "publication_preview": {
+  "title": "旅の記録テスト",
+  "algorithm_version": "journal-draft-v1",
+  "generated_at": "2026-10-23T04:58:21.021556+00:00",
+  "options": {
+   "include_locations": false,
+   "include_media": true,
+   "include_others": false
+  },
+  "days": [
+   {
+    "day_id": "e874b4de-4638-491b-8c57-ecece850d497",
+    "date": "2026-11-01",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "6e647833-e7be-4977-a26b-5c46e04208db",
+      "title": "清水寺",
+      "planned_time": "09:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "bfa463f6-04e6-49a8-8bff-ab8417684e37",
+        "kind": "note",
+        "body": "清水寺は朝が静か",
+        "occurred_at": null,
+        "place_name": "清水の舞台",
+        "has_media": false,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     },
+     {
+      "event_id": "52c15757-1831-451f-ad25-8a25bd2c05c1",
+      "title": "昼食",
+      "planned_time": "12:00",
+      "status": "no_record",
+      "memories": []
+     }
+    ],
+    "day_memories": []
+   },
+   {
+    "day_id": "f133ba8b-0458-40bc-8838-8347d1918ac8",
+    "date": "2026-11-02",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "4566eaea-770e-4f74-a30a-ccd636990441",
+      "title": "美術館",
+      "planned_time": "10:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "19257ff2-0269-4433-90a9-d8f547698a69",
+        "kind": "photo",
+        "body": null,
+        "occurred_at": null,
+        "place_name": null,
+        "has_media": true,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     }
+    ],
+    "day_memories": []
+   }
+  ],
+  "other_memories": [
+   {
+    "id": "526fb219-dc96-42cc-b3df-0a5b6a7fae65",
+    "kind": "note",
+    "body": "日のメモ",
+    "occurred_at": null,
+    "place_name": null,
+    "has_media": false,
+    "video_url": null,
+    "latitude": null,
+    "longitude": null,
+    "by_me": true
+   }
+  ],
+  "summary": {
+   "planned_events": 3,
+   "recorded_events": 2,
+   "memories": 3,
+   "photos": 1
+  },
+  "checks": [
+   {
+    "code": "photo_people",
+    "severity": "info",
+    "memory_id": "19257ff2-0269-4433-90a9-d8f547698a69",
+    "message": "写真に人の顔が写っていないか確認してください(顔の自動判定は行っていません)"
+   }
+  ],
+  "route": [],
+  "location_level": "area",
+  "hidden_places": 0,
+  "photo_ids": [
+   "19257ff2-0269-4433-90a9-d8f547698a69"
+  ],
+  "required_acknowledgements": [
+   {
+    "code": "photo_people",
+    "message": "写真に写っている人の了解を得ている(顔の自動判定はしていません)"
+   },
+   {
+    "code": "place_names",
+    "message": "地名(宿・自宅に近い場所が無いか)を確かめた"
+   }
+  ]
+ },
+ "publication_created": {
+  "id": "64fe5024-54cc-4820-9072-2b07d380b61e",
+  "plan_id": "46090631-38f5-4920-b94f-a61699604e68",
+  "title": "京都の旅行記",
+  "location_level": "area",
+  "include_photos": true,
+  "photos": 1,
+  "view_count": 0,
+  "created_at": "2026-10-23T04:58:20.240990+00:00",
+  "revoked_at": null,
+  "is_active": true,
+  "token_prefix": "U7xD7XIt",
+  "url": "/journal/TOKEN_REDACTED"
+ },
+ "publications": [
+  {
+   "id": "64fe5024-54cc-4820-9072-2b07d380b61e",
+   "plan_id": "46090631-38f5-4920-b94f-a61699604e68",
+   "title": "京都の旅行記",
+   "location_level": "area",
+   "include_photos": true,
+   "photos": 1,
+   "view_count": 0,
+   "created_at": "2026-10-23T04:58:20.240990+00:00",
+   "revoked_at": null,
+   "is_active": true,
+   "token_prefix": "U7xD7XIt",
+   "url": null
+  }
+ ],
+ "public_journal": {
+  "title": "京都の旅行記",
+  "published_at": "2026-10-23T04:58:20.240990+00:00",
+  "location_level": "area",
+  "days": [
+   {
+    "day_id": "e874b4de-4638-491b-8c57-ecece850d497",
+    "date": "2026-11-01",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "6e647833-e7be-4977-a26b-5c46e04208db",
+      "title": "清水寺",
+      "planned_time": "09:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "bfa463f6-04e6-49a8-8bff-ab8417684e37",
+        "kind": "note",
+        "body": "清水寺は朝が静か",
+        "occurred_at": null,
+        "place_name": "清水の舞台",
+        "has_media": false,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     },
+     {
+      "event_id": "52c15757-1831-451f-ad25-8a25bd2c05c1",
+      "title": "昼食",
+      "planned_time": "12:00",
+      "status": "no_record",
+      "memories": []
+     }
+    ],
+    "day_memories": []
+   },
+   {
+    "day_id": "f133ba8b-0458-40bc-8838-8347d1918ac8",
+    "date": "2026-11-02",
+    "title": null,
+    "entries": [
+     {
+      "event_id": "4566eaea-770e-4f74-a30a-ccd636990441",
+      "title": "美術館",
+      "planned_time": "10:00",
+      "status": "recorded",
+      "memories": [
+       {
+        "id": "19257ff2-0269-4433-90a9-d8f547698a69",
+        "kind": "photo",
+        "body": null,
+        "occurred_at": null,
+        "place_name": null,
+        "has_media": true,
+        "video_url": null,
+        "latitude": null,
+        "longitude": null,
+        "by_me": true
+       }
+      ]
+     }
+    ],
+    "day_memories": []
+   }
+  ],
+  "other_memories": [
+   {
+    "id": "526fb219-dc96-42cc-b3df-0a5b6a7fae65",
+    "kind": "note",
+    "body": "日のメモ",
+    "occurred_at": null,
+    "place_name": null,
+    "has_media": false,
+    "video_url": null,
+    "latitude": null,
+    "longitude": null,
+    "by_me": true
+   }
+  ],
+  "summary": {
+   "planned_events": 3,
+   "recorded_events": 2,
+   "memories": 3,
+   "photos": 1
+  },
+  "route": [],
+  "photo_ids": [
+   "19257ff2-0269-4433-90a9-d8f547698a69"
+  ]
+ },
+ "publication_revoked": {
+  "id": "64fe5024-54cc-4820-9072-2b07d380b61e",
+  "plan_id": "46090631-38f5-4920-b94f-a61699604e68",
+  "title": "京都の旅行記",
+  "location_level": "area",
+  "include_photos": true,
+  "photos": 1,
+  "view_count": 1,
+  "created_at": "2026-10-23T04:58:20.240990+00:00",
+  "revoked_at": "2026-10-23T04:58:21.089765+00:00",
+  "is_active": false,
+  "token_prefix": "U7xD7XIt",
+  "url": null
+ },
+ "memory_trash": [
+  {
+   "memory_id": "e3e9091f-164c-4581-8027-0c0c387b50e8",
+   "kind": "note",
+   "summary": "消して戻すメモ",
+   "deleted_at": "2026-10-23T04:58:20.240990+00:00",
+   "restore_until": "2026-10-30T04:58:21.115409+00:00"
+  }
+ ],
+ "sync_conflicts_day_order": {
+  "plan_id": "862b25c1-f121-4781-a394-693663c1107b",
+  "plan_revision": 7,
+  "conflicts": [
+   {
+    "operation_id": "a7e59759-3880-49c1-92b8-132f7a077352",
+    "action": "update",
+    "entity_type": "day",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "02435fe5-fa82-4edd-a102-221e184a647c",
+    "title": "サーバーで変えた",
+    "conflict": {
+     "fields": [
+      "title"
+     ],
+     "mine": {
+      "title": "端末で変えた"
+     },
+     "server": {
+      "title": "サーバーで変えた"
+     },
+     "server_deleted": false,
+     "title": "サーバーで変えた"
+    },
+    "current": {
+     "local_date": "2026-11-01",
+     "timezone_id": "Asia/Tokyo",
+     "title": "サーバーで変えた",
+     "notes": null,
+     "sort_order": 0
+    },
+    "server_deleted": false,
+    "created_at": "2026-10-23T04:59:56.434230+00:00"
+   },
+   {
+    "operation_id": "ff7079b7-7473-4009-b467-1edd785acc19",
+    "action": "reorder",
+    "entity_type": "order",
+    "code": "changed_on_server",
+    "message": "端末で編集を始めた後に、サーバーでも変更されています",
+    "entity_id": "02435fe5-fa82-4edd-a102-221e184a647c",
+    "title": "サーバーで変えた",
+    "conflict": {
+     "fields": [
+      "order"
+     ],
+     "mine": {
+      "order": [
+       "69aa724d-9461-417c-809d-83a08a065949",
+       "c9feb883-bbe4-415d-b4a7-796cc078c1f5",
+       "6397cc8f-528b-4a93-8702-585e6d63e9ed"
+      ]
+     },
+     "server": {
+      "order": [
+       {
+        "id": "6397cc8f-528b-4a93-8702-585e6d63e9ed",
+        "title": "temple"
+       },
+       {
+        "id": "c9feb883-bbe4-415d-b4a7-796cc078c1f5",
+        "title": "lunch"
+       },
+       {
+        "id": "69aa724d-9461-417c-809d-83a08a065949",
+        "title": "museum"
+       },
+       {
+        "id": "f30a8d9d-32d7-41d5-9ef9-807590ecf7ee",
+        "title": "サーバーの予定"
+       }
+      ]
+     },
+     "server_deleted": false,
+     "title": "サーバーで変えた"
+    },
+    "current": {
+     "local_date": "2026-11-01",
+     "timezone_id": "Asia/Tokyo",
+     "title": "サーバーで変えた",
+     "notes": null,
+     "sort_order": 0
+    },
+    "server_deleted": false,
+    "created_at": "2026-10-23T04:59:56.434230+00:00"
+   }
+  ]
+ }
+}

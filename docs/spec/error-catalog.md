@@ -20,12 +20,14 @@
 
 | code | HTTP | 再試行 | 利用者向けの文(例) | 場所 |
 |---|---|---|---|---|
+| `acknowledgement_required` | 422 | no | 公開の前に確認の項目を全て確かめてください | api/v1/memory_publish.py |
 | `admin_account` | 403 | no | 管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください | api/v1/privacy.py |
 | `admin_target` | — | — | ほかの管理者はこの画面から操作できません(運用の手順で権限を外してから) | api/v1/admin.py |
 | `alert_target_changed` | 409 | after_reload | — | api/v1/replans.py |
 | `already_adopted` | — | — | この投票はもう採用しています | api/v1/decisions.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
+| `already_restored` | 409 | no | この記録はすでに戻っています | api/v1/memory_publish.py |
 | `already_scheduled` | 409 | no | この候補はもう予定に配置しています | api/v1/candidates.py, api/v1/decisions.py |
 | `already_undone` | 409 | no | もう元に戻しています | api/v1/commands.py |
 | `already_visited` | 409 | no | 行った予定は次の旅行へ戻せません(行かなかった・未記録の予定だけ) | api/v1/journey.py |
@@ -39,11 +41,13 @@
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
 | `candidate_not_found` | 409 | after_reload | この候補は今の旅程では選べません。もう一度候補を計算してください | api/v1/optimization.py |
 | `candidate_unavailable` | 409 | no | この案は使えません | api/v1/replans.py |
+| `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `clone_not_allowed` | — | — | この共有では複製が許されていません | api/v1/public_share.py |
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
 | `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py |
+| `day_not_empty` | 409 | no | — | api/v1/sync.py |
 | `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
 | `deleted_on_server` | 409 | after_reload | サーバーで削除された予定のため、自分の変更は使えません | api/v1/sync.py |
@@ -57,7 +61,7 @@
 | `duplicate_event` | — | — | 同じ予定が2回含まれています | api/v1/visits.py |
 | `duplicate_item` | — | — | 同じ項目が2回あります | services/private_profile.py |
 | `email_unavailable` | 409 | no | この環境ではメールを送れません(管理者の設定が必要です) | api/v1/notifications.py |
-| `encryption_not_configured` | 503 | later | 暗号化が設定されていません(サーバー側の設定) | api/v1/location_tracks.py, api/v1/memories.py |
+| `encryption_not_configured` | 503 | later | 暗号化が設定されていません(サーバー側の設定) | api/v1/location_tracks.py, api/v1/memories.py, api/v1/privacy_zones.py |
 | `encryption_unavailable` | 503 | later | 暗号化が設定されていないため保存できません | services/private_profile.py |
 | `event_locked` | — | — | 予定「%s」はロックされているため外せません | api/v1/decisions.py |
 | `event_missing` | — | — | 決定した予定が旅程から消えています | api/v1/decisions.py |
@@ -79,7 +83,7 @@
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.p |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/memory_p |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |
@@ -87,6 +91,7 @@
 | `invalid_items` | — | — | items は一覧で指定してください | services/private_profile.py |
 | `invalid_kind` | 422 | no | 記録の種類が不正です | api/v1/memories.py, services/private_profile.py |
 | `invalid_label` | — | — | 名前は1〜…文字で入力してください | services/private_profile.py |
+| `invalid_location_level` | — | — | 場所の出し方は「出さない」か「地名だけ」です | api/v1/memory_publish.py |
 | `invalid_metrics` | — | — | 端末の判定の数値が不正です(座標は送れません) | api/v1/visits.py |
 | `invalid_name` | — | — | 連携の名前を100文字までで入力してください | api/v1/organizations.py, services/organizations.py |
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
@@ -111,6 +116,7 @@
 | `malware_found` | 422 | no | ファイルから有害なプログラムが見つかったため、受け付けませんでした | api/v1/memories.py |
 | `member_field_hidden` | 403 | no | 旅行の所有者が「…」をあなたに見せない設定にしています | services/member_policy.py |
 | `member_not_found` | 404 | no | メンバーが見つかりません | api/v1/organizations.py |
+| `members_only` | 403 | no | 旅行記の公開は会員だけができます(会員登録すると公開できます) | api/v1/memory_publish.py |
 | `mention_target_hidden` | 422 | no | その人はこの対象を見られないため、メンションできません | api/v1/discussion.py |
 | `metadata_unremovable` | 422 | no | 写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません | api/v1/memories.py |
 | `mfa_enrollment_required` | — | — | 管理者の画面を使うには、設定 → セキュリティで多要素認証(認証アプリ)を有効にしてください | api/v1/admin.py |
@@ -124,15 +130,18 @@
 | `not_areas_only` | 409 | no | 訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです | api/v1/location_tracks.py |
 | `not_conflicted` | 404 | no | この操作は競合していません | api/v1/sync.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
+| `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
 | `organization_not_found` | 404 | no | 組織が見つかりません | services/organizations.py |
 | `outside_trip_period` | 409 | no | 位置の記録は旅行の期間中(前日から最終日まで)だけ始められます | api/v1/location_tracks.py |
 | `owner_only` | 403 | no | 旅行全体のエクスポートは所有者だけが行えます。自分のデータはアカウントのエクスポートで取得できます。 | api/v1/data_export.py |
 | `poll_adopted` | 409 | no | 予定に採用した投票は変えられません(先に採用を元に戻してください) | api/v1/discussion.py |
 | `poll_not_decided` | — | — | まだ決定していません(先に選択肢を決定してください) | api/v1/decisions.py |
+| `privacy_zone_not_found` | 404 | no | 守る範囲が見つかりません | api/v1/privacy_zones.py |
 | `profile_empty` | 409 | no | 非公開の条件がまだありません。設定 → 非公開の条件 で登録してください | api/v1/private_profile.py |
 | `profile_unreadable` | 409 | no | 保存済みの内容を復号できないため変更できません | api/v1/private_profile.py |
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
+| `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/organizations.py, api/v1/privacy.py |
@@ -165,10 +174,14 @@
 | `too_many_items` | — | — | 条件は…件までです | services/private_profile.py |
 | `too_many_memories` | — | — | 1つの旅行の記録は…件までです | api/v1/memories.py |
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
+| `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
+| `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |
 | `track_active` | 409 | no | この旅行では記録中(または一時停止中)の軌跡があります。止めてから始めてください | api/v1/location_tracks.py |
 | `track_full` | 409 | no | 1つの軌跡の点は…件までです。新しく記録を始めてください | api/v1/location_tracks.py |
+| `trash_not_found` | 404 | no | 元に戻せる記録が見つかりません(期限は削除から7日です) | api/v1/memory_publish.py |
+| `trash_unreadable` | 409 | no | この記録は読めないため戻せません | api/v1/memory_publish.py |
 | `undo_conflict` | 409 | after_reload | この候補は後で使われた(予定に置いた・まとめた)ため、元に戻せません | api/v1/commands.py, services/plan_item_deletion.py |
 | `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py |
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |

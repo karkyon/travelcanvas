@@ -21,6 +21,8 @@ const SearchSettingsPage = lazyPage(() => import('@/pages/SearchSettingsPage'));
 const SettingsPage = lazyPage(() => import('@/pages/SettingsPage'));
 const SharePage = lazyPage(() => import('@/pages/SharePage'));
 const PublicSharePage = lazyPage(() => import('@/pages/PublicSharePage'));
+// [Gate G6] MEM-01 公開した旅行記(未認証で見られる)
+const PublicJournalPage = lazyPage(() => import('@/pages/PublicJournalPage'));
 const NotFoundPage = lazyPage(() => import('@/pages/NotFoundPage'));
 
 // 新しく作成したページのインポート
@@ -624,6 +626,12 @@ export const router = createBrowserRouter([
       {
         path: 's/:token',
         element: <PublicSharePage />,
+      },
+
+      // 📖 [Gate G6] 公開した旅行記の閲覧(未認証)。ProtectedRoute で包まない
+      {
+        path: 'journal/:token',
+        element: <PublicJournalPage />,
       },
       
       // 🤖 AI最適化

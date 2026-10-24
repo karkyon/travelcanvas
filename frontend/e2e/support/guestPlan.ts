@@ -15,6 +15,16 @@ import type { Page, Response } from '@playwright/test';
  */
 export type GuestPlan = { planId: string; apiBase: string; token: string };
 
+/**
+ * [Gate G6] 画面の「ゲストとして始める」の最後の応答を待つ。接続元の点数が高い時(他の試験の 403・404 の後)は、
+ * 最初の応答が計算の確認(428)になり、画面が自動で解いて送り直す。428 を待つとトークンが無く落ちる
+ * (GitHub の CI で memory-replan が2回とも落ちた)。全ての spec のゲストの開始はこれか startGuestPlanViaApi を通す。
+ */
+export function waitForGuestResponse(page: Page): Promise<Response> {
+  return page.waitForResponse(
+    (r) => /\/auth\/guest$/.test(new URL(r.url()).pathname) && r.status() !== 428, { timeout: 90_000 });
+}
+
 /** [Gate S11] POST /auth/guest の応答からゲストのアクセストークンを取る(画面の遷移と競合しない) */
 export async function guestTokenFrom(response: Response): Promise<string> {
   const body = (await response.json().catch(() => null)) as { access_token?: unknown } | null;
@@ -31,8 +41,7 @@ export async function startGuestPlanViaApi(
   const open = options.open ?? true;
   await page.goto('/');
   // [Gate A2] 接続元の点数が高い時は最初の応答が計算の確認(428)になり、画面が自動で解いて送り直す。最後の応答を待つ
-  const guestResponse = page.waitForResponse(
-    (r) => /\/auth\/guest$/.test(new URL(r.url()).pathname) && r.status() !== 428, { timeout: 90_000 });
+  const guestResponse = waitForGuestResponse(page);
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   const guest = await guestResponse;
   if (!guest.ok()) {

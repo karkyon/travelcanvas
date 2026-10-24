@@ -12,7 +12,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *   3. 公開範囲を「メンバー」に切り替えられる(再読込後も保持)
  *   4. 旅行記の下書きを作ると、記録の無い予定は「記録はありません」として残り、公開前の確認
  *      (予約番号のような文字列・写真)が出る。位置は既定で含めない
- *   5. 写真を削除すると一覧から消える
+ *   5. 写真を削除すると一覧から消える([Gate G6] 削除から7日間は元に戻せる)
  *   6. 画面にaxe(WCAG 2.1 AA)違反が無い
  */
 
@@ -103,6 +103,6 @@ test('旅の記録: メモと写真を予定に記録し、公開範囲を変え
   // 5. 写真の削除
   page.once('dialog', (d) => d.accept());
   await day1.getByRole('listitem').filter({ hasText: '本堂' }).getByRole('button', { name: '削除' }).click();
-  await expect(page.getByRole('status')).toHaveText('記録を削除しました');
+  await expect(page.getByRole('status')).toHaveText('記録を削除しました(7日間は元に戻せます)');
   await expect(day1.getByRole('img')).toHaveCount(0);
 });

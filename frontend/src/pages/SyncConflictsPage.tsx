@@ -14,7 +14,7 @@ import { getSyncConflicts, resolveSyncConflict } from '@/services/api';
 import type { SyncConflict, SyncConflictList } from '@/services/api';
 import { usePlanStore } from '@/store/planStore';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import { conflictRows, conflictSummary } from './sync/syncModel';
+import { conflictRows, conflictSubject, conflictSummary } from './sync/syncModel';
 
 const SyncConflictsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -78,12 +78,12 @@ const SyncConflictsPage: React.FC = () => {
           {data.conflicts.map((c) => (
             <li key={c.operation_id}>
               <Card padding="md" className="space-y-3">
-                <section aria-label={`競合: ${c.title ?? '予定'}`}>
-                  <h2 className="font-semibold text-gray-900">{c.title ?? '予定'}</h2>
+                <section aria-label={`競合: ${c.title ?? conflictSubject(c)}`}>
+                  <h2 className="font-semibold text-gray-900">{c.title ?? conflictSubject(c)}</h2>
                   <p className="text-sm text-gray-800">{conflictSummary(c)}</p>
                   {conflictRows(c).length > 0 && (
                     <table className="w-full text-sm mt-2">
-                      <caption className="sr-only">{`${c.title ?? '予定'}の比較`}</caption>
+                      <caption className="sr-only">{`${c.title ?? conflictSubject(c)}の比較`}</caption>
                       <thead>
                         <tr className="text-left text-gray-700">
                           <th scope="col" className="font-medium">項目</th>

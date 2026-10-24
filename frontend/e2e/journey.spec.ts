@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
-import { guestTokenFrom } from './support/guestPlan';
+import { guestTokenFrom, waitForGuestResponse } from './support/guestPlan';
 
 /**
  * [Gate P14] FR-054 Plan-to-Memory・FR-053 旅の達成指標(SC-42 Journey Review)のbrowser E2E。
@@ -27,7 +27,7 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 
 async function startGuest(page: Page): Promise<{ apiBase: string; token: string }> {
   await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
+  const guestResponse = waitForGuestResponse(page);
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   const guest = await guestResponse;
   const apiBase = guest.url().replace(/\/auth\/guest$/, '');

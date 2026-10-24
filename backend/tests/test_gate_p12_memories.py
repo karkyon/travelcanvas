@@ -186,7 +186,7 @@ def test_create_list_and_link(auth_client, audit_calls):
     assert audit_calls and all("朝の参拝" not in str(c) and "清水寺" not in str(c) for c in audit_calls)
 
 
-def test_upload_media_encrypted_and_streamed(auth_client, storage):
+def test_upload_media_encrypted_and_streamed(auth_client, storage, db_session):
     client, owner, p, base, (d1, _d2), ev = _setup(auth_client)
     r = _upload(client, base, event_id=ev["昼食"]["id"], body="おいしかった")
     assert r.status_code == 201, r.text
@@ -216,8 +216,14 @@ def test_upload_media_encrypted_and_streamed(auth_client, storage):
     note = client.post(f"{base}/memories", json={"body": "メモ"}).json()
     assert client.get(f"{base}/memories/{note['id']}/media").status_code == 404
 
-    # 削除でファイルも消える
+    # 削除でファイルも消える([Gate G6] 7日の間は元に戻せるよう保管し、期限の後に定期の処理がファイルごと消す)
     assert client.delete(f"{base}/memories/{photo['id']}").status_code == 204
+    assert len(list(Path(storage).rglob("*.png"))) == 1
+    from datetime import datetime, timedelta, timezone
+
+    from app.api.v1 import memory_publish
+
+    assert memory_publish.purge_trash(db_session, datetime.now(timezone.utc) + timedelta(days=8))["files"] == 1
     assert len(list(Path(storage).rglob("*.png"))) == 0
     assert client.get(f"{base}/memories/{photo['id']}/media").status_code == 404
 

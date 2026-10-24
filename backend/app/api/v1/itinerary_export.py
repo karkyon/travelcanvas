@@ -162,7 +162,11 @@ def _geo(fmt: str, plan_id: str, request: Request, precision: str, exclude_accom
          user: User) -> Response:
     plan, _, hidden = member_policy.require_access(db, plan_id, user, "viewer", "event_address")
     _, events, _ = _collect(db, plan, hidden)
-    points, no_location, lodging = ix.waypoints(events, precision, exclude_accommodation)
+    # [Gate G6] LOC-02 旅行の所有者と書き出す本人の守る範囲(自宅・職場など)の中の地点は書き出さない
+    from app.services import location_privacy as lp
+
+    zones = lp.zones_for(db, {plan.user_id, user.id})
+    points, no_location, lodging = ix.waypoints(events, precision, exclude_accommodation, zones)
     body = ix.build_gpx(plan.title, points, precision, _now()) if fmt == "gpx" else \
         ix.build_kml(plan.title, points, precision)
     _audit(request, user, plan, fmt, {"precision": precision, "exclude_accommodation": exclude_accommodation,

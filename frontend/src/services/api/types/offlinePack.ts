@@ -12,6 +12,9 @@ export interface OfflinePackKey {
   algorithm: 'AES-256-GCM';
   key_bits: 256;
   issued_at: string;
+  /** [Gate G6] OFF-01 端末ごとの鍵(device_id を付けて受け取った時)。この時刻を過ぎた鍵は、通信できるまで使わない */
+  device_id?: string;
+  expires_at?: string;
 }
 
 export interface OfflinePackKeyRotated extends OfflinePackKey {

@@ -114,8 +114,8 @@ export async function loadOfflinePack<T = unknown>(planId: string, session: Offl
   if (record.userId !== session.userId) return null;
   const key = await obtainOfflineKey(session);
   if (!key) return null;
-  if (record.keyVersion < key.version) {
-    await deleteOfflinePack(planId); // 失効した版
+  if (record.keyVersion < key.version || record.deviceId !== key.deviceId) {
+    await deleteOfflinePack(planId); // 失効した版・別の鍵(端末の鍵に替わる前の物)
     return null;
   }
   return unseal<T>(record, key);

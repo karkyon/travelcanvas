@@ -17,6 +17,15 @@ vi.mock('@/services/api', () => ({
   deleteMemory: m.deleteMemory, getMemoryMedia: m.getMemoryMedia, createJournalDraft: m.createJournalDraft,
 }));
 
+// [Gate G6] MEM-01 旅行記の公開・削除の取り消し
+const g6 = vi.hoisted(() => ({
+  previewPublication: vi.fn(), createPublication: vi.fn(), getPublications: vi.fn(), revokePublication: vi.fn(),
+  getMemoryTrash: vi.fn(), restoreMemory: vi.fn(),
+}));
+vi.mock('@/services/api/g6', () => g6);
+
+import g6fx from '@/services/api/__fixtures__/g6Responses.json';
+import type { MemoryPublication, MemoryTrashItem, PublicationPreview } from '@/services/api/types/g6';
 import MemoriesPage from './MemoriesPage';
 
 const list = fx.memory_list as MemoryList;
@@ -42,7 +51,9 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  for (const fn of Object.values(m)) fn.mockReset();
+  for (const fn of [...Object.values(m), ...Object.values(g6)]) fn.mockReset();
+  g6.getPublications.mockResolvedValue([]);
+  g6.getMemoryTrash.mockResolvedValue([]);
   m.getMemories.mockResolvedValue(list);
   m.getPlanDetail.mockResolvedValue({ success: true, data: detail });
   m.getMemoryMedia.mockResolvedValue(new Blob(['x'], { type: 'image/png' }));
@@ -132,6 +143,74 @@ describe('MemoriesPage (Gate P12)', () => {
     window.confirm = vi.fn(() => true);
     fireEvent.click(within(card).getByRole('button', { name: '削除' }));
     await waitFor(() => expect(m.deleteMemory).toHaveBeenCalledWith('p1', note.id));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('7日間は「元に戻す」で戻せます'));
+    expect(await screen.findByRole('status')).toHaveTextContent('記録を削除しました(7日間は元に戻せます)');
+    // [Gate G6] 削除の直後に戻せる
+    g6.restoreMemory.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole('button', { name: '削除を元に戻す' }));
+    await waitFor(() => expect(g6.restoreMemory).toHaveBeenCalledWith('p1', note.id));
+    expect(await screen.findByRole('status')).toHaveTextContent('記録を元に戻しました');
+    expect(screen.queryByRole('button', { name: '削除を元に戻す' })).toBeNull();
+  });
+
+  it('[Gate G6] 削除した記録の一覧から元に戻せる', async () => {
+    const trash = g6fx.memory_trash as MemoryTrashItem[];
+    g6.getMemoryTrash.mockResolvedValueOnce(trash).mockResolvedValue([]);
+    g6.restoreMemory.mockResolvedValue(undefined);
+    renderPage();
+    const section = await screen.findByRole('region', { name: '削除した記録' });
+    expect(section).toHaveTextContent('メモ: 消して戻すメモ');
+    fireEvent.click(within(section).getByRole('button', { name: '消して戻すメモを元に戻す' }));
+    await waitFor(() => expect(g6.restoreMemory).toHaveBeenCalledWith('p1', trash[0]!.memory_id));
+    await waitFor(() => expect(screen.queryByRole('region', { name: '削除した記録' })).toBeNull());
+  });
+
+  it('[Gate G6] 旅行記の公開: 内容と確認の項目を見せ、全て確かめた時だけ公開し、URL を一度だけ出す。公開をやめられる', async () => {
+    const preview = g6fx.publication_preview as PublicationPreview;
+    const created = g6fx.publication_created as MemoryPublication;
+    g6.previewPublication.mockResolvedValue(preview);
+    g6.createPublication.mockResolvedValue({ ...created, url: '/journal/abc' });
+    renderPage();
+    const section = await screen.findByRole('region', { name: '旅行記の公開' });
+    fireEvent.click(within(section).getByLabelText('地名と大まかな移動(約1km)だけ'));
+    fireEvent.click(within(section).getByLabelText(/写真を含める/));
+    fireEvent.click(within(section).getByRole('button', { name: '公開する内容を確認する' }));
+    await waitFor(() => expect(g6.previewPublication).toHaveBeenCalledWith('p1', { location_level: 'area', include_photos: true }));
+    const content = await within(section).findByLabelText('公開する内容');
+    expect(within(content).getByRole('list', { name: '公開する記録' })).toHaveTextContent('清水寺は朝が静か(清水の舞台)');
+    const publish = within(section).getByRole('button', { name: 'この内容で公開する' });
+    expect(publish).toBeDisabled();
+    for (const a of preview.required_acknowledgements) fireEvent.click(within(section).getByLabelText(a.message));
+    expect(publish).toBeEnabled();
+    g6.getPublications.mockResolvedValue([created]);
+    fireEvent.click(publish);
+    await waitFor(() => expect(g6.createPublication).toHaveBeenCalledWith('p1', expect.objectContaining({
+      location_level: 'area', include_photos: true,
+      acknowledge: expect.arrayContaining(preview.required_acknowledgements.map((a) => a.code)) })));
+    expect(await within(section).findByLabelText('公開の URL(今だけ表示します)')).toHaveValue(`${window.location.origin}/journal/abc`);
+    expect(await screen.findByRole('status')).toHaveTextContent('旅行記を公開しました');
+    const list = await within(section).findByRole('list', { name: '公開した旅行記' });
+    g6.revokePublication.mockResolvedValue({ ...created, is_active: false });
+    g6.getPublications.mockResolvedValue([{ ...created, is_active: false, revoked_at: '2026-10-23T00:00:00Z' }]);
+    fireEvent.click(within(list).getByRole('button', { name: `${created.title}の公開をやめる` }));
+    await waitFor(() => expect(g6.revokePublication).toHaveBeenCalledWith('p1', created.id));
+    expect(await within(list).findByText(/公開をやめました/)).toBeInTheDocument();
+  });
+
+  it('[Gate G6] 選び方を変えると確認をやり直す。公開できない理由を示す', async () => {
+    g6.previewPublication.mockResolvedValue(g6fx.publication_preview as PublicationPreview);
+    g6.createPublication.mockRejectedValue({ response: { status: 403, data: { detail: { code: 'members_only',
+      message: '旅行記の公開は会員だけができます(会員登録すると公開できます)' } } } });
+    renderPage();
+    const section = await screen.findByRole('region', { name: '旅行記の公開' });
+    fireEvent.click(within(section).getByRole('button', { name: '公開する内容を確認する' }));
+    await within(section).findByLabelText('公開する内容');
+    fireEvent.click(within(section).getByLabelText(/写真を含める/));
+    expect(within(section).queryByLabelText('公開する内容')).toBeNull();
+    g6.previewPublication.mockResolvedValue({ ...(g6fx.publication_preview as PublicationPreview), required_acknowledgements: [] });
+    fireEvent.click(within(section).getByRole('button', { name: '公開する内容を確認する' }));
+    fireEvent.click(await within(section).findByRole('button', { name: 'この内容で公開する' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('会員だけができます');
   });
 
   it('旅行記の下書き: 選んだ範囲で作り、公開前の確認を表示する', async () => {

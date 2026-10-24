@@ -22,6 +22,9 @@ import {
   AUDIO_EXTENSIONS, KIND_LABEL, PHOTO_EXTENSIONS, VISIBILITY_LABEL, eventLabel, fileProblem, formatSize,
   groupMemories, journalFileName, videoUrlProblem,
 } from './memories/memoriesModel';
+import JournalPublishCard from './memories/JournalPublishCard';
+import MemoryTrashCard from './memories/MemoryTrashCard';
+import { restoreMemory } from '@/services/api/g6';
 
 const MemoryMedia: React.FC<{ planId: string; memory: TravelMemory; alt: string }> = ({ planId, memory, alt }) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -89,6 +92,9 @@ const MemoriesPage: React.FC = () => {
   const [includeMedia, setIncludeMedia] = useState(true);
   const [includeOthers, setIncludeOthers] = useState(false);
   const [draft, setDraft] = useState<JournalDraft | null>(null);
+  // [Gate G6] MEM-01 削除の取り消し
+  const [lastDeleted, setLastDeleted] = useState<string | null>(null);
+  const [trashKey, setTrashKey] = useState(0);
 
   const load = useCallback(async () => {
     if (!planId) return;
@@ -186,15 +192,36 @@ const MemoriesPage: React.FC = () => {
   const remove = async (m: TravelMemory) => {
     if (!planId) return;
     const what = m.has_media ? `この${KIND_LABEL[m.kind]}(ファイルも消えます)` : `この${KIND_LABEL[m.kind]}`;
-    if (!window.confirm(`${what}を削除します。元に戻せません。よろしいですか?`)) return;
+    if (!window.confirm(`${what}を削除します。削除から7日間は「元に戻す」で戻せます。よろしいですか?`)) return;
     setError(null);
     setMessage(null);
+    setLastDeleted(null);
     try {
       await deleteMemory(planId, m.id);
-      setMessage('記録を削除しました');
+      setMessage('記録を削除しました(7日間は元に戻せます)');
+      setLastDeleted(m.id);
     } catch (err) {
       setError(errorDetailMessage(err, '記録を削除できませんでした'));
     } finally {
+      setTrashKey((k) => k + 1);
+      await load();
+    }
+  };
+
+  const restore = async (memoryId: string) => {
+    if (!planId) return;
+    setError(null);
+    setMessage(null);
+    setBusy(true);
+    try {
+      await restoreMemory(planId, memoryId);
+      setMessage('記録を元に戻しました');
+      setLastDeleted(null);
+    } catch (err) {
+      setError(errorDetailMessage(err, '記録を元に戻せませんでした'));
+    } finally {
+      setBusy(false);
+      setTrashKey((k) => k + 1);
       await load();
     }
   };
@@ -244,6 +271,11 @@ const MemoriesPage: React.FC = () => {
       </p>
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
+      {lastDeleted && (
+        <Button size="sm" variant="outline" className="mt-2" disabled={busy} onClick={() => void restore(lastDeleted)}>
+          削除を元に戻す
+        </Button>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
@@ -396,8 +428,8 @@ const MemoriesPage: React.FC = () => {
             <section aria-label="旅行記の下書き" className="space-y-3">
               <h2 className="font-semibold text-gray-900">旅行記の下書き</h2>
               <p className="text-sm text-gray-700">
-                予定と記録から下書きを作ります(旅程は変わりません)。公開する前に、検査の結果を確認してください。
-                公開ページへの掲載はまだできないため、コピーかファイルの保存で使ってください。
+                予定と記録から下書きを作ります(旅程は変わりません)。コピーかファイルの保存で使えます。
+                ページとして公開する時は、下の「旅行記を公開する」を使ってください。
               </p>
               <div className="flex flex-col gap-1">
                 <label className="flex items-center gap-2 text-sm text-gray-900">
@@ -442,6 +474,8 @@ const MemoriesPage: React.FC = () => {
               )}
             </section>
           </Card>
+          <JournalPublishCard planId={planId} onMessage={(t) => { setLastDeleted(null); setMessage(t); }} onError={setError} />
+          <MemoryTrashCard planId={planId} reloadKey={trashKey} busy={busy} onRestore={(id) => void restore(id)} />
         </>
       )}
     </div>

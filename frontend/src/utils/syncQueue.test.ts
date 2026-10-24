@@ -60,4 +60,26 @@ describe('syncQueue (Gate P11)', () => {
     expect(isNetworkError(new Error('x'))).toBe(false);
     expect(isNetworkError(null)).toBe(false);
   });
+
+  it('[Gate G6] 日程の作成・並べ替えも溜め、仮の日程・予定のIDを並びの中でも置き換える', () => {
+    const day = enqueue('p1', { entity_type: 'day', action: 'create', temp_id: 'day_temp_1', label: '3日目',
+      fields: { local_date: '2026-11-03', timezone_id: 'Asia/Tokyo' } })!;
+    const ev = enqueue('p1', { action: 'create', temp_id: 'event_temp_1', label: 'x', fields: { day_id: 'day_temp_1', title: 'x' } })!;
+    const order = enqueue('p1', { entity_type: 'order', action: 'reorder', entity_id: 'day_temp_1', base_revision: 2,
+      label: '並び', fields: { order: ['event_temp_1', 'e-real'] } })!;
+    expect(loadQueue('p1').map((o) => o.entity_type)).toEqual(['day', 'event', 'order']);
+    const remaining = applyResults('p1', [
+      { operation_id: day.operation_id, status: 'applied', code: null, message: null, entity_id: 'day-real', temp_id: 'day_temp_1',
+        resulting_revision: 3, conflict: null },
+      { operation_id: ev.operation_id, status: 'applied', code: null, message: null, entity_id: 'ev-real', temp_id: 'event_temp_1',
+        resulting_revision: 4, conflict: null },
+    ]);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toMatchObject({ operation_id: order.operation_id, entity_id: 'day-real',
+      fields: { order: ['ev-real', 'e-real'] } });
+    // 対象と操作の組が合わない保存内容は捨てる
+    localStorage.setItem('tc_sync_queue_p3', JSON.stringify([{ operation_id: 'x', entity_type: 'order', action: 'update', label: 'x' },
+      { operation_id: 'y', entity_type: 'reservation', action: 'update', label: 'x' }]));
+    expect(loadQueue('p3')).toEqual([]);
+  });
 });

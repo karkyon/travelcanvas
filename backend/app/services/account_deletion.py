@@ -237,6 +237,22 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     db.query(NotificationPreference).filter(NotificationPreference.user_id == me).delete(synchronize_session=False)
     summary["email_outbox"] = db.query(EmailOutbox).filter(EmailOutbox.user_id == me).delete(
         synchronize_session=False)
+    # [Gate G6] オフライン保存の端末・守る範囲・公開した旅行記(失効させて写しを消す)・消して元に戻せる間の記録
+    from app.models.models import MemoryPublication, MemoryTrash, OfflineDevice, PrivacyZone
+
+    db.query(OfflineDevice).filter(OfflineDevice.user_id == me).delete(synchronize_session=False)
+    db.query(PrivacyZone).filter(PrivacyZone.user_id == me).delete(synchronize_session=False)
+    summary["journal_publications"] = db.query(MemoryPublication).filter(MemoryPublication.user_id == me).delete(
+        synchronize_session=False)
+    trash_files: List[Any] = [t.storage_key for t in db.query(MemoryTrash).filter(
+        (MemoryTrash.deleted_by_user_id == me) | (MemoryTrash.author_user_id == me)).all() if t.storage_key]
+    db.query(MemoryTrash).filter((MemoryTrash.deleted_by_user_id == me) | (MemoryTrash.author_user_id == me)).delete(
+        synchronize_session=False)
+    for key in trash_files:
+        try:
+            get_storage_backend().delete(key)
+        except (OSError, ValueError):
+            pass
     # [Gate G5] BILL-02 本人の使用量の記録
     from app.models.models import UsageCounter
 

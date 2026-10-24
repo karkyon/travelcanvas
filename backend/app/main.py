@@ -14,6 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
+    privacy_zones, memory_publish,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -566,6 +567,10 @@ app.include_router(decisions.router, prefix="/api/v1")
 app.include_router(finance_ledger.router, prefix="/api/v1")
 # [Gate G5] BILL-02 自分の使用量(/usage)
 app.include_router(usage.router, prefix="/api/v1")
+# [Gate G6] LOC-02 守る範囲(/privacy-zones)・MEM-01 旅行記の公開と記録の削除の取り消し(公開の閲覧 /public/journal)
+app.include_router(privacy_zones.router, prefix="/api/v1")
+app.include_router(memory_publish.router, prefix="/api/v1")
+app.include_router(memory_publish.public_router, prefix="/api/v1")
 app.include_router(plan_search.global_router, prefix="/api/v1")
 # [Gate P17] FR-057 Memory Replan(過去の予定と実績から次の旅行への提案)。/plans/{plan_id}/memory-replan配下。
 app.include_router(memory_replan.router, prefix="/api/v1")

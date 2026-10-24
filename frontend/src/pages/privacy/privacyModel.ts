@@ -37,3 +37,15 @@ export function deletionEffects(p: AccountDeletionPreview): string[] {
 export function canDelete(p: AccountDeletionPreview, confirmation: string, password: string): boolean {
   return confirmation.trim() === p.confirmation_text && (!p.requires_password || password.length > 0);
 }
+
+// [Gate G6] LOC-02 守る範囲
+/** 入力の検査(画面で先に分かる誤りを、送る前に案内する) */
+export function zoneInputProblem(label: string, lat: string, lng: string): string | null {
+  if (!label.trim()) return '名前を入力してください(例: 自宅)';
+  if (label.trim().length > 50) return '名前は50文字までです';
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (lat.trim() === '' || !Number.isFinite(la) || la < -90 || la > 90) return '緯度は -90〜90 の数で入力してください';
+  if (lng.trim() === '' || !Number.isFinite(lo) || lo < -180 || lo > 180) return '経度は -180〜180 の数で入力してください';
+  return null;
+}

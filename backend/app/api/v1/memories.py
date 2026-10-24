@@ -6,7 +6,8 @@
 - POST   /memories                     : 文章のメモ・動画の参照(URL)を記録する(editor以上)
 - POST   /memories/upload              : 写真・音声メモをファイル付きで記録する(editor以上、multipart)
 - PATCH  /memories/{id}                : 記録を変える(書いた本人だけ。If-Match: 記録のrevision)
-- DELETE /memories/{id}                : 記録を消す(書いた本人、またはメンバーに公開された記録を旅行の所有者が)。ファイルも消す
+- DELETE /memories/{id}                : 記録を消す(書いた本人、またはメンバーに公開された記録を旅行の所有者が)。
+                                         [Gate G6] 7日の間は元に戻せる(memory_publish.py の restore。ファイルはその後に消す)
 - GET    /memories/{id}/media          : 写真・音声のファイル(見える人だけ。キャッシュさせない)
 - POST   /memories/journal-draft       : 計画と実績から旅行記の下書きを作り、公開前の検査結果を返す(保存しない・旅程は変えない)
 
@@ -369,16 +370,16 @@ def delete_memory(plan_id: str, memory_id: str, db: Session = Depends(get_db),
     m = _get_visible(db, plan, memory_id, current_user)
     if m.author_user_id != current_user.id and plan.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="記録を消せるのは書いた本人と旅行の所有者だけです")
-    storage_key = m.storage_key
     _audit("memory.delete", current_user, m, {"by_author": m.author_user_id == current_user.id})
-    db.delete(m)
+    # [Gate G6] MEM-01 記録の削除を元に戻せるよう、7日の間は一時の保管へ移す(ファイルはその後に定期の処理が消す)
+    from app.api.v1 import memory_publish
+
+    try:
+        until = memory_publish.to_trash(db, plan, m, current_user)
+    except EncryptionNotConfigured:
+        raise _bad("encryption_not_configured", "記録の暗号化が設定されていません(サーバー側の設定)", 503)
     db.commit()
-    if storage_key:
-        try:
-            get_storage_backend().delete(storage_key)
-        except (OSError, ValueError):
-            logger.exception("memory file delete failed (plan_id=%s)", plan.id)
-    return Response(status_code=204)
+    return Response(status_code=204, headers={"X-Restore-Until": until.isoformat()})
 
 
 @router.get("/{plan_id}/memories/{memory_id}/media")

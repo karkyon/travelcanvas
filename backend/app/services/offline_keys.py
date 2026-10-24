@@ -66,6 +66,30 @@ def derive_key(user_id: uuid.UUID, version: int) -> bytes:
     return hmac.new(_master_secret(), message, hashlib.sha256).digest()
 
 
+# [Gate G6] OFF-01 端末ごとの鍵。端末(device_id)ごとに別の鍵を導出し、1台を失効しても他の端末の鍵は変わらない。
+DEVICE_KEY_TTL_DAYS = 30
+MAX_DEVICES = 10
+
+
+def derive_device_key(user_id: uuid.UUID, version: int, device_id: str) -> bytes:
+    if version < 1:
+        raise ValueError("version は1以上")
+    device = str(uuid.UUID(str(device_id)))
+    message = f"{KEY_LABEL}|{uuid.UUID(str(user_id))}|{int(version)}|device|{device}".encode("utf-8")
+    return hmac.new(_master_secret(), message, hashlib.sha256).digest()
+
+
+def device_label(user_agent: Optional[str]) -> str:
+    """端末の一覧に出す名前(利用者の識別に使える細かい値は残さない。ブラウザと OS の種類だけ)。"""
+    ua = (user_agent or "").lower()
+    browser = next((name for key, name in (("edg/", "Edge"), ("chrome/", "Chrome"), ("firefox/", "Firefox"),
+                                           ("safari/", "Safari")) if key in ua), "ブラウザ")
+    os_name = next((name for key, name in (("iphone", "iPhone"), ("ipad", "iPad"), ("android", "Android"),
+                                           ("windows", "Windows"), ("mac os", "Mac"), ("linux", "Linux"))
+                    if key in ua), "")
+    return f"{browser}({os_name})" if os_name else browser
+
+
 def encode_key(raw: bytes) -> str:
     """base64url(パディングなし)。32バイトなら43文字"""
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")

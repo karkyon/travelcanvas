@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.main import app
 from app.models.models import Budget, Expense, ExpenseShare, PlanCollaborator, Settlement
 from app.services import finance
+from tests._scrub import scrub
 
 
 @pytest.fixture(autouse=True)
@@ -150,7 +151,7 @@ def test_expense_default_equal_split_among_members(auth_client, make_user, db_se
     assert len(shares) == 3 and sum(int(s["share_amount"]) for s in shares) == 1000
     assert sorted(s["share_amount"] for s in shares) == ["333", "333", "334"]
     assert sum(int(s["rounding_adjustment"]) for s in shares) == 1
-    assert "秘密の店名" not in repr(audit_calls) and "1000" not in repr(audit_calls)
+    assert "秘密の店名" not in repr(audit_calls) and "1000" not in scrub(repr(audit_calls))
     rows = db_session.query(ExpenseShare).filter(ExpenseShare.expense_id == uuid.UUID(e["id"])).all()
     assert sum(r.share_amount for r in rows) == Decimal("1000")
 

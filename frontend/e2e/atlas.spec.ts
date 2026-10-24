@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
-import { guestTokenFrom } from './support/guestPlan';
+import { guestTokenFrom, waitForGuestResponse } from './support/guestPlan';
 
 /**
  * [Gate P15] FR-052 Personal Travel Atlas(SC-41)のbrowser E2E。
@@ -26,7 +26,7 @@ async function axeViolations(page: Page, label: string): Promise<void> {
 
 test('旅の地図: 旅行を横断して訪れた区画を状態つきで示し、区画の大きさを変え、旅行を除ける', async ({ page, context }) => {
   await page.goto('/');
-  const guestResponse = page.waitForResponse((r) => /\/auth\/guest$/.test(new URL(r.url()).pathname));
+  const guestResponse = waitForGuestResponse(page);
   await page.getByRole('button', { name: /ゲストとして始める/ }).click();
   const guest = await guestResponse;
   const apiBase = guest.url().replace(/\/auth\/guest$/, '');

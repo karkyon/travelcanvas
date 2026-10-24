@@ -90,6 +90,11 @@ def _purge_memory_files(db: Session, plan_id: uuid.UUID) -> bool:
     ファイルが既に無い場合も成功として扱うため、失敗後の再試行で同じ処理を繰り返しても安全。"""
     keys = [r[0] for r in db.query(Memory.storage_key).filter(
         Memory.plan_id == plan_id, Memory.storage_key.isnot(None)).all()]
+    # [Gate G6] 削除して元に戻せる間の記録(memory_trash)のファイルも消す
+    from app.models.models import MemoryTrash
+
+    keys += [r[0] for r in db.query(MemoryTrash.storage_key).filter(
+        MemoryTrash.plan_id == plan_id, MemoryTrash.storage_key.isnot(None)).all()]
     if not keys:
         return True
     backend = get_storage_backend()

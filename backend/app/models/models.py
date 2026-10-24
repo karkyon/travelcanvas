@@ -2505,8 +2505,9 @@ class SyncOperation(Base):
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     device_id = Column(String(64), nullable=True)
-    entity_type = Column(String(10), nullable=False, default="event")
-    action = Column(String(6), nullable=False)
+    # [Gate G6] OFF-02 対象: event(予定)・day(日程)・order(日程の中の予定の並び)・reservation(常にオンラインへ)
+    entity_type = Column(String(16), nullable=False, default="event")
+    action = Column(String(8), nullable=False)
     entity_id = Column(UUID(as_uuid=True), nullable=True)
     temp_id = Column(String(64), nullable=True)
     base_revision = Column(Integer, nullable=True)
@@ -2521,8 +2522,9 @@ class SyncOperation(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "operation_id", name="uq_sync_operations_user_operation"),
-        CheckConstraint("entity_type IN ('event')", name="ck_sync_operations_entity_type"),
-        CheckConstraint("action IN ('create','update','delete')", name="ck_sync_operations_action"),
+        CheckConstraint("entity_type IN ('event', 'day', 'order', 'reservation')",
+                        name="ck_sync_operations_entity_type"),
+        CheckConstraint("action IN ('create', 'update', 'delete', 'reorder')", name="ck_sync_operations_action"),
         CheckConstraint(
             "status IN ('applied','conflicted','rejected','resolved_mine','resolved_server')",
             name="ck_sync_operations_status",
@@ -3252,4 +3254,98 @@ class AbuseReport(Base):
         CheckConstraint("source IN ('report', 'auto')", name="ck_abuse_reports_source"),
         CheckConstraint("status IN ('open', 'dismissed', 'actioned')", name="ck_abuse_reports_status"),
         Index("ix_abuse_reports_status_created", "status", "created_at"),
+    )
+
+
+# ==========================================================================
+# [Gate G6] OFF-01 端末ごとのオフラインの鍵 / LOC-02 位置のぼかし / MEM-01 旅行記の公開・記録の削除の取り消し
+# ==========================================================================
+
+class OfflineDevice(Base):
+    """[Gate G6] OFF-01 オフラインの鍵を受け取る端末(端末が作った device_id ごと)。
+
+    鍵そのものは保存しない(backend の秘密・利用者・版・端末から導出する。app/services/offline_keys.py)。
+    失効した端末には鍵を配らず(410)、その端末は次に通信した時に保存したデータを消す。他の端末は影響を受けない。"""
+    __tablename__ = "offline_devices"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id = Column(String(64), nullable=False)
+    label = Column(String(100), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_key_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason = Column(String(20), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_offline_devices_user_device"),
+        CheckConstraint("(revoked_at IS NULL) = (revoked_reason IS NULL)", name="ck_offline_devices_revoked"),
+    )
+
+
+class PrivacyZone(Base):
+    """[Gate G6] LOC-02 自宅・職場などの「書き出し・公開から外す範囲」(利用者ごと)。
+
+    中心の座標は利用者のデータ鍵で暗号化する(center_ciphertext、{"lat","lng"})。書き出し(GPX/KML)・公開の共有・
+    旅行記の公開では、この範囲の中の地点の座標を出さない(app/services/location_privacy.py)。"""
+    __tablename__ = "privacy_zones"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = Column(String(50), nullable=False)
+    center_ciphertext = Column(LargeBinary, nullable=False)
+    radius_m = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("radius_m BETWEEN 100 AND 5000", name="ck_privacy_zones_radius"),
+    )
+
+
+class MemoryPublication(Base):
+    """[Gate G6] MEM-01 旅行記の公開(URL)。公開した時点の本人の記録だけの写し(snapshot)で、他の人の記録は入れない。
+
+    位置は既定で出さない(none)。area は地名だけ(座標は出さない)。写真は本人が選んだ時だけ(photo_ids)。
+    公開の前の確認(写っている人・位置)を acknowledged に残す。トークンはハッシュだけを保存し、失効(revoked_at)できる。"""
+    __tablename__ = "memory_publications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    token_prefix = Column(String(8), nullable=False)
+    title = Column(String(200), nullable=False)
+    location_level = Column(String(6), nullable=False, default="none", server_default="none")
+    include_photos = Column(Boolean, nullable=False, default=False, server_default="false")
+    snapshot = Column(JSON, nullable=False)
+    photo_ids = Column(JSON, nullable=False)
+    acknowledged = Column(JSON, nullable=False)
+    view_count = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("location_level IN ('none', 'area')", name="ck_memory_publications_location"),
+    )
+
+
+class MemoryTrash(Base):
+    """[Gate G6] MEM-01 削除した記録を元に戻すための一時の保管(既定7日。過ぎたら定期の処理がファイルごと消す)。
+
+    行の中身(本文・場所を含む)は旅行のデータ鍵で暗号化する(row_ciphertext)。写真・音声のファイルは保管の間は消さない。"""
+    __tablename__ = "memory_trash"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    memory_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+                                index=True)
+    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    row_ciphertext = Column(LargeBinary, nullable=False)
+    storage_key = Column(String, nullable=True)
+    deleted_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_memory_trash_expires", "expires_at"),
     )

@@ -5,7 +5,9 @@
  * 端末に溜めた予定の操作(作成・変更・削除)を operation_id 付きで送り、操作ごとの結果を受け取る。
  * 同じ operation_id の再送は already_applied(二重に適用しない)。競合は利用者が解決するまでサーバーに残る。
  */
-export type SyncAction = 'create' | 'update' | 'delete';
+export type SyncAction = 'create' | 'update' | 'delete' | 'reorder';
+/** [Gate G6] OFF-02 予定・日程・日程の中の予定の並び(予約はオフラインでは変えない) */
+export type SyncEntityType = 'event' | 'day' | 'order';
 export type SyncResultStatus = 'applied' | 'already_applied' | 'conflicted' | 'rejected';
 
 export interface SyncEventFields {
@@ -18,11 +20,16 @@ export interface SyncEventFields {
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** [Gate G6] 日程の作成(day)・並び(order) */
+  local_date?: string;
+  timezone_id?: string;
+  notes?: string | null;
+  order?: string[];
 }
 
 export interface SyncOperationInput {
   operation_id: string;
-  entity_type: 'event';
+  entity_type: SyncEntityType;
   action: SyncAction;
   /** 予定のID、または端末で作った予定の仮のID */
   entity_id?: string | null;
@@ -65,6 +72,8 @@ export interface SyncResponse {
 export interface SyncConflict {
   operation_id: string;
   action: SyncAction;
+  /** [Gate G6] 予定(event)・日程(day)・日程の中の並び(order) */
+  entity_type?: SyncEntityType | 'reservation';
   code: string | null;
   message: string | null;
   entity_id: string | null;

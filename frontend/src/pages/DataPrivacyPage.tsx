@@ -19,6 +19,8 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { describeDataExport, saveDataExport } from './exports/exportModel';
 import AccountDeletionCard from './privacy/AccountDeletionCard';
 import ConsentsCard from './privacy/ConsentsCard';
+import OfflineDevicesCard from './privacy/OfflineDevicesCard';
+import PrivacyZonesCard from './privacy/PrivacyZonesCard';
 
 const DataPrivacyPage: React.FC = () => {
   const navigate = useNavigate();
@@ -99,6 +101,8 @@ const DataPrivacyPage: React.FC = () => {
         </section>
       </Card>
 
+      <PrivacyZonesCard />
+      <OfflineDevicesCard />
       <ConsentsCard />
       <AccountDeletionCard onDeleted={() => navigate('/account-deleted', { replace: true })} />
     </div>

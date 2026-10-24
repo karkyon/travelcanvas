@@ -22,6 +22,7 @@ from app.core.crypto import encrypt_payload
 from app.main import app
 from app.models.models import Document, PlanCollaborator, Place, TravelEvent, TravelPlan
 from app.services import member_policy as mp
+from tests._scrub import scrub
 
 NOTE = "集合は裏口G2メモ"
 ADDR = "京都市東山区G2番地"
@@ -238,7 +239,7 @@ def test_validation_hides_budget_and_reservation_issues(auth_client, make_user, 
     _act_as(s["viewer"])
     got = client.get(f"{base}/validation-runs/{run['id']}").json()
     assert not [i for i in got["issues"] if i["code"].startswith(("BUDGET_", "RESERVATION_"))]
-    assert "99000" not in str(got) and "99,000" not in str(got)
+    assert "99000" not in scrub(str(got)) and "99,000" not in str(got)
     total = sum(got["counts"].values())
     assert total == len(got["issues"])
     listed = client.get(f"{base}/validation-runs").json()

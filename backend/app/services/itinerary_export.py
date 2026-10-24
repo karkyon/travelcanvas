@@ -169,8 +169,12 @@ class Waypoint:
     longitude: float
 
 
-def waypoints(events: Sequence[ExportEvent], precision: str, exclude_accommodation: bool):
-    """(書き出す地点, 除外した件数: 位置なし, 除外した件数: 宿泊)"""
+def waypoints(events: Sequence[ExportEvent], precision: str, exclude_accommodation: bool, zones=()):
+    """(書き出す地点, 除外した件数: 位置なし, 除外した件数: 宿泊・守る範囲)。
+
+    [Gate G6] LOC-02 守る範囲(自宅・職場など。app/services/location_privacy.py)の中の地点は書き出さない。"""
+    from app.services import location_privacy as lp
+
     digits = PRECISION_DIGITS[precision]
     out: List[Waypoint] = []
     no_location = lodging = 0
@@ -178,7 +182,7 @@ def waypoints(events: Sequence[ExportEvent], precision: str, exclude_accommodati
         if e.latitude is None or e.longitude is None:
             no_location += 1
             continue
-        if exclude_accommodation and e.is_accommodation:
+        if (exclude_accommodation and e.is_accommodation) or lp.in_zones(e.latitude, e.longitude, zones):
             lodging += 1
             continue
         out.append(Waypoint(e.place_name or e.title, e.local_date, e.event_type,

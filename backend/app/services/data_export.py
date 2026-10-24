@@ -104,6 +104,7 @@ PLAN_TABLES = (
     m.PlanCandidate, m.SupportGrant,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
     m.FxRate, m.BudgetVersion,
+    m.MemoryPublication, m.MemoryTrash,
 )
 
 
@@ -247,7 +248,28 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     # [Gate G5] FIN-01 為替の記録・予算の版(金額と出典。メンバー全員が見られる値)
     t["fx_rates"] = [row(x) for x in q(m.FxRate).all()]
     t["budget_versions"] = [row(x) for x in q(m.BudgetVersion).all()]
+    # [Gate G6] MEM-01 本人が公開した旅行記(トークンのハッシュは含めない)・本人が消して元に戻せる間の記録(中身の暗号文は含めない)
+    t["memory_publications"] = [row(x) for x in q(m.MemoryPublication).filter(m.MemoryPublication.user_id == me).all()]
+    t["memory_trash"] = [row(x) for x in q(m.MemoryTrash).filter(
+        (m.MemoryTrash.deleted_by_user_id == me) | (m.MemoryTrash.author_user_id == me)).all()]
     return t
+
+
+def own_privacy_zones(db: Session, me: uuid.UUID) -> List[Dict[str, Any]]:
+    """[Gate G6] LOC-02 本人の守る範囲(中心は本人のデータ鍵で復号して含める)。"""
+    from app.services import location_privacy as lp
+
+    out = []
+    z: Any
+    for z in db.query(m.PrivacyZone).filter(m.PrivacyZone.user_id == me).all():
+        center = lp.open_center(z.center_ciphertext)
+        out.append(row(z, {"latitude": center[0] if center else None, "longitude": center[1] if center else None}))
+    return out
+
+
+def own_offline_devices(db: Session, me: uuid.UUID) -> List[Dict[str, Any]]:
+    """[Gate G6] OFF-01 本人のオフライン保存の端末(鍵そのものは保存していない)。"""
+    return [row(d) for d in db.query(m.OfflineDevice).filter(m.OfflineDevice.user_id == me).all()]
 
 
 def own_location_tracks(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> List[Dict[str, Any]]:

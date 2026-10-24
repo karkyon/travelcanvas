@@ -275,7 +275,6 @@
 1 app/api/v1/member_policy.py: [call-overload] No overload variant of "get" of "dict" matches argument types "Column[str]", "list[Never]"
 1 app/api/v1/memories.py: [arg-type] Argument "media_type" to "Response" has incompatible type "Column[str] | str"; expected "str | None"
 1 app/api/v1/memories.py: [arg-type] Argument 1 to "build_journal_draft" has incompatible type "Column[str] | str"; expected "str"
-1 app/api/v1/memories.py: [arg-type] Argument 1 to "delete" of "StorageBackend" has incompatible type "Column[str]"; expected "str"
 1 app/api/v1/memories.py: [arg-type] Argument 1 to "get" of "dict" has incompatible type "Column[str] | str"; expected "str"
 1 app/api/v1/memories.py: [arg-type] Argument 2 to "load_decrypted_file" has incompatible type "Column[str]"; expected "str"
 1 app/api/v1/memories.py: [arg-type] Argument 3 to "_common_fields" has incompatible type "Column[str]"; expected "str"
@@ -507,8 +506,6 @@
 1 app/api/v1/sync.py: [assignment] Incompatible types in assignment (expression has type "TravelEvent | None", variable has type "TravelEvent")
 1 app/api/v1/sync.py: [assignment] Incompatible types in assignment (expression has type "datetime", variable has type "Column[datetime]")
 2 app/api/v1/sync.py: [assignment] Incompatible types in assignment (expression has type "str", variable has type "Column[str]")
-1 app/api/v1/sync.py: [call-overload] No overload variant of "get" of "dict" matches argument type "Column[str]"
-1 app/api/v1/sync.py: [call-overload] No overload variant of "get" of "dict" matches argument type "str"
 2 app/api/v1/sync.py: [list-item] List item 0 has incompatible type "Column[UUID]"; expected "UUID"
 1 app/api/v1/sync.py: [return-value] Incompatible return value type (got "Column[Any]", expected "dict[str, Any]")
 1 app/api/v1/sync.py: [return-value] Incompatible return value type (got "Column[UUID] | None", expected "UUID | None")

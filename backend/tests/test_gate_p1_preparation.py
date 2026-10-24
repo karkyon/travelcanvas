@@ -26,6 +26,7 @@ from app.core.config import settings
 from app.main import app
 from app.models.models import PackingItem, PlanCollaborator, PreparationTask
 from app.services import packing_suggestions, readiness as readiness_service
+from tests._scrub import scrub
 
 SECRET_MED = "心臓の薬(朝晩)"
 
@@ -138,7 +139,7 @@ def test_create_shared_item_with_assignee_and_audit_without_name(auth_client, ma
     assert body["assignee_user_id"] == str(member.id) and body["assignee_name"] == member.username
     assert body["revision"] == 1
     assert audit_calls[-1]["action"] == "packing_item_created"
-    assert "モバイルバッテリー" not in repr(audit_calls) and "20000" not in repr(audit_calls)
+    assert "モバイルバッテリー" not in repr(audit_calls) and "20000" not in scrub(repr(audit_calls))
 
 
 def test_assignee_must_be_member(auth_client, make_user):

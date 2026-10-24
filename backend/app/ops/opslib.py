@@ -707,6 +707,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "*/5 * * * * cd %s && %s jobs email-outbox >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# [Gate G4] 毎時 25分 濫用の自動の検知(大量の閲覧・合言葉の総当たり・共有の乱造・感染した文書)",
         "25 * * * * cd %s && %s jobs abuse-scan >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
+        "# [Gate G6] 毎日 04:05 削除してから7日を過ぎた記録(写真・音声のファイルを含む)を消す",
+        "5 4 * * * cd %s && %s jobs memory-trash >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# 5分ごとの監視(状態が変わった時だけ通知)",
         "*/5 * * * * cd %s && %s monitor --quiet >> %s/monitor.log 2>&1" % (repo_dir, tool, log),
         CRON_END,

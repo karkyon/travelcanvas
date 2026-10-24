@@ -442,7 +442,7 @@ export const getMemoryReplan = (planId: string) => api.getMemoryReplan(planId);
 export const applyMemoryReplan = (planId: string, proposalId: string, inputFingerprint: string, planRevision: number) =>
   api.applyMemoryReplan(planId, proposalId, inputFingerprint, planRevision);
 // [Gate K1] オフラインパックの鍵(B-008)
-export const getOfflinePackKey = () => api.getOfflinePackKey();
+export const getOfflinePackKey = (deviceId?: string) => api.getOfflinePackKey(deviceId);
 export const rotateOfflinePackKey = (currentVersion: number) => api.rotateOfflinePackKey(currentVersion);
 
 export default api;

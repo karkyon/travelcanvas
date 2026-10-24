@@ -13,6 +13,9 @@ const m = vi.hoisted(() => ({
   status: 0,
   calls: 0,
   currentUser: 'user-A',
+  // [Gate G6] OFF-01 端末ごとの鍵(空なら以前の利用者ごとの鍵)
+  device: '',
+  expiresAt: '',
 }));
 
 function keyFor(userId: string, version: number): string {
@@ -29,6 +32,13 @@ vi.mock('@/services/api', () => ({
     if (m.offline) throw Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' });
     if (m.status) throw Object.assign(new Error(String(m.status)), { response: { status: m.status } });
     const version = m.versions.get(m.currentUser) ?? 1;
+    if (m.device) {
+      return {
+        user_id: m.currentUser, key_version: version, key: keyFor(`${m.currentUser}|${m.device}`, version),
+        algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-10-17T00:00:00Z', device_id: m.device,
+        expires_at: m.expiresAt || new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      };
+    }
     return {
       user_id: m.currentUser, key_version: version, key: keyFor(m.currentUser, version),
       algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-10-17T00:00:00Z',
@@ -40,7 +50,7 @@ import {
   saveOfflinePack, loadOfflinePack, deleteOfflinePack, isOfflinePackAvailable, listOfflinePacks, clearAllOfflinePacks,
 } from './offlinePack';
 import {
-  forgetOfflineKeys, loadSnapshot, obtainOfflineKey, resetOfflineKeyMemoForTesting, saveSnapshot,
+  forgetOfflineKeys, loadSnapshot, obtainOfflineKey, offlineDeviceId, resetOfflineKeyMemoForTesting, saveSnapshot,
   idbGet, idbPut, PACKS_STORE, META_STORE,
 } from './offlineVault';
 
@@ -54,6 +64,8 @@ beforeEach(async () => {
   m.status = 0;
   m.calls = 0;
   m.currentUser = 'user-A';
+  m.device = '';
+  m.expiresAt = '';
   await clearAllOfflinePacks();
   await forgetOfflineKeys();
 });
@@ -177,6 +189,69 @@ describe('offlinePack (Gate #36 / K1)', () => {
     expect(await idbGet(PACKS_STORE, 'old')).toMatchObject({ format: 2, userId: 'user-A' }); // 保存し直した
     expect(await loadOfflinePack('old-unreadable', { ...A(), legacyToken: 'other-token' })).toBeNull();
     expect(await isOfflinePackAvailable('old-unreadable')).toBe(false); // 読めない旧形式は消す
+  });
+});
+
+describe('端末ごとの鍵 (Gate G6 OFF-01)', () => {
+  it('端末の鍵で保存し、同じログインの間の使い回しでも、鍵を受け取り直しても読める', async () => {
+    m.device = 'dev-1';
+    await saveOfflinePack('plan-1', 't', planData, A());
+    expect(await loadOfflinePack('plan-1', A())).toEqual(planData); // 使い回した鍵(端末の情報を落とさない)
+    expect(await idbGet(PACKS_STORE, 'plan-1')).toMatchObject({ deviceId: 'dev-1' });
+    resetOfflineKeyMemoForTesting();
+    expect(await loadOfflinePack('plan-1', A('login-2'))).toEqual(planData);
+    await saveSnapshot(A('login-2'), 'today:plan-1', { x: 1 });
+    expect(await loadSnapshot(A('login-2'), 'today:plan-1')).toMatchObject({ data: { x: 1 } });
+  });
+
+  it('以前の利用者ごとの鍵のパックは、端末の鍵を受け取った時に消す。別の端末の鍵では開かない', async () => {
+    await saveOfflinePack('plan-1', 't', planData, A());
+    m.device = 'dev-1';
+    expect(await loadOfflinePack('plan-1', A('login-2'))).toBeNull();
+    expect(await isOfflinePackAvailable('plan-1')).toBe(false);
+    await saveOfflinePack('plan-2', 't', planData, A('login-2'));
+    m.device = 'dev-2';
+    expect(await loadOfflinePack('plan-2', A('login-3'))).toBeNull();
+    expect(await isOfflinePackAvailable('plan-2')).toBe(false);
+  });
+
+  it('失効した端末(410)は保存データと鍵を消し、通信できなくても開けない', async () => {
+    m.device = 'dev-1';
+    await saveOfflinePack('plan-1', 't', planData, A());
+    await saveSnapshot(A(), 'today:plan-1', { x: 1 });
+    resetOfflineKeyMemoForTesting();
+    m.status = 410;
+    expect(await loadOfflinePack('plan-1', A())).toBeNull();
+    expect(await isOfflinePackAvailable('plan-1')).toBe(false);
+    m.status = 0;
+    m.offline = true;
+    expect(await obtainOfflineKey(A())).toBeNull();
+    expect(await loadSnapshot(A(), 'today:plan-1')).toBeNull();
+  });
+
+  it('端末の ID は localStorage を消しても IndexedDB から戻し、失効(410)の後は作り直す', async () => {
+    const first = await offlineDeviceId();
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    localStorage.clear();
+    expect(await offlineDeviceId()).toBe(first);
+    expect(localStorage.getItem('tc_device_id')).toBe(first);
+    m.status = 410;
+    resetOfflineKeyMemoForTesting();
+    expect(await obtainOfflineKey(A())).toBeNull();
+    expect(await offlineDeviceId()).not.toBe(first);
+    m.status = 0;
+  });
+
+  it('期限の切れた端末の鍵は、通信できない時に使わない', async () => {
+    m.device = 'dev-1';
+    m.expiresAt = new Date(Date.now() - 1000).toISOString();
+    await saveOfflinePack('plan-1', 't', planData, A());
+    resetOfflineKeyMemoForTesting();
+    m.offline = true;
+    expect(await obtainOfflineKey(A())).toBeNull();
+    m.offline = false;
+    m.expiresAt = '';
+    expect(await loadOfflinePack('plan-1', A())).toEqual(planData); // 通信できれば受け取り直して読める
   });
 });
 

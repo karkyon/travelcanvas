@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r17",
+  "revision": "v5.1-r18",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -272,8 +272,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P11",
-   "gaps": "予定以外のオフライン編集、機密値の変更時の再認証"
+   "gates": "P11・G6",
+   "gaps": "本番での確認(RELEASE-1)"
   },
   "FR-034": {
    "title": "しおり生成",
@@ -304,8 +304,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P12・Q1",
-   "gaps": "旅行記の公開URL、顔の検査、MEMORY MAP、記録の Undo"
+   "gates": "P12・Q1・G6",
+   "gaps": "顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元)"
   },
   "FR-038": {
    "title": "位置軌跡",
@@ -389,11 +389,11 @@
   },
   "FR-048": {
    "title": "Offline Travel Pack(端末)",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "#36・P11・K1",
-   "gaps": "予定以外のオフライン編集、通信しない端末の遠隔消去"
+   "gates": "#36・P11・K1・G6",
+   "gaps": "本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)"
   },
   "FR-049": {
    "title": "Visited Area Layer",
@@ -414,10 +414,10 @@
   "FR-051": {
    "title": "訪問訂正・除外",
    "status": "INTEGRATED",
-   "partial": true,
+   "partial": false,
    "e2e": "✓",
-   "gates": "V2・Q1",
-   "gaps": "共有・公開での出発・帰着地点のぼかし"
+   "gates": "V2・Q1・G6",
+   "gaps": "VERIFIED の証拠の整理(V3)"
   },
   "FR-052": {
    "title": "Personal Travel Atlas",

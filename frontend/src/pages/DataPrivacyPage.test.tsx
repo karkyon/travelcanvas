@@ -18,6 +18,12 @@ const m = vi.hoisted(() => ({
   deleteAccount: vi.fn(),
 }));
 vi.mock('@/services/api', () => m);
+// [Gate G6] 守る範囲・オフラインの端末のカード
+vi.mock('@/services/api/g6', () => ({
+  getPrivacyZones: vi.fn(async () => ({ zones: [], max_zones: 10, radius_range: [100, 5000] })),
+  createPrivacyZone: vi.fn(), deletePrivacyZone: vi.fn(),
+  getOfflineDevices: vi.fn(async () => ({ devices: [], max_devices: 10 })), revokeOfflineDevice: vi.fn(),
+}));
 
 import DataPrivacyPage from './DataPrivacyPage';
 import ExportsPage from './ExportsPage';

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import fx from '@/services/api/__fixtures__/backendContractResponses.json';
+import g6fx from '@/services/api/__fixtures__/g6Responses.json';
 import type { SyncConflictList } from '@/services/api';
 
 const m = vi.hoisted(() => ({ getSyncConflicts: vi.fn(), resolveSyncConflict: vi.fn(), syncPending: vi.fn() }));
@@ -18,7 +19,9 @@ vi.mock('@/services/api', () => ({
 import SyncConflictsPage from './SyncConflictsPage';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
 import { usePlanStore } from '@/store/planStore';
-import { conflictRows, conflictSummary } from './sync/syncModel';
+import { conflictRows, conflictSubject, conflictSummary } from './sync/syncModel';
+import { decodeResponse } from '@/services/api/decode';
+import { syncConflictList } from '@/services/api/decoders';
 
 const list = fx.sync_conflicts as SyncConflictList;
 
@@ -46,6 +49,31 @@ describe('syncModel (Gate P11)', () => {
     expect(conflictRows(del!)[0]).toMatchObject({ label: '開始時刻', mine: '(削除)', server: '12:30' });
     expect(conflictSummary(del!)).toContain('端末で削除しましたが');
     expect(conflictSummary({ ...update!, server_deleted: true })).toContain('サーバーで削除されたため');
+  });
+});
+
+describe('syncModel (Gate G6 OFF-02 日程・並び)', () => {
+  const dayOrder = decodeResponse(g6fx.sync_conflicts_day_order, syncConflictList, 'GET /plans/{plan_id}/sync/conflicts');
+  it('日程の項目と、並びを予定名で比べる(実 backend の応答)', () => {
+    const [day, order] = dayOrder.conflicts;
+    expect(conflictSubject(day!)).toBe('日程');
+    expect(conflictRows(day!)).toEqual([{ field: 'title', label: '予定名', mine: '端末で変えた', server: 'サーバーで変えた' }]);
+    expect(conflictSubject(order!)).toBe('予定の並び');
+    expect(conflictRows(order!)).toEqual([{ field: 'order', label: '予定の並び', mine: '1. museum / 2. lunch / 3. temple',
+      server: '1. temple / 2. lunch / 3. museum / 4. サーバーの予定' }]);
+    expect(conflictSummary(order!)).toContain('予定の並びを端末で変えた後に');
+    expect(conflictSummary({ ...day!, action: 'delete' })).toContain('端末で日程を削除しました');
+  });
+
+  it('画面: 並びの競合を表で比べ、サーバーの並びを残せる', async () => {
+    m.getSyncConflicts.mockResolvedValue(dayOrder);
+    m.resolveSyncConflict.mockResolvedValue(fx.sync_resolved_server);
+    renderPage();
+    const items = await screen.findAllByRole('region', { name: '競合: サーバーで変えた' });
+    expect(items).toHaveLength(2);
+    expect(within(items[1]!).getByRole('table')).toHaveTextContent('1. museum / 2. lunch / 3. temple');
+    fireEvent.click(within(items[1]!).getByRole('button', { name: 'サーバーの内容を残す' }));
+    await waitFor(() => expect(m.resolveSyncConflict).toHaveBeenCalledWith('p1', dayOrder.conflicts[1]!.operation_id, 'keep_server', undefined));
   });
 });
 

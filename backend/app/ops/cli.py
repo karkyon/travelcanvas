@@ -1147,6 +1147,8 @@ JOBS = {
     "email-outbox": ["-m", "app.ops.email_outbox"],
     # [Gate G4] FC-097 濫用の自動の検知
     "abuse-scan": ["-m", "app.ops.abuse_scan"],
+    # [Gate G6] MEM-01 削除から7日を過ぎた記録の保管を消す
+    "memory-trash": ["-m", "app.ops.memory_trash"],
 }
 
 

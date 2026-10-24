@@ -60,6 +60,7 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | 15分ごと | [Gate G4] 投票の締切(`tcops.py jobs poll-deadlines`。締切の24時間前に未回答の人へ知らせ、締切で締めて結果を知らせる。決定は人が行う) |
 | 5分ごと | [Gate G4] 通知のまとめのメールと送信待ちのメール(`tcops.py jobs email-outbox`。送信の設定が無ければ何もしない。失敗は5分から6時間まで間を空けて6回で dead) |
 | 毎時 25分 | [Gate G4] 濫用の自動の検知(`tcops.py jobs abuse-scan`。1時間に50以上の接続元から開かれた共有・合言葉の失敗20回・1日に50個の共有・感染した文書を管理者の一覧へ) |
+| 毎日 04:05 | [Gate G6] 削除してから7日を過ぎた旅の記録を消す(`tcops.py jobs memory-trash`。写真・音声のファイルを含む。§8.12) |
 
 ログは `ops-state/logs/*.log`、演習の記録は `ops-state/drills/`(どちらも git の対象外)。
 
@@ -555,6 +556,28 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 - **席の上限**: owner が設定する(空欄は上限なし)。上限に達するとメンバーを足せない(409 `seat_limit_reached`)。参加・脱退・上限の変更は
   `organization_seat_events` に残る。
 
+## 8.12 オフラインの端末・守る範囲・旅行記の公開・記録の削除の取り消し(Gate G6)
+
+- **オフラインの端末の鍵**(OFF-01): 鍵は利用者・版・端末の ID から導出し(保存しない)、30日の期限つきで配る。端末は
+  `offline_devices` に名前(ブラウザと OS の種類だけ)と最後に鍵を受け取った時刻だけを残す。利用者は「データとプライバシー」で
+  1台だけ失効でき、失効した端末は次の通信で 410 を受け取り保存データを消す。全ての端末を一度に止める時は、以前と同じ
+  「全ての端末のオフラインデータを無効にする」(鍵の版を上げる)。端末は1人10台まで(失効した端末は数えない)。
+  失くした端末の問い合わせ: 本人に失効してもらう。通信しない端末は鍵の期限(30日)の後は開けない。
+- **オフラインの編集**(OFF-02): 予定に加えて、日程の作成・変更・削除と、日程の中の予定の並びを端末に溜める。
+  予約(予約番号・チケット)はオフラインでは変えない(`online_required`)。競合は利用者が「同期で競合した変更」で解く。
+- **守る範囲**(LOC-02): 利用者が自宅・職場などを登録する(中心は本人のデータ鍵で暗号化。`privacy_zones`)。GPX・KML の書き出しと
+  旅行記の公開から、その範囲の中の地点を外す(旅行の所有者の範囲と書き出す本人の範囲の両方)。データ鍵を破棄した利用者の範囲は
+  読めないため、その利用者に関わる書き出しは位置を全て外す(安全側)。
+- **旅行記の公開**(MEM-01): 本人の記録だけの写し(`memory_publications.snapshot`。座標・音声・他のメンバーの記録は含めない)を
+  `/journal/<推測できない値>` で見せる。サーバーには値のハッシュだけを残す(URL は作った時だけ画面に出る)。閲覧は回数の制限つき・
+  `X-Robots-Tag: noindex`・`Cache-Control: no-store`。不適切な公開の申し出があれば、所有者に失効してもらうか、管理者が
+  `docker compose exec -T postgres psql -U <所有者> -d <DB> -c "UPDATE memory_publications SET revoked_at = now() WHERE token_prefix = '<先頭8文字>'"`
+  で止める(監査に理由を残す)。
+- **記録の削除の取り消し**: 削除した記録は7日間 `memory_trash` に本文を暗号化して保管し(写真・音声のファイルも残す)、
+  削除した人か書いた人が「元に戻す」で戻せる。期限の後は毎日 04:05 の `tcops.py jobs memory-trash` がファイルごと消す
+  (出力 `{"purged": 件数, "files": 消したファイル, "failed": 失敗}`。`failed` が続く時は保存先の権限を確かめる)。
+  定期実行を登録済みなら `python3 scripts/ops/tcops.py schedule install` をもう一度実行すると足される。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
@@ -589,5 +612,6 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 | 2026-10-21 | 11 | Gate G2: DB の権限の分離(§8.6)、Webhook の自動の再送の定期実行(§2.1)、サポート閲覧と運用の要約(§8.7)、即時の通知と同行者向けの項目の規則(§8.8) |
 | 2026-10-22 | 13 | Gate G4: 検索のコマンド・合意の採用・通知の設定とメールのまとめ・ゲストの閲覧・濫用への対応(§8.10)、定期実行 poll-deadlines・email-outbox・abuse-scan(§2.1) |
 | 2026-10-23 | 14 | Gate G5: 為替の記録・予算の版・支出の取消・精算の締め・使用量の上限・組織のロゴ・独自のドメイン・席の上限(§8.11、`USAGE_LIMITS` §2.3) |
+| 2026-10-23 | 15 | Gate G6: オフラインの端末ごとの鍵と失効・日程と並びのオフラインの編集・守る範囲・旅行記の公開・記録の削除の取り消し(§8.12)、定期実行 memory-trash(§2.1) |
 | 2026-10-22 | 12 | Gate G3: 画面の本番用の配信・データ鍵と鍵の破棄による削除・バックアップの鍵の写し(§4.1・§8.9)、TOTP の鍵と解除の二者の確認(§8.3)、エラーの問い合わせ番号・性能の検査(§8.9)。定期実行を登録済みなら `schedule install` をもう一度実行すると `keys purge-escrow` が足される |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

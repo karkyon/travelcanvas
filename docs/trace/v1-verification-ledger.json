@@ -13,7 +13,8 @@
   "updated_c1": "Gate C1: FR-023 を追加(秘匿プロフィール。E2E collaboration.spec.ts)。FR-020 は INTEGRATED(部分)のため対象外",
   "updated_f45b1": "Gate F45・B1(r12): FR-009(情報内検索。E2E search.spec.ts。読み取りだけのため競合は対象外)と FR-050(訪問判定・信頼度。E2E visits.spec.ts)を追加。FR-007/008(C2)・FR-040(A2)・FR-041/042(B1)・FR-045(F45)・FR-049/051(V2)は(部分)のため対象外",
   "updated_g4": "Gate G4(r16): FR-022(合意形成。決定の採用・締切・定足数・同点。E2E gate-g4.spec.ts・discussion.spec.ts)を追加。FR-009 は書き込み(コマンド)ができたため競合の試験を足した。FR-040(濫用への対応)・FR-044(確認・一時トークン・複製)の証拠を足した。FR-008(地図の提供元)・FR-024(メールの提供元)は(部分)のため対象外",
-  "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま"
+  "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま",
+  "updated_g6": "Gate G6(r18): FR-048(Offline Travel Pack。端末ごとの鍵・期限・1台だけの失効・失効した端末の消去・日程と並びのオフラインの編集。E2E offline-pack.spec.ts・gate-g6.spec.ts)を追加。FR-033 は日程・並びの競合と依存の順・予約はオンラインだけの証拠を足した。FR-037(顔の検査・MEMORY MAP)は外部の提供元が残るため(部分)のまま。FR-051 は(部分)を外したが VERIFIED の証拠は V3 で整える"
  },
  "cross_cutting": {
   "authz": [
@@ -359,17 +360,22 @@
   "FR-033": {
    "title": "Offline同期",
    "e2e": [
+    "frontend/e2e/gate-g6.spec.ts",
     "frontend/e2e/offline-sync.spec.ts"
    ],
    "authz": [
-    "backend/tests/test_gate_p11_sync.py::test_permissions_and_isolation"
+    "backend/tests/test_gate_p11_sync.py::test_permissions_and_isolation",
+    "backend/tests/test_gate_g6_offline.py::test_day_delete_only_when_empty_and_viewer_cannot_sync"
    ],
    "conflict": [
-    "backend/tests/test_gate_p11_sync.py::test_field_level_conflicts_and_resolution"
+    "backend/tests/test_gate_p11_sync.py::test_field_level_conflicts_and_resolution",
+    "backend/tests/test_gate_g6_offline.py::test_day_create_merges_existing_date_and_update_conflict",
+    "backend/tests/test_gate_g6_offline.py::test_order_conflict_when_server_added_event_and_locked"
    ],
    "security": [
     "backend/tests/test_gate_p11_sync.py::test_offline_create_update_delete_with_temp_id_and_replay",
-    "backend/tests/test_gate_p11_sync.py::test_deleted_locked_related_and_rejections"
+    "backend/tests/test_gate_p11_sync.py::test_deleted_locked_related_and_rejections",
+    "backend/tests/test_gate_g6_offline.py::test_offline_day_event_and_order_in_one_batch_out_of_order"
    ],
    "status": "VERIFIED"
   },
@@ -601,6 +607,27 @@
    "security": [
     "backend/tests/test_gate_p2_finance.py::test_budgets_and_private_member_budget",
     "backend/tests/test_gate_g5_finance.py::test_void_keeps_row_but_leaves_totals"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-048": {
+   "title": "Offline Travel Pack(端末)",
+   "e2e": [
+    "frontend/e2e/offline-pack.spec.ts",
+    "frontend/e2e/gate-g6.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_g6_offline.py::test_devices_are_own_only",
+    "backend/tests/test_gate_k1_offline_keys.py::test_each_user_gets_a_different_key"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g6_offline.py::test_order_conflict_when_server_added_event_and_locked",
+    "backend/tests/test_gate_k1_offline_keys.py::test_rotate_requires_if_match_and_checks_version"
+   ],
+   "security": [
+    "backend/tests/test_gate_g6_offline.py::test_device_keys_are_separate_and_revocable",
+    "backend/tests/test_gate_g6_offline.py::test_device_limit",
+    "backend/tests/test_gate_g6_offline.py::test_device_label_keeps_only_families"
    ],
    "status": "VERIFIED"
   }

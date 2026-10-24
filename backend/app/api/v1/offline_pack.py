@@ -8,16 +8,25 @@
                                   (無ければ400、違えば409)。1時間10回まで。監査には版の数字だけを残す。
 
 鍵は利用者ごと・版ごとに backend の秘密から導出し、DB には保存しない(app/services/offline_keys.py)。
-"""
-from datetime import datetime, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+[Gate G6] OFF-01 端末ごとの鍵と失効:
+- GET  /offline-pack/key?device_id=<UUID> : その端末の鍵(利用者・版・端末から導出)。初めての端末は登録する(10台まで)。
+                                            失効した端末には 410 offline_device_revoked(端末は保存したデータを消す)。
+                                            expires_at(30日)を過ぎた鍵は、端末は通信できるまで使わない
+- GET  /offline-pack/devices              : 自分の端末の一覧(名前はブラウザと OS の種類だけ)
+- POST /offline-pack/devices/{id}/revoke  : その端末だけを失効する(他の端末はそのまま使える)
+device_id を付けない要求は、以前の利用者ごとの鍵を返す(古い画面の互換)。
+"""
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional, cast
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.models.models import User
+from app.models.models import OfflineDevice, User
 from app.services import offline_keys as ok
 from app.services.audit_service import record_audit_event
 from app.utils.rate_limiter import check_rate_limit
@@ -59,9 +68,35 @@ def _require_configured() -> None:
         raise _error(503, "offline_key_not_configured", "オフライン保存の鍵が設定されていません(管理者に連絡してください)")
 
 
+def _device_row(db: Session, user: User, device_id: str, request: Request) -> OfflineDevice:
+    try:
+        dev = str(uuid.UUID(device_id))
+    except ValueError:
+        raise _error(422, "invalid_device_id", "端末の ID の形が正しくありません")
+    row = db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id, OfflineDevice.device_id == dev).first()
+    if row is None:
+        active = db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id,
+                                                OfflineDevice.revoked_at.is_(None)).count()
+        if active >= ok.MAX_DEVICES:
+            raise _error(409, "too_many_offline_devices",
+                         f"オフライン保存に使える端末は{ok.MAX_DEVICES}台までです。設定のオフラインで使わない端末を失効してください")
+        row = OfflineDevice(id=uuid.uuid4(), user_id=user.id, device_id=dev,
+                            label=ok.device_label(request.headers.get("user-agent")))
+        db.add(row)
+        db.flush()
+        record_audit_event(action="offline_device_registered", resource_type="user", user_id=user.id,
+                           resource_id=user.id, ip_address=request.client.host if request.client else None,
+                           details={"device": str(row.id)})
+    if row.revoked_at is not None:
+        raise _error(410, "offline_device_revoked", "この端末のオフライン保存は失効しています。保存したデータは端末から消えます")
+    return row
+
+
 @router.get("/key")
 async def get_offline_key(
+    request: Request,
     response: Response,
+    device_id: Optional[str] = Query(None, max_length=64),
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
@@ -70,7 +105,60 @@ async def get_offline_key(
     if not check_rate_limit(f"offline_key:{user.id}", KEY_RATE_LIMIT, 3600):
         raise _error(429, "rate_limited", "オフライン鍵の取得回数が上限に達しました。しばらく待ってください")
     response.headers.update(_NO_STORE)
-    return _key_payload(user)
+    if device_id is None:
+        return _key_payload(user)
+    row: Any = _device_row(db, user, device_id, request)
+    now = datetime.now(timezone.utc)
+    row.last_key_at = now
+    db.commit()
+    version = ok.current_version(cast(Any, user).preferences)
+    raw = ok.derive_device_key(cast(Any, user).id, version, row.device_id)
+    return {**_key_payload(user), "key": ok.encode_key(raw), "device_id": row.device_id, "device": str(row.id),
+            "expires_at": (now + timedelta(days=ok.DEVICE_KEY_TTL_DAYS)).isoformat()}
+
+
+def _device_dict(d: OfflineDevice, current: Optional[str]) -> dict:
+    iso = lambda v: v.isoformat() if v else None  # noqa: E731
+    return {"id": str(d.id), "label": d.label, "created_at": iso(d.created_at), "last_key_at": iso(d.last_key_at),
+            "revoked_at": iso(d.revoked_at), "is_current": current is not None and d.device_id == current}
+
+
+@router.get("/devices")
+async def list_offline_devices(
+    response: Response,
+    device_id: Optional[str] = Query(None, max_length=64),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    user = _load_user(db, current_user)
+    try:
+        current = str(uuid.UUID(device_id)) if device_id else None
+    except ValueError:
+        current = None
+    rows = (db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id)
+            .order_by(OfflineDevice.revoked_at.isnot(None), OfflineDevice.created_at.desc()).all())
+    response.headers.update(_NO_STORE)
+    return {"devices": [_device_dict(d, current) for d in rows], "max_devices": ok.MAX_DEVICES}
+
+
+@router.post("/devices/{device_ref}/revoke")
+async def revoke_offline_device(
+    device_ref: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    user = _load_user(db, current_user)
+    row = db.query(OfflineDevice).filter(OfflineDevice.id == device_ref, OfflineDevice.user_id == user.id).first()
+    if row is None:
+        raise _error(404, "offline_device_not_found", "端末が見つかりません")
+    if row.revoked_at is None:
+        row.revoked_at, row.revoked_reason = datetime.now(timezone.utc), "user"
+        db.commit()
+        record_audit_event(action="offline_device_revoked", resource_type="user", user_id=user.id,
+                           resource_id=user.id, ip_address=request.client.host if request.client else None,
+                           details={"device": str(row.id)})
+    return _device_dict(row, None)
 
 
 @router.post("/key/rotate")

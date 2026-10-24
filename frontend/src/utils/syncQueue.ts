@@ -8,7 +8,7 @@
  * - ストレージが使えない(プライベートモード等)場合も画面を止めず、溜められなかったことを返す
  * - 競合した数はサーバーが正(一覧は /sync/conflicts)。端末には画面に出す件数だけを覚える
  */
-import type { SyncAction, SyncEventFields, SyncOperationInput, SyncResult } from '@/services/api';
+import type { SyncAction, SyncEntityType, SyncEventFields, SyncOperationInput, SyncResult } from '@/services/api';
 
 export interface QueuedOperation extends SyncOperationInput {
   /** 画面に出す予定名(未同期の一覧用) */
@@ -42,7 +42,10 @@ export function deviceId(): string {
 
 function isQueued(v: unknown): v is QueuedOperation {
   const o = v as QueuedOperation;
-  return !!o && typeof o.operation_id === 'string' && o.entity_type === 'event'
+  if (!o || typeof o.operation_id !== 'string') return false;
+  // [Gate G6] 日程(day)・並び(order)も溜める
+  if (o.entity_type === 'order') return o.action === 'reorder';
+  return (o.entity_type === 'event' || o.entity_type === 'day')
     && (o.action === 'create' || o.action === 'update' || o.action === 'delete');
 }
 
@@ -75,10 +78,10 @@ function definedFields(fields: SyncEventFields): SyncEventFields {
 export function enqueue(
   planId: string,
   op: { action: SyncAction; entity_id?: string | null; temp_id?: string | null; base_revision?: number | null;
-    fields?: SyncEventFields; label: string },
+    fields?: SyncEventFields; label: string; entity_type?: SyncEntityType },
 ): QueuedOperation | null {
   const queued: QueuedOperation = {
-    operation_id: newId(), entity_type: 'event', action: op.action, entity_id: op.entity_id ?? null,
+    operation_id: newId(), entity_type: op.entity_type ?? 'event', action: op.action, entity_id: op.entity_id ?? null,
     temp_id: op.temp_id ?? null, base_revision: op.base_revision ?? null,
     fields: op.fields ? definedFields(op.fields) : undefined, client_at: new Date().toISOString(), label: op.label,
   };
@@ -94,9 +97,16 @@ export function applyResults(planId: string, results: SyncResult[]): QueuedOpera
       mapping.set(r.temp_id, r.entity_id);
     }
   }
+  const real = (id: string) => mapping.get(id) ?? id;
   const remaining = loadQueue(planId)
     .filter((o) => !done.has(o.operation_id))
-    .map((o) => (o.entity_id && mapping.has(o.entity_id) ? { ...o, entity_id: mapping.get(o.entity_id)! } : o));
+    .map((o) => {
+      // [Gate G6] 仮のIDは予定・日程・並びの中でも本当のIDへ置き換える
+      const fields = o.fields ? { ...o.fields } : undefined;
+      if (fields?.day_id) fields.day_id = real(fields.day_id);
+      if (fields?.order) fields.order = fields.order.map(real);
+      return { ...o, entity_id: o.entity_id ? real(o.entity_id) : o.entity_id, ...(fields ? { fields } : {}) };
+    });
   saveQueue(planId, remaining);
   return remaining;
 }
