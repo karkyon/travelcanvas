@@ -14,7 +14,8 @@
   "updated_f45b1": "Gate F45・B1(r12): FR-009(情報内検索。E2E search.spec.ts。読み取りだけのため競合は対象外)と FR-050(訪問判定・信頼度。E2E visits.spec.ts)を追加。FR-007/008(C2)・FR-040(A2)・FR-041/042(B1)・FR-045(F45)・FR-049/051(V2)は(部分)のため対象外",
   "updated_g4": "Gate G4(r16): FR-022(合意形成。決定の採用・締切・定足数・同点。E2E gate-g4.spec.ts・discussion.spec.ts)を追加。FR-009 は書き込み(コマンド)ができたため競合の試験を足した。FR-040(濫用への対応)・FR-044(確認・一時トークン・複製)の証拠を足した。FR-008(地図の提供元)・FR-024(メールの提供元)は(部分)のため対象外",
   "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま",
-  "updated_g6": "Gate G6(r18): FR-048(Offline Travel Pack。端末ごとの鍵・期限・1台だけの失効・失効した端末の消去・日程と並びのオフラインの編集。E2E offline-pack.spec.ts・gate-g6.spec.ts)を追加。FR-033 は日程・並びの競合と依存の順・予約はオンラインだけの証拠を足した。FR-037(顔の検査・MEMORY MAP)は外部の提供元が残るため(部分)のまま。FR-051 は(部分)を外したが VERIFIED の証拠は V3 で整える"
+  "updated_g6": "Gate G6(r18): FR-048(Offline Travel Pack。端末ごとの鍵・期限・1台だけの失効・失効した端末の消去・日程と並びのオフラインの編集。E2E offline-pack.spec.ts・gate-g6.spec.ts)を追加。FR-033 は日程・並びの競合と依存の順・予約はオンラインだけの証拠を足した。FR-037(顔の検査・MEMORY MAP)は外部の提供元が残るため(部分)のまま。FR-051 は(部分)を外したが VERIFIED の証拠は V3 で整える",
+  "updated_g7": "Gate G7(r19): FR-005(日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグの並べ替え。E2E gate-g7.spec.ts・item-deletion.spec.ts)と FR-057(同じ同行者の傾向・移動手段の傾向と区間の余裕の提案。E2E memory-replan.spec.ts・gate-g7.spec.ts)を追加。FR-017 は既定の滞在・休憩・最終の便の証拠を足した。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま"
  },
  "cross_cutting": {
   "authz": [
@@ -201,13 +202,15 @@
   "FR-017": {
    "title": "実行可能性",
    "e2e": [
-    "frontend/e2e/feasibility.spec.ts"
+    "frontend/e2e/feasibility.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts"
    ],
    "authz": [
     "backend/tests/test_gate_l3_validation.py::test_permissions_viewer_can_run_stranger_cannot"
    ],
    "conflict": [
-    "backend/tests/test_gate_l3_validation.py::test_list_and_get_and_staleness"
+    "backend/tests/test_gate_l3_validation.py::test_list_and_get_and_staleness",
+    "backend/tests/test_gate_g7_movement.py::test_movement_settings_api_if_match_validation_and_stale"
    ],
    "conflict_note": "入力の変更で古い結果と示す",
    "security": [
@@ -628,6 +631,44 @@
     "backend/tests/test_gate_g6_offline.py::test_device_keys_are_separate_and_revocable",
     "backend/tests/test_gate_g6_offline.py::test_device_limit",
     "backend/tests/test_gate_g6_offline.py::test_device_label_keeps_only_families"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-005": {
+   "title": "日・イベント",
+   "e2e": [
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/item-deletion.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_g7_movement.py::test_event_time_edit_permissions_and_conflicts"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g7_movement.py::test_event_time_edit_permissions_and_conflicts"
+   ],
+   "conflict_note": "古い版(If-Match)の編集は 409、版の無い編集は 400。影響の確認は旅程を変えない",
+   "security": [
+    "backend/tests/test_gate_g2_member_policy.py::test_viewer_sees_nothing_hidden_on_any_route",
+    "backend/tests/test_gate_g2_member_policy.py::test_editor_cannot_write_or_read_hidden_fields"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-057": {
+   "title": "Memory Replan",
+   "e2e": [
+    "frontend/e2e/memory-replan.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p17_memory_replan.py::test_locked_and_permissions"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p17_memory_replan.py::test_insights_and_apply_with_undo",
+    "backend/tests/test_gate_g7_memory_deletion.py::test_transport_tendency_proposal_apply_and_undo"
+   ],
+   "conflict_note": "入力の指紋・版が変わった後の適用は 409 replan_stale",
+   "security": [
+    "backend/tests/test_gate_g7_memory_deletion.py::test_transport_tendency_proposal_apply_and_undo"
    ],
    "status": "VERIFIED"
   }

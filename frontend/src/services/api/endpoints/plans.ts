@@ -158,6 +158,7 @@ export class PlansApi extends SpotsApi {
     planId: string, eventId: string,
     data: Partial<{
       title: string; description: string; event_type: string; local_start_time: string;
+      local_end_time: string | null; end_day_offset: number;
       address: string; latitude: number; longitude: number; locked: boolean;
     }>,
     ifMatch: number

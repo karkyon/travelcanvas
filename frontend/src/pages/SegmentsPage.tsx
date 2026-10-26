@@ -94,6 +94,21 @@ function endpointLabel(
   return '(未設定)';
 }
 
+/** [Gate G7] 応答の最終の便(以前の decoder は宣言外の項目をそのまま残す) */
+const lastDeparture = (s: TravelSegment): string | null => {
+  const v = (s as TravelSegment & { last_departure_at?: unknown }).last_departure_at;
+  return typeof v === 'string' ? v : null;
+};
+
+/** [Gate G7] ISO の日時 → datetime-local の値(端末の現地時刻) */
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 interface SegmentFormState {
   from_type: 'event' | 'place';
   from_event_id: string;
@@ -105,6 +120,7 @@ interface SegmentFormState {
   status: SegmentStatus;
   planned_departure_at: string;
   planned_arrival_at: string;
+  last_departure_at: string;
   cost: string;
   currency: string;
   transport_number: string;
@@ -124,6 +140,7 @@ const EMPTY_FORM: SegmentFormState = {
   status: 'planned',
   planned_departure_at: '',
   planned_arrival_at: '',
+  last_departure_at: '',
   cost: '',
   currency: 'JPY',
   transport_number: '',
@@ -149,6 +166,8 @@ function formToPayload(form: SegmentFormState): SegmentCreateData {
   }
   if (form.planned_departure_at) payload.planned_departure_at = new Date(form.planned_departure_at).toISOString();
   if (form.planned_arrival_at) payload.planned_arrival_at = new Date(form.planned_arrival_at).toISOString();
+  // [Gate G7] MOVE-03 最終の便(空にすると消す)
+  payload.last_departure_at = form.last_departure_at ? new Date(form.last_departure_at).toISOString() : null;
   if (form.cost) {
     payload.cost = form.cost;
     payload.currency = form.currency;
@@ -253,6 +272,7 @@ const SegmentsPage: React.FC = () => {
       status: segment.status,
       planned_departure_at: segment.planned_departure_at ? segment.planned_departure_at.slice(0, 16) : '',
       planned_arrival_at: segment.planned_arrival_at ? segment.planned_arrival_at.slice(0, 16) : '',
+      last_departure_at: toLocalInput(lastDeparture(segment)),
       cost: segment.cost ?? '',
       currency: segment.currency ?? 'JPY',
       transport_number: segment.transport_number ?? '',
@@ -381,6 +401,11 @@ const SegmentsPage: React.FC = () => {
                     {segment.recommended_departure_at && (
                       <div className="mt-1 text-xs text-blue-600">
                         推奨出発: {formatDateTime(segment.recommended_departure_at)}
+                      </div>
+                    )}
+                    {lastDeparture(segment) && (
+                      <div className="mt-1 text-xs text-amber-900">
+                        最終の便: {formatDateTime(lastDeparture(segment)!)}
                       </div>
                     )}
                     {segment.transport_number && (
@@ -529,6 +554,12 @@ const SegmentsPage: React.FC = () => {
                 onChange={(e) => setForm({ ...form, planned_arrival_at: e.target.value })}
               />
             </div>
+            <Input
+              label="最終の便の出発(終電・最終のバスなど。間に合うかを検証で確かめます)"
+              type="datetime-local"
+              value={form.last_departure_at}
+              onChange={(e) => setForm({ ...form, last_departure_at: e.target.value })}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <Input

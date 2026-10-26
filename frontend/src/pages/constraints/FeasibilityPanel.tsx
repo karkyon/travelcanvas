@@ -4,6 +4,7 @@
  * - 未検証・結果が古い・検証失敗・問題あり・検証できない項目あり・問題なし を区別する
  * - 違反(エラー/警告)と「検証できなかった項目」を別の一覧にする(検証不能を問題なしにしない)
  * - 他のメンバーの秘匿制約に関する問題は、内容を出さずに存在だけ示す
+ * - [Gate G7] MOVE-03 日ごとの活動量・休憩なしの最長・疲れの目安(移動・滞在の既定を使った時)
  */
 import React from 'react';
 import { AlertTriangle, CheckCircle2, HelpCircle, Lock, RefreshCw, XCircle } from 'lucide-react';
@@ -13,6 +14,30 @@ import type { ValidationIssue, ValidationRunDetail } from '@/services/api';
 import {
   SEVERITY_LABEL, describeUnchecked, formatRunTime, runHeadline, splitIssues, type RunTone,
 } from './validationModel';
+import { runMovement } from '@/services/api/g7';
+import { dayMetricText } from './movementModel';
+
+function DayMetrics({ run }: { run: ValidationRunDetail }) {
+  let metrics;
+  try {
+    metrics = runMovement(run).day_metrics;
+  } catch {
+    return null;
+  }
+  if (metrics.length === 0) return null;
+  return (
+    <section aria-labelledby="feasibility-days" className="mt-4">
+      <h3 id="feasibility-days" className="text-sm font-semibold text-gray-900 mb-1">日ごとの疲れの目安</h3>
+      <ul className="text-sm text-gray-900 space-y-1">
+        {metrics.map((m) => (
+          <li key={m.day_id} data-testid="day-metric">
+            <span className="font-medium">{m.local_date}</span>{` ${dayMetricText(m)}`}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 const TONE_CLASS: Record<RunTone, string> = {
   error: 'bg-red-50 text-red-800 border-red-200',
@@ -127,6 +152,7 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
                 <IssueSection id="feasibility-unverified" title="検証できなかった項目" issues={split.unverified} />
               </>
             )}
+            {run.status === 'completed' && <DayMetrics run={run} />}
             {unchecked.length > 0 && (
               <p className="mt-3 text-xs text-gray-600">内訳: {unchecked.join(' / ')}</p>
             )}

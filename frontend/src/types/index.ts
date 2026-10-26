@@ -142,6 +142,8 @@ export interface ScheduleItem {
   category: EventCategory;
   start_time?: string;
   end_time?: string;
+  /** [Gate G7] FR-005 終了が開始の日から何日後か(0=同じ日・1=翌日・2=2日後) */
+  end_day_offset?: number;
   duration?: number;
   location_name?: string;
   latitude?: number;
@@ -165,6 +167,8 @@ export interface CreateScheduleItemData {
   category: EventCategory;
   start_time?: string;
   end_time?: string;
+  /** [Gate G7] FR-005 終了が開始の日から何日後か(0=同じ日・1=翌日・2=2日後) */
+  end_day_offset?: number;
   duration?: number;
   location_name?: string;
   latitude?: number;

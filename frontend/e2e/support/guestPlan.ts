@@ -62,7 +62,14 @@ export async function startGuestPlanViaApi(
   const planId = (await res.json()).id as string;
   if (open) {
     await page.goto(`/planner/${planId}`);
-    await page.waitForURL(new RegExp(`/planner/${planId}$`), { timeout: 15_000 });
+    try {
+      await page.waitForURL(new RegExp(`/planner/${planId}$`), { timeout: 15_000 });
+    } catch (e) {
+      // [Gate G7] omega-dev2 で1回だけ、プランの画面へ移った後に別の URL にいた(画面の記録を開かないと分からなかった)。
+      // 今の URL と画面の文言を誤りに含める
+      const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+      throw new Error(`プランの画面を開けませんでした(今の URL: ${page.url()}・画面: ${text})\n${String(e)}`);
+    }
   }
   return { planId, apiBase, token };
 }

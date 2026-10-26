@@ -18,7 +18,7 @@ import hashlib
 import itertools
 from dataclasses import dataclass, replace
 from datetime import datetime, time as time_cls, timezone
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.services import feasibility
 from app.services.route_estimator import estimate_leg, haversine_km
@@ -249,3 +249,98 @@ def explain(changes: List[Dict], saved_km: Optional[float], summary_before: Dict
     if moved:
         out.append(f"{len(moved)}件の予定の順番が変わります")
     return out
+
+
+# ===================================================================== [Gate G7] MOVE-04 目的の内訳・条件変更・部分の採用
+
+WEIGHT_KEYS = ("distance", "constraints", "fatigue", "fairness")
+WEIGHT_LABEL = {"distance": "移動距離", "constraints": "検証・制約", "fatigue": "疲れ", "fairness": "公平さ"}
+DEFAULT_WEIGHTS = {"distance": 1, "constraints": 3, "fatigue": 1, "fairness": 1}
+MAX_WEIGHT = 5
+
+
+def clean_weights(raw: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:
+    """条件(重み 0〜5)。None は「条件を指定しない」(従来どおり最短の案・制約を優先した案だけ)。"""
+    if raw is None:
+        return None
+    out = dict(DEFAULT_WEIGHTS)
+    for k, v in raw.items():
+        if k not in WEIGHT_KEYS:
+            raise ValueError(f"不明な条件です: {k}")
+        if isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= MAX_WEIGHT:
+            raise ValueError(f"{WEIGHT_LABEL[k]}の重みは0〜{MAX_WEIGHT}の整数です")
+        out[k] = v
+    if not any(out.values()):
+        raise ValueError("少なくとも1つの条件の重みを1以上にしてください")
+    return out
+
+
+def day_movement(result: "feasibility.EvaluationResult", day_id: str) -> Dict[str, Optional[int]]:
+    """その日の疲れの目安(%)と休憩なしの最長(分)。移動の既定を使っていなければ None。"""
+    m = next((d for d in result.day_metrics if d.get("day_id") == day_id), None)
+    if m is None:
+        return {"fatigue_percent": None, "longest_continuous_minutes": None}
+    return {"fatigue_percent": m.get("fatigue_percent"),
+            "longest_continuous_minutes": m.get("longest_continuous_minutes")}
+
+
+def fairness(result: "feasibility.EvaluationResult", constraints) -> Dict[str, Optional[int]]:
+    """制約を持つメンバーごとの「守れていない割合」の開き(%、0 が最も公平)。2人未満なら None。
+    秘匿制約は件数だけを使う(値・名前は使わない)。メンバーごとの内訳は返さない(誰の条件かを推測させない)。"""
+    status = {r["constraint_id"]: r["status"] for r in result.constraint_results}
+    per: Dict[str, List[int]] = {}
+    for c in constraints.constraints:
+        st = status.get(str(c.id))
+        if st not in ("satisfied", "violated"):
+            continue
+        per.setdefault(str(c.owner_user_id), []).append(1 if st == "violated" else 0)
+    rates = [sum(v) / len(v) for v in per.values() if v]
+    if len(rates) < 2:
+        return {"members": len(rates), "spread_percent": None}
+    return {"members": len(rates), "spread_percent": int(round(100 * (max(rates) - min(rates)) / 10) * 10)}
+
+
+def objective(summary: Dict[str, int], km: float, move: Dict[str, Optional[int]], fair: Dict[str, Optional[int]],
+              weights: Dict[str, int]) -> Dict[str, object]:
+    """目的の内訳(小さいほど良い)。各項目の値・重み・点と合計。点の作り方は画面に示す(説明できる最適化)。"""
+    fatigue = move.get("fatigue_percent")
+    spread = fair.get("spread_percent")
+    terms: List[Dict[str, Any]] = [
+        {"key": "distance", "label": WEIGHT_LABEL["distance"], "value": round(km, 2), "unit": "km",
+         "score": round(km, 2), "rule": "1kmごとに1点"},
+        {"key": "constraints", "label": WEIGHT_LABEL["constraints"],
+         "value": summary["error"] * 10 + summary["constraints_violated"] * 5 + summary["warning"] * 2, "unit": "点",
+         "score": summary["error"] * 10 + summary["constraints_violated"] * 5 + summary["warning"] * 2,
+         "rule": "エラー10点・守れていない制約5点・注意2点"},
+        {"key": "fatigue", "label": WEIGHT_LABEL["fatigue"], "value": fatigue, "unit": "%",
+         "score": round((fatigue or 0) / 10, 1), "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)"},
+        {"key": "fairness", "label": WEIGHT_LABEL["fairness"], "value": spread, "unit": "%",
+         "score": round((spread or 0) / 10, 1), "rule": "メンバーごとの守れていない割合の開き10%ごとに1点"},
+    ]
+    total = 0.0
+    for t in terms:
+        weight = weights.get(str(t["key"]), 0)
+        weighted = round(float(t["score"] or 0) * weight, 2)
+        t["weight"] = weight
+        t["weighted"] = weighted
+        total += weighted
+    return {"terms": terms, "total": round(total, 2), "weights": dict(weights)}
+
+
+def partial_order(items: Sequence[Item], movable: Sequence[str], cand_order: Sequence[str],
+                  cand_times: Dict[str, Optional[str]],
+                  selected: Sequence[str]) -> Tuple[List[str], Dict[str, Optional[str]]]:
+    """選んだ予定だけを案の時刻・順番へ動かした並び(他の予定は今の時刻のまま。動かさない予定の位置は変えない)。"""
+    sel = set(selected)
+    base_index = {i.id: n for n, i in enumerate(items)}
+    cand_index = {eid: n for n, eid in enumerate(cand_order)}
+    times = {i.id: (cand_times.get(i.id) if i.id in sel else i.local_start_time) for i in items}
+
+    def key(eid: str):
+        t = parse_local_time(times[eid])
+        pos = cand_index[eid] if eid in sel else base_index[eid]
+        minutes = (t.hour * 60 + t.minute) if t is not None else 0
+        return (0 if t is not None else 1, minutes, pos, 0 if eid in sel else 1)
+
+    sequence = sorted(movable, key=key)
+    return _full_order(items, movable, sequence), times

@@ -709,6 +709,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "25 * * * * cd %s && %s jobs abuse-scan >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# [Gate G6] 毎日 04:05 削除してから7日を過ぎた記録(写真・音声のファイルを含む)を消す",
         "5 4 * * * cd %s && %s jobs memory-trash >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
+        "# [Gate G7] 毎日 04:20 猶予(既定14日)を過ぎたアカウントの削除の申し込みを削除する",
+        "20 4 * * * cd %s && %s jobs account-deletions >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# 5分ごとの監視(状態が変わった時だけ通知)",
         "*/5 * * * * cd %s && %s monitor --quiet >> %s/monitor.log 2>&1" % (repo_dir, tool, log),
         CRON_END,

@@ -11,6 +11,8 @@ interface ScheduleItemProps {
   description?: string;
   startTime: string;
   endTime: string;
+  /** [Gate G7] FR-005 終了が翌日以降なら日数 */
+  endDayOffset?: number;
   duration: number;
   locationName: string;
   address: string;
@@ -51,6 +53,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   description,
   startTime,
   endTime,
+  endDayOffset,
   duration,
   locationName,
   address,
@@ -193,7 +196,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <div className="flex items-center gap-3 mb-2">
             <div className="flex items-center gap-1 text-sm font-semibold text-gray-700">
               <Clock size={14} />
-              <span>{formatTime(startTime)}-{formatTime(endTime)}</span>
+              <span>{formatTime(startTime)}-{formatTime(endTime)}{endTime && endDayOffset ? (endDayOffset === 1 ? '(翌日)' : `(${endDayOffset}日後)`) : ''}</span>
             </div>
             <div className="text-lg font-semibold text-gray-900">
               {getCategoryIcon(category)} {isEditing ? (

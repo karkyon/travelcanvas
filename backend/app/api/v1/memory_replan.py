@@ -8,6 +8,7 @@
                                                1つの変更セット(source=memory_replan)で記録し、本案の「元に戻す」で取り消せる
 
 AIは使わない(集計の規則だけ)。傾向の材料は閲覧者が参加している旅行の実績(旅行の共有データ)だけ。
+[Gate G7] MEM-03: 同じ同行者の属性の旅行を優先し(basis)、移動手段の傾向(slow_transport)から区間の前の余裕を足す提案を作る。
 監査には件数だけを記録し、予定名を残さない。
 """
 import uuid
@@ -17,15 +18,18 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.api.v1 import branches as branches_api
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    EventActual, EventReservation, PlanCollaborator, Reservation, TravelDay, TravelEvent, TravelPlan, User,
+    EventActual, EventReservation, PlanCollaborator, Reservation, TravelDay, TravelEvent, TravelPlan, TravelSegment,
+    User,
 )
 from app.services import journey as jr
 from app.services import memory_replan as mr
+from app.services import movement as mv
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/plans", tags=["memory-replan"])
@@ -59,22 +63,43 @@ def _other_plans(db: Session, user: User, exclude_id) -> List[TravelPlan]:
     return q.all()
 
 
+def _segments(db: Session, plan: TravelPlan, days: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    titles = {str(e["id"]): e["title"] for d in days for e in d["events"]}
+    out = []
+    for sg in db.query(TravelSegment).filter(TravelSegment.plan_id == plan.id).all():
+        label = f"{titles.get(str(sg.from_event_id), '出発地')} → {titles.get(str(sg.to_event_id), '到着地')}"
+        out.append({"id": sg.id, "mode": sg.mode, "status": sg.status, "to_event_id": sg.to_event_id,
+                    "buffer_before_minutes": sg.buffer_before_minutes, "label": label[:200]})
+    return out
+
+
+def _planned(d, e):
+    return jr.planned_start(d["local_date"], e.get("local_start_time"), d["timezone_id"])
+
+
 def _compute(db: Session, plan: TravelPlan, user: User) -> Dict[str, Any]:
     samples: List[Dict[str, Any]] = []
+    transport: List[Dict[str, Any]] = []
     for p in _other_plans(db, user, plan.id):
         acts = db.query(EventActual).filter(EventActual.plan_id == p.id).all()
         if not acts:
             continue
         actuals = {str(a.event_id): {"status": a.status, "actual_start_at": a.actual_start_at,
                                      "actual_end_at": a.actual_end_at} for a in acts}
-        samples.extend(mr.sample_rows(
-            _days(db, p), actuals, str(p.id), p.title or "(名前なし)",
-            lambda d, e: jr.planned_start(d["local_date"], e.get("local_start_time"), d["timezone_id"])))
-    ins = mr.insights(samples)
+        past_days = _days(db, p)
+        party = mv.party_of(db, p)  # [Gate G7] MEM-03 同行者の属性
+        samples.extend(mr.sample_rows(past_days, actuals, str(p.id), p.title or "(名前なし)", _planned, party))
+        transport.extend(mr.transport_rows(past_days, actuals, _segments(db, p, past_days),
+                                           str(p.title or "(名前なし)"), party, _planned))
+    party = mv.party_of(db, plan)
+    ins = mr.insights(samples, party, transport)
     days = _days(db, plan)
     blocked = _blocked(db, plan)
-    return {"insights": ins, "proposals": mr.proposals(ins, days, blocked),
-            "input_fingerprint": mr.fingerprint(days, blocked, ins), "sample_count": len(samples)}
+    segments = _segments(db, plan, days)
+    proposals = mr.proposals(ins, days, blocked) + mr.transport_proposals(ins, segments)
+    return {"insights": ins, "proposals": proposals, "party": party, "party_label": mr.party_label(party),
+            "input_fingerprint": mr.fingerprint(days, blocked, ins, segments), "sample_count": len(samples),
+            "transport_sample_count": len(transport)}
 
 
 @router.get("/{plan_id}/memory-replan")
@@ -107,13 +132,28 @@ def apply_memory_replan(plan_id: str, body: ApplyInput, db: Session = Depends(ge
         raise HTTPException(status_code=409, detail={"code": "proposal_not_found",
                                                      "message": "この提案は今は使えません。提案を読み込み直してください"})
     changes = []
-    for c in proposal["changes"]:
+    if proposal.get("target") == "segment":
+        # [Gate G7] MEM-03 移動手段の傾向: 区間の前の余裕を足す(区間の変更として記録し、元に戻せる)
+        for c in proposal["changes"]:
+            sg = db.query(TravelSegment).filter(TravelSegment.id == uuid.UUID(c["segment_id"]),
+                                                TravelSegment.plan_id == plan.id).first()
+            if not sg:
+                continue
+            before = plans_api._segment_to_dict(sg)
+            sg.buffer_before_minutes = c["to"]
+            setattr(sg, "revision", int(sg.revision or 1) + 1)
+            db.flush()
+            changes.append(("travel_segment", sg.id, "update", before, plans_api._segment_to_dict(sg)))
+    for c in ([] if proposal.get("target") == "segment" else proposal["changes"]):
         ev = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(c["event_id"]),
                                           TravelEvent.plan_id == plan.id).first()
         if not ev:
             continue
         before = plans_api._event_to_dict(ev)
+        old_time = ev.local_start_time
         ev.local_start_time = c["to"]
+        # [Gate G7] FR-005 終了(日をまたぐ予定を含む)も同じだけずらす
+        branches_api._apply_time(ev, ev.day, c["to"], old_time)
         changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
     if not changes:
         raise HTTPException(status_code=409, detail={"code": "no_changes", "message": "変える予定がありません"})

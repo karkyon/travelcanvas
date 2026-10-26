@@ -327,6 +327,55 @@ describe('updateScheduleItem 409競合', () => {
   });
 });
 
+describe('[Gate G7] FR-005 終了時刻(日をまたぐ予定)', () => {
+  const seedEvent = () => usePlanStore.setState((s) => ({
+    currentPlan: {
+      ...s.currentPlan!,
+      days: [{ ...s.currentPlan!.days[0]!, events: [{ id: 'event-1', title: '夜行バス', category: 'transportation', start_time: '22:30' }] }],
+    },
+  }));
+
+  it('終了時刻と終わる日を送り、応答の終了時刻・日数を画面に反映する', async () => {
+    await seedLoadedPlan(1);
+    seedEvent();
+    mockedApi.updateEvent.mockResolvedValue({
+      id: 'event-1', day_id: DAY_ID, title: '夜行バス', event_type: 'transportation', is_all_day: false, locked: false,
+      sort_order: 0, local_start_time: '22:30', local_end_time: '06:10', end_day_offset: 1,
+    });
+    const result = await usePlanStore.getState().updateScheduleItem('event-1', { end_time: '06:10', end_day_offset: 1 });
+    expect(result).toBe('saved');
+    expect(mockedApi.updateEvent).toHaveBeenCalledWith(PLAN_ID, 'event-1',
+      expect.objectContaining({ local_end_time: '06:10', end_day_offset: 1 }), 1);
+    const ev = usePlanStore.getState().currentPlan!.days[0]!.events[0]!;
+    expect(ev.end_time).toBe('06:10');
+    expect(ev.end_day_offset).toBe(1);
+  });
+
+  it('終了時刻を変えない保存では終了の項目を送らない・空にすると消す', async () => {
+    await seedLoadedPlan(1);
+    seedEvent();
+    mockedApi.updateEvent.mockResolvedValue({
+      id: 'event-1', day_id: DAY_ID, title: '夜行', event_type: 'transportation', is_all_day: false, locked: false, sort_order: 0,
+    });
+    await usePlanStore.getState().updateScheduleItem('event-1', { title: '夜行' });
+    const first = mockedApi.updateEvent.mock.calls[0]![2] as Record<string, unknown>;
+    expect('local_end_time' in first).toBe(false);
+    await usePlanStore.getState().updateScheduleItem('event-1', { end_time: '' });
+    const second = mockedApi.updateEvent.mock.calls[1]![2] as Record<string, unknown>;
+    expect(second.local_end_time).toBeNull();
+    expect('end_day_offset' in second).toBe(false);
+  });
+
+  it('通信できない時は終了時刻の変更を溜めず、元に戻して失敗を返す', async () => {
+    await seedLoadedPlan(1);
+    seedEvent();
+    mockedApi.updateEvent.mockRejectedValue(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK', isAxiosError: true }));
+    const result = await usePlanStore.getState().updateScheduleItem('event-1', { end_time: '06:10', end_day_offset: 1 });
+    expect(result).toBe('failed');
+    expect(usePlanStore.getState().currentPlan!.days[0]!.events[0]!.end_time).toBeUndefined();
+  });
+});
+
 describe('reorderScheduleItems', () => {
   it('各イベントに対しsort_orderを指定してmoveEventを逐次呼び出す', async () => {
     await seedLoadedPlan(1);

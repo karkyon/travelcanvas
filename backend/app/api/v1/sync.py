@@ -138,6 +138,9 @@ def _value_at_base(db: Session, plan: TravelPlan, ev: TravelEvent, base_revision
 
 
 def _apply_fields(db: Session, plan: TravelPlan, ev: TravelEvent, fields: Dict[str, Any]) -> None:
+    old_time = ev.local_start_time
+    old_day = db.query(TravelDay).filter(TravelDay.id == ev.day_id).first() if ev.day_id else None
+    old_date = old_day.local_date if old_day is not None else None
     if "day_id" in fields:
         day = db.query(TravelDay).filter(TravelDay.id == uuid.UUID(fields["day_id"]),
                                          TravelDay.plan_id == plan.id).first()
@@ -151,7 +154,7 @@ def _apply_fields(db: Session, plan: TravelPlan, ev: TravelEvent, fields: Dict[s
         new_time = fields.get("local_start_time", ev.local_start_time)
         ev.local_start_time = new_time
         day = db.query(TravelDay).filter(TravelDay.id == ev.day_id).first()
-        branches_api._apply_time(ev, day, new_time)
+        branches_api._apply_time(ev, day, new_time, old_time, old_date)
 
 
 def _store(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn, status: str,

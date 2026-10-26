@@ -61,6 +61,26 @@ export const moveItemBetweenDays = async (
   await usePlanStore.getState().moveItemBetweenDays(itemId, fromDayIndex, toDayIndex, targetIndex);
 };
 
+/**
+ * [Gate G7] FR-005 ドラッグの入れ物(日)の ID。以前は `${planId}-${dayId}` を '-' で分けていたため、UUID の中の '-' で
+ * 切れて旅行・日を取り違え、実際のブラウザでは並べ替え・日の間の移動が何もしなかった。区切りに UUID に現れない '::' を使う。
+ */
+export const containerId = (planId: string, dayId: string): string => `${planId}::${dayId}`;
+
+export const parseContainer = (id: string): { planId: string; dayId: string } => {
+  const at = id.indexOf('::');
+  return at < 0 ? { planId: '', dayId: '' } : { planId: id.slice(0, at), dayId: id.slice(at + 2) };
+};
+
+/**
+ * [Gate G7] FR-005 落とした隙間(元の並びの i 番目の予定の前。末尾は件数)→ 動かした後の位置。
+ * 下へ動かす時は、自分を抜いた分だけ1つ前になる(以前は1つ後ろへずれていた)。
+ */
+export const finalIndexForGap = (order: string[], itemId: string, gap: number): number => {
+  const current = order.indexOf(itemId);
+  return current >= 0 && gap > current ? gap - 1 : gap;
+};
+
 export const useDragDrop = () => {
   const { reorderSchedule } = usePlan();
   
@@ -159,11 +179,11 @@ export const useDragDrop = () => {
 
       // 同じコンテナ内での移動の場合
       if (sourceContainer === targetContainer) {
-        const [planId, dayId] = sourceContainer.split('-');
+        const { planId, dayId } = parseContainer(sourceContainer);
         
         // 現在の順序を取得し、新しい順序を計算
         const currentOrder = getCurrentItemOrder(planId, dayId);
-        const newOrder = reorderArray(currentOrder, itemId, targetIndex);
+        const newOrder = reorderArray(currentOrder, itemId, finalIndexForGap(currentOrder, itemId, targetIndex));
         
         await reorderSchedule(planId, dayId, newOrder);
         
@@ -179,11 +199,11 @@ export const useDragDrop = () => {
         onSuccess?.(result);
       } else {
         // 異なるコンテナ間での移動の場合
-        const [, sourceDayId] = sourceContainer.split('-');
-        const [, targetDayId] = targetContainer.split('-');
+        const sourceDayId = parseContainer(sourceContainer).dayId;
+        const targetDayId = parseContainer(targetContainer).dayId;
         
         // アイテムの移動（日付間移動）
-        await moveItemBetweenDays(itemId, sourceDayId ?? '', targetDayId ?? '', targetIndex);
+        await moveItemBetweenDays(itemId, sourceDayId, targetDayId, targetIndex);
         
         const result: DropResult = {
           success: true,

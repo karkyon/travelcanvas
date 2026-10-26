@@ -17,9 +17,9 @@
 """
 import uuid
 from datetime import datetime, time as time_cls, timezone as dt_timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.orm import Session
@@ -32,6 +32,7 @@ from app.models.models import (
     ChangeSet, DocumentLink, ItineraryBranch, TravelDay, TravelEvent, TravelPlan, User,
 )
 from app.services import branches as br
+from app.services import member_policy
 from app.services.audit_service import record_audit_event
 from app.services.readiness import member_names
 from app.services.today_mode import zone_for
@@ -323,9 +324,20 @@ def update_branch(plan_id: str, branch_id: str, payload: BranchUpdate, request: 
     return _response(db, plan, b, current_user, role, _names(db, [b]), detail=True)
 
 
-def _apply_time(event: TravelEvent, day: TravelDay, new_time: Optional[str]) -> None:
-    """時刻を変えた予定は、開始日時(start_at)を持っていれば同じ日の新しい時刻へ合わせ、終了も同じだけずらす。"""
+def _apply_time(event: TravelEvent, day: Any, new_time: Optional[str], old_time: Any = None,
+                old_date: Any = None) -> None:
+    """時刻を変えた予定は、開始日時(start_at)を持っていれば同じ日の新しい時刻へ合わせ、終了も同じだけずらす。
+    [Gate G7] FR-005 start_at の無い予定(画面で作った予定)も、終了(end_at)を開始と同じだけずらす(old_time・old_date が
+    分かる時。日をまたぐ予定の所要時間を保つ)。"""
     if event.start_at is None:
+        from app.services import event_times as et
+
+        if old_date is not None and old_date != day.local_date and event.end_at is not None:
+            event.end_at = et._aware(event.end_at) + (day.local_date - old_date)
+        if new_time is None:
+            event.end_at = None  # 開始の無い予定に終了だけを残さない
+            return
+        et.shift_end_with_start(event, day.local_date, day.timezone_id, old_time, new_time)
         return
     if new_time is None:
         event.start_at = None
@@ -400,6 +412,7 @@ def apply_ops(db: Session, plan: TravelPlan, ops: List[Dict[str, Any]]) -> List[
             ev = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(o["event_id"])).first()
             before = plans_api._event_to_dict(ev)
             f = o["fields"]
+            old_time, old_date = ev.local_start_time, days[str(ev.day_id)].local_date
             if "day_id" in f:
                 ev.day_id = uuid.UUID(f["day_id"])
             for k in ("title", "event_type", "is_all_day", "sort_order"):
@@ -408,10 +421,119 @@ def apply_ops(db: Session, plan: TravelPlan, ops: List[Dict[str, Any]]) -> List[
             if "local_start_time" in f or "day_id" in f:
                 new_time = f.get("local_start_time", ev.local_start_time)
                 ev.local_start_time = new_time
-                _apply_time(ev, days[str(ev.day_id)], new_time)
+                _apply_time(ev, days[str(ev.day_id)], new_time, old_time, old_date)
             db.flush()
             changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
     return changes
+
+
+# ===================================================================== [Gate G7] FR-019 比較
+
+def _cost_items(db: Session, plan: TravelPlan) -> List[Dict[str, Any]]:
+    """予約(取消を除く)・区間・支出(取消を除く)の金額と、紐付く予定。"""
+    from app.models.models import EventReservation, Expense, Reservation, TravelSegment
+
+    items: List[Dict[str, Any]] = []
+    reservations = db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None),
+                                                Reservation.status != "cancelled").all()
+    links: Dict[uuid.UUID, Set[str]] = {}
+    if reservations:
+        for link in db.query(EventReservation).filter(
+                EventReservation.reservation_id.in_([r.id for r in reservations])).all():
+            links.setdefault(cast(uuid.UUID, link.reservation_id), set()).add(str(link.event_id))
+    for r in reservations:
+        evs: Set[str] = set(links.get(cast(uuid.UUID, r.id), set()))
+        if r.event_id:
+            evs.add(str(r.event_id))
+        items.append({"kind": "reservation", "id": str(r.id), "label": r.provider_name or r.type or "予約",
+                      "status": r.status, "currency": r.currency, "amount": r.total_amount, "event_ids": evs})
+    for sg in db.query(TravelSegment).filter(TravelSegment.plan_id == plan.id, TravelSegment.status != "cancelled"):
+        evs = {str(x) for x in (sg.from_event_id, sg.to_event_id) if x}
+        items.append({"kind": "segment", "id": str(sg.id), "currency": sg.currency, "amount": sg.cost,
+                      "event_ids": evs})
+    for ex in db.query(Expense).filter(Expense.plan_id == plan.id, Expense.voided_at.is_(None)):
+        amount = -ex.amount if ex.kind == "refund" else ex.amount
+        evs = {str(ex.related_id)} if ex.related_type == "event" and ex.related_id else set()
+        items.append({"kind": "expense", "id": str(ex.id), "currency": ex.currency, "amount": amount,
+                      "event_ids": evs})
+    return items
+
+
+def _coords(db: Session, plan: TravelPlan) -> Dict[uuid.UUID, Any]:
+    return {cast(uuid.UUID, e.id): (e.latitude, e.longitude)
+            for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id)}
+
+
+def _compare(db: Session, plan: TravelPlan, rows: List[ItineraryBranch], role: str, hidden) -> Dict[str, Any]:
+    from app.api.v1.movement import evaluation_context
+    from app.services import branch_compare as bc
+    from app.services import feasibility as fz
+    from app.services import optimizer as opt
+
+    snap, cset, titles, owners, rules = evaluation_context(db, plan)
+    base = fz.evaluate(snap, cset, titles=titles, unavailable_owners=owners, movement=rules)
+    coords = _coords(db, plan)
+    show_costs = "costs" not in hidden
+    show_res = "reservations" not in hidden
+    items = _cost_items(db, plan) if (show_costs or show_res) else []
+    # 予約を見せない参加者には、予約の金額も含めない(費用の合計から予約の有無を推測させない)
+    cost_items = [i for i in items if i["amount"] is not None and (show_res or i["kind"] != "reservation")]
+    plan_cost = bc.costs(cost_items, set()) if show_costs else None
+    days = {str(d.id): d for d in snap.days}
+    out_branches = []
+    for b in rows:
+        ops = br.compute_ops(cast(Dict[str, Any], b.base_snapshot), cast(List[Dict[str, Any]], b.content))
+        sim, removed = bc.simulate(snap, ops, days)
+        result = fz.evaluate(sim, cset, titles=titles, unavailable_owners=owners, movement=rules)
+        new, resolved = opt.diff_findings(base, result)
+        new = [f for f in new if not member_policy.validation_issue_hidden(hidden, f.code, f.entity_type)]
+        resolved = [f for f in resolved if not member_policy.validation_issue_hidden(hidden, f.code, f.entity_type)]
+        cost = bc.costs(cost_items, removed) if show_costs else None
+        affected = None
+        if show_res:
+            affected = [{"id": i["id"], "label": i["label"], "status": i["status"]} for i in items
+                        if i["kind"] == "reservation" and i["event_ids"] and i["event_ids"] <= removed]
+        assumptions: Dict[str, Any] = cast(Dict[str, Any], b.assumptions) or {}
+        cut = assumptions.get("budget_cut_percent") if b.scenario_type == "budget" else None
+        out_branches.append({
+            "id": str(b.id), "title": b.title, "scenario_type": b.scenario_type, "state": _state(b, db),
+            "summary": br.summarize(ops),
+            "conflicts": len(_evaluate(db, plan, b)["conflicts"]) if b.status == "draft" else 0,
+            **bc.column(result, bc.travel(sim, coords), cost),
+            "new_issues": [bc.finding_out(f) for f in new], "resolved_issues": [bc.finding_out(f) for f in resolved],
+            "affected_reservations": affected,
+            "budget_target": bc.budget_target(plan_cost["total"], cost["total"], cut)
+            if show_costs and cut and plan_cost and cost else None,
+        })
+    return {
+        "plan_id": str(plan.id), "plan_revision": plan.revision, "algorithm_version": bc.ALGORITHM_VERSION,
+        "validation_algorithm_version": fz.ALGORITHM_VERSION, "movement_applied": rules is not None,
+        "plan": {"title": "本案", **bc.column(base, bc.travel(snap, coords), plan_cost)},
+        "branches": out_branches, "costs_hidden": not show_costs, "reservations_hidden": not show_res,
+        "can_adopt": role in ("owner", "editor"),
+    }
+
+
+@router.get("/{plan_id}/branches/{branch_id}/comparison", response_model=dict)
+def compare_branch(plan_id: str, branch_id: str, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user_or_guest)):
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    b = _get(db, plan, branch_id)
+    return _compare(db, plan, [b], role, hidden)
+
+
+@router.get("/{plan_id}/branches-comparison", response_model=dict)
+def compare_branches(plan_id: str, ids: str = Query(..., max_length=200), db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate G7] FR-019 本案と分岐案(最大3つ、カンマ区切り)を並べて比べる。"""
+    from app.services import branch_compare as bc
+
+    plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    keys = [k.strip() for k in ids.split(",") if k.strip()]
+    if not keys or len(keys) > bc.MAX_BRANCHES or len(set(keys)) != len(keys):
+        raise HTTPException(status_code=422, detail={
+            "code": "invalid_branch_selection", "message": f"比べる分岐案を1〜{bc.MAX_BRANCHES}つ選んでください"})
+    return _compare(db, plan, [_get(db, plan, k) for k in keys], role, hidden)
 
 
 @router.delete("/{plan_id}/branches/{branch_id}", response_model=dict)

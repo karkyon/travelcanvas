@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r18",
+  "revision": "v5.1-r19",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -45,11 +45,11 @@
   },
   "FR-005": {
    "title": "日・イベント",
-   "status": "INTEGRATED",
+   "status": "VERIFIED",
    "partial": false,
-   "e2e": "一部",
-   "gates": "B-013",
-   "gaps": "日跨ぎ、影響のプレビュー、DnDの実ブラウザE2E"
+   "e2e": "✓",
+   "gates": "B-013・G7",
+   "gaps": "実機 mobile のタッチでの並べ替え"
   },
   "FR-006": {
    "title": "NOW/NEXT",
@@ -144,24 +144,24 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "L3",
-   "gaps": "時刻表の照合、標準滞在時間、休憩の自動判定"
+   "gates": "L3・G7",
+   "gaps": "時刻表の照合"
   },
   "FR-018": {
    "title": "説明可能最適化",
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "L4",
-   "gaps": "公平性・疲労の指標、条件変更、部分採用、外部経路による実移動時間"
+   "gates": "L4・G7",
+   "gaps": "外部経路による実移動時間"
   },
   "FR-019": {
    "title": "What-if",
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P7",
-   "gaps": "予約・移動・費用の分岐、移動時間・制約・費用差の比較"
+   "gates": "P7・G7",
+   "gaps": "案の中で予約・移動区間そのものを変える分岐"
   },
   "FR-020": {
    "title": "共同編集",
@@ -320,8 +320,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P6・P9",
-   "gaps": "猶予つきのアカウント削除、所有者の移譲、出典つきの訂正"
+   "gates": "P6・P9・G7",
+   "gaps": "所有者の移譲、出典つきの訂正"
   },
   "FR-040": {
    "title": "管理・監査",
@@ -461,11 +461,11 @@
   },
   "FR-057": {
    "title": "Memory Replan",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "P17",
-   "gaps": "同行者属性・移動手段の傾向"
+   "gates": "P17・G7",
+   "gaps": "実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1)"
   },
   "FR-058": {
    "title": "Entitlement・料金",

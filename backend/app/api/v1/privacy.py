@@ -6,6 +6,9 @@
                                    残るもの、保持期間)。DBは変えない。
 - POST /privacy/account-deletion : 確認の文字と(登録ユーザーは)パスワードで本人確認して削除する。取り消せない。
                                    セッション・refresh cookieも失効する。処理は app/services/account_deletion.py。
+- POST /privacy/account-deletion/schedule : [Gate G7] 猶予つきの削除を申し込む(既定14日後。本人確認は即時の削除と同じ。
+                                   登録した会員だけ)。その間はいつも通り使え、取り消せる
+- POST /privacy/account-deletion/cancel   : [Gate G7] 申し込みを取り消す(ログインしている本人)
 - GET  /privacy/consents         : 目的別の同意(AI・位置・分析・お知らせメール)。
 - PUT  /privacy/consents         : 同意する/撤回する。監査には目的と新しい値だけを記録する。
 - GET/POST /privacy/support-grants, POST /privacy/support-grants/{id}/revoke : [Gate G2] FR-040 サポートへの閲覧の許可
@@ -62,11 +65,9 @@ class AccountDeletionRequest(BaseModel):
     password: Optional[str] = Field(None, max_length=200)
 
 
-@router.post("/account-deletion", response_model=dict)
-def delete_account(payload: AccountDeletionRequest, request: Request, response: Response,
-                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
-    user = _db_user(db, current_user)
-    if user.is_superuser or user.role == "admin" or str(user.user_type or "") in ("admin", "super_admin"):
+def _confirm_deletion(payload: "AccountDeletionRequest", request: Request, user: User) -> None:
+    """削除の本人確認(即時・猶予つきで同じ)。管理者・回数・確認の文字・パスワード。"""
+    if ad.is_admin(user):
         raise HTTPException(status_code=403, detail={
             "code": "admin_account", "message": "管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください"})
     if not check_rate_limit(f"account_delete:{user.id}", DELETE_ATTEMPTS_PER_HOUR, 3600):
@@ -80,12 +81,49 @@ def delete_account(payload: AccountDeletionRequest, request: Request, response: 
             _audit(request, user, "account_deletion_reauth_failed", {})
             raise HTTPException(status_code=403, detail={
                 "code": "reauth_failed", "message": "パスワードが正しくありません"})
+
+
+@router.post("/account-deletion", response_model=dict)
+def delete_account(payload: AccountDeletionRequest, request: Request, response: Response,
+                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    user = _db_user(db, current_user)
+    _confirm_deletion(payload, request, user)
     summary = ad.delete_account(db, user)
     db.commit()
     _audit(request, user, "account_deleted", {"summary": summary})
     response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
     response.headers["Cache-Control"] = "no-store"
     return {"deleted": True, "summary": summary, "plan_delete_grace_days": ad.preview_grace_days()}
+
+
+@router.post("/account-deletion/schedule", response_model=dict)
+def schedule_account_deletion(payload: AccountDeletionRequest, request: Request, db: Session = Depends(get_db),
+                              current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate G7] FR-039 猶予つきの削除を申し込む。"""
+    user = _db_user(db, current_user)
+    if not ad.can_schedule(user):
+        raise HTTPException(status_code=422, detail={
+            "code": "schedule_not_available",
+            "message": "ゲストのアカウントは猶予つきの削除を使えません(今すぐ削除するか、会員登録してください)"})
+    _confirm_deletion(payload, request, user)
+    due = ad.schedule(db, user)
+    db.commit()
+    _audit(request, user, "account_deletion_scheduled", {"grace_days": ad.account_grace_days()})
+    return {"scheduled": ad.schedule_view(user), "account_delete_grace_days": ad.account_grace_days(),
+            "due_at": due.isoformat()}
+
+
+@router.post("/account-deletion/cancel", response_model=dict)
+def cancel_account_deletion(request: Request, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate G7] FR-039 申し込みを取り消す。"""
+    user = _db_user(db, current_user)
+    if not ad.cancel(db, user):
+        raise HTTPException(status_code=409, detail={
+            "code": "not_scheduled", "message": "削除の申し込みはありません"})
+    db.commit()
+    _audit(request, user, "account_deletion_cancelled", {})
+    return {"scheduled": None}
 
 
 @router.get("/consents", response_model=dict)

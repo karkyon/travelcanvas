@@ -1854,7 +1854,7 @@ export const atlasSettingsResult: Decoder<{ excluded_plan_ids: string[] }> = obj
 
 // ===== [Gate P17] Memory Replan(FR-057) =====
 const replanInsight: Decoder<ReplanInsight> = object<ReplanInsight>({
-  kind: oneOf('stay_longer', 'stay_shorter', 'late_arrival', 'often_skipped'),
+  kind: oneOf('stay_longer', 'stay_shorter', 'late_arrival', 'often_skipped', 'slow_transport'),
   event_type: nullable(str),
   minutes: nullable(nonNegativeInt),
   samples: nonNegativeInt,
@@ -1869,11 +1869,12 @@ export const memoryReplanResult: Decoder<MemoryReplanResult> = object<MemoryRepl
   insights: arrayOf(replanInsight),
   proposals: arrayOf(object({
     id: str,
-    kind: oneOf('stay_longer'),
-    event_type: str,
+    // [Gate G7] 区間の提案(slow_transport)も拒まない。中身の検査は画面が使う decodersG7 が行う
+    kind: oneOf('stay_longer', 'slow_transport'),
+    event_type: nullable(str),
     minutes: nonNegativeInt,
-    changes: arrayOf(object({ event_id: str, title: str, day_id: str, from: str, to: str })),
-    kept: arrayOf(object({ event_id: str, title: str, reason: oneOf('locked', 'has_reservation', 'next_day') })),
+    changes: arrayOf(record),
+    kept: arrayOf(record),
   })),
   input_fingerprint: str,
   sample_count: nonNegativeInt,

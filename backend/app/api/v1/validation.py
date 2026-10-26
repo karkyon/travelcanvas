@@ -29,6 +29,7 @@ from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import PlanConstraint, TravelPlan, User, ValidationIssue, ValidationRun
 from app.services import feasibility
+from app.services import movement as mv
 from app.services.constraint_evaluation import decrypt_private_payload, load_constraints_for_evaluation
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,9 @@ def _run_validation(db: Session, plan: TravelPlan, user: User) -> ValidationRun:
         } if (constraint_set.constraints or constraint_set.unavailable) else {}
         titles = {cid: c.title for cid, c in rows.items() if c.privacy_level == "shared" and c.title}
         owners = {cid: c.owner_user_id for cid, c in rows.items()}
-        result = feasibility.evaluate(snapshot, constraint_set, titles=titles, unavailable_owners=owners)
+        rules = mv.load_rules(db, plan)  # [Gate G7] MOVE-03 移動・滞在の既定
+        result = feasibility.evaluate(snapshot, constraint_set, titles=titles, unavailable_owners=owners,
+                                      movement=rules)
     except Exception:  # 判定の不具合で500にせず「検証失敗」として残す(問題なしとは表示しない)
         # 判定は読み取りだけなのでロールバックは不要(呼出側のトランザクションを壊さない)
         logger.exception("feasibility validation failed plan_id=%s", plan.id)
@@ -87,14 +90,18 @@ def _run_validation(db: Session, plan: TravelPlan, user: User) -> ValidationRun:
         return run
 
     private_ids = {c.id for c in constraint_set.constraints if c.is_private} | set(constraint_set.unavailable)
-    run.summary_json = {
+    summary: Dict[str, Any] = {
         "unchecked": result.unchecked,
         "constraint_results": [
             {**r, "is_private": uuid.UUID(r["constraint_id"]) in private_ids,
              "owner_user_id": str(owners.get(uuid.UUID(r["constraint_id"]), ""))}
             for r in result.constraint_results
         ],
+        # [Gate G7] MOVE-03 日ごとの活動量・休憩・疲れの目安と、使った既定(値は利用者の入力と既定だけ)
+        "day_metrics": result.day_metrics,
+        "movement": mv.rules_view(rules) if result.movement_applied else None,
     }
+    setattr(run, "summary_json", summary)
     c = feasibility.counts(result.findings)
     run.error_count, run.warning_count = c["error"], c["warning"]
     run.info_count, run.unverified_count = c["info"], c["unverified"]
@@ -239,6 +246,8 @@ def _detail(db: Session, run: ValidationRun, viewer: User, current_fingerprint: 
         **_summary(run, viewer, current_fingerprint, hidden),
         "unchecked": dict(summary.get("unchecked", {})),
         "constraint_results": results,
+        "day_metrics": list(summary.get("day_metrics") or []),
+        "movement": summary.get("movement"),
         "issues": [_issue_response(i, viewer, shared, private) for i in _visible_issues(run, hidden)],
     }
 

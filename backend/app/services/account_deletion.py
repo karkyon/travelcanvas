@@ -14,10 +14,15 @@
 - アカウント行: 外部キーで参照されるため行は残し、メール・パスワード・設定を消して無効化し、
   名前を復元できない仮名にする(同じメールで新しく登録できる)。
 - 監査ログは削除の事実と件数だけを記録し、題名・メールは記録しない(監査の保持期間は retention で説明)。
+
+[Gate G7] 猶予つきの削除(登録した会員だけ。ゲストは「今すぐ」だけ):
+- 申し込むと deletion_due_at(既定14日後、ACCOUNT_DELETE_GRACE_DAYS)を記録する。その間はいつも通り使え、取り消せる
+- 時刻を過ぎたら定期の処理(tcops.py jobs account-deletions、毎日)が delete_account で削除する。管理者になっていたら
+  削除せずに申し込みを残し、件数で知らせる(管理者の権限を外すまで削除しない)
 """
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -120,6 +125,10 @@ def preview(db: Session, user: User) -> Dict[str, Any]:
         "deleted_in_member_plans": others,
         "kept_in_member_plans": kept,
         "plan_delete_grace_days": preview_grace_days(),
+        # [Gate G7] 猶予つきの削除
+        "account_delete_grace_days": account_grace_days(),
+        "can_schedule": can_schedule(user),
+        "scheduled": schedule_view(user),
     }
 
 
@@ -267,9 +276,87 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     user.is_verified = False
     user.is_superuser = False
     user.role = "user"
+    _clear_schedule(user)  # [Gate G7] 申し込みの印も消す(削除は済んだ)
     db.flush()
     return summary
 
 
 def preview_grace_days() -> int:
     return int(plan_deletion.grace_period().days)
+
+
+# ===================================================================== [Gate G7] 猶予つきの削除
+
+def account_grace_days() -> int:
+    from app.core.config import settings
+
+    return max(1, int(settings.ACCOUNT_DELETE_GRACE_DAYS))
+
+
+def _clear_schedule(user: User) -> None:
+    row: Any = user  # ORM の行の列へ値を入れる
+    row.deletion_requested_at = None
+    row.deletion_due_at = None
+
+
+def can_schedule(user: User) -> bool:
+    return bool(user.user_type != "guest") and bool(user.hashed_password)
+
+
+def schedule_view(user: User) -> Optional[Dict[str, Any]]:
+    if user.deletion_due_at is None:
+        return None
+    return {"requested_at": user.deletion_requested_at.isoformat() if user.deletion_requested_at else None,
+            "due_at": user.deletion_due_at.isoformat()}
+
+
+def schedule(db: Session, user: User, now: Optional[datetime] = None) -> datetime:
+    """削除を申し込む(呼出側で本人確認・commit)。既に申し込んでいれば、その時刻のまま。"""
+    now = now or _now()
+    row: Any = user
+    if row.deletion_due_at is None:
+        row.deletion_requested_at = now
+        row.deletion_due_at = now + timedelta(days=account_grace_days())
+        db.flush()
+    return cast(datetime, row.deletion_due_at)
+
+
+def cancel(db: Session, user: User) -> bool:
+    if user.deletion_due_at is None:
+        return False
+    _clear_schedule(user)
+    db.flush()
+    return True
+
+
+def is_admin(user: User) -> bool:
+    return bool(user.is_superuser or user.role == "admin" or str(user.user_type or "") in ("admin", "super_admin"))
+
+
+def run_due(db: Session, now: Optional[datetime] = None, limit: int = 50) -> Dict[str, int]:
+    """猶予を過ぎた申し込みを削除する(1件ずつ commit。失敗は件数に数えて次へ)。監査には件数だけを残す。"""
+    from app.services.audit_service import record_audit_event
+
+    now = now or _now()
+    counts = {"deleted": 0, "skipped_admin": 0, "failed": 0}
+    ids = [r[0] for r in db.query(User.id).filter(User.deletion_due_at.isnot(None), User.deletion_due_at <= now,
+                                                  User.is_active.is_(True)).order_by(User.deletion_due_at)
+           .limit(limit).all()]
+    for uid in ids:
+        user = db.query(User).filter(User.id == uid).first()
+        if user is None:
+            continue
+        if is_admin(user):
+            counts["skipped_admin"] += 1
+            continue
+        try:
+            summary = delete_account(db, user, now=now)
+            db.commit()
+        except Exception:  # noqa: BLE001 - 1人の失敗で他の人の削除を止めない(次の実行で再試行)
+            db.rollback()
+            counts["failed"] += 1
+            continue
+        counts["deleted"] += 1
+        record_audit_event(action="account_deleted", resource_type="user", user_id=uid, resource_id=uid,
+                           details={"summary": summary, "reason": "scheduled"})
+    return counts

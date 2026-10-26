@@ -88,6 +88,16 @@ class User(Base):
     preferences = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # [Gate G7] FR-039 猶予つきのアカウント削除。申し込んだ時刻と削除する時刻(この間は取り消せる。
+    # 時刻を過ぎたら定期の処理 tcops.py jobs account-deletions が削除する。app/services/account_deletion.py)
+    deletion_requested_at = Column(DateTime(timezone=True), nullable=True)
+    deletion_due_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("(deletion_requested_at IS NULL) = (deletion_due_at IS NULL)",
+                        name="ck_users_deletion_schedule"),
+        Index("ix_users_deletion_due_at", "deletion_due_at", postgresql_where=text("deletion_due_at IS NOT NULL")),
+    )
 
     # リレーションシップ
     travels = relationship("Travel", back_populates="owner")
@@ -922,6 +932,10 @@ class TravelSegment(Base):
     )
 
     # [Gate #32から継続] haversine fallback由来かどうかの由来管理(provenance)。
+    # [Gate G7] MOVE-03 最終の便(終電・最終のバス・船の最終便)の出発時刻。利用者が入れる(時刻表の提供元は未接続)。
+    # 実行可能性の判定が、この時刻までに出発できるかを確かめる(LAST_TRANSPORT_MISSED / LAST_TRANSPORT_TIGHT)
+    last_departure_at = Column(DateTime(timezone=True), nullable=True)
+
     is_estimate = Column(Boolean, nullable=False, default=True)
     provider = Column(String, nullable=False)  # "haversine_estimate" | "manual" 等
     algorithm_version = Column(String, nullable=False)
@@ -3349,3 +3363,19 @@ class MemoryTrash(Base):
     __table_args__ = (
         Index("ix_memory_trash_expires", "expires_at"),
     )
+
+
+class PlanMovementSettings(Base):
+    """[Gate G7] MOVE-03 旅行ごとの移動・滞在の既定(既定の滞在時間・歩く速さの見込み・休憩の規則・同行者の属性)。
+
+    行が無い旅行は既定値(app/services/movement.py の DEFAULTS)で判定する。値は利用者の入力だけで、外部の提供元は使わない。
+    revision は If-Match(変えた時に実行可能性の検証の結果が古くなる。feasibility.compute_fingerprint)。"""
+    __tablename__ = "plan_movement_settings"
+
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    settings = Column(JSONB, nullable=False)
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -135,12 +135,16 @@ interface PlanState {
 // ===== 正規化API <-> フロントエンド型 の変換 =====
 
 function mapEvent(e: NormalizedEvent): ScheduleItem {
+  // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
+  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null };
   return {
     id: e.id,
     title: e.title,
     description: e.description ?? undefined,
     category: (e.event_type as EventCategory) || 'other',
     start_time: e.local_start_time ?? undefined,
+    end_time: g7.local_end_time ?? undefined,
+    end_day_offset: g7.end_day_offset ?? undefined,
     address: e.address ?? undefined,
     latitude: e.latitude ?? undefined,
     longitude: e.longitude ?? undefined,
@@ -716,6 +720,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           description: hideNotes ? undefined : item.description,
           event_type: item.category,
           local_start_time: item.start_time,
+          // [Gate G7] FR-005 終了時刻を変えた時だけ送る(空は終了を消す)
+          ...(item.end_time === undefined ? {} : {
+            local_end_time: item.end_time || null,
+            ...(item.end_time ? { end_day_offset: item.end_day_offset ?? 0 } : {}),
+          }),
           address: hidePlace ? undefined : item.address,
           latitude: hidePlace ? undefined : item.latitude,
           longitude: hidePlace ? undefined : item.longitude,
@@ -738,6 +747,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       });
       return 'saved';
     } catch (error) {
+      if (isNetworkError(error) && item.end_time !== undefined) {
+        // [Gate G7] FR-005 終了時刻(日をまたぐ予定)の変更は端末に溜めない(同期で開始との前後を確かめられないため)
+        toast.error('終了時刻の変更は通信できる時に保存してください。');
+        set({ currentPlan: plan });
+        return 'failed';
+      }
       if (isNetworkError(error)) {
         // [Gate P11] 画面の変更はそのまま残し、変更を端末に溜める(編集を始めた版=今の画面の版)
         const current = plan.days.flatMap((d) => d.events).find((e) => e.id === itemId);

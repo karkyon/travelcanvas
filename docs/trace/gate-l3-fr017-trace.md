@@ -15,9 +15,9 @@
 | 2 | 移動不足(所要・準備・バッファ) | FR-017 | IMPLEMENTED | B `test_travel_shortfall_uses_duration_preparation_and_buffer`, `test_travel_with_unknown_end_is_error_only_when_certain_otherwise_unverified`; E |
 | 3 | 営業時間外・休業日 | FR-017 | IMPLEMENTED | B `test_opening_hours_closed_day_outside_hours_overnight_and_unknown`, `test_opening_hours_from_database` |
 | 4 | 予約不一致・取消済み予約 | FR-017 | IMPLEMENTED | B `test_reservation_mismatch_and_cancelled_reservation`, `test_reservation_link_checks_end_to_end` |
-| 5 | 滞在不足 | FR-017 | PARTIAL | 終了未定で移動に間に合うか分からない予定を検証不能として示す(STAY_LENGTH_UNKNOWN)。標準滞在時間との比較は未実装 |
+| 5 | 滞在不足 | FR-017 | PARTIAL | 終了未定で移動に間に合うか分からない予定を検証不能として示す(STAY_LENGTH_UNKNOWN)。標準滞在時間との比較は未実装 ※ **SUPERSEDED BY Gate G7(既定の滞在で見積もる。gate-g7-trace.md #2)** |
 | 6 | 予算超過 | FR-017 | IMPLEMENTED | B `test_budget_constraint_sums_same_currency_and_reports_rest_as_unverified`, `test_budget_constraint_for_one_day_counts_only_that_day` |
-| 7 | 休憩不足 | FR-017 | PARTIAL | 疲労(移動量)・食事間隔の制約で判定。B `test_fatigue_and_meal_interval_constraints`。休憩の自動判定は未実装 |
+| 7 | 休憩不足 | FR-017 | PARTIAL | 疲労(移動量)・食事間隔の制約で判定。B `test_fatigue_and_meal_interval_constraints`。休憩の自動判定は未実装 ※ **SUPERSEDED BY Gate G7(休憩の自動判定・日ごとの疲れ。gate-g7-trace.md #3)** |
 | 8 | 最終交通逸失 | FR-017 | PARTIAL | 時刻制約(before)で判定。B `test_time_constraint_before_after_between`; E前提。時刻表照合は未実装 |
 | 9 | 未確認情報(検証不能を問題なしにしない) | FR-017 | IMPLEMENTED | kind=unverified; B `test_unknown_start_time_is_reported_as_unverified_not_ok`, `test_text_constraints_are_possible_violation_or_unverified_never_satisfied`, `test_engine_failure_is_recorded_as_failed_not_as_ok`; F `validationModel.test.ts`; E |
 | 10 | ERROR/WARNING/INFO分類 | FR-017 | IMPLEMENTED | B `test_findings_are_ordered_errors_first_then_warnings_then_unverified` |

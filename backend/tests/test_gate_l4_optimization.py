@@ -112,7 +112,7 @@ def test_candidates_reorder_with_time_slots_and_do_not_touch_plan(auth_client):
     body = res.json()
     assert _rev(client, p) == rev  # 計算だけでは本案は変わらない
     assert body["algorithm_version"] == "explainable-opt-v1"
-    assert body["validation_algorithm_version"] == "feasibility-v1"
+    assert body["validation_algorithm_version"] == "feasibility-v2"  # [Gate G7] 移動・滞在の既定を足した版
     assert body["movable_count"] == 4 and body["fixed"] == [] and body["can_apply"] is True
     assert len(body["candidates"]) == 1  # 制約が無いので最短の案と制約優先の案は同じ(1つにまとめる)
     c = body["candidates"][0]

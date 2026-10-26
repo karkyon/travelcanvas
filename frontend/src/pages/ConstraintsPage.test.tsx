@@ -38,6 +38,15 @@ vi.mock('@/services/api', async () => {
   };
 });
 
+// [Gate G7] 移動・滞在の既定(この画面の上に出る)。読み込みは実 backend の応答、日ごとの疲れの読み取りは本物を使う
+const g7m = vi.hoisted(() => ({ getMovementSettings: vi.fn(), saveMovementSettings: vi.fn() }));
+vi.mock('@/services/api/g7', async () => {
+  const actual = await vi.importActual<typeof import('@/services/api/g7')>('@/services/api/g7');
+  return { runMovement: actual.runMovement, getMovementSettings: g7m.getMovementSettings, saveMovementSettings: g7m.saveMovementSettings };
+});
+
+import g7fx from '@/services/api/__fixtures__/g7Responses.json';
+import { decodeG7 } from '@/services/api/decodersG7';
 import ConstraintsPage from './ConstraintsPage';
 
 const shared = fx.constraint_shared as PlanConstraint;
@@ -58,6 +67,8 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  g7m.getMovementSettings.mockReset().mockResolvedValue(decodeG7('movementSettings', g7fx.movement_settings));
+  g7m.saveMovementSettings.mockReset().mockResolvedValue(decodeG7('movementSettings', g7fx.movement_settings_saved));
   getConstraints.mockReset();
   createConstraint.mockReset();
   updateConstraint.mockReset();
@@ -254,5 +265,35 @@ describe('実行可能性チェック (Gate L3)', () => {
     renderPage();
     expect(await screen.findByText(shared.title as string)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('サーバーエラー');
+  });
+});
+
+describe('[Gate G7] MOVE-03 移動・滞在の既定', () => {
+  it('既定の要約を出し、変えて保存すると版を If-Match に使う', async () => {
+    getConstraints.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByTestId('movement-summary')).toHaveTextContent('休憩なしは180分まで');
+    fireEvent.click(screen.getByRole('button', { name: '既定を見る・変える' }));
+    fireEvent.click(screen.getByRole('radio', { name: /ゆっくり/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '子ども連れ' }));
+    fireEvent.change(screen.getByLabelText('観光の既定の滞在(分)'), { target: { value: '90' } });
+    fireEvent.click(screen.getByRole('button', { name: '既定を保存' }));
+    await waitFor(() => expect(g7m.saveMovementSettings).toHaveBeenCalled());
+    const [planId, settings, revision] = g7m.saveMovementSettings.mock.calls[0]!;
+    expect(planId).toBe('p1');
+    expect(revision).toBe(0);
+    expect(settings).toMatchObject({ pace: 'relaxed', party: { with_children: true }, stay_minutes: { sightseeing: 90 } });
+    expect(await screen.findByRole('status')).toHaveTextContent('保存しました');
+  });
+
+  it('範囲外・整数でない入力はフォームの検査で送らない(min・step)', async () => {
+    getConstraints.mockResolvedValue([]);
+    renderPage();
+    await screen.findByTestId('movement-summary');
+    fireEvent.click(screen.getByRole('button', { name: '既定を見る・変える' }));
+    fireEvent.change(screen.getByLabelText('観光の既定の滞在(分)'), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByRole('button', { name: '既定を保存' }));
+    expect(screen.getByLabelText('観光の既定の滞在(分)')).toBeInvalid();
+    expect(g7m.saveMovementSettings).not.toHaveBeenCalled();
   });
 });

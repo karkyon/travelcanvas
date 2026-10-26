@@ -10,7 +10,9 @@ vi.mock('./usePlan', () => ({
   usePlan: () => ({ reorderSchedule }),
 }));
 
-import { useDragDrop, reorderArray, getCurrentItemOrder, moveItemBetweenDays } from './useDragDrop';
+import {
+  useDragDrop, reorderArray, getCurrentItemOrder, moveItemBetweenDays, containerId, parseContainer, finalIndexForGap,
+} from './useDragDrop';
 import { usePlanStore } from '../store/planStore';
 import type { TravelPlan, ScheduleItem } from '../types';
 
@@ -66,5 +68,41 @@ describe('useDragDrop helpers (Gate M9-FE-B3)', () => {
       await result.current.handleKeyboardMove(event, { id: 'e1' } as ScheduleItem, 'plan-1', 'day-a');
     });
     expect(reorderSchedule).toHaveBeenCalledWith('plan-1', 'day-a', ['e2', 'e1', 'e3']);
+  });
+});
+
+describe('[Gate G7] FR-005 ドラッグで並べ替え(UUID の旅行・日)', () => {
+  const P = '6f1c2b0e-1a2b-4c3d-8e9f-0a1b2c3d4e5f';
+  const D = '0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a';
+  beforeEach(() => {
+    reorderSchedule.mockReset().mockResolvedValue(undefined);
+    usePlanStore.setState({ currentPlan: { ...plan, id: P, days: [{ ...plan.days[0]!, id: D }] } as unknown as TravelPlan });
+  });
+
+  it('入れ物の ID は UUID の "-" で切れない', () => {
+    expect(parseContainer(containerId(P, D))).toEqual({ planId: P, dayId: D });
+    expect(parseContainer('壊れた値')).toEqual({ planId: '', dayId: '' });
+  });
+
+  it('落とした隙間を動かした後の位置にする(下へは1つ前)', () => {
+    const order = ['e1', 'e2', 'e3'];
+    expect(finalIndexForGap(order, 'e1', 2)).toBe(1);
+    expect(finalIndexForGap(order, 'e1', 3)).toBe(2);
+    expect(finalIndexForGap(order, 'e3', 0)).toBe(0);
+  });
+
+  it('1件目を3件目の前へ落とすと 2件目と入れ替わる', async () => {
+    const { result } = renderHook(() => useDragDrop());
+    const data = JSON.stringify({ itemId: 'e1', sourceContainer: containerId(P, D) });
+    const drop = {
+      preventDefault: vi.fn(), currentTarget: document.createElement('div'),
+      dataTransfer: { getData: () => data },
+    } as unknown as React.DragEvent;
+    const onDone = vi.fn();
+    await act(async () => {
+      await result.current.handleDrop(drop, containerId(P, D), 2, onDone);
+    });
+    expect(reorderSchedule).toHaveBeenCalledWith(P, D, ['e2', 'e1', 'e3']);
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ success: true, action: 'reorder' }));
   });
 });

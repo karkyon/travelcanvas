@@ -13,6 +13,13 @@
 
 動かさない予定: 確定(ロック)済み・予約付き・終日・位置なし(と、時刻のある予定と混在する時刻なしの予定)。
 従来の /optimization-proposal(Gate #33)は互換のため残す。
+
+[Gate G7] MOVE-04:
+- 目的の内訳: 候補ごとに「移動距離・検証と制約・疲れ(移動の既定による目安)・公平さ(メンバーごとの守れていない割合の開き)」の
+  値・重み・点と合計を返す(objective)。今の順にも付ける
+- 条件変更: weights(0〜5)を送ると、その重みで合計が最も小さい「条件に合わせた案」を足す(送らなければ従来どおり)
+- 部分の採用: POST /optimization-candidates/partial-preview で、案のうち選んだ予定だけを動かした結果を検証し、
+  apply に event_ids を付けると、その予定だけを適用する(他の予定は今の時刻のまま。1つの変更セットで元に戻せる)
 """
 import uuid
 from datetime import datetime, timezone as dt_timezone
@@ -31,6 +38,7 @@ from app.models.models import (
     ChangeSet, EventReservation, PlanConstraint, Reservation, TravelDay, TravelEvent, TravelPlan, User,
 )
 from app.services import feasibility
+from app.services import movement as mv
 from app.services import optimizer as opt
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import load_constraints_for_evaluation
@@ -46,6 +54,12 @@ TRAVEL_MODES = ("walking", "driving", "train", "bus", "bicycle", "taxi")
 class CandidatesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     travel_mode: str = "walking"
+    weights: Optional[Dict[str, int]] = None  # [Gate G7] MOVE-04 条件変更
+
+    @field_validator("weights")
+    @classmethod
+    def _v_weights(cls, v):
+        return opt.clean_weights(v)
 
     @field_validator("travel_mode")
     @classmethod
@@ -60,6 +74,14 @@ class ApplyRequest(BaseModel):
     candidate_id: str = Field(..., min_length=1, max_length=64)
     input_fingerprint: str = Field(..., min_length=1, max_length=128)
     travel_mode: str = "walking"
+    weights: Optional[Dict[str, int]] = None
+    # [Gate G7] MOVE-04 部分の採用: 案のうち動かす予定(省くと案の全て)
+    event_ids: Optional[List[str]] = Field(None, max_length=50)
+
+    @field_validator("weights")
+    @classmethod
+    def _v_weights(cls, v):
+        return opt.clean_weights(v)
 
     @field_validator("travel_mode")
     @classmethod
@@ -94,7 +116,8 @@ def _finding(f: feasibility.Finding) -> Dict[str, Any]:
             "is_private_constraint": bool(f.constraint and f.constraint.is_private)}
 
 
-def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str) -> Dict[str, Any]:
+def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str,
+             weights: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
     events = (db.query(TravelEvent).filter(TravelEvent.day_id == day.id)
               .order_by(TravelEvent.sort_order, TravelEvent.id).all())
     reserved = _reserved_ids(db, [e.id for e in events])
@@ -117,16 +140,22 @@ def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str) ->
     titles = {cid: c.title for cid, c in rows.items() if c.privacy_level == "shared" and c.title}
     owners = {cid: c.owner_user_id for cid, c in rows.items()}
     sorted_slots = sorted(i.sort_order for i in items)
+    rules = mv.load_rules(db, plan)  # [Gate G7] MOVE-03 移動・滞在の既定(疲れの目安)
+    shown_weights = weights or opt.DEFAULT_WEIGHTS
 
-    def evaluate(order: List[str]) -> Dict[str, Any]:
-        times = opt.assign_times(items, movable, order)
+    def evaluate(order: List[str], times: Optional[Dict[str, Optional[str]]] = None) -> Dict[str, Any]:
+        times = times if times is not None else opt.assign_times(items, movable, order)
         new_orders = {eid: sorted_slots[idx] for idx, eid in enumerate(order)}
         sim = opt.simulated_snapshot(snap, day.local_date, day.timezone_id, times, new_orders)
-        result = feasibility.evaluate(sim, cset, titles=titles, unavailable_owners=owners)
+        result = feasibility.evaluate(sim, cset, titles=titles, unavailable_owners=owners, movement=rules)
         km, minutes, unknown = opt.route_totals(order, by_id, travel_mode)
-        return {"order": order, "times": times, "result": result, "summary": opt.summarize_findings(result),
+        summary = opt.summarize_findings(result)
+        move = opt.day_movement(result, str(day.id))
+        fair = opt.fairness(result, cset)
+        return {"order": order, "times": times, "result": result, "summary": summary,
                 "km": km, "minutes": minutes, "unknown": unknown, "id": opt.order_hash(order, times),
-                "sort_orders": new_orders}
+                "sort_orders": new_orders, "move": move, "fair": fair,
+                "objective": opt.objective(summary, km, move, fair, shown_weights)}
 
     evals = [evaluate(o) for o in orders]
     base = evals[0]
@@ -139,11 +168,15 @@ def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str) ->
         best = min(evals, key=lambda e: (opt.score(e["summary"], e["km"]), e["id"]))
         if best is not base and opt.score(best["summary"], best["km"])[:3] < opt.score(base["summary"], base["km"])[:3]:
             picks.append(("constraints", best))
+        if weights is not None:
+            balanced = min(evals, key=lambda e: (e["objective"]["total"], e["km"], e["id"]))
+            if balanced is not base and balanced["objective"]["total"] < base["objective"]["total"] - 1e-9:
+                picks.append(("balanced", balanced))
     merged: Dict[str, Dict[str, Any]] = {}
     for kind, e in picks:
         merged.setdefault(e["id"], {"eval": e, "kinds": []})["kinds"].append(kind)
 
-    labels = {"shortest": "移動が最短の案", "constraints": "制約・検証を優先した案"}
+    labels = {"shortest": "移動が最短の案", "constraints": "制約・検証を優先した案", "balanced": "条件に合わせた案"}
     candidates = []
     for cid, m in merged.items():
         e = m["eval"]
@@ -161,7 +194,9 @@ def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str) ->
             "id": cid, "kinds": m["kinds"], "label": "・".join(labels[k] for k in m["kinds"]),
             "order": e["order"], "changes": changes,
             "metrics": {"distance_km": e["km"], "duration_minutes": e["minutes"], "unknown_legs": e["unknown"],
-                        "saved_distance_km": saved_km, "saved_duration_minutes": saved_min, **e["summary"]},
+                        "saved_distance_km": saved_km, "saved_duration_minutes": saved_min, **e["summary"],
+                        **_movement_metrics(e)},
+            "objective": e["objective"],
             "new_issues": [_finding(f) for f in new], "resolved_issues": [_finding(f) for f in resolved],
             "explanations": opt.explain(changes, saved_km, base["summary"], e["summary"]),
         })
@@ -173,12 +208,35 @@ def _compute(db: Session, plan: TravelPlan, day: TravelDay, travel_mode: str) ->
         "travel_mode": travel_mode, "base_revision": plan.revision, "input_fingerprint": fingerprint,
         "current": {"order": base["order"],
                     "metrics": {"distance_km": base["km"], "duration_minutes": base["minutes"],
-                                "unknown_legs": base["unknown"], **base["summary"]}},
+                                "unknown_legs": base["unknown"], **base["summary"], **_movement_metrics(base)},
+                    "objective": base["objective"]},
+        "weights": dict(shown_weights), "weights_given": weights is not None,
+        "weight_labels": dict(opt.WEIGHT_LABEL), "movement_applied": rules is not None,
         "fixed": [{"event_id": eid, "title": by_id[eid].title, "reason": r} for eid, r in reasons.items()],
         "movable_count": len(movable),
         "candidates": candidates, "warnings": warnings,
         "_evals": {c["id"]: merged[c["id"]]["eval"] for c in candidates},
+        "_base": base, "_items": items, "_movable": movable, "_evaluate": evaluate, "_by_id": by_id,
     }
+
+
+def _movement_metrics(e: Dict[str, Any]) -> Dict[str, Any]:
+    return {"fatigue_percent": e["move"]["fatigue_percent"],
+            "longest_continuous_minutes": e["move"]["longest_continuous_minutes"],
+            "fairness_spread_percent": e["fair"]["spread_percent"]}
+
+
+def _partial(result: Dict[str, Any], e: Dict[str, Any], event_ids: List[str]) -> Dict[str, Any]:
+    """[Gate G7] MOVE-04 案のうち選んだ予定だけを動かした結果(検証つき)。"""
+    changed = {eid for eid in e["order"]
+               if e["times"][eid] != result["_by_id"][eid].local_start_time
+               or e["order"].index(eid) != [i.id for i in result["_items"]].index(eid)}
+    unknown = sorted(set(event_ids) - changed)
+    if unknown or not event_ids:
+        raise HTTPException(status_code=422, detail={
+            "code": "invalid_selection", "message": "この案で変わる予定の中から、動かす予定を選んでください"})
+    order, times = opt.partial_order(result["_items"], result["_movable"], e["order"], e["times"], event_ids)
+    return result["_evaluate"](order, times)
 
 
 def _public(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -190,20 +248,45 @@ def optimization_candidates(plan_id: str, day_id: str, payload: Optional[Candida
                             db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     day = _day_or_404(db, plan, day_id)
-    result = _public(_compute(db, plan, day, (payload or CandidatesRequest()).travel_mode))
+    req = payload or CandidatesRequest()
+    result = _public(_compute(db, plan, day, req.travel_mode, req.weights))
     result["can_apply"] = role in ("owner", "editor")
     return result
 
 
-@router.post("/{plan_id}/days/{day_id}/optimization-candidates/apply", response_model=dict)
-def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyRequest, request: Request,
-                                 db: Session = Depends(get_db),
-                                 if_match: Optional[str] = Header(None, alias="If-Match"),
+class PartialRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    candidate_id: str = Field(..., min_length=1, max_length=64)
+    input_fingerprint: str = Field(..., min_length=1, max_length=128)
+    event_ids: List[str] = Field(..., min_length=1, max_length=50)
+    travel_mode: str = "walking"
+    weights: Optional[Dict[str, int]] = None
+
+    @field_validator("weights")
+    @classmethod
+    def _v_weights(cls, v):
+        return opt.clean_weights(v)
+
+
+def _changes_of(result: Dict[str, Any], e: Dict[str, Any]) -> List[Dict[str, Any]]:
+    by_id, items = result["_by_id"], result["_items"]
+    out = []
+    for idx, eid in enumerate(e["order"]):
+        before_idx = next(i for i, it in enumerate(items) if it.id == eid)
+        before_t, after_t = by_id[eid].local_start_time, e["times"][eid]
+        if before_idx != idx or before_t != after_t:
+            out.append({"event_id": eid, "title": by_id[eid].title, "before_index": before_idx + 1,
+                        "after_index": idx + 1, "before_time": before_t, "after_time": after_t})
+    return out
+
+
+@router.post("/{plan_id}/days/{day_id}/optimization-candidates/partial-preview", response_model=dict)
+def optimization_partial_preview(plan_id: str, day_id: str, payload: PartialRequest, db: Session = Depends(get_db),
                                  current_user: User = Depends(get_current_user_or_guest)):
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    """[Gate G7] MOVE-04 部分の採用の前の確認(DBは変えない)。"""
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     day = _day_or_404(db, plan, day_id)
-    plans_api._require_if_match(plan, if_match)
-    result = _compute(db, plan, day, payload.travel_mode)
+    result = _compute(db, plan, day, payload.travel_mode, payload.weights)
     if result["input_fingerprint"] != payload.input_fingerprint:
         raise HTTPException(status_code=409, detail={
             "code": "optimization_stale",
@@ -214,6 +297,46 @@ def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyReques
         raise HTTPException(status_code=409, detail={
             "code": "candidate_not_found", "message": "この候補は今の旅程では選べません。もう一度候補を計算してください",
         })
+    part = _partial(result, e, payload.event_ids)
+    base = result["_base"]
+    new, resolved = opt.diff_findings(base["result"], part["result"])
+    changes = _changes_of(result, part)
+    saved_km = round(base["km"] - part["km"], 2)
+    return {
+        "candidate_id": payload.candidate_id, "event_ids": payload.event_ids, "order": part["order"],
+        "changes": changes,
+        "metrics": {"distance_km": part["km"], "duration_minutes": part["minutes"], "unknown_legs": part["unknown"],
+                    "saved_distance_km": saved_km,
+                    "saved_duration_minutes": round(base["minutes"] - part["minutes"], 1),
+                    **part["summary"], **_movement_metrics(part)},
+        "objective": part["objective"],
+        "new_issues": [_finding(f) for f in new], "resolved_issues": [_finding(f) for f in resolved],
+        "explanations": opt.explain(changes, saved_km, base["summary"], part["summary"]),
+        "can_apply": role in ("owner", "editor"),
+    }
+
+
+@router.post("/{plan_id}/days/{day_id}/optimization-candidates/apply", response_model=dict)
+def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyRequest, request: Request,
+                                 db: Session = Depends(get_db),
+                                 if_match: Optional[str] = Header(None, alias="If-Match"),
+                                 current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    day = _day_or_404(db, plan, day_id)
+    plans_api._require_if_match(plan, if_match)
+    result = _compute(db, plan, day, payload.travel_mode, payload.weights)
+    if result["input_fingerprint"] != payload.input_fingerprint:
+        raise HTTPException(status_code=409, detail={
+            "code": "optimization_stale",
+            "message": "候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください",
+        })
+    e = result["_evals"].get(payload.candidate_id)
+    if e is None:
+        raise HTTPException(status_code=409, detail={
+            "code": "candidate_not_found", "message": "この候補は今の旅程では選べません。もう一度候補を計算してください",
+        })
+    if payload.event_ids is not None:
+        e = _partial(result, e, payload.event_ids)  # [Gate G7] MOVE-04 部分の採用
     events = {str(ev.id): ev for ev in db.query(TravelEvent).filter(TravelEvent.day_id == day.id).all()}
     changes = []
     for eid in e["order"]:
@@ -225,8 +348,9 @@ def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyReques
         before = plans_api._event_to_dict(ev)
         ev.sort_order = new_sort
         if new_time != ev.local_start_time:
+            old_time = ev.local_start_time
             ev.local_start_time = new_time
-            branches_api._apply_time(ev, day, new_time)
+            branches_api._apply_time(ev, day, new_time, old_time)
         db.flush()
         changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
     if not changes:
@@ -238,7 +362,8 @@ def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyReques
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent", "")[:255],
         details={"day_id": str(day.id), "changed": len(changes), "algorithm_version": opt.ALGORITHM_VERSION,
-                 "candidate_id": payload.candidate_id, "plan_revision": new_revision},
+                 "candidate_id": payload.candidate_id, "plan_revision": new_revision,
+                 "partial": payload.event_ids is not None},
     )
     return {"plan_revision": new_revision, "changed": len(changes), "change_set_id": str(cs.id) if cs else None,
             "algorithm_version": opt.ALGORITHM_VERSION}

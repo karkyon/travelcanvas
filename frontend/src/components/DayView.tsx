@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { usePlan } from '../hooks/usePlan';
-import { useDragDrop } from '../hooks/useDragDrop';
+import { useDragDrop, containerId } from '../hooks/useDragDrop';
 import { useToast } from './common/toastContext';
 import Button from './common/Button';
 import Card from './common/Card';
@@ -178,7 +178,7 @@ const DayView: React.FC<DayViewProps> = ({
 
   // ドロップゾーンの処理
   const handleItemDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
-    const sourceContainerId = `${planId}-${day.id}`;
+    const sourceContainerId = containerId(planId, day.id);
     handleDrop(e, sourceContainerId, targetIndex, (result) => {
       if (result.success) {
         addToast({
@@ -280,7 +280,7 @@ const DayView: React.FC<DayViewProps> = ({
                 tabIndex={0}
                 role="listitem"
                 aria-label={`${event.title}(上下矢印キーで並べ替え)`}
-                onDragStart={(e) => handleDragStart(e, event, `${planId}-${day.id}`)}
+                onDragStart={(e) => handleDragStart(e, event, containerId(planId, day.id))}
                 onDragEnd={handleDragEnd}
                 onClick={() => onItemClick?.(event)}
                 onKeyDown={(e) => handleKeyboardMove(e, event, planId, day.id)}
@@ -292,6 +292,7 @@ const DayView: React.FC<DayViewProps> = ({
                   description={event.description}
                   startTime={event.start_time || ''}
                   endTime={event.end_time || ''}
+                  endDayOffset={event.end_day_offset}
                   duration={event.duration || 0}
                   locationName={event.location_name || ''}
                   address={event.address || ''}

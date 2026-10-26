@@ -21,5 +21,5 @@
 | 9 | 1つの変更セットで適用、Undo | 共通不変条件4 | IMPLEMENTED | B `test_constraint_aware_candidate_and_apply_undo`; E |
 | 10 | 権限・楽観ロック・監査に内容なし | DOC-06、DOC-11 | IMPLEMENTED | B `test_permissions`, `test_constraint_aware_candidate_and_apply_undo` |
 | 11 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe: 候補の表示) |
-| 12 | 公平性・疲労の指標、条件変更、部分採用 | SC-16 | NOT STARTED | ADR §3 |
+| 12 | 公平性・疲労の指標、条件変更、部分採用 | SC-16 | NOT STARTED | ADR §3 ※ **SUPERSEDED BY Gate G7(目的の内訳・重み・選んだ予定だけ。gate-g7-trace.md #14〜17)** |
 | 13 | 外部経路サービスによる実移動時間 | FR-014/015 | NOT STARTED | ADR §3 |

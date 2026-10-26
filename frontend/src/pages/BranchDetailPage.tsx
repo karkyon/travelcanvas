@@ -4,6 +4,7 @@
  * [Gate P7] 分岐案の予定を日ごとに編集し(時刻・題名・日付の変更、外す、追加)、本案との差分と
  * 採用できない理由を見て、採用・見送り・削除を行う。採用は本案への1つの変更セットで、本案の「元に戻す」で取り消せる。
  * 採用できない理由(分岐後に本案でも変更された等)がある間は採用ボタンを押せない。
+ * [Gate G7] FR-019 「移動・検証・費用で比べる」: 本案とこの案の移動時間・検証の件数と新たな問題・疲れ・費用・予約への影響。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -14,6 +15,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { adoptBranch, deleteBranch, getBranch, updateBranch, updateBranchContent } from '@/services/api';
 import type { BranchDetail, BranchEventItem } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { compareBranches } from '@/services/api/g7';
+import type { BranchComparison as ComparisonData } from '@/services/api/types/g7';
+import BranchComparison from './branches/BranchComparison';
 import {
   SCENARIO_LABEL, STATE_LABEL, contentToPayload, describeConflict, describeOp, groupByDay, newItem,
 } from './branches/branchModel';
@@ -28,6 +32,20 @@ const BranchDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
+
+  const compare = async () => {
+    if (!planId || !branchId) return;
+    setBusy('比較');
+    setError(null);
+    try {
+      setComparison(await compareBranches(planId, [branchId]));
+    } catch (e) {
+      setError(errorDetailMessage(e, '比較できませんでした'));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const apply = (d: BranchDetail) => {
     setDetail(d);
@@ -219,6 +237,12 @@ const BranchDetailPage: React.FC = () => {
                   {detail.ops.map((o, i) => <li key={i}>{describeOp(o, dayLabel)}</li>)}
                 </ul>
               )}
+              <Button variant="secondary" size="sm" className="mt-3" onClick={compare} loading={busy === '比較'}
+                disabled={dirty}>
+                移動・検証・費用で比べる
+              </Button>
+              {dirty && <p className="text-xs text-gray-700 mt-1">比べる前に保存してください。</p>}
+              {comparison && !dirty && <BranchComparison data={comparison} />}
             </section>
           </Card>
           {detail.state === 'draft' && detail.conflicts.length > 0 && (

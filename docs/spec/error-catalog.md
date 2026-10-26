@@ -47,6 +47,7 @@
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
 | `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py |
+| `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
 | `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
@@ -79,7 +80,8 @@
 | `has_relations` | 409 | no | — | api/v1/sync.py |
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
-| `if_match_required` | 428 | after_reload | If-Match(プロフィールの版。まだ無ければ 0)が必要です | api/v1/private_profile.py |
+| `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
+| `invalid_branch_selection` | 422 | no | 比べる分岐案を1〜…つ選んでください | api/v1/branches.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
@@ -101,6 +103,7 @@
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
 | `invalid_scope` | — | — | スコープは | api/v1/organizations.py |
 | `invalid_seat_limit` | — | — | 席の上限(1以上の整数、上限なしは null)を指定してください | api/v1/organizations.py |
+| `invalid_selection` | 422 | no | この案で変わる予定の中から、動かす予定を選んでください | api/v1/optimization.py |
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
@@ -129,6 +132,7 @@
 | `not_adopted` | — | — | この投票はまだ採用していません | api/v1/decisions.py |
 | `not_areas_only` | 409 | no | 訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです | api/v1/location_tracks.py |
 | `not_conflicted` | 404 | no | この操作は競合していません | api/v1/sync.py |
+| `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
 | `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
@@ -155,6 +159,7 @@
 | `same_candidate` | — | — | 同じ候補へはまとめられません | api/v1/candidates.py |
 | `same_plan` | 409 | no | 同じ旅行へは戻せません。別の旅行を選んでください | api/v1/journey.py |
 | `scan_unavailable` | 503 | later | ファイルの安全確認ができないため、今は受け付けられません | api/v1/memories.py |
+| `schedule_not_available` | 422 | no | ゲストのアカウントは猶予つきの削除を使えません(今すぐ削除するか、会員登録してください) | api/v1/privacy.py |
 | `scheduled` | 409 | no | 予定に配置済みの候補は、予定を消すと候補に戻ります | api/v1/candidates.py |
 | `seat_limit_below_members` | 409 | no | 今のメンバー(…人)より少なくはできません。先にメンバーを外してください | api/v1/organizations.py |
 | `seat_limit_reached` | 409 | no | 席の上限(…人)に達しています。上限を見直すか、メンバーを外してください | api/v1/organizations.py |

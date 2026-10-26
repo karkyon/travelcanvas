@@ -32,7 +32,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
 
 from sqlalchemy.orm import Session
 
@@ -42,7 +42,9 @@ from app.models.models import (
 from app.services.constraint_evaluation import ConstraintSet, EffectiveConstraint
 from app.services.today_mode import effective_start, parse_local_time, zone_for
 
-ALGORITHM_VERSION = "feasibility-v1"
+# [Gate G7] v2: 移動・滞在の既定(app/services/movement.py)による見積もり・休憩・1日の長さ・疲れ・最終の便を足した。
+# 既定を無効にした旅行(enabled=false)は v1 と同じ判定になる
+ALGORITHM_VERSION = "feasibility-v2"
 RESERVATION_TIME_TOLERANCE = timedelta(minutes=15)
 
 CURRENCY_UNITS = {"JPY", "USD", "EUR"}
@@ -107,6 +109,7 @@ class SegmentInfo:
     planned_arrival_at: Optional[datetime]
     cost: Optional[Decimal]
     currency: Optional[str]
+    last_departure_at: Optional[datetime] = None  # [Gate G7] MOVE-03 最終の便
 
 
 @dataclass(frozen=True)
@@ -180,6 +183,9 @@ class EvaluationResult:
     findings: List[Finding] = field(default_factory=list)
     constraint_results: List[Dict[str, str]] = field(default_factory=list)
     unchecked: Dict[str, int] = field(default_factory=dict)
+    # [Gate G7] MOVE-03 日ごとの活動量・休憩・疲れ(移動の既定を使った時だけ)
+    day_metrics: List[Dict[str, Any]] = field(default_factory=list)
+    movement_applied: bool = False
 
     def count(self, key: str, n: int = 1) -> None:
         self.unchecked[key] = self.unchecked.get(key, 0) + n
@@ -187,7 +193,7 @@ class EvaluationResult:
 
 # ============================================================ 読み出し
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def _aware(dt: Any) -> Optional[datetime]:
     if dt is None:
         return None
     if dt.tzinfo is None:
@@ -218,7 +224,7 @@ def load_snapshot(db: Session, plan: TravelPlan) -> Snapshot:
             duration_minutes=s.duration_minutes, distance_km=s.distance_km,
             preparation_minutes=s.preparation_minutes or 0, buffer_before_minutes=s.buffer_before_minutes or 0,
             planned_departure_at=_aware(s.planned_departure_at), planned_arrival_at=_aware(s.planned_arrival_at),
-            cost=s.cost, currency=s.currency,
+            cost=s.cost, currency=s.currency, last_departure_at=_aware(s.last_departure_at),
         )
         for s in db.query(TravelSegment).filter(TravelSegment.plan_id == plan.id).all()
     ]
@@ -279,6 +285,12 @@ def compute_fingerprint(db: Session, plan: TravelPlan) -> str:
     if place_ids:
         for pid, rev in db.query(Place.id, Place.revision).filter(Place.id.in_(place_ids)):
             parts.append(f"p:{pid}:{rev}")
+    # [Gate G7] MOVE-03 移動の既定を変えれば結果は古い(行が無い旅行は今までと同じ値)
+    from app.models.models import PlanMovementSettings
+
+    mrev = db.query(PlanMovementSettings.revision).filter(PlanMovementSettings.plan_id == plan.id).scalar()
+    if mrev is not None:
+        parts.append(f"m:{mrev}")
     return hashlib.sha256("\n".join(sorted(parts)).encode("utf-8")).hexdigest()
 
 
@@ -362,7 +374,15 @@ def _check_overlaps(timed: List[EventInfo], res: EvaluationResult) -> None:
                 ))
 
 
-def _check_segments(snap: Snapshot, res: EvaluationResult) -> None:
+def _estimated_end(e: EventInfo, rules: Any) -> Optional[datetime]:
+    """[Gate G7] MOVE-03 終了時刻の無い予定の、既定の滞在による見積もりの終わり(見積もれなければ None)。"""
+    if rules is None or e.start is None or e.end is not None or e.is_all_day:
+        return None
+    stay = rules.stay_for(e.event_type)
+    return e.start + timedelta(minutes=stay) if stay else None
+
+
+def _check_segments(snap: Snapshot, res: EvaluationResult, rules: Any = None) -> None:
     by_id = {e.id: e for e in snap.events}
     for s in snap.segments:
         if s.status == "cancelled" or s.from_event_id is None or s.to_event_id is None:
@@ -420,12 +440,29 @@ def _check_segments(snap: Snapshot, res: EvaluationResult) -> None:
                 suggestion={"action": "move_event", "earliest_start": _iso(src.start + required)},
             ))
         else:
+            est = _estimated_end(src, rules)
+            stay = rules.stay_for(src.event_type) if est is not None else None
+            if est is not None and dst.start - est < required:
+                # [Gate G7] MOVE-03 既定の滞在をとると間に合わない(見積もり。終了時刻を入れれば確かめられる)
+                gap = dst.start - est
+                res.findings.append(Finding(
+                    code="ESTIMATED_TRAVEL_SHORTFALL", kind="violation", severity="WARNING",
+                    message=(f"「{src.title}」に既定の滞在({stay}分)をとると、移動({label})に必要な{_minutes(required)}分に"
+                             f"対して{max(_minutes(gap), 0)}分しかありません(見積もり)"),
+                    entity_type="segment", entity_id=s.id, entity_label=label, day_id=dst.day.id,
+                    evidence={"estimated": True, "stay_minutes": stay, "available_minutes": _minutes(gap),
+                              "required_minutes": _minutes(required), "estimated_end": _iso(est)},
+                    suggestion={"action": "set_end_time", "latest_end": _iso(dst.start - required)},
+                ))
+                continue
             res.count("stay_length_unknown")
+            note = f"(既定の滞在{stay}分なら間に合う見込みです)" if est is not None else ""
             res.findings.append(Finding(
                 code="STAY_LENGTH_UNKNOWN", kind="unverified", severity="INFO",
-                message=f"「{src.title}」の終了時刻が未定のため、移動({label})に間に合うか検証できません",
+                message=f"「{src.title}」の終了時刻が未定のため、移動({label})に間に合うか検証できません{note}",
                 entity_type="event", entity_id=src.id, entity_label=_event_label(src), day_id=src.day.id,
-                evidence={"required_minutes": _minutes(required)},
+                evidence={"required_minutes": _minutes(required),
+                          **({"estimated_ok": True, "stay_minutes": stay} if est is not None else {})},
                 suggestion={"action": "set_end_time", "latest_end": _iso(dst.start - required)},
             ))
 
@@ -460,7 +497,7 @@ def _check_reservations(snap: Snapshot, res: EvaluationResult) -> None:
             ))
 
 
-def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: EvaluationResult) -> None:
+def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: EvaluationResult, rules: Any = None) -> None:
     """[Gate G4] MAP-02 その日の実際の営業時間(例外の日 → 曜日 → 前の日から続く深夜営業、app/services/place_hours.py)。
     以前は曜日の最初の区切りだけを見ていた(昼休みのある店・深夜営業・臨時休業を正しく判定できなかった)。"""
     from app.services import place_hours
@@ -502,6 +539,19 @@ def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: Evaluation
                 suggestion={"action": "move_event_into_hours"},
             ))
             continue
+        est = _estimated_end(e, rules)
+        if est is not None and e.start is not None and _local(est, e.day).replace(tzinfo=None) > win.end:
+            # [Gate G7] MOVE-03 既定の滞在をとると閉まる時刻を過ぎる(見積もり)
+            stay = rules.stay_for(e.event_type)
+            res.findings.append(Finding(
+                code="ESTIMATED_PAST_CLOSING", kind="violation", severity="WARNING",
+                message=(f"「{e.title}」に既定の滞在({stay}分)をとると、閉まる時刻({win.end:%H:%M})を過ぎます(見積もり)"),
+                entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
+                evidence={"estimated": True, "stay_minutes": stay, "close": win.end.strftime("%H:%M"),
+                          "start": _iso(e.start), "estimated_end": _iso(est)},
+                suggestion={"action": "move_event_earlier_or_set_end",
+                            "latest_start": _iso(e.start + (win.end - _local(est, e.day).replace(tzinfo=None)))},
+            ))
         if win.last_entry is not None and local_start > win.last_entry:
             res.findings.append(Finding(
                 code="AFTER_LAST_ENTRY", kind="violation", severity="ERROR",
@@ -517,6 +567,210 @@ def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: Evaluation
                 entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
                 evidence={"last_order": win.last_order.strftime("%H:%M"), "start": _iso(e.start)},
                 suggestion={"action": "move_event_into_hours"},
+            ))
+
+
+# ============================================================ [Gate G7] MOVE-03 滞在・休憩・1日の長さ・疲れ・最終の便
+
+# 疲れの重み(活動1分あたり)。食事は休憩を兼ねるので軽く数える
+_FATIGUE_WEIGHT = {"dining": 0.3, "accommodation": 0.0}
+_WALK_WEIGHT = 1.5
+_RIDE_WEIGHT = 0.5
+
+
+def _span(e: EventInfo, rules: Any) -> Tuple[Optional[datetime], bool]:
+    """(終わり, 見積もりか)。終わりが分からなければ (None, False)。"""
+    if e.end is not None:
+        return e.end, False
+    est = _estimated_end(e, rules)
+    return (est, True) if est is not None else (None, False)
+
+
+def _check_stays(timed: List[EventInfo], res: EvaluationResult, rules: Any) -> None:
+    for e in timed:
+        if e.end is None or e.event_type in ("accommodation", "transportation"):
+            continue
+        stay = rules.stay_for(e.event_type)
+        if not stay:
+            continue
+        actual = _minutes(e.end - cast(datetime, e.start))
+        if actual < stay * rules.short_stay_ratio:
+            res.findings.append(Finding(
+                code="SHORT_STAY", kind="violation", severity="WARNING",
+                message=f"「{e.title}」の滞在が{actual}分です(既定の{stay}分に比べて短すぎる可能性があります)",
+                entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
+                evidence={"stay_minutes": actual, "default_stay_minutes": stay, "ratio": rules.short_stay_ratio},
+                suggestion={"action": "extend_stay", "recommended_minutes": stay},
+            ))
+
+
+def _travel_between(snap: Snapshot, a: EventInfo, b: EventInfo) -> Tuple[float, float]:
+    """(徒歩の分, それ以外の移動の分)。区間が無い・所要時間が不明なら 0。"""
+    walk = ride = 0.0
+    for s in snap.segments:
+        if s.status == "cancelled" or s.from_event_id != a.id or s.to_event_id != b.id or s.duration_minutes is None:
+            continue
+        if s.mode in ("walking",):
+            walk += float(s.duration_minutes)
+        else:
+            ride += float(s.duration_minutes)
+    return walk, ride
+
+
+def _check_days(snap: Snapshot, timed: List[EventInfo], res: EvaluationResult, rules: Any) -> None:
+    """休憩の無い連続・1日の長さ・疲れの目安(日ごと)。"""
+    by_day: Dict[uuid.UUID, List[EventInfo]] = {}
+    for e in timed:
+        by_day.setdefault(e.day.id, []).append(e)
+    for day in snap.days:
+        events = sorted(by_day.get(day.id, []), key=lambda e: (e.start, e.sort_order))
+        active = [e for e in events if e.event_type != "accommodation"]
+        metrics: Dict[str, Any] = {
+            "day_id": str(day.id), "local_date": day.local_date.isoformat(), "events": len(active),
+            "active_minutes": 0, "walking_minutes": 0, "ride_minutes": 0, "longest_continuous_minutes": 0,
+            "span_minutes": 0, "fatigue_percent": 0, "level": "light", "estimated": False, "incomplete": False,
+        }
+        if not active:
+            res.day_metrics.append(metrics)
+            continue
+        load = 0.0
+        chain_start: Optional[datetime] = None
+        chain_end: Optional[datetime] = None
+        flagged = False
+        first_start, last_end = active[0].start, None
+        prev: Optional[EventInfo] = None
+        for e in active:
+            start = cast(datetime, e.start)  # active は開始の時刻のある予定だけ
+            end, estimated = _span(e, rules)
+            metrics["estimated"] = metrics["estimated"] or estimated
+            if end is None:
+                metrics["incomplete"] = True
+                res.count("movement_unknown")
+                chain_start = chain_end = None
+                prev = None
+                continue
+            minutes = max(_minutes(end - start), 0)
+            metrics["active_minutes"] += minutes if e.event_type != "dining" else 0
+            load += minutes * _FATIGUE_WEIGHT.get(e.event_type, 1.0)
+            walk = ride = 0.0
+            if prev is not None:
+                walk, ride = _travel_between(snap, prev, e)
+                metrics["walking_minutes"] += int(round(walk))
+                metrics["ride_minutes"] += int(round(ride))
+                load += walk * _WALK_WEIGHT + ride * _RIDE_WEIGHT
+            last_end = end if last_end is None or end > last_end else last_end
+            if e.event_type == "dining":
+                # 食事は休憩として数える(連続を区切る)
+                chain_start = chain_end = None
+                prev = e
+                continue
+            if chain_end is not None and prev is not None:
+                idle = _minutes(start - chain_end) - walk - ride
+                if idle >= rules.break_minutes:
+                    chain_start = None
+            if chain_start is None:
+                chain_start = start
+                flagged = False
+            chain_end = end if chain_end is None or end > chain_end else chain_end
+            continuous = _minutes(chain_end - chain_start)
+            metrics["longest_continuous_minutes"] = max(metrics["longest_continuous_minutes"], continuous)
+            if continuous > rules.max_continuous_minutes and not flagged:
+                flagged = True
+                res.findings.append(Finding(
+                    code="NO_BREAK", kind="violation", severity="WARNING",
+                    message=(f"{day.local_date.isoformat()}は{_fmt(chain_start, day)}から「{e.title}」まで"
+                             f"{continuous}分、休憩({rules.break_minutes}分以上の空きか食事)がありません"
+                             f"(目安は{rules.max_continuous_minutes}分まで)" + ("(見積もりを含む)" if estimated else "")),
+                    # 日の単位の問題にする(並べ替えで対象の予定が変わっても同じ問題として比べる)
+                    entity_type="day", entity_id=day.id, entity_label=day.local_date.isoformat(), day_id=day.id,
+                    evidence={"continuous_minutes": continuous, "limit_minutes": rules.max_continuous_minutes,
+                              "break_minutes": rules.break_minutes, "estimated": bool(metrics["estimated"]),
+                              "event_id": str(e.id)},
+                    suggestion={"action": "insert_break", "before_event_id": str(e.id),
+                                "minutes": rules.break_minutes},
+                ))
+            prev = e
+        if last_end is not None and first_start is not None:
+            metrics["span_minutes"] = max(_minutes(last_end - first_start), 0)
+        metrics["fatigue_percent"] = int(round(100 * load / max(rules.max_day_minutes, 1)))
+        pct = metrics["fatigue_percent"]
+        metrics["level"] = "light" if pct <= 60 else "normal" if pct <= 100 else "heavy"
+        if metrics["span_minutes"] > rules.max_day_minutes:
+            res.findings.append(Finding(
+                code="LONG_DAY", kind="violation", severity="WARNING",
+                message=(f"{day.local_date.isoformat()}は最初の予定から最後の予定の終わりまで"
+                         f"{metrics['span_minutes'] // 60}時間{metrics['span_minutes'] % 60}分あります"
+                         f"(目安は{rules.max_day_minutes // 60}時間まで)"),
+                entity_type="day", entity_id=day.id, entity_label=day.local_date.isoformat(), day_id=day.id,
+                evidence={"span_minutes": metrics["span_minutes"], "limit_minutes": rules.max_day_minutes,
+                          "estimated": bool(metrics["estimated"])},
+                suggestion={"action": "reduce_day"},
+            ))
+        elif pct > 100:
+            res.findings.append(Finding(
+                code="DAY_FATIGUE_HIGH", kind="violation", severity="WARNING",
+                message=(f"{day.local_date.isoformat()}は活動と移動(特に徒歩)が多く、疲れの目安が{pct}%です"
+                         f"(100%が1日の上限の目安)"),
+                entity_type="day", entity_id=day.id, entity_label=day.local_date.isoformat(), day_id=day.id,
+                evidence={"fatigue_percent": pct, "walking_minutes": metrics["walking_minutes"],
+                          "active_minutes": metrics["active_minutes"], "estimated": bool(metrics["estimated"])},
+                suggestion={"action": "reduce_day"},
+            ))
+        res.day_metrics.append(metrics)
+
+
+def _check_last_transport(snap: Snapshot, res: EvaluationResult, rules: Any) -> None:
+    by_id = {e.id: e for e in snap.events}
+    margin = timedelta(minutes=rules.last_transport_margin_minutes if rules else 15)
+    for s in snap.segments:
+        if s.status == "cancelled" or s.last_departure_at is None:
+            continue
+        src = by_id.get(s.from_event_id) if s.from_event_id else None
+        dst = by_id.get(s.to_event_id) if s.to_event_id else None
+        label = f"{src.title if src else '出発地'} → {dst.title if dst else '到着地'}"[:300]
+        anchor = src or dst
+        day = anchor.day if anchor is not None else None
+        departure = s.planned_departure_at
+        estimated = False
+        basis = "planned_departure"
+        if departure is None and src is not None and src.start is not None:
+            end, estimated = _span(src, rules)
+            if end is not None:
+                departure = end + timedelta(minutes=s.preparation_minutes)
+                basis = "estimated_end" if estimated else "event_end"
+        last = s.last_departure_at
+        shown_last = _fmt(last, day) if day else _iso(last)
+        if departure is None:
+            res.count("last_transport_unknown")
+            res.findings.append(Finding(
+                code="LAST_TRANSPORT_UNVERIFIED", kind="unverified", severity="INFO",
+                message=f"移動({label})の最終の便({shown_last})に間に合うか、出発の時刻が分からないため検証できません",
+                entity_type="segment", entity_id=s.id, entity_label=label, day_id=day.id if day else None,
+                evidence={"last_departure_at": _iso(last)},
+                suggestion={"action": "set_departure_or_end_time"},
+            ))
+            continue
+        shown_dep = _fmt(departure, day) if day else _iso(departure)
+        ev = {"last_departure_at": _iso(last), "departure": _iso(departure), "basis": basis,
+              "estimated": estimated, "margin_minutes": int(margin.total_seconds() // 60)}
+        if departure > last:
+            res.findings.append(Finding(
+                code="LAST_TRANSPORT_MISSED", kind="violation", severity="ERROR" if not estimated else "WARNING",
+                message=(f"移動({label})の出発({shown_dep})が最終の便({shown_last})より後です"
+                         + ("(既定の滞在による見積もり)" if estimated else "")),
+                entity_type="segment", entity_id=s.id, entity_label=label, day_id=day.id if day else None,
+                evidence={**ev, "late_minutes": _minutes(departure - last)},
+                suggestion={"action": "leave_earlier", "latest_departure": _iso(last - margin)},
+            ))
+        elif last - departure < margin:
+            res.findings.append(Finding(
+                code="LAST_TRANSPORT_TIGHT", kind="violation", severity="WARNING",
+                message=(f"移動({label})の出発({shown_dep})から最終の便({shown_last})まで"
+                         f"{_minutes(last - departure)}分しかありません(余裕の目安は{_minutes(margin)}分)"
+                         + ("(見積もり)" if estimated else "")),
+                entity_type="segment", entity_id=s.id, entity_label=label, day_id=day.id if day else None,
+                evidence={**ev, "spare_minutes": _minutes(last - departure)},
+                suggestion={"action": "leave_earlier", "latest_departure": _iso(last - margin)},
             ))
 
 
@@ -910,19 +1164,25 @@ _SEVERITY_ORDER = {"ERROR": 0, "WARNING": 1, "INFO": 2}
 
 
 def evaluate(snap: Snapshot, constraints: ConstraintSet, titles: Optional[Dict[uuid.UUID, str]] = None,
-             unavailable_owners: Optional[Dict[uuid.UUID, uuid.UUID]] = None) -> EvaluationResult:
+             unavailable_owners: Optional[Dict[uuid.UUID, uuid.UUID]] = None, movement: Any = None) -> EvaluationResult:
     """旅程と制約を検証する(DBに触れない純粋関数)。
 
     titles: 共有制約の題名(文面用)。秘匿制約の題名は渡さない。
     unavailable_owners: 復号できなかった秘匿制約のID→作成者ID。
+    movement: [Gate G7] 移動・滞在の既定(app/services/movement.Rules)。None なら見積もりをしない(v1 と同じ)。
     """
     titles = titles or {}
     res = EvaluationResult()
     timed = _check_event_times(snap, res)
     _check_overlaps(timed, res)
-    _check_segments(snap, res)
+    _check_segments(snap, res, movement)
     _check_reservations(snap, res)
-    _check_opening_hours(timed, snap, res)
+    _check_opening_hours(timed, snap, res, movement)
+    _check_last_transport(snap, res, movement)
+    if movement is not None:
+        res.movement_applied = True
+        _check_stays(timed, res, movement)
+        _check_days(snap, timed, res, movement)
 
     for c in constraints.constraints:
         status = _evaluate_constraint(c, None if c.is_private else titles.get(c.id), snap, res)

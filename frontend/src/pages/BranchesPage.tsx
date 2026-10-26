@@ -3,6 +3,7 @@
  *
  * [Gate P7] backend/app/api/v1/branches.py の画面。雨・遅延・体力・欠席・予算・自由の想定から、
  * 本案を壊さずに分岐案を作る。分岐案の編集・本案との比較・採用は詳細画面(BranchDetailPage)で行う。
+ * [Gate G7] FR-019 案を最大3つ選んで、本案と並べて比べる(移動・検証・疲れ・費用・予約への影響)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -13,6 +14,9 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 import api, { createBranch, getBranches, getPlanMembers } from '@/services/api';
 import type { Branch, PlanMember } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { compareBranches } from '@/services/api/g7';
+import type { BranchComparison as ComparisonData } from '@/services/api/types/g7';
+import BranchComparison from './branches/BranchComparison';
 import {
   SCENARIO_LABEL, SCENARIO_OPTIONS, STATE_LABEL, createFormToPayload, emptyCreateForm, type CreateForm,
 } from './branches/branchModel';
@@ -29,6 +33,27 @@ const BranchesPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [comparing, setComparing] = useState(false);
+
+  const togglePick = (id: string) => {
+    setComparison(null);
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 3 ? p : [...p, id]));
+  };
+
+  const compare = async () => {
+    if (!planId || picked.length === 0) return;
+    setComparing(true);
+    setError(null);
+    try {
+      setComparison(await compareBranches(planId, picked));
+    } catch (e) {
+      setError(errorDetailMessage(e, '比較できませんでした'));
+    } finally {
+      setComparing(false);
+    }
+  };
 
   const canEdit = members.some((m) => m.is_me && (m.role === 'owner' || m.role === 'editor'));
 
@@ -179,14 +204,29 @@ const BranchesPage: React.FC = () => {
                             {b.state === 'draft' && b.plan_changed_since_base && ' ・ 作成後に本案が更新されています'}
                           </p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/planner/${planId}/branches/${b.id}`)}>
-                          開く
-                        </Button>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1 text-sm text-gray-800">
+                            <input type="checkbox" checked={picked.includes(b.id)} onChange={() => togglePick(b.id)}
+                              disabled={!picked.includes(b.id) && picked.length >= 3} />
+                            {`「${b.title}」を比べる`}
+                          </label>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/planner/${planId}/branches/${b.id}`)}>
+                            開く
+                          </Button>
+                        </div>
                       </div>
                     </Card>
                   </li>
                 ))}
               </ul>
+            )}
+            {branches.length > 0 && (
+              <div className="mt-3">
+                <Button variant="secondary" size="sm" onClick={compare} loading={comparing} disabled={picked.length === 0}>
+                  {`選んだ案(${picked.length}/3)を本案と比べる`}
+                </Button>
+                {comparison && <BranchComparison data={comparison} />}
+              </div>
             )}
           </section>
         </>

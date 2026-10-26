@@ -405,6 +405,15 @@ async def clone_travel_plan(
                 )
                 db.add(new_event)
 
+        # [Gate G7] MOVE-03 移動・滞在の既定も複製する(同行者の属性・休憩の規則を同じ前提で判定する)
+        from app.models.models import PlanMovementSettings
+        from app.services import movement as mv
+
+        settings_row = mv.get_row(db, original_plan.id)
+        if settings_row is not None:
+            db.add(PlanMovementSettings(plan_id=new_plan.id, settings=dict(settings_row.settings), revision=1,
+                                        updated_by_user_id=current_user.id))
+
         db.commit()
         db.refresh(new_plan)
         return new_plan

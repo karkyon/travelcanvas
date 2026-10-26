@@ -111,8 +111,9 @@ test('COL-02 候補の投票を決定して旅程に反映し、元に戻す / C
   await page.getByRole('textbox').first().fill('集合は駅でG4');
   await page.getByRole('button', { name: 'コメントする' }).click();
   await expect(page.getByText('集合は駅でG4')).toBeVisible();
-  const comments = await send('get', `/plans/${planId}/comments?target_type=event&target_id=${ev.id}`);
-  expect(comments.map((c: { body: string }) => c.body)).toEqual(['集合は駅でG4']);
+  // [Gate G7] 画面に出た直後は保存の応答の前のことがある(G7 の予行で1回)。保存されるまで待って確かめる
+  await expect.poll(async () => (await send('get', `/plans/${planId}/comments?target_type=event&target_id=${ev.id}`))
+    .map((c: { body: string }) => c.body)).toEqual(['集合は駅でG4']);
   const planComments = await send('get', `/plans/${planId}/comments?target_type=plan`);
   expect(planComments).toEqual([]);
 });

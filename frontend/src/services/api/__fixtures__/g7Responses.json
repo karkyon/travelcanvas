@@ -1,0 +1,1592 @@
+{
+ "branch_comparison": {
+  "algorithm_version": "branch-compare-v1",
+  "branches": [
+   {
+    "affected_reservations": [
+     {
+      "id": "91623791-99b5-4369-90f1-24af1dc21ca7",
+      "label": "酒蔵見学",
+      "status": "confirmed"
+     }
+    ],
+    "budget_target": [
+     {
+      "branch": "0.00",
+      "currency": "JPY",
+      "met": true,
+      "target": "1750.00"
+     }
+    ],
+    "conflicts": 1,
+    "constraints_satisfied": 0,
+    "constraints_violated": 0,
+    "costs": {
+     "removed": [
+      {
+       "amount": "3500.00",
+       "currency": "JPY"
+      }
+     ],
+     "total": []
+    },
+    "counts": {
+     "error": 0,
+     "info": 0,
+     "unverified": 0,
+     "warning": 1
+    },
+    "heavy_days": 0,
+    "id": "407faf60-f7d8-45f8-ae0d-d2bd27e786ac",
+    "max_fatigue_percent": 17,
+    "new_issues": [
+     {
+      "code": "SAME_START_TIME",
+      "entity_label": "2026-11-21 藤居本家",
+      "estimated": false,
+      "is_private_constraint": false,
+      "message": "「美冨久酒造」と「藤居本家」が同じ時刻(10:00)に始まります",
+      "severity": "WARNING"
+     }
+    ],
+    "resolved_issues": [],
+    "scenario_type": "budget",
+    "state": "draft",
+    "summary": {
+     "added": 0,
+     "removed": 1,
+     "time_changed": 1,
+     "updated": 1
+    },
+    "title": "予算を削る",
+    "travel": {
+     "is_estimate": true,
+     "km": 13.7,
+     "legs": 1,
+     "minutes": 41,
+     "unknown_legs": 0
+    }
+   },
+   {
+    "affected_reservations": [],
+    "budget_target": null,
+    "conflicts": 0,
+    "constraints_satisfied": 0,
+    "constraints_violated": 0,
+    "costs": {
+     "removed": [],
+     "total": [
+      {
+       "amount": "3500.00",
+       "currency": "JPY"
+      }
+     ]
+    },
+    "counts": {
+     "error": 0,
+     "info": 0,
+     "unverified": 1,
+     "warning": 0
+    },
+    "heavy_days": 0,
+    "id": "bebc7cfd-8b4c-4c35-a542-c0c1e439a89e",
+    "max_fatigue_percent": 26,
+    "new_issues": [],
+    "resolved_issues": [],
+    "scenario_type": "rain",
+    "state": "draft",
+    "summary": {
+     "added": 0,
+     "removed": 0,
+     "time_changed": 0,
+     "updated": 0
+    },
+    "title": "雨の日",
+    "travel": {
+     "is_estimate": true,
+     "km": 13.7,
+     "legs": 2,
+     "minutes": 56,
+     "unknown_legs": 0
+    }
+   }
+  ],
+  "can_adopt": true,
+  "costs_hidden": false,
+  "movement_applied": true,
+  "plan": {
+   "constraints_satisfied": 0,
+   "constraints_violated": 0,
+   "costs": {
+    "removed": [],
+    "total": [
+     {
+      "amount": "3500.00",
+      "currency": "JPY"
+     }
+    ]
+   },
+   "counts": {
+    "error": 0,
+    "info": 0,
+    "unverified": 1,
+    "warning": 0
+   },
+   "heavy_days": 0,
+   "max_fatigue_percent": 26,
+   "title": "本案",
+   "travel": {
+    "is_estimate": true,
+    "km": 13.7,
+    "legs": 2,
+    "minutes": 56,
+    "unknown_legs": 0
+   }
+  },
+  "plan_id": "e6b7ef3d-4eba-4397-8408-0ad15a66dcd3",
+  "plan_revision": 6,
+  "reservations_hidden": false,
+  "validation_algorithm_version": "feasibility-v2"
+ },
+ "deletion_cancelled": {
+  "scheduled": null
+ },
+ "deletion_preview_scheduled": {
+  "account_delete_grace_days": 14,
+  "account_type": "registered",
+  "can_schedule": true,
+  "confirmation_text": "退会する",
+  "deleted_in_member_plans": {
+   "documents": 0,
+   "location_tracks": 0,
+   "member_budgets": 0,
+   "memories": 0,
+   "personal_packing_items": 0,
+   "private_constraints": 0
+  },
+  "kept_in_member_plans": {
+   "comments": 0,
+   "expenses": 0,
+   "votes": 0
+  },
+  "member_plan_count": 0,
+  "owned_plans": [
+   {
+    "id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+    "member_count": 0,
+    "title": "G7 最適化"
+   },
+   {
+    "id": "e6b7ef3d-4eba-4397-8408-0ad15a66dcd3",
+    "member_count": 0,
+    "title": "G7 比較"
+   },
+   {
+    "id": "0f77cbc7-cc02-4f31-83ae-34396f847eb5",
+    "member_count": 0,
+    "title": "過去0"
+   },
+   {
+    "id": "76f80fa5-9cb2-4e61-84ab-5c4d29d6669f",
+    "member_count": 0,
+    "title": "過去1"
+   },
+   {
+    "id": "2c6dff06-1c6f-4a97-ac33-d1d33d62d1ca",
+    "member_count": 0,
+    "title": "滋賀2026"
+   }
+  ],
+  "plan_delete_grace_days": 30,
+  "requires_password": true,
+  "retention": {
+   "items": [
+    {
+     "key": "deleted_plan",
+     "label": "削除した旅行",
+     "note": "削除後30日間は復元できます。その後、予定・予約・文書の原本を含めて完全に削除します。",
+     "period": "削除後30日間"
+    },
+    {
+     "key": "quick_draft",
+     "label": "登録前の下書き(クイック作成)",
+     "note": "期限を過ぎた下書きは自動で削除します。",
+     "period": "期限切れ後7日 / 旅行へ変換後90日"
+    },
+    {
+     "key": "documents",
+     "label": "文書の原本",
+     "note": "文書に保持期限を設定すると、期限後に原本を削除します。旅行を完全に削除した時も削除します。",
+     "period": "設定した保持期限まで"
+    },
+    {
+     "key": "audit",
+     "label": "操作の記録(監査ログ)",
+     "note": "不正利用の調査のため、誰がいつ何をしたかだけを、予定名・予約番号・本文などの内容を含めずに記録し、旅行の削除後も保持します。",
+     "period": "セキュリティ上の保持期間"
+    },
+    {
+     "key": "backup",
+     "label": "バックアップ",
+     "note": "障害からの復旧のため、削除したデータも一定期間バックアップに残り、保持期間を過ぎると消去されます(設計上の目安は35日分と月次。運用環境の設定に従います)。",
+     "period": "運用環境の設定による"
+    },
+    {
+     "key": "exported",
+     "label": "書き出したファイル・印刷物",
+     "note": "エクスポートしたファイル・PDF・印刷物・共有したリンク先で保存されたものは、アプリから削除できません。",
+     "period": "回収できません"
+    }
+   ],
+   "plan_delete_grace_days": 30,
+   "quick_draft_expired_retention_days": 7,
+   "quick_draft_promoted_retention_days": 90
+  },
+  "scheduled": {
+   "due_at": "2026-11-09T04:15:34.327897+00:00",
+   "requested_at": "2026-10-26T04:15:34.327897+00:00"
+  }
+ },
+ "deletion_scheduled": {
+  "account_delete_grace_days": 14,
+  "due_at": "2026-11-09T04:15:34.327897+00:00",
+  "scheduled": {
+   "due_at": "2026-11-09T04:15:34.327897+00:00",
+   "requested_at": "2026-10-26T04:15:34.327897+00:00"
+  }
+ },
+ "event_cross_day": {
+  "address": null,
+  "day_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+  "description": null,
+  "end_at": "2026-11-21T21:10:00Z",
+  "end_day_offset": 1,
+  "event_type": "transportation",
+  "id": "f1c1308b-c53b-4c16-a9c2-a335be078d6a",
+  "is_all_day": false,
+  "latitude": null,
+  "local_end_time": "06:10",
+  "local_start_time": "23:30",
+  "locked": false,
+  "longitude": null,
+  "place_id": null,
+  "sort_order": 4,
+  "start_at": null,
+  "title": "夜行バス"
+ },
+ "impact_preview": {
+  "after": {
+   "error": 4,
+   "info": 0,
+   "unverified": 0,
+   "warning": 3
+  },
+  "algorithm_version": "feasibility-v2",
+  "before": {
+   "error": 1,
+   "info": 0,
+   "unverified": 0,
+   "warning": 2
+  },
+  "end_day_offset": 1,
+  "event_id": "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+  "new_issues": [
+   {
+    "code": "TIME_OVERLAP",
+    "entity_label": "2026-11-21 地点B",
+    "estimated": false,
+    "is_private_constraint": false,
+    "message": "「地点B」が「地点A」(10:00〜11/22 01:00)の途中に始まります",
+    "severity": "ERROR"
+   },
+   {
+    "code": "TIME_OVERLAP",
+    "entity_label": "2026-11-21 地点C",
+    "estimated": false,
+    "is_private_constraint": false,
+    "message": "「地点C」が「地点A」(10:00〜11/22 01:00)の途中に始まります",
+    "severity": "ERROR"
+   },
+   {
+    "code": "TIME_OVERLAP",
+    "entity_label": "2026-11-21 地点D",
+    "estimated": false,
+    "is_private_constraint": false,
+    "message": "「地点D」が「地点A」(10:00〜11/22 01:00)の途中に始まります",
+    "severity": "ERROR"
+   },
+   {
+    "code": "LONG_DAY",
+    "entity_label": "2026-11-21",
+    "estimated": true,
+    "is_private_constraint": false,
+    "message": "2026-11-21は最初の予定から最後の予定の終わりまで15時間0分あります(目安は10時間まで)",
+    "severity": "WARNING"
+   }
+  ],
+  "plan_revision": 7,
+  "related": {
+   "reservations": 0,
+   "segments": 0
+  },
+  "resolved_issues": [],
+  "summary": [
+   "この変更で新たに4件の問題が出ます",
+   "終了は開始の1日後です(日をまたぐ予定)"
+  ]
+ },
+ "memory_replan_v2": {
+  "algorithm_version": "memory-replan-v2",
+  "can_apply": true,
+  "input_fingerprint": "a7d4fefc33dcb45d458c0001",
+  "insights": [
+   {
+    "applicable": false,
+    "basis": "same_party",
+    "event_type": null,
+    "examples": [
+     "駅",
+     "寺0",
+     "寺1"
+    ],
+    "kind": "late_arrival",
+    "minutes": 10,
+    "party_label": "子ども連れ・1人",
+    "plans": [
+     "過去0",
+     "過去1"
+    ],
+    "samples": 5
+   },
+   {
+    "applicable": true,
+    "basis": "same_party",
+    "event_type": null,
+    "examples": [
+     "バス → 寺0",
+     "バス → 寺1",
+     "バス → 寺0"
+    ],
+    "kind": "slow_transport",
+    "minutes": 20,
+    "mode": "bus",
+    "mode_label": "バス",
+    "party_label": "子ども連れ・1人",
+    "plans": [
+     "過去0",
+     "過去1"
+    ],
+    "samples": 3
+   }
+  ],
+  "party": {
+   "group": "solo",
+   "size": 1,
+   "with_children": true,
+   "with_seniors": false
+  },
+  "party_label": "子ども連れ・1人",
+  "plan_id": "2c6dff06-1c6f-4a97-ac33-d1d33d62d1ca",
+  "plan_revision": 5,
+  "proposals": [
+   {
+    "changes": [
+     {
+      "from": 0,
+      "label": "美冨久 → 藤居本家",
+      "segment_id": "31681235-a267-4499-9aa9-309486086595",
+      "to": 20
+     }
+    ],
+    "event_type": null,
+    "id": "01a95278f0130e8d",
+    "kept": [],
+    "kind": "slow_transport",
+    "minutes": 20,
+    "mode": "bus",
+    "target": "segment"
+   }
+  ],
+  "sample_count": 5,
+  "transport_sample_count": 3
+ },
+ "movement_settings": {
+  "algorithm_version": "movement-v1",
+  "can_edit": true,
+  "defaults": {
+   "break_minutes": 15,
+   "enabled": true,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": null,
+   "max_day_minutes": null,
+   "pace": "normal",
+   "party": {
+    "size": null,
+    "with_children": false,
+    "with_seniors": false
+   },
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   }
+  },
+  "effective": {
+   "break_minutes": 15,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": 180,
+   "max_day_minutes": 720,
+   "notes": [],
+   "pace": "normal",
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   },
+   "with_children": false,
+   "with_seniors": false
+  },
+  "event_types": [
+   {
+    "default_minutes": 60,
+    "estimated": true,
+    "key": "sightseeing",
+    "label": "観光"
+   },
+   {
+    "default_minutes": 90,
+    "estimated": true,
+    "key": "activity",
+    "label": "アクティビティ"
+   },
+   {
+    "default_minutes": 60,
+    "estimated": true,
+    "key": "dining",
+    "label": "食事"
+   },
+   {
+    "default_minutes": 45,
+    "estimated": true,
+    "key": "shopping",
+    "label": "買い物"
+   },
+   {
+    "default_minutes": null,
+    "estimated": false,
+    "key": "accommodation",
+    "label": "宿泊"
+   },
+   {
+    "default_minutes": null,
+    "estimated": false,
+    "key": "transportation",
+    "label": "移動"
+   },
+   {
+    "default_minutes": 30,
+    "estimated": true,
+    "key": "other",
+    "label": "その他"
+   }
+  ],
+  "is_default": true,
+  "paces": [
+   {
+    "key": "relaxed",
+    "label": "ゆっくり",
+    "max_continuous": 150,
+    "max_day": 600,
+    "stay_factor": 1.25
+   },
+   {
+    "key": "normal",
+    "label": "ふつう",
+    "max_continuous": 180,
+    "max_day": 720,
+    "stay_factor": 1.0
+   },
+   {
+    "key": "active",
+    "label": "しっかり",
+    "max_continuous": 240,
+    "max_day": 840,
+    "stay_factor": 0.85
+   }
+  ],
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "revision": 0,
+  "settings": {
+   "break_minutes": 15,
+   "enabled": true,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": null,
+   "max_day_minutes": null,
+   "pace": "normal",
+   "party": {
+    "size": null,
+    "with_children": false,
+    "with_seniors": false
+   },
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   }
+  }
+ },
+ "movement_settings_saved": {
+  "algorithm_version": "movement-v1",
+  "can_edit": true,
+  "defaults": {
+   "break_minutes": 15,
+   "enabled": true,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": null,
+   "max_day_minutes": null,
+   "pace": "normal",
+   "party": {
+    "size": null,
+    "with_children": false,
+    "with_seniors": false
+   },
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   }
+  },
+  "effective": {
+   "break_minutes": 20,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": 120,
+   "max_day_minutes": 600,
+   "notes": [
+    "歩く速さの見込みが「ゆっくり」のため、既定の滞在を1.25倍にしました",
+    "子どもと一緒のため、休憩なしの連続を120分・1日を10時間までにしました"
+   ],
+   "pace": "relaxed",
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 110,
+    "dining": 75,
+    "other": 40,
+    "shopping": 55,
+    "sightseeing": 75,
+    "transportation": null
+   },
+   "with_children": true,
+   "with_seniors": false
+  },
+  "event_types": [
+   {
+    "default_minutes": 60,
+    "estimated": true,
+    "key": "sightseeing",
+    "label": "観光"
+   },
+   {
+    "default_minutes": 90,
+    "estimated": true,
+    "key": "activity",
+    "label": "アクティビティ"
+   },
+   {
+    "default_minutes": 60,
+    "estimated": true,
+    "key": "dining",
+    "label": "食事"
+   },
+   {
+    "default_minutes": 45,
+    "estimated": true,
+    "key": "shopping",
+    "label": "買い物"
+   },
+   {
+    "default_minutes": null,
+    "estimated": false,
+    "key": "accommodation",
+    "label": "宿泊"
+   },
+   {
+    "default_minutes": null,
+    "estimated": false,
+    "key": "transportation",
+    "label": "移動"
+   },
+   {
+    "default_minutes": 30,
+    "estimated": true,
+    "key": "other",
+    "label": "その他"
+   }
+  ],
+  "is_default": false,
+  "paces": [
+   {
+    "key": "relaxed",
+    "label": "ゆっくり",
+    "max_continuous": 150,
+    "max_day": 600,
+    "stay_factor": 1.25
+   },
+   {
+    "key": "normal",
+    "label": "ふつう",
+    "max_continuous": 180,
+    "max_day": 720,
+    "stay_factor": 1.0
+   },
+   {
+    "key": "active",
+    "label": "しっかり",
+    "max_continuous": 240,
+    "max_day": 840,
+    "stay_factor": 0.85
+   }
+  ],
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "revision": 1,
+  "settings": {
+   "break_minutes": 15,
+   "enabled": true,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": null,
+   "max_day_minutes": null,
+   "pace": "relaxed",
+   "party": {
+    "size": null,
+    "with_children": true,
+    "with_seniors": false
+   },
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   }
+  }
+ },
+ "optimization_apply_partial": {
+  "algorithm_version": "explainable-opt-v1",
+  "change_set_id": "42c3cf35-7727-45cd-af58-95245175c123",
+  "changed": 2,
+  "plan_revision": 7
+ },
+ "optimization_g7": {
+  "algorithm_version": "explainable-opt-v1",
+  "base_revision": 6,
+  "can_apply": true,
+  "candidates": [
+   {
+    "changes": [
+     {
+      "after_index": 2,
+      "after_time": "10:00",
+      "before_index": 3,
+      "before_time": "11:00",
+      "event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+      "title": "地点B"
+     },
+     {
+      "after_index": 3,
+      "after_time": "11:00",
+      "before_index": 2,
+      "before_time": "10:00",
+      "event_id": "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+      "title": "地点C"
+     }
+    ],
+    "explanations": [
+     "移動距離が約2.62km短くなります(直線距離による概算)",
+     "2件の予定の順番が変わります"
+    ],
+    "id": "16384e27430da8cb",
+    "kinds": [
+     "shortest"
+    ],
+    "label": "移動が最短の案",
+    "metrics": {
+     "constraints_satisfied": 0,
+     "constraints_violated": 1,
+     "distance_km": 3.9,
+     "duration_minutes": 52.2,
+     "error": 1,
+     "fairness_spread_percent": null,
+     "fatigue_percent": 50,
+     "info": 0,
+     "longest_continuous_minutes": 255,
+     "saved_distance_km": 2.62,
+     "saved_duration_minutes": 34.6,
+     "unknown_legs": 0,
+     "unverified": 0,
+     "warning": 1
+    },
+    "new_issues": [],
+    "objective": {
+     "terms": [
+      {
+       "key": "distance",
+       "label": "移動距離",
+       "rule": "1kmごとに1点",
+       "score": 3.9,
+       "unit": "km",
+       "value": 3.9,
+       "weight": 1,
+       "weighted": 3.9
+      },
+      {
+       "key": "constraints",
+       "label": "検証・制約",
+       "rule": "エラー10点・守れていない制約5点・注意2点",
+       "score": 17,
+       "unit": "点",
+       "value": 17,
+       "weight": 3,
+       "weighted": 51.0
+      },
+      {
+       "key": "fatigue",
+       "label": "疲れ",
+       "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+       "score": 5.0,
+       "unit": "%",
+       "value": 50,
+       "weight": 1,
+       "weighted": 5.0
+      },
+      {
+       "key": "fairness",
+       "label": "公平さ",
+       "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+       "score": 0.0,
+       "unit": "%",
+       "value": null,
+       "weight": 1,
+       "weighted": 0.0
+      }
+     ],
+     "total": 59.9,
+     "weights": {
+      "constraints": 3,
+      "distance": 1,
+      "fairness": 1,
+      "fatigue": 1
+     }
+    },
+    "order": [
+     "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+     "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+     "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+     "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a"
+    ],
+    "resolved_issues": []
+   },
+   {
+    "changes": [
+     {
+      "after_index": 2,
+      "after_time": "10:00",
+      "before_index": 3,
+      "before_time": "11:00",
+      "event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+      "title": "地点B"
+     },
+     {
+      "after_index": 3,
+      "after_time": "11:00",
+      "before_index": 4,
+      "before_time": "12:00",
+      "event_id": "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+      "title": "地点D"
+     },
+     {
+      "after_index": 4,
+      "after_time": "12:00",
+      "before_index": 2,
+      "before_time": "10:00",
+      "event_id": "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+      "title": "地点C"
+     }
+    ],
+    "explanations": [
+     "移動距離が約1.31km短くなります(直線距離による概算)",
+     "検証のエラーが1件減ります",
+     "守れていない制約が1件減ります",
+     "3件の予定の順番が変わります"
+    ],
+    "id": "248e47e22c0da0d4",
+    "kinds": [
+     "constraints"
+    ],
+    "label": "制約・検証を優先した案",
+    "metrics": {
+     "constraints_satisfied": 1,
+     "constraints_violated": 0,
+     "distance_km": 5.21,
+     "duration_minutes": 69.5,
+     "error": 0,
+     "fairness_spread_percent": null,
+     "fatigue_percent": 50,
+     "info": 0,
+     "longest_continuous_minutes": 255,
+     "saved_distance_km": 1.31,
+     "saved_duration_minutes": 17.3,
+     "unknown_legs": 0,
+     "unverified": 0,
+     "warning": 1
+    },
+    "new_issues": [],
+    "objective": {
+     "terms": [
+      {
+       "key": "distance",
+       "label": "移動距離",
+       "rule": "1kmごとに1点",
+       "score": 5.21,
+       "unit": "km",
+       "value": 5.21,
+       "weight": 1,
+       "weighted": 5.21
+      },
+      {
+       "key": "constraints",
+       "label": "検証・制約",
+       "rule": "エラー10点・守れていない制約5点・注意2点",
+       "score": 2,
+       "unit": "点",
+       "value": 2,
+       "weight": 3,
+       "weighted": 6.0
+      },
+      {
+       "key": "fatigue",
+       "label": "疲れ",
+       "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+       "score": 5.0,
+       "unit": "%",
+       "value": 50,
+       "weight": 1,
+       "weighted": 5.0
+      },
+      {
+       "key": "fairness",
+       "label": "公平さ",
+       "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+       "score": 0.0,
+       "unit": "%",
+       "value": null,
+       "weight": 1,
+       "weighted": 0.0
+      }
+     ],
+     "total": 16.21,
+     "weights": {
+      "constraints": 3,
+      "distance": 1,
+      "fairness": 1,
+      "fatigue": 1
+     }
+    },
+    "order": [
+     "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+     "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+     "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+     "23535b40-6747-4dd7-a7f5-9059d372b3f6"
+    ],
+    "resolved_issues": [
+     {
+      "code": "CONSTRAINT_TIME_VIOLATION",
+      "entity_label": "2026-11-21 地点C",
+      "is_private_constraint": false,
+      "message": "制約「地点Cは午後」に違反: 「地点C」の開始(10:00)が11:30より前です",
+      "severity": "ERROR"
+     }
+    ]
+   }
+  ],
+  "current": {
+   "metrics": {
+    "constraints_satisfied": 0,
+    "constraints_violated": 1,
+    "distance_km": 6.52,
+    "duration_minutes": 86.8,
+    "error": 1,
+    "fairness_spread_percent": null,
+    "fatigue_percent": 50,
+    "info": 0,
+    "longest_continuous_minutes": 255,
+    "unknown_legs": 0,
+    "unverified": 0,
+    "warning": 1
+   },
+   "objective": {
+    "terms": [
+     {
+      "key": "distance",
+      "label": "移動距離",
+      "rule": "1kmごとに1点",
+      "score": 6.52,
+      "unit": "km",
+      "value": 6.52,
+      "weight": 1,
+      "weighted": 6.52
+     },
+     {
+      "key": "constraints",
+      "label": "検証・制約",
+      "rule": "エラー10点・守れていない制約5点・注意2点",
+      "score": 17,
+      "unit": "点",
+      "value": 17,
+      "weight": 3,
+      "weighted": 51.0
+     },
+     {
+      "key": "fatigue",
+      "label": "疲れ",
+      "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+      "score": 5.0,
+      "unit": "%",
+      "value": 50,
+      "weight": 1,
+      "weighted": 5.0
+     },
+     {
+      "key": "fairness",
+      "label": "公平さ",
+      "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+      "score": 0.0,
+      "unit": "%",
+      "value": null,
+      "weight": 1,
+      "weighted": 0.0
+     }
+    ],
+    "total": 62.52,
+    "weights": {
+     "constraints": 3,
+     "distance": 1,
+     "fairness": 1,
+     "fatigue": 1
+    }
+   },
+   "order": [
+    "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+    "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+    "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+    "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a"
+   ]
+  },
+  "day_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+  "fixed": [],
+  "input_fingerprint": "3baab322d222abb0f750494bc8e7863f94fc70c29082af5a02bbea9e6ab2b7ff",
+  "local_date": "2026-11-21",
+  "movable_count": 4,
+  "movement_applied": true,
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "travel_mode": "walking",
+  "validation_algorithm_version": "feasibility-v2",
+  "warnings": [],
+  "weight_labels": {
+   "constraints": "検証・制約",
+   "distance": "移動距離",
+   "fairness": "公平さ",
+   "fatigue": "疲れ"
+  },
+  "weights": {
+   "constraints": 3,
+   "distance": 1,
+   "fairness": 1,
+   "fatigue": 1
+  },
+  "weights_given": false
+ },
+ "optimization_g7_weighted": {
+  "algorithm_version": "explainable-opt-v1",
+  "base_revision": 6,
+  "can_apply": true,
+  "candidates": [
+   {
+    "changes": [
+     {
+      "after_index": 2,
+      "after_time": "10:00",
+      "before_index": 3,
+      "before_time": "11:00",
+      "event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+      "title": "地点B"
+     },
+     {
+      "after_index": 3,
+      "after_time": "11:00",
+      "before_index": 2,
+      "before_time": "10:00",
+      "event_id": "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+      "title": "地点C"
+     }
+    ],
+    "explanations": [
+     "移動距離が約2.62km短くなります(直線距離による概算)",
+     "2件の予定の順番が変わります"
+    ],
+    "id": "16384e27430da8cb",
+    "kinds": [
+     "shortest"
+    ],
+    "label": "移動が最短の案",
+    "metrics": {
+     "constraints_satisfied": 0,
+     "constraints_violated": 1,
+     "distance_km": 3.9,
+     "duration_minutes": 52.2,
+     "error": 1,
+     "fairness_spread_percent": null,
+     "fatigue_percent": 50,
+     "info": 0,
+     "longest_continuous_minutes": 255,
+     "saved_distance_km": 2.62,
+     "saved_duration_minutes": 34.6,
+     "unknown_legs": 0,
+     "unverified": 0,
+     "warning": 1
+    },
+    "new_issues": [],
+    "objective": {
+     "terms": [
+      {
+       "key": "distance",
+       "label": "移動距離",
+       "rule": "1kmごとに1点",
+       "score": 3.9,
+       "unit": "km",
+       "value": 3.9,
+       "weight": 5,
+       "weighted": 19.5
+      },
+      {
+       "key": "constraints",
+       "label": "検証・制約",
+       "rule": "エラー10点・守れていない制約5点・注意2点",
+       "score": 17,
+       "unit": "点",
+       "value": 17,
+       "weight": 1,
+       "weighted": 17.0
+      },
+      {
+       "key": "fatigue",
+       "label": "疲れ",
+       "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+       "score": 5.0,
+       "unit": "%",
+       "value": 50,
+       "weight": 0,
+       "weighted": 0.0
+      },
+      {
+       "key": "fairness",
+       "label": "公平さ",
+       "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+       "score": 0.0,
+       "unit": "%",
+       "value": null,
+       "weight": 0,
+       "weighted": 0.0
+      }
+     ],
+     "total": 36.5,
+     "weights": {
+      "constraints": 1,
+      "distance": 5,
+      "fairness": 0,
+      "fatigue": 0
+     }
+    },
+    "order": [
+     "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+     "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+     "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+     "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a"
+    ],
+    "resolved_issues": []
+   },
+   {
+    "changes": [
+     {
+      "after_index": 2,
+      "after_time": "10:00",
+      "before_index": 3,
+      "before_time": "11:00",
+      "event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+      "title": "地点B"
+     },
+     {
+      "after_index": 3,
+      "after_time": "11:00",
+      "before_index": 4,
+      "before_time": "12:00",
+      "event_id": "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+      "title": "地点D"
+     },
+     {
+      "after_index": 4,
+      "after_time": "12:00",
+      "before_index": 2,
+      "before_time": "10:00",
+      "event_id": "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+      "title": "地点C"
+     }
+    ],
+    "explanations": [
+     "移動距離が約1.31km短くなります(直線距離による概算)",
+     "検証のエラーが1件減ります",
+     "守れていない制約が1件減ります",
+     "3件の予定の順番が変わります"
+    ],
+    "id": "248e47e22c0da0d4",
+    "kinds": [
+     "constraints",
+     "balanced"
+    ],
+    "label": "制約・検証を優先した案・条件に合わせた案",
+    "metrics": {
+     "constraints_satisfied": 1,
+     "constraints_violated": 0,
+     "distance_km": 5.21,
+     "duration_minutes": 69.5,
+     "error": 0,
+     "fairness_spread_percent": null,
+     "fatigue_percent": 50,
+     "info": 0,
+     "longest_continuous_minutes": 255,
+     "saved_distance_km": 1.31,
+     "saved_duration_minutes": 17.3,
+     "unknown_legs": 0,
+     "unverified": 0,
+     "warning": 1
+    },
+    "new_issues": [],
+    "objective": {
+     "terms": [
+      {
+       "key": "distance",
+       "label": "移動距離",
+       "rule": "1kmごとに1点",
+       "score": 5.21,
+       "unit": "km",
+       "value": 5.21,
+       "weight": 5,
+       "weighted": 26.05
+      },
+      {
+       "key": "constraints",
+       "label": "検証・制約",
+       "rule": "エラー10点・守れていない制約5点・注意2点",
+       "score": 2,
+       "unit": "点",
+       "value": 2,
+       "weight": 1,
+       "weighted": 2.0
+      },
+      {
+       "key": "fatigue",
+       "label": "疲れ",
+       "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+       "score": 5.0,
+       "unit": "%",
+       "value": 50,
+       "weight": 0,
+       "weighted": 0.0
+      },
+      {
+       "key": "fairness",
+       "label": "公平さ",
+       "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+       "score": 0.0,
+       "unit": "%",
+       "value": null,
+       "weight": 0,
+       "weighted": 0.0
+      }
+     ],
+     "total": 28.05,
+     "weights": {
+      "constraints": 1,
+      "distance": 5,
+      "fairness": 0,
+      "fatigue": 0
+     }
+    },
+    "order": [
+     "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+     "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+     "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+     "23535b40-6747-4dd7-a7f5-9059d372b3f6"
+    ],
+    "resolved_issues": [
+     {
+      "code": "CONSTRAINT_TIME_VIOLATION",
+      "entity_label": "2026-11-21 地点C",
+      "is_private_constraint": false,
+      "message": "制約「地点Cは午後」に違反: 「地点C」の開始(10:00)が11:30より前です",
+      "severity": "ERROR"
+     }
+    ]
+   }
+  ],
+  "current": {
+   "metrics": {
+    "constraints_satisfied": 0,
+    "constraints_violated": 1,
+    "distance_km": 6.52,
+    "duration_minutes": 86.8,
+    "error": 1,
+    "fairness_spread_percent": null,
+    "fatigue_percent": 50,
+    "info": 0,
+    "longest_continuous_minutes": 255,
+    "unknown_legs": 0,
+    "unverified": 0,
+    "warning": 1
+   },
+   "objective": {
+    "terms": [
+     {
+      "key": "distance",
+      "label": "移動距離",
+      "rule": "1kmごとに1点",
+      "score": 6.52,
+      "unit": "km",
+      "value": 6.52,
+      "weight": 5,
+      "weighted": 32.6
+     },
+     {
+      "key": "constraints",
+      "label": "検証・制約",
+      "rule": "エラー10点・守れていない制約5点・注意2点",
+      "score": 17,
+      "unit": "点",
+      "value": 17,
+      "weight": 1,
+      "weighted": 17.0
+     },
+     {
+      "key": "fatigue",
+      "label": "疲れ",
+      "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+      "score": 5.0,
+      "unit": "%",
+      "value": 50,
+      "weight": 0,
+      "weighted": 0.0
+     },
+     {
+      "key": "fairness",
+      "label": "公平さ",
+      "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+      "score": 0.0,
+      "unit": "%",
+      "value": null,
+      "weight": 0,
+      "weighted": 0.0
+     }
+    ],
+    "total": 49.6,
+    "weights": {
+     "constraints": 1,
+     "distance": 5,
+     "fairness": 0,
+     "fatigue": 0
+    }
+   },
+   "order": [
+    "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+    "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+    "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+    "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a"
+   ]
+  },
+  "day_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+  "fixed": [],
+  "input_fingerprint": "3baab322d222abb0f750494bc8e7863f94fc70c29082af5a02bbea9e6ab2b7ff",
+  "local_date": "2026-11-21",
+  "movable_count": 4,
+  "movement_applied": true,
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "travel_mode": "walking",
+  "validation_algorithm_version": "feasibility-v2",
+  "warnings": [],
+  "weight_labels": {
+   "constraints": "検証・制約",
+   "distance": "移動距離",
+   "fairness": "公平さ",
+   "fatigue": "疲れ"
+  },
+  "weights": {
+   "constraints": 1,
+   "distance": 5,
+   "fairness": 0,
+   "fatigue": 0
+  },
+  "weights_given": true
+ },
+ "optimization_partial": {
+  "can_apply": true,
+  "candidate_id": "16384e27430da8cb",
+  "changes": [
+   {
+    "after_index": 2,
+    "after_time": "10:00",
+    "before_index": 3,
+    "before_time": "11:00",
+    "event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+    "title": "地点B"
+   },
+   {
+    "after_index": 3,
+    "after_time": "10:00",
+    "before_index": 2,
+    "before_time": "10:00",
+    "event_id": "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+    "title": "地点C"
+   }
+  ],
+  "event_ids": [
+   "b80712e4-e00b-4a70-bb55-3612a4d24f96"
+  ],
+  "explanations": [
+   "移動距離が約2.62km短くなります(直線距離による概算)",
+   "検証の注意が1件増えます",
+   "2件の予定の順番が変わります"
+  ],
+  "metrics": {
+   "constraints_satisfied": 0,
+   "constraints_violated": 1,
+   "distance_km": 3.9,
+   "duration_minutes": 52.2,
+   "error": 1,
+   "fairness_spread_percent": null,
+   "fatigue_percent": 50,
+   "info": 0,
+   "longest_continuous_minutes": 135,
+   "saved_distance_km": 2.62,
+   "saved_duration_minutes": 34.6,
+   "unknown_legs": 0,
+   "unverified": 0,
+   "warning": 2
+  },
+  "new_issues": [
+   {
+    "code": "SAME_START_TIME",
+    "entity_label": "2026-11-21 地点C",
+    "is_private_constraint": false,
+    "message": "「地点B」と「地点C」が同じ時刻(10:00)に始まります",
+    "severity": "WARNING"
+   }
+  ],
+  "objective": {
+   "terms": [
+    {
+     "key": "distance",
+     "label": "移動距離",
+     "rule": "1kmごとに1点",
+     "score": 3.9,
+     "unit": "km",
+     "value": 3.9,
+     "weight": 1,
+     "weighted": 3.9
+    },
+    {
+     "key": "constraints",
+     "label": "検証・制約",
+     "rule": "エラー10点・守れていない制約5点・注意2点",
+     "score": 19,
+     "unit": "点",
+     "value": 19,
+     "weight": 3,
+     "weighted": 57.0
+    },
+    {
+     "key": "fatigue",
+     "label": "疲れ",
+     "rule": "疲れの目安10%ごとに1点(移動の既定を使う時だけ)",
+     "score": 5.0,
+     "unit": "%",
+     "value": 50,
+     "weight": 1,
+     "weighted": 5.0
+    },
+    {
+     "key": "fairness",
+     "label": "公平さ",
+     "rule": "メンバーごとの守れていない割合の開き10%ごとに1点",
+     "score": 0.0,
+     "unit": "%",
+     "value": null,
+     "weight": 1,
+     "weighted": 0.0
+    }
+   ],
+   "total": 65.9,
+   "weights": {
+    "constraints": 3,
+    "distance": 1,
+    "fairness": 1,
+    "fatigue": 1
+   }
+  },
+  "order": [
+   "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+   "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+   "23535b40-6747-4dd7-a7f5-9059d372b3f6",
+   "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a"
+  ],
+  "resolved_issues": []
+ },
+ "segment_last_departure": {
+  "algorithm_version": "manual-v1",
+  "buffer_after_minutes": 0,
+  "buffer_before_minutes": 0,
+  "computed_at": "2026-10-26T04:15:33.519003Z",
+  "cost": null,
+  "created_at": "2026-10-26T04:15:32.722694Z",
+  "currency": null,
+  "distance_km": null,
+  "duration_minutes": 30.0,
+  "from_event_id": "9725e039-2a8c-41e0-9482-fe1738d79ccf",
+  "from_place_id": null,
+  "id": "7da02c50-2fa8-4c14-8568-7d819e02b563",
+  "is_estimate": false,
+  "last_departure_at": "2026-11-21T12:40:00Z",
+  "luggage_note": null,
+  "mode": "train",
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "planned_arrival_at": null,
+  "planned_departure_at": null,
+  "platform": null,
+  "preparation_minutes": 0,
+  "provider": "manual",
+  "recommended_departure_at": null,
+  "reservation_id": null,
+  "revision": 1,
+  "route_option_id": null,
+  "status": "planned",
+  "to_event_id": "b80712e4-e00b-4a70-bb55-3612a4d24f96",
+  "to_place_id": null,
+  "transfer_count": null,
+  "transport_number": null,
+  "updated_at": null
+ },
+ "validation_run_movement": {
+  "algorithm_version": "feasibility-v2",
+  "constraint_results": [],
+  "counts": {
+   "error": 0,
+   "info": 0,
+   "unverified": 0,
+   "warning": 1
+  },
+  "created_by_me": true,
+  "day_metrics": [
+   {
+    "active_minutes": 240,
+    "day_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+    "estimated": true,
+    "events": 4,
+    "fatigue_percent": 33,
+    "incomplete": false,
+    "level": "light",
+    "local_date": "2026-11-21",
+    "longest_continuous_minutes": 240,
+    "ride_minutes": 0,
+    "span_minutes": 240,
+    "walking_minutes": 0
+   }
+  ],
+  "finished_at": "2026-10-26T04:15:33.217334+00:00",
+  "id": "398649e1-053f-4e2b-8d2b-94980dbd0440",
+  "input_revision": 6,
+  "is_stale": false,
+  "issues": [
+   {
+    "code": "NO_BREAK",
+    "constraint_id": null,
+    "constraint_title": null,
+    "day_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+    "entity_id": "aa5873d7-01c1-4956-8dfa-4b4515c698d3",
+    "entity_label": "2026-11-21",
+    "entity_type": "day",
+    "evidence": {
+     "break_minutes": 15,
+     "continuous_minutes": 240,
+     "estimated": true,
+     "event_id": "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+     "limit_minutes": 180
+    },
+    "id": "b915fcf3-d972-497f-ad4f-f4eabceed217",
+    "is_masked": false,
+    "is_private_constraint": false,
+    "kind": "violation",
+    "message": "2026-11-21は09:00から「地点D」まで240分、休憩(15分以上の空きか食事)がありません(目安は180分まで)(見積もりを含む)",
+    "severity": "WARNING",
+    "suggestion": {
+     "action": "insert_break",
+     "before_event_id": "80bc36b7-7f5e-4f4c-bc06-55fbc6d5ce7a",
+     "minutes": 15
+    }
+   }
+  ],
+  "movement": {
+   "break_minutes": 15,
+   "last_transport_margin_minutes": 15,
+   "max_continuous_minutes": 180,
+   "max_day_minutes": 720,
+   "notes": [],
+   "pace": "normal",
+   "short_stay_ratio": 0.5,
+   "stay_minutes": {
+    "accommodation": null,
+    "activity": 90,
+    "dining": 60,
+    "other": 30,
+    "shopping": 45,
+    "sightseeing": 60,
+    "transportation": null
+   },
+   "with_children": false,
+   "with_seniors": false
+  },
+  "plan_id": "c693e2e9-7dd1-49fd-b03f-aa0f1d49c608",
+  "started_at": "2026-10-26T04:15:33.197944+00:00",
+  "status": "completed",
+  "unchecked": {}
+ }
+}

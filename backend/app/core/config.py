@@ -199,6 +199,9 @@ class Settings(BaseSettings):
     # [Gate B-012] プラン削除の猶予期間(日)。DELETEは論理削除し、この期間内は所有者が
     # 復元できる。期間を過ぎたプランはscripts/run_plan_purge.pyで完全削除する(DOC-02 §5)。
     PLAN_DELETE_GRACE_DAYS: int = 30
+    # [Gate G7] FR-039 猶予つきのアカウント削除(日)。申し込みからこの日数の間は取り消せる。過ぎたら定期の処理
+    # (tcops.py jobs account-deletions)が削除する。「今すぐ削除」も残す
+    ACCOUNT_DELETE_GRACE_DAYS: int = 14
 
     # [Gate R2-2] QuickDraft payload field encryption用の鍵。
     # 注意: DATABASE_URL/JWT_SECRET_KEYと異なり意図的にOptionalとする。

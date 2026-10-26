@@ -105,6 +105,7 @@ PLAN_TABLES = (
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
     m.FxRate, m.BudgetVersion,
     m.MemoryPublication, m.MemoryTrash,
+    m.PlanMovementSettings,
 )
 
 
@@ -252,6 +253,8 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["memory_publications"] = [row(x) for x in q(m.MemoryPublication).filter(m.MemoryPublication.user_id == me).all()]
     t["memory_trash"] = [row(x) for x in q(m.MemoryTrash).filter(
         (m.MemoryTrash.deleted_by_user_id == me) | (m.MemoryTrash.author_user_id == me)).all()]
+    # [Gate G7] MOVE-03 旅行の移動・滞在の既定(メンバー全員が見られる値)
+    t["plan_movement_settings"] = [row(x) for x in q(m.PlanMovementSettings).all()]
     return t
 
 

@@ -22,6 +22,9 @@ const m = vi.hoisted(() => ({
   deleteBranch: vi.fn(),
 }));
 
+const g7 = vi.hoisted(() => ({ compareBranches: vi.fn() }));
+vi.mock('@/services/api/g7', () => g7);
+
 vi.mock('@/services/api', () => ({
   default: { getPlanDetail: m.getPlanDetail },
   getBranches: m.getBranches, getPlanMembers: m.getPlanMembers, createBranch: m.createBranch, getBranch: m.getBranch,
@@ -79,6 +82,20 @@ describe('BranchesPage (Gate P7)', () => {
     await waitFor(() => expect(m.createBranch).toHaveBeenCalledWith('p1', {
       title: '電車遅延', scenario_type: 'delay', assumptions: { day_id: days[0]!.id, minutes: 90 } }));
     await waitFor(() => expect(m.getBranch).toHaveBeenCalled());
+  });
+
+  it('[Gate G7] FR-019 案を3つまで選んで本案と比べる', async () => {
+    const g7fx = (await import('@/services/api/__fixtures__/g7Responses.json')).default;
+    const { decodeG7 } = await import('@/services/api/decodersG7');
+    g7.compareBranches.mockResolvedValue(decodeG7('comparison', g7fx.branch_comparison));
+    renderAt('/planner/p1/branches');
+    await screen.findByRole('list', { name: '作った案' });
+    const boxes = screen.getAllByRole('checkbox', { name: /を比べる$/ });
+    expect(screen.getByRole('button', { name: '選んだ案(0/3)を本案と比べる' })).toBeDisabled();
+    fireEvent.click(boxes[0]!);
+    fireEvent.click(screen.getByRole('button', { name: '選んだ案(1/3)を本案と比べる' }));
+    expect(await screen.findByRole('table', { name: '本案と案の比較' })).toBeInTheDocument();
+    expect(g7.compareBranches).toHaveBeenCalledWith('p1', [(fx.branch_list as Branch[])[0]!.id]);
   });
 
   it('閲覧者には作成フォームを出さない', async () => {

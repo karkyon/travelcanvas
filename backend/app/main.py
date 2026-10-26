@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
-    privacy_zones, memory_publish,
+    privacy_zones, memory_publish, movement,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -571,6 +571,8 @@ app.include_router(usage.router, prefix="/api/v1")
 app.include_router(privacy_zones.router, prefix="/api/v1")
 app.include_router(memory_publish.router, prefix="/api/v1")
 app.include_router(memory_publish.public_router, prefix="/api/v1")
+# [Gate G7] MOVE-03 移動・滞在の既定(/plans/{plan_id}/movement-settings)・FR-005 変更の影響のプレビュー
+app.include_router(movement.router, prefix="/api/v1")
 app.include_router(plan_search.global_router, prefix="/api/v1")
 # [Gate P17] FR-057 Memory Replan(過去の予定と実績から次の旅行への提案)。/plans/{plan_id}/memory-replan配下。
 app.include_router(memory_replan.router, prefix="/api/v1")

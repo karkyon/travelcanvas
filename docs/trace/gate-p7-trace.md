@@ -20,4 +20,4 @@
 | 7 | 権限・楽観ロック・監査に内容なし | DOC-06 | IMPLEMENTED | B `test_discard_delete_and_permissions`, `test_create_delay_branch_does_not_touch_plan` |
 | 8 | 契約・URL実在 | Gate C2b方式 | IMPLEMENTED | fixture 8種; F `contract.test.ts`, `c2b3.test.ts`, `p7branches.test.ts` |
 | 9 | a11y(WCAG 2.1 AA) | DOC-04 §7 | IMPLEMENTED | E(axe: 一覧・詳細) |
-| 10 | 予約・移動・費用の分岐と、移動時間・制約・費用差の比較 | SC-17 | NOT STARTED | ADR §3 |
+| 10 | 予約・移動・費用の分岐と、移動時間・制約・費用差の比較 | SC-17 | NOT STARTED | ADR §3 ※ **SUPERSEDED BY Gate G7(比較は解消。案の中で予約・区間を変える分岐は gate-g7-trace.md #22 に残す)** |

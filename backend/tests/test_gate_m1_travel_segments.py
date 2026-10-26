@@ -695,4 +695,5 @@ def test_response_does_not_leak_internal_fields(auth_client):
         "buffer_after_minutes", "transport_number", "platform", "transfer_count",
         "luggage_note", "reservation_id", "route_option_id", "is_estimate", "provider", "algorithm_version",
         "computed_at", "recommended_departure_at", "revision", "created_at", "updated_at",
+        "last_departure_at",  # [Gate G7] MOVE-03 最終の便(利用者が入れる値)
     }

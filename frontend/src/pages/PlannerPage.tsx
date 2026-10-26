@@ -17,6 +17,7 @@ import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
 import DateNavigation from '@/components/planner/DateNavigation';
 import OptimizationPanel from '@/components/planner/OptimizationPanel';
+import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeImpact';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -124,6 +125,9 @@ const PlannerPage: React.FC = () => {
   // [Gate C1] FR-020 編集を始めた時の内容(競合した時に「相手が変えた/自分が変えた」を出すため)
   const [editOriginal, setEditOriginal] = useState<EditFields>(emptyEdit);
   const [editConflict, setEditConflict] = useState<EditConflict | null>(null);
+  // [Gate G7] FR-005 終了時刻と終わる日(競合の比較には入れず、変えた時だけ送る)
+  const [editEnd, setEditEnd] = useState<EndValue>({ time: '', offset: 0 });
+  const [editEndOriginal, setEditEndOriginal] = useState<EndValue>({ time: '', offset: 0 });
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [isReloadingPlan, setIsReloadingPlan] = useState(false);
 
@@ -138,6 +142,9 @@ const PlannerPage: React.FC = () => {
     setEditingItem(item);
     setEditForm(fieldsOf(item));
     setEditOriginal(fieldsOf(item));
+    const end = { time: item.end_time || '', offset: item.end_day_offset ?? 0 };
+    setEditEnd(end);
+    setEditEndOriginal(end);
     setEditConflict(null);
   };
 
@@ -154,7 +161,10 @@ const PlannerPage: React.FC = () => {
         start_time: fields.start_time || undefined,
         address: fields.location_name || undefined,
         description: fields.notes || undefined,
+        ...(editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
+          ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
       });
+      if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'conflict') {
         // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
         const latestItem = usePlanStore.getState().currentPlan?.days.flatMap((d) => d.events).find((e) => e.id === itemId);
@@ -936,6 +946,10 @@ const PlannerPage: React.FC = () => {
                 onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
                 fullWidth
               />
+              {currentPlan && editingItem && (
+                <EventTimeImpact planId={currentPlan.id} eventId={editingItem.id} startTime={editForm.start_time}
+                  end={editEnd} onEndChange={setEditEnd} />
+              )}
               {/* [Gate G2] FR-045 所有者が見せない設定にした項目は入力を出さない */}
               {!currentPlan?.hidden_fields?.includes('event_address') && (
                 <Input

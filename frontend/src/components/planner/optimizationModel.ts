@@ -23,7 +23,14 @@ export interface MetricRow {
 const trendOf = (before: number, after: number, eps = 0): MetricRow['trend'] =>
   after < before - eps ? 'better' : after > before + eps ? 'worse' : 'same';
 
-export function metricRows(before: OptimizationMetrics, after: OptimizationMetrics): MetricRow[] {
+type WithFatigue = OptimizationMetrics & { fatigue_percent?: number | null };
+
+export function metricRows(before: WithFatigue, after: WithFatigue): MetricRow[] {
+  // [Gate G7] MOVE-04 疲れの目安(移動・滞在の既定を使った時だけ)
+  const fatigue: MetricRow[] = typeof before.fatigue_percent === 'number' && typeof after.fatigue_percent === 'number'
+    ? [{ label: '疲れの目安', before: `${before.fatigue_percent}%`, after: `${after.fatigue_percent}%`,
+      trend: trendOf(before.fatigue_percent, after.fatigue_percent) }]
+    : [];
   return [
     { label: '移動距離(概算)', before: `${before.distance_km}km`, after: `${after.distance_km}km`,
       trend: trendOf(before.distance_km, after.distance_km, 0.01) },
@@ -35,12 +42,13 @@ export function metricRows(before: OptimizationMetrics, after: OptimizationMetri
       trend: trendOf(before.constraints_violated, after.constraints_violated) },
     { label: '検証できない項目', before: `${before.unverified}件`, after: `${after.unverified}件`,
       trend: trendOf(before.unverified, after.unverified) },
+    ...fatigue,
   ];
 }
 
 export const TREND_TEXT: Record<MetricRow['trend'], string> = { better: '改善', worse: '悪化', same: '変化なし' };
 
-export function confirmApplyText(c: OptimizationCandidate): string {
+export function confirmApplyText(c: Pick<OptimizationCandidate, 'label' | 'changes' | 'new_issues'>): string {
   const worse = c.new_issues.length > 0 ? `新たに出る問題が${c.new_issues.length}件あります。` : '';
   return `「${c.label}」で${c.changes.length}件の予定の順番・時刻を変更します。${worse}あとから「元に戻す」で取り消せます。よろしいですか?`;
 }

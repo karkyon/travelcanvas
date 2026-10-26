@@ -456,7 +456,7 @@ def test_run_detects_overlap_and_travel_shortfall_end_to_end(auth_client, db_ses
     assert seg.status_code == 201, seg.text
 
     run = _run(client, plan_id)
-    assert run["status"] == "completed" and run["algorithm_version"] == "feasibility-v1"
+    assert run["status"] == "completed" and run["algorithm_version"] == "feasibility-v2"  # [Gate G7]
     assert run["is_stale"] is False and run["created_by_me"] is True
     codes = {i["code"] for i in run["issues"]}
     assert {"TIME_OVERLAP", "TRAVEL_TIME_SHORTFALL", "EVENT_TIME_UNKNOWN"} <= codes

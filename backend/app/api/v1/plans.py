@@ -44,6 +44,7 @@ from app.services import member_policy, place_access
 from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
 from app.services import plan_item_deletion
+from app.services import event_times as et
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -92,6 +93,10 @@ class EventCreate(BaseModel):
     address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # [Gate G7] FR-005 終了時刻(その日の現地時刻)と、開始の日から何日後か(0〜2。省くと開始以前の時刻は翌日)。
+    # 正本は end_at(app/services/event_times.py)
+    local_end_time: Optional[str] = None
+    end_day_offset: Optional[int] = None
     # [Gate #32] 検索候補(Gate #31 /search)から採用したPlaceのID。
     # 指定された場合、title/address/latitude/longitudeのうち未指定の
     # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
@@ -111,6 +116,9 @@ class EventUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     locked: Optional[bool] = None
+    # [Gate G7] FR-005 終了時刻(null で消す)と日数の差
+    local_end_time: Optional[str] = None
+    end_day_offset: Optional[int] = None
 
 
 class EventMove(BaseModel):
@@ -134,6 +142,9 @@ class EventResponse(BaseModel):
     locked: bool
     sort_order: int
     place_id: Optional[str] = None
+    # [Gate G7] FR-005 終了のその日の現地時刻と、開始の日から何日後か(end_at から作る。日をまたぐ予定は 1 以上)
+    local_end_time: Optional[str] = None
+    end_day_offset: Optional[int] = None
 
     @field_validator("id", "day_id", "place_id", mode="before")
     @classmethod
@@ -167,9 +178,39 @@ class PlanDetailResponse(BaseModel):
 
 # ===== 共通ヘルパー =====
 
-def _event_out(e, hidden) -> dict:
-    """[Gate G2] FR-045 予定の応答。隠す項目(予定のメモ・住所と位置)は値を返さない。"""
-    return member_policy.mask_event_dict(EventResponse.model_validate(e).model_dump(mode="json"), hidden)
+def _event_out(e, hidden, day=None) -> dict:
+    """[Gate G2] FR-045 予定の応答。隠す項目(予定のメモ・住所と位置)は値を返さない。
+    [Gate G7] day を渡すと日程を読み直さない(旅行の詳細で予定ごとに問い合わせない)。"""
+    out = EventResponse.model_validate(e).model_dump(mode="json")
+    if e.end_at is not None:
+        d = day if day is not None else e.day
+        out["local_end_time"], out["end_day_offset"] = et.end_fields(
+            e.end_at, d.local_date if d is not None else None, d.timezone_id if d is not None else None)
+    return member_policy.mask_event_dict(out, hidden)
+
+
+def _time_error(exc: "et.EventTimeError") -> HTTPException:
+    return HTTPException(status_code=422, detail={"code": exc.code, "message": exc.message})
+
+
+def _apply_end_and_check(event: TravelEvent, day: TravelDay, end_given: bool, local_end_time: Optional[str],
+                         end_day_offset: Optional[int]) -> None:
+    """[Gate G7] FR-005 終了時刻の入力を end_at へ反映し、開始との前後・長さを確かめる(違えば 422)。"""
+    try:
+        start = et.effective_start(event.start_at, event.local_start_time, bool(event.is_all_day),
+                                   day.local_date, day.timezone_id)
+        if end_given:
+            if local_end_time in (None, ""):
+                setattr(event, "end_at", None)
+            else:
+                if start is None:
+                    raise et.EventTimeError("end_requires_start", "終了時刻を入れるには、先に開始時刻を入れてください")
+                end_at, _offset = et.end_from_local(day.local_date, day.timezone_id, local_end_time,
+                                                    end_day_offset, start)
+                setattr(event, "end_at", end_at)
+        et.check_range(start, et._aware(event.end_at))
+    except et.EventTimeError as exc:
+        raise _time_error(exc)
 
 
 def _plan_hidden(db: Session, plan_id, user: User, min_role: str, *categories: str):
@@ -332,6 +373,8 @@ def _segment_to_dict(seg: TravelSegment) -> dict:
         "status": seg.status,
         "planned_departure_at": seg.planned_departure_at.isoformat() if seg.planned_departure_at else None,
         "planned_arrival_at": seg.planned_arrival_at.isoformat() if seg.planned_arrival_at else None,
+        # [Gate G7] MOVE-03 最終の便
+        "last_departure_at": seg.last_departure_at.isoformat() if seg.last_departure_at else None,
         "distance_km": seg.distance_km,
         "duration_minutes": seg.duration_minutes,
         "cost": str(seg.cost) if seg.cost is not None else None,
@@ -389,7 +432,7 @@ async def get_plan_detail(
             DayWithEvents(
                 id=str(day.id), local_date=day.local_date, timezone_id=day.timezone_id,
                 title=day.title, notes=day.notes, sort_order=day.sort_order,
-                events=[_event_out(e, hidden) for e in sorted(day.events, key=lambda e: e.sort_order)],
+                events=[_event_out(e, hidden, day) for e in sorted(day.events, key=lambda e: e.sort_order)],
             )
             for day in days
         ],
@@ -714,6 +757,9 @@ async def create_event(
         address=address, latitude=latitude, longitude=longitude,
         sort_order=max_sort,
     )
+    # [Gate G7] FR-005 終了時刻(日をまたぐ予定)と前後の確認
+    _apply_end_and_check(new_event, day, event_data.local_end_time is not None, event_data.local_end_time,
+                         event_data.end_day_offset)
     db.add(new_event)
     db.flush()
 
@@ -755,8 +801,21 @@ async def update_event(
         )
 
     before = _event_to_dict(event)
+    # [Gate G7] FR-005 終了時刻の入力(列ではない)を取り出してから項目を当てる
+    end_given = "local_end_time" in update_data or "end_day_offset" in update_data
+    local_end_time = update_data.pop("local_end_time", None)
+    end_day_offset = update_data.pop("end_day_offset", None)
+    if end_given and "local_end_time" not in event_data.model_fields_set:
+        local_end_time = et.end_fields(event.end_at, event.day.local_date, event.day.timezone_id)[0]
+    old_time = event.local_start_time
     for field, value in update_data.items():
         setattr(event, field, value)
+    if "local_start_time" in update_data and not end_given and "end_at" not in update_data:
+        # 開始の時刻だけを変えたら、終了も同じだけずらす(所要時間を保つ)
+        et.shift_end_with_start(event, event.day.local_date, event.day.timezone_id, old_time,
+                                event.local_start_time)
+    if end_given or {"start_at", "end_at", "local_start_time", "is_all_day"} & set(update_data):
+        _apply_end_and_check(event, event.day, end_given, local_end_time, end_day_offset)
     db.flush()
 
     _record_change_and_bump_revision(
@@ -838,6 +897,8 @@ async def move_event(
 
     before = _event_to_dict(event)
     if target_day:
+        # [Gate G7] FR-005 開始・終了の日時も日数の差だけずらす(以前は日程だけ変わり、日時が元の日に残った)
+        et.shift_dates(event, event.day.local_date, target_day.local_date)
         event.day_id = target_day.id
     event.sort_order = move_data.sort_order
     db.flush()
@@ -1046,10 +1107,10 @@ def _undo_segment_item(db: Session, plan: TravelPlan, item: ChangeItem):
 
 
 def _apply_segment_snapshot(seg: TravelSegment, snapshot: dict) -> None:
-    dt_fields = {"planned_departure_at", "planned_arrival_at", "computed_at"}
+    dt_fields = {"planned_departure_at", "planned_arrival_at", "computed_at", "last_departure_at"}
     for key in (
         "from_event_id", "from_place_id", "to_event_id", "to_place_id", "mode", "status",
-        "planned_departure_at", "planned_arrival_at", "distance_km", "duration_minutes",
+        "planned_departure_at", "planned_arrival_at", "last_departure_at", "distance_km", "duration_minutes",
         "cost", "currency", "preparation_minutes", "buffer_before_minutes",
         "buffer_after_minutes", "transport_number", "platform", "transfer_count",
         "luggage_note", "reservation_id", "route_option_id", "is_estimate", "provider", "algorithm_version",

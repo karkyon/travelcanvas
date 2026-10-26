@@ -1149,6 +1149,8 @@ JOBS = {
     "abuse-scan": ["-m", "app.ops.abuse_scan"],
     # [Gate G6] MEM-01 削除から7日を過ぎた記録の保管を消す
     "memory-trash": ["-m", "app.ops.memory_trash"],
+    # [Gate G7] FR-039 猶予を過ぎたアカウントの削除の申し込みを削除する
+    "account-deletions": ["-m", "app.ops.account_deletions"],
 }
 
 

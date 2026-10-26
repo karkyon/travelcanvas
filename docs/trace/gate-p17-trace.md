@@ -18,5 +18,5 @@
 | 6 | 入力が変わったら適用しない(409) | — | IMPLEMENTED | B `test_insights_and_apply_with_undo` |
 | 7 | 権限・材料の範囲(参加している旅行だけ) | DOC-11 | IMPLEMENTED | B `test_locked_and_permissions` |
 | 8 | 機微情報をAIへ送らない | CA-015 | IMPLEMENTED | AIを使わない(集計の規則だけ) |
-| 9 | 同行者属性・移動手段の傾向 | CA-015 | NOT STARTED | ADR §3 |
+| 9 | 同行者属性・移動手段の傾向 | CA-015 | NOT STARTED | ADR §3 ※ **SUPERSEDED BY Gate G7(gate-g7-trace.md #23・#24)** |
 | 10 | API契約 | DOC-06 | IMPLEMENTED | F `contract.test.ts`(4種), `p17memoryReplan.test.ts` |

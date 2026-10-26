@@ -52,6 +52,8 @@ export interface SegmentCreateData {
   status?: SegmentStatus;
   planned_departure_at?: string;
   planned_arrival_at?: string;
+  /** [Gate G7] MOVE-03 最終の便(終電・最終のバス・船)の出発時刻。利用者が入れる(null で消す) */
+  last_departure_at?: string | null;
   distance_km?: number;
   duration_minutes?: number;
   cost?: string;

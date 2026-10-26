@@ -62,6 +62,8 @@ class SegmentCreateRequest(BaseModel):
     status: str = "planned"
     planned_departure_at: Optional[datetime] = None
     planned_arrival_at: Optional[datetime] = None
+    # [Gate G7] MOVE-03 最終の便(終電・最終のバス・船)の出発時刻。利用者が入れる
+    last_departure_at: Optional[datetime] = None
     distance_km: Optional[float] = Field(None, ge=0)
     duration_minutes: Optional[float] = Field(None, ge=0)
     cost: Optional[Decimal] = Field(None, ge=0)
@@ -96,7 +98,7 @@ class SegmentCreateRequest(BaseModel):
             raise ValueError("currency must be an uppercase 3-letter ISO 4217 code")
         return v
 
-    @field_validator("planned_departure_at", "planned_arrival_at")
+    @field_validator("planned_departure_at", "planned_arrival_at", "last_departure_at")
     @classmethod
     def _require_tz(cls, v):
         if v is not None and v.tzinfo is None:
@@ -116,6 +118,8 @@ class SegmentUpdateRequest(BaseModel):
     status: Optional[str] = None
     planned_departure_at: Optional[datetime] = None
     planned_arrival_at: Optional[datetime] = None
+    # [Gate G7] MOVE-03 最終の便(終電・最終のバス・船)の出発時刻。利用者が入れる
+    last_departure_at: Optional[datetime] = None
     distance_km: Optional[float] = Field(None, ge=0)
     duration_minutes: Optional[float] = Field(None, ge=0)
     cost: Optional[Decimal] = Field(None, ge=0)
@@ -150,7 +154,7 @@ class SegmentUpdateRequest(BaseModel):
             raise ValueError("currency must be an uppercase 3-letter ISO 4217 code")
         return v
 
-    @field_validator("planned_departure_at", "planned_arrival_at")
+    @field_validator("planned_departure_at", "planned_arrival_at", "last_departure_at")
     @classmethod
     def _require_tz(cls, v):
         if v is not None and v.tzinfo is None:
@@ -169,6 +173,7 @@ class SegmentResponse(BaseModel):
     status: str
     planned_departure_at: Optional[datetime] = None
     planned_arrival_at: Optional[datetime] = None
+    last_departure_at: Optional[datetime] = None
     distance_km: Optional[float] = None
     duration_minutes: Optional[float] = None
     cost: Optional[Decimal] = None
@@ -361,6 +366,7 @@ def _to_response(seg: TravelSegment, db: Session) -> dict:
         "status": seg.status,
         "planned_departure_at": seg.planned_departure_at,
         "planned_arrival_at": seg.planned_arrival_at,
+        "last_departure_at": seg.last_departure_at,
         "distance_km": seg.distance_km,
         "duration_minutes": seg.duration_minutes,
         "cost": seg.cost,
@@ -502,6 +508,7 @@ def create_segment(
                 status=payload.status,
                 planned_departure_at=payload.planned_departure_at,
                 planned_arrival_at=payload.planned_arrival_at,
+                last_departure_at=payload.last_departure_at,
                 distance_km=fields["distance_km"],
                 duration_minutes=fields["duration_minutes"],
                 cost=payload.cost,
@@ -587,7 +594,7 @@ def update_segment(
         seg.reservation_id = _resolve_reservation_ref(db, plan, data["reservation_id"])
 
     for field in (
-        "mode", "status", "planned_departure_at", "planned_arrival_at",
+        "mode", "status", "planned_departure_at", "planned_arrival_at", "last_departure_at",
         "preparation_minutes", "buffer_before_minutes", "buffer_after_minutes",
         "transport_number", "platform", "transfer_count", "luggage_note",
     ):

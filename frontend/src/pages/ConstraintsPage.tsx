@@ -27,6 +27,7 @@ import {
 import type { ConstraintType, NormalizedDay, PlanConstraint, ValidationRunDetail } from '@/services/api';
 import FeasibilityPanel from './constraints/FeasibilityPanel';
 import PrivateProfilePanel from './constraints/PrivateProfilePanel';
+import MovementSettingsPanel from './constraints/MovementSettingsPanel';
 import { CONSTRAINT_STATUS_LABEL, constraintStatus } from './constraints/validationModel';
 import {
   OPERATOR_OPTIONS, TYPE_OPTIONS, UNIT_OPTIONS, applyTypePreset, describeCondition, describeScope, emptyForm,
@@ -302,6 +303,7 @@ const ConstraintsPage: React.FC = () => {
       </div>
 
       {planId && <PrivateProfilePanel planId={planId} onChanged={() => void load()} />}
+      {planId && <MovementSettingsPanel planId={planId} onSaved={() => void load()} />}
 
       <FeasibilityPanel
         run={latestRun}

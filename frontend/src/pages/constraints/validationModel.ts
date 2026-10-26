@@ -81,6 +81,9 @@ const UNCHECKED_LABEL: Record<string, string> = {
   stay_length_unknown: '終了時刻が未定で移動に間に合うか分からない予定',
   segment_duration_unknown: '所要時間が不明な移動',
   opening_hours_unknown: '営業時間が登録されていない場所',
+  // [Gate G7] MOVE-03
+  movement_unknown: '終わりが分からず休憩・疲れを見積もれない予定',
+  last_transport_unknown: '出発の時刻が分からず最終の便に間に合うか分からない移動',
 };
 
 export function describeUnchecked(unchecked: Record<string, unknown>): string[] {

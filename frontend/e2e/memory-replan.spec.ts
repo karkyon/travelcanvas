@@ -61,7 +61,8 @@ test('過去の旅からの提案: 傾向を根拠つきで示し、確認して
   await page.goto(`/planner/${next.id}/memory-replan`);
   const insights = page.getByRole('region', { name: '見つかった傾向' });
   await expect(insights).toContainText('「美術館・博物館」の予定では、実際の滞在が予定より平均45分長くなっています');
-  await expect(insights).toContainText(`根拠: 上野-${stamp}・金沢-${stamp}の2件`);
+  // [Gate G7] MEM-03 同じ同行者(人数・子ども連れ・高齢の方)の旅行を優先し、どちらで比べたかを根拠に書く
+  await expect(insights).toContainText(`根拠: 同じ同行者(1人)の旅行の上野-${stamp}・金沢-${stamp}の2件`);
   expect((await send('get', `/plans/${next.id}`)).revision).toBe(before.revision); // 見るだけでは変わらない
   await axeViolations(page, '過去の旅からの提案');
 
