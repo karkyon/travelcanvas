@@ -4,7 +4,7 @@
 # =================================
 # Base Image
 # =================================
-FROM python:3.12-slim as base
+FROM python:3.12-slim AS base
 
 # 環境変数設定
 ENV PYTHONUNBUFFERED=1 \
@@ -46,7 +46,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # =================================
 # Dependencies Stage
 # =================================
-FROM base as dependencies
+FROM base AS dependencies
 
 # Poetry または pip を使用
 COPY requirements.txt .
@@ -58,7 +58,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # =================================
 # Development Stage
 # =================================
-FROM dependencies as development
+FROM dependencies AS development
 
 # 開発用追加パッケージ
 # [Gate S1] 以前は pytest・black・mypy 等を版を固定せずに入れていた(ビルドのたびに版が変わり、
@@ -82,7 +82,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 # =================================
 # Testing Stage
 # =================================
-FROM development as testing
+FROM development AS testing
 
 # テスト実行用
 USER root
@@ -95,7 +95,7 @@ CMD ["python", "-m", "pytest", "-v", "--cov=app", "--cov-report=html", "--cov-re
 # =================================
 # Production Stage
 # =================================
-FROM dependencies as production
+FROM dependencies AS production
 
 # 本番用システム設定
 RUN apt-get update && apt-get install -y \
@@ -114,40 +114,8 @@ COPY --chown=appuser:appuser . .
 RUN mkdir -p logs uploads temp && \
     chown -R appuser:appuser /app
 
-# 実行可能ファイルの権限設定
-RUN chmod +x docker-entrypoint.sh || true
-
-# 本番用Gunicorn設定ファイル作成
-RUN echo 'import multiprocessing\n\
-\n\
-bind = "0.0.0.0:8000"\n\
-workers = multiprocessing.cpu_count() * 2 + 1\n\
-worker_class = "uvicorn.workers.UvicornWorker"\n\
-worker_connections = 1000\n\
-max_requests = 1000\n\
-max_requests_jitter = 100\n\
-timeout = 30\n\
-keepalive = 2\n\
-preload_app = True\n\
-\n\
-# Logging\n\
-accesslog = "/app/logs/access.log"\n\
-errorlog = "/app/logs/error.log"\n\
-loglevel = "info"\n\
-access_log_format = "%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s \"%(f)s\" \"%(a)s\" %(D)s"\n\
-\n\
-# Process names\n\
-proc_name = "travelcanvas"\n\
-\n\
-# Server mechanics\n\
-pidfile = "/app/gunicorn.pid"\n\
-user = "appuser"\n\
-group = "appuser"\n\
-daemon = False\n\
-\n\
-# SSL (if needed)\n\
-# keyfile = "/app/ssl/key.pem"\n\
-# certfile = "/app/ssl/cert.pem"\n' > gunicorn.conf.py
+# Gunicorn設定はレビュー可能な追跡ファイル gunicorn.conf.py を使用する
+RUN test -f gunicorn.conf.py && chown appuser:appuser gunicorn.conf.py
 
 # ユーザー切り替え
 USER appuser
@@ -165,26 +133,16 @@ CMD ["gunicorn", "-c", "gunicorn.conf.py", "app.main:app"]
 # =================================
 # Migration Stage (データベース初期化用)
 # =================================
-FROM production as migration
+FROM production AS migration
 
 USER root
 
-# Alembic migration実行用エントリーポイント
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-echo "Waiting for database..."\n\
-while ! pg_isready -h $DATABASE_HOST -p $DATABASE_PORT -U $DATABASE_USER; do\n\
-  echo "Waiting for database connection..."\n\
-  sleep 2\n\
-done\n\
-echo "Database is ready!"\n\
-\n\
-echo "Running database migrations..."\n\
-alembic upgrade head\n\
-\n\
-echo "Migration completed!"\n' > /app/migrate.sh && \
-    chmod +x /app/migrate.sh
+# pg_isready と追跡済みの migration スクリプトを使用する
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && \
+    rm -rf /var/lib/apt/lists/* && \
+    test -f /app/migrate.sh && \
+    chmod +x /app/migrate.sh && \
+    chown appuser:appuser /app/migrate.sh
 
 USER appuser
 
