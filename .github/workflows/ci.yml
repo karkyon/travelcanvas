@@ -20,7 +20,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # [Gate S1] 判定(一致した文字列にダミーの印があるときだけ除外)の自己試験も行う
       - name: Secret scanner self-test (ブロッキング)
         run: python3 scripts/security/scan_secrets.py --self-test
@@ -34,7 +34,7 @@ jobs:
     needs: secret-scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -89,7 +89,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v4
         with:
@@ -180,7 +180,7 @@ jobs:
       JWT_SECRET_KEY: ci-only-dummy-jwt-secret-not-used-anywhere-else
     steps:
       # [Gate G1] GOV-01 DOC-10 の基準 commit が履歴にあるかを確かめるため、履歴を全部取る
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -211,6 +211,10 @@ jobs:
 
       - name: Import smoke test (ブロッキング)
         run: python -c "from app.main import app; print('app import OK:', app.title if hasattr(app, \"title\") else app)"
+
+      # GCP公開用と同じproduction targetを毎回ビルドし、Dockerfile破損をmainへ入れない。
+      - name: Production container build (ブロッキング)
+        run: docker build --target production --tag "travelcanvas-backend-ci:${{ github.sha }}" .
 
       # [Gate O1] 運用コマンド(ホストの python3 で標準ライブラリだけで動くこと)の起動確認
       - name: Ops CLI smoke test (ブロッキング)
@@ -273,7 +277,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # docker-compose.ymlはDB_PASSWORD等を.envからの読込み必須としている
       # (`${DB_PASSWORD:?DB_PASSWORD must be set in .env}`)。このジョブの
