@@ -2,6 +2,17 @@ name: GCP dev image publish
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy_service:
+        description: "Run DB migration and deploy private Cloud Run service"
+        required: true
+        type: boolean
+        default: false
+      cors_origin:
+        description: "HTTPS frontend origin; required only when deploy_service is true"
+        required: false
+        type: string
+        default: "https://dev.travelcanvas.invalid"
 
 permissions:
   contents: read
@@ -15,8 +26,12 @@ env:
   REGION: asia-northeast1
   REPOSITORY: travelcanvas-dev
   IMAGE: backend
+  SERVICE_NAME: travelcanvas-dev-backend
+  MIGRATION_JOB: travelcanvas-dev-migrate
   WORKLOAD_IDENTITY_PROVIDER: projects/142651556966/locations/global/workloadIdentityPools/github-actions/providers/github
   SERVICE_ACCOUNT: tc-dev-deployer@travelcanvas-development.iam.gserviceaccount.com
+  RUNTIME_SERVICE_ACCOUNT: tc-dev-runtime@travelcanvas-development.iam.gserviceaccount.com
+  MIGRATOR_SERVICE_ACCOUNT: tc-dev-migrator@travelcanvas-development.iam.gserviceaccount.com
 
 jobs:
   publish-backend-image:
@@ -26,6 +41,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      image_uri: ${{ steps.image.outputs.uri }}
     steps:
       - name: Checkout exact main commit
         uses: actions/checkout@v5
@@ -51,29 +68,30 @@ jobs:
 
       - name: Configure Artifact Registry authentication
         shell: bash
-        run: |
-          set -euo pipefail
-          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Resolve immutable image URI
+        id: image
+        shell: bash
+        run: echo "uri=${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Build production image
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}"
           docker build \
             --target production \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --tag "${IMAGE_URI}:${GITHUB_SHA}" \
+            --tag "${{ steps.image.outputs.uri }}" \
             backend
 
       - name: Push immutable image
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}:${GITHUB_SHA}"
-          docker push "${IMAGE_URI}"
-          echo "Published ${IMAGE_URI}" >> "${GITHUB_STEP_SUMMARY}"
+          docker push "${{ steps.image.outputs.uri }}"
+          echo "Published ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify registry digest
         shell: bash
@@ -82,4 +100,95 @@ jobs:
           IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}"
           gcloud artifacts docker images describe "${IMAGE_PATH}:${GITHUB_SHA}" \
             --project="${PROJECT_ID}" \
-            --format='value(image_summary.digest)' | tee -a "${GITHUB_STEP_SUMMARY}"
+            --format='value(image_summary.digest)' | tee -a "$GITHUB_STEP_SUMMARY"
+
+  deploy-private-service:
+    name: Migrate and deploy private Cloud Run service
+    if: ${{ inputs.deploy_service }}
+    needs: publish-backend-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    environment: gcp-development
+    steps:
+      - name: Validate deployment input
+        shell: bash
+        env:
+          CORS_ORIGIN: ${{ inputs.cors_origin }}
+        run: |
+          set -euo pipefail
+          [[ "$CORS_ORIGIN" == https://* ]]
+          [[ "$CORS_ORIGIN" != "https://dev.travelcanvas.invalid" ]]
+          [[ "$CORS_ORIGIN" != *","* ]]
+
+      - name: Authenticate to Google Cloud without a service-account key
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Deploy bounded migration job
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud run jobs deploy "${MIGRATION_JOB}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${{ needs.publish-backend-image.outputs.image_uri }}" \
+            --service-account="${MIGRATOR_SERVICE_ACCOUNT}" \
+            --command="/app/migrate.sh" \
+            --set-env-vars="APP_ENV=migration,DEBUG=false,SQL_ECHO=false" \
+            --set-secrets="DATABASE_URL=tc-dev-db-owner-url:latest" \
+            --max-retries=0 \
+            --task-timeout=10m \
+            --quiet
+          gcloud run jobs execute "${MIGRATION_JOB}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --wait \
+            --quiet
+
+      - name: Deploy scale-to-zero private backend
+        shell: bash
+        env:
+          CORS_ORIGIN: ${{ inputs.cors_origin }}
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${SERVICE_NAME}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${{ needs.publish-backend-image.outputs.image_uri }}" \
+            --service-account="${RUNTIME_SERVICE_ACCOUNT}" \
+            --no-allow-unauthenticated \
+            --ingress=all \
+            --min=0 \
+            --max=1 \
+            --cpu=1 \
+            --memory=512Mi \
+            --concurrency=40 \
+            --timeout=300 \
+            --port=8080 \
+            --set-env-vars="APP_ENV=staging,DEBUG=false,SQL_ECHO=false,ADMIN_MFA_REQUIRED=true,CORS_ORIGINS=${CORS_ORIGIN},RATE_LIMIT_NAMESPACE=tc-dev,DOCUMENT_REQUIRE_CLEAN_SCAN=false,MALWARE_SCAN_BACKEND=none" \
+            --set-secrets="DATABASE_URL=tc-dev-db-app-url:latest,REDIS_URL=tc-dev-redis-url:latest,JWT_SECRET_KEY=tc-dev-jwt-secret:latest,ENCRYPTION_KEY=tc-dev-encryption-key:latest,LOOKUP_INDEX_KEY=tc-dev-lookup-index-key:latest,DOCUMENT_DOWNLOAD_SIGNING_KEY=tc-dev-document-signing-key:latest,MFA_KEY=tc-dev-mfa-key:latest,OFFLINE_PACK_KEY_SECRET=tc-dev-offline-pack-key:latest,METRICS_TOKEN=tc-dev-metrics-token:latest" \
+            --quiet
+
+      - name: Verify deployment remains private and healthy
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$(gcloud run services describe "${SERVICE_NAME}" --project="${PROJECT_ID}" --region="${REGION}" --format='value(status.url)')"
+          test -n "$URL"
+          if gcloud run services get-iam-policy "${SERVICE_NAME}" --project="${PROJECT_ID}" --region="${REGION}" --format='value(bindings.members)' | grep -q 'allUsers'; then
+            echo "Refusing public Cloud Run service" >&2
+            exit 1
+          fi
+          TOKEN="$(gcloud auth print-identity-token --audiences="$URL")"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            -H "Authorization: Bearer $TOKEN" "$URL/health"
+          echo "Private service verified: $URL" >> "$GITHUB_STEP_SUMMARY"
