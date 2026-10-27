@@ -1,0 +1,85 @@
+name: GCP dev image publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gcp-dev-image-publish
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: travelcanvas-development
+  REGION: asia-northeast1
+  REPOSITORY: travelcanvas-dev
+  IMAGE: backend
+  WORKLOAD_IDENTITY_PROVIDER: projects/142651556966/locations/global/workloadIdentityPools/github-actions/providers/github
+  SERVICE_ACCOUNT: tc-dev-deployer@travelcanvas-development.iam.gserviceaccount.com
+
+jobs:
+  publish-backend-image:
+    name: Publish immutable backend image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Refuse non-main execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_REPOSITORY}" = "karkyon/travelcanvas"
+
+      - name: Authenticate to Google Cloud without a service-account key
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Configure Artifact Registry authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build production image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}"
+          docker build \
+            --target production \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --tag "${IMAGE_URI}:${GITHUB_SHA}" \
+            backend
+
+      - name: Push immutable image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE_URI}"
+          echo "Published ${IMAGE_URI}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Verify registry digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_PATH="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE}"
+          gcloud artifacts docker images describe "${IMAGE_PATH}:${GITHUB_SHA}" \
+            --project="${PROJECT_ID}" \
+            --format='value(image_summary.digest)' | tee -a "${GITHUB_STEP_SUMMARY}"
