@@ -57,8 +57,8 @@ run gcloud billing projects describe "${PROJECT_ID}" --format='yaml(projectId,bi
 run gcloud iam service-accounts keys list --iam-account="${DEPLOYER_SA}" --managed-by=user --project="${PROJECT_ID}" --format='table(name.basename(),keyType,validAfterTime,validBeforeTime)'
 
 echo "===== 2. WIF: IMMUTABLE REPOSITORY + EXACT WORKFLOW ====="
-ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner=assertion.repository_owner,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref,attribute.job_workflow_ref=assertion.job_workflow_ref"
-ATTRIBUTE_CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.repository_owner_id=='${REPOSITORY_OWNER_ID}' && assertion.ref=='refs/heads/main' && assertion.job_workflow_ref=='${WORKFLOW_REF}'"
+ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner=assertion.repository_owner,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref,attribute.workflow_ref=assertion.workflow_ref"
+ATTRIBUTE_CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.repository_owner_id=='${REPOSITORY_OWNER_ID}' && assertion.ref=='refs/heads/main' && assertion.workflow_ref=='${WORKFLOW_REF}'"
 
 run gcloud iam workload-identity-pools providers update-oidc "${PROVIDER}" \
   --project="${PROJECT_ID}" \
