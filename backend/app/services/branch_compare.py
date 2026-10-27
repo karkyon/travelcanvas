@@ -76,6 +76,102 @@ def simulate(snap: fz.Snapshot, ops: List[Dict[str, Any]], days: Dict[str, Any])
     return replace(snap, events=events, segments=segments, links=links), removed
 
 
+def _ref_uuid(ref: Optional[Dict[str, str]]) -> Optional[uuid.UUID]:
+    if not ref:
+        return None
+    return uuid.UUID(ref["event"]) if ref.get("event") else uuid.uuid5(_NS, str(ref["key"]))
+
+
+def _dt(v: Optional[str]) -> Optional[datetime]:
+    return datetime.fromisoformat(v) if v else None
+
+
+def simulate_resources(snap: fz.Snapshot, resources: Dict[str, Any]) -> fz.Snapshot:
+    """[Gate G8] 案の中の区間(変える・外す・足す)と予約(付け替え・取り消す予定)の変更を当てた姿。"""
+    seg_ops = resources.get("segments") or []
+    res_ops = resources.get("reservations") or []
+    if not seg_ops and not res_ops:
+        return snap
+    removed = {o["segment_id"] for o in seg_ops if o["op"] == "remove"}
+    updates = {o["segment_id"]: o["fields"] for o in seg_ops if o["op"] == "update"}
+    segments: List[fz.SegmentInfo] = []
+    for sg in snap.segments:
+        key = str(sg.id)
+        if key in removed:
+            continue
+        f = updates.get(key)
+        if f:
+            kw: Dict[str, Any] = {}
+            for name in ("mode", "status", "duration_minutes", "distance_km", "currency", "preparation_minutes",
+                         "buffer_before_minutes"):
+                if name in f:
+                    kw[name] = f[name] if f[name] is not None or name in ("duration_minutes", "distance_km",
+                                                                          "currency") else getattr(sg, name)
+            for name in ("planned_departure_at", "planned_arrival_at", "last_departure_at"):
+                if name in f:
+                    kw[name] = _dt(f[name])
+            if "cost" in f:
+                kw["cost"] = Decimal(f["cost"]) if f["cost"] is not None else None
+            sg = replace(sg, **kw)
+        segments.append(sg)
+    for o in seg_ops:
+        if o["op"] != "add":
+            continue
+        f = o["fields"]
+        segments.append(fz.SegmentInfo(
+            id=uuid.uuid5(_NS, "segment:" + str(o["key"])), from_event_id=_ref_uuid(f.get("from")),
+            to_event_id=_ref_uuid(f.get("to")), mode=f["mode"], status=f.get("status") or "planned",
+            duration_minutes=f.get("duration_minutes"), distance_km=f.get("distance_km"),
+            preparation_minutes=int(f.get("preparation_minutes") or 0),
+            buffer_before_minutes=int(f.get("buffer_before_minutes") or 0),
+            planned_departure_at=_dt(f.get("planned_departure_at")),
+            planned_arrival_at=_dt(f.get("planned_arrival_at")),
+            cost=Decimal(f["cost"]) if f.get("cost") is not None else None, currency=f.get("currency"),
+            last_departure_at=_dt(f.get("last_departure_at")),
+        ))
+    touched = {uuid.UUID(o["reservation_id"]) for o in res_ops}
+    links = [link for link in snap.links if link.reservation_id not in touched]
+    for o in res_ops:
+        target = _ref_uuid(o.get("to")) if o["op"] == "relink" else None
+        if target is not None:
+            links.append(fz.LinkInfo(event_id=target, reservation_id=uuid.UUID(o["reservation_id"]),
+                                     relation_type="primary"))
+    return replace(snap, segments=segments, links=links)
+
+
+def resource_cost_items(items: List[Dict[str, Any]], resources: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """[Gate G8] 費用の行(branches._cost_items)へ区間・予約の変更を当てる。取り消す予定の予約は「外れる費用」へ。"""
+    seg_ops = resources.get("segments") or []
+    res_ops = {o["reservation_id"]: o for o in resources.get("reservations") or []}
+    removed = {o["segment_id"] for o in seg_ops if o["op"] == "remove"}
+    updates = {o["segment_id"]: o["fields"] for o in seg_ops if o["op"] == "update"}
+    out: List[Dict[str, Any]] = []
+    for it in items:
+        it = dict(it)
+        if it["kind"] == "segment":
+            f = updates.get(it["id"])
+            if f and ("cost" in f or "currency" in f):
+                it["amount"] = f.get("cost", it["amount"])
+                it["currency"] = f.get("currency", it["currency"])
+            if it["id"] in removed or (f and f.get("status") == "cancelled"):
+                it["cancelled"] = True  # 外す・取消にする区間の費用は「外れる費用」
+        elif it["kind"] == "reservation" and it["id"] in res_ops:
+            o = res_ops[it["id"]]
+            if o["op"] == "cancel":
+                it["cancelled"] = True
+                it["event_ids"] = set()
+            else:
+                ref = o.get("to")
+                it["event_ids"] = {str(_ref_uuid(ref))} if ref else set()
+        out.append(it)
+    for o in seg_ops:
+        if o["op"] == "add" and o["fields"].get("cost") is not None:
+            f = o["fields"]
+            out.append({"kind": "segment", "id": "segment:add:" + o["key"], "currency": f.get("currency"),
+                        "amount": f["cost"], "event_ids": {str(_ref_uuid(f.get("from"))), str(_ref_uuid(f.get("to")))}})
+    return out
+
+
 def travel(snap: fz.Snapshot, coords: Dict[uuid.UUID, Tuple[Optional[float], Optional[float]]]) -> Dict[str, Any]:
     """移動の合計(分・km)と不明な区間の数。"""
     minutes = km = 0.0
@@ -124,6 +220,8 @@ def costs(items: Iterable[Dict[str, Any]], removed: Set[str]) -> Dict[str, Any]:
     for it in items:
         ev = it.get("event_ids") or set()
         hit = bool(ev & removed) if it.get("kind") == "segment" else bool(ev) and ev <= removed
+        if it.get("cancelled"):  # [Gate G8] 取り消す予定の予約(取消料がかかることがある)
+            hit = True
         if hit:
             money_add(gone, it["currency"], it["amount"])
         else:

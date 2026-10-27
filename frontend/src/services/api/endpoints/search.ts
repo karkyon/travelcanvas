@@ -6,7 +6,8 @@
 import { AuthApi } from './auth';
 import type { ApiResponse, PlaceDetail, SearchRequest, SearchResponse, SpotResult, UnavailableSearchResult, VoiceSearchRequestData } from '../types';
 import { decodeResponse } from '../decode';
-import { placeDetail } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 // [Gate M9-FE-A2] POST /search/spots (backend/app/services/search_provider.py)
 // が返す個々の生候補の形状。この関数の中でのみ使う内部形状のため非export。
@@ -113,7 +114,7 @@ export class SearchApi extends AuthApi {
   // グローバルなエンティティのため一覧APIは無く、個別取得のみを提供する。
   async getPlace(placeId: string): Promise<PlaceDetail> {
     const response = await this.client.get(`/search/places/${placeId}`);
-    return decodeResponse(response.data, placeDetail, 'GET /search/places/{place_id}');
+    return decodeResponse(response.data, (await DL()).placeDetail, 'GET /search/places/{place_id}');
   }
 
   // [Gate #31.5B] 監査是正: 以前はファイル名の文字列マッチ(「tower」「寺」

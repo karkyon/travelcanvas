@@ -5,6 +5,8 @@
  * 採用できない理由を見て、採用・見送り・削除を行う。採用は本案への1つの変更セットで、本案の「元に戻す」で取り消せる。
  * 採用できない理由(分岐後に本案でも変更された等)がある間は採用ボタンを押せない。
  * [Gate G7] FR-019 「移動・検証・費用で比べる」: 本案とこの案の移動時間・検証の件数と新たな問題・疲れ・費用・予約への影響。
+ * [Gate G8] FR-019 案の中で移動区間・予約を変える(BranchResourcesPanel。予定と一緒に保存する)。採用の前に変更ごとに
+ * 確かめ、選んだ変更だけを採用できる(AdoptionDialog)。区間・予約の変更が無い案は今までどおりの確認で採用する。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -17,7 +19,15 @@ import type { BranchDetail, BranchEventItem } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { compareBranches } from '@/services/api/g7';
 import type { BranchComparison as ComparisonData } from '@/services/api/types/g7';
+import { adoptBranchG8, branchExtras, saveBranchWithResources } from '@/services/api/g8';
+import type { BranchG8Extras } from '@/services/api/decodersG8';
+import type { ResourcesInput } from '@/services/api/types/g8';
+import { decodeResponse } from '@/services/api/decode';
+import { branchDetail } from '@/services/api/decoders';
 import BranchComparison from './branches/BranchComparison';
+import BranchResourcesPanel from './branches/BranchResourcesPanel';
+import AdoptionDialog from './branches/AdoptionDialog';
+import { emptyResources, fromExtras, validateResources } from './branches/resourcesModel';
 import {
   SCENARIO_LABEL, STATE_LABEL, contentToPayload, describeConflict, describeOp, groupByDay, newItem,
 } from './branches/branchModel';
@@ -33,6 +43,10 @@ const BranchDetailPage: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [extras, setExtras] = useState<BranchG8Extras | null>(null);
+  const [resources, setResources] = useState<ResourcesInput>(emptyResources());
+  const [resDirty, setResDirty] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const compare = async () => {
     if (!planId || !branchId) return;
@@ -51,6 +65,10 @@ const BranchDetailPage: React.FC = () => {
     setDetail(d);
     setItems(d.content);
     setDirty(false);
+    const x = branchExtras(d);
+    setExtras(x);
+    setResources(fromExtras(x.resources.segments, x.resources.reservations));
+    setResDirty(false);
   };
 
   const load = useCallback(async () => {
@@ -93,6 +111,9 @@ const BranchDetailPage: React.FC = () => {
     }
   };
 
+  const hasResourceOps = resources.segments.length > 0 || resources.reservations.length > 0
+    || (extras !== null && (extras.resources.segments.length > 0 || extras.resources.reservations.length > 0));
+
   const save = () => {
     if (!planId || !branchId || !detail) return;
     const r = contentToPayload(items);
@@ -101,18 +122,49 @@ const BranchDetailPage: React.FC = () => {
       setError(r.error);
       return;
     }
+    if (extras) {
+      const v = validateResources(resources, items, {
+        segments: extras.resources.base_segments, reservations: extras.resources.base_reservations });
+      if (!v.ok) {
+        setMessage(null);
+        setError(v.error);
+        return;
+      }
+    }
     void run('保存', async () => {
-      apply(await updateBranchContent(planId, branchId, r.data, detail.revision));
+      if (resDirty || hasResourceOps) {
+        const raw = await saveBranchWithResources(planId, branchId, r.data, resources, detail.revision);
+        apply(decodeResponse(raw, branchDetail, 'PUT /plans/{plan_id}/branches/{branch_id}/content'));
+      } else {
+        apply(await updateBranchContent(planId, branchId, r.data, detail.revision));
+      }
       setMessage('分岐案を保存しました');
     });
   };
 
-  const adopt = () => run('採用', async () => {
+  const adopt = () => {
+    if (hasResourceOps) {
+      setDialogOpen(true);
+      return;
+    }
+    void run('採用', async () => {
+      if (!planId || !branchId || !detail) return;
+      if (!window.confirm('この案での変更を本案へ反映しますか?(本案の「元に戻す」で取り消せます)')) return;
+      const res = await adoptBranch(planId, branchId, detail.revision);
+      apply(res.branch);
+      setMessage(`本案へ反映しました(本案の版 ${res.plan_revision})。プラン画面の「元に戻す」で取り消せます。`);
+    });
+  };
+
+  const adoptSelected = (only: string[] | null) => run('採用', async () => {
     if (!planId || !branchId || !detail) return;
-    if (!window.confirm('この案での変更を本案へ反映しますか?(本案の「元に戻す」で取り消せます)')) return;
-    const res = await adoptBranch(planId, branchId, detail.revision);
-    apply(res.branch);
-    setMessage(`本案へ反映しました(本案の版 ${res.plan_revision})。プラン画面の「元に戻す」で取り消せます。`);
+    const res = await adoptBranchG8(planId, branchId, detail.revision, only);
+    apply(decodeResponse(res.raw, branchDetail, 'POST /plans/{plan_id}/branches/{branch_id}/adopt'));
+    setDialogOpen(false);
+    setMessage(`本案へ反映しました(本案の版 ${res.plan_revision})。`
+      + (res.left_out.length ? `選ばなかった${res.left_out.length}件は当てていません。` : '')
+      + (res.tasks_created ? `準備の一覧に「予約の取消の手続き」を${res.tasks_created}件入れました。` : '')
+      + 'プラン画面の「元に戻す」で取り消せます。');
   });
 
   const setStatus = (status: 'draft' | 'discarded') => run(status === 'discarded' ? '見送り' : '再開', async () => {
@@ -139,7 +191,10 @@ const BranchDetailPage: React.FC = () => {
 
   const editable = detail.can_edit;
   const groups = groupByDay(detail, items);
-  const canAdopt = editable && !dirty && detail.conflicts.length === 0 && detail.ops.length > 0;
+  const anyDirty = dirty || resDirty;
+  const canAdopt = editable && !anyDirty && detail.conflicts.length === 0 && (detail.ops.length > 0 || hasResourceOps);
+  const canChoose = editable && !anyDirty && (detail.ops.length > 0 || hasResourceOps) && detail.status === 'draft';
+  const baseTitles = new Map(detail.content.filter((i) => i.source_event_id).map((i) => [i.source_event_id as string, i.title]));
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -217,13 +272,25 @@ const BranchDetailPage: React.FC = () => {
               </section>
             </Card>
           ))}
+          {extras && (detail.status === 'draft' || hasResourceOps) && (
+            <BranchResourcesPanel resources={extras.resources} value={resources} items={items} baseTitles={baseTitles}
+              editable={editable} onChange={(next) => { setResources(next); setResDirty(true); }} />
+          )}
         </div>
 
         <div className="space-y-4">
           <Card padding="md">
             <section aria-labelledby="branch-diff">
               <h2 id="branch-diff" className="font-semibold text-gray-900">本案との違い</h2>
-              {dirty && <p className="text-xs text-amber-900 mt-1" role="note">未保存の変更があります。保存すると違いを更新します。</p>}
+              {anyDirty && <p className="text-xs text-amber-900 mt-1" role="note">未保存の変更があります。保存すると違いを更新します。</p>}
+              {extras && hasResourceOps && (
+                <p className="text-sm text-gray-800 mt-1" data-testid="branch-resource-summary">
+                  {`移動区間: 追加${extras.resource_summary.segments_added}・外す${extras.resource_summary.segments_removed}`
+                    + `・変更${extras.resource_summary.segments_updated}`
+                    + (extras.resources.reservations_hidden ? '' : ` / 予約: 付け替え${extras.resource_summary.reservations_relinked}`
+                      + `・取り消す予定${extras.resource_summary.reservations_cancel_planned}`)}
+                </p>
+              )}
               <table className="w-full text-sm mt-2">
                 <thead><tr className="text-left border-b"><th className="py-1">日付</th><th className="text-right">本案</th><th className="text-right">この案</th></tr></thead>
                 <tbody>
@@ -238,11 +305,11 @@ const BranchDetailPage: React.FC = () => {
                 </ul>
               )}
               <Button variant="secondary" size="sm" className="mt-3" onClick={compare} loading={busy === '比較'}
-                disabled={dirty}>
+                disabled={anyDirty}>
                 移動・検証・費用で比べる
               </Button>
-              {dirty && <p className="text-xs text-gray-700 mt-1">比べる前に保存してください。</p>}
-              {comparison && !dirty && <BranchComparison data={comparison} />}
+              {anyDirty && <p className="text-xs text-gray-700 mt-1">比べる前に保存してください。</p>}
+              {comparison && !anyDirty && <BranchComparison data={comparison} />}
             </section>
           </Card>
           {detail.state === 'draft' && detail.conflicts.length > 0 && (
@@ -260,14 +327,19 @@ const BranchDetailPage: React.FC = () => {
             <p className="text-xs text-gray-700">この案を作った後に本案が更新されています(作成時の版 {detail.base_revision} → 現在 {detail.plan_revision})。</p>
           )}
           <div className="flex flex-wrap gap-2">
-            {editable && <Button variant="outline" onClick={save} loading={busy === '保存'} disabled={!dirty}>保存</Button>}
-            {editable && <Button variant="primary" onClick={adopt} loading={busy === '採用'} disabled={!canAdopt}>本案に採用</Button>}
+            {editable && <Button variant="outline" onClick={save} loading={busy === '保存'} disabled={!anyDirty}>保存</Button>}
+            {editable && <Button variant="primary" onClick={adopt} loading={busy === '採用' && !dialogOpen} disabled={!canAdopt}>本案に採用</Button>}
+            {canChoose && <Button variant="secondary" onClick={() => setDialogOpen(true)}>選んで採用…</Button>}
             {detail.status === 'draft' && editable && <Button variant="ghost" onClick={() => setStatus('discarded')}>見送り</Button>}
             {detail.status === 'discarded' && <Button variant="ghost" onClick={() => setStatus('draft')}>検討に戻す</Button>}
             {detail.status !== 'adopted' && <Button variant="ghost" onClick={remove}>削除</Button>}
           </div>
         </div>
       </div>
+      {planId && branchId && dialogOpen && (
+        <AdoptionDialog planId={planId} branchId={branchId} isOpen={dialogOpen} busy={busy === '採用'}
+          onClose={() => setDialogOpen(false)} onAdopt={adoptSelected} />
+      )}
     </div>
   );
 };

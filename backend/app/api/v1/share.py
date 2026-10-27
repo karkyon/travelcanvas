@@ -490,6 +490,12 @@ async def remove_collaborator(
     )
     if not collab:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="コラボレーターが見つかりません")
+    # [Gate G8] FR-021 移譲の手続き中は、受け取る人を外さない(先に移譲を取り下げる)
+    from app.api.v1 import ownership
+
+    pending = ownership.pending_for(db, plan.id)
+    if pending is not None and collab.user_id is not None and pending.to_user_id == collab.user_id:
+        raise ownership.pending_error()
 
     detached = plan_item_deletion.detach_collaborator_references(db, collab.id)
     removed_id = collab.id

@@ -271,10 +271,10 @@ const ConstraintsPage: React.FC = () => {
             >
               {c.is_active ? '無効にする' : '有効にする'}
             </button>
-            <button type="button" onClick={() => openEdit(c)} className="text-gray-400 hover:text-blue-600 p-1" aria-label={`${c.title}を編集`}>
+            <button type="button" onClick={() => openEdit(c)} className="text-gray-500 hover:text-blue-600 p-1" aria-label={`${c.title}を編集`}>
               <Pencil size={16} />
             </button>
-            <button type="button" onClick={() => handleDelete(c)} className="text-gray-400 hover:text-red-600 p-1" aria-label={`${c.title}を削除`}>
+            <button type="button" onClick={() => handleDelete(c)} className="text-gray-500 hover:text-red-600 p-1" aria-label={`${c.title}を削除`}>
               <Trash2 size={16} />
             </button>
           </div>}

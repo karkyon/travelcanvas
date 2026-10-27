@@ -2404,6 +2404,11 @@ class ItineraryBranch(Base):
     adopted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     revision = Column(Integer, nullable=False, default=1, server_default="1")
+    # [Gate G8] FR-019 案の中で予約・移動区間そのものを変える分岐(branch-v2)。NULL は予定だけの案(G7 まで)。
+    # {"base": {"segments": [...], "reservations": [...]}, "segments": [変更], "reservations": [変更]}。
+    # base は変更を初めて保存した時の本案の区間・予約(三方向の取り込みの基準)。予約は外部へ取消・変更を送らない
+    # (取消は「手続きの準備」を作るだけ。app/services/branch_resources.py)
+    resources = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -3379,3 +3384,98 @@ class PlanMovementSettings(Base):
                                 index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class PlanOwnershipTransfer(Base):
+    """[Gate G8] FR-021・FR-039 旅行の所有者の移譲。
+
+    所有者がパスワードで本人確認して、参加済みの会員の共同編集者へ申し出る(旅行ごとに手続き中は1件)。受け取る人が
+    パスワードで本人確認して受け入れた時だけ所有者が替わる(前の所有者は選んだ役割の共同編集者として残るか、外れる)。
+    期限(既定7日)を過ぎた申し出は受け入れられない。手続き中は旅行の削除と、受け取る人を共同編集者から外すことを止める。
+    旅行の中身は旅行のデータ鍵で暗号化されているため、移譲で鍵を替える必要は無い(ADR-data-keys)。"""
+    __tablename__ = "plan_ownership_transfers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # pending(手続き中) / accepted / declined / cancelled
+    status = Column(String(9), nullable=False, default="pending", server_default="pending")
+    # 前の所有者が残る時の役割(editor / viewer)。none は共同編集者から外れる
+    keep_role = Column(String(6), nullable=False, default="editor", server_default="editor")
+    message = Column(String(500), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','accepted','declined','cancelled')",
+                        name="ck_plan_ownership_transfers_status"),
+        CheckConstraint("keep_role IN ('editor','viewer','none')", name="ck_plan_ownership_transfers_keep_role"),
+        CheckConstraint("from_user_id <> to_user_id", name="ck_plan_ownership_transfers_distinct"),
+        CheckConstraint("(status = 'pending') = (responded_at IS NULL)", name="ck_plan_ownership_transfers_responded"),
+        Index("uq_plan_ownership_transfers_pending", "plan_id", unique=True,
+              postgresql_where=text("status = 'pending'")),
+    )
+
+
+class DataCorrection(Base):
+    """[Gate G8] FR-039・DOC-11 §15 出典・確認・履歴つきの訂正。
+
+    kind = self: 本人が自分のアカウントの値(表示名・メールアドレス)を訂正した記録。訂正の前後の値は本人のデータ鍵で
+    暗号化して持ち、本人だけが履歴で見て、取り消せる(今の値が訂正の後の値のままの時だけ)。メールアドレスはパスワードで
+    本人確認し、確認済みの印を外して他の端末のセッションを失効させる(PUT /auth/me と同じ)。
+    kind = request: 共同の旅行の中の本人に関わる情報の訂正を、その旅行の所有者へ申し出た記録(所有者が対応・見送りを
+    記録する)。申し出の内容は旅行のデータ鍵で暗号化する(旅行の参加者の個人データのため)。
+    source は訂正の根拠(本人の申告・公的な書類・予約の確認書・その他)、source_note はその補足(500文字まで)。"""
+    __tablename__ = "data_corrections"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(7), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    field = Column(String(40), nullable=False)
+    source = Column(String(20), nullable=False)
+    # 本人確認の方法: password(パスワード) / session(ログイン中の本人)
+    verification = Column(String(8), nullable=False)
+    payload_ciphertext = Column(LargeBinary, nullable=False)
+    # self: applied / reverted。request: open / resolved / declined
+    status = Column(String(8), nullable=False)
+    resolution_note_ciphertext = Column(LargeBinary, nullable=True)
+    resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+                                 index=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('self','request')", name="ck_data_corrections_kind"),
+        CheckConstraint("source IN ('self_statement','official_document','booking_document','other')",
+                        name="ck_data_corrections_source"),
+        CheckConstraint("verification IN ('password','session')", name="ck_data_corrections_verification"),
+        CheckConstraint(
+            "(kind = 'self' AND status IN ('applied','reverted') AND plan_id IS NULL) OR "
+            "(kind = 'request' AND status IN ('open','resolved','declined') AND plan_id IS NOT NULL)",
+            name="ck_data_corrections_kind_status",
+        ),
+        CheckConstraint("(status IN ('applied','open')) = (resolved_at IS NULL)", name="ck_data_corrections_resolved"),
+    )
+
+
+class OpsJobRun(Base):
+    """[Gate G8] FR-004・O02 定期の処理の実行の記録(継続して動いているかを、最後の成功の時刻で確かめる)。
+
+    各処理(app/ops/* と scripts/run_*_purge.py)が始めと終わりを記録する。中身は件数だけ(誰・どの旅行かは書かない)。
+    30日より古い記録は処理のたびに消す。管理の画面(GET /admin/ops/jobs)と /metrics の最後の成功からの経過で見る。"""
+    __tablename__ = "ops_job_runs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    job = Column(String(40), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    ok = Column(Boolean, nullable=True)
+    summary = Column(JSONB, nullable=True)
+    error_code = Column(String(80), nullable=True)
+
+    __table_args__ = (
+        Index("ix_ops_job_runs_job_started", "job", "started_at"),
+    )

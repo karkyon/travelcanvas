@@ -644,6 +644,20 @@ def evaluate_monitor(
             add("warning", "restore_drill_missing", "復元演習の記録がありません")
         elif float(age) > th["drill_max_age_days"]:
             add("warning", "restore_drill_stale", "最後の復元演習から約%d日経っています" % float(age))
+    # [Gate G8] FR-004 定期の処理の記録(app/ops/job_runs.py の status)。一度も動いていない処理(never)は判定しない
+    jobs = snapshot.get("jobs")
+    if isinstance(jobs, list):
+        for j in jobs:
+            if not isinstance(j, dict):
+                continue
+            name = str(j.get("job"))
+            if j.get("state") == "overdue":
+                mins = j.get("minutes_since_success")
+                add("warning", "job_overdue:" + name, "定期の処理 %s の最後の成功から %s 分経っています(定期実行が止まった"
+                    "・失敗が続いている)" % (name, "不明" if mins is None else int(mins)))
+            elif j.get("state") == "failing":
+                add("warning", "job_failing:" + name, "定期の処理 %s が %d 回続けて失敗しています"
+                    % (name, int(j.get("consecutive_failures") or 1)))
     return out
 
 

@@ -66,6 +66,18 @@ DOC-10 r7 時点で、FR の91%にコードがあり71%が画面〜DBまで結�
 `remove` で元どおり)。パッチは crontab を自動では変更しない(利用者の環境の恒常的な変更のため、
 利用者が1度だけ実行する)。
 
+### 2.6 [Gate G8] 定期の処理の実行の記録(FR-004・O02、migration `f4d8a2c6e9b1`)
+
+- 9つの定期の処理(webhook-retry・poll-deadlines・email-outbox・abuse-scan・memory-trash・account-deletions・plan-purge・
+  document-purge・quickdraft-purge)を `app/ops/job_runs.recorded(job, fn)` で包み、始めと終わりの時刻・成否・件数(数と真偽
+  だけ。旅行名・メールアドレスなどは入れない)・失敗の種類を `ops_job_runs` に残す。記録に失敗しても処理は止めない。
+- 判定は「最後の成功が 間隔×2 + 10分 以内なら ok、超えたら overdue、最後の実行が失敗なら failing、記録が無ければ never」。
+  `python -m app.ops.job_runs status`(1行の JSON)・管理者の `GET /admin/ops/jobs`(管理者のダッシュボードの「定期の処理」)・
+  `tcops.py monitor`(`job_overdue:<名前>`・`job_failing:<名前>` の警告。never は警告にしない)で同じ判定を見る。
+- 30日より古い記録は、その処理の次の実行の時に消す。
+- 「cron が登録されているか」ではなく「実際に動いて成功したか」を見る。cron を登録し忘れた・コンテナの中で処理が毎回
+  失敗している、をどちらも見つけられる。
+
 ## 3. 採らなかった案
 
 | 案 | 理由 |

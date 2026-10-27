@@ -1033,6 +1033,14 @@ def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -
             snap["last_drill_age_days"] = round((now_utc() - at).total_seconds() / 86400, 1)
         except (ValueError, KeyError):
             pass
+    # [Gate G8] FR-004 定期の処理の記録(backend のコンテナで job_runs status を1回。取れなければ判定しない)
+    try:
+        proc = ex.backend_python(["-m", "app.ops.job_runs", "status"], check=False)
+        if proc.returncode == 0:
+            lines = (proc.stdout or b"").decode("utf-8", "replace").strip().splitlines()
+            snap["jobs"] = json.loads(lines[-1]).get("jobs") if lines else None
+    except Exception:  # noqa: BLE001  監視は止めない
+        pass
     state_path = state_dir() / "monitor-state.json"
     prev_state: Dict[str, object] = {}
     if state_path.is_file():

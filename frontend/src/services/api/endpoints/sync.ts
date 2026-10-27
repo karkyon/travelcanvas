@@ -9,19 +9,20 @@ import type { AxiosRequestConfig } from 'axios';
 import { OptimizationApi } from './optimization';
 import type { SyncConflictList, SyncOperationInput, SyncResolveResult, SyncResponse } from '../types';
 import { decodeResponse } from '../decode';
-import { syncConflictList, syncResolveResult, syncResponse } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class SyncApi extends OptimizationApi {
   async syncOperations(planId: string, operations: SyncOperationInput[], deviceId?: string): Promise<SyncResponse> {
     const response = await this.client.post(`/plans/${planId}/sync`, { device_id: deviceId, operations }, SILENT);
-    return decodeResponse(response.data, syncResponse, 'POST /plans/{plan_id}/sync');
+    return decodeResponse(response.data, (await DL()).syncResponse, 'POST /plans/{plan_id}/sync');
   }
 
   async getSyncConflicts(planId: string): Promise<SyncConflictList> {
     const response = await this.client.get(`/plans/${planId}/sync/conflicts`, SILENT);
-    return decodeResponse(response.data, syncConflictList, 'GET /plans/{plan_id}/sync/conflicts');
+    return decodeResponse(response.data, (await DL()).syncConflictList, 'GET /plans/{plan_id}/sync/conflicts');
   }
 
   async resolveSyncConflict(
@@ -33,6 +34,6 @@ export class SyncApi extends OptimizationApi {
     const response = await this.client.post(
       `/plans/${planId}/sync/conflicts/${operationId}/resolve`, { resolution }, config,
     );
-    return decodeResponse(response.data, syncResolveResult, 'POST /plans/{plan_id}/sync/conflicts/{operation_id}/resolve');
+    return decodeResponse(response.data, (await DL()).syncResolveResult, 'POST /plans/{plan_id}/sync/conflicts/{operation_id}/resolve');
   }
 }

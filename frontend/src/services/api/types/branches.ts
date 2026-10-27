@@ -44,15 +44,21 @@ export interface BranchOp {
   before?: Partial<Record<BranchEditableField, unknown>>;
 }
 
-export type BranchConflictReason = 'changed_in_plan' | 'deleted_in_plan' | 'locked' | 'has_relations' | 'day_missing';
+export type BranchConflictReason = 'changed_in_plan' | 'deleted_in_plan' | 'locked' | 'has_relations' | 'day_missing'
+  // [Gate G8] 区間・予約の変更の競合
+  | 'event_missing' | 'already_cancelled' | 'hidden';
 
 export interface BranchConflict {
-  op: 'add' | 'remove' | 'update';
+  op: 'add' | 'remove' | 'update' | 'relink' | 'cancel';
   event_id?: string;
   key?: string;
   title?: string;
   reason: BranchConflictReason;
   fields?: string[];
+  /** [Gate G8] event(予定)・segment(移動区間)・reservation(予約)。G7 までの応答には無い */
+  kind?: 'event' | 'segment' | 'reservation';
+  op_id?: string;
+  label?: string;
 }
 
 export interface BranchSummaryCounts {

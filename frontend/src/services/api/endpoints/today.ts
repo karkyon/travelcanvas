@@ -6,7 +6,8 @@
 import { ImportsApi } from './imports';
 import type { TodayResponse } from '../types';
 import { decodeResponse } from '../decode';
-import { todayResponse } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class TodayApi extends ImportsApi {
   // [Gate R3-10] FR-013文書ウォレット(documents/document_links)
@@ -14,6 +15,6 @@ export class TodayApi extends ImportsApi {
 
   async getToday(planId: string): Promise<TodayResponse> {
     const response = await this.client.get(`/plans/${planId}/today`);
-    return decodeResponse(response.data, todayResponse, 'GET /plans/{plan_id}/today');
+    return decodeResponse(response.data, (await DL()).todayResponse, 'GET /plans/{plan_id}/today');
   }
 }

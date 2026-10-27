@@ -15,11 +15,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     from app.core.database import SessionLocal
     from app.services import org_api
 
-    db = SessionLocal()
-    try:
-        result = org_api.retry_due(db)
-    finally:
-        db.close()
+    from app.ops.job_runs import recorded
+
+    def run():
+        db = SessionLocal()
+        try:
+            return org_api.retry_due(db)
+        finally:
+            db.close()
+
+    # [Gate G8] FR-004 実行の記録(最後の成功の時刻。件数だけ)
+    result = recorded("webhook-retry", run)
     print(json.dumps({"ok": True, **result}, ensure_ascii=False, sort_keys=True))
     return 0
 

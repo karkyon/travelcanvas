@@ -106,6 +106,7 @@ PLAN_TABLES = (
     m.FxRate, m.BudgetVersion,
     m.MemoryPublication, m.MemoryTrash,
     m.PlanMovementSettings,
+    m.PlanOwnershipTransfer, m.DataCorrection,
 )
 
 
@@ -255,6 +256,11 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
         (m.MemoryTrash.deleted_by_user_id == me) | (m.MemoryTrash.author_user_id == me)).all()]
     # [Gate G7] MOVE-03 旅行の移動・滞在の既定(メンバー全員が見られる値)
     t["plan_movement_settings"] = [row(x) for x in q(m.PlanMovementSettings).all()]
+    # [Gate G8] FR-021 この旅行の所有者の移譲(本人が申し出た・受け取った分だけ)・FR-039 本人の訂正の申し出(状態だけ。
+    # 内容はアカウントの書き出しの corrections に復号して入れる)
+    t["plan_ownership_transfers"] = [row(x) for x in q(m.PlanOwnershipTransfer).filter(
+        (m.PlanOwnershipTransfer.from_user_id == me) | (m.PlanOwnershipTransfer.to_user_id == me)).all()]
+    t["data_corrections"] = [row(x) for x in q(m.DataCorrection).filter(m.DataCorrection.user_id == me).all()]
     return t
 
 

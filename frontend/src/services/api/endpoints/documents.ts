@@ -6,17 +6,18 @@
 import { TodayApi } from './today';
 import type { DocumentClassification, DocumentLink, TravelDocument } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { documentLink, downloadUrlResult, travelDocument } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class DocumentsApi extends TodayApi {
   async getDocuments(planId: string): Promise<TravelDocument[]> {
     const response = await this.client.get(`/plans/${planId}/documents`);
-    return decodeResponse(response.data, arrayOf(travelDocument), 'GET /plans/{plan_id}/documents');
+    return decodeResponse(response.data, arrayOf((await DL()).travelDocument), 'GET /plans/{plan_id}/documents');
   }
 
   async getDocument(planId: string, documentId: string): Promise<TravelDocument> {
     const response = await this.client.get(`/plans/${planId}/documents/${documentId}`);
-    return decodeResponse(response.data, travelDocument, 'GET /plans/{plan_id}/documents/{document_id}');
+    return decodeResponse(response.data, (await DL()).travelDocument, 'GET /plans/{plan_id}/documents/{document_id}');
   }
 
   // [Gate M6] FR-013 Object Storage実連携(Gate M5)への接続。実ファイルを
@@ -40,14 +41,14 @@ export class DocumentsApi extends TodayApi {
       `/plans/${planId}/documents/upload`, formData,
       { headers: { 'Content-Type': undefined } }
     );
-    return decodeResponse(response.data, travelDocument, 'POST /plans/{plan_id}/documents/upload');
+    return decodeResponse(response.data, (await DL()).travelDocument, 'POST /plans/{plan_id}/documents/upload');
   }
 
   async getDocumentDownloadUrl(planId: string, documentId: string): Promise<{ url: string; expires_at: number }> {
     const response = await this.client.get(
       `/plans/${planId}/documents/${documentId}/download-url`
     );
-    return decodeResponse(response.data, downloadUrlResult, 'GET /plans/{plan_id}/documents/{document_id}/download-url');
+    return decodeResponse(response.data, (await DL()).downloadUrlResult, 'GET /plans/{plan_id}/documents/{document_id}/download-url');
   }
 
   async deleteDocument(planId: string, documentId: string, ifMatch: number): Promise<void> {
@@ -58,6 +59,6 @@ export class DocumentsApi extends TodayApi {
 
   async getDocumentLinks(planId: string, documentId: string): Promise<DocumentLink[]> {
     const response = await this.client.get(`/plans/${planId}/documents/${documentId}/links`);
-    return decodeResponse(response.data, arrayOf(documentLink), 'GET /plans/{plan_id}/documents/{document_id}/links');
+    return decodeResponse(response.data, arrayOf((await DL()).documentLink), 'GET /plans/{plan_id}/documents/{document_id}/links');
   }
 }

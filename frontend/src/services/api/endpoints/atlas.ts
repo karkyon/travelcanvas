@@ -7,7 +7,8 @@ import type { AxiosRequestConfig } from 'axios';
 import { JourneyApi } from './journey';
 import type { AtlasPrecision, AtlasResponse } from '../types';
 import { decodeResponse } from '../decode';
-import { atlasResponse, atlasSettingsResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -16,11 +17,11 @@ export class AtlasApi extends JourneyApi {
     const params: Record<string, string | number> = { precision };
     if (year) params.year = year;
     const response = await this.client.get('/atlas', { ...SILENT, params });
-    return decodeResponse(response.data, atlasResponse, 'GET /atlas');
+    return decodeResponse(response.data, (await DL()).atlasResponse, 'GET /atlas');
   }
 
   async updateAtlasSettings(excludedPlanIds: string[]): Promise<{ excluded_plan_ids: string[] }> {
     const response = await this.client.put('/atlas/settings', { excluded_plan_ids: excludedPlanIds }, SILENT);
-    return decodeResponse(response.data, atlasSettingsResult, 'PUT /atlas/settings');
+    return decodeResponse(response.data, (await DL()).atlasSettingsResult, 'PUT /atlas/settings');
   }
 }

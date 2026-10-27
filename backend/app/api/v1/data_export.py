@@ -134,10 +134,18 @@ def export_account(request: Request, db: Session = Depends(get_db),
         # [Gate G6] 守る範囲(自宅・職場など)・オフライン保存の端末
         privacy_zones=dx.own_privacy_zones(db, cast(uuid.UUID, current_user.id)),
         offline_devices=dx.own_offline_devices(db, cast(uuid.UUID, current_user.id)),
+        # [Gate G8] FR-039 訂正の履歴・所有者への訂正の申し出(本人の分。復号した値)
+        corrections=_corrections(db, current_user),
     )
     _audit(request, current_user, "account_data_exported", "user", current_user.id,
            {"owned_plans": len(owned), "member_plans": len(member_plans)})
     return _file(payload, f"travelcanvas-account-{now.strftime('%Y%m%d')}.json")
+
+
+def _corrections(db: Session, user: User) -> dict:
+    from app.api.v1 import corrections
+
+    return corrections.export_rows(db, user.id)
 
 
 @privacy_router.get("/retention", response_model=dict)

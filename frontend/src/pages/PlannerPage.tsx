@@ -560,7 +560,8 @@ const PlannerPage: React.FC = () => {
           {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
               どこからもリンクされておらずUIから一度も到達できなかった。
               [Gate R3-2] 予約一覧も同様に実装済みだが未到達だったため追加。 */}
-          <div className="flex items-center justify-end gap-2 mb-2">
+          {/* [Gate G9] UX-0 折り返す(以前は1行に詰めたため、左端の「予約」「今日」が画面の外に出て押せなかった) */}
+          <div className="flex flex-wrap items-center justify-end gap-2 mb-2" data-testid="planner-actions">
             <Button
               variant="outline"
               size="sm"
@@ -714,6 +715,14 @@ const PlannerPage: React.FC = () => {
               onClick={() => navigate(`/share/${currentPlan.id}`)}
             >
               🤝 共有
+            </Button>
+            {/* [Gate G8] FR-039 旅行の中の情報の訂正の申し出 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/planner/${currentPlan.id}/corrections`)}
+            >
+              ✏️ 訂正の申し出
             </Button>
           </div>
 

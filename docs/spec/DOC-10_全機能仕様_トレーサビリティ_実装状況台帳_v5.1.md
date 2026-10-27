@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r19** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-26  
+> 文書ID: DOC-10 / 版: **v5.1-r20** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-27  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,9 +14,9 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `2576a91`(Gate G6。この後に、この版を入れる Gate G7 の commit が続く) |
-| Alembic head | `e8b2c6d0f4a7`(単一の head。G6 `d7f1b5c9e2a6` の後、G7 で移動・滞在の既定・最終の便・猶予つきのアカウントの削除) |
-| 基準の試験の実測(サンドボックス、G7 の予行) | backend pytest 1,197 合格・1 飛ばし / frontend vitest 782 合格・標準エラー 0 行 / E2E 70 合格(本番用の配信 static-server.mjs で実行。計算の確認を常に求める設定でも 70 合格)/ mypy の誤り 1,383 件(基準を 7 件下げた)/ 最初に読む JS 448.82 kB(上限 450 kB) |
+| 基準commit | `083e6b1`(Gate G7 `d0630f8` の後の GCP 開発環境 PR #1〜#3。この後に、この版を入れる Gate G8 の commit が続く) |
+| Alembic head | `f4d8a2c6e9b1`(単一の head。G7 `e8b2c6d0f4a7` の後、G8 で案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録) |
+| 基準の試験の実測(サンドボックス、G8 の予行) | backend pytest 1,214 合格・1 飛ばし / frontend vitest 812 合格・標準エラー 0 行 / E2E 75 合格(本番用の配信 static-server.mjs で実行。計算の確認を常に求める設定では account-deletion が1回だけ落ち、単独の流し直し3回は合格)/ mypy の誤り 1,382 件(基準を 1 件下げた)/ 最初に読む JS 422.41 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -63,13 +63,13 @@
 | 見方 | 値 |
 |---|---|
 | コードがある機能(IMPLEMENTED 以上) | 57/58 = 98% |
-| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 19) |
-| VERIFIED | 34/58 = 59% |
+| INTEGRATED 以上 | 57/58 = 98%(うち(部分) 17) |
+| VERIFIED | 38/58 = 66% |
 | RELEASED | 0/58 = 0% |
-| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約80.5% |
+| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約81.9% |
 | 未着手(SPECIFIED 以下) | FR-058 |
 
-VERIFIED の一覧: 001/002/003/005/006/009/010/012/013/016/017/020/021/022/023/025/026/027/028/029/031/032/033/034/038/040/043/044/045/047/048/050/053/057。
+VERIFIED の一覧: 001/002/003/004/005/006/009/010/012/013/016/017/019/020/021/022/023/025/026/027/028/029/031/032/033/034/038/039/040/043/044/045/047/048/050/051/053/057。
 <!-- /generated:summary -->
 
 ## 3. 親機能のトレーサビリティ(全58 FR)
@@ -83,7 +83,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-001 | ゲスト旅行開始 | VERIFIED | ✓ | #35・R1・R2 | KPI、回復UX |
 | FR-002 | ゲスト昇格 | VERIFIED | ✓ | G1・A1 | 全所有物の移管のE2E、重複統合 |
 | FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | メールの確認、passkey |
-| FR-004 | 旅行CRUD | INTEGRATED | 一部 | B-012 | 定期実行の継続記録、複数端末の同時編集のE2E |
+| FR-004 | 旅行CRUD | VERIFIED | ✓ | B-012・G8 | 本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1) |
 | FR-005 | 日・イベント | VERIFIED | ✓ | B-013・G7 | 実機 mobile のタッチでの並べ替え |
 | FR-006 | NOW/NEXT | VERIFIED | ✓ | L1・L1b | 実機mobile、夜行便のE2E |
 | FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2 | 画像・音声からの候補(OCR・音声認識)、候補への投票、URLの題名・画像の取得 |
@@ -98,9 +98,9 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-016 | 制約 | VERIFIED | ✓ | L2 | 制約の変更の Undo |
 | FR-017 | 実行可能性 | VERIFIED | ✓ | L3・G7 | 時刻表の照合 |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | ✓ | L4・G7 | 外部経路による実移動時間 |
-| FR-019 | What-if | INTEGRATED(部分) | ✓ | P7・G7 | 案の中で予約・移動区間そのものを変える分岐 |
+| FR-019 | What-if | VERIFIED | ✓ | P7・G7・G8 | 案どうしの統合(rebase) |
 | FR-020 | 共同編集 | VERIFIED | ✓ | C1・G2 | 文字単位の同時編集(CRDT)は対象外(版の競合を検出する方式) |
-| FR-021 | 共有・権限 | VERIFIED | ✓ | #25・#30・E1 | 所有者の移譲 |
+| FR-021 | 共有・権限 | VERIFIED | ✓ | #25・#30・E1・G8 | 組織(B2B)の旅行の所有者の移譲(組織の管理で扱う) |
 | FR-022 | 合意形成 | VERIFIED | ✓ | P3・G4 | 利用の計測、本番での確認(RELEASE-1) |
 | FR-023 | 秘匿プロフィール・制約 | VERIFIED | ✓ | L2・C1 | — |
 | FR-024 | コメント・通知 | INTEGRATED(部分) | ✓ | P3・G4 | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
@@ -118,7 +118,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-036 | Calendar/Map IO | INTEGRATED(部分) | ✓ | P5・P8 | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
 | FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6 | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
-| FR-039 | 輸出・削除 | INTEGRATED(部分) | ✓ | P6・P9・G7 | 所有者の移譲、出典つきの訂正 |
+| FR-039 | 輸出・削除 | VERIFIED | ✓ | P6・P9・G7・G8 | 書類の写しの添付による出典の証明 |
 | FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2・G4 | 管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1) |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | ✓ | B1・G5 | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | ✓ | B1・G2 | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
@@ -130,7 +130,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時) |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | ✓ | V2 | 候補の層、地図タイルの上への表示 |
 | FR-050 | 訪問判定・信頼度 | VERIFIED | ✓ | V2 | — |
-| FR-051 | 訪問訂正・除外 | INTEGRATED | ✓ | V2・Q1・G6 | VERIFIED の証拠の整理(V3) |
+| FR-051 | 訪問訂正・除外 | VERIFIED | ✓ | V2・Q1・G6・G8 | 実機の GPS での訂正・除外の確認(PoC) |
 | FR-052 | Personal Travel Atlas | INTEGRATED(部分) | ✓ | P15 | 国・都道府県・市区町村・テーマ別(逆ジオコーディング)、地点単位の公開範囲 |
 | FR-053 | 旅の達成指標 | VERIFIED | ✓ | P14 | — |
 | FR-054 | 予定と実績 | INTEGRATED(部分) | ✓ | P14 | 予定経路と GPS 軌跡の比較 |
@@ -156,13 +156,14 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 
 | 区分 | 現在 | 証拠 |
 |---|---|---|
-| CI | 5ジョブが blocking(secret-scan / dependency-audit / frontend / backend / e2e)。**G1: pytest と E2E の結果(JUnit)を保存し、VERIFIED の証拠の合格を照合。frontend の bundle の上限(main 450kB・gzip 150kB)** | `.github/workflows/ci.yml`、`scripts/ci/` |
+| CI | 5ジョブが blocking(secret-scan / dependency-audit / frontend / backend / e2e)。**G1: pytest と E2E の結果(JUnit)を保存し、VERIFIED の証拠の合格を照合。frontend の bundle の上限(main 450kB・gzip 150kB)。G9 Q03 で main を 430kB に下げた** | `.github/workflows/ci.yml`、`scripts/ci/` |
 | main の保護 | 必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴(H1 で設定)。**G1: 設定を `docs/ops/evidence/branch-protection.json` に記録** | `scripts/ops/ci_gate.py export` |
 | 秘密の検査 | 追跡中のファイルの中身と、**G1: ファイルの種類(.env・鍵・Redis のダンプ・DB のファイル)**。`backend/dump.rdb` を追跡から外した | `scripts/security/scan_secrets.py` |
 | 依存の脆弱性 | pip-audit 0件。npm audit 0件(G2 で例外 0 件) | `scripts/security/audit_deps.py` |
 | 試験の品質(G3) | 単体試験の標準エラー 0 行・本物の通信の禁止・再試行なし(vitest)。E2E の flaky を別に数え issue 化。coverage・migration の構造の差分・mypy の基準(増やさない) | `scripts/ci/`、`backend/mypy-baseline.txt` |
 | 性能(G3) | 外部キーの索引の欠落 0・主な API の SQL の数が件数で増えない(N+1)・主な問い合わせの索引の使用。毎晩、予定 10,000・通知 100,000 で p95 | `backend/tests/test_gate_g3_perf.py`、`.github/workflows/perf.yml` |
 | 画面の配信(G3) | `vite preview` をやめ、依存なしの本番用の配信(CSP・キャッシュ・圧縮・SPA) | `frontend/server/static-server.mjs` |
+| 見た目の基準(G9) | UX-0 今の6画面の記録(PC・スマホ)と壊してはいけない所の E2E、UX-1 デザインの決まり(色・面4種類・文字と地の AA・暗い見た目)と一覧 `/design-system` | `docs/ux/UX-0_baseline.md`、`frontend/e2e/ux-baseline.spec.ts`、`frontend/src/styles/tokens.ts`、`docs/adr/ADR-design-tokens.md` |
 | エラーの説明(G3) | 全てのエラーの応答に問い合わせ番号・再試行の可否・code。一覧はコードから生成 | `docs/spec/error-catalog.md` |
 | 運用 | バックアップ・別DBへの復元演習・監視・ログの漏れの検査・封じ込め・**G1: 鍵の点検と版の切り替え(`tcops.py keys`)** | `docs/ops/RUNBOOK.md`、`docs/ops/KEY-INVENTORY.md` |
 
@@ -203,7 +204,9 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | 4 | G4(済) | 検索のコマンド・場所の例外日と入口・合意の決定・対象ごとのコメント・ゲストの閲覧の複製・濫用の検知の画面 | あり | なし |
 | 5 | G5(済) | 予算の版と為替の記録・精算の取消と端数・使用量の上限・組織のロゴ・ドメイン・席 | あり | なし |
 | 5b | G6(済) | オフラインの端末ごとの鍵と失効・日程と並びのオフラインの編集・位置のぼかし(守る範囲・軌跡の両端)・旅行記の公開と失効・記録の削除の取り消し | あり | なし |
-| 5c | **G7(本版)** | 移動の既定の滞在・疲れと休憩・最終の便(MOVE-03)・目的の内訳と部分の採用(MOVE-04)・記録の残り(MEM-03)・日をまたぐ予定・もしもの比較・猶予つきの削除 | あり | なし |
+| 5c | G7(済) | 移動の既定の滞在・疲れと休憩・最終の便(MOVE-03)・目的の内訳と部分の採用(MOVE-04)・記録の残り(MEM-03)・日をまたぐ予定・もしもの比較・猶予つきの削除 | あり | なし |
+| 5d | **G8・G9 前半(本版)** | 案の中の区間・予約の変更と選んだ変更だけの採用・所有者の移譲・出典つきの訂正・定期の処理の記録・2つの端末の同時の編集(G8)、最初に読む JS 430kB・今の画面の記録・デザインの決まり(G9 Q03・UX-0・UX-1) | あり | なし |
+| 5e | G9 後半 | UX-2 以降(旅行の表紙・すりガラスの面・当日の地図の画面・既存の部品の置き換え・暗い見た目の全体) | なし | 見た目の確認 |
 | 6 | PROD-1・2 | HTTPS・WAF・private origin・Cloud SQL・Redis・GCS・ClamAV・別系統のバックアップ・外部監視・KMS | 場合により | GCP の project・domain・費用 |
 | 7 | MAP-P / OCR-P | 地図・経路・ジオコード・OCR・天気・メールの提供元 | cache 等 | 契約・API キー |
 | 8 | BILL-1 | FR-058 料金 | あり | **利用者の決定が必須** |
@@ -226,7 +229,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r16 | 2026-10-22 | `f327971`+G3 | Gate G4: 場所の例外の日・最終入場・ラストオーダー・入口・出典の違い(MAP-02)・検索のコマンド(MAP-03)・合意の決定の採用・締切・定足数・同点(COL-02)・対象ごとのコメント・通知の設定・メールのまとめと再送(COL-03)・ゲストの閲覧の確認・一時トークン・複製(COL-05)・濫用への対応(FC-097)。FR-022 を VERIFIED。FR-008・FR-024 は外部の提供元(地図・メール)が残るため(部分)のまま。`docs/trace/gate-g4-trace.md` |
 | r17 | 2026-10-23 | `f327971`+G3+G4 | Gate G5: 為替の記録(出典・基準日)・予算の版(当初・更新・確定・実績)・確定した予約額の換算と換算できない通貨の別表示(FIN-01)・支出の取消・端数の規則・精算の締め・領収書の選択・精算の冪等(FIN-02)・使用量の上限(soft/hard・管理者の上書き。BILL-02)・組織のロゴ・独自のドメインの確認・席の上限(ORG-01)。FR-027 を VERIFIED。FR-041 は料金(FR-058)が残るため(部分)のまま。`docs/trace/gate-g5-trace.md` |
 | r18 | 2026-10-23 | `f327971`+G3+G4+G5 | Gate G6: オフラインの端末ごとの鍵(期限・1台だけの失効・失効した端末の消去。OFF-01)・日程と並びのオフラインの編集と依存の順・予約はオンラインだけ(OFF-02)・守る範囲と書き出し・公開での位置のぼかし(LOC-02)・旅行記の公開と失効・記録の削除の取り消し(MEM-01)。FR-048 を VERIFIED。FR-051 は(部分)を外した。FR-037 は顔の検査・MEMORY MAP(外部の提供元)が残るため(部分)のまま。`docs/trace/gate-g6-trace.md` |
-| **r19** | 2026-10-26 | `2576a91` | **Gate G7: 移動・滞在の既定・休憩の自動判定・日ごとの疲れ・最終の便(MOVE-03)・目的の内訳・条件の変更・選んだ予定だけの採用(MOVE-04)・同じ同行者と移動手段の傾向(MEM-03)・日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグ(FR-005)・本案と案の比較(FR-019)・猶予つきのアカウントの削除(FR-039)。FR-005・FR-057 を VERIFIED。FR-017 は時刻表の照合だけが残る。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま。`docs/trace/gate-g7-trace.md`** |
+| r19 | 2026-10-26 | `2576a91` | **Gate G7: 移動・滞在の既定・休憩の自動判定・日ごとの疲れ・最終の便(MOVE-03)・目的の内訳・条件の変更・選んだ予定だけの採用(MOVE-04)・同じ同行者と移動手段の傾向(MEM-03)・日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグ(FR-005)・本案と案の比較(FR-019)・猶予つきのアカウントの削除(FR-039)。FR-005・FR-057 を VERIFIED。FR-017 は時刻表の照合だけが残る。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま。`docs/trace/gate-g7-trace.md` |
+| **r20** | 2026-10-27 | `083e6b1` | **Gate G8: 案の中の移動区間・予約の変更と選んだ変更だけの採用・予約の取消の手続き(FR-019)・所有者の移譲(FR-021・FR-039)・出典・確認・履歴つきの訂正と所有者への訂正の申し出(FR-039)・定期の処理の実行の記録と遅れ・失敗の監視・2つの端末の同時の編集の E2E(FR-004)・訪問の訂正の証拠の整理(FR-051)。FR-004・FR-019・FR-039・FR-051 を VERIFIED。Gate G9 前半: 最初に読む JS の上限 430kB(Q03)・今の6画面の記録と壊してはいけない所の E2E(UX-0)・デザインの決まり(UX-1)。`docs/trace/gate-g8-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

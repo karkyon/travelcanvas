@@ -6,19 +6,20 @@
 import { SegmentsApi } from './segments';
 import type { AdoptRouteOptionResponse, RouteLeg, RouteLegCreateData, RouteLegUpdateData, RouteOption, RouteOptionCreateData, RouteOptionDeleteResult, RouteOptionUpdateData } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { adoptRouteOptionResponse, revisionResult, routeLeg, routeOption, routeOptionDeleteResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class RouteOptionsApi extends SegmentsApi {
   // backend/app/api/v1/route_options.py (Gate M3)。/plans/{planId}/route-options配下。
 
   async getRouteOptions(planId: string): Promise<RouteOption[]> {
     const response = await this.client.get(`/plans/${planId}/route-options`);
-    return decodeResponse(response.data, arrayOf(routeOption), 'GET /plans/{plan_id}/route-options');
+    return decodeResponse(response.data, arrayOf((await DL()).routeOption), 'GET /plans/{plan_id}/route-options');
   }
 
   async getRouteOption(planId: string, optionId: string): Promise<RouteOption> {
     const response = await this.client.get(`/plans/${planId}/route-options/${optionId}`);
-    return decodeResponse(response.data, routeOption, 'GET /plans/{plan_id}/route-options/{option_id}');
+    return decodeResponse(response.data, (await DL()).routeOption, 'GET /plans/{plan_id}/route-options/{option_id}');
   }
 
   async createRouteOption(
@@ -27,7 +28,7 @@ export class RouteOptionsApi extends SegmentsApi {
     const response = await this.client.post(
       `/plans/${planId}/route-options`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
     );
-    return decodeResponse(response.data, routeOption, 'POST /plans/{plan_id}/route-options');
+    return decodeResponse(response.data, (await DL()).routeOption, 'POST /plans/{plan_id}/route-options');
   }
 
   async updateRouteOption(
@@ -36,7 +37,7 @@ export class RouteOptionsApi extends SegmentsApi {
     const response = await this.client.patch(
       `/plans/${planId}/route-options/${optionId}`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, routeOption, 'PATCH /plans/{plan_id}/route-options/{option_id}');
+    return decodeResponse(response.data, (await DL()).routeOption, 'PATCH /plans/{plan_id}/route-options/{option_id}');
   }
 
   // [Gate B-013] 採用済みの候補を削除しても、採用した移動区間は残り参照だけが外れる。
@@ -44,7 +45,7 @@ export class RouteOptionsApi extends SegmentsApi {
     const response = await this.client.delete(
       `/plans/${planId}/route-options/${optionId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, routeOptionDeleteResult, 'DELETE /plans/{plan_id}/route-options/{option_id}');
+    return decodeResponse(response.data, (await DL()).routeOptionDeleteResult, 'DELETE /plans/{plan_id}/route-options/{option_id}');
   }
 
   async addRouteLeg(
@@ -53,7 +54,7 @@ export class RouteOptionsApi extends SegmentsApi {
     const response = await this.client.post(
       `/plans/${planId}/route-options/${optionId}/legs`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, routeLeg, 'POST /plans/{plan_id}/route-options/{option_id}/legs');
+    return decodeResponse(response.data, (await DL()).routeLeg, 'POST /plans/{plan_id}/route-options/{option_id}/legs');
   }
 
   async updateRouteLeg(
@@ -63,7 +64,7 @@ export class RouteOptionsApi extends SegmentsApi {
       `/plans/${planId}/route-options/${optionId}/legs/${legId}`, data,
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, routeLeg, 'PATCH /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
+    return decodeResponse(response.data, (await DL()).routeLeg, 'PATCH /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
   }
 
   async deleteRouteLeg(
@@ -73,7 +74,7 @@ export class RouteOptionsApi extends SegmentsApi {
       `/plans/${planId}/route-options/${optionId}/legs/${legId}`,
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
+    return decodeResponse(response.data, (await DL()).revisionResult, 'DELETE /plans/{plan_id}/route-options/{option_id}/legs/{leg_id}');
   }
 
   async adoptRouteOption(
@@ -82,6 +83,6 @@ export class RouteOptionsApi extends SegmentsApi {
     const response = await this.client.post(
       `/plans/${planId}/route-options/${optionId}/adopt`, {}, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, adoptRouteOptionResponse, 'POST /plans/{plan_id}/route-options/{option_id}/adopt');
+    return decodeResponse(response.data, (await DL()).adoptRouteOptionResponse, 'POST /plans/{plan_id}/route-options/{option_id}/adopt');
   }
 }

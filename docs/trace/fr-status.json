@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r19",
+  "revision": "v5.1-r20",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -37,11 +37,11 @@
   },
   "FR-004": {
    "title": "旅行CRUD",
-   "status": "INTEGRATED",
+   "status": "VERIFIED",
    "partial": false,
-   "e2e": "一部",
-   "gates": "B-012",
-   "gaps": "定期実行の継続記録、複数端末の同時編集のE2E"
+   "e2e": "✓",
+   "gates": "B-012・G8",
+   "gaps": "本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1)"
   },
   "FR-005": {
    "title": "日・イベント",
@@ -157,11 +157,11 @@
   },
   "FR-019": {
    "title": "What-if",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "P7・G7",
-   "gaps": "案の中で予約・移動区間そのものを変える分岐"
+   "gates": "P7・G7・G8",
+   "gaps": "案どうしの統合(rebase)"
   },
   "FR-020": {
    "title": "共同編集",
@@ -176,8 +176,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "#25・#30・E1",
-   "gaps": "所有者の移譲"
+   "gates": "#25・#30・E1・G8",
+   "gaps": "組織(B2B)の旅行の所有者の移譲(組織の管理で扱う)"
   },
   "FR-022": {
    "title": "合意形成",
@@ -317,11 +317,11 @@
   },
   "FR-039": {
    "title": "輸出・削除",
-   "status": "INTEGRATED",
-   "partial": true,
+   "status": "VERIFIED",
+   "partial": false,
    "e2e": "✓",
-   "gates": "P6・P9・G7",
-   "gaps": "所有者の移譲、出典つきの訂正"
+   "gates": "P6・P9・G7・G8",
+   "gaps": "書類の写しの添付による出典の証明"
   },
   "FR-040": {
    "title": "管理・監査",
@@ -413,11 +413,11 @@
   },
   "FR-051": {
    "title": "訪問訂正・除外",
-   "status": "INTEGRATED",
+   "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "V2・Q1・G6",
-   "gaps": "VERIFIED の証拠の整理(V3)"
+   "gates": "V2・Q1・G6・G8",
+   "gaps": "実機の GPS での訂正・除外の確認(PoC)"
   },
   "FR-052": {
    "title": "Personal Travel Atlas",

@@ -21,11 +21,17 @@ from app.services.plan_deletion import purge_expired_plans  # noqa: E402
 
 
 def main() -> int:
-    session = SessionLocal()
-    try:
-        counts = purge_expired_plans(session)
-    finally:
-        session.close()
+    from app.ops.job_runs import recorded
+
+    def run():
+        session = SessionLocal()
+        try:
+            return purge_expired_plans(session)
+        finally:
+            session.close()
+
+    # [Gate G8] FR-004 実行の記録(最後の成功の時刻。件数だけ)
+    counts = recorded("plan-purge", run)
     print("Plan purge完了:")
     for key, value in counts.items():
         print(f"  {key}: {value}")

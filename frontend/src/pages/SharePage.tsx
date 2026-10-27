@@ -30,6 +30,7 @@ import { errorDetailMessage } from '../utils/apiErrorDetail';
 import SharedPlanView from '../components/share/SharedPlanView';
 import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
 import MemberPolicyPanel from '@/components/share/MemberPolicyPanel';
+import OwnershipTransferPanel from '@/components/share/OwnershipTransferPanel';
 import LocalQrCode from '../components/share/LocalQrCode';
 
 const PRESET_BUTTONS: Array<{ value: SharePreset; label: string }> = [
@@ -724,6 +725,15 @@ const SharePage: React.FC = () => {
 
             {/* [Gate G2] FR-045 参加者に見せない項目(所有者だけに表示) */}
             <MemberPolicyPanel planId={planId!} reloadKey={collaborators.length} />
+
+            {/* [Gate G8] FR-021 所有者の移譲(所有者だけに表示) */}
+            <OwnershipTransferPanel planId={planId!} reloadKey={collaborators.length} />
+            <p className="mt-4 text-sm">
+              <a className="text-blue-700 underline" href={`/planner/${planId}/corrections`}
+                onClick={(e) => { e.preventDefault(); navigate(`/planner/${planId}/corrections`); }}>
+                参加者からの情報の訂正の申し出を見る
+              </a>
+            </p>
           </div>
         </div>
 

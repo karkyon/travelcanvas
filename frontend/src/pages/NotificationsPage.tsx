@@ -15,6 +15,7 @@ import { notificationsAPI, listMyInvitations, acceptInvitation, declineInvitatio
 import type { Notification, Collaborator } from '@/services/api';
 import { toast } from 'react-hot-toast';
 import NotificationSettingsPanel from '@/components/notifications/NotificationSettingsPanel';
+import IncomingTransfers from '@/components/notifications/IncomingTransfers';
 import { safeInternalPath } from '@/utils/safeNavigation';
 
 const NotificationsPage: React.FC = () => {
@@ -140,6 +141,9 @@ const NotificationsPage: React.FC = () => {
 
       <NotificationSettingsPanel />
 
+      {/* [Gate G8] FR-021 自分あての所有者の移譲の申し出 */}
+      <IncomingTransfers />
+
       {!invitationsLoading && invitations.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
@@ -218,7 +222,7 @@ const NotificationsPage: React.FC = () => {
                   {notification.message && (
                     <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                   )}
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-600 mt-2">
                     {new Date(notification.created_at).toLocaleString('ja-JP')}
                   </p>
                 </div>
@@ -228,7 +232,7 @@ const NotificationsPage: React.FC = () => {
                       e.stopPropagation();
                       handleMarkAsRead(notification.id);
                     }}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-100 rounded-sm transition-colors shrink-0"
+                    className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-sm transition-colors shrink-0"
                     title="既読にする"
                   >
                     <Check size={16} />

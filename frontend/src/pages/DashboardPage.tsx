@@ -226,7 +226,7 @@ const DashboardPage: React.FC = () => {
                   <span className="text-xl">{activity.type === 'spot' ? '📍' : '🗺️'}</span>
                   <div className="flex-1">
                     <p className="text-sm text-gray-800">{activity.label}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-600">
                       {new Date(activity.createdAt).toLocaleString('ja-JP')}
                     </p>
                   </div>

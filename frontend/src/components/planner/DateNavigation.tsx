@@ -282,7 +282,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
                         <div key={idx} className="truncate">• {highlight}</div>
                       ))}
                       {day.highlights.length > 2 && (
-                        <div className="text-gray-400">他{day.highlights.length - 2}件...</div>
+                        <div className="text-gray-600">他{day.highlights.length - 2}件...</div>
                       )}
                     </div>
                   </div>

@@ -595,6 +595,25 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
   (管理者の権限を外してから本人が削除する。§8.5)。本人からの「取り消したい」: 予定日の前なら画面で取り消せる。
   定期実行を登録済みなら `python3 scripts/ops/tcops.py schedule install` をもう一度実行すると足される。
 
+## 8.14 案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録(Gate G8)
+
+- **定期の処理の記録**(FR-004・O02): 9つの定期の処理は実行ごとに `ops_job_runs` へ時刻・成否・件数だけを残す(30日で消す)。
+  確かめる: `docker compose exec -T backend python -m app.ops.job_runs status`(1行の JSON)、または管理者の画面の「定期の処理」。
+  判定は ok(最後の成功が 間隔×2+10分 以内)・overdue(それより古い)・failing(最後の実行が失敗)・never(記録なし)。
+  `tcops.py monitor` は overdue・failing を `job_overdue:<名前>`・`job_failing:<名前>` として知らせる(never は知らせない)。
+  - `never` しか無い: 定期実行が未登録(§2.1 の `schedule install`)。
+  - `overdue`: crontab が消えた・コンテナが止まっていた。`crontab -l` と §3.1 を確かめ、処理を手で1回動かす
+    (例: `python3 scripts/ops/tcops.py jobs account-deletions`)。
+  - `failing`: `last_error`(例外の種類だけ)とコンテナのログを確かめる。DB・Redis の障害なら §3.1・§3.2。
+- **案の中の区間・予約**(FR-019): 案で「取り消す予定」にした予約は、採用しても予約先では取り消されない。準備の一覧に
+  「予約の取消の手続き: <予約>」が入る。問い合わせ「採用したのに予約が残っている」: 手続きの後に予約の状態を「取消」にする。
+  採用は本案の「元に戻す」で戻せる(採用の後に予約の紐付けを手で変えていれば 409。紐付けを戻してからやり直す)。
+- **所有者の移譲**(FR-021): 手続き中(期限7日、`OWNERSHIP_TRANSFER_DAYS`)は旅行の削除・受け取る人を外すことが 409
+  (`ownership_transfer_pending`)。問い合わせ「旅行を消せない」: 共有の画面の「所有者の移譲」で申し出を取り下げる。
+  運用者が所有者を直接書き換えることはしない(本人どうしの申し出と受け入れで行う)。
+- **訂正**(FR-039): 本人の情報の訂正の前後と出典は本人だけが見られる(運用者・監査ログには値を残さない)。旅行の中の情報の
+  訂正の申し出は旅行の所有者が対応する。`ENCRYPTION_KEY` が無い環境では 503(`encryption_not_configured`)で何も変えない。
+
 ## 9. CI と main の保護(Gate S11)
 
 - main は保護する: 必須の CI(secret-scan / dependency-audit / frontend / backend / e2e)、管理者にも適用、強制 push・削除の禁止。
@@ -630,6 +649,7 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 | 2026-10-22 | 13 | Gate G4: 検索のコマンド・合意の採用・通知の設定とメールのまとめ・ゲストの閲覧・濫用への対応(§8.10)、定期実行 poll-deadlines・email-outbox・abuse-scan(§2.1) |
 | 2026-10-23 | 14 | Gate G5: 為替の記録・予算の版・支出の取消・精算の締め・使用量の上限・組織のロゴ・独自のドメイン・席の上限(§8.11、`USAGE_LIMITS` §2.3) |
 | 2026-10-23 | 15 | Gate G6: オフラインの端末ごとの鍵と失効・日程と並びのオフラインの編集・守る範囲・旅行記の公開・記録の削除の取り消し(§8.12)、定期実行 memory-trash(§2.1) |
+| 2026-10-27 | 17 | Gate G8: 定期の処理の記録と遅れ・失敗の監視、案の中の区間・予約、所有者の移譲、出典つきの訂正(§8.14) |
 | 2026-10-26 | 16 | Gate G7: 移動・滞在の既定・最終の便・日をまたぐ予定・案の比較・猶予つきのアカウントの削除(§8.13)、定期実行 account-deletions(§2.1) |
 | 2026-10-22 | 12 | Gate G3: 画面の本番用の配信・データ鍵と鍵の破棄による削除・バックアップの鍵の写し(§4.1・§8.9)、TOTP の鍵と解除の二者の確認(§8.3)、エラーの問い合わせ番号・性能の検査(§8.9)。定期実行を登録済みなら `schedule install` をもう一度実行すると `keys purge-escrow` が足される |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |

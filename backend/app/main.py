@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
-    privacy_zones, memory_publish, movement,
+    privacy_zones, memory_publish, movement, ownership, corrections,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -586,6 +586,9 @@ app.include_router(private_profile.plan_router, prefix="/api/v1")
 # [Gate B1] FR-041 組織・B2B / FR-042 外部連携(OAuth client_credentials・Webhook)
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(org_external.router, prefix="/api/v1")
+# [Gate G8] FR-021・FR-039 所有者の移譲(/plans/{id}/ownership-transfer・/ownership-transfers)・出典つきの訂正
+app.include_router(ownership.router, prefix="/api/v1")
+app.include_router(corrections.router, prefix="/api/v1")
 
 
 @app.exception_handler(org_external.ApiError)

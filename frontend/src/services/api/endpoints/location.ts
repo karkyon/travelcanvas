@@ -13,29 +13,27 @@ import type {
   TripLocationMode,
 } from '../types';
 import { decodeResponse } from '../decode';
-import {
-  areaCellsUploadResult, locationSettings, locationTrack, locationTrackDetail, locationTrackList,
-  trackPointsDeleteResult, trackPointsUploadResult,
-} from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class LocationApi extends MemoriesApi {
   async getLocationTracks(planId: string): Promise<LocationTrackList> {
     const response = await this.client.get(`/plans/${planId}/location-tracks`, SILENT);
-    return decodeResponse(response.data, locationTrackList, 'GET /plans/{plan_id}/location-tracks');
+    return decodeResponse(response.data, (await DL()).locationTrackList, 'GET /plans/{plan_id}/location-tracks');
   }
 
   /** [Gate L5] mode を省略すると、この旅行の位置の設定で始める */
   async startLocationTrack(planId: string, mode: TrackMode | null, precision: TrackPrecision): Promise<LocationTrack> {
     const body = mode ? { mode, precision } : { precision };
     const response = await this.client.post(`/plans/${planId}/location-tracks`, body, SILENT);
-    return decodeResponse(response.data, locationTrack, 'POST /plans/{plan_id}/location-tracks');
+    return decodeResponse(response.data, (await DL()).locationTrack, 'POST /plans/{plan_id}/location-tracks');
   }
 
   async getLocationTrack(planId: string, trackId: string): Promise<LocationTrackDetail> {
     const response = await this.client.get(`/plans/${planId}/location-tracks/${trackId}`, SILENT);
-    return decodeResponse(response.data, locationTrackDetail, 'GET /plans/{plan_id}/location-tracks/{track_id}');
+    return decodeResponse(response.data, (await DL()).locationTrackDetail, 'GET /plans/{plan_id}/location-tracks/{track_id}');
   }
 
   async changeLocationTrack(
@@ -44,7 +42,7 @@ export class LocationApi extends MemoriesApi {
     const response = await this.client.patch(`/plans/${planId}/location-tracks/${trackId}`, { action }, {
       ...SILENT, headers: { 'If-Match': String(revision) },
     });
-    return decodeResponse(response.data, locationTrack, 'PATCH /plans/{plan_id}/location-tracks/{track_id}');
+    return decodeResponse(response.data, (await DL()).locationTrack, 'PATCH /plans/{plan_id}/location-tracks/{track_id}');
   }
 
   async uploadTrackPoints(
@@ -53,14 +51,14 @@ export class LocationApi extends MemoriesApi {
     const response = await this.client.post(
       `/plans/${planId}/location-tracks/${trackId}/points`, { batch_id: batchId, points }, SILENT,
     );
-    return decodeResponse(response.data, trackPointsUploadResult, 'POST /plans/{plan_id}/location-tracks/{track_id}/points');
+    return decodeResponse(response.data, (await DL()).trackPointsUploadResult, 'POST /plans/{plan_id}/location-tracks/{track_id}/points');
   }
 
   async deleteTrackPoints(planId: string, trackId: string, start: string, end: string): Promise<TrackPointsDeleteResult> {
     // [Gate S1] axios 1.20 で params の型が config の型引数から推論されるようになったため、型を明示する
     const config: AxiosRequestConfig = { ...SILENT, params: { start, end } };
     const response = await this.client.delete(`/plans/${planId}/location-tracks/${trackId}/points`, config);
-    return decodeResponse(response.data, trackPointsDeleteResult, 'DELETE /plans/{plan_id}/location-tracks/{track_id}/points');
+    return decodeResponse(response.data, (await DL()).trackPointsDeleteResult, 'DELETE /plans/{plan_id}/location-tracks/{track_id}/points');
   }
 
   async deleteLocationTrack(planId: string, trackId: string): Promise<void> {
@@ -70,7 +68,7 @@ export class LocationApi extends MemoriesApi {
   /** [Gate L5] この旅行の位置の扱い(本人の分。mode が null ならまだ選んでいない) */
   async getLocationSettings(planId: string): Promise<LocationSettings> {
     const response = await this.client.get(`/plans/${planId}/location-settings`, SILENT);
-    return decodeResponse(response.data, locationSettings, 'GET /plans/{plan_id}/location-settings');
+    return decodeResponse(response.data, (await DL()).locationSettings, 'GET /plans/{plan_id}/location-settings');
   }
 
   /** [Gate L5] 位置の扱いを変える(If-Match: 設定の revision。未設定は 0)。off にすると記録中の軌跡は止まる */
@@ -78,7 +76,7 @@ export class LocationApi extends MemoriesApi {
     const response = await this.client.put(`/plans/${planId}/location-settings`, { mode }, {
       ...SILENT, headers: { 'If-Match': String(revision) },
     });
-    return decodeResponse(response.data, locationSettings, 'PUT /plans/{plan_id}/location-settings');
+    return decodeResponse(response.data, (await DL()).locationSettings, 'PUT /plans/{plan_id}/location-settings');
   }
 
   /** [Gate L5] 「訪問地域だけ同期」の区画を送る(同じ区画は合わせられるので送り直してよい) */
@@ -86,7 +84,7 @@ export class LocationApi extends MemoriesApi {
     const response = await this.client.post(
       `/plans/${planId}/location-tracks/${trackId}/area-cells`, { cells }, SILENT,
     );
-    return decodeResponse(response.data, areaCellsUploadResult, 'POST /plans/{plan_id}/location-tracks/{track_id}/area-cells');
+    return decodeResponse(response.data, (await DL()).areaCellsUploadResult, 'POST /plans/{plan_id}/location-tracks/{track_id}/area-cells');
   }
 
   /** [Gate L5] 端末の記録の観測値(電池・欠測率・取得の間隔の内訳。座標を含まない) */
@@ -94,6 +92,6 @@ export class LocationApi extends MemoriesApi {
     const response = await this.client.put(
       `/plans/${planId}/location-tracks/${trackId}/sampling`, { sampling }, SILENT,
     );
-    return decodeResponse(response.data, locationTrack, 'PUT /plans/{plan_id}/location-tracks/{track_id}/sampling');
+    return decodeResponse(response.data, (await DL()).locationTrack, 'PUT /plans/{plan_id}/location-tracks/{track_id}/sampling');
   }
 }

@@ -19,73 +19,41 @@
  *  TicketStatus/TicketSharePolicy)と一致させている。実backendの応答で検証した契約
  * fixture: __fixtures__/backendContractResponses.json。
  */
-import type { User } from '@/types';
 import type { VisitAssessment, VisitCorrectionResult, VisitItem, VisitsOverview } from './types/visits';
 import type { CandidateList, PlaceInfo, PlanCandidateItem, PlanPlaces } from './types/candidates';
 import type { SearchHit, SearchResults } from './types/planSearch';
-import type {
-  PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld,
-} from './types/share';
-import type {
-  AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, NormalizedDay, NormalizedEvent,
-  NormalizedPlanDetail, Notification, OptimizationProposal, PlaceDetail, PromoteQuickDraftResult,
-  PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation,
-  ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket,
-  TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment,
-  AuthResponse, AuthUser, GuestSessionResponse, ActiveSession, MfaChallenge, MfaRecoveryCodes, MfaSetup, MfaStatus,
-  ConstraintValue, PlanConstraint,
-  AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry,
-  AuditLogPage,
-  PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem,
-  ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary,
-  DeletedPlanSummary, PlanDeleteResult, PlanPurgeResult,
-  CollaboratorRemoveResult, DeletionImpact, ItemDeleteResult, LockedRelationDetail, RouteOptionDeleteResult,
-  UndoConflictDetail,
-  PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem,
-  Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement,
-  PlanComment, Poll, PollOption, PollVote,
-  Booklet, BookletExport, BookletIncludes,
-  RetentionInfo,
-  Branch, BranchAssumptions, BranchDetail,
-  CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState,
-  AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail,
-  OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics,
-  SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse,
-  JournalDraft, JournalMemory, MemoryList, TravelMemory,
-  LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult,
-  AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling,
-  ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview,
-  AtlasCell, AtlasResponse,
-  MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight,
-  OfflinePackKey, OfflinePackKeyRotated,
-} from './types';
-import {
-  arrayOf, bool, exactNumber, int, isRecord, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str,
-  trueOnly, unitInterval, type Decoder,
-} from './decode';
+import type { PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
+import type { AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, OptimizationProposal, PlaceDetail, PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation, ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket, TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment, ConstraintValue, PlanConstraint, AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry, AuditLogPage, PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem, ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary, DeletedPlanSummary, PlanPurgeResult, CollaboratorRemoveResult, LockedRelationDetail, RouteOptionDeleteResult, UndoConflictDetail, PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem, Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement, PlanComment, Poll, PollOption, PollVote, Booklet, BookletExport, BookletIncludes, RetentionInfo, Branch, BranchAssumptions, BranchDetail, CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState, AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail, OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics, SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse, JournalDraft, JournalMemory, MemoryList, TravelMemory, LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult, AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling, ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview, AtlasCell, AtlasResponse, MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight, OfflinePackKey, OfflinePackKeyRotated } from './types';
+import { arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, unitInterval, type Decoder } from './decode';
+import { count } from './decodersCore';
 
-export interface RevisionResult {
-  revision: number;
-}
-
-export const revisionResult: Decoder<RevisionResult> = object<RevisionResult>({ revision: int });
-
-// [Gate B-013] 個別削除で外した紐付け・一緒に削除したデータの件数。件数は利用者への
-// 案内(「予約1件との紐付けを外しました」)に使うため、非負の整数であることを検証する。
-const count = nonNegativeInt;
-
-export const deletionImpact: Decoder<DeletionImpact> = object<DeletionImpact>({
-  reservations_unlinked: count,
-  document_links_removed: count,
-  segments_removed: count,
-  route_options_removed: count,
-  segments_unlinked: count,
-});
-
-export const itemDeleteResult: Decoder<ItemDeleteResult> = object<ItemDeleteResult>({
-  revision: int,
-  detached: optional(deletionImpact),
-});
+// [Gate G9] Q03 起動に要る decoder は decodersCore.ts へ移した(ここから同じ名前で公開し直す)。
+// 起動の経路(auth・plans・notifications の endpoint)以外は、この塊を使う時に読み込む。
+export {
+  revisionResult,
+  deletionImpact,
+  itemDeleteResult,
+  normalizedEvent,
+  normalizedDay,
+  normalizedPlanDetail,
+  promoteQuickDraftResult,
+  legacyTravelPlan,
+  notification,
+  unreadCount,
+  user,
+  authUser,
+  authResponse,
+  mfaChallenge,
+  loginResult,
+  mfaStatus,
+  mfaSetup,
+  mfaRecoveryCodes,
+  activeSession,
+  guestSessionResponse,
+  planDeleteResult,
+  count,
+} from './decodersCore';
+export type { RevisionResult, LegacyTravelPlanCore, UnreadCount } from './decodersCore';
 
 export const routeOptionDeleteResult: Decoder<RouteOptionDeleteResult> = object<RouteOptionDeleteResult>({
   revision: int,
@@ -408,66 +376,6 @@ export const documentLink: Decoder<DocumentLink> = object<DocumentLink>({
   created_at: str,
 });
 
-// ===== [Gate M9-FE-C2b-3] 正規化Plan/Day/Event(/plans) =====
-
-export const normalizedEvent: Decoder<NormalizedEvent> = object<NormalizedEvent>({
-  id: str,
-  day_id: str,
-  title: str,
-  description: optional(nullable(str)),
-  event_type: str,
-  start_at: optional(nullable(str)),
-  end_at: optional(nullable(str)),
-  local_start_time: optional(nullable(str)),
-  is_all_day: bool,
-  address: optional(nullable(str)),
-  latitude: optional(nullable(num)),
-  longitude: optional(nullable(num)),
-  locked: bool,
-  sort_order: int,
-  place_id: optional(nullable(str)),
-});
-
-/** 日の作成・更新応答にはeventsが含まれず、プラン詳細・最適化適用の応答には含まれる。 */
-export const normalizedDay: Decoder<NormalizedDay> = object<NormalizedDay>({
-  id: str,
-  local_date: str,
-  timezone_id: str,
-  title: optional(nullable(str)),
-  notes: optional(nullable(str)),
-  sort_order: int,
-  events: optional(arrayOf(normalizedEvent)),
-});
-
-export const normalizedPlanDetail: Decoder<NormalizedPlanDetail> = object<NormalizedPlanDetail>({
-  id: str,
-  title: str,
-  revision: int,
-  days: arrayOf(normalizedDay),
-  hidden_fields: optional(arrayOf(str)),
-});
-
-export const promoteQuickDraftResult: Decoder<PromoteQuickDraftResult> = object<PromoteQuickDraftResult>({
-  id: str,
-  revision: int,
-  title: optional(nullable(str)),
-  start_date: optional(nullable(str)),
-  end_date: optional(nullable(str)),
-  quick_draft_id: str,
-  quick_draft_status: str,
-});
-
-/**
- * 旧metadata API(/travel-plans)の応答。本体の変換はplanFromApi()が担うため、
- * ここでは後段が必ず使う識別子(id/title)だけを検証する(宣言外の項目は保持される)。
- */
-export interface LegacyTravelPlanCore {
-  id: string;
-  title: string;
-}
-
-export const legacyTravelPlan: Decoder<LegacyTravelPlanCore> = object<LegacyTravelPlanCore>({ id: str, title: str });
-
 // ===== [Gate M9-FE-C2b-3] PLAN MAP・最適化 =====
 
 export const legPreview: Decoder<LegPreview> = object<LegPreview>({
@@ -624,113 +532,6 @@ export const sharePreview: Decoder<SharePreview> = object<SharePreview>({
   }),
 });
 
-// ===== [Gate M9-FE-C2b-3] 通知・認証 =====
-
-export const notification: Decoder<Notification> = object<Notification>({
-  id: str,
-  title: str,
-  message: str,
-  type: str,
-  is_read: bool,
-  related_plan_id: optional(nullable(str)),
-  created_at: str,
-});
-
-export interface UnreadCount {
-  unread_count: number;
-}
-
-export const unreadCount: Decoder<UnreadCount> = object<UnreadCount>({ unread_count: int });
-
-export const user: Decoder<User> = object<User>({
-  id: str,
-  username: str,
-  email: str,
-  is_active: bool,
-  is_verified: optional(bool),
-  is_superuser: optional(bool),
-  role: optional(str),
-  user_type: optional(str),
-  preferences: optional(nullable(record)),
-  created_at: str,
-  updated_at: optional(str),
-});
-
-// ----- [Gate A1] 認証(login/register/guest/guest-upgrade)
-// backend/app/api/v1/auth.py UserResponse / TokenResponse / GuestSessionResponse。
-// user_typeはmodels.py UserTypeの値集合に限定する(AdminRoute等の権限判定に使うため、
-// 想定外の値を黙って受け入れない)。
-const userTypeValue = oneOf('guest', 'registered', 'premium', 'admin', 'super_admin');
-
-export const authUser: Decoder<AuthUser> = object<AuthUser>({
-  id: str,
-  username: str,
-  email: str,
-  user_type: userTypeValue,
-  is_verified: bool,
-});
-
-export const authResponse: Decoder<AuthResponse> = object<AuthResponse>({
-  access_token: str,
-  token_type: str,
-  user: authUser,
-});
-
-// [Gate S11] 多要素認証(backend app/api/v1/mfa.py、auth.py MfaChallengeResponse)
-export const mfaChallenge: Decoder<MfaChallenge> = object<MfaChallenge>({
-  mfa_required: trueOnly,
-  mfa_token: str,
-  methods: arrayOf(str),
-  expires_in: int,
-});
-
-/** POST /auth/login: 確認コードの入力待ち(mfa_required)か、ログイン完了か */
-export const loginResult: Decoder<AuthResponse | MfaChallenge> = (v, path) =>
-  isRecord(v) && v.mfa_required === true ? mfaChallenge(v, path) : authResponse(v, path);
-
-export const mfaStatus: Decoder<MfaStatus> = object<MfaStatus>({
-  enabled: bool,
-  pending: bool,
-  confirmed_at: nullable(str),
-  recovery_codes_remaining: nonNegativeInt,
-  is_admin: bool,
-  required: bool,
-  session_verified: bool,
-  session_verified_at: nullable(str),
-});
-
-export const mfaSetup: Decoder<MfaSetup> = object<MfaSetup>({
-  secret: matching(/^[A-Z2-7]{16,64}$/, 'base32 の秘密'),
-  otpauth_uri: matching(/^otpauth:\/\/totp\//, 'otpauth://totp/ で始まる URI'),
-  digits: int,
-  period: int,
-  algorithm: str,
-});
-
-export const mfaRecoveryCodes: Decoder<MfaRecoveryCodes> = object<MfaRecoveryCodes>({
-  recovery_codes: arrayOf(str),
-});
-
-// [Gate S9] ログイン中の端末(GET /auth/sessions)。device_info(User-Agent 全文)は画面で使わないので読まない
-export const activeSession: Decoder<ActiveSession> = object<ActiveSession>({
-  id: str,
-  device_label: str,
-  network_label: nullable(str),
-  ip_address: nullable(str),
-  created_at: str,
-  last_active_at: str,
-  expires_at: str,
-  is_current: bool,
-});
-
-export const guestSessionResponse: Decoder<GuestSessionResponse> = object<GuestSessionResponse>({
-  access_token: str,
-  token_type: str,
-  user_type: oneOf('guest'),
-  guest_id: str,
-  expires_in_hours: int,
-});
-
 // ----- [Gate L2] 制約(FR-016)。backend/app/api/v1/constraints.py の応答。
 // 列挙値はbackendの CONSTRAINT_TYPES / OPERATORS / SCOPE_TYPES と一致させる。
 // 他人の秘匿制約(visibility='masked')では題名・種類・値・理由などがnullになる。
@@ -843,12 +644,6 @@ export const deletedPlanSummary: Decoder<DeletedPlanSummary> = object<DeletedPla
 });
 
 export const planPurgeResult: Decoder<PlanPurgeResult> = object<PlanPurgeResult>({ message: str });
-
-export const planDeleteResult: Decoder<PlanDeleteResult> = object<PlanDeleteResult>({
-  message: str,
-  deleted_at: str,
-  purge_after: str,
-});
 
 // ----- [Gate P1] 持ち物(FR-025)・準備タスク/レディネス(FR-026)。backend/app/api/v1/preparation.py の応答。
 // 件数を誤ると「準備完了」と誤表示するため、件数・列挙値・真偽値を厳密に検査する。
@@ -1323,10 +1118,14 @@ export const branchDetail: Decoder<BranchDetail> = object<BranchDetail>({
     op: oneOf('add', 'remove', 'update'), event_id: optional(str), key: optional(str), title: optional(str),
     fields: optional(record), before: optional(record),
   })),
+  // [Gate G8] FR-019 区間・予約の変更の競合(kind: segment / reservation、op: relink / cancel、理由を足した)
   conflicts: arrayOf(object({
-    op: oneOf('add', 'remove', 'update'), event_id: optional(str), key: optional(str), title: optional(str),
-    reason: oneOf('changed_in_plan', 'deleted_in_plan', 'locked', 'has_relations', 'day_missing'),
-    fields: optional(arrayOf(str)),
+    op: oneOf('add', 'remove', 'update', 'relink', 'cancel'), event_id: optional(str), key: optional(str),
+    title: optional(str),
+    reason: oneOf('changed_in_plan', 'deleted_in_plan', 'locked', 'has_relations', 'day_missing', 'event_missing',
+      'already_cancelled', 'hidden'),
+    fields: optional(arrayOf(str)), kind: optional(oneOf('event', 'segment', 'reservation')), op_id: optional(str),
+    label: optional(str),
   })),
   day_counts: arrayOf(object({ day_id: str, local_date: str, plan: nonNegativeInt, branch: nonNegativeInt })),
 });

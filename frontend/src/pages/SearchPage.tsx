@@ -613,7 +613,7 @@ const SearchPage: React.FC = () => {
 
                   {/* Web情報源表示 */}
                   {spot.web_source && (
-                    <div className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                    <div className="text-xs text-gray-600 mb-3 flex items-center gap-1">
                       <Globe size={12} />
                       <span>情報源: {spot.web_source}</span>
                     </div>
@@ -656,7 +656,7 @@ const SearchPage: React.FC = () => {
             </div>
             <p className="text-lg font-medium">AI検索エンジンが待機中</p>
             <p className="text-sm mt-2">上記の検索機能を使ってスポットを探してみましょう</p>
-            <div className="mt-4 text-xs text-gray-400">
+            <div className="mt-4 text-xs text-gray-600">
               <p>• テキスト検索: 自然言語での検索</p>
               <p>• 画像解析: 写真からスポット特定</p>
               <p>• 音声認識: 話し言葉での検索</p>

@@ -27,7 +27,7 @@ import { apiOk, apiOkVoid } from '../response';
 import { ApiDecodeError, decodeResponse } from '../decode';
 import {
   activeSession, authResponse, guestSessionResponse, loginResult, mfaRecoveryCodes, mfaSetup, mfaStatus, user,
-} from '../decoders';
+} from '../decodersCore';
 import { arrayOf } from '../decode';
 
 /** 認証APIの失敗。messageはそのまま画面に表示してよい文言、statusはHTTPステータス(通信失敗時はnull)。 */

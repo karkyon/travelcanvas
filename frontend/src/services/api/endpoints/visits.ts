@@ -9,26 +9,27 @@ import type { AxiosRequestConfig } from 'axios';
 import { AdminApi } from './admin';
 import type { DeviceVisitMetrics, VisitAction, VisitCorrectionResult, VisitsOverview } from '../types';
 import { decodeResponse } from '../decode';
-import { visitCorrectionResult, visitsOverview } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class VisitsApi extends AdminApi {
   async getVisits(planId: string): Promise<VisitsOverview> {
     const response = await this.client.get(`/plans/${planId}/visits`, SILENT);
-    return decodeResponse(response.data, visitsOverview, 'GET /plans/{plan_id}/visits');
+    return decodeResponse(response.data, (await DL()).visitsOverview, 'GET /plans/{plan_id}/visits');
   }
 
   async assessVisits(planId: string): Promise<VisitsOverview> {
     const response = await this.client.post(`/plans/${planId}/visits/assess`, {}, SILENT);
-    return decodeResponse(response.data, visitsOverview, 'POST /plans/{plan_id}/visits/assess');
+    return decodeResponse(response.data, (await DL()).visitsOverview, 'POST /plans/{plan_id}/visits/assess');
   }
 
   async postDeviceVisitResults(
     planId: string, results: Array<{ event_id: string; metrics: DeviceVisitMetrics }>,
   ): Promise<VisitsOverview> {
     const response = await this.client.post(`/plans/${planId}/visits/device-results`, { results }, SILENT);
-    return decodeResponse(response.data, visitsOverview, 'POST /plans/{plan_id}/visits/device-results');
+    return decodeResponse(response.data, (await DL()).visitsOverview, 'POST /plans/{plan_id}/visits/device-results');
   }
 
   async correctVisit(planId: string, eventId: string, action: VisitAction, revision?: number): Promise<VisitCorrectionResult> {
@@ -36,6 +37,6 @@ export class VisitsApi extends AdminApi {
       ? SILENT
       : { ...SILENT, headers: { 'If-Match': String(revision) } };
     const response = await this.client.patch(`/plans/${planId}/visits/${eventId}`, { action }, config);
-    return decodeResponse(response.data, visitCorrectionResult, 'PATCH /plans/{plan_id}/visits/{event_id}');
+    return decodeResponse(response.data, (await DL()).visitCorrectionResult, 'PATCH /plans/{plan_id}/visits/{event_id}');
   }
 }

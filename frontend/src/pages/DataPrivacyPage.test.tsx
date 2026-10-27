@@ -25,6 +25,12 @@ vi.mock('@/services/api/g6', () => ({
   getOfflineDevices: vi.fn(async () => ({ devices: [], max_devices: 10 })), revokeOfflineDevice: vi.fn(),
 }));
 
+// [Gate G8] 出典つきの訂正のカード
+vi.mock('@/services/api/g8', () => ({
+  getCorrections: vi.fn(async () => ({ current: { username: 'u', email: 'u@example.com' }, fields: [], sources: [], history: [], requests: [] })),
+  createCorrection: vi.fn(), revertCorrection: vi.fn(),
+}));
+
 import DataPrivacyPage from './DataPrivacyPage';
 import ExportsPage from './ExportsPage';
 

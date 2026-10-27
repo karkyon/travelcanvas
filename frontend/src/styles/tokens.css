@@ -1,0 +1,188 @@
+/*
+  [Gate G9] UX-1 デザインの決まり(design tokens)。値の正本は src/styles/tokens.ts(試験 tokens.test.ts で一致を確かめる)。
+
+  - 変数は --tc-* の名前で :root に置く。今の画面(Tailwind の色を直に使う部品)の見た目は変えない
+  - 面(surface)は glass / solid / quiet / critical の4つだけ。glass は見出し・切り替え・NOW/NEXT・浮かぶ操作だけに使い、
+    フォーム・表・チケット・警告・長文は solid にする。glass の上に glass を重ねない
+  - 透明・ぼかしを使えない時(backdrop-filter 未対応・透明を減らす設定・強制の色)は不透明の面に落とす
+  - 動きは状態の変化を伝えるだけ(150〜220ms)。動きを減らす設定では止める
+  - 暗い見た目は data-theme="dark" の中だけ(UX-8 で全体へ広げるまで、今の画面には当てない)
+*/
+:root {
+  --tc-ink-900: #0f172a;
+  --tc-ink-700: #334155;
+  --tc-ink-500: #5b6b80;
+  --tc-cloud-0: #ffffff;
+  --tc-cloud-50: #f8fafc;
+  --tc-cloud-100: #f1f5f9;
+  --tc-cloud-200: #e2e8f0;
+  --tc-sand-50: #fbf8f3;
+  --tc-sand-100: #f5efe4;
+  --tc-sand-300: #e3d5bb;
+  --tc-mist-50: #f1f6f8;
+  --tc-mist-200: #d5e3ea;
+  --tc-accent: #0f6e66;
+  --tc-accent-strong: #0b544e;
+  --tc-accent-soft: #e3f2ef;
+  --tc-success: #166534;
+  --tc-success-soft: #ecfdf3;
+  --tc-warning: #92400e;
+  --tc-warning-soft: #fff7e6;
+  --tc-danger: #b42318;
+  --tc-danger-soft: #fef3f2;
+  --tc-info: #1d4ed8;
+  --tc-info-soft: #eff4ff;
+  --tc-focus: #2563eb;
+
+  --tc-radius-sm: 4px;
+  --tc-radius-md: 8px;
+  --tc-radius-lg: 12px;
+  --tc-radius-xl: 16px;
+  --tc-radius-pill: 999px;
+
+  --tc-space-1: 4px;
+  --tc-space-2: 8px;
+  --tc-space-3: 12px;
+  --tc-space-4: 16px;
+  --tc-space-5: 24px;
+  --tc-space-6: 32px;
+  --tc-space-7: 48px;
+
+  --tc-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --tc-shadow-2: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --tc-shadow-3: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  --tc-surface-glass: rgba(255, 255, 255, 0.72);
+  --tc-glass-border: rgba(15, 23, 42, 0.08);
+  --tc-glass-blur: 16px;
+  --tc-glass-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --tc-surface-solid: var(--tc-cloud-0);
+  --tc-surface-quiet: var(--tc-sand-50);
+  --tc-surface-critical: var(--tc-danger-soft);
+
+  --tc-font-display: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --tc-font-body: Inter, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', sans-serif;
+  --tc-text-xs: 12px;
+  --tc-text-sm: 14px;
+  --tc-text-md: 16px;
+  --tc-text-lg: 20px;
+  --tc-text-xl: 24px;
+  --tc-text-2xl: 32px;
+
+  --tc-motion-fast: 150ms;
+  --tc-motion-base: 220ms;
+  --tc-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme='dark'] {
+  --tc-ink-900: #f1f5f9;
+  --tc-ink-700: #cbd5e1;
+  --tc-ink-500: #94a3b8;
+  --tc-cloud-0: #0b1220;
+  --tc-cloud-50: #111a2b;
+  --tc-cloud-100: #162236;
+  --tc-cloud-200: #24324a;
+  --tc-accent: #5ec4b8;
+  --tc-danger: #fca5a5;
+  --tc-warning: #fcd34d;
+  --tc-success: #86efac;
+  --tc-info: #93c5fd;
+  --tc-surface-glass: rgba(17, 26, 43, 0.72);
+  --tc-glass-border: rgba(241, 245, 249, 0.10);
+  --tc-surface-solid: var(--tc-cloud-50);
+  --tc-surface-quiet: var(--tc-cloud-100);
+  --tc-surface-critical: #3b1219;
+  color: var(--tc-ink-900);
+  background-color: var(--tc-cloud-0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tc-motion-fast: 0ms;
+    --tc-motion-base: 0ms;
+  }
+}
+
+/* ===== 面(surface) ===== */
+.tc-surface {
+  border-radius: var(--tc-radius-lg);
+  color: var(--tc-ink-900);
+  transition: box-shadow var(--tc-motion-base) var(--tc-motion-easing),
+    background-color var(--tc-motion-base) var(--tc-motion-easing);
+}
+
+.tc-surface--solid {
+  background-color: var(--tc-surface-solid);
+  border: 1px solid var(--tc-cloud-200);
+  box-shadow: var(--tc-shadow-1);
+}
+
+.tc-surface--quiet {
+  background-color: var(--tc-surface-quiet);
+  border: 1px solid transparent;
+}
+
+.tc-surface--critical {
+  background-color: var(--tc-surface-critical);
+  border: 1px solid var(--tc-danger);
+  color: var(--tc-ink-900);
+}
+
+.tc-surface--glass {
+  background-color: var(--tc-surface-glass);
+  border: 1px solid var(--tc-glass-border);
+  box-shadow: var(--tc-glass-shadow);
+  -webkit-backdrop-filter: blur(var(--tc-glass-blur)) saturate(1.2);
+  backdrop-filter: blur(var(--tc-glass-blur)) saturate(1.2);
+}
+
+/* glass の上に glass を重ねない(中の glass は solid にする) */
+.tc-surface--glass .tc-surface--glass {
+  background-color: var(--tc-surface-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tc-surface--glass {
+    background-color: var(--tc-surface-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .tc-surface--glass {
+    background-color: var(--tc-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .tc-surface {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* 時刻・金額は桁をそろえる */
+.tc-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 旅行の表紙が無い時の背景(等高線のような模様。画像を読まない) */
+.tc-contour {
+  background-color: var(--tc-mist-50);
+  background-image:
+    radial-gradient(circle at 20% 30%, transparent 0 38px, var(--tc-mist-200) 39px 40px, transparent 41px 78px,
+      var(--tc-mist-200) 79px 80px, transparent 81px),
+    radial-gradient(circle at 75% 65%, transparent 0 46px, var(--tc-sand-300) 47px 48px, transparent 49px 94px,
+      var(--tc-sand-300) 95px 96px, transparent 97px),
+    linear-gradient(160deg, var(--tc-mist-50), var(--tc-sand-50));
+}
+
+.tc-focus-ring:focus-visible {
+  outline: 2px solid var(--tc-focus);
+  outline-offset: 2px;
+}

@@ -17,8 +17,9 @@ import type {
   PrivateProfileItemInput,
 } from '../types';
 import { decodeResponse } from '../decode';
-import { planPrivateProfile, presenceState, privateProfile } from '../decoders';
 import { API_BASE_URL } from '../core';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -31,7 +32,7 @@ export interface PresenceInput {
 export class CollabApi extends OfflinePackApi {
   async postPresence(planId: string, input: PresenceInput): Promise<PresenceState> {
     const response = await this.client.post(`/plans/${planId}/presence`, input, SILENT);
-    return decodeResponse(response.data, presenceState, 'POST /plans/{plan_id}/presence');
+    return decodeResponse(response.data, (await DL()).presenceState, 'POST /plans/{plan_id}/presence');
   }
 
   async leavePresence(planId: string, clientId: string): Promise<void> {
@@ -40,24 +41,24 @@ export class CollabApi extends OfflinePackApi {
 
   async getPrivateProfile(): Promise<PrivateProfile> {
     const response = await this.client.get('/privacy/private-profile', SILENT);
-    return decodeResponse(response.data, privateProfile, 'GET /privacy/private-profile');
+    return decodeResponse(response.data, (await DL()).privateProfile, 'GET /privacy/private-profile');
   }
 
   async putPrivateProfile(items: PrivateProfileItemInput[], revision: number): Promise<PrivateProfile> {
     const response = await this.client.put('/privacy/private-profile', { items }, {
       ...SILENT, headers: { 'If-Match': String(revision) },
     });
-    return decodeResponse(response.data, privateProfile, 'PUT /privacy/private-profile');
+    return decodeResponse(response.data, (await DL()).privateProfile, 'PUT /privacy/private-profile');
   }
 
   async getPlanPrivateProfile(planId: string): Promise<PlanPrivateProfile> {
     const response = await this.client.get(`/plans/${planId}/private-profile`, SILENT);
-    return decodeResponse(response.data, planPrivateProfile, 'GET /plans/{plan_id}/private-profile');
+    return decodeResponse(response.data, (await DL()).planPrivateProfile, 'GET /plans/{plan_id}/private-profile');
   }
 
   async putPlanPrivateProfile(planId: string, applied: boolean): Promise<PlanPrivateProfile> {
     const response = await this.client.put(`/plans/${planId}/private-profile`, { applied }, SILENT);
-    return decodeResponse(response.data, planPrivateProfile, 'PUT /plans/{plan_id}/private-profile');
+    return decodeResponse(response.data, (await DL()).planPrivateProfile, 'PUT /plans/{plan_id}/private-profile');
   }
 
   /**

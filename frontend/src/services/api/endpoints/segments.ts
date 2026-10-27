@@ -6,7 +6,8 @@
 import { ReservationsApi } from './reservations';
 import type { SegmentCreateData, SegmentUpdateData, TravelSegment } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { revisionResult, travelSegment } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class SegmentsApi extends ReservationsApi {
   // backend/app/api/v1/segments.py (Gate M1)。/plans/{planId}/segments配下。
@@ -15,12 +16,12 @@ export class SegmentsApi extends ReservationsApi {
 
   async getSegments(planId: string): Promise<TravelSegment[]> {
     const response = await this.client.get(`/plans/${planId}/segments`);
-    return decodeResponse(response.data, arrayOf(travelSegment), 'GET /plans/{plan_id}/segments');
+    return decodeResponse(response.data, arrayOf((await DL()).travelSegment), 'GET /plans/{plan_id}/segments');
   }
 
   async getSegment(planId: string, segmentId: string): Promise<TravelSegment> {
     const response = await this.client.get(`/plans/${planId}/segments/${segmentId}`);
-    return decodeResponse(response.data, travelSegment, 'GET /plans/{plan_id}/segments/{segment_id}');
+    return decodeResponse(response.data, (await DL()).travelSegment, 'GET /plans/{plan_id}/segments/{segment_id}');
   }
 
   async createSegment(
@@ -29,7 +30,7 @@ export class SegmentsApi extends ReservationsApi {
     const response = await this.client.post(
       `/plans/${planId}/segments`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
     );
-    return decodeResponse(response.data, travelSegment, 'POST /plans/{plan_id}/segments');
+    return decodeResponse(response.data, (await DL()).travelSegment, 'POST /plans/{plan_id}/segments');
   }
 
   async updateSegment(
@@ -38,13 +39,13 @@ export class SegmentsApi extends ReservationsApi {
     const response = await this.client.patch(
       `/plans/${planId}/segments/${segmentId}`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, travelSegment, 'PATCH /plans/{plan_id}/segments/{segment_id}');
+    return decodeResponse(response.data, (await DL()).travelSegment, 'PATCH /plans/{plan_id}/segments/{segment_id}');
   }
 
   async deleteSegment(planId: string, segmentId: string, ifMatch: number): Promise<{ revision: number }> {
     const response = await this.client.delete(
       `/plans/${planId}/segments/${segmentId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/segments/{segment_id}');
+    return decodeResponse(response.data, (await DL()).revisionResult, 'DELETE /plans/{plan_id}/segments/{segment_id}');
   }
 }
