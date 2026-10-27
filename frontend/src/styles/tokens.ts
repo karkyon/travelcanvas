@@ -51,6 +51,12 @@ export const darkColor = {
   warning: '#fcd34d',
   success: '#86efac',
   info: '#93c5fd',
+  accentStrong: '#7fd6cb',
+  accentSoft: '#0f2d2a',
+  successSoft: '#0f2a1c',
+  warningSoft: '#2e2208',
+  dangerSoft: '#3b1219',
+  infoSoft: '#13254a',
 } as const;
 
 export const radius = { sm: '4px', md: '8px', lg: '12px', xl: '16px', pill: '999px' } as const;
@@ -73,6 +79,52 @@ export const type = {
 } as const;
 export const motion = { fast: '150ms', base: '220ms', easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
 
+/**
+ * [Gate G9] UX-2 旅行の表紙(写真が無い時の生成グラデーション)。季節ごとに2つ。どれも白い文字が 4.5:1 以上になる
+ * 濃さにする(tokens.test.ts で確かめる)。写真の読み込み・保存は別の Gate(ADR-design-tokens §4)。
+ */
+export const COVER_PALETTES = [
+  { id: 'sakura', season: 'spring', from: '#8a2c55', to: '#b03a5b' },
+  { id: 'wakaba', season: 'spring', from: '#2f6b3a', to: '#1f5b52' },
+  { id: 'umi', season: 'summer', from: '#0b5a7a', to: '#1d4f91' },
+  { id: 'natsuzora', season: 'summer', from: '#0f6e66', to: '#1e5aa8' },
+  { id: 'momiji', season: 'autumn', from: '#9a2f1f', to: '#8a4b14' },
+  { id: 'kogane', season: 'autumn', from: '#7a4a0b', to: '#8b3a1e' },
+  { id: 'yuki', season: 'winter', from: '#33416b', to: '#4b3f7a' },
+  { id: 'yoru', season: 'winter', from: '#1e2a4a', to: '#3b2f63' },
+] as const;
+export type CoverPalette = typeof COVER_PALETTES[number];
+export type Season = CoverPalette['season'];
+
+/** 月(1〜12)から季節(北半球。旅行先が南半球でも見た目の色だけの違い) */
+export function seasonOf(month: number): Season {
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'autumn';
+  return 'winter';
+}
+
+function hashString(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * 旅行の表紙の色(決まった入力には必ず同じ色)。旅行先(無ければ題名)で選び、開始の日があればその季節の中から選ぶ。
+ */
+export function coverFor(seed: { destination?: string | null; title?: string | null; startDate?: string | null }): CoverPalette {
+  const key = (seed.destination || seed.title || 'travelcanvas').trim().toLowerCase();
+  const month = seed.startDate ? Number(seed.startDate.slice(5, 7)) : NaN;
+  const pool = Number.isFinite(month) && month >= 1 && month <= 12
+    ? COVER_PALETTES.filter((p) => p.season === seasonOf(month))
+    : COVER_PALETTES;
+  return pool[hashString(key) % pool.length]!;
+}
+
 export const SURFACES = ['glass', 'solid', 'quiet', 'critical'] as const;
 export type SurfaceVariant = typeof SURFACES[number];
 
@@ -94,6 +146,21 @@ export const TEXT_PAIRS: Array<{ name: string; fg: string; bg: string; min: numb
   { name: '暗い: 補足', fg: darkColor.ink700, bg: darkColor.cloud50, min: 4.5 },
   { name: '暗い: 強調色', fg: darkColor.accent, bg: darkColor.cloud0, min: 4.5 },
   { name: 'フォーカスの枠 / 白', fg: color.focus, bg: color.cloud0, min: 3 },
+  { name: '暗い: 弱い文字', fg: darkColor.ink500, bg: darkColor.cloud0, min: 4.5 },
+  { name: '暗い: 弱い文字 / 面', fg: darkColor.ink500, bg: darkColor.cloud50, min: 4.5 },
+  { name: '暗い: 危険', fg: darkColor.danger, bg: darkColor.cloud50, min: 4.5 },
+  { name: '暗い: 注意', fg: darkColor.warning, bg: darkColor.cloud50, min: 4.5 },
+  { name: '暗い: 成功', fg: darkColor.success, bg: darkColor.cloud50, min: 4.5 },
+  { name: '暗い: 情報', fg: darkColor.info, bg: darkColor.cloud50, min: 4.5 },
+  { name: '暗い: 成功 / 弱い成功', fg: darkColor.success, bg: darkColor.successSoft, min: 4.5 },
+  { name: '暗い: 注意 / 弱い注意', fg: darkColor.warning, bg: darkColor.warningSoft, min: 4.5 },
+  { name: '暗い: 危険 / 弱い危険', fg: darkColor.danger, bg: darkColor.dangerSoft, min: 4.5 },
+  { name: '暗い: 情報 / 弱い情報', fg: darkColor.info, bg: darkColor.infoSoft, min: 4.5 },
+  { name: '暗い: 強調色 / 弱い強調色', fg: darkColor.accentStrong, bg: darkColor.accentSoft, min: 4.5 },
+  ...COVER_PALETTES.flatMap((c) => [
+    { name: `表紙 ${c.id}(白い文字・始まり)`, fg: color.cloud0, bg: c.from, min: 4.5 },
+    { name: `表紙 ${c.id}(白い文字・終わり)`, fg: color.cloud0, bg: c.to, min: 4.5 },
+  ]),
 ];
 
 // ===================================================================== コントラスト(WCAG 2.1)

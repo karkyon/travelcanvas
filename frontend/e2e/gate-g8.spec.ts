@@ -3,6 +3,7 @@ import { apiClient, registerAccount, type Send } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 import { grantAdmin, revokeAdmin } from './support/admin';
 import { stepNow, totp } from './support/totp';
+import { TEXT_PAIRS } from '../src/styles/tokens';
 
 /**
  * [Gate G8・G9] 外部の判断の要らない残りを、実際のブラウザで確かめる。
@@ -234,7 +235,8 @@ test('FR-004 管理者の画面の定期の処理、UX-1 デザインの決ま�
   // UX-1 デザインの決まり(ログイン不要・利用者のデータを含まない)
   await page.goto('/design-system');
   await expect(page.getByRole('heading', { name: 'デザインの決まり' })).toBeVisible();
-  await expect(page.getByRole('table', { name: '文字と地の組み合わせ' }).getByRole('row')).toHaveCount(17);
+  // 見出しの行 + 決めた組み合わせの数(G9 後半で暗い見た目の状態の色・表紙の色を足した)
+  await expect(page.getByRole('table', { name: '文字と地の組み合わせ' }).getByRole('row')).toHaveCount(TEXT_PAIRS.length + 1);
   // 面の見本4つ + 一覧の区切り6つ(色・コントラスト・形・文字・強調色・動き)
   await expect(page.locator('[data-surface]')).toHaveCount(4 + 6);
   await expectNoAxeViolations(page, 'デザインの決まり(明るい)');

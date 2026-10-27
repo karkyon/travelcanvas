@@ -87,6 +87,12 @@
   --tc-warning: #fcd34d;
   --tc-success: #86efac;
   --tc-info: #93c5fd;
+  --tc-accent-strong: #7fd6cb;
+  --tc-accent-soft: #0f2d2a;
+  --tc-success-soft: #0f2a1c;
+  --tc-warning-soft: #2e2208;
+  --tc-danger-soft: #3b1219;
+  --tc-info-soft: #13254a;
   --tc-surface-glass: rgba(17, 26, 43, 0.72);
   --tc-glass-border: rgba(241, 245, 249, 0.10);
   --tc-surface-solid: var(--tc-cloud-50);
@@ -186,3 +192,43 @@
   outline: 2px solid var(--tc-focus);
   outline-offset: 2px;
 }
+
+/* ===== [Gate G9] UX-2 旅行の表紙(写真が無い時の生成グラデーション。色は COVER_PALETTES) ===== */
+.tc-cover {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: var(--tc-cover-to, #1e2a4a);
+  background-image: linear-gradient(135deg, var(--tc-cover-from, #1e2a4a), var(--tc-cover-to, #3b2f63));
+}
+
+/* 等高線のような模様(画像を読まない)。文字の後ろに細かい模様を置かないよう薄くする */
+.tc-cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(circle at 85% 20%, transparent 0 46px, rgba(255, 255, 255, 0.09) 47px 48px, transparent 49px 94px,
+      rgba(255, 255, 255, 0.07) 95px 96px, transparent 97px 142px, rgba(255, 255, 255, 0.05) 143px 144px, transparent 145px),
+    radial-gradient(circle at 10% 110%, transparent 0 60px, rgba(255, 255, 255, 0.06) 61px 62px, transparent 63px);
+}
+
+/* 下を少し暗くして文字を読みやすくする(暗くするだけなので、白い文字のコントラストは下がらない) */
+.tc-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0));
+}
+
+@media (forced-colors: active) {
+  .tc-cover {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+}
+

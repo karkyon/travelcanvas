@@ -1,0 +1,293 @@
+{
+ "dashboard_empty": {
+  "server_time": "2026-10-27T19:38:15.041098+00:00",
+  "is_guest": false,
+  "trips": [],
+  "counts": {
+   "ongoing": 0,
+   "upcoming": 0,
+   "past": 0,
+   "undated": 0
+  },
+  "focus": null,
+  "limit": 50,
+  "algorithm_version": "dashboard-v1"
+ },
+ "dashboard_past": {
+  "server_time": "2026-10-27T19:38:15.174828+00:00",
+  "is_guest": false,
+  "trips": [
+   {
+    "id": "b265eb30-06da-4e26-b5e9-abc07d97bcd3",
+    "title": "先月の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-10-18",
+    "end_date": "2026-10-19",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "past",
+    "days_until_start": null,
+    "day_number": null,
+    "days_since_end": 9,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   }
+  ],
+  "counts": {
+   "ongoing": 0,
+   "upcoming": 0,
+   "past": 1,
+   "undated": 0
+  },
+  "focus": {
+   "plan_id": "b265eb30-06da-4e26-b5e9-abc07d97bcd3",
+   "phase": "past",
+   "today": null,
+   "readiness": null,
+   "alerts": null
+  },
+  "limit": 50,
+  "algorithm_version": "dashboard-v1"
+ },
+ "dashboard_upcoming": {
+  "server_time": "2026-10-27T19:38:15.284571+00:00",
+  "is_guest": false,
+  "trips": [
+   {
+    "id": "d21c3de4-7713-4da7-9280-52459cf36287",
+    "title": "京都 紅葉の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-11-04",
+    "end_date": "2026-11-05",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "upcoming",
+    "days_until_start": 7,
+    "day_number": null,
+    "days_since_end": null,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   },
+   {
+    "id": "b265eb30-06da-4e26-b5e9-abc07d97bcd3",
+    "title": "先月の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-10-18",
+    "end_date": "2026-10-19",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "past",
+    "days_until_start": null,
+    "day_number": null,
+    "days_since_end": 9,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   }
+  ],
+  "counts": {
+   "ongoing": 0,
+   "upcoming": 1,
+   "past": 1,
+   "undated": 0
+  },
+  "focus": {
+   "plan_id": "d21c3de4-7713-4da7-9280-52459cf36287",
+   "phase": "upcoming",
+   "today": null,
+   "readiness": {
+    "is_ready": false,
+    "total": 1,
+    "high": 1,
+    "top": [
+     {
+      "title": "「ホテル」に予約がありません",
+      "severity": "high",
+      "link": "/planner/d21c3de4-7713-4da7-9280-52459cf36287/reservations",
+      "due_at": null
+     }
+    ]
+   },
+   "alerts": {
+    "active": 0,
+    "detected": 0,
+    "top": []
+   }
+  },
+  "limit": 50,
+  "algorithm_version": "dashboard-v1"
+ },
+ "dashboard_ongoing": {
+  "server_time": "2026-10-27T19:38:15.652891+00:00",
+  "is_guest": false,
+  "trips": [
+   {
+    "id": "bd054cef-4cd9-4698-9839-c9befc8659fa",
+    "title": "今日の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-10-28",
+    "end_date": "2026-10-29",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "ongoing",
+    "days_until_start": null,
+    "day_number": 1,
+    "days_since_end": null,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   },
+   {
+    "id": "d21c3de4-7713-4da7-9280-52459cf36287",
+    "title": "京都 紅葉の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-11-04",
+    "end_date": "2026-11-05",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "upcoming",
+    "days_until_start": 7,
+    "day_number": null,
+    "days_since_end": null,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   },
+   {
+    "id": "b265eb30-06da-4e26-b5e9-abc07d97bcd3",
+    "title": "先月の旅",
+    "destination": "京都",
+    "role": "owner",
+    "can_edit": true,
+    "start_date": "2026-10-18",
+    "end_date": "2026-10-19",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "past",
+    "days_until_start": null,
+    "day_number": null,
+    "days_since_end": 9,
+    "member_count": 1,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   }
+  ],
+  "counts": {
+   "ongoing": 1,
+   "upcoming": 1,
+   "past": 1,
+   "undated": 0
+  },
+  "focus": {
+   "plan_id": "bd054cef-4cd9-4698-9839-c9befc8659fa",
+   "phase": "ongoing",
+   "today": {
+    "today_date": "2026-10-28",
+    "timezone_id": "Asia/Tokyo",
+    "now_event": null,
+    "next_event": {
+     "id": "7a34ae79-25c6-4e2d-838d-d33ffccab5c4",
+     "title": "美術館",
+     "event_type": "museum",
+     "start_at": "2026-10-27T21:38:00Z",
+     "end_at": null,
+     "local_start_time": "06:38",
+     "has_ticket": false,
+     "reservation_id": null,
+     "departure_at": null,
+     "transport_mode": null,
+     "transport_status": null
+    },
+    "minutes_until_next": 119,
+    "event_count": 1
+   },
+   "readiness": {
+    "is_ready": true,
+    "total": 0,
+    "high": 0,
+    "top": []
+   },
+   "alerts": {
+    "active": 0,
+    "detected": 0,
+    "top": []
+   }
+  },
+  "limit": 50,
+  "algorithm_version": "dashboard-v1"
+ },
+ "dashboard_viewer": {
+  "server_time": "2026-10-27T19:38:15.967343+00:00",
+  "is_guest": false,
+  "trips": [
+   {
+    "id": "d21c3de4-7713-4da7-9280-52459cf36287",
+    "title": "京都 紅葉の旅",
+    "destination": "京都",
+    "role": "viewer",
+    "can_edit": false,
+    "start_date": "2026-11-04",
+    "end_date": "2026-11-05",
+    "timezone_id": "Asia/Tokyo",
+    "local_today": "2026-10-28",
+    "day_count": 2,
+    "total_days": 2,
+    "phase": "upcoming",
+    "days_until_start": 7,
+    "day_number": null,
+    "days_since_end": null,
+    "member_count": 2,
+    "created_at": "2026-10-27T19:38:14.482054+00:00"
+   }
+  ],
+  "counts": {
+   "ongoing": 0,
+   "upcoming": 1,
+   "past": 0,
+   "undated": 0
+  },
+  "focus": {
+   "plan_id": "d21c3de4-7713-4da7-9280-52459cf36287",
+   "phase": "upcoming",
+   "today": null,
+   "readiness": {
+    "is_ready": false,
+    "total": 1,
+    "high": 1,
+    "top": [
+     {
+      "title": "「ホテル」に予約がありません",
+      "severity": "high",
+      "link": "/planner/d21c3de4-7713-4da7-9280-52459cf36287/reservations",
+      "due_at": null
+     }
+    ]
+   },
+   "alerts": {
+    "active": 0,
+    "detected": 0,
+    "top": []
+   }
+  },
+  "limit": 50,
+  "algorithm_version": "dashboard-v1"
+ }
+}

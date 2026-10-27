@@ -24,6 +24,19 @@
   --color-accent: var(--tc-accent);
   --color-accent-strong: var(--tc-accent-strong);
   --color-accent-soft: var(--tc-accent-soft);
+  /* [Gate G9] UX-2〜4 で使う残りの決まり */
+  --color-cloud-100: var(--tc-cloud-100);
+  --color-cloud-200: var(--tc-cloud-200);
+  --color-mist-200: var(--tc-mist-200);
+  --color-success: var(--tc-success);
+  --color-success-soft: var(--tc-success-soft);
+  --color-warning: var(--tc-warning);
+  --color-warning-soft: var(--tc-warning-soft);
+  --color-danger: var(--tc-danger);
+  --color-danger-soft: var(--tc-danger-soft);
+  --color-info: var(--tc-info);
+  --color-info-soft: var(--tc-info-soft);
+  --color-focus: var(--tc-focus);
 }
 
 /*

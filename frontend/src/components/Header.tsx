@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Search, 
-  Settings, 
+import {
+  Settings,
   User, 
   Bell, 
   Menu, 
   X, 
   Home,
   Calendar,
-  Zap,
   Brain,
   LogOut,
   Building2
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useCurrentTripStore } from '../store/currentTripStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import CommandPaletteLauncher from './CommandPaletteLauncher';
@@ -23,6 +22,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isGuest } = useAuthStore();
+  const currentPlan = useCurrentTripStore((st) => st.trip);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   // [Gate #26] 以前は実データと無関係な固定の未読バッジ(常時点滅)だった。
@@ -198,8 +198,12 @@ const Header: React.FC = () => {
   }
 
   // 認証済みユーザー向けのフルヘッダー
+  // [Gate G9] UX-3 いつも同じ高さ(h-16)・項目名を折り返さない・「AI検索」を1か所にまとめる・今開いている旅行を示す。
+  // 面は決まり(tokens)の glass(見出しの帯)。動きを減らす設定では点滅させない(NEW は静止の印)。
+  const tripMatch = /^\/planner\/([0-9a-fA-F-]{36})(?:\/|$)/.exec(location.pathname);
+  const currentTrip = tripMatch && currentPlan && currentPlan.id === tripMatch[1] ? currentPlan : null;
   return (
-    <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
+    <header className="tc-surface tc-surface--glass rounded-none border-x-0 border-t-0 sticky top-0 z-50" data-testid="global-header">
       {/* [Gate #35] ゲストセッション中は常時表示するアカウント登録の案内バー。
           データが消えるわけではないが、端末やブラウザを変えると失われるため、
           目立つ位置で「保存」を促す。 */}
@@ -212,256 +216,213 @@ const Header: React.FC = () => {
         </div>
       )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex items-center gap-2 h-16">
           {/* ロゴ */}
-          <div className="flex items-center">
-            <Link to="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">TC</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900 hidden sm:block">
-                TravelCanvas
-              </span>
-            </Link>
-          </div>
+          <Link to="/dashboard" className="tc-focus-ring flex items-center gap-2 shrink-0 rounded-lg" aria-label="TravelCanvas(ダッシュボードへ)">
+            <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm" aria-hidden="true">TC</span>
+            </div>
+            <span className="text-xl font-bold text-ink-900 hidden xl:block whitespace-nowrap" aria-hidden="true">
+              TravelCanvas
+            </span>
+          </Link>
 
           {/* デスクトップナビゲーション */}
-          <nav className="hidden md:flex space-x-1">
+          <nav className="hidden md:flex items-center gap-1 ml-2 shrink-0" aria-label="主なメニュー">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActivePath(item.path);
-              
               return (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`relative px-4 py-2 rounded-lg transition-colors duration-200 flex items-center space-x-2 group ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`tc-focus-ring relative px-3 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap ${
+                    isActive ? 'bg-accent-soft text-accent-strong' : 'text-ink-700 hover:text-ink-900 hover:bg-cloud-100'
                   }`}
                   title={item.description}
                 >
-                  <Icon size={18} />
-                  <span className="font-medium">{item.name}</span>
-                  
-                  {/* NEW バッジ */}
+                  <Icon size={18} aria-hidden="true" />
+                  <span className="sr-only lg:hidden">{item.name}</span>
+                  <span className="hidden lg:inline font-medium">{item.name}</span>
                   {item.isNew && (
-                    <span className="absolute -top-1 -right-1 bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                    <span className="hidden lg:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent-soft text-accent-strong">
                       NEW
                     </span>
-                  )}
-                  
-                  {/* AI検索の場合の特別なアイコン */}
-                  {item.path === '/search' && (
-                    <Zap size={14} className="text-yellow-500 animate-pulse" />
                   )}
                 </Link>
               );
             })}
           </nav>
 
+          {/* 今開いている旅行(旅行の中にいる時だけ) */}
+          {currentTrip && (
+            <Link to={`/planner/${currentTrip.id}`} data-testid="header-current-trip"
+              className="tc-focus-ring hidden md:inline-flex items-center gap-1 min-w-0 shrink max-w-[16rem] px-3 py-1.5 rounded-full border border-cloud-200 text-sm text-ink-900 hover:bg-cloud-100">
+              <span className="text-ink-700 shrink-0">旅行:</span>
+              <span className="truncate">{currentTrip.title}</span>
+            </Link>
+          )}
+
+          <div className="flex-1" />
+
           {/* [Gate C3] 情報内検索・コマンドパレット(Ctrl+K) */}
           <CommandPaletteLauncher />
 
-          {/* AI検索クイックアクセス（デスクトップ） */}
-          <div className="hidden lg:flex items-center space-x-3">
-            <Link
-              to="/search/settings"
-              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="AI検索設定"
-            >
-              <Settings size={18} />
-            </Link>
-            
-            {/* クイック検索ボタン */}
-            <Link
-              to="/search"
-              className="bg-linear-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center space-x-2 shadow-xs hover:shadow-md transform hover:scale-105"
-            >
-              <Search size={16} />
-              <span className="font-medium">AI検索</span>
-              <Zap size={14} className="animate-pulse" />
-            </Link>
-          </div>
+          {/* 通知 */}
+          <Link
+            to="/notifications"
+            className="tc-focus-ring p-2 text-ink-700 hover:text-ink-900 hover:bg-cloud-100 rounded-lg relative shrink-0"
+            aria-label={unreadCount > 0 ? `通知(未読 ${unreadCount}件)` : '通知'}
+            title="通知"
+          >
+            <Bell size={18} aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span aria-hidden="true" className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-red-700 text-white rounded-full">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
 
-          {/* 右側メニュー */}
-          <div className="flex items-center space-x-3">
-            {/* 通知 */}
-            <Link
-              to="/notifications"
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors relative"
-              title="通知"
-            >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-medium bg-red-500 text-white rounded-full">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </Link>
-
-            {/* ユーザーメニュー */}
-            <div className="relative user-menu-container">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsUserMenuOpen(!isUserMenuOpen);
-                }}
-                className="flex items-center space-x-2 p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <User size={16} className="text-white" />
-                </div>
-                {/* [Gate G9] UX-0 スマホの幅でも名前を読み上げる(見た目は隠す。button-name) */}
-                <span className="sr-only sm:not-sr-only font-medium">
-                  {isGuest ? 'ゲスト' : (user?.username || 'ユーザー')}
-                </span>
-              </button>
-
-              {/* ユーザードロップダウン */}
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 animate-in slide-in-from-top-1 duration-200">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.username}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {user?.email}
-                    </p>
-                  </div>
-                  
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => setIsUserMenuOpen(false)}
-                  >
-                    <User size={16} className="inline mr-2" />
-                    プロフィール
-                  </Link>
-                  {/* [Gate B1] 組織(FR-041)。ゲストは使えない */}
-                  {user?.user_type !== 'guest' && (
-                    <Link
-                      to="/organizations"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      <Building2 size={16} className="inline mr-2" aria-hidden="true" />
-                      組織
-                    </Link>
-                  )}
-                  <Link
-                    to="/settings"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => setIsUserMenuOpen(false)}
-                  >
-                    <Settings size={16} className="inline mr-2" />
-                    設定
-                  </Link>
-                  <Link
-                    to="/search/settings"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => setIsUserMenuOpen(false)}
-                  >
-                    <Brain size={16} className="inline mr-2" />
-                    AI検索設定
-                    <span className="ml-2 bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                      NEW
-                    </span>
-                  </Link>
-                  <hr className="my-1" />
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOut size={16} className="inline mr-2" />
-                    ログアウト
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* モバイルメニューボタン */}
+          {/* ユーザーメニュー */}
+          <div className="relative user-menu-container shrink-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsMobileMenuOpen(!isMobileMenuOpen);
+                setIsUserMenuOpen(!isUserMenuOpen);
               }}
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label={isMobileMenuOpen ? 'メニューを閉じる' : 'メニューを開く'}
-              aria-expanded={isMobileMenuOpen}
+              aria-haspopup="menu"
+              aria-expanded={isUserMenuOpen}
+              className="tc-focus-ring flex items-center gap-2 p-1.5 text-ink-900 hover:bg-cloud-100 rounded-lg"
             >
-              {isMobileMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <User size={16} className="text-white" aria-hidden="true" />
+              </div>
+              {/* [Gate G9] UX-0 スマホの幅でも名前を読み上げる(見た目は隠す。button-name) */}
+              {/* not-sr-only は切り詰め(overflow・nowrap)を打ち消すため、読み上げ用と見た目用を分ける */}
+              <span className="sr-only xl:hidden">{isGuest ? 'ゲスト' : (user?.username || 'ユーザー')}</span>
+              <span className="hidden xl:inline-block font-medium max-w-[10rem] truncate align-middle">{isGuest ? 'ゲスト' : (user?.username || 'ユーザー')}</span>
             </button>
+
+            {/* ユーザードロップダウン */}
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.username}
+                  </p>
+                  <p className="text-xs text-gray-700 truncate">
+                    {user?.email}
+                  </p>
+                </div>
+
+                <Link
+                  to="/profile"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  onClick={() => setIsUserMenuOpen(false)}
+                >
+                  <User size={16} className="inline mr-2" aria-hidden="true" />
+                  プロフィール
+                </Link>
+                {/* [Gate B1] 組織(FR-041)。ゲストは使えない */}
+                {user?.user_type !== 'guest' && (
+                  <Link
+                    to="/organizations"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  >
+                    <Building2 size={16} className="inline mr-2" aria-hidden="true" />
+                    組織
+                  </Link>
+                )}
+                <Link
+                  to="/settings"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  onClick={() => setIsUserMenuOpen(false)}
+                >
+                  <Settings size={16} className="inline mr-2" aria-hidden="true" />
+                  設定
+                </Link>
+                <Link
+                  to="/search/settings"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  onClick={() => setIsUserMenuOpen(false)}
+                >
+                  <Brain size={16} className="inline mr-2" aria-hidden="true" />
+                  AI検索設定
+                </Link>
+                <hr className="my-1" />
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut size={16} className="inline mr-2" aria-hidden="true" />
+                  ログアウト
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* モバイルメニューボタン */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMobileMenuOpen(!isMobileMenuOpen);
+            }}
+            className="tc-focus-ring md:hidden p-2 text-ink-700 hover:text-ink-900 hover:bg-cloud-100 rounded-lg shrink-0"
+            aria-label={isMobileMenuOpen ? 'メニューを閉じる' : 'メニューを開く'}
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+          </button>
         </div>
 
         {/* モバイルメニュー */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white mobile-menu-container animate-in slide-in-from-top-2 duration-200">
-            <div className="py-2 space-y-1">
+          <nav className="md:hidden border-t border-cloud-200 mobile-menu-container" aria-label="主なメニュー(スマホ)">
+            <ul className="py-2 space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = isActivePath(item.path);
-                
                 return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`relative flex items-center space-x-3 px-4 py-3 text-base font-medium rounded-lg mx-2 transition-colors ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Icon size={20} />
-                    <span>{item.name}</span>
-                    
-                    {/* AI検索の特別表示 */}
-                    {item.path === '/search' && (
-                      <div className="flex items-center space-x-1">
-                        <Zap size={16} className="text-yellow-500 animate-pulse" />
-                        {item.isNew && (
-                          <span className="bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
-                            NEW
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </Link>
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`tc-focus-ring flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg mx-2 ${
+                        isActive ? 'bg-accent-soft text-accent-strong' : 'text-ink-700 hover:text-ink-900 hover:bg-cloud-100'
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Icon size={20} aria-hidden="true" />
+                      <span>{item.name}</span>
+                    </Link>
+                  </li>
                 );
               })}
-              
-              {/* モバイル専用クイックアクション */}
-              <div className="px-2 pt-2 border-t border-gray-200">
-                <Link
-                  to="/search"
-                  className="flex items-center space-x-3 px-4 py-3 text-base font-medium bg-linear-to-r from-blue-500 to-purple-600 text-white rounded-lg mb-2 hover:from-blue-600 hover:to-purple-700 transition-all"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Search size={20} />
-                  <span>AI検索を開始</span>
-                  <Zap size={16} className="animate-pulse" />
-                </Link>
-                
+              {currentTrip && (
+                <li>
+                  <Link to={`/planner/${currentTrip.id}`} onClick={() => setIsMobileMenuOpen(false)}
+                    className="tc-focus-ring flex items-center gap-2 px-4 py-3 text-base rounded-lg mx-2 text-ink-900 hover:bg-cloud-100">
+                    <span className="text-ink-700">旅行:</span><span className="truncate">{currentTrip.title}</span>
+                  </Link>
+                </li>
+              )}
+              <li>
                 <Link
                   to="/search/settings"
-                  className="flex items-center space-x-3 px-4 py-3 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                  className="tc-focus-ring flex items-center gap-3 px-4 py-3 text-base font-medium text-ink-700 hover:text-ink-900 hover:bg-cloud-100 rounded-lg mx-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Settings size={20} />
+                  <Settings size={20} aria-hidden="true" />
                   <span>AI検索設定</span>
-                  <span className="ml-auto bg-linear-to-r from-green-400 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    NEW
-                  </span>
                 </Link>
-              </div>
-            </div>
-          </div>
+              </li>
+            </ul>
+          </nav>
         )}
       </div>
     </header>

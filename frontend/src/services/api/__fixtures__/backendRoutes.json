@@ -36,6 +36,7 @@
   "captured_at_head_g5": "sandbox/g5 (+Gate G5 fx-rates/budget-versions/void/finance-lock、usage・admin usage、organization logo/seats/domains/usage)",
   "captured_at_head_g6": "sandbox/g6 (+Gate G6 offline devices / privacy zones / journal publications)",
   "captured_at_head_g7": "sandbox/g7 (+Gate G7 movement-settings・impact-preview・partial-preview・branch comparison・account-deletion schedule/cancel)",
+  "captured_at_head_g9": "99744c3 (+Gate G9 GET /dashboard)",
   "captured_at_head_g8": "sandbox/g8 (+Gate G8 adoption-preview・ownership-transfer・ownership-transfers・privacy/corrections・correction-requests・admin/ops/jobs)"
  },
  "routes": [
@@ -97,6 +98,7 @@
   "GET /api/v1/auth/mfa",
   "GET /api/v1/auth/sessions",
   "GET /api/v1/auth/test",
+  "GET /api/v1/dashboard",
   "GET /api/v1/ext/distributions",
   "GET /api/v1/ext/distributions/{dist_id}",
   "GET /api/v1/ext/distributions/{dist_id}/acknowledgements",

@@ -21,6 +21,14 @@ export const VIEWPORTS = [
   { id: 'mobile', width: 390, height: 844 },
 ] as const;
 
+/** [Gate G9] UX-2〜UX-4 の後は、狭いスマホ・タブレット・小さいPCの幅でも同じ決まりを確かめる(撮るのは VIEWPORTS だけ) */
+export const CHECK_VIEWPORTS = [
+  ...VIEWPORTS,
+  { id: 'mobile-s', width: 360, height: 780 },
+  { id: 'tablet', width: 768, height: 1024 },
+  { id: 'laptop', width: 1024, height: 768 },
+] as const;
+
 export async function seedBaseline(page: Page, label: string): Promise<{ planId: string; send: Send }> {
   const a = await registerAccount(page, { prefix: 'ux', label, password: UX_PASSWORD });
   const send = apiClient(page.request, a.apiBase, a.token);
