@@ -7,23 +7,24 @@
 import { ConstraintsApi } from './constraints';
 import type { ValidationRunDetail, ValidationRunSummary } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { validationRunDetail, validationRunSummary } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class ValidationApi extends ConstraintsApi {
   async runValidation(planId: string): Promise<ValidationRunDetail> {
     const response = await this.client.post(`/plans/${planId}/validation-runs`);
-    return decodeResponse(response.data, validationRunDetail, 'POST /plans/{plan_id}/validation-runs');
+    return decodeResponse(response.data, (await DL()).validationRunDetail, 'POST /plans/{plan_id}/validation-runs');
   }
 
   async getValidationRuns(planId: string, limit?: number): Promise<ValidationRunSummary[]> {
     const response = await this.client.get(`/plans/${planId}/validation-runs`, {
       params: limit === undefined ? undefined : { limit },
     });
-    return decodeResponse(response.data, arrayOf(validationRunSummary), 'GET /plans/{plan_id}/validation-runs');
+    return decodeResponse(response.data, arrayOf((await DL()).validationRunSummary), 'GET /plans/{plan_id}/validation-runs');
   }
 
   async getValidationRun(planId: string, runId: string): Promise<ValidationRunDetail> {
     const response = await this.client.get(`/plans/${planId}/validation-runs/${runId}`);
-    return decodeResponse(response.data, validationRunDetail, 'GET /plans/{plan_id}/validation-runs/{run_id}');
+    return decodeResponse(response.data, (await DL()).validationRunDetail, 'GET /plans/{plan_id}/validation-runs/{run_id}');
   }
 }

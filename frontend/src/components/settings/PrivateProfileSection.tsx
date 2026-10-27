@@ -104,7 +104,7 @@ const PrivateProfileSection: React.FC = () => {
                   <div className="text-sm text-gray-600">{describeItem(i)}</div>
                 </div>
                 <button type="button" onClick={() => void handleRemove(i.id)} disabled={isSaving}
-                  className="text-gray-400 hover:text-red-600 p-1" aria-label={`${i.label}を削除`}>
+                  className="text-gray-500 hover:text-red-600 p-1" aria-label={`${i.label}を削除`}>
                   <Trash2 size={16} />
                 </button>
               </li>

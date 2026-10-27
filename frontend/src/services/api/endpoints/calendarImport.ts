@@ -7,7 +7,8 @@
 import { BranchesApi } from './branches';
 import type { CalendarImportApplyItem, CalendarImportPreview, CalendarImportResult } from '../types';
 import { decodeResponse } from '../decode';
-import { calendarImportPreview, calendarImportResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class CalendarImportApi extends BranchesApi {
   async previewCalendarImport(planId: string, file: Blob, createMissingDays = false): Promise<CalendarImportPreview> {
@@ -18,7 +19,7 @@ export class CalendarImportApi extends BranchesApi {
     const response = await this.client.post(
       `/plans/${planId}/calendar-import/preview`, form, { headers: { 'Content-Type': undefined } }
     );
-    return decodeResponse(response.data, calendarImportPreview, 'POST /plans/{plan_id}/calendar-import/preview');
+    return decodeResponse(response.data, (await DL()).calendarImportPreview, 'POST /plans/{plan_id}/calendar-import/preview');
   }
 
   async applyCalendarImport(
@@ -28,6 +29,6 @@ export class CalendarImportApi extends BranchesApi {
       `/plans/${planId}/calendar-import/apply`, { items, create_missing_days: createMissingDays },
       { headers: { 'If-Match': String(revision) } }
     );
-    return decodeResponse(response.data, calendarImportResult, 'POST /plans/{plan_id}/calendar-import/apply');
+    return decodeResponse(response.data, (await DL()).calendarImportResult, 'POST /plans/{plan_id}/calendar-import/apply');
   }
 }

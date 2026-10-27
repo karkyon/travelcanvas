@@ -14,30 +14,31 @@ import type {
 } from '../types';
 import { decodeResponse } from '../decode';
 import type { G2Types } from '../decodersG2';
-import { accountDeletionPreview, accountDeletionResult, consentState } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class PrivacyApi extends CalendarImportApi {
   async getConsents(): Promise<ConsentState> {
     const response = await this.client.get('/privacy/consents', SILENT);
-    return decodeResponse(response.data, consentState, 'GET /privacy/consents');
+    return decodeResponse(response.data, (await DL()).consentState, 'GET /privacy/consents');
   }
 
   async updateConsents(consents: Partial<Record<ConsentPurpose, boolean>>): Promise<ConsentState> {
     const response = await this.client.put('/privacy/consents', { consents }, SILENT);
-    return decodeResponse(response.data, consentState, 'PUT /privacy/consents');
+    return decodeResponse(response.data, (await DL()).consentState, 'PUT /privacy/consents');
   }
 
   async getAccountDeletionPreview(): Promise<AccountDeletionPreview> {
     const response = await this.client.get('/privacy/account-deletion', SILENT);
-    return decodeResponse(response.data, accountDeletionPreview, 'GET /privacy/account-deletion');
+    return decodeResponse(response.data, (await DL()).accountDeletionPreview, 'GET /privacy/account-deletion');
   }
 
   async deleteAccount(confirmation: string, password?: string): Promise<AccountDeletionResult> {
     const body = password ? { confirmation, password } : { confirmation };
     const response = await this.client.post('/privacy/account-deletion', body, SILENT);
-    return decodeResponse(response.data, accountDeletionResult, 'POST /privacy/account-deletion');
+    return decodeResponse(response.data, (await DL()).accountDeletionResult, 'POST /privacy/account-deletion');
   }
 
   /** [Gate G2] 応答の検証(decoder は使う時に読み込む。最初に読む JS を小さく保つため) */

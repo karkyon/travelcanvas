@@ -6,7 +6,8 @@
 import { PlansApi } from './plans';
 import type { Reservation, ReservationCreateData, ReservationEventLink, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationParticipant, ReservationRevealResult, ReservationUpdateData } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { reservation, reservationEventLink, reservationParticipant, reservationRevealResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class ReservationsApi extends PlansApi {
   // backend/app/api/v1/reservations.py (Gate R3-0/R3-1)。/plans/{planId}/...
@@ -14,17 +15,17 @@ export class ReservationsApi extends PlansApi {
 
   async getReservations(planId: string): Promise<Reservation[]> {
     const response = await this.client.get(`/plans/${planId}/reservations`);
-    return decodeResponse(response.data, arrayOf(reservation), 'GET /plans/{plan_id}/reservations');
+    return decodeResponse(response.data, arrayOf((await DL()).reservation), 'GET /plans/{plan_id}/reservations');
   }
 
   async getReservation(planId: string, reservationId: string): Promise<Reservation> {
     const response = await this.client.get(`/plans/${planId}/reservations/${reservationId}`);
-    return decodeResponse(response.data, reservation, 'GET /plans/{plan_id}/reservations/{reservation_id}');
+    return decodeResponse(response.data, (await DL()).reservation, 'GET /plans/{plan_id}/reservations/{reservation_id}');
   }
 
   async createReservation(planId: string, data: ReservationCreateData): Promise<Reservation> {
     const response = await this.client.post(`/plans/${planId}/reservations`, data);
-    return decodeResponse(response.data, reservation, 'POST /plans/{plan_id}/reservations');
+    return decodeResponse(response.data, (await DL()).reservation, 'POST /plans/{plan_id}/reservations');
   }
 
   async updateReservation(
@@ -36,7 +37,7 @@ export class ReservationsApi extends PlansApi {
       data,
       headers: { 'If-Match': String(ifMatch) },
     });
-    return decodeResponse(response.data, reservation, 'PATCH /plans/{plan_id}/reservations/{reservation_id}');
+    return decodeResponse(response.data, (await DL()).reservation, 'PATCH /plans/{plan_id}/reservations/{reservation_id}');
   }
 
   async deleteReservation(planId: string, reservationId: string, ifMatch: number): Promise<void> {
@@ -49,14 +50,14 @@ export class ReservationsApi extends PlansApi {
     const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/reveal`, {}
     );
-    return decodeResponse(response.data, reservationRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/reveal');
+    return decodeResponse(response.data, (await DL()).reservationRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/reveal');
   }
 
   async getReservationParticipants(planId: string, reservationId: string): Promise<ReservationParticipant[]> {
     const response = await this.client.get(
       `/plans/${planId}/reservations/${reservationId}/participants`
     );
-    return decodeResponse(response.data, arrayOf(reservationParticipant), 'GET /plans/{plan_id}/reservations/{reservation_id}/participants');
+    return decodeResponse(response.data, arrayOf((await DL()).reservationParticipant), 'GET /plans/{plan_id}/reservations/{reservation_id}/participants');
   }
 
   async createReservationParticipant(
@@ -66,7 +67,7 @@ export class ReservationsApi extends PlansApi {
     const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/participants`, data
     );
-    return decodeResponse(response.data, reservationParticipant, 'POST /plans/{plan_id}/reservations/{reservation_id}/participants');
+    return decodeResponse(response.data, (await DL()).reservationParticipant, 'POST /plans/{plan_id}/reservations/{reservation_id}/participants');
   }
 
   async deleteReservationParticipant(
@@ -82,7 +83,7 @@ export class ReservationsApi extends PlansApi {
     const response = await this.client.get(
       `/plans/${planId}/reservations/${reservationId}/events`
     );
-    return decodeResponse(response.data, arrayOf(reservationEventLink), 'GET /plans/{plan_id}/reservations/{reservation_id}/events');
+    return decodeResponse(response.data, arrayOf((await DL()).reservationEventLink), 'GET /plans/{plan_id}/reservations/{reservation_id}/events');
   }
 
   async createReservationEventLink(
@@ -91,7 +92,7 @@ export class ReservationsApi extends PlansApi {
     const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/events`, data
     );
-    return decodeResponse(response.data, reservationEventLink, 'POST /plans/{plan_id}/reservations/{reservation_id}/events');
+    return decodeResponse(response.data, (await DL()).reservationEventLink, 'POST /plans/{plan_id}/reservations/{reservation_id}/events');
   }
 
   async updateReservationEventLink(
@@ -100,7 +101,7 @@ export class ReservationsApi extends PlansApi {
     const response = await this.client.patch(
       `/plans/${planId}/reservations/${reservationId}/events/${linkId}`, data
     );
-    return decodeResponse(response.data, reservationEventLink, 'PATCH /plans/{plan_id}/reservations/{reservation_id}/events/{link_id}');
+    return decodeResponse(response.data, (await DL()).reservationEventLink, 'PATCH /plans/{plan_id}/reservations/{reservation_id}/events/{link_id}');
   }
 
   async deleteReservationEventLink(planId: string, reservationId: string, linkId: string): Promise<void> {

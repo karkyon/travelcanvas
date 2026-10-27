@@ -6,14 +6,15 @@
 import { TicketsApi } from './tickets';
 import type { InsertionPreview, NormalizedDay, OptimizationProposal, RoutePreview } from '../types';
 import { decodeResponse } from '../decode';
-import { insertionPreview, normalizedDay, optimizationProposal, routePreview } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class PlanInsightsApi extends TicketsApi {
   async getRoutePreview(planId: string, dayId: string, mode: string = 'walking'): Promise<RoutePreview> {
     const response = await this.client.get(
       `/plans/${planId}/days/${dayId}/route-preview`, { params: { mode } }
     );
-    return decodeResponse(response.data, routePreview, 'GET /plans/{plan_id}/days/{day_id}/route-preview');
+    return decodeResponse(response.data, (await DL()).routePreview, 'GET /plans/{plan_id}/days/{day_id}/route-preview');
   }
 
   async getInsertionPreview(
@@ -23,7 +24,7 @@ export class PlanInsightsApi extends TicketsApi {
     const response = await this.client.post(
       `/plans/${planId}/days/${dayId}/insertion-preview`, data
     );
-    return decodeResponse(response.data, insertionPreview, 'POST /plans/{plan_id}/days/{day_id}/insertion-preview');
+    return decodeResponse(response.data, (await DL()).insertionPreview, 'POST /plans/{plan_id}/days/{day_id}/insertion-preview');
   }
 
   // [Gate #33 監査是正] 旧OptimizationPanelは「AI最適化」と称し天候・混雑・
@@ -34,7 +35,7 @@ export class PlanInsightsApi extends TicketsApi {
     const response = await this.client.post(
       `/plans/${planId}/days/${dayId}/optimization-proposal`
     );
-    return decodeResponse(response.data, optimizationProposal, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal');
+    return decodeResponse(response.data, (await DL()).optimizationProposal, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal');
   }
 
   async applyOptimizationProposal(
@@ -45,6 +46,6 @@ export class PlanInsightsApi extends TicketsApi {
       { proposed_order: proposedOrder },
       { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, normalizedDay, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal/apply');
+    return decodeResponse(response.data, (await DL()).normalizedDay, 'POST /plans/{plan_id}/days/{day_id}/optimization-proposal/apply');
   }
 }

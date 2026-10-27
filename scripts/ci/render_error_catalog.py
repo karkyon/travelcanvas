@@ -59,7 +59,10 @@ def collect():
                         end = i
                         break
                     depth -= 1
-            st = STATUS.search(after[:end]) or STATUS.search(src[max(0, m.start() - 160):m.start()])
+            # [Gate G8] 直前を探す時は、code に一番近い状態を使う(以前は 160 文字の中で最初の状態を拾い、前の行の
+            # raise の状態と取り違えることがあった)
+            before = list(STATUS.finditer(src[max(0, m.start() - 160):m.start()]))
+            st = STATUS.search(after[:end]) or (before[-1] if before else None)
             if st:
                 entry["statuses"].add(st.group(1))
             entry["files"].add(rel.replace("backend/app/", ""))

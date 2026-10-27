@@ -10,9 +10,8 @@ import type {
   PlanMember, PreparationTask, PreparationTaskCreateData, PreparationTaskUpdateData, Readiness,
 } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import {
-  packingItem, packingSuggestions, planMember, preparationTask, readiness, revisionResult,
-} from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 function conditionParams(c?: PackingSuggestionConditions): Record<string, boolean> | undefined {
   if (!c) return undefined;
@@ -26,17 +25,17 @@ function conditionParams(c?: PackingSuggestionConditions): Record<string, boolea
 export class PreparationApi extends PlanTrashApi {
   async getPlanMembers(planId: string): Promise<PlanMember[]> {
     const response = await this.client.get(`/plans/${planId}/members`);
-    return decodeResponse(response.data, arrayOf(planMember), 'GET /plans/{plan_id}/members');
+    return decodeResponse(response.data, arrayOf((await DL()).planMember), 'GET /plans/{plan_id}/members');
   }
 
   async getPackingItems(planId: string): Promise<PackingItem[]> {
     const response = await this.client.get(`/plans/${planId}/packing-items`);
-    return decodeResponse(response.data, arrayOf(packingItem), 'GET /plans/{plan_id}/packing-items');
+    return decodeResponse(response.data, arrayOf((await DL()).packingItem), 'GET /plans/{plan_id}/packing-items');
   }
 
   async createPackingItem(planId: string, data: PackingItemCreateData): Promise<PackingItem> {
     const response = await this.client.post(`/plans/${planId}/packing-items`, data);
-    return decodeResponse(response.data, packingItem, 'POST /plans/{plan_id}/packing-items');
+    return decodeResponse(response.data, (await DL()).packingItem, 'POST /plans/{plan_id}/packing-items');
   }
 
   async updatePackingItem(
@@ -45,31 +44,31 @@ export class PreparationApi extends PlanTrashApi {
     const response = await this.client.patch(
       `/plans/${planId}/packing-items/${itemId}`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, packingItem, 'PATCH /plans/{plan_id}/packing-items/{item_id}');
+    return decodeResponse(response.data, (await DL()).packingItem, 'PATCH /plans/{plan_id}/packing-items/{item_id}');
   }
 
   async deletePackingItem(planId: string, itemId: string, ifMatch: number): Promise<{ revision: number }> {
     const response = await this.client.delete(
       `/plans/${planId}/packing-items/${itemId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/packing-items/{item_id}');
+    return decodeResponse(response.data, (await DL()).revisionResult, 'DELETE /plans/{plan_id}/packing-items/{item_id}');
   }
 
   async getPackingSuggestions(planId: string, conditions?: PackingSuggestionConditions): Promise<PackingSuggestions> {
     const response = await this.client.get(`/plans/${planId}/packing-suggestions`, {
       params: conditionParams(conditions),
     });
-    return decodeResponse(response.data, packingSuggestions, 'GET /plans/{plan_id}/packing-suggestions');
+    return decodeResponse(response.data, (await DL()).packingSuggestions, 'GET /plans/{plan_id}/packing-suggestions');
   }
 
   async getPreparationTasks(planId: string): Promise<PreparationTask[]> {
     const response = await this.client.get(`/plans/${planId}/preparation-tasks`);
-    return decodeResponse(response.data, arrayOf(preparationTask), 'GET /plans/{plan_id}/preparation-tasks');
+    return decodeResponse(response.data, arrayOf((await DL()).preparationTask), 'GET /plans/{plan_id}/preparation-tasks');
   }
 
   async createPreparationTask(planId: string, data: PreparationTaskCreateData): Promise<PreparationTask> {
     const response = await this.client.post(`/plans/${planId}/preparation-tasks`, data);
-    return decodeResponse(response.data, preparationTask, 'POST /plans/{plan_id}/preparation-tasks');
+    return decodeResponse(response.data, (await DL()).preparationTask, 'POST /plans/{plan_id}/preparation-tasks');
   }
 
   async updatePreparationTask(
@@ -78,18 +77,18 @@ export class PreparationApi extends PlanTrashApi {
     const response = await this.client.patch(
       `/plans/${planId}/preparation-tasks/${taskId}`, data, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, preparationTask, 'PATCH /plans/{plan_id}/preparation-tasks/{task_id}');
+    return decodeResponse(response.data, (await DL()).preparationTask, 'PATCH /plans/{plan_id}/preparation-tasks/{task_id}');
   }
 
   async deletePreparationTask(planId: string, taskId: string, ifMatch: number): Promise<{ revision: number }> {
     const response = await this.client.delete(
       `/plans/${planId}/preparation-tasks/${taskId}`, { headers: { 'If-Match': String(ifMatch) } }
     );
-    return decodeResponse(response.data, revisionResult, 'DELETE /plans/{plan_id}/preparation-tasks/{task_id}');
+    return decodeResponse(response.data, (await DL()).revisionResult, 'DELETE /plans/{plan_id}/preparation-tasks/{task_id}');
   }
 
   async getReadiness(planId: string): Promise<Readiness> {
     const response = await this.client.get(`/plans/${planId}/readiness`);
-    return decodeResponse(response.data, readiness, 'GET /plans/{plan_id}/readiness');
+    return decodeResponse(response.data, (await DL()).readiness, 'GET /plans/{plan_id}/readiness');
   }
 }

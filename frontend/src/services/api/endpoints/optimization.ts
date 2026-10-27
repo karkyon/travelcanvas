@@ -9,12 +9,13 @@
 import { ReplansApi } from './replans';
 import type { OptimizationApplyResult, OptimizationCandidates, OptimizationTravelMode } from '../types';
 import { decodeResponse } from '../decode';
-import { optimizationApplyResult, optimizationCandidates } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class OptimizationApi extends ReplansApi {
   async getOptimizationCandidates(planId: string, dayId: string, travelMode: OptimizationTravelMode = 'walking'): Promise<OptimizationCandidates> {
     const response = await this.client.post(`/plans/${planId}/days/${dayId}/optimization-candidates`, { travel_mode: travelMode });
-    return decodeResponse(response.data, optimizationCandidates, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates');
+    return decodeResponse(response.data, (await DL()).optimizationCandidates, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates');
   }
 
   async applyOptimizationCandidate(
@@ -26,6 +27,6 @@ export class OptimizationApi extends ReplansApi {
       { candidate_id: candidateId, input_fingerprint: inputFingerprint, travel_mode: travelMode },
       { headers: { 'If-Match': String(planRevision) } },
     );
-    return decodeResponse(response.data, optimizationApplyResult, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates/apply');
+    return decodeResponse(response.data, (await DL()).optimizationApplyResult, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates/apply');
   }
 }

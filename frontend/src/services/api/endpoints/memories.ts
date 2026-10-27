@@ -12,19 +12,20 @@ import type {
   JournalDraft, JournalOptions, MemoryInput, MemoryList, MemoryUpdateInput, MemoryUploadInput, TravelMemory,
 } from '../types';
 import { decodeResponse } from '../decode';
-import { journalDraft, memoryList, travelMemory } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class MemoriesApi extends SyncApi {
   async getMemories(planId: string): Promise<MemoryList> {
     const response = await this.client.get(`/plans/${planId}/memories`, SILENT);
-    return decodeResponse(response.data, memoryList, 'GET /plans/{plan_id}/memories');
+    return decodeResponse(response.data, (await DL()).memoryList, 'GET /plans/{plan_id}/memories');
   }
 
   async createMemory(planId: string, input: MemoryInput): Promise<TravelMemory> {
     const response = await this.client.post(`/plans/${planId}/memories`, input, SILENT);
-    return decodeResponse(response.data, travelMemory, 'POST /plans/{plan_id}/memories');
+    return decodeResponse(response.data, (await DL()).travelMemory, 'POST /plans/{plan_id}/memories');
   }
 
   async uploadMemory(planId: string, input: MemoryUploadInput): Promise<TravelMemory> {
@@ -43,14 +44,14 @@ export class MemoriesApi extends SyncApi {
     const response = await this.client.post(`/plans/${planId}/memories/upload`, form, {
       ...SILENT, headers: { 'Content-Type': undefined },
     });
-    return decodeResponse(response.data, travelMemory, 'POST /plans/{plan_id}/memories/upload');
+    return decodeResponse(response.data, (await DL()).travelMemory, 'POST /plans/{plan_id}/memories/upload');
   }
 
   async updateMemory(planId: string, memoryId: string, input: MemoryUpdateInput, revision: number): Promise<TravelMemory> {
     const response = await this.client.patch(`/plans/${planId}/memories/${memoryId}`, input, {
       ...SILENT, headers: { 'If-Match': String(revision) },
     });
-    return decodeResponse(response.data, travelMemory, 'PATCH /plans/{plan_id}/memories/{memory_id}');
+    return decodeResponse(response.data, (await DL()).travelMemory, 'PATCH /plans/{plan_id}/memories/{memory_id}');
   }
 
   async deleteMemory(planId: string, memoryId: string): Promise<void> {
@@ -66,6 +67,6 @@ export class MemoriesApi extends SyncApi {
 
   async createJournalDraft(planId: string, options: JournalOptions): Promise<JournalDraft> {
     const response = await this.client.post(`/plans/${planId}/memories/journal-draft`, options, SILENT);
-    return decodeResponse(response.data, journalDraft, 'POST /plans/{plan_id}/memories/journal-draft');
+    return decodeResponse(response.data, (await DL()).journalDraft, 'POST /plans/{plan_id}/memories/journal-draft');
   }
 }

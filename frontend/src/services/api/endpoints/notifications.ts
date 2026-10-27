@@ -7,7 +7,7 @@ import { PlanInsightsApi } from './insights';
 import type { ApiResponse, Notification } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { notification, unreadCount } from '../decoders';
+import { notification, unreadCount } from '../decodersCore';
 
 export class NotificationsApi extends PlanInsightsApi {
   // [Gate #26] URLは実装済みだったが、バックエンド(/notifications)自体が

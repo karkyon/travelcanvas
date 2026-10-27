@@ -13,12 +13,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     from app.core.database import SessionLocal
     from app.services import notify
 
-    db = SessionLocal()
-    try:
-        digest = notify.build_digests(db)
-        sent = notify.deliver_outbox(db)
-    finally:
-        db.close()
+    from app.ops.job_runs import recorded
+
+    def run():
+        db = SessionLocal()
+        try:
+            return {"digest": notify.build_digests(db), "outbox": notify.deliver_outbox(db)}
+        finally:
+            db.close()
+
+    # [Gate G8] FR-004 実行の記録(最後の成功の時刻。件数だけ)
+    out = recorded("email-outbox", run)
+    digest, sent = out["digest"], out["outbox"]
     print(json.dumps({"ok": True, "digest": digest, "outbox": sent}, ensure_ascii=False, sort_keys=True))
     return 0
 

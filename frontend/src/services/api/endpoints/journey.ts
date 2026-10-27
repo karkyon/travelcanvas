@@ -9,14 +9,15 @@ import type { AxiosRequestConfig } from 'axios';
 import { LocationApi } from './location';
 import type { ActualInput, ActualPutResult, CarryOverResult, JourneyReview } from '../types';
 import { decodeResponse } from '../decode';
-import { actualPutResult, carryOverResult, journeyReview } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class JourneyApi extends LocationApi {
   async getJourney(planId: string): Promise<JourneyReview> {
     const response = await this.client.get(`/plans/${planId}/journey`, SILENT);
-    return decodeResponse(response.data, journeyReview, 'GET /plans/{plan_id}/journey');
+    return decodeResponse(response.data, (await DL()).journeyReview, 'GET /plans/{plan_id}/journey');
   }
 
   async putEventActual(planId: string, eventId: string, input: ActualInput, revision?: number): Promise<ActualPutResult> {
@@ -24,7 +25,7 @@ export class JourneyApi extends LocationApi {
       ? SILENT
       : { ...SILENT, headers: { 'If-Match': String(revision) } };
     const response = await this.client.put(`/plans/${planId}/journey/events/${eventId}`, input, config);
-    return decodeResponse(response.data, actualPutResult, 'PUT /plans/{plan_id}/journey/events/{event_id}');
+    return decodeResponse(response.data, (await DL()).actualPutResult, 'PUT /plans/{plan_id}/journey/events/{event_id}');
   }
 
   async deleteEventActual(planId: string, eventId: string): Promise<void> {
@@ -35,6 +36,6 @@ export class JourneyApi extends LocationApi {
     const response = await this.client.post(`/plans/${planId}/journey/events/${eventId}/carry-over`, {
       target_plan_id: targetPlanId, target_day_id: targetDayId,
     }, SILENT);
-    return decodeResponse(response.data, carryOverResult, 'POST /plans/{plan_id}/journey/events/{event_id}/carry-over');
+    return decodeResponse(response.data, (await DL()).carryOverResult, 'POST /plans/{plan_id}/journey/events/{event_id}/carry-over');
   }
 }

@@ -148,6 +148,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     now = now or _now()
     me = user.id
     summary: Dict[str, int] = {}
+    # [Gate G8] FR-021 この人が申し出た・受け取る手続き中の所有者の移譲は取り下げにする
+    from app.api.v1 import ownership
+
+    summary["ownership_transfers_closed"] = ownership.close_for_user(db, me)
 
     owned = _owned_plans(db, user)
     owned_ids = {p.id for p in owned}
@@ -262,6 +266,11 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
             get_storage_backend().delete(key)
         except (OSError, ValueError):
             pass
+    # [Gate G8] FR-039 本人の訂正の履歴・所有者への訂正の申し出(本人の個人データ)
+    from app.models.models import DataCorrection
+
+    summary["data_corrections"] = db.query(DataCorrection).filter(DataCorrection.user_id == me).delete(
+        synchronize_session=False)
     # [Gate G5] BILL-02 本人の使用量の記録
     from app.models.models import UsageCounter
 

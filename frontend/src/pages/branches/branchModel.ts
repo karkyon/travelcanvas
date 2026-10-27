@@ -35,11 +35,27 @@ const CONFLICT_TEXT: Record<BranchConflict['reason'], string> = {
   changed_in_plan: '分岐した後に本案でも変更されています',
   deleted_in_plan: '本案では削除されています',
   locked: '本案で確定(ロック)されています',
-  has_relations: '予約・移動区間などと紐付いているため、分岐案からは外せません',
+  has_relations: '予約・移動区間などと紐付いているため、このままでは外せません(この案の「移動区間・予約」で区間を外すか予約を付け替えてください)',
   day_missing: '移動先の日程が本案にありません',
+  event_missing: 'つなぐ予定が本案にありません',
+  already_cancelled: '本案で既に取消になっています',
+  hidden: '見せない設定の項目に、本案と食い違う変更があります',
+};
+
+const SEGMENT_FIELD_LABEL: Record<string, string> = {
+  mode: '移動手段', status: '状態', duration_minutes: '所要時間', distance_km: '距離', cost: '費用', currency: '通貨',
+  planned_departure_at: '出発', planned_arrival_at: '到着', last_departure_at: '最終の便', transport_number: '便名',
+  platform: '番線', preparation_minutes: '準備', buffer_before_minutes: '余裕', from_event_id: '出発の予定',
+  to_event_id: '到着の予定', event_ids: '紐付く予定',
 };
 
 export function describeConflict(c: BranchConflict): string {
+  if (c.kind === 'segment' || c.kind === 'reservation') {
+    const target = c.kind === 'segment' ? '移動区間' : `予約「${c.label ?? '予約'}」`;
+    const fields = c.fields && c.fields.length > 0
+      ? `(${c.fields.map((f) => SEGMENT_FIELD_LABEL[f] ?? f).join('・')})` : '';
+    return `${target}: ${CONFLICT_TEXT[c.reason]}${fields}`;
+  }
   const target = c.title ?? '追加した予定';
   const fields = c.fields && c.fields.length > 0 ? `(${c.fields.map(fieldLabel).join('・')})` : '';
   return `「${target}」: ${CONFLICT_TEXT[c.reason]}${fields}`;

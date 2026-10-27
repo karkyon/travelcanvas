@@ -26,12 +26,19 @@ from app.services.document_purge_service import (  # noqa: E402
 
 
 def main() -> int:
-    session = SessionLocal()
-    try:
-        retention_counts = soft_delete_expired_retention_documents(session)
-        purge_counts = purge_deleted_documents(session)
-    finally:
-        session.close()
+    from app.ops.job_runs import recorded
+
+    def run():
+        session = SessionLocal()
+        try:
+            return {"retention": soft_delete_expired_retention_documents(session),
+                    "purge": purge_deleted_documents(session)}
+        finally:
+            session.close()
+
+    # [Gate G8] FR-004 実行の記録(最後の成功の時刻。件数だけ)
+    out = recorded("document-purge", run)
+    retention_counts, purge_counts = out["retention"], out["purge"]
 
     print("Document retention/purge完了:")
     for key, value in retention_counts.items():

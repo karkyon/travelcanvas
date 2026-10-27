@@ -202,6 +202,8 @@ class Settings(BaseSettings):
     # [Gate G7] FR-039 猶予つきのアカウント削除(日)。申し込みからこの日数の間は取り消せる。過ぎたら定期の処理
     # (tcops.py jobs account-deletions)が削除する。「今すぐ削除」も残す
     ACCOUNT_DELETE_GRACE_DAYS: int = 14
+    # [Gate G8] FR-021 所有者の移譲の申し出の期限(日)
+    OWNERSHIP_TRANSFER_DAYS: int = 7
 
     # [Gate R2-2] QuickDraft payload field encryption用の鍵。
     # 注意: DATABASE_URL/JWT_SECRET_KEYと異なり意図的にOptionalとする。

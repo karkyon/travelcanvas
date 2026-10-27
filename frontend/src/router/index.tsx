@@ -57,6 +57,9 @@ const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
 const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
 const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
+// [Gate G8] FR-039 訂正の申し出・UX-1 デザインの部品の一覧
+const CorrectionRequestsPage = lazyPage(() => import('@/pages/CorrectionRequestsPage'));
+const DesignCatalogPage = lazyPage(() => import('@/pages/DesignCatalogPage'));
 const AlertsPage = lazyPage(() => import('@/pages/AlertsPage'));
 const ReplanPage = lazyPage(() => import('@/pages/ReplanPage'));
 const SyncConflictsPage = lazyPage(() => import('@/pages/SyncConflictsPage'));
@@ -312,6 +315,21 @@ export const router = createBrowserRouter([
             <BranchDetailPage />
           </ProtectedRoute>
         ),
+      },
+
+      // ✏️ [Gate G8] FR-039 旅行の中の情報の訂正の申し出(参加者が出し、所有者が対応を記録する)。
+      {
+        path: 'planner/:planId/corrections',
+        element: (
+          <ProtectedRoute>
+            <CorrectionRequestsPage />
+          </ProtectedRoute>
+        ),
+      },
+      // 🎨 [Gate G9] UX-1 デザインの決まり(色・面・余白・文字・動き)と部品の一覧。利用者のデータを含まない
+      {
+        path: 'design-system',
+        element: <DesignCatalogPage />,
       },
 
       // 📥 [Gate P8] カレンダー(ICS)の取込(FR-036、差分確認後に適用)。

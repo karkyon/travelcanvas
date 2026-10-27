@@ -8,7 +8,7 @@ import { SpotsApi } from './spots';
 import type { ApiResponse, ItemDeleteResult, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { itemDeleteResult, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decoders';
+import { itemDeleteResult, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decodersCore';
 
 export class PlansApi extends SpotsApi {
   // [Gate #8] URLが実バックエンド(prefix="/travel-plans", main.pyでtravel.routerとして

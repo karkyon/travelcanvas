@@ -27,6 +27,7 @@
 | [gate-g5-trace.md](gate-g5-trace.md) | Gate G5 トレース(機能: 費用・使用量・組織) | 2 | 1 | 0 |
 | [gate-g6-trace.md](gate-g6-trace.md) | Gate G6 トレース(機能: オフライン・位置・記録) | 1 | 1 | 0 |
 | [gate-g7-trace.md](gate-g7-trace.md) | Gate G7 トレース(機能: 移動・最適化・案の比較・記録・削除) | 4 | 0 | 0 |
+| [gate-g8-trace.md](gate-g8-trace.md) | Gate G8・G9 トレース(機能: 案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録 / 見た目の準備) | 2 | 0 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
@@ -75,25 +76,21 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 
 | FR | 機能 | 状態 | 主な不足 |
 |---|---|---|---|
-| FR-004 | 旅行CRUD | INTEGRATED | 定期実行の継続記録、複数端末の同時編集のE2E |
 | FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、候補への投票、URLの題名・画像の取得 |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-011 | 予約取込 | INTEGRATED(部分) | メール・OCRによる自動抽出 |
 | FR-014 | 移動区間 | INTEGRATED | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 外部経路による実移動時間 |
-| FR-019 | What-if | INTEGRATED(部分) | 案の中で予約・移動区間そのものを変える分岐 |
 | FR-024 | コメント・通知 | INTEGRATED(部分) | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
 | FR-030 | 外部状況 | INTEGRATED(部分) | 外部provider(運行情報・天気・警報・休業) |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | サーバー側の PDF・ダウンロード URL |
 | FR-036 | Calendar/Map IO | INTEGRATED(部分) | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
 | FR-037 | 写真・旅行記 | INTEGRATED(部分) | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
-| FR-039 | 輸出・削除 | INTEGRATED(部分) | 所有者の移譲、出典つきの訂正 |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | 候補の層、地図タイルの上への表示 |
-| FR-051 | 訪問訂正・除外 | INTEGRATED | VERIFIED の証拠の整理(V3) |
 | FR-052 | Personal Travel Atlas | INTEGRATED(部分) | 国・都道府県・市区町村・テーマ別(逆ジオコーディング)、地点単位の公開範囲 |
 | FR-054 | 予定と実績 | INTEGRATED(部分) | 予定経路と GPS 軌跡の比較 |
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |

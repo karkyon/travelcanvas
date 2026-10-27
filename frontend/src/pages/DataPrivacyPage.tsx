@@ -6,6 +6,7 @@
  *   - 削除後・バックアップ・監査の保持期間を説明する
  * 旅行ごとのエクスポートは各旅行の「書き出し」画面で行う(所有者だけ)。
  * [Gate P9] 目的別の同意と撤回(ConsentsCard)、アカウントの削除(AccountDeletionCard)を追加。
+ * [Gate G8] FR-039 出典・確認・履歴つきの訂正(CorrectionsCard)を追加。
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +22,7 @@ import AccountDeletionCard from './privacy/AccountDeletionCard';
 import ConsentsCard from './privacy/ConsentsCard';
 import OfflineDevicesCard from './privacy/OfflineDevicesCard';
 import PrivacyZonesCard from './privacy/PrivacyZonesCard';
+import CorrectionsCard from './privacy/CorrectionsCard';
 
 const DataPrivacyPage: React.FC = () => {
   const navigate = useNavigate();
@@ -101,6 +103,7 @@ const DataPrivacyPage: React.FC = () => {
         </section>
       </Card>
 
+      <CorrectionsCard />
       <PrivacyZonesCard />
       <OfflineDevicesCard />
       <ConsentsCard />

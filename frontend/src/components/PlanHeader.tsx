@@ -7,6 +7,15 @@ import Card from './common/Card';
 import Modal from './common/Modal';
 import type { TravelPlan } from '../types';
 
+/** [Gate G9] UX-0 旅行の最初・最後の日(日程の日付を優先し、無ければ旅行の開始・終了の日)。無ければ空 */
+function firstDate(plan: TravelPlan): string {
+  return plan.days?.[0]?.date || plan.start_date || '';
+}
+
+function lastDate(plan: TravelPlan): string {
+  return plan.days?.[plan.days.length - 1]?.date || plan.end_date || '';
+}
+
 interface PlanHeaderProps {
   plan: TravelPlan;
   onShare?: () => void;
@@ -47,9 +56,13 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     const totalDuration = plan.days?.reduce((daySum, day) => 
       daySum + day.events.reduce((eventSum, event) => eventSum + (event.duration || 0), 0), 0) || 0;
 
-    const startDate = new Date(plan.start_date || 0);
-    const endDate = new Date(plan.end_date || 0);
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    // [Gate G9] UX-0 旅行の期間は日程(days)を優先し、無ければ開始・終了の日から求める(どちらも無ければ null = 未設定)。
+    // 以前は日付の無い旅行で「Invalid Date」「1日間」と出ていた
+    const startDate = new Date(firstDate(plan) || NaN);
+    const endDate = new Date(lastDate(plan) || NaN);
+    const fromDates = Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())
+      ? null : Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysDiff = totalDays > 0 ? totalDays : fromDates;
 
     return {
       totalDays,
@@ -128,7 +141,8 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
 
   // 日付フォーマット
   const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString || NaN);
+    if (Number.isNaN(date.getTime())) return '未設定';
     return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
       month: 'long',
@@ -166,9 +180,10 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
           /* 表示モード */
           <div className="space-y-6">
             {/* ヘッダー情報 */}
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
+            {/* [Gate G9] UX-0 スマホの幅では題名と操作を縦に並べる(以前は題名が1文字ずつ折り返した) */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
                   <h1 className="text-2xl font-bold text-gray-900">{plan.title}</h1>
                   <span className={`
                     px-2 py-1 text-xs font-medium rounded-full
@@ -191,28 +206,28 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">📍 目的地</span>
-                    <div className="font-medium">{plan.destination}</div>
+                    <div className="font-medium">{plan.destination || '未設定'}</div>
                   </div>
                   <div>
                     <span className="text-gray-500">📅 期間</span>
-                    <div className="font-medium">{planStats.daysDiff}日間</div>
+                    <div className="font-medium">{planStats.daysDiff ? `${planStats.daysDiff}日間` : '未設定'}</div>
                   </div>
                   <div>
                     <span className="text-gray-500">👥 人数</span>
-                    <div className="font-medium">{plan.group_size}人</div>
+                    <div className="font-medium">{plan.group_size ? `${plan.group_size}人` : '未設定'}</div>
                   </div>
                   <div>
                     <span className="text-gray-500">💰 予算</span>
-                    <div className="font-medium">¥{plan.budget?.toLocaleString()}</div>
+                    <div className="font-medium">{plan.budget !== undefined && plan.budget !== null ? `¥${plan.budget.toLocaleString()}` : '未設定'}</div>
                   </div>
                 </div>
 
                 {/* 日程 */}
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <div className="text-sm text-blue-800">
-                    <span className="font-medium">📅 {formatDate(plan.start_date || '')}</span>
+                    <span className="font-medium">📅 {formatDate(firstDate(plan))}</span>
                     <span className="mx-2">〜</span>
-                    <span className="font-medium">{formatDate(plan.end_date || '')}</span>
+                    <span className="font-medium">{formatDate(lastDate(plan))}</span>
                   </div>
                 </div>
 

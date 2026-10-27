@@ -6,20 +6,21 @@
 import { DocumentsApi } from './documents';
 import type { Ticket, TicketCreateData, TicketRevealResult } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
-import { ticket, ticketRevealResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 export class TicketsApi extends DocumentsApi {
   // [Gate R3-11] FR-012 QR・チケット(tickets)
   async getTickets(planId: string, reservationId: string): Promise<Ticket[]> {
     const response = await this.client.get(`/plans/${planId}/reservations/${reservationId}/tickets`);
-    return decodeResponse(response.data, arrayOf(ticket), 'GET /plans/{plan_id}/reservations/{reservation_id}/tickets');
+    return decodeResponse(response.data, arrayOf((await DL()).ticket), 'GET /plans/{plan_id}/reservations/{reservation_id}/tickets');
   }
 
   async createTicket(planId: string, reservationId: string, data: TicketCreateData): Promise<Ticket> {
     const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/tickets`, data
     );
-    return decodeResponse(response.data, ticket, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets');
+    return decodeResponse(response.data, (await DL()).ticket, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets');
   }
 
   async deleteTicket(planId: string, reservationId: string, ticketId: string, ifMatch: number): Promise<void> {
@@ -32,6 +33,6 @@ export class TicketsApi extends DocumentsApi {
     const response = await this.client.post(
       `/plans/${planId}/reservations/${reservationId}/tickets/${ticketId}/reveal`, {}
     );
-    return decodeResponse(response.data, ticketRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}/reveal');
+    return decodeResponse(response.data, (await DL()).ticketRevealResult, 'POST /plans/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}/reveal');
   }
 }

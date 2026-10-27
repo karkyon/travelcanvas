@@ -10,7 +10,8 @@ import type {
 } from '../types';
 import { apiOk, apiOkVoid } from '../response';
 import { arrayOf, decodeResponse } from '../decode';
-import { collaborator, collaboratorRemoveResult, publicSharedPlan, shareLink, sharePreview } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const PUBLIC_SHARE_SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -25,22 +26,22 @@ export class ShareApi extends NotificationsApi {
   // 返すためクライアント側でApiResponse形状へ手動で包む。
   async revokeShareLink(planId: string, shareId: string): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post(`/travel-plans/${planId}/share/${shareId}/revoke`);
-    return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'POST /travel-plans/{plan_id}/share/{share_id}/revoke'));
+    return apiOk<ShareLink>(decodeResponse(response.data, (await DL()).shareLink, 'POST /travel-plans/{plan_id}/share/{share_id}/revoke'));
   }
 
   async listMyInvitations(): Promise<ApiResponse<Collaborator[]>> {
     const response = await this.client.get('/travel-plans/invitations');
-    return apiOk<Collaborator[]>(decodeResponse(response.data, arrayOf(collaborator), 'GET /travel-plans/invitations'));
+    return apiOk<Collaborator[]>(decodeResponse(response.data, arrayOf((await DL()).collaborator), 'GET /travel-plans/invitations'));
   }
 
   async acceptInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post(`/travel-plans/invitations/${collaboratorId}/accept`);
-    return apiOk<Collaborator>(decodeResponse(response.data, collaborator, 'POST /travel-plans/invitations/{collaborator_id}/accept'));
+    return apiOk<Collaborator>(decodeResponse(response.data, (await DL()).collaborator, 'POST /travel-plans/invitations/{collaborator_id}/accept'));
   }
 
   async declineInvitation(collaboratorId: string): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post(`/travel-plans/invitations/${collaboratorId}/decline`);
-    return apiOk<Collaborator>(decodeResponse(response.data, collaborator, 'POST /travel-plans/invitations/{collaborator_id}/decline'));
+    return apiOk<Collaborator>(decodeResponse(response.data, (await DL()).collaborator, 'POST /travel-plans/invitations/{collaborator_id}/decline'));
   }
 
   // [Gate #30] 認証不要の公開共有リンク解決。未ログインでも呼び出せる
@@ -53,7 +54,7 @@ export class ShareApi extends NotificationsApi {
     const response = await this.client.post(`/public/share/${token}/resolve`, {
       passcode: passcode || undefined,
     }, PUBLIC_SHARE_SILENT);
-    return apiOk<PublicSharedPlan>(decodeResponse(response.data, publicSharedPlan, 'POST /public/share/{token}/resolve'));
+    return apiOk<PublicSharedPlan>(decodeResponse(response.data, (await DL()).publicSharedPlan, 'POST /public/share/{token}/resolve'));
   }
 
   // [Gate F45] FR-045 見せる項目(preset / fields / acknowledge_confidential)も送れる
@@ -66,12 +67,12 @@ export class ShareApi extends NotificationsApi {
     allow_clone?: boolean;
   } & SharePolicyInput): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.post(`/travel-plans/${planId}/share`, shareData);
-    return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'POST /travel-plans/{plan_id}/share'));
+    return apiOk<ShareLink>(decodeResponse(response.data, (await DL()).shareLink, 'POST /travel-plans/{plan_id}/share'));
   }
 
   async getShareSettings(planId: string): Promise<ApiResponse<ShareLink[]>> {
     const response = await this.client.get(`/travel-plans/${planId}/share`);
-    return apiOk<ShareLink[]>(decodeResponse(response.data, arrayOf(shareLink), 'GET /travel-plans/{plan_id}/share'));
+    return apiOk<ShareLink[]>(decodeResponse(response.data, arrayOf((await DL()).shareLink), 'GET /travel-plans/{plan_id}/share'));
   }
 
   async updateShareSettings(planId: string, shareId: string, data: {
@@ -81,19 +82,19 @@ export class ShareApi extends NotificationsApi {
     max_uses?: number | null;
   } & SharePolicyInput): Promise<ApiResponse<ShareLink>> {
     const response = await this.client.put(`/travel-plans/${planId}/share/${shareId}`, data);
-    return apiOk<ShareLink>(decodeResponse(response.data, shareLink, 'PUT /travel-plans/{plan_id}/share/{share_id}'));
+    return apiOk<ShareLink>(decodeResponse(response.data, (await DL()).shareLink, 'PUT /travel-plans/{plan_id}/share/{share_id}'));
   }
 
   // [Gate F45] 共有前プレビュー(所有者のみ)。リンクを作らず、閲覧者に見える内容と見せない情報の件数を返す
   async previewSharePolicy(planId: string, policy: SharePolicyInput & { permission?: 'view' | 'edit' }): Promise<SharePreview> {
     const response = await this.client.post(`/travel-plans/${planId}/share-preview`, policy);
-    return decodeResponse(response.data, sharePreview, 'POST /travel-plans/{plan_id}/share-preview');
+    return decodeResponse(response.data, (await DL()).sharePreview, 'POST /travel-plans/{plan_id}/share-preview');
   }
 
   // [Gate F45] 発行済みリンクで閲覧者に見える内容(所有者のみ。使用回数を消費しない)
   async previewShareLink(planId: string, shareId: string): Promise<SharePreview> {
     const response = await this.client.get(`/travel-plans/${planId}/share/${shareId}/preview`);
-    return decodeResponse(response.data, sharePreview, 'GET /travel-plans/{plan_id}/share/{share_id}/preview');
+    return decodeResponse(response.data, (await DL()).sharePreview, 'GET /travel-plans/{plan_id}/share/{share_id}/preview');
   }
 
   async deleteShareLink(planId: string, shareId: string): Promise<ApiResponse<void>> {
@@ -107,19 +108,19 @@ export class ShareApi extends NotificationsApi {
     message?: string;
   }): Promise<ApiResponse<Collaborator>> {
     const response = await this.client.post(`/travel-plans/${planId}/collaborators`, inviteData);
-    return apiOk<Collaborator>(decodeResponse(response.data, collaborator, 'POST /travel-plans/{plan_id}/collaborators'));
+    return apiOk<Collaborator>(decodeResponse(response.data, (await DL()).collaborator, 'POST /travel-plans/{plan_id}/collaborators'));
   }
 
   async getCollaborators(planId: string): Promise<ApiResponse<Collaborator[]>> {
     const response = await this.client.get(`/travel-plans/${planId}/collaborators`);
-    return apiOk<Collaborator[]>(decodeResponse(response.data, arrayOf(collaborator), 'GET /travel-plans/{plan_id}/collaborators'));
+    return apiOk<Collaborator[]>(decodeResponse(response.data, arrayOf((await DL()).collaborator), 'GET /travel-plans/{plan_id}/collaborators'));
   }
 
   // [Gate B-013] アクセス取消しは常に成功し、チケット担当者・参加者の割当だけが外れる。
   async removeCollaborator(planId: string, collaboratorId: string): Promise<ApiResponse<CollaboratorRemoveResult>> {
     const response = await this.client.delete<unknown>(`/travel-plans/${planId}/collaborators/${collaboratorId}`);
     return apiOk<CollaboratorRemoveResult>(
-      decodeResponse(response.data, collaboratorRemoveResult, 'DELETE /travel-plans/{plan_id}/collaborators/{collaborator_id}')
+      decodeResponse(response.data, (await DL()).collaboratorRemoveResult, 'DELETE /travel-plans/{plan_id}/collaborators/{collaborator_id}')
     );
   }
 }

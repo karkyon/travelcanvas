@@ -7,7 +7,8 @@
 import { ItineraryExportApi } from './itineraryExport';
 import type { DataExportFile, RetentionInfo } from '../types';
 import { decodeResponse } from '../decode';
-import { retentionInfo } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 function toFile(response: { data: unknown }, fallbackName: string, endpoint: string): DataExportFile {
   if (!(response.data instanceof Blob)) throw new Error(`エクスポートの応答がファイルではありません: ${endpoint}`);
@@ -21,7 +22,7 @@ function toFile(response: { data: unknown }, fallbackName: string, endpoint: str
 export class DataExportApi extends ItineraryExportApi {
   async getRetentionInfo(): Promise<RetentionInfo> {
     const response = await this.client.get('/privacy/retention');
-    return decodeResponse(response.data, retentionInfo, 'GET /privacy/retention');
+    return decodeResponse(response.data, (await DL()).retentionInfo, 'GET /privacy/retention');
   }
 
   async downloadPlanDataExport(planId: string): Promise<DataExportFile> {

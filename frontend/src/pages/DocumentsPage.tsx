@@ -216,7 +216,7 @@ const DocumentsPage: React.FC = () => {
                     type="button"
                     onClick={() => handleDownload(d)}
                     disabled={downloadingId === d.id}
-                    className="text-gray-400 hover:text-blue-600 p-1 disabled:opacity-50"
+                    className="text-gray-500 hover:text-blue-600 p-1 disabled:opacity-50"
                     aria-label="ダウンロード"
                   >
                     <Download size={16} />
@@ -224,7 +224,7 @@ const DocumentsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDelete(d)}
-                    className="text-gray-400 hover:text-red-600 p-1"
+                    className="text-gray-500 hover:text-red-600 p-1"
                     aria-label="削除"
                   >
                     <Trash2 size={16} />
@@ -254,7 +254,7 @@ const DocumentsPage: React.FC = () => {
                   onChange={handleFileSelect}
                   className="w-full text-sm"
                 />
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-600 mt-1">
                   PDF・画像(jpg/png/gif/webp/bmp)・Office文書に対応。サーバー側で暗号化して保存されます。
                 </div>
               </div>

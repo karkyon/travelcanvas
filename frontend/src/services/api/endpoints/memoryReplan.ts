@@ -8,14 +8,15 @@ import type { AxiosRequestConfig } from 'axios';
 import { AtlasApi } from './atlas';
 import type { MemoryReplanApplyResult, MemoryReplanResult } from '../types';
 import { decodeResponse } from '../decode';
-import { memoryReplanApplyResult, memoryReplanResult } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
 export class MemoryReplanApi extends AtlasApi {
   async getMemoryReplan(planId: string): Promise<MemoryReplanResult> {
     const response = await this.client.get(`/plans/${planId}/memory-replan`, SILENT);
-    return decodeResponse(response.data, memoryReplanResult, 'GET /plans/{plan_id}/memory-replan');
+    return decodeResponse(response.data, (await DL()).memoryReplanResult, 'GET /plans/{plan_id}/memory-replan');
   }
 
   async applyMemoryReplan(
@@ -24,6 +25,6 @@ export class MemoryReplanApi extends AtlasApi {
     const response = await this.client.post(`/plans/${planId}/memory-replan/apply`, {
       proposal_id: proposalId, input_fingerprint: inputFingerprint,
     }, { ...SILENT, headers: { 'If-Match': String(planRevision) } });
-    return decodeResponse(response.data, memoryReplanApplyResult, 'POST /plans/{plan_id}/memory-replan/apply');
+    return decodeResponse(response.data, (await DL()).memoryReplanApplyResult, 'POST /plans/{plan_id}/memory-replan/apply');
   }
 }

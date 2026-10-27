@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* [Gate G9] UX-1 デザインの決まり(--tc-* の変数と面の部品)。今の画面の見た目は変えない */
+@import './styles/tokens.css';
 
 @theme {
   --font-inter: Inter, sans-serif;
@@ -7,6 +9,21 @@
   --color-primary-500: #3b82f6;
   --color-primary-600: #2563eb;
   --color-primary-700: #1d4ed8;
+}
+
+/* [Gate G9] UX-1 デザインの決まりを Tailwind の色の名前でも使えるようにする(text-ink-900・bg-sand-50 など) */
+@theme inline {
+  --color-ink-900: var(--tc-ink-900);
+  --color-ink-700: var(--tc-ink-700);
+  --color-ink-500: var(--tc-ink-500);
+  --color-cloud-0: var(--tc-cloud-0);
+  --color-cloud-50: var(--tc-cloud-50);
+  --color-sand-50: var(--tc-sand-50);
+  --color-sand-100: var(--tc-sand-100);
+  --color-mist-50: var(--tc-mist-50);
+  --color-accent: var(--tc-accent);
+  --color-accent-strong: var(--tc-accent-strong);
+  --color-accent-soft: var(--tc-accent-soft);
 }
 
 /*

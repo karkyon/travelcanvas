@@ -20,7 +20,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BUDGET = {
-    "initial_js_kb": 450.0,       # 最初に読む JS の合計(生)
+    # [Gate G9] Q03 450 → 430(decoder の大半を後から読む塊へ移して 448.82 → 約422)。次の変更の余裕を残す
+    "initial_js_kb": 430.0,       # 最初に読む JS の合計(生)
     "initial_js_gzip_kb": 150.0,  # 同(gzip 後)
     "chunk_kb": 500.0,            # どの JS の塊も
 }

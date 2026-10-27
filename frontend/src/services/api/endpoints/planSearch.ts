@@ -7,19 +7,20 @@
 import { CandidatesApi } from './candidates';
 import type { SearchFilter, SearchResults } from '../types';
 import { decodeResponse } from '../decode';
-import { searchResults } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const params = (q: string, filter: SearchFilter | null) => ({ q, ...(filter ? { filter } : {}) });
 
 export class PlanSearchApi extends CandidatesApi {
   async searchPlan(planId: string, q: string, filter: SearchFilter | null = null): Promise<SearchResults> {
     const response = await this.client.get(`/plans/${planId}/search`, { params: params(q, filter), skipGlobalErrorHandler: true });
-    return decodeResponse(response.data, searchResults, 'GET /plans/{plan_id}/search');
+    return decodeResponse(response.data, (await DL()).searchResults, 'GET /plans/{plan_id}/search');
   }
 
   async searchEverything(q: string, filter: SearchFilter | null = null): Promise<SearchResults> {
     const response = await this.client.get('/search/everything', { params: params(q, filter), skipGlobalErrorHandler: true });
-    return decodeResponse(response.data, searchResults, 'GET /search/everything');
+    return decodeResponse(response.data, (await DL()).searchResults, 'GET /search/everything');
   }
 
 }

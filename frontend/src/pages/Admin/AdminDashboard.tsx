@@ -20,6 +20,7 @@ import { apiErrorMessage } from '../../utils/apiError';
 import type { AdminSystemStats } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import AdminUsagePanel from './AdminUsagePanel';
+import AdminJobsPanel from './AdminJobsPanel';
 
 // [Gate A2] 応答の形は services/api の adminSystemStats で検査する
 type SystemStats = AdminSystemStats;
@@ -247,6 +248,9 @@ const AdminDashboard: React.FC = () => {
 
       {/* [Gate G5] BILL-02 使用量と上限の上書き */}
       <AdminUsagePanel />
+
+      {/* [Gate G8] FR-004 定期の処理が続いて動いているか */}
+      <AdminJobsPanel />
     </div>
   );
 };

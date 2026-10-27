@@ -443,6 +443,11 @@ async def delete_travel_plan(
     意図的な判断)。
     """
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="owner")
+    # [Gate G8] FR-021 所有者の移譲の手続き中は削除しない(受け取る人が受け入れた旅行が消えていないように)
+    from app.api.v1 import ownership
+
+    if ownership.pending_for(db, plan.id) is not None:
+        raise ownership.pending_error()
 
     # [Gate B-012] 物理削除(db.delete)は子データの外部キーで500になっていた。論理削除して
     # 共有リンクを即時失効し、猶予期間(PLAN_DELETE_GRACE_DAYS)後に完全削除する。

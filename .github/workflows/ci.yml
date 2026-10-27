@@ -120,7 +120,7 @@ jobs:
       - name: Build (ブロッキング)
         run: npx vite build
 
-      # [Gate G1] DEP-05 bundle の上限(最初に読む JS 450kB・gzip 150kB、1つの塊 500kB)
+      # [Gate G1] DEP-05 bundle の上限(最初に読む JS 430kB(Gate G9 Q03 で 450 から下げた)・gzip 150kB、1つの塊 500kB)
       - name: Bundle budget (ブロッキング)
         run: python3 ../scripts/ci/check_bundle_budget.py --dist dist
 

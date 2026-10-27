@@ -13,7 +13,8 @@ import type {
   AdminUserDetail, AdminUsersPage, AdminUsersQuery, AuditLogPage, AuditLogQuery, SupportView,
 } from '../types';
 import { decodeResponse } from '../decode';
-import { adminManageResult, adminSystemStats, adminUserDetail, adminUsersPage, auditLogPage } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -28,29 +29,29 @@ function params<T extends object>(q: T): Record<string, string | number> {
 export class AdminApi extends CollabApi {
   async getAdminStats(): Promise<AdminSystemStats> {
     const response = await this.client.get('/admin/stats/system', SILENT);
-    return decodeResponse(response.data, adminSystemStats, 'GET /admin/stats/system');
+    return decodeResponse(response.data, (await DL()).adminSystemStats, 'GET /admin/stats/system');
   }
 
   async getAdminUsers(query: AdminUsersQuery = {}): Promise<AdminUsersPage> {
     const config: AxiosRequestConfig<unknown> = { ...SILENT, params: params(query) };
     const response = await this.client.get('/admin/users', config);
-    return decodeResponse(response.data, adminUsersPage, 'GET /admin/users');
+    return decodeResponse(response.data, (await DL()).adminUsersPage, 'GET /admin/users');
   }
 
   async getAdminUser(userId: string): Promise<AdminUserDetail> {
     const response = await this.client.get(`/admin/users/${userId}`, SILENT);
-    return decodeResponse(response.data, adminUserDetail, 'GET /admin/users/{user_id}');
+    return decodeResponse(response.data, (await DL()).adminUserDetail, 'GET /admin/users/{user_id}');
   }
 
   async manageAdminUsers(action: AdminUserAction, userIds: string[]): Promise<AdminManageResult> {
     const response = await this.client.post('/admin/users/manage', { action, user_ids: userIds }, SILENT);
-    return decodeResponse(response.data, adminManageResult, 'POST /admin/users/manage');
+    return decodeResponse(response.data, (await DL()).adminManageResult, 'POST /admin/users/manage');
   }
 
   async getAuditLogs(query: AuditLogQuery = {}): Promise<AuditLogPage> {
     const config: AxiosRequestConfig<unknown> = { ...SILENT, params: params(query) };
     const response = await this.client.get('/admin/audit-logs', config);
-    return decodeResponse(response.data, auditLogPage, 'GET /admin/audit-logs');
+    return decodeResponse(response.data, (await DL()).auditLogPage, 'GET /admin/audit-logs');
   }
 
   async getAdminSupportGrants(includeInactive = false): Promise<AdminSupportGrant[]> {

@@ -502,6 +502,20 @@ async def act_on_abuse_report(
     return {"id": str(r.id), "status": r.status, "message": "対応を記録しました"}
 
 
+# ===== [Gate G8] FR-004・O02 定期の処理が続いて動いているか(最後の成功・続けての失敗・遅れ)
+
+@router.get("/ops/jobs")
+async def admin_ops_jobs(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """定期の処理ごとの最後の実行・最後の成功・状態(ok / overdue / failing / never)。中身は件数だけ。"""
+    from app.ops import job_runs
+
+    jobs = job_runs.status(db)
+    return {"jobs": jobs, "attention": [j["job"] for j in jobs if j["state"] in ("overdue", "failing")]}
+
+
 # ===== [Gate G5] BILL-02 使用量の確認と上限の上書き(理由つき。監査に残す)
 
 @router.get("/usage")

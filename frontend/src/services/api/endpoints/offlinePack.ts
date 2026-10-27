@@ -9,7 +9,8 @@ import type { AxiosRequestConfig } from 'axios';
 import { MemoryReplanApi } from './memoryReplan';
 import type { OfflinePackKey, OfflinePackKeyRotated } from '../types';
 import { decodeResponse } from '../decode';
-import { offlinePackKey, offlinePackKeyRotated } from '../decoders';
+// [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
+const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -17,13 +18,13 @@ export class OfflinePackApi extends MemoryReplanApi {
   async getOfflinePackKey(deviceId?: string): Promise<OfflinePackKey> {
     // [Gate G6] OFF-01 端末ごとの鍵(端末を失効すると、その端末だけ 410)
     const response = await this.client.get('/offline-pack/key', deviceId ? { ...SILENT, params: { device_id: deviceId } } : SILENT);
-    return decodeResponse(response.data, offlinePackKey, 'GET /offline-pack/key');
+    return decodeResponse(response.data, (await DL()).offlinePackKey, 'GET /offline-pack/key');
   }
 
   async rotateOfflinePackKey(currentVersion: number): Promise<OfflinePackKeyRotated> {
     const response = await this.client.post('/offline-pack/key/rotate', undefined, {
       ...SILENT, headers: { 'If-Match': String(currentVersion) },
     });
-    return decodeResponse(response.data, offlinePackKeyRotated, 'POST /offline-pack/key/rotate');
+    return decodeResponse(response.data, (await DL()).offlinePackKeyRotated, 'POST /offline-pack/key/rotate');
   }
 }

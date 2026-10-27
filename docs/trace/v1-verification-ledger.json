@@ -15,7 +15,8 @@
   "updated_g4": "Gate G4(r16): FR-022(合意形成。決定の採用・締切・定足数・同点。E2E gate-g4.spec.ts・discussion.spec.ts)を追加。FR-009 は書き込み(コマンド)ができたため競合の試験を足した。FR-040(濫用への対応)・FR-044(確認・一時トークン・複製)の証拠を足した。FR-008(地図の提供元)・FR-024(メールの提供元)は(部分)のため対象外",
   "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま",
   "updated_g6": "Gate G6(r18): FR-048(Offline Travel Pack。端末ごとの鍵・期限・1台だけの失効・失効した端末の消去・日程と並びのオフラインの編集。E2E offline-pack.spec.ts・gate-g6.spec.ts)を追加。FR-033 は日程・並びの競合と依存の順・予約はオンラインだけの証拠を足した。FR-037(顔の検査・MEMORY MAP)は外部の提供元が残るため(部分)のまま。FR-051 は(部分)を外したが VERIFIED の証拠は V3 で整える",
-  "updated_g7": "Gate G7(r19): FR-005(日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグの並べ替え。E2E gate-g7.spec.ts・item-deletion.spec.ts)と FR-057(同じ同行者の傾向・移動手段の傾向と区間の余裕の提案。E2E memory-replan.spec.ts・gate-g7.spec.ts)を追加。FR-017 は既定の滞在・休憩・最終の便の証拠を足した。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま"
+  "updated_g7": "Gate G7(r19): FR-005(日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグの並べ替え。E2E gate-g7.spec.ts・item-deletion.spec.ts)と FR-057(同じ同行者の傾向・移動手段の傾向と区間の余裕の提案。E2E memory-replan.spec.ts・gate-g7.spec.ts)を追加。FR-017 は既定の滞在・休憩・最終の便の証拠を足した。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま",
+  "updated_g8": "Gate G8(r20): FR-004(定期の処理の実行の記録・2つの端末の同時の編集。E2E plan-deletion.spec.ts・gate-g8.spec.ts)・FR-019(案の中の移動区間・予約の変更・選んだ変更だけの採用。E2E branches.spec.ts・gate-g7.spec.ts・gate-g8.spec.ts)・FR-039(所有者の移譲・出典つきの訂正。E2E data-export.spec.ts・account-deletion.spec.ts・gate-g8.spec.ts)・FR-051(訪問の訂正・除外。V3 の証拠の整理。E2E visits.spec.ts)を追加。FR-021 は所有者の移譲の証拠を足した"
  },
  "cross_cutting": {
   "authz": [
@@ -222,15 +223,18 @@
    "title": "共有・権限",
    "e2e": [
     "frontend/e2e/share-clone.spec.ts",
-    "frontend/e2e/document-wallet.spec.ts"
+    "frontend/e2e/document-wallet.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts"
    ],
    "authz": [
     "backend/tests/test_share.py::test_accepted_viewer_can_read_but_not_write",
     "backend/tests/test_share.py::test_accepted_editor_can_write_but_not_delete_or_manage_share",
-    "backend/tests/test_share.py::test_removed_collaborator_loses_access_immediately"
+    "backend/tests/test_share.py::test_removed_collaborator_loses_access_immediately",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_transfer_request_accept_and_roles"
    ],
    "conflict": [
-    "backend/tests/test_share.py::test_concurrent_resolve_never_exceeds_max_uses"
+    "backend/tests/test_share.py::test_concurrent_resolve_never_exceeds_max_uses",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_transfer_decline_cancel_expire_and_invalidated"
    ],
    "security": [
     "backend/tests/test_share.py::test_share_token_is_not_stored_in_plaintext",
@@ -669,6 +673,89 @@
    "conflict_note": "入力の指紋・版が変わった後の適用は 409 replan_stale",
    "security": [
     "backend/tests/test_gate_g7_memory_deletion.py::test_transport_tendency_proposal_apply_and_undo"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-004": {
+   "title": "旅行CRUD",
+   "e2e": [
+    "frontend/e2e/plan-deletion.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_b012_plan_deletion.py::test_only_owner_can_delete",
+    "backend/tests/test_gate_g8_job_runs.py::test_admin_jobs_endpoint_requires_admin"
+   ],
+   "conflict": [
+    "backend/tests/test_plans_normalized.py::test_update_day_requires_if_match"
+   ],
+   "conflict_note": "古い版(If-Match)の更新は 409。2つの端末の同時の編集は違いを示して重ねて保存(E2E gate-g8.spec.ts)",
+   "security": [
+    "backend/tests/test_gate_b012_plan_deletion.py::test_soft_deleted_plan_is_hidden_everywhere",
+    "backend/tests/test_gate_g8_job_runs.py::test_recorded_success_failure_and_states"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-019": {
+   "title": "What-if",
+   "e2e": [
+    "frontend/e2e/branches.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_p7_branches.py::test_discard_delete_and_permissions"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_p7_branches.py::test_conflicts_block_adoption",
+    "backend/tests/test_gate_g8_branch_resources.py::test_partial_adoption_and_three_way_conflicts",
+    "backend/tests/test_gate_g8_branch_resources.py::test_reservation_changed_in_plan_blocks_and_undo_refuses_after_relink"
+   ],
+   "conflict_note": "分岐の後に本案でも変わった予定・区間・予約は採用を止める(三方向の取り込み)。採用の後に紐付けを変えた時の元に戻すは 409",
+   "security": [
+    "backend/tests/test_gate_g8_branch_resources.py::test_member_policy_hides_reservation_and_cost_changes",
+    "backend/tests/test_gate_g8_branch_resources.py::test_cancel_planned_creates_task_and_never_cancels"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-039": {
+   "title": "輸出・削除",
+   "e2e": [
+    "frontend/e2e/data-export.spec.ts",
+    "frontend/e2e/account-deletion.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_correction_requests_to_owner",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_transfer_request_accept_and_roles"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_transfer_decline_cancel_expire_and_invalidated",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_self_correction_history_revert_and_email_reauth"
+   ],
+   "conflict_note": "手続き中の移譲は1件・受け入れの時に確かめ直して崩れていれば 409。訂正の取り消しは今の値が訂正の後のままの時だけ(409)",
+   "security": [
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_self_correction_history_revert_and_email_reauth",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_account_deletion_closes_transfers_and_export_includes",
+    "backend/tests/test_gate_g8_ownership_corrections.py::test_corrections_without_encryption_change_nothing"
+   ],
+   "status": "VERIFIED"
+  },
+  "FR-051": {
+   "title": "訪問訂正・除外",
+   "e2e": [
+    "frontend/e2e/visits.spec.ts"
+   ],
+   "authz": [
+    "backend/tests/test_gate_v2_visits.py::test_visit_flow"
+   ],
+   "conflict": [
+    "backend/tests/test_gate_v2_visits.py::test_visit_flow"
+   ],
+   "conflict_note": "訂正(確定・通過・取消・非表示・戻す)は If-Match、古い revision は 409",
+   "security": [
+    "backend/tests/test_gate_g6_location_memory.py::test_privacy_zone_api_is_encrypted_and_own_only",
+    "backend/tests/test_gate_g6_location_memory.py::test_gpx_export_drops_points_in_owner_zones"
    ],
    "status": "VERIFIED"
   }

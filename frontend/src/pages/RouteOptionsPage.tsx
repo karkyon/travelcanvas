@@ -255,7 +255,7 @@ const RouteOptionsPage: React.FC = () => {
                       {option.transfer_count != null && <span>乗換{option.transfer_count}回</span>}
                       {option.walking_minutes != null && <span>徒歩{Math.round(option.walking_minutes)}分</span>}
                     </div>
-                    <div className="mt-1 flex gap-3 text-xs text-gray-400">
+                    <div className="mt-1 flex gap-3 text-xs text-gray-600">
                       {option.accessibility_score != null && (
                         <span className="flex items-center gap-1">
                           <Accessibility size={12} /> {(option.accessibility_score * 100).toFixed(0)}%

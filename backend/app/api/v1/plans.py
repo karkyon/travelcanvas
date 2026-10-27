@@ -25,7 +25,7 @@ JSON blobに日程・イベントを丸ごと保持しており、フロント�
 import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
 from decimal import Decimal
-from typing import Optional, List
+from typing import Any, Dict, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from pydantic import BaseModel, field_validator
@@ -38,7 +38,7 @@ from app.core.plan_access import require_plan_access
 from app.models.models import (
     TravelPlan, TravelDay, TravelEvent, PlanVersion, ChangeSet, ChangeItem,
     IdempotencyRecord, User, Place, TravelSegment, RouteOption, RouteLeg,
-    Reservation, Ticket,
+    Reservation, Ticket, EventReservation,
 )
 from app.services import member_policy, place_access
 from app.services.route_estimator import estimate_leg, haversine_km
@@ -947,6 +947,7 @@ async def undo_last_change(
     # 別の予定へ紐付け直された・論理削除された、同じ日付の日程が作られた等の場合は、
     # 既存の状態を上書きせずに409で断る(一部だけ戻った状態を残さない)。
     conflicts = plan_item_deletion.check_undo_conflicts(db, plan, items)
+    conflicts += _branch_undo_conflicts(db, plan, items)  # [Gate G8] 予約の付け替え
     if conflicts:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=plan_item_deletion.undo_conflict_detail(conflicts))
@@ -962,6 +963,13 @@ async def undo_last_change(
     # 関連は、参照先の予定・経路候補がすべて戻った後で戻す。各パスの後にflushして
     # 外部キーの検査順を固定する。予期しない制約違反は途中まで戻った状態を残さず409にする。
     def _passes():
+        # [Gate G8] FR-019 分岐の採用で足した区間・付け替えた予約の紐付けを先に外す(足した予定を消す前に)
+        for item in items:
+            if item.entity_type == "travel_segment" and item.action == "create":
+                _undo_segment_item(db, plan, item)
+            elif item.entity_type == "reservation_links":
+                _detach_reservation_links(db, plan, item)
+        db.flush()
         for item in items:
             if item.entity_type == "travel_day":
                 _undo_day_item(db, plan, item)
@@ -987,6 +995,13 @@ async def undo_last_change(
         for item in items:
             if item.entity_type in plan_item_deletion.RELATION_ENTITY_TYPES:
                 plan_item_deletion.restore_relation_item(db, plan, item)
+        db.flush()
+        # [Gate G8] 予約の紐付けを元へ・分岐の採用で作った取消の手続きの準備を消す
+        for item in items:
+            if item.entity_type == "reservation_links":
+                _restore_reservation_links(db, plan, item)
+            elif item.entity_type == "preparation_task" and item.action == "create":
+                _undo_branch_task(db, plan, item)
         db.flush()
 
     try:
@@ -1014,6 +1029,63 @@ async def undo_last_change(
     ))
     db.commit()
     return {"message": "直前の変更を取り消しました", "revision": new_revision}
+
+
+def _links_now(db: Session, reservation_id) -> Dict[str, Any]:
+    r = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    if r is None:
+        return {}
+    links = (db.query(EventReservation).filter(EventReservation.reservation_id == reservation_id)
+             .order_by(EventReservation.id).all())
+    return {"event_id": str(r.event_id) if r.event_id else None, "deleted": r.deleted_at is not None,
+            "links": [{"id": str(x.id), "event_id": str(x.event_id), "relation_type": x.relation_type,
+                       "is_locked": bool(x.is_locked)} for x in links]}
+
+
+def _branch_undo_conflicts(db: Session, plan: TravelPlan, items) -> List[dict]:
+    """[Gate G8] 分岐の採用で付け替えた予約が、その後に変わっていたら戻さない(黙って上書きしない)。"""
+    out = []
+    for item in items:
+        if item.entity_type != "reservation_links":
+            continue
+        now = _links_now(db, item.entity_id)
+        after = item.after_json or {}
+        if not now or now.get("deleted"):
+            out.append({"type": "reservation", "id": str(item.entity_id), "reason": "deleted"})
+        elif {"event_id": now["event_id"], "links": now["links"]} != {"event_id": after.get("event_id"),
+                                                                      "links": after.get("links") or []}:
+            out.append({"type": "reservation", "id": str(item.entity_id), "reason": "relinked"})
+    return out
+
+
+def _detach_reservation_links(db: Session, plan: TravelPlan, item: ChangeItem) -> None:
+    r: Any = db.query(Reservation).filter(Reservation.id == item.entity_id, Reservation.plan_id == plan.id).first()
+    if r is None:
+        return
+    db.query(EventReservation).filter(EventReservation.reservation_id == r.id).delete(synchronize_session=False)
+    r.event_id = None
+
+
+def _restore_reservation_links(db: Session, plan: TravelPlan, item: ChangeItem) -> None:
+    r: Any = db.query(Reservation).filter(Reservation.id == item.entity_id, Reservation.plan_id == plan.id).first()
+    before: Dict[str, Any] = cast(Dict[str, Any], item.before_json) or {}
+    if r is None:
+        return
+    for link in before.get("links") or []:
+        db.add(EventReservation(id=uuid.UUID(link["id"]), event_id=uuid.UUID(link["event_id"]), reservation_id=r.id,
+                                relation_type=link.get("relation_type") or "primary",
+                                is_locked=bool(link.get("is_locked"))))
+    r.event_id = uuid.UUID(before["event_id"]) if before.get("event_id") else None
+    r.revision = (r.revision or 1) + 1
+
+
+def _undo_branch_task(db: Session, plan: TravelPlan, item: ChangeItem) -> None:
+    from app.models.models import PreparationTask
+
+    task: Any = (db.query(PreparationTask)
+                 .filter(PreparationTask.id == item.entity_id, PreparationTask.plan_id == plan.id).first())
+    if task is not None and task.deleted_at is None and task.status == "open":
+        task.deleted_at = datetime.now(dt_timezone.utc)
 
 
 def _undo_day_item(db: Session, plan: TravelPlan, item: ChangeItem):

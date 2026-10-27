@@ -1,0 +1,1118 @@
+{
+ "admin_jobs": {
+  "attention": [],
+  "jobs": [
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 5,
+    "job": "webhook-retry",
+    "last_error": null,
+    "last_finished_at": "2026-10-27T00:24:38.749959+00:00",
+    "last_ok": true,
+    "last_started_at": "2026-10-27T00:24:38.743850+00:00",
+    "last_success_at": "2026-10-27T00:24:38.749959+00:00",
+    "last_summary": {
+     "attempted": 0,
+     "dead": 0,
+     "delivered": 0,
+     "failed": 0
+    },
+    "minutes_since_success": 1,
+    "state": "ok"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 15,
+    "job": "poll-deadlines",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 5,
+    "job": "email-outbox",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 60,
+    "job": "abuse-scan",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 1440,
+    "job": "memory-trash",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 1440,
+    "job": "account-deletions",
+    "last_error": null,
+    "last_finished_at": "2026-10-27T00:24:41.934985+00:00",
+    "last_ok": true,
+    "last_started_at": "2026-10-27T00:24:41.929562+00:00",
+    "last_success_at": "2026-10-27T00:24:41.934985+00:00",
+    "last_summary": {
+     "deleted": 0,
+     "failed": 0,
+     "skipped_admin": 0
+    },
+    "minutes_since_success": 1,
+    "state": "ok"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 1440,
+    "job": "plan-purge",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 1440,
+    "job": "document-purge",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   },
+   {
+    "consecutive_failures": 0,
+    "expected_minutes": 1440,
+    "job": "quickdraft-purge",
+    "last_error": null,
+    "last_finished_at": null,
+    "last_ok": null,
+    "last_started_at": null,
+    "last_success_at": null,
+    "last_summary": null,
+    "minutes_since_success": null,
+    "state": "never"
+   }
+  ]
+ },
+ "adopt_result": {
+  "branch": {
+   "adopted_at": "2026-10-27T00:25:49.665863+00:00",
+   "adopted_by_name": "user_c2049db2e2",
+   "algorithm_version": "branch-v2",
+   "assumptions": {},
+   "base_revision": 6,
+   "can_edit": false,
+   "conflicts": [],
+   "content": [
+    {
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "event_type": "sightseeing",
+     "is_all_day": false,
+     "key": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+     "local_start_time": "10:00",
+     "locked": false,
+     "note": null,
+     "removed": false,
+     "sort_order": 0,
+     "source_event_id": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+     "title": "美冨久酒造"
+    },
+    {
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "event_type": "sightseeing",
+     "is_all_day": false,
+     "key": "aa652a8d-780b-40ef-9429-0988179f2814",
+     "local_start_time": "13:00",
+     "locked": false,
+     "note": null,
+     "removed": false,
+     "sort_order": 1,
+     "source_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+     "title": "藤居本家"
+    },
+    {
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "event_type": "sightseeing",
+     "is_all_day": false,
+     "key": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "local_start_time": "15:00",
+     "locked": false,
+     "note": null,
+     "removed": true,
+     "sort_order": 2,
+     "source_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "title": "岡村本家"
+    },
+    {
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "event_type": "sightseeing",
+     "is_all_day": false,
+     "key": "new-sake",
+     "local_start_time": "15:30",
+     "locked": false,
+     "note": null,
+     "removed": false,
+     "sort_order": 9,
+     "source_event_id": null,
+     "title": "喜多酒造"
+    }
+   ],
+   "created_at": "2026-10-27T00:25:48.768521+00:00",
+   "created_by_name": "user_c2049db2e2",
+   "day_counts": [
+    {
+     "branch": 3,
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "local_date": "2026-11-21",
+     "plan": 3
+    }
+   ],
+   "days": [
+    {
+     "id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "local_date": "2026-11-21",
+     "timezone_id": "Asia/Tokyo",
+     "title": null
+    }
+   ],
+   "id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+   "ops": [
+    {
+     "event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "op": "remove",
+     "op_id": "event:6552136b-789a-41b8-80fe-5759161af9ee",
+     "title": "岡村本家"
+    },
+    {
+     "fields": {
+      "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+      "event_type": "sightseeing",
+      "is_all_day": false,
+      "local_start_time": "15:30",
+      "sort_order": 9,
+      "title": "喜多酒造"
+     },
+     "key": "new-sake",
+     "op": "add",
+     "op_id": "event:add:new-sake"
+    }
+   ],
+   "plan_changed_since_base": true,
+   "plan_id": "590940d2-4bc7-4b0a-a759-101fc28144b8",
+   "plan_revision": 7,
+   "resource_summary": {
+    "reservations_cancel_planned": 1,
+    "reservations_relinked": 0,
+    "segments_added": 1,
+    "segments_removed": 1,
+    "segments_updated": 0
+   },
+   "resources": {
+    "algorithm_version": "branch-v2",
+    "base_reservations": [
+     {
+      "cancellation_deadline": "2026-11-19T06:00:00+00:00",
+      "currency": "JPY",
+      "event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+      "event_ids": [
+       "6552136b-789a-41b8-80fe-5759161af9ee"
+      ],
+      "id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+      "label": "酒蔵見学",
+      "locked": false,
+      "status": "confirmed",
+      "total_amount": 3000.0,
+      "type": "activity"
+     }
+    ],
+    "base_segments": [
+     {
+      "buffer_before_minutes": 0,
+      "cost": "500.00",
+      "currency": "JPY",
+      "distance_km": null,
+      "duration_minutes": 15.0,
+      "from_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+      "from_place_id": null,
+      "id": "7ed98604-68c9-4b28-a149-279403540409",
+      "last_departure_at": null,
+      "mode": "driving",
+      "planned_arrival_at": null,
+      "planned_departure_at": null,
+      "platform": null,
+      "preparation_minutes": 0,
+      "reservation_id": null,
+      "status": "planned",
+      "to_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+      "to_place_id": null,
+      "transport_number": null
+     }
+    ],
+    "costs_hidden": false,
+    "reservations": [
+     {
+      "note": "雨",
+      "op": "cancel",
+      "reservation_id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf"
+     }
+    ],
+    "reservations_hidden": false,
+    "segments": [
+     {
+      "op": "remove",
+      "segment_id": "7ed98604-68c9-4b28-a149-279403540409"
+     },
+     {
+      "fields": {
+       "cost": "0.00",
+       "currency": "JPY",
+       "duration_minutes": 20.0,
+       "from": {
+        "event": "aa652a8d-780b-40ef-9429-0988179f2814"
+       },
+       "mode": "walking",
+       "status": "planned",
+       "to": {
+        "key": "new-sake"
+       }
+      },
+      "key": "walk-1",
+      "op": "add"
+     }
+    ]
+   },
+   "revision": 3,
+   "scenario_type": "custom",
+   "state": "adopted",
+   "status": "adopted",
+   "summary": {
+    "added": 1,
+    "removed": 1,
+    "time_changed": 0,
+    "updated": 0
+   },
+   "title": "案",
+   "updated_at": "2026-10-27T00:25:48.768521+00:00"
+  },
+  "left_out": [],
+  "plan_revision": 7,
+  "tasks_created": 1
+ },
+ "adoption_preview": {
+  "algorithm_version": "branch-v2",
+  "branch_id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+  "can_adopt": true,
+  "conflicts": [],
+  "items": [
+   {
+    "kind": "event",
+    "label": "岡村本家",
+    "op": "remove",
+    "op_id": "event:6552136b-789a-41b8-80fe-5759161af9ee",
+    "requires": [],
+    "selected": true
+   },
+   {
+    "kind": "event",
+    "label": "喜多酒造",
+    "op": "add",
+    "op_id": "event:add:new-sake",
+    "requires": [],
+    "selected": true
+   },
+   {
+    "kind": "segment",
+    "label": "藤居本家 → 岡村本家",
+    "op": "remove",
+    "op_id": "segment:7ed98604-68c9-4b28-a149-279403540409",
+    "requires": [],
+    "selected": true
+   },
+   {
+    "kind": "segment",
+    "label": "藤居本家 → 喜多酒造",
+    "op": "add",
+    "op_id": "segment:add:walk-1",
+    "requires": [
+     "event:add:new-sake"
+    ],
+    "selected": true
+   },
+   {
+    "kind": "reservation",
+    "label": "酒蔵見学",
+    "op": "cancel",
+    "op_id": "reservation:97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+    "requires": [],
+    "selected": true
+   }
+  ],
+  "missing_dependencies": [],
+  "partial": false,
+  "reservations_hidden": false,
+  "tasks": [
+   {
+    "due_at": "2026-11-19T06:00:00+00:00",
+    "title": "予約の取消の手続き: 酒蔵見学"
+   }
+  ]
+ },
+ "adoption_preview_partial": {
+  "algorithm_version": "branch-v2",
+  "branch_id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+  "can_adopt": false,
+  "conflicts": [],
+  "items": [
+   {
+    "kind": "event",
+    "label": "岡村本家",
+    "op": "remove",
+    "op_id": "event:6552136b-789a-41b8-80fe-5759161af9ee",
+    "requires": [],
+    "selected": false
+   },
+   {
+    "kind": "event",
+    "label": "喜多酒造",
+    "op": "add",
+    "op_id": "event:add:new-sake",
+    "requires": [],
+    "selected": false
+   },
+   {
+    "kind": "segment",
+    "label": "藤居本家 → 岡村本家",
+    "op": "remove",
+    "op_id": "segment:7ed98604-68c9-4b28-a149-279403540409",
+    "requires": [],
+    "selected": false
+   },
+   {
+    "kind": "segment",
+    "label": "藤居本家 → 喜多酒造",
+    "op": "add",
+    "op_id": "segment:add:walk-1",
+    "requires": [
+     "event:add:new-sake"
+    ],
+    "selected": true
+   },
+   {
+    "kind": "reservation",
+    "label": "酒蔵見学",
+    "op": "cancel",
+    "op_id": "reservation:97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+    "requires": [],
+    "selected": false
+   }
+  ],
+  "missing_dependencies": [
+   {
+    "op_id": "segment:add:walk-1",
+    "requires": [
+     "event:add:new-sake"
+    ]
+   }
+  ],
+  "partial": true,
+  "reservations_hidden": false,
+  "tasks": []
+ },
+ "branch_detail_resources": {
+  "adopted_at": null,
+  "adopted_by_name": null,
+  "algorithm_version": "branch-v2",
+  "assumptions": {},
+  "base_revision": 6,
+  "can_edit": true,
+  "conflicts": [],
+  "content": [
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+    "local_start_time": "10:00",
+    "locked": false,
+    "note": null,
+    "removed": false,
+    "sort_order": 0,
+    "source_event_id": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+    "title": "美冨久酒造"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "aa652a8d-780b-40ef-9429-0988179f2814",
+    "local_start_time": "13:00",
+    "locked": false,
+    "note": null,
+    "removed": false,
+    "sort_order": 1,
+    "source_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+    "title": "藤居本家"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "6552136b-789a-41b8-80fe-5759161af9ee",
+    "local_start_time": "15:00",
+    "locked": false,
+    "note": null,
+    "removed": true,
+    "sort_order": 2,
+    "source_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+    "title": "岡村本家"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "new-sake",
+    "local_start_time": "15:30",
+    "locked": false,
+    "note": null,
+    "removed": false,
+    "sort_order": 9,
+    "source_event_id": null,
+    "title": "喜多酒造"
+   }
+  ],
+  "created_at": "2026-10-27T00:25:48.768521+00:00",
+  "created_by_name": "user_c2049db2e2",
+  "day_counts": [
+   {
+    "branch": 3,
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "local_date": "2026-11-21",
+    "plan": 3
+   }
+  ],
+  "days": [
+   {
+    "id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "local_date": "2026-11-21",
+    "timezone_id": "Asia/Tokyo",
+    "title": null
+   }
+  ],
+  "id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+  "ops": [
+   {
+    "event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+    "op": "remove",
+    "op_id": "event:6552136b-789a-41b8-80fe-5759161af9ee",
+    "title": "岡村本家"
+   },
+   {
+    "fields": {
+     "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+     "event_type": "sightseeing",
+     "is_all_day": false,
+     "local_start_time": "15:30",
+     "sort_order": 9,
+     "title": "喜多酒造"
+    },
+    "key": "new-sake",
+    "op": "add",
+    "op_id": "event:add:new-sake"
+   }
+  ],
+  "plan_changed_since_base": false,
+  "plan_id": "590940d2-4bc7-4b0a-a759-101fc28144b8",
+  "plan_revision": 6,
+  "resource_summary": {
+   "reservations_cancel_planned": 1,
+   "reservations_relinked": 0,
+   "segments_added": 1,
+   "segments_removed": 1,
+   "segments_updated": 0
+  },
+  "resources": {
+   "algorithm_version": "branch-v2",
+   "base_reservations": [
+    {
+     "cancellation_deadline": "2026-11-19T06:00:00+00:00",
+     "currency": "JPY",
+     "event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "event_ids": [
+      "6552136b-789a-41b8-80fe-5759161af9ee"
+     ],
+     "id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+     "label": "酒蔵見学",
+     "locked": false,
+     "status": "confirmed",
+     "total_amount": 3000.0,
+     "type": "activity"
+    }
+   ],
+   "base_segments": [
+    {
+     "buffer_before_minutes": 0,
+     "cost": "500.00",
+     "currency": "JPY",
+     "distance_km": null,
+     "duration_minutes": 15.0,
+     "from_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+     "from_place_id": null,
+     "id": "7ed98604-68c9-4b28-a149-279403540409",
+     "last_departure_at": null,
+     "mode": "driving",
+     "planned_arrival_at": null,
+     "planned_departure_at": null,
+     "platform": null,
+     "preparation_minutes": 0,
+     "reservation_id": null,
+     "status": "planned",
+     "to_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "to_place_id": null,
+     "transport_number": null
+    }
+   ],
+   "costs_hidden": false,
+   "reservations": [
+    {
+     "note": "雨",
+     "op": "cancel",
+     "reservation_id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf"
+    }
+   ],
+   "reservations_hidden": false,
+   "segments": [
+    {
+     "op": "remove",
+     "segment_id": "7ed98604-68c9-4b28-a149-279403540409"
+    },
+    {
+     "fields": {
+      "cost": "0.00",
+      "currency": "JPY",
+      "duration_minutes": 20.0,
+      "from": {
+       "event": "aa652a8d-780b-40ef-9429-0988179f2814"
+      },
+      "mode": "walking",
+      "status": "planned",
+      "to": {
+       "key": "new-sake"
+      }
+     },
+     "key": "walk-1",
+     "op": "add"
+    }
+   ]
+  },
+  "revision": 2,
+  "scenario_type": "custom",
+  "state": "draft",
+  "status": "draft",
+  "summary": {
+   "added": 1,
+   "removed": 1,
+   "time_changed": 0,
+   "updated": 0
+  },
+  "title": "案",
+  "updated_at": "2026-10-27T00:25:48.768521+00:00"
+ },
+ "branch_detail_v1_with_resources_base": {
+  "adopted_at": null,
+  "adopted_by_name": null,
+  "algorithm_version": "branch-v1",
+  "assumptions": {},
+  "base_revision": 6,
+  "can_edit": true,
+  "conflicts": [],
+  "content": [
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+    "local_start_time": "10:00",
+    "locked": false,
+    "note": null,
+    "removed": false,
+    "sort_order": 0,
+    "source_event_id": "955afb5c-f2b5-4634-9a87-d6f1aa741e42",
+    "title": "美冨久酒造"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "aa652a8d-780b-40ef-9429-0988179f2814",
+    "local_start_time": "13:00",
+    "locked": false,
+    "note": null,
+    "removed": false,
+    "sort_order": 1,
+    "source_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+    "title": "藤居本家"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "6552136b-789a-41b8-80fe-5759161af9ee",
+    "local_start_time": "15:00",
+    "locked": false,
+    "note": null,
+    "removed": true,
+    "sort_order": 2,
+    "source_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+    "title": "岡村本家"
+   },
+   {
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "event_type": "sightseeing",
+    "is_all_day": false,
+    "key": "new-sake",
+    "local_start_time": "15:30",
+    "note": null,
+    "removed": false,
+    "sort_order": 9,
+    "source_event_id": null,
+    "title": "喜多酒造"
+   }
+  ],
+  "created_at": "2026-10-27T00:25:48.768521+00:00",
+  "created_by_name": "user_c2049db2e2",
+  "day_counts": [
+   {
+    "branch": 3,
+    "day_id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "local_date": "2026-11-21",
+    "plan": 3
+   }
+  ],
+  "days": [
+   {
+    "id": "5b8af31d-3ca9-4321-9664-f23f508eadce",
+    "local_date": "2026-11-21",
+    "timezone_id": "Asia/Tokyo",
+    "title": null
+   }
+  ],
+  "id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+  "ops": [],
+  "plan_changed_since_base": false,
+  "plan_id": "590940d2-4bc7-4b0a-a759-101fc28144b8",
+  "plan_revision": 6,
+  "resource_summary": {
+   "reservations_cancel_planned": 0,
+   "reservations_relinked": 0,
+   "segments_added": 0,
+   "segments_removed": 0,
+   "segments_updated": 0
+  },
+  "resources": {
+   "algorithm_version": "branch-v2",
+   "base_reservations": [
+    {
+     "cancellation_deadline": "2026-11-19T06:00:00+00:00",
+     "currency": "JPY",
+     "event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "event_ids": [
+      "6552136b-789a-41b8-80fe-5759161af9ee"
+     ],
+     "id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+     "label": "酒蔵見学",
+     "locked": false,
+     "status": "confirmed",
+     "total_amount": 3000.0,
+     "type": "activity"
+    }
+   ],
+   "base_segments": [
+    {
+     "buffer_before_minutes": 0,
+     "cost": "500.00",
+     "currency": "JPY",
+     "distance_km": null,
+     "duration_minutes": 15.0,
+     "from_event_id": "aa652a8d-780b-40ef-9429-0988179f2814",
+     "from_place_id": null,
+     "id": "7ed98604-68c9-4b28-a149-279403540409",
+     "last_departure_at": null,
+     "mode": "driving",
+     "planned_arrival_at": null,
+     "planned_departure_at": null,
+     "platform": null,
+     "preparation_minutes": 0,
+     "reservation_id": null,
+     "status": "planned",
+     "to_event_id": "6552136b-789a-41b8-80fe-5759161af9ee",
+     "to_place_id": null,
+     "transport_number": null
+    }
+   ],
+   "costs_hidden": false,
+   "reservations": [],
+   "reservations_hidden": false,
+   "segments": []
+  },
+  "revision": 1,
+  "scenario_type": "custom",
+  "state": "draft",
+  "status": "draft",
+  "summary": {
+   "added": 0,
+   "removed": 0,
+   "time_changed": 0,
+   "updated": 0
+  },
+  "title": "案",
+  "updated_at": null
+ },
+ "comparison_resources": {
+  "algorithm_version": "branch-compare-v1",
+  "branches": [
+   {
+    "affected_reservations": [
+     {
+      "cancel_planned": true,
+      "id": "97adba7d-d1ac-42cb-8e08-7d83ff85becf",
+      "label": "酒蔵見学",
+      "status": "confirmed"
+     }
+    ],
+    "budget_target": null,
+    "conflicts": 0,
+    "constraints_satisfied": 0,
+    "constraints_violated": 0,
+    "costs": {
+     "removed": [
+      {
+       "amount": "3500.00",
+       "currency": "JPY"
+      }
+     ],
+     "total": [
+      {
+       "amount": "0.00",
+       "currency": "JPY"
+      }
+     ]
+    },
+    "counts": {
+     "error": 0,
+     "info": 0,
+     "unverified": 1,
+     "warning": 0
+    },
+    "heavy_days": 0,
+    "id": "bba38ff6-df34-48be-8f0c-6d0a2fc76046",
+    "max_fatigue_percent": 29,
+    "new_issues": [],
+    "resolved_issues": [],
+    "resource_summary": {
+     "reservations_cancel_planned": 1,
+     "reservations_relinked": 0,
+     "segments_added": 1,
+     "segments_removed": 1,
+     "segments_updated": 0
+    },
+    "scenario_type": "custom",
+    "state": "draft",
+    "summary": {
+     "added": 1,
+     "removed": 1,
+     "time_changed": 0,
+     "updated": 0
+    },
+    "title": "案",
+    "travel": {
+     "is_estimate": true,
+     "km": 13.7,
+     "legs": 2,
+     "minutes": 61,
+     "unknown_legs": 0
+    }
+   }
+  ],
+  "can_adopt": true,
+  "costs_hidden": false,
+  "movement_applied": true,
+  "plan": {
+   "constraints_satisfied": 0,
+   "constraints_violated": 0,
+   "costs": {
+    "removed": [],
+    "total": [
+     {
+      "amount": "3500.00",
+      "currency": "JPY"
+     }
+    ]
+   },
+   "counts": {
+    "error": 0,
+    "info": 0,
+    "unverified": 1,
+    "warning": 0
+   },
+   "heavy_days": 0,
+   "max_fatigue_percent": 26,
+   "title": "本案",
+   "travel": {
+    "is_estimate": true,
+    "km": 13.7,
+    "legs": 2,
+    "minutes": 56,
+    "unknown_legs": 0
+   }
+  },
+  "plan_id": "590940d2-4bc7-4b0a-a759-101fc28144b8",
+  "plan_revision": 6,
+  "reservations_hidden": false,
+  "validation_algorithm_version": "feasibility-v2"
+ },
+ "correction_request_created": {
+  "created_at": "2026-10-27T00:25:50.273205+00:00",
+  "current_value": null,
+  "field": "plan_data",
+  "field_label": "名義",
+  "id": "39bb0994-9cea-4f62-92d8-03859c32fdb4",
+  "kind": "request",
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "proposed_value": "B",
+  "resolution_note": null,
+  "resolved_at": null,
+  "source": "booking_document",
+  "source_label": "予約の確認書",
+  "source_note": null,
+  "status": "open"
+ },
+ "correction_request_resolved": {
+  "created_at": "2026-10-27T00:25:50.273205+00:00",
+  "current_value": null,
+  "field": "plan_data",
+  "field_label": "名義",
+  "id": "39bb0994-9cea-4f62-92d8-03859c32fdb4",
+  "kind": "request",
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "proposed_value": "B",
+  "requester_name": "user_32f64348d3",
+  "resolution_note": "確認できず",
+  "resolved_at": "2026-10-27T00:25:50.620123+00:00",
+  "source": "booking_document",
+  "source_label": "予約の確認書",
+  "source_note": null,
+  "status": "declined"
+ },
+ "correction_requests_owner": [
+  {
+   "created_at": "2026-10-27T00:25:50.273205+00:00",
+   "current_value": null,
+   "field": "plan_data",
+   "field_label": "名義",
+   "id": "39bb0994-9cea-4f62-92d8-03859c32fdb4",
+   "kind": "request",
+   "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+   "proposed_value": "B",
+   "requester_name": "user_32f64348d3",
+   "resolution_note": null,
+   "resolved_at": null,
+   "source": "booking_document",
+   "source_label": "予約の確認書",
+   "source_note": null,
+   "status": "open"
+  }
+ ],
+ "corrections_list": {
+  "current": {
+   "email": "user_63cb5127c7@example.com",
+   "username": "訂正後の名前"
+  },
+  "fields": [
+   {
+    "field": "username",
+    "label": "表示名",
+    "requires_password": false
+   },
+   {
+    "field": "email",
+    "label": "メールアドレス",
+    "requires_password": true
+   }
+  ],
+  "history": [
+   {
+    "after": "訂正後の名前",
+    "before": "user_c2049db2e2",
+    "created_at": "2026-10-27T00:25:50.591647+00:00",
+    "field": "username",
+    "field_label": "表示名",
+    "id": "0cf73bee-cbbd-4899-b988-f700794f26f2",
+    "kind": "self",
+    "reverted_at": null,
+    "source": "self_statement",
+    "source_label": "本人の申告",
+    "source_note": "表記",
+    "status": "applied",
+    "verification": "session"
+   }
+  ],
+  "requests": [],
+  "sources": [
+   {
+    "label": "本人の申告",
+    "source": "self_statement"
+   },
+   {
+    "label": "公的な書類",
+    "source": "official_document"
+   },
+   {
+    "label": "予約の確認書",
+    "source": "booking_document"
+   },
+   {
+    "label": "その他",
+    "source": "other"
+   }
+  ]
+ },
+ "corrections_self_created": {
+  "after": "訂正後の名前",
+  "before": "user_c2049db2e2",
+  "created_at": "2026-10-27T00:25:50.591647+00:00",
+  "field": "username",
+  "field_label": "表示名",
+  "id": "0cf73bee-cbbd-4899-b988-f700794f26f2",
+  "kind": "self",
+  "reverted_at": null,
+  "source": "self_statement",
+  "source_label": "本人の申告",
+  "source_note": "表記",
+  "status": "applied",
+  "verification": "session"
+ },
+ "ownership_accepted": {
+  "created_at": "2026-10-27T00:25:48.768521+00:00",
+  "expires_at": "2026-11-03T00:25:50.240309+00:00",
+  "from_name": "user_c2049db2e2",
+  "id": "613bfc5b-a6c7-4d82-a9f1-ac81ccc0d72c",
+  "is_recipient": true,
+  "is_sender": false,
+  "keep_role": "editor",
+  "message": null,
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "responded_at": "2026-10-27T00:25:50.574241+00:00",
+  "status": "accepted",
+  "to_name": "user_32f64348d3"
+ },
+ "ownership_created": {
+  "created_at": "2026-10-27T00:25:48.768521+00:00",
+  "expires_at": "2026-11-03T00:25:50.240309+00:00",
+  "from_name": "user_c2049db2e2",
+  "id": "613bfc5b-a6c7-4d82-a9f1-ac81ccc0d72c",
+  "is_recipient": false,
+  "is_sender": true,
+  "keep_role": "editor",
+  "message": null,
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "responded_at": null,
+  "status": "pending",
+  "to_name": "user_32f64348d3"
+ },
+ "ownership_incoming": [
+  {
+   "created_at": "2026-10-27T00:25:48.768521+00:00",
+   "expires_at": "2026-11-03T00:25:50.240309+00:00",
+   "from_name": "user_c2049db2e2",
+   "id": "613bfc5b-a6c7-4d82-a9f1-ac81ccc0d72c",
+   "is_recipient": true,
+   "is_sender": false,
+   "keep_role": "editor",
+   "message": null,
+   "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+   "plan_title": "移譲",
+   "responded_at": null,
+   "status": "pending",
+   "to_name": "user_32f64348d3"
+  }
+ ],
+ "ownership_info_owner": {
+  "can_transfer": true,
+  "candidates": [
+   {
+    "collaborator_id": "131ed579-d97b-4a62-8474-e7bc283e6fde",
+    "name": "user_32f64348d3",
+    "role": "editor"
+   }
+  ],
+  "pending": null,
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "role": "owner",
+  "transfer_days": 7,
+  "transfer_in_progress": false
+ },
+ "ownership_info_pending": {
+  "can_transfer": true,
+  "candidates": [
+   {
+    "collaborator_id": "131ed579-d97b-4a62-8474-e7bc283e6fde",
+    "name": "user_32f64348d3",
+    "role": "editor"
+   }
+  ],
+  "pending": {
+   "created_at": "2026-10-27T00:25:48.768521+00:00",
+   "expires_at": "2026-11-03T00:25:50.240309+00:00",
+   "from_name": "user_c2049db2e2",
+   "id": "613bfc5b-a6c7-4d82-a9f1-ac81ccc0d72c",
+   "is_recipient": false,
+   "is_sender": true,
+   "keep_role": "editor",
+   "message": null,
+   "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+   "responded_at": null,
+   "status": "pending",
+   "to_name": "user_32f64348d3"
+  },
+  "plan_id": "2de09247-0c63-449f-a430-700385cbd412",
+  "role": "owner",
+  "transfer_days": 7,
+  "transfer_in_progress": true
+ }
+}

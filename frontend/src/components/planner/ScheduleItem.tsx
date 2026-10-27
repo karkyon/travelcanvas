@@ -257,7 +257,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               setIsEditing(true);
             }}
-            className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
+            className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
             title="編集"
           >
             <Edit3 size={14} />
@@ -281,7 +281,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onShare?.(id);
             }}
-            className="p-1 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
+            className="p-1 text-gray-500 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
             title="共有"
           >
             <Share2 size={14} />
@@ -291,7 +291,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onDelete?.(id);
             }}
-            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
+            className="p-1 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
             title="削除"
           >
             <Trash2 size={14} />
