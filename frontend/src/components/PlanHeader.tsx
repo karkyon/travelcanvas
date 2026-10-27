@@ -6,6 +6,8 @@ import Input from './common/Input';
 import Card from './common/Card';
 import Modal from './common/Modal';
 import type { TravelPlan } from '../types';
+import TripCover from './trip/TripCover';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 /** [Gate G9] UX-0 旅行の最初・最後の日(日程の日付を優先し、無ければ旅行の開始・終了の日)。無ければ空 */
 function firstDate(plan: TravelPlan): string {
@@ -35,6 +37,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
 }) => {
   const { updatePlanDetails, duplicatePlan, deletePlan } = usePlan();
   const { addToast } = useToast();
+  const online = useOnlineStatus();
   
   const [isEditing, setIsEditing] = useState(false);
   const [editedPlan, setEditedPlan] = useState({
@@ -183,20 +186,25 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
             {/* [Gate G9] UX-0 スマホの幅では題名と操作を縦に並べる(以前は題名が1文字ずつ折り返した) */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-gray-900">{plan.title}</h1>
-                  <span className={`
-                    px-2 py-1 text-xs font-medium rounded-full
-                    ${plan.status === 'active' ? 'bg-green-100 text-green-800' :
-                      plan.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                      plan.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'}
-                  `}>
-                    {plan.status === 'active' ? 'アクティブ' :
-                     plan.status === 'draft' ? 'ドラフト' :
-                     plan.status === 'completed' ? '完了' : plan.status}
-                  </span>
-                </div>
+                {/* [Gate G9] UX-2・UX-3 旅行の表紙(生成グラデーション)に題名・状態・行き先・期間・通信の状態をまとめる */}
+                <TripCover size="header" destination={plan.destination} tripTitle={plan.title}
+                  startDate={firstDate(plan) || null} className="mb-3" data-testid="trip-header-cover">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span className="rounded-full border border-white px-2 py-0.5">
+                      {plan.status === 'active' ? 'アクティブ' :
+                       plan.status === 'draft' ? 'ドラフト' :
+                       plan.status === 'completed' ? '完了' : plan.status}
+                    </span>
+                    {!online && (
+                      <span className="rounded-full border border-white px-2 py-0.5" role="status">オフライン(保存済みの内容)</span>
+                    )}
+                  </div>
+                  <h1 className="mt-2 text-2xl font-bold break-words" style={{ fontFamily: 'var(--tc-font-display)' }}>{plan.title}</h1>
+                  <p className="mt-1 text-sm">
+                    {[plan.destination || null, `${formatDate(firstDate(plan))} 〜 ${formatDate(lastDate(plan))}`]
+                      .filter(Boolean).join('・')}
+                  </p>
+                </TripCover>
                 
                 {plan.description && (
                   <p className="text-gray-600 mb-3 leading-relaxed">{plan.description}</p>
@@ -222,14 +230,6 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                   </div>
                 </div>
 
-                {/* 日程 */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <div className="text-sm text-blue-800">
-                    <span className="font-medium">📅 {formatDate(firstDate(plan))}</span>
-                    <span className="mx-2">〜</span>
-                    <span className="font-medium">{formatDate(lastDate(plan))}</span>
-                  </div>
-                </div>
 
                 {/* タグ */}
                 {plan.tags && plan.tags.length > 0 && (

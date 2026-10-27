@@ -28,6 +28,7 @@
 | [gate-g6-trace.md](gate-g6-trace.md) | Gate G6 トレース(機能: オフライン・位置・記録) | 1 | 1 | 0 |
 | [gate-g7-trace.md](gate-g7-trace.md) | Gate G7 トレース(機能: 移動・最適化・案の比較・記録・削除) | 4 | 0 | 0 |
 | [gate-g8-trace.md](gate-g8-trace.md) | Gate G8・G9 トレース(機能: 案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録 / 見た目の準備) | 2 | 0 | 0 |
+| [gate-g9b-trace.md](gate-g9b-trace.md) | Gate G9 後半 トレース(UX-2 旅行の表紙・UX-3 見出しと移動・UX-4 文脈型ダッシュボード) | 2 | 0 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |

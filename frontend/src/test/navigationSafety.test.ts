@@ -20,6 +20,8 @@ const ALLOW = new Set([
   'components/layout/Header.tsx::item.href',
   'components/common/Button.tsx::isDisabled ? undefined : href',
   'components/location/RecordingIndicator.tsx::trackPath',
+  // [Gate G9] ダッシュボードの「スポット・地図」への入口(固定の配列 OTHER_LINKS)
+  'pages/DashboardPage.tsx::to',
 ]);
 
 function sourceFiles(dir: string): string[] {

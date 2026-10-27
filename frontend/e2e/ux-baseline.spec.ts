@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { expectNoAxeViolations } from './support/axe';
-import { SCREENS, VIEWPORTS, seedBaseline } from '../ux/baselineData';
+import { CHECK_VIEWPORTS, SCREENS, seedBaseline } from '../ux/baselineData';
 
 /**
- * [Gate G9] UX-0 今の6画面の「壊してはいけない所」(docs/ux/UX-0_baseline.md §3)を、PC・スマホの幅で確かめる。
+ * [Gate G9] UX-0 今の6画面の「壊してはいけない所」(docs/ux/UX-0_baseline.md §3)を、360・390・768・1024・1440px の幅で確かめる
+ * (後半の UX-2〜UX-4 で 768・1024・360 を足した)。
  * 見た目の改修(UX-2 以降)の前後で、この試験が通り続けることを条件にする。
  *   - 本文の目印(main)と見出し(h1)が1つずつある
  *   - 横にはみ出さない(スマホで横に動かさなくても全部読める)
@@ -21,9 +22,9 @@ const KEY_TEXT: Record<string, string | null> = {
 };
 
 test('UX-0 今の6画面は PC・スマホの幅で、目印・見出し・主な情報を保ち、横にはみ出さない', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(480_000);
   const { planId } = await seedBaseline(page, 'base');
-  for (const vp of VIEWPORTS) {
+  for (const vp of CHECK_VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     for (const s of SCREENS) {
       const where = `${s.name}(${vp.id} ${vp.width}px)`;

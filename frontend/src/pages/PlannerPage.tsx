@@ -557,175 +557,6 @@ const PlannerPage: React.FC = () => {
             ← プラン一覧へ戻る
           </Button>
 
-          {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
-              どこからもリンクされておらずUIから一度も到達できなかった。
-              [Gate R3-2] 予約一覧も同様に実装済みだが未到達だったため追加。 */}
-          {/* [Gate G9] UX-0 折り返す(以前は1行に詰めたため、左端の「予約」「今日」が画面の外に出て押せなかった) */}
-          <div className="flex flex-wrap items-center justify-end gap-2 mb-2" data-testid="planner-actions">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/reservations`)}
-            >
-              🧳 予約
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/today`)}
-            >
-              ☀️ 今日
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/alerts`)}
-            >
-              ⚠️ 遅延・休業の対応
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/memories`)}
-            >
-              📷 旅の記録
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/track`)}
-            >
-              📍 位置の記録
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/journey`)}
-            >
-              🧭 振り返り
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/visits`)}
-            >
-              🗺️ 訪問の地図
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}
-            >
-              ⭐ 候補箱
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/memory-replan`)}
-            >
-              💡 過去の旅からの提案
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/atlas')}
-            >
-              🗺️ 旅の地図
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
-            >
-              🚶 移動区間
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/route-options`)}
-            >
-              🗺️ 経路の比較
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/constraints`)}
-            >
-              ⚖️ 制約
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/preparation`)}
-            >
-              ✅ 準備
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/expenses`)}
-            >
-              💴 予算・費用
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/discussion`)}
-            >
-              🗳️ 相談・投票
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/booklet`)}
-            >
-              📖 しおり・印刷
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/exports`)}
-            >
-              📤 書き出し
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/branches`)}
-            >
-              🔀 もしもの案
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/imports`)}
-            >
-              📥 予約取込
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/documents`)}
-            >
-              📄 文書
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/share/${currentPlan.id}`)}
-            >
-              🤝 共有
-            </Button>
-            {/* [Gate G8] FR-039 旅行の中の情報の訂正の申し出 */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/planner/${currentPlan.id}/corrections`)}
-            >
-              ✏️ 訂正の申し出
-            </Button>
-          </div>
-
           <SyncStatusBar planId={currentPlan.id} />
 
           <MemberPolicyNotice planId={currentPlan.id} />
@@ -741,7 +572,204 @@ const PlannerPage: React.FC = () => {
             isReloading={isReloadingPlan}
           />
 
-          <PlanHeader plan={currentPlan} className="mb-6" onDelete={() => navigate('/planner')} />
+          <PlanHeader plan={currentPlan} className="mb-4" onDelete={() => navigate('/planner')} />
+
+          {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
+              どこからもリンクされておらずUIから一度も到達できなかった。
+              [Gate R3-2] 予約一覧も同様に実装済みだが未到達だったため追加。 */}
+          {/* [Gate G9] UX-3 旅行の中の移動を、目的ごとのまとまり(当日・計画・予約と準備・一緒に・記録)に分けて並べる。
+              全ての入口は今までどおり押せる(以前は23個を1行に詰めていた)。
+              旅行の見出し(表紙)の後に置く(スマホで最初に旅行名が見えるように)。 */}
+          <nav aria-label="旅行の中の移動" data-testid="planner-actions"
+            className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 rounded-lg border border-gray-200 bg-white p-3">
+            <div role="group" aria-labelledby="planner-actions-0">
+              <p id="planner-actions-0" className="text-xs font-semibold text-gray-700 mb-1">当日</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/today`)}
+                >
+                  ☀️ 今日
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/alerts`)}
+                >
+                  ⚠️ 遅延・休業の対応
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/track`)}
+                >
+                  📍 位置の記録
+                </Button>
+              </div>
+            </div>
+            <div role="group" aria-labelledby="planner-actions-1">
+              <p id="planner-actions-1" className="text-xs font-semibold text-gray-700 mb-1">計画</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}
+                >
+                  ⭐ 候補箱
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/constraints`)}
+                >
+                  ⚖️ 制約
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
+                >
+                  🚶 移動区間
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/route-options`)}
+                >
+                  🗺️ 経路の比較
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/branches`)}
+                >
+                  🔀 もしもの案
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/memory-replan`)}
+                >
+                  💡 過去の旅からの提案
+                </Button>
+              </div>
+            </div>
+            <div role="group" aria-labelledby="planner-actions-2">
+              <p id="planner-actions-2" className="text-xs font-semibold text-gray-700 mb-1">予約・準備・費用</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/reservations`)}
+                >
+                  🧳 予約
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/imports`)}
+                >
+                  📥 予約取込
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/documents`)}
+                >
+                  📄 文書
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/preparation`)}
+                >
+                  ✅ 準備
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/expenses`)}
+                >
+                  💴 予算・費用
+                </Button>
+              </div>
+            </div>
+            <div role="group" aria-labelledby="planner-actions-3">
+              <p id="planner-actions-3" className="text-xs font-semibold text-gray-700 mb-1">一緒に・出力</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/share/${currentPlan.id}`)}
+                >
+                  🤝 共有
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/discussion`)}
+                >
+                  🗳️ 相談・投票
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/corrections`)}
+                >
+                  ✏️ 訂正の申し出
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/booklet`)}
+                >
+                  📖 しおり・印刷
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/exports`)}
+                >
+                  📤 書き出し
+                </Button>
+              </div>
+            </div>
+            <div role="group" aria-labelledby="planner-actions-4">
+              <p id="planner-actions-4" className="text-xs font-semibold text-gray-700 mb-1">記録・振り返り</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/memories`)}
+                >
+                  📷 旅の記録
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/journey`)}
+                >
+                  🧭 振り返り
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/visits`)}
+                >
+                  🗺️ 訪問の地図
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/atlas')}
+                >
+                  🗺️ 旅の地図
+                </Button>
+              </div>
+            </div>
+          </nav>
+
 
           <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mb-6" />
 

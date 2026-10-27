@@ -1,248 +1,142 @@
 /**
- * ダッシュボードページ
- * ユーザーのメイン画面
+ * ダッシュボード(SC-04 旅行一覧 / [Gate G9] UX-4 文脈型ダッシュボード)。
+ *
+ * 最上段で「次に何をすべきか」を示す(GET /dashboard の焦点の旅行):
+ *   旅行が無い → 旅行を始める / 旅行前 → 準備・遅延と休業 / 旅行中 → 今と次・遅延と休業 / 旅行後 → 精算・記録
+ * その下に段階ごとの旅行の一覧(表紙つき)と、スポット・地図への入口を置く。
+ * 状態: 読み込み中・失敗(問い合わせ番号つき・再試行)・オフライン(つながったら読み直す)・旅行なし・閲覧のみ(操作を出さない)。
+ * 見た目: デザインの決まり(tokens・Surface・旅行の表紙)だけを使い、明るい・暗い・端末に合わせるを選べる(この端末だけ)。
+ *
+ * [Gate M9-FE-B3] 表示中に未認証へ変わった場合もログイン画面へ移る(依存を正しく宣言する)。
+ * 以前の統計(登録スポット・お気に入り・訪問済みの数)と擬似的な「最近の活動」は、旅行を主役にするため外した
+ * (スポット・地図への入口は残す)。
  */
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { spotApiService } from '../services/spotApi';
-import { usePlanStore } from '../store/planStore';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { MapPin, Search, Star, User as UserIcon, Map as MapIcon, RefreshCw } from 'lucide-react';
+import Surface from '@/components/design/Surface';
+import { useAuthStore } from '@/store/authStore';
+import { getDashboard } from '@/services/api/g9';
+import type { DashboardSummary } from '@/services/api/types/g9';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
+import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
+
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; data: DashboardSummary }
+  | { kind: 'offline' }
+  | { kind: 'error'; message: string };
+
+const OTHER_LINKS = [
+  { to: '/spots/search', label: 'スポット検索', icon: Search },
+  { to: '/spots/register', label: 'スポット登録', icon: MapPin },
+  { to: '/spots', label: 'スポット一覧', icon: Star },
+  { to: '/atlas', label: '旅の地図', icon: MapIcon },
+  { to: '/profile', label: 'プロフィール', icon: UserIcon },
+];
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
-  const [loading, setLoading] = useState(true);
-  // [Gate #14] 以前は登録スポット/お気に入り/訪問済みが常にハードコードの0だった。
-  // [Gate #15] お気に入りAPI(backend/app/api/v1/spots.py)を新規実装したのに合わせ、
-  // 登録スポット数・お気に入り数の両方を実データに置き換える。
-  // [Gate #19] 訪問記録API(UserSpotVisit新規テーブル)を実装したのに合わせ、
-  // 訪問済み数も実データに置き換える。
-  const [spotCount, setSpotCount] = useState(0);
-  const [favoriteCount, setFavoriteCount] = useState(0);
-  const [visitedCount, setVisitedCount] = useState(0);
-  const [statsLoading, setStatsLoading] = useState(true);
-  // [Gate #16] 「最近の活動」は常に固定の「まだ活動がありません」表示だった。
-  // バックエンドに専用の活動ログテーブルは存在しないため、既存のスポット/プラン
-  // 作成日時(created_at)から擬似的な活動フィードを構成する。
-  interface ActivityItem {
-    id: string;
-    type: 'spot' | 'plan';
-    label: string;
-    createdAt: string;
-  }
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const { user, isAuthenticated, isGuest } = useAuthStore();
+  const { preference, theme, setPreference } = useThemePreference();
+  const [state, setState] = useState<LoadState>({ kind: 'loading' });
 
-  // 認証チェック
-  // [Gate M9-FE-B3] 以前は空の依存配列で「マウント時の一度だけ」判定しており、
-  // 表示中にログアウトしてもリダイレクトされなかった(exhaustive-deps警告)。
-  // isAuthenticatedの変化にも追随する。navigateはdata router配下で安定参照。
-  // (ユーザーオブジェクト全体をconsoleへ出力していたログは個人情報を含むため削除)
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
-    setLoading(false);
+    if (!isAuthenticated) navigate('/login');
   }, [isAuthenticated, navigate]);
 
-  // 登録スポット数・お気に入り数を取得
+  const load = useCallback(async () => {
+    setState((s) => (s.kind === 'ready' ? s : { kind: 'loading' }));
+    try {
+      setState({ kind: 'ready', data: await getDashboard() });
+    } catch (e) {
+      if (isOffline()) setState({ kind: 'offline' });
+      else setState({ kind: 'error', message: errorDetailMessage(e, 'ダッシュボードを読み込めませんでした') });
+    }
+  }, []);
+
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
-    (async () => {
-      try {
-        const [spots, favorites, visits] = await Promise.all([
-          spotApiService.getSpots(undefined, 100),
-          spotApiService.getFavorites(),
-          spotApiService.getVisits(),
-        ]);
-        setSpotCount(spots.filter((s) => s.created_by === user.id).length);
-        setFavoriteCount(favorites.length);
-        setVisitedCount(visits.length);
+    if (!isAuthenticated) return undefined;
+    void load();
+    const online = () => { void load(); };
+    window.addEventListener('online', online);
+    return () => window.removeEventListener('online', online);
+  }, [isAuthenticated, load]);
 
-        await usePlanStore.getState().loadPlans();
-        const plans = usePlanStore.getState().plans;
+  if (!isAuthenticated) return null;
 
-        const spotActivities: ActivityItem[] = spots
-          .filter((s) => s.created_by === user.id)
-          .map((s) => ({
-            id: `spot-${s.id}`,
-            type: 'spot',
-            label: `「${s.name}」を登録しました`,
-            createdAt: s.created_at,
-          }));
-        const planActivities: ActivityItem[] = plans
-          .filter((p) => p.created_at)
-          .map((p) => ({
-            id: `plan-${p.id}`,
-            type: 'plan',
-            label: `「${p.title}」プランを作成しました`,
-            createdAt: p.created_at as string,
-          }));
-
-        const merged = [...spotActivities, ...planActivities]
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 5);
-        setActivities(merged);
-      } catch (error) {
-        console.error('統計取得エラー:', error);
-      } finally {
-        setStatsLoading(false);
-      }
-    })();
-  }, [isAuthenticated, user]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const data = state.kind === 'ready' ? state.data : null;
+  const focusTrip = data?.focus ? data.trips.find((t) => t.id === data.focus?.plan_id) ?? null : null;
+  const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-6xl mx-auto">
-        {/* ヘッダー */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🌍 TravelCanvas ダッシュボード
-          </h1>
-          <p className="text-gray-600">
-            ようこそ、{user?.username || 'ユーザー'}さん！
-          </p>
+    <div data-theme={theme} className="min-h-[calc(100vh-4rem)] bg-cloud-50 text-ink-900" data-testid="dashboard">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-ink-900">ダッシュボード</h1>
+            <p className="text-sm text-ink-700 break-words">{`${name}さん、次にすることをまとめました。`}</p>
+          </div>
+          <label className="text-sm text-ink-700 flex items-center gap-2">
+            表示
+            <select value={preference} onChange={(e) => setPreference(e.target.value as ThemePreference)}
+              className="tc-focus-ring rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-1 text-ink-900">
+              <option value="system">端末に合わせる</option>
+              <option value="light">明るい</option>
+              <option value="dark">暗い</option>
+            </select>
+          </label>
         </div>
 
-        {/* 統計カード */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">登録スポット</h3>
-                <p className="text-2xl font-bold text-blue-600">{statsLoading ? '…' : spotCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-2 rounded-lg bg-green-100">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">お気に入り</h3>
-                <p className="text-2xl font-bold text-green-600">{statsLoading ? '…' : favoriteCount}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-semibold text-gray-900">訪問済み</h3>
-                <p className="text-2xl font-bold text-purple-600">{statsLoading ? '…' : visitedCount}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* クイックアクション */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">クイックアクション</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button 
-              onClick={() => navigate('/spots/search')}
-              className="flex flex-col items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              <svg className="w-8 h-8 text-blue-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">スポット検索</span>
+        {state.kind === 'loading' && (
+          <Surface variant="quiet" role="status" aria-live="polite" className="min-h-[11rem]" data-testid="dashboard-loading">
+            <p className="text-sm text-ink-700">読み込み中…</p>
+          </Surface>
+        )}
+        {state.kind === 'offline' && (
+          <Surface variant="quiet" role="status" data-testid="dashboard-offline">
+            <p className="font-semibold text-ink-900">オフラインです</p>
+            <p className="text-sm text-ink-700 mt-1">
+              つながると自動で読み直します。端末に保存した旅行(オフラインの旅行パック)は、旅程の画面から開けます。
+            </p>
+            <Link to="/planner" className="tc-focus-ring mt-2 inline-block text-sm font-medium text-accent underline">旅程の一覧を開く</Link>
+          </Surface>
+        )}
+        {state.kind === 'error' && (
+          <Surface variant="critical" role="alert" data-testid="dashboard-error">
+            <p className="font-semibold">{state.message}</p>
+            <button type="button" onClick={() => void load()}
+              className="tc-focus-ring mt-2 inline-flex items-center gap-1 rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-1.5 text-sm font-medium text-ink-900">
+              <RefreshCw size={14} aria-hidden="true" />もう一度読み込む
             </button>
+          </Surface>
+        )}
 
-            <button 
-              onClick={() => navigate('/spots/register')}
-              className="flex flex-col items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <svg className="w-8 h-8 text-green-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">スポット登録</span>
-            </button>
+        {data && !focusTrip && <EmptyHero isGuest={data.is_guest} />}
+        {data && focusTrip && data.focus && (
+          <>
+            <TripHero trip={focusTrip} />
+            <div className="mt-4"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
+            <QuickActions trip={focusTrip} />
+          </>
+        )}
+        {data && data.trips.length > 0 && <TripList trips={data.trips} />}
 
-            <button 
-              onClick={() => navigate('/spots')}
-              className="flex flex-col items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-            >
-              <svg className="w-8 h-8 text-purple-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">スポット一覧</span>
-            </button>
-
-            <button 
-              onClick={() => navigate('/profile')}
-              className="flex flex-col items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-            >
-              <svg className="w-8 h-8 text-orange-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">プロフィール</span>
-            </button>
-
-            {/* 🗺️ [Gate P15] Personal Travel Atlas(FR-052) */}
-            <button
-              onClick={() => navigate('/atlas')}
-              className="flex flex-col items-center p-4 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
-            >
-              <svg className="w-8 h-8 text-teal-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700">旅の地図</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 最近の活動 */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">最近の活動</h2>
-          {activities.length > 0 ? (
-            <ul className="divide-y divide-gray-100">
-              {activities.map((activity) => (
-                <li key={activity.id} className="flex items-center gap-3 py-3">
-                  <span className="text-xl">{activity.type === 'spot' ? '📍' : '🗺️'}</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-800">{activity.label}</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(activity.createdAt).toLocaleString('ja-JP')}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <svg className="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <p>まだ活動がありません</p>
-              <p className="text-sm">スポットを検索・登録して始めましょう！</p>
-            </div>
-          )}
-        </div>
+        <section aria-labelledby="dash-other" className="mt-8">
+          <h2 id="dash-other" className="text-lg font-semibold text-ink-900">スポット・地図</h2>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {OTHER_LINKS.map(({ to, label, icon: Icon }) => (
+              <li key={to}>
+                <Link to={to} className="tc-focus-ring inline-flex items-center gap-2 rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900 hover:bg-cloud-100">
+                  <Icon size={16} aria-hidden="true" />{label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
   );

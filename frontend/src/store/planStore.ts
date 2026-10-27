@@ -28,6 +28,7 @@ import { TravelPlan, ScheduleItem, DaySchedule, EventCategory } from '@/types';
 import { api as apiService, travelAPI } from '@/services/api';
 import type { SpotResult, NormalizedDay, NormalizedEvent } from '@/services/api';
 import { createQuickDraft, getStoredDeviceToken } from '@/services/quickDraftApi';
+import { publishCurrentTrip } from './currentTripStore';
 import { toast } from 'react-hot-toast';
 import {
   saveOfflinePack,
@@ -1062,3 +1063,7 @@ if (typeof window !== 'undefined') {
     if (planId && st.currentPlan?.id === planId) void st.loadPlan(planId);
   });
 }
+
+// [Gate G9] UX-3 全体の見出しへ今開いている旅行を知らせる(見出しが planStore を読み込まずに済むように)
+publishCurrentTrip(usePlanStore.getState().currentPlan);
+usePlanStore.subscribe((st) => publishCurrentTrip(st.currentPlan));
