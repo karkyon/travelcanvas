@@ -28,7 +28,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout exact main commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
