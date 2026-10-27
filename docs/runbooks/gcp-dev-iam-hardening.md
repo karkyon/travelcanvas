@@ -6,7 +6,7 @@
 
 | 項目 | 変更後 | 検証 |
 |---|---|---|
-| GitHub WIF | repository ID `1351842847`、owner ID `20151723`、`main`、`.github/workflows/deploy-gcp-dev.yml` の組合せだけ許可 | providerの`attributeCondition`とSAポリシーを表示 |
+| GitHub WIF | repository ID `1351842847`、owner ID `20151723`、`main`、通常workflow用OIDC claim `workflow_ref` が `.github/workflows/deploy-gcp-dev.yml@refs/heads/main` の組合せだけ許可 | providerの`attributeCondition`とSAポリシーを表示 |
 | SA鍵 | 新規のユーザー管理鍵の作成と外部公開鍵のアップロードをプロジェクト組織ポリシーで禁止 | effective policyを表示。既存ユーザー管理鍵一覧が空であることも確認 |
 | Artifact Registry | deployerのWriterをプロジェクトから削除し、`travelcanvas-dev`リポジトリだけへ付与 | リポジトリIAMとプロジェクトIAMを両方表示 |
 | イメージ公開 | 手動起動・main限定・WIF限定。commit SHAタグだけをpush | Artifact Registryからdigestを再取得 |
