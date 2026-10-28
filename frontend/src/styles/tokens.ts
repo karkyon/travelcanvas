@@ -131,6 +131,20 @@ export function coverFor(seed: { destination?: string | null; title?: string | n
   return pool[hashString(key) % pool.length]!;
 }
 
+/**
+ * [Gate G11] 表紙の写真の上の暗い重ね(写真の色に関わらず白い文字を 4.5:1 以上にする)。上(top)・下(bottom)の不透明度。
+ * 真っ白の写真でも、上の端の色(ink900 を top の割合で混ぜた色)と白の比が 4.5 以上(cover.test.ts で確かめる)。
+ * tokens.css の .tc-cover[data-has-photo]::after と同じ値。
+ */
+export const COVER_PHOTO_SCRIM = { color: '#0f172a', top: 0.62, bottom: 0.8 } as const;
+
+/** 下の色(bottom)に上の色(top)を不透明度 alpha で重ねた色 */
+export function blend(top: string, bottom: string, alpha: number): string {
+  const a = parseHex(top);
+  const b = parseHex(bottom);
+  return toHex([0, 1, 2].map((i) => b[i]! + (a[i]! - b[i]!) * alpha) as [number, number, number]);
+}
+
 export const SURFACES = ['glass', 'solid', 'quiet', 'critical'] as const;
 export type SurfaceVariant = typeof SURFACES[number];
 

@@ -1,4 +1,5 @@
 /** [Gate G9] UX-4 文脈型ダッシュボード(GET /dashboard、backend/app/api/v1/dashboard.py)の型 */
+import type { PlanCover } from './g11';
 export type TripPhase = 'ongoing' | 'upcoming' | 'past' | 'undated';
 export type TripRole = 'owner' | 'editor' | 'viewer';
 
@@ -20,6 +21,8 @@ export interface DashboardTrip {
   days_since_end: number | null;
   member_count: number;
   created_at: string | null;
+  /** [Gate G11] 表紙の写真(見える人だけ。無ければ null) */
+  cover: PlanCover | null;
 }
 
 export interface DashboardEvent {

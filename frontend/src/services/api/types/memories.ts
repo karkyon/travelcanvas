@@ -32,6 +32,8 @@ export interface TravelMemory {
   revision: number;
   created_at: string | null;
   updated_at: string | null;
+  /** [Gate G11] 外部から取り込んだ写真の出典(作者・ライセンス等)。手で上げた写真は null(古い backend では無い) */
+  source?: Record<string, unknown> | null;
 }
 
 export interface MemoryList {

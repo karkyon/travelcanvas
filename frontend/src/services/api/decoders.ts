@@ -1418,6 +1418,7 @@ export const travelMemory: Decoder<TravelMemory> = object<TravelMemory>({
   revision: int,
   created_at: nullable(str),
   updated_at: nullable(str),
+  source: optional(nullable(record)),
 });
 export const memoryList: Decoder<MemoryList> = object<MemoryList>({
   memories: arrayOf(travelMemory),

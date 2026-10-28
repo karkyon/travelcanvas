@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
-    privacy_zones, memory_publish, movement, ownership, corrections, dashboard,
+    privacy_zones, memory_publish, movement, ownership, corrections, dashboard, plan_cover,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -591,6 +591,8 @@ app.include_router(ownership.router, prefix="/api/v1")
 app.include_router(corrections.router, prefix="/api/v1")
 # [Gate G9] UX-4 文脈型ダッシュボードの集約(GET /dashboard。旅行の前・中・後と焦点の旅行)
 app.include_router(dashboard.router, prefix="/api/v1")
+# [Gate G11] 旅行の表紙の写真
+app.include_router(plan_cover.router, prefix="/api/v1")
 
 
 @app.exception_handler(org_external.ApiError)

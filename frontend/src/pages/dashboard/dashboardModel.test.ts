@@ -9,7 +9,7 @@ const base: DashboardTrip = {
   id: 'p1', title: '京都', destination: '京都', role: 'owner', can_edit: true, start_date: '2026-11-04',
   end_date: '2026-11-05', timezone_id: 'Asia/Tokyo', local_today: '2026-10-28', day_count: 2, total_days: 2,
   phase: 'upcoming', days_until_start: 7, day_number: null, days_since_end: null, member_count: 1,
-  created_at: '2026-10-01T00:00:00Z',
+  created_at: '2026-10-01T00:00:00Z', cover: null,
 };
 
 describe('日付・状況の表示', () => {

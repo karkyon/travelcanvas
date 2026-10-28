@@ -27,6 +27,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import accessible_plan_ids_subquery
 from app.models.models import PlanCollaborator, TravelDay, TravelPlan, User
+from app.services import plan_cover
 
 router = APIRouter(tags=["dashboard"])
 
@@ -137,6 +138,7 @@ def _trip(plan: TravelPlan, role: str, ranges: Dict[Any, Tuple[date, date, int, 
         "days_since_end": (today - end).days if phase == "past" and end else None,
         "member_count": members.get(plan.id, 0) + 1,
         "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        "cover": None,  # [Gate G11] 呼ぶ側で見える人の表紙を入れる
     }
 
 
@@ -219,6 +221,9 @@ async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depe
     ranges = _day_ranges(db, plan_ids)
     trips = [_trip(p, "owner" if p.user_id == current_user.id else roles.get(p.id, "viewer"), ranges, members, now)
              for p in plans]
+    covers = plan_cover.covers_for(db, plans, current_user)  # [Gate G11] 表紙の写真(見える人だけ)
+    for t, p in zip(trips, plans):
+        t["cover"] = covers.get(p.id)
     # 旅行中・旅行前は開始の早い順、旅行後は終わりの新しい順、日付の無い旅行は作成の新しい順
     head = sorted((t for t in trips if t["phase"] in ("ongoing", "upcoming")),
                   key=lambda t: (0 if t["phase"] == "ongoing" else 1, t["start_date"] or ""))

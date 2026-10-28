@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r22** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-28  
+> 文書ID: DOC-10 / 版: **v5.1-r23** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-28  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,8 +14,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `e39d5e7`(Gate G10-Q PR #6。この後に、この版を入れる Gate G10-UX の commit が続く) |
-| Alembic head | `f4d8a2c6e9b1`(単一の head。G7 `e8b2c6d0f4a7` の後、G8 で案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録) |
+| 基準commit | `540955d`(Gate G10-UX PR #8。この後に、この版を入れる Gate G11-Media の commit が続く) |
+| Alembic head | `a7c3e5f9b2d4`(単一の head。G8 `f4d8a2c6e9b1` の後、G11 で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)) |
 | 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 853 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.24 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -116,7 +116,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-034 | しおり生成 | VERIFIED | ✓ | P4 | 冊子の面付 |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | ✓ | P4 | サーバー側の PDF・ダウンロード URL |
 | FR-036 | Calendar/Map IO | INTEGRATED(部分) | ✓ | P5・P8 | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
-| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6 | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
+| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6・G11 | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
 | FR-039 | 輸出・削除 | VERIFIED | ✓ | P6・P9・G7・G8 | 書類の写しの添付による出典の証明 |
 | FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2・G4 | 管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1) |
@@ -235,7 +235,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r19 | 2026-10-26 | `2576a91` | **Gate G7: 移動・滞在の既定・休憩の自動判定・日ごとの疲れ・最終の便(MOVE-03)・目的の内訳・条件の変更・選んだ予定だけの採用(MOVE-04)・同じ同行者と移動手段の傾向(MEM-03)・日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグ(FR-005)・本案と案の比較(FR-019)・猶予つきのアカウントの削除(FR-039)。FR-005・FR-057 を VERIFIED。FR-017 は時刻表の照合だけが残る。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま。`docs/trace/gate-g7-trace.md` |
 | r20 | 2026-10-27 | `083e6b1` | Gate G8: 案の中の移動区間・予約の変更と選んだ変更だけの採用・予約の取消の手続き(FR-019)・所有者の移譲(FR-021・FR-039)・出典・確認・履歴つきの訂正と所有者への訂正の申し出(FR-039)・定期の処理の実行の記録と遅れ・失敗の監視・2つの端末の同時の編集の E2E(FR-004)・訪問の訂正の証拠の整理(FR-051)。FR-004・FR-019・FR-039・FR-051 を VERIFIED。Gate G9 前半: 最初に読む JS の上限 430kB(Q03)・今の6画面の記録と壊してはいけない所の E2E(UX-0)・デザインの決まり(UX-1)。`docs/trace/gate-g8-trace.md` |
 | r21 | 2026-10-28 | `3c23828` | Gate G10-Q: V3 再監査(`scripts/ci/audit_v3.py` の R1〜R8。誤った VERIFIED 0、FR-001・002・006・044 の E2E に FR 番号を記載)・account-deletion の E2E の不安定の根治(削除の後の 401 で /login へ移さない)・mypy 1,382 → 0・毎晩の perf の修正・計算の確認の最初の1回を点数にしない。FR の状態の遷移なし。`docs/trace/gate-g10q-trace.md` |
-| **r22** | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面・issue #7(オフラインの書き込みで共通の「ネットワークエラー」と「端末に保存」が食い違う)。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
+| r22 | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面・issue #7(オフラインの書き込みで共通の「ネットワークエラー」と「端末に保存」が食い違う)。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
+| **r23** | 2026-10-28 | `540955d` | **Gate G11-Media(G11 の段階1): 旅行の表紙の写真(既存の非公開・暗号化した写真の記録を選ぶ・取り込む、見せる位置と拡大、見える人だけに配信、撮影情報の除去、読めない時は色の表紙)。migration `a7c3e5f9b2d4`(表紙・予定の写真・外部の写真の出典・SNS の候補)。FR-037 は顔の検査・MEMORY MAP が残るため(部分)のまま。仕様 `docs/ux/G11_UIUX全範囲_実装仕様.md`、`docs/trace/gate-g11-media-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

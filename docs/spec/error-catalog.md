@@ -51,6 +51,7 @@
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
 | `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py |
+| `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
 | `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
@@ -133,7 +134,7 @@
 | `mode_mismatch` | 409 | after_reload | この旅行の位置の設定と違う保存先です。先に設定を変えてください | api/v1/location_tracks.py |
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
-| `no_changes` | 403, 409 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/replans.py |
+| `no_changes` | 403, 409, 422 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v1/re |
 | `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
 | `no_ops_selected` | 422 | no | 採用する変更を選んでください | api/v1/branches.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |

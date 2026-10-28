@@ -3,6 +3,7 @@ import type {
   DashboardAlerts, DashboardEvent, DashboardFocus, DashboardReadiness, DashboardSummary, DashboardToday, DashboardTrip,
   TripPhase,
 } from './types/g9';
+import { optionalPlanCover } from './g11cover';
 import { arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, object, oneOf, str, type Decoder } from './decode';
 
 const phase = oneOf('ongoing', 'upcoming', 'past', 'undated');
@@ -11,7 +12,7 @@ const trip: Decoder<DashboardTrip> = object<DashboardTrip>({
   id: str, title: str, destination: nullable(str), role: oneOf('owner', 'editor', 'viewer'), can_edit: bool,
   start_date: nullable(str), end_date: nullable(str), timezone_id: str, local_today: str, day_count: nonNegativeInt,
   total_days: nullable(nonNegativeInt), phase, days_until_start: nullable(int), day_number: nullable(int),
-  days_since_end: nullable(int), member_count: nonNegativeInt, created_at: nullable(str),
+  days_since_end: nullable(int), member_count: nonNegativeInt, created_at: nullable(str), cover: optionalPlanCover,
 });
 
 const event: Decoder<DashboardEvent> = object<DashboardEvent>({

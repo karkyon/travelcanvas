@@ -194,6 +194,11 @@ export class ApiCore {
     return this.client.delete<T>(url, config);
   }
 
+  /** [Gate G11] 部分の更新(表紙の位置の調整など) */
+  async patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.client.patch<T>(url, data, config);
+  }
+
   // [Gate M9-FE-A2] テスト専用の型付きシーム。以前は単体テストが
   // `(api as any).client = {...}` でprivate clientを直接`any`キャストして
   // 丸ごと差し替えており、モック関数の引数型が一切検査されていなかった。

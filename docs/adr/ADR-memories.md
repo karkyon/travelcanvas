@@ -89,3 +89,13 @@ FR-037(イベント・場所・日時へ写真、動画参照、音声メモ、�
 - 写真・記録の地図表示(MEMORY MAP、DOC-14 §4.5)、位置軌跡(FR-038)との近接による自動紐付け
 - 記録の変更・削除のUndo(変更セットへの記録)
 - オフラインでの記録の作成(P11の同期は予定だけが対象)
+
+## 5. 追補(Gate G11): 旅行の表紙・予定の写真
+
+- 旅行の表紙(`travel_plans.cover_memory_id`)・予定の写真(`travel_events.image_memory_id`)は、この記録(kind=photo)を指すだけで、
+  ファイルを複製しない。記録が消える(ゴミ箱へ移す・退会)と外部キー(ON DELETE SET NULL)で外れる。ゴミ箱から戻しても表紙には戻さない。
+- 表紙にしても記録の公開範囲は変えない。見えない人には表紙の情報も写真も返さない(`app/services/plan_cover.py`)。
+- 配信は `GET /plans/{id}/cover/media` で、`GET /memories/{id}/media` と同じ処理(`media_response`: 撮影情報の除去・no-store・
+  nosniff・CSP sandbox)。旅行の複製は表紙をコピーしない。
+- `memories.source`(JSONB): 外部から取り込んだ写真の出典(G11 段階3。手で上げた写真は NULL)。
+
