@@ -87,6 +87,8 @@ export interface User {
   user_type?: string;
   // [Gate M9-FE-C2b-3] 未設定のユーザーではbackendがnullを返す(GET /auth/me 実応答で確認)
   preferences?: Record<string, unknown> | null;
+  /** [Gate G11] ログイン・refresh の応答の見た目の系統(preferences.ui_style と同じ) */
+  ui_style?: string | null;
   created_at: string;
   updated_at?: string;
 }

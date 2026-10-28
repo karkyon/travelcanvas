@@ -3,9 +3,12 @@
  * [Gate G10-UX] UX-8 選択をアプリの全体で共有する(以前はダッシュボードの中だけで、他の画面は明るいままだった)。
  * 当てる場所は <html data-theme>(components/design/ThemeRoot.tsx)。今の画面の Tailwind の色は
  * src/styles/theme-dark.css が暗い地で読める色に置き換える。
+ * [Gate G11] 見た目の系統(標準・Atlas・Editorial・Daylight・Studio。<html data-style>)も同じ所で持つ。
+ * 端末(localStorage tc.style)とアカウント(users.preferences.ui_style)に保存し、ログインした時はアカウントの値を優先する。
  */
 import { useEffect } from 'react';
 import { create } from 'zustand';
+import { STYLE_KEY, isStyleId, type StyleId } from '@/styles/styleIds';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export const THEME_KEY = 'tc.theme';
@@ -27,16 +30,29 @@ function systemDark(): boolean {
   }
 }
 
+function readStyle(): StyleId {
+  try {
+    const v = window.localStorage.getItem(STYLE_KEY);
+    return isStyleId(v) ? v : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
 interface ThemeState {
   preference: ThemePreference;
   systemDark: boolean;
+  style: StyleId;
   setPreference: (p: ThemePreference) => void;
   setSystemDark: (dark: boolean) => void;
+  /** 見た目の系統をこの端末に当てて保存する(アカウントへの保存は設定の画面が行う) */
+  setStyle: (s: StyleId) => void;
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
   preference: typeof window === 'undefined' ? 'system' : read(),
   systemDark: typeof window === 'undefined' ? false : systemDark(),
+  style: typeof window === 'undefined' ? 'standard' : readStyle(),
   setPreference: (p) => {
     set({ preference: p });
     try {
@@ -47,7 +63,24 @@ export const useThemeStore = create<ThemeState>((set) => ({
     }
   },
   setSystemDark: (dark) => set({ systemDark: dark }),
+  setStyle: (s) => {
+    if (!isStyleId(s)) return;
+    set({ style: s });
+    try {
+      if (s === 'standard') window.localStorage.removeItem(STYLE_KEY);
+      else window.localStorage.setItem(STYLE_KEY, s);
+    } catch {
+      // 保存できない環境では、この画面を開いている間だけ有効
+    }
+  },
 }));
+
+/** 見た目の系統(設定の画面・ThemeRoot が使う) */
+export function useStylePreference(): { style: StyleId; setStyle: (s: StyleId) => void } {
+  const style = useThemeStore((s) => s.style);
+  const setStyle = useThemeStore((s) => s.setStyle);
+  return { style, setStyle };
+}
 
 export function resolveTheme(preference: ThemePreference, dark: boolean): 'light' | 'dark' {
   return preference === 'system' ? (dark ? 'dark' : 'light') : preference;

@@ -15,6 +15,8 @@ import MfaSection from '@/components/settings/MfaSection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
 import SupportAccessSection from '@/components/settings/SupportAccessSection';
 import UsageSection from '@/components/settings/UsageSection';
+import StylePicker from '@/components/settings/StylePicker';
+import { useStylePreference, useThemeStore } from '@/hooks/useThemePreference';
 import {
   listOfflinePacks,
   deleteOfflinePack,
@@ -66,12 +68,15 @@ const SettingsPage: React.FC = () => {
   
   // [Gate G10-UX] UX-8 テーマはこの端末にすぐ当てる(以前はサーバーに保存するだけで、画面には何も効いていなかった)
   const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
+  // [Gate G11] 見た目の系統(保存の内容に今の系統を入れ、古い値でアカウントを上書きしない)
+  const { style: uiStyle } = useStylePreference();
   const [preferences, setPreferences] = useState({
     language: 'ja',
     timezone: 'Asia/Tokyo',
     currency: 'JPY',
     theme: 'light',
-    travel_style: 'balanced'
+    travel_style: 'balanced',
+    ui_style: uiStyle as string,
   });
 
   // [Gate #20] 以前は保存ボタンがsetTimeoutで成功を偽装するだけで、
@@ -359,6 +364,8 @@ const SettingsPage: React.FC = () => {
               <option value="auto">システム設定に従う</option>
             </select>
           </div>
+
+          <StylePicker onChange={(v) => setPreferences((prev) => ({ ...prev, ui_style: v }))} />
         </div>
       </div>
 
@@ -667,6 +674,7 @@ const SettingsPage: React.FC = () => {
           bio: profileData.bio,
           notification_settings: notificationSettings,
           ...preferences,
+          ui_style: useThemeStore.getState().style,
         },
       });
       if (emailChanging) {

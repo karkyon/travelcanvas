@@ -929,7 +929,7 @@ const PlannerPage: React.FC = () => {
           ) : activeDay ? (
             <>
               {showMap && (
-                <div className="mb-4">
+                <div className="mb-4 tc-map-frame">
                   <PlanMap
                     day={activeDay}
                     candidates={searchResults}

@@ -250,8 +250,9 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | 段階 | branch | 内容 | 状態 |
 |---|---|---|---|
 | 1 Media | gate/g11-media | migration `a7c3e5f9b2d4`(§1 の全て)・表紙の API・TripCover の写真・CoverPhotoDialog・位置の調整・試験 | **完了**: PR #9、CI 5ジョブ合格、main `b21e47b`(新しい clone で tree 一致)。DOC-10 r23。omega-dev2 は未反映 |
-| 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24 |
-| 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-discover-trace.md`、`docs/adr/ADR-media-providers.md`)。DOC-10 r25 |
-| 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | 未着手 |
+| 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | **完了**: PR #11、CI 5ジョブ合格、main `ee4368c`(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24。omega-dev2 は未反映 |
+| 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | **完了**: PR #12、CI 5ジョブ合格(run 40683118167・40683094584)、main `4525c0e`(tree 一致)。DOC-10 r25。omega-dev2 は未反映 |
+| 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-style-trace.md`)。migration なし・DOC-10 の変更なし |
+| 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→旅程の下書き)・信頼の状態の表示・provider 未接続の表示(2026-10-29 の統合ハンドオフ §3・§4 の範囲 B。§3.5 に仕様を足す) | 未着手 |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。

@@ -26,6 +26,7 @@
 | [gate-g11-discover-trace.md](gate-g11-discover-trace.md) | Gate G11-Discover トレース(G11 の段階3: 発見・SNS・外部の写真・予定の写真) | 1 | 0 | 0 |
 | [gate-g11-media-trace.md](gate-g11-media-trace.md) | Gate G11-Media トレース(G11 の段階1: 旅行の表紙の写真) | 2 | 0 | 0 |
 | [gate-g11-planner-trace.md](gate-g11-planner-trace.md) | Gate G11-Planner トレース(G11 の段階2: 旅程の画面) | 1 | 0 | 0 |
+| [gate-g11-style-trace.md](gate-g11-style-trace.md) | Gate G11-Style トレース(G11 の段階4: 見た目の系統) | 0 | 0 | 0 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-g4-trace.md](gate-g4-trace.md) | Gate G4 トレース(機能: 外部の判断の要らない残り) | 1 | 1 | 0 |

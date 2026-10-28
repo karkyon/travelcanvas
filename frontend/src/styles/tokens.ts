@@ -237,3 +237,153 @@ export function safeAccent(hex: string | null | undefined, background: string = 
   }
   return color.ink900;
 }
+
+
+// ===================================================================== [Gate G11] 見た目の系統(仕様 §3.4)
+
+export { STYLE_IDS, isStyleId, type StyleId } from './styleIds';
+import type { StyleId } from './styleIds';
+
+export const STYLE_META: Record<StyleId, { label: string; description: string }> = {
+  standard: { label: '標準', description: 'これまでの見た目(青緑の強調色・白い地)' },
+  atlas: { label: 'Atlas', description: '地図の紙のような落ち着いた地と、深い緑の強調色。角は大きめ' },
+  editorial: { label: 'Editorial', description: '温かい紙の地と、こげ茶の強調色。見出しを明朝体にして読み物のように' },
+  daylight: { label: 'Daylight', description: '明るい空色の地と青の強調色。文字を太め・ボタンを大きく(当日の画面向け)' },
+  studio: { label: 'Studio', description: '静かな灰色の地と藍の強調色。地図の枠だけを軽いすりガラスに' },
+};
+
+interface StylePalette {
+  accent: string;
+  accentStrong: string;
+  accentSoft: string;
+  onAccent: string;
+}
+
+export interface StyleTokens {
+  /** 明るい時のページの地(--tc-cloud-50)。面(カード)の地は白のまま */
+  page: string;
+  light: StylePalette;
+  dark: StylePalette;
+  radiusLg?: string;
+  radiusXl?: string;
+  /** 見出し(h1〜h3)を --tc-font-display にする */
+  displayHeadings?: boolean;
+  /** ボタン(.tc-btn)の最小の高さと、本文を太めにする */
+  controlMin?: string;
+  /** 地図の枠(.tc-map-frame)だけを軽いすりガラスの縁にする */
+  glassMapFrame?: boolean;
+}
+
+export const STYLE_TOKENS: Record<Exclude<StyleId, 'standard'>, StyleTokens> = {
+  atlas: {
+    page: '#f5f4ee',
+    light: { accent: '#385a55', accentStrong: '#2b4642', accentSoft: '#e6efec', onAccent: '#ffffff' },
+    dark: { accent: '#8fc2b0', accentStrong: '#a9d4c5', accentSoft: '#142a24', onAccent: '#0b1220' },
+    radiusLg: '16px',
+    radiusXl: '20px',
+  },
+  editorial: {
+    page: '#f7f3f0',
+    light: { accent: '#65463a', accentStrong: '#4f362c', accentSoft: '#f3e9e3', onAccent: '#ffffff' },
+    dark: { accent: '#e2b29c', accentStrong: '#ecc6b4', accentSoft: '#2e1d16', onAccent: '#0b1220' },
+    displayHeadings: true,
+  },
+  daylight: {
+    page: '#eef3f8',
+    light: { accent: '#2451a4', accentStrong: '#1b3f82', accentSoft: '#e6eefb', onAccent: '#ffffff' },
+    dark: { accent: '#9cc0f5', accentStrong: '#b8d2f8', accentSoft: '#13254a', onAccent: '#0b1220' },
+    controlMin: '48px',
+  },
+  studio: {
+    page: '#f4f6fa',
+    light: { accent: '#4338ca', accentStrong: '#3730a3', accentSoft: '#eceafd', onAccent: '#ffffff' },
+    dark: { accent: '#a5b4fc', accentStrong: '#c0cafd', accentSoft: '#1e1f4a', onAccent: '#0b1220' },
+    radiusLg: '14px',
+    glassMapFrame: true,
+  },
+};
+
+/** 各系統 × 明暗の文字と地の組み合わせ(全て AA を満たすことを styles.test.ts で確かめる) */
+export function styleTextPairs(): Array<{ name: string; fg: string; bg: string; min: number }> {
+  const out: Array<{ name: string; fg: string; bg: string; min: number }> = [];
+  for (const [id, t] of Object.entries(STYLE_TOKENS)) {
+    const L = t.light;
+    const D = t.dark;
+    const add = (name: string, fg: string, bg: string, min = 4.5) => out.push({ name: `${id}: ${name}`, fg, bg, min });
+    add('本文 / ページの地', color.ink900, t.page);
+    add('補足 / ページの地', color.ink700, t.page);
+    add('弱い文字 / ページの地', color.ink500, t.page);
+    add('強調色の文字 / 白い面', L.accent, color.cloud0);
+    add('強調色の文字 / ページの地', L.accent, t.page);
+    add('主な操作の文字 / 強調色', L.onAccent, L.accent);
+    add('主な操作の文字 / 強い強調色', L.onAccent, L.accentStrong);
+    add('強い強調色 / 弱い強調色', L.accentStrong, L.accentSoft);
+    add('フォーカスの枠 / ページの地', color.focus, t.page, 3);
+    add('成功 / ページの地', color.success, t.page);
+    add('注意 / ページの地', color.warning, t.page);
+    add('危険 / ページの地', color.danger, t.page);
+    add('情報 / ページの地', color.info, t.page);
+    add('暗い: 強調色 / 地', D.accent, darkColor.cloud0);
+    add('暗い: 強調色 / 面', D.accent, darkColor.cloud50);
+    add('暗い: 主な操作の文字 / 強調色', D.onAccent, D.accent);
+    add('暗い: 主な操作の文字 / 強い強調色', D.onAccent, D.accentStrong);
+    add('暗い: 強い強調色 / 弱い強調色', D.accentStrong, D.accentSoft);
+    add('暗い: 強調色 / 弱い強調色', D.accent, D.accentSoft);
+  }
+  return out;
+}
+
+export const STYLE_CSS_START = '/* generated:styles:start(tokens.ts の renderStyleCss が作る。手で直さず UPDATE_STYLE_CSS=1 で作り直す) */';
+export const STYLE_CSS_END = '/* generated:styles:end */';
+
+/** 系統ごとの CSS 変数の上書き(tokens.css の generated の部分と一致させる) */
+export function renderStyleCss(): string {
+  const lines: string[] = [STYLE_CSS_START];
+  for (const [id, t] of Object.entries(STYLE_TOKENS)) {
+    const sel = `html[data-style='${id}']`;
+    lines.push(`${sel} {`);
+    lines.push(`  --tc-cloud-50: ${t.page};`);
+    lines.push(`  --tc-accent: ${t.light.accent};`);
+    lines.push(`  --tc-accent-strong: ${t.light.accentStrong};`);
+    lines.push(`  --tc-accent-soft: ${t.light.accentSoft};`);
+    lines.push(`  --tc-on-accent: ${t.light.onAccent};`);
+    if (t.radiusLg) lines.push(`  --tc-radius-lg: ${t.radiusLg};`);
+    if (t.radiusXl) lines.push(`  --tc-radius-xl: ${t.radiusXl};`);
+    if (t.controlMin) lines.push(`  --tc-control-min: ${t.controlMin};`);
+    lines.push('}');
+    lines.push('@media screen {');
+    lines.push(`  ${sel}[data-theme='dark'] {`);
+    lines.push(`    --tc-cloud-50: ${darkColor.cloud50};`);
+    lines.push(`    --tc-accent: ${t.dark.accent};`);
+    lines.push(`    --tc-accent-strong: ${t.dark.accentStrong};`);
+    lines.push(`    --tc-accent-soft: ${t.dark.accentSoft};`);
+    lines.push(`    --tc-on-accent: ${t.dark.onAccent};`);
+    lines.push('  }');
+    lines.push('}');
+    if (t.displayHeadings) {
+      lines.push(`${sel} :is(h1, h2, h3) {`);
+      lines.push('  font-family: var(--tc-font-display);');
+      lines.push('  letter-spacing: 0.01em;');
+      lines.push('}');
+    }
+    if (t.controlMin) {
+      lines.push(`${sel} body {`);
+      lines.push('  font-weight: 500;');
+      lines.push('}');
+      lines.push(`${sel} .tc-btn {`);
+      lines.push('  min-height: var(--tc-control-min);');
+      lines.push('  font-weight: 700;');
+      lines.push('}');
+    }
+    if (t.glassMapFrame) {
+      lines.push(`${sel} .tc-map-frame {`);
+      lines.push('  border-radius: var(--tc-radius-xl);');
+      lines.push('  border: 1px solid var(--tc-glass-border);');
+      lines.push('  box-shadow: var(--tc-glass-shadow);');
+      lines.push('  overflow: hidden;');
+      lines.push('}');
+    }
+  }
+  lines.push(STYLE_CSS_END);
+  return lines.join('\n');
+}
