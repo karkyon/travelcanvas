@@ -16,7 +16,7 @@
 |---|---|
 | 基準commit | `e39d5e7`(Gate G10-Q PR #6。この後に、この版を入れる Gate G10-UX の commit が続く) |
 | Alembic head | `f4d8a2c6e9b1`(単一の head。G7 `e8b2c6d0f4a7` の後、G8 で案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録) |
-| 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 851 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.08 kB(上限 430 kB) |
+| 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 853 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.24 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -235,7 +235,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r19 | 2026-10-26 | `2576a91` | **Gate G7: 移動・滞在の既定・休憩の自動判定・日ごとの疲れ・最終の便(MOVE-03)・目的の内訳・条件の変更・選んだ予定だけの採用(MOVE-04)・同じ同行者と移動手段の傾向(MEM-03)・日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグ(FR-005)・本案と案の比較(FR-019)・猶予つきのアカウントの削除(FR-039)。FR-005・FR-057 を VERIFIED。FR-017 は時刻表の照合だけが残る。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま。`docs/trace/gate-g7-trace.md` |
 | r20 | 2026-10-27 | `083e6b1` | Gate G8: 案の中の移動区間・予約の変更と選んだ変更だけの採用・予約の取消の手続き(FR-019)・所有者の移譲(FR-021・FR-039)・出典・確認・履歴つきの訂正と所有者への訂正の申し出(FR-039)・定期の処理の実行の記録と遅れ・失敗の監視・2つの端末の同時の編集の E2E(FR-004)・訪問の訂正の証拠の整理(FR-051)。FR-004・FR-019・FR-039・FR-051 を VERIFIED。Gate G9 前半: 最初に読む JS の上限 430kB(Q03)・今の6画面の記録と壊してはいけない所の E2E(UX-0)・デザインの決まり(UX-1)。`docs/trace/gate-g8-trace.md` |
 | r21 | 2026-10-28 | `3c23828` | Gate G10-Q: V3 再監査(`scripts/ci/audit_v3.py` の R1〜R8。誤った VERIFIED 0、FR-001・002・006・044 の E2E に FR 番号を記載)・account-deletion の E2E の不安定の根治(削除の後の 401 で /login へ移さない)・mypy 1,382 → 0・毎晩の perf の修正・計算の確認の最初の1回を点数にしない。FR の状態の遷移なし。`docs/trace/gate-g10q-trace.md` |
-| **r22** | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
+| **r22** | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面・issue #7(オフラインの書き込みで共通の「ネットワークエラー」と「端末に保存」が食い違う)。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

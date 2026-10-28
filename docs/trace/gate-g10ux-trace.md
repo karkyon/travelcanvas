@@ -19,6 +19,7 @@ E2E = `frontend/e2e/gate-g10-ux.spec.ts`、UXB = `frontend/e2e/ux-baseline.spec.
 | 4 | 主な9画面(ダッシュボード・プランナー・今日・予約・共有・準備・費用・データとプライバシー・設定)を暗い見た目の 1440px・360px で開き、地が暗い・横にはみ出さない・axe 違反 0。読み直しても続く | IMPLEMENTED | E2E |
 | 5 | 印刷(しおり)は白い紙のまま(暗い見た目は `@media screen` だけ。しおりの部品は置き換えの対象外) | IMPLEMENTED | `styles/tokens.css`、`styles/darkBridge.ts` |
 | 4b | 暗い見た目で地が明るいままの画面があった: `[data-theme=dark]` は `<html>` を塗るが、`index.css` の `body` が明るい地(#f9fafb)を自分で塗って隠していた(E2E の「地が暗くない」で検出)→ 暗い見た目では `body` も塗り直す(印刷は対象外のまま) | IMPLEMENTED | `styles/tokens.css`、E2E |
+| 4c | issue #7(CI の `offline-sync.spec.ts` が再試行で合格): 通信できない時の予定の削除・変更で、API の共通処理が「ネットワークエラー」を出し、続けて画面が「端末に保存しました」と出す食い違い。削除ごとに積み重なった通知がクリックした位置の下へ届くと、通知が止まり(hover で一時停止)同期の通知が消えなかった → 端末に溜める5つの書き込み(日程の追加・予定の追加・変更・削除・並べ替え)は応答の無い失敗だけ共通の表示を出さない(`offlineQueueable`。サーバーが答えた失敗は従来どおり・溜められない時は画面が失敗を伝える) | IMPLEMENTED | `services/api/core.ts`・`endpoints/plans.ts`、`services/api/core.silent.test.ts`、`e2e/offline-sync.spec.ts`(10 回連続合格) |
 | 5b | 最初に読む JS を上限(430 kB)の内に保つ: 根の ThemeRoot が `theme-color` のために色の一覧(tokens.ts、4.5 kB)全体を最初の読み込みへ入れていた → 地の2色だけを `styles/themeColor.ts` に分け、tokens.ts もその値を使う(正本は1か所)。431.07 → 426.08 kB | IMPLEMENTED | `styles/themeColor.ts`、`scripts/ci/check_bundle_budget.py`、TR・TK |
 
 ## UX-6 共通の部品をデザインの決まりへ

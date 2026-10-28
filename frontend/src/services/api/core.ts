@@ -19,6 +19,12 @@ import { errorSupportId } from '@/utils/apiErrorDetail';
 declare module 'axios' {
   interface AxiosRequestConfig {
     skipGlobalErrorHandler?: boolean;
+    /**
+     * [Gate G10-UX] 通信できない時は呼び出し側(planStore)が変更を端末に溜めて「端末に保存しました」と伝える書き込み。
+     * 応答の無い失敗だけ共通の「ネットワークエラー」の表示を出さない(溜めたのに失敗と出る食い違いと、通知の積み重ねを防ぐ)。
+     * サーバーが答えた失敗(409・403・500 など)は従来どおり。溜められなかった時は呼び出し側が自分で失敗を伝える。
+     */
+    offlineQueueable?: boolean;
   }
 }
 
@@ -281,7 +287,8 @@ export class ApiCore {
         // 共通のトースト「アクセス権限がありません」を出さない(各画面が理由を示す。旅程の画面は上部の知らせ)
         const hiddenByOwner = error.response?.status === 403 &&
           (error.response.data as { detail?: { code?: unknown } } | undefined)?.detail?.code === 'member_field_hidden';
-        if (!originalRequest?.skipGlobalErrorHandler && !hiddenByOwner) {
+        const queuedByCaller = originalRequest?.offlineQueueable === true && !error.response;
+        if (!originalRequest?.skipGlobalErrorHandler && !hiddenByOwner && !queuedByCaller) {
           this.handleApiError(error);
         }
         return Promise.reject(error);

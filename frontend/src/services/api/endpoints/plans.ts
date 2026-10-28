@@ -114,7 +114,7 @@ export class PlansApi extends SpotsApi {
     idempotencyKey: string
   ): Promise<NormalizedDay> {
     const response = await this.client.post(
-      `/plans/${planId}/days`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+      `/plans/${planId}/days`, data, { headers: { 'Idempotency-Key': idempotencyKey }, offlineQueueable: true }
     );
     return decodeResponse(response.data, normalizedDay, 'POST /plans/{plan_id}/days');
   }
@@ -149,7 +149,7 @@ export class PlansApi extends SpotsApi {
     idempotencyKey: string
   ): Promise<NormalizedEvent> {
     const response = await this.client.post(
-      `/plans/${planId}/events`, data, { headers: { 'Idempotency-Key': idempotencyKey } }
+      `/plans/${planId}/events`, data, { headers: { 'Idempotency-Key': idempotencyKey }, offlineQueueable: true }
     );
     return decodeResponse(response.data, normalizedEvent, 'POST /plans/{plan_id}/events');
   }
@@ -164,14 +164,14 @@ export class PlansApi extends SpotsApi {
     ifMatch: number
   ): Promise<NormalizedEvent> {
     const response = await this.client.put(
-      `/plans/${planId}/events/${eventId}`, data, { headers: { 'If-Match': String(ifMatch) } }
+      `/plans/${planId}/events/${eventId}`, data, { headers: { 'If-Match': String(ifMatch) }, offlineQueueable: true }
     );
     return decodeResponse(response.data, normalizedEvent, 'PUT /plans/{plan_id}/events/{event_id}');
   }
 
   async deleteEvent(planId: string, eventId: string, ifMatch: number): Promise<ItemDeleteResult> {
     const response = await this.client.delete(
-      `/plans/${planId}/events/${eventId}`, { headers: { 'If-Match': String(ifMatch) } }
+      `/plans/${planId}/events/${eventId}`, { headers: { 'If-Match': String(ifMatch) }, offlineQueueable: true }
     );
     return decodeResponse(response.data, itemDeleteResult, 'DELETE /plans/{plan_id}/events/{event_id}');
   }
@@ -183,7 +183,7 @@ export class PlansApi extends SpotsApi {
   ): Promise<NormalizedEvent> {
     const response = await this.client.post(
       `/plans/${planId}/events/${eventId}/move`, data,
-      { headers: { 'If-Match': String(ifMatch), 'Idempotency-Key': idempotencyKey } }
+      { headers: { 'If-Match': String(ifMatch), 'Idempotency-Key': idempotencyKey }, offlineQueueable: true }
     );
     return decodeResponse(response.data, normalizedEvent, 'POST /plans/{plan_id}/events/{event_id}/move');
   }
