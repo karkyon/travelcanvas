@@ -51,6 +51,10 @@ interface ScheduleItemProps {
   arrival?: ArrivalLeg | null;
   /** [Gate G11] 営業時間の照合の帯 */
   hours?: HoursBadge | null;
+  /** [Gate G11] 予定のカードの写真(一時の URL)と出典 */
+  image?: { src: string; credit: string | null } | null;
+  /** [Gate G11] 予定の写真を選ぶ(編集できる人だけ) */
+  onPhoto?: (id: string) => void;
 }
 
 const ScheduleItem: React.FC<ScheduleItemProps> = ({
@@ -87,6 +91,8 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   style,
   arrival,
   hours,
+  image,
+  onPhoto,
 }) => {
   void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -185,8 +191,15 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
       )}
 
       {/* Main Content */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+      <div className="flex items-start justify-between gap-3">
+        {/* [Gate G11] 予定のカードの写真(非公開の記録を権限付きで読んだ一時の URL) */}
+        {image && (
+          <figure className="m-0 w-20 shrink-0 sm:w-28" data-testid="schedule-image">
+            <img src={image.src} alt="" className="aspect-[4/3] w-full rounded-md object-cover" />
+            {image.credit && <figcaption className="mt-0.5 text-[10px] leading-tight text-ink-700 break-words">{image.credit}</figcaption>}
+          </figure>
+        )}
+        <div className="flex-1 min-w-0">
           {/* Time and Title */}
           <div className="flex items-center gap-3 mb-2">
             <div className="flex items-center gap-1 text-sm font-semibold text-ink-700">
@@ -278,6 +291,21 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           >
             <Edit3 size={14} />
           </button>
+          {onPhoto && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPhoto(id);
+              }}
+              className="p-1 text-ink-700 hover:bg-cloud-100 rounded-sm transition-colors"
+              title="写真"
+              aria-label="この予定の写真を選ぶ"
+              data-testid={`schedule-photo-${id}`}
+            >
+              🖼
+            </button>
+          )}
           {onComment && (
             <button
               type="button"

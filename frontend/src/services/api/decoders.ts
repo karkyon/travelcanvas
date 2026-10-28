@@ -1873,7 +1873,7 @@ export const visitCorrectionResult: Decoder<VisitCorrectionResult> = object<Visi
 // ===== [Gate C2] 候補箱(FR-007)・場所の一元管理(FR-008) =====
 const candidateStatus = oneOf('open', 'scheduled', 'dismissed');
 const planCandidateItem: Decoder<PlanCandidateItem> = object<PlanCandidateItem>({
-  id: str, title: str, note: nullable(str), source_kind: oneOf('url', 'text', 'manual', 'search'),
+  id: str, title: str, note: nullable(str), source_kind: oneOf('url', 'text', 'manual', 'search', 'social'),
   source_url: nullable(str), source_label: nullable(str), provider: nullable(str), retrieved_at: nullable(str),
   place_id: nullable(str), category: nullable(str), address: nullable(str), latitude: nullable(num),
   longitude: nullable(num), priority: int, status: candidateStatus, status_label: str,

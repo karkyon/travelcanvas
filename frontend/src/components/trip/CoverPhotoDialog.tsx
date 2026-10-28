@@ -17,6 +17,8 @@ import { clearPlanCover, setPlanCover } from '@/services/api/g11';
 import type { PlanCover } from '@/services/api/types/g11';
 import type { TravelMemory } from '@/services/api/types/memories';
 import { bumpCover, creditOf } from '@/hooks/useCoverPhoto';
+import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
+import { getMediaProviderStatus } from '@/services/api/g11discover';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 
@@ -119,6 +121,16 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // [Gate G11] 外部の写真(provider が止めてあれば項目ごと出さない)
+  const [externalEnabled, setExternalEnabled] = useState(false);
+  const [picker, setPicker] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let active = true;
+    getMediaProviderStatus().then((s) => { if (active) setExternalEnabled(s.image_providers.length > 0); })
+      .catch(() => { if (active) setExternalEnabled(false); });
+    return () => { active = false; };
+  }, [isOpen]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -202,7 +214,16 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
 
   const limit = maxBytes ? sizeLabel(maxBytes) : null;
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="旅行の表紙の写真" size="xl">
+    <>
+    <ExternalPhotoPicker isOpen={isOpen && picker} onClose={() => setPicker(false)} planId={planId}
+      initialQuery={destination || tripTitle} purposeLabel="旅行の表紙"
+      onImported={(m) => {
+        setPhotos((prev) => [...(prev ?? []), m]);
+        setSelected(m.id);
+        setPos({ focus_x: 50, focus_y: 50, zoom: 100 });
+        setNotice('外部の写真をこの旅行内に非公開(自分だけ)で取り込みました。作者・ライセンスは表紙に表示します');
+      }} />
+    <Modal isOpen={isOpen && !picker} onClose={onClose} title="旅行の表紙の写真" size="xl">
       <div className="space-y-5" data-testid="cover-photo-dialog">
         {error && <p role="alert" className="rounded-md bg-danger-soft p-3 text-sm text-danger">{error}</p>}
         {notice && <p role="status" className="rounded-md bg-success-soft p-3 text-sm text-success">{notice}</p>}
@@ -233,6 +254,15 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
           <Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy}
             onClick={() => fileRef.current?.click()}>写真のファイルを選ぶ</Button>
         </section>
+
+        {externalEnabled && (
+          <section aria-labelledby="cover-external-title">
+            <h3 id="cover-external-title" className="text-sm font-semibold text-ink-900">外部の写真を探す</h3>
+            <p className="mt-1 text-xs text-ink-700">作者・ライセンスが分かる写真(CC0・パブリックドメイン・CC BY・CC BY-SA)だけを取り込めます。</p>
+            <Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy}
+              onClick={() => setPicker(true)} data-testid="cover-external">外部の写真を探す</Button>
+          </section>
+        )}
 
         {selected && (
           <section aria-labelledby="cover-adjust-title" className="space-y-3">
@@ -275,6 +305,7 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
         </div>
       </div>
     </Modal>
+    </>
   );
 };
 

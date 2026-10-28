@@ -23,11 +23,27 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 
 class SearchSpotsBody(BaseModel):
-    query: str
+    query: str = ""
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     radius_km: float = 5.0
     max_results: int = 20
+    # [Gate G11] 近くの検索のカテゴリ(all・food・market・shopping・viewpoint)
+    category: str = "all"
+
+
+# [Gate G11] 半径を保証できる provider(座標の周りを探す)。他は「周辺優先」で、半径の内と言い切らない
+RADIUS_GUARANTEED = frozenset({"overpass"})
+
+
+def _distance(c: SearchCandidate, body: "SearchSpotsBody") -> dict:
+    from app.services.route_estimator import haversine_km
+
+    if body.latitude is None or body.longitude is None or c.latitude is None or c.longitude is None:
+        return {"distance_m": None, "within_radius": None, "radius_guaranteed": c.provider in RADIUS_GUARANTEED}
+    d = haversine_km(body.latitude, body.longitude, c.latitude, c.longitude) * 1000
+    return {"distance_m": round(d), "within_radius": d <= body.radius_km * 1000,
+            "radius_guaranteed": c.provider in RADIUS_GUARANTEED}
 
 
 def _candidate_to_dict(c: SearchCandidate) -> dict:
@@ -59,11 +75,21 @@ async def search_spots(
     返す。かつてfrontendに存在した「0件やエラー時にMath.random()で
     架空のスポットを生成して返す」という挙動はここには一切存在しない。
     """
-    if not body.query or not body.query.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="queryは必須です")
+    from app.services.search_provider import CATEGORIES
 
+    if body.category not in CATEGORIES:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "カテゴリが不正です"})
+    if not (body.query or "").strip() and body.category == "all":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="queryは必須です")
+    if body.category != "all" and (body.latitude is None or body.longitude is None):
+        raise HTTPException(status_code=422, detail={"code": "invalid_field",
+                                                     "message": "カテゴリで探す時は、探す基点(緯度・経度)を指定してください"})
+    if not 0.1 <= body.radius_km <= 20:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "半径は0.1〜20kmで指定してください"})
+
+    extra = {"category": body.category} if body.category != "all" else {}  # 「すべて」は以前と同じ呼び方
     raw_results = await search_all_providers(
-        body.query.strip(), body.latitude, body.longitude, body.radius_km
+        (body.query or "").strip(), body.latitude, body.longitude, body.radius_km, **extra
     )
     raw_results = raw_results[: max(1, min(body.max_results, 50))]
 
@@ -71,7 +97,7 @@ async def search_spots(
     for r in raw_results:
         candidate = SearchCandidate(
             id=uuid.uuid4(),
-            query=body.query.strip(),
+            query=(body.query or "").strip() or f"category:{body.category}",
             provider=r["provider"],
             external_id=r.get("external_id"),
             name=r["name"],
@@ -102,8 +128,12 @@ async def search_spots(
 
     return {
         "query": body.query,
+        "category": body.category,
+        "radius_km": body.radius_km,
+        "base": ({"latitude": body.latitude, "longitude": body.longitude}
+                 if body.latitude is not None and body.longitude is not None else None),
         "total": len(candidates),
-        "candidates": [_candidate_to_dict(c) for c in candidates],
+        "candidates": [{**_candidate_to_dict(c), **_distance(c, body)} for c in candidates],
     }
 
 

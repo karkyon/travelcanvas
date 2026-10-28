@@ -11,6 +11,11 @@ const { getMemories, getMemoryMedia, uploadMemory, setPlanCover, clearPlanCover,
 }));
 vi.mock('@/services/api', () => ({ getMemories, getMemoryMedia, uploadMemory }));
 vi.mock('@/services/api/g11', () => ({ setPlanCover, clearPlanCover, getPlanCoverMedia }));
+// [Gate G11] 段階3: 外部の写真の提供元(この試験では止めてある → 項目を出さない)
+vi.mock('@/services/api/g11discover', () => ({
+  getMediaProviderStatus: vi.fn().mockResolvedValue({ image_providers: [], social_providers: [] }),
+  searchExternalImages: vi.fn(), getExternalThumb: vi.fn(), importExternalImage: vi.fn(),
+}));
 
 import { MemoryRouter } from 'react-router-dom';
 import TripCover from './TripCover';

@@ -277,8 +277,28 @@ async def upload_memory(
         ops_metrics.registry.count_security_event("upload_too_large")
         limit_mb = settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)
         raise _bad("file_too_large", f"ファイルが大きすぎます(上限 {limit_mb}MB)", 413)
+    m = _store_media(request, db, plan, current_user, kind, file.filename or "", content, f, include_in_journal)
+    _audit("memory.create", current_user, m, {"size": m.size})
+    return _to_dict(m, current_user, plan, _names(db, plan))
+
+
+async def save_photo(request: Optional[Request], db: Session, plan: TravelPlan, user: User, content: bytes,
+                     filename: str, *, body: Optional[str] = None, event_id: Optional[str] = None,
+                     source: Optional[Dict[str, Any]] = None, include_in_journal: bool = False) -> Memory:
+    """[Gate G11] 外部から取り込んだ写真を、上げた写真と同じ検査(形式・先頭の中身・ウイルス・撮影情報の除去)と暗号化で、
+    非公開(自分だけ)の記録として保存する。出典(source)を記録に残す。"""
+    _count_check(db, plan)
+    f = _common_fields(db, plan, "photo", (body or "")[:mem.MAX_BODY] or None, event_id, None, None, None, None, None,
+                       "private")
+    return _store_media(request, db, plan, user, "photo", filename, content, f, include_in_journal, source=source)
+
+
+def _store_media(request: Optional[Request], db: Session, plan: TravelPlan, current_user: User, kind: str,
+                 filename: str, content: bytes, f: Dict[str, Any], include_in_journal: bool,
+                 source: Optional[Dict[str, Any]] = None) -> Memory:
+    """記録のファイルの検査・保存の共通の処理(上げた写真・音声と、外部から取り込んだ写真)"""
     try:
-        ext, mime_type = mem.validate_media(kind, file.filename or "", content,
+        ext, mime_type = mem.validate_media(kind, filename, content,
                                             settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
     except mem.MemoryInputError as e:
         raise _bad(e.code, str(e), 413 if e.code == "file_too_large" else 422)
@@ -313,7 +333,7 @@ async def upload_memory(
         raise _bad("storage_failed", "ファイルの保存に失敗しました。しばらくしてから再試行してください", 503)
     m = Memory(plan_id=plan.id, author_user_id=current_user.id, kind=kind, storage_key=storage_key,
                mime_type=mime_type, size=len(content), sha256=compute_sha256(content),
-               include_in_journal=include_in_journal, **f)
+               include_in_journal=include_in_journal, source=source, **f)
     db.add(m)
     try:
         db.commit()
@@ -322,8 +342,7 @@ async def upload_memory(
         backend.delete(storage_key)
         raise
     db.refresh(m)
-    _audit("memory.create", current_user, m, {"size": m.size})
-    return _to_dict(m, current_user, plan, _names(db, plan))
+    return m
 
 
 @router.patch("/{plan_id}/memories/{memory_id}")

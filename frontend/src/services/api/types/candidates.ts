@@ -4,7 +4,7 @@
  * [Gate C2] backend/app/api/v1/candidates.py・places.py に対応する。
  */
 export type CandidateStatus = 'open' | 'scheduled' | 'dismissed';
-export type CandidateSourceKind = 'url' | 'text' | 'manual' | 'search';
+export type CandidateSourceKind = 'url' | 'text' | 'manual' | 'search' | 'social';  // [Gate G11] social = SNS の投稿
 export type DuplicateReason = 'same_provider_id' | 'same_name' | 'nearby' | 'same_address' | 'same_url';
 
 export interface PlanCandidateItem {
@@ -54,6 +54,10 @@ export interface CandidateInput {
   latitude?: number | null;
   longitude?: number | null;
   priority?: number;
+  /** [Gate G11] SNS の投稿の確認(social-preview)の後に保存する時 */
+  source_kind?: 'social';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | null;
+  retrieved_at?: string | null;
 }
 
 export interface CandidatePatch extends Omit<CandidateInput, 'priority' | 'source_url'> {

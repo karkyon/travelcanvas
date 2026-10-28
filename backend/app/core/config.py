@@ -282,6 +282,11 @@ class Settings(BaseSettings):
     MALWARE_SCAN_TIMEOUT_SECONDS: float = 30.0
     # true にすると、検査できなかったファイルは受け付けず、clean と確認できた文書だけを配る
     DOCUMENT_REQUIRE_CLEAN_SCAN: bool = False
+    # [Gate G11] 外部の画像・SNS の provider(カンマ区切り。空にすると止まり、画面はその項目を出さない。
+    # docs/ux/G11_UIUX全範囲_実装仕様.md §5)。Instagram の oEmbed は鍵がある時だけ使う
+    IMAGE_PROVIDERS: str = "wikimedia_commons"
+    SOCIAL_PROVIDERS: str = "youtube_oembed,tiktok_oembed"
+    SOCIAL_INSTAGRAM_OEMBED_TOKEN: str = ""
 
     # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
     # 文書の上限 + 余白(multipart の区切り等)まで受ける。
