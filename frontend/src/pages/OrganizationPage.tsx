@@ -35,7 +35,7 @@ function branding(org: Organization): { hasLogo: boolean; logoVersion: string | 
   };
 }
 
-const sectionClass = 'bg-white rounded-xl shadow-xs p-6 mb-6';
+const sectionClass = 'bg-surface rounded-xl shadow-xs p-6 mb-6';
 const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg';
 const btn = 'px-3 py-2 rounded-lg text-sm disabled:opacity-50';
 // [Gate G2] 送信の状態の表示(dead: 自動の再送の上限に達した。手で送り直せる)
@@ -127,27 +127,27 @@ const OrganizationPage: React.FC = () => {
         <Link to="/organizations" className="text-blue-800 hover:underline">← 組織の一覧</Link>
         <div className="flex items-center gap-3 mt-2">
           {branding(org).hasLogo && <OrgLogo orgId={orgId} version={branding(org).logoVersion} />}
-          <h1 className="text-3xl font-bold text-gray-900">{org.name}</h1>
+          <h1 className="text-3xl font-bold text-ink-900">{org.name}</h1>
         </div>
-        <p className="text-gray-700 mb-6">{ROLE_LABEL[org.role]}・メンバー {org.member_count}人</p>
+        <p className="text-ink-700 mb-6">{ROLE_LABEL[org.role]}・メンバー {org.member_count}人</p>
         {error && <p role="alert" className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 border border-red-200">{error}</p>}
         {notice && <p role="status" className="mb-4 p-3 rounded-lg bg-green-50 text-green-900 border border-green-200">{notice}</p>}
 
         <section className={sectionClass} aria-labelledby="dist-heading">
-          <h2 id="dist-heading" className="text-lg font-semibold text-gray-900 mb-3">配布されている旅程</h2>
+          <h2 id="dist-heading" className="text-lg font-semibold text-ink-900 mb-3">配布されている旅程</h2>
           {dists.length === 0 ? (
-            <p className="text-gray-700">まだ配布されている旅程はありません。</p>
+            <p className="text-ink-700">まだ配布されている旅程はありません。</p>
           ) : (
             <ul className="space-y-3">
               {dists.map((d) => (
                 <li key={d.id} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium text-gray-900">{d.title}</p>
-                    <p className="text-sm text-gray-700">
+                    <p className="font-medium text-ink-900">{d.title}</p>
+                    <p className="text-sm text-ink-700">
                       版{d.version}・{fmtDateTime(d.published_at)}
                       {d.change_note ? `・${d.change_note}` : ''}
                     </p>
-                    <p className="text-sm text-gray-800">
+                    <p className="text-sm text-ink-900">
                       {d.ack_status
                         ? `確認 ${d.ack_status.acknowledged_latest}/${d.ack_status.members}人(未確認 ${d.ack_status.pending}人)`
                         : myAckLabel(d)}
@@ -169,8 +169,8 @@ const OrganizationPage: React.FC = () => {
               logoVersion={branding(org).logoVersion} seatLimit={branding(org).seatLimit} memberCount={org.member_count}
               onChanged={load} />
             <section className={sectionClass} aria-labelledby="publish-heading">
-              <h2 id="publish-heading" className="text-lg font-semibold text-gray-900 mb-2">旅程を配布する</h2>
-              <p className="text-sm text-gray-700 mb-3">
+              <h2 id="publish-heading" className="text-lg font-semibold text-ink-900 mb-2">旅程を配布する</h2>
+              <p className="text-sm text-ink-700 mb-3">
                 配布するのは、旅行名・目的地・期間・説明・日程の見出し・予定名・種類・時刻だけです。予約・予約番号・住所・メモ・位置は配布しません。
                 メンバーは確認でき、自分の旅行として複製できます(後の改訂で、複製した旅行は変わりません)。
               </p>
@@ -181,7 +181,7 @@ const OrganizationPage: React.FC = () => {
                 }), '配布しました', '配布できませんでした').then(() => setPublish({ plan_id: '', title: '', change_note: '' }));
               }}>
                 <div>
-                  <label htmlFor="publish-plan" className="block text-sm font-medium text-gray-800 mb-1">配布する旅行(自分の旅行)</label>
+                  <label htmlFor="publish-plan" className="block text-sm font-medium text-ink-900 mb-1">配布する旅行(自分の旅行)</label>
                   <select id="publish-plan" value={publish.plan_id} onChange={(e) => setPublish({ ...publish, plan_id: e.target.value })}
                     className={inputClass} required>
                     <option value="">選んでください</option>
@@ -189,12 +189,12 @@ const OrganizationPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="publish-title" className="block text-sm font-medium text-gray-800 mb-1">配布の題名(任意。空なら旅行名)</label>
+                  <label htmlFor="publish-title" className="block text-sm font-medium text-ink-900 mb-1">配布の題名(任意。空なら旅行名)</label>
                   <input id="publish-title" value={publish.title} maxLength={200} onChange={(e) => setPublish({ ...publish, title: e.target.value })}
                     className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="publish-note" className="block text-sm font-medium text-gray-800 mb-1">説明(任意)</label>
+                  <label htmlFor="publish-note" className="block text-sm font-medium text-ink-900 mb-1">説明(任意)</label>
                   <input id="publish-note" value={publish.change_note} maxLength={500}
                     onChange={(e) => setPublish({ ...publish, change_note: e.target.value })} className={inputClass} />
                 </div>
@@ -205,13 +205,13 @@ const OrganizationPage: React.FC = () => {
             </section>
 
             <section className={sectionClass} aria-labelledby="members-heading">
-              <h2 id="members-heading" className="text-lg font-semibold text-gray-900 mb-3">メンバー</h2>
+              <h2 id="members-heading" className="text-lg font-semibold text-ink-900 mb-3">メンバー</h2>
               <ul className="space-y-2 mb-4">
                 {members.map((m) => (
                   <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-200 rounded-lg p-3">
                     <div>
-                      <p className="font-medium text-gray-900">{m.username ?? '(退会済み)'}</p>
-                      <p className="text-sm text-gray-700">{m.email}</p>
+                      <p className="font-medium text-ink-900">{m.username ?? '(退会済み)'}</p>
+                      <p className="text-sm text-ink-700">{m.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {org.role === 'owner' ? (
@@ -225,7 +225,7 @@ const OrganizationPage: React.FC = () => {
                           </select>
                         </>
                       ) : (
-                        <span className="text-sm text-gray-800">{ROLE_LABEL[m.role]}</span>
+                        <span className="text-sm text-ink-900">{ROLE_LABEL[m.role]}</span>
                       )}
                       <button type="button" disabled={busy} aria-label={`${m.username ?? 'メンバー'} を組織から外す`}
                         onClick={() => {
@@ -245,12 +245,12 @@ const OrganizationPage: React.FC = () => {
                   .then(() => setInvite({ email: '', role: 'member' }));
               }}>
                 <div className="flex-1 min-w-[200px]">
-                  <label htmlFor="member-email" className="block text-sm font-medium text-gray-800 mb-1">会員のメールアドレス</label>
+                  <label htmlFor="member-email" className="block text-sm font-medium text-ink-900 mb-1">会員のメールアドレス</label>
                   <input id="member-email" type="email" value={invite.email} required
                     onChange={(e) => setInvite({ ...invite, email: e.target.value })} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="member-role" className="block text-sm font-medium text-gray-800 mb-1">役割</label>
+                  <label htmlFor="member-role" className="block text-sm font-medium text-ink-900 mb-1">役割</label>
                   <select id="member-role" value={invite.role} onChange={(e) => setInvite({ ...invite, role: e.target.value as 'member' | 'admin' })}
                     className="px-3 py-2 border border-gray-300 rounded-lg">
                     <option value="member">メンバー</option>
@@ -264,25 +264,25 @@ const OrganizationPage: React.FC = () => {
             </section>
 
             <section className={sectionClass} aria-labelledby="api-heading">
-              <h2 id="api-heading" className="text-lg font-semibold text-gray-900 mb-2">外部連携</h2>
-              <p className="text-sm text-gray-700 mb-4">
+              <h2 id="api-heading" className="text-lg font-semibold text-ink-900 mb-2">外部連携</h2>
+              <p className="text-sm text-ink-700 mb-4">
                 旅行会社などのシステムが、この組織の配布(写し)を読めるようにします。OAuth 2.0 の client_credentials で
                 1時間のトークンを受け取り、許可したスコープの範囲だけを読めます。個人の旅行・予約・メンバーの個人情報は読めません。
               </p>
 
-              <h3 className="font-semibold text-gray-900 mb-2">API クライアント</h3>
+              <h3 className="font-semibold text-ink-900 mb-2">API クライアント</h3>
               {createdClient?.client_secret && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-lg" role="status">
                   <p className="text-sm text-amber-900 font-medium">
                     秘密は今だけ表示されます。安全な場所に控えてください。{createdClient.secret_version > 1 ? `(版 ${createdClient.secret_version})` : ''}
                   </p>
-                  <p className="text-sm text-gray-900 mt-1">client_id: <code>{createdClient.client_id}</code></p>
-                  <label htmlFor="client-secret" className="block text-sm text-gray-900 mt-1">client_secret</label>
+                  <p className="text-sm text-ink-900 mt-1">client_id: <code>{createdClient.client_id}</code></p>
+                  <label htmlFor="client-secret" className="block text-sm text-ink-900 mt-1">client_secret</label>
                   <input id="client-secret" readOnly value={createdClient.client_secret} className={`${inputClass} font-mono text-sm`} />
                 </div>
               )}
               <div className="mb-3">
-                <label htmlFor="grace-hours" className="block text-sm font-medium text-gray-800 mb-1">
+                <label htmlFor="grace-hours" className="block text-sm font-medium text-ink-900 mb-1">
                   切り替えの猶予(時間)— この間は前の秘密・鍵も使えます(0〜168)
                 </label>
                 <input id="grace-hours" type="number" min={0} max={168} value={graceHours}
@@ -293,10 +293,10 @@ const OrganizationPage: React.FC = () => {
                 {clients?.clients.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-200 rounded-lg p-3 text-sm">
                     <div>
-                      <p className="font-medium text-gray-900">{c.name}{c.revoked_at ? '(止めました)' : ''}</p>
-                      <p className="text-gray-700"><code>{c.client_id}</code>・{c.scopes.join(' ')}
+                      <p className="font-medium text-ink-900">{c.name}{c.revoked_at ? '(止めました)' : ''}</p>
+                      <p className="text-ink-700"><code>{c.client_id}</code>・{c.scopes.join(' ')}
                         {c.last_used_at ? `・最後の利用 ${fmtDateTime(c.last_used_at)}` : '・未使用'}</p>
-                      <p className="text-gray-700">秘密の版 {c.secret_version}
+                      <p className="text-ink-700">秘密の版 {c.secret_version}
                         {c.secret_rotated_at ? `・切り替え ${fmtDateTime(c.secret_rotated_at)}` : ''}
                         {c.previous_secret_valid_until ? `・前の秘密は ${fmtDateTime(c.previous_secret_valid_until)} まで使えます` : ''}</p>
                     </div>
@@ -305,7 +305,7 @@ const OrganizationPage: React.FC = () => {
                         <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」の秘密を切り替える`}
                           onClick={() => run(async () => setCreatedClient(await api.rotateOrgApiClientSecret(orgId, c.id, graceHours)),
                             null, '秘密を切り替えられませんでした')}
-                          className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}>
+                          className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}>
                           秘密を切り替える
                         </button>
                         {c.previous_secret_valid_until && (
@@ -332,14 +332,14 @@ const OrganizationPage: React.FC = () => {
                   .then(() => setNewClient({ name: '', scopes: ['distributions:read'] }));
               }}>
                 <div>
-                  <label htmlFor="client-name" className="block text-sm font-medium text-gray-800 mb-1">連携の名前</label>
+                  <label htmlFor="client-name" className="block text-sm font-medium text-ink-900 mb-1">連携の名前</label>
                   <input id="client-name" value={newClient.name} maxLength={100} required
                     onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} className={inputClass} />
                 </div>
                 <fieldset>
-                  <legend className="text-sm font-medium text-gray-800">スコープ</legend>
+                  <legend className="text-sm font-medium text-ink-900">スコープ</legend>
                   {Object.entries(clients?.scopes ?? {}).map(([k, label]) => (
-                    <label key={k} className="flex items-center gap-2 text-sm text-gray-800">
+                    <label key={k} className="flex items-center gap-2 text-sm text-ink-900">
                       <input type="checkbox" checked={newClient.scopes.includes(k as OrgApiScope)}
                         onChange={() => setNewClient({ ...newClient, scopes: toggle(newClient.scopes, k as OrgApiScope) })} />
                       <code>{k}</code> {label}
@@ -352,15 +352,15 @@ const OrganizationPage: React.FC = () => {
                 </button>
               </form>
 
-              <h3 className="font-semibold text-gray-900 mb-2">Webhook</h3>
-              <p className="text-sm text-gray-700 mb-2">
+              <h3 className="font-semibold text-ink-900 mb-2">Webhook</h3>
+              <p className="text-sm text-ink-700 mb-2">
                 配布の変更を https の URL へ知らせます。本文は配布の ID・版・件数だけで、
                 <code>X-TravelCanvas-Signature</code>(HMAC-SHA256)で送り主を確かめられます。
               </p>
               {createdHook?.secret && (
                 <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-lg" role="status">
                   <p className="text-sm text-amber-900 font-medium">署名の鍵は今だけ表示されます。</p>
-                  <label htmlFor="hook-secret" className="block text-sm text-gray-900 mt-1">署名の鍵</label>
+                  <label htmlFor="hook-secret" className="block text-sm text-ink-900 mt-1">署名の鍵</label>
                   <input id="hook-secret" readOnly value={createdHook.secret} className={`${inputClass} font-mono text-sm`} />
                 </div>
               )}
@@ -369,9 +369,9 @@ const OrganizationPage: React.FC = () => {
                   <li key={h.id} className="border border-gray-200 rounded-lg p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900 break-all">{h.url}{h.revoked_at ? '(止めました)' : ''}</p>
-                        <p className="text-gray-700">{h.events.map((ev) => hooks.events[ev] ?? ev).join('・')}</p>
-                        <p className="text-gray-700">署名の鍵の版 {h.secret_version}
+                        <p className="font-medium text-ink-900 break-all">{h.url}{h.revoked_at ? '(止めました)' : ''}</p>
+                        <p className="text-ink-700">{h.events.map((ev) => hooks.events[ev] ?? ev).join('・')}</p>
+                        <p className="text-ink-700">署名の鍵の版 {h.secret_version}
                           {h.previous_secret_valid_until ? `・${fmtDateTime(h.previous_secret_valid_until)} まで前の鍵でも署名します` : ''}</p>
                         {h.disabled_reason === 'receiver_gone' && (
                           <p className="text-red-800">受け手が「もう無い」(410)と返したため、自動で止めました。</p>
@@ -379,7 +379,7 @@ const OrganizationPage: React.FC = () => {
                       </div>
                       <div className="flex gap-2">
                         {!h.revoked_at && (
-                          <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                          <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                             aria-label={`Webhook「${h.url}」へ試しに送る`}
                             onClick={() => run(async () => {
                               const d = await api.pingOrgWebhook(orgId, h.id);
@@ -389,14 +389,14 @@ const OrganizationPage: React.FC = () => {
                             試しに送る
                           </button>
                         )}
-                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                           aria-label={`Webhook「${h.url}」の送信の記録`}
                           onClick={() => run(async () => setDeliveries({ ...deliveries, [h.id]: await api.getOrgWebhookDeliveries(orgId, h.id) }),
                             null, '記録を取得できませんでした')}>
                           送信の記録
                         </button>
                         {!h.revoked_at && (
-                          <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                          <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                             aria-label={`Webhook「${h.url}」の署名の鍵を切り替える`}
                             onClick={() => run(async () => setCreatedHook(await api.rotateOrgWebhookSecret(orgId, h.id, graceHours)),
                               null, '署名の鍵を切り替えられませんでした')}>
@@ -422,9 +422,9 @@ const OrganizationPage: React.FC = () => {
                     </div>
                     {deliveries[h.id] && (
                       <ul className="mt-2 space-y-1" aria-label={`Webhook「${h.url}」の送信の記録`}>
-                        {deliveries[h.id]!.length === 0 && <li className="text-gray-700">まだ送っていません。</li>}
+                        {deliveries[h.id]!.length === 0 && <li className="text-ink-700">まだ送っていません。</li>}
                         {deliveries[h.id]!.map((d) => (
-                          <li key={d.id} className="flex items-center justify-between gap-2 text-gray-800">
+                          <li key={d.id} className="flex items-center justify-between gap-2 text-ink-900">
                             <span>
                               {d.event_type}・{DELIVERY_LABEL[d.status]}
                               {d.last_status_code ? `(${d.last_status_code})` : d.last_error ? `(${d.last_error})` : ''}・{d.attempts}/{d.max_attempts}回・{fmtDateTime(d.created_at)}
@@ -452,14 +452,14 @@ const OrganizationPage: React.FC = () => {
                   .then(() => setNewHook({ ...newHook, url: '' }));
               }}>
                 <div>
-                  <label htmlFor="hook-url" className="block text-sm font-medium text-gray-800 mb-1">送り先の URL(https)</label>
+                  <label htmlFor="hook-url" className="block text-sm font-medium text-ink-900 mb-1">送り先の URL(https)</label>
                   <input id="hook-url" type="url" value={newHook.url} required placeholder="https://"
                     onChange={(e) => setNewHook({ ...newHook, url: e.target.value })} className={inputClass} />
                 </div>
                 <fieldset>
-                  <legend className="text-sm font-medium text-gray-800">知らせるできごと</legend>
+                  <legend className="text-sm font-medium text-ink-900">知らせるできごと</legend>
                   {Object.entries(hooks?.events ?? {}).map(([k, label]) => (
-                    <label key={k} className="flex items-center gap-2 text-sm text-gray-800">
+                    <label key={k} className="flex items-center gap-2 text-sm text-ink-900">
                       <input type="checkbox" checked={newHook.events.includes(k as OrgWebhookEvent)}
                         onChange={() => setNewHook({ ...newHook, events: toggle(newHook.events, k as OrgWebhookEvent) })} />
                       {label}

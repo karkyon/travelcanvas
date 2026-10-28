@@ -109,19 +109,19 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
               <h3 className="text-lg font-semibold mb-3">📋 基本情報</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium text-gray-700">ユーザーID:</span>
-                  <p className="text-gray-900 font-mono">{user.id}</p>
+                  <span className="font-medium text-ink-700">ユーザーID:</span>
+                  <p className="text-ink-900 font-mono">{user.id}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">ユーザー名:</span>
-                  <p className="text-gray-900">{user.username}</p>
+                  <span className="font-medium text-ink-700">ユーザー名:</span>
+                  <p className="text-ink-900">{user.username}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">メールアドレス:</span>
-                  <p className="text-gray-900">{user.email}</p>
+                  <span className="font-medium text-ink-700">メールアドレス:</span>
+                  <p className="text-ink-900">{user.email}</p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">ユーザータイプ:</span>
+                  <span className="font-medium text-ink-700">ユーザータイプ:</span>
                   <span
                     className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                       user.user_type === 'admin'
@@ -130,14 +130,14 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                         ? 'bg-purple-100 text-purple-800'
                         : user.user_type === 'registered'
                         ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
+                        : 'bg-gray-100 text-ink-900'
                     }`}
                   >
                     {user.user_type}
                   </span>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">状態:</span>
+                  <span className="font-medium text-ink-700">状態:</span>
                   <div className="flex items-center space-x-2">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -156,8 +156,8 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                   </div>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-700">登録日:</span>
-                  <p className="text-gray-900">{user.created_at ? new Date(user.created_at).toLocaleString('ja-JP') : '—'}</p>
+                  <span className="font-medium text-ink-700">登録日:</span>
+                  <p className="text-ink-900">{user.created_at ? new Date(user.created_at).toLocaleString('ja-JP') : '—'}</p>
                 </div>
               </div>
             </div>
@@ -190,7 +190,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
             {/* アクションボタン */}
             {actionError && <p role="alert" className="text-sm text-red-700">{actionError}</p>}
             {(user.is_self || user.is_admin) && (
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-ink-700">
                 {user.is_self ? '自分自身のアカウントは' : 'ほかの管理者は'}この画面から停止・認証の切り替えができません。
               </p>
             )}
@@ -348,8 +348,8 @@ const AdminUsers: React.FC = () => {
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">ユーザー管理</h1>
-          <p className="text-gray-600 mt-1">総ユーザー数: {pagination.total_count.toLocaleString()}名</p>
+          <h1 className="text-3xl font-bold text-ink-900">ユーザー管理</h1>
+          <p className="text-ink-700 mt-1">総ユーザー数: {pagination.total_count.toLocaleString()}名</p>
         </div>
       </div>
 
@@ -425,33 +425,33 @@ const AdminUsers: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       ユーザー
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       タイプ
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       ステータス
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       プラン数
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       登録日
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-ink-700 uppercase tracking-wider">
                       アクション
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-surface divide-y divide-gray-200">
                   {users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                          <div className="text-sm text-gray-600">{user.email}</div>
+                          <div className="text-sm font-medium text-ink-900">{user.username}</div>
+                          <div className="text-sm text-ink-700">{user.email}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -463,7 +463,7 @@ const AdminUsers: React.FC = () => {
                               ? 'bg-purple-100 text-purple-800'
                               : user.user_type === 'registered'
                               ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-800'
+                              : 'bg-gray-100 text-ink-900'
                           }`}
                         >
                           {getUserTypeLabel(user.user_type)}
@@ -485,10 +485,10 @@ const AdminUsers: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-900">
                         {user.travel_plans_count}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-700">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('ja-JP') : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -505,7 +505,7 @@ const AdminUsers: React.FC = () => {
             {/* ページネーション */}
             {pagination.total_pages > 1 && (
               <div className="px-6 py-3 bg-gray-50 border-t flex items-center justify-between">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-ink-700">
                   {(pagination.page - 1) * pagination.page_size + 1} -{' '}
                   {Math.min(pagination.page * pagination.page_size, pagination.total_count)} /{' '}
                   {pagination.total_count} 件
@@ -519,7 +519,7 @@ const AdminUsers: React.FC = () => {
                   >
                     前へ
                   </Button>
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-ink-700">
                     {pagination.page} / {pagination.total_pages}
                   </span>
                   <Button

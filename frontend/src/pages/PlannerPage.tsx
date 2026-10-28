@@ -534,7 +534,7 @@ const PlannerPage: React.FC = () => {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-600 mb-4">プランが見つかりませんでした</p>
+            <p className="text-ink-700 mb-4">プランが見つかりませんでした</p>
             <Button variant="primary" onClick={() => navigate('/planner')}>
               プラン一覧へ戻る
             </Button>
@@ -581,9 +581,9 @@ const PlannerPage: React.FC = () => {
               全ての入口は今までどおり押せる(以前は23個を1行に詰めていた)。
               旅行の見出し(表紙)の後に置く(スマホで最初に旅行名が見えるように)。 */}
           <nav aria-label="旅行の中の移動" data-testid="planner-actions"
-            className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 rounded-lg border border-gray-200 bg-white p-3">
+            className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 rounded-lg border border-gray-200 bg-surface p-3">
             <div role="group" aria-labelledby="planner-actions-0">
-              <p id="planner-actions-0" className="text-xs font-semibold text-gray-700 mb-1">当日</p>
+              <p id="planner-actions-0" className="text-xs font-semibold text-ink-700 mb-1">当日</p>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="outline"
@@ -609,7 +609,7 @@ const PlannerPage: React.FC = () => {
               </div>
             </div>
             <div role="group" aria-labelledby="planner-actions-1">
-              <p id="planner-actions-1" className="text-xs font-semibold text-gray-700 mb-1">計画</p>
+              <p id="planner-actions-1" className="text-xs font-semibold text-ink-700 mb-1">計画</p>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="outline"
@@ -656,7 +656,7 @@ const PlannerPage: React.FC = () => {
               </div>
             </div>
             <div role="group" aria-labelledby="planner-actions-2">
-              <p id="planner-actions-2" className="text-xs font-semibold text-gray-700 mb-1">予約・準備・費用</p>
+              <p id="planner-actions-2" className="text-xs font-semibold text-ink-700 mb-1">予約・準備・費用</p>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="outline"
@@ -696,7 +696,7 @@ const PlannerPage: React.FC = () => {
               </div>
             </div>
             <div role="group" aria-labelledby="planner-actions-3">
-              <p id="planner-actions-3" className="text-xs font-semibold text-gray-700 mb-1">一緒に・出力</p>
+              <p id="planner-actions-3" className="text-xs font-semibold text-ink-700 mb-1">一緒に・出力</p>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="outline"
@@ -736,7 +736,7 @@ const PlannerPage: React.FC = () => {
               </div>
             </div>
             <div role="group" aria-labelledby="planner-actions-4">
-              <p id="planner-actions-4" className="text-xs font-semibold text-gray-700 mb-1">記録・振り返り</p>
+              <p id="planner-actions-4" className="text-xs font-semibold text-ink-700 mb-1">記録・振り返り</p>
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="outline"
@@ -890,7 +890,7 @@ const PlannerPage: React.FC = () => {
 
           {currentPlan.days.length === 0 ? (
             <Card>
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-ink-500">
                 <p className="mb-4">まだ日程がありません</p>
                 <Button variant="primary" onClick={addDay}>
                   最初の日を追加
@@ -1032,8 +1032,8 @@ const PlannerPage: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">プランナー</h1>
-            <p className="text-gray-600">旅行プランを作成・編集します</p>
+            <h1 className="text-3xl font-bold text-ink-900">プランナー</h1>
+            <p className="text-ink-700">旅行プランを作成・編集します</p>
           </div>
           <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
             ＋ 新しいプラン
@@ -1046,7 +1046,7 @@ const PlannerPage: React.FC = () => {
           </div>
         ) : plans.length === 0 ? (
           <Card>
-            <div className="p-12 text-center text-gray-500">
+            <div className="p-12 text-center text-ink-500">
               <p className="mb-4">まだプランがありません</p>
               <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
                 最初のプランを作成
@@ -1062,7 +1062,7 @@ const PlannerPage: React.FC = () => {
               <li key={plan.id} aria-label={plan.title}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                   <div className="p-5" onClick={() => navigate(`/planner/${plan.id}`)}>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-semibold text-ink-900 mb-1">
                       <button
                         type="button"
                         className="text-left rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
@@ -1076,9 +1076,9 @@ const PlannerPage: React.FC = () => {
                       </button>
                     </h3>
                     {plan.destination && (
-                      <p className="text-sm text-gray-600 mb-2">📍 {plan.destination}</p>
+                      <p className="text-sm text-ink-700 mb-2">📍 {plan.destination}</p>
                     )}
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-ink-700">
                       {plan.days?.length ?? 0}日間の日程
                     </p>
                   </div>
@@ -1119,7 +1119,7 @@ const PlannerPage: React.FC = () => {
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="新しい旅行プラン">
         <Modal.Body>
           <div className="space-y-4">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-500">
               未定の項目は空欄のままで大丈夫です。後からいつでも追加・変更できます。
             </p>
             <Input
@@ -1155,7 +1155,7 @@ const PlannerPage: React.FC = () => {
             </div>
 
             <div className="pt-2 border-t border-gray-100">
-              <p className="text-sm font-medium text-gray-700 mb-3">
+              <p className="text-sm font-medium text-ink-700 mb-3">
                 最初の予定(任意)
               </p>
               <div className="space-y-3">
@@ -1211,7 +1211,7 @@ const PlannerPage: React.FC = () => {
         title="プランに追加"
       >
         <Modal.Body>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-ink-700 mb-4">
             「{incomingSpot?.name}」をどのプランに追加しますか？
           </p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -1222,9 +1222,9 @@ const PlannerPage: React.FC = () => {
                 disabled={isAddingSpot}
                 className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50"
               >
-                <div className="font-medium text-gray-900">{plan.title}</div>
+                <div className="font-medium text-ink-900">{plan.title}</div>
                 {plan.destination && (
-                  <div className="text-xs text-gray-500">📍 {plan.destination}</div>
+                  <div className="text-xs text-ink-500">📍 {plan.destination}</div>
                 )}
               </button>
             ))}

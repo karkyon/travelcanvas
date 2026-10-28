@@ -356,13 +356,13 @@ const SearchPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* ヘッダー */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-ink-900 mb-4">
             🤖 AIスポット検索
           </h1>
-          <p className="text-gray-600">
+          <p className="text-ink-700">
             高度なAI技術でインターネット上の情報を解析し、あなたに最適な旅行スポットをランキング表示
           </p>
-          <div className="mt-2 flex justify-center items-center gap-4 text-sm text-gray-500">
+          <div className="mt-2 flex justify-center items-center gap-4 text-sm text-ink-500">
             <span className="flex items-center gap-1"><Globe size={14} /> Web情報統合</span>
             <span className="flex items-center gap-1"><Zap size={14} /> AI分析</span>
             <span className="flex items-center gap-1"><Target size={14} /> 位置最適化</span>
@@ -370,14 +370,14 @@ const SearchPage: React.FC = () => {
         </div>
 
         {/* 検索タイプ選択 */}
-        <div className="bg-white rounded-xl shadow-xs p-6 mb-8">
+        <div className="bg-surface rounded-xl shadow-xs p-6 mb-8">
           <div className="flex flex-wrap gap-4 mb-6">
             <button
               onClick={() => setSearchType('text')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                 searchType === 'text'
                   ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
               }`}
             >
               <Search size={18} />
@@ -388,7 +388,7 @@ const SearchPage: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                 searchType === 'image'
                   ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
               }`}
             >
               <Camera size={18} />
@@ -399,7 +399,7 @@ const SearchPage: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                 searchType === 'voice'
                   ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
               }`}
             >
               <Mic size={18} />
@@ -439,10 +439,10 @@ const SearchPage: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Camera size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600 mb-2">
+                <p className="text-ink-700 mb-2">
                   写真をアップロードしてAI画像解析
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-ink-500">
                   建物、料理、風景等を自動認識してスポットを特定
                 </p>
                 <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
@@ -461,7 +461,7 @@ const SearchPage: React.FC = () => {
               {/* アップロード済み画像プレビュー */}
               {uploadedImages.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">解析済み画像:</p>
+                  <p className="text-sm text-ink-700 mb-2">解析済み画像:</p>
                   <div className="grid grid-cols-6 gap-2">
                     {uploadedImages.map((file, index) => (
                       <div key={index} className="relative group">
@@ -499,15 +499,15 @@ const SearchPage: React.FC = () => {
                 >
                   <Mic size={32} />
                 </button>
-                <p className="mt-4 text-gray-600">
+                <p className="mt-4 text-ink-700">
                   {isRecording ? 'AI音声認識中... クリックで停止' : 'AI音声認識を開始'}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-ink-500 mt-1">
                   自然な話し言葉で検索内容を話してください
                 </p>
                 {searchQuery && (
                   <div className="mt-3 bg-gray-100 px-4 py-2 rounded-lg">
-                    <p className="text-sm text-gray-600">認識結果:</p>
+                    <p className="text-sm text-ink-700">認識結果:</p>
                     <p className="font-medium">「{searchQuery}」</p>
                   </div>
                 )}
@@ -539,10 +539,10 @@ const SearchPage: React.FC = () => {
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
             <LoadingSpinner />
-            <span className="ml-3 text-gray-600">AI分析中...</span>
+            <span className="ml-3 text-ink-700">AI分析中...</span>
           </div>
         ) : hasSearched && searchResults.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-ink-500">
             <Search size={48} className="mx-auto mb-4 opacity-50" />
             <p>AI検索結果が見つかりませんでした</p>
             <p className="text-sm mt-2">別の検索条件で試してみてください</p>
@@ -550,13 +550,13 @@ const SearchPage: React.FC = () => {
         ) : searchResults.length > 0 ? (
           <div className="space-y-6">
             <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">AI推奨スポット（上位{searchResults.length}件）</h2>
-              <p className="text-sm text-gray-600">AIアルゴリズムによって最適化された順序で表示</p>
+              <h2 className="text-xl font-bold text-ink-900">AI推奨スポット（上位{searchResults.length}件）</h2>
+              <p className="text-sm text-ink-700">AIアルゴリズムによって最適化された順序で表示</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {searchResults.map((spot, index) => (
-                <div key={spot.id} className="bg-white rounded-xl shadow-xs hover:shadow-md transition-shadow p-6 relative">
+                <div key={spot.id} className="bg-surface rounded-xl shadow-xs hover:shadow-md transition-shadow p-6 relative">
                   {/* AIランキングバッジ */}
                   <div className="absolute -top-2 -left-2 bg-linear-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
                     {index + 1}
@@ -564,10 +564,10 @@ const SearchPage: React.FC = () => {
                   
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                      <h3 className="font-semibold text-lg text-ink-900 mb-1">
                         {getCategoryIcon(spot.category)} {spot.name}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="flex items-center gap-2 text-sm text-ink-500">
                         {spot.rating && (
                           <>
                             <Star size={14} className="text-yellow-400 fill-current" />
@@ -600,11 +600,11 @@ const SearchPage: React.FC = () => {
                     </div>
                   </div>
                   
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                  <p className="text-ink-700 text-sm mb-3 line-clamp-2">
                     {spot.description}
                   </p>
                   
-                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                  <div className="flex items-center gap-4 text-xs text-ink-500 mb-3">
                     <div className="flex items-center gap-1">
                       <MapPin size={12} />
                       <span>{spot.location?.address || spot.address || '住所情報なし'}</span>
@@ -613,7 +613,7 @@ const SearchPage: React.FC = () => {
 
                   {/* Web情報源表示 */}
                   {spot.web_source && (
-                    <div className="text-xs text-gray-600 mb-3 flex items-center gap-1">
+                    <div className="text-xs text-ink-700 mb-3 flex items-center gap-1">
                       <Globe size={12} />
                       <span>情報源: {spot.web_source}</span>
                     </div>
@@ -646,7 +646,7 @@ const SearchPage: React.FC = () => {
             </div>
           </div>
         ) : !hasSearched ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-ink-500">
             <div className="mb-4">
               <div className="flex justify-center items-center gap-4 mb-4">
                 <Search size={32} className="text-blue-500" />
@@ -656,7 +656,7 @@ const SearchPage: React.FC = () => {
             </div>
             <p className="text-lg font-medium">AI検索エンジンが待機中</p>
             <p className="text-sm mt-2">上記の検索機能を使ってスポットを探してみましょう</p>
-            <div className="mt-4 text-xs text-gray-600">
+            <div className="mt-4 text-xs text-ink-700">
               <p>• テキスト検索: 自然言語での検索</p>
               <p>• 画像解析: 写真からスポット特定</p>
               <p>• 音声認識: 話し言葉での検索</p>

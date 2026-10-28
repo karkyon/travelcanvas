@@ -53,7 +53,7 @@ const AdoptDialog: React.FC<Props> = ({ poll, days, onPreview, onAdopt, onClose 
   return (
     <Modal isOpen onClose={onClose} title={`「${poll.title}」の決定を旅程に反映`} size="md">
       <Modal.Body>
-        <div className="space-y-3 text-sm text-gray-900">
+        <div className="space-y-3 text-sm text-ink-900">
           <p>決定: <span className="font-medium">{decided?.label ?? '(決定なし)'}</span></p>
           {needsDay && (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -82,7 +82,7 @@ const AdoptDialog: React.FC<Props> = ({ poll, days, onPreview, onAdopt, onClose 
             <section aria-label="反映の内容" className="border rounded-sm p-2 bg-gray-50">
               <ul className="list-disc ml-5">{preview.effects.map((e) => <li key={e}>{e}</li>)}</ul>
               {preview.problems.map((p) => <p key={p.code} role="alert" className="mt-1 text-red-800">{p.message}</p>)}
-              <p className="mt-1 text-xs text-gray-700">反映した後に「反映を元に戻す」ができます(その後に別の変更が無い時)。</p>
+              <p className="mt-1 text-xs text-ink-700">反映した後に「反映を元に戻す」ができます(その後に別の変更が無い時)。</p>
             </section>
           )}
         </div>

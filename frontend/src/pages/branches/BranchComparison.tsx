@@ -32,11 +32,11 @@ function rows(data: Data): Array<{ label: string; cells: string[] }> {
 
 const BranchComparison: React.FC<{ data: Data }> = ({ data }) => (
   <section aria-labelledby="branch-compare-heading" className="mt-4 space-y-3">
-    <h3 id="branch-compare-heading" className="font-semibold text-gray-900">本案と比べる</h3>
+    <h3 id="branch-compare-heading" className="font-semibold text-ink-900">本案と比べる</h3>
     <div className="overflow-x-auto">
       <table className="w-full text-sm" aria-label="本案と案の比較">
         <thead>
-          <tr className="text-left text-gray-700">
+          <tr className="text-left text-ink-700">
             <th scope="col" className="font-medium">項目</th>
             <th scope="col" className="font-medium">本案</th>
             {data.branches.map((b) => <th key={b.id} scope="col" className="font-medium">{b.title}</th>)}
@@ -45,8 +45,8 @@ const BranchComparison: React.FC<{ data: Data }> = ({ data }) => (
         <tbody>
           {rows(data).map((r) => (
             <tr key={r.label} className="border-t border-gray-100">
-              <th scope="row" className="font-normal text-gray-800">{r.label}</th>
-              {r.cells.map((c, i) => <td key={i} className="text-gray-900">{c}</td>)}
+              <th scope="row" className="font-normal text-ink-900">{r.label}</th>
+              {r.cells.map((c, i) => <td key={i} className="text-ink-900">{c}</td>)}
             </tr>
           ))}
         </tbody>
@@ -54,7 +54,7 @@ const BranchComparison: React.FC<{ data: Data }> = ({ data }) => (
     </div>
     {data.branches.map((b) => (
       <div key={b.id} className="text-sm space-y-1" aria-label={`${b.title}の違い`} role="group">
-        <p className="font-medium text-gray-900">{b.title}</p>
+        <p className="font-medium text-ink-900">{b.title}</p>
         {b.conflicts > 0 && <p className="text-amber-900">{`本案と食い違う変更が${b.conflicts}件あります(採用の前に直してください)`}</p>}
         {b.budget_target?.map((t) => (
           <p key={t.currency} className={t.met ? 'text-green-800' : 'text-red-800'}>
@@ -77,10 +77,10 @@ const BranchComparison: React.FC<{ data: Data }> = ({ data }) => (
             {b.resolved_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}
           </ul>
         )}
-        {b.new_issues.length === 0 && b.resolved_issues.length === 0 && <p className="text-gray-700">検証の結果は本案と変わりません。</p>}
+        {b.new_issues.length === 0 && b.resolved_issues.length === 0 && <p className="text-ink-700">検証の結果は本案と変わりません。</p>}
       </div>
     ))}
-    <p className="text-xs text-gray-700">
+    <p className="text-xs text-ink-700">
       {`移動は直線距離による概算です。検証: ${data.validation_algorithm_version}`}
       {data.costs_hidden ? '・費用は見せない設定のため表示していません' : ''}
     </p>

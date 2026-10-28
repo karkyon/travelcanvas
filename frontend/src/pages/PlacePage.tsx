@@ -83,7 +83,7 @@ const PlacePage: React.FC = () => {
     load();
   }, [load]);
 
-  if (!planId || !placeId) return <div className="p-8 text-center text-gray-700">場所が選択されていません。</div>;
+  if (!planId || !placeId) return <div className="p-8 text-center text-ink-700">場所が選択されていません。</div>;
 
   const run = async (fn: () => Promise<PlaceInfo>, done: string, fallback: string) => {
     setBusy(true);
@@ -159,7 +159,7 @@ const PlacePage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/candidates`)} className="mb-2">← 候補箱へ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">場所の詳細</h1>
+      <h1 className="text-2xl font-bold text-ink-900">場所の詳細</h1>
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
       {isLoading ? (
@@ -168,39 +168,39 @@ const PlacePage: React.FC = () => {
         <>
           <Card className="mt-4 p-4">
             <section aria-label="場所の情報">
-              <h2 className="text-lg font-semibold text-gray-900">{place.name}</h2>
-              {place.aliases.length > 0 && <p className="text-sm text-gray-700">別名: {place.aliases.join('、')}</p>}
+              <h2 className="text-lg font-semibold text-ink-900">{place.name}</h2>
+              {place.aliases.length > 0 && <p className="text-sm text-ink-700">別名: {place.aliases.join('、')}</p>}
               {place.phone && (
                 <Button size="sm" variant="outline" className="mt-2" onClick={call}>電話をかける({place.phone})</Button>
               )}
               {!place.can_edit && (
-                <p className="text-sm text-gray-700 mt-2">この場所を使うすべての旅行を編集できる人だけが直せます(見るだけです)。</p>
+                <p className="text-sm text-ink-700 mt-2">この場所を使うすべての旅行を編集できる人だけが直せます(見るだけです)。</p>
               )}
               <form aria-label="場所の情報を直す" onSubmit={save} className="mt-3 space-y-2">
                 {FIELDS.map((f) => (
                   <div key={f.key}>
-                    <label className="block text-sm text-gray-800">{f.label}
+                    <label className="block text-sm text-ink-900">{f.label}
                       {f.long ? (
-                        <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" rows={2} value={form[f.key]}
+                        <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" rows={2} value={form[f.key]}
                           disabled={!place.can_edit} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
                       ) : (
-                        <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form[f.key]}
+                        <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form[f.key]}
                           disabled={!place.can_edit} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
                       )}
                     </label>
                     {place.sources[f.key] && (
-                      <p className="text-xs text-gray-700" data-testid={`source-${f.key}`}>
+                      <p className="text-xs text-ink-700" data-testid={`source-${f.key}`}>
                         出典: {place.sources[f.key]!.label}{place.sources[f.key]!.retrieved_at ? `(${fmt(place.sources[f.key]!.retrieved_at)})` : ''}
                       </p>
                     )}
                   </div>
                 ))}
-                <label className="block text-sm text-gray-800">別名(「、」区切り)
-                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.aliases}
+                <label className="block text-sm text-ink-900">別名(「、」区切り)
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.aliases}
                     disabled={!place.can_edit} onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
                 </label>
-                <label className="block text-sm text-gray-800">予約
-                  <select className="ml-2 border rounded-sm px-2 py-1 text-gray-900" value={form.reservation_required}
+                <label className="block text-sm text-ink-900">予約
+                  <select className="ml-2 border rounded-sm px-2 py-1 text-ink-900" value={form.reservation_required}
                     disabled={!place.can_edit}
                     onChange={(e) => setForm({ ...form, reservation_required: e.target.value as Form['reservation_required'] })}>
                     <option value="">分からない</option>
@@ -215,34 +215,34 @@ const PlacePage: React.FC = () => {
 
           <Card className="mt-4 p-4">
             <section aria-label="営業時間">
-              <h2 className="text-lg font-semibold text-gray-900">営業時間</h2>
+              <h2 className="text-lg font-semibold text-ink-900">営業時間</h2>
               {place.sources.opening_hours && (
-                <p className="text-xs text-gray-700">出典: {place.sources.opening_hours.label}({fmt(place.sources.opening_hours.retrieved_at)})</p>
+                <p className="text-xs text-ink-700">出典: {place.sources.opening_hours.label}({fmt(place.sources.opening_hours.retrieved_at)})</p>
               )}
-              {hours.length === 0 && <p className="text-sm text-gray-700 mt-1">営業時間は登録されていません。</p>}
+              {hours.length === 0 && <p className="text-sm text-ink-700 mt-1">営業時間は登録されていません。</p>}
               <ul className="mt-2 space-y-2">
                 {hours.map((h, i) => (
-                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-gray-800">
+                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-ink-900">
                     <label>曜日
-                      <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.day_of_week} disabled={!place.can_edit}
+                      <select className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={h.day_of_week} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, day_of_week: Number(e.target.value) } : x)))}>
                         {DAYS.map((d, k) => <option key={k} value={k}>{d}</option>)}
                       </select>
                     </label>
                     <label>開く
-                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.open_time} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={h.open_time} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, open_time: e.target.value } : x)))} />
                     </label>
                     <label>閉じる
-                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.close_time} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={h.close_time} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, close_time: e.target.value } : x)))} />
                     </label>
                     <label>最終入場
-                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.last_entry ?? ''} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={h.last_entry ?? ''} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, last_entry: e.target.value || null } : x)))} />
                     </label>
                     <label>ラストオーダー
-                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={h.last_order ?? ''} disabled={!place.can_edit}
+                      <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={h.last_order ?? ''} disabled={!place.can_edit}
                         onChange={(e) => setHours(hours.map((x, j) => (j === i ? { ...x, last_order: e.target.value || null } : x)))} />
                     </label>
                     {h.close_time < h.open_time && <span>(日をまたぐ)</span>}
@@ -265,18 +265,18 @@ const PlacePage: React.FC = () => {
 
           <Card className="mt-4 p-4">
             <section aria-label="例外の日">
-              <h2 className="text-lg font-semibold text-gray-900">例外の日(臨時休業・特別営業)</h2>
-              <p className="text-sm text-gray-700">年末年始・祝日・臨時休業など。その日は曜日の営業時間より優先します。</p>
-              {special.length === 0 && <p className="text-sm text-gray-700 mt-1">登録されていません。</p>}
+              <h2 className="text-lg font-semibold text-ink-900">例外の日(臨時休業・特別営業)</h2>
+              <p className="text-sm text-ink-700">年末年始・祝日・臨時休業など。その日は曜日の営業時間より優先します。</p>
+              {special.length === 0 && <p className="text-sm text-ink-700 mt-1">登録されていません。</p>}
               <ul className="mt-2 space-y-2">
                 {special.map((sp, i) => (
-                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-gray-800" aria-label={`例外の日 ${i + 1}`}>
+                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-ink-900" aria-label={`例外の日 ${i + 1}`}>
                     <label>日付
-                      <input type="date" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.local_date} disabled={!place.can_edit}
+                      <input type="date" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.local_date} disabled={!place.can_edit}
                         onChange={(e) => setSp(i, { local_date: e.target.value })} />
                     </label>
                     <label>この日は
-                      <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.kind} disabled={!place.can_edit}
+                      <select className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.kind} disabled={!place.can_edit}
                         onChange={(e) => setSp(i, e.target.value === 'closed'
                           ? { kind: 'closed', open_time: null, close_time: null, last_entry: null, last_order: null }
                           : { kind: 'open', open_time: sp.open_time ?? '10:00', close_time: sp.close_time ?? '17:00' })}>
@@ -287,21 +287,21 @@ const PlacePage: React.FC = () => {
                     {sp.kind === 'open' && (
                       <>
                         <label>開く
-                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.open_time ?? ''} disabled={!place.can_edit}
+                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.open_time ?? ''} disabled={!place.can_edit}
                             onChange={(e) => setSp(i, { open_time: e.target.value })} />
                         </label>
                         <label>閉じる
-                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.close_time ?? ''} disabled={!place.can_edit}
+                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.close_time ?? ''} disabled={!place.can_edit}
                             onChange={(e) => setSp(i, { close_time: e.target.value })} />
                         </label>
                         <label>最終入場
-                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.last_entry ?? ''} disabled={!place.can_edit}
+                          <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.last_entry ?? ''} disabled={!place.can_edit}
                             onChange={(e) => setSp(i, { last_entry: e.target.value || null })} />
                         </label>
                       </>
                     )}
                     <label>メモ
-                      <input className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={sp.note ?? ''} maxLength={200} disabled={!place.can_edit}
+                      <input className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={sp.note ?? ''} maxLength={200} disabled={!place.can_edit}
                         onChange={(e) => setSp(i, { note: e.target.value || null })} />
                     </label>
                     {place.can_edit && (
@@ -317,15 +317,15 @@ const PlacePage: React.FC = () => {
                   <Button size="sm" disabled={busy} onClick={saveSpecial}>例外の日を保存</Button>
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap items-end gap-2 text-sm text-gray-800">
+              <div className="mt-4 flex flex-wrap items-end gap-2 text-sm text-ink-900">
                 <label>その日の営業時間を確かめる
-                  <input type="date" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={checkDate}
+                  <input type="date" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={checkDate}
                     onChange={(e) => setCheckDate(e.target.value)} />
                 </label>
                 <Button size="sm" variant="outline" onClick={checkDay}>確かめる</Button>
               </div>
               {dayHours && (
-                <p className="mt-2 text-sm text-gray-900" role="status" aria-label="その日の営業時間">
+                <p className="mt-2 text-sm text-ink-900" role="status" aria-label="その日の営業時間">
                   {dayHours.summary}
                   {dayHours.source === 'special' && '(例外の日)'}
                   {dayHours.windows.some((w) => w.last_entry) && ` 最終入場 ${dayHours.windows.filter((w) => w.last_entry).map((w) => w.last_entry).join('・')}`}
@@ -337,26 +337,26 @@ const PlacePage: React.FC = () => {
 
           <Card className="mt-4 p-4">
             <section aria-label="入口">
-              <h2 className="text-lg font-semibold text-gray-900">入口</h2>
-              <p className="text-sm text-gray-700">正面・裏口・駐車場・駅の出口など、入口ごとの位置(緯度・経度)を登録できます。</p>
-              {entrances.length === 0 && <p className="text-sm text-gray-700 mt-1">登録されていません。</p>}
+              <h2 className="text-lg font-semibold text-ink-900">入口</h2>
+              <p className="text-sm text-ink-700">正面・裏口・駐車場・駅の出口など、入口ごとの位置(緯度・経度)を登録できます。</p>
+              {entrances.length === 0 && <p className="text-sm text-ink-700 mt-1">登録されていません。</p>}
               <ul className="mt-2 space-y-2">
                 {entrances.map((en, i) => (
-                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-gray-800" aria-label={`入口 ${i + 1}`}>
+                  <li key={i} className="flex flex-wrap items-end gap-2 text-sm text-ink-900" aria-label={`入口 ${i + 1}`}>
                     <label>名前
-                      <input className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={en.label} maxLength={100} disabled={!place.can_edit}
+                      <input className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={en.label} maxLength={100} disabled={!place.can_edit}
                         onChange={(e) => setEn(i, { label: e.target.value })} />
                     </label>
                     <label>緯度
-                      <input inputMode="decimal" className="ml-1 w-28 border rounded-sm px-2 py-1 text-gray-900" value={en.latitude ?? ''} disabled={!place.can_edit}
+                      <input inputMode="decimal" className="ml-1 w-28 border rounded-sm px-2 py-1 text-ink-900" value={en.latitude ?? ''} disabled={!place.can_edit}
                         onChange={(e) => setEn(i, { latitude: numOrNull(e.target.value) })} />
                     </label>
                     <label>経度
-                      <input inputMode="decimal" className="ml-1 w-28 border rounded-sm px-2 py-1 text-gray-900" value={en.longitude ?? ''} disabled={!place.can_edit}
+                      <input inputMode="decimal" className="ml-1 w-28 border rounded-sm px-2 py-1 text-ink-900" value={en.longitude ?? ''} disabled={!place.can_edit}
                         onChange={(e) => setEn(i, { longitude: numOrNull(e.target.value) })} />
                     </label>
                     <label>段差なし
-                      <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={en.accessible === null ? '' : en.accessible ? 'yes' : 'no'} disabled={!place.can_edit}
+                      <select className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={en.accessible === null ? '' : en.accessible ? 'yes' : 'no'} disabled={!place.can_edit}
                         onChange={(e) => setEn(i, { accessible: e.target.value === '' ? null : e.target.value === 'yes' })}>
                         <option value="">分からない</option>
                         <option value="yes">段差なし</option>
@@ -364,7 +364,7 @@ const PlacePage: React.FC = () => {
                       </select>
                     </label>
                     <label>メモ
-                      <input className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={en.note ?? ''} maxLength={300} disabled={!place.can_edit}
+                      <input className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={en.note ?? ''} maxLength={300} disabled={!place.can_edit}
                         onChange={(e) => setEn(i, { note: e.target.value || null })} />
                     </label>
                     {place.can_edit && (
@@ -386,9 +386,9 @@ const PlacePage: React.FC = () => {
           {place.source_history && Object.keys(place.source_history).length > 0 && (
             <Card className="mt-4 p-4">
               <section aria-label="出典による違い">
-                <h2 className="text-lg font-semibold text-gray-900">出典による違い</h2>
-                <p className="text-sm text-gray-700">出典によって値が違う項目です(新しい順)。正しい値を確かめて直してください。</p>
-                <dl className="mt-2 text-sm text-gray-900 space-y-2">
+                <h2 className="text-lg font-semibold text-ink-900">出典による違い</h2>
+                <p className="text-sm text-ink-700">出典によって値が違う項目です(新しい順)。正しい値を確かめて直してください。</p>
+                <dl className="mt-2 text-sm text-ink-900 space-y-2">
                   {Object.entries(place.source_history).map(([field, items]) => (
                     <div key={field}>
                       <dt className="font-medium">{FIELD_LABEL[field] ?? field}</dt>
@@ -408,9 +408,9 @@ const PlacePage: React.FC = () => {
 
           <Card className="mt-4 p-4">
             <section aria-label="この場所を使う予定">
-              <h2 className="text-lg font-semibold text-gray-900">この場所を使う予定</h2>
-              {place.events.length === 0 ? <p className="text-sm text-gray-700 mt-1">ありません。</p> : (
-                <ul className="mt-2 text-sm text-gray-900 space-y-1">
+              <h2 className="text-lg font-semibold text-ink-900">この場所を使う予定</h2>
+              {place.events.length === 0 ? <p className="text-sm text-ink-700 mt-1">ありません。</p> : (
+                <ul className="mt-2 text-sm text-ink-900 space-y-1">
                   {place.events.map((e) => (
                     <li key={e.event_id}>{e.date} {e.local_start_time ?? ''} {e.title}({e.plan_title})</li>
                   ))}

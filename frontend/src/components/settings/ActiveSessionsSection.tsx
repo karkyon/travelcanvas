@@ -75,8 +75,8 @@ const ActiveSessionsSection: React.FC = () => {
 
   return (
     <section aria-labelledby="active-sessions-heading" className="border-t pt-6">
-      <h3 id="active-sessions-heading" className="text-lg font-semibold text-gray-900 mb-2">ログイン中の端末</h3>
-      <p className="text-sm text-gray-700 mb-4">
+      <h3 id="active-sessions-heading" className="text-lg font-semibold text-ink-900 mb-2">ログイン中の端末</h3>
+      <p className="text-sm text-ink-700 mb-4">
         心当たりの無い端末があれば、ログアウトさせてからパスワードを変更してください。
         新しい端末からログインすると、通知でお知らせします。
       </p>
@@ -92,19 +92,19 @@ const ActiveSessionsSection: React.FC = () => {
           <button type="button" className="underline" onClick={() => void load()}>再読み込み</button>
         </p>
       )}
-      {sessions === null && !loadError && <p className="text-sm text-gray-700">読み込み中…</p>}
+      {sessions === null && !loadError && <p className="text-sm text-ink-700">読み込み中…</p>}
       {sessions !== null && (
         <ul aria-label="ログイン中の端末" className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
           {sessions.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-ink-900">
                   {s.device_label}
                   {s.is_current && (
                     <span className="ml-2 rounded-sm bg-blue-100 px-2 py-0.5 text-xs text-blue-800">この端末</span>
                   )}
                 </p>
-                <p className="text-xs text-gray-700">
+                <p className="text-xs text-ink-700">
                   {s.network_label ? `接続元 ${s.network_label}・` : ''}
                   ログイン {formatDateTime(s.created_at)}・最終利用 {formatDateTime(s.last_active_at)}
                 </p>

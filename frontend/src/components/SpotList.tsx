@@ -164,7 +164,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
     <div className="space-y-6">
       {/* ヘッダーとフィルター */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">登録済みスポット</h2>
+        <h2 className="text-2xl font-bold text-ink-900">登録済みスポット</h2>
         <div className="flex items-center space-x-4">
           <select
             value={selectedCategory}
@@ -187,13 +187,13 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
       {isLoading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">スポットを読み込んでいます...</p>
+          <p className="mt-2 text-ink-700">スポットを読み込んでいます...</p>
         </div>
       ) : spots.length === 0 ? (
         <Card>
           <div className="p-8 text-center">
-            <p className="text-gray-600">登録されたスポットがありません</p>
-            <p className="text-sm text-gray-500 mt-2">新しいスポットを登録してみましょう</p>
+            <p className="text-ink-700">登録されたスポットがありません</p>
+            <p className="text-sm text-ink-500 mt-2">新しいスポットを登録してみましょう</p>
           </div>
         </Card>
       ) : (
@@ -217,7 +217,7 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                 
                 {/* スポット情報 */}
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-lg font-semibold text-ink-900 mb-2">
                     {spot.name}
                   </h3>
                   
@@ -233,18 +233,18 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                   </div>
                   
                   {spot.description && (
-                    <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                    <p className="text-ink-700 text-sm mb-2 line-clamp-2">
                       {spot.description}
                     </p>
                   )}
                   
                   {spot.address && (
-                    <p className="text-gray-500 text-xs mb-2">
+                    <p className="text-ink-500 text-xs mb-2">
                       📍 {spot.address}
                     </p>
                   )}
                   
-                  <div className="flex justify-between items-center text-xs text-gray-500">
+                  <div className="flex justify-between items-center text-xs text-ink-500">
                     <span>👀 {spot.visit_count}回表示</span>
                     <span>{formatDate(spot.created_at)}</span>
                   </div>

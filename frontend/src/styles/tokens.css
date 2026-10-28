@@ -33,6 +33,8 @@
   --tc-info: #1d4ed8;
   --tc-info-soft: #eff4ff;
   --tc-focus: #2563eb;
+  --tc-on-accent: #ffffff;
+  --tc-danger-solid: #b42318;
 
   --tc-radius-sm: 4px;
   --tc-radius-md: 8px;
@@ -74,32 +76,41 @@
   --tc-motion-easing: cubic-bezier(0.2, 0, 0, 1);
 }
 
-[data-theme='dark'] {
-  --tc-ink-900: #f1f5f9;
-  --tc-ink-700: #cbd5e1;
-  --tc-ink-500: #94a3b8;
-  --tc-cloud-0: #0b1220;
-  --tc-cloud-50: #111a2b;
-  --tc-cloud-100: #162236;
-  --tc-cloud-200: #24324a;
-  --tc-accent: #5ec4b8;
-  --tc-danger: #fca5a5;
-  --tc-warning: #fcd34d;
-  --tc-success: #86efac;
-  --tc-info: #93c5fd;
-  --tc-accent-strong: #7fd6cb;
-  --tc-accent-soft: #0f2d2a;
-  --tc-success-soft: #0f2a1c;
-  --tc-warning-soft: #2e2208;
-  --tc-danger-soft: #3b1219;
-  --tc-info-soft: #13254a;
-  --tc-surface-glass: rgba(17, 26, 43, 0.72);
-  --tc-glass-border: rgba(241, 245, 249, 0.10);
-  --tc-surface-solid: var(--tc-cloud-50);
-  --tc-surface-quiet: var(--tc-cloud-100);
-  --tc-surface-critical: #3b1219;
-  color: var(--tc-ink-900);
-  background-color: var(--tc-cloud-0);
+/* [Gate G10-UX] 暗い見た目は画面だけ(印刷は白い紙のまま) */
+@media screen {
+  [data-theme='dark'] {
+    --tc-ink-900: #f1f5f9;
+    --tc-ink-700: #cbd5e1;
+    --tc-ink-500: #94a3b8;
+    --tc-cloud-0: #0b1220;
+    --tc-cloud-50: #111a2b;
+    --tc-cloud-100: #162236;
+    --tc-cloud-200: #24324a;
+    --tc-accent: #5ec4b8;
+    --tc-danger: #fca5a5;
+    --tc-warning: #fcd34d;
+    --tc-success: #86efac;
+    --tc-info: #93c5fd;
+    --tc-accent-strong: #7fd6cb;
+    --tc-accent-soft: #0f2d2a;
+    --tc-success-soft: #0f2a1c;
+    --tc-warning-soft: #2e2208;
+    --tc-danger-soft: #3b1219;
+    --tc-info-soft: #13254a;
+    --tc-on-accent: #0b1220;
+    --tc-surface-glass: rgba(17, 26, 43, 0.72);
+    --tc-glass-border: rgba(241, 245, 249, 0.10);
+    --tc-surface-solid: var(--tc-cloud-50);
+    --tc-surface-quiet: var(--tc-cloud-100);
+    --tc-surface-critical: #3b1219;
+    color: var(--tc-ink-900);
+    background-color: var(--tc-cloud-0);
+  }
+  /* body は index.css で明るい地(#f9fafb)を自分で塗るため、暗い見た目では body も塗り直す(html だけでは隠れる) */
+  [data-theme='dark'] body {
+    color: var(--tc-ink-900);
+    background-color: var(--tc-cloud-0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

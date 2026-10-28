@@ -22,7 +22,7 @@ const STATE_CLASS: Record<string, string> = {
   agreed: 'bg-green-100 text-green-900',
   has_concerns: 'bg-amber-100 text-amber-900',
   blocked: 'bg-red-100 text-red-800',
-  pending: 'bg-gray-100 text-gray-800',
+  pending: 'bg-gray-100 text-ink-900',
 };
 
 interface Props {
@@ -77,8 +77,8 @@ const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecid
       <section aria-labelledby={headingId}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 id={headingId} className="font-semibold text-gray-900">{poll.title}</h3>
-            <p className="text-xs text-gray-700 mt-0.5">
+            <h3 id={headingId} className="font-semibold text-ink-900">{poll.title}</h3>
+            <p className="text-xs text-ink-700 mt-0.5">
               {POLL_STATE_LABEL[poll.state]}
               {poll.deadline_at && ` ・ 締切: ${formatDue(poll.deadline_at)}`}
               {poll.is_closed && ' ・ 締め切りました'}
@@ -88,17 +88,17 @@ const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecid
             {poll.phase && (
               <p className="text-xs mt-1" data-testid={`poll-phase-${poll.id}`}>
                 <span className="px-2 py-0.5 rounded-sm bg-indigo-100 text-indigo-900">状態: {PHASE_LABEL[poll.phase] ?? poll.phase}</span>
-                {poll.quorum ? <span className="ml-2 text-gray-700">回答 {poll.responders ?? 0}人 / 定足数 {poll.quorum}人</span> : null}
-                {poll.closed_reason === 'deadline' && <span className="ml-2 text-gray-700">締切の日時で締め切りました</span>}
-                {poll.adopted_by_name && <span className="ml-2 text-gray-700">{poll.adopted_by_name}さんが反映</span>}
+                {poll.quorum ? <span className="ml-2 text-ink-700">回答 {poll.responders ?? 0}人 / 定足数 {poll.quorum}人</span> : null}
+                {poll.closed_reason === 'deadline' && <span className="ml-2 text-ink-700">締切の日時で締め切りました</span>}
+                {poll.adopted_by_name && <span className="ml-2 text-ink-700">{poll.adopted_by_name}さんが反映</span>}
               </p>
             )}
             {(poll.tied_option_ids?.length ?? 0) > 1 && poll.phase !== 'adopted' && !poll.decided_option_id && (
               <p className="text-xs text-amber-900 mt-1" role="note">最有力が同点です。話し合って、編集者が1つに決めてください(自動では決めません)。</p>
             )}
-            {poll.description && <p className="text-sm text-gray-800 mt-1">{poll.description}</p>}
+            {poll.description && <p className="text-sm text-ink-900 mt-1">{poll.description}</p>}
             {poll.unanswered.length > 0 && (
-              <p className="text-xs text-gray-700 mt-1" data-testid={`poll-unanswered-${poll.id}`}>
+              <p className="text-xs text-ink-700 mt-1" data-testid={`poll-unanswered-${poll.id}`}>
                 未回答: {poll.unanswered.map((u) => u.name).join('、')}
               </p>
             )}
@@ -132,15 +132,15 @@ const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecid
             return (
               <li key={o.id} className="border rounded-sm p-3" data-testid={`poll-option-${o.id}`}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-gray-900">{o.label}</span>
+                  <span className="font-medium text-ink-900">{o.label}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-sm ${STATE_CLASS[o.state]}`}>{OPTION_STATE_LABEL[o.state]}</span>
                   {o.is_leading && !o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-100 text-blue-900">最有力</span>}
                   {o.is_decided && <span className="text-xs px-2 py-0.5 rounded-sm bg-blue-600 text-white">決定</span>}
-                  {o.event_missing && <span className="text-xs text-gray-700">(元の予定は削除されています)</span>}
-                  {o.candidate_id && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">候補箱{o.candidate_missing ? '(削除済み)' : ''}</span>}
+                  {o.event_missing && <span className="text-xs text-ink-700">(元の予定は削除されています)</span>}
+                  {o.candidate_id && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-ink-900">候補箱{o.candidate_missing ? '(削除済み)' : ''}</span>}
                   {o.is_tied && <span className="text-xs px-2 py-0.5 rounded-sm bg-amber-100 text-amber-900">同点</span>}
                 </div>
-                <p className="text-xs text-gray-700 mt-1">{describeCounts(o)}</p>
+                <p className="text-xs text-ink-700 mt-1">{describeCounts(o)}</p>
                 {o.votes.filter((v) => v.value === 'concern' || v.value === 'veto').map((v) => (
                   <div key={v.id} className="mt-2 text-sm bg-amber-50 border border-amber-200 rounded-sm p-2">
                     <p>
@@ -161,7 +161,7 @@ const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecid
                 {!poll.is_closed && (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div>
-                      <label htmlFor={`vote-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}へのあなたの回答`}</label>
+                      <label htmlFor={`vote-${o.id}`} className="block text-xs font-medium text-ink-900">{`${o.label}へのあなたの回答`}</label>
                       <select id={`vote-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" value={d.value}
                         onChange={(e) => update(o.id, { value: e.target.value as AnswerDraft['value'] })}>
                         <option value="">未回答</option>
@@ -170,14 +170,14 @@ const PollCard: React.FC<Props> = ({ poll: p0, onSubmitVotes, onResolve, onDecid
                     </div>
                     {needsReason && (
                       <div>
-                        <label htmlFor={`reason-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}の理由`}</label>
+                        <label htmlFor={`reason-${o.id}`} className="block text-xs font-medium text-ink-900">{`${o.label}の理由`}</label>
                         <input id={`reason-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={500}
                           value={d.reason} onChange={(e) => update(o.id, { reason: e.target.value })} />
                       </div>
                     )}
                     {d.value === 'veto' && (
                       <div>
-                        <label htmlFor={`alt-${o.id}`} className="block text-xs font-medium text-gray-800">{`${o.label}の代替案`}</label>
+                        <label htmlFor={`alt-${o.id}`} className="block text-xs font-medium text-ink-900">{`${o.label}の代替案`}</label>
                         <input id={`alt-${o.id}`} className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={200}
                           value={d.alternative} onChange={(e) => update(o.id, { alternative: e.target.value })} />
                       </div>

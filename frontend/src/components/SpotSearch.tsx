@@ -252,9 +252,9 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
             
             {/* 検索候補 */}
             {showSuggestions && searchHistory.length > 0 && (
-              <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1">
+              <div className="absolute top-full left-0 right-0 bg-surface border border-gray-200 rounded-lg shadow-lg z-10 mt-1">
                 <div className="p-2">
-                  <div className="text-xs text-gray-500 mb-2">検索履歴</div>
+                  <div className="text-xs text-ink-500 mb-2">検索履歴</div>
                   {searchHistory.map((item, index) => (
                     <button
                       key={index}
@@ -303,7 +303,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                   p-3 text-center border rounded-lg transition-all duration-200
                   ${filters.categories.includes(category.id)
                     ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                    : 'border-gray-200 hover:border-gray-300 text-ink-700'
                   }
                 `}
               >
@@ -366,7 +366,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* 価格帯 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   価格帯
                 </label>
                 <select
@@ -384,7 +384,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
 
               {/* 評価 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   最低評価
                 </label>
                 <select
@@ -402,7 +402,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
 
               {/* 検索範囲 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   検索範囲 ({filters.radius}km)
                 </label>
                 <input
@@ -425,7 +425,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                     onChange={(e) => setFilters(prev => ({ ...prev, openNow: e.target.checked }))}
                     className="rounded-sm border-gray-300"
                   />
-                  <span className="text-sm text-gray-700">現在営業中のみ</span>
+                  <span className="text-sm text-ink-700">現在営業中のみ</span>
                 </label>
               </div>
             </div>
@@ -460,14 +460,14 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h5 className="font-medium text-gray-900">{spot.name}</h5>
+                      <h5 className="font-medium text-ink-900">{spot.name}</h5>
                       {spot.description && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                        <p className="text-sm text-ink-700 mt-1 line-clamp-2">
                           {spot.description}
                         </p>
                       )}
                       
-                      <div className="flex items-center mt-2 space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center mt-2 space-x-4 text-sm text-ink-700">
                         {spot.category && (
                           <span>
                             {categories.find(c => c.id === spot.category)?.icon || '📍'} 
@@ -486,7 +486,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
                       </div>
 
                       {spot.location?.address && (
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-ink-500 mt-1">
                           📍 {spot.location.address}
                         </p>
                       )}
@@ -516,7 +516,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
           <Card.Body>
             <div className="text-center py-8">
               <LoadingSpinner size={32} className="mx-auto mb-3" />
-              <p className="text-gray-600">検索中...</p>
+              <p className="text-ink-700">検索中...</p>
             </div>
           </Card.Body>
         </Card>
@@ -538,7 +538,7 @@ const SpotSearch: React.FC<SpotSearchProps> = ({
       {!loading && !error && searchResults.length === 0 && query && (
         <Card variant="outlined">
           <Card.Body>
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-ink-500">
               <div className="text-4xl mb-2">🔍</div>
               <p>「{query}」に関連するスポットが見つかりませんでした</p>
               <p className="text-sm mt-1">検索条件を変更してお試しください</p>

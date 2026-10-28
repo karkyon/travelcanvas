@@ -82,8 +82,8 @@ const SupportAccessSection: React.FC = () => {
   return (
     <section aria-labelledby="support-access-heading" className="space-y-4">
       <div>
-        <h3 id="support-access-heading" className="text-lg font-medium text-gray-900">サポートへの閲覧の許可</h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <h3 id="support-access-heading" className="text-lg font-medium text-ink-900">サポートへの閲覧の許可</h3>
+        <p className="text-sm text-ink-700 mt-1">
           問い合わせの調査のため、運営のサポート担当者に読み取り専用で見せることを許可します。期限が来ると自動で終わり、
           いつでも取り消せます。担当者が閲覧するたびに、あなたに知らせが届きます。住所・メモの本文・位置・予約番号・
           文書の中身は、許可しても担当者には見えません。
@@ -92,14 +92,14 @@ const SupportAccessSection: React.FC = () => {
 
       <form onSubmit={submit} className="space-y-3 border rounded-lg p-4" aria-label="サポートへの閲覧を許可する">
         <div>
-          <label htmlFor="support-purpose" className="block text-sm font-medium text-gray-800 mb-1">目的(担当者に伝わります)</label>
+          <label htmlFor="support-purpose" className="block text-sm font-medium text-ink-900 mb-1">目的(担当者に伝わります)</label>
           <input id="support-purpose" required maxLength={limits?.purpose_max ?? 200} value={form.purpose}
             onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={inputClass}
             placeholder="例: 予約が表示されない件の調査" />
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <label htmlFor="support-scope" className="block text-sm font-medium text-gray-800 mb-1">見せる範囲</label>
+            <label htmlFor="support-scope" className="block text-sm font-medium text-ink-900 mb-1">見せる範囲</label>
             <select id="support-scope" value={form.plan_id} onChange={(e) => setForm({ ...form, plan_id: e.target.value })}
               className={inputClass}>
               <option value="">アカウントの概要と旅行の一覧</option>
@@ -107,21 +107,21 @@ const SupportAccessSection: React.FC = () => {
             </select>
           </div>
           <div>
-            <label htmlFor="support-hours" className="block text-sm font-medium text-gray-800 mb-1">
+            <label htmlFor="support-hours" className="block text-sm font-medium text-ink-900 mb-1">
               期間(時間・{limits?.min_hours ?? 1}〜{limits?.max_hours ?? 72})
             </label>
             <input id="support-hours" type="number" required min={limits?.min_hours ?? 1} max={limits?.max_hours ?? 72}
               value={form.hours} onChange={(e) => setForm({ ...form, hours: Number(e.target.value) })} className={inputClass} />
           </div>
           <div>
-            <label htmlFor="support-ticket" className="block text-sm font-medium text-gray-800 mb-1">問い合わせ番号(任意)</label>
+            <label htmlFor="support-ticket" className="block text-sm font-medium text-ink-900 mb-1">問い合わせ番号(任意)</label>
             <input id="support-ticket" maxLength={40} value={form.ticket_ref}
               onChange={(e) => setForm({ ...form, ticket_ref: e.target.value })} className={inputClass} />
           </div>
         </div>
         {data?.requires_password && (
           <div>
-            <label htmlFor="support-password" className="block text-sm font-medium text-gray-800 mb-1">
+            <label htmlFor="support-password" className="block text-sm font-medium text-ink-900 mb-1">
               本人確認のためのパスワード
             </label>
             <input id="support-password" type="password" required autoComplete="current-password" value={form.password}
@@ -139,17 +139,17 @@ const SupportAccessSection: React.FC = () => {
       )}
 
       <div>
-        <h4 className="font-medium text-gray-900 mb-2">これまでの許可</h4>
-        {(data?.grants.length ?? 0) === 0 ? <p className="text-sm text-gray-600">まだありません。</p> : (
+        <h4 className="font-medium text-ink-900 mb-2">これまでの許可</h4>
+        {(data?.grants.length ?? 0) === 0 ? <p className="text-sm text-ink-700">まだありません。</p> : (
           <ul className="space-y-2">
             {data!.grants.map((g) => (
               <li key={g.id} className="border rounded-lg p-3 text-sm flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-ink-900">
                     {g.scope === 'plan' ? `旅行「${g.plan_title ?? ''}」` : 'アカウント'}・{STATE_LABEL[g.state]}
                   </p>
-                  <p className="text-gray-700">目的: {g.purpose}{g.ticket_ref ? `(${g.ticket_ref})` : ''}</p>
-                  <p className="text-gray-700">期限 {fmt(g.expires_at)}・閲覧 {g.access_count}回
+                  <p className="text-ink-700">目的: {g.purpose}{g.ticket_ref ? `(${g.ticket_ref})` : ''}</p>
+                  <p className="text-ink-700">期限 {fmt(g.expires_at)}・閲覧 {g.access_count}回
                     {g.last_accessed_at ? `・最後の閲覧 ${fmt(g.last_accessed_at)}` : ''}</p>
                 </div>
                 {g.state === 'active' && (

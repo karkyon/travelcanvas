@@ -253,7 +253,7 @@ const SharePage: React.FC = () => {
       case 'viewer': return <Eye size={16} className="text-blue-500" />;
       case 'editor': return <Edit3 size={16} className="text-green-500" />;
       case 'owner': return <Shield size={16} className="text-purple-500" />;
-      default: return <Eye size={16} className="text-gray-500" />;
+      default: return <Eye size={16} className="text-ink-500" />;
     }
   };
 
@@ -273,7 +273,7 @@ const SharePage: React.FC = () => {
       case 'pending':
         return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-sm">招待中</span>;
       case 'declined':
-        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-sm">辞退</span>;
+        return <span className="px-2 py-1 text-xs bg-gray-100 text-ink-900 rounded-sm">辞退</span>;
       default:
         return null;
     }
@@ -284,7 +284,7 @@ const SharePage: React.FC = () => {
       return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-sm">失効済み</span>;
     }
     if (!share.is_active) {
-      return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-sm">無効(期限切れ/上限到達)</span>;
+      return <span className="px-2 py-1 text-xs bg-gray-100 text-ink-900 rounded-sm">無効(期限切れ/上限到達)</span>;
     }
     return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-sm">有効</span>;
   };
@@ -308,10 +308,10 @@ const SharePage: React.FC = () => {
           >
             ← プランナーに戻る
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-ink-900 mb-4">
             🤝 プラン共有・権限設定
           </h1>
-          <p className="text-gray-600">
+          <p className="text-ink-700">
             URL共有、QRコード、メール招待で柔軟な共有が可能です
           </p>
         </div>
@@ -332,8 +332,8 @@ const SharePage: React.FC = () => {
           {/* 左列: 共有設定 */}
           <div className="space-y-6">
             {/* URL共有 */}
-            <div className="bg-white rounded-xl shadow-xs p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface rounded-xl shadow-xs p-6">
+              <h2 className="text-lg font-semibold text-ink-900 mb-4 flex items-center gap-2">
                 <Link size={20} />
                 URL共有
               </h2>
@@ -349,7 +349,7 @@ const SharePage: React.FC = () => {
                       value={justCreatedUrl}
                       readOnly
                       aria-label="発行した共有URL"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-surface text-sm"
                     />
                     <button
                       onClick={() => handleCopyLink(justCreatedUrl)}
@@ -362,7 +362,7 @@ const SharePage: React.FC = () => {
                   <div className="flex items-center gap-4">
                     {/* [Gate E1] QRは端末内で作る(共有URLのトークンを外部へ送らない) */}
                     <LocalQrCode value={justCreatedUrl} size={80} label="共有リンクのQRコード" />
-                    <p className="text-sm text-gray-700 flex items-center gap-1">
+                    <p className="text-sm text-ink-700 flex items-center gap-1">
                       <QrCode size={14} aria-hidden="true" />
                       スマホでスキャンしてアクセス
                     </p>
@@ -390,7 +390,7 @@ const SharePage: React.FC = () => {
                           await handleCopyLink(justCreatedUrl);
                         }
                       }}
-                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                      className="px-3 py-2 border border-gray-300 text-ink-700 rounded-lg hover:bg-gray-50 text-sm"
                     >
                       共有する
                     </button>
@@ -404,7 +404,7 @@ const SharePage: React.FC = () => {
                     <div key={share.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg text-sm">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-gray-600">...{share.token_prefix}</span>
+                          <span className="font-mono text-ink-700">...{share.token_prefix}</span>
                           {getShareStatusBadge(share)}
                           {share.has_passcode && (
                             <span title="パスコード保護あり" className="inline-flex items-center gap-0.5 text-xs text-purple-800">
@@ -413,7 +413,7 @@ const SharePage: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <div className="text-gray-600 text-xs">
+                        <div className="text-ink-700 text-xs">
                           {share.permission === 'edit' ? '編集可能' : '閲覧のみ'}
                           {` ・ 使用 ${share.use_count}${share.max_uses != null ? `/${share.max_uses}` : ''}回`}
                           {share.expires_at && ` ・ 期限 ${new Date(share.expires_at).toLocaleDateString('ja-JP')}`}
@@ -421,14 +421,14 @@ const SharePage: React.FC = () => {
                             ? ` ・ 最終閲覧 ${new Date(share.last_accessed_at).toLocaleString('ja-JP')}`
                             : ' ・ 未閲覧'}
                         </div>
-                        <div className="text-gray-700 text-xs">
+                        <div className="text-ink-700 text-xs">
                           見せる項目: {share.fields.length > 0 ? share.fields.map(labelOf).join('・') : '最小限(旅行名・期間・予定名だけ)'}
                         </div>
                         {(() => {
                           // [Gate G4] COL-05 複製の可否 / FC-097 管理者・自動の対応で止めた理由
                           const g4 = share as typeof share & { allow_clone?: boolean; revoked_reason?: string | null };
                           return (
-                            <div className="text-gray-700 text-xs">
+                            <div className="text-ink-700 text-xs">
                               {g4.allow_clone && '受け取った人が複製できます'}
                               {g4.revoked_reason === 'abuse_auto' && '問題の報告が続いたため自動で止めました(サポートへ連絡できます)'}
                               {g4.revoked_reason === 'admin_abuse' && '管理者が利用の規則により止めました'}
@@ -461,7 +461,7 @@ const SharePage: React.FC = () => {
               )}
 
               {shareLinks.length === 0 && !justCreatedUrl && (
-                <div className="text-center py-8 text-gray-600">
+                <div className="text-center py-8 text-ink-700">
                   <Link size={48} className="mx-auto mb-4 opacity-50" aria-hidden="true" />
                   <p className="mb-4">まだ共有リンクが作成されていません</p>
                 </div>
@@ -469,15 +469,15 @@ const SharePage: React.FC = () => {
             </div>
 
             {/* 新規共有リンクの設定 */}
-            <div className="bg-white rounded-xl shadow-xs p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface rounded-xl shadow-xs p-6">
+              <h2 className="text-lg font-semibold text-ink-900 mb-4 flex items-center gap-2">
                 <Settings size={20} />
                 新しい共有リンクを発行
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="share-permission" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-permission" className="block text-sm font-medium text-ink-700 mb-2">
                     アクセス権限
                   </label>
                   <select
@@ -492,7 +492,7 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="share-passcode" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-passcode" className="block text-sm font-medium text-ink-700 mb-2">
                     パスコード保護（任意）
                   </label>
                   <input
@@ -505,13 +505,13 @@ const SharePage: React.FC = () => {
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-gray-800">
+                <label className="flex items-center gap-2 text-sm text-ink-900">
                   <input type="checkbox" checked={allowClone} onChange={(e) => setAllowClone(e.target.checked)} />
                   受け取った人が、共有した項目だけを自分の旅行として複製できるようにする
                 </label>
 
                 <div>
-                  <label htmlFor="share-expiry" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-expiry" className="block text-sm font-medium text-ink-700 mb-2">
                     有効期限（任意）
                   </label>
                   <input
@@ -524,7 +524,7 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="share-max-uses" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="share-max-uses" className="block text-sm font-medium text-ink-700 mb-2">
                     最大使用回数（任意）
                   </label>
                   <input
@@ -540,16 +540,16 @@ const SharePage: React.FC = () => {
 
                 {/* [Gate F45] FR-045 閲覧者に見せる項目 */}
                 <fieldset className="border border-gray-200 rounded-lg p-4">
-                  <legend className="px-1 text-sm font-medium text-gray-800">閲覧者に見せる項目</legend>
+                  <legend className="px-1 text-sm font-medium text-ink-900">閲覧者に見せる項目</legend>
                   <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="まとめて選ぶ">
                     {PRESET_BUTTONS.map((p) => (
                       <button key={p.value} type="button" onClick={() => applyPreset(p.value)}
-                        className="text-sm px-3 py-1 rounded-full border border-gray-300 text-gray-800 hover:bg-gray-100">
+                        className="text-sm px-3 py-1 rounded-full border border-gray-300 text-ink-900 hover:bg-gray-100">
                         {p.label}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-700 mb-2">
+                  <p className="text-xs text-ink-700 mb-2">
                     いつも見せる: {(catalog?.always ?? ['旅行名', '目的地', '期間', '予定名', '予定の種類']).join('・')}
                   </p>
                   {catalog ? (
@@ -557,10 +557,10 @@ const SharePage: React.FC = () => {
                       <ul className="space-y-2">
                         {catalog.fields.filter((f) => f.classification === 'internal').map((f) => (
                           <li key={f.key}>
-                            <label className="flex items-start gap-2 text-sm text-gray-800">
+                            <label className="flex items-start gap-2 text-sm text-ink-900">
                               <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggleField(f.key)}
                                 aria-describedby={`share-field-${f.key}`} className="mt-1" />
-                              <span>{f.label}<span id={`share-field-${f.key}`} className="block text-xs text-gray-700">{f.description}</span></span>
+                              <span>{f.label}<span id={`share-field-${f.key}`} className="block text-xs text-ink-700">{f.description}</span></span>
                             </label>
                           </li>
                         ))}
@@ -569,10 +569,10 @@ const SharePage: React.FC = () => {
                       <ul className="space-y-2 mt-1">
                         {catalog.fields.filter((f) => f.classification === 'confidential').map((f) => (
                           <li key={f.key}>
-                            <label className="flex items-start gap-2 text-sm text-gray-800">
+                            <label className="flex items-start gap-2 text-sm text-ink-900">
                               <input type="checkbox" checked={fields.includes(f.key)} onChange={() => toggleField(f.key)}
                                 aria-describedby={`share-field-${f.key}`} className="mt-1" />
-                              <span>{f.label}(機密)<span id={`share-field-${f.key}`} className="block text-xs text-gray-700">{f.description}</span></span>
+                              <span>{f.label}(機密)<span id={`share-field-${f.key}`} className="block text-xs text-ink-700">{f.description}</span></span>
                             </label>
                           </li>
                         ))}
@@ -583,18 +583,18 @@ const SharePage: React.FC = () => {
                             URLを知っている人なら誰でも「{selectedConfidential.map(labelOf).join('・')}」を見られます。
                             転送やスクリーンショットで広がることがあります。
                           </p>
-                          <label className="mt-2 flex items-start gap-2 text-sm text-gray-900">
+                          <label className="mt-2 flex items-start gap-2 text-sm text-ink-900">
                             <input type="checkbox" checked={ackConfidential} onChange={(e) => setAckConfidential(e.target.checked)} className="mt-1" />
                             機密の項目を見せることを確認しました
                           </label>
                         </div>
                       )}
-                      <p className="mt-3 text-xs text-gray-700">
+                      <p className="mt-3 text-xs text-ink-700">
                         どの設定でも見せない: {catalog.restricted.map((r) => r.label).join('・')}
                       </p>
                     </>
                   ) : (
-                    <p className="text-sm text-gray-700">項目を読み込み中です…</p>
+                    <p className="text-sm text-ink-700">項目を読み込み中です…</p>
                   )}
                 </fieldset>
               </div>
@@ -614,15 +614,15 @@ const SharePage: React.FC = () => {
           {/* 右列: コラボレーター管理 */}
           <div className="space-y-6">
             {/* メール招待 */}
-            <div className="bg-white rounded-xl shadow-xs p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface rounded-xl shadow-xs p-6">
+              <h2 className="text-lg font-semibold text-ink-900 mb-4 flex items-center gap-2">
                 <Mail size={20} />
                 メール招待
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-email" className="block text-sm font-medium text-ink-700 mb-2">
                     メールアドレス
                   </label>
                   <input
@@ -636,7 +636,7 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-role" className="block text-sm font-medium text-ink-700 mb-2">
                     権限
                   </label>
                   <select
@@ -651,7 +651,7 @@ const SharePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="invite-message" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="invite-message" className="block text-sm font-medium text-ink-700 mb-2">
                     招待メッセージ（任意）
                   </label>
                   <textarea
@@ -675,8 +675,8 @@ const SharePage: React.FC = () => {
             </div>
 
             {/* コラボレーター一覧 */}
-            <div className="bg-white rounded-xl shadow-xs p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-surface rounded-xl shadow-xs p-6">
+              <h2 className="text-lg font-semibold text-ink-900 mb-4 flex items-center gap-2">
                 <Users size={20} />
                 コラボレーター ({collaborators.length})
               </h2>
@@ -690,12 +690,12 @@ const SharePage: React.FC = () => {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-ink-900">
                             {collaborator.name || collaborator.email}
                           </span>
                           {getStatusBadge(collaborator.status)}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-ink-700">
                           {getPermissionIcon(collaborator.role)}
                           <span>{getPermissionText(collaborator.role)}</span>
                           <span>•</span>
@@ -715,7 +715,7 @@ const SharePage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-600">
+                <div className="text-center py-8 text-ink-700">
                   <Users size={48} className="mx-auto mb-4 opacity-50" aria-hidden="true" />
                   <p>まだコラボレーターがいません</p>
                   <p className="text-sm">メール招待でチームメンバーを追加しましょう</p>
@@ -738,12 +738,12 @@ const SharePage: React.FC = () => {
         </div>
 
         {/* [Gate F45] 共有前プレビュー(閲覧者に見える内容。使用回数を消費しない) */}
-        <section className="mt-8 bg-white rounded-xl shadow-xs p-6" aria-labelledby="share-preview-heading">
-          <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+        <section className="mt-8 bg-surface rounded-xl shadow-xs p-6" aria-labelledby="share-preview-heading">
+          <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-ink-900 mb-1 flex items-center gap-2">
             <Eye size={20} aria-hidden="true" />
             閲覧者に見える内容
           </h2>
-          <p className="text-sm text-gray-700 mb-4" aria-live="polite">
+          <p className="text-sm text-ink-700 mb-4" aria-live="polite">
             {previewOf ? `発行済みのリンク「...${previewOf}」で見える内容です。` : '今の設定で発行すると見える内容です。'}
             確認しても使用回数は減りません。
           </p>
@@ -754,7 +754,7 @@ const SharePage: React.FC = () => {
           {preview && (
             <>
               {WITHHELD_LABEL.some(([k]) => preview.withheld[k] > 0) && (
-                <p className="text-sm text-gray-800 mb-4">
+                <p className="text-sm text-ink-900 mb-4">
                   見せない情報: {WITHHELD_LABEL.filter(([k]) => preview.withheld[k] > 0).map(([k, label]) => `${label} ${preview.withheld[k]}件`).join('・')}
                 </p>
               )}

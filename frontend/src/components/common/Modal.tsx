@@ -137,7 +137,7 @@ const Modal: React.FC<ModalProps> & {
     >
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black/50 transition-opacity"
         onClick={handleMaskClick}
       />
       
@@ -148,7 +148,7 @@ const Modal: React.FC<ModalProps> & {
           className={`
             relative transform transition-all w-full
             ${sizeClasses[size]}
-            bg-white rounded-xl shadow-2xl
+            bg-cloud-0 text-ink-900 rounded-xl shadow-2xl
             ${size === 'full' ? 'flex flex-col' : ''}
             ${className}
           `}
@@ -183,15 +183,15 @@ const ModalHeader: React.FC<ModalHeaderProps> = ({
 }) => {
   if (children) {
     return (
-      <div className="flex items-center justify-between p-6 border-b border-gray-200">
+      <div className="flex items-center justify-between p-6 border-b border-cloud-200">
         {children}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between p-6 border-b border-gray-200">
-      <h2 id="modal-title" className="text-xl font-semibold text-gray-900">
+    <div className="flex items-center justify-between p-6 border-b border-cloud-200">
+      <h2 id="modal-title" className="text-xl font-semibold text-ink-900">
         {title}
       </h2>
       {showCloseButton && onClose && (
@@ -229,7 +229,7 @@ const ModalFooter: React.FC<ModalFooterProps> = ({
   children
 }) => {
   return (
-    <div className={`flex items-center justify-end gap-3 p-6 border-t border-gray-200 ${className}`}>
+    <div className={`flex items-center justify-end gap-3 p-6 border-t border-cloud-200 ${className}`}>
       {children}
     </div>
   );

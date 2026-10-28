@@ -9,6 +9,7 @@ import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/se
 import { forgetOfflineKeys, obtainOfflineKey } from '@/utils/offlineVault';
 import { currentOfflineSession } from '@/utils/offlineSession';
 import Button from '@/components/common/Button';
+import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
 import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import MfaSection from '@/components/settings/MfaSection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
@@ -63,6 +64,8 @@ const SettingsPage: React.FC = () => {
     marketing_emails: false
   });
   
+  // [Gate G10-UX] UX-8 テーマはこの端末にすぐ当てる(以前はサーバーに保存するだけで、画面には何も効いていなかった)
+  const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   const [preferences, setPreferences] = useState({
     language: 'ja',
     timezone: 'Asia/Tokyo',
@@ -125,7 +128,7 @@ const SettingsPage: React.FC = () => {
   const ProfileTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">プロフィール情報</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">プロフィール情報</h3>
         
         {/* Avatar */}
         <div className="flex items-center gap-4 mb-6">
@@ -135,15 +138,15 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-sm text-gray-600">プロフィール画像</p>
-            <p className="text-xs text-gray-500">JPG、PNG、最大2MB</p>
+            <p className="text-sm text-ink-700">プロフィール画像</p>
+            <p className="text-xs text-ink-500">JPG、PNG、最大2MB</p>
           </div>
         </div>
 
         {/* Form Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="profile-full-name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-full-name" className="block text-sm font-medium text-ink-700 mb-1">
               フルネーム
             </label>
             <input
@@ -156,7 +159,7 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label htmlFor="profile-username" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-username" className="block text-sm font-medium text-ink-700 mb-1">
               ユーザー名
             </label>
             <input
@@ -169,7 +172,7 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div className="md:col-span-2">
-            <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-email" className="block text-sm font-medium text-ink-700 mb-1">
               メールアドレス
             </label>
             <input
@@ -183,7 +186,7 @@ const SettingsPage: React.FC = () => {
 
           {emailChanging && (
             <div className="md:col-span-2">
-              <label htmlFor="email-change-password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email-change-password" className="block text-sm font-medium text-ink-700 mb-1">
                 現在のパスワード(メールアドレスの変更に必要)
               </label>
               <input
@@ -195,14 +198,14 @@ const SettingsPage: React.FC = () => {
                 aria-describedby="email-change-note"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p id="email-change-note" className="mt-1 text-xs text-gray-700">
+              <p id="email-change-note" className="mt-1 text-xs text-ink-700">
                 変更すると、メールアドレスは未確認の状態になり、ほかの端末はログアウトされます。
               </p>
             </div>
           )}
           
           <div className="md:col-span-2">
-            <label htmlFor="profile-bio" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="profile-bio" className="block text-sm font-medium text-ink-700 mb-1">
               自己紹介
             </label>
             <textarea
@@ -223,11 +226,11 @@ const SettingsPage: React.FC = () => {
   const NotificationsTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">通知設定</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">通知設定</h3>
         
         <div className="space-y-4">
           <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">メール通知</h4>
+            <h4 className="font-medium text-ink-900 mb-3">メール通知</h4>
             <div className="space-y-3">
               {Object.entries({
                 email_notifications: 'メール通知を有効にする',
@@ -247,14 +250,14 @@ const SettingsPage: React.FC = () => {
                     })}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
                   />
-                  <span className="ml-2 text-sm text-gray-700">{label}</span>
+                  <span className="ml-2 text-sm text-ink-700">{label}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="border border-gray-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">プッシュ通知</h4>
+            <h4 className="font-medium text-ink-900 mb-3">プッシュ通知</h4>
             <div className="space-y-3">
               <label className="flex items-center">
                 <input
@@ -266,9 +269,9 @@ const SettingsPage: React.FC = () => {
                   })}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
                 />
-                <span className="ml-2 text-sm text-gray-700">プッシュ通知を有効にする</span>
+                <span className="ml-2 text-sm text-ink-700">プッシュ通知を有効にする</span>
               </label>
-              <p className="text-xs text-gray-500 ml-6">
+              <p className="text-xs text-ink-500 ml-6">
                 ブラウザまたはモバイルアプリでのプッシュ通知
               </p>
             </div>
@@ -282,14 +285,15 @@ const SettingsPage: React.FC = () => {
   const PreferencesTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">表示設定</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">表示設定</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1" htmlFor="settings-language">
               言語
             </label>
             <select
+              id="settings-language"
               value={preferences.language}
               onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -302,10 +306,11 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1" htmlFor="settings-timezone">
               タイムゾーン
             </label>
             <select
+              id="settings-timezone"
               value={preferences.timezone}
               onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -318,10 +323,11 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1" htmlFor="settings-currency">
               通貨
             </label>
             <select
+              id="settings-currency"
               value={preferences.currency}
               onChange={(e) => setPreferences({ ...preferences, currency: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -335,12 +341,17 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink-700 mb-1" htmlFor="settings-theme">
               テーマ
             </label>
             <select
-              value={preferences.theme}
-              onChange={(e) => setPreferences({ ...preferences, theme: e.target.value })}
+              id="settings-theme"
+              value={themePreference === 'system' ? 'auto' : themePreference}
+              onChange={(e) => {
+                const v = e.target.value;
+                setThemePreference((v === 'auto' ? 'system' : v) as ThemePreference);
+                setPreferences({ ...preferences, theme: v });
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="light">ライト</option>
@@ -352,13 +363,14 @@ const SettingsPage: React.FC = () => {
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">旅行設定</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">旅行設定</h3>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-ink-700 mb-1" htmlFor="settings-travel-style">
             旅行スタイル
           </label>
           <select
+            id="settings-travel-style"
             value={preferences.travel_style}
             onChange={(e) => setPreferences({ ...preferences, travel_style: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -379,11 +391,11 @@ const SettingsPage: React.FC = () => {
   const SecurityTab = (): React.ReactElement => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">パスワード変更</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">パスワード変更</h3>
         
         <div className="space-y-4">
           <div>
-            <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="current-password" className="block text-sm font-medium text-ink-700 mb-1">
               現在のパスワード
             </label>
             <div className="relative">
@@ -407,7 +419,7 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="new-password" className="block text-sm font-medium text-ink-700 mb-1">
               新しいパスワード
             </label>
             <div className="relative">
@@ -431,7 +443,7 @@ const SettingsPage: React.FC = () => {
           </div>
           
           <div>
-            <label htmlFor="confirm-new-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="confirm-new-password" className="block text-sm font-medium text-ink-700 mb-1">
               新しいパスワード（確認）
             </label>
             <div className="relative">
@@ -556,8 +568,8 @@ const SettingsPage: React.FC = () => {
   const OfflineTab = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">オフラインデータ</h3>
-        <p className="text-sm text-gray-600 mb-4">
+        <h3 className="text-lg font-medium text-ink-900 mb-2">オフラインデータ</h3>
+        <p className="text-sm text-ink-700 mb-4">
           プランナー画面の「オフラインで使う」で保存したプランがここに表示されます。
           この端末に暗号化して保存されており、7日間で自動的に失効します。
           ログアウトすると、次にログインするまで開けなくなります。
@@ -565,9 +577,9 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {isLoadingPacks ? (
-        <p className="text-sm text-gray-600">読み込み中...</p>
+        <p className="text-sm text-ink-700">読み込み中...</p>
       ) : offlinePacks.length === 0 ? (
-        <p className="text-sm text-gray-600">保存されているオフラインデータはありません。</p>
+        <p className="text-sm text-ink-700">保存されているオフラインデータはありません。</p>
       ) : (
         <div className="space-y-3" role="list" aria-label="保存したオフラインデータ">
           {offlinePacks.map((pack) => (
@@ -577,15 +589,15 @@ const SettingsPage: React.FC = () => {
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
             >
               <div className="min-w-0">
-                <p className="font-medium text-gray-900 truncate">{pack.planTitle}</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-ink-900 truncate">{pack.planTitle}</p>
+                <p className="text-xs text-ink-700">
                   {formatBytes(pack.approxSizeBytes)} ・
                   {new Date(pack.expiresAt).toLocaleDateString('ja-JP')}まで有効
                 </p>
               </div>
               <button
                 onClick={() => handleDeletePack(pack.planId)}
-                className="p-2 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-ink-700 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                 title="このオフラインデータを削除"
                 aria-label={`「${pack.planTitle}」のオフラインデータを削除`}
               >
@@ -604,10 +616,10 @@ const SettingsPage: React.FC = () => {
       )}
 
       <section aria-labelledby="offline-revoke-heading" className="border-t pt-6">
-        <h3 id="offline-revoke-heading" className="text-base font-medium text-gray-900 mb-2">
+        <h3 id="offline-revoke-heading" className="text-base font-medium text-ink-900 mb-2">
           端末を無くした時は
         </h3>
-        <p className="text-sm text-gray-600 mb-3">
+        <p className="text-sm text-ink-700 mb-3">
           全ての端末に保存したオフラインデータを読めなくします。ほかの端末のデータは、その端末が次に通信した時に消えます。
         </p>
         <Button variant="danger" onClick={handleRevokeAllDevices} loading={isRevokingDevices}>
@@ -733,10 +745,10 @@ const SettingsPage: React.FC = () => {
           >
             ← ダッシュボードに戻る
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-ink-900 mb-4">
             ⚙️ 設定
           </h1>
-          <p className="text-gray-600">
+          <p className="text-ink-700">
             アカウント情報、通知設定、プライバシー設定を管理
           </p>
         </div>
@@ -756,7 +768,7 @@ const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* サイドバー */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-xs p-4">
+            <div className="bg-surface rounded-xl shadow-xs p-4">
               <nav className="space-y-1">
                 {tabs.map((tab) => (
                   <button
@@ -765,7 +777,7 @@ const SettingsPage: React.FC = () => {
                     className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors ${
                       activeTab === tab.id
                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        : 'text-ink-700 hover:bg-gray-50'
                     }`}
                   >
                     {tab.icon}
@@ -776,7 +788,7 @@ const SettingsPage: React.FC = () => {
                 {/* [Gate P6] FR-039 データの書き出しと保持期間 / [Gate P9] 同意・アカウントの削除 */}
                 <button
                   onClick={() => navigate('/settings/data')}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-ink-700 hover:bg-gray-50 transition-colors"
                 >
                   <Download size={16} />
                   <span className="font-medium">データとプライバシー</span>
@@ -797,7 +809,7 @@ const SettingsPage: React.FC = () => {
 
           {/* メインコンテンツ */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-xs p-6">
+            <div className="bg-surface rounded-xl shadow-xs p-6">
               {renderActiveTab()}
               
               {/* 保存ボタン([Gate C1] 非公開の条件のタブは自分の保存ボタンを持つため出さない) */}

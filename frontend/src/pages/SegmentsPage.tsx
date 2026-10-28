@@ -357,7 +357,7 @@ const SegmentsPage: React.FC = () => {
 
         {allEvents.length < 2 && (
           <Card className="mb-4">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-500">
               移動区間を作成するには、旅程に2つ以上のイベントが必要です。
             </p>
           </Card>
@@ -365,7 +365,7 @@ const SegmentsPage: React.FC = () => {
 
         {segments.length === 0 ? (
           <Card>
-            <p className="text-sm text-gray-500 text-center py-8">まだ移動区間がありません</p>
+            <p className="text-sm text-ink-500 text-center py-8">まだ移動区間がありません</p>
           </Card>
         ) : (
           <div className="space-y-3">
@@ -376,15 +376,15 @@ const SegmentsPage: React.FC = () => {
                     <div className="flex items-center gap-2 text-sm font-medium">
                       {modeIcon(segment.mode)}
                       <span>{modeLabel(segment.mode)}</span>
-                      <span className="text-gray-600">|</span>
-                      <span className="text-xs text-gray-500">{STATUS_LABEL[segment.status]}</span>
+                      <span className="text-ink-700">|</span>
+                      <span className="text-xs text-ink-500">{STATUS_LABEL[segment.status]}</span>
                     </div>
-                    <div className="mt-1 text-sm text-gray-700">
+                    <div className="mt-1 text-sm text-ink-700">
                       {endpointLabel(allEvents, places, segment.from_event_id, segment.from_place_id)}
                       {' → '}
                       {endpointLabel(allEvents, places, segment.to_event_id, segment.to_place_id)}
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 space-x-3">
+                    <div className="mt-1 text-xs text-ink-500 space-x-3">
                       {segment.distance_km != null && (
                         <span>
                           {segment.distance_km.toFixed(1)}km
@@ -409,7 +409,7 @@ const SegmentsPage: React.FC = () => {
                       </div>
                     )}
                     {segment.transport_number && (
-                      <div className="mt-1 text-xs text-gray-500">
+                      <div className="mt-1 text-xs text-ink-500">
                         便名: {segment.transport_number}
                         {segment.platform && ` / ${segment.platform}`}
                       </div>
@@ -441,14 +441,14 @@ const SegmentsPage: React.FC = () => {
                 <div className="flex gap-1 text-xs">
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded-sm ${form.from_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}
+                    className={`px-2 py-0.5 rounded-sm ${form.from_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-ink-700'}`}
                     onClick={() => setForm({ ...form, from_type: 'event' })}
                   >
                     イベント
                   </button>
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.from_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}
+                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.from_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-ink-700'}`}
                     onClick={() => setForm({ ...form, from_type: 'place' })}
                     disabled={placeOptions.length === 0}
                   >
@@ -487,14 +487,14 @@ const SegmentsPage: React.FC = () => {
                 <div className="flex gap-1 text-xs">
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded-sm ${form.to_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}
+                    className={`px-2 py-0.5 rounded-sm ${form.to_type === 'event' ? 'bg-blue-100 text-blue-700' : 'text-ink-700'}`}
                     onClick={() => setForm({ ...form, to_type: 'event' })}
                   >
                     イベント
                   </button>
                   <button
                     type="button"
-                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.to_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}
+                    className={`px-2 py-0.5 rounded-sm flex items-center gap-1 ${form.to_type === 'place' ? 'bg-blue-100 text-blue-700' : 'text-ink-700'}`}
                     onClick={() => setForm({ ...form, to_type: 'place' })}
                     disabled={placeOptions.length === 0}
                   >

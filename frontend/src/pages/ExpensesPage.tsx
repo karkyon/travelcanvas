@@ -316,7 +316,7 @@ const ExpensesPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-700">
+      <div className="p-8 text-center text-ink-700">
         プランが選択されていません。
         <div className="mt-4"><Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button></div>
       </div>
@@ -339,11 +339,11 @@ const ExpensesPage: React.FC = () => {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-          <h1 className="text-2xl font-bold text-gray-900">予算・費用</h1>
-          <p className="text-sm text-gray-700 mt-1">予算と実績、立替の精算をまとめて管理します。</p>
+          <h1 className="text-2xl font-bold text-ink-900">予算・費用</h1>
+          <p className="text-sm text-ink-700 mt-1">予算と実績、立替の精算をまとめて管理します。</p>
         </div>
         <div>
-          <label htmlFor="finance-base-currency" className="block text-sm font-medium text-gray-800 mb-1">基準通貨</label>
+          <label htmlFor="finance-base-currency" className="block text-sm font-medium text-ink-900 mb-1">基準通貨</label>
           <select id="finance-base-currency" className="border rounded-lg px-3 py-2" value={base}
             disabled={!canEdit || currencyLocked} onChange={(e) => changeCurrency(e.target.value)}>
             {[...new Set([base, ...CURRENCY_OPTIONS])].map((c) => <option key={c} value={c}>{c}</option>)}
@@ -355,7 +355,7 @@ const ExpensesPage: React.FC = () => {
         {TABS.map((t) => (
           <button key={t.id} id={`fin-tab-${t.id}`} type="button" role="tab" aria-selected={tab === t.id}
             aria-controls={`fin-panel-${t.id}`} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-gray-700'}`}>
+            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}>
             {t.label}
           </button>
         ))}
@@ -396,10 +396,10 @@ const ExpensesPage: React.FC = () => {
             <Modal.Body>
               <div className="space-y-4">
                 {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
-                <p className="text-sm text-gray-800">{BUDGET_KIND_LABEL[budgetForm.kind]}</p>
+                <p className="text-sm text-ink-900">{BUDGET_KIND_LABEL[budgetForm.kind]}</p>
                 {budgetForm.kind === 'category' && (
                   <div>
-                    <label htmlFor="budget-category" className="block text-sm font-medium text-gray-800 mb-1">カテゴリ</label>
+                    <label htmlFor="budget-category" className="block text-sm font-medium text-ink-900 mb-1">カテゴリ</label>
                     <select id="budget-category" className={inputClass} value={budgetForm.category} disabled={!!budgetForm.existing}
                       onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value as ExpenseCategory })}>
                       {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -408,13 +408,13 @@ const ExpensesPage: React.FC = () => {
                 )}
                 {budgetForm.kind === 'day' && (
                   <div>
-                    <label htmlFor="budget-date" className="block text-sm font-medium text-gray-800 mb-1">日付</label>
+                    <label htmlFor="budget-date" className="block text-sm font-medium text-ink-900 mb-1">日付</label>
                     <input id="budget-date" type="date" className={inputClass} value={budgetForm.local_date} disabled={!!budgetForm.existing}
                       onChange={(e) => setBudgetForm({ ...budgetForm, local_date: e.target.value })} />
                   </div>
                 )}
                 <div>
-                  <label htmlFor="budget-amount" className="block text-sm font-medium text-gray-800 mb-1">金額({base})</label>
+                  <label htmlFor="budget-amount" className="block text-sm font-medium text-ink-900 mb-1">金額({base})</label>
                   <input id="budget-amount" inputMode="decimal" className={inputClass} value={budgetForm.amount}
                     onChange={(e) => setBudgetForm({ ...budgetForm, amount: e.target.value })} />
                 </div>
@@ -437,25 +437,25 @@ const ExpensesPage: React.FC = () => {
               <div className="space-y-4">
                 {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
                 <div>
-                  <label htmlFor="expense-title" className="block text-sm font-medium text-gray-800 mb-1">内容</label>
+                  <label htmlFor="expense-title" className="block text-sm font-medium text-ink-900 mb-1">内容</label>
                   <input id="expense-title" className={inputClass} maxLength={200} value={expenseForm.title}
                     onChange={(e) => updateExp('title', e.target.value)} placeholder="例: 夕食" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label htmlFor="expense-amount" className="block text-sm font-medium text-gray-800 mb-1">金額</label>
+                    <label htmlFor="expense-amount" className="block text-sm font-medium text-ink-900 mb-1">金額</label>
                     <input id="expense-amount" inputMode="decimal" className={inputClass} value={expenseForm.amount}
                       onChange={(e) => updateExp('amount', e.target.value)} />
                   </div>
                   <div>
-                    <label htmlFor="expense-currency" className="block text-sm font-medium text-gray-800 mb-1">通貨</label>
+                    <label htmlFor="expense-currency" className="block text-sm font-medium text-ink-900 mb-1">通貨</label>
                     <select id="expense-currency" className={inputClass} value={expenseForm.currency}
                       disabled={expenseMode.mode === 'refund'} onChange={(e) => updateExp('currency', e.target.value)}>
                       {[...new Set([base, expenseForm.currency, ...CURRENCY_OPTIONS])].map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="expense-category" className="block text-sm font-medium text-gray-800 mb-1">カテゴリ</label>
+                    <label htmlFor="expense-category" className="block text-sm font-medium text-ink-900 mb-1">カテゴリ</label>
                     <select id="expense-category" className={inputClass} value={expenseForm.category}
                       onChange={(e) => updateExp('category', e.target.value as ExpenseCategory)}>
                       {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -464,7 +464,7 @@ const ExpensesPage: React.FC = () => {
                 </div>
                 {expenseForm.currency !== base && rates.some((r) => r.currency === expenseForm.currency) && (
                   <div>
-                    <label htmlFor="expense-fx-record" className="block text-sm font-medium text-gray-800 mb-1">記録した為替</label>
+                    <label htmlFor="expense-fx-record" className="block text-sm font-medium text-ink-900 mb-1">記録した為替</label>
                     <select id="expense-fx-record" className={inputClass} value={extra.fx_rate_id}
                       onChange={(e) => setExtra({ ...extra, fx_rate_id: e.target.value })}>
                       <option value="">使わない(下にレートを入力)</option>
@@ -476,33 +476,33 @@ const ExpensesPage: React.FC = () => {
                 )}
                 {expenseForm.currency !== base && !(extra.fx_rate_id && rates.some((r) => r.id === extra.fx_rate_id && r.currency === expenseForm.currency)) && (
                   <div>
-                    <label htmlFor="expense-rate" className="block text-sm font-medium text-gray-800 mb-1">
+                    <label htmlFor="expense-rate" className="block text-sm font-medium text-ink-900 mb-1">
                       換算レート(1 {expenseForm.currency} = ? {base})
                     </label>
                     <input id="expense-rate" inputMode="decimal" className={inputClass} value={expenseForm.fx_rate}
                       onChange={(e) => updateExp('fx_rate', e.target.value)} />
-                    <p className="text-xs text-gray-700 mt-1">空欄のままだと、この支出は合計・精算に含まれません(後で入力できます)。</p>
+                    <p className="text-xs text-ink-700 mt-1">空欄のままだと、この支出は合計・精算に含まれません(後で入力できます)。</p>
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label htmlFor="expense-date" className="block text-sm font-medium text-gray-800 mb-1">日付(任意)</label>
+                    <label htmlFor="expense-date" className="block text-sm font-medium text-ink-900 mb-1">日付(任意)</label>
                     <input id="expense-date" type="date" className={inputClass} value={expenseForm.local_date}
                       onChange={(e) => updateExp('local_date', e.target.value)} />
                   </div>
                   <div>
-                    <label htmlFor="expense-tax" className="block text-sm font-medium text-gray-800 mb-1">うち税(任意)</label>
+                    <label htmlFor="expense-tax" className="block text-sm font-medium text-ink-900 mb-1">うち税(任意)</label>
                     <input id="expense-tax" inputMode="decimal" className={inputClass} value={expenseForm.tax_amount}
                       onChange={(e) => updateExp('tax_amount', e.target.value)} />
                   </div>
                   <div>
-                    <label htmlFor="expense-fee" className="block text-sm font-medium text-gray-800 mb-1">うち手数料(任意)</label>
+                    <label htmlFor="expense-fee" className="block text-sm font-medium text-ink-900 mb-1">うち手数料(任意)</label>
                     <input id="expense-fee" inputMode="decimal" className={inputClass} value={expenseForm.fee_amount}
                       onChange={(e) => updateExp('fee_amount', e.target.value)} />
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="expense-payer" className="block text-sm font-medium text-gray-800 mb-1">
+                  <label htmlFor="expense-payer" className="block text-sm font-medium text-ink-900 mb-1">
                     {expenseMode.mode === 'refund' ? '返金を受け取った人' : '支払った人'}
                   </label>
                   <select id="expense-payer" className={inputClass} value={expenseForm.paid_by_user_id}
@@ -511,7 +511,7 @@ const ExpensesPage: React.FC = () => {
                   </select>
                 </div>
                 <fieldset>
-                  <legend className="block text-sm font-medium text-gray-800 mb-1">分け方</legend>
+                  <legend className="block text-sm font-medium text-ink-900 mb-1">分け方</legend>
                   <div className="flex flex-wrap gap-4 text-sm">
                     {SPLIT_OPTIONS.map((o) => (
                       <label key={o.value} className="flex items-center gap-1">
@@ -524,7 +524,7 @@ const ExpensesPage: React.FC = () => {
                 </fieldset>
                 {expenseForm.split_method !== 'none' && (
                   <fieldset>
-                    <legend className="block text-sm font-medium text-gray-800 mb-1">負担する人</legend>
+                    <legend className="block text-sm font-medium text-ink-900 mb-1">負担する人</legend>
                     <div className="space-y-2">
                       {Object.entries(expenseForm.participants).map(([id, p]) => (
                         <div key={id} className="flex flex-wrap items-center gap-2 text-sm">
@@ -546,7 +546,7 @@ const ExpensesPage: React.FC = () => {
                   </fieldset>
                 )}
                 <div>
-                  <label htmlFor="expense-receipt" className="block text-sm font-medium text-gray-800 mb-1">領収書(任意)</label>
+                  <label htmlFor="expense-receipt" className="block text-sm font-medium text-ink-900 mb-1">領収書(任意)</label>
                   <select id="expense-receipt" className={inputClass} value={extra.receipt_document_id}
                     onChange={(e) => setExtra({ ...extra, receipt_document_id: e.target.value })}>
                     <option value="">なし</option>
@@ -557,10 +557,10 @@ const ExpensesPage: React.FC = () => {
                       <option key={d.id} value={d.id}>{d.original_filename ?? d.document_type ?? `文書 ${d.id.slice(0, 8)}`}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-700 mt-1">「文書」に登録した領収書を選べます。</p>
+                  <p className="text-xs text-ink-700 mt-1">「文書」に登録した領収書を選べます。</p>
                 </div>
                 <div>
-                  <label htmlFor="expense-note" className="block text-sm font-medium text-gray-800 mb-1">メモ(任意)</label>
+                  <label htmlFor="expense-note" className="block text-sm font-medium text-ink-900 mb-1">メモ(任意)</label>
                   <input id="expense-note" className={inputClass} maxLength={500} value={expenseForm.note}
                     onChange={(e) => updateExp('note', e.target.value)} />
                 </div>
@@ -580,11 +580,11 @@ const ExpensesPage: React.FC = () => {
             <Modal.Body>
               <div className="space-y-3">
                 {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-ink-900">
                   「{voidTarget.title}」を取り消します。記録は残り、合計・精算からは外れます(元には戻せません)。
                 </p>
                 <div>
-                  <label htmlFor="void-reason" className="block text-sm font-medium text-gray-800 mb-1">取り消す理由</label>
+                  <label htmlFor="void-reason" className="block text-sm font-medium text-ink-900 mb-1">取り消す理由</label>
                   <input id="void-reason" className={inputClass} maxLength={200} value={voidReason}
                     onChange={(e) => setVoidReason(e.target.value)} placeholder="例: 二重に登録した" />
                 </div>

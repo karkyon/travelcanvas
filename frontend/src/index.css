@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 /* [Gate G9] UX-1 デザインの決まり(--tc-* の変数と面の部品)。今の画面の見た目は変えない */
 @import './styles/tokens.css';
+/* [Gate G10-UX] UX-8 暗い見た目を全ての画面へ(Tailwind の色のクラスの置き換え。darkBridge.ts が作る) */
+@import './styles/theme-dark.css';
 
 @theme {
   --font-inter: Inter, sans-serif;
@@ -37,6 +39,11 @@
   --color-info: var(--tc-info);
   --color-info-soft: var(--tc-info-soft);
   --color-focus: var(--tc-focus);
+  /* [Gate G10-UX] UX-6 */
+  --color-on-accent: var(--tc-on-accent);
+  --color-danger-solid: var(--tc-danger-solid);
+  /* 白い面(カード・入力・表)。明るい見た目では白、暗い見た目では面の色 */
+  --color-surface: var(--tc-surface-solid);
 }
 
 /*

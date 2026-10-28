@@ -51,7 +51,7 @@ const AdminMfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   if (load.state === 'loading') {
-    return <p role="status" className="p-8 text-gray-700">確認しています…</p>;
+    return <p role="status" className="p-8 text-ink-700">確認しています…</p>;
   }
   if (load.state === 'error') {
     return (
@@ -66,11 +66,11 @@ const AdminMfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900 mb-3">管理者の確認</h1>
+      <div className="w-full max-w-md rounded-2xl bg-surface p-8 shadow-sm">
+        <h1 className="text-xl font-bold text-ink-900 mb-3">管理者の確認</h1>
         {!status.enabled ? (
           <>
-            <p className="text-sm text-gray-800 mb-4">
+            <p className="text-sm text-ink-900 mb-4">
               管理者の画面を使うには、多要素認証(認証アプリの確認コード)を有効にしてください。
               パスワードだけが漏れても、管理者の操作をされないようにするためです。
             </p>
@@ -81,11 +81,11 @@ const AdminMfaGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           </>
         ) : (
           <form onSubmit={submit} className="space-y-4">
-            <p className="text-sm text-gray-800">
+            <p className="text-sm text-ink-900">
               認証アプリの6桁の確認コード(または回復コード)を入力してください。確認は12時間ごとに求めます。
             </p>
             <div>
-              <label htmlFor="admin-mfa-code" className="block text-sm font-medium text-gray-700 mb-1">確認コード</label>
+              <label htmlFor="admin-mfa-code" className="block text-sm font-medium text-ink-700 mb-1">確認コード</label>
               <input id="admin-mfa-code" type="text" autoComplete="one-time-code" maxLength={32} autoFocus required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
                 value={code} onChange={(e) => setCode(e.target.value)} />

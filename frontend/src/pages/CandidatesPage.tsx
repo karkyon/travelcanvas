@@ -23,7 +23,7 @@ const REASON_LABEL: Record<string, string> = {
 };
 const PRIORITY_LABEL: Record<number, string> = { 1: '高', 2: '中', 3: '低' };
 const STATUS_BADGE: Record<string, string> = {
-  open: 'bg-indigo-50 text-indigo-900', scheduled: 'bg-green-50 text-green-900', dismissed: 'bg-gray-100 text-gray-800',
+  open: 'bg-indigo-50 text-indigo-900', scheduled: 'bg-green-50 text-green-900', dismissed: 'bg-gray-100 text-ink-900',
 };
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ja-JP', { dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -58,7 +58,7 @@ const CandidatesPage: React.FC = () => {
     load();
   }, [load]);
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const run = async (fn: () => Promise<CandidateList | void>, done: string, fallback: string) => {
     setBusy(true);
@@ -111,8 +111,8 @@ const CandidatesPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">候補箱</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">候補箱</h1>
+      <p className="text-sm text-ink-700 mt-1">
         行きたい場所・気になる店を、まだ予定にしないで貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。
         URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。
       </p>
@@ -126,21 +126,21 @@ const CandidatesPage: React.FC = () => {
           {canEdit && (
             <Card className="mt-4 p-4">
               <form aria-label="候補を追加" onSubmit={add} className="space-y-3">
-                <h2 className="text-lg font-semibold text-gray-900">候補を追加</h2>
-                <label className="block text-sm text-gray-800">名前
-                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.title} maxLength={200}
+                <h2 className="text-lg font-semibold text-ink-900">候補を追加</h2>
+                <label className="block text-sm text-ink-900">名前
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.title} maxLength={200}
                     onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 </label>
-                <label className="block text-sm text-gray-800">URL(任意)
-                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.source_url} inputMode="url"
+                <label className="block text-sm text-ink-900">URL(任意)
+                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.source_url} inputMode="url"
                     onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://" />
                 </label>
-                <label className="block text-sm text-gray-800">メモ(任意)
-                  <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-gray-900" value={form.note} maxLength={2000}
+                <label className="block text-sm text-ink-900">メモ(任意)
+                  <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.note} maxLength={2000}
                     rows={2} onChange={(e) => setForm({ ...form, note: e.target.value })} />
                 </label>
-                <label className="block text-sm text-gray-800">優先度
-                  <select className="ml-2 border rounded-sm px-2 py-1 text-gray-900" value={form.priority}
+                <label className="block text-sm text-ink-900">優先度
+                  <select className="ml-2 border rounded-sm px-2 py-1 text-ink-900" value={form.priority}
                     onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}>
                     {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
                   </select>
@@ -152,8 +152,8 @@ const CandidatesPage: React.FC = () => {
 
           <section aria-label="候補の一覧" className="mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">候補({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
-              <label className="text-sm text-gray-800 inline-flex items-center gap-1">
+              <h2 className="text-lg font-semibold text-ink-900">候補({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
+              <label className="text-sm text-ink-900 inline-flex items-center gap-1">
                 <input type="checkbox" checked={showDismissed} onChange={() => setShowDismissed((v) => !v)} />
                 見送り・まとめた候補も出す({data.counts.dismissed}件)
               </label>
@@ -161,7 +161,7 @@ const CandidatesPage: React.FC = () => {
             {data.duplicate_pairs > 0 && (
               <p className="text-sm text-amber-900">重複の可能性がある候補が {data.duplicate_pairs}組あります(自動では消しません)。</p>
             )}
-            {items.length === 0 && <p className="text-gray-700">候補はまだありません。</p>}
+            {items.length === 0 && <p className="text-ink-700">候補はまだありません。</p>}
             {items.map((c) => {
               const headingId = `cand-${c.id}`;
               const s = scheduling[c.id] ?? { day_id: days[0]?.id ?? '', time: '' };
@@ -169,11 +169,11 @@ const CandidatesPage: React.FC = () => {
                 <Card key={c.id} className="p-4">
                   <article aria-labelledby={headingId}>
                     <div className="flex flex-wrap items-baseline gap-2">
-                      <h3 id={headingId} className="font-semibold text-gray-900">{c.title}</h3>
+                      <h3 id={headingId} className="font-semibold text-ink-900">{c.title}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
-                      <span className="text-xs text-gray-700">優先度 {PRIORITY_LABEL[c.priority]}</span>
+                      <span className="text-xs text-ink-700">優先度 {PRIORITY_LABEL[c.priority]}</span>
                     </div>
-                    <p className="text-sm text-gray-700 mt-1">
+                    <p className="text-sm text-ink-700 mt-1">
                       {c.created_by} が {fmt(c.created_at)} に追加
                       {c.source_url && (safeExternalUrl(c.source_url)
                         ? <>・出典 <a className="text-indigo-800 underline" href={safeExternalUrl(c.source_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow">{c.source_label}</a></>
@@ -181,11 +181,11 @@ const CandidatesPage: React.FC = () => {
                       )}
                       {c.provider && `・${c.provider}${c.retrieved_at ? `(${fmt(c.retrieved_at)}取得)` : ''}`}
                     </p>
-                    {c.note && <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">{c.note}</p>}
+                    {c.note && <p className="text-sm text-ink-900 mt-1 whitespace-pre-wrap">{c.note}</p>}
                     {c.merged_from.length > 0 && (
-                      <p className="text-sm text-gray-800 mt-1">まとめた候補: {c.merged_from.map((m) => m.title).join('、')}</p>
+                      <p className="text-sm text-ink-900 mt-1">まとめた候補: {c.merged_from.map((m) => m.title).join('、')}</p>
                     )}
-                    {c.merged_into_id && <p className="text-sm text-gray-800 mt-1">「{titleOf(c.merged_into_id)}」にまとめました</p>}
+                    {c.merged_into_id && <p className="text-sm text-ink-900 mt-1">「{titleOf(c.merged_into_id)}」にまとめました</p>}
                     {c.duplicates.map((d) => (
                       <div key={d.id} className="mt-2 text-sm text-amber-900 flex flex-wrap items-center gap-2">
                         <span>「{d.title}」と重複の可能性({d.reasons.map((r) => REASON_LABEL[r] ?? r).join('・')})</span>
@@ -202,14 +202,14 @@ const CandidatesPage: React.FC = () => {
                       <div className="mt-3 flex flex-wrap items-end gap-2">
                         {c.status === 'open' && (
                           <>
-                            <label className="text-sm text-gray-800">日
-                              <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={s.day_id}
+                            <label className="text-sm text-ink-900">日
+                              <select className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={s.day_id}
                                 onChange={(e) => setScheduling((x) => ({ ...x, [c.id]: { ...s, day_id: e.target.value } }))}>
                                 {days.map((d) => <option key={d.id} value={d.id}>{d.local_date}{d.title ? ` ${d.title}` : ''}</option>)}
                               </select>
                             </label>
-                            <label className="text-sm text-gray-800">時刻
-                              <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={s.time}
+                            <label className="text-sm text-ink-900">時刻
+                              <input type="time" className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={s.time}
                                 onChange={(e) => setScheduling((x) => ({ ...x, [c.id]: { ...s, time: e.target.value } }))} />
                             </label>
                             <Button size="sm" disabled={busy || days.length === 0} onClick={() => schedule(c)}

@@ -14,7 +14,7 @@ const STATE: Record<JobState, { label: string; cls: string }> = {
   ok: { label: '正常', cls: 'text-green-800' },
   overdue: { label: '遅れ', cls: 'text-red-800' },
   failing: { label: '失敗が続いている', cls: 'text-red-800' },
-  never: { label: '記録なし', cls: 'text-gray-700' },
+  never: { label: '記録なし', cls: 'text-ink-700' },
 };
 
 const interval = (m: number) => (m >= 1440 ? `${Math.round(m / 1440)}日ごと` : m >= 60 ? `${Math.round(m / 60)}時間ごと` : `${m}分ごと`);
@@ -30,8 +30,8 @@ const AdminJobsPanel: React.FC = () => {
   return (
     <Card padding="md" className="mt-6">
       <section aria-labelledby="ops-jobs-heading">
-        <h2 id="ops-jobs-heading" className="text-xl font-semibold text-gray-900">定期の処理</h2>
-        <p className="text-sm text-gray-700 mt-1">
+        <h2 id="ops-jobs-heading" className="text-xl font-semibold text-ink-900">定期の処理</h2>
+        <p className="text-sm text-ink-700 mt-1">
           削除の期限・送信の再送などの処理が続いて動いているかを、最後の成功からの経過で確かめます(中身は件数だけ)。
         </p>
         {error && <p className="text-sm text-red-800 mt-2" role="alert">{error}</p>}
@@ -42,7 +42,7 @@ const AdminJobsPanel: React.FC = () => {
           <div className="overflow-x-auto mt-2">
             <table className="w-full text-sm" aria-label="定期の処理の状態">
               <thead>
-                <tr className="text-left text-gray-700">
+                <tr className="text-left text-ink-700">
                   <th scope="col" className="font-medium">処理</th>
                   <th scope="col" className="font-medium">間隔</th>
                   <th scope="col" className="font-medium">状態</th>
@@ -53,7 +53,7 @@ const AdminJobsPanel: React.FC = () => {
               <tbody>
                 {data.jobs.map((j) => (
                   <tr key={j.job} className="border-t border-gray-100">
-                    <th scope="row" className="font-normal text-gray-900">{j.job}</th>
+                    <th scope="row" className="font-normal text-ink-900">{j.job}</th>
                     <td>{interval(j.expected_minutes)}</td>
                     <td className={STATE[j.state].cls}>{STATE[j.state].label}</td>
                     <td>{j.last_success_at ? `${new Date(j.last_success_at).toLocaleString('ja-JP')}(${j.minutes_since_success}分前)` : '—'}</td>

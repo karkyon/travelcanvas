@@ -30,7 +30,7 @@ const inputClass =
 const primary =
   'px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-50';
 const secondary =
-  'px-4 py-2 rounded-lg text-sm font-medium text-gray-800 border border-gray-400 hover:bg-gray-100 disabled:opacity-50';
+  'px-4 py-2 rounded-lg text-sm font-medium text-ink-900 border border-gray-400 hover:bg-gray-100 disabled:opacity-50';
 
 const MfaSection: React.FC = () => {
   const [status, setStatusState] = useState<MfaStatus | null>(null);
@@ -132,8 +132,8 @@ const MfaSection: React.FC = () => {
 
   return (
     <section aria-labelledby="mfa-heading" className="border-t pt-6">
-      <h3 id="mfa-heading" className="text-lg font-semibold text-gray-900 mb-2">多要素認証(認証アプリ)</h3>
-      <p className="text-sm text-gray-700 mb-4">
+      <h3 id="mfa-heading" className="text-lg font-semibold text-ink-900 mb-2">多要素認証(認証アプリ)</h3>
+      <p className="text-sm text-ink-700 mb-4">
         ログインの時に、パスワードに加えて認証アプリ(Google Authenticator・Microsoft Authenticator など)の
         6桁の確認コードを求めます。パスワードが漏れても、確認コードが無ければログインできません。
       </p>
@@ -161,7 +161,7 @@ const MfaSection: React.FC = () => {
       {status && step === 'idle' && (
         status.enabled ? (
           <div className="space-y-3">
-            <p className="text-sm text-gray-900" data-testid="mfa-state">
+            <p className="text-sm text-ink-900" data-testid="mfa-state">
               <span className="font-semibold text-green-800">有効</span>
               (回復コードの残り {status.recovery_codes_remaining} 個)
             </p>
@@ -176,7 +176,7 @@ const MfaSection: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-gray-900" data-testid="mfa-state">未設定</p>
+            <p className="text-sm text-ink-900" data-testid="mfa-state">未設定</p>
             <button type="button" className={primary} onClick={() => { setNotice(null); setStep('password'); }}>
               多要素認証を設定する
             </button>
@@ -186,7 +186,7 @@ const MfaSection: React.FC = () => {
 
       {step === 'password' && (
         <form onSubmit={startSetup} className="space-y-3 max-w-md">
-          <label htmlFor="mfa-current-password" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="mfa-current-password" className="block text-sm font-medium text-ink-700">
             確認のため、現在のパスワードを入力してください
           </label>
           <input id="mfa-current-password" type="password" autoComplete="current-password" className={inputClass}
@@ -200,20 +200,20 @@ const MfaSection: React.FC = () => {
 
       {step === 'scan' && setup && (
         <form onSubmit={confirmSetup} className="space-y-4 max-w-md">
-          <ol className="list-decimal pl-5 text-sm text-gray-800 space-y-1">
+          <ol className="list-decimal pl-5 text-sm text-ink-900 space-y-1">
             <li>認証アプリで QR コードを読み取ってください(読み取れない時は下のキーを手で入力します)。</li>
             <li>アプリに表示された6桁の確認コードを入力してください。</li>
           </ol>
           <LocalQrCode value={setup.otpauth_uri} size={180} label="認証アプリに登録する QR コード" />
           <div>
-            <p className="text-sm font-medium text-gray-700">手入力用のキー</p>
-            <code className="block break-all rounded-sm bg-gray-100 px-2 py-1 text-sm text-gray-900" data-testid="mfa-secret"
+            <p className="text-sm font-medium text-ink-700">手入力用のキー</p>
+            <code className="block break-all rounded-sm bg-gray-100 px-2 py-1 text-sm text-ink-900" data-testid="mfa-secret"
               data-secret={setup.secret}>
               {groupSecret(setup.secret)}
             </code>
           </div>
           <div>
-            <label htmlFor="mfa-setup-code" className="block text-sm font-medium text-gray-700">確認コード(6桁)</label>
+            <label htmlFor="mfa-setup-code" className="block text-sm font-medium text-ink-700">確認コード(6桁)</label>
             <input id="mfa-setup-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8}
               className={inputClass} value={code} onChange={(e) => setCode(e.target.value)} required />
           </div>
@@ -226,12 +226,12 @@ const MfaSection: React.FC = () => {
 
       {step === 'codes' && codes && (
         <div className="space-y-3 max-w-md" aria-labelledby="mfa-codes-heading">
-          <h4 id="mfa-codes-heading" className="font-semibold text-gray-900">回復コード</h4>
-          <p className="text-sm text-gray-800">
+          <h4 id="mfa-codes-heading" className="font-semibold text-ink-900">回復コード</h4>
+          <p className="text-sm text-ink-900">
             端末をなくした時に、確認コードの代わりに1回ずつ使えます。この画面を閉じると二度と表示されません。
             印刷するか、パスワード管理アプリなどの安全な場所に保存してください。
           </p>
-          <ul className="grid grid-cols-2 gap-1 rounded-sm bg-gray-100 p-3 font-mono text-sm text-gray-900"
+          <ul className="grid grid-cols-2 gap-1 rounded-sm bg-gray-100 p-3 font-mono text-sm text-ink-900"
             data-testid="mfa-recovery-codes">
             {codes.map((c) => <li key={c}>{c}</li>)}
           </ul>
@@ -246,16 +246,16 @@ const MfaSection: React.FC = () => {
 
       {(step === 'disable' || step === 'regenerate') && (
         <form onSubmit={submitWithCode} className="space-y-3 max-w-md">
-          <p className="text-sm text-gray-800">
+          <p className="text-sm text-ink-900">
             {step === 'disable'
               ? '無効にすると、パスワードだけでログインできるようになり、ほかの端末はログアウトします。'
               : '作り直すと、今までの回復コードは使えなくなります。'}
             {step === 'disable' && status?.is_admin && ' 管理者の画面は使えなくなります。'}
           </p>
-          <label htmlFor="mfa-confirm-password" className="block text-sm font-medium text-gray-700">現在のパスワード</label>
+          <label htmlFor="mfa-confirm-password" className="block text-sm font-medium text-ink-700">現在のパスワード</label>
           <input id="mfa-confirm-password" type="password" autoComplete="current-password" className={inputClass}
             value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <label htmlFor="mfa-confirm-code" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="mfa-confirm-code" className="block text-sm font-medium text-ink-700">
             確認コード{step === 'disable' ? '(または回復コード)' : '(6桁)'}
           </label>
           <input id="mfa-confirm-code" type="text" autoComplete="one-time-code" maxLength={32} className={inputClass}

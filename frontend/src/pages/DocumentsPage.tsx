@@ -157,7 +157,7 @@ const DocumentsPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-500">
+      <div className="p-8 text-center text-ink-500">
         プランが選択されていません。
         <div className="mt-4">
           <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
@@ -173,8 +173,8 @@ const DocumentsPage: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
             ← プランへ戻る
           </Button>
-          <h1 className="text-2xl font-bold text-gray-900">文書ウォレット</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink-900">文書ウォレット</h1>
+          <p className="text-sm text-ink-500 mt-1">
             領収書・確認書等のファイルをアップロード・管理できます(暗号化して保存されます)。
           </p>
         </div>
@@ -190,7 +190,7 @@ const DocumentsPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : documents.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-500">
+        <Card padding="lg" className="text-center text-ink-500">
           文書がまだ登録されていません。「新規アップロード」から追加できます。
         </Card>
       ) : (
@@ -201,10 +201,10 @@ const DocumentsPage: React.FC = () => {
                 <div className="flex items-center gap-3 min-w-0">
                   <FileText size={20} className="text-gray-400 shrink-0" />
                   <div className="min-w-0">
-                    <div className="font-medium text-gray-900 truncate">
+                    <div className="font-medium text-ink-900 truncate">
                       {d.original_filename ?? '(ファイル名不明)'}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-ink-500">
                       {CLASSIFICATION_LABEL[d.classification] ?? d.classification}
                       {d.document_type && ` ・ ${d.document_type}`}
                       {' ・ '}{formatSize(d.size)}
@@ -216,7 +216,7 @@ const DocumentsPage: React.FC = () => {
                     type="button"
                     onClick={() => handleDownload(d)}
                     disabled={downloadingId === d.id}
-                    className="text-gray-500 hover:text-blue-600 p-1 disabled:opacity-50"
+                    className="text-ink-500 hover:text-blue-600 p-1 disabled:opacity-50"
                     aria-label="ダウンロード"
                   >
                     <Download size={16} />
@@ -224,7 +224,7 @@ const DocumentsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDelete(d)}
-                    className="text-gray-500 hover:text-red-600 p-1"
+                    className="text-ink-500 hover:text-red-600 p-1"
                     aria-label="削除"
                   >
                     <Trash2 size={16} />
@@ -247,20 +247,20 @@ const DocumentsPage: React.FC = () => {
           <Modal.Body>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ファイル</label>
+                <label className="block text-sm font-medium text-ink-700 mb-1">ファイル</label>
                 <input
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileSelect}
                   className="w-full text-sm"
                 />
-                <div className="text-xs text-gray-600 mt-1">
+                <div className="text-xs text-ink-700 mt-1">
                   PDF・画像(jpg/png/gif/webp/bmp)・Office文書に対応。サーバー側で暗号化して保存されます。
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">分類</label>
+                <label className="block text-sm font-medium text-ink-700 mb-1">分類</label>
                 <select
                   value={classification}
                   onChange={(e) => setClassification(e.target.value as DocumentClassification)}

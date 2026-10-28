@@ -53,8 +53,8 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
   return (
     <Card padding="md">
       <section aria-labelledby="branch-resources">
-        <h2 id="branch-resources" className="font-semibold text-gray-900">移動区間・予約</h2>
-        <p className="text-xs text-gray-700 mt-1">
+        <h2 id="branch-resources" className="font-semibold text-ink-900">移動区間・予約</h2>
+        <p className="text-xs text-ink-700 mt-1">
           この案の中だけで変えます。採用するまで本案は変わりません。予約は予約先へ何も送りません。
         </p>
         {(pending.segments.length > 0 || pending.reservations.length > 0) && (
@@ -66,8 +66,8 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
           </p>
         )}
 
-        <h3 className="font-medium text-gray-900 mt-3">移動区間</h3>
-        {resources.base_segments.length === 0 && <p className="text-sm text-gray-700">本案に移動区間はありません。</p>}
+        <h3 className="font-medium text-ink-900 mt-3">移動区間</h3>
+        {resources.base_segments.length === 0 && <p className="text-sm text-ink-700">本案に移動区間はありません。</p>}
         <ul className="space-y-2 mt-1" aria-label="移動区間">
           {resources.base_segments.map((s) => {
             const op = segmentOp(value, s.id);
@@ -77,17 +77,17 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
             const cur = <K extends keyof typeof s>(k: K) => (k in fields ? (fields as Record<string, unknown>)[k as string] : s[k]);
             return (
               <li key={s.id} className={`border rounded-sm p-2 ${removed ? 'bg-gray-50' : ''}`} data-testid={`branch-segment-${s.id}`}>
-                <p className={`text-sm text-gray-900 ${removed ? 'line-through' : ''}`}>{describeSegment(s, title)}</p>
+                <p className={`text-sm text-ink-900 ${removed ? 'line-through' : ''}`}>{describeSegment(s, title)}</p>
                 <div className="grid gap-2 sm:grid-cols-4 mt-1 items-end">
                   <div>
-                    <label htmlFor={`seg-mode-${s.id}`} className="block text-xs text-gray-800">移動手段</label>
+                    <label htmlFor={`seg-mode-${s.id}`} className="block text-xs text-ink-900">移動手段</label>
                     <select id={`seg-mode-${s.id}`} className={input} disabled={!editable || removed || touchesRemoved}
                       value={String(cur('mode'))} onChange={(e) => onChange(setSegmentField(value, s, 'mode', e.target.value))}>
                       {MODE_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label htmlFor={`seg-min-${s.id}`} className="block text-xs text-gray-800">所要時間(分)</label>
+                    <label htmlFor={`seg-min-${s.id}`} className="block text-xs text-ink-900">所要時間(分)</label>
                     <input id={`seg-min-${s.id}`} type="number" min={0} className={input}
                       disabled={!editable || removed || touchesRemoved}
                       value={cur('duration_minutes') === null || cur('duration_minutes') === undefined ? '' : String(cur('duration_minutes'))}
@@ -96,7 +96,7 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
                   </div>
                   {!resources.costs_hidden && (
                     <div>
-                      <label htmlFor={`seg-cost-${s.id}`} className="block text-xs text-gray-800">費用</label>
+                      <label htmlFor={`seg-cost-${s.id}`} className="block text-xs text-ink-900">費用</label>
                       <input id={`seg-cost-${s.id}`} type="number" min={0} className={input}
                         disabled={!editable || removed || touchesRemoved}
                         value={cur('cost') === null || cur('cost') === undefined ? '' : String(Number(cur('cost')))}
@@ -122,7 +122,7 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
           })}
           {value.segments.filter((s) => s.op === 'add').map((s) => s.op === 'add' && (
             <li key={s.key} className="border rounded-sm p-2 bg-green-50" data-testid={`branch-segment-new-${s.key}`}>
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-ink-900">
                 {`追加: ${title(refId(s.fields.from))} → ${title(refId(s.fields.to))}`
                   + `(${MODE_OPTIONS.find((m) => m.value === s.fields.mode)?.label ?? s.fields.mode}`
                   + `${s.fields.duration_minutes !== undefined && s.fields.duration_minutes !== null ? `・${s.fields.duration_minutes}分` : ''})`}
@@ -135,30 +135,30 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
         </ul>
         {editable && live.length >= 2 && (
           <fieldset className="mt-2 border rounded-sm p-2">
-            <legend className="text-xs text-gray-800 px-1">区間を足す</legend>
+            <legend className="text-xs text-ink-900 px-1">区間を足す</legend>
             <div className="grid gap-2 sm:grid-cols-4 items-end">
               <div>
-                <label htmlFor="seg-add-from" className="block text-xs text-gray-800">出発の予定</label>
+                <label htmlFor="seg-add-from" className="block text-xs text-ink-900">出発の予定</label>
                 <select id="seg-add-from" className={input} value={from} onChange={(e) => setFrom(e.target.value)}>
                   <option value="">選ぶ</option>
                   {live.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="seg-add-to" className="block text-xs text-gray-800">到着の予定</label>
+                <label htmlFor="seg-add-to" className="block text-xs text-ink-900">到着の予定</label>
                 <select id="seg-add-to" className={input} value={to} onChange={(e) => setTo(e.target.value)}>
                   <option value="">選ぶ</option>
                   {live.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="seg-add-mode" className="block text-xs text-gray-800">移動手段</label>
+                <label htmlFor="seg-add-mode" className="block text-xs text-ink-900">移動手段</label>
                 <select id="seg-add-mode" className={input} value={mode} onChange={(e) => setMode(e.target.value as SegmentMode)}>
                   {MODE_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="seg-add-min" className="block text-xs text-gray-800">所要時間(分・空なら概算)</label>
+                <label htmlFor="seg-add-min" className="block text-xs text-ink-900">所要時間(分・空なら概算)</label>
                 <input id="seg-add-min" type="number" min={0} className={input} value={minutes}
                   onChange={(e) => setMinutes(e.target.value)} />
               </div>
@@ -171,8 +171,8 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
 
         {!resources.reservations_hidden && (
           <>
-            <h3 className="font-medium text-gray-900 mt-4">予約</h3>
-            {resources.base_reservations.length === 0 && <p className="text-sm text-gray-700">本案に予約はありません。</p>}
+            <h3 className="font-medium text-ink-900 mt-4">予約</h3>
+            {resources.base_reservations.length === 0 && <p className="text-sm text-ink-700">本案に予約はありません。</p>}
             <ul className="space-y-2 mt-1" aria-label="予約">
               {resources.base_reservations.map((r) => {
                 const op = reservationOp(value, r.id);
@@ -180,13 +180,13 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
                 const cancel = op?.op === 'cancel';
                 return (
                   <li key={r.id} className="border rounded-sm p-2" data-testid={`branch-reservation-${r.id}`}>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-ink-900">
                       {`${r.label}(${r.event_ids.length ? r.event_ids.map((e) => title(e)).join('・') : '予定なし'})`}
-                      {r.locked && <span className="ml-2 px-1.5 rounded-sm bg-gray-200 text-gray-900 text-xs">確定した紐付け</span>}
+                      {r.locked && <span className="ml-2 px-1.5 rounded-sm bg-gray-200 text-ink-900 text-xs">確定した紐付け</span>}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto] items-end mt-1">
                       <div>
-                        <label htmlFor={`res-to-${r.id}`} className="block text-xs text-gray-800">付け替え先</label>
+                        <label htmlFor={`res-to-${r.id}`} className="block text-xs text-ink-900">付け替え先</label>
                         <select id={`res-to-${r.id}`} className={input} disabled={!editable || r.locked || cancel}
                           value={relinkTo}
                           onChange={(e) => {
@@ -204,7 +204,7 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
                             <option key={e.id} value={e.id}>{e.label}</option>)}
                         </select>
                       </div>
-                      <label className="flex items-center gap-1 text-sm text-gray-900">
+                      <label className="flex items-center gap-1 text-sm text-ink-900">
                         <input type="checkbox" checked={cancel} disabled={!editable || r.locked || r.status === 'cancelled'}
                           onChange={(e) => onChange(setReservationOp(value, r.id,
                             e.target.checked ? { op: 'cancel', reservation_id: r.id, note: null } : null))} />
@@ -224,7 +224,7 @@ const BranchResourcesPanel: React.FC<Props> = ({ resources, value, items, baseTi
           </>
         )}
         {resources.reservations_hidden && (
-          <p className="text-sm text-gray-700 mt-3">予約は見せない設定のため表示していません。</p>
+          <p className="text-sm text-ink-700 mt-3">予約は見せない設定のため表示していません。</p>
         )}
       </section>
     </Card>

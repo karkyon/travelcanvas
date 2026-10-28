@@ -17,6 +17,7 @@ import Header from './Header';
 import { useAuthStore } from '../store/authStore';
 import { useCurrentTripStore } from '../store/currentTripStore';
 import type { User } from '../types';
+import { useThemeStore } from '../hooks/useThemePreference';
 
 const PLAN = '11111111-2222-3333-4444-555555555555';
 
@@ -72,5 +73,19 @@ describe('Header (Gate G9 UX-3)', () => {
     const menuBtn = screen.getByRole('button', { name: 'メニューを開く' });
     fireEvent.click(menuBtn);
     await waitFor(() => expect(screen.getByRole('button', { name: 'メニューを閉じる' })).toHaveAttribute('aria-expanded', 'true'));
+  });
+
+  it('[Gate G10-UX] UX-8 ユーザーのメニューで見た目(明るい・暗い・端末)を選べ、選んだものを aria-pressed で示す', async () => {
+    useThemeStore.setState({ preference: 'system' });
+    await renderAt('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /^alice/ }));
+    const group = screen.getByRole('group', { name: '表示' });
+    expect(within(group).getByRole('button', { name: '端末' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: '暗い' }));
+    expect(useThemeStore.getState().preference).toBe('dark');
+    expect(window.localStorage.getItem('tc.theme')).toBe('dark');
+    expect(within(group).getByRole('button', { name: '暗い' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(group).getByRole('button', { name: '端末' }));
+    expect(window.localStorage.getItem('tc.theme')).toBeNull();
   });
 });

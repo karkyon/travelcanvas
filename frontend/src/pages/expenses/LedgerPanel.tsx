@@ -87,10 +87,10 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
 
       <Card padding="md">
         <section aria-labelledby="ledger-lock-heading">
-          <h2 id="ledger-lock-heading" className="text-lg font-semibold text-gray-900 mb-2">精算の締め</h2>
+          <h2 id="ledger-lock-heading" className="text-lg font-semibold text-ink-900 mb-2">精算の締め</h2>
           {locked ? (
             <>
-              <p className="text-sm text-gray-800 mb-3">
+              <p className="text-sm text-ink-900 mb-3">
                 精算を締めています(支出・精算・端数の規則は変えられません)。
               </p>
               {isOwner && (
@@ -100,11 +100,11 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
                     .then(() => setUnlockReason(''));
                 }}>
                   <div className="flex-1 min-w-48">
-                    <label htmlFor="unlock-reason" className="block text-sm font-medium text-gray-800 mb-1">解除する理由</label>
+                    <label htmlFor="unlock-reason" className="block text-sm font-medium text-ink-900 mb-1">解除する理由</label>
                     <input id="unlock-reason" className={inputClass} maxLength={200} value={unlockReason}
                       onChange={(e) => setUnlockReason(e.target.value)} />
                   </div>
-                  <button type="submit" disabled={busy || !unlockReason.trim()} className={`${btn} border border-gray-400 text-gray-900`}>
+                  <button type="submit" disabled={busy || !unlockReason.trim()} className={`${btn} border border-gray-400 text-ink-900`}>
                     締めを解除する
                   </button>
                 </form>
@@ -112,7 +112,7 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
             </>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-gray-800">精算が終わったら締めると、後から金額が変わりません。</p>
+              <p className="text-sm text-ink-900">精算が終わったら締めると、後から金額が変わりません。</p>
               {canEdit && (
                 <button type="button" disabled={busy} className={`${btn} bg-blue-700 text-white`}
                   onClick={() => {
@@ -129,22 +129,22 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
 
       <Card padding="md">
         <section aria-labelledby="ledger-rounding-heading">
-          <h2 id="ledger-rounding-heading" className="text-lg font-semibold text-gray-900 mb-2">端数の規則</h2>
-          <p className="text-sm text-gray-700 mb-3">これから登録・変更する支出に使います(登録済みの支出は変わりません)。</p>
+          <h2 id="ledger-rounding-heading" className="text-lg font-semibold text-ink-900 mb-2">端数の規則</h2>
+          <p className="text-sm text-ink-700 mb-3">これから登録・変更する支出に使います(登録済みの支出は変わりません)。</p>
           <form className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end" onSubmit={(e) => {
             e.preventDefault();
             if (!settings) return;
             void run(() => putRoundingPolicy(planId, policy, settings.revision), '端数の規則を保存しました', '端数の規則を保存できませんでした', true);
           }}>
             <div>
-              <label htmlFor="rounding-mode" className="block text-sm font-medium text-gray-800 mb-1">換算の丸め方</label>
+              <label htmlFor="rounding-mode" className="block text-sm font-medium text-ink-900 mb-1">換算の丸め方</label>
               <select id="rounding-mode" className={inputClass} value={policy.rounding_mode} disabled={!canEdit || locked}
                 onChange={(e) => setPolicy({ ...policy, rounding_mode: e.target.value as RoundingMode })}>
                 {(Object.keys(ROUNDING_LABEL) as RoundingMode[]).map((k) => <option key={k} value={k}>{ROUNDING_LABEL[k]}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="remainder-to" className="block text-sm font-medium text-gray-800 mb-1">割り切れない端数</label>
+              <label htmlFor="remainder-to" className="block text-sm font-medium text-ink-900 mb-1">割り切れない端数</label>
               <select id="remainder-to" className={inputClass} value={policy.remainder_to} disabled={!canEdit || locked}
                 onChange={(e) => setPolicy({ ...policy, remainder_to: e.target.value as RemainderTo })}>
                 {(Object.keys(REMAINDER_LABEL) as RemainderTo[]).map((k) => <option key={k} value={k}>{REMAINDER_LABEL[k]}</option>)}
@@ -161,13 +161,13 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
 
       <Card padding="md">
         <section aria-labelledby="ledger-rates-heading">
-          <h2 id="ledger-rates-heading" className="text-lg font-semibold text-gray-900 mb-2">為替の記録</h2>
+          <h2 id="ledger-rates-heading" className="text-lg font-semibold text-ink-900 mb-2">為替の記録</h2>
           {rates.length === 0 ? (
-            <p className="text-sm text-gray-700 mb-3">まだ記録はありません。</p>
+            <p className="text-sm text-ink-700 mb-3">まだ記録はありません。</p>
           ) : (
             <ul className="mb-3 divide-y" aria-label="為替の記録">
               {rates.map((r) => (
-                <li key={r.id} className="py-2 text-sm text-gray-800">
+                <li key={r.id} className="py-2 text-sm text-ink-900">
                   1 {r.currency} = {r.rate} {r.base_currency}(基準日 {r.rate_date}・出典 {r.source})
                 </li>
               ))}
@@ -182,24 +182,24 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
               }), '為替を記録しました', '為替を記録できませんでした', true).then(() => setRateForm({ ...rateForm, rate: '', source: '' }));
             }}>
               <div>
-                <label htmlFor="fx-currency" className="block text-sm font-medium text-gray-800 mb-1">通貨</label>
+                <label htmlFor="fx-currency" className="block text-sm font-medium text-ink-900 mb-1">通貨</label>
                 <select id="fx-currency" className={inputClass} value={rateForm.currency}
                   onChange={(e) => setRateForm({ ...rateForm, currency: e.target.value })}>
                   {foreign.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="fx-rate" className="block text-sm font-medium text-gray-800 mb-1">1 単位 = ? {baseCurrency}</label>
+                <label htmlFor="fx-rate" className="block text-sm font-medium text-ink-900 mb-1">1 単位 = ? {baseCurrency}</label>
                 <input id="fx-rate" inputMode="decimal" className={inputClass} value={rateForm.rate}
                   onChange={(e) => setRateForm({ ...rateForm, rate: e.target.value })} />
               </div>
               <div>
-                <label htmlFor="fx-date" className="block text-sm font-medium text-gray-800 mb-1">基準日</label>
+                <label htmlFor="fx-date" className="block text-sm font-medium text-ink-900 mb-1">基準日</label>
                 <input id="fx-date" type="date" className={inputClass} value={rateForm.rate_date}
                   onChange={(e) => setRateForm({ ...rateForm, rate_date: e.target.value })} />
               </div>
               <div>
-                <label htmlFor="fx-source" className="block text-sm font-medium text-gray-800 mb-1">出典</label>
+                <label htmlFor="fx-source" className="block text-sm font-medium text-ink-900 mb-1">出典</label>
                 <input id="fx-source" className={inputClass} maxLength={100} placeholder="手入力" value={rateForm.source}
                   onChange={(e) => setRateForm({ ...rateForm, source: e.target.value })} />
               </div>
@@ -214,13 +214,13 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
 
       <Card padding="md">
         <section aria-labelledby="ledger-versions-heading">
-          <h2 id="ledger-versions-heading" className="text-lg font-semibold text-gray-900 mb-2">予算の版</h2>
+          <h2 id="ledger-versions-heading" className="text-lg font-semibold text-ink-900 mb-2">予算の版</h2>
           {versions.length === 0 ? (
-            <p className="text-sm text-gray-700 mb-3">まだ版はありません。</p>
+            <p className="text-sm text-ink-700 mb-3">まだ版はありません。</p>
           ) : (
             <ul className="mb-3 divide-y" aria-label="予算の版">
               {versions.map((v) => (
-                <li key={v.id} className="py-2 text-sm text-gray-800">
+                <li key={v.id} className="py-2 text-sm text-ink-900">
                   <span className="font-medium">{VERSION_LABEL[v.kind]}: {v.label}</span>
                   {' '}合計 {formatMoney(v.total_amount, v.base_currency)}
                   {Object.keys(v.unconverted).length > 0 && (
@@ -228,7 +228,7 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
                       (換算できない分: {Object.entries(v.unconverted).map(([c, a]) => `${c} ${String(a)}`).join('・')})
                     </span>
                   )}
-                  {v.created_at && <span className="text-gray-700"> ・{v.created_at.slice(0, 10)}</span>}
+                  {v.created_at && <span className="text-ink-700"> ・{v.created_at.slice(0, 10)}</span>}
                 </li>
               ))}
             </ul>
@@ -238,7 +238,7 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
               {(Object.keys(VERSION_LABEL) as BudgetVersionKind[])
                 .filter((k) => k !== 'initial' || !versions.some((v) => v.kind === 'initial'))
                 .map((k) => (
-                  <button key={k} type="button" disabled={busy} className={`${btn} border border-gray-400 text-gray-900`}
+                  <button key={k} type="button" disabled={busy} className={`${btn} border border-gray-400 text-ink-900`}
                     onClick={() => void run(() => createBudgetVersion(planId, { kind: k }), `「${VERSION_LABEL[k]}」の版を残しました`,
                       '予算の版を残せませんでした')}>
                     「{VERSION_LABEL[k]}」の版を残す

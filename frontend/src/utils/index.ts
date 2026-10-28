@@ -356,13 +356,13 @@ export const categoryColors: Record<string, string> = {
   accommodation: 'text-purple-600 bg-purple-50',
   transport: 'text-green-600 bg-green-50',
   transportation: 'text-green-600 bg-green-50', // 後方互換性
-  business: 'text-gray-600 bg-gray-50',
+  business: 'text-ink-700 bg-gray-50',
   education: 'text-blue-600 bg-blue-50',
   healthcare: 'text-red-600 bg-red-50',
   activity: 'text-pink-600 bg-pink-50',
   relaxation: 'text-cyan-600 bg-cyan-50',
-  other: 'text-gray-600 bg-gray-50',
-  default: 'text-gray-600 bg-gray-50'
+  other: 'text-ink-700 bg-gray-50',
+  default: 'text-ink-700 bg-gray-50'
 };
 
 /**
@@ -415,7 +415,7 @@ export const getPriorityColor = (priority: 'low' | 'medium' | 'high'): string =>
     case 'high': return 'text-red-500 border-red-500 bg-red-50';
     case 'medium': return 'text-yellow-500 border-yellow-500 bg-yellow-50';
     case 'low': return 'text-green-500 border-green-500 bg-green-50';
-    default: return 'text-gray-500 border-gray-300 bg-white';
+    default: return 'text-ink-500 border-gray-300 bg-surface';
   }
 };
 

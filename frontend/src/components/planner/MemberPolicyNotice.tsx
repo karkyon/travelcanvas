@@ -23,7 +23,7 @@ const MemberPolicyNotice: React.FC<Props> = ({ planId }) => {
   if (!policy || policy.role === 'owner' || policy.my_hidden.length === 0) return null;
   const labels = policy.catalog.categories.filter((c) => policy.my_hidden.includes(c.key)).map((c) => c.label);
   return (
-    <p role="note" className="mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm text-gray-800"
+    <p role="note" className="mb-4 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm text-ink-900"
       data-testid="member-policy-notice">
       旅行の所有者が、次の項目をあなたに見せない設定にしています: {labels.join('・')}
     </p>

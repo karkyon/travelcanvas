@@ -105,15 +105,15 @@ const DummyMap: React.FC<{
       style={{ height }}
     >
       <MapPin size={48} className="text-gray-400 mb-4" />
-      <p className="text-gray-600 mb-4 text-center">
+      <p className="text-ink-700 mb-4 text-center">
         🗺️ 地図表示エリア<br />
         {locations.length}個のロケーション
       </p>
       
       {/* ロケーション一覧 */}
       <div className="absolute bottom-4 left-4 right-4 max-h-32 overflow-y-auto">
-        <div className="bg-white rounded-lg shadow-xs p-3">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">スポット一覧</h4>
+        <div className="bg-surface rounded-lg shadow-xs p-3">
+          <h4 className="text-sm font-semibold text-ink-700 mb-2">スポット一覧</h4>
           <div className="space-y-1">
             {locations.map((location, index) => (
               <button
@@ -254,8 +254,8 @@ const MapView: React.FC<MapViewProps> = ({
         const infoWindow = new google.maps.InfoWindow({
           content: `
             <div class="p-2">
-              <h3 class="font-semibold text-gray-900 mb-1">${location.name}</h3>
-              <p class="text-sm text-gray-600">カテゴリ: ${location.category}</p>
+              <h3 class="font-semibold text-ink-900 mb-1">${location.name}</h3>
+              <p class="text-sm text-ink-700">カテゴリ: ${location.category}</p>
               ${location.estimatedArrival ? `<p class="text-sm text-blue-600">到着予定: ${location.estimatedArrival}</p>` : ''}
             </div>
           `
@@ -358,12 +358,12 @@ const MapView: React.FC<MapViewProps> = ({
     <div className={`relative ${className}`}>
       {/* マップコントロール */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-        <div className="bg-white rounded-lg shadow-md p-2">
+        <div className="bg-surface rounded-lg shadow-md p-2">
           <div className="flex gap-1">
             <button
               onClick={() => handleViewChange('roadmap')}
               className={`px-2 py-1 text-xs rounded ${
-                currentView === 'roadmap' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                currentView === 'roadmap' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-ink-700 hover:bg-gray-200'
               }`}
             >
               地図
@@ -371,7 +371,7 @@ const MapView: React.FC<MapViewProps> = ({
             <button
               onClick={() => handleViewChange('satellite')}
               className={`px-2 py-1 text-xs rounded ${
-                currentView === 'satellite' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                currentView === 'satellite' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-ink-700 hover:bg-gray-200'
               }`}
             >
               衛星
@@ -379,7 +379,7 @@ const MapView: React.FC<MapViewProps> = ({
             <button
               onClick={() => handleViewChange('hybrid')}
               className={`px-2 py-1 text-xs rounded ${
-                currentView === 'hybrid' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                currentView === 'hybrid' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-ink-700 hover:bg-gray-200'
               }`}
             >
               混合
@@ -387,12 +387,12 @@ const MapView: React.FC<MapViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-2">
+        <div className="bg-surface rounded-lg shadow-md p-2">
           <div className="flex flex-col gap-1">
             <button
               onClick={() => setShowOptimizedRoute(!showOptimizedRoute)}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
-                showOptimizedRoute ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                showOptimizedRoute ? 'bg-green-500 text-white' : 'bg-gray-100 text-ink-700 hover:bg-gray-200'
               }`}
             >
               {showOptimizedRoute ? <Eye size={12} /> : <EyeOff size={12} />}
@@ -400,7 +400,7 @@ const MapView: React.FC<MapViewProps> = ({
             </button>
             <button
               onClick={handleResetView}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-sm bg-gray-100 text-ink-700 hover:bg-gray-200"
             >
               <RotateCcw size={12} />
               リセット
@@ -422,23 +422,23 @@ const MapView: React.FC<MapViewProps> = ({
       {/* 統計情報 */}
       {routes.length > 0 && (
         <div className="absolute bottom-4 left-4 z-10">
-          <div className="bg-white rounded-lg shadow-md p-3 text-sm">
-            <h4 className="font-semibold text-gray-900 mb-2">ルート情報</h4>
+          <div className="bg-surface rounded-lg shadow-md p-3 text-sm">
+            <h4 className="font-semibold text-ink-900 mb-2">ルート情報</h4>
             <div className="space-y-1">
               <div className="flex justify-between">
-                <span className="text-gray-600">総距離:</span>
+                <span className="text-ink-700">総距離:</span>
                 <span className="font-medium">
                   {routes.reduce((sum, route) => sum + route.distance, 0).toFixed(1)}km
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">総移動時間:</span>
+                <span className="text-ink-700">総移動時間:</span>
                 <span className="font-medium">
                   {Math.round(routes.reduce((sum, route) => sum + route.duration, 0))}分
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">スポット数:</span>
+                <span className="text-ink-700">スポット数:</span>
                 <span className="font-medium">{locations.length}箇所</span>
               </div>
             </div>

@@ -189,10 +189,10 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
       {/* 画像アップロードエリア */}
       <Card variant="outlined" padding="lg">
         <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-ink-900 mb-2">
             📷 AI画像認識スポット検索
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-700">
             写真をドラッグ&ドロップまたはクリックして選択してください
           </p>
         </div>
@@ -215,10 +215,10 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
           <div className="space-y-4">
             <div className="text-6xl">📸</div>
             <div>
-              <p className="text-lg font-medium text-gray-700">
+              <p className="text-lg font-medium text-ink-700">
                 画像をドロップまたはクリックして選択
               </p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-ink-500 mt-1">
                 JPEG, PNG, WebP対応（最大20枚、各10MB以下）
               </p>
             </div>
@@ -296,7 +296,7 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
             {/* 認識されたオブジェクト */}
             {searchResults.recognized_objects && searchResults.recognized_objects.length > 0 && (
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-900 mb-3">認識されたオブジェクト</h4>
+                <h4 className="font-semibold text-ink-900 mb-3">認識されたオブジェクト</h4>
                 <div className="space-y-2">
                   {searchResults.recognized_objects.map((obj, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
@@ -315,7 +315,7 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
             {/* 推薦スポット */}
             {searchResults.suggested_spots && searchResults.suggested_spots.length > 0 && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">推薦スポット</h4>
+                <h4 className="font-semibold text-ink-900 mb-3">推薦スポット</h4>
                 <div className="space-y-3">
                   {searchResults.suggested_spots.map((spot, index) => (
                     <div
@@ -325,13 +325,13 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{spot.name}</h5>
+                          <h5 className="font-medium text-ink-900">{spot.name}</h5>
                           {spot.location && (
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-ink-500">
                               📍 {spot.location.address}
                             </p>
                           )}
-                          <div className="flex items-center mt-2 text-sm text-gray-600">
+                          <div className="flex items-center mt-2 text-sm text-ink-700">
                             <span>類似度: {Math.round((spot.similarity ?? 0) * 100)}%</span>
                           </div>
                         </div>
@@ -354,7 +354,7 @@ const ImageSearch: React.FC<ImageSearchProps> = ({
 
             {/* 結果なしの場合 */}
             {searchResults.suggested_spots?.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-ink-500">
                 <div className="text-4xl mb-2">🤔</div>
                 <p>関連するスポットが見つかりませんでした</p>
                 <p className="text-sm mt-1">別の画像をお試しください</p>

@@ -144,3 +144,46 @@ describe('オフライン表示用の保存 (Gate L1b / K1: 暗号化して保�
     expect(await loadTodayCache(SESSION, 'q')).toBeNull();
   });
 });
+
+// [Gate G10-UX] UX-5 当日の流れ(今の予定の進み・NEXT の後の予定・済んだ数)
+import { computeTodayFlow } from './todayModel';
+
+describe('computeTodayFlow (Gate G10-UX)', () => {
+  const ev = (id: string, start: string, end: string | null = null) => ({
+    id, title: id, event_type: 'activity', start_at: start, end_at: end, local_start_time: null, address: null,
+    latitude: null, longitude: null, has_ticket: false, reservation_id: null, time_source: 'start_at' as const,
+    departure_at: null, transport_mode: null, transport_status: null,
+  });
+  const res = {
+    plan_id: 'p', today_date: '2026-05-01', timezone_id: 'Asia/Tokyo', server_time: '2026-05-01T02:30:00Z',
+    now_event: null, next_event: null, minutes_until_next: null, day_end_at: '2026-05-01T15:00:00Z',
+    events: [
+      ev('朝食', '2026-04-30T23:00:00Z', '2026-04-30T23:45:00Z'),
+      ev('寺', '2026-05-01T02:00:00Z', '2026-05-01T03:00:00Z'),
+      ev('昼食', '2026-05-01T03:30:00Z'),
+      ev('庭園', '2026-05-01T05:00:00Z'),
+      ev('夕食', '2026-05-01T09:00:00Z'),
+    ],
+  };
+
+  it('今の予定の残りと進み、NEXT の後の予定、済んだ数', () => {
+    const now = Date.parse('2026-05-01T02:30:00Z');
+    const view = computeTodayView(res, now);
+    expect(view.nowEvent?.id).toBe('寺');
+    expect(view.nextEvent?.id).toBe('昼食');
+    const flow = computeTodayFlow(res, view, now);
+    expect(flow.nowProgress).toEqual({ minutesLeft: 30, percent: 50 });
+    expect(flow.later.map((e) => e.id)).toEqual(['庭園', '夕食']);
+    expect(flow.doneCount).toBe(1);
+  });
+
+  it('終わりの時刻が無い今の予定は、次の予定の開始までで進みを出す。NEXT が無ければ後の予定も無い', () => {
+    const now = Date.parse('2026-05-01T09:30:00Z');
+    const view = computeTodayView(res, now);
+    expect(view.nowEvent?.id).toBe('夕食');
+    const flow = computeTodayFlow(res, view, now);
+    expect(flow.nowProgress?.minutesLeft).toBe(330); // 現地の翌日0時(day_end_at)まで
+    expect(flow.later).toEqual([]);
+    expect(flow.doneCount).toBe(4);
+  });
+});

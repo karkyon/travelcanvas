@@ -273,16 +273,16 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
   return (
     <>
       <button type="button" onClick={openPalette}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-100"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-ink-900 hover:bg-gray-100"
         aria-haspopup="dialog" aria-label="検索(Ctrl+K)">
         <Search size={16} aria-hidden="true" />
         <span className="hidden lg:inline text-sm">検索</span>
-        <kbd className="hidden lg:inline text-xs text-gray-700 border border-gray-300 rounded-sm px-1">Ctrl K</kbd>
+        <kbd className="hidden lg:inline text-xs text-ink-700 border border-gray-300 rounded-sm px-1">Ctrl K</kbd>
       </button>
       {open && (
         <div className="fixed inset-0 z-60 bg-black/40 flex items-start justify-center pt-20 px-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
-          <div role="dialog" aria-modal="true" aria-label="検索" className="w-full max-w-2xl bg-white rounded-xl shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label="検索" className="w-full max-w-2xl bg-surface rounded-xl shadow-2xl">
             <div className="p-3 border-b border-gray-200">
               <input ref={inputRef} value={q} onChange={(e) => { setQ(e.target.value); setPreview(null); setActive(0); }}
                 onKeyDown={onInputKey} maxLength={commandMode ? 300 : 100}
@@ -292,17 +292,17 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
                   ? (commandListShown && suggestions[active] ? `cmd-${suggestions[active]!.name}` : undefined)
                   : (flat[active] ? `cp-${flat[active]!.category}-${flat[active]!.id}` : undefined)}
                 aria-label="検索語" placeholder="店名・住所・日付(明日・11/3)・予約番号の末尾…「>」でコマンド"
-                className="w-full px-3 py-2 text-base text-gray-900 border border-gray-300 rounded-lg" />
+                className="w-full px-3 py-2 text-base text-ink-900 border border-gray-300 rounded-lg" />
               {!commandMode && <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="絞り込み">
                 {FILTERS.map((f) => (
                   <button key={f.value} type="button" aria-pressed={filter === f.value}
                     onClick={() => setFilter((cur) => (cur === f.value ? null : f.value))}
-                    className={`text-sm px-3 py-1 rounded-full border ${filter === f.value ? 'bg-indigo-700 text-white border-indigo-700' : 'border-gray-300 text-gray-800'}`}>
+                    className={`text-sm px-3 py-1 rounded-full border ${filter === f.value ? 'bg-indigo-700 text-white border-indigo-700' : 'border-gray-300 text-ink-900'}`}>
                     {f.label}
                   </button>
                 ))}
                 {currentPlan && (
-                  <label className="ml-auto text-sm text-gray-800 inline-flex items-center gap-1">
+                  <label className="ml-auto text-sm text-ink-900 inline-flex items-center gap-1">
                     <input type="checkbox" checked={scope === 'all'} onChange={() => setScope((s) => (s === 'all' ? 'plan' : 'all'))} />
                     すべての旅行
                   </label>
@@ -313,12 +313,12 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
               <div className="max-h-[60vh] overflow-y-auto p-2">
                 <p className="sr-only" role="status" aria-live="polite">{cmdBusy ? '処理中' : (cmdMessage ?? '')}</p>
                 {!currentPlan && (
-                  <p className="p-3 text-sm text-gray-800">コマンドは、旅行を開いている時だけ使えます。</p>
+                  <p className="p-3 text-sm text-ink-900">コマンドは、旅行を開いている時だけ使えます。</p>
                 )}
                 {cmdError && <p role="alert" className="p-3 text-sm text-red-800">{cmdError}</p>}
                 {currentPlan && !preview && (
                   <>
-                    <p className="px-2 pb-1 text-xs text-gray-700">
+                    <p className="px-2 pb-1 text-xs text-ink-700">
                       コマンドは Enter で確認を表示し、「実行する」を押した時だけ変更します。
                     </p>
                     <ul id="command-palette-commands" role="listbox" aria-label="コマンド">
@@ -327,45 +327,45 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
                           onMouseEnter={() => setActive(i)} onClick={() => pickSuggestion(c)}
                           className={`px-3 py-2 rounded-sm cursor-pointer ${i === active ? 'bg-indigo-50' : ''}`}>
                           <div className="flex flex-wrap items-baseline gap-2">
-                            <span className="font-medium text-gray-900">{c.label}</span>
-                            {!c.allowed && <span className="text-xs px-1.5 rounded-sm bg-gray-200 text-gray-800">閲覧だけのため使えません</span>}
+                            <span className="font-medium text-ink-900">{c.label}</span>
+                            {!c.allowed && <span className="text-xs px-1.5 rounded-sm bg-gray-200 text-ink-900">閲覧だけのため使えません</span>}
                           </div>
-                          <div className="text-sm text-gray-700">例: &gt;{c.usage}</div>
+                          <div className="text-sm text-ink-700">例: &gt;{c.usage}</div>
                         </li>
                       ))}
                     </ul>
                     {commands && suggestions.length === 0 && (
-                      <p className="p-3 text-sm text-gray-700">合うコマンドがありません。「&gt;」だけを入れると一覧を表示します。</p>
+                      <p className="p-3 text-sm text-ink-700">合うコマンドがありません。「&gt;」だけを入れると一覧を表示します。</p>
                     )}
                   </>
                 )}
                 {preview && (
                   <section aria-label="コマンドの確認" className="p-3">
-                    <h3 className="font-semibold text-gray-900">{preview.label}</h3>
-                    <ul className="mt-1 list-disc ml-5 text-sm text-gray-900">
+                    <h3 className="font-semibold text-ink-900">{preview.label}</h3>
+                    <ul className="mt-1 list-disc ml-5 text-sm text-ink-900">
                       {preview.summary.map((line) => <li key={line}>{line}</li>)}
                     </ul>
-                    {preview.undoable && <p className="mt-1 text-xs text-gray-700">実行した後に「元に戻す」ができます。</p>}
+                    {preview.undoable && <p className="mt-1 text-xs text-ink-700">実行した後に「元に戻す」ができます。</p>}
                     {preview.problem && <p role="alert" className="mt-2 text-sm text-red-800">{preview.problem.message}</p>}
                     {!preview.allowed && preview.reason && <p role="alert" className="mt-2 text-sm text-red-800">{preview.reason}</p>}
                     <div className="mt-3 flex gap-2">
                       <button type="button" disabled={cmdBusy || !preview.allowed || !!preview.problem} onClick={() => void runExecute()}
                         className="px-3 py-1.5 rounded-sm bg-indigo-700 text-white text-sm disabled:opacity-50">実行する</button>
                       <button type="button" onClick={() => { setPreview(null); inputRef.current?.focus(); }}
-                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">やめる</button>
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-ink-900 text-sm">やめる</button>
                     </div>
                   </section>
                 )}
                 {cmdMessage && !preview && (
                   <div className="p-3 flex flex-wrap items-center gap-2" aria-label="コマンドの結果">
-                    <span className="text-sm text-gray-900">{cmdMessage}</span>
+                    <span className="text-sm text-ink-900">{cmdMessage}</span>
                     {result?.undoable && (
                       <button type="button" disabled={cmdBusy} onClick={() => void runUndo()}
-                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">元に戻す</button>
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-ink-900 text-sm">元に戻す</button>
                     )}
                     {result?.link && (
                       <button type="button" onClick={() => go(result.link!)}
-                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-gray-800 text-sm">開く</button>
+                        className="px-3 py-1.5 rounded-sm border border-gray-300 text-ink-900 text-sm">開く</button>
                     )}
                   </div>
                 )}
@@ -377,18 +377,18 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
               </p>
               {error && <p role="alert" className="p-3 text-sm text-red-800">{error}</p>}
               {!data && !error && (
-                <p className="p-3 text-sm text-gray-700">
+                <p className="p-3 text-sm text-ink-700">
                   {effectiveScope === 'plan' ? 'この旅行の中' : '参加しているすべての旅行'}を探します。予約番号の末尾(4文字)は「予約」に絞って探してください。
                 </p>
               )}
-              {data && data.total === 0 && planHits.length === 0 && <p className="p-3 text-sm text-gray-700">見つかりませんでした。</p>}
+              {data && data.total === 0 && planHits.length === 0 && <p className="p-3 text-sm text-ink-700">見つかりませんでした。</p>}
               {planHits.length > 0 && (
                 <section aria-label="旅行" className="mb-2">
-                  <h3 className="px-2 text-xs font-semibold text-gray-700">旅行</h3>
+                  <h3 className="px-2 text-xs font-semibold text-ink-700">旅行</h3>
                   <ul>
                     {planHits.map((p) => (
                       <li key={p.plan_id}>
-                        <button type="button" className="w-full text-left px-3 py-2 rounded-sm hover:bg-gray-100 text-gray-900"
+                        <button type="button" className="w-full text-left px-3 py-2 rounded-sm hover:bg-gray-100 text-ink-900"
                           onClick={() => go(p.link)}>{p.title}</button>
                       </li>
                     ))}
@@ -398,7 +398,7 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
               <ul id="command-palette-results" role="listbox" aria-label="検索の結果">
                 {(data?.categories ?? []).map((cat) => (
                   <li key={cat.category} role="presentation" className="mb-2">
-                    <div className="px-2 text-xs font-semibold text-gray-700" aria-hidden="true">
+                    <div className="px-2 text-xs font-semibold text-ink-700" aria-hidden="true">
                       {cat.label}({cat.count}件{cat.count > cat.results.length ? `・上位${cat.results.length}件を表示` : ''})
                     </div>
                     <ul role="group" aria-label={`${cat.label}(${cat.count}件)`}>
@@ -410,12 +410,12 @@ const CommandPalette: React.FC<Props> = ({ defaultOpen = false, onLive }) => {
                             onMouseEnter={() => setActive(i)} onClick={() => go(h.link)}
                             className={`px-3 py-2 rounded-sm cursor-pointer ${i === active ? 'bg-indigo-50' : ''}`}>
                             <div className="flex flex-wrap items-baseline gap-2">
-                              <span className="font-medium text-gray-900">{h.title}</span>
+                              <span className="font-medium text-ink-900">{h.title}</span>
                               {h.badge && <span className="text-xs px-1.5 rounded-sm bg-amber-100 text-amber-900">{h.badge}</span>}
-                              {h.when && <span className="text-xs text-gray-700">{h.when}</span>}
-                              {effectiveScope === 'all' && <span className="text-xs text-gray-700">{h.plan_title}</span>}
+                              {h.when && <span className="text-xs text-ink-700">{h.when}</span>}
+                              {effectiveScope === 'all' && <span className="text-xs text-ink-700">{h.plan_title}</span>}
                             </div>
-                            {h.subtitle && <div className="text-sm text-gray-700">{h.subtitle}</div>}
+                            {h.subtitle && <div className="text-sm text-ink-700">{h.subtitle}</div>}
                           </li>
                         );
                       })}

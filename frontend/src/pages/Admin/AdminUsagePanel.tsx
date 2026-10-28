@@ -42,7 +42,7 @@ const AdminUsagePanel: React.FC = () => {
   return (
     <Card className="p-6">
       <section aria-labelledby="admin-usage-heading">
-        <h3 id="admin-usage-heading" className="text-lg font-semibold text-gray-900 mb-4">使用量と上限</h3>
+        <h3 id="admin-usage-heading" className="text-lg font-semibold text-ink-900 mb-4">使用量と上限</h3>
         {error && <p role="alert" className="mb-3 p-3 rounded-lg bg-red-50 text-red-800 text-sm">{error}</p>}
         {notice && <p role="status" className="mb-3 p-3 rounded-lg bg-green-50 text-green-900 text-sm">{notice}</p>}
         <form className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end mb-4" onSubmit={(e) => {
@@ -50,7 +50,7 @@ const AdminUsagePanel: React.FC = () => {
           void run(() => adminGetUsage(subject.type, subject.id.trim()), null, '使用量を取得できませんでした');
         }}>
           <div>
-            <label htmlFor="usage-subject-type" className="block text-sm font-medium text-gray-800 mb-1">対象</label>
+            <label htmlFor="usage-subject-type" className="block text-sm font-medium text-ink-900 mb-1">対象</label>
             <select id="usage-subject-type" className={inputClass} value={subject.type}
               onChange={(e) => setSubject({ ...subject, type: e.target.value as 'user' | 'org' })}>
               <option value="user">利用者</option>
@@ -58,7 +58,7 @@ const AdminUsagePanel: React.FC = () => {
             </select>
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="usage-subject-id" className="block text-sm font-medium text-gray-800 mb-1">ID</label>
+            <label htmlFor="usage-subject-id" className="block text-sm font-medium text-ink-900 mb-1">ID</label>
             <input id="usage-subject-id" className={inputClass} value={subject.id}
               onChange={(e) => setSubject({ ...subject, id: e.target.value })} />
           </div>
@@ -78,7 +78,7 @@ const AdminUsagePanel: React.FC = () => {
               }), limitValue === null ? '既定の上限に戻しました' : '今月の上限を上書きしました', '上限を変えられませんでした');
             }}>
               <div>
-                <label htmlFor="usage-metric" className="block text-sm font-medium text-gray-800 mb-1">指標</label>
+                <label htmlFor="usage-metric" className="block text-sm font-medium text-ink-900 mb-1">指標</label>
                 <select id="usage-metric" className={inputClass} value={form.metric}
                   onChange={(e) => setForm({ ...form, metric: e.target.value as UsageMetric })}>
                   <option value="">選ぶ</option>
@@ -86,12 +86,12 @@ const AdminUsagePanel: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label htmlFor="usage-limit" className="block text-sm font-medium text-gray-800 mb-1">今月の上限(空欄は既定)</label>
+                <label htmlFor="usage-limit" className="block text-sm font-medium text-ink-900 mb-1">今月の上限(空欄は既定)</label>
                 <input id="usage-limit" inputMode="numeric" className={inputClass} value={form.limit}
                   onChange={(e) => setForm({ ...form, limit: e.target.value })} />
               </div>
               <div>
-                <label htmlFor="usage-reason" className="block text-sm font-medium text-gray-800 mb-1">理由</label>
+                <label htmlFor="usage-reason" className="block text-sm font-medium text-ink-900 mb-1">理由</label>
                 <input id="usage-reason" className={inputClass} maxLength={200} value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })} />
               </div>

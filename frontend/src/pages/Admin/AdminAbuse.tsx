@@ -73,12 +73,12 @@ const AdminAbuse: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       <p className="mb-2"><Link to="/admin" className="text-blue-700 underline">管理者ダッシュボードへ</Link></p>
-      <h1 className="text-2xl font-bold text-gray-900">濫用への対応</h1>
-      <p className="text-sm text-gray-700 mt-1">公開の共有への通報と、自動の検知です。旅行の中身は表示しません。</p>
+      <h1 className="text-2xl font-bold text-ink-900">濫用への対応</h1>
+      <p className="text-sm text-ink-700 mt-1">公開の共有への通報と、自動の検知です。旅行の中身は表示しません。</p>
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="状態で絞り込む">
         {FILTERS.map((f) => (
           <button key={f.value} type="button" aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}
-            className={`text-sm px-3 py-1 rounded-full border ${filter === f.value ? 'bg-indigo-700 text-white border-indigo-700' : 'border-gray-300 text-gray-800'}`}>
+            className={`text-sm px-3 py-1 rounded-full border ${filter === f.value ? 'bg-indigo-700 text-white border-indigo-700' : 'border-gray-300 text-ink-900'}`}>
             {f.label}{data && f.value !== 'all' ? `(${data.counts[f.value]})` : ''}
           </button>
         ))}
@@ -86,26 +86,26 @@ const AdminAbuse: React.FC = () => {
       {error && <p role="alert" className="mt-3 p-2 rounded-sm bg-red-50 text-red-800 text-sm">{error}</p>}
       {notice && <p role="status" className="mt-3 p-2 rounded-sm bg-green-50 text-green-900 text-sm">{notice}</p>}
       {!data && !error && <div className="flex justify-center py-12"><LoadingSpinner /></div>}
-      {data && data.reports.length === 0 && <Card className="mt-4 p-6 text-center text-gray-700">該当する通報はありません。</Card>}
+      {data && data.reports.length === 0 && <Card className="mt-4 p-6 text-center text-ink-700">該当する通報はありません。</Card>}
       <ul className="mt-4 space-y-3" aria-label="通報">
         {data?.reports.map((r) => (
           <li key={r.id}>
             <Card className="p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-gray-900">{r.reason_label}</span>
-                <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">{r.source === 'auto' ? '自動の検知' : '通報'}</span>
+                <span className="font-medium text-ink-900">{r.reason_label}</span>
+                <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-ink-900">{r.source === 'auto' ? '自動の検知' : '通報'}</span>
                 <span className="text-xs px-2 py-0.5 rounded-sm bg-indigo-100 text-indigo-900">{STATUS_LABEL[r.status]}</span>
-                <span className="text-xs text-gray-700">{fmt(r.created_at)}</span>
+                <span className="text-xs text-ink-700">{fmt(r.created_at)}</span>
               </div>
-              {r.note && <p className="mt-1 text-sm text-gray-800">{r.note}</p>}
-              <p className="mt-1 text-xs text-gray-700">
+              {r.note && <p className="mt-1 text-sm text-ink-900">{r.note}</p>}
+              <p className="mt-1 text-xs text-ink-700">
                 旅行: {r.plan ? `${r.plan.title}(所有者 ${r.plan.owner_user_id.slice(0, 8)}…)` : '—'}
                 {r.share && ` ・ 共有 …${r.share.token_prefix}・${r.share.is_active ? '有効' : '停止中'}・24時間の閲覧 ${r.share.accesses_24h}回`}
                 {r.share?.revoked_reason && ` ・ 停止の理由 ${r.share.revoked_reason}`}
               </p>
-              {r.resolution && <p className="mt-1 text-xs text-gray-700">対応: {r.resolution}</p>}
+              {r.resolution && <p className="mt-1 text-xs text-ink-700">対応: {r.resolution}</p>}
               <div className="mt-2 flex flex-wrap items-end gap-2">
-                <label className="text-sm text-gray-800">対応のメモ
+                <label className="text-sm text-ink-900">対応のメモ
                   <input className="ml-1 border rounded-sm px-2 py-1" maxLength={500} value={notes[r.id] ?? ''}
                     onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                 </label>

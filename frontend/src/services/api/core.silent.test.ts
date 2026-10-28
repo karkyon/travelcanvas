@@ -159,3 +159,25 @@ describe('アカウントの削除の後の 401 (Gate G10-Q)', () => {
     expect(window.location.href).toBe('/login');
   });
 });
+
+describe('端末に溜める書き込みの通信の失敗 (Gate G10-UX)', () => {
+  beforeEach(() => vi.mocked(toast.error).mockClear());
+
+  it('offlineQueueable の応答の無い失敗では共通の「ネットワークエラー」を出さない(呼び出し側が端末に溜めて伝える)', async () => {
+    const core = new TestCore();
+    core.http.defaults.adapter = async (config) => { throw new AxiosError('Network Error', 'ERR_NETWORK', config); };
+    await expect(core.http.delete('/plans/p/events/e', { offlineQueueable: true })).rejects.toMatchObject({ code: 'ERR_NETWORK' });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('対照: 指定なしの通信の失敗・指定ありでもサーバーが答えた失敗は従来どおり共通の表示を出す', async () => {
+    const core = new TestCore();
+    core.http.defaults.adapter = async (config) => { throw new AxiosError('Network Error', 'ERR_NETWORK', config); };
+    await expect(core.http.delete('/plans/p/events/e')).rejects.toBeTruthy();
+    expect(toast.error).toHaveBeenCalledWith('ネットワークエラーが発生しました。接続を確認してください。');
+    vi.mocked(toast.error).mockClear();
+    core.http.defaults.adapter = async (config) => reject(config, 500, {});
+    await expect(core.http.delete('/plans/p/events/e', { offlineQueueable: true })).rejects.toBeTruthy();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+});

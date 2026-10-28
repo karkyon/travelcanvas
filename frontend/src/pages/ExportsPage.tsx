@@ -61,15 +61,15 @@ const ExportsPage: React.FC = () => {
     }
   };
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const geo = { precision, exclude_accommodation: excludeLodging };
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-        <h1 className="text-2xl font-bold text-gray-900">書き出し</h1>
-        <p className="text-sm text-gray-700 mt-1">
+        <h1 className="text-2xl font-bold text-ink-900">書き出し</h1>
+        <p className="text-sm text-ink-700 mt-1">
           旅程をカレンダー・地図アプリ・表計算ソフトで使える形式で保存します。予約番号・チケット・メモ・参加者名は含めません。
         </p>
         <p className="text-sm mt-1">
@@ -87,8 +87,8 @@ const ExportsPage: React.FC = () => {
       <div className="space-y-4">
         <Card padding="md">
           <section aria-labelledby="export-ics">
-            <h2 id="export-ics" className="font-semibold text-gray-900 flex items-center gap-2"><Calendar size={18} aria-hidden="true" />カレンダー(ICS)</h2>
-            <p className="text-sm text-gray-700 mt-1">
+            <h2 id="export-ics" className="font-semibold text-ink-900 flex items-center gap-2"><Calendar size={18} aria-hidden="true" />カレンダー(ICS)</h2>
+            <p className="text-sm text-ink-700 mt-1">
               予定と移動をGoogle・Apple・Outlookのカレンダーへ取り込めます。同じ予定を再度取り込むと、新しい内容で更新されます。
               時刻が未定の予定は「(時刻未定)」の終日予定になります。
             </p>
@@ -103,13 +103,13 @@ const ExportsPage: React.FC = () => {
 
         <Card padding="md">
           <section aria-labelledby="export-geo">
-            <h2 id="export-geo" className="font-semibold text-gray-900 flex items-center gap-2"><MapIcon size={18} aria-hidden="true" />地図(GPX・KML)</h2>
-            <p className="text-sm text-gray-700 mt-1">
+            <h2 id="export-geo" className="font-semibold text-ink-900 flex items-center gap-2"><MapIcon size={18} aria-hidden="true" />地図(GPX・KML)</h2>
+            <p className="text-sm text-ink-700 mt-1">
               訪れる場所と日ごとの順路を、地図アプリ(Googleマイマップ・Google Earth・登山/GPSアプリ等)で開けます。
               位置が登録されていない予定は含まれません。
             </p>
             <fieldset className="mt-2">
-              <legend className="text-sm font-medium text-gray-800">位置の精度</legend>
+              <legend className="text-sm font-medium text-ink-900">位置の精度</legend>
               <label className="flex items-center gap-2 text-sm">
                 <input type="radio" name="export-precision" checked={precision === 'approx'} onChange={() => setPrecision('approx')} />
                 約1km単位に丸める(おすすめ)
@@ -137,8 +137,8 @@ const ExportsPage: React.FC = () => {
 
         <Card padding="md">
           <section aria-labelledby="export-csv">
-            <h2 id="export-csv" className="font-semibold text-gray-900 flex items-center gap-2"><FileSpreadsheet size={18} aria-hidden="true" />表計算(CSV)</h2>
-            <p className="text-sm text-gray-700 mt-1">予定の一覧をExcel・Googleスプレッドシート等で開けます。</p>
+            <h2 id="export-csv" className="font-semibold text-ink-900 flex items-center gap-2"><FileSpreadsheet size={18} aria-hidden="true" />表計算(CSV)</h2>
+            <p className="text-sm text-ink-700 mt-1">予定の一覧をExcel・Googleスプレッドシート等で開けます。</p>
             <label className="flex items-center gap-2 text-sm mt-2">
               <input type="checkbox" checked={csvAddresses} onChange={(e) => setCsvAddresses(e.target.checked)} />
               住所を含める
@@ -150,8 +150,8 @@ const ExportsPage: React.FC = () => {
 
         <Card padding="md">
           <section aria-labelledby="export-json">
-            <h2 id="export-json" className="font-semibold text-gray-900 flex items-center gap-2"><FileJson size={18} aria-hidden="true" />旅行データ(JSON・所有者のみ)</h2>
-            <p className="text-sm text-gray-700 mt-1">
+            <h2 id="export-json" className="font-semibold text-ink-900 flex items-center gap-2"><FileJson size={18} aria-hidden="true" />旅行データ(JSON・所有者のみ)</h2>
+            <p className="text-sm text-ink-700 mt-1">
               この旅行のデータ(日程・予約・持ち物・費用・投票・コメント・変更履歴など)をすべて1つのファイルにまとめます。
               別のサービスへの移行や保管に使えます。予約番号・チケットの中身など暗号化している値と、他の参加者だけの情報は含めません。
             </p>

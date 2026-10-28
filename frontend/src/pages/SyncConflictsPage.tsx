@@ -58,13 +58,13 @@ const SyncConflictsPage: React.FC = () => {
     }
   };
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">同期で競合した変更</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">同期で競合した変更</h1>
+      <p className="text-sm text-ink-700 mt-1">
         通信できない間に行った変更のうち、他の人やほかの端末の変更と重なったものです。どちらの内容を残すか選んでください。
       </p>
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
@@ -72,20 +72,20 @@ const SyncConflictsPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : !data || data.conflicts.length === 0 ? (
-        <Card padding="lg" className="mt-6 text-center text-gray-700">競合している変更はありません。</Card>
+        <Card padding="lg" className="mt-6 text-center text-ink-700">競合している変更はありません。</Card>
       ) : (
         <ul className="mt-6 space-y-3" aria-label="競合している変更">
           {data.conflicts.map((c) => (
             <li key={c.operation_id}>
               <Card padding="md" className="space-y-3">
                 <section aria-label={`競合: ${c.title ?? conflictSubject(c)}`}>
-                  <h2 className="font-semibold text-gray-900">{c.title ?? conflictSubject(c)}</h2>
-                  <p className="text-sm text-gray-800">{conflictSummary(c)}</p>
+                  <h2 className="font-semibold text-ink-900">{c.title ?? conflictSubject(c)}</h2>
+                  <p className="text-sm text-ink-900">{conflictSummary(c)}</p>
                   {conflictRows(c).length > 0 && (
                     <table className="w-full text-sm mt-2">
                       <caption className="sr-only">{`${c.title ?? conflictSubject(c)}の比較`}</caption>
                       <thead>
-                        <tr className="text-left text-gray-700">
+                        <tr className="text-left text-ink-700">
                           <th scope="col" className="font-medium">項目</th>
                           <th scope="col" className="font-medium">自分の変更</th>
                           <th scope="col" className="font-medium">サーバーの今の内容</th>
@@ -94,9 +94,9 @@ const SyncConflictsPage: React.FC = () => {
                       <tbody>
                         {conflictRows(c).map((r) => (
                           <tr key={r.field}>
-                            <th scope="row" className="font-normal text-gray-800">{r.label}</th>
-                            <td className="text-gray-900">{r.mine}</td>
-                            <td className="text-gray-900">{r.server}</td>
+                            <th scope="row" className="font-normal text-ink-900">{r.label}</th>
+                            <td className="text-ink-900">{r.mine}</td>
+                            <td className="text-ink-900">{r.server}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -28,10 +28,10 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
   const reservations = plan.reservations;
   return (
     <div>
-      <Heading level={titleLevel} className={titleLevel === 1 ? 'text-3xl font-bold text-gray-900 mb-3' : 'text-xl font-bold text-gray-900 mb-2'}>
+      <Heading level={titleLevel} className={titleLevel === 1 ? 'text-3xl font-bold text-ink-900 mb-3' : 'text-xl font-bold text-ink-900 mb-2'}>
         {plan.title}
       </Heading>
-      <div className="flex flex-wrap items-center gap-4 text-gray-700 text-sm mb-6">
+      <div className="flex flex-wrap items-center gap-4 text-ink-700 text-sm mb-6">
         {plan.destination && (
           <span className="flex items-center gap-1">
             <MapPin size={16} aria-hidden="true" />
@@ -48,45 +48,45 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
         )}
       </div>
 
-      {plan.description && <p className="text-gray-700 mb-8 whitespace-pre-wrap">{plan.description}</p>}
+      {plan.description && <p className="text-ink-700 mb-8 whitespace-pre-wrap">{plan.description}</p>}
 
       {days.length > 0 ? (
         <div className="space-y-4">
           {days.map((day, idx) => (
-            <section key={idx} className="bg-white rounded-xl shadow-xs p-5 border border-gray-100">
-              <Heading level={titleLevel + 1} className="font-semibold text-gray-900 mb-2">
+            <section key={idx} className="bg-surface rounded-xl shadow-xs p-5 border border-gray-100">
+              <Heading level={titleLevel + 1} className="font-semibold text-ink-900 mb-2">
                 {dayHeading(day.date, day.title, idx)}
               </Heading>
               {day.events.length > 0 ? (
                 <ul className="space-y-2">
                   {day.events.map((ev, evIdx) => (
-                    <li key={evIdx} className="text-sm text-gray-800 border-l-2 border-blue-200 pl-3">
-                      {ev.local_start_time && <span className="text-gray-700 mr-2">{ev.local_start_time}</span>}
+                    <li key={evIdx} className="text-sm text-ink-900 border-l-2 border-blue-200 pl-3">
+                      {ev.local_start_time && <span className="text-ink-700 mr-2">{ev.local_start_time}</span>}
                       {ev.title || '(名称未設定のイベント)'}
-                      {ev.address && <div className="text-xs text-gray-700">住所: {ev.address}</div>}
-                      {ev.notes && <div className="text-xs text-gray-700 whitespace-pre-wrap">メモ: {ev.notes}</div>}
+                      {ev.address && <div className="text-xs text-ink-700">住所: {ev.address}</div>}
+                      {ev.notes && <div className="text-xs text-ink-700 whitespace-pre-wrap">メモ: {ev.notes}</div>}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-gray-700">予定はまだ登録されていません</p>
+                <p className="text-sm text-ink-700">予定はまだ登録されていません</p>
               )}
             </section>
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-xs p-8 text-center text-gray-700">まだ日程が登録されていません</div>
+        <div className="bg-surface rounded-xl shadow-xs p-8 text-center text-ink-700">まだ日程が登録されていません</div>
       )}
 
       {reservations && (
-        <section className="mt-6 bg-white rounded-xl shadow-xs p-5 border border-gray-100" aria-label="予約の概要">
-          <Heading level={titleLevel + 1} className="font-semibold text-gray-900 mb-2">予約の概要</Heading>
+        <section className="mt-6 bg-surface rounded-xl shadow-xs p-5 border border-gray-100" aria-label="予約の概要">
+          <Heading level={titleLevel + 1} className="font-semibold text-ink-900 mb-2">予約の概要</Heading>
           {reservations.length > 0 ? (
             <ul className="space-y-2">
               {reservations.map((r, i) => (
-                <li key={i} className="text-sm text-gray-800">
+                <li key={i} className="text-sm text-ink-900">
                   <span className="font-medium">{r.provider_name || reservationTypeLabel(r.type)}</span>
-                  <span className="ml-2 text-xs text-gray-700">
+                  <span className="ml-2 text-xs text-ink-700">
                     {reservationTypeLabel(r.type)}・{reservationStatusLabel(r.status)}
                     {r.start ? `・${r.start}` : ''}{r.end ? ` 〜 ${r.end}` : ''}
                   </span>
@@ -94,9 +94,9 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-700">予約はまだ登録されていません</p>
+            <p className="text-sm text-ink-700">予約はまだ登録されていません</p>
           )}
-          <p className="mt-2 text-xs text-gray-700">予約番号・予約者名・連絡先・金額は共有されません。</p>
+          <p className="mt-2 text-xs text-ink-700">予約番号・予約者名・連絡先・金額は共有されません。</p>
         </section>
       )}
     </div>

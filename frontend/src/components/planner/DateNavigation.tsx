@@ -128,12 +128,12 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
   };
 
   return (
-    <div className={`bg-white border-b border-gray-200 ${className}`}>
+    <div className={`bg-surface border-b border-gray-200 ${className}`}>
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">
+          <Calendar size={16} className="text-ink-700" />
+          <span className="text-sm font-medium text-ink-700">
             旅行期間: {travelDates.startDate} 〜 {travelDates.endDate}
           </span>
         </div>
@@ -153,7 +153,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
             onClick={() => scroll('left')}
             className="absolute left-0 top-0 z-10 h-full px-2 bg-linear-to-r from-white via-white to-transparent hover:from-gray-50 transition-colors"
           >
-            <ChevronLeft size={16} className="text-gray-600" />
+            <ChevronLeft size={16} className="text-ink-700" />
           </button>
         )}
 
@@ -163,7 +163,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
             onClick={() => scroll('right')}
             className="absolute right-0 top-0 z-10 h-full px-2 bg-linear-to-l from-white via-white to-transparent hover:from-gray-50 transition-colors"
           >
-            <ChevronRight size={16} className="text-gray-600" />
+            <ChevronRight size={16} className="text-ink-700" />
           </button>
         )}
 
@@ -183,7 +183,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
                 relative shrink-0 min-w-[90px] p-3 rounded-lg border-2 transition-all duration-200
                 ${day.isActive 
                   ? 'border-blue-500 bg-blue-50 shadow-md transform scale-105' 
-                  : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                  : 'border-gray-200 bg-surface hover:border-blue-300 hover:bg-blue-50'
                 }
               `}
             >
@@ -195,21 +195,21 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
               <div className="text-center">
                 {/* Day Label */}
                 <div className={`text-xs font-bold mb-1 ${
-                  day.isActive ? 'text-blue-700' : 'text-gray-600'
+                  day.isActive ? 'text-blue-700' : 'text-ink-700'
                 }`}>
                   {getDayLabel(index)}
                 </div>
 
                 {/* Date */}
                 <div className={`text-sm font-semibold mb-1 ${
-                  day.isActive ? 'text-blue-900' : 'text-gray-900'
+                  day.isActive ? 'text-blue-900' : 'text-ink-900'
                 }`}>
                   {day.date}
                 </div>
 
                 {/* Day of Week */}
                 <div className={`text-xs mb-2 ${
-                  day.isActive ? 'text-blue-600' : 'text-gray-500'
+                  day.isActive ? 'text-blue-600' : 'text-ink-500'
                 }`}>
                   ({day.dayOfWeek})
                 </div>
@@ -218,7 +218,7 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
                 <div className={`text-xs px-2 py-1 rounded-full ${
                   day.isActive 
                     ? 'bg-blue-200 text-blue-800' 
-                    : 'bg-gray-100 text-gray-600'
+                    : 'bg-gray-100 text-ink-700'
                 }`}>
                   {day.eventCount}件
                 </div>
@@ -247,18 +247,18 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
                 className={`p-3 rounded-lg border transition-colors cursor-pointer ${
                   day.isActive 
                     ? 'border-blue-300 bg-blue-50' 
-                    : 'border-gray-200 bg-white hover:border-blue-200'
+                    : 'border-gray-200 bg-surface hover:border-blue-200'
                 }`}
                 onClick={() => handleDayClick(day.index)}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-ink-900">
                     {getDayLabel(index)} ({day.date})
                   </span>
                   {getStatusIcon(day.status, day.isCompleted)}
                 </div>
 
-                <div className="space-y-1 text-sm text-gray-600">
+                <div className="space-y-1 text-sm text-ink-700">
                   <div className="flex items-center gap-1">
                     <MapPin size={12} />
                     <span>{day.eventCount}個のスポット</span>
@@ -276,13 +276,13 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
                 {/* ハイライト */}
                 {day.highlights.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-gray-200">
-                    <div className="text-xs text-gray-500 mb-1">主要スポット:</div>
-                    <div className="text-xs text-gray-700">
+                    <div className="text-xs text-ink-500 mb-1">主要スポット:</div>
+                    <div className="text-xs text-ink-700">
                       {day.highlights.slice(0, 2).map((highlight, idx) => (
                         <div key={idx} className="truncate">• {highlight}</div>
                       ))}
                       {day.highlights.length > 2 && (
-                        <div className="text-gray-600">他{day.highlights.length - 2}件...</div>
+                        <div className="text-ink-700">他{day.highlights.length - 2}件...</div>
                       )}
                     </div>
                   </div>
@@ -293,31 +293,31 @@ const DateNavigation: React.FC<DateNavigationProps> = ({
 
           {/* 全体統計 */}
           <div className="mt-4 pt-4 border-t border-gray-300">
-            <h4 className="font-semibold text-gray-900 mb-2">旅行全体の統計</h4>
+            <h4 className="font-semibold text-ink-900 mb-2">旅行全体の統計</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
                 <div className="text-lg font-bold text-blue-600">
                   {days.reduce((sum, day) => sum + day.eventCount, 0)}
                 </div>
-                <div className="text-gray-600">総スポット数</div>
+                <div className="text-ink-700">総スポット数</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-green-600">
                   {formatDuration(days.reduce((sum, day) => sum + day.totalDuration, 0))}
                 </div>
-                <div className="text-gray-600">総所要時間</div>
+                <div className="text-ink-700">総所要時間</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-purple-600">
                   {formatCurrency(days.reduce((sum, day) => sum + day.totalCost, 0))}
                 </div>
-                <div className="text-gray-600">総予算</div>
+                <div className="text-ink-700">総予算</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-orange-600">
                   {days.filter(day => day.isCompleted).length}/{days.length}
                 </div>
-                <div className="text-gray-600">完了日数</div>
+                <div className="text-ink-700">完了日数</div>
               </div>
             </div>
           </div>

@@ -47,7 +47,7 @@ const PlanNotificationLevel: React.FC<{ planId: string }> = ({ planId }) => {
     );
   }
   return (
-    <div className="text-sm text-gray-900 flex flex-wrap items-center gap-2">
+    <div className="text-sm text-ink-900 flex flex-wrap items-center gap-2">
       <label>この旅行の通知
         <select className="ml-1 border rounded-sm px-2 py-1" value={value}
           onChange={(e) => void change(e.target.value as NotificationLevel | 'default')}>

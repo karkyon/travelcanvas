@@ -367,7 +367,7 @@ const LocationTrackPage: React.FC = () => {
     }
   };
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const showDetail = async (t: LocationTrack) => {
     const localPoints = loadLocalPoints(t.id);
@@ -449,8 +449,8 @@ const LocationTrackPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">位置の記録</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">位置の記録</h1>
+      <p className="text-sm text-ink-700 mt-1">
         旅の記録のために、旅行の期間中だけ位置を記録できます。軌跡はあなただけが見られ、同行者(旅行の所有者を含む)には共有されません。
         記録はこの画面を開いている間だけ行います。
       </p>
@@ -463,16 +463,16 @@ const LocationTrackPage: React.FC = () => {
         <>
           <Card padding="md" className="mt-6">
             <section aria-label="この旅行での位置の扱い" className="space-y-3">
-              <h2 className="font-semibold text-gray-900">この旅行での位置の扱い</h2>
-              <p className="text-sm text-gray-800">
+              <h2 className="font-semibold text-ink-900">この旅行での位置の扱い</h2>
+              <p className="text-sm text-ink-900">
                 {savedMode
                   ? `いまの設定: ${TRIP_MODE_OPTIONS.find((o) => o.value === savedMode)?.label.split('(')[0]}`
                   : 'まだ選んでいません(位置は記録していません)'}
               </p>
               <fieldset className="space-y-1">
-                <legend className="text-sm text-gray-800">位置の扱い</legend>
+                <legend className="text-sm text-ink-900">位置の扱い</legend>
                 {TRIP_MODE_OPTIONS.map((o) => (
-                  <label key={o.value} className="flex items-start gap-2 text-sm text-gray-900">
+                  <label key={o.value} className="flex items-start gap-2 text-sm text-ink-900">
                     <input type="radio" name="trip-location-mode" value={o.value} className="mt-1"
                       checked={tripMode === o.value} onChange={() => setTripMode(o.value)} />
                     {o.label}
@@ -486,15 +486,15 @@ const LocationTrackPage: React.FC = () => {
 
           <Card padding="md" className="mt-6">
             <section aria-label="保護エリア" className="space-y-3">
-              <h2 className="font-semibold text-gray-900">保護エリア(自宅・職場など)</h2>
-              <p className="text-sm text-gray-800">
+              <h2 className="font-semibold text-ink-900">保護エリア(自宅・職場など)</h2>
+              <p className="text-sm text-ink-900">
                 保護エリアの中で取れた位置は、どの記録の方法でも保存・送信しません。保護エリアはこの端末だけに保存し、サーバーへは送りません
                 (ほかの端末では設定し直してください)。
               </p>
               {zones.length > 0 ? (
                 <ul className="space-y-1">
                   {zones.map((z) => (
-                    <li key={z.id} className="flex items-center gap-2 text-sm text-gray-900">
+                    <li key={z.id} className="flex items-center gap-2 text-sm text-ink-900">
                       <span>{z.label}(半径{z.radius_m}m)</span>
                       <Button size="sm" variant="ghost" aria-label={`保護エリア「${z.label}」を削除`}
                         onClick={() => { setZones(removeZone(z.id)); setMessage(`保護エリア「${z.label}」を削除しました`); }}>
@@ -503,17 +503,17 @@ const LocationTrackPage: React.FC = () => {
                     </li>
                   ))}
                 </ul>
-              ) : <p className="text-sm text-gray-700">保護エリアはありません。</p>}
+              ) : <p className="text-sm text-ink-700">保護エリアはありません。</p>}
               {zoneSkipped > 0 && (
-                <p className="text-sm text-gray-800">保護エリアの中だったため記録しなかった位置: {zoneSkipped}件</p>
+                <p className="text-sm text-ink-900">保護エリアの中だったため記録しなかった位置: {zoneSkipped}件</p>
               )}
               <div className="flex flex-wrap items-end gap-2">
-                <label className="text-sm text-gray-800">名前
-                  <input className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={zoneLabel} maxLength={40}
+                <label className="text-sm text-ink-900">名前
+                  <input className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={zoneLabel} maxLength={40}
                     onChange={(e) => setZoneLabel(e.target.value)} placeholder="自宅" />
                 </label>
-                <label className="text-sm text-gray-800">半径
-                  <select className="ml-1 border rounded-sm px-2 py-1 text-gray-900" value={zoneRadius}
+                <label className="text-sm text-ink-900">半径
+                  <select className="ml-1 border rounded-sm px-2 py-1 text-ink-900" value={zoneRadius}
                     onChange={(e) => setZoneRadius(Number(e.target.value))}>
                     {ZONE_RADII.map((r) => <option key={r} value={r}>{r}m</option>)}
                   </select>
@@ -529,16 +529,16 @@ const LocationTrackPage: React.FC = () => {
                 <p className="font-semibold text-blue-900" aria-live="polite">
                   {active.status === 'recording' ? '● 位置を記録しています' : '一時停止しています'}
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-ink-900">
                   {`保存先: ${MODE_LABEL[active.mode]}・精度: ${PRECISION[active.precision].label}・この画面で記録した点: ${collected}件`}
                   {active.mode === 'synced' ? `・未送信: ${pending}件` : ''}
                   {active.mode === 'areas_only' && syncedCells !== null ? `・送った区画: ${syncedCells}件` : ''}
                 </p>
                 {active.status === 'recording' && tier && (
-                  <p className="text-sm text-gray-800" data-testid="sampling-tier">{`取得の間隔: ${tier.label}`}</p>
+                  <p className="text-sm text-ink-900" data-testid="sampling-tier">{`取得の間隔: ${tier.label}`}</p>
                 )}
-                {battery && <p className="text-sm text-gray-700">{`電池: ${pct(battery.level)}${battery.charging ? '(充電中)' : ''}`}</p>}
-                <p className="text-sm text-gray-700">{`${showTime(active.auto_stop_at)}に自動で止まります(旅行の期間の終わり)`}</p>
+                {battery && <p className="text-sm text-ink-700">{`電池: ${pct(battery.level)}${battery.charging ? '(充電中)' : ''}`}</p>}
+                <p className="text-sm text-ink-700">{`${showTime(active.auto_stop_at)}に自動で止まります(旅行の期間の終わり)`}</p>
                 {geoError && <p className="text-sm text-red-800" role="alert">{geoError}</p>}
                 <div className="flex flex-wrap gap-2">
                   {active.status === 'recording' ? (
@@ -583,27 +583,27 @@ const LocationTrackPage: React.FC = () => {
           {!active && (
             <Card padding="md" className="mt-6">
               <section aria-label="記録を始める" className="space-y-3">
-                <h2 className="font-semibold text-gray-900">記録を始める</h2>
+                <h2 className="font-semibold text-ink-900">記録を始める</h2>
                 {!data.location_consent && (
                   <div className="space-y-2">
-                    <p className="text-sm text-gray-800">位置の記録には、位置情報の利用への同意が必要です(いつでも撤回でき、撤回すると記録はすぐ止まります)。</p>
+                    <p className="text-sm text-ink-900">位置の記録には、位置情報の利用への同意が必要です(いつでも撤回でき、撤回すると記録はすぐ止まります)。</p>
                     <Button size="sm" variant="outline" disabled={busy} onClick={() => run(
                       () => updateConsents({ location: true }), '位置情報の利用に同意しました', '同意を保存できませんでした')}>
                       位置情報の利用に同意する
                     </Button>
                   </div>
                 )}
-                {!savedMode && <p className="text-sm text-gray-800">先に「この旅行での位置の扱い」を選んで保存してください。</p>}
-                {savedMode === 'off' && <p className="text-sm text-gray-800">この旅行は「記録しない」設定です。</p>}
+                {!savedMode && <p className="text-sm text-ink-900">先に「この旅行での位置の扱い」を選んで保存してください。</p>}
+                {savedMode === 'off' && <p className="text-sm text-ink-900">この旅行は「記録しない」設定です。</p>}
                 {!data.trip_period ? (
-                  <p className="text-sm text-gray-800">旅行の日程が無いため記録できません。先にプランで日程を登録してください。</p>
+                  <p className="text-sm text-ink-900">旅行の日程が無いため記録できません。先にプランで日程を登録してください。</p>
                 ) : (
-                  <p className="text-sm text-gray-800">
+                  <p className="text-sm text-ink-900">
                     {`記録できる期間: ${showTime(data.trip_period.start)} 〜 ${showTime(data.trip_period.end)}(前日から始められます)`}
                     {!data.in_trip_period && '。今は期間外です'}
                   </p>
                 )}
-                <label className="block text-sm text-gray-800">
+                <label className="block text-sm text-ink-900">
                   精度
                   <select className="block mt-1 border rounded-sm px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as TrackPrecision)}>
                     {(['high', 'standard', 'low'] as TrackPrecision[]).map((p) => (
@@ -611,7 +611,7 @@ const LocationTrackPage: React.FC = () => {
                     ))}
                   </select>
                 </label>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-ink-700">
                   移動の速さ・止まっているか・電池の残量に合わせて、位置を取る頻度を自動で変えます。
                 </p>
                 <Button size="sm" variant="primary" disabled={busy || !canStart} onClick={() => run(
@@ -623,9 +623,9 @@ const LocationTrackPage: React.FC = () => {
           )}
 
           <section aria-label="記録した軌跡" className="mt-6">
-            <h2 className="font-semibold text-gray-900">記録した軌跡</h2>
+            <h2 className="font-semibold text-ink-900">記録した軌跡</h2>
             {data.tracks.length === 0 ? (
-              <Card padding="lg" className="mt-2 text-center text-gray-700">まだ記録はありません。</Card>
+              <Card padding="lg" className="mt-2 text-center text-ink-700">まだ記録はありません。</Card>
             ) : (
               <ul className="mt-2 space-y-2">
                 {data.tracks.map((t) => {
@@ -635,22 +635,22 @@ const LocationTrackPage: React.FC = () => {
                   return (
                     <li key={t.id}>
                       <Card padding="md" className="space-y-2">
-                        <p className="text-sm text-gray-900">
+                        <p className="text-sm text-ink-900">
                           {`${showTime(t.started_at)} 開始・${STATUS_LABEL[t.status]}・${MODE_LABEL[t.mode]}・${PRECISION[t.precision].label}・${count}件`}
                         </p>
-                        {t.stopped_reason && <p className="text-sm text-gray-700">{`${REASON_LABEL[t.stopped_reason]}(${showTime(t.stopped_at)})`}</p>}
-                        {summary && <p className="text-sm text-gray-700">{`記録の状態: ${summary}`}</p>}
+                        {t.stopped_reason && <p className="text-sm text-ink-700">{`${REASON_LABEL[t.stopped_reason]}(${showTime(t.stopped_at)})`}</p>}
+                        {summary && <p className="text-sm text-ink-700">{`記録の状態: ${summary}`}</p>}
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="outline" onClick={() => showDetail(t)}>軌跡を見る</Button>
                           <Button size="sm" variant="danger" disabled={busy} onClick={() => removeTrack(t)}>軌跡を削除</Button>
                         </div>
                         {detail && (
                           <div className="space-y-2">
-                            <p className="text-sm text-gray-800">{`点${detail.points.length}件・移動距離 約${formatDistance(detail.distance)}`}</p>
+                            <p className="text-sm text-ink-900">{`点${detail.points.length}件・移動距離 約${formatDistance(detail.distance)}`}</p>
                             {t.mode === 'areas_only' && (
                               <div>
-                                <p className="text-sm text-gray-800">{`サーバーにあるのは訪問地域(区画)${detail.cells.length}件だけです(座標はこの端末だけ)`}</p>
-                                <ul className="text-sm text-gray-800 list-disc pl-5">
+                                <p className="text-sm text-ink-900">{`サーバーにあるのは訪問地域(区画)${detail.cells.length}件だけです(座標はこの端末だけ)`}</p>
+                                <ul className="text-sm text-ink-900 list-disc pl-5">
                                   {detail.cells.map((c) => (
                                     <li key={c.key}>{`${CELL_STATE_LABEL[c.state]}・${Math.round(c.dwell_seconds / 60)}分・${showTime(c.first_at)}`}</li>
                                   ))}
@@ -659,12 +659,12 @@ const LocationTrackPage: React.FC = () => {
                             )}
                             <TrackSketch points={detail.points} label={`軌跡の略図(点${detail.points.length}件)`} />
                             <fieldset className="space-y-1">
-                              <legend className="text-sm text-gray-800">時間帯を指定して消す</legend>
+                              <legend className="text-sm text-ink-900">時間帯を指定して消す</legend>
                               <div className="flex flex-wrap gap-2 items-end">
-                                <label className="text-sm text-gray-800">開始
+                                <label className="text-sm text-ink-900">開始
                                   <input type="datetime-local" className="block border rounded-sm px-2 py-1" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
                                 </label>
-                                <label className="text-sm text-gray-800">終了
+                                <label className="text-sm text-ink-900">終了
                                   <input type="datetime-local" className="block border rounded-sm px-2 py-1" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
                                 </label>
                                 <Button size="sm" variant="outline" disabled={busy} onClick={() => removeRange(t)}>この時間帯を消す</Button>

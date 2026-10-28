@@ -39,8 +39,8 @@ const ConsentsCard: React.FC = () => {
   return (
     <Card padding="md" className="mt-4">
       <section aria-labelledby="consents-heading">
-        <h2 id="consents-heading" className="font-semibold text-gray-900">同意の管理</h2>
-        <p className="text-sm text-gray-700 mt-1">
+        <h2 id="consents-heading" className="font-semibold text-ink-900">同意の管理</h2>
+        <p className="text-sm text-ink-700 mt-1">
           目的ごとに、データの使い方に同意するかを選べます。いつでも撤回でき、撤回した後はその目的の処理を行いません。
           最初はすべて「同意しない」です。
         </p>
@@ -54,11 +54,11 @@ const ConsentsCard: React.FC = () => {
                   <input type="checkbox" className="mt-1" checked={i.granted} disabled={saving !== null}
                     onChange={(e) => void toggle(i, e.target.checked)} />
                   <span>
-                    <span className="font-medium text-gray-900">{i.label}</span>
-                    <span className="ml-2 text-sm text-gray-700">{i.granted ? '同意しています' : '同意していません'}</span>
-                    <span className="block text-sm text-gray-700">{i.description}</span>
-                    {!i.in_use && <span className="block text-xs text-gray-700">現在、この目的の処理を行う機能はありません。</span>}
-                    {i.updated_at && <span className="block text-xs text-gray-700">最終変更: {formatDate(i.updated_at)}</span>}
+                    <span className="font-medium text-ink-900">{i.label}</span>
+                    <span className="ml-2 text-sm text-ink-700">{i.granted ? '同意しています' : '同意していません'}</span>
+                    <span className="block text-sm text-ink-700">{i.description}</span>
+                    {!i.in_use && <span className="block text-xs text-ink-700">現在、この目的の処理を行う機能はありません。</span>}
+                    {i.updated_at && <span className="block text-xs text-ink-700">最終変更: {formatDate(i.updated_at)}</span>}
                   </span>
                 </label>
               </li>

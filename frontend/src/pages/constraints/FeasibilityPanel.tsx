@@ -27,8 +27,8 @@ function DayMetrics({ run }: { run: ValidationRunDetail }) {
   if (metrics.length === 0) return null;
   return (
     <section aria-labelledby="feasibility-days" className="mt-4">
-      <h3 id="feasibility-days" className="text-sm font-semibold text-gray-900 mb-1">日ごとの疲れの目安</h3>
-      <ul className="text-sm text-gray-900 space-y-1">
+      <h3 id="feasibility-days" className="text-sm font-semibold text-ink-900 mb-1">日ごとの疲れの目安</h3>
+      <ul className="text-sm text-ink-900 space-y-1">
         {metrics.map((m) => (
           <li key={m.day_id} data-testid="day-metric">
             <span className="font-medium">{m.local_date}</span>{` ${dayMetricText(m)}`}
@@ -42,7 +42,7 @@ function DayMetrics({ run }: { run: ValidationRunDetail }) {
 const TONE_CLASS: Record<RunTone, string> = {
   error: 'bg-red-50 text-red-800 border-red-200',
   warning: 'bg-amber-50 text-amber-900 border-amber-200',
-  unverified: 'bg-slate-50 text-slate-800 border-slate-300',
+  unverified: 'bg-slate-50 text-ink-900 border-slate-300',
   ok: 'bg-green-50 text-green-800 border-green-200',
   failed: 'bg-red-50 text-red-800 border-red-200',
 };
@@ -50,7 +50,7 @@ const TONE_CLASS: Record<RunTone, string> = {
 const SEVERITY_BADGE: Record<string, string> = {
   ERROR: 'bg-red-100 text-red-800',
   WARNING: 'bg-amber-100 text-amber-900',
-  INFO: 'bg-slate-200 text-slate-800',
+  INFO: 'bg-slate-200 text-ink-900',
 };
 
 function IssueItem({ issue }: { issue: ValidationIssue }) {
@@ -61,8 +61,8 @@ function IssueItem({ issue }: { issue: ValidationIssue }) {
           {issue.kind === 'unverified' ? '検証不能' : SEVERITY_LABEL[issue.severity]}
         </span>
         <div className="min-w-0 text-sm">
-          <div className="text-gray-900">{issue.message}</div>
-          <div className="text-xs text-gray-600 mt-0.5 flex flex-wrap gap-x-3">
+          <div className="text-ink-900">{issue.message}</div>
+          <div className="text-xs text-ink-700 mt-0.5 flex flex-wrap gap-x-3">
             {issue.entity_label && <span>対象: {issue.entity_label}</span>}
             {issue.constraint_title && <span>制約: {issue.constraint_title}</span>}
             {issue.is_masked && (
@@ -81,7 +81,7 @@ function IssueSection({ id, title, issues }: { id: string; title: string; issues
   if (issues.length === 0) return null;
   return (
     <section aria-labelledby={id} className="mt-4">
-      <h3 id={id} className="text-sm font-semibold text-gray-900 mb-1">{title} {issues.length}件</h3>
+      <h3 id={id} className="text-sm font-semibold text-ink-900 mb-1">{title} {issues.length}件</h3>
       <ul>{issues.map((i) => <IssueItem key={i.id} issue={i} />)}</ul>
     </section>
   );
@@ -109,8 +109,8 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
       <section aria-labelledby="feasibility-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="feasibility-heading" className="text-lg font-semibold text-gray-900">実行可能性チェック</h2>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <h2 id="feasibility-heading" className="text-lg font-semibold text-ink-900">実行可能性チェック</h2>
+            <p className="text-xs text-ink-700 mt-0.5">
               時間の重なり・移動時間・営業時間・予約との食い違いと、登録した制約を旅程と照らし合わせます。
             </p>
           </div>
@@ -141,7 +141,7 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
               <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
                 <div className="rounded-sm bg-red-50 p-2"><dt className="text-xs text-red-800">エラー</dt><dd className="text-lg font-semibold text-red-800">{run.counts.error}</dd></div>
                 <div className="rounded-sm bg-amber-50 p-2"><dt className="text-xs text-amber-900">警告</dt><dd className="text-lg font-semibold text-amber-900">{run.counts.warning}</dd></div>
-                <div className="rounded-sm bg-slate-100 p-2"><dt className="text-xs text-slate-800">検証できなかった</dt><dd className="text-lg font-semibold text-slate-800">{run.counts.unverified}</dd></div>
+                <div className="rounded-sm bg-slate-100 p-2"><dt className="text-xs text-ink-900">検証できなかった</dt><dd className="text-lg font-semibold text-ink-900">{run.counts.unverified}</dd></div>
               </dl>
             )}
             {split && (
@@ -154,9 +154,9 @@ const FeasibilityPanel: React.FC<FeasibilityPanelProps> = ({ run, hasConstraints
             )}
             {run.status === 'completed' && <DayMetrics run={run} />}
             {unchecked.length > 0 && (
-              <p className="mt-3 text-xs text-gray-600">内訳: {unchecked.join(' / ')}</p>
+              <p className="mt-3 text-xs text-ink-700">内訳: {unchecked.join(' / ')}</p>
             )}
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs text-ink-500">
               検証日時: {formatRunTime(run.finished_at ?? run.started_at)}{run.created_by_me ? '(自分が実行)' : '(他のメンバーが実行)'}
             </p>
           </div>

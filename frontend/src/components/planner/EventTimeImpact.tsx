@@ -44,12 +44,12 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-ink-900">
           終了時刻
           <input type="time" className="mt-1 block border rounded-lg px-2 py-1" value={end.time}
             onChange={(e) => { setImpact(null); onEndChange({ ...end, time: e.target.value }); }} />
         </label>
-        <label className="text-sm text-gray-800">
+        <label className="text-sm text-ink-900">
           終わる日
           <select className="mt-1 block border rounded-lg px-2 py-1" value={end.offset}
             onChange={(e) => { setImpact(null); onEndChange({ ...end, offset: Number(e.target.value) }); }}>
@@ -65,7 +65,7 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
       </div>
       {error && <p className="text-sm text-red-800" role="alert">{error}</p>}
       {impact && (
-        <div className="rounded-lg bg-slate-50 p-2 text-sm text-gray-900 space-y-1" role="status" aria-label="変更の影響">
+        <div className="rounded-lg bg-slate-50 p-2 text-sm text-ink-900 space-y-1" role="status" aria-label="変更の影響">
           {impact.summary.map((s) => <p key={s}>{s}</p>)}
           {impact.new_issues.length > 0 && (
             <ul className="list-disc pl-5 text-red-800" aria-label="新たに出る問題">

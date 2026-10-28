@@ -85,7 +85,7 @@ const JourneyPage: React.FC = () => {
     }
   };
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const save = (e: JourneyEvent, input: ActualInput, done: string) =>
     run(() => putEventActual(planId, e.event_id, input, e.actual?.revision), done, '実績を保存できませんでした。画面を読み込み直してください');
@@ -132,8 +132,8 @@ const JourneyPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">旅の振り返り</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">旅の振り返り</h1>
+      <p className="text-sm text-ink-700 mt-1">
         予定ごとに、行ったか・いつ着いて出たかを記録します。予定そのものは変わりません。時刻は各日のタイムゾーンで表示します。
       </p>
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
@@ -146,18 +146,18 @@ const JourneyPage: React.FC = () => {
           <Card padding="md" className="mt-6">
             <section aria-label="達成指標" className="space-y-2">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">達成指標</h2>
+                <h2 className="font-semibold text-ink-900">達成指標</h2>
                 <Button size="sm" variant="ghost" onClick={toggleHidden}>{hidden ? '数値を表示する' : '数値を隠す'}</Button>
               </div>
               {hidden ? (
-                <p className="text-sm text-gray-700">数値は隠しています。</p>
+                <p className="text-sm text-ink-700">数値は隠しています。</p>
               ) : (
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {metricRows(data.metrics).map((r) => (
                     <div key={r.label} className="p-2 rounded-sm bg-gray-50">
-                      <dt className="text-sm text-gray-700">{r.label}</dt>
-                      <dd className="text-xl font-semibold text-gray-900">{r.value}</dd>
-                      <dd className="text-xs text-gray-700">{r.help}</dd>
+                      <dt className="text-sm text-ink-700">{r.label}</dt>
+                      <dd className="text-xl font-semibold text-ink-900">{r.value}</dd>
+                      <dd className="text-xs text-ink-700">{r.help}</dd>
                     </div>
                   ))}
                 </dl>
@@ -165,10 +165,10 @@ const JourneyPage: React.FC = () => {
             </section>
           </Card>
 
-          {data.days.length === 0 && <Card padding="lg" className="mt-6 text-center text-gray-700">日程がありません。</Card>}
+          {data.days.length === 0 && <Card padding="lg" className="mt-6 text-center text-ink-700">日程がありません。</Card>}
           {data.days.map((d) => (
             <section key={d.day_id} aria-label={d.date} className="mt-6">
-              <h2 className="font-semibold text-gray-900">{`${d.date}${d.title ? ` ${d.title}` : ''}`}</h2>
+              <h2 className="font-semibold text-ink-900">{`${d.date}${d.title ? ` ${d.title}` : ''}`}</h2>
               <ul className="mt-2 space-y-2">
                 {d.events.map((e) => {
                   const t = times[e.event_id] ?? {
@@ -181,25 +181,25 @@ const JourneyPage: React.FC = () => {
                     <li key={e.event_id}>
                       <Card padding="md" className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-gray-900">{`${e.planned_time ? `${e.planned_time} ` : ''}${e.title}`}</span>
-                          <span className="px-2 py-0.5 rounded-sm text-sm bg-gray-100 text-gray-800" data-testid="actual-status">
+                          <span className="font-medium text-ink-900">{`${e.planned_time ? `${e.planned_time} ` : ''}${e.title}`}</span>
+                          <span className="px-2 py-0.5 rounded-sm text-sm bg-gray-100 text-ink-900" data-testid="actual-status">
                             {status === 'visited' ? '行った' : status === 'skipped' ? '行かなかった' : '未記録'}
                           </span>
-                          {e.start_diff_minutes !== null && <span className="text-sm text-gray-700">{diffLabel(e.start_diff_minutes)}</span>}
+                          {e.start_diff_minutes !== null && <span className="text-sm text-ink-700">{diffLabel(e.start_diff_minutes)}</span>}
                         </div>
                         {status === 'visited' && (e.actual?.actual_start_at || e.actual?.actual_end_at) && (
-                          <p className="text-sm text-gray-800">
+                          <p className="text-sm text-ink-900">
                             {`到着 ${localTime(e.actual?.actual_start_at ?? null, d.timezone_id) || '—'}・出発 ${localTime(e.actual?.actual_end_at ?? null, d.timezone_id) || '—'}`}
                             {e.actual?.source === 'suggested' ? '(提案から)' : ''}
                           </p>
                         )}
                         {(e.memory_count > 0) && (
-                          <p className="text-sm text-gray-700">
+                          <p className="text-sm text-ink-700">
                             {`記録${e.memory_count}件(写真${e.photo_count}枚)`}・<Link className="text-blue-800 underline" to={`/planner/${planId}/memories`}>旅の記録を見る</Link>
                           </p>
                         )}
                         {e.suggestion && (
-                          <p className="text-sm text-gray-800">
+                          <p className="text-sm text-ink-900">
                             {`提案: 到着 ${localTime(e.suggestion.actual_start_at, d.timezone_id)}・出発 ${localTime(e.suggestion.actual_end_at, d.timezone_id)}(${e.suggestion.basis === 'track' ? 'あなたの位置の軌跡' : '記録の日時'}から)`}
                             {data.can_edit && (
                               <Button size="sm" variant="outline" className="ml-2" disabled={busy} onClick={() => save(e, {
@@ -231,12 +231,12 @@ const JourneyPage: React.FC = () => {
                         )}
                         {data.can_edit && status === 'visited' && (
                           <fieldset className="flex flex-wrap items-end gap-2">
-                            <legend className="text-sm text-gray-800">{`到着と出発(${d.timezone_id})`}</legend>
-                            <label className="text-sm text-gray-800">到着
+                            <legend className="text-sm text-ink-900">{`到着と出発(${d.timezone_id})`}</legend>
+                            <label className="text-sm text-ink-900">到着
                               <input type="time" className="block border rounded-sm px-2 py-1" value={t.start}
                                 onChange={(ev) => setTimes((s) => ({ ...s, [e.event_id]: { ...t, start: ev.target.value } }))} />
                             </label>
-                            <label className="text-sm text-gray-800">出発
+                            <label className="text-sm text-ink-900">出発
                               <input type="time" className="block border rounded-sm px-2 py-1" value={t.end}
                                 onChange={(ev) => setTimes((s) => ({ ...s, [e.event_id]: { ...t, end: ev.target.value } }))} />
                             </label>
@@ -248,20 +248,20 @@ const JourneyPage: React.FC = () => {
                             <Button size="sm" variant="ghost" onClick={() => openCarry(e)}>次の旅行の候補に戻す</Button>
                           ) : (
                             <fieldset className="flex flex-wrap items-end gap-2">
-                              <legend className="text-sm text-gray-800">戻し先</legend>
+                              <legend className="text-sm text-ink-900">戻し先</legend>
                               {c.plans.length === 0 ? (
-                                <p className="text-sm text-gray-700">ほかの旅行がありません。先に次の旅行を作ってください。</p>
+                                <p className="text-sm text-ink-700">ほかの旅行がありません。先に次の旅行を作ってください。</p>
                               ) : (
                                 <>
-                                  <label className="text-sm text-gray-800">旅行
+                                  <label className="text-sm text-ink-900">旅行
                                     <select className="block border rounded-sm px-2 py-1" value={c.planId} onChange={(ev) => chooseCarryPlan(e, ev.target.value)}>
                                       <option value="">選んでください</option>
                                       {c.plans.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
                                     </select>
                                   </label>
                                   {c.planId && (
-                                    c.days.length === 0 ? <p className="text-sm text-gray-700">その旅行には日程がありません。</p> : (
-                                      <label className="text-sm text-gray-800">日
+                                    c.days.length === 0 ? <p className="text-sm text-ink-700">その旅行には日程がありません。</p> : (
+                                      <label className="text-sm text-ink-900">日
                                         <select className="block border rounded-sm px-2 py-1" value={c.dayId}
                                           onChange={(ev) => setCarry((s) => ({ ...s, [e.event_id]: { ...c, dayId: ev.target.value } }))}>
                                           {c.days.map((day) => <option key={day.id} value={day.id}>{day.local_date}</option>)}
@@ -286,7 +286,7 @@ const JourneyPage: React.FC = () => {
                     </li>
                   );
                 })}
-                {d.events.length === 0 && <li className="text-sm text-gray-700">予定はありません。</li>}
+                {d.events.length === 0 && <li className="text-sm text-ink-700">予定はありません。</li>}
               </ul>
             </section>
           ))}

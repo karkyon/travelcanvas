@@ -69,7 +69,7 @@ const VisitsPage: React.FC = () => {
   const listItems = useMemo(() => (data?.items ?? []).filter((i) => shown[i.layer_state]), [data, shown]);
   const positions = useMemo(() => project(mapItems, MAP_W, MAP_H), [mapItems]);
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const assess = async () => {
     if (!data) return;
@@ -126,8 +126,8 @@ const VisitsPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">訪問の地図</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">訪問の地図</h1>
+      <p className="text-sm text-ink-700 mt-1">
         位置のある予定に、あなたの位置の記録から判定した「通過・訪問・滞在」を重ねます。自動の判定は確定しません。
         予定そのものや振り返りの記録は変わりません。判定はあなただけのもので、同じ旅行のほかの人には見えません。
       </p>
@@ -140,8 +140,8 @@ const VisitsPage: React.FC = () => {
         <>
           <Card className="mt-4 p-4">
             <section aria-label="訪問の判定">
-              <h2 className="text-lg font-semibold text-gray-900">判定する</h2>
-              <p className="text-sm text-gray-700 mt-1">
+              <h2 className="text-lg font-semibold text-ink-900">判定する</h2>
+              <p className="text-sm text-ink-700 mt-1">
                 {data.tracks.synced + data.tracks.device === 0
                   ? 'この旅行の位置の記録がありません。写真・予約・振り返りの「行った」だけから判定します。'
                   : `位置の記録: サーバーに保存 ${data.tracks.synced}件・この端末だけ ${data.tracks.device}件(端末の軌跡は座標を送らず、距離や時間だけを送ります)`}
@@ -151,7 +151,7 @@ const VisitsPage: React.FC = () => {
                 <Link className="text-sm text-indigo-800 underline" to={`/planner/${planId}/track`}>位置の記録・保護エリア</Link>
                 <Link className="text-sm text-indigo-800 underline" to="/atlas">Atlas(旅行を横断した訪問地域)</Link>
               </div>
-              <details className="mt-3 text-sm text-gray-800">
+              <details className="mt-3 text-sm text-ink-900">
                 <summary className="cursor-pointer">判定の規則({data.rules.algorithm_version})</summary>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                   <li>精度が{data.rules.max_accuracy_m}mより悪い位置は使いません</li>
@@ -169,11 +169,11 @@ const VisitsPage: React.FC = () => {
 
           <Card className="mt-4 p-4">
             <section aria-label="地図の凡例と表示する状態">
-              <h2 className="text-lg font-semibold text-gray-900">表示する状態</h2>
+              <h2 className="text-lg font-semibold text-ink-900">表示する状態</h2>
               <ul className="mt-2 flex flex-wrap gap-3">
                 {LAYER_ORDER.map((s) => (
                   <li key={s}>
-                    <label className="inline-flex items-center gap-1 text-sm text-gray-900">
+                    <label className="inline-flex items-center gap-1 text-sm text-ink-900">
                       <input type="checkbox" checked={shown[s]} onChange={() => toggle(s)} />
                       <span aria-hidden="true">{LAYER_SYMBOL[s]}</span>
                       {LAYER_LABEL[s]}({data.counts[s]}件)
@@ -182,7 +182,7 @@ const VisitsPage: React.FC = () => {
                 ))}
               </ul>
               {data.events_without_location > 0 && (
-                <p className="text-sm text-gray-700 mt-2">場所の無い予定 {data.events_without_location}件は判定できません。</p>
+                <p className="text-sm text-ink-700 mt-2">場所の無い予定 {data.events_without_location}件は判定できません。</p>
               )}
               {data.needs_confirmation > 0 && (
                 <p className="text-sm text-amber-900 mt-2">確認が必要な判定が {data.needs_confirmation}件あります(一覧の「確認してください」)。</p>
@@ -191,7 +191,7 @@ const VisitsPage: React.FC = () => {
           </Card>
 
           {data.items.length === 0 ? (
-            <p className="mt-6 text-gray-700">位置のある予定がありません。予定に場所を登録すると判定できます。</p>
+            <p className="mt-6 text-ink-700">位置のある予定がありません。予定に場所を登録すると判定できます。</p>
           ) : (
             <>
               <Card className="mt-4 p-2">
@@ -229,7 +229,7 @@ const VisitsPage: React.FC = () => {
               </Card>
 
               <section aria-label="訪問の一覧" className="mt-4 space-y-3">
-                <h2 className="text-lg font-semibold text-gray-900">一覧</h2>
+                <h2 className="text-lg font-semibold text-ink-900">一覧</h2>
                 {listItems.map((it) => {
                   const a = it.assessment;
                   const headingId = `visit-${it.event_id}`;
@@ -238,9 +238,9 @@ const VisitsPage: React.FC = () => {
                       <article aria-labelledby={headingId} onFocus={() => setSelected(it.event_id)}
                         onMouseEnter={() => setSelected(it.event_id)}>
                         <div className="flex flex-wrap items-baseline gap-2">
-                          <h3 id={headingId} className="font-semibold text-gray-900">{it.title}</h3>
-                          <span className="text-sm text-gray-700">{it.date}{it.planned_time ? ` ${it.planned_time}` : ''}</span>
-                          <span className="text-sm font-medium text-gray-900" data-testid="layer-state">
+                          <h3 id={headingId} className="font-semibold text-ink-900">{it.title}</h3>
+                          <span className="text-sm text-ink-700">{it.date}{it.planned_time ? ` ${it.planned_time}` : ''}</span>
+                          <span className="text-sm font-medium text-ink-900" data-testid="layer-state">
                             <span aria-hidden="true">{LAYER_SYMBOL[it.layer_state]} </span>{LAYER_LABEL[it.layer_state]}
                           </span>
                           {a?.needs_confirmation && !a.hidden && (
@@ -248,21 +248,21 @@ const VisitsPage: React.FC = () => {
                           )}
                         </div>
                         {a ? (
-                          <dl className="mt-2 text-sm text-gray-800 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                            <dt className="text-gray-700">判定</dt>
+                          <dl className="mt-2 text-sm text-ink-900 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                            <dt className="text-ink-700">判定</dt>
                             <dd>{STATE_LABEL[a.state]}{a.hidden ? '(地図と Atlas から隠しています)' : ''}</dd>
-                            <dt className="text-gray-700">信頼度</dt>
+                            <dt className="text-ink-700">信頼度</dt>
                             <dd>{a.confidence === null ? '—' : `${pct(a.confidence)}(${a.level ? LEVEL_LABEL[a.level] : '—'})`}</dd>
-                            <dt className="text-gray-700">根拠</dt>
+                            <dt className="text-ink-700">根拠</dt>
                             <dd>{reasonText(a, it.radius_m)}</dd>
-                            <dt className="text-gray-700">出どころ</dt>
+                            <dt className="text-ink-700">出どころ</dt>
                             <dd>{SOURCE_LABEL[a.source]}</dd>
                           </dl>
                         ) : (
-                          <p className="mt-2 text-sm text-gray-700">まだ判定していません(半径{it.radius_m}m)</p>
+                          <p className="mt-2 text-sm text-ink-700">まだ判定していません(半径{it.radius_m}m)</p>
                         )}
                         {a?.differs_from_auto && a.auto_state && (
-                          <p className="mt-1 text-sm text-gray-800">自動の判定は「{STATE_LABEL[a.auto_state]}」です(あなたの判定を優先しています)</p>
+                          <p className="mt-1 text-sm text-ink-900">自動の判定は「{STATE_LABEL[a.auto_state]}」です(あなたの判定を優先しています)</p>
                         )}
                         <div className="mt-3 flex flex-wrap gap-2">
                           {actionsFor(it).map((b) => (
@@ -276,7 +276,7 @@ const VisitsPage: React.FC = () => {
                     </Card>
                   );
                 })}
-                {listItems.length === 0 && <p className="text-gray-700">表示する状態に当てはまる予定がありません。</p>}
+                {listItems.length === 0 && <p className="text-ink-700">表示する状態に当てはまる予定がありません。</p>}
               </section>
             </>
           )}

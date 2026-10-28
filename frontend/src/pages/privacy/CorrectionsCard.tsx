@@ -86,8 +86,8 @@ const CorrectionsCard: React.FC = () => {
   return (
     <Card padding="md" className="mt-4">
       <section aria-labelledby="corrections-heading">
-        <h2 id="corrections-heading" className="font-semibold text-gray-900">情報の訂正</h2>
-        <p className="text-sm text-gray-700 mt-1">
+        <h2 id="corrections-heading" className="font-semibold text-ink-900">情報の訂正</h2>
+        <p className="text-sm text-ink-700 mt-1">
           アカウントの情報を、根拠(出典)を添えて直します。訂正の前後と根拠は履歴に残り、あなただけが見られます。
         </p>
         <div aria-live="polite">{message && <p className="text-sm text-green-800 mt-2" role="status">{message}</p>}</div>
@@ -95,33 +95,33 @@ const CorrectionsCard: React.FC = () => {
         {data && (
           <form className="grid gap-2 sm:grid-cols-2 mt-3" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <div>
-              <label htmlFor="corr-field" className="block text-xs text-gray-800">直す項目</label>
+              <label htmlFor="corr-field" className="block text-xs text-ink-900">直す項目</label>
               <select id="corr-field" className="w-full border rounded-sm px-2 py-1 text-sm" value={field}
                 onChange={(e) => setField(e.target.value as 'username' | 'email')}>
                 {data.fields.map((f) => <option key={f.field} value={f.field}>{f.label}</option>)}
               </select>
-              <p className="text-xs text-gray-700 mt-0.5">{`今の値: ${data.current[field] ?? '(なし)'}`}</p>
+              <p className="text-xs text-ink-700 mt-0.5">{`今の値: ${data.current[field] ?? '(なし)'}`}</p>
             </div>
             <div>
-              <label htmlFor="corr-value" className="block text-xs text-gray-800">正しい値</label>
+              <label htmlFor="corr-value" className="block text-xs text-ink-900">正しい値</label>
               <input id="corr-value" className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={254} value={value}
                 type={field === 'email' ? 'email' : 'text'} onChange={(e) => setValue(e.target.value)} />
             </div>
             <div>
-              <label htmlFor="corr-source" className="block text-xs text-gray-800">根拠(出典)</label>
+              <label htmlFor="corr-source" className="block text-xs text-ink-900">根拠(出典)</label>
               <select id="corr-source" className="w-full border rounded-sm px-2 py-1 text-sm" value={source}
                 onChange={(e) => setSource(e.target.value as CorrectionSource)}>
                 {data.sources.map((s) => <option key={s.source} value={s.source}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="corr-note" className="block text-xs text-gray-800">根拠の補足(任意・500文字まで)</label>
+              <label htmlFor="corr-note" className="block text-xs text-ink-900">根拠の補足(任意・500文字まで)</label>
               <input id="corr-note" className="w-full border rounded-sm px-2 py-1 text-sm" maxLength={500} value={note}
                 onChange={(e) => setNote(e.target.value)} />
             </div>
             {needsPassword && (
               <div>
-                <label htmlFor="corr-password" className="block text-xs text-gray-800">本人確認のためのパスワード</label>
+                <label htmlFor="corr-password" className="block text-xs text-ink-900">本人確認のためのパスワード</label>
                 <input id="corr-password" type="password" autoComplete="current-password"
                   className="w-full border rounded-sm px-2 py-1 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
@@ -134,10 +134,10 @@ const CorrectionsCard: React.FC = () => {
         )}
         {data && data.history.length > 0 && (
           <>
-            <h3 className="font-medium text-gray-900 mt-4">訂正の履歴</h3>
+            <h3 className="font-medium text-ink-900 mt-4">訂正の履歴</h3>
             {data.history.some((h) => h.field === 'email' && h.status === 'applied') && (
               <div className="mt-1">
-                <label htmlFor="corr-revert-password" className="block text-xs text-gray-800">
+                <label htmlFor="corr-revert-password" className="block text-xs text-ink-900">
                   メールアドレスの訂正を取り消す時のパスワード
                 </label>
                 <input id="corr-revert-password" type="password" autoComplete="current-password"
@@ -148,8 +148,8 @@ const CorrectionsCard: React.FC = () => {
             <ul className="mt-1 divide-y" aria-label="訂正の履歴">
               {data.history.map((h) => (
                 <li key={h.id} className="py-2 text-sm">
-                  <p className="text-gray-900">{`${h.field_label}: ${h.before ?? '(なし)'} → ${h.after ?? '(なし)'}`}</p>
-                  <p className="text-xs text-gray-700">
+                  <p className="text-ink-900">{`${h.field_label}: ${h.before ?? '(なし)'} → ${h.after ?? '(なし)'}`}</p>
+                  <p className="text-xs text-ink-700">
                     {`${h.created_at ? new Date(h.created_at).toLocaleString('ja-JP') : ''}・出典: ${h.source_label}`
                       + `${h.source_note ? `(${h.source_note})` : ''}・確認: ${h.verification === 'password' ? 'パスワード' : 'ログイン中の本人'}`
                       + `・${STATUS[h.status]}`}
@@ -166,12 +166,12 @@ const CorrectionsCard: React.FC = () => {
         )}
         {data && data.requests.length > 0 && (
           <>
-            <h3 className="font-medium text-gray-900 mt-4">旅行の所有者への訂正の申し出</h3>
+            <h3 className="font-medium text-ink-900 mt-4">旅行の所有者への訂正の申し出</h3>
             <ul className="mt-1 divide-y" aria-label="訂正の申し出">
               {data.requests.map((r) => (
                 <li key={r.id} className="py-2 text-sm">
-                  <p className="text-gray-900">{`${r.plan_title ?? '(見られない旅行)'}: ${r.field_label ?? ''} → ${r.proposed_value ?? ''}`}</p>
-                  <p className="text-xs text-gray-700">
+                  <p className="text-ink-900">{`${r.plan_title ?? '(見られない旅行)'}: ${r.field_label ?? ''} → ${r.proposed_value ?? ''}`}</p>
+                  <p className="text-xs text-ink-700">
                     {`${STATUS[r.status]}${r.resolution_note ? `(所有者: ${r.resolution_note})` : ''}`}
                   </p>
                 </li>

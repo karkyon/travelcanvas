@@ -75,8 +75,8 @@ const PrivateProfileSection: React.FC = () => {
   return (
     <section aria-labelledby="private-profile-heading" className="space-y-4">
       <div>
-        <h3 id="private-profile-heading" className="text-lg font-medium text-gray-900">非公開の条件(あなただけに見えます)</h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <h3 id="private-profile-heading" className="text-lg font-medium text-ink-900">非公開の条件(あなただけに見えます)</h3>
+        <p className="text-sm text-ink-700 mt-1">
           体力・食事・予算など、ほかの参加者に詳しく知られたくない条件を登録します。旅行の「制約」画面で
           「この旅行に適用する」を選ぶと、その旅行の確認に使われます。ほかの参加者には「秘匿制約を満たしていません」
           とだけ伝わり、名前や値は見えません。運用者にも見えないよう暗号化して保存します。
@@ -92,19 +92,19 @@ const PrivateProfileSection: React.FC = () => {
       )}
 
       <div>
-        <h4 className="text-sm font-medium text-gray-800 mb-2">登録した条件 {profile ? `${profile.items.length}件` : ''}</h4>
+        <h4 className="text-sm font-medium text-ink-900 mb-2">登録した条件 {profile ? `${profile.items.length}件` : ''}</h4>
         {profile && profile.items.length === 0 ? (
-          <p className="text-sm text-gray-500">まだありません</p>
+          <p className="text-sm text-ink-500">まだありません</p>
         ) : (
           <ul className="space-y-2" aria-label="登録した非公開の条件">
             {profile?.items.map((i) => (
               <li key={i.id} className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
                 <div>
-                  <div className="font-medium text-gray-900">{i.label}</div>
-                  <div className="text-sm text-gray-600">{describeItem(i)}</div>
+                  <div className="font-medium text-ink-900">{i.label}</div>
+                  <div className="text-sm text-ink-700">{describeItem(i)}</div>
                 </div>
                 <button type="button" onClick={() => void handleRemove(i.id)} disabled={isSaving}
-                  className="text-gray-500 hover:text-red-600 p-1" aria-label={`${i.label}を削除`}>
+                  className="text-ink-500 hover:text-red-600 p-1" aria-label={`${i.label}を削除`}>
                   <Trash2 size={16} />
                 </button>
               </li>
@@ -116,20 +116,20 @@ const PrivateProfileSection: React.FC = () => {
       <form onSubmit={handleAdd} className="rounded-lg border p-4 space-y-3" aria-label="非公開の条件を追加">
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="pp-kind" className="block text-sm font-medium text-gray-700 mb-1">種類</label>
+            <label htmlFor="pp-kind" className="block text-sm font-medium text-ink-700 mb-1">種類</label>
             <select id="pp-kind" className={inputClass} value={draft.kind}
               onChange={(e) => setDraft(emptyDraft(e.target.value as PrivateProfileKind))}>
               {KIND_OPTIONS.map((o) => <option key={o.kind} value={o.kind}>{o.label}</option>)}
             </select>
-            <p className="text-xs text-gray-500 mt-1">{opt.hint}</p>
+            <p className="text-xs text-ink-500 mt-1">{opt.hint}</p>
           </div>
           <div>
-            <label htmlFor="pp-label" className="block text-sm font-medium text-gray-700 mb-1">名前(あなたにだけ表示)</label>
+            <label htmlFor="pp-label" className="block text-sm font-medium text-ink-700 mb-1">名前(あなたにだけ表示)</label>
             <input id="pp-label" className={inputClass} maxLength={60} value={draft.label}
               placeholder="例: 朝はゆっくりしたい" onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))} />
           </div>
           <div>
-            <label htmlFor="pp-value" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="pp-value" className="block text-sm font-medium text-ink-700 mb-1">
               {opt.type === 'time' ? '時刻' : opt.type === 'number' ? '上限' : '語'}
             </label>
             <div className="flex gap-2">
@@ -146,7 +146,7 @@ const PrivateProfileSection: React.FC = () => {
             </div>
           </div>
           <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-1">強さ</legend>
+            <legend className="block text-sm font-medium text-ink-700 mb-1">強さ</legend>
             <div className="flex gap-4 text-sm pt-2">
               <label className="flex items-center gap-1">
                 <input type="radio" name="pp-hardness" checked={draft.hardness === 'hard'}
@@ -162,12 +162,12 @@ const PrivateProfileSection: React.FC = () => {
         <Button type="submit" variant="primary" loading={isSaving} disabled={!profile || full || !profile.readable}>
           条件を追加して保存
         </Button>
-        {full && <p className="text-xs text-gray-600">条件は{profile?.max_items}件までです</p>}
+        {full && <p className="text-xs text-ink-700">条件は{profile?.max_items}件までです</p>}
       </form>
 
       {profile && profile.applied_plans.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-gray-800 mb-1">適用している旅行</h4>
+          <h4 className="text-sm font-medium text-ink-900 mb-1">適用している旅行</h4>
           <ul className="list-disc ml-5 text-sm">
             {profile.applied_plans.map((p) => (
               <li key={p.plan_id}><Link className="text-blue-700 underline" to={`/planner/${p.plan_id}/constraints`}>{p.title || '(名前のない旅行)'}</Link></li>

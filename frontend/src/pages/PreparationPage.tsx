@@ -275,7 +275,7 @@ const PreparationPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-700">
+      <div className="p-8 text-center text-ink-700">
         プランが選択されていません。
         <div className="mt-4">
           <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
@@ -295,8 +295,8 @@ const PreparationPage: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
           ← プランへ戻る
         </Button>
-        <h1 className="text-2xl font-bold text-gray-900">出発前の準備</h1>
-        <p className="text-sm text-gray-700 mt-1">準備状況・持ち物・準備タスクをまとめて確認します。</p>
+        <h1 className="text-2xl font-bold text-ink-900">出発前の準備</h1>
+        <p className="text-sm text-ink-700 mt-1">準備状況・持ち物・準備タスクをまとめて確認します。</p>
       </div>
 
       <div role="tablist" aria-label="準備の表示切替" className="flex gap-2 mb-4 border-b">
@@ -309,7 +309,7 @@ const PreparationPage: React.FC = () => {
             aria-selected={tab === t.id}
             aria-controls={`prep-panel-${t.id}`}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-gray-700'}`}
+            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}
           >
             {t.label}
             {t.id === 'readiness' && readiness && !readiness.is_ready ? `(${readiness.counts.total})` : ''}
@@ -371,26 +371,26 @@ const PreparationPage: React.FC = () => {
             <div className="space-y-4">
               {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
               <div>
-                <label htmlFor="packing-name" className="block text-sm font-medium text-gray-800 mb-1">名前</label>
+                <label htmlFor="packing-name" className="block text-sm font-medium text-ink-900 mb-1">名前</label>
                 <input id="packing-name" className={inputClass} maxLength={120} value={packingForm.name}
                   onChange={(e) => updatePacking('name', e.target.value)} placeholder="例: 折りたたみ傘" />
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label htmlFor="packing-category" className="block text-sm font-medium text-gray-800 mb-1">分類</label>
+                  <label htmlFor="packing-category" className="block text-sm font-medium text-ink-900 mb-1">分類</label>
                   <select id="packing-category" className={inputClass} value={packingForm.category}
                     onChange={(e) => updatePacking('category', e.target.value as PackingForm['category'])}>
                     {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div className="w-28">
-                  <label htmlFor="packing-quantity" className="block text-sm font-medium text-gray-800 mb-1">数量</label>
+                  <label htmlFor="packing-quantity" className="block text-sm font-medium text-ink-900 mb-1">数量</label>
                   <input id="packing-quantity" type="number" min={1} max={999} className={inputClass} value={packingForm.quantity}
                     onChange={(e) => updatePacking('quantity', e.target.value)} />
                 </div>
               </div>
               <div>
-                <label htmlFor="packing-status" className="block text-sm font-medium text-gray-800 mb-1">状態</label>
+                <label htmlFor="packing-status" className="block text-sm font-medium text-ink-900 mb-1">状態</label>
                 <select id="packing-status" className={inputClass} value={packingForm.status}
                   onChange={(e) => updatePacking('status', e.target.value as PackingStatus)}>
                   {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -402,7 +402,7 @@ const PreparationPage: React.FC = () => {
               </label>
               {!packingEditing && (
                 <fieldset>
-                  <legend className="block text-sm font-medium text-gray-800 mb-1">公開範囲</legend>
+                  <legend className="block text-sm font-medium text-ink-900 mb-1">公開範囲</legend>
                   <div className="space-y-1 text-sm">
                     <label className="flex items-center gap-1">
                       <input type="radio" name="packing-scope" checked={packingForm.scope === 'shared'}
@@ -419,7 +419,7 @@ const PreparationPage: React.FC = () => {
               )}
               {packingForm.scope === 'shared' && (
                 <div>
-                  <label htmlFor="packing-assignee" className="block text-sm font-medium text-gray-800 mb-1">担当</label>
+                  <label htmlFor="packing-assignee" className="block text-sm font-medium text-ink-900 mb-1">担当</label>
                   <select id="packing-assignee" className={inputClass} value={packingForm.assignee_user_id}
                     onChange={(e) => updatePacking('assignee_user_id', e.target.value)}>
                     <option value="">未定</option>
@@ -428,7 +428,7 @@ const PreparationPage: React.FC = () => {
                 </div>
               )}
               <div>
-                <label htmlFor="packing-note" className="block text-sm font-medium text-gray-800 mb-1">メモ(任意)</label>
+                <label htmlFor="packing-note" className="block text-sm font-medium text-ink-900 mb-1">メモ(任意)</label>
                 <input id="packing-note" className={inputClass} maxLength={500} value={packingForm.note}
                   onChange={(e) => updatePacking('note', e.target.value)} />
               </div>
@@ -447,21 +447,21 @@ const PreparationPage: React.FC = () => {
             <div className="space-y-4">
               {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
               {taskReadinessKey && (
-                <p className="text-sm text-gray-700">準備状況の項目からタスクを作ります。完了にすると、その項目は対応済みになります。</p>
+                <p className="text-sm text-ink-700">準備状況の項目からタスクを作ります。完了にすると、その項目は対応済みになります。</p>
               )}
               <div>
-                <label htmlFor="task-title" className="block text-sm font-medium text-gray-800 mb-1">題名</label>
+                <label htmlFor="task-title" className="block text-sm font-medium text-ink-900 mb-1">題名</label>
                 <input id="task-title" className={inputClass} maxLength={200} value={taskForm.title}
                   onChange={(e) => updateTask('title', e.target.value)} placeholder="例: 両替する" />
               </div>
               <div>
-                <label htmlFor="task-criteria" className="block text-sm font-medium text-gray-800 mb-1">完了条件(任意)</label>
+                <label htmlFor="task-criteria" className="block text-sm font-medium text-ink-900 mb-1">完了条件(任意)</label>
                 <input id="task-criteria" className={inputClass} maxLength={500} value={taskForm.completion_criteria}
                   onChange={(e) => updateTask('completion_criteria', e.target.value)} placeholder="例: 現地通貨を受け取った" />
               </div>
               <div className="flex gap-3 flex-wrap">
                 <div className="flex-1 min-w-48">
-                  <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-800 mb-1">担当</label>
+                  <label htmlFor="task-assignee" className="block text-sm font-medium text-ink-900 mb-1">担当</label>
                   <select id="task-assignee" className={inputClass} value={taskForm.assignee_user_id}
                     onChange={(e) => updateTask('assignee_user_id', e.target.value)}>
                     <option value="">未定</option>
@@ -469,13 +469,13 @@ const PreparationPage: React.FC = () => {
                   </select>
                 </div>
                 <div className="flex-1 min-w-48">
-                  <label htmlFor="task-due" className="block text-sm font-medium text-gray-800 mb-1">期限(任意)</label>
+                  <label htmlFor="task-due" className="block text-sm font-medium text-ink-900 mb-1">期限(任意)</label>
                   <input id="task-due" type="datetime-local" className={inputClass} value={taskForm.due_local}
                     onChange={(e) => updateTask('due_local', e.target.value)} />
                 </div>
               </div>
               <div>
-                <label htmlFor="task-description" className="block text-sm font-medium text-gray-800 mb-1">メモ(任意)</label>
+                <label htmlFor="task-description" className="block text-sm font-medium text-ink-900 mb-1">メモ(任意)</label>
                 <textarea id="task-description" className={inputClass} rows={2} maxLength={2000} value={taskForm.description}
                   onChange={(e) => updateTask('description', e.target.value)} />
               </div>

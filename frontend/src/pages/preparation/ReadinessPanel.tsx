@@ -17,7 +17,7 @@ import { safeInternalPath } from '@/utils/safeNavigation';
 const SEVERITY_CLASS: Record<string, string> = {
   high: 'bg-red-100 text-red-800',
   medium: 'bg-amber-100 text-amber-900',
-  low: 'bg-slate-200 text-slate-800',
+  low: 'bg-slate-200 text-ink-900',
 };
 
 interface Props {
@@ -32,7 +32,7 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
   const summary = readinessSummary(readiness);
   const toneClass = summary.tone === 'ready'
     ? 'bg-green-50 text-green-900 border-green-200'
-    : summary.tone === 'attention' ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-gray-50 text-gray-800 border-gray-200';
+    : summary.tone === 'attention' ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-gray-50 text-ink-900 border-gray-200';
 
   return (
     <div className="space-y-4">
@@ -51,7 +51,7 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
           {(Object.keys(READINESS_CATEGORY_LABEL) as Array<keyof typeof READINESS_CATEGORY_LABEL>)
             .filter((c) => readiness.counts.by_category[c] > 0)
             .map((c) => (
-              <li key={c} className="text-sm px-2 py-1 rounded-sm bg-gray-100 text-gray-800">
+              <li key={c} className="text-sm px-2 py-1 rounded-sm bg-gray-100 text-ink-900">
                 {READINESS_CATEGORY_LABEL[c]} {readiness.counts.by_category[c]}件
               </li>
             ))}
@@ -69,13 +69,13 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
                       <span className={`text-xs px-2 py-0.5 rounded-sm ${SEVERITY_CLASS[item.severity]}`}>
                         {SEVERITY_LABEL[item.severity]}
                       </span>
-                      <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-gray-800">
+                      <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-100 text-ink-900">
                         {READINESS_CATEGORY_LABEL[item.category]}
                       </span>
-                      <span className="font-medium text-gray-900">{item.title}</span>
+                      <span className="font-medium text-ink-900">{item.title}</span>
                     </div>
-                    <p className="text-sm text-gray-700 mt-1">{item.detail}</p>
-                    {item.due_at && <p className="text-xs text-gray-700 mt-1">期限: {formatDue(item.due_at)}</p>}
+                    <p className="text-sm text-ink-700 mt-1">{item.detail}</p>
+                    {item.due_at && <p className="text-xs text-ink-700 mt-1">期限: {formatDue(item.due_at)}</p>}
                     {item.task && (
                       <p className="text-xs text-blue-900 mt-1" data-testid={`readiness-task-${item.key}`}>
                         タスクにしました(担当: {item.task.assignee_name ?? '未定'}

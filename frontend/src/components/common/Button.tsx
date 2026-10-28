@@ -33,41 +33,36 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
   onClick,
   ...props
 }, ref) => {
+  // [Gate G10-UX] UX-6 デザインの決まり(tokens)の色へ置き換えた(以前は青・灰・赤のグラデーションと強い影)。
+  // 主な操作は強調色の1色だけ・状態の色は危険だけ。暗い見た目でも同じ名前の色が読める値になる(tokens.css)。
+  // フォーカスの枠は決まりの色(--tc-focus)で、押せる部品と地の間に 3:1 以上の差を付ける。
   const baseClasses = [
     'inline-flex items-center justify-center',
-    'font-medium rounded-lg transition-all duration-200',
-    'focus:outline-hidden focus:ring-2 focus:ring-offset-2',
+    'font-medium rounded-lg transition-colors duration-150',
+    'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ring-offset-cloud-0',
     'disabled:opacity-50 disabled:cursor-not-allowed',
-    'transform active:scale-95'
+    'active:translate-y-px'
   ];
 
   const variantClasses = {
     primary: [
-      'bg-linear-to-r from-blue-600 to-blue-700',
-      'hover:from-blue-700 hover:to-blue-800',
-      'text-white shadow-lg hover:shadow-xl',
-      'focus:ring-blue-500'
+      'bg-accent text-on-accent shadow-sm',
+      'hover:bg-accent-strong',
     ],
     secondary: [
-      'bg-linear-to-r from-gray-600 to-gray-700',
-      'hover:from-gray-700 hover:to-gray-800',
-      'text-white shadow-lg hover:shadow-xl',
-      'focus:ring-gray-500'
+      'bg-cloud-100 text-ink-900 border border-cloud-200',
+      'hover:bg-cloud-200',
     ],
     outline: [
-      'border-2 border-blue-600 text-blue-600',
-      'hover:bg-blue-600 hover:text-white',
-      'focus:ring-blue-500'
+      'border-2 border-accent text-accent bg-transparent',
+      'hover:bg-accent-soft',
     ],
     ghost: [
-      'text-gray-700 hover:bg-gray-100',
-      'focus:ring-gray-500'
+      'text-ink-700 hover:bg-cloud-100',
     ],
     danger: [
-      'bg-linear-to-r from-red-600 to-red-700',
-      'hover:from-red-700 hover:to-red-800',
-      'text-white shadow-lg hover:shadow-xl',
-      'focus:ring-red-500'
+      'bg-danger-solid text-white shadow-sm',
+      'hover:brightness-110',
     ]
   };
 

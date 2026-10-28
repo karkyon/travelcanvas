@@ -27,7 +27,7 @@ const SIZE_CLASS_MAP: Record<string, string> = {
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'md',
   className = '',
-  color = 'text-blue-600',
+  color = 'text-accent', // [Gate G10-UX] UX-6 強調色(暗い見た目では明るい強調色)
 }) => {
   if (typeof size === 'number') {
     const px = `${size}px`;

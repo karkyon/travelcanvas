@@ -30,9 +30,9 @@ const RouteErrorBoundary = () => {
 
   return (
     <div role="alert" className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8 text-center">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">{title}</h1>
-        <p className="text-gray-600 mb-6">{message}</p>
+      <div className="max-w-md w-full bg-surface rounded-xl shadow-sm p-8 text-center">
+        <h1 className="text-xl font-bold text-ink-900 mb-2">{title}</h1>
+        <p className="text-ink-700 mb-6">{message}</p>
         <div className="flex justify-center gap-3">
           <button
             type="button"
@@ -41,7 +41,7 @@ const RouteErrorBoundary = () => {
           >
             再読み込み
           </button>
-          <a href="/" className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+          <a href="/" className="px-4 py-2 rounded-lg border border-gray-300 text-ink-700 hover:bg-gray-50">
             ホームへ
           </a>
         </div>

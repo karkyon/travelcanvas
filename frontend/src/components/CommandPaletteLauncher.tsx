@@ -13,11 +13,11 @@ const CommandPalette = lazy(loadPalette);
 
 const Placeholder: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
   <button type="button" onClick={onOpen}
-    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-100"
+    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-ink-900 hover:bg-gray-100"
     aria-haspopup="dialog" aria-label="検索(Ctrl+K)">
     <Search size={16} aria-hidden="true" />
     <span className="hidden lg:inline text-sm">検索</span>
-    <kbd className="hidden lg:inline text-xs text-gray-700 border border-gray-300 rounded-sm px-1">Ctrl K</kbd>
+    <kbd className="hidden lg:inline text-xs text-ink-700 border border-gray-300 rounded-sm px-1">Ctrl K</kbd>
   </button>
 );
 

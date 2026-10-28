@@ -108,7 +108,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
       case 'high': return 'border-red-500 bg-red-50';
       case 'medium': return 'border-yellow-500 bg-yellow-50';
       case 'low': return 'border-green-500 bg-green-50';
-      default: return 'border-gray-300 bg-white';
+      default: return 'border-gray-300 bg-surface';
     }
   };
 
@@ -160,7 +160,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   };
 
   const baseClasses = `
-    relative bg-white border rounded-xl p-4 mb-3 cursor-grab transition-all duration-200
+    relative bg-surface border rounded-xl p-4 mb-3 cursor-grab transition-all duration-200
     ${isDragging ? 'opacity-80 scale-105 rotate-1 shadow-xl z-50' : 'hover:shadow-md'}
     ${isNext ? 'border-orange-400 bg-orange-50 shadow-lg' : ''}
     ${isCompleted ? 'opacity-60 bg-gray-50' : ''}
@@ -194,11 +194,11 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
         <div className="flex-1">
           {/* Time and Title */}
           <div className="flex items-center gap-3 mb-2">
-            <div className="flex items-center gap-1 text-sm font-semibold text-gray-700">
+            <div className="flex items-center gap-1 text-sm font-semibold text-ink-700">
               <Clock size={14} />
               <span>{formatTime(startTime)}-{formatTime(endTime)}{endTime && endDayOffset ? (endDayOffset === 1 ? '(翌日)' : `(${endDayOffset}日後)`) : ''}</span>
             </div>
-            <div className="text-lg font-semibold text-gray-900">
+            <div className="text-lg font-semibold text-ink-900">
               {getCategoryIcon(category)} {isEditing ? (
                 <input
                   type="text"
@@ -212,7 +212,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           </div>
 
           {/* Location and Basic Info */}
-          <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+          <div className="flex items-center gap-4 text-sm text-ink-700 mb-2">
             <div className="flex items-center gap-1">
               <MapPin size={12} />
               <span>{locationName}</span>
@@ -246,7 +246,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
 
           {/* Description */}
           {description && !isExpanded && (
-            <p className="text-sm text-gray-600 line-clamp-1">{description}</p>
+            <p className="text-sm text-ink-700 line-clamp-1">{description}</p>
           )}
         </div>
 
@@ -257,7 +257,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               setIsEditing(true);
             }}
-            className="p-1 text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
+            className="p-1 text-ink-500 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
             title="編集"
           >
             <Edit3 size={14} />
@@ -269,7 +269,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                 e.stopPropagation();
                 onComment(id);
               }}
-              className="p-1 text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-sm transition-colors"
+              className="p-1 text-ink-700 hover:text-indigo-700 hover:bg-indigo-50 rounded-sm transition-colors"
               title="コメント"
               aria-label="この予定へのコメント"
             >
@@ -281,7 +281,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onShare?.(id);
             }}
-            className="p-1 text-gray-500 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
+            className="p-1 text-ink-500 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
             title="共有"
           >
             <Share2 size={14} />
@@ -291,7 +291,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               e.stopPropagation();
               onDelete?.(id);
             }}
-            className="p-1 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
+            className="p-1 text-ink-500 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
             title="削除"
           >
             <Trash2 size={14} />
@@ -305,7 +305,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {/* Description */}
           {description && (
             <div className="mb-3">
-              <p className="text-sm text-gray-700">{description}</p>
+              <p className="text-sm text-ink-700">{description}</p>
             </div>
           )}
 
@@ -314,7 +314,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             <div className="mb-3">
               <div className="flex items-center gap-2 text-sm">
                 <MapPin size={14} className="text-gray-400" aria-hidden="true" />
-                <span className="text-gray-600">{address}</span>
+                <span className="text-ink-700">{address}</span>
               </div>
             </div>
           )}
@@ -322,7 +322,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {/* Notes */}
           {(notes || isEditing) && (
             <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-500 mb-1">メモ</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1">メモ</label>
               {isEditing ? (
                 <textarea
                   value={editData.notes}
@@ -332,7 +332,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   placeholder="メモを追加..."
                 />
               ) : (
-                <p className="text-sm text-gray-600">{notes}</p>
+                <p className="text-sm text-ink-700">{notes}</p>
               )}
             </div>
           )}

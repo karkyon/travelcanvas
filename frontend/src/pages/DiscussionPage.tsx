@@ -229,7 +229,7 @@ const DiscussionPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-700">
+      <div className="p-8 text-center text-ink-700">
         プランが選択されていません。
         <div className="mt-4"><Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button></div>
       </div>
@@ -240,8 +240,8 @@ const DiscussionPage: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-        <h1 className="text-2xl font-bold text-gray-900">相談・投票</h1>
-        <p className="text-sm text-gray-700 mt-1">候補を投票で決め、気になることはコメントで相談します。</p>
+        <h1 className="text-2xl font-bold text-ink-900">相談・投票</h1>
+        <p className="text-sm text-ink-700 mt-1">候補を投票で決め、気になることはコメントで相談します。</p>
         <div className="mt-2"><PlanNotificationLevel planId={planId} /></div>
       </div>
 
@@ -249,7 +249,7 @@ const DiscussionPage: React.FC = () => {
         {(['polls', 'comments'] as const).map((t) => (
           <button key={t} id={`disc-tab-${t}`} type="button" role="tab" aria-selected={tab === t}
             aria-controls={`disc-panel-${t}`} onClick={() => setTab(t)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t ? 'border-blue-600 text-blue-800' : 'border-transparent text-gray-700'}`}>
+            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}>
             {t === 'polls' ? `投票(${polls.length})` : `コメント(${comments.filter((c) => !c.is_deleted).length})`}
           </button>
         ))}
@@ -271,7 +271,7 @@ const DiscussionPage: React.FC = () => {
                 </Button>
               )}
               {polls.length === 0 ? (
-                <Card padding="lg" className="text-center text-gray-700">投票はまだありません。</Card>
+                <Card padding="lg" className="text-center text-ink-700">投票はまだありません。</Card>
               ) : polls.map((p) => (
                 <PollCard key={p.id} poll={p} onSubmitVotes={submitVotes}
                   onResolve={(poll, voteId, resolved) => void run(() => resolveVote(planId, poll.id, voteId, resolved), '懸念の更新に失敗しました')}
@@ -313,12 +313,12 @@ const DiscussionPage: React.FC = () => {
               <div className="space-y-4">
                 {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
                 <div>
-                  <label htmlFor="poll-title" className="block text-sm font-medium text-gray-800 mb-1">題名</label>
+                  <label htmlFor="poll-title" className="block text-sm font-medium text-ink-900 mb-1">題名</label>
                   <input id="poll-title" className={inputClass} maxLength={200} value={pollForm.title}
                     onChange={(e) => setPollForm({ ...pollForm, title: e.target.value })} placeholder="例: 2日目の夕食" />
                 </div>
                 <fieldset>
-                  <legend className="block text-sm font-medium text-gray-800 mb-1">選択肢</legend>
+                  <legend className="block text-sm font-medium text-ink-900 mb-1">選択肢</legend>
                   <div className="space-y-2">
                     {pollForm.options.map((o, i) => (
                       <input key={i} aria-label={`選択肢${i + 1}`} className={inputClass} maxLength={200} value={o}
@@ -327,7 +327,7 @@ const DiscussionPage: React.FC = () => {
                   </div>
                   {candidates.length > 0 && (
                     <div className="mt-2">
-                      <p className="text-sm text-gray-800">候補箱から選ぶ</p>
+                      <p className="text-sm text-ink-900">候補箱から選ぶ</p>
                       <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
                         {candidates.map((c) => (
                           <label key={c.id} className="flex items-center gap-2 text-sm">
@@ -346,12 +346,12 @@ const DiscussionPage: React.FC = () => {
                   )}
                 </fieldset>
                 <div>
-                  <label htmlFor="poll-deadline" className="block text-sm font-medium text-gray-800 mb-1">締切(任意)</label>
+                  <label htmlFor="poll-deadline" className="block text-sm font-medium text-ink-900 mb-1">締切(任意)</label>
                   <input id="poll-deadline" type="datetime-local" className={inputClass} value={pollForm.deadline_local}
                     onChange={(e) => setPollForm({ ...pollForm, deadline_local: e.target.value })} />
                 </div>
                 <fieldset>
-                  <legend className="block text-sm font-medium text-gray-800 mb-1">「不可」の扱い</legend>
+                  <legend className="block text-sm font-medium text-ink-900 mb-1">「不可」の扱い</legend>
                   <div className="space-y-1 text-sm">
                     {VETO_POLICY_OPTIONS.map((o) => (
                       <label key={o.value} className="flex items-center gap-1">
@@ -363,7 +363,7 @@ const DiscussionPage: React.FC = () => {
                   </div>
                 </fieldset>
                 <div>
-                  <label htmlFor="poll-quorum" className="block text-sm font-medium text-gray-800 mb-1">定足数(任意。決定に要る回答者の人数)</label>
+                  <label htmlFor="poll-quorum" className="block text-sm font-medium text-ink-900 mb-1">定足数(任意。決定に要る回答者の人数)</label>
                   <input id="poll-quorum" inputMode="numeric" className={inputClass} value={pollForm.quorum}
                     onChange={(e) => setPollForm({ ...pollForm, quorum: e.target.value })} placeholder="例: 3" />
                 </div>
@@ -373,7 +373,7 @@ const DiscussionPage: React.FC = () => {
                   匿名にする(誰がどう回答したかを本人以外に表示しない)
                 </label>
                 <div>
-                  <label htmlFor="poll-description" className="block text-sm font-medium text-gray-800 mb-1">説明(任意)</label>
+                  <label htmlFor="poll-description" className="block text-sm font-medium text-ink-900 mb-1">説明(任意)</label>
                   <textarea id="poll-description" className={inputClass} rows={2} maxLength={1000} value={pollForm.description}
                     onChange={(e) => setPollForm({ ...pollForm, description: e.target.value })} />
                 </div>

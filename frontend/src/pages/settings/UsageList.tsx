@@ -9,7 +9,7 @@ const UsageList: React.FC<{ usage: UsageSummary }> = ({ usage }) => (
       const pct = row.limit > 0 ? Math.min(100, Math.round((row.used / row.limit) * 100)) : 100;
       return (
         <li key={row.metric} className="text-sm">
-          <div className="flex flex-wrap justify-between gap-2 text-gray-900">
+          <div className="flex flex-wrap justify-between gap-2 text-ink-900">
             <span>{row.label}</span>
             <span>{formatUsage(row, row.used)} / {formatUsage(row, row.limit)}{row.overridden ? '(個別の上限)' : ''}</span>
           </div>

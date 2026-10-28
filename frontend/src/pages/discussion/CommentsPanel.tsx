@@ -41,13 +41,13 @@ const Composer: React.FC<{
   };
   return (
     <div className="space-y-2">
-      <label htmlFor={`${idPrefix}-body`} className="block text-sm font-medium text-gray-800">{submitLabel}の内容</label>
+      <label htmlFor={`${idPrefix}-body`} className="block text-sm font-medium text-ink-900">{submitLabel}の内容</label>
       <textarea id={`${idPrefix}-body`} className="w-full border rounded-lg px-3 py-2" rows={2} maxLength={2000}
         value={body} onChange={(e) => setBody(e.target.value)} />
       {looksSensitive(body) && <p className="text-xs text-amber-900" role="note">{SENSITIVE_NOTE}</p>}
       {others.length > 0 && (
         <fieldset>
-          <legend className="text-xs text-gray-800">メンション(通知する人)</legend>
+          <legend className="text-xs text-ink-900">メンション(通知する人)</legend>
           <div className="flex flex-wrap gap-3 text-sm">
             {others.map((m) => (
               <label key={m.user_id} className="flex items-center gap-1">
@@ -69,10 +69,10 @@ const CommentItem: React.FC<{
 }> = ({ c, onToggleResolved, onEdit, onDelete }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(c.body ?? '');
-  if (c.is_deleted) return <p className="text-sm text-gray-700 italic">このコメントは削除されました</p>;
+  if (c.is_deleted) return <p className="text-sm text-ink-700 italic">このコメントは削除されました</p>;
   return (
     <div>
-      <p className="text-xs text-gray-700">
+      <p className="text-xs text-ink-700">
         {c.author_name}{c.is_mine ? '(自分)' : ''}{c.edited_at ? '・編集済み' : ''}
         {c.status === 'resolved' && <span className="ml-1 px-1.5 rounded-sm bg-green-100 text-green-900">解決済み</span>}
       </p>
@@ -87,9 +87,9 @@ const CommentItem: React.FC<{
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-900 whitespace-pre-wrap">{c.body}</p>
+        <p className="text-sm text-ink-900 whitespace-pre-wrap">{c.body}</p>
       )}
-      {c.mentions.length > 0 && <p className="text-xs text-gray-700">メンション: {c.mentions.map((m) => `@${m.name}`).join(' ')}</p>}
+      {c.mentions.length > 0 && <p className="text-xs text-ink-700">メンション: {c.mentions.map((m) => `@${m.name}`).join(' ')}</p>}
       {c.sensitive_warning && <p className="text-xs text-amber-900">{SENSITIVE_NOTE}</p>}
       <div className="flex gap-1 mt-1">
         {c.can_moderate && (
@@ -114,7 +114,7 @@ const CommentsPanel: React.FC<Props> = ({ comments, members, onCreate, onToggleR
           onSubmit={(body, mentions) => onCreate({ body, mentions })} />
       </Card>
       {threads.length === 0 ? (
-        <p className="text-sm text-gray-700">まだコメントはありません。</p>
+        <p className="text-sm text-ink-700">まだコメントはありません。</p>
       ) : (
         <ul className="space-y-3" aria-label="コメント">
           {threads.map(({ root, replies }) => (

@@ -148,7 +148,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
               <Popup>
                 <div className="text-sm">
                   <p className="font-semibold">{idx + 1}. {event.title}</p>
-                  {event.start_time && <p className="text-gray-500">{event.start_time}</p>}
+                  {event.start_time && <p className="text-ink-500">{event.start_time}</p>}
                 </div>
               </Popup>
             </Marker>
@@ -163,7 +163,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
               <Popup>
                 <div className="text-sm space-y-2">
                   <p className="font-semibold">{candidate.name}</p>
-                  <p className="text-gray-500 text-xs">{candidate.provider}経由の候補</p>
+                  <p className="text-ink-500 text-xs">{candidate.provider}経由の候補</p>
                   {onAddCandidateToItinerary && candidate.candidate_id && (
                     <button
                       className="px-2 py-1 bg-blue-500 text-white rounded-sm text-xs hover:bg-blue-600"
@@ -180,20 +180,20 @@ const PlanMap: React.FC<PlanMapProps> = ({
       </div>
 
       {routePreview && (
-        <div className="text-xs text-gray-500 px-1">
+        <div className="text-xs text-ink-500 px-1">
           {routePreview.total_distance_km != null && routePreview.total_duration_minutes != null ? (
             <span>
               この日の移動概算: 約{routePreview.total_distance_km}km・約{Math.round(routePreview.total_duration_minutes)}分
-              <span className="text-gray-600">(直線距離ベースの概算、確定値ではありません)</span>
+              <span className="text-ink-700">(直線距離ベースの概算、確定値ではありません)</span>
             </span>
           ) : (
-            <span className="text-gray-600">一部区間の移動概算は算出できません(位置情報不明の地点を含みます)</span>
+            <span className="text-ink-700">一部区間の移動概算は算出できません(位置情報不明の地点を含みます)</span>
           )}
         </div>
       )}
 
       {(scheduledUnknown.length > 0 || candidatesUnknown.length > 0) && (
-        <div className="text-xs text-gray-500 px-1 space-y-1">
+        <div className="text-xs text-ink-500 px-1 space-y-1">
           {scheduledUnknown.length > 0 && (
             <p>位置情報不明の予定: {scheduledUnknown.map((e) => e.title).join('、')}</p>
           )}
