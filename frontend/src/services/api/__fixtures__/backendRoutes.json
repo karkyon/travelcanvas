@@ -37,7 +37,8 @@
   "captured_at_head_g6": "sandbox/g6 (+Gate G6 offline devices / privacy zones / journal publications)",
   "captured_at_head_g7": "sandbox/g7 (+Gate G7 movement-settings・impact-preview・partial-preview・branch comparison・account-deletion schedule/cancel)",
   "captured_at_head_g9": "99744c3 (+Gate G9 GET /dashboard)",
-  "captured_at_head_g8": "sandbox/g8 (+Gate G8 adoption-preview・ownership-transfer・ownership-transfers・privacy/corrections・correction-requests・admin/ops/jobs)"
+  "captured_at_head_g8": "sandbox/g8 (+Gate G8 adoption-preview・ownership-transfer・ownership-transfers・privacy/corrections・correction-requests・admin/ops/jobs)",
+  "captured_at_head_g11": "gate/g11-media (+Gate G11 plans/{plan_id}/cover・cover/media)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -51,6 +52,7 @@
   "DELETE /api/v1/plans/{plan_id}/candidates/{candidate_id}",
   "DELETE /api/v1/plans/{plan_id}/comments/{comment_id}",
   "DELETE /api/v1/plans/{plan_id}/constraints/{constraint_id}",
+  "DELETE /api/v1/plans/{plan_id}/cover",
   "DELETE /api/v1/plans/{plan_id}/days/{day_id}",
   "DELETE /api/v1/plans/{plan_id}/documents/{document_id}",
   "DELETE /api/v1/plans/{plan_id}/documents/{document_id}/links/{link_id}",
@@ -144,6 +146,8 @@
   "GET /api/v1/plans/{plan_id}/constraints",
   "GET /api/v1/plans/{plan_id}/constraints/{constraint_id}",
   "GET /api/v1/plans/{plan_id}/correction-requests",
+  "GET /api/v1/plans/{plan_id}/cover",
+  "GET /api/v1/plans/{plan_id}/cover/media",
   "GET /api/v1/plans/{plan_id}/data-export",
   "GET /api/v1/plans/{plan_id}/days/{day_id}/route-preview",
   "GET /api/v1/plans/{plan_id}/documents",
@@ -241,6 +245,7 @@
   "PATCH /api/v1/plans/{plan_id}/candidates/{candidate_id}",
   "PATCH /api/v1/plans/{plan_id}/comments/{comment_id}",
   "PATCH /api/v1/plans/{plan_id}/constraints/{constraint_id}",
+  "PATCH /api/v1/plans/{plan_id}/cover",
   "PATCH /api/v1/plans/{plan_id}/documents/{document_id}",
   "PATCH /api/v1/plans/{plan_id}/expenses/{expense_id}",
   "PATCH /api/v1/plans/{plan_id}/location-tracks/{track_id}",
@@ -429,6 +434,7 @@
   "PUT /api/v1/places/{place_id}/special-hours",
   "PUT /api/v1/plans/{plan_id}/branches/{branch_id}/content",
   "PUT /api/v1/plans/{plan_id}/branches/{branch_id}/resources",
+  "PUT /api/v1/plans/{plan_id}/cover",
   "PUT /api/v1/plans/{plan_id}/days/{day_id}",
   "PUT /api/v1/plans/{plan_id}/events/{event_id}",
   "PUT /api/v1/plans/{plan_id}/finance-settings",

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { usePlan } from '../hooks/usePlan';
 import { useToast } from './common/toastContext';
 import Button from './common/Button';
@@ -7,6 +7,10 @@ import Card from './common/Card';
 import Modal from './common/Modal';
 import type { TravelPlan } from '../types';
 import TripCover from './trip/TripCover';
+import CoverPhotoDialog from './trip/CoverPhotoDialog';
+import { getPlanCover } from '../services/api/g11';
+import type { PlanCover } from '../services/api/types/g11';
+import { useCoverPhoto, useCoverVersions } from '../hooks/useCoverPhoto';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 /** [Gate G9] UX-0 旅行の最初・最後の日(日程の日付を優先し、無ければ旅行の開始・終了の日)。無ければ空 */
@@ -49,6 +53,23 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     tags: plan.tags || []
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // [Gate G11] 表紙の写真(見える人だけ)。変えられるのは編集できる人だけ
+  const [cover, setCover] = useState<PlanCover | null>(null);
+  const [canEditCover, setCanEditCover] = useState(false);
+  const [coverDialog, setCoverDialog] = useState(false);
+  const coverVersion = useCoverVersions((s) => s.versions[plan.id] ?? 0);
+  useEffect(() => {
+    let active = true;
+    getPlanCover(plan.id).then((r) => {
+      if (!active) return;
+      setCover(r.cover);
+      setCanEditCover(r.can_edit);
+    }).catch(() => {
+      if (active) { setCover(null); setCanEditCover(false); }
+    });
+    return () => { active = false; };
+  }, [plan.id, coverVersion]);
+  const coverPhoto = useCoverPhoto(plan.id, cover, '');
 
   // プラン統計の計算
   const planStats = useMemo(() => {
@@ -188,8 +209,9 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               <div className="flex-1 min-w-0">
                 {/* [Gate G9] UX-2・UX-3 旅行の表紙(生成グラデーション)に題名・状態・行き先・期間・通信の状態をまとめる */}
                 <TripCover size="header" destination={plan.destination} tripTitle={plan.title}
-                  startDate={firstDate(plan) || null} className="mb-3" data-testid="trip-header-cover">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                  startDate={firstDate(plan) || null} className="mb-3" data-testid="trip-header-cover"
+                  photo={coverPhoto.photo} onPhotoError={coverPhoto.onError}>
+                  <div className="flex flex-wrap items-center gap-2 pr-28 text-xs font-semibold">
                     <span className="rounded-full border border-white px-2 py-0.5">
                       {plan.status === 'active' ? 'アクティブ' :
                        plan.status === 'draft' ? 'ドラフト' :
@@ -204,7 +226,19 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                     {[plan.destination || null, `${formatDate(firstDate(plan))} 〜 ${formatDate(lastDate(plan))}`]
                       .filter(Boolean).join('・')}
                   </p>
+                  {/* [Gate G11] 表紙の右上に重ねる(権限は後から分かるため、置いても他の要素の位置を動かさない) */}
+                  {canEditCover && (
+                    <button type="button" onClick={() => setCoverDialog(true)} data-testid="cover-edit"
+                      className="tc-on-cover-button absolute right-3 top-3">
+                      {cover ? '写真を変更' : '写真を設定'}
+                    </button>
+                  )}
                 </TripCover>
+                {canEditCover && (
+                  <CoverPhotoDialog isOpen={coverDialog} onClose={() => setCoverDialog(false)} planId={plan.id}
+                    tripTitle={plan.title} destination={plan.destination} startDate={firstDate(plan) || null}
+                    current={cover} onSaved={setCover} />
+                )}
                 
                 {plan.description && (
                   <p className="text-ink-700 mb-3 leading-relaxed">{plan.description}</p>

@@ -33,6 +33,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
 from app.models.models import PlanCollaborator, TravelPlan, TravelDay, TravelEvent, User
 from app.services import member_policy, plan_deletion
+from app.services import plan_cover
 from app.services.audit_service import record_audit_event
 from app.schemas.travel_plan import (
     TravelPlanCreate,
@@ -103,10 +104,15 @@ async def create_travel_plan(
         )
 
 
-def _member_view(db: Session, plan: TravelPlan, user: User, role: Optional[str] = None) -> TravelPlanResponse:
+_UNSET: Any = object()
+
+
+def _member_view(db: Session, plan: TravelPlan, user: User, role: Optional[str] = None,
+                 cover: Any = _UNSET) -> TravelPlanResponse:
     """[Gate G2] FR-045 参加者に隠す項目: 費用 → 予算(budget)を返さない。予定のメモ・住所 → 旧形式の
     itinerary(自由形式の JSON。メモ・住所を含みうる)を返さない。所有者には全て返す。"""
     out = TravelPlanResponse.model_validate(plan)
+    out.cover = cover if cover is not _UNSET else plan_cover.cover_of(db, plan, user)  # [Gate G11]
     if plan.user_id == user.id:
         return out
     hidden = member_policy.hidden_for(db, plan, role or "viewer", user)
@@ -151,7 +157,9 @@ async def get_travel_plans(
     role_rows = db.query(PlanCollaborator.plan_id, PlanCollaborator.role).filter(
         PlanCollaborator.user_id == current_user.id, PlanCollaborator.status == "accepted").all()
     roles: Dict[Any, str] = {pid: str(role) for pid, role in role_rows}
-    return {"plans": [_member_view(db, p, current_user, roles.get(p.id)) for p in plans], "total": total}
+    covers = plan_cover.covers_for(db, plans, current_user)  # [Gate G11] 表紙はまとめて引く
+    return {"plans": [_member_view(db, p, current_user, roles.get(p.id), covers.get(p.id)) for p in plans],
+            "total": total}
 
 
 # [Gate #27 / A-011] /test/ping は /{plan_id}(UUID型パスパラメータ)より前に

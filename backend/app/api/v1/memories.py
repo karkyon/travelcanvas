@@ -88,7 +88,13 @@ def _to_dict(m: Memory, user: User, plan: TravelPlan, names: Dict[uuid.UUID, str
         "author_name": names.get(m.author_user_id, "退会したメンバー"),
         "by_me": by_me, "can_edit": by_me, "can_delete": by_me or plan.user_id == user.id,
         "revision": m.revision, "created_at": _iso(m.created_at), "updated_at": _iso(m.updated_at),
+        "source": _source_summary(m),  # [Gate G11] 外部の写真の出典(手で上げた写真は null)
     }
+
+
+def _source_summary(m: Memory) -> Optional[Dict[str, Any]]:
+    from app.services.plan_cover import source_summary
+    return source_summary(m)
 
 
 def _names(db: Session, plan: TravelPlan, extra: Sequence[uuid.UUID] = ()) -> Dict[uuid.UUID, str]:
@@ -387,6 +393,11 @@ def get_memory_media(plan_id: str, memory_id: str, db: Session = Depends(get_db)
                      current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     m = _get_visible(db, plan, memory_id, current_user)
+    return media_response(m)
+
+
+def media_response(m: Memory) -> Response:
+    """[Gate G11] 記録のファイルの配信(表紙・予定の写真も同じ守りで返す)。呼ぶ側で見える人か確かめてから使う"""
     if not m.storage_key:
         raise HTTPException(status_code=404, detail="この記録にはファイルがありません")
     try:

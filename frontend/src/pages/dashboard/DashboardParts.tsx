@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, CalendarClock, CheckCircle2, ListChecks, Ticket, Users } from 'lucide-react';
 import Surface from '@/components/design/Surface';
 import TripCover from '@/components/trip/TripCover';
+import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import type { DashboardFocus, DashboardTrip } from '@/services/api/types/g9';
 import {
@@ -41,13 +42,28 @@ export const EmptyHero: React.FC<{ isGuest: boolean }> = ({ isGuest }) => (
   </TripCover>
 );
 
+/** [Gate G11] 旅行のカード(表紙の写真があれば写真、無い・読めない時はグラデーション) */
+const TripCard: React.FC<{ trip: DashboardTrip }> = ({ trip: t }) => {
+  const coverPhoto = useCoverPhoto(t.id, t.cover);
+  return (
+    <TripCover size="card" destination={t.destination} tripTitle={t.title} startDate={t.start_date}
+      data-testid={`trip-card-${t.id}`} photo={coverPhoto.photo} onPhotoError={coverPhoto.onError}>
+      <p className="font-semibold break-words">{t.title}</p>
+      <p className="text-xs mt-1">{tripDateLabel(t)}</p>
+      <p className="text-xs mt-1">{`${statusLabel(t)}・${ROLE_LABEL[t.role]}`}</p>
+    </TripCover>
+  );
+};
+
 export const TripHero: React.FC<{ trip: DashboardTrip }> = ({ trip }) => {
+  const coverPhoto = useCoverPhoto(trip.id, trip.cover);  // [Gate G11] 表紙の写真(無い・読めない時はグラデーション)
   const primary = trip.phase === 'ongoing'
     ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' }
     : { to: `/planner/${trip.id}`, label: '旅程を開く' };
   return (
     <TripCover as="section" size="hero" destination={trip.destination} tripTitle={trip.title} startDate={trip.start_date}
-      aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}>
+      aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}
+      photo={coverPhoto.photo} onPhotoError={coverPhoto.onError}>
       <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
         <span className="rounded-full border border-white px-2 py-0.5" data-testid="dashboard-phase">{PHASE_LABEL[trip.phase]}</span>
         <span>{statusLabel(trip)}</span>
@@ -243,12 +259,7 @@ export const TripList: React.FC<{ trips: DashboardTrip[] }> = ({ trips }) => {
                 <li key={t.id}>
                   <Link to={`/planner/${t.id}`} aria-label={`${t.title}(${PHASE_LABEL[t.phase]}・${tripDateLabel(t)})を開く`}
                     className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-                    <TripCover size="card" destination={t.destination} tripTitle={t.title} startDate={t.start_date}
-                      data-testid={`trip-card-${t.id}`}>
-                      <p className="font-semibold break-words">{t.title}</p>
-                      <p className="text-xs mt-1">{tripDateLabel(t)}</p>
-                      <p className="text-xs mt-1">{`${statusLabel(t)}・${ROLE_LABEL[t.role]}`}</p>
-                    </TripCover>
+                    <TripCard trip={t} />
                   </Link>
                 </li>
               ))}

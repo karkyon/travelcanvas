@@ -71,6 +71,8 @@ class TravelPlanResponse(TravelPlanBase):
     itinerary: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    # [Gate G11] 表紙の写真(見える人だけ。app/services/plan_cover.py)。PUT では受け取らない
+    cover: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True

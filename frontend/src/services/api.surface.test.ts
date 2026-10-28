@@ -39,6 +39,7 @@
  * [Gate C3] 情報内検索(FR-009)の2メソッド(searchPlan/searchEverything)
  * [Gate B1] 組織・B2B・外部連携の管理(FR-041・FR-042)の25メソッド(api のメソッドだけ。個別の export は足さない)
  * [Gate F45] 項目単位の共有の規則(FR-045)の共有前プレビュー2メソッド(previewSharePolicy/previewShareLink。shareAPI にも追加)
+ * [Gate G11] 汎用の部分の更新 patch(表紙の位置の調整。get・post・put・delete と同じ薄い包み)を足した。
  * [Gate G2] 即時の通知・同行者向けの項目の規則・サポート閲覧・運用の要約の12関数(export・メソッド)、
  *   外部連携の秘密・鍵の切り替えの4メソッド(api のメソッドだけ)、即時の通知が使う bearerHeader・応答の検証の g2(内部)
  */
@@ -124,7 +125,7 @@ const EXPECTED_METHODS = [
   'getToday', 'getUnreadNotificationCount', 'getValidationRun', 'getValidationRuns', 'getVisits', 'handleApiError',
   'hasAccessToken', 'healthCheck', 'initializeTokens', 'inviteCollaborator', 'leavePresence', 'listMyInvitations',
   'login', 'logout', 'manageAdminUsers', 'markAllNotificationsAsRead', 'markNotificationAsRead', 'mergeCandidate',
-  'moveEvent', 'pingOrgWebhook', 'planFromApi', 'planToApi', 'post', 'postDeviceVisitResults', 'postPresence',
+  'moveEvent', 'patch', 'pingOrgWebhook', 'planFromApi', 'planToApi', 'post', 'postDeviceVisitResults', 'postPresence',
   'previewBooklet', 'previewCalendarImport', 'previewShareLink', 'previewSharePolicy', 'promoteQuickDraft',
   'publishDistribution', 'purgePlan', 'put', 'putEventActual', 'putLocationSettings', 'putMemberOverride',
   'putMemberPolicy', 'putOpeningHours', 'putPlanPrivateProfile', 'putPrivateProfile', 'putTrackSampling', 'putVotes',

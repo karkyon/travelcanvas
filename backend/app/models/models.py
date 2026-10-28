@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any, Optional
 from datetime import date, datetime, timedelta
 from sqlalchemy import (
+    SmallInteger,
     Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
     ForeignKey, UniqueConstraint, LargeBinary, Index, CheckConstraint, text,
     Numeric, BigInteger,
@@ -209,6 +210,14 @@ class TravelPlan(Base):
     deleted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     purge_after: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate G11] 表紙の写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)と、見せる位置(%)・拡大(%)。
+    # 見えるかどうかは記録の公開範囲で決まる(app/services/plan_cover.py)。PUT /travel-plans では変えない
+    cover_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,
+                                       name="fk_travel_plans_cover_memory"), nullable=True)
+    cover_focus_x: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=50, server_default="50")
+    cover_focus_y: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=50, server_default="50")
+    cover_zoom: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100, server_default="100")
 
     __table_args__ = (
         CheckConstraint(
@@ -216,6 +225,10 @@ class TravelPlan(Base):
             name="ck_travel_plans_deleted_consistency",
         ),
         Index("ix_travel_plans_purge_after", "purge_after", postgresql_where=text("deleted_at IS NOT NULL")),
+        CheckConstraint("cover_focus_x BETWEEN 0 AND 100 AND cover_focus_y BETWEEN 0 AND 100",
+                        name="ck_travel_plans_cover_focus"),
+        CheckConstraint("cover_zoom BETWEEN 100 AND 300", name="ck_travel_plans_cover_zoom"),
+        Index("ix_travel_plans_cover_memory", "cover_memory_id", postgresql_where=text("cover_memory_id IS NOT NULL")),
     )
 
     # リレーションシップ
@@ -497,6 +510,10 @@ class TravelEvent(Base):
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # [Gate G11] 予定のカードの写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)
+    image_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,
+                                       name="fk_travel_events_image_memory"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
@@ -2612,6 +2629,8 @@ class Memory(Base):
     sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     visibility: Mapped[str] = mapped_column(String(8), nullable=False, default="private")
     include_in_journal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # [Gate G11] 外部から取り込んだ写真の出典(provider・作者・ライセンス・取得日時。仕様 §5.3)。手で上げた写真は NULL
+    source: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
@@ -2858,7 +2877,8 @@ class PlanCandidate(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
-        CheckConstraint("source_kind IN ('url','text','manual','search')", name="ck_plan_candidates_source_kind"),
+        CheckConstraint("source_kind IN ('url','text','manual','search','social')",
+                        name="ck_plan_candidates_source_kind"),
         CheckConstraint("status IN ('open','scheduled','dismissed')", name="ck_plan_candidates_status"),
         CheckConstraint("priority BETWEEN 1 AND 3", name="ck_plan_candidates_priority"),
         CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="ck_plan_candidates_location_pair"),
