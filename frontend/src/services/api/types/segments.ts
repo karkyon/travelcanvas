@@ -6,7 +6,9 @@
 // [Gate M2] FR-014移動区間(TravelSegment)。backend/app/api/v1/segments.py
 // (Gate M1)に対応するfrontend型。DOC-05 §7.1参照。
 export type SegmentMode =
-  | 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed';
+  | 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed'
+  // [Gate G11] 新幹線(明示された時だけ)・ヘリ(要手配)
+  | 'shinkansen' | 'helicopter';
 
 export type SegmentStatus = 'planned' | 'confirmed' | 'cancelled';
 

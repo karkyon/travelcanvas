@@ -55,6 +55,7 @@ const setupMocks = () => {
   vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
   // 一覧画面の「削除済み」(この試験の対象外。通信しない)
   vi.spyOn(api, 'getDeletedPlans').mockResolvedValue([]);
+  vi.spyOn(api, 'getSegments').mockResolvedValue([]);  // [Gate G11] 予定へ着く移動区間
   // [Gate G2] 即時の通知は使わない(ポーリングだけ)。同行者向けの項目の規則: 何も隠されていない
   vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
   vi.spyOn(api, 'getMemberPolicy').mockResolvedValue({

@@ -158,6 +158,9 @@ export interface ScheduleItem {
   notes?: string;
   booking_info?: Record<string, unknown>;
   contact_info?: Record<string, unknown>;
+  /** [Gate G11] 場所(営業時間の照合に使う)・最適化から外す固定 */
+  place_id?: string;
+  locked?: boolean;
 }
 
 export interface CreateScheduleItemData {
@@ -189,6 +192,8 @@ export interface CreateScheduleItemData {
 export interface DaySchedule {
   id: string;
   date?: string;
+  /** [Gate G11] その日の IANA の時刻帯(現地時間の表示) */
+  timezone_id?: string;
   events: ScheduleItem[];
 }
 

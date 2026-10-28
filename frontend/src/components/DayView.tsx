@@ -1,4 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { getHoursCheck } from '../services/api/g11planner';
+import type { EventHoursCheck } from '../services/api/types/g11planner';
+import type { TravelSegment } from '../services/api/types/segments';
+import { arrivalLeg, arrivalSegment, hoursBadge } from './planner/plannerModel';
 import { usePlan } from '../hooks/usePlan';
 import { useDragDrop, containerId } from '../hooks/useDragDrop';
 import { useToast } from './common/toastContext';
@@ -20,6 +24,10 @@ interface DayViewProps {
   /** [Gate G4] COL-03 予定へのコメントを開く */
   onItemComment?: (item: ScheduleItemType) => void;
   className?: string;
+  /** [Gate G11] 旅行の移動区間(予定へ着く移動の名前・時差) */
+  segments?: TravelSegment[];
+  /** [Gate G11] 予定 → その日の時刻帯(時差をまたぐ区間の出発地) */
+  zones?: Record<string, string | undefined>;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -31,10 +39,41 @@ const DayView: React.FC<DayViewProps> = ({
   onItemEdit,
   onItemDelete,
   onItemComment,
-  className = ''
+  className = '',
+  segments = [],
+  zones = {},
 }) => {
   const { addNewScheduleItem, deleteScheduleItem } = usePlan();
-  const { dragState, handleDragStart, handleDrop, handleDragEnd, handleKeyboardMove, isItemDragged } = useDragDrop();
+  const { dragState, handleDragStart, handleDrop, handleDragEnd, handleKeyboardMove, moveItemBy, isItemDragged } = useDragDrop();
+
+  // [Gate G11] 営業時間の照合。予定の順・時刻・場所が変わったら読み直し、読み直すまでは古い判定を「確認中」にする
+  const hoursKey = useMemo(() => day.events.map((e) => `${e.id}|${e.start_time ?? ''}|${e.end_time ?? ''}|${e.place_id ?? ''}`)
+    .join(','), [day.events]);
+  const [hours, setHours] = useState<{ key: string; byId: Record<string, EventHoursCheck> } | null>(null);
+  const [announce, setAnnounce] = useState('');
+  useEffect(() => {
+    if (!day.events.some((e) => e.place_id)) {
+      setHours({ key: hoursKey, byId: {} });
+      return undefined;
+    }
+    let active = true;
+    getHoursCheck(planId, day.id).then((r) => {
+      if (!active) return;
+      setHours({ key: hoursKey, byId: Object.fromEntries(r.events.map((h) => [h.event_id, h])) });
+    }).catch(() => {
+      if (active) setHours({ key: hoursKey, byId: {} });
+    });
+    return () => { active = false; };
+  }, [planId, day.id, hoursKey, day.events]);
+  const hoursPending = !hours || hours.key !== hoursKey;
+  useEffect(() => {
+    if (!hoursPending && announce.endsWith('確かめています')) setAnnounce(announce.replace('確かめています', '確かめました'));
+  }, [hoursPending, announce]);
+
+  const moveBy = useCallback(async (event: ScheduleItemType, delta: -1 | 1) => {
+    const to = await moveItemBy(event, planId, day.id, delta);
+    if (to !== null) setAnnounce(`「${event.title}」を${to + 1}番目へ移しました。営業時間と移動を確かめています`);
+  }, [moveItemBy, planId, day.id]);
   const { addToast } = useToast();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -203,6 +242,8 @@ const DayView: React.FC<DayViewProps> = ({
             <h3 className="text-lg font-semibold text-ink-900">
               {day.date} ({getDayOfWeek(day.date)})
             </h3>
+            {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
+            <p className="text-xs text-ink-700" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
             <div className="flex items-center space-x-4 text-sm text-ink-700 mt-1">
               <span>📍 {timeStats.eventCount}件</span>
               <span>⏱️ {Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
@@ -227,6 +268,9 @@ const DayView: React.FC<DayViewProps> = ({
           </Button>
         </div>
       </Card>
+
+      {/* [Gate G11] 並べ替えの結果と再確認の知らせ(読み上げ) */}
+      <p className="sr-only" role="status" aria-live="polite" data-testid="reorder-status">{announce}</p>
 
       {/* スケジュールリスト
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
@@ -283,9 +327,26 @@ const DayView: React.FC<DayViewProps> = ({
                 onDragStart={(e) => handleDragStart(e, event, containerId(planId, day.id))}
                 onDragEnd={handleDragEnd}
                 onClick={() => onItemClick?.(event)}
-                onKeyDown={(e) => handleKeyboardMove(e, event, planId, day.id)}
-                className={isItemDragged(event.id) ? 'opacity-50' : ''}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  void handleKeyboardMove(e, event, planId, day.id).then((to) => {
+                    if (to !== null) setAnnounce(`「${event.title}」を${to + 1}番目へ移しました。営業時間と移動を確かめています`);
+                  });
+                }}
+                className={`flex items-stretch gap-2 ${isItemDragged(event.id) ? 'opacity-50' : ''}`.trim()}
               >
+                {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え) */}
+                <div className="flex shrink-0 flex-col justify-center gap-1">
+                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={index === 0}
+                    data-testid={`move-up-${event.id}`}
+                    className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
+                    onClick={(e) => { e.stopPropagation(); void moveBy(event, -1); }}>↑</button>
+                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={index === day.events.length - 1}
+                    data-testid={`move-down-${event.id}`}
+                    className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
+                    onClick={(e) => { e.stopPropagation(); void moveBy(event, 1); }}>↓</button>
+                </div>
+                <div className="min-w-0 flex-1">
                 <ScheduleItem
                   id={event.id}
                   title={event.title}
@@ -310,7 +371,10 @@ const DayView: React.FC<DayViewProps> = ({
                   onEdit={() => onItemEdit?.(event)}
                   onDelete={() => handleDeleteItem(event.id)}
                   onComment={onItemComment ? () => onItemComment(event) : undefined}
+                  arrival={arrivalLeg(arrivalSegment(event.id, segments), zones, day.timezone_id)}
+                  hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
                 />
+                </div>
               </div>
             </div>
           ))

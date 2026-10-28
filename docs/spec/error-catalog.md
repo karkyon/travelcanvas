@@ -92,7 +92,7 @@
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/memory_p |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memor |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |

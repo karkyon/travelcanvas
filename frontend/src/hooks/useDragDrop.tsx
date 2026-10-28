@@ -324,21 +324,19 @@ export const useDragDrop = () => {
   // [Gate #31.5C] 監査是正(R-08): 以前はEnter/Spaceキーを検知するだけで
   // 実際の移動処理が無いTODOスタブだった。矢印キーで前後のアイテムと
   // 入れ替え、reorderScheduleを呼び出す実装に置き換える。
-  const handleKeyboardMove = useCallback(async (
-    event: React.KeyboardEvent,
+  // [Gate G11] 触って使う「上へ」「下へ」もキーボードと同じ入れ替えを使う(移した先の位置を返す。動かなければ null)
+  const moveItemBy = useCallback(async (
     item: ScheduleItem,
     planId: string,
-    dayId: string
-  ) => {
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-
+    dayId: string,
+    delta: -1 | 1
+  ): Promise<number | null> => {
     const currentOrder = getCurrentItemOrder(planId, dayId);
     const currentIndex = currentOrder.indexOf(item.id);
-    if (currentIndex === -1) return;
+    if (currentIndex === -1) return null;
 
-    const targetIndex = event.key === 'ArrowUp' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= currentOrder.length) return;
+    const targetIndex = currentIndex + delta;
+    if (targetIndex < 0 || targetIndex >= currentOrder.length) return null;
 
     const newOrder = [...currentOrder];
     const tmp = newOrder[currentIndex]!;
@@ -346,7 +344,19 @@ export const useDragDrop = () => {
     newOrder[targetIndex] = tmp;
 
     await reorderSchedule(planId, dayId, newOrder);
+    return targetIndex;
   }, [reorderSchedule]);
+
+  const handleKeyboardMove = useCallback(async (
+    event: React.KeyboardEvent,
+    item: ScheduleItem,
+    planId: string,
+    dayId: string
+  ): Promise<number | null> => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return null;
+    event.preventDefault();
+    return moveItemBy(item, planId, dayId, event.key === 'ArrowUp' ? -1 : 1);
+  }, [moveItemBy]);
 
   return {
     dragState,
@@ -359,6 +369,7 @@ export const useDragDrop = () => {
     calculateSnapPosition,
     updateDragPreview,
     handleKeyboardMove,
+    moveItemBy,
     
     // ヘルパー関数
     isDragging: dragState.isDragging,

@@ -28,6 +28,10 @@ import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
+import AllDaysChart from '@/components/planner/AllDaysChart';
+import { zoneOfEvent } from '@/components/planner/plannerModel';
+import { getSegments } from '@/services/api';
+import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
@@ -105,6 +109,9 @@ const PlannerPage: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   const [showMap, setShowMap] = useState(true);
+  // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
+  const [planView, setPlanView] = useState<'day' | 'all'>('day');
+  const [segments, setSegments] = useState<TravelSegment[]>([]);
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
@@ -120,6 +127,15 @@ const PlannerPage: React.FC = () => {
   // [Gate C1] 以前は終了時刻・場所・費用・メモを入力しても保存の通信に載らず、黙って捨てていた(場所は address、
   // メモは description として保存する。終了時刻・費用は予定の項目に無いため、この画面からは外した。費用は「予算・費用」)。
   const [editingItem, setEditingItem] = useState<ScheduleItemType | null>(null);
+  const segmentPlanId = currentPlan?.id;
+  const segmentRevision = currentPlan?.revision;
+  useEffect(() => {
+    if (!segmentPlanId) return undefined;
+    let active = true;
+    getSegments(segmentPlanId).then((rows) => { if (active) setSegments(rows); })
+      .catch(() => { if (active) setSegments([]); });
+    return () => { active = false; };
+  }, [segmentPlanId, segmentRevision]);
   const emptyEdit: EditFields = { title: '', start_time: '', location_name: '', notes: '' };
   const [editForm, setEditForm] = useState<EditFields>(emptyEdit);
   // [Gate C1] FR-020 編集を始めた時の内容(競合した時に「相手が変えた/自分が変えた」を出すため)
@@ -773,6 +789,16 @@ const PlannerPage: React.FC = () => {
 
           <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mb-6" />
 
+          {/* [Gate G11] 日別 / 全日程の切り替え(全日程は同じ時刻の物差しで日を並べる) */}
+          {currentPlan.days.length > 0 && (
+            <div className="mb-2 flex gap-2" role="group" aria-label="旅程の表示">
+              <Button size="sm" variant={planView === 'day' ? 'primary' : 'outline'} aria-pressed={planView === 'day'}
+                onClick={() => setPlanView('day')} data-testid="plan-view-day">日別</Button>
+              <Button size="sm" variant={planView === 'all' ? 'primary' : 'outline'} aria-pressed={planView === 'all'}
+                onClick={() => setPlanView('all')} data-testid="plan-view-all">全日程</Button>
+            </div>
+          )}
+
           {/* 日タブナビゲーション + 日ごとの概要(スポット数・所要時間・予算) */}
           {currentPlan.days.length > 0 && (
             <DateNavigation
@@ -897,6 +923,9 @@ const PlannerPage: React.FC = () => {
                 </Button>
               </div>
             </Card>
+          ) : planView === 'all' ? (
+            <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
+              onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }} />
           ) : activeDay ? (
             <>
               {showMap && (
@@ -924,6 +953,8 @@ const PlannerPage: React.FC = () => {
                 onItemEdit={openEditItem}
                 onItemDelete={handleDeleteItem}
                 onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
+                segments={segments}
+                zones={zoneOfEvent(currentPlan.days)}
               />
             </>
           ) : null}

@@ -1,7 +1,7 @@
 # Gate G11 UI/UX 全範囲 実装仕様(正本)
 
 - 文書の位置づけ: Gate G11 の実装の正本。`claude/TravelCanvas_UIUXモック実装仕様_2026-10-28.md`(前の版)を置き換える
-- 版: r2(2026-10-28 JST。r2: 段階1 の実装に合わせ、表紙の API の If-Match をやめた・「写真を外す」の確認を置かない・migration の revision を記した)
+- 版: r3(2026-10-28 JST。r3: 段階2 の mode の CHECK の migration(§1.0)。r2: 段階1 の実装に合わせ、表紙の API の If-Match をやめた・「写真を外す」の確認を置かない・migration の revision を記した)
 - 基準: main `540955d40edc0ccc31df877a1435868bee5edaf7`(G10-UX)、DOC-10 `v5.1-r22`、Alembic head `f4d8a2c6e9b1`
 - CI の基準: main の CI run 40647781901(secret-scan・dependency-audit・frontend・backend・e2e の5つが合格。2026-10-28 に GitHub API で確認)
 - 画面の正本: `docs/ux/references/TravelCanvas_UIUX_Mock_2026-10-28.html`(ブラウザで開ける。4つの見た目の比較・各画面の操作)
@@ -46,6 +46,13 @@
 - upgrade: 列・FK・索引・CHECK を足す。既存の行は NULL / 既定値(表示は今と同じ)
 - downgrade: 足したものを消す。CHECK は元の4つ(`url,text,manual,search`)へ戻す(`social` の行があれば `manual` に直してから戻す)
 - 試験: CI の往復(upgrade → downgrade → upgrade の構造一致)、schema の写し(`app/ops/schema_snapshot`)
+
+### 1.0 段階2 の migration `b8d4f6a0c3e5`(down `a7c3e5f9b2d4`)
+
+§4 の語彙(shinkansen・helicopter)を区間に保存するため、`travel_segments`・`route_legs` の `mode` の CHECK
+(`ck_travel_segments_mode_vocab`・`ck_route_legs_mode_vocab`)を広げる。r1 では API の MODES だけで足りると書いたが、DB に
+CHECK があり、実装の時に分かった(保存すると 500 になる)。承認済みの §4 の範囲の中の変更として段階2 の PR に入れ、PR と報告に明記する。
+downgrade は shinkansen → train、helicopter → mixed に直してから元に戻す。
 
 ### 1.1 場面ごとの動き(dangling reference を作らない)
 
@@ -240,8 +247,8 @@
 
 | 段階 | branch | 内容 | 状態 |
 |---|---|---|---|
-| 1 Media | gate/g11-media | migration `a7c3e5f9b2d4`(§1 の全て)・表紙の API・TripCover の写真・CoverPhotoDialog・位置の調整・試験 | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-media-trace.md`)。DOC-10 r23 |
-| 2 Planner | gate/g11-planner | hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | 未着手 |
+| 1 Media | gate/g11-media | migration `a7c3e5f9b2d4`(§1 の全て)・表紙の API・TripCover の写真・CoverPhotoDialog・位置の調整・試験 | **完了**: PR #9、CI 5ジョブ合格、main `b21e47b`(新しい clone で tree 一致)。DOC-10 r23。omega-dev2 は未反映 |
+| 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24 |
 | 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | 未着手 |
 | 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | 未着手 |
 

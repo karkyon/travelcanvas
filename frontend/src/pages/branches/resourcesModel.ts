@@ -16,6 +16,8 @@ export const MODE_OPTIONS: Array<{ value: SegmentMode; label: string }> = [
   { value: 'walking', label: '徒歩' }, { value: 'train', label: '鉄道' }, { value: 'bus', label: 'バス' },
   { value: 'driving', label: '車' }, { value: 'taxi', label: 'タクシー' }, { value: 'bicycle', label: '自転車' },
   { value: 'ferry', label: '船' }, { value: 'flight', label: '飛行機' }, { value: 'mixed', label: '複合' },
+  // [Gate G11] 新幹線は明示する時だけ。ヘリは要手配(所要時間を推定しない)
+  { value: 'shinkansen', label: '新幹線' }, { value: 'helicopter', label: 'ヘリ(要手配)' },
 ];
 export const MODE_LABEL = Object.fromEntries(MODE_OPTIONS.map((o) => [o.value, o.label])) as Record<SegmentMode, string>;
 

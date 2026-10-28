@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r23",
+  "revision": "v5.1-r24",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -48,7 +48,7 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "B-013・G7",
+   "gates": "B-013・G7・G11",
    "gaps": "実機 mobile のタッチでの並べ替え"
   },
   "FR-006": {
@@ -72,7 +72,7 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "C2・G4",
+   "gates": "C2・G4・G11",
    "gaps": "ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる)"
   },
   "FR-009": {
@@ -120,7 +120,7 @@
    "status": "INTEGRATED",
    "partial": false,
    "e2e": "一部",
-   "gates": "M1・M2・B-014",
+   "gates": "M1・M2・B-014・G11",
    "gaps": "外部の交通(時刻表・運賃)、区間の編集・UndoのE2E"
   },
   "FR-015": {
@@ -144,7 +144,7 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "L3・G7",
+   "gates": "L3・G7・G11",
    "gaps": "時刻表の照合"
   },
   "FR-018": {

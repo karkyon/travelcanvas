@@ -38,7 +38,7 @@
   "captured_at_head_g7": "sandbox/g7 (+Gate G7 movement-settings・impact-preview・partial-preview・branch comparison・account-deletion schedule/cancel)",
   "captured_at_head_g9": "99744c3 (+Gate G9 GET /dashboard)",
   "captured_at_head_g8": "sandbox/g8 (+Gate G8 adoption-preview・ownership-transfer・ownership-transfers・privacy/corrections・correction-requests・admin/ops/jobs)",
-  "captured_at_head_g11": "gate/g11-media (+Gate G11 plans/{plan_id}/cover・cover/media)"
+  "captured_at_head_g11": "gate/g11-planner (+Gate G11 plans/{plan_id}/cover・cover/media・hours-check)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -163,6 +163,7 @@
   "GET /api/v1/plans/{plan_id}/finance-settings",
   "GET /api/v1/plans/{plan_id}/finance-summary",
   "GET /api/v1/plans/{plan_id}/fx-rates",
+  "GET /api/v1/plans/{plan_id}/hours-check",
   "GET /api/v1/plans/{plan_id}/imports",
   "GET /api/v1/plans/{plan_id}/imports/{job_id}",
   "GET /api/v1/plans/{plan_id}/journey",

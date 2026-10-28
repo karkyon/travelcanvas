@@ -212,7 +212,8 @@ export const ticket: Decoder<Ticket> = object<Ticket>({
 
 // ===== [Gate M9-FE-C2b-2] 移動区間(FR-014) =====
 
-const segmentMode = oneOf('walking', 'driving', 'train', 'bus', 'ferry', 'flight', 'bicycle', 'taxi', 'mixed');
+const segmentMode = oneOf('walking', 'driving', 'train', 'bus', 'ferry', 'flight', 'bicycle', 'taxi', 'mixed',
+  'shinkansen', 'helicopter');  // [Gate G11]
 
 export const travelSegment: Decoder<TravelSegment> = object<TravelSegment>({
   id: str,

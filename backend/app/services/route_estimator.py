@@ -36,7 +36,12 @@ _MODE_SPEED_KMH = {
     "bicycle": 15.0,
     "taxi": 28.0,
     "mixed": 20.0,  # 複合交通は単一速度で表現できないため、目安として保持
+    # [Gate G11] 新幹線(区間で明示された時だけ。鉄道から推測しない)
+    "shinkansen": 200.0,
 }
+
+# [Gate G11] 所要時間を推定しない手段(ヘリ・チャーターは運航の手配で決まる。歩きの速さで代わりに推定しない)
+NO_ESTIMATE_MODES = frozenset({"helicopter"})
 
 # 直線距離に対し実際の道路網で生じる迂回を補正する係数(目安)。
 _MODE_DETOUR_FACTOR = {
@@ -51,6 +56,7 @@ _MODE_DETOUR_FACTOR = {
     "bicycle": 1.3,
     "taxi": 1.4,
     "mixed": 1.4,
+    "shinkansen": 1.1,
 }
 
 
@@ -73,6 +79,8 @@ def estimate_leg(
     Noneを返す(架空の値を作らず「unknown」として扱う)。"""
     if from_lat is None or from_lon is None or to_lat is None or to_lon is None:
         return None
+    if mode in NO_ESTIMATE_MODES:
+        return None  # [Gate G11] 要手配(推定しない)
 
     mode = mode if mode in _MODE_SPEED_KMH else "walking"
     straight_km = haversine_km(from_lat, from_lon, to_lat, to_lon)

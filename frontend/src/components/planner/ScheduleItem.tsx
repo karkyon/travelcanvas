@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { safeExternalUrl, safeTelHref } from '@/utils/safeNavigation';
+import { transportText } from '@/utils/transportModes';
+import type { ArrivalLeg, HoursBadge } from './plannerModel';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, AlertTriangle, MessageSquare,
@@ -45,6 +47,10 @@ interface ScheduleItemProps {
   isDragging?: boolean;
   dragRef?: React.RefObject<HTMLDivElement>;
   style?: React.CSSProperties;
+  /** [Gate G11] この予定へ着く移動区間(移動手段の名前・所要時間・時差) */
+  arrival?: ArrivalLeg | null;
+  /** [Gate G11] 営業時間の照合の帯 */
+  hours?: HoursBadge | null;
 }
 
 const ScheduleItem: React.FC<ScheduleItemProps> = ({
@@ -78,7 +84,9 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   onShare,
   isDragging = false,
   dragRef,
-  style
+  style,
+  arrival,
+  hours,
 }) => {
   void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -109,19 +117,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
       case 'medium': return 'border-yellow-500 bg-yellow-50';
       case 'low': return 'border-green-500 bg-green-50';
       default: return 'border-gray-300 bg-surface';
-    }
-  };
-
-  const getTravelMethodIcon = (method?: string) => {
-    switch (method) {
-      case 'train': return '🚃';
-      case 'bus': return '🚌';
-      case 'car': return '🚗';
-      case 'taxi': return '🚕';
-      case 'walking': return '🚶';
-      case 'bicycle': return '🚲';
-      case 'plane': return '✈️';
-      default: return '🚃';
     }
   };
 
@@ -235,13 +230,34 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             )}
           </div>
 
-          {/* Travel Info */}
-          {travelMethod && travelTime && (
-            <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-sm mb-2">
-              <span>{getTravelMethodIcon(travelMethod)}</span>
-              <span>移動: {formatDuration(travelTime)}</span>
-              {travelCost && <span>• {formatCurrency(travelCost)}</span>}
+          {/* [Gate G11] この予定へ着く移動(アイコンと名前・所要時間・推定か・時差)。区間が無ければ以前の移動の値 */}
+          {arrival ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
+              data-testid="schedule-arrival">
+              <span>{arrival.text}</span>
+              {arrival.isEstimate && <span>(推定)</span>}
+              {arrival.status === 'confirmed' && <span>・確定</span>}
+              {arrival.crossZone && <span data-testid="schedule-cross-zone">{arrival.crossZone.text}</span>}
+              {arrival.zoneUnknown && <span>・時刻帯未確認</span>}
             </div>
+          ) : travelMethod ? (
+            <div className="flex items-center gap-2 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
+              data-testid="schedule-arrival">
+              <span>{transportText(travelMethod, travelTime ?? null)}</span>
+              {travelCost ? <span>• {formatCurrency(travelCost)}</span> : null}
+            </div>
+          ) : null}
+
+          {/* [Gate G11] 営業時間の照合(記号と文字。色だけで伝えない) */}
+          {hours && (
+            <p className={`flex flex-wrap items-center gap-x-1 text-xs px-2 py-1 rounded-sm mb-2 ${
+              hours.tone === 'good' ? 'text-success bg-success-soft' : hours.tone === 'warn' ? 'text-warning bg-warning-soft'
+                : hours.tone === 'bad' ? 'text-danger bg-danger-soft' : 'text-ink-700 bg-cloud-100'}`}
+            data-testid="schedule-hours" data-tone={hours.tone}>
+              <span aria-hidden="true">{hours.symbol}</span>
+              <span>{hours.text}</span>
+              {hours.sourceText && <span className="opacity-90">({hours.sourceText})</span>}
+            </p>
           )}
 
           {/* Description */}
