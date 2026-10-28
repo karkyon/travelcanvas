@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
-from app.models.models import User
+from app.models.models import Memory, TravelEvent, User
 from app.services import plan_cover as pc
 from app.services.audit_service import record_audit_event
 
@@ -124,5 +124,95 @@ def get_cover_media(plan_id: str, db: Session = Depends(get_db),
     m = pc.cover_memory(db, plan, current_user)
     if m is None:
         raise HTTPException(status_code=404, detail="表紙の写真がありません")
+    from app.api.v1.memories import media_response
+    return media_response(m)
+
+
+# ============================================================ [Gate G11] 予定のカードの写真(仕様 §2.2)
+
+class EventImageSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    memory_id: str
+
+
+def _event(db: Session, plan, event_id: str) -> TravelEvent:
+    import uuid as _uuid
+
+    try:
+        eid = _uuid.UUID(event_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="予定が見つかりません")
+    ev = db.query(TravelEvent).filter(TravelEvent.id == eid, TravelEvent.plan_id == plan.id).first()
+    if ev is None:
+        raise HTTPException(status_code=404, detail="予定が見つかりません")
+    return ev
+
+
+def event_image_memory(db: Session, plan, ev: TravelEvent, user: User) -> Optional[Memory]:
+    if ev.image_memory_id is None:
+        return None
+    m = db.query(Memory).filter(Memory.id == ev.image_memory_id, Memory.plan_id == plan.id).first()
+    if m is None or not pc.visible_to(m, user) or m.kind != "photo" or not m.storage_key:
+        return None
+    return m
+
+
+def _event_out(db: Session, plan, ev: TravelEvent, user: User) -> dict:
+    m = event_image_memory(db, plan, ev, user)
+    return {"event_id": str(ev.id), "image": ({"memory_id": str(m.id), "visibility": m.visibility,
+                                              "source": pc.source_summary(m)} if m else None)}
+
+
+@router.get("/{plan_id}/event-images")
+def list_event_images(plan_id: str, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)):
+    """見える予定の写真の一覧(予定 → 写真の記録)。見えない写真は含めない"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    rows = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id, TravelEvent.image_memory_id.isnot(None)).all()
+    out = {}
+    for ev in rows:
+        item = _event_out(db, plan, ev, current_user)
+        if item["image"]:
+            out[str(ev.id)] = item["image"]
+    return {"images": out}
+
+
+@router.put("/{plan_id}/events/{event_id}/image")
+def set_event_image(plan_id: str, event_id: str, body: EventImageSet, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    ev = _event(db, plan, event_id)
+    try:
+        m = pc.photo_for(db, plan, body.memory_id, current_user)
+    except pc.CoverInputError as e:
+        raise _err(e)
+    ev.image_memory_id = m.id
+    db.commit()
+    _audit("event.image_set", current_user, plan,
+           {"event_id": str(ev.id), "memory_id": str(m.id), "visibility": m.visibility})
+    return _event_out(db, plan, ev, current_user)
+
+
+@router.delete("/{plan_id}/events/{event_id}/image")
+def clear_event_image(plan_id: str, event_id: str, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    ev = _event(db, plan, event_id)
+    had = ev.image_memory_id is not None
+    ev.image_memory_id = None
+    db.commit()
+    if had:
+        _audit("event.image_clear", current_user, plan, {"event_id": str(ev.id)})
+    return _event_out(db, plan, ev, current_user)
+
+
+@router.get("/{plan_id}/events/{event_id}/image/media")
+def get_event_image_media(plan_id: str, event_id: str, db: Session = Depends(get_db),
+                          current_user: User = Depends(get_current_user_or_guest)) -> Response:
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    ev = _event(db, plan, event_id)
+    m = event_image_memory(db, plan, ev, current_user)
+    if m is None:
+        raise HTTPException(status_code=404, detail="予定の写真がありません")
     from app.api.v1.memories import media_response
     return media_response(m)

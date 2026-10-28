@@ -17,6 +17,18 @@ import api, {
 import type { CandidateList, NormalizedDay, PlanCandidateItem } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
+import NearbyDiscover from './discover/NearbyDiscover';
+import type { BasePoint } from './discover/discoverModel';
+import SocialImportCard, { type SocialCandidateInput } from './discover/SocialImportCard';
+import { createCandidateFromSearch } from '@/services/api';
+import type { NearbyResult } from '@/services/api/types/g11discover';
+
+const SOURCE_KIND_LABEL: Record<string, string> = {
+  url: 'URL', text: 'メモ', manual: '手入力', search: '検索', social: 'SNS の投稿',
+};
+const SOCIAL_PROVIDER_LABEL: Record<string, string> = {
+  youtube_oembed: 'YouTube', tiktok_oembed: 'TikTok', instagram_oembed: 'Instagram',
+};
 
 const REASON_LABEL: Record<string, string> = {
   same_provider_id: '同じ提供元の場所', same_name: '同じ名前', nearby: '100m以内', same_address: '同じ住所', same_url: '同じURL',
@@ -95,6 +107,21 @@ const CandidatesPage: React.FC = () => {
   };
 
   const canEdit = Boolean(data?.can_edit);
+
+  // [Gate G11] 発見: 旅程の場所(座標のある予定)を探す基点にする
+  const bases: BasePoint[] = days.flatMap((d) => (d.events ?? [])
+    .filter((e) => typeof e.latitude === 'number' && typeof e.longitude === 'number')
+    .map((e) => ({ id: e.id, label: `${d.local_date} ${e.title}`, latitude: e.latitude as number, longitude: e.longitude as number })));
+  const addFromNearby = async (r: NearbyResult) => {
+    await run(() => createCandidateFromSearch(planId, r.id), `「${r.name}」を候補箱に入れました`, '候補箱に入れられませんでした');
+  };
+  const addFromSocial = async (input: SocialCandidateInput) => {
+    await run(() => createCandidate(planId, {
+      title: input.title || null, source_url: input.source_url, note: input.note, address: input.address,
+      latitude: input.latitude, longitude: input.longitude,
+      ...(input.social ? { source_kind: 'social' as const, platform: input.platform, retrieved_at: input.retrieved_at } : {}),
+    }), input.social ? 'SNS の投稿を候補箱に入れました' : 'URL とメモを出典として候補箱に入れました', '候補箱に入れられませんでした');
+  };
   const items = (data?.items ?? []).filter((c) => showDismissed || c.status !== 'dismissed');
   const titleOf = (id: string) => data?.items.find((c) => c.id === id)?.title ?? '';
 
@@ -123,6 +150,12 @@ const CandidatesPage: React.FC = () => {
         <div className="py-12 flex justify-center"><LoadingSpinner /></div>
       ) : data && (
         <>
+          {canEdit && (
+            <div className="mt-4 space-y-4">
+              <NearbyDiscover bases={bases} canEdit={canEdit} onAddCandidate={addFromNearby} />
+              <SocialImportCard planId={planId} canEdit={canEdit} onSave={addFromSocial} />
+            </div>
+          )}
           {canEdit && (
             <Card className="mt-4 p-4">
               <form aria-label="候補を追加" onSubmit={add} className="space-y-3">
@@ -179,7 +212,8 @@ const CandidatesPage: React.FC = () => {
                         ? <>・出典 <a className="text-indigo-800 underline" href={safeExternalUrl(c.source_url) ?? undefined} target="_blank" rel="noopener noreferrer nofollow">{c.source_label}</a></>
                         : <>・出典 {c.source_label}</>
                       )}
-                      {c.provider && `・${c.provider}${c.retrieved_at ? `(${fmt(c.retrieved_at)}取得)` : ''}`}
+                      {`・${SOURCE_KIND_LABEL[c.source_kind] ?? c.source_kind}`}
+                      {c.provider && `・${SOCIAL_PROVIDER_LABEL[c.provider] ?? c.provider}${c.retrieved_at ? `(${fmt(c.retrieved_at)}取得)` : ''}`}
                     </p>
                     {c.note && <p className="text-sm text-ink-900 mt-1 whitespace-pre-wrap">{c.note}</p>}
                     {c.merged_from.length > 0 && (

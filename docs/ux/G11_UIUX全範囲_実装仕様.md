@@ -1,7 +1,7 @@
 # Gate G11 UI/UX 全範囲 実装仕様(正本)
 
 - 文書の位置づけ: Gate G11 の実装の正本。`claude/TravelCanvas_UIUXモック実装仕様_2026-10-28.md`(前の版)を置き換える
-- 版: r3(2026-10-28 JST。r3: 段階2 の mode の CHECK の migration(§1.0)。r2: 段階1 の実装に合わせ、表紙の API の If-Match をやめた・「写真を外す」の確認を置かない・migration の revision を記した)
+- 版: r4(2026-10-28 JST。r4: 段階3 の縮小画像の API の形・発見の置き場所・E2E の外部の差し替え。r3: r3: 段階2 の mode の CHECK の migration(§1.0)。r2: 段階1 の実装に合わせ、表紙の API の If-Match をやめた・「写真を外す」の確認を置かない・migration の revision を記した)
 - 基準: main `540955d40edc0ccc31df877a1435868bee5edaf7`(G10-UX)、DOC-10 `v5.1-r22`、Alembic head `f4d8a2c6e9b1`
 - CI の基準: main の CI run 40647781901(secret-scan・dependency-audit・frontend・backend・e2e の5つが合格。2026-10-28 に GitHub API で確認)
 - 画面の正本: `docs/ux/references/TravelCanvas_UIUX_Mock_2026-10-28.html`(ブラウザで開ける。4つの見た目の比較・各画面の操作)
@@ -107,7 +107,8 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - `POST /plans/{plan_id}/candidates` の `source_kind` に `social` を許す(preview を確かめた後の保存)
 - `GET /media-providers/images?q=&lat=&lng=` (ログイン必須): 外部の画像の候補 `[{provider, provider_id, title, thumb_proxy_id, author, license, license_url, attribution, source_page_url, width, height, retrieved_at}]`
 - `POST /plans/{plan_id}/memories/import-external` (editor 以上): `{provider, provider_id}` → サーバーが provider から取り直し(利用者が送った URL は使わない)、上限・形式・ウイルス検査・撮影情報の除去を通し、**非公開の Memory(kind=photo、`source` 付き)** として保存して返す。そのあと表紙・予定の写真に設定できる
-- 候補の縮小画像はサーバーが中継する(`GET /media-providers/images/thumb/{thumb_proxy_id}`、ログイン必須、短期のキャッシュだけ)。ブラウザから外部へ直接読みに行かない
+- 候補の縮小画像はサーバーが中継する(`GET /media-providers/images/thumb?provider=&id=`、ログイン必須、`Cache-Control: private, max-age=300`)。サーバーは provider_id から提供元の API で URL を引き直す(利用者の URL を使わない・状態を保存しない)。ブラウザから外部へ直接読みに行かない
+- 予定の写真の一覧: `GET /plans/{plan_id}/event-images`(見える写真だけ。予定 → 写真の記録)
 
 ---
 
@@ -143,7 +144,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
   - 空き時間・移動の合計は重なりを二重に数えない
 
 ### 3.3 発見の画面(段階3。モック: 発見)
-- 既存の検索画面(SearchPage・SpotSearch)の上部に「基点」(現在地 / 旅程の場所 / 地図の地点 / 地名の入力)・半径・カテゴリ(すべて・食べ物・市場・買い物・絶景)。位置の許可を断っても地名で探せる
+- 置き場所: 旅行の **候補箱の画面**(`/planner/{id}/candidates`。保存先の旅行が決まっている所)の上部に「近くの「行きたい」を集める」と「SNS の投稿から取り込む」を置く(r3 で決めた。旧来の SearchPage・SpotSearch は変えない)。「基点」(現在地 / 旅程の場所 / 地図の地点 / 地名の入力)・半径・カテゴリ(すべて・食べ物・市場・買い物・絶景)。位置の許可を断っても地名で探せる
 - 候補のカード: 名前・カテゴリ・距離(「半径内」/「周辺優先」)・出典・取得時刻・「候補箱へ」・「写真を探す」
 - SNS から取り込む: URL を貼る →「URL を確かめる」→ 確認のカード(SNS の名前・作者・題名・取得時刻・場所の候補と確からしさ「低」「中」)→ 利用者が直す →「候補箱へ追加」(source_kind=social)。取れない時は「URL とメモを出典として保存」に切り替え、取れたように見せない
 - 場所の写真の提案: 予定・候補の「写真を探す」→ 外部の画像の候補(作者・ライセンス・出典のページ・取得日)→「この予定のカードに使う」「旅行の表紙に使う」→ 非公開の記録として取り込み → 設定
@@ -229,6 +230,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - backend: 表紙の API(権限: 所有者・editor・viewer・他人の非公開・他の旅行の記録・音声の記録・存在しない)、If-Match、SET NULL(記録の削除・ゴミ箱)、複製でコピーしない、`PUT /travel-plans` で変わらない、配信の撮影情報の除去(GPS 付きの JPEG を作って確かめる)、監査に本文・ファイル名が無い。hours-check の各 status(例外の日・深夜営業・最終入場・L.O.・未登録・古い)。provider は `httpx.MockTransport` で外へつながない(ライセンスの判定・redirect の拒否・上限・SSRF)
 - frontend: TripCover の写真・失敗時のグラデーション・重ねのコントラスト、CoverPhotoDialog の権限ごとの表示、ScheduleItem の移動手段の名前と営業時間の帯、全日程のチャート、時差の表示(夜行便・日付変更線)、系統×明暗のトークンの AA と CSS の一致
 - E2E: 表紙の設定→PlanHeader・ダッシュボードに出る→外す、閲覧者に操作が無い、全日程の切り替え、系統の切り替えが再読み込みで続く。各 spec は台帳の証拠に足す
+- E2E は外部の提供元(OpenStreetMap・oEmbed・Wikimedia Commons)へつながない。外部に頼る応答だけを `page.route` で差し替え(gate-g9 と同じ)、保存は本物の backend を通す。提供元の取り込み・ライセンス・SSRF の守りは backend の試験(`httpx.MockTransport`)で確かめる
 
 ---
 
@@ -249,7 +251,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 |---|---|---|---|
 | 1 Media | gate/g11-media | migration `a7c3e5f9b2d4`(§1 の全て)・表紙の API・TripCover の写真・CoverPhotoDialog・位置の調整・試験 | **完了**: PR #9、CI 5ジョブ合格、main `b21e47b`(新しい clone で tree 一致)。DOC-10 r23。omega-dev2 は未反映 |
 | 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24 |
-| 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | 未着手 |
+| 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-discover-trace.md`、`docs/adr/ADR-media-providers.md`)。DOC-10 r25 |
 | 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | 未着手 |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。

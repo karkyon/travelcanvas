@@ -3,6 +3,11 @@ import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
 import { arrivalLeg, arrivalSegment, hoursBadge } from './planner/plannerModel';
+import EventPhotoDialog from './planner/EventPhotoDialog';
+import { getEventImageMedia, getEventImages, getMediaProviderStatus } from '../services/api/g11discover';
+import type { EventImage } from '../services/api/types/g11discover';
+import { creditOf } from '../hooks/useCoverPhoto';
+import { getPlanCover } from '../services/api/g11';
 import { usePlan } from '../hooks/usePlan';
 import { useDragDrop, containerId } from '../hooks/useDragDrop';
 import { useToast } from './common/toastContext';
@@ -69,6 +74,47 @@ const DayView: React.FC<DayViewProps> = ({
   useEffect(() => {
     if (!hoursPending && announce.endsWith('確かめています')) setAnnounce(announce.replace('確かめています', '確かめました'));
   }, [hoursPending, announce]);
+
+  // [Gate G11] 予定のカードの写真(見える写真だけ。一時の URL)
+  const [images, setImages] = useState<Record<string, EventImage>>({});
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [imagesVersion, setImagesVersion] = useState(0);
+  const [photoFor, setPhotoFor] = useState<ScheduleItemType | null>(null);
+  const [externalEnabled, setExternalEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getEventImages(planId).then((m) => { if (active) setImages(m); }).catch(() => { if (active) setImages({}); });
+    return () => { active = false; };
+  }, [planId, imagesVersion]);
+  const imageKey = day.events.filter((e) => images[e.id]).map((e) => `${e.id}:${images[e.id]!.memory_id}`).join(',');
+  useEffect(() => {
+    let active = true;
+    const made: string[] = [];
+    const ids = day.events.filter((e) => images[e.id]).map((e) => e.id);
+    Promise.all(ids.map((id) => getEventImageMedia(planId, id).then((b) => [id, URL.createObjectURL(b)] as const)
+      .catch(() => null))).then((rows) => {
+      const ok = rows.filter((r): r is readonly [string, string] => r !== null);
+      ok.forEach(([, u]) => made.push(u));
+      if (active) setImageUrls(Object.fromEntries(ok));
+      else ok.forEach(([, u]) => URL.revokeObjectURL(u));
+    });
+    return () => { active = false; made.forEach((u) => URL.revokeObjectURL(u)); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 写真の組み合わせ(imageKey)が変わった時だけ読み直す
+  }, [planId, imageKey]);
+  // 予定の写真を変えられるのは編集できる人だけ(表紙の API の can_edit と同じ判定)
+  const [canEdit, setCanEdit] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getPlanCover(planId).then((r) => { if (active) setCanEdit(r.can_edit); }).catch(() => { if (active) setCanEdit(false); });
+    return () => { active = false; };
+  }, [planId]);
+  useEffect(() => {
+    if (!canEdit) return undefined;
+    let active = true;
+    getMediaProviderStatus().then((s) => { if (active) setExternalEnabled(s.image_providers.length > 0); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [canEdit]);
 
   const moveBy = useCallback(async (event: ScheduleItemType, delta: -1 | 1) => {
     const to = await moveItemBy(event, planId, day.id, delta);
@@ -269,6 +315,15 @@ const DayView: React.FC<DayViewProps> = ({
         </div>
       </Card>
 
+      {photoFor && (
+        <EventPhotoDialog isOpen onClose={() => setPhotoFor(null)} planId={planId} eventId={photoFor.id}
+          eventTitle={photoFor.title}
+          near={typeof photoFor.latitude === 'number' && typeof photoFor.longitude === 'number'
+            ? { latitude: photoFor.latitude, longitude: photoFor.longitude } : null}
+          current={images[photoFor.id] ?? null} externalEnabled={externalEnabled}
+          onChanged={() => setImagesVersion((v) => v + 1)} />
+      )}
+
       {/* [Gate G11] 並べ替えの結果と再確認の知らせ(読み上げ) */}
       <p className="sr-only" role="status" aria-live="polite" data-testid="reorder-status">{announce}</p>
 
@@ -373,6 +428,8 @@ const DayView: React.FC<DayViewProps> = ({
                   onComment={onItemComment ? () => onItemComment(event) : undefined}
                   arrival={arrivalLeg(arrivalSegment(event.id, segments), zones, day.timezone_id)}
                   hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
+                  image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
+                  onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
                 />
                 </div>
               </div>

@@ -92,7 +92,7 @@
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memor |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/media |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |
@@ -158,6 +158,7 @@
 | `profile_empty` | 409 | no | 非公開の条件がまだありません。設定 → 非公開の条件 で登録してください | api/v1/private_profile.py |
 | `profile_unreadable` | 409 | no | 保存済みの内容を復号できないため変更できません | api/v1/private_profile.py |
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
+| `provider_disabled` | 404 | no | この画像の提供元は使えません(止めてあります) | api/v1/media_providers.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
@@ -211,6 +212,8 @@
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unlock_reason_required` | 422 | no | 締めを解除する理由を200文字までで入力してください | api/v1/finance_ledger.py |
+| `unsupported_platform` | — | — | 対応していない SNS の URL です | api/v1/candidates.py |
+| `unsupported_type` | — | — | 対応していない形式の画像です | api/v1/media_providers.py |
 | `usage_reason_required` | 422 | no | 上書きの理由を200文字までで入力してください | api/v1/admin.py |
 | `user_not_found` | 404 | no | このメールアドレスの会員が見つかりません。先に会員登録してもらってください | api/v1/organizations.py |
 | `username_taken` | 409 | no | この表示名は既に使われています | api/v1/corrections.py |

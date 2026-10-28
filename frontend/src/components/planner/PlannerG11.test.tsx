@@ -9,6 +9,12 @@ const { getHoursCheck, moveItemBy, handleKeyboardMove } = vi.hoisted(() => ({
   getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(),
 }));
 vi.mock('@/services/api/g11planner', () => ({ getHoursCheck }));
+// [Gate G11] 段階3: 予定の写真・提供元の状態・編集できるか(この試験では写真なし・閲覧者)
+vi.mock('@/services/api/g11discover', () => ({
+  getEventImages: vi.fn().mockResolvedValue({}), getEventImageMedia: vi.fn(), getMediaProviderStatus: vi.fn(),
+  setEventImage: vi.fn(), clearEventImage: vi.fn(),
+}));
+vi.mock('@/services/api/g11', () => ({ getPlanCover: vi.fn().mockResolvedValue({ cover: null, can_edit: false }) }));
 vi.mock('@/hooks/useDragDrop', () => ({
   containerId: (p: string, d: string) => `${p}:${d}`,
   useDragDrop: () => ({

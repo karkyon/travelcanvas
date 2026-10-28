@@ -152,6 +152,10 @@ class CandidateInput(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     priority: int = Field(2, ge=1, le=3)
+    # [Gate G11] SNS の投稿 URL の確認(social-preview)の後に保存する時。platform は youtube・tiktok・instagram
+    source_kind: Optional[str] = Field(None, pattern="^social$")
+    platform: Optional[str] = Field(None, pattern="^(youtube|tiktok|instagram)$")
+    retrieved_at: Optional[datetime] = None
 
 
 @router.get("/{plan_id}/candidates")
@@ -175,10 +179,24 @@ def create_candidate(plan_id: str, body: CandidateInput, db: Session = Depends(g
     note = _guard(lambda: cs.clean_text(body.note, 2000, "メモ"))
     lat, lng = _guard(lambda: cs.check_location(body.latitude, body.longitude))
     kind = "url" if url else ("text" if note else "manual")
+    provider = None
+    retrieved = None
+    if body.source_kind == "social":
+        from app.services.media_providers.social import PROVIDER_OF, platform_of
+
+        if not url:
+            raise _bad("invalid_field", "SNS の投稿の URL を入力してください")
+        platform = platform_of(url)
+        if platform is None or (body.platform and body.platform != platform):
+            raise _bad("unsupported_platform", "対応していない SNS の URL です")
+        kind, provider = "social", PROVIDER_OF[platform]
+        retrieved = body.retrieved_at
+        if retrieved is not None and retrieved.tzinfo is None:
+            raise _bad("invalid_field", "日時にはタイムゾーンを含めてください")
     c = PlanCandidate(plan_id=plan.id, created_by_user_id=current_user.id, title=title, note=note, source_kind=kind,
                       source_url=url, category=_guard(lambda: cs.clean_text(body.category, 50, "種類")),
                       address=_guard(lambda: cs.clean_text(body.address, 500, "住所")), latitude=lat, longitude=lng,
-                      priority=body.priority, status="open")
+                      priority=body.priority, status="open", provider=provider, retrieved_at=retrieved)
     db.add(c)
     db.commit()
     _audit("candidate.create", current_user, plan, {"source_kind": kind})

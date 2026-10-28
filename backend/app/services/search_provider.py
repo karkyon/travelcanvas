@@ -121,12 +121,38 @@ async def search_nominatim(
             await client.aclose()
 
 
+# [Gate G11] 近くの検索のカテゴリ(仕様 §2.4)→ OpenStreetMap のタグ
+CATEGORY_TAGS: Dict[str, List[str]] = {
+    "food": ['["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream)$"]'],
+    "market": ['["amenity"="marketplace"]', '["shop"~"^(greengrocer|seafood|deli|butcher|bakery)$"]'],
+    "shopping": ['["shop"]'],
+    "viewpoint": ['["tourism"~"^(viewpoint|attraction)$"]'],
+}
+CATEGORIES = ("all",) + tuple(CATEGORY_TAGS)
+
+
+def overpass_regex(text: str) -> str:
+    """[Gate G11] 利用者の文字を Overpass の正規表現・文字列の中で文字どおりに扱う(以前はそのまま入れていた)"""
+    out = []
+    for ch in text:
+        if ch in '\\.^$|?*+()[]{}':
+            out.append('\\' + ch)
+        elif ch == '"':
+            out.append('\\"')
+        elif ch in "\n\r\t":
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 async def search_overpass(
     query: str,
     latitude: Optional[float],
     longitude: Optional[float],
     radius_km: float = 5.0,
     client: Optional[httpx.AsyncClient] = None,
+    category: str = "all",
 ) -> List[Dict[str, Any]]:
     """Overpass API(OpenStreetMap POI検索、APIキー不要)。座標が無ければ
     範囲を絞れないため空リストを返す(失敗ではなく仕様上の制約)。"""
@@ -135,12 +161,15 @@ async def search_overpass(
 
     url = "https://overpass-api.de/api/interpreter"
     radius_m = int(radius_km * 1000)
+    name_filter = f'["name"~"{overpass_regex(query)}",i]' if query and query.strip() else '["name"]'
+    tags = CATEGORY_TAGS.get(category) or [""]
+    selectors = "\n".join(f"      node{tag}{name_filter}(around:{radius_m},{latitude},{longitude});" for tag in tags)
     overpass_query = f"""
     [out:json][timeout:8];
     (
-      node["name"~"{query}",i](around:{radius_m},{latitude},{longitude});
+{selectors}
     );
-    out body 10;
+    out body 20;
     """
 
     owns_client = client is None
@@ -182,6 +211,7 @@ async def search_all_providers(
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
     radius_km: float = 5.0,
+    category: str = "all",
 ) -> List[Dict[str, Any]]:
     """全providerを並列に呼び出し、結果を1つのリストへ結合する。
     重複は削除しない(監査指摘: duplicate候補は自動削除せず比較提示)。
@@ -190,13 +220,22 @@ async def search_all_providers(
     import asyncio
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        wiki_task = search_wikipedia(query, client=client)
-        nominatim_task = search_nominatim(query, latitude, longitude, client=client)
-        overpass_task = search_overpass(query, latitude, longitude, radius_km, client=client)
-        results = await asyncio.gather(wiki_task, nominatim_task, overpass_task, return_exceptions=True)
+        results: List[Any]
+        if category != "all":
+            # [Gate G11] カテゴリで絞る時は、タグで絞れる OpenStreetMap(近くの場所)だけを使う
+            names: tuple = ("overpass",)
+            results = list(await asyncio.gather(
+                search_overpass(query, latitude, longitude, radius_km, client=client, category=category),
+                return_exceptions=True))
+        else:
+            names = ("wikipedia", "nominatim", "overpass")
+            wiki_task = search_wikipedia(query, client=client)
+            nominatim_task = search_nominatim(query, latitude, longitude, client=client)
+            overpass_task = search_overpass(query, latitude, longitude, radius_km, client=client)
+            results = list(await asyncio.gather(wiki_task, nominatim_task, overpass_task, return_exceptions=True))
 
     combined: List[Dict[str, Any]] = []
-    for provider_name, r in zip(("wikipedia", "nominatim", "overpass"), results):
+    for provider_name, r in zip(names, results):
         if isinstance(r, BaseException):
             logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
             continue
