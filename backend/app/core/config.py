@@ -287,6 +287,9 @@ class Settings(BaseSettings):
     IMAGE_PROVIDERS: str = "wikimedia_commons"
     SOCIAL_PROVIDERS: str = "youtube_oembed,tiktok_oembed"
     SOCIAL_INSTAGRAM_OEMBED_TOKEN: str = ""
+    # [Gate G11] 旅行相談の方面の位置の照会(地名の照会。空にすると止まり、方面は位置「未照会」で比べる。
+    # docs/ux/G11_UIUX全範囲_実装仕様.md §3.5)。Nominatim の利用の条件(1秒に1回)を守る
+    TRIP_INTENT_GEOCODER: str = "nominatim"
 
     # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
     # 文書の上限 + 余白(multipart の区切り等)まで受ける。

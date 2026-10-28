@@ -28,7 +28,7 @@ class SearchSpotsBody(BaseModel):
     longitude: Optional[float] = None
     radius_km: float = 5.0
     max_results: int = 20
-    # [Gate G11] 近くの検索のカテゴリ(all・food・market・shopping・viewpoint)
+    # [Gate G11] 近くの検索のカテゴリ(all・food・market・shopping・viewpoint・sightseeing・quiet)
     category: str = "all"
 
 

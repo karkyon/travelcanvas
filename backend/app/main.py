@@ -16,6 +16,7 @@ from app.api.v1 import (
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
     privacy_zones, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers,
+    trip_intents,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -599,6 +600,9 @@ app.include_router(hours_check.router, prefix="/api/v1")
 # [Gate G11] 外部の画像・SNS の投稿の確認(provider の interface 経由)
 app.include_router(media_providers.router, prefix="/api/v1")
 app.include_router(media_providers.plan_router, prefix="/api/v1")
+# [Gate G11] 行き先が未定の旅行相談(段階5)
+app.include_router(trip_intents.router, prefix="/api/v1")
+app.include_router(trip_intents.plan_router, prefix="/api/v1")
 
 
 @app.exception_handler(org_external.ApiError)

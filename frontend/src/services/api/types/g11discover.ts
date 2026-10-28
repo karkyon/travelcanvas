@@ -1,5 +1,5 @@
 /** [Gate G11] 発見・外部の画像・SNS の投稿・予定の写真の型(docs/ux/G11_UIUX全範囲_実装仕様.md §2.2・§2.4・§5) */
-export type DiscoverCategory = 'all' | 'food' | 'market' | 'shopping' | 'viewpoint';
+export type DiscoverCategory = 'all' | 'food' | 'market' | 'shopping' | 'viewpoint' | 'sightseeing' | 'quiet';
 
 export interface NearbyResult {
   id: string;

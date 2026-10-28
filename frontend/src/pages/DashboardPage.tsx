@@ -115,6 +115,15 @@ const DashboardPage: React.FC = () => {
           </Surface>
         )}
 
+        {/* [Gate G11] 旅の始め方を2つ(行き先が未定なら相談から・決まっていれば旅行を作る) */}
+        <nav aria-label="新しい旅を始める" className="mb-4 flex flex-wrap gap-2" data-testid="dashboard-start">
+          <Link to="/trip-consult" className="tc-focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
+            ✦ 条件から旅行先を相談
+          </Link>
+          <Link to="/planner" className="tc-focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border border-cloud-200 bg-cloud-0 px-4 text-sm font-medium text-ink-900 hover:bg-cloud-100">
+            ＋ 行き先が決まっている(旅行を作る)
+          </Link>
+        </nav>
         {data && !focusTrip && <EmptyHero isGuest={data.is_guest} />}
         {data && focusTrip && data.focus && (
           <>

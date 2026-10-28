@@ -127,6 +127,9 @@ CATEGORY_TAGS: Dict[str, List[str]] = {
     "market": ['["amenity"="marketplace"]', '["shop"~"^(greengrocer|seafood|deli|butcher|bakery)$"]'],
     "shopping": ['["shop"]'],
     "viewpoint": ['["tourism"~"^(viewpoint|attraction)$"]'],
+    # [Gate G11] 旅行相談の方面の詳細(観光・静かに過ごす)
+    "sightseeing": ['["tourism"~"^(attraction|museum|gallery|artwork)$"]', '["historic"]'],
+    "quiet": ['["leisure"~"^(park|garden|nature_reserve)$"]', '["amenity"="place_of_worship"]'],
 }
 CATEGORIES = ("all",) + tuple(CATEGORY_TAGS)
 
@@ -189,7 +192,8 @@ async def search_overpass(
                 "provider": "overpass",
                 "external_id": str(element.get("id")),
                 "name": name,
-                "category": tags.get("amenity") or tags.get("tourism") or tags.get("shop"),
+                "category": (tags.get("amenity") or tags.get("tourism") or tags.get("shop") or tags.get("leisure")
+                             or tags.get("historic")),
                 "latitude": element.get("lat"),
                 "longitude": element.get("lon"),
                 "address": tags.get("addr:full") or None,

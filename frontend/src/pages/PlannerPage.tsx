@@ -1066,9 +1066,13 @@ const PlannerPage: React.FC = () => {
             <h1 className="text-3xl font-bold text-ink-900">プランナー</h1>
             <p className="text-ink-700">旅行プランを作成・編集します</p>
           </div>
-          <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-            ＋ 新しいプラン
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {/* [Gate G11] 行き先が未定なら相談から(段階5) */}
+            <Button variant="outline" onClick={() => navigate('/trip-consult')}>✦ 条件から旅行先を相談</Button>
+            <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
+              ＋ 新しいプラン
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
