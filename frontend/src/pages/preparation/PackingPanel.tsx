@@ -51,7 +51,7 @@ const PackingPanel: React.FC<Props> = (props) => {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-700" data-testid="packing-progress">
+        <p className="text-sm text-ink-700" data-testid="packing-progress">
           梱包済み {progress.packed}/{progress.total} 件
           {progress.requiredLeft > 0 ? `(必須で未準備 ${progress.requiredLeft} 件)` : ''}
         </p>
@@ -61,8 +61,8 @@ const PackingPanel: React.FC<Props> = (props) => {
       </div>
 
       <section aria-labelledby="packing-suggestion-heading" className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-        <h3 id="packing-suggestion-heading" className="font-semibold text-gray-900">持ち物の候補</h3>
-        <p className="text-sm text-gray-700 mt-1">旅程(日数・予定・予約・移動)と、次の条件から候補を作ります。</p>
+        <h3 id="packing-suggestion-heading" className="font-semibold text-ink-900">持ち物の候補</h3>
+        <p className="text-sm text-ink-700 mt-1">旅程(日数・予定・予約・移動)と、次の条件から候補を作ります。</p>
         <fieldset className="mt-2">
             <legend className="sr-only">候補の条件</legend>
             <div className="flex flex-wrap gap-4 text-sm">
@@ -87,21 +87,21 @@ const PackingPanel: React.FC<Props> = (props) => {
         {suggestions && (
           <div className="mt-4 space-y-3" data-testid="packing-suggestions">
             {suggestions.unverified.map((u) => (
-              <p key={u.code} className="text-sm text-gray-800 bg-white border rounded-sm p-2">{u.message}</p>
+              <p key={u.code} className="text-sm text-ink-900 bg-surface border rounded-sm p-2">{u.message}</p>
             ))}
             {suggestions.add.length === 0 && suggestions.remove.length === 0 && suggestions.change.length === 0 && (
-              <p className="text-sm text-gray-700">追加・見直しの候補はありません。</p>
+              <p className="text-sm text-ink-700">追加・見直しの候補はありません。</p>
             )}
             {suggestions.add.length > 0 && (
               <ul className="space-y-2" aria-label="追加の候補">
                 {suggestions.add.map((s) => (
-                  <li key={s.key} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-sm p-2">
+                  <li key={s.key} className="flex flex-wrap items-center justify-between gap-2 bg-surface border rounded-sm p-2">
                     <div className="min-w-0">
-                      <span className="font-medium text-gray-900">{s.name}</span>
-                      <span className="text-sm text-gray-700"> ×{s.quantity}</span>
+                      <span className="font-medium text-ink-900">{s.name}</span>
+                      <span className="text-sm text-ink-700"> ×{s.quantity}</span>
                       {s.is_required && <span className="ml-2 text-xs px-2 py-0.5 rounded-sm bg-red-100 text-red-800">必須</span>}
                       {s.scope === 'personal' && <span className="ml-2 text-xs px-2 py-0.5 rounded-sm bg-purple-100 text-purple-800">自分だけ</span>}
-                      <p className="text-xs text-gray-700">{s.reason}</p>
+                      <p className="text-xs text-ink-700">{s.reason}</p>
                     </div>
                     {(s.scope === 'personal' || canEdit) && (
                       <Button variant="outline" size="sm" onClick={() => props.onAdoptSuggestion(s)} aria-label={`${s.name}を持ち物に追加`}>
@@ -115,11 +115,11 @@ const PackingPanel: React.FC<Props> = (props) => {
             {suggestions.change.length > 0 && (
               <ul className="space-y-2" aria-label="数量の見直し">
                 {suggestions.change.map((c) => (
-                  <li key={c.item_id} className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-sm p-2">
+                  <li key={c.item_id} className="flex flex-wrap items-center justify-between gap-2 bg-surface border rounded-sm p-2">
                     <div>
-                      <span className="font-medium text-gray-900">{c.name}</span>
-                      <span className="text-sm text-gray-700"> {c.current_quantity} → {c.suggested_quantity}</span>
-                      <p className="text-xs text-gray-700">{c.reason}</p>
+                      <span className="font-medium text-ink-900">{c.name}</span>
+                      <span className="text-sm text-ink-700"> {c.current_quantity} → {c.suggested_quantity}</span>
+                      <p className="text-xs text-ink-700">{c.reason}</p>
                     </div>
                     {canEdit && (
                       <Button variant="outline" size="sm" onClick={() => props.onApplyQuantity(c.item_id, c.suggested_quantity)}>
@@ -133,9 +133,9 @@ const PackingPanel: React.FC<Props> = (props) => {
             {suggestions.remove.length > 0 && (
               <ul className="space-y-2" aria-label="不要かもしれない持ち物">
                 {suggestions.remove.map((r) => (
-                  <li key={r.item_id} className="bg-white border rounded-sm p-2">
-                    <span className="font-medium text-gray-900">{r.name}</span>
-                    <p className="text-xs text-gray-700">{r.reason}</p>
+                  <li key={r.item_id} className="bg-surface border rounded-sm p-2">
+                    <span className="font-medium text-ink-900">{r.name}</span>
+                    <p className="text-xs text-ink-700">{r.reason}</p>
                   </li>
                 ))}
               </ul>
@@ -145,11 +145,11 @@ const PackingPanel: React.FC<Props> = (props) => {
       </section>
 
       {items.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-700">持ち物はまだありません。</Card>
+        <Card padding="lg" className="text-center text-ink-700">持ち物はまだありません。</Card>
       ) : (
         groups.map((g) => (
           <section key={g.category} aria-labelledby={`packing-group-${g.category}`}>
-            <h3 id={`packing-group-${g.category}`} className="text-base font-semibold text-gray-900 mb-2">
+            <h3 id={`packing-group-${g.category}`} className="text-base font-semibold text-ink-900 mb-2">
               {g.label}
             </h3>
             <ul className="space-y-2">
@@ -160,11 +160,11 @@ const PackingPanel: React.FC<Props> = (props) => {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           {item.scope === 'personal' && <Lock size={14} aria-label="自分だけの持ち物" />}
-                          <span className="font-medium text-gray-900">{item.name ?? '(内容を表示できません)'}</span>
-                          <span className="text-sm text-gray-700">×{item.quantity}</span>
+                          <span className="font-medium text-ink-900">{item.name ?? '(内容を表示できません)'}</span>
+                          <span className="text-sm text-ink-700">×{item.quantity}</span>
                           {item.is_required && <span className="text-xs px-2 py-0.5 rounded-sm bg-red-100 text-red-800">必須</span>}
                         </div>
-                        <p className="text-xs text-gray-700 mt-0.5">
+                        <p className="text-xs text-ink-700 mt-0.5">
                           {categoryLabel(item.category)}
                           {item.scope === 'shared' && ` ・ 担当: ${item.assignee_name ?? (item.assignee_missing ? 'メンバー外(未割当)' : '未定')}`}
                           {item.note ? ` ・ ${item.note}` : ''}
@@ -183,10 +183,10 @@ const PackingPanel: React.FC<Props> = (props) => {
                         </select>
                         {canModify(item) && (
                           <>
-                            <button type="button" onClick={() => props.onEdit(item)} className="text-gray-600 hover:text-blue-700 p-1" aria-label={`${item.name ?? '持ち物'}を編集`}>
+                            <button type="button" onClick={() => props.onEdit(item)} className="text-ink-700 hover:text-blue-700 p-1" aria-label={`${item.name ?? '持ち物'}を編集`}>
                               <Pencil size={16} />
                             </button>
-                            <button type="button" onClick={() => props.onDelete(item)} className="text-gray-600 hover:text-red-700 p-1" aria-label={`${item.name ?? '持ち物'}を削除`}>
+                            <button type="button" onClick={() => props.onDelete(item)} className="text-ink-700 hover:text-red-700 p-1" aria-label={`${item.name ?? '持ち物'}を削除`}>
                               <Trash2 size={16} />
                             </button>
                           </>

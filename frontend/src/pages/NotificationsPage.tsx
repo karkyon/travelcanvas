@@ -146,7 +146,7 @@ const NotificationsPage: React.FC = () => {
 
       {!invitationsLoading && invitations.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-600 mb-2 flex items-center gap-1">
+          <h2 className="text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
             <Users size={16} />
             保留中の招待 ({invitations.length})
           </h2>
@@ -165,10 +165,10 @@ const NotificationsPage: React.FC = () => {
               // 確実に「保留中の招待」カードだけを選択できるようにする。
               <div key={inv.id} data-testid="pending-invitation-card">
                 <Card className="p-4">
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-ink-900">
                     「{inv.plan_title || '旅行プラン'}」への招待
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-ink-500 mt-1">
                     権限: {inv.role === 'editor' ? '編集可能' : '閲覧のみ'}
                   </p>
                   <div className="flex gap-2 mt-3">
@@ -202,7 +202,7 @@ const NotificationsPage: React.FC = () => {
           <LoadingSpinner size="lg" />
         </div>
       ) : notifications.length === 0 ? (
-        <Card className="p-12 text-center text-gray-500">
+        <Card className="p-12 text-center text-ink-500">
           <Bell size={48} className="mx-auto mb-4 opacity-40" />
           <p>通知はまだありません</p>
         </Card>
@@ -218,11 +218,11 @@ const NotificationsPage: React.FC = () => {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{notification.title}</p>
+                  <p className="font-medium text-ink-900">{notification.title}</p>
                   {notification.message && (
-                    <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                    <p className="text-sm text-ink-700 mt-1">{notification.message}</p>
                   )}
-                  <p className="text-xs text-gray-600 mt-2">
+                  <p className="text-xs text-ink-700 mt-2">
                     {new Date(notification.created_at).toLocaleString('ja-JP')}
                   </p>
                 </div>
@@ -232,7 +232,7 @@ const NotificationsPage: React.FC = () => {
                       e.stopPropagation();
                       handleMarkAsRead(notification.id);
                     }}
-                    className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-sm transition-colors shrink-0"
+                    className="p-1.5 text-ink-700 hover:text-blue-600 hover:bg-blue-100 rounded-sm transition-colors shrink-0"
                     title="既読にする"
                   >
                     <Check size={16} />

@@ -241,14 +241,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <Card className="max-w-2xl w-full p-8 text-center">
             <div className="mb-6">
               <div className="text-6xl mb-4">🚨</div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-ink-900 mb-2">
                 予期しないエラーが発生しました
               </h1>
-              <p className="text-gray-600 mb-4">
+              <p className="text-ink-700 mb-4">
                 申し訳ありません。アプリケーションでエラーが発生しました。<br />
                 以下の方法で問題を解決できる可能性があります。
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-ink-500">
                 エラーID: <code className="bg-gray-100 px-2 py-1 rounded-sm">{errorId}</code>
               </p>
             </div>
@@ -290,21 +290,21 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             {/* エラー詳細の表示（開発時またはオプション） */}
             {(showErrorDetails || process.env.NODE_ENV === 'development') && error && (
               <details className="text-left bg-gray-50 p-4 rounded-lg mt-6">
-                <summary className="cursor-pointer font-semibold text-gray-700 mb-2">
+                <summary className="cursor-pointer font-semibold text-ink-700 mb-2">
                   🔧 エラー詳細（技術者向け）
                 </summary>
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium text-gray-800">エラーメッセージ:</h4>
-                    <pre className="bg-white p-2 rounded-sm text-sm text-red-600 overflow-auto">
+                    <h4 className="font-medium text-ink-900">エラーメッセージ:</h4>
+                    <pre className="bg-surface p-2 rounded-sm text-sm text-red-600 overflow-auto">
                       {error.message}
                     </pre>
                   </div>
                   
                   {error.stack && (
                     <div>
-                      <h4 className="font-medium text-gray-800">スタックトレース:</h4>
-                      <pre className="bg-white p-2 rounded-sm text-xs text-gray-600 overflow-auto max-h-40">
+                      <h4 className="font-medium text-ink-900">スタックトレース:</h4>
+                      <pre className="bg-surface p-2 rounded-sm text-xs text-ink-700 overflow-auto max-h-40">
                         {error.stack}
                       </pre>
                     </div>
@@ -312,16 +312,16 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   
                   {errorInfo?.componentStack && (
                     <div>
-                      <h4 className="font-medium text-gray-800">コンポーネントスタック:</h4>
-                      <pre className="bg-white p-2 rounded-sm text-xs text-gray-600 overflow-auto max-h-40">
+                      <h4 className="font-medium text-ink-900">コンポーネントスタック:</h4>
+                      <pre className="bg-surface p-2 rounded-sm text-xs text-ink-700 overflow-auto max-h-40">
                         {errorInfo.componentStack}
                       </pre>
                     </div>
                   )}
 
                   <div>
-                    <h4 className="font-medium text-gray-800">環境情報:</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
+                    <h4 className="font-medium text-ink-900">環境情報:</h4>
+                    <ul className="text-sm text-ink-700 space-y-1">
                       <li>URL: {window.location.href}</li>
                       <li>User Agent: {navigator.userAgent}</li>
                       <li>Timestamp: {new Date().toISOString()}</li>
@@ -331,7 +331,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </details>
             )}
 
-            <div className="mt-6 text-xs text-gray-500">
+            <div className="mt-6 text-xs text-ink-500">
               <p>
                 問題が継続する場合は、
                 <a href="mailto:support@travelcanvas.app" className="text-blue-600 hover:underline">

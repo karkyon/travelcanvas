@@ -80,7 +80,7 @@ const AdoptionDialog: React.FC<Props> = ({ planId, branchId, isOpen, busy, onClo
         {preview && (
           <>
             <fieldset>
-              <legend className="font-medium text-gray-900">本案へ当てる変更</legend>
+              <legend className="font-medium text-ink-900">本案へ当てる変更</legend>
               <ul className="mt-1 space-y-1" aria-label="採用する変更">
                 {preview.items.map((i) => (
                   <li key={i.op_id}>
@@ -89,7 +89,7 @@ const AdoptionDialog: React.FC<Props> = ({ planId, branchId, isOpen, busy, onClo
                       <span>
                         {`${KIND_LABEL[i.kind]}・${OP_LABEL[i.op] ?? i.op}: ${i.label}`}
                         {i.requires.length > 0 && (
-                          <span className="block text-xs text-gray-700">
+                          <span className="block text-xs text-ink-700">
                             {`頼る変更: ${i.requires.map((r) => labels.get(r) ?? r).join('・')}`}
                           </span>
                         )}
@@ -118,7 +118,7 @@ const AdoptionDialog: React.FC<Props> = ({ planId, branchId, isOpen, busy, onClo
               </div>
             )}
             {preview.tasks.length > 0 && (
-              <div className="p-2 rounded-sm bg-gray-50 text-gray-900">
+              <div className="p-2 rounded-sm bg-gray-50 text-ink-900">
                 <p className="font-medium">採用すると準備の一覧に入るもの</p>
                 <ul className="list-disc pl-5">
                   {preview.tasks.map((t) => (
@@ -129,7 +129,7 @@ const AdoptionDialog: React.FC<Props> = ({ planId, branchId, isOpen, busy, onClo
               </div>
             )}
             {partial && (
-              <p className="text-xs text-gray-700">選ばなかった変更は本案へ当てません(この案は採用済みとして閉じます)。</p>
+              <p className="text-xs text-ink-700">選ばなかった変更は本案へ当てません(この案は採用済みとして閉じます)。</p>
             )}
           </>
         )}
@@ -140,7 +140,7 @@ const AdoptionDialog: React.FC<Props> = ({ planId, branchId, isOpen, busy, onClo
             {partial ? `選んだ${selected.size}件を採用` : 'すべて採用'}
           </Button>
         </div>
-        <p className="text-xs text-gray-700">採用は本案の「元に戻す」で取り消せます(予定・区間・予約の紐付け・作った準備が戻ります)。</p>
+        <p className="text-xs text-ink-700">採用は本案の「元に戻す」で取り消せます(予定・区間・予約の紐付け・作った準備が戻ります)。</p>
       </div>
     </Modal>
   );

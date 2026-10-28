@@ -200,10 +200,10 @@ const DayView: React.FC<DayViewProps> = ({
       <Card variant={isActive ? "elevated" : "default"} padding="md">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-ink-900">
               {day.date} ({getDayOfWeek(day.date)})
             </h3>
-            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+            <div className="flex items-center space-x-4 text-sm text-ink-700 mt-1">
               <span>📍 {timeStats.eventCount}件</span>
               <span>⏱️ {Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
               <span>💰 ¥{timeStats.totalCost.toLocaleString()}</span>
@@ -239,7 +239,7 @@ const DayView: React.FC<DayViewProps> = ({
         {day.events.length === 0 ? (
           /* 空の状態 */
           <Card variant="outlined" padding="lg">
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-ink-500">
               <div className="text-4xl mb-3">📅</div>
               <p className="text-lg font-medium mb-2">まだスケジュールがありません</p>
               <p className="text-sm mb-4">スポットを追加してプランを作成しましょう</p>
@@ -359,7 +359,7 @@ const DayView: React.FC<DayViewProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-ink-700 mb-1">
                   カテゴリ
                 </label>
                 <select
@@ -378,7 +378,7 @@ const DayView: React.FC<DayViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-ink-700 mb-1">
                   優先度
                 </label>
                 <select

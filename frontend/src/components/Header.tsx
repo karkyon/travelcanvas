@@ -17,6 +17,13 @@ import { useCurrentTripStore } from '../store/currentTripStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import CommandPaletteLauncher from './CommandPaletteLauncher';
+import { useThemePreference, type ThemePreference } from '../hooks/useThemePreference';
+
+const THEME_CHOICES: Array<{ value: ThemePreference; label: string }> = [
+  { value: 'light', label: '明るい' },
+  { value: 'dark', label: '暗い' },
+  { value: 'system', label: '端末' },
+];
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -24,6 +31,7 @@ const Header: React.FC = () => {
   const { user, logout, isAuthenticated, isGuest } = useAuthStore();
   const currentPlan = useCurrentTripStore((st) => st.trip);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   // [Gate #26] 以前は実データと無関係な固定の未読バッジ(常時点滅)だった。
   const [unreadCount, setUnreadCount] = useState(0);
@@ -122,7 +130,7 @@ const Header: React.FC = () => {
   // 認証されていないユーザーには最小限のヘッダーを表示
   if (!isAuthenticated && isAuthRequired()) {
     return (
-      <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-surface shadow-xs border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* ロゴのみ */}
@@ -131,7 +139,7 @@ const Header: React.FC = () => {
                 <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">TC</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">
+                <span className="text-xl font-bold text-ink-900">
                   TravelCanvas
                 </span>
               </Link>
@@ -141,7 +149,7 @@ const Header: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Link
                 to="/login"
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg transition-colors"
+                className="text-ink-700 hover:text-ink-900 px-3 py-2 rounded-lg transition-colors"
               >
                 ログイン
               </Link>
@@ -161,7 +169,7 @@ const Header: React.FC = () => {
   // 認証されていないユーザーがパブリックページにいる場合も最小限のヘッダー
   if (!isAuthenticated) {
     return (
-      <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-surface shadow-xs border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* ロゴ */}
@@ -170,7 +178,7 @@ const Header: React.FC = () => {
                 <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">TC</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">
+                <span className="text-xl font-bold text-ink-900">
                   TravelCanvas
                 </span>
               </Link>
@@ -180,7 +188,7 @@ const Header: React.FC = () => {
             <div className="flex items-center space-x-3">
               <Link
                 to="/login"
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg transition-colors"
+                className="text-ink-700 hover:text-ink-900 px-3 py-2 rounded-lg transition-colors"
               >
                 ログイン
               </Link>
@@ -306,19 +314,19 @@ const Header: React.FC = () => {
 
             {/* ユーザードロップダウン */}
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                <div className="px-4 py-2 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+              <div className="absolute right-0 mt-2 w-60 bg-cloud-0 text-ink-900 rounded-lg shadow-lg border border-cloud-200 py-1 z-10">
+                <div className="px-4 py-2 border-b border-cloud-200">
+                  <p className="text-sm font-medium text-ink-900 truncate">
                     {user?.username}
                   </p>
-                  <p className="text-xs text-gray-700 truncate">
+                  <p className="text-xs text-ink-700 truncate">
                     {user?.email}
                   </p>
                 </div>
 
                 <Link
                   to="/profile"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors"
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <User size={16} className="inline mr-2" aria-hidden="true" />
@@ -328,7 +336,7 @@ const Header: React.FC = () => {
                 {user?.user_type !== 'guest' && (
                   <Link
                     to="/organizations"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors"
                     onClick={() => setIsUserMenuOpen(false)}
                   >
                     <Building2 size={16} className="inline mr-2" aria-hidden="true" />
@@ -337,7 +345,7 @@ const Header: React.FC = () => {
                 )}
                 <Link
                   to="/settings"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors"
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <Settings size={16} className="inline mr-2" aria-hidden="true" />
@@ -345,19 +353,37 @@ const Header: React.FC = () => {
                 </Link>
                 <Link
                   to="/search/settings"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                  className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors"
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <Brain size={16} className="inline mr-2" aria-hidden="true" />
                   AI検索設定
                 </Link>
-                <hr className="my-1" />
+                {/* [Gate G10-UX] UX-8 見た目の切り替え(この端末。全ての画面に効く) */}
+                <div className="px-4 py-2 border-t border-cloud-200" role="group" aria-label="表示">
+                  <p className="text-xs text-ink-700 mb-1" aria-hidden="true">表示</p>
+                  <div className="flex gap-1">
+                    {THEME_CHOICES.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        aria-pressed={themePreference === c.value}
+                        onClick={(e) => { e.stopPropagation(); setThemePreference(c.value); }}
+                        className={`tc-focus-ring flex-1 min-h-9 px-2 rounded-md text-xs font-medium border ${themePreference === c.value
+                          ? 'bg-accent text-on-accent border-accent' : 'bg-cloud-0 text-ink-900 border-cloud-200 hover:bg-cloud-100'}`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <hr className="my-1 border-cloud-200" />
                 <button
                   onClick={() => {
                     setIsUserMenuOpen(false);
                     handleLogout();
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
+                  className="block w-full text-left px-4 py-2 text-sm text-danger hover:bg-danger-soft transition-colors"
                 >
                   <LogOut size={16} className="inline mr-2" aria-hidden="true" />
                   ログアウト

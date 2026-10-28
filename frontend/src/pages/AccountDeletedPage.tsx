@@ -29,9 +29,9 @@ const AccountDeletedPage: React.FC = () => {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12 text-center">
-      <h1 className="text-2xl font-bold text-gray-900">アカウントを削除しました</h1>
-      <p className="text-sm text-gray-700 mt-3">ご利用ありがとうございました。すべての端末でログアウトしました。</p>
-      <p className="text-sm text-gray-700 mt-1" role="status">
+      <h1 className="text-2xl font-bold text-ink-900">アカウントを削除しました</h1>
+      <p className="text-sm text-ink-700 mt-3">ご利用ありがとうございました。すべての端末でログアウトしました。</p>
+      <p className="text-sm text-ink-700 mt-1" role="status">
         {offlineCleared === null ? 'この端末に保存したオフラインデータを消しています…'
           : offlineCleared ? 'この端末に保存したオフラインデータも消しました。'
             : 'この端末のオフラインデータを消せませんでした。ブラウザのサイトデータを削除してください。'}

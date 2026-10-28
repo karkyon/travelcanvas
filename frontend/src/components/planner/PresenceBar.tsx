@@ -31,7 +31,7 @@ const PresenceBar: React.FC<Props> = ({
   return (
     <section aria-label="一緒に見ている人" className="mb-4 space-y-2" data-testid="presence-bar">
       {others.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-ink-700">
           <span className="font-medium">この旅行を開いている人:</span>
           {live && <span className="text-xs text-green-800" data-testid="presence-live">(変更はすぐに届きます)</span>}
           <ul className="flex flex-wrap gap-2" aria-label="開いている人の一覧">
@@ -56,7 +56,7 @@ const PresenceBar: React.FC<Props> = ({
         </div>
       )}
       {offline && (
-        <p className="text-xs text-gray-600">ほかの人の状況を確認できません(通信が戻ると自動で確認します)</p>
+        <p className="text-xs text-ink-700">ほかの人の状況を確認できません(通信が戻ると自動で確認します)</p>
       )}
     </section>
   );

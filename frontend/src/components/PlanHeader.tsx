@@ -207,25 +207,25 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 </TripCover>
                 
                 {plan.description && (
-                  <p className="text-gray-600 mb-3 leading-relaxed">{plan.description}</p>
+                  <p className="text-ink-700 mb-3 leading-relaxed">{plan.description}</p>
                 )}
 
                 {/* 基本情報 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-500">📍 目的地</span>
+                    <span className="text-ink-500">📍 目的地</span>
                     <div className="font-medium">{plan.destination || '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">📅 期間</span>
+                    <span className="text-ink-500">📅 期間</span>
                     <div className="font-medium">{planStats.daysDiff ? `${planStats.daysDiff}日間` : '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">👥 人数</span>
+                    <span className="text-ink-500">👥 人数</span>
                     <div className="font-medium">{plan.group_size ? `${plan.group_size}人` : '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-gray-500">💰 予算</span>
+                    <span className="text-ink-500">💰 予算</span>
                     <div className="font-medium">{plan.budget !== undefined && plan.budget !== null ? `¥${plan.budget.toLocaleString()}` : '未設定'}</div>
                   </div>
                 </div>
@@ -238,7 +238,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                       {plan.tags.map((tag, index) => (
                         <span
                           key={index}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                          className="px-2 py-1 bg-gray-100 text-ink-700 text-xs rounded-full"
                         >
                           #{tag}
                         </span>
@@ -329,19 +329,19 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{planStats.totalEvents}</div>
-                <div className="text-sm text-gray-600">総スポット数</div>
+                <div className="text-sm text-ink-700">総スポット数</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">¥{planStats.totalCost.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">総費用</div>
+                <div className="text-sm text-ink-700">総費用</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">{Math.floor(planStats.totalDuration / 60)}h</div>
-                <div className="text-sm text-gray-600">総所要時間</div>
+                <div className="text-sm text-ink-700">総所要時間</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">¥{planStats.averageCostPerDay.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">1日平均費用</div>
+                <div className="text-sm text-ink-700">1日平均費用</div>
               </div>
             </div>
           </div>
@@ -349,7 +349,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
           /* 編集モード */
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">プラン情報を編集</h2>
+              <h2 className="text-xl font-semibold text-ink-900">プラン情報を編集</h2>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={handleCancelEdit}>
                   キャンセル
@@ -369,7 +369,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
             />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink-700 mb-1">
                 説明
               </label>
               <textarea
@@ -412,7 +412,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
 
             {/* タグ編集 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink-700 mb-1">
                 タグ
               </label>
               <div className="space-y-2">
@@ -456,10 +456,10 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
         <Modal.Body>
           <div className="text-center">
             <div className="text-4xl mb-4">⚠️</div>
-            <p className="text-gray-700 mb-2">
+            <p className="text-ink-700 mb-2">
               「{plan.title}」を削除しますか？
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-500">
               削除から30日以内なら、プラン一覧の「最近削除したプラン」から復元できます。
             </p>
           </div>

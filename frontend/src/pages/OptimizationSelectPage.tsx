@@ -68,7 +68,7 @@ const OptimizationSelectPage: React.FC = () => {
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Sparkles className="w-7 h-7 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-900">AI最適化</h1>
+          <h1 className="text-2xl font-bold text-ink-900">AI最適化</h1>
         </div>
 
         {error && (
@@ -78,8 +78,8 @@ const OptimizationSelectPage: React.FC = () => {
         )}
 
         {!error && plans.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-gray-600 mb-4">
+          <div className="bg-surface rounded-lg shadow-sm p-6 text-center">
+            <p className="text-ink-700 mb-4">
               最適化できる旅行プランがまだありません。まずはプランを作成してください。
             </p>
             <Button onClick={() => navigate('/planner')}>プランを作成する</Button>
@@ -88,7 +88,7 @@ const OptimizationSelectPage: React.FC = () => {
 
         {!error && plans.length > 0 && (
           <>
-            <p className="text-gray-600 mb-4">
+            <p className="text-ink-700 mb-4">
               最適化するプランを選択してください。実行はプラン編集画面内の
               「AI最適化」パネルから行います。
             </p>
@@ -97,12 +97,12 @@ const OptimizationSelectPage: React.FC = () => {
                 <button
                   key={plan.id}
                   onClick={() => navigate(`/planner/${plan.id}`)}
-                  className="w-full flex items-center justify-between bg-white rounded-lg shadow-sm p-4 text-left hover:shadow-md transition-shadow"
+                  className="w-full flex items-center justify-between bg-surface rounded-lg shadow-sm p-4 text-left hover:shadow-md transition-shadow"
                 >
                   <div>
-                    <p className="font-semibold text-gray-900">{plan.title}</p>
+                    <p className="font-semibold text-ink-900">{plan.title}</p>
                     {plan.destination && (
-                      <p className="text-sm text-gray-500">{plan.destination}</p>
+                      <p className="text-sm text-ink-500">{plan.destination}</p>
                     )}
                   </div>
                   <ArrowRight className="w-5 h-5 text-gray-400" />

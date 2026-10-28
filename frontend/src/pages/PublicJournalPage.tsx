@@ -31,8 +31,8 @@ const PublicPhoto: React.FC<{ token: string; memoryId: string }> = ({ token, mem
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [token, memoryId]);
-  if (failed) return <p className="text-sm text-gray-700">写真を読み込めませんでした</p>;
-  if (!url) return <p className="text-sm text-gray-700">写真を読み込み中…</p>;
+  if (failed) return <p className="text-sm text-ink-700">写真を読み込めませんでした</p>;
+  if (!url) return <p className="text-sm text-ink-700">写真を読み込み中…</p>;
   return <img src={url} alt="旅の写真" className="max-h-80 rounded-lg border border-gray-200" />;
 };
 
@@ -53,19 +53,19 @@ const RouteSketch: React.FC<{ route: RoutePoint[] }> = ({ route }) => {
   if (!path) return null;
   return (
     <figure className="mt-4">
-      <svg viewBox="0 0 200 200" className="w-48 h-48 border border-gray-200 rounded-lg bg-white" role="img"
+      <svg viewBox="0 0 200 200" className="w-48 h-48 border border-gray-200 rounded-lg bg-surface" role="img"
         aria-label={`大まかな移動の形(${route.length}地点)`}>
         <path d={path} fill="none" stroke="#1d4ed8" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
-      <figcaption className="text-xs text-gray-700 mt-1">大まかな移動の形です(約1kmごとにまとめ、出発と帰着の近くは出していません)。</figcaption>
+      <figcaption className="text-xs text-ink-700 mt-1">大まかな移動の形です(約1kmごとにまとめ、出発と帰着の近くは出していません)。</figcaption>
     </figure>
   );
 };
 
 const MemoryItem: React.FC<{ token: string; memory: JournalMemory; photoIds: Set<string> }> = ({ token, memory, photoIds }) => (
   <li className="space-y-1">
-    {memory.body && <p className="text-gray-900 whitespace-pre-wrap">{memory.body}</p>}
-    {memory.place_name && <p className="text-sm text-gray-700">{memory.place_name}</p>}
+    {memory.body && <p className="text-ink-900 whitespace-pre-wrap">{memory.body}</p>}
+    {memory.place_name && <p className="text-sm text-ink-700">{memory.place_name}</p>}
     {memory.kind === 'photo' && photoIds.has(memory.id) && <PublicPhoto token={token} memoryId={memory.id} />}
   </li>
 );
@@ -99,8 +99,8 @@ const PublicJournalPage: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12">
-        <h1 className="text-xl font-bold text-gray-900">旅行記</h1>
-        <p className="mt-4 text-gray-800" role="alert">{error}</p>
+        <h1 className="text-xl font-bold text-ink-900">旅行記</h1>
+        <p className="mt-4 text-ink-900" role="alert">{error}</p>
       </div>
     );
   }
@@ -109,9 +109,9 @@ const PublicJournalPage: React.FC = () => {
 
   return (
     <article className="max-w-2xl mx-auto px-4 py-8" aria-label="公開した旅行記">
-      <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
+      <h1 className="text-2xl font-bold text-ink-900">{data.title}</h1>
       {data.published_at && (
-        <p className="text-sm text-gray-700 mt-1">{`${new Date(data.published_at).toLocaleDateString('ja-JP')} 公開`}</p>
+        <p className="text-sm text-ink-700 mt-1">{`${new Date(data.published_at).toLocaleDateString('ja-JP')} 公開`}</p>
       )}
       {data.route.length > 1 && <RouteSketch route={data.route} />}
       {data.days.map((d) => {
@@ -119,10 +119,10 @@ const PublicJournalPage: React.FC = () => {
         if (entries.length === 0 && d.day_memories.length === 0) return null;
         return (
           <section key={d.day_id} aria-label={d.date} className="mt-6">
-            <h2 className="text-lg font-semibold text-gray-900">{d.title ? `${d.date} ${d.title}` : d.date}</h2>
+            <h2 className="text-lg font-semibold text-ink-900">{d.title ? `${d.date} ${d.title}` : d.date}</h2>
             {entries.map((e) => (
               <article key={e.event_id} className="mt-3">
-                <h3 className="font-medium text-gray-900">{[e.planned_time, e.title].filter(Boolean).join(' ')}</h3>
+                <h3 className="font-medium text-ink-900">{[e.planned_time, e.title].filter(Boolean).join(' ')}</h3>
                 <ul className="mt-1 space-y-2">
                   {e.memories.map((v) => <MemoryItem key={v.id} token={token} memory={v} photoIds={photoIds} />)}
                 </ul>
@@ -138,13 +138,13 @@ const PublicJournalPage: React.FC = () => {
       })}
       {data.other_memories.length > 0 && (
         <section aria-label="そのほかの記録" className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-900">そのほかの記録</h2>
+          <h2 className="text-lg font-semibold text-ink-900">そのほかの記録</h2>
           <ul className="mt-2 space-y-2">
             {data.other_memories.map((v) => <MemoryItem key={v.id} token={token} memory={v} photoIds={photoIds} />)}
           </ul>
         </section>
       )}
-      <p className="text-xs text-gray-700 mt-10">TravelCanvas で作った旅行記です。</p>
+      <p className="text-xs text-ink-700 mt-10">TravelCanvas で作った旅行記です。</p>
     </article>
   );
 };

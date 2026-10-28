@@ -52,8 +52,8 @@ const PrivateProfilePanel: React.FC<Props> = ({ planId, onChanged }) => {
   return (
     <Card padding="md" className="mb-6">
       <section aria-labelledby="pp-panel-heading" className="space-y-2">
-        <h2 id="pp-panel-heading" className="text-base font-semibold text-gray-900">あなたの非公開の条件</h2>
-        <p className="text-sm text-gray-600">
+        <h2 id="pp-panel-heading" className="text-base font-semibold text-ink-900">あなたの非公開の条件</h2>
+        <p className="text-sm text-ink-700">
           登録した条件 {state.profile_items}件。
           {state.applied ? `この旅行に適用しています(${state.applied_constraints}件)。` : 'この旅行にはまだ適用していません。'}
           ほかの参加者には「秘匿制約を満たしていません」とだけ伝わります。

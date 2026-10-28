@@ -54,8 +54,8 @@ const DataPrivacyPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate('/settings')} className="mb-2">← 設定へ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">データとプライバシー</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">データとプライバシー</h1>
+      <p className="text-sm text-ink-700 mt-1">
         あなたのデータをファイルとして受け取れます。データの使い方への同意の変更、アカウントの削除、削除したデータがいつまで残るかの確認もできます。
       </p>
 
@@ -66,12 +66,12 @@ const DataPrivacyPage: React.FC = () => {
 
       <Card padding="md" className="mt-6">
         <section aria-labelledby="account-export">
-          <h2 id="account-export" className="font-semibold text-gray-900">アカウントのデータを書き出す</h2>
-          <p className="text-sm text-gray-700 mt-1">
+          <h2 id="account-export" className="font-semibold text-ink-900">アカウントのデータを書き出す</h2>
+          <p className="text-sm text-ink-700 mt-1">
             プロフィール、あなたが所有する旅行のすべてのデータ、参加している旅行であなたが作成・回答したもの、
             あなた宛ての通知を、1つのJSONファイルにまとめます。
           </p>
-          <ul className="text-sm text-gray-700 mt-2 list-disc pl-5 space-y-1">
+          <ul className="text-sm text-ink-700 mt-2 list-disc pl-5 space-y-1">
             <li>予約番号・PIN・名義・電話・チケットの中身は含めません。予約画面の「表示」で個別に確認できます。</li>
             <li>個人の持ち物・秘匿の条件・個人予算は、あなた本人の分だけを含めます。他の参加者の分は含めません。</li>
             <li>文書の原本ファイルは含めず、種類・サイズ・確認用のハッシュ値の一覧を含めます。原本は文書画面から取得できます。</li>
@@ -85,7 +85,7 @@ const DataPrivacyPage: React.FC = () => {
 
       <Card padding="md" className="mt-4">
         <section aria-labelledby="retention-heading">
-          <h2 id="retention-heading" className="font-semibold text-gray-900">削除したデータの保持期間</h2>
+          <h2 id="retention-heading" className="font-semibold text-ink-900">削除したデータの保持期間</h2>
           {loadError && <p className="text-sm text-red-800 mt-2" role="alert">{loadError}</p>}
           {!retention && !loadError ? (
             <div className="flex justify-center py-6"><LoadingSpinner /></div>
@@ -93,13 +93,13 @@ const DataPrivacyPage: React.FC = () => {
             <dl className="mt-2 divide-y" data-testid="retention-list">
               {retention.items.map((i) => (
                 <div key={i.key} className="py-2">
-                  <dt className="font-medium text-gray-900">{i.label}<span className="ml-2 text-sm font-normal text-gray-700">{i.period}</span></dt>
-                  <dd className="text-sm text-gray-700 mt-0.5">{i.note}</dd>
+                  <dt className="font-medium text-ink-900">{i.label}<span className="ml-2 text-sm font-normal text-ink-700">{i.period}</span></dt>
+                  <dd className="text-sm text-ink-700 mt-0.5">{i.note}</dd>
                 </div>
               ))}
             </dl>
           )}
-          <p className="text-sm text-gray-700 mt-3">旅行の削除は各旅行の画面から行えます。</p>
+          <p className="text-sm text-ink-700 mt-3">旅行の削除は各旅行の画面から行えます。</p>
         </section>
       </Card>
 

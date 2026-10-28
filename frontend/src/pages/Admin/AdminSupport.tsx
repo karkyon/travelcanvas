@@ -41,8 +41,8 @@ function bytes(n: number | null): string {
 
 const Stat: React.FC<{ label: string; value: string | number; warn?: boolean }> = ({ label, value, warn }) => (
   <div className={`rounded-lg border p-3 ${warn ? 'border-amber-400 bg-amber-50' : 'border-gray-200'}`}>
-    <p className="text-xs text-gray-700">{label}</p>
-    <p className="text-xl font-semibold text-gray-900">{value}</p>
+    <p className="text-xs text-ink-700">{label}</p>
+    <p className="text-xl font-semibold text-ink-900">{value}</p>
   </div>
 );
 
@@ -94,8 +94,8 @@ const AdminSupport: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">運用とサポート</h1>
-          <p className="text-gray-700 mt-1">この画面を見たこと・サポートで閲覧したことは監査に残ります。</p>
+          <h1 className="text-3xl font-bold text-ink-900">運用とサポート</h1>
+          <p className="text-ink-700 mt-1">この画面を見たこと・サポートで閲覧したことは監査に残ります。</p>
         </div>
         <Link to="/admin" className="text-blue-700 underline">管理者ダッシュボードへ</Link>
       </div>
@@ -104,7 +104,7 @@ const AdminSupport: React.FC = () => {
 
       {ops && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">運用の要約</h2>
+          <h2 className="text-xl font-semibold text-ink-900 mb-4">運用の要約</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat label="有効な共有リンク" value={ops.share_links.active} />
             <Stat label="うち編集できるリンク" value={ops.share_links.active_edit} warn={ops.share_links.active_edit > 0} />
@@ -120,23 +120,23 @@ const AdminSupport: React.FC = () => {
               warn={ops.purge.plans_due > 0} />
             <Stat label="ファイルの削除待ちの文書" value={ops.purge.documents_pending} />
           </div>
-          <p className="text-xs text-gray-600 mt-2">取得: {fmt(ops.timestamp)}</p>
+          <p className="text-xs text-ink-700 mt-2">取得: {fmt(ops.timestamp)}</p>
         </Card>
       )}
 
       <Card className="p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">有効な共有リンク</h2>
-        <p className="text-sm text-gray-700 mb-3">使用回数の多い順。旅行の名前・所有者・リンクの値は表示しません。</p>
-        {links.length === 0 ? <p className="text-sm text-gray-700">有効な共有リンクはありません。</p> : (
+        <h2 className="text-xl font-semibold text-ink-900 mb-2">有効な共有リンク</h2>
+        <p className="text-sm text-ink-700 mb-3">使用回数の多い順。旅行の名前・所有者・リンクの値は表示しません。</p>
+        {links.length === 0 ? <p className="text-sm text-ink-700">有効な共有リンクはありません。</p> : (
           <ul className="space-y-2">
             {links.map((l) => (
               <li key={l.id} className="border border-gray-200 rounded-lg p-3 text-sm">
-                <p className="text-gray-900"><code>{l.token_prefix}…</code>・{l.permission === 'edit' ? '編集できる' : '閲覧だけ'}
+                <p className="text-ink-900"><code>{l.token_prefix}…</code>・{l.permission === 'edit' ? '編集できる' : '閲覧だけ'}
                   ・{l.use_count}回{l.max_uses ? ` / 上限 ${l.max_uses}回` : ''}・{l.has_passcode ? '合言葉あり' : '合言葉なし'}
                   ・期限 {fmt(l.expires_at)}</p>
                 <div className="flex flex-wrap items-end gap-2 mt-2">
                   <div className="grow">
-                    <label htmlFor={`reason-${l.id}`} className="block text-xs text-gray-800">止める理由(所有者に伝わります)</label>
+                    <label htmlFor={`reason-${l.id}`} className="block text-xs text-ink-900">止める理由(所有者に伝わります)</label>
                     <input id={`reason-${l.id}`} value={reason[l.id] ?? ''} maxLength={200}
                       onChange={(e) => setReason({ ...reason, [l.id]: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2" />
@@ -159,20 +159,20 @@ const AdminSupport: React.FC = () => {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">サポートへの閲覧の許可</h2>
-        <p className="text-sm text-gray-700 mb-3">
+        <h2 className="text-xl font-semibold text-ink-900 mb-2">サポートへの閲覧の許可</h2>
+        <p className="text-sm text-ink-700 mb-3">
           利用者本人が作った、期限内の許可だけです。閲覧は読み取り専用で、閲覧するたびに本人へ知らせが届きます。
         </p>
-        {grants.length === 0 ? <p className="text-sm text-gray-700">有効な許可はありません。</p> : (
+        {grants.length === 0 ? <p className="text-sm text-ink-700">有効な許可はありません。</p> : (
           <ul className="space-y-2">
             {grants.map((g) => (
               <li key={g.id} className="border border-gray-200 rounded-lg p-3 text-sm flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="font-medium text-gray-900">{g.user_label}・{g.scope === 'plan' ? `旅行「${g.plan_title ?? ''}」` : 'アカウント'}</p>
-                  <p className="text-gray-700">目的: {g.purpose}{g.ticket_ref ? `(問い合わせ ${g.ticket_ref})` : ''}</p>
-                  <p className="text-gray-700">期限 {fmt(g.expires_at)}・閲覧 {g.access_count}回</p>
+                  <p className="font-medium text-ink-900">{g.user_label}・{g.scope === 'plan' ? `旅行「${g.plan_title ?? ''}」` : 'アカウント'}</p>
+                  <p className="text-ink-700">目的: {g.purpose}{g.ticket_ref ? `(問い合わせ ${g.ticket_ref})` : ''}</p>
+                  <p className="text-ink-700">期限 {fmt(g.expires_at)}・閲覧 {g.access_count}回</p>
                 </div>
-                {g.own ? <span className="text-gray-700">自分の許可は見られません</span> : (
+                {g.own ? <span className="text-ink-700">自分の許可は見られません</span> : (
                   <button type="button" disabled={busy} className={`${btn} bg-blue-700 text-white hover:bg-blue-800`}
                     aria-label={`${g.user_label} の許可(${g.scope === 'plan' ? `旅行「${g.plan_title ?? ''}」` : 'アカウント'})で閲覧する`}
                     onClick={() => void run(async () => setView(await viewAdminSupportGrant(g.id)))}>
@@ -188,17 +188,17 @@ const AdminSupport: React.FC = () => {
       {view && (
         <Card className="p-6">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <h2 className="text-xl font-semibold text-gray-900">閲覧中(読み取り専用): {view.grant.user_label}</h2>
+            <h2 className="text-xl font-semibold text-ink-900">閲覧中(読み取り専用): {view.grant.user_label}</h2>
             <button type="button" className={`${btn} border border-gray-300`} onClick={() => setView(null)}>閉じる</button>
           </div>
-          <p className="text-sm text-gray-700 mb-3">住所・メモの本文・位置・予約番号・文書の中身は表示しません(有無だけ)。</p>
+          <p className="text-sm text-ink-700 mb-3">住所・メモの本文・位置・予約番号・文書の中身は表示しません(有無だけ)。</p>
           {view.plan && (
             <div className="space-y-3 text-sm" aria-label="旅行の内容(読み取り専用)">
-              <p className="text-gray-900">{view.plan.title}・{view.plan.destination ?? '目的地なし'}・{view.plan.status ?? ''}
+              <p className="text-ink-900">{view.plan.title}・{view.plan.destination ?? '目的地なし'}・{view.plan.status ?? ''}
                 ・版 {view.plan.revision}・参加者 {view.plan.collaborators}人{view.plan.deleted ? '・削除済み' : ''}</p>
               {view.plan.days.map((d) => (
                 <div key={d.id}>
-                  <p className="font-medium text-gray-900">{d.local_date} {d.title ?? ''}({d.timezone_id})</p>
+                  <p className="font-medium text-ink-900">{d.local_date} {d.title ?? ''}({d.timezone_id})</p>
                   <ul className="ml-4 list-disc">
                     {d.events.map((e) => (
                       <li key={e.id}>{e.local_start_time ?? (e.is_all_day ? '終日' : '時刻なし')} {e.title}({e.event_type})
@@ -208,19 +208,19 @@ const AdminSupport: React.FC = () => {
                   </ul>
                 </div>
               ))}
-              <p className="font-medium text-gray-900">予約</p>
+              <p className="font-medium text-ink-900">予約</p>
               <ul className="ml-4 list-disc">
                 {view.plan.reservations.map((r) => (
                   <li key={r.id}>{r.type}・{r.provider_name ?? '施設名なし'}・{r.status}・{fmt(r.start_at)}・予約番号 {r.confirmation_number ?? 'なし'}</li>
                 ))}
               </ul>
-              <p className="text-gray-900">文書: {Object.entries(view.plan.documents_by_classification)
+              <p className="text-ink-900">文書: {Object.entries(view.plan.documents_by_classification)
                 .map(([k, v]) => `${k} ${v}件`).join('・') || 'なし'}</p>
             </div>
           )}
           {view.account && (
             <div className="space-y-2 text-sm" aria-label="アカウントの概要(読み取り専用)">
-              <p className="text-gray-900">{view.account.username ?? '(名前なし)'}・{view.account.user_type}
+              <p className="text-ink-900">{view.account.username ?? '(名前なし)'}・{view.account.user_type}
                 ・{view.account.is_active ? '有効' : '停止中'}・登録 {fmt(view.account.created_at)}</p>
               <ul className="ml-4 list-disc">
                 {view.account.plans.map((p) => (

@@ -57,7 +57,7 @@ const IncomingTransfers: React.FC = () => {
   return (
     <Card padding="md" className="mb-6">
       <section aria-labelledby="incoming-transfers">
-        <h2 id="incoming-transfers" className="font-semibold text-gray-900 flex items-center gap-2">
+        <h2 id="incoming-transfers" className="font-semibold text-ink-900 flex items-center gap-2">
           <KeyRound size={18} aria-hidden="true" />所有者の移譲の申し出
         </h2>
         <div aria-live="polite">{message && <p className="text-sm text-green-800 mt-2" role="status">{message}</p>}</div>
@@ -65,14 +65,14 @@ const IncomingTransfers: React.FC = () => {
         <ul className="mt-2 space-y-3">
           {items.map((t) => (
             <li key={t.id} className="border rounded-sm p-3" data-testid={`incoming-transfer-${t.id}`}>
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-ink-900">
                 {`${t.from_name} さんから「${t.plan_title ?? '旅行'}」の所有者を引き継ぐ申し出(期限 ${new Date(t.expires_at).toLocaleString('ja-JP')})`}
               </p>
-              <p className="text-xs text-gray-700 mt-1">{KEEP[t.keep_role]}</p>
-              {t.message && <p className="text-sm text-gray-800 mt-1">{`ひとこと: ${t.message}`}</p>}
+              <p className="text-xs text-ink-700 mt-1">{KEEP[t.keep_role]}</p>
+              {t.message && <p className="text-sm text-ink-900 mt-1">{`ひとこと: ${t.message}`}</p>}
               <div className="flex flex-wrap items-end gap-2 mt-2">
                 <div>
-                  <label htmlFor={`transfer-pw-${t.id}`} className="block text-xs text-gray-800">受け入れるにはパスワード</label>
+                  <label htmlFor={`transfer-pw-${t.id}`} className="block text-xs text-ink-900">受け入れるにはパスワード</label>
                   <input id={`transfer-pw-${t.id}`} type="password" autoComplete="current-password"
                     className="border rounded-sm px-2 py-1 text-sm" value={passwords[t.id] ?? ''}
                     onChange={(e) => setPasswords((p) => ({ ...p, [t.id]: e.target.value }))} />

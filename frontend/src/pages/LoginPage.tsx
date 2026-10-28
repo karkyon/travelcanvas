@@ -25,13 +25,13 @@ const MfaLoginStep: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   return (
     <form onSubmit={submit} className="space-y-6" aria-labelledby="mfa-login-heading">
       <div>
-        <h3 id="mfa-login-heading" className="text-lg font-semibold text-gray-900 mb-2">確認コードの入力</h3>
-        <p className="text-sm text-gray-700">
+        <h3 id="mfa-login-heading" className="text-lg font-semibold text-ink-900 mb-2">確認コードの入力</h3>
+        <p className="text-sm text-ink-700">
           認証アプリに表示されている6桁の確認コードを入力してください。端末が手元に無い時は、回復コードも使えます。
         </p>
       </div>
       <div>
-        <label htmlFor="mfa-code" className="block text-sm font-medium text-gray-700 mb-2">確認コード</label>
+        <label htmlFor="mfa-code" className="block text-sm font-medium text-ink-700 mb-2">確認コード</label>
         <input
           id="mfa-code"
           name="mfa-code"
@@ -126,13 +126,13 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
-        <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
+        <div className="bg-surface shadow-2xl rounded-2xl overflow-hidden">
           <div className="px-8 py-10">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-3xl font-bold text-ink-900 mb-2">
                 TravelCanvas
               </h2>
-              <p className="text-gray-600">Sign in to your account</p>
+              <p className="text-ink-700">Sign in to your account</p>
             </div>
             
             {pendingMfa ? (
@@ -140,7 +140,7 @@ const LoginPage = () => {
             ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-ink-700 mb-2">
                   Email
                 </label>
                 <input
@@ -158,7 +158,7 @@ const LoginPage = () => {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-ink-700 mb-2">
                   Password
                 </label>
                 <input
@@ -199,7 +199,7 @@ const LoginPage = () => {
               </div>
 
               <div className="text-center">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-ink-700">
                   Don't have an account?{' '}
                   <Link 
                     to="/register" 

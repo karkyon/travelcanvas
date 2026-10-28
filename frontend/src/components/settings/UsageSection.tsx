@@ -15,8 +15,8 @@ const UsageSection: React.FC = () => {
   }, []);
   return (
     <section aria-labelledby="usage-heading" className="space-y-3">
-      <h2 id="usage-heading" className="text-lg font-semibold text-gray-900">今月の使用量{usage ? `(${usage.period})` : ''}</h2>
-      {failed && <p className="text-sm text-gray-700">使用量を取得できませんでした。時間をおいて開き直してください。</p>}
+      <h2 id="usage-heading" className="text-lg font-semibold text-ink-900">今月の使用量{usage ? `(${usage.period})` : ''}</h2>
+      {failed && <p className="text-sm text-ink-700">使用量を取得できませんでした。時間をおいて開き直してください。</p>}
       {usage && <UsageList usage={usage} />}
     </section>
   );

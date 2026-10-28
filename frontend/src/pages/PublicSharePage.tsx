@@ -128,7 +128,7 @@ const PublicSharePage: React.FC = () => {
 
   const explained = plan?.policy_explained ?? info?.policy_explained ?? null;
   const policyPanel = explained ? (
-    <details className="mt-4 text-sm text-gray-800 bg-white rounded-lg border p-3">
+    <details className="mt-4 text-sm text-ink-900 bg-surface rounded-lg border p-3">
       <summary className="cursor-pointer font-medium">この共有で見える情報</summary>
       <p className="mt-2">いつも見える: {explained.always.join('・')}</p>
       {explained.shown.length > 0 && <p>共有された項目: {explained.shown.map((x) => x.label).join('・')}</p>}
@@ -177,10 +177,10 @@ const PublicSharePage: React.FC = () => {
   if (state === 'invalid') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-xs p-8 text-center">
+        <div className="max-w-md w-full bg-surface rounded-xl shadow-xs p-8 text-center">
           <AlertCircle size={48} className="mx-auto mb-4 text-red-400" aria-hidden="true" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2">このリンクは無効です</h1>
-          <p className="text-gray-600 text-sm">
+          <h1 className="text-xl font-bold text-ink-900 mb-2">このリンクは無効です</h1>
+          <p className="text-ink-700 text-sm">
             共有リンクが失効しているか、有効期限が切れているか、使用回数の上限に達しています。
             プランの共有者に新しいリンクの発行を依頼してください。
           </p>
@@ -192,14 +192,14 @@ const PublicSharePage: React.FC = () => {
   if (state === 'needs_passcode') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-xs p-8">
+        <div className="max-w-md w-full bg-surface rounded-xl shadow-xs p-8">
           <Lock size={40} className="mx-auto mb-4 text-blue-500" aria-hidden="true" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">パスコードが必要です</h1>
-          <p className="text-gray-600 text-sm mb-6 text-center">
+          <h1 className="text-xl font-bold text-ink-900 mb-2 text-center">パスコードが必要です</h1>
+          <p className="text-ink-700 text-sm mb-6 text-center">
             このプランを閲覧するにはパスコードの入力が必要です。
           </p>
           {info?.expires_at && (
-            <p className="text-xs text-gray-700 mb-4 text-center">有効期限: {new Date(info.expires_at).toLocaleString('ja-JP')}</p>
+            <p className="text-xs text-ink-700 mb-4 text-center">有効期限: {new Date(info.expires_at).toLocaleString('ja-JP')}</p>
           )}
           <form onSubmit={handleSubmitPasscode} className="space-y-4">
             <label htmlFor="public-share-passcode" className="sr-only">パスコード</label>
@@ -243,7 +243,7 @@ const PublicSharePage: React.FC = () => {
           </div>
           <button
             onClick={handleShare}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-ink-700 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
           >
             <Share2 size={14} aria-hidden="true" />
             共有
@@ -254,13 +254,13 @@ const PublicSharePage: React.FC = () => {
         <div className="flex flex-wrap gap-2 mb-3">
           {viewToken && (
             <button type="button" onClick={() => void reload()}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-ink-900 bg-surface">
               <RefreshCw size={14} aria-hidden="true" />最新を読み込む
             </button>
           )}
           {plan.allow_clone && viewToken && (
             <button type="button" onClick={() => void clone()}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-ink-900 bg-surface">
               <Copy size={14} aria-hidden="true" />自分の旅行として複製
             </button>
           )}
@@ -270,12 +270,12 @@ const PublicSharePage: React.FC = () => {
         {policyPanel}
         <div className="mt-6 text-sm">
           {!reportOpen ? (
-            <button type="button" onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1 text-gray-700 underline">
+            <button type="button" onClick={() => setReportOpen(true)} className="inline-flex items-center gap-1 text-ink-700 underline">
               <Flag size={14} aria-hidden="true" />問題を報告
             </button>
           ) : (
-            <form onSubmit={report} aria-label="問題を報告" className="bg-white border rounded-lg p-3 space-y-2">
-              <label className="block text-gray-800">問題の種類
+            <form onSubmit={report} aria-label="問題を報告" className="bg-surface border rounded-lg p-3 space-y-2">
+              <label className="block text-ink-900">問題の種類
                 <select className="ml-2 border rounded-sm px-2 py-1" value={reason} onChange={(e) => setReason(e.target.value as AbuseReason)}>
                   <option value="phishing">詐欺・なりすまし(ログインや支払いを求める)</option>
                   <option value="malware">有害なファイル・リンク</option>
@@ -284,7 +284,7 @@ const PublicSharePage: React.FC = () => {
                   <option value="other">その他</option>
                 </select>
               </label>
-              <label className="block text-gray-800">詳しく(任意)
+              <label className="block text-ink-900">詳しく(任意)
                 <textarea className="mt-1 w-full border rounded-sm px-2 py-1" rows={2} maxLength={500} value={reportNote}
                   onChange={(e) => setReportNote(e.target.value)} />
               </label>

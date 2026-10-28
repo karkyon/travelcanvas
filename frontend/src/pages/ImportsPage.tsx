@@ -47,7 +47,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   review_required: 'bg-amber-100 text-amber-800',
   confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-gray-100 text-gray-700',
+  rejected: 'bg-gray-100 text-ink-700',
 };
 
 const FIELD_PATH_OPTIONS: { value: ImportFieldPath; label: string }[] = [
@@ -226,7 +226,7 @@ const ImportsPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-500">
+      <div className="p-8 text-center text-ink-500">
         プランが選択されていません。
         <div className="mt-4">
           <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
@@ -242,8 +242,8 @@ const ImportsPage: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
             ← プランへ戻る
           </Button>
-          <h1 className="text-2xl font-bold text-gray-900">予約取込</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-ink-900">予約取込</h1>
+          <p className="text-sm text-ink-700 mt-1">
             メール・確認書等の内容を手動で登録し、レビューのうえ予約として確定できます。
           </p>
         </div>
@@ -259,7 +259,7 @@ const ImportsPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : jobs.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-600">
+        <Card padding="lg" className="text-center text-ink-700">
           取込ジョブがまだありません。「新規取込」から追加できます。
         </Card>
       ) : (
@@ -276,10 +276,10 @@ const ImportsPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-gray-900">取込ジョブ({formatDateTime(j.created_at)})</div>
-                      <div className="text-sm text-gray-600">provider: {j.provider}</div>
+                      <div className="font-medium text-ink-900">取込ジョブ({formatDateTime(j.created_at)})</div>
+                      <div className="text-sm text-ink-700">provider: {j.provider}</div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-ink-700'}`}>
                       {STATUS_LABEL[j.status] ?? j.status}
                     </span>
                   </div>
@@ -294,7 +294,7 @@ const ImportsPage: React.FC = () => {
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="新規取込ジョブ" size="sm">
         <form onSubmit={handleCreate}>
           <Modal.Body>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-ink-700 mb-4">
               メールや確認書の内容を、次の画面で1項目ずつ手動登録できます
               (自動抽出には対応していません)。
             </p>
@@ -327,7 +327,7 @@ const ImportsPage: React.FC = () => {
             <Modal.Body>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[selected.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[selected.status] ?? 'bg-gray-100 text-ink-700'}`}>
                     {STATUS_LABEL[selected.status] ?? selected.status}
                   </span>
                   {selected.result_reservation_id && (
@@ -336,22 +336,22 @@ const ImportsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-gray-700 mb-2">抽出候補</div>
+                  <div className="text-sm font-medium text-ink-700 mb-2">抽出候補</div>
                   <div className="space-y-2 mb-3">
                     {selected.candidates.length === 0 && (
-                      <div className="text-sm text-gray-600">候補がまだ登録されていません</div>
+                      <div className="text-sm text-ink-700">候補がまだ登録されていません</div>
                     )}
                     {selected.candidates.map((c) => (
                       <div key={c.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2">
                         <div className="min-w-0">
                           <span className="font-medium">{c.field_path}</span>
-                          <span className="text-gray-600"> = </span>
+                          <span className="text-ink-700"> = </span>
                           <span className="truncate">{c.value}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={
                             c.review_status === 'accepted' ? 'text-xs text-green-700'
-                            : c.review_status === 'rejected' ? 'text-xs text-gray-600' : 'text-xs text-amber-800'
+                            : c.review_status === 'rejected' ? 'text-xs text-ink-700' : 'text-xs text-amber-800'
                           }>
                             {c.review_status === 'accepted' ? '承認済み' : c.review_status === 'rejected' ? '却下済み' : '未レビュー'}
                           </span>
@@ -373,7 +373,7 @@ const ImportsPage: React.FC = () => {
                   {selected.status === 'review_required' && (
                     <form onSubmit={handleAddCandidate} className="flex flex-wrap gap-2 items-end">
                       <div>
-                        <label htmlFor="import-candidate-field" className="block text-xs text-gray-600 mb-1">項目</label>
+                        <label htmlFor="import-candidate-field" className="block text-xs text-ink-700 mb-1">項目</label>
                         <select
                           id="import-candidate-field"
                           value={newFieldPath}

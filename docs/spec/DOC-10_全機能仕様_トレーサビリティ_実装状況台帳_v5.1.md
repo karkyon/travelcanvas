@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r21** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-28  
+> 文書ID: DOC-10 / 版: **v5.1-r22** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-28  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,9 +14,9 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `3c23828`(Gate G9 後半 PR #5。この後に、この版を入れる Gate G10-Q の commit が続く) |
+| 基準commit | `e39d5e7`(Gate G10-Q PR #6。この後に、この版を入れる Gate G10-UX の commit が続く) |
 | Alembic head | `f4d8a2c6e9b1`(単一の head。G7 `e8b2c6d0f4a7` の後、G8 で案の中の区間・予約・所有者の移譲・訂正・定期の処理の記録) |
-| 基準の試験の実測(サンドボックス、G10-Q) | backend pytest 1239 合格・2 飛ばし / frontend vitest 838 合格(167 ファイル)・標準エラー 0 行 / E2E 79 合格・再試行 0(本番用の配信 static-server.mjs。account-deletion は通常・計算の確認を常に求める設定の両方で連続 20 回合格)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 423.78 kB(上限 430 kB) |
+| 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 851 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.08 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
@@ -163,7 +163,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | 試験の品質(G3) | 単体試験の標準エラー 0 行・本物の通信の禁止・再試行なし(vitest)。E2E の flaky を別に数え issue 化。coverage・migration の構造の差分・mypy の基準(増やさない)。**G10-Q: mypy 0 件(models を SQLAlchemy 2.0 の型付きの列へ・不要な type: ignore も失敗)・ORM と migration の列・型・NULL の一致を試験・V3 再監査の規則 R1〜R8 を CI で検査(`scripts/ci/audit_v3.py`)** | `scripts/ci/`、`backend/mypy-baseline.txt`、`backend/tests/test_gate_g10_quality.py` |
 | 性能(G3) | 外部キーの索引の欠落 0・主な API の SQL の数が件数で増えない(N+1)・主な問い合わせの索引の使用。毎晩、予定 10,000・通知 100,000 で p95。**G10-Q: `99744c3` から落ちていた毎晩の検査を修正(一括の INSERT の分割を1文として数える・古い判定の記録の削除を1文に)** | `backend/tests/test_gate_g3_perf.py`、`.github/workflows/perf.yml` |
 | 画面の配信(G3) | `vite preview` をやめ、依存なしの本番用の配信(CSP・キャッシュ・圧縮・SPA) | `frontend/server/static-server.mjs` |
-| 見た目の基準(G9) | UX-0 今の6画面の記録(PC・スマホ)と壊してはいけない所の E2E、UX-1 デザインの決まり(色・面4種類・文字と地の AA・暗い見た目)と一覧 `/design-system` | `docs/ux/UX-0_baseline.md`、`frontend/e2e/ux-baseline.spec.ts`、`frontend/src/styles/tokens.ts`、`docs/adr/ADR-design-tokens.md` |
+| 見た目の基準(G9) | UX-0 今の6画面の記録(PC・スマホ)と壊してはいけない所の E2E、UX-1 デザインの決まり(色・面4種類・文字と地の AA・暗い見た目)と一覧 `/design-system`。**G10-UX: UX-8 暗い見た目を全ての画面へ(`<html data-theme>`・今の色のクラスの橋渡しの生成 CSS、漏れ 0・置き換えた文字は 4.5:1 以上)・UX-6 共通の部品を決まりへ(直書きの色のクラス 3,338 → 1,632、増やさない)・UX-5 当日の画面(今・次・この後・下の固定の操作)** | `docs/ux/UX-0_baseline.md`、`frontend/e2e/ux-baseline.spec.ts`、`frontend/src/styles/tokens.ts`、`docs/adr/ADR-design-tokens.md`、`frontend/src/styles/darkBridge.ts`、`frontend/e2e/gate-g10-ux.spec.ts` |
 | エラーの説明(G3) | 全てのエラーの応答に問い合わせ番号・再試行の可否・code。一覧はコードから生成 | `docs/spec/error-catalog.md` |
 | 運用 | バックアップ・別DBへの復元演習・監視・ログの漏れの検査・封じ込め・**G1: 鍵の点検と版の切り替え(`tcops.py keys`)** | `docs/ops/RUNBOOK.md`、`docs/ops/KEY-INVENTORY.md` |
 
@@ -207,8 +207,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | 5c | G7(済) | 移動の既定の滞在・疲れと休憩・最終の便(MOVE-03)・目的の内訳と部分の採用(MOVE-04)・記録の残り(MEM-03)・日をまたぐ予定・もしもの比較・猶予つきの削除 | あり | なし |
 | 5d | **G8・G9 前半(本版)** | 案の中の区間・予約の変更と選んだ変更だけの採用・所有者の移譲・出典つきの訂正・定期の処理の記録・2つの端末の同時の編集(G8)、最初に読む JS 430kB・今の画面の記録・デザインの決まり(G9 Q03・UX-0・UX-1) | あり | なし |
 | 5e | G9 後半(済) | UX-2 旅行の表紙・UX-3 見出し・UX-4 文脈型ダッシュボード | なし | 見た目の確認 |
-| 5f | **G10-Q(本版)** | V3 再監査(R1〜R8)・account-deletion の不安定の根治・mypy 0・毎晩の perf の修正・計算の確認の点数 | なし | なし |
-| 5g | G10-UX | UX-5 当日の画面・UX-6 共通の部品の置き換え・UX-8 暗い見た目を全体へ | なし | 見た目の確認 |
+| 5f | G10-Q(済) | V3 再監査(R1〜R8)・account-deletion の不安定の根治・mypy 0・毎晩の perf の修正・計算の確認の点数 | なし | なし |
+| 5g | **G10-UX(本版)** | UX-5 当日の画面・UX-6 共通の部品の置き換え(残りの直書きの色 1,632 件は画面ごとに下げる)・UX-8 暗い見た目を全体へ | なし | 見た目の確認 |
 | 5h | G11-Media / G12-Self | 旅行の写真の表紙(EXIF の除去・非公開の保存)/ 外部の提供元の要らない残り(Undo・投票・URL の題名・即時の通知・取り込み・埋め込み) | 場合により | なし |
 | 6 | PROD-1・2 | HTTPS・WAF・private origin・Cloud SQL・Redis・GCS・ClamAV・別系統のバックアップ・外部監視・KMS | 場合により | GCP の project・domain・費用 |
 | 7 | MAP-P / OCR-P | 地図・経路・ジオコード・OCR・天気・メールの提供元 | cache 等 | 契約・API キー |
@@ -234,7 +234,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r18 | 2026-10-23 | `f327971`+G3+G4+G5 | Gate G6: オフラインの端末ごとの鍵(期限・1台だけの失効・失効した端末の消去。OFF-01)・日程と並びのオフラインの編集と依存の順・予約はオンラインだけ(OFF-02)・守る範囲と書き出し・公開での位置のぼかし(LOC-02)・旅行記の公開と失効・記録の削除の取り消し(MEM-01)。FR-048 を VERIFIED。FR-051 は(部分)を外した。FR-037 は顔の検査・MEMORY MAP(外部の提供元)が残るため(部分)のまま。`docs/trace/gate-g6-trace.md` |
 | r19 | 2026-10-26 | `2576a91` | **Gate G7: 移動・滞在の既定・休憩の自動判定・日ごとの疲れ・最終の便(MOVE-03)・目的の内訳・条件の変更・選んだ予定だけの採用(MOVE-04)・同じ同行者と移動手段の傾向(MEM-03)・日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグ(FR-005)・本案と案の比較(FR-019)・猶予つきのアカウントの削除(FR-039)。FR-005・FR-057 を VERIFIED。FR-017 は時刻表の照合だけが残る。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま。`docs/trace/gate-g7-trace.md` |
 | r20 | 2026-10-27 | `083e6b1` | Gate G8: 案の中の移動区間・予約の変更と選んだ変更だけの採用・予約の取消の手続き(FR-019)・所有者の移譲(FR-021・FR-039)・出典・確認・履歴つきの訂正と所有者への訂正の申し出(FR-039)・定期の処理の実行の記録と遅れ・失敗の監視・2つの端末の同時の編集の E2E(FR-004)・訪問の訂正の証拠の整理(FR-051)。FR-004・FR-019・FR-039・FR-051 を VERIFIED。Gate G9 前半: 最初に読む JS の上限 430kB(Q03)・今の6画面の記録と壊してはいけない所の E2E(UX-0)・デザインの決まり(UX-1)。`docs/trace/gate-g8-trace.md` |
-| **r21** | 2026-10-28 | `3c23828` | **Gate G10-Q: V3 再監査(`scripts/ci/audit_v3.py` の R1〜R8。誤った VERIFIED 0、FR-001・002・006・044 の E2E に FR 番号を記載)・account-deletion の E2E の不安定の根治(削除の後の 401 で /login へ移さない)・mypy 1,382 → 0・毎晩の perf の修正・計算の確認の最初の1回を点数にしない。FR の状態の遷移なし。`docs/trace/gate-g10q-trace.md`** |
+| r21 | 2026-10-28 | `3c23828` | Gate G10-Q: V3 再監査(`scripts/ci/audit_v3.py` の R1〜R8。誤った VERIFIED 0、FR-001・002・006・044 の E2E に FR 番号を記載)・account-deletion の E2E の不安定の根治(削除の後の 401 で /login へ移さない)・mypy 1,382 → 0・毎晩の perf の修正・計算の確認の最初の1回を点数にしない。FR の状態の遷移なし。`docs/trace/gate-g10q-trace.md` |
+| **r22** | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

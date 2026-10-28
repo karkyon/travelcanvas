@@ -39,19 +39,19 @@ const AlertCard: React.FC<{
     <Card padding="md">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-medium text-gray-900">
+          <p className="font-medium text-ink-900">
             <span className="mr-2 text-xs px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-900">{alert.kind_label}</span>
             {target}
-            {alert.delay_minutes !== null && <span className="ml-2 text-sm text-gray-800">約{alert.delay_minutes}分の遅れ</span>}
+            {alert.delay_minutes !== null && <span className="ml-2 text-sm text-ink-900">約{alert.delay_minutes}分の遅れ</span>}
           </p>
-          <p className="text-xs text-gray-700 mt-1">
+          <p className="text-xs text-ink-700 mt-1">
             {`${alert.source_label ?? SOURCE_LABEL[alert.source]} ・ ${formatObserved(alert.observed_at)} ・ ${CONFIDENCE_LABEL[alert.confidence]} ・ ${STATUS_LABEL[alert.status]}`}
             {alert.latest_replan_status && ` ・ 再計画: ${REPLAN_STATE_LABEL[alert.latest_replan_status]}`}
           </p>
           {alert.is_stale && active && (
             <p className="text-xs text-red-800 mt-1">取得から3時間以上たった情報です。最新の状況を確認してください</p>
           )}
-          {alert.note && <p className="text-sm text-gray-800 mt-1 wrap-break-word">{alert.note}</p>}
+          {alert.note && <p className="text-sm text-ink-900 mt-1 wrap-break-word">{alert.note}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {alert.latest_replan_id && (
@@ -164,7 +164,7 @@ const AlertsPage: React.FC = () => {
     }
   };
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
   const canEdit = list?.can_edit ?? false;
   const active = list?.alerts.filter((a) => a.status === 'active') ?? [];
   const closed = list?.alerts.filter((a) => a.status !== 'active') ?? [];
@@ -176,12 +176,12 @@ const AlertsPage: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/today`)}>☀️ 今日の画面</Button>
       </div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">遅延・休業などへの対応</h1>
-        <button type="button" onClick={load} aria-label="再読み込み" className="text-gray-700 hover:text-blue-700 p-2">
+        <h1 className="text-2xl font-bold text-ink-900">遅延・休業などへの対応</h1>
+        <button type="button" onClick={load} aria-label="再読み込み" className="text-ink-700 hover:text-blue-700 p-2">
           <RefreshCw size={20} />
         </button>
       </div>
-      <p className="text-sm text-gray-700 mt-1">
+      <p className="text-sm text-ink-700 mt-1">
         遅延・運休・休業・天候を登録すると、予約付きの予定を守る代わりの案を2つ作って比べられます。承認するまで旅程は変わりません。
       </p>
 
@@ -194,17 +194,17 @@ const AlertsPage: React.FC = () => {
         <>
           {list && list.detected.length > 0 && (
             <section aria-labelledby="detected-heading" className="mt-6">
-              <h2 id="detected-heading" className="font-semibold text-gray-900 mb-2">登録済み経路で見つかった遅延・運休</h2>
+              <h2 id="detected-heading" className="font-semibold text-ink-900 mb-2">登録済み経路で見つかった遅延・運休</h2>
               <ul className="space-y-2" aria-label="見つかった遅延・運休">
                 {list.detected.map((d) => (
                   <li key={d.event_id}>
                     <Card padding="md" className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-ink-900">
                           <AlertTriangle size={16} aria-hidden="true" className="inline mr-1 text-amber-700" />
                           {`${d.local_date ?? ''} ${d.event_local_start_time ?? ''} ${d.event_title}へ向かう経路が${d.transport_status === 'cancelled' ? '運休' : '遅延'}`}
                         </p>
-                        <p className="text-xs text-gray-700 mt-1">
+                        <p className="text-xs text-ink-700 mt-1">
                           {`${SOURCE_LABEL.route_status} ・ ${formatObserved(d.observed_at)}`}
                           {d.is_stale && ' ・ 取得から3時間以上たった情報です'}
                         </p>
@@ -218,9 +218,9 @@ const AlertsPage: React.FC = () => {
           )}
 
           <section aria-labelledby="alert-list-heading" className="mt-6">
-            <h2 id="alert-list-heading" className="font-semibold text-gray-900 mb-2">対応中の状況</h2>
+            <h2 id="alert-list-heading" className="font-semibold text-ink-900 mb-2">対応中の状況</h2>
             {active.length === 0 ? (
-              <Card padding="lg" className="text-center text-gray-700">対応中の状況はありません。</Card>
+              <Card padding="lg" className="text-center text-ink-700">対応中の状況はありません。</Card>
             ) : (
               <ul className="space-y-2" aria-label="対応中の状況">
                 {active.map((a) => (
@@ -236,33 +236,33 @@ const AlertsPage: React.FC = () => {
           {canEdit && (
             <Card padding="md" className="mt-6">
               <form onSubmit={submit} noValidate aria-labelledby="alert-create-heading">
-                <h2 id="alert-create-heading" className="font-semibold text-gray-900 mb-3">状況を登録する</h2>
+                <h2 id="alert-create-heading" className="font-semibold text-ink-900 mb-3">状況を登録する</h2>
                 <div className="space-y-3">
                   <fieldset>
-                    <legend className="block text-sm font-medium text-gray-800 mb-1">種類</legend>
+                    <legend className="block text-sm font-medium text-ink-900 mb-1">種類</legend>
                     <div className="grid sm:grid-cols-2 gap-1 text-sm">
                       {KIND_OPTIONS.map((o) => (
                         <label key={o.value} className="flex items-start gap-2">
                           <input type="radio" name="alert-kind" className="mt-1" checked={form.kind === o.value}
                             onChange={() => setForm({ ...form, kind: o.value, event_id: '' })} />
-                          <span><span className="font-medium">{o.label}</span><span className="block text-xs text-gray-700">{o.help}</span></span>
+                          <span><span className="font-medium">{o.label}</span><span className="block text-xs text-ink-700">{o.help}</span></span>
                         </label>
                       ))}
                     </div>
                   </fieldset>
                   {needsEvent(form.kind) ? (
                     <div>
-                      <label htmlFor="alert-event" className="block text-sm font-medium text-gray-800 mb-1">影響を受ける予定</label>
+                      <label htmlFor="alert-event" className="block text-sm font-medium text-ink-900 mb-1">影響を受ける予定</label>
                       <select id="alert-event" className={inputClass} value={form.event_id}
                         onChange={(e) => setForm({ ...form, event_id: e.target.value })}>
                         <option value="">選んでください</option>
                         {eventOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                       </select>
-                      {needsDelay(form.kind) && <p className="text-xs text-gray-700 mt-1">時刻のある予定だけ選べます</p>}
+                      {needsDelay(form.kind) && <p className="text-xs text-ink-700 mt-1">時刻のある予定だけ選べます</p>}
                     </div>
                   ) : (
                     <div>
-                      <label htmlFor="alert-day" className="block text-sm font-medium text-gray-800 mb-1">影響を受ける日</label>
+                      <label htmlFor="alert-day" className="block text-sm font-medium text-ink-900 mb-1">影響を受ける日</label>
                       <select id="alert-day" className={inputClass} value={form.day_id}
                         onChange={(e) => setForm({ ...form, day_id: e.target.value })}>
                         <option value="">選んでください</option>
@@ -272,25 +272,25 @@ const AlertsPage: React.FC = () => {
                   )}
                   {needsDelay(form.kind) && (
                     <div>
-                      <label htmlFor="alert-delay" className="block text-sm font-medium text-gray-800 mb-1">遅れの見込み(分)</label>
+                      <label htmlFor="alert-delay" className="block text-sm font-medium text-ink-900 mb-1">遅れの見込み(分)</label>
                       <input id="alert-delay" inputMode="numeric" className={inputClass} value={form.delay_minutes}
                         onChange={(e) => setForm({ ...form, delay_minutes: e.target.value })} />
                     </div>
                   )}
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="alert-source" className="block text-sm font-medium text-gray-800 mb-1">情報源(任意)</label>
+                      <label htmlFor="alert-source" className="block text-sm font-medium text-ink-900 mb-1">情報源(任意)</label>
                       <input id="alert-source" className={inputClass} maxLength={100} value={form.source_label}
                         placeholder="例: 駅の掲示、運行情報アプリ" onChange={(e) => setForm({ ...form, source_label: e.target.value })} />
                     </div>
                     <div>
-                      <label htmlFor="alert-observed" className="block text-sm font-medium text-gray-800 mb-1">情報を得た時刻(空なら今)</label>
+                      <label htmlFor="alert-observed" className="block text-sm font-medium text-ink-900 mb-1">情報を得た時刻(空なら今)</label>
                       <input id="alert-observed" type="datetime-local" className={inputClass} value={form.observed_at}
                         onChange={(e) => setForm({ ...form, observed_at: e.target.value })} />
                     </div>
                   </div>
                   <fieldset>
-                    <legend className="block text-sm font-medium text-gray-800 mb-1">確かさ</legend>
+                    <legend className="block text-sm font-medium text-ink-900 mb-1">確かさ</legend>
                     <div className="flex gap-4 text-sm">
                       {(['reported', 'confirmed'] as const).map((c) => (
                         <label key={c} className="flex items-center gap-2">
@@ -302,7 +302,7 @@ const AlertsPage: React.FC = () => {
                     </div>
                   </fieldset>
                   <div>
-                    <label htmlFor="alert-note" className="block text-sm font-medium text-gray-800 mb-1">メモ(任意)</label>
+                    <label htmlFor="alert-note" className="block text-sm font-medium text-ink-900 mb-1">メモ(任意)</label>
                     <textarea id="alert-note" className={inputClass} rows={2} maxLength={500} value={form.note}
                       onChange={(e) => setForm({ ...form, note: e.target.value })} />
                   </div>
@@ -314,7 +314,7 @@ const AlertsPage: React.FC = () => {
 
           {closed.length > 0 && (
             <section aria-labelledby="closed-heading" className="mt-6">
-              <h2 id="closed-heading" className="font-semibold text-gray-900 mb-2">解決・取り下げた状況</h2>
+              <h2 id="closed-heading" className="font-semibold text-ink-900 mb-2">解決・取り下げた状況</h2>
               <ul className="space-y-2" aria-label="解決・取り下げた状況">
                 {closed.map((a) => (
                   <li key={a.id}>

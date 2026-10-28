@@ -40,7 +40,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, icon, c
     yellow: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     red: 'bg-red-50 border-red-200 text-red-800',
     purple: 'bg-purple-50 border-purple-200 text-purple-800',
-    gray: 'bg-gray-50 border-gray-200 text-gray-800',
+    gray: 'bg-gray-50 border-gray-200 text-ink-900',
   };
 
   return (
@@ -105,7 +105,7 @@ const AdminDashboard: React.FC = () => {
   if (!stats) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-700">統計データを取得できませんでした</p>
+        <p className="text-ink-700">統計データを取得できませんでした</p>
         <Button onClick={() => fetchStats()} className="mt-4">
           再試行
         </Button>
@@ -118,8 +118,8 @@ const AdminDashboard: React.FC = () => {
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">管理者ダッシュボード</h1>
-          <p className="text-gray-600 mt-1">最終更新: {lastRefresh.toLocaleString('ja-JP')}</p>
+          <h1 className="text-3xl font-bold text-ink-900">管理者ダッシュボード</h1>
+          <p className="text-ink-700 mt-1">最終更新: {lastRefresh.toLocaleString('ja-JP')}</p>
         </div>
         <Button onClick={() => fetchStats(true)} disabled={refreshing} variant="outline">
           {refreshing ? (
@@ -135,7 +135,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* ユーザー統計 */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">👥 ユーザー統計</h2>
+        <h2 className="text-xl font-semibold text-ink-900 mb-4">👥 ユーザー統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="総ユーザー数"
@@ -170,7 +170,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* プラン統計 */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">📋 プラン統計</h2>
+        <h2 className="text-xl font-semibold text-ink-900 mb-4">📋 プラン統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard title="総プラン数" value={stats.travel_plans.total_plans} icon="📊" color="blue" />
           <MetricCard title="アクティブプラン" value={stats.travel_plans.active_plans} icon="🔥" color="green" />
@@ -187,9 +187,9 @@ const AdminDashboard: React.FC = () => {
 
       {/* 人気デスティネーション */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">🌍 人気デスティネーション</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">🌍 人気デスティネーション</h3>
         {stats.travel_plans.popular_destinations.length === 0 ? (
-          <p className="text-sm text-gray-700">デスティネーションが設定されたプランがまだありません</p>
+          <p className="text-sm text-ink-700">デスティネーションが設定されたプランがまだありません</p>
         ) : (
           <div className="space-y-3">
             {stats.travel_plans.popular_destinations.map((dest, index) => (
@@ -200,7 +200,7 @@ const AdminDashboard: React.FC = () => {
                   </span>
                   <span className="font-medium">{dest.destination}</span>
                 </div>
-                <span className="text-gray-600">{dest.count} プラン</span>
+                <span className="text-ink-700">{dest.count} プラン</span>
               </div>
             ))}
           </div>
@@ -209,7 +209,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* クイックアクション */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">⚡ クイックアクション</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4">⚡ クイックアクション</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Button
             onClick={() => navigate('/admin/users')}

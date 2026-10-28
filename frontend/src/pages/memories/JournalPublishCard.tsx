@@ -117,29 +117,29 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
   return (
     <Card padding="md" className="mt-4">
       <section aria-label="旅行記の公開" className="space-y-3">
-        <h2 className="font-semibold text-gray-900">旅行記を公開する</h2>
-        <p className="text-sm text-gray-700">
+        <h2 className="font-semibold text-ink-900">旅行記を公開する</h2>
+        <p className="text-sm text-ink-700">
           自分の記録だけで旅行記のページを作り、URL を知っている人に見せます。他のメンバーの記録・音声メモ・緯度経度は含めません。
           公開をやめると、URL はすぐに開けなくなります。
         </p>
         <fieldset>
-          <legend className="text-sm text-gray-800">場所の出し方</legend>
+          <legend className="text-sm text-ink-900">場所の出し方</legend>
           <div className="flex flex-wrap gap-3 mt-1">
-            <label className="flex items-center gap-1 text-sm text-gray-900">
+            <label className="flex items-center gap-1 text-sm text-ink-900">
               <input type="radio" name="journal-level" checked={level === 'none'} onChange={() => { setLevel('none'); resetPreview(); }} />
               出さない
             </label>
-            <label className="flex items-center gap-1 text-sm text-gray-900">
+            <label className="flex items-center gap-1 text-sm text-ink-900">
               <input type="radio" name="journal-level" checked={level === 'area'} onChange={() => { setLevel('area'); resetPreview(); }} />
               地名と大まかな移動(約1km)だけ
             </label>
           </div>
         </fieldset>
-        <label className="flex items-center gap-2 text-sm text-gray-900">
+        <label className="flex items-center gap-2 text-sm text-ink-900">
           <input type="checkbox" checked={photos} onChange={(e) => { setPhotos(e.target.checked); resetPreview(); }} />
           写真を含める(撮影場所などの情報は消して出します)
         </label>
-        <label className="block text-sm text-gray-800">
+        <label className="block text-sm text-ink-900">
           題名(空なら旅行の名前)
           <input className="block w-full mt-1 border rounded-sm px-2 py-1" value={title} maxLength={200}
             onChange={(e) => { setTitle(e.target.value); resetPreview(); }} />
@@ -148,12 +148,12 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
 
         {preview && (
           <div className="space-y-2" aria-label="公開する内容">
-            <p className="text-sm text-gray-900">
+            <p className="text-sm text-ink-900">
               {`「${preview.title}」: 記録${memoryCount}件・写真${preview.photo_ids.length}枚を公開します。`}
               {preview.hidden_places > 0 && `守る範囲の中の地名${preview.hidden_places}件は出しません。`}
               {preview.location_level === 'area' && `大まかな移動は${preview.route?.length ?? 0}地点です。`}
             </p>
-            <ul className="text-sm text-gray-800 list-disc pl-5" aria-label="公開する記録">
+            <ul className="text-sm text-ink-900 list-disc pl-5" aria-label="公開する記録">
               {preview.days.flatMap((d) => [
                 ...d.entries.flatMap((e) => e.memories.map((v) => (
                   <li key={v.id}>{`${d.date} ${e.title ?? ''}: ${v.body ?? (v.kind === 'photo' ? '(写真)' : '')}${v.place_name ? `(${v.place_name})` : ''}`}</li>
@@ -168,7 +168,7 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
             </ul>
             {preview.required_acknowledgements.length > 0 && (
               <fieldset className="space-y-1">
-                <legend className="text-sm font-medium text-gray-900">公開の前に確かめてください</legend>
+                <legend className="text-sm font-medium text-ink-900">公開の前に確かめてください</legend>
                 {preview.required_acknowledgements.map((a) => (
                   <label key={a.code} className="flex items-start gap-2 text-sm text-amber-900 bg-amber-50 p-2 rounded-sm">
                     <input type="checkbox" className="mt-1" checked={acks.has(a.code)} onChange={(e) => {
@@ -186,13 +186,13 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
               onClick={() => void publish()}>
               この内容で公開する
             </Button>
-            {memoryCount === 0 && <p className="text-sm text-gray-700">公開できる自分の記録がありません(旅行記に含める記録を書いてください)。</p>}
+            {memoryCount === 0 && <p className="text-sm text-ink-700">公開できる自分の記録がありません(旅行記に含める記録を書いてください)。</p>}
           </div>
         )}
 
         {created && (
           <div className="space-y-1">
-            <label className="block text-sm text-gray-800">
+            <label className="block text-sm text-ink-900">
               公開の URL(今だけ表示します)
               <input readOnly className="block w-full mt-1 border rounded-sm px-2 py-1 font-mono text-sm" value={created}
                 onFocus={(e) => e.target.select()} />
@@ -206,8 +206,8 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
             {items.map((p) => (
               <li key={p.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm">
-                  <span className="font-medium text-gray-900">{p.title}</span>
-                  <span className="block text-gray-700">
+                  <span className="font-medium text-ink-900">{p.title}</span>
+                  <span className="block text-ink-700">
                     {`${formatDate(p.created_at)} 公開・閲覧${p.view_count}回・${p.location_level === 'area' ? '地名あり' : '場所なし'}・写真${p.photos}枚`}
                     {!p.is_active && `・公開をやめました(${formatDate(p.revoked_at)})`}
                   </span>

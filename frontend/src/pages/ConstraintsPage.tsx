@@ -47,9 +47,9 @@ const inputClass = 'w-full border rounded-lg px-3 py-2';
 const STATUS_BADGE_CLASS: Record<string, string> = {
   satisfied: 'bg-green-100 text-green-800',
   violated: 'bg-red-100 text-red-800',
-  unverified: 'bg-slate-200 text-slate-800',
-  not_applicable: 'bg-gray-100 text-gray-700',
-  not_checked: 'bg-gray-100 text-gray-700',
+  unverified: 'bg-slate-200 text-ink-900',
+  not_applicable: 'bg-gray-100 text-ink-700',
+  not_checked: 'bg-gray-100 text-ink-700',
 };
 
 const ConstraintsPage: React.FC = () => {
@@ -199,7 +199,7 @@ const ConstraintsPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-500">
+      <div className="p-8 text-center text-ink-500">
         プランが選択されていません。
         <div className="mt-4">
           <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
@@ -222,14 +222,14 @@ const ConstraintsPage: React.FC = () => {
     if (c.visibility === 'masked') {
       return (
         <Card key={c.id} padding="md" className="bg-gray-50">
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-ink-700">
             <Lock size={16} aria-hidden="true" />
             <span>他のメンバーの秘匿制約</span>
             <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">{c.hardness === 'hard' ? 'ハード' : 'ソフト'}</span>
             {!c.is_active && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">無効</span>}
             {renderStatus(c)}
           </div>
-          <p className="text-xs text-gray-500 mt-1">内容は作成した本人にだけ表示されます(旅程の判定には使われます)。</p>
+          <p className="text-xs text-ink-500 mt-1">内容は作成した本人にだけ表示されます(旅程の判定には使われます)。</p>
         </Card>
       );
     }
@@ -245,7 +245,7 @@ const ConstraintsPage: React.FC = () => {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-gray-900">{c.title}</span>
+              <span className="font-medium text-ink-900">{c.title}</span>
               {c.privacy_level === 'private' && (
                 <span className="text-xs px-2 py-0.5 rounded-sm bg-purple-100 text-purple-800">自分だけ(秘匿)</span>
               )}
@@ -255,12 +255,12 @@ const ConstraintsPage: React.FC = () => {
               {!c.is_active && <span className="text-xs px-2 py-0.5 rounded-sm bg-gray-200">無効</span>}
               {renderStatus(c)}
             </div>
-            <div className="text-sm text-gray-600 mt-1">
+            <div className="text-sm text-ink-700 mt-1">
               {typeLabel(c.constraint_type)} ・ {describeCondition(c)}
               {c.hardness === 'soft' && c.weight != null && ` ・ 重み ${c.weight}`}
             </div>
-            <div className="text-xs text-gray-500 mt-1">適用範囲: {describeScope(c)}</div>
-            {c.reason && <div className="text-xs text-gray-500 mt-1">理由(自分だけに表示): {c.reason}</div>}
+            <div className="text-xs text-ink-500 mt-1">適用範囲: {describeScope(c)}</div>
+            {c.reason && <div className="text-xs text-ink-500 mt-1">理由(自分だけに表示): {c.reason}</div>}
           </div>
           {/* [Gate C1] 非公開の条件(プロフィール)から作った制約は、設定で変えるか適用をやめる */}
           {!c.from_profile && <div className="flex items-center gap-1 shrink-0">
@@ -271,10 +271,10 @@ const ConstraintsPage: React.FC = () => {
             >
               {c.is_active ? '無効にする' : '有効にする'}
             </button>
-            <button type="button" onClick={() => openEdit(c)} className="text-gray-500 hover:text-blue-600 p-1" aria-label={`${c.title}を編集`}>
+            <button type="button" onClick={() => openEdit(c)} className="text-ink-500 hover:text-blue-600 p-1" aria-label={`${c.title}を編集`}>
               <Pencil size={16} />
             </button>
-            <button type="button" onClick={() => handleDelete(c)} className="text-gray-500 hover:text-red-600 p-1" aria-label={`${c.title}を削除`}>
+            <button type="button" onClick={() => handleDelete(c)} className="text-ink-500 hover:text-red-600 p-1" aria-label={`${c.title}を削除`}>
               <Trash2 size={16} />
             </button>
           </div>}
@@ -292,8 +292,8 @@ const ConstraintsPage: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
             ← プランへ戻る
           </Button>
-          <h1 className="text-2xl font-bold text-gray-900">制約</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink-900">制約</h1>
+          <p className="text-sm text-ink-500 mt-1">
             守らなければならない条件(ハード)と、できれば叶えたい希望(ソフト)を登録します。
           </p>
         </div>
@@ -318,25 +318,25 @@ const ConstraintsPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : items.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-500">
+        <Card padding="lg" className="text-center text-ink-500">
           制約はまだ登録されていません。「制約を追加」から登録できます。
         </Card>
       ) : (
         <div className="space-y-6">
           <section aria-labelledby="hard-heading">
-            <h2 id="hard-heading" className="text-lg font-semibold text-gray-900 mb-2">
+            <h2 id="hard-heading" className="text-lg font-semibold text-ink-900 mb-2">
               ハード制約(守らなければならない条件) {hard.length}件
             </h2>
             <div className="space-y-3">
-              {hard.length === 0 ? <p className="text-sm text-gray-500">ありません</p> : hard.map(renderCard)}
+              {hard.length === 0 ? <p className="text-sm text-ink-500">ありません</p> : hard.map(renderCard)}
             </div>
           </section>
           <section aria-labelledby="soft-heading">
-            <h2 id="soft-heading" className="text-lg font-semibold text-gray-900 mb-2">
+            <h2 id="soft-heading" className="text-lg font-semibold text-ink-900 mb-2">
               ソフト制約(できれば叶えたい希望) {soft.length}件
             </h2>
             <div className="space-y-3">
-              {soft.length === 0 ? <p className="text-sm text-gray-500">ありません</p> : soft.map(renderCard)}
+              {soft.length === 0 ? <p className="text-sm text-ink-500">ありません</p> : soft.map(renderCard)}
             </div>
           </section>
         </div>
@@ -349,7 +349,7 @@ const ConstraintsPage: React.FC = () => {
               {formError && <div className="p-2 rounded-sm bg-red-50 text-red-700 text-sm" role="alert">{formError}</div>}
 
               <div>
-                <label htmlFor="constraint-title" className="block text-sm font-medium text-gray-700 mb-1">題名</label>
+                <label htmlFor="constraint-title" className="block text-sm font-medium text-ink-700 mb-1">題名</label>
                 <input
                   id="constraint-title"
                   className={inputClass}
@@ -361,7 +361,7 @@ const ConstraintsPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="constraint-type" className="block text-sm font-medium text-gray-700 mb-1">種類</label>
+                <label htmlFor="constraint-type" className="block text-sm font-medium text-ink-700 mb-1">種類</label>
                 <select
                   id="constraint-type"
                   className={inputClass}
@@ -373,7 +373,7 @@ const ConstraintsPage: React.FC = () => {
               </div>
 
               <fieldset>
-                <legend className="block text-sm font-medium text-gray-700 mb-1">強さ</legend>
+                <legend className="block text-sm font-medium text-ink-700 mb-1">強さ</legend>
                 <div className="flex gap-4 text-sm">
                   <label className="flex items-center gap-1">
                     <input type="radio" name="hardness" checked={form.hardness === 'hard'} onChange={() => update('hardness', 'hard')} />
@@ -388,7 +388,7 @@ const ConstraintsPage: React.FC = () => {
 
               {form.hardness === 'soft' && (
                 <div>
-                  <label htmlFor="constraint-weight" className="block text-sm font-medium text-gray-700 mb-1">重み(1〜100、大きいほど重視)</label>
+                  <label htmlFor="constraint-weight" className="block text-sm font-medium text-ink-700 mb-1">重み(1〜100、大きいほど重視)</label>
                   <input
                     id="constraint-weight"
                     type="number"
@@ -402,7 +402,7 @@ const ConstraintsPage: React.FC = () => {
               )}
 
               <div>
-                <label htmlFor="constraint-operator" className="block text-sm font-medium text-gray-700 mb-1">条件</label>
+                <label htmlFor="constraint-operator" className="block text-sm font-medium text-ink-700 mb-1">条件</label>
                 <select
                   id="constraint-operator"
                   className={inputClass}
@@ -425,14 +425,14 @@ const ConstraintsPage: React.FC = () => {
               {kind === 'time' && (
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label htmlFor="constraint-value" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="constraint-value" className="block text-sm font-medium text-ink-700 mb-1">
                       {form.operator === 'between' ? '開始時刻' : '時刻'}
                     </label>
                     <input id="constraint-value" type="time" className={inputClass} value={form.value} onChange={(e) => update('value', e.target.value)} />
                   </div>
                   {form.operator === 'between' && (
                     <div className="flex-1">
-                      <label htmlFor="constraint-value-to" className="block text-sm font-medium text-gray-700 mb-1">終了時刻</label>
+                      <label htmlFor="constraint-value-to" className="block text-sm font-medium text-ink-700 mb-1">終了時刻</label>
                       <input id="constraint-value-to" type="time" className={inputClass} value={form.value_to} onChange={(e) => update('value_to', e.target.value)} />
                     </div>
                   )}
@@ -441,11 +441,11 @@ const ConstraintsPage: React.FC = () => {
               {kind === 'number' && (
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label htmlFor="constraint-value" className="block text-sm font-medium text-gray-700 mb-1">数値</label>
+                    <label htmlFor="constraint-value" className="block text-sm font-medium text-ink-700 mb-1">数値</label>
                     <input id="constraint-value" type="number" min={0} className={inputClass} value={form.value} onChange={(e) => update('value', e.target.value)} />
                   </div>
                   <div className="w-36">
-                    <label htmlFor="constraint-unit" className="block text-sm font-medium text-gray-700 mb-1">単位</label>
+                    <label htmlFor="constraint-unit" className="block text-sm font-medium text-ink-700 mb-1">単位</label>
                     <select id="constraint-unit" className={inputClass} value={form.unit} onChange={(e) => update('unit', e.target.value)}>
                       <option value="">選択</option>
                       {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{unitLabel(u)}</option>)}
@@ -455,13 +455,13 @@ const ConstraintsPage: React.FC = () => {
               )}
               {kind === 'text' && (
                 <div>
-                  <label htmlFor="constraint-value" className="block text-sm font-medium text-gray-700 mb-1">内容</label>
+                  <label htmlFor="constraint-value" className="block text-sm font-medium text-ink-700 mb-1">内容</label>
                   <input id="constraint-value" className={inputClass} maxLength={200} value={form.value} onChange={(e) => update('value', e.target.value)} />
                 </div>
               )}
 
               <div>
-                <label htmlFor="constraint-scope" className="block text-sm font-medium text-gray-700 mb-1">適用範囲</label>
+                <label htmlFor="constraint-scope" className="block text-sm font-medium text-ink-700 mb-1">適用範囲</label>
                 <select
                   id="constraint-scope"
                   className={inputClass}
@@ -476,7 +476,7 @@ const ConstraintsPage: React.FC = () => {
               </div>
               {form.scope_type === 'day' && (
                 <div>
-                  <label htmlFor="constraint-scope-id" className="block text-sm font-medium text-gray-700 mb-1">対象の日</label>
+                  <label htmlFor="constraint-scope-id" className="block text-sm font-medium text-ink-700 mb-1">対象の日</label>
                   <select id="constraint-scope-id" className={inputClass} value={form.scope_id} onChange={(e) => update('scope_id', e.target.value)}>
                     <option value="">選択してください</option>
                     {days.map((d) => <option key={d.id} value={d.id}>{d.local_date}</option>)}
@@ -485,7 +485,7 @@ const ConstraintsPage: React.FC = () => {
               )}
               {form.scope_type === 'event' && (
                 <div>
-                  <label htmlFor="constraint-scope-id" className="block text-sm font-medium text-gray-700 mb-1">対象のイベント</label>
+                  <label htmlFor="constraint-scope-id" className="block text-sm font-medium text-ink-700 mb-1">対象のイベント</label>
                   <select id="constraint-scope-id" className={inputClass} value={form.scope_id} onChange={(e) => update('scope_id', e.target.value)}>
                     <option value="">選択してください</option>
                     {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.label}</option>)}
@@ -494,7 +494,7 @@ const ConstraintsPage: React.FC = () => {
               )}
 
               <fieldset>
-                <legend className="block text-sm font-medium text-gray-700 mb-1">公開範囲</legend>
+                <legend className="block text-sm font-medium text-ink-700 mb-1">公開範囲</legend>
                 <div className="space-y-1 text-sm">
                   <label className="flex items-center gap-1">
                     <input type="radio" name="privacy" checked={form.privacy_level === 'shared'} onChange={() => update('privacy_level', 'shared')} />
@@ -508,7 +508,7 @@ const ConstraintsPage: React.FC = () => {
               </fieldset>
 
               <div>
-                <label htmlFor="constraint-reason" className="block text-sm font-medium text-gray-700 mb-1">理由(任意・自分だけに表示)</label>
+                <label htmlFor="constraint-reason" className="block text-sm font-medium text-ink-700 mb-1">理由(任意・自分だけに表示)</label>
                 <textarea
                   id="constraint-reason"
                   className={inputClass}

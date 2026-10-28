@@ -27,15 +27,15 @@ interface OptimizationPanelProps {
   className?: string;
 }
 
-const TREND_CLASS = { better: 'text-green-800', worse: 'text-red-800', same: 'text-gray-700' } as const;
+const TREND_CLASS = { better: 'text-green-800', worse: 'text-red-800', same: 'text-ink-700' } as const;
 const WEIGHT_KEYS: WeightKey[] = ['distance', 'constraints', 'fatigue', 'fairness'];
 const DEFAULT_WEIGHTS: Weights = { distance: 1, constraints: 3, fatigue: 1, fairness: 1 };
 
 const ObjectiveTable: React.FC<{ label: string; objective: Objective; current: Objective }> = ({ label, objective, current }) => (
   <div>
-    <h5 className="text-sm font-semibold text-gray-900">目的の内訳(点は小さいほど良い。かっこは今の順)</h5>
+    <h5 className="text-sm font-semibold text-ink-900">目的の内訳(点は小さいほど良い。かっこは今の順)</h5>
     {/* 比較の表(table)と区別するため、一覧で示す */}
-    <ul className="text-sm text-gray-900" aria-label={`${label}の目的の内訳`}>
+    <ul className="text-sm text-ink-900" aria-label={`${label}の目的の内訳`}>
       {objective.terms.map((t) => {
         const before = current.terms.find((x) => x.key === t.key);
         const value = t.value === null ? '—' : `${t.value}${t.unit}`;
@@ -65,11 +65,11 @@ const CandidateView: React.FC<{
   };
   return (
     <section aria-label={c.label} className="border border-gray-200 rounded-lg p-3 space-y-2">
-      <h4 className="font-semibold text-gray-900">{c.label}</h4>
+      <h4 className="font-semibold text-ink-900">{c.label}</h4>
       <table className="w-full text-sm">
         <caption className="sr-only">{`${c.label}と今の順の比較`}</caption>
         <thead>
-          <tr className="text-left text-gray-700">
+          <tr className="text-left text-ink-700">
             <th scope="col" className="font-medium">項目</th>
             <th scope="col" className="font-medium">今の順</th>
             <th scope="col" className="font-medium">この案</th>
@@ -79,9 +79,9 @@ const CandidateView: React.FC<{
         <tbody>
           {metricRows(data.current.metrics, c.metrics).map((r) => (
             <tr key={r.label}>
-              <th scope="row" className="font-normal text-gray-800">{r.label}</th>
-              <td className="text-gray-900">{r.before}</td>
-              <td className="text-gray-900">{r.after}</td>
+              <th scope="row" className="font-normal text-ink-900">{r.label}</th>
+              <td className="text-ink-900">{r.before}</td>
+              <td className="text-ink-900">{r.after}</td>
               <td className={TREND_CLASS[r.trend]}>{TREND_TEXT[r.trend]}</td>
             </tr>
           ))}
@@ -89,13 +89,13 @@ const CandidateView: React.FC<{
       </table>
       <ObjectiveTable label={c.label} objective={c.objective} current={data.current.objective} />
       {c.explanations.length > 0 && (
-        <ul className="text-sm text-gray-900 list-disc pl-5" aria-label={`${c.label}の理由`}>
+        <ul className="text-sm text-ink-900 list-disc pl-5" aria-label={`${c.label}の理由`}>
           {c.explanations.map((s) => <li key={s}>{s}</li>)}
         </ul>
       )}
       <fieldset>
-        <legend className="text-sm font-semibold text-gray-900">変わる予定{data.can_apply ? '(一部だけ動かす時は選ぶ)' : ''}</legend>
-        <ul className="text-sm text-gray-900 pl-1">
+        <legend className="text-sm font-semibold text-ink-900">変わる予定{data.can_apply ? '(一部だけ動かす時は選ぶ)' : ''}</legend>
+        <ul className="text-sm text-ink-900 pl-1">
           {c.changes.map((x) => (
             <li key={x.event_id}>
               {data.can_apply ? (
@@ -111,13 +111,13 @@ const CandidateView: React.FC<{
       {c.resolved_issues.length > 0 && (
         <div>
           <h5 className="text-sm font-semibold text-green-800">解消する問題</h5>
-          <ul className="text-sm text-gray-900 list-disc pl-5">{c.resolved_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
+          <ul className="text-sm text-ink-900 list-disc pl-5">{c.resolved_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
         </div>
       )}
       {c.new_issues.length > 0 && (
         <div>
           <h5 className="text-sm font-semibold text-red-800">新たに出る問題</h5>
-          <ul className="text-sm text-gray-900 list-disc pl-5">{c.new_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
+          <ul className="text-sm text-ink-900 list-disc pl-5">{c.new_issues.map((x, i) => <li key={`${x.code}-${i}`}>{x.message}</li>)}</ul>
         </div>
       )}
       {data.can_apply && (
@@ -133,7 +133,7 @@ const CandidateView: React.FC<{
                 {`選んだ${picked.length}件だけ動かした結果を確かめる`}
               </button>
               {partial && (
-                <div className="text-sm text-gray-900 space-y-1" role="status">
+                <div className="text-sm text-ink-900 space-y-1" role="status">
                   <p>{`選んだ予定だけ: 移動距離${partial.metrics.distance_km}km・検証のエラー${partial.metrics.error}件・注意${partial.metrics.warning}件・目的の合計${partial.objective.total}`}</p>
                   {partial.new_issues.length > 0 && (
                     <ul className="list-disc pl-5 text-red-800" aria-label="一部だけの時に新たに出る問題">
@@ -238,23 +238,23 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
   if (!day) return null;
 
   return (
-    <div className={`bg-white rounded-xl shadow-xs border border-gray-200 ${className}`}>
+    <div className={`bg-surface rounded-xl shadow-xs border border-gray-200 ${className}`}>
       <button
         type="button"
         className="w-full flex items-center justify-between p-4 text-left"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((prev) => !prev)}
       >
-        <span className="flex items-center gap-2 font-medium text-gray-900">
+        <span className="flex items-center gap-2 font-medium text-ink-900">
           <Route size={18} className="text-blue-700" aria-hidden="true" />
           この日の並べ替え(検証つき)
         </span>
-        <span className="text-gray-700 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
+        <span className="text-ink-700 text-sm">{isExpanded ? '閉じる' : '開く'}</span>
       </button>
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-ink-700">
             移動距離(直線距離による概算)と、制約・実行可能性の検証結果を比べて、並び順と時刻の候補を示します。
             確定・予約付きの予定は動かしません。適用するまで旅程は変わりません。
           </p>
@@ -282,7 +282,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
               <fieldset className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <legend className="sr-only">目的の重み(0〜5。大きいほど重視)</legend>
                 {WEIGHT_KEYS.map((k) => (
-                  <label key={k} className="flex items-center justify-between gap-2 text-gray-900">
+                  <label key={k} className="flex items-center justify-between gap-2 text-ink-900">
                     {data?.weight_labels[k] ?? { distance: '移動距離', constraints: '検証・制約', fatigue: '疲れ', fairness: '公平さ' }[k]}
                     <select
                       className="border rounded-sm px-2 py-1"
@@ -318,7 +318,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
               <button
                 type="button"
                 onClick={handleUndo}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-800 hover:text-gray-900"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-ink-900 hover:text-ink-900"
               >
                 <Undo2 size={14} aria-hidden="true" />
                 直前の変更を取り消す
@@ -334,7 +334,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
                 </ul>
               )}
               {data.fixed.length > 0 && (
-                <div className="text-sm text-gray-800">
+                <div className="text-sm text-ink-900">
                   <p className="font-medium flex items-center gap-1">
                     <ShieldCheck size={14} className="text-green-700" aria-hidden="true" />動かさない予定
                   </p>
@@ -345,7 +345,7 @@ const OptimizationPanel: React.FC<OptimizationPanelProps> = ({ plan, dayIndex, c
                 <CandidateView key={c.id} data={data} c={c} applying={applying === c.id} onApply={handleApply}
                   onPreview={handlePreview} />
               ))}
-              <p className="text-xs text-gray-700">{`方式: ${data.algorithm_version}・検証: ${data.validation_algorithm_version}`}
+              <p className="text-xs text-ink-700">{`方式: ${data.algorithm_version}・検証: ${data.validation_algorithm_version}`}
                 {data.weights_given ? '・条件を変えて計算' : ''}</p>
             </div>
           )}

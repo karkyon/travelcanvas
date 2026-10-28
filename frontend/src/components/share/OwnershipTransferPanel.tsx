@@ -72,10 +72,10 @@ const OwnershipTransferPanel: React.FC<{ planId: string; reloadKey?: number }> =
 
   return (
     <section className="mt-6 border-t pt-4" aria-labelledby="ownership-heading">
-      <h3 id="ownership-heading" className="font-semibold text-gray-900 flex items-center gap-2">
+      <h3 id="ownership-heading" className="font-semibold text-ink-900 flex items-center gap-2">
         <KeyRound size={18} aria-hidden="true" />所有者の移譲
       </h3>
-      <p className="text-sm text-gray-700 mt-1">
+      <p className="text-sm text-ink-700 mt-1">
         旅行の所有者を、参加済みの共同編集者へ引き継ぎます。相手が受け入れるまで所有者は替わりません。
       </p>
       <div aria-live="polite">{done && <p className="text-sm text-green-800 mt-2" role="status">{done}</p>}</div>
@@ -87,13 +87,13 @@ const OwnershipTransferPanel: React.FC<{ planId: string; reloadKey?: number }> =
           <Button variant="outline" size="sm" className="mt-2" loading={busy} onClick={cancel}>申し出を取り下げる</Button>
         </div>
       ) : info.candidates.length === 0 ? (
-        <p className="text-sm text-gray-700 mt-2">移譲できる相手がいません(招待を承諾した会員の共同編集者を選べます)。</p>
+        <p className="text-sm text-ink-700 mt-2">移譲できる相手がいません(招待を承諾した会員の共同編集者を選べます)。</p>
       ) : !info.can_transfer ? (
-        <p className="text-sm text-gray-700 mt-2">所有者の移譲は会員登録したアカウントだけが使えます。</p>
+        <p className="text-sm text-ink-700 mt-2">所有者の移譲は会員登録したアカウントだけが使えます。</p>
       ) : (
         <form className="mt-2 grid gap-2 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
           <div>
-            <label htmlFor="ownership-target" className="block text-xs text-gray-800">引き継ぐ人</label>
+            <label htmlFor="ownership-target" className="block text-xs text-ink-900">引き継ぐ人</label>
             <select id="ownership-target" className="w-full border rounded-sm px-2 py-1 text-sm" value={target}
               onChange={(e) => setTarget(e.target.value)}>
               <option value="">選ぶ</option>
@@ -101,19 +101,19 @@ const OwnershipTransferPanel: React.FC<{ planId: string; reloadKey?: number }> =
             </select>
           </div>
           <div>
-            <label htmlFor="ownership-keep" className="block text-xs text-gray-800">引き継いだ後のあなた</label>
+            <label htmlFor="ownership-keep" className="block text-xs text-ink-900">引き継いだ後のあなた</label>
             <select id="ownership-keep" className="w-full border rounded-sm px-2 py-1 text-sm" value={keep}
               onChange={(e) => setKeep(e.target.value as KeepRole)}>
               {(Object.keys(KEEP_LABEL) as KeepRole[]).map((k) => <option key={k} value={k}>{KEEP_LABEL[k]}</option>)}
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label htmlFor="ownership-note" className="block text-xs text-gray-800">ひとこと(任意・500文字まで)</label>
+            <label htmlFor="ownership-note" className="block text-xs text-ink-900">ひとこと(任意・500文字まで)</label>
             <input id="ownership-note" maxLength={500} className="w-full border rounded-sm px-2 py-1 text-sm" value={note}
               onChange={(e) => setNote(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="ownership-password" className="block text-xs text-gray-800">本人確認のためのパスワード</label>
+            <label htmlFor="ownership-password" className="block text-xs text-ink-900">本人確認のためのパスワード</label>
             <input id="ownership-password" type="password" autoComplete="current-password"
               className="w-full border rounded-sm px-2 py-1 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
@@ -122,7 +122,7 @@ const OwnershipTransferPanel: React.FC<{ planId: string; reloadKey?: number }> =
               移譲を申し出る
             </Button>
           </div>
-          <p className="text-xs text-gray-700 sm:col-span-2">
+          <p className="text-xs text-ink-700 sm:col-span-2">
             {`申し出の期限は${info.transfer_days}日です。手続き中は旅行の削除と、引き継ぐ人を外すことはできません。`}
           </p>
         </form>

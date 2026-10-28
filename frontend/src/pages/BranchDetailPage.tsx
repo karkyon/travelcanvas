@@ -199,13 +199,13 @@ const BranchDetailPage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/branches`)} className="mb-2">← 案の一覧へ</Button>
-      <h1 className="text-2xl font-bold text-gray-900">{detail.title}</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">{detail.title}</h1>
+      <p className="text-sm text-ink-700 mt-1">
         想定: {SCENARIO_LABEL[detail.scenario_type]} ・ 状態: {STATE_LABEL[detail.state]} ・ 作成: {detail.created_by_name}
         {detail.assumptions.absent_member && ` ・ 欠席: ${detail.assumptions.absent_member}`}
         {detail.assumptions.budget_cut_percent && ` ・ 予算 ${detail.assumptions.budget_cut_percent}%減`}
       </p>
-      {detail.assumptions.note && <p className="text-sm text-gray-800 mt-1">メモ: {detail.assumptions.note}</p>}
+      {detail.assumptions.note && <p className="text-sm text-ink-900 mt-1">メモ: {detail.assumptions.note}</p>}
 
       <div aria-live="polite">
         {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
@@ -217,26 +217,26 @@ const BranchDetailPage: React.FC = () => {
           {groups.map(({ day, items: dayItems }) => (
             <Card key={day.id} padding="md">
               <section aria-labelledby={`branch-day-${day.id}`}>
-                <h2 id={`branch-day-${day.id}`} className="font-semibold text-gray-900">{day.local_date}{day.title ? ` ${day.title}` : ''}</h2>
-                {dayItems.length === 0 ? <p className="text-sm text-gray-700 mt-1">予定はありません。</p> : (
+                <h2 id={`branch-day-${day.id}`} className="font-semibold text-ink-900">{day.local_date}{day.title ? ` ${day.title}` : ''}</h2>
+                {dayItems.length === 0 ? <p className="text-sm text-ink-700 mt-1">予定はありません。</p> : (
                   <ul className="mt-2 space-y-2">
                     {dayItems.map((it) => (
                       <li key={it.key} className={`border rounded-sm p-2 ${it.removed ? 'bg-gray-50' : ''}`} data-testid={`branch-item-${it.key}`}>
                         <div className="grid gap-2 sm:grid-cols-[6rem_1fr_9rem] items-end">
                           <div>
-                            <label htmlFor={`time-${it.key}`} className="block text-xs text-gray-800">開始時刻</label>
+                            <label htmlFor={`time-${it.key}`} className="block text-xs text-ink-900">開始時刻</label>
                             <input id={`time-${it.key}`} type="time" className="w-full border rounded-sm px-2 py-1 text-sm"
                               value={it.local_start_time ?? ''} disabled={!editable || it.removed}
                               onChange={(e) => edit(it.key, { local_start_time: e.target.value || null })} />
                           </div>
                           <div>
-                            <label htmlFor={`title-${it.key}`} className="block text-xs text-gray-800">予定名</label>
+                            <label htmlFor={`title-${it.key}`} className="block text-xs text-ink-900">予定名</label>
                             <input id={`title-${it.key}`} className={`w-full border rounded-sm px-2 py-1 text-sm ${it.removed ? 'line-through' : ''}`}
                               maxLength={200} value={it.title} disabled={!editable || it.removed}
                               onChange={(e) => edit(it.key, { title: e.target.value })} />
                           </div>
                           <div>
-                            <label htmlFor={`day-${it.key}`} className="block text-xs text-gray-800">日付</label>
+                            <label htmlFor={`day-${it.key}`} className="block text-xs text-ink-900">日付</label>
                             <select id={`day-${it.key}`} className="w-full border rounded-sm px-2 py-1 text-sm" value={it.day_id}
                               disabled={!editable || it.removed} onChange={(e) => edit(it.key, { day_id: e.target.value })}>
                               {detail.days.map((d) => <option key={d.id} value={d.id}>{d.local_date}</option>)}
@@ -244,7 +244,7 @@ const BranchDetailPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
-                          {it.locked && <span className="px-1.5 rounded-sm bg-gray-200 text-gray-900">確定済み</span>}
+                          {it.locked && <span className="px-1.5 rounded-sm bg-gray-200 text-ink-900">確定済み</span>}
                           {it.source_event_id === null && <span className="px-1.5 rounded-sm bg-green-100 text-green-900">追加</span>}
                           {it.removed && <span className="px-1.5 rounded-sm bg-red-100 text-red-800">外す</span>}
                           {it.note && <span className="text-amber-900">{it.note}</span>}
@@ -281,10 +281,10 @@ const BranchDetailPage: React.FC = () => {
         <div className="space-y-4">
           <Card padding="md">
             <section aria-labelledby="branch-diff">
-              <h2 id="branch-diff" className="font-semibold text-gray-900">本案との違い</h2>
+              <h2 id="branch-diff" className="font-semibold text-ink-900">本案との違い</h2>
               {anyDirty && <p className="text-xs text-amber-900 mt-1" role="note">未保存の変更があります。保存すると違いを更新します。</p>}
               {extras && hasResourceOps && (
-                <p className="text-sm text-gray-800 mt-1" data-testid="branch-resource-summary">
+                <p className="text-sm text-ink-900 mt-1" data-testid="branch-resource-summary">
                   {`移動区間: 追加${extras.resource_summary.segments_added}・外す${extras.resource_summary.segments_removed}`
                     + `・変更${extras.resource_summary.segments_updated}`
                     + (extras.resources.reservations_hidden ? '' : ` / 予約: 付け替え${extras.resource_summary.reservations_relinked}`
@@ -299,7 +299,7 @@ const BranchDetailPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-              {detail.ops.length === 0 ? <p className="text-sm text-gray-700 mt-2">本案からの変更はありません。</p> : (
+              {detail.ops.length === 0 ? <p className="text-sm text-ink-700 mt-2">本案からの変更はありません。</p> : (
                 <ul className="text-sm mt-2 space-y-1 list-disc pl-5" aria-label="変更の一覧">
                   {detail.ops.map((o, i) => <li key={i}>{describeOp(o, dayLabel)}</li>)}
                 </ul>
@@ -308,7 +308,7 @@ const BranchDetailPage: React.FC = () => {
                 disabled={anyDirty}>
                 移動・検証・費用で比べる
               </Button>
-              {anyDirty && <p className="text-xs text-gray-700 mt-1">比べる前に保存してください。</p>}
+              {anyDirty && <p className="text-xs text-ink-700 mt-1">比べる前に保存してください。</p>}
               {comparison && !anyDirty && <BranchComparison data={comparison} />}
             </section>
           </Card>
@@ -319,12 +319,12 @@ const BranchDetailPage: React.FC = () => {
                 <ul className="text-sm mt-2 space-y-1 list-disc pl-5" data-testid="branch-conflicts">
                   {detail.conflicts.map((c, i) => <li key={i}>{describeConflict(c)}</li>)}
                 </ul>
-                <p className="text-xs text-gray-700 mt-2">分岐案を本案に合わせて直してから保存すると、採用できるようになります。</p>
+                <p className="text-xs text-ink-700 mt-2">分岐案を本案に合わせて直してから保存すると、採用できるようになります。</p>
               </section>
             </Card>
           )}
           {detail.plan_changed_since_base && detail.state === 'draft' && (
-            <p className="text-xs text-gray-700">この案を作った後に本案が更新されています(作成時の版 {detail.base_revision} → 現在 {detail.plan_revision})。</p>
+            <p className="text-xs text-ink-700">この案を作った後に本案が更新されています(作成時の版 {detail.base_revision} → 現在 {detail.plan_revision})。</p>
           )}
           <div className="flex flex-wrap gap-2">
             {editable && <Button variant="outline" onClick={save} loading={busy === '保存'} disabled={!anyDirty}>保存</Button>}

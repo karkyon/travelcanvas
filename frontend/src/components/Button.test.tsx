@@ -20,18 +20,18 @@ describe('Button Component', () => {
     const button = screen.getByRole('button', { name: /click me/i })
     expect(button).toBeInTheDocument()
     // デフォルトvariantはprimary(青系グラデーション)
-    expect(button).toHaveClass('from-blue-600', 'text-white')
+    expect(button).toHaveClass('bg-accent', 'text-on-accent')
   })
 
   it('renders with different variants', () => {
     const { rerender } = render(<Button variant="outline">Outline</Button>)
-    expect(screen.getByRole('button')).toHaveClass('border-2', 'border-blue-600')
+    expect(screen.getByRole('button')).toHaveClass('border-2', 'border-accent')
 
     rerender(<Button variant="danger">Danger</Button>)
-    expect(screen.getByRole('button')).toHaveClass('from-red-600', 'text-white')
+    expect(screen.getByRole('button')).toHaveClass('bg-danger-solid', 'text-white')
 
     rerender(<Button variant="ghost">Ghost</Button>)
-    expect(screen.getByRole('button')).toHaveClass('text-gray-700')
+    expect(screen.getByRole('button')).toHaveClass('text-ink-700')
   })
 
   it('renders with different sizes', () => {
@@ -236,21 +236,21 @@ describe('Button Component', () => {
       render(<Button variant="primary">Primary</Button>)
 
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('from-blue-600', 'text-white')
+      expect(button).toHaveClass('bg-accent', 'text-on-accent')
     })
 
     it('applies correct classes for outline variant', () => {
       render(<Button variant="outline">Outline</Button>)
 
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('border-2', 'border-blue-600', 'text-blue-600')
+      expect(button).toHaveClass('border-2', 'border-accent', 'text-accent')
     })
 
     it('applies correct classes for danger variant', () => {
       render(<Button variant="danger">Danger</Button>)
 
       const button = screen.getByRole('button')
-      expect(button).toHaveClass('from-red-600', 'text-white')
+      expect(button).toHaveClass('bg-danger-solid', 'text-white')
     })
   })
 

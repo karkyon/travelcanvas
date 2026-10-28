@@ -10,11 +10,13 @@
  * - 状態(成功・注意・危険・情報)は装飾の色と分け、必ず文字やアイコンと一緒に使う(色だけで伝えない)
  * - 文字と地の組み合わせは WCAG 2.1 AA(本文 4.5:1・大きい文字と部品 3:1)を満たす
  */
+import { PAGE_BACKGROUND } from './themeColor';
+
 export const color = {
   ink900: '#0f172a',
   ink700: '#334155',
   ink500: '#5b6b80',
-  cloud0: '#ffffff',
+  cloud0: PAGE_BACKGROUND.light,
   cloud50: '#f8fafc',
   cloud100: '#f1f5f9',
   cloud200: '#e2e8f0',
@@ -35,6 +37,9 @@ export const color = {
   info: '#1d4ed8',
   infoSoft: '#eff4ff',
   focus: '#2563eb',
+  /** [Gate G10-UX] UX-6 強調色の地の上の文字(主な操作のボタン)・危険の操作の地(暗い見た目でも同じ濃い赤に白い文字) */
+  onAccent: '#ffffff',
+  dangerSolid: '#b42318',
 } as const;
 
 /** 暗い見た目(data-theme="dark" の中だけ。今の画面には当てない) */
@@ -42,7 +47,7 @@ export const darkColor = {
   ink900: '#f1f5f9',
   ink700: '#cbd5e1',
   ink500: '#94a3b8',
-  cloud0: '#0b1220',
+  cloud0: PAGE_BACKGROUND.dark,
   cloud50: '#111a2b',
   cloud100: '#162236',
   cloud200: '#24324a',
@@ -57,6 +62,7 @@ export const darkColor = {
   warningSoft: '#2e2208',
   dangerSoft: '#3b1219',
   infoSoft: '#13254a',
+  onAccent: '#0b1220',
 } as const;
 
 export const radius = { sm: '4px', md: '8px', lg: '12px', xl: '16px', pill: '999px' } as const;
@@ -137,6 +143,12 @@ export const TEXT_PAIRS: Array<{ name: string; fg: string; bg: string; min: numb
   { name: '補足 / Mist', fg: color.ink700, bg: color.mist50, min: 4.5 },
   { name: '強調色の文字 / 白', fg: color.accent, bg: color.cloud0, min: 4.5 },
   { name: '白文字 / 強調色', fg: color.cloud0, bg: color.accent, min: 4.5 },
+  { name: '主な操作の文字 / 強調色', fg: color.onAccent, bg: color.accent, min: 4.5 },
+  { name: '主な操作の文字 / 強い強調色(押した時)', fg: color.onAccent, bg: color.accentStrong, min: 4.5 },
+  { name: '暗い: 主な操作の文字 / 強調色', fg: darkColor.onAccent, bg: darkColor.accent, min: 4.5 },
+  { name: '暗い: 主な操作の文字 / 強い強調色', fg: darkColor.onAccent, bg: darkColor.accentStrong, min: 4.5 },
+  { name: '危険の操作の白文字', fg: color.cloud0, bg: color.dangerSolid, min: 4.5 },
+  { name: '暗い: 枠の強調色 / 弱い強調色', fg: darkColor.accent, bg: darkColor.accentSoft, min: 4.5 },
   { name: '強調色の文字 / 弱い強調色', fg: color.accentStrong, bg: color.accentSoft, min: 4.5 },
   { name: '成功', fg: color.success, bg: color.successSoft, min: 4.5 },
   { name: '注意', fg: color.warning, bg: color.warningSoft, min: 4.5 },

@@ -29,39 +29,39 @@ const CandidateCard: React.FC<{
 }> = ({ c, canApply, applying, applied, onApply }) => (
   <Card padding="md" className={`space-y-3 ${applied ? 'ring-2 ring-green-600' : ''}`}>
     <section aria-label={`案${c.id}`}>
-      <h2 className="text-lg font-bold text-gray-900">
+      <h2 className="text-lg font-bold text-ink-900">
         {`案${c.id}: ${c.label}`}
         {applied && <span className="ml-2 text-xs px-1.5 py-0.5 rounded-sm bg-green-100 text-green-900">適用した案</span>}
       </h2>
-      <p className="text-sm text-gray-700 mt-1">{c.description}</p>
+      <p className="text-sm text-ink-700 mt-1">{c.description}</p>
       {!c.available ? (
-        <p className="mt-3 text-sm text-gray-800">{`この案は使えません: ${c.unavailable_reason ?? ''}`}</p>
+        <p className="mt-3 text-sm text-ink-900">{`この案は使えません: ${c.unavailable_reason ?? ''}`}</p>
       ) : (
         <>
           <dl className="grid grid-cols-2 gap-2 mt-3 text-sm">
-            <div><dt className="text-gray-700">変わる予定</dt><dd className="font-semibold text-gray-900">{`${c.metrics.changed_count}件`}</dd></div>
-            <div><dt className="text-gray-700">外す予定</dt><dd className="font-semibold text-gray-900">{`${c.metrics.lost_count}件`}</dd></div>
-            <div><dt className="text-gray-700">最大の遅れ</dt><dd className="font-semibold text-gray-900">{formatMinutes(c.metrics.max_delay_minutes)}</dd></div>
-            <div><dt className="text-gray-700">その日の最後の予定</dt><dd className="font-semibold text-gray-900">{formatMinutes(c.metrics.day_end_shift_minutes)}</dd></div>
+            <div><dt className="text-ink-700">変わる予定</dt><dd className="font-semibold text-ink-900">{`${c.metrics.changed_count}件`}</dd></div>
+            <div><dt className="text-ink-700">外す予定</dt><dd className="font-semibold text-ink-900">{`${c.metrics.lost_count}件`}</dd></div>
+            <div><dt className="text-ink-700">最大の遅れ</dt><dd className="font-semibold text-ink-900">{formatMinutes(c.metrics.max_delay_minutes)}</dd></div>
+            <div><dt className="text-ink-700">その日の最後の予定</dt><dd className="font-semibold text-ink-900">{formatMinutes(c.metrics.day_end_shift_minutes)}</dd></div>
           </dl>
           <div className="mt-3">
-            <h3 className="text-sm font-semibold text-gray-900">変わる予定</h3>
-            {c.changes.length === 0 ? <p className="text-sm text-gray-700">ありません</p> : (
-              <ul className="text-sm text-gray-900 list-disc pl-5">{c.changes.map((x) => <li key={x.event_id}>{describeChange(x)}</li>)}</ul>
+            <h3 className="text-sm font-semibold text-ink-900">変わる予定</h3>
+            {c.changes.length === 0 ? <p className="text-sm text-ink-700">ありません</p> : (
+              <ul className="text-sm text-ink-900 list-disc pl-5">{c.changes.map((x) => <li key={x.event_id}>{describeChange(x)}</li>)}</ul>
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">外す予定(失う予定)</h3>
-            {c.lost.length === 0 ? <p className="text-sm text-gray-700">ありません</p> : (
+            <h3 className="text-sm font-semibold text-ink-900">外す予定(失う予定)</h3>
+            {c.lost.length === 0 ? <p className="text-sm text-ink-700">ありません</p> : (
               <ul className="text-sm text-red-800 list-disc pl-5">{c.lost.map((x) => <li key={x.event_id}>{x.title}</li>)}</ul>
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-ink-900">
               <ShieldCheck size={14} aria-hidden="true" className="inline mr-1 text-green-700" />守る予定(時刻を変えません)
             </h3>
-            {c.protected.length === 0 ? <p className="text-sm text-gray-700">ありません</p> : (
-              <ul className="text-sm text-gray-900 list-disc pl-5">
+            {c.protected.length === 0 ? <p className="text-sm text-ink-700">ありません</p> : (
+              <ul className="text-sm text-ink-900 list-disc pl-5">
                 {c.protected.map((x) => (
                   <li key={x.event_id}>{`${x.local_start_time ?? '時刻未定'} ${x.title}${x.has_reservation ? '(予約あり)' : '(確定済み)'}`}</li>
                 ))}
@@ -73,8 +73,8 @@ const CandidateCard: React.FC<{
               {c.warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
           )}
-          <p className="text-sm text-gray-800">{`費用: ${formatCost(c.cost_impact)}`}</p>
-          <p className="text-sm text-gray-800">
+          <p className="text-sm text-ink-900">{`費用: ${formatCost(c.cost_impact)}`}</p>
+          <p className="text-sm text-ink-900">
             {c.notify_member_names.length > 0 ? `通知する人: ${c.notify_member_names.join('、')}` : '通知する人: いません(自分だけの旅行)'}
           </p>
           {canApply && (
@@ -156,7 +156,7 @@ const ReplanPage: React.FC = () => {
     }
   };
 
-  if (!planId || !replanId) return <div className="p-8 text-center text-gray-700">再計画案が選択されていません。</div>;
+  if (!planId || !replanId) return <div className="p-8 text-center text-ink-700">再計画案が選択されていません。</div>;
   const [a, b] = replan?.candidates ?? [];
   const canApply = !!replan?.can_apply && !done;
 
@@ -166,9 +166,9 @@ const ReplanPage: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/alerts`)}>← 状況の一覧へ</Button>
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)}>プランを見る</Button>
       </div>
-      <h1 className="text-2xl font-bold text-gray-900">再計画案の比較</h1>
+      <h1 className="text-2xl font-bold text-ink-900">再計画案の比較</h1>
       {alert && (
-        <p className="text-sm text-gray-800 mt-1">
+        <p className="text-sm text-ink-900 mt-1">
           {`${alert.kind_label}: ${alert.event_title ?? `${alert.local_date ?? ''} の屋外の予定`}`}
           {alert.delay_minutes !== null && `(約${alert.delay_minutes}分の遅れ)`}
           {` ・ ${alert.source_label ?? SOURCE_LABEL[alert.source]} ・ ${formatObserved(alert.observed_at)} ・ ${CONFIDENCE_LABEL[alert.confidence]}`}
@@ -177,7 +177,7 @@ const ReplanPage: React.FC = () => {
       {alert?.is_stale && (
         <p className="text-sm text-red-800 mt-1">状況の情報は取得から3時間以上たっています。最新の状況を確認してから判断してください</p>
       )}
-      <p className="text-sm text-gray-700 mt-1">承認するまで旅程は変わりません。予約付き・確定済みの予定はどちらの案でも動かしません。</p>
+      <p className="text-sm text-ink-700 mt-1">承認するまで旅程は変わりません。予約付き・確定済みの予定はどちらの案でも動かしません。</p>
 
       {error && (
         <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">
@@ -191,7 +191,7 @@ const ReplanPage: React.FC = () => {
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : !replan ? null : (
         <>
-          <p className="mt-4 text-sm text-gray-800">
+          <p className="mt-4 text-sm text-ink-900">
             {`状態: ${REPLAN_STATE_LABEL[replan.state]} ・ 作成: ${replan.created_by_name}`}
             {replan.applied_by_name && ` ・ 適用: ${replan.applied_by_name}`}
           </p>
@@ -202,7 +202,7 @@ const ReplanPage: React.FC = () => {
             </div>
           )}
           {a && b && sameOutcome(a, b) && (
-            <p className="mt-3 text-sm text-gray-800">この状況では、案Aと案Bの結果は同じです。</p>
+            <p className="mt-3 text-sm text-ink-900">この状況では、案Aと案Bの結果は同じです。</p>
           )}
           <div className="grid md:grid-cols-2 gap-4 mt-4">
             {replan.candidates.map((c) => (

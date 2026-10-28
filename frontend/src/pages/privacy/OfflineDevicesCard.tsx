@@ -56,8 +56,8 @@ const OfflineDevicesCard: React.FC = () => {
   return (
     <Card padding="md" className="mt-4">
       <section aria-labelledby="offline-devices-heading">
-        <h2 id="offline-devices-heading" className="font-semibold text-gray-900">オフラインで使う端末</h2>
-        <p className="text-sm text-gray-700 mt-1">
+        <h2 id="offline-devices-heading" className="font-semibold text-ink-900">オフラインで使う端末</h2>
+        <p className="text-sm text-ink-700 mt-1">
           旅行をオフラインで使うために保存した端末です。保存データは端末ごとの鍵で暗号化し、鍵は30日で期限が切れます。
           失くした端末は失効すると、その端末の保存データは開けなくなります(他の端末はそのまま使えます)。
           端末の名前はブラウザとOSの種類だけです。
@@ -66,15 +66,15 @@ const OfflineDevicesCard: React.FC = () => {
         {error && <p className="text-sm text-red-800 mt-2" role="alert">{error}</p>}
         {!data && !error ? <div className="flex justify-center py-6"><LoadingSpinner /></div> : data && (
           data.devices.length === 0 ? (
-            <p className="text-sm text-gray-700 mt-3">オフラインで使う端末はまだありません。</p>
+            <p className="text-sm text-ink-700 mt-3">オフラインで使う端末はまだありません。</p>
           ) : (
             <ul className="mt-3 divide-y" aria-label="オフラインで使う端末の一覧">
               {data.devices.map((d) => (
                 <li key={d.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
                   <span>
-                    <span className="font-medium text-gray-900">{d.label}</span>
-                    {d.is_current && <span className="ml-2 text-sm text-gray-700">(この端末)</span>}
-                    <span className="block text-sm text-gray-700">
+                    <span className="font-medium text-ink-900">{d.label}</span>
+                    {d.is_current && <span className="ml-2 text-sm text-ink-700">(この端末)</span>}
+                    <span className="block text-sm text-ink-700">
                       {d.revoked_at ? `失効しました(${formatDate(d.revoked_at)})` : `最後に鍵を受け取った日時: ${formatDate(d.last_key_at)}`}
                     </span>
                   </span>
@@ -89,7 +89,7 @@ const OfflineDevicesCard: React.FC = () => {
             </ul>
           )
         )}
-        {data && <p className="text-xs text-gray-700 mt-2">登録できる端末は{data.max_devices}台までです(失効した端末は数えません)。</p>}
+        {data && <p className="text-xs text-ink-700 mt-2">登録できる端末は{data.max_devices}台までです(失効した端末は数えません)。</p>}
       </section>
     </Card>
   );

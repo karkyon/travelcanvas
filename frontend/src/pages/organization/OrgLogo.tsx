@@ -18,7 +18,7 @@ const OrgLogo: React.FC<{ orgId: string; version: string | null; size?: number }
     };
   }, [orgId, version]);
   if (!url) return null;
-  return <img src={url} alt="組織のロゴ" width={size} height={size} className="rounded-sm object-contain bg-white" style={{ maxHeight: size }} />;
+  return <img src={url} alt="組織のロゴ" width={size} height={size} className="rounded-sm object-contain bg-surface" style={{ maxHeight: size }} />;
 };
 
 export default OrgLogo;

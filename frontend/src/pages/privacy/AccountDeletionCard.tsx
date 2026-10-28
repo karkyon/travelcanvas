@@ -100,8 +100,8 @@ const AccountDeletionCard: React.FC<{ onDeleted: () => void }> = ({ onDeleted })
   return (
     <Card padding="md" className="mt-4">
       <section aria-labelledby="account-deletion-heading">
-        <h2 id="account-deletion-heading" className="font-semibold text-gray-900">アカウントの削除</h2>
-        <p className="text-sm text-gray-700 mt-1">
+        <h2 id="account-deletion-heading" className="font-semibold text-ink-900">アカウントの削除</h2>
+        <p className="text-sm text-ink-700 mt-1">
           アカウントを削除すると元に戻せません。必要なデータは、先に「アカウントのデータを書き出す」で保存してください。
         </p>
         {error && <p className="text-sm text-red-800 mt-2" role="alert">{error}</p>}
@@ -118,31 +118,31 @@ const AccountDeletionCard: React.FC<{ onDeleted: () => void }> = ({ onDeleted })
           <Button variant="outline" size="sm" className="mt-3" loading={busy === 'preview'} onClick={load}>削除の内容を確認する</Button>
         ) : (
           <form className="mt-3" onSubmit={submit} aria-label="アカウントの削除">
-            <ul className="text-sm text-gray-800 list-disc pl-5 space-y-1" data-testid="deletion-effects">
+            <ul className="text-sm text-ink-900 list-disc pl-5 space-y-1" data-testid="deletion-effects">
               {deletionEffects(preview).map((t) => <li key={t}>{t}</li>)}
             </ul>
             {preview.owned_plans.length > 0 && (
               <>
-                <h3 className="text-sm font-medium text-gray-900 mt-3">削除する旅行</h3>
-                <ul className="text-sm text-gray-800 mt-1 list-disc pl-5" aria-label="削除する旅行">
+                <h3 className="text-sm font-medium text-ink-900 mt-3">削除する旅行</h3>
+                <ul className="text-sm text-ink-900 mt-1 list-disc pl-5" aria-label="削除する旅行">
                   {preview.owned_plans.map((p) => (
                     <li key={p.id}>{p.title}{p.member_count > 0 ? `(参加者${p.member_count}人も見られなくなります)` : ''}</li>
                   ))}
                 </ul>
               </>
             )}
-            <p className="text-sm text-gray-700 mt-3">
+            <p className="text-sm text-ink-700 mt-3">
               操作の記録(監査ログ)とバックアップは、内容を含めない形で保持期間の間残ります(下の「削除したデータの保持期間」)。
             </p>
             {preview.requires_password && (
               <div className="mt-3">
-                <label htmlFor="delete-password" className="block text-sm font-medium text-gray-800">現在のパスワード</label>
+                <label htmlFor="delete-password" className="block text-sm font-medium text-ink-900">現在のパスワード</label>
                 <input id="delete-password" type="password" autoComplete="current-password" value={password}
                   onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full max-w-sm border rounded-sm px-2 py-1" />
               </div>
             )}
             <div className="mt-3">
-              <label htmlFor="delete-confirmation" className="block text-sm font-medium text-gray-800">
+              <label htmlFor="delete-confirmation" className="block text-sm font-medium text-ink-900">
                 確認のため「{preview.confirmation_text}」と入力してください
               </label>
               <input id="delete-confirmation" type="text" value={confirmation} autoComplete="off"

@@ -441,7 +441,7 @@ const ReservationsPage: React.FC = () => {
 
   if (!planId) {
     return (
-      <div className="p-8 text-center text-gray-500">
+      <div className="p-8 text-center text-ink-500">
         プランが選択されていません。
         <div className="mt-4">
           <Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button>
@@ -457,7 +457,7 @@ const ReservationsPage: React.FC = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
             ← プランへ戻る
           </Button>
-          <h1 className="text-2xl font-bold text-gray-900">予約一覧</h1>
+          <h1 className="text-2xl font-bold text-ink-900">予約一覧</h1>
         </div>
         <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
           新規予約
@@ -471,7 +471,7 @@ const ReservationsPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : reservations.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-600">
+        <Card padding="lg" className="text-center text-ink-700">
           予約がまだ登録されていません。「新規予約」から追加できます。
         </Card>
       ) : (
@@ -489,18 +489,18 @@ const ReservationsPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-gray-600" aria-hidden="true">{typeIcon(r.type)}</span>
+                      <span className="text-ink-700" aria-hidden="true">{typeIcon(r.type)}</span>
                       <div>
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-ink-900">
                           {r.provider_name || typeLabel(r.type)}
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-ink-700">
                           {typeLabel(r.type)} ・ {formatDateTime(r.start_at)}
                           {r.confirmation_number_masked && ` ・ 予約番号 ${r.confirmation_number_masked}`}
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-ink-700">
                       {STATUS_LABEL[r.status] ?? r.status}
                     </span>
                   </div>
@@ -523,7 +523,7 @@ const ReservationsPage: React.FC = () => {
           <Modal.Body>
             <div className="space-y-4">
               <div>
-                <label htmlFor="reservation-create-type" className="block text-sm font-medium text-gray-700 mb-1">種類</label>
+                <label htmlFor="reservation-create-type" className="block text-sm font-medium text-ink-700 mb-1">種類</label>
                 <select
                   id="reservation-create-type"
                   value={createForm.type}
@@ -585,7 +585,7 @@ const ReservationsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label htmlFor="reservation-create-notes" className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <label htmlFor="reservation-create-notes" className="block text-sm font-medium text-ink-700 mb-1">メモ</label>
                 <textarea
                   id="reservation-create-notes"
                   value={createForm.notes}
@@ -616,27 +616,27 @@ const ReservationsPage: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-gray-600">種類</div>
+                    <div className="text-ink-700">種類</div>
                     <div>{typeLabel(selected.type)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">状態</div>
+                    <div className="text-ink-700">状態</div>
                     <div>{STATUS_LABEL[selected.status] ?? selected.status}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">開始</div>
+                    <div className="text-ink-700">開始</div>
                     <div>{formatDateTime(selected.start_at)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">終了</div>
+                    <div className="text-ink-700">終了</div>
                     <div>{formatDateTime(selected.end_at)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">名義</div>
+                    <div className="text-ink-700">名義</div>
                     <div>{selected.holder_name || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">金額</div>
+                    <div className="text-ink-700">金額</div>
                     <div>
                       {selected.total_amount != null
                         ? `${selected.total_amount.toLocaleString()} ${selected.currency ?? ''}`
@@ -648,7 +648,7 @@ const ReservationsPage: React.FC = () => {
                 {/* 予約番号・PIN(マスク表示 + reveal) */}
                 <div className="border rounded-lg p-3 bg-gray-50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">予約番号 / PIN</span>
+                    <span className="text-sm font-medium text-ink-700">予約番号 / PIN</span>
                     {!revealed && (
                       <Button
                         variant="outline"
@@ -681,7 +681,7 @@ const ReservationsPage: React.FC = () => {
 
                 {selected.notes && (
                   <div>
-                    <div className="text-gray-600 text-sm mb-1">メモ</div>
+                    <div className="text-ink-700 text-sm mb-1">メモ</div>
                     <div className="text-sm whitespace-pre-wrap">{selected.notes}</div>
                   </div>
                 )}
@@ -689,7 +689,7 @@ const ReservationsPage: React.FC = () => {
                 {/* [Gate R3-3] 紐付いているイベント(連泊等の複数日紐付け) */}
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <div className="flex items-center gap-2 text-sm font-medium text-ink-700">
                       <Link2 size={16} /> 紐付いているイベント
                     </div>
                     {!isAddLinkOpen && linkCandidates.length > 0 && (
@@ -710,7 +710,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {eventLinks.length === 0 && (
-                        <div className="text-sm text-gray-600">紐付いているイベントがありません</div>
+                        <div className="text-sm text-ink-700">紐付いているイベントがありません</div>
                       )}
                       {eventLinks.map((link) => (
                         <div
@@ -718,9 +718,9 @@ const ReservationsPage: React.FC = () => {
                           className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <CalendarDays size={14} className="text-gray-500 shrink-0" aria-hidden="true" />
+                            <CalendarDays size={14} className="text-ink-500 shrink-0" aria-hidden="true" />
                             <span className="truncate">{eventLabel(link.event_id)}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-ink-700 shrink-0">
                               {RELATION_TYPE_LABEL[link.relation_type] ?? link.relation_type}
                             </span>
                           </div>
@@ -728,7 +728,7 @@ const ReservationsPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleToggleLinkLock(link)}
-                              className="text-gray-600 hover:text-gray-900 p-1"
+                              className="text-ink-700 hover:text-ink-900 p-1"
                               aria-label={link.is_locked ? 'ロック解除' : 'ロック'}
                               title={link.is_locked ? 'ロック解除する' : '誤操作防止のためロックする'}
                             >
@@ -738,7 +738,7 @@ const ReservationsPage: React.FC = () => {
                               type="button"
                               onClick={() => handleDeleteEventLink(link)}
                               disabled={link.is_locked}
-                              className="text-gray-600 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed p-1"
+                              className="text-ink-700 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed p-1"
                               aria-label="イベント紐付けを解除"
                               title={link.is_locked ? 'ロック中は解除できません' : '紐付けを解除する'}
                             >
@@ -753,7 +753,7 @@ const ReservationsPage: React.FC = () => {
                   {isAddLinkOpen && (
                     <form onSubmit={handleAddEventLink} className="flex flex-wrap gap-2 items-end">
                       <div className="flex-1 min-w-[180px]">
-                        <label htmlFor="reservation-link-event" className="block text-xs text-gray-600 mb-1">イベント</label>
+                        <label htmlFor="reservation-link-event" className="block text-xs text-ink-700 mb-1">イベント</label>
                         <select
                           id="reservation-link-event"
                           value={newLinkEventId}
@@ -769,7 +769,7 @@ const ReservationsPage: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label htmlFor="reservation-link-relation" className="block text-xs text-gray-600 mb-1">紐付け種別</label>
+                        <label htmlFor="reservation-link-relation" className="block text-xs text-ink-700 mb-1">紐付け種別</label>
                         <select
                           id="reservation-link-relation"
                           value={newLinkRelationType}
@@ -793,7 +793,7 @@ const ReservationsPage: React.FC = () => {
                 {/* [Gate R3-11] チケット(QR/バーコード) */}
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <div className="flex items-center gap-2 text-sm font-medium text-ink-700">
                       <QrCode size={16} /> チケット
                     </div>
                     {!isAddTicketOpen && (
@@ -814,7 +814,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {tickets.length === 0 && (
-                        <div className="text-sm text-gray-600">チケットが登録されていません</div>
+                        <div className="text-sm text-ink-700">チケットが登録されていません</div>
                       )}
                       {tickets.map((t) => (
                         <div key={t.id} className="text-sm bg-gray-50 rounded-sm px-3 py-2">
@@ -822,9 +822,9 @@ const ReservationsPage: React.FC = () => {
                             <div>
                               <span className="font-medium">{t.ticket_type}</span>
                               {t.barcode_format && (
-                                <span className="text-xs text-gray-600 ml-2">{t.barcode_format}</span>
+                                <span className="text-xs text-ink-700 ml-2">{t.barcode_format}</span>
                               )}
-                              <span className="text-xs text-gray-600 ml-2">
+                              <span className="text-xs text-ink-700 ml-2">
                                 {t.has_payload ? 'データあり' : 'データなし'}
                               </span>
                             </div>
@@ -853,7 +853,7 @@ const ReservationsPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteTicket(t)}
-                                className="text-gray-600 hover:text-red-700"
+                                className="text-ink-700 hover:text-red-700"
                                 aria-label={`チケット「${t.ticket_type}」を削除`}
                               >
                                 <X size={14} />
@@ -861,7 +861,7 @@ const ReservationsPage: React.FC = () => {
                             </div>
                           </div>
                           {revealedTickets[t.id] !== undefined && (
-                            <div className="mt-1 text-xs font-mono break-all text-gray-700">
+                            <div className="mt-1 text-xs font-mono break-all text-ink-700">
                               {revealedTickets[t.id] || '(データなし)'}
                             </div>
                           )}
@@ -908,7 +908,7 @@ const ReservationsPage: React.FC = () => {
 
                 {/* 参加者 */}
                 <div className="border-t pt-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-ink-700 mb-2">
                     <Users size={16} /> 参加者
                   </div>
                   {isParticipantsLoading ? (
@@ -916,7 +916,7 @@ const ReservationsPage: React.FC = () => {
                   ) : (
                     <div className="space-y-2 mb-3">
                       {participants.length === 0 && (
-                        <div className="text-sm text-gray-600">参加者が登録されていません</div>
+                        <div className="text-sm text-ink-700">参加者が登録されていません</div>
                       )}
                       {participants.map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2">
@@ -924,7 +924,7 @@ const ReservationsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleRemoveParticipant(p)}
-                            className="text-gray-600 hover:text-red-700"
+                            className="text-ink-700 hover:text-red-700"
                             aria-label={`参加者「${p.name}」を削除`}
                           >
                             <X size={14} />

@@ -76,10 +76,10 @@ const MovementSettingsPanel: React.FC<Props> = ({ planId, onSaved }) => {
       <section aria-labelledby="movement-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="movement-heading" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <h2 id="movement-heading" className="text-lg font-semibold text-ink-900 flex items-center gap-2">
               <Footprints size={18} className="text-blue-700" aria-hidden="true" />移動・滞在の既定
             </h2>
-            <p className="text-xs text-gray-600 mt-0.5">
+            <p className="text-xs text-ink-700 mt-0.5">
               終了時刻が無い予定の滞在を見積もり、休憩の無い連続・長すぎる1日・最終の便に間に合うかを確かめます。
             </p>
           </div>
@@ -88,29 +88,29 @@ const MovementSettingsPanel: React.FC<Props> = ({ planId, onSaved }) => {
           </Button>
         </div>
         {eff && (
-          <p className="mt-2 text-sm text-gray-800" data-testid="movement-summary">
+          <p className="mt-2 text-sm text-ink-900" data-testid="movement-summary">
             {`休憩なしは${eff.max_continuous_minutes}分まで・1日は${Math.round(eff.max_day_minutes / 60)}時間まで・`
               + `${eff.break_minutes}分以上の空きか食事を休憩とみなします`}
             {data?.is_default ? '(既定のまま)' : ''}
           </p>
         )}
         {data && !eff && <p className="mt-2 text-sm text-amber-900">見積もりを使わない設定です(終了時刻のある予定だけで判定します)。</p>}
-        {eff?.notes.map((n) => <p key={n} className="text-xs text-gray-700">{n}</p>)}
+        {eff?.notes.map((n) => <p key={n} className="text-xs text-ink-700">{n}</p>)}
         {error && <div className="mt-3 p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
         {message && <div className="mt-3 p-2 rounded-sm bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
 
         {open && data && draft && (
           <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-            <label className="flex items-center gap-2 text-sm text-gray-900">
+            <label className="flex items-center gap-2 text-sm text-ink-900">
               <input type="checkbox" checked={draft.enabled} disabled={!data.can_edit}
                 onChange={(e) => set('enabled', e.target.checked)} />
               既定の滞在で見積もって確かめる
             </label>
             <fieldset className="space-y-1">
-              <legend className="text-sm font-medium text-gray-900">歩く速さの見込み</legend>
+              <legend className="text-sm font-medium text-ink-900">歩く速さの見込み</legend>
               <div className="flex flex-wrap gap-3">
                 {data.paces.map((p) => (
-                  <label key={p.key} className="flex items-center gap-1 text-sm text-gray-900">
+                  <label key={p.key} className="flex items-center gap-1 text-sm text-ink-900">
                     <input type="radio" name="movement-pace" value={p.key} checked={draft.pace === p.key}
                       disabled={!data.can_edit} onChange={() => set('pace', p.key as MovementPace)} />
                     {`${p.label}(滞在×${p.stay_factor}・連続${p.max_continuous}分)`}
@@ -119,29 +119,29 @@ const MovementSettingsPanel: React.FC<Props> = ({ planId, onSaved }) => {
               </div>
             </fieldset>
             <fieldset className="space-y-1">
-              <legend className="text-sm font-medium text-gray-900">同行者</legend>
-              <label className="flex items-center gap-2 text-sm text-gray-900">
+              <legend className="text-sm font-medium text-ink-900">同行者</legend>
+              <label className="flex items-center gap-2 text-sm text-ink-900">
                 <input type="checkbox" checked={draft.withChildren} disabled={!data.can_edit}
                   onChange={(e) => set('withChildren', e.target.checked)} />
                 子ども連れ
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-900">
+              <label className="flex items-center gap-2 text-sm text-ink-900">
                 <input type="checkbox" checked={draft.withSeniors} disabled={!data.can_edit}
                   onChange={(e) => set('withSeniors', e.target.checked)} />
                 高齢の方と一緒
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-900">
+              <label className="flex items-center gap-2 text-sm text-ink-900">
                 人数
                 <input type="number" min={1} max={50} className={input} value={draft.size} disabled={!data.can_edit}
                   onChange={(e) => set('size', e.target.value)} aria-describedby="movement-size-help" />
               </label>
-              <p id="movement-size-help" className="text-xs text-gray-600">空のままなら参加者の数を使います(思い出からの提案で、同じ人数の旅行を優先します)。</p>
+              <p id="movement-size-help" className="text-xs text-ink-700">空のままなら参加者の数を使います(思い出からの提案で、同じ人数の旅行を優先します)。</p>
             </fieldset>
             <fieldset>
-              <legend className="text-sm font-medium text-gray-900">種類ごとの既定の滞在(分)</legend>
+              <legend className="text-sm font-medium text-ink-900">種類ごとの既定の滞在(分)</legend>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
                 {data.event_types.filter((t) => t.estimated).map((t) => (
-                  <label key={t.key} className="flex items-center justify-between gap-2 text-sm text-gray-900">
+                  <label key={t.key} className="flex items-center justify-between gap-2 text-sm text-ink-900">
                     {t.label}
                     <input type="number" min={5} max={600} className={input} value={draft.stays[t.key] ?? ''}
                       disabled={!data.can_edit} aria-label={`${t.label}の既定の滞在(分)`}
@@ -151,22 +151,22 @@ const MovementSettingsPanel: React.FC<Props> = ({ planId, onSaved }) => {
               </div>
             </fieldset>
             <div className="grid sm:grid-cols-2 gap-2">
-              <label className="flex items-center justify-between gap-2 text-sm text-gray-900">
+              <label className="flex items-center justify-between gap-2 text-sm text-ink-900">
                 休憩とみなす空き(分)
                 <input type="number" min={5} max={120} className={input} value={draft.breakMinutes}
                   disabled={!data.can_edit} onChange={(e) => set('breakMinutes', e.target.value)} />
               </label>
-              <label className="flex items-center justify-between gap-2 text-sm text-gray-900">
+              <label className="flex items-center justify-between gap-2 text-sm text-ink-900">
                 休憩なしで続けてよい時間(分)
                 <input type="number" min={30} max={720} className={input} value={draft.maxContinuous}
                   placeholder="既定" disabled={!data.can_edit} onChange={(e) => set('maxContinuous', e.target.value)} />
               </label>
-              <label className="flex items-center justify-between gap-2 text-sm text-gray-900">
+              <label className="flex items-center justify-between gap-2 text-sm text-ink-900">
                 1日の活動の上限(時間)
                 <input type="number" min={2} max={18} className={input} value={draft.maxDayHours}
                   placeholder="既定" disabled={!data.can_edit} onChange={(e) => set('maxDayHours', e.target.value)} />
               </label>
-              <label className="flex items-center justify-between gap-2 text-sm text-gray-900">
+              <label className="flex items-center justify-between gap-2 text-sm text-ink-900">
                 最終の便の前の余裕(分)
                 <input type="number" min={0} max={120} className={input} value={draft.margin}
                   disabled={!data.can_edit} onChange={(e) => set('margin', e.target.value)} />
@@ -175,7 +175,7 @@ const MovementSettingsPanel: React.FC<Props> = ({ planId, onSaved }) => {
             {data.can_edit ? (
               <Button type="submit" variant="primary" size="sm" loading={busy}>既定を保存</Button>
             ) : (
-              <p className="text-sm text-gray-700">閲覧のみの参加者は変えられません。</p>
+              <p className="text-sm text-ink-700">閲覧のみの参加者は変えられません。</p>
             )}
           </form>
         )}

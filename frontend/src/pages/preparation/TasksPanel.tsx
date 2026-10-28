@@ -25,7 +25,7 @@ const TasksPanel: React.FC<Props> = ({ tasks, canEdit, onAdd, onEdit, onDelete, 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-700">未完了 {open} 件 / 全 {tasks.length} 件</p>
+        <p className="text-sm text-ink-700">未完了 {open} 件 / 全 {tasks.length} 件</p>
         {canEdit && (
           <Button variant="primary" size="sm" icon={<Plus size={16} />} onClick={onAdd}>
             タスクを追加
@@ -33,7 +33,7 @@ const TasksPanel: React.FC<Props> = ({ tasks, canEdit, onAdd, onEdit, onDelete, 
         )}
       </div>
       {tasks.length === 0 ? (
-        <Card padding="lg" className="text-center text-gray-700">準備タスクはまだありません。</Card>
+        <Card padding="lg" className="text-center text-ink-700">準備タスクはまだありません。</Card>
       ) : (
         <ul className="space-y-2" aria-label="準備タスク">
           {tasks.map((t) => (
@@ -50,29 +50,29 @@ const TasksPanel: React.FC<Props> = ({ tasks, canEdit, onAdd, onEdit, onDelete, 
                       onChange={() => onToggle(t)}
                     />
                     <div className="min-w-0">
-                      <label htmlFor={`task-done-${t.id}`} className={`font-medium text-gray-900 ${t.status === 'done' ? 'line-through' : ''}`}>
+                      <label htmlFor={`task-done-${t.id}`} className={`font-medium text-ink-900 ${t.status === 'done' ? 'line-through' : ''}`}>
                         {t.title}
                       </label>
-                      <p className="text-xs text-gray-700 mt-0.5">
+                      <p className="text-xs text-ink-700 mt-0.5">
                         担当: {t.assignee_name ?? (t.assignee_missing ? 'メンバー外(未割当)' : '未定')}
                         {t.due_at && ` ・ 期限: ${formatDue(t.due_at)}`}
                         {t.is_overdue && <span className="ml-1 text-red-800 font-medium">(期限切れ)</span>}
                         {t.related_label && ` ・ 関連: ${t.related_label}`}
                         {t.related_missing && ' ・ 関連先は削除されています'}
                       </p>
-                      {t.completion_criteria && <p className="text-xs text-gray-700">完了条件: {t.completion_criteria}</p>}
-                      {t.description && <p className="text-xs text-gray-700">{t.description}</p>}
+                      {t.completion_criteria && <p className="text-xs text-ink-700">完了条件: {t.completion_criteria}</p>}
+                      {t.description && <p className="text-xs text-ink-700">{t.description}</p>}
                       {t.status === 'done' && t.completed_by_name && (
-                        <p className="text-xs text-gray-700">{t.completed_by_name}さんが完了</p>
+                        <p className="text-xs text-ink-700">{t.completed_by_name}さんが完了</p>
                       )}
                     </div>
                   </div>
                   {t.can_edit && (
                     <div className="flex items-center gap-1 shrink-0">
-                      <button type="button" onClick={() => onEdit(t)} className="text-gray-600 hover:text-blue-700 p-1" aria-label={`${t.title}を編集`}>
+                      <button type="button" onClick={() => onEdit(t)} className="text-ink-700 hover:text-blue-700 p-1" aria-label={`${t.title}を編集`}>
                         <Pencil size={16} />
                       </button>
-                      <button type="button" onClick={() => onDelete(t)} className="text-gray-600 hover:text-red-700 p-1" aria-label={`${t.title}を削除`}>
+                      <button type="button" onClick={() => onDelete(t)} className="text-ink-700 hover:text-red-700 p-1" aria-label={`${t.title}を削除`}>
                         <Trash2 size={16} />
                       </button>
                     </div>

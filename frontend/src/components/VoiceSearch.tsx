@@ -211,10 +211,10 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
       {/* 音声録音エリア */}
       <Card variant="outlined" padding="lg">
         <div className="text-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-ink-900 mb-2">
             🎤 AI音声認識スポット検索
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-700">
             音声でスポットを検索できます。「東京タワー周辺のグルメスポット」など自然に話しかけてください
           </p>
         </div>
@@ -362,18 +362,18 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h5 className="font-medium text-gray-900">{spot.name}</h5>
+                      <h5 className="font-medium text-ink-900">{spot.name}</h5>
                       {spot.description && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                        <p className="text-sm text-ink-700 mt-1 line-clamp-2">
                           {spot.description}
                         </p>
                       )}
                       {spot.location && (
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-ink-500 mt-1">
                           📍 {spot.location.address}
                         </p>
                       )}
-                      <div className="flex items-center mt-2 space-x-4 text-sm text-gray-600">
+                      <div className="flex items-center mt-2 space-x-4 text-sm text-ink-700">
                         {spot.rating && (
                           <span>⭐ {spot.rating}</span>
                         )}
@@ -407,7 +407,7 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
       {searchResults && searchResults.spots?.length === 0 && (
         <Card variant="outlined">
           <Card.Body>
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-ink-500">
               <div className="text-4xl mb-2">🤔</div>
               <p>「{transcription}」に関連するスポットが見つかりませんでした</p>
               <p className="text-sm mt-1">別の表現でお試しください</p>
@@ -422,7 +422,7 @@ const VoiceSearch: React.FC<VoiceSearchProps> = ({
           <Card.Body>
             <div className="text-center py-8">
               <LoadingSpinner size={32} className="mx-auto mb-3" />
-              <p className="text-gray-600">音声を解析中...</p>
+              <p className="text-ink-700">音声を解析中...</p>
             </div>
           </Card.Body>
         </Card>

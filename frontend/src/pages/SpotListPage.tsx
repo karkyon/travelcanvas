@@ -27,7 +27,7 @@ const SpotListPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">📋 スポット一覧</h1>
+          <h1 className="text-3xl font-bold text-ink-900">📋 スポット一覧</h1>
         </div>
 
         <SpotList

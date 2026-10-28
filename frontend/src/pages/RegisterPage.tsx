@@ -76,18 +76,18 @@ const RegisterPage = () => {
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
-        <div className="bg-white shadow-2xl rounded-2xl overflow-hidden">
+        <div className="bg-surface shadow-2xl rounded-2xl overflow-hidden">
           <div className="px-8 py-10">
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-3xl font-bold text-ink-900 mb-2">
                 TravelCanvas
               </h2>
-              <p className="text-gray-600">Create your account</p>
+              <p className="text-ink-700">Create your account</p>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="username" className="block text-sm font-medium text-ink-700 mb-2">
                   Username
                 </label>
                 <input
@@ -104,7 +104,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-ink-700 mb-2">
                   Email
                 </label>
                 <input
@@ -122,7 +122,7 @@ const RegisterPage = () => {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-ink-700 mb-2">
                   Password
                 </label>
                 <input
@@ -138,13 +138,13 @@ const RegisterPage = () => {
                   disabled={isLoading}
                   aria-describedby="password-rule"
                 />
-                <p id="password-rule" className="mt-1 text-xs text-gray-700">
+                <p id="password-rule" className="mt-1 text-xs text-ink-700">
                   8文字以上。よく使われるパスワードや、メールアドレス・ユーザー名を含むものは使えません。
                 </p>
               </div>
 
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-ink-700 mb-2">
                   Confirm Password
                 </label>
                 <input
@@ -185,7 +185,7 @@ const RegisterPage = () => {
               </div>
 
               <div className="text-center">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-ink-700">
                   Already have an account?{' '}
                   <Link 
                     to="/login" 

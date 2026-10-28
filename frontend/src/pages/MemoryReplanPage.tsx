@@ -46,7 +46,7 @@ const MemoryReplanPage: React.FC = () => {
     load();
   }, [load]);
 
-  if (!planId) return <div className="p-8 text-center text-gray-700">プランが選択されていません。</div>;
+  if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   const apply = async (p: G7Proposal) => {
     if (!data) return;
@@ -73,12 +73,12 @@ const MemoryReplanPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-gray-900">過去の旅からの提案</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">過去の旅からの提案</h1>
+      <p className="text-sm text-ink-700 mt-1">
         あなたが参加したほかの旅行の「振り返り」(行った・着いた・出た時刻)から傾向を見つけます。提案は適用するまで旅程を変えません。
       </p>
       {data && (
-        <p className="text-sm text-gray-700 mt-1" data-testid="party-label">
+        <p className="text-sm text-ink-700 mt-1" data-testid="party-label">
           {`この旅行の同行者: ${data.party_label}(同じ属性の旅行の傾向を優先します。属性は「制約」の「移動・滞在の既定」で変えられます)`}
         </p>
       )}
@@ -89,9 +89,9 @@ const MemoryReplanPage: React.FC = () => {
       ) : (
         <>
           <section aria-label="見つかった傾向" className="mt-6">
-            <h2 className="font-semibold text-gray-900">見つかった傾向</h2>
+            <h2 className="font-semibold text-ink-900">見つかった傾向</h2>
             {data.insights.length === 0 ? (
-              <Card padding="lg" className="mt-2 text-center text-gray-700">
+              <Card padding="lg" className="mt-2 text-center text-ink-700">
                 {data.sample_count === 0
                   ? 'まだ材料がありません。ほかの旅行の「振り返り」で、行った予定と着いた・出た時刻を記録すると提案できます。'
                   : `記録${data.sample_count}件からは、はっきりした傾向は見つかりませんでした。`}
@@ -101,8 +101,8 @@ const MemoryReplanPage: React.FC = () => {
                 {data.insights.map((i) => (
                   <li key={`${i.kind}-${i.event_type ?? ''}-${i.mode ?? ''}`}>
                     <Card padding="md">
-                      <p className="text-gray-900">{insightText(i)}</p>
-                      <p className="text-sm text-gray-700 mt-1">{basisText(i)}</p>
+                      <p className="text-ink-900">{insightText(i)}</p>
+                      <p className="text-sm text-ink-700 mt-1">{basisText(i)}</p>
                     </Card>
                   </li>
                 ))}
@@ -112,16 +112,16 @@ const MemoryReplanPage: React.FC = () => {
 
           {data.proposals.length > 0 && (
             <section aria-label="この旅行への提案" className="mt-6">
-              <h2 className="font-semibold text-gray-900">この旅行への提案</h2>
+              <h2 className="font-semibold text-ink-900">この旅行への提案</h2>
               <ul className="mt-2 space-y-2">
                 {data.proposals.map((p) => (
                   <li key={p.id}>
                     <Card padding="md" className="space-y-2">
-                      <p className="text-gray-900">{proposalTitle(p, eventTypeLabel)}</p>
+                      <p className="text-ink-900">{proposalTitle(p, eventTypeLabel)}</p>
                       <table className="w-full text-sm">
                         <caption className="sr-only">{p.target === 'segment' ? '変わる移動' : '変わる予定'}</caption>
                         <thead>
-                          <tr className="text-left text-gray-700">
+                          <tr className="text-left text-ink-700">
                             <th scope="col" className="font-medium">{p.target === 'segment' ? '移動' : '予定'}</th>
                             <th scope="col" className="font-medium">今</th>
                             <th scope="col" className="font-medium">提案</th>
@@ -130,21 +130,21 @@ const MemoryReplanPage: React.FC = () => {
                         <tbody>
                           {p.changes.map((c) => (isSegment(c) ? (
                             <tr key={c.segment_id}>
-                              <th scope="row" className="font-normal text-gray-900">{c.label}</th>
-                              <td className="text-gray-900">{`前の余裕${c.from}分`}</td>
-                              <td className="text-gray-900">{`前の余裕${c.to}分`}</td>
+                              <th scope="row" className="font-normal text-ink-900">{c.label}</th>
+                              <td className="text-ink-900">{`前の余裕${c.from}分`}</td>
+                              <td className="text-ink-900">{`前の余裕${c.to}分`}</td>
                             </tr>
                           ) : (
                             <tr key={c.event_id}>
-                              <th scope="row" className="font-normal text-gray-900">{c.title}</th>
-                              <td className="text-gray-900">{c.from}</td>
-                              <td className="text-gray-900">{c.to}</td>
+                              <th scope="row" className="font-normal text-ink-900">{c.title}</th>
+                              <td className="text-ink-900">{c.from}</td>
+                              <td className="text-ink-900">{c.to}</td>
                             </tr>
                           )))}
                         </tbody>
                       </table>
                       {p.kept.length > 0 && (
-                        <ul className="text-sm text-gray-800" aria-label="動かさない予定">
+                        <ul className="text-sm text-ink-900" aria-label="動かさない予定">
                           {p.kept.map((k) => <li key={k.event_id}>{`${k.title}: ${KEPT_REASON[k.reason]}`}</li>)}
                         </ul>
                       )}

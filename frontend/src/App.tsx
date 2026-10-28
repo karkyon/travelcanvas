@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from '@/router';
 import { useAuthStore } from '@/store/authStore';
 import { Toaster } from 'react-hot-toast';
+import ThemeRoot from '@/components/design/ThemeRoot';
 import '@/styles/globals.css';
 
 function App() {
@@ -35,12 +36,13 @@ function App() {
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <ThemeRoot />
         <div className="text-center">
           <div className="w-16 h-16 bg-linear-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">TC</span>
           </div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">TravelCanvas を起動中...</p>
+          <p className="text-ink-700">TravelCanvas を起動中...</p>
         </div>
       </div>
     );
@@ -48,6 +50,8 @@ function App() {
 
   return (
     <div className="App">
+      {/* [Gate G10-UX] UX-8 選んだ見た目を <html data-theme> に当てる(全ての画面) */}
+      <ThemeRoot />
       {/* [Gate G2] React Router 7: startTransition は既定の動作(future flag は不要) */}
       <RouterProvider router={router} />
       <Toaster 
@@ -55,11 +59,12 @@ function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#fff',
-            color: '#374151',
+            // [Gate G10-UX] UX-8 暗い見た目でも読める(デザインの決まりの面と文字の色)
+            background: 'var(--tc-surface-solid)',
+            color: 'var(--tc-ink-900)',
             borderRadius: '12px',
             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            border: '1px solid #e5e7eb',
+            border: '1px solid var(--tc-cloud-200)',
             fontSize: '14px',
             fontWeight: '500',
           },
@@ -84,14 +89,15 @@ function App() {
               secondary: '#b91c1c',
             },
           },
+          // [Gate G10-UX] 以前の #3b82f6 は白い文字と 3.7:1(AA 未満)。#1d4ed8 で 6.7:1
           loading: {
             style: {
-              background: '#3b82f6',
+              background: '#1d4ed8',
               color: '#fff',
             },
             iconTheme: {
               primary: '#fff',
-              secondary: '#3b82f6',
+              secondary: '#1d4ed8',
             },
           },
         }}

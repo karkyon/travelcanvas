@@ -69,8 +69,8 @@ const AtlasPage: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900">旅の地図(Atlas)</h1>
-      <p className="text-sm text-gray-700 mt-1">
+      <h1 className="text-2xl font-bold text-ink-900">旅の地図(Atlas)</h1>
+      <p className="text-sm text-ink-700 mt-1">
         参加している旅行を横断して、訪れた地域を区画で表します。材料は旅行の「行った」記録、あなたの位置付きの記録と位置の軌跡、
         これからの旅行の予定です。Atlasはあなただけが見られます。
       </p>
@@ -78,13 +78,13 @@ const AtlasPage: React.FC = () => {
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
 
       <div className="mt-4 flex flex-wrap gap-4">
-        <label className="text-sm text-gray-800">区画の大きさ
+        <label className="text-sm text-ink-900">区画の大きさ
           <select className="block mt-1 border rounded-sm px-2 py-1" value={precision} onChange={(e) => setPrecision(e.target.value as AtlasPrecision)}>
             <option value="region">約11km(0.1度)</option>
             <option value="area">約110km(1度)</option>
           </select>
         </label>
-        <label className="text-sm text-gray-800">年
+        <label className="text-sm text-ink-900">年
           <select className="block mt-1 border rounded-sm px-2 py-1" value={year ?? ''} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
             <option value="">すべて</option>
             {(data?.years ?? []).map((y) => <option key={y} value={y}>{`${y}年`}</option>)}
@@ -98,10 +98,10 @@ const AtlasPage: React.FC = () => {
         <>
           <Card padding="md" className="mt-4">
             <section aria-label="Atlasの概要" className="space-y-2">
-              <p className="text-sm text-gray-900">
+              <p className="text-sm text-ink-900">
                 {`区画${data.summary.cells}件(滞在${data.summary.by_state.STAYED}・訪問${data.summary.by_state.VISITED}・通過${data.summary.by_state.PASS_THROUGH}・予定${data.summary.by_state.PLANNED})・再訪率 ${percent(data.summary.revisit_rate)}`}
               </p>
-              <ul className="flex flex-wrap gap-3 text-sm text-gray-800" aria-label="凡例">
+              <ul className="flex flex-wrap gap-3 text-sm text-ink-900" aria-label="凡例">
                 {STATES.map((s) => (
                   <li key={s} className="flex items-center gap-1">
                     <span aria-hidden="true" className="inline-block w-3 h-3 border border-gray-500" style={{ background: STATE_INFO[s].fill }} />
@@ -111,7 +111,7 @@ const AtlasPage: React.FC = () => {
               </ul>
               {data.cells.length > 0 && (
                 <svg viewBox={`0 0 ${sketch.width} ${sketch.height}`} width="100%" style={{ maxWidth: 360 }} role="img"
-                  aria-label={`訪れた地域の略図(区画${data.cells.length}件。内容は下の一覧と同じ)`} className="border border-gray-200 rounded-sm bg-white">
+                  aria-label={`訪れた地域の略図(区画${data.cells.length}件。内容は下の一覧と同じ)`} className="border border-gray-200 rounded-sm bg-surface">
                   {sketch.rects.map((r) => (
                     <rect key={r.key} x={r.x} y={r.y} width={Math.max(r.w, 2)} height={Math.max(r.h, 2)} fill={r.fill} stroke="#374151" strokeWidth="0.5">
                       <title>{r.title}</title>
@@ -123,16 +123,16 @@ const AtlasPage: React.FC = () => {
           </Card>
 
           <section aria-label="区画の一覧" className="mt-6">
-            <h2 className="font-semibold text-gray-900">区画の一覧</h2>
+            <h2 className="font-semibold text-ink-900">区画の一覧</h2>
             {data.cells.length === 0 ? (
-              <Card padding="lg" className="mt-2 text-center text-gray-700">
+              <Card padding="lg" className="mt-2 text-center text-ink-700">
                 まだ訪れた地域はありません。旅行の「振り返り」で行った予定を記録すると表示されます。
               </Card>
             ) : (
               <table className="w-full mt-2 text-sm">
                 <caption className="sr-only">区画ごとの状態と旅行</caption>
                 <thead>
-                  <tr className="text-left text-gray-700">
+                  <tr className="text-left text-ink-700">
                     <th scope="col" className="font-medium">状態</th>
                     <th scope="col" className="font-medium">区画</th>
                     <th scope="col" className="font-medium">旅行</th>
@@ -142,9 +142,9 @@ const AtlasPage: React.FC = () => {
                 <tbody>
                   {data.cells.map((c) => (
                     <tr key={c.key} className="border-t border-gray-200">
-                      <td className="py-1 text-gray-900">{`${STATE_INFO[c.state].mark} ${STATE_INFO[c.state].label}`}</td>
-                      <td className="py-1 text-gray-900">{cellLabel(c)}</td>
-                      <td className="py-1 text-gray-900">
+                      <td className="py-1 text-ink-900">{`${STATE_INFO[c.state].mark} ${STATE_INFO[c.state].label}`}</td>
+                      <td className="py-1 text-ink-900">{cellLabel(c)}</td>
+                      <td className="py-1 text-ink-900">
                         {c.trips.map((t, i) => (
                           <React.Fragment key={t.plan_id}>
                             {i > 0 && '、'}
@@ -152,7 +152,7 @@ const AtlasPage: React.FC = () => {
                           </React.Fragment>
                         ))}
                       </td>
-                      <td className="py-1 text-gray-800">{`${showDate(c.first_at)} / ${showDate(c.last_at)}`}</td>
+                      <td className="py-1 text-ink-900">{`${showDate(c.first_at)} / ${showDate(c.last_at)}`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -161,14 +161,14 @@ const AtlasPage: React.FC = () => {
           </section>
 
           <section aria-label="Atlasに含める旅行" className="mt-6">
-            <h2 className="font-semibold text-gray-900">Atlasに含める旅行</h2>
+            <h2 className="font-semibold text-ink-900">Atlasに含める旅行</h2>
             {data.plans.length === 0 ? (
-              <p className="text-sm text-gray-700 mt-2">参加している旅行がありません。</p>
+              <p className="text-sm text-ink-700 mt-2">参加している旅行がありません。</p>
             ) : (
               <ul className="mt-2 space-y-1">
                 {data.plans.map((p) => (
                   <li key={p.plan_id}>
-                    <label className="flex items-center gap-2 text-sm text-gray-900">
+                    <label className="flex items-center gap-2 text-sm text-ink-900">
                       <input type="checkbox" checked={!p.excluded} disabled={busy} onChange={(e) => toggleExclude(p.plan_id, e.target.checked)} />
                       {`${p.title}(材料${p.observations}件)`}
                     </label>

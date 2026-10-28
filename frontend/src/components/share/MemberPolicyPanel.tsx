@@ -93,12 +93,12 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
     policy.catalog.categories.some((c) => list.includes(c.key) && c.implies.includes(key));
 
   return (
-    <section className="bg-white rounded-xl shadow-xs p-6" aria-labelledby="member-policy-heading">
-      <h2 id="member-policy-heading" className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+    <section className="bg-surface rounded-xl shadow-xs p-6" aria-labelledby="member-policy-heading">
+      <h2 id="member-policy-heading" className="text-lg font-semibold text-ink-900 mb-1 flex items-center gap-2">
         <ShieldCheck size={20} aria-hidden="true" />
         参加者に見せない項目
       </h2>
-      <p className="text-sm text-gray-700 mb-4">
+      <p className="text-sm text-ink-700 mb-4">
         招待した人(編集者・閲覧者)に見せない項目を選びます。隠した項目は、その人の画面・検索・書き出し・しおり・
         当日モードのどこにも表示されません。所有者(あなた)には全て見えます。
       </p>
@@ -106,7 +106,7 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
       <table className="w-full text-sm mb-3">
         <caption className="sr-only">役割ごとに見せない項目</caption>
         <thead>
-          <tr className="text-left text-gray-800">
+          <tr className="text-left text-ink-900">
             <th scope="col" className="py-1">項目</th>
             {(Object.keys(ROLE_LABEL) as RoleKey[]).map((r) => (
               <th key={r} scope="col" className="py-1 text-center">{ROLE_LABEL[r]}に見せない</th>
@@ -116,9 +116,9 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
         <tbody>
           {policy.catalog.categories.map((c) => (
             <tr key={c.key} className="border-t border-gray-100">
-              <th scope="row" className="py-2 font-normal text-gray-900">
+              <th scope="row" className="py-2 font-normal text-ink-900">
                 {c.label}
-                <span className="block text-xs text-gray-600">{c.description}</span>
+                <span className="block text-xs text-ink-700">{c.description}</span>
               </th>
               {(Object.keys(ROLE_LABEL) as RoleKey[]).map((r) => (
                 <td key={r} className="py-2 text-center">
@@ -138,22 +138,22 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
 
       {(policy.members ?? []).length > 0 && (
         <div className="mt-6">
-          <h3 className="font-semibold text-gray-900 mb-2">1人ずつの設定</h3>
+          <h3 className="font-semibold text-ink-900 mb-2">1人ずつの設定</h3>
           <ul className="space-y-3">
             {(policy.members ?? []).map((m) => {
               const draft = editing[m.id];
               const labels = policy.catalog.categories.filter((c) => m.effective_hidden.includes(c.key)).map((c) => c.label);
               return (
                 <li key={m.id} className="border border-gray-200 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-gray-900">{m.email}({m.role === 'editor' ? '編集者' : '閲覧者'})</p>
-                  <p className="text-gray-700">
+                  <p className="font-medium text-ink-900">{m.email}({m.role === 'editor' ? '編集者' : '閲覧者'})</p>
+                  <p className="text-ink-700">
                     {m.hidden === null ? '役割の設定に従う' : 'この人だけの設定'}・見せない項目: {labels.length ? labels.join('・') : 'なし'}
                   </p>
                   {draft ? (
                     <fieldset className="mt-2">
                       <legend className="sr-only">{m.email} に見せない項目</legend>
                       {policy.catalog.categories.map((c) => (
-                        <label key={c.key} className="flex items-center gap-2 text-gray-800">
+                        <label key={c.key} className="flex items-center gap-2 text-ink-900">
                           <input type="checkbox" checked={draft.includes(c.key)} disabled={busy || implied(draft, c.key)}
                             onChange={() => setEditing({ ...editing, [m.id]: toggle(draft, c.key) })} />
                           {c.label}
@@ -165,7 +165,7 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
                             .then((ok) => { if (ok) setEditing((cur) => without(cur, m.id)); })}>
                           保存する
                         </button>
-                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800`}
+                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900`}
                           onClick={() => setEditing((cur) => without(cur, m.id))}>
                           やめる
                         </button>
@@ -173,13 +173,13 @@ const MemberPolicyPanel: React.FC<Props> = ({ planId, reloadKey = 0 }) => {
                     </fieldset>
                   ) : (
                     <div className="flex gap-2 mt-2">
-                      <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                      <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                         aria-label={`${m.email} だけの設定を変える`}
                         onClick={() => setEditing({ ...editing, [m.id]: m.effective_hidden })}>
                         この人だけ変える
                       </button>
                       {m.hidden !== null && (
-                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                        <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                           aria-label={`${m.email} を役割の設定に戻す`}
                           onClick={() => void run(() => putMemberOverride(planId, m.id, null), `${m.email} を役割の設定に戻しました`)}>
                           役割の設定に戻す

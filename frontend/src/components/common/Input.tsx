@@ -41,21 +41,22 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   const baseClasses = [
     'block w-full rounded-lg border transition-all duration-200',
     'focus:outline-hidden focus:ring-2 focus:ring-offset-1',
-    'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50'
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-cloud-100',
+    // [Gate G10-UX] UX-6 入力の地・文字・枠・フォーカスはデザインの決まり(暗い見た目でも同じ部品で読める)
+    'bg-cloud-0 text-ink-900 placeholder:text-ink-500 ring-offset-cloud-0'
   ];
 
   const variantClasses = {
     default: [
-      'border-gray-300 focus:border-blue-500 focus:ring-blue-500',
-      'placeholder-gray-400'
+      'border-cloud-200 focus:border-focus focus:ring-focus',
     ],
     error: [
-      'border-red-500 focus:border-red-500 focus:ring-red-500',
-      'placeholder-red-300 bg-red-50'
+      'border-danger focus:border-danger focus:ring-danger',
+      'bg-danger-soft'
     ],
     success: [
-      'border-green-500 focus:border-green-500 focus:ring-green-500',
-      'placeholder-green-300 bg-green-50'
+      'border-success focus:border-success focus:ring-success',
+      'bg-success-soft'
     ]
   };
 
@@ -92,14 +93,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   return (
     <div className={containerClasses}>
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={inputId} className="block text-sm font-medium text-ink-700 mb-1">
           {label}
         </label>
       )}
       
       <div className="relative">
         {leftIcon && (
-          <div className={`absolute left-3 ${iconPositionClass} ${iconClass} text-gray-400 pointer-events-none flex items-center justify-center`}>
+          <div className={`absolute left-3 ${iconPositionClass} ${iconClass} text-ink-500 pointer-events-none flex items-center justify-center`}>
             {leftIcon}
           </div>
         )}
@@ -115,7 +116,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
         />
         
         {rightIcon && (
-          <div className={`absolute right-3 ${iconPositionClass} ${iconClass} text-gray-400 pointer-events-none flex items-center justify-center`}>
+          <div className={`absolute right-3 ${iconPositionClass} ${iconClass} text-ink-500 pointer-events-none flex items-center justify-center`}>
             {rightIcon}
           </div>
         )}
@@ -124,7 +125,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
       {(error || helperText) && (
         <div className="mt-1" id={messageId}>
           {error && (
-            <p className="text-sm text-red-700 flex items-center" role="alert">
+            <p className="text-sm text-danger flex items-center" role="alert">
               <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -132,7 +133,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
             </p>
           )}
           {!error && helperText && (
-            <p className="text-sm text-gray-600">{helperText}</p>
+            <p className="text-sm text-ink-700">{helperText}</p>
           )}
         </div>
       )}

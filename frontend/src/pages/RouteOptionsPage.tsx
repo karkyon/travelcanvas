@@ -223,7 +223,7 @@ const RouteOptionsPage: React.FC = () => {
 
         {allEvents.length < 2 && (
           <Card className="mb-4">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-500">
               経路候補を作成するには、旅程に2つ以上のイベントが必要です。
             </p>
           </Card>
@@ -231,7 +231,7 @@ const RouteOptionsPage: React.FC = () => {
 
         {options.length === 0 ? (
           <Card>
-            <p className="text-sm text-gray-500 text-center py-8">まだ経路候補がありません</p>
+            <p className="text-sm text-ink-500 text-center py-8">まだ経路候補がありません</p>
           </Card>
         ) : (
           <div className="space-y-3">
@@ -245,17 +245,17 @@ const RouteOptionsPage: React.FC = () => {
                         <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">採用済み</span>
                       )}
                       {option.status === 'discarded' && (
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">見送り</span>
+                        <span className="text-xs text-ink-500 bg-gray-100 px-2 py-0.5 rounded-full">見送り</span>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
+                    <div className="mt-1 text-xs text-ink-500 flex flex-wrap gap-x-3 gap-y-1">
                       {option.total_duration_minutes != null && <span>約{Math.round(option.total_duration_minutes)}分</span>}
                       {option.total_distance_km != null && <span>{option.total_distance_km.toFixed(1)}km</span>}
                       {option.total_cost != null && <span>{option.total_cost} {option.currency}</span>}
                       {option.transfer_count != null && <span>乗換{option.transfer_count}回</span>}
                       {option.walking_minutes != null && <span>徒歩{Math.round(option.walking_minutes)}分</span>}
                     </div>
-                    <div className="mt-1 flex gap-3 text-xs text-gray-600">
+                    <div className="mt-1 flex gap-3 text-xs text-ink-700">
                       {option.accessibility_score != null && (
                         <span className="flex items-center gap-1">
                           <Accessibility size={12} /> {(option.accessibility_score * 100).toFixed(0)}%
@@ -273,7 +273,7 @@ const RouteOptionsPage: React.FC = () => {
                       )}
                     </div>
                     {option.legs.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">
+                      <div className="mt-2 text-xs text-ink-500">
                         {option.legs.map((leg) => leg.line || leg.mode).join(' → ')}
                       </div>
                     )}

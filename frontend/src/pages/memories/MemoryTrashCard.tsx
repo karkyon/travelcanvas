@@ -34,14 +34,14 @@ const MemoryTrashCard: React.FC<Props> = ({ planId, reloadKey, busy, onRestore }
   return (
     <Card padding="md" className="mt-4">
       <section aria-label="削除した記録" className="space-y-2">
-        <h2 className="font-semibold text-gray-900">削除した記録</h2>
-        <p className="text-sm text-gray-700">削除から7日間は元に戻せます。期限を過ぎるとファイルごと消えます。</p>
+        <h2 className="font-semibold text-ink-900">削除した記録</h2>
+        <p className="text-sm text-ink-700">削除から7日間は元に戻せます。期限を過ぎるとファイルごと消えます。</p>
         <ul className="divide-y">
           {items.map((t) => (
             <li key={t.memory_id} className="py-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm">
-                <span className="font-medium text-gray-900">{`${kindLabel(t.kind)}: ${t.summary || '(本文なし)'}`}</span>
-                <span className="block text-gray-700">{`${formatDate(t.restore_until)} まで戻せます`}</span>
+                <span className="font-medium text-ink-900">{`${kindLabel(t.kind)}: ${t.summary || '(本文なし)'}`}</span>
+                <span className="block text-ink-700">{`${formatDate(t.restore_until)} まで戻せます`}</span>
               </span>
               <Button size="sm" variant="outline" disabled={busy} aria-label={`${t.summary || kindLabel(t.kind)}を元に戻す`}
                 onClick={() => onRestore(t.memory_id)}>

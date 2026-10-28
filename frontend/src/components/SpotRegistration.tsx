@@ -97,7 +97,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
     <Card className="max-w-2xl mx-auto">
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">新しいスポットを登録</h2>
+          <h2 className="text-2xl font-bold text-ink-900">新しいスポットを登録</h2>
           {onClose && (
             <Button variant="ghost" onClick={onClose}>
               ✕
@@ -108,7 +108,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* スポット名 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               スポット名 *
             </label>
             <Input
@@ -122,7 +122,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           
           {/* カテゴリ */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               カテゴリ
             </label>
             <select
@@ -140,7 +140,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           
           {/* 説明 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               説明
             </label>
             <textarea
@@ -154,7 +154,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           
           {/* 住所 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               住所
             </label>
             <Input
@@ -168,7 +168,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           {/* 位置情報 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink-700 mb-2">
                 緯度
               </label>
               <Input
@@ -180,7 +180,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-ink-700 mb-2">
                 経度
               </label>
               <Input
@@ -195,7 +195,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           
           {/* 価格帯 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               価格帯
             </label>
             <select
@@ -213,7 +213,7 @@ const SpotRegistration: React.FC<SpotRegistrationProps> = ({ onSpotCreated, onCl
           
           {/* 画像URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-ink-700 mb-2">
               画像URL
             </label>
             <Input

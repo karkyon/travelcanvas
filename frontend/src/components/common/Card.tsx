@@ -45,17 +45,18 @@ const Card: React.FC<CardProps> & {
   fullHeight = false
 }) => {
   const baseClasses = [
-    'bg-white rounded-xl border transition-all duration-200',
+    // [Gate G10-UX] UX-6 面はデザインの決まり(tokens の solid の面・枠・影)へ置き換えた。暗い見た目でも同じ部品で読める
+    'bg-cloud-0 text-ink-900 rounded-xl border transition-shadow duration-200',
     onClick ? 'cursor-pointer' : '',
-    hover || onClick ? 'hover:shadow-lg hover:shadow-gray-200/50 hover:-translate-y-1' : '',
+    hover || onClick ? 'hover:shadow-md' : '',
     fullHeight ? 'h-full' : ''
   ];
 
   const variantClasses = {
-    default: 'border-gray-200 shadow-xs',
-    outlined: 'border-gray-300 shadow-none',
-    elevated: 'border-gray-100 shadow-lg shadow-gray-200/50',
-    gradient: 'border-none bg-linear-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-200/50'
+    default: 'border-cloud-200 shadow-xs',
+    outlined: 'border-cloud-200 shadow-none',
+    elevated: 'border-cloud-100 shadow-md',
+    gradient: 'border-none bg-accent-soft shadow-sm'
   };
 
   const paddingClasses = {
@@ -90,23 +91,23 @@ const CardHeader: React.FC<CardHeaderProps> = ({
 }) => {
   if (children) {
     return (
-      <div className={`border-b border-gray-200 pb-4 mb-4 ${className}`}>
+      <div className={`border-b border-cloud-200 pb-4 mb-4 ${className}`}>
         {children}
       </div>
     );
   }
 
   return (
-    <div className={`border-b border-gray-200 pb-4 mb-4 ${className}`}>
+    <div className={`border-b border-cloud-200 pb-4 mb-4 ${className}`}>
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           {title && (
-            <h3 className="text-lg font-semibold text-gray-900 truncate">
+            <h3 className="text-lg font-semibold text-ink-900 truncate">
               {title}
             </h3>
           )}
           {subtitle && (
-            <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+            <p className="mt-1 text-sm text-ink-500 line-clamp-2">
               {subtitle}
             </p>
           )}
@@ -139,7 +140,7 @@ const CardFooter: React.FC<CardFooterProps> = ({
   children
 }) => {
   return (
-    <div className={`border-t border-gray-200 pt-4 mt-4 ${className}`}>
+    <div className={`border-t border-cloud-200 pt-4 mt-4 ${className}`}>
       {children}
     </div>
   );

@@ -149,26 +149,26 @@ const SearchSettingsPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* ヘッダー */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3">
+          <h1 className="text-3xl font-bold text-ink-900 mb-4 flex items-center justify-center gap-3">
             <Settings size={32} className="text-blue-500" />
             AI検索設定
           </h1>
-          <p className="text-gray-600">
+          <p className="text-ink-700">
             あなたの趣味・志向と旅行スタイルを設定して、最適なスポット検索を実現
           </p>
         </div>
 
         <div className="space-y-8">
           {/* 地理的設定 */}
-          <div className="bg-white rounded-xl shadow-xs p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <div className="bg-surface rounded-xl shadow-xs p-6">
+            <h2 className="text-xl font-bold text-ink-900 mb-6 flex items-center gap-2">
               <MapPin size={24} className="text-green-500" />
               旅行エリア設定
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   メインエリア
                 </label>
                 <input
@@ -181,7 +181,7 @@ const SearchSettingsPage: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   検索半径: {preferences.preferredArea.radius}km
                 </label>
                 <input
@@ -192,7 +192,7 @@ const SearchSettingsPage: React.FC = () => {
                   onChange={(e) => updateArea('radius', parseInt(e.target.value))}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-xs text-ink-500 mt-1">
                   <span>5km</span>
                   <span>200km</span>
                 </div>
@@ -201,8 +201,8 @@ const SearchSettingsPage: React.FC = () => {
           </div>
 
           {/* 趣味・志向設定 */}
-          <div className="bg-white rounded-xl shadow-xs p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+          <div className="bg-surface rounded-xl shadow-xs p-6">
+            <h2 className="text-xl font-bold text-ink-900 mb-6 flex items-center gap-2">
               <Heart size={24} className="text-red-500" />
               趣味・志向設定
             </h2>
@@ -210,7 +210,7 @@ const SearchSettingsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {Object.entries(preferences.interests).map(([key, value]) => (
                 <div key={key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-ink-700 mb-2">
                     {interestLabels[key as keyof typeof interestLabels]} 
                     <span className="ml-2 text-blue-600 font-bold">{value}/10</span>
                   </label>
@@ -222,7 +222,7 @@ const SearchSettingsPage: React.FC = () => {
                     onChange={(e) => updateInterest(key as keyof typeof preferences.interests, parseInt(e.target.value))}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-xs text-ink-500 mt-1">
                     <span>興味なし</span>
                     <span>とても興味あり</span>
                   </div>
@@ -232,14 +232,14 @@ const SearchSettingsPage: React.FC = () => {
           </div>
 
           {/* 検索設定 */}
-          <div className="bg-white rounded-xl shadow-xs p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">
+          <div className="bg-surface rounded-xl shadow-xs p-6">
+            <h2 className="text-xl font-bold text-ink-900 mb-6">
               🔍 検索詳細設定
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   候補数
                 </label>
                 <select
@@ -255,7 +255,7 @@ const SearchSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   予算レベル
                 </label>
                 <select
@@ -271,7 +271,7 @@ const SearchSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   旅行スタイル
                 </label>
                 <select
@@ -287,7 +287,7 @@ const SearchSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   最大距離: {preferences.searchSettings.maxDistance}km
                 </label>
                 <input
@@ -301,7 +301,7 @@ const SearchSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   滞在時間
                 </label>
                 <select

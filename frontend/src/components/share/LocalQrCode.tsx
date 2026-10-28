@@ -48,7 +48,7 @@ const LocalQrCode: React.FC<Props> = ({ value, size = 80, className = '', label 
   if (!src) {
     return (
       <div
-        className={`border rounded-lg bg-white ${className}`}
+        className={`border rounded-lg bg-surface ${className}`}
         style={{ width: size, height: size }}
         aria-hidden="true"
       />
@@ -60,7 +60,7 @@ const LocalQrCode: React.FC<Props> = ({ value, size = 80, className = '', label 
       alt={label}
       width={size}
       height={size}
-      className={`border rounded-lg bg-white ${className}`}
+      className={`border rounded-lg bg-surface ${className}`}
       data-testid="local-qr"
     />
   );
