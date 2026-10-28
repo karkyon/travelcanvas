@@ -139,3 +139,23 @@ describe('Authorizationヘッダー (Gate A1)', () => {
     expect(seen[0]?.authorization).toBeUndefined();
   });
 });
+
+describe('アカウントの削除の後の 401 (Gate G10-Q)', () => {
+  it('suppressAuthRedirect の間・削除の完了の画面では /login へ強制的に移さない(戻すと従来どおり)', async () => {
+    const core = new TestCore();
+    install(core, (config) => reject(config, 401, { detail: 'x' }));
+    core.suppressAuthRedirect();
+    Object.defineProperty(window, 'location', { configurable: true, value: { href: 'http://localhost/settings/data', pathname: '/settings/data' } });
+    await expect(core.http.get('/notifications/unread-count')).rejects.toBeInstanceOf(AxiosError);
+    expect(window.location.href).toBe('http://localhost/settings/data');
+
+    core.suppressAuthRedirect(false);
+    Object.defineProperty(window, 'location', { configurable: true, value: { href: 'http://localhost/account-deleted', pathname: '/account-deleted' } });
+    await expect(core.http.get('/notifications/unread-count')).rejects.toBeInstanceOf(AxiosError);
+    expect(window.location.href).toBe('http://localhost/account-deleted');
+
+    Object.defineProperty(window, 'location', { configurable: true, value: { href: 'http://localhost/planner', pathname: '/planner' } });
+    await expect(core.http.get('/plans')).rejects.toBeInstanceOf(AxiosError);
+    expect(window.location.href).toBe('/login');
+  });
+});

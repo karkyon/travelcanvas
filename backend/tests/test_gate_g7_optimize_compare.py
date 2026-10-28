@@ -65,6 +65,20 @@ def _times(client, p):
 
 # ================================================================ 単体
 
+def _json_values(node):
+    """JSON の中の値(dict の値・list の要素)をすべて集める。"""
+    out = []
+    if isinstance(node, dict):
+        for v in node.values():
+            out.extend(_json_values(v))
+    elif isinstance(node, list):
+        for v in node:
+            out.extend(_json_values(v))
+    else:
+        out.append(node)
+    return out
+
+
 def test_weights_objective_and_partial_order_units():
     assert opt.clean_weights(None) is None
     assert opt.clean_weights({"distance": 5})["constraints"] == opt.DEFAULT_WEIGHTS["constraints"]
@@ -247,7 +261,9 @@ def test_comparison_hides_costs_and_reservations_by_member_policy(auth_client, m
         body = r.json()
         assert body["costs_hidden"] is True and body["reservations_hidden"] is True
         assert body["plan"]["costs"] is None and body["branches"][0]["affected_reservations"] is None
-        assert "酒蔵見学" not in r.text and "3500" not in r.text and body["can_adopt"] is False
+        # 費用 3500 が値として残っていない(文字列の検索は、乱数の ID・時刻に含まれると誤って落ちる)
+        leaked = {str(v) for v in _json_values(body)} & {"3500", "3500.0", "3500.00"}
+        assert "酒蔵見学" not in r.text and not leaked and body["can_adopt"] is False
         _act_as(stranger)
         assert client.get(f"{base}/branches/{b['id']}/comparison").status_code in (403, 404)
     finally:

@@ -123,7 +123,8 @@ def test_preview_candidates_and_no_db_change(auth_client, db_session, audit_call
     assert c["ext-4"]["reason"] == "recurring" and c["ext-5"]["reason"] == "cancelled"
     assert body["summary"] == {"total": 7, "create": 1, "update": 1, "skip": 5, "skipped_by_reason": {
         "locked": 1, "duplicate": 1, "no_day": 1, "recurring": 1, "cancelled": 1}}
-    assert "secret" not in res.text and "1234" not in res.text
+    # 説明文の中身(会議の URL・パスコード)を返さない。数字だけの "1234" の検索は乱数の ID に含まれると誤って落ちるため、文の形で調べる
+    assert "https://x/secret" not in res.text and "パスコード" not in res.text and "パスコード 1234" not in res.text
     assert audit_calls[-1]["action"] == "calendar_import_previewed" and "水族館" not in str(audit_calls)
     with_days = _preview(client, base, data, create_missing_days=True).json()
     assert next(x for x in with_days["candidates"] if x["uid"] == "ext-3")["action"] == "create"

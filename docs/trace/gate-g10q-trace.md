@@ -23,7 +23,7 @@ AP = `frontend/src/pages/AccountDeletedPage.test.tsx`。
 | # | 要件 | 状態 | 証拠 |
 |---|---|---|---|
 | 5 | 原因: 削除の後、完了の画面(`AccountDeletedPage`)はオフラインのデータの消去(IndexedDB)を待ってからログイン状態を消していた。その間に会員の定期の取得(見出しの未読数、60秒ごと)が当たると、失効したトークンで 401 → 更新も 401 → `window.location.href = '/login'` で強制的に移った(まれ。DOC-10 r20「計算の確認を常に求める設定で1回だけ落ちる」)。利用者には「削除の完了の画面がログイン画面に変わる」実害 | IMPLEMENTED | `services/api/core.ts` の 401 の処理、`components/Header.tsx` の定期の取得 |
-| 6 | 修正: 削除が成功したら、完了の画面へ移すのと同時にログイン状態を消す(`DataPrivacyPage`)。完了の画面も最初に消してからオフラインのデータを消す(固定の待ち・再試行は使わない) | IMPLEMENTED | `pages/DataPrivacyPage.tsx`・`pages/AccountDeletedPage.tsx`、DP、AP |
+| 6 | 修正: 削除が成功したら、API の共通処理の「401 で /login へ強制的に移す」を止めてから完了の画面へ移す(`api.suppressAuthRedirect()`。完了の画面 `/account-deleted` でも移さない)。完了の画面は最初にログイン状態を消し(定期の取得が止まる)、その後に止めた移動を戻してからオフラインのデータを消す。固定の待ち・再試行は使わない。※ 移る前に画面側でログイン状態を消す案は、保護の付いた設定の画面が先に /login へ移すため採らなかった(サンドボックスで 20 回とも失敗を確認) | IMPLEMENTED | `services/api/core.ts`・`pages/DataPrivacyPage.tsx`・`pages/AccountDeletedPage.tsx`、DP、AP、`services/api/core.silent.test.ts` |
 | 7 | E2E の強化: 削除の後に `/login` へ移らないこと・失効したトークンで API を呼ばないことを記録して確かめる。エラーの表示は削除のカードの中だけを見る(他のカードの読み込みの失敗の `role=alert` と取り違えない) | IMPLEMENTED | AD |
 | 8 | 連続 20 回・再試行 0 で合格(通常の設定・計算の確認を常に求める設定の両方) | IMPLEMENTED | PR の本文の実測 |
 
@@ -44,6 +44,14 @@ AP = `frontend/src/pages/AccountDeletedPage.test.tsx`。
 | 14 | 計測: 同じ一括の INSERT の分割だけを1文として数える(行ごとの問い合わせの N+1 は従来どおり検出) | IMPLEMENTED | PF `count_queries` |
 | 15 | 本当の非効率も直した: 判定の記録が 20 件を超えた時、古い記録の指摘を ORM が全て読み込んでから1行ずつ消していた → DB の外部キー(ON DELETE CASCADE)に任せ、記録だけを1文で消す | IMPLEMENTED | `app/api/v1/validation.py` `_prune_old_runs`、Q `test_prune_old_validation_runs_is_bulk` |
 | 16 | 結果: 全 10 の画面の API で SQL の数が少ない時+2 以内、p95 は上限内(validation_run 約 3.0 秒 / 上限 8 秒) | IMPLEMENTED | PF(TC_PERF=1) |
+
+## 4b. 単体試験の実行順・乱数による不安定(全体の実行で見つかったもの)
+
+| # | 要件 | 状態 | 証拠 |
+|---|---|---|---|
+| 17 | Header・Dashboard の試験: トークンの無い会員の状態を入れていたため、authStore が読み込み時に予約した `initialize()`(setTimeout 0)が「再読込の後」とみなして本物の `POST /auth/refresh` を呼ぶことがあった(実行順で `差し替えていない通信` が出る)。試験の会員にトークンを入れ、初期化済みにする | IMPLEMENTED | `frontend/src/components/Header.test.tsx`・`frontend/src/pages/DashboardPage.test.tsx`(vitest 全体を2回、838 合格・標準エラー 0 行) |
+| 18 | 隠した費用・説明文が応答に無いことを、応答の文字列に `"900"`・`"3500"`・`"1234"` が無いことで調べていたため、乱数の ID・時刻にその数字が含まれると落ちた(G8 の試験で実際に1回)。JSON の値として調べる(`900.00` などの形も)・説明文は文の形で調べる。持ち主には値が見えること(検査が効くこと)も確かめた | IMPLEMENTED | `backend/tests/test_gate_g8_branch_resources.py`・`test_gate_g7_optimize_compare.py`・`test_gate_p8_calendar_import.py` |
+| 19 | E2E `gate-g9.spec.ts`「オフラインはつながると読み直す」: プランナーへ移る時、URL は先に変わり画面の塊の読み込み中はダッシュボードの見出しが残るため、`h1` が見えるだけの待ちでは移り終わる前に通信を切ることがあった(閉じていないダッシュボードへ戻るだけで読み直さず、オフラインの表示が出ない)。プランナーの見出しが出てダッシュボードの見出しが消えたことを待つ(固定の待ち・再試行なし、10 回連続合格) | IMPLEMENTED | `frontend/e2e/gate-g9.spec.ts` |
 
 ## 5. 維持した基準
 

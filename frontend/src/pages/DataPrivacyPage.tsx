@@ -14,10 +14,9 @@ import { Download } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { downloadAccountDataExport, getRetentionInfo } from '@/services/api';
+import { api as apiService, downloadAccountDataExport, getRetentionInfo } from '@/services/api';
 import type { RetentionInfo } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import { useAuthStore } from '@/store/authStore';
 import { describeDataExport, saveDataExport } from './exports/exportModel';
 import AccountDeletionCard from './privacy/AccountDeletionCard';
 import ConsentsCard from './privacy/ConsentsCard';
@@ -27,7 +26,6 @@ import CorrectionsCard from './privacy/CorrectionsCard';
 
 const DataPrivacyPage: React.FC = () => {
   const navigate = useNavigate();
-  const clearLocalSession = useAuthStore((s) => s.clearLocalSession);
   const [retention, setRetention] = useState<RetentionInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,11 +109,11 @@ const DataPrivacyPage: React.FC = () => {
       <ConsentsCard />
       <AccountDeletionCard
         onDeleted={() => {
-          // [Gate G10-Q] 削除が済んだら、完了の画面へ移すのと同時に端末のログイン状態を消す。以前は完了の画面が
-          // オフラインのデータの消去を待ってから消していたため、その間に会員の定期の取得(見出しの未読数など)が
-          // 失効したトークンで 401 → 更新も失敗 → /login へ強制的に移ることがあった(account-deletion の E2E の不安定の原因)
+          // [Gate G10-Q] 削除が済んだら、完了の画面を出すまでの間に会員の定期の取得(見出しの未読数など)が失効した
+          // トークンで 401 になっても /login へ強制的に移さない(以前はまれに移って、完了の画面が出なかった)。
+          // ログイン状態は完了の画面が最初に消す(ここで消すと、移る前の画面の保護が先に /login へ移す)
+          apiService.suppressAuthRedirect();
           navigate('/account-deleted', { replace: true });
-          clearLocalSession();
         }}
       />
     </div>

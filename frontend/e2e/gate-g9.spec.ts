@@ -174,7 +174,10 @@ test('UX-4 API の失敗は再試行で直り、オフラインはつながる�
   // 旅程の一覧を一度開いて(画面の塊を読み込んでおく)、オフラインでダッシュボードへ戻る
   await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link', { name: 'プランナー' }).click();
   await expect(page).toHaveURL(/\/planner$/);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  // URL は先に変わり、画面の塊を読み込む間はダッシュボードの見出しが残る。プランナーの見出しが出て
+  // ダッシュボードが閉じたことを確かめてから切る(閉じる前に切ると、開いたままのダッシュボードへ戻るだけで読み直さない)
+  await expect(page.getByRole('heading', { level: 1, name: 'プランナー' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'ダッシュボード' })).toHaveCount(0);
   await context.setOffline(true);
   await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link', { name: 'ダッシュボード' }).click();
   await expect(page.getByTestId('dashboard-offline')).toContainText('オフラインです');

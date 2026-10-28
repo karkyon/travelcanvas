@@ -144,6 +144,10 @@ export class ApiCore {
   // [Gate S5] 会員としてログインしている(アクセストークンはメモリだけに持つため、再読込直後や通信が戻った直後は
   // トークンが無いことがある)。その間に 401 になったら、cookie の更新鍵で取り直す。
   private isMemberSession: boolean = false;
+  // [Gate G10-Q] アカウントの削除が済んだ後は、401 でも /login へ強制的に移さない(完了の画面を出し続ける)。
+  // 削除の後、完了の画面がログイン状態を消すまでの間に、会員の定期の取得(見出しの未読数など)が失効したトークンで
+  // 401 → 更新も 401 → /login へ移ることがあった(account-deletion の E2E の不安定の原因)。
+  private authRedirectSuppressed: boolean = false;
 
   constructor() {
     this.client = axios.create({
@@ -340,6 +344,11 @@ export class ApiCore {
     this.isGuestSession = isGuest;
   }
 
+  /** [Gate G10-Q] 401 での /login への強制の移動を止める・戻す(アカウントの削除の後だけ使う) */
+  suppressAuthRedirect(on: boolean = true): void {
+    this.authRedirectSuppressed = on;
+  }
+
   protected clearTokens(): void {
     this.accessToken = null;
     removeStorage('auth_token');
@@ -371,7 +380,9 @@ export class ApiCore {
           }
           message = '認証が必要です。ログインしてください。';
           this.clearTokens();
-          if (typeof window !== 'undefined') {
+          // [Gate G10-Q] アカウントの削除の後(完了の画面)は移さない
+          if (typeof window !== 'undefined' && !this.authRedirectSuppressed
+            && window.location.pathname !== '/account-deleted') {
             window.location.href = '/login';
           }
           break;

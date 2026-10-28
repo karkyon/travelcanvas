@@ -7,6 +7,8 @@ import { MemoryRouter } from 'react-router-dom';
 
 const m = vi.hoisted(() => ({ clearAllOfflinePacks: vi.fn(), clearLocalSession: vi.fn(), logout: vi.fn() }));
 vi.mock('@/utils/offlinePack', () => ({ clearAllOfflinePacks: m.clearAllOfflinePacks }));
+const order = vi.hoisted(() => [] as string[]);
+vi.mock('@/services/api', () => ({ api: { suppressAuthRedirect: (on?: boolean) => order.push(`suppress:${String(on)}`) } }));
 vi.mock('@/store/authStore', () => ({
   useAuthStore: (sel: (s: { clearLocalSession: () => void; logout: () => void }) => unknown) =>
     sel({ clearLocalSession: m.clearLocalSession, logout: m.logout }),
@@ -16,6 +18,8 @@ import AccountDeletedPage from './AccountDeletedPage';
 
 beforeEach(() => {
   for (const fn of Object.values(m)) fn.mockReset();
+  order.length = 0;
+  m.clearLocalSession.mockImplementation(() => { order.push('clear'); });
 });
 
 describe('AccountDeletedPage (Gate P9)', () => {
@@ -33,6 +37,8 @@ describe('AccountDeletedPage (Gate P9)', () => {
     m.clearAllOfflinePacks.mockReturnValue(new Promise(() => undefined)); // 消去が終わらない
     render(<MemoryRouter><AccountDeletedPage /></MemoryRouter>);
     expect(m.clearLocalSession).toHaveBeenCalledTimes(1);
+    // ログイン状態を消して定期の取得が止まってから、/login への強制の移動を戻す
+    expect(order).toEqual(['clear', 'suppress:false']);
     expect(screen.getByText('この端末に保存したオフラインデータを消しています…')).toBeInTheDocument();
   });
 

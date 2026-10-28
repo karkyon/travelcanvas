@@ -29,8 +29,10 @@ const renderAt = async (path: string) => {
 describe('Header (Gate G9 UX-3)', () => {
   beforeEach(() => {
     getUnreadCount.mockReset().mockResolvedValue({ data: { unread_count: 3 } });
+    // 会員のトークンも入れておく。authStore は読み込み時に setTimeout(0) で initialize() を予約しており、
+    // トークンの無い会員だと「再読込の後」とみなして /auth/refresh を本当に呼んでしまう(実行順で結果が変わる原因)。
     useAuthStore.setState({
-      isAuthenticated: true, isGuest: false,
+      isAuthenticated: true, isGuest: false, token: 'test-access-token', isInitialized: true,
       user: { id: 'u-1', username: 'alice', email: 'a@example.com', user_type: 'standard' } as unknown as User,
     });
     useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都 紅葉の1泊2日' } });
