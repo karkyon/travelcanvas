@@ -275,3 +275,11 @@ backendにはPlaceのplan横断一覧API(Placeはplanに属さないグローバ
 - `npm install`後、`tsc --noEmit`エラー0、`vitest run` 67件PASS
   (リグレッションなし、Segment関連の既存5件も含め全て継続PASS)、
   `vite build`成功を確認。
+
+## 追補(Gate G11): 新幹線・ヘリ
+
+- mode の語彙に `shinkansen`(区間で明示された時だけ。`train` から推測しない)と `helicopter`(要手配)を足した。migration `b8d4f6a0c3e5`
+  が `ck_travel_segments_mode_vocab`・`ck_route_legs_mode_vocab` を広げる。
+- 概算(`route_estimator.estimate_leg`): shinkansen は 200km/h・迂回 1.1。helicopter は推定しない(None)。以前は知らない mode を
+  歩きの速さで推定していたため、ヘリで歩きの所要時間が出るところだった。
+- 画面の名前は `frontend/src/utils/transportModes.ts`(仕様 §4 の表)が正本。

@@ -87,3 +87,10 @@ DBからの読み出し(`load_snapshot`)と判定(`evaluate`、純粋関数)を�
 - 最終交通逸失の時刻表照合、滞在時間の目安(場所の標準滞在時間データが無い)、休憩の自動判定。
 - 修正候補の適用(ワンクリック修正)と最適化への反映(FR-018、Gate L4)。
 - 検証結果の変更通知、旅程画面への問題の重ね表示。
+
+## 追補(Gate G11): 予定のカードの営業時間の照合
+
+- `GET /plans/{id}/hours-check?day_id=` は検証(feasibility)と同じ入力(`load_snapshot`・`place_hours.day_hours`・既定の滞在)で、
+  予定ごとの状態(ok / near_close / last_entry / last_order / closes_during / closed / unknown)を返す。検証の結果(問題の一覧)とは別に、
+  旅程の画面の帯のために「時間内」も返す。出典が90日より古い時は ok を出さない(検証不能を問題なしにしない、と同じ考え)。
+- 予定は変えない。直す提案は既存の再計画・最適化の流れ。

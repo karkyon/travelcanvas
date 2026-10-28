@@ -5,7 +5,8 @@
  */
 export type EventRef = { event: string } | { key: string };
 
-export type SegmentMode = 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed';
+export type SegmentMode = 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed'
+  | 'shinkansen' | 'helicopter';  // [Gate G11]
 export type SegmentStatus = 'planned' | 'confirmed' | 'cancelled';
 
 export interface BaseSegment {

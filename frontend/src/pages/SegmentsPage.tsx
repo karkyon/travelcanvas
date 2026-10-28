@@ -46,6 +46,9 @@ const MODE_OPTIONS: { value: SegmentMode; label: string; icon: React.ReactNode }
   { value: 'bicycle', label: '自転車', icon: <Bike size={16} /> },
   { value: 'taxi', label: 'タクシー', icon: <TaxiIcon size={16} /> },
   { value: 'mixed', label: '混合', icon: <Shuffle size={16} /> },
+  // [Gate G11] 新幹線は明示する時だけ(鉄道から推測しない)。ヘリは要手配(所要時間を推定しない)
+  { value: 'shinkansen', label: '新幹線', icon: <Train size={16} /> },
+  { value: 'helicopter', label: 'ヘリ(要手配)', icon: <Plane size={16} /> },
 ];
 
 const STATUS_LABEL: Record<SegmentStatus, string> = {

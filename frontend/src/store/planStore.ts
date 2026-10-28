@@ -149,6 +149,9 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     address: e.address ?? undefined,
     latitude: e.latitude ?? undefined,
     longitude: e.longitude ?? undefined,
+    // [Gate G11] 営業時間の照合・全日程のチャートの固定の数
+    place_id: e.place_id ?? undefined,
+    locked: e.locked,
   };
 }
 
@@ -156,6 +159,7 @@ function mapDay(d: NormalizedDay): DaySchedule {
   return {
     id: d.id,
     date: d.local_date,
+    timezone_id: d.timezone_id,
     events: (d.events ?? []).map(mapEvent),
   };
 }

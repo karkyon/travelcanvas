@@ -40,6 +40,7 @@ function setup() {
   useAuthStore.setState({ isAuthenticated: true, isGuest: false });
   vi.spyOn(api, 'getRoutePreview').mockResolvedValue({ legs: [] } as unknown as Awaited<ReturnType<typeof api.getRoutePreview>>);
   vi.spyOn(api, 'leavePresence').mockResolvedValue(undefined);
+  vi.spyOn(api, 'getSegments').mockResolvedValue([]);  // [Gate G11] 予定へ着く移動区間
   // [Gate G2] 即時の通知は使わない(ポーリングだけ)。同行者向けの項目の規則: 何も隠されていない
   vi.spyOn(api, 'streamPlanEvents').mockResolvedValue('unsupported');
   vi.spyOn(api, 'getMemberPolicy').mockResolvedValue({
