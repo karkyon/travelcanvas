@@ -52,6 +52,7 @@ AP = `frontend/src/pages/AccountDeletedPage.test.tsx`。
 | 17 | Header・Dashboard の試験: トークンの無い会員の状態を入れていたため、authStore が読み込み時に予約した `initialize()`(setTimeout 0)が「再読込の後」とみなして本物の `POST /auth/refresh` を呼ぶことがあった(実行順で `差し替えていない通信` が出る)。試験の会員にトークンを入れ、初期化済みにする | IMPLEMENTED | `frontend/src/components/Header.test.tsx`・`frontend/src/pages/DashboardPage.test.tsx`(vitest 全体を2回、838 合格・標準エラー 0 行) |
 | 18 | 隠した費用・説明文が応答に無いことを、応答の文字列に `"900"`・`"3500"`・`"1234"` が無いことで調べていたため、乱数の ID・時刻にその数字が含まれると落ちた(G8 の試験で実際に1回)。JSON の値として調べる(`900.00` などの形も)・説明文は文の形で調べる。持ち主には値が見えること(検査が効くこと)も確かめた | IMPLEMENTED | `backend/tests/test_gate_g8_branch_resources.py`・`test_gate_g7_optimize_compare.py`・`test_gate_p8_calendar_import.py` |
 | 19 | E2E `gate-g9.spec.ts`「オフラインはつながると読み直す」: プランナーへ移る時、URL は先に変わり画面の塊の読み込み中はダッシュボードの見出しが残るため、`h1` が見えるだけの待ちでは移り終わる前に通信を切ることがあった(閉じていないダッシュボードへ戻るだけで読み直さず、オフラインの表示が出ない)。プランナーの見出しが出てダッシュボードの見出しが消えたことを待つ(固定の待ち・再試行なし、10 回連続合格) | IMPLEMENTED | `frontend/e2e/gate-g9.spec.ts` |
+| 20 | 依存の監査: 新しく公開された `deepmerge` の助言(GHSA-gcqx-w48m-w2h4、直った版なし)で CI が失敗。経路の `vite-plugin-pwa` は設定で使われていないため外した(例外にしない。他の依存の版は不変・最初に読む JS も不変) | IMPLEMENTED | `frontend/package.json`・`package-lock.json`、`scripts/security/audit_deps.py node` 失敗 0 件 |
 
 ## 5. 維持した基準
 
