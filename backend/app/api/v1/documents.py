@@ -31,7 +31,7 @@ import logging
 import re
 import uuid as uuid_module
 from datetime import datetime, timezone as dt_timezone
-from typing import List, Optional
+from typing import List, NoReturn, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
@@ -343,7 +343,7 @@ def _scan_or_reject(content: bytes, request: Request, current_user: User, plan) 
 
 
 def _deny_download(request: Request, reason: str, resource_id=None, status_code: int = status.HTTP_403_FORBIDDEN,
-                   detail: str = "この文書はダウンロードできません。もう一度画面から開いてください。"):
+                   detail: str = "この文書はダウンロードできません。もう一度画面から開いてください。") -> NoReturn:
     ops_metrics.registry.count_security_event("download_denied")
     threat_guard.signal(request, "download_denied")  # [Gate S6]
     record_audit_event(

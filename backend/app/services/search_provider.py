@@ -197,7 +197,7 @@ async def search_all_providers(
 
     combined: List[Dict[str, Any]] = []
     for provider_name, r in zip(("wikipedia", "nominatim", "overpass"), results):
-        if isinstance(r, Exception):
+        if isinstance(r, BaseException):
             logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
             continue
         combined.extend(r)

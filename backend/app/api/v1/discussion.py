@@ -726,7 +726,7 @@ def list_comments(
 ):
     plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
     if member_policy.comment_target_hidden(hidden, target_type):
-        raise member_policy.hidden_error(member_policy.COMMENT_TARGET_CATEGORY[target_type])
+        raise member_policy.hidden_error(member_policy.COMMENT_TARGET_CATEGORY[str(target_type)])
     q = db.query(Comment).filter(Comment.plan_id == plan.id)
     if target_type is not None:
         if target_type not in TARGET_TYPES:

@@ -211,7 +211,7 @@ def resolves_to_public(host: str, port: int) -> bool:
         infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
     except OSError:
         return False
-    return bool(infos) and not any(_blocked_ip(i[4][0]) for i in infos)
+    return bool(infos) and not any(_blocked_ip(str(i[4][0])) for i in infos)
 
 
 def clean_events(raw: Any) -> List[str]:

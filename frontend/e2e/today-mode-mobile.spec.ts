@@ -3,6 +3,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [Gate L1b] FR-029/030/032 当日モード(SC-07、NOW/NEXT)のmobile viewport browser E2E。
+ * [Gate G10-Q] FR-006 NOW/NEXT(日程の現地時間での判定・出発まで)の証拠でもある。
  *
  * 画面から作った予定と同じ形(local_start_timeのみ、start_atなし)で今日の予定を
  * 作り、スマートフォン幅の画面で次を確認する。

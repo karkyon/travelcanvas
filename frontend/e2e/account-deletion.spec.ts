@@ -12,6 +12,11 @@ import { settleForAxe } from './support/axe';
  *   2. 削除の内容(所有する旅行の削除・猶予日数)を確認でき、パスワードが違うと削除されない
  *   3. 正しいパスワードで削除すると完了画面になり、端末のログイン状態が消え、元のトークンは使えない
  *   4. 画面にaxe(WCAG 2.1 AA)違反が無い
+ *
+ * [Gate G10-Q] 以前は削除の後、完了の画面がオフラインのデータの消去を待ってから端末のログイン状態を消していたため、
+ * その間に会員の定期の取得(見出しの未読数)が失効したトークンで 401 → /login へ強制的に移ることがあり、まれに落ちた。
+ * 削除と同時にログイン状態を消すように直し、ここでは「削除の後に /login へ移らない・失効したトークンで要求しない」を確かめる。
+ * エラーの表示は削除のカードの中だけを見る(他のカードの読み込みの失敗の表示と取り違えない)。
  */
 
 const PASSWORD = 'Gate-P9-TestPass-1';
@@ -50,19 +55,31 @@ test('アカウント削除: 同意の変更・撤回、削除内容の確認、
   await expect(page.getByText('「お知らせのメール」を同意しないに変更しました。')).toBeVisible();
 
   // 2. 削除の内容とパスワード確認
-  await page.getByRole('button', { name: '削除の内容を確認する' }).click();
+  const deletion = page.getByRole('region', { name: 'アカウントの削除' });
+  await deletion.getByRole('button', { name: '削除の内容を確認する' }).click();
   await expect(page.getByTestId('deletion-effects')).toContainText('あなたが所有する旅行1件を削除します');
   await expect(page.getByRole('list', { name: '削除する旅行' })).toContainText(`P9削除E2E-${suffix}`);
   await axeViolations(page, 'アカウントの削除(確認)');
   await page.getByLabel(/確認のため/).fill('退会する');
   await page.getByLabel('現在のパスワード').fill('wrong-password-1');
   await page.getByRole('button', { name: 'アカウントを削除する' }).click();
-  await expect(page.getByRole('alert')).toContainText('パスワードが正しくありません');
+  await expect(deletion.getByRole('alert')).toContainText('パスワードが正しくありません');
   expect((await context.request.get(`${apiBase}/auth/me`, { headers: auth })).status()).toBe(200);
 
-  // 3. 削除
+  // 3. 削除。削除の後に移った先と、送った API(失効したトークン付き)を記録する
+  const visited: string[] = [];
+  const afterDelete: string[] = [];
+  let deleted = false;
+  page.on('framenavigated', (f) => { if (f === page.mainFrame() && deleted) visited.push(new URL(f.url()).pathname); });
+  page.on('request', (r) => {
+    if (deleted && r.url().startsWith(apiBase) && r.headers()['authorization']) afterDelete.push(new URL(r.url()).pathname);
+  });
   await page.getByLabel('現在のパスワード').fill(PASSWORD);
+  const deletedRes = page.waitForResponse((r) => r.request().method() === 'POST' && r.ok()
+    && new URL(r.url()).pathname.endsWith('/privacy/account-deletion'), { timeout: 15_000 });
   await page.getByRole('button', { name: 'アカウントを削除する' }).click();
+  await deletedRes;
+  deleted = true;
   await page.waitForURL(/\/account-deleted$/, { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'アカウントを削除しました', level: 1 })).toBeVisible();
   await expect(page.getByText('この端末に保存したオフラインデータも消しました。')).toBeVisible();
@@ -72,4 +89,6 @@ test('アカウント削除: 同意の変更・撤回、削除内容の確認、
   expect(persisted.isAuthenticated).toBe(false);
   expect((await context.request.get(`${apiBase}/auth/me`, { headers: auth })).status()).toBe(401);
   expect(new URL(page.url()).pathname).toBe('/account-deleted');
+  expect(visited.filter((v) => v !== '/account-deleted')).toEqual([]);
+  expect(afterDelete).toEqual([]);
 });

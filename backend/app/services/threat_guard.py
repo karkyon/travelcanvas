@@ -67,8 +67,8 @@ def _enabled() -> bool:
     return bool(getattr(settings, "GUARD_ENABLED", True))
 
 
-def _hash(ip: str) -> str:
-    return hashlib.sha256(("guard|" + ip).encode("utf-8")).hexdigest()[:40]
+def _hash(ip: Optional[str]) -> str:
+    return hashlib.sha256(("guard|" + (ip or "")).encode("utf-8")).hexdigest()[:40]
 
 
 def _ns() -> str:

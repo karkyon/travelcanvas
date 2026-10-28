@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Iterable, List, Optional, Sequence
+from typing import Any, Iterable, List, Optional, Sequence, overload
 from zoneinfo import ZoneInfo
 
 _LOCAL_TIME_RE = re.compile(r"^\s*([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?\s*$")
@@ -81,6 +81,14 @@ def effective_start(event, day) -> tuple[Optional[datetime], Optional[str]]:
     return local.astimezone(timezone.utc), "local_start_time"
 
 
+@overload
+def _aware(dt: datetime) -> datetime: ...
+
+
+@overload
+def _aware(dt: None) -> None: ...
+
+
 def _aware(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
         return None
@@ -91,7 +99,7 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
 
 @dataclass
 class TimedEvent:
-    event: object
+    event: Any
     start: datetime
     end: Optional[datetime]  # 明示されたend_at(UTC)。未設定はNone
     time_source: str
@@ -100,7 +108,7 @@ class TimedEvent:
 
 @dataclass
 class TodaySelection:
-    today_days: List[object]
+    today_days: List[Any]
     today_date: Optional[date]
     timezone_id: Optional[str]
     day_end_at: Optional[datetime]
@@ -114,7 +122,7 @@ def _day_sort_key(day):
     return (day.local_date, day.sort_order or 0, str(day.id))
 
 
-def select_today(days: Iterable[object], now_utc: datetime) -> TodaySelection:
+def select_today(days: Iterable[Any], now_utc: datetime) -> TodaySelection:
     """当日の日程・NOW・NEXTを決める。
 
     - 「今日」は各TravelDay.timezone_idの現地日付で判定する(旅行先の時差を
@@ -144,12 +152,12 @@ def select_today(days: Iterable[object], now_utc: datetime) -> TodaySelection:
             start, source = effective_start(e, day)
             end = _aware(e.end_at)
             if start is not None and end is not None and start <= now_utc < end:
-                timed.append(TimedEvent(e, start, end, source, is_today=False))
+                timed.append(TimedEvent(e, start, end, str(source), is_today=False))
     for day in today_days:
         for e in day.events:
             start, source = effective_start(e, day)
             if start is not None:
-                timed.append(TimedEvent(e, start, _aware(e.end_at), source, is_today=True))
+                timed.append(TimedEvent(e, start, _aware(e.end_at), str(source), is_today=True))
 
     timed.sort(key=lambda t: (t.start, getattr(t.event, "sort_order", 0) or 0, str(t.event.id)))
 

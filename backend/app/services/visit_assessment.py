@@ -78,8 +78,9 @@ def level_of(confidence: Optional[float]) -> Optional[str]:
 def visit_metrics(lat: float, lng: float, radius_m: float, points: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     """軌跡の点から、予定の場所についての数値だけを取り出す(座標は返さない)。
     points: [{t, lat, lng, acc}]。端末だけに座標を置くモードでは、端末が同じ計算をして数値だけを送る。"""
-    pts = sorted(({"t": _t(p["t"]), "lat": float(p["lat"]), "lng": float(p["lng"]), "acc": p.get("acc")}
-                  for p in points), key=lambda p: p["t"])
+    pts: List[Dict[str, Any]] = sorted(
+        ({"t": _t(p["t"]), "lat": float(p["lat"]), "lng": float(p["lng"]), "acc": p.get("acc")} for p in points),
+        key=lambda p: p["t"])
     valid = [p for p in pts if p["acc"] is None or float(p["acc"]) <= MAX_ACCURACY_M]
     low_accuracy = len(pts) - len(valid)
     # 有効な点を時刻順に見て、半径の中に続けている間を1回の訪問としてまとめる

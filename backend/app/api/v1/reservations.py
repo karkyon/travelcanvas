@@ -486,7 +486,7 @@ def search_reservations(
         )
 
     if has_suffix:
-        normalized_suffix = confirmation_number_suffix.strip()
+        normalized_suffix = (confirmation_number_suffix or "").strip()
         if len(normalized_suffix) != SUFFIX_LOOKUP_LENGTH:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -502,7 +502,7 @@ def search_reservations(
         filter_column = Reservation.confirmation_number_suffix_lookup_hash
     else:
         try:
-            target_hash = compute_lookup_hash(confirmation_number)
+            target_hash = compute_lookup_hash(confirmation_number or "")
         except LookupIndexNotConfigured:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

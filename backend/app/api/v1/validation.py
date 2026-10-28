@@ -125,15 +125,23 @@ def _run_validation(db: Session, plan: TravelPlan, user: User) -> ValidationRun:
 
 
 def _prune_old_runs(db: Session, plan_id: uuid.UUID) -> None:
-    stale = (
-        db.query(ValidationRun)
-        .filter(ValidationRun.plan_id == plan_id)
-        .order_by(ValidationRun.created_at.desc(), ValidationRun.started_at.desc(), ValidationRun.id.desc())
-        .offset(MAX_RUNS_PER_PLAN)
-        .all()
-    )
-    for old in stale:
-        db.delete(old)
+    """古い判定の記録を消す(1つの旅行に MAX_RUNS_PER_PLAN 件まで)。
+
+    [Gate G10-Q] 以前は ORM の連鎖の削除(db.delete)で、古い記録の指摘(大きい旅行では数千行)を全て読み込んでから
+    1行ずつ消していた(毎晩の性能の検査で SQL が増えて見つかった)。指摘は DB の外部キー(ON DELETE CASCADE)で消える
+    ため、記録だけを1文で消す。消す記録はこの要求の中で読み込んでいないため、セッションとの同期は要らない。
+    """
+    stale_ids = [
+        row[0] for row in (
+            db.query(ValidationRun.id)
+            .filter(ValidationRun.plan_id == plan_id)
+            .order_by(ValidationRun.created_at.desc(), ValidationRun.started_at.desc(), ValidationRun.id.desc())
+            .offset(MAX_RUNS_PER_PLAN)
+            .all()
+        )
+    ]
+    if stale_ids:
+        db.query(ValidationRun).filter(ValidationRun.id.in_(stale_ids)).delete(synchronize_session=False)
 
 
 # ===== レスポンス =====
@@ -203,7 +211,7 @@ def _issue_response(issue: ValidationIssue, viewer: User, shared: Dict[uuid.UUID
                     private: Dict[uuid.UUID, Optional[str]]) -> Dict[str, Any]:
     masked = issue.is_private_constraint and issue.constraint_owner_user_id != viewer.id
     if issue.is_private_constraint:
-        title = None if masked else private.get(issue.constraint_id)
+        title = None if masked or issue.constraint_id is None else private.get(issue.constraint_id)
     else:
         title = shared.get(issue.constraint_id) if issue.constraint_id else None
     return {

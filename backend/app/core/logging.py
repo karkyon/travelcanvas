@@ -126,7 +126,7 @@ class StructuredFormatter(logging.Formatter):
         """ログレコードフォーマット"""
 
         # 基本情報
-        log_data = {
+        log_data: Dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
@@ -592,40 +592,6 @@ def log_security_event(
         client_ip_var.set(original_client_ip)
 
 
-def log_system_event(
-    logger: logging.Logger,
-    event: str,
-    level: str = "INFO",
-    metadata: Optional[Dict[str, Any]] = None
-):
-    """システムイベントログ"""
-
-    extra_data = {
-        "event": event,
-        "system_info": {
-            "environment": settings.ENVIRONMENT,
-            "version": getattr(settings, 'APP_VERSION', '1.0.0')
-        }
-    }
-
-    if metadata:
-        extra_data.update(metadata)
-
-    message = f"System event: {event}"
-
-    log_with_context(
-        logger=logger,
-        level=level,
-        message=message,
-        category=LogCategory.SYSTEM,
-        extra_data=extra_data
-    )
-
-
-# ==========================================
-# パフォーマンス監視デコレータ
-# ==========================================
-
 def log_execution_time(
     logger: Optional[logging.Logger] = None,
     operation_name: Optional[str] = None,
@@ -703,103 +669,10 @@ def log_execution_time(
 
 
 # ==========================================
-# ログ分析・ユーティリティ
-# ==========================================
-
-def get_log_stats(log_file_path: str, hours: int = 24) -> Dict[str, Any]:
-    """ログ統計取得"""
-
-    try:
-        stats = {
-            "total_lines": 0,
-            "error_count": 0,
-            "warning_count": 0,
-            "info_count": 0,
-            "debug_count": 0,
-            "unique_users": set(),
-            "unique_ips": set(),
-            "performance_issues": 0
-        }
-
-        cutoff_time = time.time() - (hours * 3600)
-
-        with open(log_file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    if settings.LOG_JSON_FORMAT:
-                        log_data = json.loads(line.strip())
-                        log_time = log_data.get("timestamp")
-
-                        if log_time:
-                            log_timestamp = datetime.fromisoformat(log_time.replace('Z', '+00:00')).timestamp()
-                            if log_timestamp < cutoff_time:
-                                continue
-
-                        stats["total_lines"] += 1
-
-                        level = log_data.get("level", "").upper()
-                        if level == "ERROR":
-                            stats["error_count"] += 1
-                        elif level == "WARNING":
-                            stats["warning_count"] += 1
-                        elif level == "INFO":
-                            stats["info_count"] += 1
-                        elif level == "DEBUG":
-                            stats["debug_count"] += 1
-
-                        if log_data.get("user_id"):
-                            stats["unique_users"].add(log_data["user_id"])
-
-                        if log_data.get("client_ip"):
-                            stats["unique_ips"].add(log_data["client_ip"])
-
-                        if log_data.get("duration_ms", 0) > 1000:
-                            stats["performance_issues"] += 1
-
-                except json.JSONDecodeError:
-                    continue
-
-        # セットを数値に変換
-        stats["unique_users"] = len(stats["unique_users"])
-        stats["unique_ips"] = len(stats["unique_ips"])
-
-        return stats
-
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def cleanup_old_logs(days_to_keep: int = 30):
-    """古いログファイルクリーンアップ"""
-
-    try:
-        log_dir = Path(settings.LOG_DIR)
-        if not log_dir.exists():
-            return
-
-        cutoff_time = time.time() - (days_to_keep * 24 * 3600)
-        cleaned_count = 0
-
-        for log_file in log_dir.glob("*.log*"):
-            if log_file.stat().st_mtime < cutoff_time:
-                log_file.unlink()
-                cleaned_count += 1
-
-        if cleaned_count > 0:
-            logger = get_logger(__name__)
-            log_system_event(
-                logger, f"Cleaned up {cleaned_count} old log files",
-                metadata={"days_to_keep": days_to_keep}
-            )
-
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error(f"Failed to cleanup old logs: {str(e)}")
-
-
-# ==========================================
 # エクスポート
 # ==========================================
+# [Gate G10-Q] log_system_event・get_log_stats・cleanup_old_logs は Settings に無い設定
+# (ENVIRONMENT・LOG_JSON_FORMAT・LOG_DIR)を読むため呼べば必ず失敗し、呼び出し元も無かった。削除した。
 
 __all__ = [
     'setup_logging',
@@ -812,10 +685,7 @@ __all__ = [
     'log_external_api_call',
     'log_user_action',
     'log_security_event',
-    'log_system_event',
     'log_execution_time',
-    'get_log_stats',
-    'cleanup_old_logs',
     'LogLevel',
     'LogCategory',
     'SecurityEvents'

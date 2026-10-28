@@ -60,7 +60,10 @@ def planned_minutes(day_events: List[Dict[str, Any]]) -> Dict[str, int]:
                    key=lambda e: (_minutes(e["local_start_time"]), e.get("sort_order") or 0, str(e["id"])))
     out = {}
     for a, b in zip(timed, timed[1:]):
-        d = _minutes(b["local_start_time"]) - _minutes(a["local_start_time"])
+        ma, mb = _minutes(a["local_start_time"]), _minutes(b["local_start_time"])
+        if ma is None or mb is None:  # timed は時刻のある予定だけ
+            continue
+        d = mb - ma
         if d > 0:
             out[str(a["id"])] = d
     return out

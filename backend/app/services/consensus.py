@@ -13,7 +13,7 @@
 (少人数だと件数から個人の回答が推測できるため)。誰が未回答かは表示する(参加の有無は回答内容ではない)。
 """
 from dataclasses import dataclass
-from typing import Dict, Hashable, List, Optional, Sequence, Set
+from typing import AbstractSet, Dict, Hashable, List, Optional, Sequence
 
 ALGORITHM_VERSION = "consensus-v1"
 ANONYMITY_THRESHOLD = 3
@@ -28,7 +28,7 @@ class VoteView:
     resolved: bool
 
 
-def option_state(votes: Sequence[VoteView], members: Set[Hashable], veto_policy: str, is_closed: bool) -> dict:
+def option_state(votes: Sequence[VoteView], members: AbstractSet[Hashable], veto_policy: str, is_closed: bool) -> dict:
     counts = {v: 0 for v in VALUES}
     for v in votes:
         counts[v.value] += 1

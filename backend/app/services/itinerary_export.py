@@ -15,7 +15,7 @@ import csv
 import io
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, overload
 from xml.sax.saxutils import escape, quoteattr
 
 PRODID = "-//TravelCanvas//Itinerary Export 1.0//JA"
@@ -73,6 +73,14 @@ EVENT_TYPE_LABEL = {
 
 def _type_label(t: str) -> str:
     return EVENT_TYPE_LABEL.get(t, t)
+
+
+@overload
+def _utc(dt: datetime) -> datetime: ...
+
+
+@overload
+def _utc(dt: None) -> None: ...
 
 
 def _utc(dt: Optional[datetime]) -> Optional[datetime]:

@@ -189,7 +189,7 @@ def detach_event_references(db: Session, event_ids: Iterable[uuid.UUID]) -> Deta
     from app.api.v1.plans import _segment_to_dict
     from app.api.v1.route_options import _option_snapshot_with_legs
 
-    ids = [_u(i) for i in event_ids]
+    ids = [u for u in (_u(i) for i in event_ids) if u is not None]
     det = Detachment()
     if not ids:
         return det
@@ -348,7 +348,7 @@ def check_undo_conflicts(db: Session, plan, items) -> List[dict]:
             reason = _reservation_state(db, plan, item.entity_id, bool(before.get("reservation_deleted")))
             if reason is None:
                 r = db.query(Reservation).filter(Reservation.id == item.entity_id).first()
-                if r.event_id is not None and str(r.event_id) != before.get("event_id"):
+                if r is not None and r.event_id is not None and str(r.event_id) != before.get("event_id"):
                     reason = "relinked"
             if reason:
                 conflicts.append(_missing("reservation", item.entity_id, reason))

@@ -69,8 +69,8 @@ def _collect(db: Session, plan: TravelPlan, hidden=member_policy.EMPTY):
             linked.setdefault(r.event_id, []).append(r)
     if events and reservations:
         for er in db.query(EventReservation).filter(EventReservation.event_id.in_([e.id for e in events])).all():
-            r = res_by_id.get(er.reservation_id)
-            if r is not None and r not in linked.setdefault(er.event_id, []):
+            found = res_by_id.get(er.reservation_id)
+            if found is not None and found not in linked.setdefault(er.event_id, []):
                 linked[er.event_id].append(r)
 
     out: List[ix.ExportEvent] = []

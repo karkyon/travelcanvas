@@ -20,7 +20,7 @@
 """
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, cast, overload
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -41,6 +41,14 @@ KEEP_ROLES = ("editor", "viewer", "none")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+@overload
+def _aware(dt: datetime) -> datetime: ...
+
+
+@overload
+def _aware(dt: None) -> None: ...
 
 
 def _aware(dt: Optional[datetime]) -> Optional[datetime]:
@@ -103,7 +111,7 @@ def _db_user(db: Session, current: User) -> User:
 
 
 def _name(user: Optional[User]) -> str:
-    return cast(str, (user.username if user is not None and user.username else None) or "メンバー")
+    return (user.username if user is not None and user.username else None) or "メンバー"
 
 
 def _eligible(db: Session, plan: TravelPlan) -> List[Dict[str, Any]]:
@@ -127,7 +135,7 @@ def _view(db: Session, t: PlanOwnershipTransfer, me: User) -> Dict[str, Any]:
         else "expired",
         "from_name": _name(users.get(t.from_user_id)), "to_name": _name(users.get(t.to_user_id)),
         "keep_role": t.keep_role, "message": t.message if me.id in (t.from_user_id, t.to_user_id) else None,
-        "expires_at": cast(datetime, _aware(cast(datetime, t.expires_at))).isoformat(),
+        "expires_at": _aware(t.expires_at).isoformat(),
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "responded_at": t.responded_at.isoformat() if t.responded_at else None,
         "is_recipient": me.id == t.to_user_id, "is_sender": me.id == t.from_user_id,
@@ -182,7 +190,7 @@ def create_transfer(plan_id: str, payload: TransferCreate, request: Request, db:
         raise HTTPException(status_code=422, detail="相手の指定が正しくありません")
     eligible = {c["collaborator_id"] for c in _eligible(db, plan)}
     collab = db.query(PlanCollaborator).filter(PlanCollaborator.id == cid, PlanCollaborator.plan_id == plan.id).first()
-    if collab is None or str(cid) not in eligible:
+    if collab is None or collab.user_id is None or str(cid) not in eligible:
         raise HTTPException(status_code=422, detail={
             "code": "not_eligible",
             "message": "移譲できるのは、参加済みの会員の共同編集者だけです(招待中・ゲスト・削除の申し込み中の人は選べません)"})
@@ -194,16 +202,17 @@ def create_transfer(plan_id: str, payload: TransferCreate, request: Request, db:
         old.status = "cancelled"  # 期限切れの申し出を閉じる
         old.responded_at = _now()
         db.flush()
+    to_user_id: uuid.UUID = collab.user_id
     t = PlanOwnershipTransfer(
-        id=uuid.uuid4(), plan_id=plan.id, from_user_id=me.id, to_user_id=collab.user_id, status="pending",
+        id=uuid.uuid4(), plan_id=plan.id, from_user_id=me.id, to_user_id=to_user_id, status="pending",
         keep_role=payload.keep_role, message=(payload.message or "").strip() or None,
         expires_at=_now() + timedelta(days=transfer_days()),
     )
     db.add(t)
-    notify.deliver(db, plan, [cast(uuid.UUID, collab.user_id)], "ownership_transfer", "旅行の所有者の移譲の申し出",
+    notify.deliver(db, plan, [to_user_id], "ownership_transfer", "旅行の所有者の移譲の申し出",
                    f"{_name(me)} さんから「{plan.title}」の所有者を引き継ぐ申し出が届きました。お知らせの画面で受け入れるか"
-                   f"断ってください(期限 {transfer_days()} 日)。", target_type="plan", target_id=cast(uuid.UUID, plan.id),
-                   direct_ids=[cast(uuid.UUID, collab.user_id)])
+                   f"断ってください(期限 {transfer_days()} 日)。", target_type="plan", target_id=plan.id,
+                   direct_ids=[to_user_id])
     db.commit()
     db.refresh(t)
     _audit(request, me, "plan_ownership_transfer_requested", t)
@@ -294,9 +303,9 @@ def accept_transfer(transfer_id: str, payload: PasswordBody, request: Request, d
     t.status = "accepted"
     t.responded_at = _now()
     if previous is not None:
-        notify.deliver(db, plan, [cast(uuid.UUID, previous.id)], "ownership_transfer", "所有者の移譲が完了しました",
+        notify.deliver(db, plan, [previous.id], "ownership_transfer", "所有者の移譲が完了しました",
                        f"{_name(me)} さんが「{plan.title}」の所有者を引き継ぎました。", target_type="plan",
-                       target_id=cast(uuid.UUID, plan.id), direct_ids=[cast(uuid.UUID, previous.id)])
+                       target_id=plan.id, direct_ids=[previous.id])
     db.commit()
     _audit(request, me, "plan_ownership_transferred", t)
     return _view(db, t, me)

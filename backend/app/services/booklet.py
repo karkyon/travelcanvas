@@ -14,7 +14,7 @@ Web表示・印刷・PDF保存は、すべてこの1つの構造化データか�
 from dataclasses import dataclass
 from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, overload
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.orm import Session
@@ -66,6 +66,14 @@ class Options:
 def normalize_sections(sections: Sequence[str]) -> List[str]:
     chosen = set(sections)
     return [s for s in SECTIONS if s in chosen]
+
+
+@overload
+def _aware(dt: datetime) -> datetime: ...
+
+
+@overload
+def _aware(dt: None) -> None: ...
 
 
 def _aware(dt: Optional[datetime]) -> Optional[datetime]:
@@ -184,8 +192,8 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
             links.setdefault(r.event_id, []).append(r)
     if events:
         for er in db.query(EventReservation).filter(EventReservation.event_id.in_([e.id for e in events])).all():
-            r = res_by_id.get(er.reservation_id)
-            if r is not None and r not in links.setdefault(er.event_id, []):
+            linked = res_by_id.get(er.reservation_id)
+            if linked is not None and linked not in links.setdefault(er.event_id, []):
                 links[er.event_id].append(r)
 
     members = member_user_ids(db, plan)
@@ -372,7 +380,7 @@ def _costs(db: Session, plan: TravelPlan) -> Dict[str, Any]:
         by_cat[e.category] = by_cat.get(e.category, 0) + v
     budgets = db.query(Budget).filter(Budget.plan_id == plan.id, Budget.deleted_at.is_(None)).all()
     total_budget = next((b.amount for b in budgets if b.kind == "total"), None)
-    cat_budgets = {b.category: b.amount for b in budgets if b.kind == "category"}
+    cat_budgets = {b.category: b.amount for b in budgets if b.kind == "category" and b.category is not None}
 
     def money(minor: int) -> str:
         return str(finance.from_minor(minor, base))

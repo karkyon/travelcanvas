@@ -828,7 +828,7 @@ def apply_ops(db: Session, plan: TravelPlan, ops: List[Dict[str, Any]],
     [Gate P10] 再計画の承認(app/api/v1/replans.py)でも同じ処理を使うため関数に切り出した。
     [Gate G8] keyed を渡すと、足した予定の key → 新しい予定の ID を入れる(区間・予約の付け替えで使う)。"""
     days = {str(d.id): d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
-    changes = []
+    changes: List[tuple] = []
     for o in ops:
         if o["op"] == "add":
             f = o["fields"]
@@ -838,16 +838,20 @@ def apply_ops(db: Session, plan: TravelPlan, ops: List[Dict[str, Any]],
             db.add(ev)
             db.flush()
             if keyed is not None and o.get("key"):
-                keyed[o["key"]] = cast(uuid.UUID, ev.id)
+                keyed[o["key"]] = ev.id
             changes.append(("travel_event", ev.id, "create", None, plans_api._event_to_dict(ev)))
         elif o["op"] == "remove":
-            ev = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(o["event_id"])).first()
-            if ev is None:
+            gone = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(o["event_id"])).first()
+            if gone is None:
                 continue
+            ev = gone
             changes.append(("travel_event", ev.id, "delete", plans_api._event_to_dict(ev), None))
             db.delete(ev)
         else:
-            ev = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(o["event_id"])).first()
+            target = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(o["event_id"])).first()
+            if target is None:
+                continue
+            ev = target
             before = plans_api._event_to_dict(ev)
             f = o["fields"]
             old_time, old_date = ev.local_start_time, days[str(ev.day_id)].local_date
@@ -878,9 +882,9 @@ def _cost_items(db: Session, plan: TravelPlan) -> List[Dict[str, Any]]:
     if reservations:
         for link in db.query(EventReservation).filter(
                 EventReservation.reservation_id.in_([r.id for r in reservations])).all():
-            links.setdefault(cast(uuid.UUID, link.reservation_id), set()).add(str(link.event_id))
+            links.setdefault(link.reservation_id, set()).add(str(link.event_id))
     for r in reservations:
-        evs: Set[str] = set(links.get(cast(uuid.UUID, r.id), set()))
+        evs: Set[str] = set(links.get(r.id, set()))
         if r.event_id:
             evs.add(str(r.event_id))
         items.append({"kind": "reservation", "id": str(r.id), "label": r.provider_name or r.type or "予約",
@@ -898,7 +902,7 @@ def _cost_items(db: Session, plan: TravelPlan) -> List[Dict[str, Any]]:
 
 
 def _coords(db: Session, plan: TravelPlan) -> Dict[uuid.UUID, Any]:
-    return {cast(uuid.UUID, e.id): (e.latitude, e.longitude)
+    return {e.id: (e.latitude, e.longitude)
             for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id)}
 
 

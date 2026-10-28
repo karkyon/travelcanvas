@@ -16,10 +16,11 @@ const AccountDeletedPage: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
+    // [Gate G10-Q] ログイン状態は最初に消す(オフラインのデータの消去を待つ間に、失効したトークンで要求を送らない)
+    clearLocalSession();
     clearAllOfflinePacks()
       .then(() => alive && setOfflineCleared(true))
-      .catch(() => alive && setOfflineCleared(false))
-      .finally(() => clearLocalSession());
+      .catch(() => alive && setOfflineCleared(false));
     return () => { alive = false; };
   }, [clearLocalSession]);
 

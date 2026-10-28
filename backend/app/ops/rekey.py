@@ -124,16 +124,16 @@ def process_database(database: Optional[str], *, apply: bool, batch: int = 500,
                         if kid is None:
                             if _erased(value):
                                 # [Gate G3] SEC-F5 破棄したデータ鍵の暗号文(鍵の破棄による削除で読めなくした物)
-                                entry["erased"] = int(entry.get("erased", 0)) + 1  # type: ignore[arg-type]
+                                entry["erased"] = int(entry.get("erased", 0)) + 1
                                 continue
-                            entry["undecryptable"] = int(entry["undecryptable"]) + 1  # type: ignore[arg-type]
+                            entry["undecryptable"] = int(entry["undecryptable"]) + 1
                             continue
                         to_mfa = ((table, column) in MFA_COLUMNS and crypto.mfa_key_configured()
                                   and not kid.startswith("mfa:"))
                         # MFA_KEY がある時の ENCRYPTION_KEY のままの TOTP の秘密は「legacy-mfa」に数える(掛け直しが要る)
                         count_as = LEGACY_MFA if to_mfa else kid
                         by_key = entry["by_key"]
-                        by_key[count_as] = by_key.get(count_as, 0) + 1  # type: ignore[index,union-attr]
+                        by_key[count_as] = by_key.get(count_as, 0) + 1
                         if apply and (kid != active or to_mfa) and (budget is None or budget > 0):
                             if to_mfa:
                                 # [Gate G3] SEC-F6 以前の ENCRYPTION_KEY の TOTP の秘密を MFA_KEY で包み直す
@@ -157,16 +157,16 @@ def process_database(database: Optional[str], *, apply: bool, batch: int = 500,
                                     {"new": new, "id": ident, "old": old},
                                 )
                                 if res.rowcount == 1:
-                                    entry["reencrypted"] = int(entry["reencrypted"]) + 1  # type: ignore[arg-type]
+                                    entry["reencrypted"] = int(entry["reencrypted"]) + 1
                                 else:
-                                    totals["skipped_concurrent"] += 1  # type: ignore[operator]
+                                    totals["skipped_concurrent"] += 1
             if entry["undecryptable"]:
                 quarantined.append("%s.%s" % (table, column))
-            for kid, n in entry["by_key"].items():  # type: ignore[union-attr]
-                totals["by_key"][kid] = totals["by_key"].get(kid, 0) + n  # type: ignore[index,union-attr]
-            totals["erased"] = int(totals.get("erased", 0)) + int(entry.get("erased", 0))  # type: ignore[arg-type]
-            totals["undecryptable"] += int(entry["undecryptable"])  # type: ignore[operator,arg-type]
-            totals["reencrypted"] += int(entry["reencrypted"])  # type: ignore[operator,arg-type]
+            for kid, n in entry["by_key"].items():
+                totals["by_key"][kid] = totals["by_key"].get(kid, 0) + n
+            totals["erased"] = int(totals.get("erased", 0)) + int(entry.get("erased", 0))
+            totals["undecryptable"] += int(entry["undecryptable"])
+            totals["reencrypted"] += int(entry["reencrypted"])
             columns.append(entry)
     finally:
         engine.dispose()
@@ -194,16 +194,16 @@ def process_files(root: Optional[str], *, apply: bool, max_files: Optional[int] 
     for path in _storage_files(base):
         data = path.read_bytes()
         if not (data.startswith(FERNET_PREFIX) or data.startswith(crypto.ENVELOPE_PREFIX)):
-            out["not_encrypted"] = int(out["not_encrypted"]) + 1  # type: ignore[arg-type]
+            out["not_encrypted"] = int(out["not_encrypted"]) + 1
             continue
         kid = crypto.key_id_of(data)
         if kid is None:
             if _erased(data):
-                out["erased"] = int(out.get("erased", 0)) + 1  # type: ignore[arg-type]
+                out["erased"] = int(out.get("erased", 0)) + 1
                 continue
-            out["undecryptable"] = int(out["undecryptable"]) + 1  # type: ignore[arg-type]
+            out["undecryptable"] = int(out["undecryptable"]) + 1
             continue
-        out["by_key"][kid] = out["by_key"].get(kid, 0) + 1  # type: ignore[index,union-attr]
+        out["by_key"][kid] = out["by_key"].get(kid, 0) + 1
         if not apply or kid == active or (budget is not None and budget <= 0):
             continue
         new, _, changed = crypto.reencrypt(data)
@@ -217,7 +217,7 @@ def process_files(root: Optional[str], *, apply: bool, max_files: Optional[int] 
             os.fsync(f.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
-        out["reencrypted"] = int(out["reencrypted"]) + 1  # type: ignore[arg-type]
+        out["reencrypted"] = int(out["reencrypted"]) + 1
         if budget is not None:
             budget -= 1
     return out
@@ -225,23 +225,23 @@ def process_files(root: Optional[str], *, apply: bool, max_files: Optional[int] 
 
 def summarize(db: Dict[str, Any], files: Optional[Dict[str, Any]], ring: List[str]) -> Dict[str, Any]:
     active, previous = ring[0], ring[1:]
-    totals = db["totals"]  # type: ignore[assignment]
+    totals = db["totals"]
     # by_key は読んだ時点の件数。run では掛け直した分を引いた残りが「前の鍵のまま」
     from app.core import crypto
 
     mfa_previous = ["mfa:" + k for k in crypto.mfa_keyring_ids()[1:]]
     # [Gate G3] MFA_KEY がある時、ENCRYPTION_KEY のままの TOTP の秘密も「掛け直しが要る」に数える
-    remaining_db = sum(totals["by_key"].get(k, 0) for k in previous + mfa_previous + [LEGACY_MFA])  # type: ignore
-    remaining_db -= int(totals["reencrypted"])  # type: ignore[index]
+    remaining_db = sum(totals["by_key"].get(k, 0) for k in previous + mfa_previous + [LEGACY_MFA])
+    remaining_db -= int(totals["reencrypted"])
     remaining_files = 0
     if files:
-        remaining_files = sum(files["by_key"].get(k, 0) for k in previous) - int(files["reencrypted"])  # type: ignore
-    undecryptable = int(totals["undecryptable"]) + (int(files["undecryptable"]) if files else 0)  # type: ignore[index]
+        remaining_files = sum(files["by_key"].get(k, 0) for k in previous) - int(files["reencrypted"])
+    undecryptable = int(totals["undecryptable"]) + (int(files["undecryptable"]) if files else 0)
     return {
         "ok": undecryptable == 0,
         "active_key": active,
         "previous_keys": previous,
-        "rows": dict(totals),  # type: ignore[call-overload]
+        "rows": dict(totals),
         "files": files,
         "remaining_on_previous_keys": remaining_db + remaining_files,
         # 前の鍵を外してよいか(前の鍵の暗号文が0件で、読めない物も無い)
@@ -249,9 +249,9 @@ def summarize(db: Dict[str, Any], files: Optional[Dict[str, Any]], ring: List[st
         and undecryptable == 0,
         "mfa_active_key": next(iter(crypto.mfa_keyring_ids()), None),
         "mfa_previous_keys": [k[4:] for k in mfa_previous],
-        "erased": int(totals.get("erased", 0)) + (int(files.get("erased", 0)) if files else 0),  # type: ignore
+        "erased": int(totals.get("erased", 0)) + (int(files.get("erased", 0)) if files else 0),
         "quarantined_columns": db["quarantined_columns"],
-        "columns": len(db["columns"]),  # type: ignore[arg-type]
+        "columns": len(db["columns"]),
     }
 
 
@@ -300,7 +300,7 @@ def convert_database(database: Optional[str], to: str, *, batch: int = 500) -> D
                 continue
             if to == "envelope" and table not in SUBJECT_SQL and (table, column) not in MFA_COLUMNS:
                 continue
-            out["columns"] = int(out["columns"]) + 1  # type: ignore[arg-type]
+            out["columns"] = int(out["columns"]) + 1
             subj_sql = SUBJECT_SQL.get(table, (None, "NULL"))
             last = None
             while True:
@@ -324,25 +324,25 @@ def convert_database(database: Optional[str], to: str, *, batch: int = 500) -> D
                     try:
                         if to == "legacy":
                             if env is None:
-                                out["unchanged"] = int(out["unchanged"]) + 1  # type: ignore[arg-type]
+                                out["unchanged"] = int(out["unchanged"]) + 1
                                 continue
                             new = crypto._get_fernet().encrypt(crypto.decrypt_payload(value))
                         elif (table, column) in MFA_COLUMNS:
                             if env is not None or not crypto.mfa_key_configured():
-                                out["unchanged"] = int(out["unchanged"]) + 1  # type: ignore[arg-type]
+                                out["unchanged"] = int(out["unchanged"]) + 1
                                 continue
                             new = crypto.encrypt_mfa(crypto.decrypt_payload(value))
                         else:
                             subj = subject(subj_sql[0], subject_id) if subj_sql[0] else None
                             if env is not None or subj is None:
-                                out["unchanged"] = int(out["unchanged"]) + 1  # type: ignore[arg-type]
+                                out["unchanged"] = int(out["unchanged"]) + 1
                                 continue
                             new = crypto.encrypt_payload(crypto.decrypt_payload(value), subj)
                     except DataKeyDestroyed:
-                        out["erased"] = int(out["erased"]) + 1  # type: ignore[arg-type]
+                        out["erased"] = int(out["erased"]) + 1
                         continue
                     except Exception:  # noqa: BLE001 - 読めない値は変えずに数える(中身は出さない)
-                        out["failed"] = int(out["failed"]) + 1  # type: ignore[arg-type]
+                        out["failed"] = int(out["failed"]) + 1
                         if "%s.%s" % (table, column) not in failed_cols:
                             failed_cols.append("%s.%s" % (table, column))
                         continue
@@ -355,9 +355,9 @@ def convert_database(database: Optional[str], to: str, *, batch: int = 500) -> D
                                 % (_quote(table), _quote(column), _quote(pk), _quote(column))),
                                 {"new": new, "id": ident, "old": old})
                             if res.rowcount == 1:
-                                out["converted"] = int(out["converted"]) + 1  # type: ignore[arg-type]
+                                out["converted"] = int(out["converted"]) + 1
                             else:
-                                out["skipped_concurrent"] = int(out["skipped_concurrent"]) + 1  # type: ignore
+                                out["skipped_concurrent"] = int(out["skipped_concurrent"]) + 1
     finally:
         engine.dispose()
     out["failed_columns"] = failed_cols
@@ -379,21 +379,21 @@ def convert_files(root: Optional[str], to: str) -> Dict[str, Any]:
         try:
             if to == "legacy":
                 if env is None:
-                    out["unchanged"] = int(out["unchanged"]) + 1  # type: ignore[arg-type]
+                    out["unchanged"] = int(out["unchanged"]) + 1
                     continue
                 new = crypto._get_fernet().encrypt(crypto.decrypt_payload(data))
             else:
                 rel = path.relative_to(base).parts
                 subj = subject("plan", rel[0]) if len(rel) > 1 else None
                 if env is not None or subj is None or not data.startswith(FERNET_PREFIX):
-                    out["unchanged"] = int(out["unchanged"]) + 1  # type: ignore[arg-type]
+                    out["unchanged"] = int(out["unchanged"]) + 1
                     continue
                 new = crypto.encrypt_payload(crypto.decrypt_payload(data), subj)
         except DataKeyDestroyed:
-            out["erased"] = int(out["erased"]) + 1  # type: ignore[arg-type]
+            out["erased"] = int(out["erased"]) + 1
             continue
         except Exception:  # noqa: BLE001
-            out["failed"] = int(out["failed"]) + 1  # type: ignore[arg-type]
+            out["failed"] = int(out["failed"]) + 1
             continue
         tmp = path.with_name(path.name + TMP_SUFFIX)
         mode = path.stat().st_mode & 0o777
@@ -403,7 +403,7 @@ def convert_files(root: Optional[str], to: str) -> Dict[str, Any]:
             os.fsync(f.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
-        out["converted"] = int(out["converted"]) + 1  # type: ignore[arg-type]
+        out["converted"] = int(out["converted"]) + 1
     return out
 
 
@@ -431,7 +431,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.cmd == "convert":
         res = convert_database(args.database, args.to, batch=args.batch)
         res["files"] = None if args.no_files else convert_files(args.files_root, args.to)
-        if res["files"] and res["files"]["failed"]:  # type: ignore[index]
+        if res["files"] and res["files"]["failed"]:
             res["ok"] = False
         print(json.dumps(res, ensure_ascii=False, sort_keys=True))
         return 0 if res["ok"] else 1

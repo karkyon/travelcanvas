@@ -14,7 +14,7 @@ FR-045「項目単位の共有の規則」、DOC-11「RESTRICTED は本人限定
 """
 from __future__ import annotations
 
-from typing import Any, Dict, FrozenSet, Iterable, List, Optional
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Set
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -125,7 +125,7 @@ def hidden_for(db: Session, plan: TravelPlan, role: Optional[str], user: Optiona
     override = member_override(collab)
     if override is not None:
         return frozenset(override)
-    return frozenset(role_defaults(plan).get(role, []))
+    return frozenset(role_defaults(plan).get(role or "", []))
 
 
 def hidden_error(category: str) -> HTTPException:
@@ -166,7 +166,7 @@ def mask_event_dict(d: Dict[str, Any], hidden: FrozenSet[str]) -> Dict[str, Any]
 
 
 def forbidden_write_fields(hidden: FrozenSet[str], fields: Iterable[str]) -> List[str]:
-    blocked = set()
+    blocked: Set[str] = set()
     if "event_notes" in hidden:
         blocked.update(EVENT_NOTE_FIELDS)
     if "event_address" in hidden:

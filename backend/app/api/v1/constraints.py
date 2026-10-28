@@ -24,7 +24,7 @@ import json
 import re
 import uuid
 from datetime import datetime, timezone as dt_timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypeGuard, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -206,7 +206,7 @@ class ConstraintUpdateRequest(BaseModel):
 
 # ===== 値の検証 =====
 
-def _is_time_value(v: Any) -> bool:
+def _is_time_value(v: Any) -> TypeGuard[str]:
     if not isinstance(v, str):
         return False
     if _HHMM.match(v):
@@ -218,7 +218,7 @@ def _is_time_value(v: Any) -> bool:
     return parsed.tzinfo is not None
 
 
-def _is_number(v: Any) -> bool:
+def _is_number(v: Any) -> TypeGuard[Union[int, float]]:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
@@ -629,7 +629,7 @@ def update_constraint(
     if not title:
         raise HTTPException(status_code=422, detail="titleを入力してください")
     operator = data.get("operator", c.operator)
-    raw_value = payload.value.model_dump() if "value" in data else (current_value or {})
+    raw_value = payload.value.model_dump() if "value" in data and payload.value is not None else (current_value or {})
     value = _validate_value(operator, raw_value)
     hardness = data.get("hardness", c.hardness)
     if "weight" in data:

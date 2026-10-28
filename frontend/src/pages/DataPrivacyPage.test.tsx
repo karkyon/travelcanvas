@@ -31,6 +31,12 @@ vi.mock('@/services/api/g8', () => ({
   createCorrection: vi.fn(), revertCorrection: vi.fn(),
 }));
 
+// [Gate G10-Q] 削除の後に端末のログイン状態を消す(画面を移すのと同時)
+const auth = vi.hoisted(() => ({ clearLocalSession: vi.fn() }));
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: (sel: (s: { clearLocalSession: () => void }) => unknown) => sel({ clearLocalSession: auth.clearLocalSession }),
+}));
+
 import DataPrivacyPage from './DataPrivacyPage';
 import ExportsPage from './ExportsPage';
 
@@ -80,6 +86,27 @@ describe('DataPrivacyPage (Gate P6)', () => {
     m.downloadAccountDataExport.mockRejectedValue({ response: { data: { detail: '認証が必要です' } } });
     fireEvent.click(screen.getByRole('button', { name: 'アカウントのデータを書き出す' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('認証が必要です');
+  });
+
+  it('[Gate G10-Q] アカウントを削除すると、完了の画面へ移すのと同時に端末のログイン状態を消す', async () => {
+    m.getAccountDeletionPreview.mockResolvedValue(fx.account_deletion_preview);
+    m.deleteAccount.mockResolvedValue(undefined);
+    auth.clearLocalSession.mockReset();
+    render(
+      <MemoryRouter initialEntries={['/settings/data']}>
+        <Routes>
+          <Route path="/settings/data" element={<DataPrivacyPage />} />
+          <Route path="/account-deleted" element={<p>削除の完了</p>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '削除の内容を確認する' }));
+    fireEvent.change(await screen.findByLabelText(/確認のため/), { target: { value: '退会する' } });
+    fireEvent.change(screen.getByLabelText('現在のパスワード'), { target: { value: 'Gate-P9-TestPass-1' } });
+    expect(auth.clearLocalSession).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'アカウントを削除する' }));
+    expect(await screen.findByText('削除の完了')).toBeInTheDocument();
+    expect(auth.clearLocalSession).toHaveBeenCalledTimes(1);
   });
 
   it('保持期間を取得できない時はその旨を出す', async () => {

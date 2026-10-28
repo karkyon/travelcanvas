@@ -3,14 +3,16 @@ TravelCanvas Database Models - 最終完成版
 統一されたBaseクラスを使用、重複定義なし
 """
 import uuid
-from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Optional
+from datetime import date, datetime, timedelta
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
+    Integer, String, Float, Boolean, DateTime, Date, Text, JSON,
     ForeignKey, UniqueConstraint, LargeBinary, Index, CheckConstraint, text,
     Numeric, BigInteger,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import deferred, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from enum import Enum
 
@@ -76,22 +78,22 @@ class User(Base):
     """ユーザーモデル - 唯一の定義"""
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)      # ← 認証で必要
-    is_superuser = Column(Boolean, default=False)     # ← 管理者権限
-    role = Column(String, default="user")
-    user_type = Column(String, default="registered")  # ← ユーザータイプ
-    preferences = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    username: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)      # ← 認証で必要
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)     # ← 管理者権限
+    role: Mapped[str] = mapped_column(String, default="user", nullable=True)
+    user_type: Mapped[str] = mapped_column(String, default="registered", nullable=True)  # ← ユーザータイプ
+    preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
     # [Gate G7] FR-039 猶予つきのアカウント削除。申し込んだ時刻と削除する時刻(この間は取り消せる。
     # 時刻を過ぎたら定期の処理 tcops.py jobs account-deletions が削除する。app/services/account_deletion.py)
-    deletion_requested_at = Column(DateTime(timezone=True), nullable=True)
-    deletion_due_at = Column(DateTime(timezone=True), nullable=True)
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deletion_due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("(deletion_requested_at IS NULL) = (deletion_due_at IS NULL)",
@@ -110,15 +112,15 @@ class UserSession(Base):
     """ユーザーセッションモデル"""
     __tablename__ = "user_sessions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    session_token = Column(String, unique=True, index=True, nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_active = Column(Boolean, default=True)
-    device_info = Column(JSON, nullable=True)
-    ip_address = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    session_token: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
+    device_info: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # リレーションシップ
     user = relationship("User", back_populates="sessions")
@@ -131,15 +133,17 @@ class UserMfa(Base):
     設定の途中(認証アプリへの登録を確かめる前)で、ログインには使わない。回復コードはハッシュだけを持つ。"""
     __tablename__ = "user_mfa"
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    method = Column(String(8), nullable=False, default="totp", server_default="totp")
-    totp_secret_ciphertext = Column(LargeBinary, nullable=False)
-    confirmed_at = Column(DateTime(timezone=True), nullable=True)
-    last_used_step = Column(BigInteger, nullable=True)
-    recovery_code_hashes = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
-    recovery_salt = Column(String(64), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    method: Mapped[str] = mapped_column(String(8), nullable=False, default="totp", server_default="totp")
+    totp_secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_step: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    recovery_code_hashes: Mapped[Any] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    recovery_salt: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (CheckConstraint("method IN ('totp')", name="ck_user_mfa_method"),)
 
@@ -148,26 +152,26 @@ class Travel(Base):
     """旅行モデル"""
     __tablename__ = "travels"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    title = Column(String, index=True)
-    description = Column(Text)
-    location = Column(String)
-    duration = Column(Integer)  # days
-    estimated_cost = Column(Float)
-    optimized_route = Column(Boolean, default=False)
-    optimization_score = Column(Float, nullable=True)
-    transport_modes = Column(JSON, nullable=True)
-    waypoints = Column(JSON, nullable=True)
-    preferences = Column(JSON, nullable=True)
-    status = Column(String, default="draft")
-    is_public = Column(Boolean, default=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    location: Mapped[Optional[str]] = mapped_column(String)
+    duration: Mapped[Optional[int]] = mapped_column(Integer)  # days
+    estimated_cost: Mapped[Optional[float]] = mapped_column(Float)
+    optimized_route: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    optimization_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    transport_modes: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    waypoints: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="draft", nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
 
     # 外部キー
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     # タイムスタンプ
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # リレーションシップ
     owner = relationship("User", back_populates="travels")
@@ -178,32 +182,33 @@ class TravelPlan(Base):
     """旅行プランモデル"""
     __tablename__ = "travel_plans"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    destination = Column(String)
-    start_date = Column(DateTime(timezone=True))
-    end_date = Column(DateTime(timezone=True))
-    budget = Column(Float)
-    status = Column(String, default="draft")
-    preferences = Column(JSON, nullable=True)
-    itinerary = Column(JSON, nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    destination: Mapped[Optional[str]] = mapped_column(String)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    budget: Mapped[Optional[float]] = mapped_column(Float)
+    status: Mapped[str] = mapped_column(String, default="draft", nullable=True)
+    preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    itinerary: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     # [Gate #29] 楽観的並行制御用のリビジョン番号。/plans系の新エンドポイントの
     # 更新・削除・並べ替えはこの値をIf-Matchヘッダーで要求し、一致しない場合は
     # 409を返す。更新の度に加算される。既存の/travel-plansエンドポイント
     # (itinerary JSONベース)は当面この値を変更しない(後方互換維持のため)。
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
     # [Gate G2] FR-045 参加者(編集者・閲覧者)に隠す項目の、役割ごとの既定。NULL は何も隠さない(本Gate以前と同じ)
-    member_field_policy = Column(JSONB, nullable=True)
+    member_field_policy: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     # [Gate B-012] 2段階削除。DELETEで論理削除(deleted_at)し、purge_after(既定30日後)を
     # 過ぎたらapp/services/plan_deletion.pyの完全削除で子データごと物理削除する。
     # 論理削除中はrequire_plan_access等で存在しないもの(404)として扱う。
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
-    deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    purge_after = Column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    purge_after: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -239,24 +244,25 @@ class PlanShareLink(Base):
     """
     __tablename__ = "plan_share_links"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    token_hash = Column(String, unique=True, index=True, nullable=False)
-    token_prefix = Column(String(8), nullable=False)
-    permission = Column(String, default="view")  # view | edit
-    passcode_hash = Column(String, nullable=True)
-    max_uses = Column(Integer, nullable=True)
-    use_count = Column(Integer, nullable=False, default=0, server_default="0")
-    expires_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    token_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
+    permission: Mapped[str] = mapped_column(String, default="view", nullable=True)  # view | edit
+    passcode_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    max_uses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     # [Gate F45] FR-045 項目単位の共有の規則({"version":1,"fields":[...],"preset":...})。
     # NULL は本Gate以前のリンク(=標準の項目)。app/services/share_policy.py が正本。
-    policy = Column(JSONB, nullable=True)
+    policy: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     # [Gate G4] COL-05 受け取った人が、許可された項目だけを自分の旅行へ複製してよい(所有者が選ぶ。既定は不可)
-    allow_clone = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    allow_clone: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     # [Gate G4] FC-097 失効の理由(owner / admin_abuse など。所有者の失効は NULL のまま)
-    revoked_reason = Column(String(16), nullable=True)
+    revoked_reason: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="share_links")
@@ -266,19 +272,20 @@ class PlanCollaborator(Base):
     """旅行プランコラボレーターモデル"""
     __tablename__ = "plan_collaborators"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    email = Column(String, nullable=False)
-    role = Column(String, default="viewer")  # viewer | editor | owner
-    status = Column(String, default="pending")  # pending | accepted | declined
-    invite_message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, default="viewer", nullable=True)  # viewer | editor | owner
+    status: Mapped[str] = mapped_column(String, default="pending", nullable=True)  # pending | accepted | declined
+    invite_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     # [Gate #30] 招待された側がaccept/declineした日時。pending中はNULL。
-    decided_at = Column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate G2] FR-045 この参加者だけに適用する項目の規則({"version":1,"hidden":[...]})。
     # NULL は役割の既定(travel_plans.member_field_policy)に従う。app/services/member_policy.py が正本。
-    field_policy = Column(JSONB, nullable=True)
+    field_policy: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     # リレーションシップ
     plan = relationship("TravelPlan", back_populates="collaborators")
@@ -289,17 +296,18 @@ class Notification(Base):
     """通知モデル"""
     __tablename__ = "notifications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    type = Column(String, nullable=False)
-    title = Column(String, nullable=False)
-    message = Column(Text, nullable=True)
-    related_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    related_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
     # [Gate G4] COL-03 コメントの対象(予定・予約・費用・投票)へ移るため。本文は入れない
-    target_type = Column(String(12), nullable=True)
-    target_id = Column(UUID(as_uuid=True), nullable=True)
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    target_type: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    target_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     # リレーションシップ
     user = relationship("User")
@@ -310,13 +318,13 @@ class OptimizationResult(Base):
     """最適化結果モデル"""
     __tablename__ = "optimization_results"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    travel_id = Column(UUID(as_uuid=True), ForeignKey("travels.id"))
-    optimization_type = Column(String)
-    original_data = Column(JSON)
-    optimized_data = Column(JSON)
-    improvement_metrics = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    travel_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("travels.id"))
+    optimization_type: Mapped[Optional[str]] = mapped_column(String)
+    original_data: Mapped[Optional[Any]] = mapped_column(JSON)
+    optimized_data: Mapped[Optional[Any]] = mapped_column(JSON)
+    improvement_metrics: Mapped[Optional[Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     # リレーションシップ
     travel = relationship("Travel", back_populates="optimization_results")
@@ -340,33 +348,33 @@ class Spot(Base):
     __tablename__ = "spots"
 
     # 基本情報
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String(200), nullable=False, index=True)
-    description = Column(Text, nullable=True)
-    category = Column(String(50), nullable=False, default="other")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String(50), nullable=False, default="other")
 
     # 位置情報（MVP版：手動入力）
-    address = Column(String(500), nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # MVPメタデータ
-    rating = Column(Float, nullable=True)  # 1-5評価
-    price_range = Column(String(10), nullable=True)  # $, $$, $$$
+    rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 1-5評価
+    price_range: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # $, $$, $$$
 
     # 画像（MVP版：URL文字列）
-    image_url = Column(String(500), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # ユーザー関連
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    is_public = Column(Boolean, default=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
 
     # 統計
-    visit_count = Column(Integer, default=0)
+    visit_count: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
 
     # タイムスタンプ
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     # リレーションシップ
     creator = relationship("User", back_populates="created_spots")
@@ -376,15 +384,15 @@ class UserSpotFavorite(Base):
     """ユーザーお気に入りスポット - MVP版"""
     __tablename__ = "user_spot_favorites"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    spot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
 
     # 個人メモ
-    personal_note = Column(Text, nullable=True)
-    personal_rating = Column(Float, nullable=True)
+    personal_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    personal_rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     # ユニーク制約
     __table_args__ = (
@@ -403,21 +411,21 @@ class UserSpotVisit(Base):
     """
     __tablename__ = "user_spot_visits"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    spot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=False)
 
     # 訪問メモ
-    visit_note = Column(Text, nullable=True)
+    visit_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    visited_at = Column(DateTime(timezone=True), server_default=func.now())
+    visited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     # [Gate #37] Visited Area Layer: GPS自動判定による訪問記録に対応する。
     # 既存の手動記録行はsource='manual'のまま(server_defaultにより後方互換)。
     # confidence/detected_accuracy_metersは手動記録では常にNULL。
-    source = Column(String, nullable=False, server_default="manual")
-    confidence = Column(Float, nullable=True)
-    detected_accuracy_meters = Column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=False, server_default="manual")
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    detected_accuracy_meters: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     __table_args__ = (
         {"extend_existing": True},
@@ -437,15 +445,16 @@ class TravelDay(Base):
     """旅行プランの「日」。1プラン×1現地日で一意。"""
     __tablename__ = "travel_days"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    local_date = Column(Date, nullable=False)
-    timezone_id = Column(String, nullable=False, default="UTC")
-    title = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-    sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    timezone_id: Mapped[str] = mapped_column(String, nullable=False, default="UTC")
+    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     plan = relationship("TravelPlan", back_populates="days")
     events = relationship(
@@ -462,33 +471,35 @@ class TravelEvent(Base):
     """旅程イベント(観光・食事・移動等)。"""
     __tablename__ = "travel_events"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    day_id = Column(UUID(as_uuid=True), ForeignKey("travel_days.id", ondelete="CASCADE"), nullable=False)
-    spot_id = Column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    day_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_days.id", ondelete="CASCADE"), nullable=False)
+    spot_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("spots.id"), nullable=True)
     # [Gate #32] このイベントがcandidate/place(Gate #31正規化検索結果)から
     # 採用されたものであれば、そのPlaceを参照する(出典追跡・地図上の
     # candidate<->event紐付けのため)。手動作成されたイベントはNULL。
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    event_type = Column(String, nullable=False, default="activity")
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    event_type: Mapped[str] = mapped_column(String, nullable=False, default="activity")
 
-    start_at = Column(DateTime(timezone=True), nullable=True)
-    end_at = Column(DateTime(timezone=True), nullable=True)
-    local_start_time = Column(String, nullable=True)  # "HH:MM" 表示用
-    is_all_day = Column(Boolean, nullable=False, default=False)
+    start_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    local_start_time: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # "HH:MM" 表示用
+    is_all_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    address = Column(String, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-    locked = Column(Boolean, nullable=False, default=False)  # 最適化対象から除外
-    sort_order = Column(Integer, nullable=False, default=0)
+    locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     day = relationship("TravelDay", back_populates="events")
 
@@ -498,24 +509,26 @@ class EventLink(Base):
     参照はsource_type/source_idの汎用形で拡張する想定。"""
     __tablename__ = "event_links"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    event_id = Column(UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="CASCADE"), nullable=False)
-    link_type = Column(String, nullable=False)  # note | url | other
-    label = Column(String, nullable=True)
-    url = Column(String, nullable=True)
-    body = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="CASCADE"), nullable=False)
+    link_type: Mapped[str] = mapped_column(String, nullable=False)  # note | url | other
+    label: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 class PlanVersion(Base):
     """プラン全体の論理版。変更が確定するたびに1行追加する。"""
     __tablename__ = "plan_versions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    revision = Column(Integer, nullable=False)
-    summary = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("plan_id", "revision", name="uq_plan_versions_plan_revision"),
@@ -526,14 +539,17 @@ class ChangeSet(Base):
     """1回の変更操作(作成/更新/削除/並べ替え/Undo)の単位。"""
     __tablename__ = "change_sets"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    source = Column(String, nullable=False, default="manual")  # manual|optimization|replan|import|undo
-    base_revision = Column(Integer, nullable=False)
-    resulting_revision = Column(Integer, nullable=False)
-    applied_at = Column(DateTime(timezone=True), server_default=func.now())
-    undone_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # manual|optimization|replan|import|undo
+    source: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    resulting_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    undone_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     items = relationship("ChangeItem", back_populates="change_set", cascade="all, delete-orphan")
 
@@ -542,15 +558,20 @@ class ChangeItem(Base):
     """ChangeSet内の個別エンティティ差分。Undo時にafter->beforeへ戻す。"""
     __tablename__ = "change_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="CASCADE"), nullable=False)
-    entity_type = Column(String, nullable=False)  # travel_day | travel_event
-    entity_id = Column(UUID(as_uuid=True), nullable=False)
-    action = Column(String, nullable=False)  # create | update | delete | reorder
-    before_json = Column(JSON, nullable=True)
-    after_json = Column(JSON, nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    change_set_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="CASCADE"), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String, nullable=False)  # travel_day | travel_event
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)  # create | update | delete | reorder
+    before_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    after_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     change_set = relationship("ChangeSet", back_populates="items")
+
+
+# [Gate G10-Q] 下の IdempotencyRecord.payload_hash の既定値が読むため、クラスより前に置く
+_LEGACY_PAYLOAD_HASH_SENTINEL = b"\x00" * 32
 
 
 class IdempotencyRecord(Base):
@@ -562,22 +583,20 @@ class IdempotencyRecord(Base):
     後方互換を保つ。詳細はdocs/adr/ADR-quick-draft.md参照。"""
     __tablename__ = "idempotency_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    key = Column(String, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id"), nullable=True)
-    endpoint = Column(String, nullable=False)
-    payload_hash = Column(
-        LargeBinary(32), nullable=False, default=lambda: _LEGACY_PAYLOAD_HASH_SENTINEL,
-    )
-    status = Column(String, nullable=False, default="COMPLETED")  # IN_PROGRESS/COMPLETED/FAILED
-    response_status = Column(Integer, nullable=True)
-    response_json = Column(JSON, nullable=True)
-    error_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(
-        DateTime(timezone=True), nullable=False, default=lambda: _default_idempotency_expiry(),
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    device_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("devices.id"), nullable=True)
+    endpoint: Mapped[str] = mapped_column(String, nullable=False)
+    payload_hash: Mapped[bytes] = mapped_column(
+        LargeBinary(32), nullable=False, default=lambda: _LEGACY_PAYLOAD_HASH_SENTINEL)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="COMPLETED")  # IN_PROGRESS/COMPLETED/FAILED
+    response_status: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    response_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    error_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: _default_idempotency_expiry())
 
     __table_args__ = (
         CheckConstraint(
@@ -601,8 +620,6 @@ class IdempotencyRecord(Base):
 # docs/adr/ADR-quick-draft.mdを参照。payload暗号化の実装はGate R2-2で導入し、
 # 本Gateはスキーマ(devices/quick_drafts)のみを追加する。
 # ==========================================
-
-_LEGACY_PAYLOAD_HASH_SENTINEL = b"\x00" * 32
 
 
 def _default_idempotency_expiry():
@@ -632,12 +649,13 @@ class Device(Base):
     SHA-256 digestのみ保存する。"""
     __tablename__ = "devices"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    token_digest = Column(LargeBinary(32), nullable=False, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_seen_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False, default=_default_device_expiry)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    token_digest: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_default_device_expiry)
 
     quick_drafts = relationship("QuickDraft", back_populates="device")
 
@@ -647,17 +665,18 @@ class QuickDraft(Base):
     作成・promote APIの実装はGate R2-2/R2-3で行う(本Gateはスキーマのみ)。"""
     __tablename__ = "quick_drafts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    device_id = Column(UUID(as_uuid=True), ForeignKey("devices.id"), nullable=False, index=True)
-    payload_ciphertext = Column(LargeBinary, nullable=False)
-    revision = Column(Integer, nullable=False, default=1)
-    status = Column(String, nullable=False, default=QuickDraftStatus.ACTIVE.value)
-    expires_at = Column(
-        DateTime(timezone=True), nullable=False, default=_default_quick_draft_expiry,
-    )
-    promoted_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    device_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("devices.id"), nullable=False, index=True)
+    payload_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String, nullable=False, default=QuickDraftStatus.ACTIVE.value)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_default_quick_draft_expiry)
+    promoted_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     device = relationship("Device", back_populates="quick_drafts")
 
@@ -682,19 +701,20 @@ class SearchCandidate(Base):
     重複削除せず毎回新規行として保持する(比較提示のため)。"""
     __tablename__ = "search_candidates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    query = Column(String, nullable=False)
-    provider = Column(String, nullable=False)  # wikipedia | nominatim | overpass
-    external_id = Column(String, nullable=True)
-    name = Column(String, nullable=False)
-    category = Column(String, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    address = Column(String, nullable=True)
-    raw_payload = Column(JSON, nullable=True)
-    searched_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    retrieved_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    query: Mapped[str] = mapped_column(String, nullable=False)
+    provider: Mapped[str] = mapped_column(String, nullable=False)  # wikipedia | nominatim | overpass
+    external_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    raw_payload: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    searched_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     source_records = relationship(
         "SourceRecord", back_populates="candidate", cascade="all, delete-orphan"
@@ -705,30 +725,29 @@ class Place(Base):
     """候補(Candidate)をユーザーが採用(adopt)して確定した正規の場所。"""
     __tablename__ = "places"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String, nullable=False)
-    category = Column(String, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    address = Column(String, nullable=True)
-    adopted_from_candidate_id = Column(
-        UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True
-    )
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    adopted_from_candidate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     # [Gate C2] FR-008 場所の一元管理(DOC-02 FR-008、DOC-04 SC-09)。項目ごとの出典は field_sources
-    aliases = Column(JSONB, nullable=True)            # 別名の一覧
-    phone = Column(String(40), nullable=True)
-    website = Column(String(2000), nullable=True)
-    entrance_note = Column(String(500), nullable=True)  # 入口(駅の改札・施設の入口・ロビー・駐車場など)
-    floor = Column(String(40), nullable=True)
-    reservation_required = Column(Boolean, nullable=True)  # NULL = 分からない
-    price_range = Column(String(40), nullable=True)
-    accessibility_note = Column(String(1000), nullable=True)
-    closed_days = Column(String(200), nullable=True)
-    note = Column(String(2000), nullable=True)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    aliases: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)            # 別名の一覧
+    phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    website: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    entrance_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # 入口(駅の改札・施設の入口・ロビー・駐車場など)
+    floor: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    reservation_required: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)  # NULL = 分からない
+    price_range: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    accessibility_note: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    closed_days: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     field_sources = relationship(
         "FieldSource", back_populates="place", cascade="all, delete-orphan"
@@ -744,15 +763,16 @@ class SourceRecord(Base):
     いるかを表す(呼び出し側が取得後の経過時間から判定して更新する)。"""
     __tablename__ = "source_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    candidate_id = Column(UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
-    provider = Column(String, nullable=False)
-    source_url = Column(String, nullable=True)
-    retrieved_at = Column(DateTime(timezone=True), nullable=False)
-    freshness_state = Column(String, nullable=False, default="fresh")  # fresh | stale | expired
-    raw_response = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    candidate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("search_candidates.id"), nullable=True)
+    place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    freshness_state: Mapped[str] = mapped_column(String, nullable=False, default="fresh")  # fresh | stale | expired
+    raw_response: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     candidate = relationship("SearchCandidate", back_populates="source_records")
     place = relationship("Place")
@@ -763,12 +783,13 @@ class FieldSource(Base):
     1つのPlaceの複数フィールドが異なるproviderに由来するケースを表現できる。"""
     __tablename__ = "field_sources"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
-    field_name = Column(String, nullable=False)
-    value = Column(Text, nullable=True)
-    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    place_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
+    field_name: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_record_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     place = relationship("Place", back_populates="field_sources")
     source_record = relationship("SourceRecord")
@@ -779,16 +800,17 @@ class OpeningHours(Base):
     populateは次Gate以降(Overpassのopening_hoursタグ解析等)。"""
     __tablename__ = "opening_hours"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
-    day_of_week = Column(Integer, nullable=False)  # 0=月 ... 6=日
-    open_time = Column(String, nullable=True)  # "09:00"
-    close_time = Column(String, nullable=True)  # "18:00"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    place_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=False)
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=月 ... 6=日
+    open_time: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # "09:00"
+    close_time: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # "18:00"
     # [Gate G4] MAP-02 最終入場・ラストオーダー("HH:MM"。無ければ閉じる時刻まで)
-    last_entry = Column(String(5), nullable=True)
-    last_order = Column(String(5), nullable=True)
-    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_entry: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    last_order: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    source_record_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_records.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     place = relationship("Place", back_populates="opening_hours")
 
@@ -807,18 +829,19 @@ class PlaceSpecialHours(Base):
     kind = closed(その日は休み。時刻なし)/ open(その日だけの営業時間。1日に3つまで)。"""
     __tablename__ = "place_special_hours"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
-    local_date = Column(Date, nullable=False)
-    kind = Column(String(8), nullable=False)
-    open_time = Column(String(5), nullable=True)
-    close_time = Column(String(5), nullable=True)
-    last_entry = Column(String(5), nullable=True)
-    last_order = Column(String(5), nullable=True)
-    note = Column(String(200), nullable=True)
-    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True,
-                              index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    place_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    open_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    close_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    last_entry: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    last_order: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    source_record_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("kind IN ('closed', 'open')", name="ck_place_special_hours_kind"),
@@ -832,30 +855,32 @@ class PlaceEntrance(Base):
     """[Gate G4] MAP-02 入口(正面・裏口・駐車場・駅の出口など)。地点(座標)を別に持てる。"""
     __tablename__ = "place_entrances"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
-    label = Column(String(100), nullable=False)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    note = Column(String(300), nullable=True)
-    accessible = Column(Boolean, nullable=True)  # 段差なしで入れるか(NULL = 分からない)
-    sort_order = Column(Integer, nullable=False, default=0)
-    source_record_id = Column(UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True,
-                              index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    place_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    accessible: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)  # 段差なしで入れるか(NULL = 分からない)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source_record_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_records.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 class ShareAccessLog(Base):
     """公開共有リンクへのアクセス試行監査ログ"""
     __tablename__ = "share_access_logs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True)
-    token_hash = Column(String, nullable=True)
-    ip_address = Column(String, nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    share_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True)
+    token_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # result: success | invalid | passcode_failed | rate_limited
-    result = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    result: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 # ==========================================
@@ -880,70 +905,64 @@ class TravelSegment(Base):
     """
     __tablename__ = "travel_segments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    from_event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
-    from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
-    to_event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
-    to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
+    from_place_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    to_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
+    to_place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     # walking | driving | train | bus | ferry | flight | bicycle | taxi | mixed
-    mode = Column(String, nullable=False)
+    mode: Mapped[str] = mapped_column(String, nullable=False)
     # planned | confirmed | cancelled
-    status = Column(String, nullable=False, default="planned", server_default="planned")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="planned", server_default="planned")
 
-    planned_departure_at = Column(DateTime(timezone=True), nullable=True)
-    planned_arrival_at = Column(DateTime(timezone=True), nullable=True)
+    planned_departure_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    planned_arrival_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    distance_km = Column(Float, nullable=True)
-    duration_minutes = Column(Float, nullable=True)
+    distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    duration_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # [Gate M1] 金額はFloatではなくNumericで保持する(DOC-03の金額精度規約)。
-    cost = Column(Numeric(14, 2), nullable=True)
-    currency = Column(String(3), nullable=True)
+    cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
 
-    preparation_minutes = Column(Integer, nullable=False, default=0, server_default="0")
-    buffer_before_minutes = Column(Integer, nullable=False, default=0, server_default="0")
-    buffer_after_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+    preparation_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    buffer_before_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    buffer_after_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
-    transport_number = Column(String, nullable=True)  # 便名・列車番号等
-    platform = Column(String, nullable=True)
-    transfer_count = Column(Integer, nullable=True)
-    luggage_note = Column(Text, nullable=True)
+    transport_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 便名・列車番号等
+    platform: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    transfer_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    luggage_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
+    reservation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
 
     # [Gate M3] FR-015複数経路比較。採用されたRouteOption(候補)への参照。
     # additive(nullable)。route_optionsテーブルはGate M3で新設したため、
     # Gate M1時点ではこの列を先行追加しなかった(ADR-travel-segment.md
     # 「参照先tableが無い状態でFKなしのUUID列だけ先行追加しない」を参照)。
-    route_option_id = Column(
-        UUID(as_uuid=True), ForeignKey("route_options.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
+    route_option_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("route_options.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
 
     # [Gate #32から継続] haversine fallback由来かどうかの由来管理(provenance)。
     # [Gate G7] MOVE-03 最終の便(終電・最終のバス・船の最終便)の出発時刻。利用者が入れる(時刻表の提供元は未接続)。
     # 実行可能性の判定が、この時刻までに出発できるかを確かめる(LAST_TRANSPORT_MISSED / LAST_TRANSPORT_TIGHT)
-    last_departure_at = Column(DateTime(timezone=True), nullable=True)
+    last_departure_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    is_estimate = Column(Boolean, nullable=False, default=True)
-    provider = Column(String, nullable=False)  # "haversine_estimate" | "manual" 等
-    algorithm_version = Column(String, nullable=False)
-    computed_at = Column(DateTime(timezone=True), nullable=False)
+    is_estimate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False)  # "haversine_estimate" | "manual" 等
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
 # 後方互換エイリアス(Gate #32時点のimport元を壊さないため)。
@@ -972,47 +991,45 @@ class RouteOption(Base):
     """
     __tablename__ = "route_options"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    from_event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
-    from_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
-    to_event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
-    to_place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    from_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
+    from_place_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    to_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
+    to_place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     # candidate | adopted | discarded
-    status = Column(String, nullable=False, default="candidate", server_default="candidate")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="candidate", server_default="candidate")
 
     # [Gate M3] DOC-02 FR-015の比較軸。全て概算・推定であり確定値ではない。
-    total_duration_minutes = Column(Float, nullable=True)
-    total_cost = Column(Numeric(14, 2), nullable=True)
-    currency = Column(String(3), nullable=True)
-    total_distance_km = Column(Float, nullable=True)
-    walking_minutes = Column(Float, nullable=True)
-    transfer_count = Column(Integer, nullable=True)
-    accessibility_score = Column(Float, nullable=True)  # 0.0-1.0、高いほどバリアフリー
-    scenic_score = Column(Float, nullable=True)  # 0.0-1.0、高いほど景観が良い
-    co2_estimate_kg = Column(Float, nullable=True)
+    total_duration_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    total_distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    walking_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    transfer_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    accessibility_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0.0-1.0、高いほどバリアフリー
+    scenic_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0.0-1.0、高いほど景観が良い
+    co2_estimate_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # [Gate M3] DOC-02「外部経路値には提供元、取得時刻、推定幅を保存する」。
-    duration_estimate_low_minutes = Column(Float, nullable=True)
-    duration_estimate_high_minutes = Column(Float, nullable=True)
+    duration_estimate_low_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    duration_estimate_high_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-    provider = Column(String, nullable=False)  # "manual" 等
-    retrieved_at = Column(DateTime(timezone=True), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=True)
-    is_estimate = Column(Boolean, nullable=False, default=True)
-    algorithm_version = Column(String, nullable=False)
+    provider: Mapped[str] = mapped_column(String, nullable=False)  # "manual" 等
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_estimate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
 class RouteLeg(Base):
@@ -1026,29 +1043,27 @@ class RouteLeg(Base):
     """
     __tablename__ = "route_legs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    route_option_id = Column(
-        UUID(as_uuid=True), ForeignKey("route_options.id", ondelete="CASCADE"),
-        nullable=False, index=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    route_option_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("route_options.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    leg_order = Column(Integer, nullable=False)
-    mode = Column(String, nullable=False)
-    line = Column(String, nullable=True)  # 路線名
-    operator = Column(String, nullable=True)  # 事業者
-    platform = Column(String, nullable=True)
-    from_label = Column(String, nullable=True)
-    to_label = Column(String, nullable=True)
-    departure_at = Column(DateTime(timezone=True), nullable=True)
-    arrival_at = Column(DateTime(timezone=True), nullable=True)
-    distance_km = Column(Float, nullable=True)
-    duration_minutes = Column(Float, nullable=True)
+    leg_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    mode: Mapped[str] = mapped_column(String, nullable=False)
+    line: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 路線名
+    operator: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 事業者
+    platform: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    from_label: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    to_label: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    departure_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    arrival_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    duration_minutes: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     # unknown | on_time | delayed | cancelled。外部providerからのリアルタイム
     # 運行情報は本Gateでは未導入のため、常にunknownとなる(捏造しない)。
-    realtime_status = Column(String, nullable=False, default="unknown", server_default="unknown")
+    realtime_status: Mapped[str] = mapped_column(String, nullable=False, default="unknown", server_default="unknown")
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint("route_option_id", "leg_order", name="uq_route_legs_option_order"),
@@ -1074,15 +1089,17 @@ class AuditLog(Base):
     """監査ログモデル(schemas.AuditLogに対応する永続化実体)"""
     __tablename__ = "audit_logs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
-    action = Column(String, nullable=False, index=True)
-    resource_type = Column(String, nullable=False, index=True)
-    resource_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    ip_address = Column(String, nullable=True)
-    user_agent = Column(String, nullable=True)
-    details = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    resource_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    details: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True, nullable=True)
 
 
 # ==========================================
@@ -1145,62 +1162,62 @@ class Reservation(Base):
     """[Gate R3-0] FR-010予約管理の最小永続モデル。"""
     __tablename__ = "reservations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
     # [Gate R3-0スコープ限定] 単一イベントのみへの紐付け(§上部コメント2参照)。
-    event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True, index=True,
-    )
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
+    event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=True,
+        index=True)
+    place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
-    type = Column(String, nullable=False)  # ReservationType
-    status = Column(String, nullable=False, default=ReservationStatus.CONFIRMED.value)
-    provider_name = Column(String, nullable=True)
+    type: Mapped[str] = mapped_column(String, nullable=False)  # ReservationType
+    status: Mapped[str] = mapped_column(String, nullable=False, default=ReservationStatus.CONFIRMED.value)
+    provider_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # 秘密値(Fernet field encryption。app/core/crypto.py参照)。
-    confirmation_number_ciphertext = Column(LargeBinary, nullable=True)
+    confirmation_number_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     # 一覧・masked表示用の非機微プレフィックス("****1234"形式)。単体では
     # 予約特定に使えない末尾4文字相当のみを平文保持する(DOC-11 §6.3の
     # 盲検索indexとは異なる、表示専用の簡易マスク)。
-    confirmation_number_masked = Column(String, nullable=True)
+    confirmation_number_masked: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # [Gate R3-13] DOC-11 §6.3 / DOC-08 §19 blind index。confirmation_number
     # (暗号化フィールド)に対する完全一致検索のためのHMAC-SHA256決定的ハッシュ
     # (app/core/crypto.py compute_lookup_hash参照)。LOOKUP_INDEX_KEYで導出し、
     # ENCRYPTION_KEYとは異なる鍵を使う(用途別鍵分離)。APIレスポンスには
     # 一切含めない(内部的な検索索引専用)。
-    confirmation_number_lookup_hash = Column(String(64), nullable=True, index=True)
+    confirmation_number_lookup_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     # [Gate R3-14] DOC-04 SC-10/SC-17・POC-03対応。末尾4文字専用のHMAC blind
     # index(app/core/crypto.py compute_suffix_lookup_hash参照)。上の完全一致用
     # lookup_hashとは別列・別ドメインのHMAC値であり、混同できない。
-    confirmation_number_suffix_lookup_hash = Column(String(64), nullable=True, index=True)
-    pin_ciphertext = Column(LargeBinary, nullable=True)
+    confirmation_number_suffix_lookup_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    pin_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
     # [Gate R3-16] holder_name平文列はDOC-11 §14 expand/contractのcontract
     # フェーズとして削除した(Gate R3-8のコメントを参照。以前はここに
     # `holder_name = Column(String, nullable=True)` が存在した)。
     # holder_name_ciphertextのみが正本となる。
-    holder_name_ciphertext = Column(LargeBinary, nullable=True)
-    guest_count = Column(Integer, nullable=True)
+    holder_name_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    guest_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    start_at = Column(DateTime(timezone=True), nullable=True)
-    end_at = Column(DateTime(timezone=True), nullable=True)
-    timezone_id = Column(String, nullable=True)
+    start_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    timezone_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    total_amount = Column(Float, nullable=True)
-    currency = Column(String(3), nullable=True)
-    payment_status = Column(String, nullable=True)
+    total_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    payment_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    cancellation_deadline = Column(DateTime(timezone=True), nullable=True)
+    cancellation_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate R3-16] contact_phone平文列も同様にcontract済み(削除)。
-    contact_phone_ciphertext = Column(LargeBinary, nullable=True)
-    contact_url = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
+    contact_phone_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    contact_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan = relationship("TravelPlan")
     event = relationship("TravelEvent")
@@ -1237,20 +1254,18 @@ class EventReservation(Base):
     """[Gate R3-3] 予約とイベントの多対多紐付け。"""
     __tablename__ = "event_reservations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    event_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=False, index=True,
-    )
-    reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"),
-        nullable=False, index=True,
-    )
-    relation_type = Column(String, nullable=False, default=ReservationEventRelationType.PRIMARY.value)
-    is_locked = Column(Boolean, nullable=False, default=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", deferrable=True, initially="IMMEDIATE"), nullable=False,
+        index=True)
+    reservation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True)
+    relation_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=ReservationEventRelationType.PRIMARY.value)
+    is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     event = relationship("TravelEvent")
     reservation = relationship("Reservation")
@@ -1285,14 +1300,11 @@ class ReservationParticipant(Base):
     """[Gate R3-1] 予約参加者(DOC-05 §6.3)。"""
     __tablename__ = "reservation_participants"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True,
-    )
-    plan_member_id = Column(
-        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    reservation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_member_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
 
     # [Gate R3-16] name/seat/special_requestの平文列はDOC-11 §14
     # expand/contractのcontractフェーズとして削除した(Gate R3-8時点では
@@ -1300,19 +1312,19 @@ class ReservationParticipant(Base):
     # *_ciphertext列のみが正本となる。
 
     # [Gate R3-8] Gate R2-2/R3-0と同じFernet field encryption。
-    name_ciphertext = Column(LargeBinary, nullable=True)
-    seat_ciphertext = Column(LargeBinary, nullable=True)
-    special_request_ciphertext = Column(LargeBinary, nullable=True)
+    name_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    seat_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    special_request_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
     # [Gate R3-15] DOC-11 §6.3 blind index。nameに対する完全一致検索用の
     # HMAC-SHA256(app/core/crypto.py compute_participant_name_lookup_hash
     # 参照)。confirmation_number用lookup_hashとは別ドメインのHMAC値。
-    name_lookup_hash = Column(String(64), nullable=True, index=True)
+    name_lookup_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     reservation = relationship("Reservation")
     plan_member = relationship("PlanCollaborator")
@@ -1359,34 +1371,30 @@ class Ticket(Base):
     """[Gate R3-5] FR-012 QR・チケットの最小永続モデル。"""
     __tablename__ = "tickets"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"),
-        nullable=False, index=True,
-    )
-    ticket_type = Column(String, nullable=False)  # 例: boarding_pass/entry_ticket/other
-    holder_member_id = Column(
-        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    reservation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False, index=True)
+    ticket_type: Mapped[str] = mapped_column(String, nullable=False)  # 例: boarding_pass/entry_ticket/other
+    holder_member_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_collaborators.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
 
     # 秘密値(Fernet field encryption)。QR/バーコードの生データ本体。
-    payload_ciphertext = Column(LargeBinary, nullable=True)
-    barcode_format = Column(String, nullable=True)  # 例: QR_CODE/CODE128/PDF417
+    payload_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    barcode_format: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 例: QR_CODE/CODE128/PDF417
     # [スコープ限定] documentsテーブル未実装のためFK制約は付与しない(上部コメント参照)。
-    display_document_id = Column(UUID(as_uuid=True), nullable=True)
+    display_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
 
-    valid_from = Column(DateTime(timezone=True), nullable=True)
-    valid_to = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String, nullable=False, default=TicketStatus.ACTIVE.value)
-    offline_allowed = Column(Boolean, nullable=False, default=True)
-    share_policy = Column(String, nullable=False, default=TicketSharePolicy.OWNER_EDITOR.value)
-    key_version = Column(Integer, nullable=False, default=1, server_default="1")
+    valid_from: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_to: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default=TicketStatus.ACTIVE.value)
+    offline_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    share_policy: Mapped[str] = mapped_column(String, nullable=False, default=TicketSharePolicy.OWNER_EDITOR.value)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     reservation = relationship("Reservation")
     holder_member = relationship("PlanCollaborator")
@@ -1465,35 +1473,39 @@ class Document(Base):
     """[Gate R3-6] FR-013文書ウォレットの最小永続モデル(メタデータのみ)。"""
     __tablename__ = "documents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    owner_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    classification = Column(String, nullable=False, default=DocumentClassification.INTERNAL.value)
-    document_type = Column(String, nullable=True)  # 例: receipt/ticket/passport/map/other(自由記述)
+    classification: Mapped[str] = mapped_column(String, nullable=False, default=DocumentClassification.INTERNAL.value)
+    # 例: receipt/ticket/passport/map/other(自由記述)
+    document_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # 秘密値(Fernet field encryption)。ファイル名自体が機微な情報を
     # 含みうるため暗号化する(DOC-05 §6.5)。
-    original_filename_ciphertext = Column(LargeBinary, nullable=True)
+    original_filename_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
-    storage_key = Column(String, nullable=False)  # [スコープ限定] 呼び出し側が別途アップロード済みの参照
-    mime_type = Column(String, nullable=True)
-    size = Column(Integer, nullable=True)  # バイト数
-    sha256 = Column(String(64), nullable=True)
-    encryption_key_ref = Column(String, nullable=True)  # [スコープ限定] KMS未導入のため常にNULL
+    storage_key: Mapped[str] = mapped_column(String, nullable=False)  # [スコープ限定] 呼び出し側が別途アップロード済みの参照
+    mime_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # バイト数
+    sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    encryption_key_ref: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # [スコープ限定] KMS未導入のため常にNULL
 
-    malware_status = Column(String, nullable=False, default=DocumentMalwareStatus.NOT_SCANNED.value)
-    ocr_status = Column(String, nullable=False, default=DocumentOcrStatus.NOT_REQUESTED.value)
-    retention_until = Column(DateTime(timezone=True), nullable=True)
+    malware_status: Mapped[str] = mapped_column(String, nullable=False, default=DocumentMalwareStatus.NOT_SCANNED.value)
+    ocr_status: Mapped[str] = mapped_column(String, nullable=False, default=DocumentOcrStatus.NOT_REQUESTED.value)
+    retention_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # [Gate M7] P0-04是正: soft delete後の実storage file purgeを再試行可能に
     # 追跡するための状態列(app/services/document_purge_service.py参照)。
-    purge_status = Column(String, nullable=False, default=DocumentPurgeStatus.PENDING.value, server_default="pending")
+    purge_status: Mapped[str] = mapped_column(
+        String, nullable=False, default=DocumentPurgeStatus.PENDING.value, server_default="pending")
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan = relationship("TravelPlan")
     owner = relationship("User")
@@ -1505,14 +1517,16 @@ class DocumentLink(Base):
     持たない(entity_typeごとにAPI側で存在検証する)。"""
     __tablename__ = "document_links"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
-    entity_type = Column(String, nullable=False)  # 例: reservation/ticket/event/attachment
-    entity_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    relation_type = Column(String, nullable=False, default=DocumentLinkRelationType.ATTACHMENT.value)
-    display_order = Column(Integer, nullable=False, default=0)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String, nullable=False)  # 例: reservation/ticket/event/attachment
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    relation_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=DocumentLinkRelationType.ATTACHMENT.value)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     document = relationship("Document")
 
@@ -1567,30 +1581,28 @@ class ImportJob(Base):
     """[Gate R3-7] FR-011予約取込ジョブの最小永続モデル。"""
     __tablename__ = "import_jobs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    document_id = Column(
-        UUID(as_uuid=True), ForeignKey("documents.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # [スコープ限定] providerは常に"manual"(AI/OCR provider未導入のため)。
-    provider = Column(String, nullable=False, default="manual")
-    status = Column(String, nullable=False, default=ImportJobStatus.REVIEW_REQUIRED.value)
-    consent_given = Column(Boolean, nullable=False, default=False)
-    error_message = Column(Text, nullable=True)
+    provider: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+    status: Mapped[str] = mapped_column(String, nullable=False, default=ImportJobStatus.REVIEW_REQUIRED.value)
+    consent_given: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # 確定時に生成されたReservationへの参照(confirm操作で設定)。
-    result_reservation_id = Column(
-        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"),
-        nullable=True,
-    )
+    result_reservation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", deferrable=True, initially="IMMEDIATE"), nullable=True)
 
-    started_at = Column(DateTime(timezone=True), server_default=func.now())
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     plan = relationship("TravelPlan")
     document = relationship("Document")
@@ -1603,22 +1615,22 @@ class ExtractionCandidate(Base):
     encryptionで保護する(confirmation_number等の機微情報を含みうる)。"""
     __tablename__ = "extraction_candidates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    import_job_id = Column(
-        UUID(as_uuid=True), ForeignKey("import_jobs.id", ondelete="CASCADE"),
-        nullable=False, index=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    import_job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("import_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    field_path = Column(String, nullable=False)  # 例: "type"/"confirmation_number"/"start_at"
-    candidate_value_ciphertext = Column(LargeBinary, nullable=False)
-    confidence = Column(Float, nullable=False, default=1.0)  # [スコープ限定] 手動入力のため既定1.0
-    evidence_locator = Column(String, nullable=True)  # 例: 原本内の参照(ページ番号等の自由記述)
+    field_path: Mapped[str] = mapped_column(String, nullable=False)  # 例: "type"/"confirmation_number"/"start_at"
+    candidate_value_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)  # [スコープ限定] 手動入力のため既定1.0
+    evidence_locator: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 例: 原本内の参照(ページ番号等の自由記述)
 
-    review_status = Column(String, nullable=False, default=ExtractionCandidateReviewStatus.PENDING.value)
-    reviewed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_status: Mapped[str] = mapped_column(
+        String, nullable=False, default=ExtractionCandidateReviewStatus.PENDING.value)
+    reviewed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     import_job = relationship("ImportJob")
     reviewed_by = relationship("User")
@@ -1653,40 +1665,39 @@ class PlanConstraint(Base):
     """[Gate L2] 旅行の制約(ハード/ソフト、共有/秘匿)。"""
     __tablename__ = "constraints"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
-    scope_type = Column(String(10), nullable=False)
-    scope_id = Column(UUID(as_uuid=True), nullable=True)
+    scope_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    scope_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
 
-    constraint_type = Column(String(30), nullable=False)
-    hardness = Column(String(4), nullable=False)
-    operator = Column(String(12), nullable=False)
-    weight = Column(Integer, nullable=True)
-    privacy_level = Column(String(7), nullable=False, default="shared")
+    constraint_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    hardness: Mapped[str] = mapped_column(String(4), nullable=False)
+    operator: Mapped[str] = mapped_column(String(12), nullable=False)
+    weight: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    privacy_level: Mapped[str] = mapped_column(String(7), nullable=False, default="shared")
 
     # shared時のみ使用(private時はNULL)
-    title = Column(String(200), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     # none_as_null=True: Python の None を JSON の null ではなく SQL の NULL として書く
     # (既定の JSON 型は 'null' という値を保存し、private時の CHECK に違反する)。
-    value_json = Column(JSON(none_as_null=True), nullable=True)
+    value_json: Mapped[Optional[Any]] = mapped_column(JSON(none_as_null=True), nullable=True)
     # private時のみ使用: {"title": ..., "value": {...}} をFernetで暗号化したもの
-    value_ciphertext = Column(LargeBinary, nullable=True)
-    reason_ciphertext = Column(LargeBinary, nullable=True)
+    value_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    reason_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
-    is_active = Column(Boolean, nullable=False, default=True, server_default=text("true"))
-    active_from = Column(DateTime(timezone=True), nullable=True)
-    active_to = Column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    active_from: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    active_to: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate C1] FR-023 秘匿プロフィールから作った制約の印(プロフィールの項目の ID)。プロフィールの変更で作り直す
-    profile_item_id = Column(String(36), nullable=True)
+    profile_item_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan = relationship("TravelPlan")
     owner = relationship("User")
@@ -1730,23 +1741,24 @@ class ValidationRun(Base):
     """[Gate L3] 実行可能性検証の1回分。"""
     __tablename__ = "validation_runs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    input_revision = Column(Integer, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    input_revision: Mapped[int] = mapped_column(Integer, nullable=False)
     # 旅程・制約・予約・区間の版の組み合わせのハッシュ。現在値と違えば結果は古い(is_stale)。
-    input_fingerprint = Column(String(64), nullable=False)
-    algorithm_version = Column(String(30), nullable=False)
-    status = Column(String(10), nullable=False)
-    error_count = Column(Integer, nullable=False, default=0)
-    warning_count = Column(Integer, nullable=False, default=0)
-    info_count = Column(Integer, nullable=False, default=0)
-    unverified_count = Column(Integer, nullable=False, default=0)
+    input_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    warning_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    info_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unverified_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # {"unchecked": {...件数}, "constraint_results": [{"constraint_id","status"}]}
-    summary_json = Column(JSON, nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=False)
-    finished_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    summary_json: Mapped[Any] = mapped_column(JSON, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     issues = relationship(
         "ValidationIssue", back_populates="run", cascade="all, delete-orphan",
@@ -1763,22 +1775,24 @@ class ValidationIssue(Base):
     """[Gate L3] 検証で見つかった問題(違反または検証不能)。"""
     __tablename__ = "validation_issues"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("validation_runs.id", ondelete="CASCADE"), nullable=False)
-    sort_order = Column(Integer, nullable=False, default=0)
-    code = Column(String(40), nullable=False)
-    kind = Column(String(10), nullable=False)
-    severity = Column(String(7), nullable=False)
-    message = Column(Text, nullable=False)
-    entity_type = Column(String(20), nullable=True)
-    entity_id = Column(UUID(as_uuid=True), nullable=True)
-    entity_label = Column(String(300), nullable=True)
-    day_id = Column(UUID(as_uuid=True), nullable=True)
-    constraint_id = Column(UUID(as_uuid=True), ForeignKey("constraints.id", ondelete="CASCADE"), nullable=True)
-    constraint_owner_user_id = Column(UUID(as_uuid=True), nullable=True)
-    is_private_constraint = Column(Boolean, nullable=False, default=False)
-    evidence_json = Column(JSON, nullable=True)
-    suggestion_json = Column(JSON, nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("validation_runs.id", ondelete="CASCADE"), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    severity: Mapped[str] = mapped_column(String(7), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    entity_label: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    day_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    constraint_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("constraints.id", ondelete="CASCADE"), nullable=True)
+    constraint_owner_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    is_private_constraint: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    evidence_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    suggestion_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     run = relationship("ValidationRun", back_populates="issues")
 
@@ -1808,35 +1822,35 @@ class PackingItem(Base):
     """
     __tablename__ = "packing_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    owner_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    scope = Column(String(8), nullable=False, default="shared")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    scope: Mapped[str] = mapped_column(String(8), nullable=False, default="shared")
     # 共有の持ち物の担当者(メンバーのユーザーID)。メンバーから外れた担当者は未割当として扱う。
-    assignee_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    assignee_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # shared時のみ使用(personal時はNULL)
-    name = Column(String(120), nullable=True)
-    note = Column(String(500), nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # personal時のみ使用: {"name": ..., "note": ...} をFernetで暗号化したもの
-    payload_ciphertext = Column(LargeBinary, nullable=True)
+    payload_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
 
-    category = Column(String(20), nullable=False, default="other")
-    quantity = Column(Integer, nullable=False, default=1, server_default="1")
-    is_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="other")
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     # to_prepare(未準備) / to_buy(要購入) / packed(梱包済み) / after_use(使用後・片付け済み)
-    status = Column(String(10), nullable=False, default="to_prepare")
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="to_prepare")
     # manual(手入力) / suggested(候補から採用)。採用した候補の識別子を残し、旅程変更時に
     # 「もう不要かもしれない」候補を判定する。
-    source = Column(String(10), nullable=False, default="manual")
-    suggestion_key = Column(String(40), nullable=True)
+    source: Mapped[str] = mapped_column(String(10), nullable=False, default="manual")
+    suggestion_key: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("scope IN ('shared','personal')", name="ck_packing_items_scope"),
@@ -1879,31 +1893,32 @@ class PreparationTask(Base):
     """
     __tablename__ = "preparation_tasks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    assignee_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    assignee_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    title = Column(String(200), nullable=False)
-    description = Column(String(2000), nullable=True)
-    completion_criteria = Column(String(500), nullable=True)
-    due_at = Column(DateTime(timezone=True), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    completion_criteria: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # open(未完了) / done(完了)
-    status = Column(String(4), nullable=False, default="open")
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    completed_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(4), nullable=False, default="open")
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # 関連する対象(外部キーにしない。対象の個別削除を妨げないため。表示時に存在を確認する)
-    related_type = Column(String(20), nullable=True)
-    related_id = Column(UUID(as_uuid=True), nullable=True)
-    readiness_key = Column(String(80), nullable=True)
+    related_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    related_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    readiness_key: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('open','done')", name="ck_preparation_tasks_status"),
@@ -1937,18 +1952,18 @@ class PlanFinanceSettings(Base):
     """[Gate P2] プランの基準通貨(予算・集計・精算の通貨)。行が無ければJPYとして扱う。"""
     __tablename__ = "plan_finance_settings"
 
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True,
-    )
-    base_currency = Column(String(3), nullable=False, default="JPY")
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="JPY")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     # [Gate G5] FIN-02 端数の規則と精算の締め
-    rounding_mode = Column(String(8), nullable=False, default="half_up", server_default="half_up")
-    remainder_to = Column(String(8), nullable=False, default="largest", server_default="largest")
-    locked_at = Column(DateTime(timezone=True), nullable=True)
-    locked_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    rounding_mode: Mapped[str] = mapped_column(String(8), nullable=False, default="half_up", server_default="half_up")
+    remainder_to: Mapped[str] = mapped_column(String(8), nullable=False, default="largest", server_default="largest")
+    locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("base_currency ~ '^[A-Z]{3}$'", name="ck_plan_finance_settings_currency"),
@@ -1963,17 +1978,18 @@ class FxRate(Base):
     支出は使ったレートを fx_rate_id で指す(後でレートを足しても過去の換算は変わらない)。"""
     __tablename__ = "fx_rates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    currency = Column(String(3), nullable=False)
-    base_currency = Column(String(3), nullable=False)
-    rate = Column(Numeric(18, 8), nullable=False)
-    rate_date = Column(Date, nullable=False)
-    source = Column(String(100), nullable=False)
-    retrieved_at = Column(DateTime(timezone=True), nullable=False)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    rate_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("rate > 0", name="ck_fx_rates_rate"),
@@ -1990,18 +2006,19 @@ class BudgetVersion(Base):
     (基準通貨の合計に混ぜない)。"""
     __tablename__ = "budget_versions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    kind = Column(String(9), nullable=False)
-    label = Column(String(100), nullable=False)
-    base_currency = Column(String(3), nullable=False)
-    total_amount = Column(Numeric(18, 2), nullable=False)
-    lines = Column(JSON, nullable=False)
-    unconverted = Column(JSON, nullable=True)
-    note = Column(String(200), nullable=True)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(9), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    lines: Mapped[Any] = mapped_column(JSON, nullable=False)
+    unconverted: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("kind IN ('initial', 'revised', 'committed', 'actual')", name="ck_budget_versions_kind"),
@@ -2016,23 +2033,23 @@ class Budget(Base):
     """
     __tablename__ = "budgets"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    kind = Column(String(8), nullable=False)
-    category = Column(String(20), nullable=True)
-    local_date = Column(Date, nullable=True)
-    member_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    amount = Column(Numeric(18, 2), nullable=True)
-    amount_ciphertext = Column(LargeBinary, nullable=True)
-    note = Column(String(200), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    local_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    member_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    amount_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("kind IN ('total','category','day','member')", name="ck_budgets_kind"),
@@ -2062,42 +2079,42 @@ class Expense(Base):
     """
     __tablename__ = "expenses"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    kind = Column(String(7), nullable=False, default="expense")
-    refund_of_expense_id = Column(
-        UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=True,
-    )
-    title = Column(String(200), nullable=False)
-    category = Column(String(20), nullable=False, default="other")
-    local_date = Column(Date, nullable=True)
-    amount = Column(Numeric(18, 2), nullable=False)
-    currency = Column(String(3), nullable=False)
-    tax_amount = Column(Numeric(18, 2), nullable=True)
-    fee_amount = Column(Numeric(18, 2), nullable=True)
-    fx_rate = Column(Numeric(18, 8), nullable=True)
-    fx_source = Column(String(100), nullable=True)
-    fx_date = Column(Date, nullable=True)
-    base_amount = Column(Numeric(18, 2), nullable=True)
-    paid_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    split_method = Column(String(6), nullable=False, default="equal")
-    related_type = Column(String(20), nullable=True)
-    related_id = Column(UUID(as_uuid=True), nullable=True)
-    receipt_document_id = Column(UUID(as_uuid=True), nullable=True)
-    note = Column(String(500), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(7), nullable=False, default="expense")
+    refund_of_expense_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="other")
+    local_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    tax_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    fee_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    fx_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 8), nullable=True)
+    fx_source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    fx_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    base_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    paid_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    split_method: Mapped[str] = mapped_column(String(6), nullable=False, default="equal")
+    related_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    related_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    receipt_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # [Gate G5] FIN-01 使ったレートの記録、FIN-02 取消(消さずに集計から外す)
-    fx_rate_id = Column(UUID(as_uuid=True), ForeignKey("fx_rates.id", ondelete="SET NULL"), nullable=True)
-    voided_at = Column(DateTime(timezone=True), nullable=True)
-    void_reason = Column(String(200), nullable=True)
-    voided_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    fx_rate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fx_rates.id", ondelete="SET NULL"), nullable=True)
+    voided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    void_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    voided_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     shares = relationship(
         "ExpenseShare", back_populates="expense", cascade="all, delete-orphan", passive_deletes=True,
@@ -2134,14 +2151,15 @@ class ExpenseShare(Base):
     """[Gate P2] 支出の負担者ごとの負担額。合計は支出額と必ず一致する(丸め差は rounding_adjustment に明示)。"""
     __tablename__ = "expense_shares"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    expense_id = Column(UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    sort_order = Column(Integer, nullable=False, default=0)
-    weight = Column(Numeric(12, 4), nullable=True)
-    share_amount = Column(Numeric(18, 2), nullable=False)
-    base_share_amount = Column(Numeric(18, 2), nullable=True)
-    rounding_adjustment = Column(Numeric(18, 2), nullable=False, default=0, server_default="0")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    expense_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    weight: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    share_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    base_share_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    rounding_adjustment: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
 
     expense = relationship("Expense", back_populates="shares")
 
@@ -2158,22 +2176,21 @@ class Settlement(Base):
     """[Gate P2] メンバー間の精算(from が to へ基準通貨で支払った記録)。"""
     __tablename__ = "settlements"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    from_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    amount = Column(Numeric(18, 2), nullable=False)
-    currency = Column(String(3), nullable=False)
-    settled_on = Column(Date, nullable=True)
-    note = Column(String(200), nullable=True)
-    idempotency_key = Column(String(100), nullable=True)  # [Gate G5] FIN-02 二重の記録の防止
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    from_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    to_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    settled_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # [Gate G5] FIN-02 二重の記録の防止
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_settlements_amount"),
@@ -2196,34 +2213,34 @@ class Poll(Base):
     """[Gate P3] 投票(候補の比較・決定)。veto_policy で「不可」の扱いを旅行ごとに決める(拒否権の濫用対策)。"""
     __tablename__ = "polls"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title = Column(String(200), nullable=False)
-    description = Column(String(1000), nullable=True)
-    deadline_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(6), nullable=False, default="open")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    deadline_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(6), nullable=False, default="open")
     # block: 不可1票で不成立(理由必須) / block_with_alternative: 不可には理由と代替案が必須 /
     # advisory: 不可も参考意見として扱い、不成立にしない
-    veto_policy = Column(String(24), nullable=False, default="block")
-    is_anonymous = Column(Boolean, nullable=False, default=False, server_default=text("false"))
-    decided_option_id = Column(UUID(as_uuid=True), nullable=True)
-    closed_at = Column(DateTime(timezone=True), nullable=True)
+    veto_policy: Mapped[str] = mapped_column(String(24), nullable=False, default="block")
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    decided_option_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate G4] COL-02 決定に要る回答者の数(NULL は制限なし)・締切の理由・締切前の知らせ・採用(予定への反映)
-    quorum = Column(Integer, nullable=True)
-    closed_reason = Column(String(10), nullable=True)  # manual / deadline / decided
-    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
-    adopted_at = Column(DateTime(timezone=True), nullable=True)
-    adopted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    adopted_change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"),
-                                   nullable=True)
+    quorum: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    closed_reason: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # manual / deadline / decided
+    reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    adopted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    adopted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    adopted_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     options = relationship(
         "PollOption", back_populates="poll", cascade="all, delete-orphan", passive_deletes=True,
@@ -2244,14 +2261,16 @@ class PollOption(Base):
     """[Gate P3] 投票の選択肢。予定(event_id)を候補にする場合は外部キーにせず、表示時に存在を確認する。"""
     __tablename__ = "poll_options"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    poll_id = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
-    label = Column(String(200), nullable=False)
-    event_id = Column(UUID(as_uuid=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    poll_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     # [Gate G4] COL-02 候補箱の候補を選択肢にする(採用すると予定に置く)
-    candidate_id = Column(UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="SET NULL"), nullable=True)
-    sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    candidate_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="SET NULL"), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     poll = relationship("Poll", back_populates="options")
 
@@ -2262,18 +2281,21 @@ class Vote(Base):
     """[Gate P3] 選択肢へのメンバーの回答。懸念・不可は理由必須で、解決の記録を持つ(FC-066)。"""
     __tablename__ = "votes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    poll_id = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
-    option_id = Column(UUID(as_uuid=True), ForeignKey("poll_options.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    value = Column(String(8), nullable=False)
-    reason = Column(String(500), nullable=True)
-    alternative = Column(String(200), nullable=True)
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
-    resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    resolution_note = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    poll_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False)
+    option_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("poll_options.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    value: Mapped[str] = mapped_column(String(8), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    alternative: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    resolution_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint("option_id", "user_id", name="uq_votes_option_user"),
@@ -2296,22 +2318,22 @@ class Comment(Base):
     """
     __tablename__ = "comments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    target_type = Column(String(12), nullable=False, default="plan")
-    target_id = Column(UUID(as_uuid=True), nullable=True)
-    parent_id = Column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
-    body = Column(Text, nullable=False)
-    mentions = Column(JSON(none_as_null=True), nullable=True)
-    status = Column(String(8), nullable=False, default="open")
-    edited_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    author_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(12), nullable=False, default="plan")
+    target_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    mentions: Mapped[Optional[Any]] = mapped_column(JSON(none_as_null=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="open")
+    edited_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -2333,27 +2355,27 @@ class BookletExport(Base):
     """
     __tablename__ = "booklet_exports"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    version_no = Column(Integer, nullable=False)
-    format = Column(String(5), nullable=False, default="print")
-    theme = Column(String(12), nullable=False, default="simple")
-    density = Column(String(7), nullable=False, default="normal")
-    sections = Column(JSON, nullable=False)
-    includes = Column(JSON, nullable=False)
-    contains_sensitive = Column(Boolean, nullable=False, default=False, server_default=text("false"))
-    watermark_text = Column(String(200), nullable=True)
-    valid_until = Column(DateTime(timezone=True), nullable=True)
-    input_revision = Column(Integer, nullable=False)
-    policy_version = Column(String(20), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    format: Mapped[str] = mapped_column(String(5), nullable=False, default="print")
+    theme: Mapped[str] = mapped_column(String(12), nullable=False, default="simple")
+    density: Mapped[str] = mapped_column(String(7), nullable=False, default="normal")
+    sections: Mapped[Any] = mapped_column(JSON, nullable=False)
+    includes: Mapped[Any] = mapped_column(JSON, nullable=False)
+    contains_sensitive: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false"))
+    watermark_text: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    valid_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    input_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(20), nullable=False)
     # 作成時点のしおり投影(JSON)を暗号化して保持する(版は作成後に変わらない)。失効時に消去する。
-    snapshot_ciphertext = Column(LargeBinary, nullable=True)
-    status = Column(String(7), nullable=False, default="active")
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    snapshot_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    status: Mapped[str] = mapped_column(String(7), nullable=False, default="active")
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("plan_id", "version_no", name="uq_booklet_exports_plan_version"),
@@ -2385,33 +2407,32 @@ class ItineraryBranch(Base):
     """
     __tablename__ = "itinerary_branches"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False,
-    )
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title = Column(String(200), nullable=False)
-    scenario_type = Column(String(10), nullable=False, default="custom")
-    assumptions = Column(JSON, nullable=False)
-    base_revision = Column(Integer, nullable=False)
-    base_snapshot = Column(JSON, nullable=False)
-    content = Column(JSON, nullable=False)
-    status = Column(String(9), nullable=False, default="draft")
-    adopted_change_set_id = Column(
-        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
-    )
-    adopted_at = Column(DateTime(timezone=True), nullable=True)
-    adopted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    scenario_type: Mapped[str] = mapped_column(String(10), nullable=False, default="custom")
+    assumptions: Mapped[Any] = mapped_column(JSON, nullable=False)
+    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_snapshot: Mapped[Any] = mapped_column(JSON, nullable=False)
+    content: Mapped[Any] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="draft")
+    adopted_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
+    adopted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    adopted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     # [Gate G8] FR-019 案の中で予約・移動区間そのものを変える分岐(branch-v2)。NULL は予定だけの案(G7 まで)。
     # {"base": {"segments": [...], "reservations": [...]}, "segments": [変更], "reservations": [変更]}。
     # base は変更を初めて保存した時の本案の区間・予約(三方向の取り込みの基準)。予約は外部へ取消・変更を送らない
     # (取消は「手続きの準備」を作るだけ。app/services/branch_resources.py)
-    resources = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    resources: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -2434,24 +2455,25 @@ class PlanAlert(Base):
     """
     __tablename__ = "plan_alerts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    kind = Column(String(12), nullable=False)
-    source = Column(String(12), nullable=False, default="user_report")
-    source_label = Column(String(100), nullable=True)
-    confidence = Column(String(9), nullable=False, default="reported")
-    observed_at = Column(DateTime(timezone=True), nullable=False)
-    event_id = Column(UUID(as_uuid=True), nullable=True)
-    day_id = Column(UUID(as_uuid=True), nullable=True)
-    delay_minutes = Column(Integer, nullable=True)
-    note = Column(String(500), nullable=True)
-    status = Column(String(9), nullable=False, default="active")
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    source: Mapped[str] = mapped_column(String(12), nullable=False, default="user_report")
+    source_label: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    confidence: Mapped[str] = mapped_column(String(9), nullable=False, default="reported")
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    day_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    delay_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="active")
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("kind IN ('delay','cancellation','closure','weather')", name="ck_plan_alerts_kind"),
@@ -2479,24 +2501,26 @@ class Replan(Base):
     """
     __tablename__ = "replans"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    alert_id = Column(UUID(as_uuid=True), ForeignKey("plan_alerts.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    base_revision = Column(Integer, nullable=False)
-    base_snapshot = Column(JSON, nullable=False)
-    candidates = Column(JSON, nullable=False)
-    status = Column(String(8), nullable=False, default="proposed")
-    applied_candidate = Column(String(1), nullable=True)
-    applied_change_set_id = Column(
-        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
-    )
-    applied_at = Column(DateTime(timezone=True), nullable=True)
-    applied_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    alert_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_alerts.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_snapshot: Mapped[Any] = mapped_column(JSON, nullable=False)
+    candidates: Mapped[Any] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="proposed")
+    applied_candidate: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    applied_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    applied_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("status IN ('proposed','applied','rejected')", name="ck_replans_status"),
@@ -2519,25 +2543,26 @@ class SyncOperation(Base):
     """
     __tablename__ = "sync_operations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    operation_id = Column(UUID(as_uuid=True), nullable=False)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    device_id = Column(String(64), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    operation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    device_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     # [Gate G6] OFF-02 対象: event(予定)・day(日程)・order(日程の中の予定の並び)・reservation(常にオンラインへ)
-    entity_type = Column(String(16), nullable=False, default="event")
-    action = Column(String(8), nullable=False)
-    entity_id = Column(UUID(as_uuid=True), nullable=True)
-    temp_id = Column(String(64), nullable=True)
-    base_revision = Column(Integer, nullable=True)
-    fields = Column(JSON, nullable=True)
-    client_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(15), nullable=False)
-    code = Column(String(40), nullable=True)
-    conflict = Column(JSON, nullable=True)
-    resulting_revision = Column(Integer, nullable=True)
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    entity_type: Mapped[str] = mapped_column(String(16), nullable=False, default="event")
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    temp_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    base_revision: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    fields: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    client_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(15), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    conflict: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    resulting_revision: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "operation_id", name="uq_sync_operations_user_operation"),
@@ -2568,28 +2593,29 @@ class Memory(Base):
     """
     __tablename__ = "memories"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    kind = Column(String(10), nullable=False)
-    body = Column(Text, nullable=True)
-    event_id = Column(UUID(as_uuid=True), nullable=True)
-    day_id = Column(UUID(as_uuid=True), nullable=True)
-    occurred_at = Column(DateTime(timezone=True), nullable=True)
-    place_name = Column(String(200), nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    video_url = Column(String(2000), nullable=True)
-    storage_key = Column(String, nullable=True)
-    mime_type = Column(String(100), nullable=True)
-    size = Column(Integer, nullable=True)
-    sha256 = Column(String(64), nullable=True)
-    visibility = Column(String(8), nullable=False, default="private")
-    include_in_journal = Column(Boolean, nullable=False, default=True, server_default="true")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    author_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    day_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    occurred_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    place_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    video_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    storage_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    visibility: Mapped[str] = mapped_column(String(8), nullable=False, default="private")
+    include_in_journal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("kind IN ('note','photo','audio','video')", name="ck_memories_kind"),
@@ -2614,22 +2640,23 @@ class LocationTrack(Base):
     """
     __tablename__ = "location_tracks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    mode = Column(String(11), nullable=False)
-    precision = Column(String(9), nullable=False)
-    status = Column(String(9), nullable=False, default="recording")
-    stopped_reason = Column(String(20), nullable=True)
-    started_at = Column(DateTime(timezone=True), nullable=False)
-    auto_stop_at = Column(DateTime(timezone=True), nullable=False)
-    stopped_at = Column(DateTime(timezone=True), nullable=True)
-    point_count = Column(Integer, nullable=False, default=0, server_default="0")
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    mode: Mapped[str] = mapped_column(String(11), nullable=False)
+    precision: Mapped[str] = mapped_column(String(9), nullable=False)
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="recording")
+    stopped_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    auto_stop_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stopped_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    point_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     # [Gate L5] 端末の記録の観測値(電池・欠測率・取得の間隔の内訳。座標を含まない。app/services/location_tracks.py)
-    sampling = Column(JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    sampling: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         # [Gate L5] areas_only = 生の座標は端末だけに置き、集計した訪問地域(区画)だけを同期する
@@ -2649,12 +2676,14 @@ class TripLocationSetting(Base):
     行が無い時は「まだ選んでいない」(記録は始まっていない。初期値は OFF)。"""
     __tablename__ = "trip_location_settings"
 
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    mode = Column(String(11), nullable=False)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    mode: Mapped[str] = mapped_column(String(11), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("mode IN ('off','device_only','areas_only','synced')", name="ck_trip_location_settings_mode"),
@@ -2665,17 +2694,20 @@ class LocationAreaCell(Base):
     """[Gate L5] FR-055「訪問地域だけ同期」の区画(0.1度 ≒ 11km)。端末が生の座標から集計した結果だけを持つ。"""
     __tablename__ = "location_area_cells"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    track_id = Column(UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    cell_key = Column(String(24), nullable=False)
-    first_at = Column(DateTime(timezone=True), nullable=False)
-    last_at = Column(DateTime(timezone=True), nullable=False)
-    dwell_seconds = Column(Integer, nullable=False, default=0, server_default="0")
-    samples = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    track_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    cell_key: Mapped[str] = mapped_column(String(24), nullable=False)
+    first_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    dwell_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    samples: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint("track_id", "cell_key", name="uq_location_area_cells_track_cell"),
@@ -2690,14 +2722,15 @@ class LocationPointBatch(Base):
     batch_id は端末が付ける再送用のID(同じ軌跡で一意。再送しても二重に保存しない)。"""
     __tablename__ = "location_point_batches"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    track_id = Column(UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), nullable=False)
-    points_ciphertext = Column(LargeBinary, nullable=False)
-    point_count = Column(Integer, nullable=False)
-    first_at = Column(DateTime(timezone=True), nullable=False)
-    last_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    track_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("location_tracks.id", ondelete="CASCADE"), nullable=False)
+    batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    points_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    point_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    first_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("track_id", "batch_id", name="uq_location_point_batches_track_batch"),
@@ -2715,18 +2748,19 @@ class EventActual(Base):
     """
     __tablename__ = "event_actuals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    event_id = Column(UUID(as_uuid=True), nullable=False)
-    status = Column(String(7), nullable=False)
-    actual_start_at = Column(DateTime(timezone=True), nullable=True)
-    actual_end_at = Column(DateTime(timezone=True), nullable=True)
-    source = Column(String(9), nullable=False, default="manual")
-    note = Column(String(500), nullable=True)
-    recorded_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(7), nullable=False)
+    actual_start_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_end_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(9), nullable=False, default="manual")
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    recorded_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint("plan_id", "event_id", name="uq_event_actuals_plan_event"),
@@ -2753,22 +2787,24 @@ class VisitAssessment(Base):
     予定には外部キーを張らない(B-013 の個別削除を妨げないため。予定が消えた判定は出さない)。"""
     __tablename__ = "visit_assessments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    event_id = Column(UUID(as_uuid=True), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    state = Column(String(14), nullable=False)
-    auto_state = Column(String(14), nullable=True)
-    confidence = Column(Float, nullable=True)
-    reasons = Column(JSONB, nullable=True)
-    algorithm_version = Column(String(16), nullable=False)
-    source = Column(String(6), nullable=False)
-    hidden = Column(Boolean, nullable=False, default=False, server_default="false")
-    assessed_at = Column(DateTime(timezone=True), nullable=False)
-    corrected_at = Column(DateTime(timezone=True), nullable=True)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    state: Mapped[str] = mapped_column(String(14), nullable=False)
+    auto_state: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    reasons: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    algorithm_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(6), nullable=False)
+    hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    corrected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         UniqueConstraint("plan_id", "event_id", "user_id", name="uq_visit_assessments_plan_event_user"),
@@ -2796,28 +2832,30 @@ class PlanCandidate(Base):
     予定には外部キーを張らない(B-013 の個別削除を妨げないため)。"""
     __tablename__ = "plan_candidates"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title = Column(String(200), nullable=False)
-    note = Column(String(2000), nullable=True)
-    source_kind = Column(String(8), nullable=False)
-    source_url = Column(String(2000), nullable=True)
-    provider = Column(String(40), nullable=True)
-    external_id = Column(String(200), nullable=True)
-    retrieved_at = Column(DateTime(timezone=True), nullable=True)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id", ondelete="SET NULL"), nullable=True)
-    category = Column(String(50), nullable=True)
-    address = Column(String(500), nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    priority = Column(Integer, nullable=False, default=2, server_default="2")
-    status = Column(String(9), nullable=False, default="open", server_default="open")
-    scheduled_event_id = Column(UUID(as_uuid=True), nullable=True)
-    merged_into_id = Column(UUID(as_uuid=True), nullable=True)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    source_kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    retrieved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    place_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("places.id", ondelete="SET NULL"), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default="2")
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="open", server_default="open")
+    scheduled_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    merged_into_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint("source_kind IN ('url','text','manual','search')", name="ck_plan_candidates_source_kind"),
@@ -2836,11 +2874,12 @@ class UserPrivateProfile(Base):
     中身は app/services/private_profile.py の項目の一覧。本人だけが読み書きでき、運用管理者の画面・API にも出さない。"""
     __tablename__ = "user_private_profiles"
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    items_ciphertext = Column(LargeBinary, nullable=False)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    items_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
 class PrivateProfileLink(Base):
@@ -2848,9 +2887,11 @@ class PrivateProfileLink(Base):
     項目ごとに秘匿制約(constraints.profile_item_id)を作り、プロフィールの変更で作り直す。"""
     __tablename__ = "private_profile_links"
 
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 # ==========================================================================
@@ -2865,18 +2906,19 @@ class PrivateProfileLink(Base):
 class Organization(Base):
     __tablename__ = "organizations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String(100), nullable=False)
-    brand_color = Column(String(7), nullable=True)  # "#RRGGBB"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    brand_color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # "#RRGGBB"
     # [Gate G5] ORG-01 ロゴ(検査して作り直した PNG だけ。一覧では読まない)・席の上限(NULL は上限なし)
-    logo_png = deferred(Column(LargeBinary, nullable=True))  # type: ignore[var-annotated]
-    logo_sha256 = Column(String(64), nullable=True)
-    logo_updated_at = Column(DateTime(timezone=True), nullable=True)
-    seat_limit = Column(Integer, nullable=True)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    logo_png: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    logo_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    logo_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    seat_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("seat_limit IS NULL OR seat_limit >= 1", name="ck_organizations_seat_limit"),
@@ -2888,18 +2930,18 @@ class OrganizationDomain(Base):
     確認済みのドメインは1つの組織だけ(uq_organization_domains_verified)。"""
     __tablename__ = "organization_domains"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False,
-                             index=True)
-    domain = Column(String(253), nullable=False)
-    token = Column(String(64), nullable=False)
-    status = Column(String(8), nullable=False, default="pending", server_default="pending")
-    verified_at = Column(DateTime(timezone=True), nullable=True)
-    last_checked_at = Column(DateTime(timezone=True), nullable=True)
-    last_error = Column(String(100), nullable=True)
-    created_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    domain: Mapped[str] = mapped_column(String(253), nullable=False)
+    token: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="pending", server_default="pending")
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'verified', 'failed', 'revoked')",
@@ -2913,14 +2955,16 @@ class OrganizationSeatEvent(Base):
     """[Gate G5] ORG-01 席の記録(参加・脱退・上限の変更。seats_after はその後の席の数)。"""
     __tablename__ = "organization_seat_events"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False,
-                             index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    event = Column(String(8), nullable=False)
-    seats_after = Column(Integer, nullable=False)
-    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    event: Mapped[str] = mapped_column(String(8), nullable=False)
+    seats_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("event IN ('join', 'leave', 'limit')", name="ck_organization_seat_events_event"),
@@ -2934,18 +2978,18 @@ class UsageCounter(Base):
     override_limit は管理者の上書き(理由つき・監査に残す)。"""
     __tablename__ = "usage_counters"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    subject_type = Column(String(4), nullable=False)
-    subject_id = Column(UUID(as_uuid=True), nullable=False)
-    metric = Column(String(24), nullable=False)
-    period = Column(String(7), nullable=False)
-    used = Column(BigInteger, nullable=False, default=0, server_default="0")
-    override_limit = Column(BigInteger, nullable=True)
-    override_reason = Column(String(200), nullable=True)
-    override_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                 index=True)
-    warned_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_type: Mapped[str] = mapped_column(String(4), nullable=False)
+    subject_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    metric: Mapped[str] = mapped_column(String(24), nullable=False)
+    period: Mapped[str] = mapped_column(String(7), nullable=False)
+    used: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    override_limit: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    override_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    override_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    warned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("subject_type", "subject_id", "metric", "period", name="uq_usage_counters_key"),
@@ -2958,11 +3002,13 @@ class UsageCounter(Base):
 class OrganizationMember(Base):
     __tablename__ = "organization_members"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    role = Column(String(6), nullable=False, default="member", server_default="member")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(6), nullable=False, default="member", server_default="member")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("organization_id", "user_id", name="uq_organization_members_org_user"),
@@ -2974,30 +3020,33 @@ class OrgDistribution(Base):
     """配布する旅程。版を上げるたびに snapshot を作り直す(過去の版の確認は残る)。"""
     __tablename__ = "org_distributions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
-                             nullable=False, index=True)
-    source_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
-    title = Column(String(200), nullable=False)
-    version = Column(Integer, nullable=False, default=1, server_default="1")
-    snapshot = Column(JSONB, nullable=False)
-    change_note = Column(String(500), nullable=True)
-    published_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    published_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    snapshot: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    change_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    published_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OrgDistributionAck(Base):
     """閲覧確認(どの版を確認したか)。"""
     __tablename__ = "org_distribution_acks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    distribution_id = Column(UUID(as_uuid=True), ForeignKey("org_distributions.id", ondelete="CASCADE"),
-                             nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    version = Column(Integer, nullable=False)
-    acked_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    distribution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("org_distributions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    acked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("distribution_id", "user_id", "version", name="uq_org_distribution_acks_once"),
@@ -3008,76 +3057,78 @@ class OrgApiClient(Base):
     """FR-042 組織の外部連携(OAuth 2.0 client_credentials)。秘密はハッシュだけを持つ。"""
     __tablename__ = "org_api_clients"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
-                             nullable=False, index=True)
-    name = Column(String(100), nullable=False)
-    client_id = Column(String(40), nullable=False, unique=True, index=True)
-    secret_hash = Column(String(64), nullable=False)
-    scopes = Column(JSONB, nullable=False)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_used_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    client_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    secret_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate G2] 秘密の切り替え: 猶予の間は前の秘密でもトークンを取れる(ハッシュだけ)
-    previous_secret_hash = Column(String(64), nullable=True)
-    previous_secret_expires_at = Column(DateTime(timezone=True), nullable=True)
-    secret_version = Column(Integer, nullable=False, default=1, server_default="1")
-    secret_rotated_at = Column(DateTime(timezone=True), nullable=True)
+    previous_secret_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    previous_secret_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    secret_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    secret_rotated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OrgApiToken(Base):
     """短命のアクセストークン(ハッシュだけを持つ)。"""
     __tablename__ = "org_api_tokens"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False,
-                       index=True)
-    token_hash = Column(String(64), nullable=False, unique=True, index=True)
-    scopes = Column(JSONB, nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    scopes: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 class OrgWebhook(Base):
     """FR-042 署名つき Webhook。署名の鍵は暗号化して持つ(送るたびに署名に使うため)。"""
     __tablename__ = "org_webhooks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"),
-                             nullable=False, index=True)
-    url = Column(String(2000), nullable=False)
-    secret_ciphertext = Column(LargeBinary, nullable=False)
-    events = Column(JSONB, nullable=False)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    events: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate G2] 署名の鍵の切り替え: 猶予の間は新旧の両方で署名する(受け手が切り替える時間を取る)
-    previous_secret_ciphertext = Column(LargeBinary, nullable=True)
-    previous_secret_expires_at = Column(DateTime(timezone=True), nullable=True)
-    secret_version = Column(Integer, nullable=False, default=1, server_default="1")
+    previous_secret_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    previous_secret_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    secret_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     # 受け手が 410 Gone を返した等で自動で止めた理由
-    disabled_reason = Column(String(40), nullable=True)
+    disabled_reason: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
 
 class OrgWebhookDelivery(Base):
     """送信の記録(再送できるよう本文を持つ。本文に個人・秘密の値は入れない)。"""
     __tablename__ = "org_webhook_deliveries"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    webhook_id = Column(UUID(as_uuid=True), ForeignKey("org_webhooks.id", ondelete="CASCADE"), nullable=False,
-                        index=True)
-    event_id = Column(UUID(as_uuid=True), nullable=False)
-    event_type = Column(String(40), nullable=False)
-    payload = Column(JSONB, nullable=False)
-    status = Column(String(9), nullable=False, default="pending", server_default="pending")
-    attempts = Column(Integer, nullable=False, default=0, server_default="0")
-    last_status_code = Column(Integer, nullable=True)
-    last_error = Column(String(40), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    webhook_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("org_webhooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # [Gate G2] 自動の再送: 次に送る時刻(失敗のたびに間隔を伸ばす)。上限に達したら dead(手で送り直せる)
-    next_attempt_at = Column(DateTime(timezone=True), nullable=True)
+    next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending','delivered','failed','dead')", name="ck_org_webhook_deliveries_status"),
@@ -3091,17 +3142,20 @@ class SupportGrant(Base):
     plan_id が NULL ならアカウントの概要と旅行の一覧、あれば1つの旅行の中身(機密・個人の値は伏せる)を見られる。"""
     __tablename__ = "support_grants"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
-    purpose = Column(String(200), nullable=False)
-    ticket_ref = Column(String(40), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    access_count = Column(Integer, nullable=False, default=0, server_default="0")
-    last_accessed_at = Column(DateTime(timezone=True), nullable=True)
-    last_accessed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    purpose: Mapped[str] = mapped_column(String(200), nullable=False)
+    ticket_ref: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    access_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_accessed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_accessed_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class DataKey(Base):
@@ -3111,13 +3165,13 @@ class DataKey(Base):
     DB・バックアップのどちらからも読めなくなる(バックアップの鍵の写しも消す: app/ops/key_escrow.py)。"""
     __tablename__ = "data_keys"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    subject_type = Column(String(8), nullable=False)
-    subject_id = Column(UUID(as_uuid=True), nullable=False)
-    wrapped_key_ciphertext = Column(LargeBinary, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    destroyed_at = Column(DateTime(timezone=True), nullable=True)
-    destroy_reason = Column(String(40), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    subject_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    wrapped_key_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    destroyed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    destroy_reason: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
     __table_args__ = (
         CheckConstraint("subject_type IN ('plan', 'user')", name="ck_data_keys_subject_type"),
@@ -3133,16 +3187,19 @@ class MfaResetRequest(Base):
     """[Gate G3] SEC-F6 多要素認証の解除の申請と承認(scripts/security_incident.py の mfa-reset-request・mfa-reset)。"""
     __tablename__ = "mfa_reset_requests"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    target_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    requested_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    reason = Column(String(200), nullable=False)
-    status = Column(String(12), nullable=False, default="pending", server_default="pending")
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    approved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    decided_at = Column(DateTime(timezone=True), nullable=True)
-    single_operator = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    target_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="pending", server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    approved_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    single_operator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'approved', 'cancelled', 'expired')",
@@ -3154,15 +3211,16 @@ class OrgApiIdempotency(Base):
     """[Gate G2] FR-042 外部 API の書き込みの Idempotency-Key(クライアントごと)。同じキーの再送は同じ応答を返す。"""
     __tablename__ = "org_api_idempotency"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False)
-    key = Column(String(100), nullable=False)
-    route = Column(String(120), nullable=False)
-    payload_hash = Column(String(64), nullable=False)
-    response_status = Column(Integer, nullable=False)
-    response_json = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("org_api_clients.id", ondelete="CASCADE"), nullable=False)
+    key: Mapped[str] = mapped_column(String(100), nullable=False)
+    route: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_status: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_json: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     __table_args__ = (UniqueConstraint("client_id", "key", name="uq_org_api_idempotency_client_key"),)
 
@@ -3177,19 +3235,21 @@ class CommandRun(Base):
     (予定・日程)か target(候補)を使う。題名などの入力値は response_json(実行した本人だけに返す)にだけ残し、監査には残さない。"""
     __tablename__ = "command_runs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    command = Column(String(32), nullable=False)
-    idempotency_key = Column(String(100), nullable=False)
-    target_type = Column(String(24), nullable=True)
-    target_id = Column(UUID(as_uuid=True), nullable=True)
-    change_set_id = Column(UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True,
-                           index=True)
-    status = Column(String(8), nullable=False, default="executed", server_default="executed")
-    response_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    undone_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    command: Mapped[str] = mapped_column(String(32), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_type: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    target_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="executed", server_default="executed")
+    response_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    undone_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="uq_command_runs_user_key"),
@@ -3204,13 +3264,16 @@ class NotificationPreference(Base):
     email_digest: daily なら、読んでいない通知を1日1回メールでまとめて送る(本文は件数と旅行名だけ)。"""
     __tablename__ = "notification_preferences"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
-    level = Column(String(10), nullable=False, default="all", server_default="all")
-    email_digest = Column(String(8), nullable=False, default="off", server_default="off")
-    last_digest_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    level: Mapped[str] = mapped_column(String(10), nullable=False, default="all", server_default="all")
+    email_digest: Mapped[str] = mapped_column(String(8), nullable=False, default="off", server_default="off")
+    last_digest_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("level IN ('all', 'mentions', 'none')", name="ck_notification_preferences_level"),
@@ -3228,17 +3291,18 @@ class EmailOutbox(Base):
     本文に予約番号・コメントの本文・位置は入れない(件数・旅行名・画面への案内だけ)。"""
     __tablename__ = "email_outbox"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    kind = Column(String(24), nullable=False)
-    subject = Column(String(200), nullable=False)
-    body = Column(Text, nullable=False)
-    status = Column(String(8), nullable=False, default="pending", server_default="pending")
-    attempts = Column(Integer, nullable=False, default=0, server_default="0")
-    next_attempt_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_error = Column(String(200), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    sent_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'sent', 'failed', 'dead')", name="ck_email_outbox_status"),
@@ -3252,20 +3316,21 @@ class AbuseReport(Base):
     通報した人は特定しない(接続元の sha256 だけ。同じ人の連続の通報を数えるため)。"""
     __tablename__ = "abuse_reports"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    share_id = Column(UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True,
-                      index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
-    source = Column(String(8), nullable=False, default="report", server_default="report")
-    reason = Column(String(10), nullable=False)
-    note = Column(String(500), nullable=True)
-    reporter_hash = Column(String(64), nullable=True)
-    status = Column(String(10), nullable=False, default="open", server_default="open")
-    handled_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                index=True)
-    handled_at = Column(DateTime(timezone=True), nullable=True)
-    resolution = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    share_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_share_links.id", ondelete="SET NULL"), nullable=True, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    source: Mapped[str] = mapped_column(String(8), nullable=False, default="report", server_default="report")
+    reason: Mapped[str] = mapped_column(String(10), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    reporter_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="open", server_default="open")
+    handled_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    handled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("reason IN ('phishing', 'malware', 'spam', 'scraping', 'privacy', 'other')",
@@ -3287,14 +3352,15 @@ class OfflineDevice(Base):
     失効した端末には鍵を配らず(410)、その端末は次に通信した時に保存したデータを消す。他の端末は影響を受けない。"""
     __tablename__ = "offline_devices"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    device_id = Column(String(64), nullable=False)
-    label = Column(String(100), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_key_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_reason = Column(String(20), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    last_key_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "device_id", name="uq_offline_devices_user_device"),
@@ -3309,12 +3375,13 @@ class PrivacyZone(Base):
     旅行記の公開では、この範囲の中の地点の座標を出さない(app/services/location_privacy.py)。"""
     __tablename__ = "privacy_zones"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    label = Column(String(50), nullable=False)
-    center_ciphertext = Column(LargeBinary, nullable=False)
-    radius_m = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(50), nullable=False)
+    center_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    radius_m: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("radius_m BETWEEN 100 AND 5000", name="ck_privacy_zones_radius"),
@@ -3328,20 +3395,22 @@ class MemoryPublication(Base):
     公開の前の確認(写っている人・位置)を acknowledged に残す。トークンはハッシュだけを保存し、失効(revoked_at)できる。"""
     __tablename__ = "memory_publications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    token_hash = Column(String(64), nullable=False, unique=True)
-    token_prefix = Column(String(8), nullable=False)
-    title = Column(String(200), nullable=False)
-    location_level = Column(String(6), nullable=False, default="none", server_default="none")
-    include_photos = Column(Boolean, nullable=False, default=False, server_default="false")
-    snapshot = Column(JSON, nullable=False)
-    photo_ids = Column(JSON, nullable=False)
-    acknowledged = Column(JSON, nullable=False)
-    view_count = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    token_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    location_level: Mapped[str] = mapped_column(String(6), nullable=False, default="none", server_default="none")
+    include_photos: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    snapshot: Mapped[Any] = mapped_column(JSON, nullable=False)
+    photo_ids: Mapped[Any] = mapped_column(JSON, nullable=False)
+    acknowledged: Mapped[Any] = mapped_column(JSON, nullable=False)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("location_level IN ('none', 'area')", name="ck_memory_publications_location"),
@@ -3354,16 +3423,18 @@ class MemoryTrash(Base):
     行の中身(本文・場所を含む)は旅行のデータ鍵で暗号化する(row_ciphertext)。写真・音声のファイルは保管の間は消さない。"""
     __tablename__ = "memory_trash"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    memory_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    deleted_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
-                                index=True)
-    author_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    row_ciphertext = Column(LargeBinary, nullable=False)
-    storage_key = Column(String, nullable=True)
-    deleted_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    memory_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    deleted_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    row_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    storage_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (
         Index("ix_memory_trash_expires", "expires_at"),
@@ -3377,13 +3448,14 @@ class PlanMovementSettings(Base):
     revision は If-Match(変えた時に実行可能性の検証の結果が古くなる。feasibility.compute_fingerprint)。"""
     __tablename__ = "plan_movement_settings"
 
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
-    settings = Column(JSONB, nullable=False)
-    revision = Column(Integer, nullable=False, default=1, server_default="1")
-    updated_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    settings: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    updated_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
 class PlanOwnershipTransfer(Base):
@@ -3395,18 +3467,21 @@ class PlanOwnershipTransfer(Base):
     旅行の中身は旅行のデータ鍵で暗号化されているため、移譲で鍵を替える必要は無い(ADR-data-keys)。"""
     __tablename__ = "plan_ownership_transfers"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
-    from_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    to_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     # pending(手続き中) / accepted / declined / cancelled
-    status = Column(String(9), nullable=False, default="pending", server_default="pending")
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="pending", server_default="pending")
     # 前の所有者が残る時の役割(editor / viewer)。none は共同編集者から外れる
-    keep_role = Column(String(6), nullable=False, default="editor", server_default="editor")
-    message = Column(String(500), nullable=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    responded_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    keep_role: Mapped[str] = mapped_column(String(6), nullable=False, default="editor", server_default="editor")
+    message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    responded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending','accepted','declined','cancelled')",
@@ -3430,22 +3505,24 @@ class DataCorrection(Base):
     source は訂正の根拠(本人の申告・公的な書類・予約の確認書・その他)、source_note はその補足(500文字まで)。"""
     __tablename__ = "data_corrections"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    kind = Column(String(7), nullable=False)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
-    field = Column(String(40), nullable=False)
-    source = Column(String(20), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(7), nullable=False)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=True, index=True)
+    field: Mapped[str] = mapped_column(String(40), nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
     # 本人確認の方法: password(パスワード) / session(ログイン中の本人)
-    verification = Column(String(8), nullable=False)
-    payload_ciphertext = Column(LargeBinary, nullable=False)
+    verification: Mapped[str] = mapped_column(String(8), nullable=False)
+    payload_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     # self: applied / reverted。request: open / resolved / declined
-    status = Column(String(8), nullable=False)
-    resolution_note_ciphertext = Column(LargeBinary, nullable=True)
-    resolved_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-                                 index=True)
-    resolved_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    status: Mapped[str] = mapped_column(String(8), nullable=False)
+    resolution_note_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    resolved_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (
         CheckConstraint("kind IN ('self','request')", name="ck_data_corrections_kind"),
@@ -3468,13 +3545,13 @@ class OpsJobRun(Base):
     30日より古い記録は処理のたびに消す。管理の画面(GET /admin/ops/jobs)と /metrics の最後の成功からの経過で見る。"""
     __tablename__ = "ops_job_runs"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    job = Column(String(40), nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=False)
-    finished_at = Column(DateTime(timezone=True), nullable=True)
-    ok = Column(Boolean, nullable=True)
-    summary = Column(JSONB, nullable=True)
-    error_code = Column(String(80), nullable=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    job: Mapped[str] = mapped_column(String(40), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    summary: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
 
     __table_args__ = (
         Index("ix_ops_job_runs_job_started", "job", "started_at"),

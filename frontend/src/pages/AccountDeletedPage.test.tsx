@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 describe('AccountDeletedPage (Gate P9)', () => {
-  it('オフラインデータを消してからログイン状態を消す(サーバーのログアウトは呼ばない)', async () => {
+  it('ログイン状態を消し、オフラインデータを消す(サーバーのログアウトは呼ばない)', async () => {
     m.clearAllOfflinePacks.mockResolvedValue(undefined);
     render(<MemoryRouter><AccountDeletedPage /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'アカウントを削除しました' })).toBeInTheDocument();
@@ -27,6 +27,13 @@ describe('AccountDeletedPage (Gate P9)', () => {
     await waitFor(() => expect(m.clearLocalSession).toHaveBeenCalledTimes(1));
     expect(m.logout).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'トップページへ' })).toHaveAttribute('href', '/');
+  });
+
+  it('[Gate G10-Q] ログイン状態はオフラインデータの消去を待たずに最初に消す(失効したトークンで要求を送らない)', () => {
+    m.clearAllOfflinePacks.mockReturnValue(new Promise(() => undefined)); // 消去が終わらない
+    render(<MemoryRouter><AccountDeletedPage /></MemoryRouter>);
+    expect(m.clearLocalSession).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('この端末に保存したオフラインデータを消しています…')).toBeInTheDocument();
   });
 
   it('オフラインデータを消せなくても、ログイン状態は消して案内する', async () => {

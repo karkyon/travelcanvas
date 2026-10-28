@@ -21,7 +21,7 @@ import logging
 import numbers
 import re
 import traceback
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # ---------------------------------------------------------------------------
 # 伏せる規則(順序に意味がある: 接続文字列の資格情報 → URL のパラメータ → 個別の値)
@@ -120,7 +120,7 @@ def redact_value(value: object, _depth: int = 0) -> object:
     if _depth >= _MAX_DEPTH:
         return "<truncated>"
     if isinstance(value, dict):
-        out = {}
+        out: Dict[str, Any] = {}
         for i, (k, v) in enumerate(value.items()):
             if i >= _MAX_ITEMS:
                 out["<truncated>"] = len(value) - _MAX_ITEMS
@@ -148,7 +148,7 @@ def safe_exception_text(exc_info) -> str:
         return f"{etype}: <例外の文面を整形できませんでした>"
 
 
-def safe_exception_summary(exc_info) -> Dict[str, object]:
+def safe_exception_summary(exc_info) -> Dict[str, Any]:
     """構造化ログ用: 型・伏せた本文・伏せたトレースバック。"""
     etype = exc_info[0].__name__ if exc_info and exc_info[0] else None
     try:
@@ -241,8 +241,8 @@ def sanitize_extra(record: logging.LogRecord, keys: Iterable[str]) -> None:
             record.__dict__[key] = redact_value(value)
 
 
-_INSTALLED = {"factory": None}
-_INSPECTOR: Dict[str, object] = {"fn": None}
+_INSTALLED: Dict[str, Any] = {"factory": None}
+_INSPECTOR: Dict[str, Any] = {"fn": None}
 
 
 def set_raw_inspector(fn) -> None:
@@ -270,7 +270,7 @@ def install() -> None:
         inspector = _INSPECTOR["fn"]
         if inspector is not None:
             try:
-                inspector(record)  # type: ignore[operator]
+                inspector(record)
             except Exception:  # noqa: BLE001 - 検査の失敗でログを止めない
                 pass
         return sanitize_record(record)
@@ -312,7 +312,7 @@ def _excerpt(line: str, start: int, end: int, width: int = 40) -> str:
 
 
 def find_leaks(text: str, secrets: Iterable[str] = (), *, max_findings: int = 200,
-               allow_emails: Iterable[str] = ()) -> List[Dict[str, object]]:
+               allow_emails: Iterable[str] = ()) -> List[Dict[str, Any]]:
     """文面から漏れを探す。戻り値は [{kind, line, excerpt}](値そのものは含めない)。
 
     secrets: 既知の秘密の値(8文字以上のものだけ使う)。
@@ -320,7 +320,7 @@ def find_leaks(text: str, secrets: Iterable[str] = (), *, max_findings: int = 20
     """
     known = sorted({s for s in secrets if isinstance(s, str) and len(s) >= 8}, key=len, reverse=True)
     allowed = {e.lower() for e in allow_emails}
-    findings: List[Dict[str, object]] = []
+    findings: List[Dict[str, Any]] = []
     for no, line in enumerate((text or "").splitlines(), start=1):
         if len(findings) >= max_findings:
             break
@@ -345,7 +345,7 @@ def find_leaks(text: str, secrets: Iterable[str] = (), *, max_findings: int = 20
     return findings[:max_findings]
 
 
-def summarize(findings: Sequence[Dict[str, object]]) -> Dict[str, int]:
+def summarize(findings: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     out: Dict[str, int] = {}
     for f in findings:
         out[str(f["kind"])] = out.get(str(f["kind"]), 0) + 1
@@ -358,7 +358,7 @@ class LeakCollector(logging.Handler):
     def __init__(self, level: int = logging.DEBUG) -> None:
         super().__init__(level)
         self.secrets: set = set()
-        self.findings: List[Dict[str, object]] = []
+        self.findings: List[Dict[str, Any]] = []
         self.records = 0
         self.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
 

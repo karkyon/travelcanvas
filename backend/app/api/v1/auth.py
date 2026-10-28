@@ -169,7 +169,10 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: Optional[str]) -> bool:
+    # [Gate G10-Q] パスワードの無い利用者(ゲスト等、hashed_password が NULL)は常に不一致
+    if not hashed_password:
+        return False
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -296,7 +299,19 @@ def _session_from_refresh_cookie(request: Request, db: Session) -> Optional[User
     return session
 
 
-def _access_token_for(user: User, session_id: str) -> str:
+def _user_response(user: User) -> UserResponse:
+    """[Gate G10-Q] 応答の利用者。DB では名前・メールが NULL を許すため(ゲストからの昇格の途中など)、
+    以前は None のまま UserResponse に渡して検証の誤り(500)になり得た。空の文字列にそろえる。"""
+    return UserResponse(
+        id=str(user.id),
+        username=user.username or "",
+        email=user.email or "",
+        user_type=str(user.user_type or "registered"),
+        is_verified=bool(user.is_verified),
+    )
+
+
+def _access_token_for(user: User, session_id: Union[str, uuid.UUID]) -> str:
     return create_access_token(
         data={"sub": str(user.id), "username": user.username, "session_id": str(session_id)}
     )
@@ -433,13 +448,7 @@ async def upgrade_guest_to_user(
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
-            user=UserResponse(
-                id=str(db_user.id),
-                username=db_user.username,
-                email=db_user.email,
-                user_type=db_user.user_type,
-                is_verified=db_user.is_verified
-            )
+            user=_user_response(db_user)
         )
 
     except HTTPException:
@@ -519,13 +528,7 @@ async def register(
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
-            user=UserResponse(
-                id=str(new_user.id),
-                username=new_user.username,
-                email=new_user.email,
-                user_type=new_user.user_type,
-                is_verified=new_user.is_verified
-            )
+            user=_user_response(new_user)
         )
 
     except HTTPException:
@@ -586,13 +589,7 @@ def complete_login(db: Session, user: User, request: Request, response: Response
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse(
-            id=str(user.id),
-            username=user.username,
-            email=user.email,
-            user_type=user.user_type,
-            is_verified=user.is_verified
-        )
+        user=_user_response(user)
     )
 
 
@@ -771,13 +768,7 @@ async def refresh_token_endpoint(
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse(
-            id=str(user.id),
-            username=user.username,
-            email=user.email,
-            user_type=user.user_type,
-            is_verified=user.is_verified,
-        ),
+        user=_user_response(user),
     )
 
 

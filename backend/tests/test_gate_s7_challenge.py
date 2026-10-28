@@ -198,3 +198,22 @@ def test_ignoring_the_challenge_eventually_gets_blocked(client, monkeypatch):
     statuses = [client.post("/api/v1/auth/guest").status_code for _ in range(20)]
     assert statuses[0] == 428
     assert statuses[-1] == 429
+
+
+def test_first_unsolved_attempt_is_not_scored_but_repeats_are(client, monkeypatch):
+    """[Gate G10-Q] 正しい利用者は確認が要るかを知らないため、最初の1回は解なしで送る。その1回には点数を付けない。
+    問題を出した後も解かずに送り続けた時(解かない攻撃)だけ点数を付け、解いて通ったら数え直す。"""
+    monkeypatch.setattr(settings, "CHALLENGE_ALWAYS", "register")
+    body = _register_body()
+    first = client.post("/api/v1/auth/register", json=body)
+    assert first.status_code == 428
+    assert guard.current_score(IP) == 0
+    again = client.post("/api/v1/auth/register", json=body)  # 解かずに送り直す
+    assert again.status_code == 428
+    assert guard.current_score(IP) == guard.SIGNAL_WEIGHTS["challenge_unsolved"]
+    headers, _, _ = _solved_headers(again)
+    assert client.post("/api/v1/auth/register", json=body, headers=headers).status_code == 200
+    # 解いて通った後の、次の入口の最初の1回はまた点数にしない(正しい利用者が繰り返し登録・ログインしても上がらない)
+    before = guard.current_score(IP)
+    assert client.post("/api/v1/auth/register", json=_register_body()).status_code == 428
+    assert guard.current_score(IP) == before

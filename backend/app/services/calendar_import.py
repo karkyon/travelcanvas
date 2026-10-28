@@ -152,6 +152,8 @@ def to_local(e: IcsEvent, plan_tz: str) -> Tuple[date, Optional[str], bool]:
         return e.start_date, None, True
     if e.floating_local is not None:
         return e.floating_local.date(), e.floating_local.strftime("%H:%M"), False
+    if e.start is None:  # 読み込みで start・start_date・floating_local のどれかは必ず入る
+        raise IcsError("開始日時を読み取れません")
     local = e.start.astimezone(_zone(plan_tz) or timezone.utc)
     return local.date(), local.strftime("%H:%M"), False
 
@@ -204,7 +206,7 @@ def plan_candidates(events: Sequence[IcsEvent], plan_tz: str, days: Dict[str, st
     return out
 
 
-def summarize(candidates: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+def summarize(candidates: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     reasons: Dict[str, int] = {}
     for c in candidates:
         if c["action"] == "skip":

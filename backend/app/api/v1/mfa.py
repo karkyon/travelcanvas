@@ -306,6 +306,8 @@ def step_up(payload: CodeOnly, request: Request, response: Response, auth=Depend
         raise _error(409, "mfa_not_enabled", "多要素認証が有効ではありません")
     method = _check_code(db, request, current_user, rec, payload.code, "step_up")
     session = _session_for(db, auth)
+    if session is None:
+        raise _error(401, "session_required", "セッションが無効です。再度ログインしてください。")
     mfa.mark_session_verified(db, session)
     record_audit_event(action="mfa_step_up", resource_type="session", user_id=current_user.id,
                        resource_id=session.id, ip_address=_ip(request), details={"method": method})

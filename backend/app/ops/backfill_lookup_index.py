@@ -57,7 +57,7 @@ def backfill(db: Session, recompute: bool = False) -> Dict[str, int]:
     rows = query.all()
     for r in rows:
         raw = _plain(r.confirmation_number_ciphertext)
-        if raw == "":
+        if not raw:
             out["undecryptable"] += 1
             continue
         changed = False

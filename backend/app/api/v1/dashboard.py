@@ -16,7 +16,7 @@
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends
@@ -204,7 +204,7 @@ async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depe
              .filter(or_(TravelPlan.user_id == current_user.id, TravelPlan.id.in_(collab_ids)),
                      TravelPlan.deleted_at.is_(None))
              .order_by(TravelPlan.created_at.desc()).limit(MAX_TRIPS).all())
-    plan_ids = [cast(uuid.UUID, p.id) for p in plans]
+    plan_ids = [p.id for p in plans]
     roles: Dict[Any, str] = {}
     if plan_ids:
         for pid, role in db.query(PlanCollaborator.plan_id, PlanCollaborator.role).filter(

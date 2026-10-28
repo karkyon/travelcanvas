@@ -17,7 +17,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone as dt_timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict
@@ -91,7 +91,7 @@ def _to_dict(m: Memory, user: User, plan: TravelPlan, names: Dict[uuid.UUID, str
     }
 
 
-def _names(db: Session, plan: TravelPlan, extra: List[uuid.UUID] = ()) -> Dict[uuid.UUID, str]:
+def _names(db: Session, plan: TravelPlan, extra: Sequence[uuid.UUID] = ()) -> Dict[uuid.UUID, str]:
     return member_names(db, set(member_user_ids(db, plan)) | set(extra))
 
 
@@ -243,6 +243,7 @@ def create_memory(plan_id: str, body: MemoryCreate, db: Session = Depends(get_db
 @router.post("/{plan_id}/memories/upload", status_code=201)
 async def upload_memory(
     plan_id: str,
+    request: Request,
     file: UploadFile = File(...),
     kind: str = Form(...),
     body: Optional[str] = Form(None),
@@ -254,7 +255,6 @@ async def upload_memory(
     longitude: Optional[float] = Form(None),
     visibility: str = Form("private"),
     include_in_journal: bool = Form(True),
-    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):

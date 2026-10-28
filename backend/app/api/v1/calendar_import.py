@@ -132,7 +132,7 @@ def apply(plan_id: str, payload: ApplyRequest, request: Request, db: Session = D
     days = _days(db, plan)
     tz = _plan_tz(days)
     day_by_date = {d.local_date: d for d in days}
-    changes = []
+    changes: List[tuple] = []
     created_days = created = updated = 0
 
     # 先に全件を検査する(一部だけ適用された状態を残さない)
@@ -150,7 +150,7 @@ def apply(plan_id: str, payload: ApplyRequest, request: Request, db: Session = D
                 raise HTTPException(status_code=409, detail=f"{i + 1}件目: 変更する予定が本案にありません")
             if ev.locked:
                 raise HTTPException(status_code=409, detail=f"{i + 1}件目: 確定済みの予定は取り込みで変更できません")
-            events[it.event_id] = ev
+            events[str(it.event_id)] = ev
 
     def day_for(d: date_cls) -> TravelDay:
         nonlocal created_days
@@ -176,7 +176,7 @@ def apply(plan_id: str, payload: ApplyRequest, request: Request, db: Session = D
             changes.append(("travel_event", ev.id, "create", None, plans_api._event_to_dict(ev)))
             created += 1
         else:
-            ev = events[it.event_id]
+            ev = events[str(it.event_id)]
             before = plans_api._event_to_dict(ev)
             ev.title = it.title
             ev.day_id = day.id

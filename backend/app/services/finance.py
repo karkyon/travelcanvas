@@ -14,7 +14,7 @@
 """
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
-from typing import Dict, Hashable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple
 
 ALGORITHM_VERSION = "finance-v1"
 ROUNDING_MODES = {"half_up": ROUND_HALF_UP, "down": ROUND_DOWN, "up": ROUND_UP}
@@ -193,12 +193,12 @@ def balances(expenses: Sequence[ExpenseView], settlements: Sequence[SettlementVi
     return out
 
 
-def suggest_transfers(nets: Dict[Hashable, int]) -> List[Tuple[Hashable, Hashable, int]]:
+def suggest_transfers(nets: Mapping[Any, int]) -> List[Tuple[Any, Any, int]]:
     """(支払う人, 受け取る人, 額)。大きい債務者から大きい債権者へ順に相殺する(送金回数を少なくする)。"""
-    debtors = sorted(((-n, uid) for uid, n in nets.items() if n < 0), key=lambda x: (-x[0], str(x[1])))
-    creditors = sorted(((n, uid) for uid, n in nets.items() if n > 0), key=lambda x: (-x[0], str(x[1])))
-    debtors = [[a, u] for a, u in debtors]
-    creditors = [[a, u] for a, u in creditors]
+    debtors: List[List[Any]] = [
+        [a, u] for a, u in sorted(((-n, uid) for uid, n in nets.items() if n < 0), key=lambda x: (-x[0], str(x[1])))]
+    creditors: List[List[Any]] = [
+        [a, u] for a, u in sorted(((n, uid) for uid, n in nets.items() if n > 0), key=lambda x: (-x[0], str(x[1])))]
     transfers = []
     i = j = 0
     while i < len(debtors) and j < len(creditors):

@@ -70,6 +70,21 @@ def test_verified_features_have_every_kind_of_evidence():
     assert not problems, "\n".join(problems)
 
 
+def test_verified_features_are_named_by_an_e2e_spec():
+    """[Gate G10-Q] V3: VERIFIED の機能は、台帳の E2E のうち少なくとも1本がその FR の番号を名乗る(spec の説明に書く)。
+
+    以前は FR-001・002・006・044 の spec に番号が無く、どの試験が何の証拠かを台帳だけでしか追えなかった。
+    """
+    missing = []
+    for fr, f in _ledger()["features"].items():
+        if f["status"] != "VERIFIED":
+            continue
+        texts = [(ROOT / r).read_text(encoding="utf-8") for r in f["e2e"] if r.startswith("frontend/e2e/")]
+        if not any(re.search(r"\b%s\b" % fr, t) for t in texts):
+            missing.append(fr)
+    assert not missing, "E2E の spec に FR の番号がありません: %s" % missing
+
+
 def partial_features():
     """[Gate G1] (部分)の機能は docs/trace/fr-status.json が正本(以前はこの試験に一覧を直書きしていた)。"""
     status = json.loads((ROOT / "docs" / "trace" / "fr-status.json").read_text(encoding="utf-8"))

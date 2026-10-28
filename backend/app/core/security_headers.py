@@ -5,9 +5,18 @@ API の応答は JSON・ファイルだけで、ブラウザで画面として�
 (公開共有の no-referrer、ダウンロードの Content-Disposition など)は上書きしない。
 開発用の API 画面(/docs・/redoc)は外部のスクリプトを読むので CSP を付けない(本番では画面自体を出さない)。
 """
-from typing import MutableMapping
+from typing import Protocol
 
-from app.core.config import settings
+
+class HeaderMap(Protocol):
+    """ヘッダーの入れ物(starlette の MutableHeaders・dict)。有無を調べて、値を入れられるもの"""
+
+    def __contains__(self, key: object, /) -> bool: ...
+
+    def __setitem__(self, key: str, value: str, /) -> None: ...
+
+
+from app.core.config import settings  # noqa: E402 - 型の定義の後で設定を読む
 
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
@@ -23,7 +32,7 @@ BASE_HEADERS = {
 }
 
 
-def apply_security_headers(path: str, headers: MutableMapping[str, str]) -> None:
+def apply_security_headers(path: str, headers: HeaderMap) -> None:
     for name, value in BASE_HEADERS.items():
         if name not in headers:
             headers[name] = value

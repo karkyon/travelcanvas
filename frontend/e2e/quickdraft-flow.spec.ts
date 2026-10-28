@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * [Gate R2-6] FR-043 / FC-101〜105 (QuickDraft) のbrowser E2E。
+ * [Gate G10-Q] FR-001 ゲスト旅行開始(匿名のゲストで始めて旅行を作り、読み直しても残る)の証拠でもある。
  *
  * docs/trace/gate-r2-trace.md の R2-5行が「未達」としていた
  * 「Playwright browser E2E」を満たすために追加。

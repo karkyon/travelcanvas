@@ -103,6 +103,8 @@ def _evidence(db: Session, plan: TravelPlan, user: User, events: List[TravelEven
             out[mm.event_id]["photo"] = True
         elif mm.latitude is not None and mm.longitude is not None:
             for e in events:
+                if e.latitude is None or e.longitude is None:
+                    continue
                 if va._haversine_m(e.latitude, e.longitude, mm.latitude, mm.longitude) <= va.radius_for(e.event_type):
                     out[e.id]["photo"] = True
     # 予約(チケット・予約確認): 予定に紐付けた予約

@@ -3,6 +3,7 @@ import { registerAccount } from './support/api';
 
 /**
  * [Gate A1] FR-003 認証の一本化(B-002)のbrowser E2E。
+ * [Gate G10-Q] FR-002 ゲスト昇格(ゲストから正式なアカウントへ昇格してログインできる)の証拠でもある。
  *
  * authStoreの独自fetch()をAPIクライアント経由へ置き換えたため、これまでE2Eで
  * 通していなかった「ログイン(失敗→成功)」と「ゲスト昇格」を実際の画面から確認する。

@@ -19,7 +19,7 @@ get_current_active_userからget_current_user_or_guestへ変更した。ゲス�
 import logging
 import uuid
 from datetime import datetime, date, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -148,8 +148,9 @@ async def get_travel_plans(
         .all()
     )
 
-    roles = dict(db.query(PlanCollaborator.plan_id, PlanCollaborator.role).filter(
-        PlanCollaborator.user_id == current_user.id, PlanCollaborator.status == "accepted").all())
+    role_rows = db.query(PlanCollaborator.plan_id, PlanCollaborator.role).filter(
+        PlanCollaborator.user_id == current_user.id, PlanCollaborator.status == "accepted").all()
+    roles: Dict[Any, str] = {pid: str(role) for pid, role in role_rows}
     return {"plans": [_member_view(db, p, current_user, roles.get(p.id)) for p in plans], "total": total}
 
 
