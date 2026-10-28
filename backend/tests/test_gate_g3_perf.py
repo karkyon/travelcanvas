@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import event, text
+from sqlalchemy.engine.interfaces import ExecuteStyle
 
 from app.core.database import engine
 from app.services.booklet import SECTIONS as BOOKLET_SECTIONS
@@ -47,11 +48,25 @@ P95_LIMIT_MS = {
 
 @contextmanager
 def count_queries():
-    box = {"n": 0}
+    """1回の要求で送った SQL の文の数。
+
+    [Gate G10-Q] 1つの一括の INSERT(SQLAlchemy の insertmanyvalues)は、行の数に応じて 1,000 行ずつの文に分けて
+    送られる。G7 の日ごとの判定(休憩・疲れ)で 365 日 × 1万件の旅行の判定の結果が数千件になり、分けた数だけ増えて
+    「N+1」と誤って判定していた(毎晩の perf が 99744c3 から失敗)。行ごとの問い合わせ(本当の N+1)を見逃さないよう、
+    同じ一括の INSERT の分割だけを1文として数える。分割の数は box["insert_batches"] に残す。
+    """
+    box = {"n": 0, "insert_batches": 0}
+    seen_bulk = set()
 
     def before(conn, cursor, statement, params, context, executemany):
-        if not statement.lstrip().upper().startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
-            box["n"] += 1
+        if statement.lstrip().upper().startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
+            return
+        if getattr(context, "execute_style", None) is ExecuteStyle.INSERTMANYVALUES:
+            box["insert_batches"] += 1
+            if id(context) in seen_bulk:
+                return
+            seen_bulk.add(id(context))
+        box["n"] += 1
 
     event.listen(engine, "before_cursor_execute", before)
     try:

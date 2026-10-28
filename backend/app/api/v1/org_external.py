@@ -77,7 +77,9 @@ async def token(request: Request, db: Session = Depends(get_db)):
         return _oauth_error("unsupported_grant_type")
     cid, secret = _basic(request)
     if cid is None:
-        cid, secret = form.get("client_id"), form.get("client_secret")
+        f_cid, f_secret = form.get("client_id"), form.get("client_secret")
+        cid = f_cid if isinstance(f_cid, str) else None
+        secret = f_secret if isinstance(f_secret, str) else None
     client = org_api.verify_client(db, str(cid or ""), str(secret or ""))
     if not client:
         return _oauth_error("invalid_client", 401)

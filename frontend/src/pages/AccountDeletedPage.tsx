@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { clearAllOfflinePacks } from '@/utils/offlinePack';
+import { api as apiService } from '@/services/api';
 
 const AccountDeletedPage: React.FC = () => {
   const clearLocalSession = useAuthStore((s) => s.clearLocalSession);
@@ -16,10 +17,13 @@ const AccountDeletedPage: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
+    // [Gate G10-Q] ログイン状態は最初に消す(オフラインのデータの消去を待つ間に、失効したトークンで要求を送らない)。
+    // 消した後は定期の取得が止まるため、削除の画面が止めた /login への強制の移動を元に戻す
+    clearLocalSession();
+    apiService.suppressAuthRedirect(false);
     clearAllOfflinePacks()
       .then(() => alive && setOfflineCleared(true))
-      .catch(() => alive && setOfflineCleared(false))
-      .finally(() => clearLocalSession());
+      .catch(() => alive && setOfflineCleared(false));
     return () => { alive = false; };
   }, [clearLocalSession]);
 

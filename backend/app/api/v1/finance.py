@@ -31,7 +31,7 @@ import json
 import uuid
 from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from fastapi.responses import JSONResponse
@@ -674,7 +674,11 @@ def _apply_expense(db: Session, plan: TravelPlan, e: Expense, data: Dict[str, An
         _fail(err)
 
     base_amount = finance.convert(data["amount"], rate, base, rounding) if rate is not None else None
-    base_shares = finance.split_base(base_amount, base, shares) if base_amount is not None else [None] * len(shares)
+    base_shares: Sequence[Optional[int]]
+    if base_amount is not None:
+        base_shares = finance.split_base(base_amount, base, shares)
+    else:
+        base_shares = [None] * len(shares)
 
     related_type = data.get("related_type")
     related_id = data.get("related_id")
@@ -701,7 +705,7 @@ def _apply_expense(db: Session, plan: TravelPlan, e: Expense, data: Dict[str, An
     e.tax_amount = data.get("tax_amount")
     e.fee_amount = data.get("fee_amount")
     e.fx_rate = rate
-    e.fx_rate_id = fx_row.id if fx_row is not None else None  # type: ignore[assignment]
+    e.fx_rate_id = fx_row.id if fx_row is not None else None
     if fx_row is not None:
         e.fx_source, e.fx_date = fx_row.source, fx_row.rate_date
     else:
@@ -1055,7 +1059,7 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
     budgets = [b for b in db.query(Budget).filter(Budget.plan_id == plan.id, Budget.deleted_at.is_(None)).all()]
     total_budget = next((b.amount for b in budgets if b.kind == "total"), None)
     cat_budgets = {b.category: b.amount for b in budgets if b.kind == "category"}
-    day_budgets = {b.local_date.isoformat(): b.amount for b in budgets if b.kind == "day"}
+    day_budgets = {b.local_date.isoformat(): b.amount for b in budgets if b.kind == "day" and b.local_date is not None}
     my_budget_row = next((b for b in budgets if b.kind == "member" and b.member_user_id == current_user.id), None)
 
     def diff_row(budget: Optional[Decimal], actual_minor: int) -> dict:
@@ -1084,10 +1088,10 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
     reserved = reserved_amounts(db, plan, base, rounding)
 
     member_rows = []
-    for uid, row in bal.items():
+    for member_id, row in bal.items():
         member_rows.append({
-            "user_id": str(uid), "name": names.get(uid, "メンバー外"), "is_member": uid in members,
-            "is_me": uid == current_user.id,
+            "user_id": str(member_id), "name": names.get(member_id, "メンバー外"), "is_member": member_id in members,
+            "is_me": member_id == current_user.id,
             **{k: money(v) for k, v in row.items()},
         })
     member_rows.sort(key=lambda r: (not r["is_me"], r["name"]))

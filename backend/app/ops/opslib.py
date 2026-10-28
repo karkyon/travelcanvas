@@ -14,7 +14,7 @@ import json
 import math
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 TOOL_VERSION = "ops-v1"
 
@@ -131,11 +131,11 @@ def build_manifest(
     git_commit: Optional[str],
     alembic_revision: Optional[str],
     source_database: str,
-    files: Mapping[str, Mapping[str, object]],
+    files: Mapping[str, Mapping[str, Any]],
     table_counts: Mapping[str, int],
-    upload_files: Mapping[str, Mapping[str, object]],
+    upload_files: Mapping[str, Mapping[str, Any]],
     key_fingerprints: Mapping[str, Optional[str]],
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     """バックアップの目録。秘密は含めない(鍵は SHA-256 の先頭12桁の指紋だけ)。"""
     for role in ("database", "uploads"):
         if role not in files:
@@ -158,7 +158,7 @@ def build_manifest(
     }
 
 
-def manifest_problems(manifest: Mapping[str, object], actual: Mapping[str, Mapping[str, object]]) -> List[str]:
+def manifest_problems(manifest: Mapping[str, Any], actual: Mapping[str, Mapping[str, Any]]) -> List[str]:
     """manifest と実際のファイル(role → {name, size, sha256})を突き合わせ、問題を文で返す。空なら健全。"""
     problems: List[str] = []
     if manifest.get("format") != "travelcanvas-backup":
@@ -261,7 +261,7 @@ def compare_table_counts(
     source_before: Mapping[str, int],
     source_after: Mapping[str, int],
     restored: Mapping[str, int],
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     """復元先の表ごとの件数を、バックアップ直前・直後の元DBと比べる。
 
     - バックアップ中に元DBの件数が変わった表は ``unstable``(運用中の書き込み。失敗にしない)。
@@ -269,7 +269,7 @@ def compare_table_counts(
     """
     matched: List[str] = []
     unstable: List[str] = []
-    mismatched: List[Dict[str, object]] = []
+    mismatched: List[Dict[str, Any]] = []
     missing = sorted(set(source_before) - set(restored))
     extra = sorted(set(restored) - set(source_before) - set(source_after))
     for table in sorted(set(source_before) & set(restored)):
@@ -298,9 +298,9 @@ def compare_table_counts(
 
 
 def compare_file_listings(
-    source: Mapping[str, Mapping[str, object]],
-    archived: Mapping[str, Mapping[str, object]],
-) -> Dict[str, object]:
+    source: Mapping[str, Mapping[str, Any]],
+    archived: Mapping[str, Mapping[str, Any]],
+) -> Dict[str, Any]:
     """保存ファイル(文書・写真・音声)の一覧(相対パス → size/sha256)を、アーカイブ内と比べる。"""
     missing = sorted(set(source) - set(archived))
     extra = sorted(set(archived) - set(source))
@@ -369,7 +369,7 @@ def parse_migration_source(source: str) -> Tuple[str, Tuple[str, ...]]:
 
 def migration_heads(graph: Mapping[str, Sequence[str]]) -> List[str]:
     """どの revision からも down として参照されていない revision(= head)。"""
-    referenced = set()
+    referenced: Set[str] = set()
     for downs in graph.values():
         referenced.update(downs)
     return sorted(r for r in graph if r not in referenced)
@@ -387,7 +387,7 @@ def ancestors(graph: Mapping[str, Sequence[str]], rev: str) -> Set[str]:
     return out
 
 
-def rollback_plan(current: Mapping[str, Sequence[str]], target: Mapping[str, Sequence[str]]) -> Dict[str, object]:
+def rollback_plan(current: Mapping[str, Sequence[str]], target: Mapping[str, Sequence[str]]) -> Dict[str, Any]:
     """今の版から過去の版へコードを戻す時に、先に downgrade が要る migration を求める。
 
     - ``current`` / ``target``: それぞれの版の revision → down_revisions
@@ -549,8 +549,8 @@ DEFAULT_THRESHOLDS = {
 
 
 def evaluate_monitor(
-    snapshot: Mapping[str, object],
-    previous: Optional[Mapping[str, object]],
+    snapshot: Mapping[str, Any],
+    previous: Optional[Mapping[str, Any]],
     thresholds: Optional[Mapping[str, float]] = None,
 ) -> List[Dict[str, str]]:
     """監視の1回分の観測(snapshot)から、注意・異常を判定する。
@@ -670,11 +670,11 @@ def _num(v: object) -> Optional[float]:
         return None
 
 
-def _float_keys(d: Mapping[object, object]) -> Dict[float, float]:
+def _float_keys(d: Mapping[Any, Any]) -> Dict[float, float]:
     out: Dict[float, float] = {}
     for k, v in d.items():
-        key = math.inf if str(k) in ("inf", "+Inf", "Inf") else float(k)  # type: ignore[arg-type]
-        out[key] = float(v)  # type: ignore[arg-type]
+        key = math.inf if str(k) in ("inf", "+Inf", "Inf") else float(k)
+        out[key] = float(v)
     return out
 
 
@@ -765,7 +765,7 @@ def merge_cron(existing: str, block: Optional[str]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def render_drill_report(result: Mapping[str, object]) -> str:
+def render_drill_report(result: Mapping[str, Any]) -> str:
     """復元・rollback 演習の結果を Markdown にする。DB名・件数・ハッシュ・所要時間だけを書き、
     個人データ・storage_key・接続文字列は書かない。"""
 

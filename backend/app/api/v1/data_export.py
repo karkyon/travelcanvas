@@ -12,9 +12,8 @@
 """
 import hashlib
 import json
-import uuid
 from datetime import datetime, timezone as dt_timezone
-from typing import Any, Dict, cast
+from typing import Any, Dict
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -132,8 +131,8 @@ def export_account(request: Request, db: Session = Depends(get_db),
         # [Gate C1] 秘匿プロフィール(本人だけ。復号した項目)
         private_profile=_private_profile(db, current_user),
         # [Gate G6] 守る範囲(自宅・職場など)・オフライン保存の端末
-        privacy_zones=dx.own_privacy_zones(db, cast(uuid.UUID, current_user.id)),
-        offline_devices=dx.own_offline_devices(db, cast(uuid.UUID, current_user.id)),
+        privacy_zones=dx.own_privacy_zones(db, current_user.id),
+        offline_devices=dx.own_offline_devices(db, current_user.id),
         # [Gate G8] FR-039 訂正の履歴・所有者への訂正の申し出(本人の分。復号した値)
         corrections=_corrections(db, current_user),
     )

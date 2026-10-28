@@ -18,14 +18,14 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from app.core.config import settings
 from app.utils import rate_limiter as _rl
 
 _lock = threading.Lock()
-_local: Dict[str, object] = {"state": None}
-_cache: Dict[str, object] = {"at": 0.0, "state": None}
+_local: Dict[str, Any] = {"state": None}
+_cache: Dict[str, Any] = {"at": 0.0, "state": None}
 CACHE_SECONDS = 5.0
 MAX_LOCKDOWN_MINUTES = 7 * 24 * 60
 
@@ -70,23 +70,23 @@ def clear_lockdown() -> bool:
     return True
 
 
-def lockdown_state(*, fresh: bool = False) -> Optional[Dict[str, object]]:
+def lockdown_state(*, fresh: bool = False) -> Optional[Dict[str, Any]]:
     """今の警戒モード(期限切れなら None)。数秒は覚えておき、要求ごとに Redis を読まない。"""
     now = _now()
     with _lock:
         if not fresh and now - float(_cache["at"]) < CACHE_SECONDS:
-            state = _cache["state"]
-            return state if state and float(state["until"]) > now else None  # type: ignore[index]
-    state: Optional[Dict[str, object]] = None
+            cached: Optional[Dict[str, Any]] = _cache["state"]
+            return cached if cached and float(cached["until"]) > now else None
+    state: Optional[Dict[str, Any]] = None
     if _rl.current_backend() != "memory" and _rl._redis_available():
         try:
             raw = _rl._client().get(_key())
             state = json.loads(raw) if raw else None
         except Exception as error:  # noqa: BLE001
             _rl._mark_down(error)
-            state = _local["state"]  # type: ignore[assignment]
+            state = _local["state"]
     else:
-        state = _local["state"]  # type: ignore[assignment]
+        state = _local["state"]
     with _lock:
         _cache["at"] = now
         _cache["state"] = state

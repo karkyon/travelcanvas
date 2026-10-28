@@ -86,8 +86,8 @@ def apply(conn: Connection, app_password: str, names: RoleNames = RoleNames()) -
     """所有者の接続で、ロール・パスワード・権限・既定の権限を設定する(何度実行しても同じ)。"""
     if not app_password or len(app_password) < MIN_PASSWORD_LENGTH:
         raise ValueError("TC_DB_APP_PASSWORD(DB_APP_PASSWORD)が未設定か %d 文字未満です" % MIN_PASSWORD_LENGTH)
-    owner = conn.execute(text("SELECT current_user")).scalar()
-    database = conn.execute(text("SELECT current_database()")).scalar()
+    owner = str(conn.execute(text("SELECT current_user")).scalar())
+    database = str(conn.execute(text("SELECT current_database()")).scalar())
     if owner in names.all():
         raise ValueError("apply は所有者(migration を流すロール)で実行してください")
     app, backup, monitor = (_ident(n) for n in names.all())
@@ -157,6 +157,8 @@ def check(conn: Connection) -> Dict[str, object]:
         "has_schema_privilege(current_user, 'public', 'CREATE'), "
         "has_database_privilege(current_user, current_database(), 'CREATE') "
         "FROM pg_roles r WHERE r.rolname = current_user")).first()
+    if row is None:
+        raise RuntimeError("現在のロールを pg_roles から読めません")
     owned = conn.execute(text(
         "SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user")).scalar()
     missing = conn.execute(text(

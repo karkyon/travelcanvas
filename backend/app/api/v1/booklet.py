@@ -291,6 +291,8 @@ def get_export(plan_id: str, export_id: str, request: Request, response: Respons
         raise HTTPException(status_code=403, detail={
             "code": "sensitive_creator_only", "message": "機密情報を含む版は作成者だけが表示できます",
         })
+    if e.snapshot_ciphertext is None:
+        raise HTTPException(status_code=404, detail="しおりの版が見つかりません")
     snapshot = member_policy.redact_booklet(json.loads(decrypt_payload(e.snapshot_ciphertext).decode("utf-8")),
                                             hidden)
     snapshot["current_revision"] = plan.revision

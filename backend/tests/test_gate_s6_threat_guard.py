@@ -127,9 +127,14 @@ def test_id_enumeration_across_endpoints_gets_blocked(client):
 
 
 def test_credential_stuffing_with_rotating_emails_gets_blocked(client):
-    """メールを毎回変えたパスワードリスト攻撃(メールごとの回数制限には引っかからない)。"""
+    """メールを毎回変えたパスワードリスト攻撃(メールごとの回数制限には引っかからない)。
+
+    点数: 失敗 6 回(5×6=30)で計算の確認が始まり、解かずに送り続けると 2 点ずつ上がって 40 で遮断。
+    [Gate G10-Q] 確認を出した後の最初の解なしの1回は点数にしない(正しい利用者も最初は解なしで送る)ため、
+    遮断は以前より1回遅れる(12 回目 → 14 回目)。
+    """
     statuses = []
-    for i in range(12):
+    for i in range(14):
         rate_limiter.reset_all()  # IP ごとの回数制限を外しても、点数で止まることを確かめる
         res = client.post("/api/v1/auth/login", json={"email": f"victim{i}@example.com", "password": "Spring2026!"})
         statuses.append(res.status_code)

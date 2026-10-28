@@ -209,6 +209,52 @@ def verify(request: Request, kind: str, difficulty: int) -> Optional[str]:
     return None
 
 
+_pending_lock = threading.Lock()
+_pending: Dict[str, float] = {}
+
+
+def _pending_key(ip: Optional[str], kind: str) -> str:
+    return "%s:chalpend:%s:%s" % (_rl.namespace(), _ip_tag(ip), kind)
+
+
+def _first_unsolved(ip: Optional[str], kind: str) -> bool:
+    """[Gate G10-Q] この接続元・入口に、まだ解かれていない問題を出していなければ True(出したことを記録する)。
+
+    画面は確認が要るかを知らないため、正しい利用者でも最初の1回は解なしで送り、428 を受けてから解いて送り直す。
+    以前はその1回目にも毎回「解かない」の点数(+2)を付けたため、同じ接続元でログイン・登録を繰り返すと
+    (家族・職場の同じ回線、E2E)、解いているのに遮断(429)まで上がった。問題を出した後も解かずに送ってきた時
+    (解かない攻撃)だけ点数を付ける。
+    """
+    key = _pending_key(ip, kind)
+    ttl = max(1, int(settings.CHALLENGE_TTL_SECONDS))
+    if _rl._redis_available():
+        try:
+            return bool(_rl._client().set(key, "1", nx=True, ex=ttl))
+        except Exception as error:  # noqa: BLE001
+            _rl._mark_down(error)
+    now = _now()
+    with _pending_lock:
+        if len(_pending) > MAX_MEMORY_USED:
+            for k in [k for k, exp in _pending.items() if exp <= now]:
+                del _pending[k]
+        if _pending.get(key, 0) > now:
+            return False
+        _pending[key] = now + ttl
+        return True
+
+
+def _clear_pending(ip: Optional[str], kind: str) -> None:
+    key = _pending_key(ip, kind)
+    if _rl._redis_available():
+        try:
+            _rl._client().delete(key)
+            return
+        except Exception as error:  # noqa: BLE001
+            _rl._mark_down(error)
+    with _pending_lock:
+        _pending.pop(key, None)
+
+
 def require(request: Request, kind: str) -> None:
     """入口の最初に呼ぶ。要るのに解が無い・誤りなら 428(新しい問題を付ける)。"""
     ip = threat_guard.client_ip(request)
@@ -218,10 +264,12 @@ def require(request: Request, kind: str) -> None:
     problem = verify(request, kind, difficulty)
     if problem is None:
         _count("challenge_passed")
+        _clear_pending(ip, kind)
         return
     _count("challenge_issued" if problem == "missing" else "challenge_failed")
     if problem == "missing":
-        threat_guard.signal(request, "challenge_unsolved")
+        if not _first_unsolved(ip, kind):
+            threat_guard.signal(request, "challenge_unsolved")
     elif problem not in ("expired", "too_easy"):
         threat_guard.signal(request, "challenge_failed")
     raise ChallengeRequired(issue(ip, kind, difficulty), difficulty, problem)
@@ -239,3 +287,5 @@ def _count(kind: str) -> None:
 def reset_used() -> None:
     with _used_lock:
         _used.clear()
+    with _pending_lock:
+        _pending.clear()

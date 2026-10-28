@@ -244,15 +244,16 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         if day is None:
             return reject("day_missing", fields=fields)
         max_order = db.query(sa_func.max(TravelEvent.sort_order)).filter(TravelEvent.day_id == day.id).scalar()
-        ev = TravelEvent(id=uuid.uuid4(), plan_id=plan.id, day_id=day.id, title=fields["title"],
-                         event_type=fields.get("event_type", "activity"), sort_order=(max_order or 0) + 1)
-        db.add(ev)
+        created = TravelEvent(id=uuid.uuid4(), plan_id=plan.id, day_id=day.id, title=fields["title"],
+                              event_type=fields.get("event_type", "activity"), sort_order=(max_order or 0) + 1)
+        db.add(created)
         db.flush()
-        _apply_fields(db, plan, ev, {k: v for k, v in fields.items() if k != "day_id"})
+        _apply_fields(db, plan, created, {k: v for k, v in fields.items() if k != "day_id"})
         db.flush()
-        rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_event", ev.id, "create",
-                                                         None, plans_api._event_to_dict(ev))
-        row = _store(db, plan, user, device_id, op, "applied", entity_id=ev.id, resulting_revision=rev, fields=fields)
+        rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_event", created.id, "create",
+                                                         None, plans_api._event_to_dict(created))
+        row = _store(db, plan, user, device_id, op, "applied", entity_id=created.id, resulting_revision=rev,
+                     fields=fields)
         return _row_result(row, replay=False)
 
     target_id = _resolve_entity(db, plan, user, op.entity_id)
@@ -264,7 +265,8 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
 
     if op.action == "update":
         if ev is None:
-            conflict = {"fields": sorted(fields), "mine": fields, "server": None, "server_deleted": True}
+            conflict: Dict[str, Any] = {"fields": sorted(fields), "mine": fields, "server": None,
+                                        "server_deleted": True}
             row = _store(db, plan, user, device_id, op, "conflicted", "deleted_on_server", entity_id=target_id,
                          conflict=conflict, fields=fields)
             return {**_row_result(row, replay=False), "message": CODE_MESSAGES["deleted_on_server"]}
@@ -367,7 +369,8 @@ def _process_day(db: Session, plan: TravelPlan, user: User, device_id: Optional[
     day = cast(Any, _day(db, plan, target))
     if op.action == "update":
         if day is None:
-            conflict = {"fields": sorted(fields), "mine": fields, "server": None, "server_deleted": True}
+            conflict: Dict[str, Any] = {"fields": sorted(fields), "mine": fields, "server": None,
+                                        "server_deleted": True}
             row = _store(db, plan, user, device_id, op, "conflicted", "deleted_on_server", entity_id=target,
                          conflict=conflict, fields=fields)
             return {**_row_result(row, replay=False), "message": CODE_MESSAGES["deleted_on_server"]}
@@ -623,7 +626,11 @@ def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, r
                 raise HTTPException(status_code=409, detail={"code": "has_relations",
                                                              "message": CODE_MESSAGES["has_relations"]})
             rev = _delete_event(db, plan, current_user, ev)
-    r = db.query(SyncOperation).filter(SyncOperation.id == r.id).first()
+    reloaded = db.query(SyncOperation).filter(SyncOperation.id == r.id).first()
+    if reloaded is None:
+        raise HTTPException(status_code=404, detail={"code": "sync_operation_missing",
+                                                     "message": "同期の記録が見つかりません"})
+    r = reloaded
     r.status = "resolved_mine"
     r.resolved_at = _now()
     r.resulting_revision = rev

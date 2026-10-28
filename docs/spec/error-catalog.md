@@ -183,6 +183,7 @@
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
 | `stale_version` | 409 | after_reload | 配布が別の操作で改訂されています。読み直してください | api/v1/organizations.py |
 | `storage_failed` | 503 | later | ファイルの保存に失敗しました。しばらくしてから再試行してください | api/v1/memories.py |
+| `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |

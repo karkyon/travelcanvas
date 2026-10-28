@@ -300,6 +300,13 @@ def _local(dt: datetime, day: DayInfo) -> datetime:
     return dt.astimezone(zone_for(day.timezone_id))
 
 
+def _start(e: EventInfo) -> datetime:
+    """時刻のある予定の開始(_check_event_times・各判定で開始の無い予定は先に除いている)"""
+    if e.start is None:
+        raise ValueError("開始時刻の無い予定です: %s" % e.id)
+    return e.start
+
+
 def _fmt(dt: Optional[datetime], day: DayInfo) -> Optional[str]:
     if dt is None:
         return None
@@ -353,9 +360,9 @@ def _check_overlaps(timed: List[EventInfo], res: EvaluationResult) -> None:
     ordered = sorted(timed, key=lambda e: (e.start, e.sort_order))
     for i, a in enumerate(ordered):
         for b in ordered[i + 1:]:
-            if a.end is not None and b.start >= a.end:
+            if a.end is not None and _start(b) >= a.end:
                 continue
-            if a.end is not None and a.start <= b.start < a.end:
+            if a.end is not None and _start(a) <= _start(b) < a.end:
                 res.findings.append(Finding(
                     code="TIME_OVERLAP", kind="violation", severity="ERROR",
                     message=f"「{b.title}」が「{a.title}」({_fmt(a.start, a.day)}〜{_fmt(a.end, a.day)})の途中に始まります",
@@ -507,7 +514,7 @@ def _check_opening_hours(timed: List[EventInfo], snap: Snapshot, res: Evaluation
             continue
         weekly = snap.opening_hours.get(e.place_id) or []
         special = snap.special_hours.get(e.place_id) or []
-        local_start = _local(e.start, e.day).replace(tzinfo=None)
+        local_start = _local(_start(e), e.day).replace(tzinfo=None)
         dh = place_hours.day_hours(local_start.date(), weekly, special)
         if dh.source == "unknown":
             res.count("opening_hours_unknown")
@@ -865,7 +872,7 @@ def _eval_time(c: EffectiveConstraint, title: Optional[str], snap: Snapshot, res
         if e.start is None:
             t.unverified += 1
             continue
-        base = dict(entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id)
+        base: Dict[str, Any] = dict(entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id)
         times = {"start": _iso(e.start), "end": _iso(e.end)}
         if c.operator == "after":
             limit = _threshold(value, e.day)
@@ -976,6 +983,8 @@ def _eval_budget(c: EffectiveConstraint, title: Optional[str], snap: Snapshot, r
         if currency != unit:
             other_currency += 1
             continue
+        if amount is None:
+            continue
         total += float(amount)
     t.checked += 1
     if _compare(total, c.operator, float(limit)):
@@ -1058,7 +1067,7 @@ def _eval_meal_interval(c: EffectiveConstraint, title: Optional[str], snap: Snap
             t.unverified += 1
         meals = [m for m in meals if m.start is not None]
         for prev, nxt in zip(meals, meals[1:]):
-            gap = _minutes(nxt.start - prev.start)
+            gap = _minutes(_start(nxt) - _start(prev))
             t.checked += 1
             if _compare(gap, c.operator, limit_minutes):
                 t.violations += 1

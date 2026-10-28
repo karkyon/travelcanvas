@@ -19,7 +19,7 @@
 """
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Set
+from typing import AbstractSet, Any, Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
@@ -82,7 +82,7 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.isoformat() if dt else None
 
 
-def member_names(db: Session, member_ids: Set[uuid.UUID]) -> Dict[uuid.UUID, str]:
+def member_names(db: Session, member_ids: AbstractSet[Any]) -> Dict[Any, str]:
     rows = db.query(User.id, User.username).filter(User.id.in_(member_ids)).all() if member_ids else []
     return {uid: (name or "ゲスト") for uid, name in rows}
 
@@ -108,7 +108,7 @@ def compute(db: Session, plan: TravelPlan, viewer: User, now: Optional[datetime]
             "id": str(t.id),
             "status": t.status,
             "assignee_user_id": str(t.assignee_user_id) if valid else None,
-            "assignee_name": names.get(t.assignee_user_id) if valid else None,
+            "assignee_name": names.get(t.assignee_user_id) if valid and t.assignee_user_id is not None else None,
             "due_at": _iso(t.due_at),
             "revision": t.revision,
         }

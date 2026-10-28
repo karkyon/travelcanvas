@@ -332,9 +332,9 @@ def create_request(plan_id: str, payload: CorrectionRequestCreate, request: Requ
                                 crypto.plan_subject(plan.id)),
     )
     db.add(c)
-    notify.deliver(db, plan, [cast(uuid.UUID, plan.user_id)], "correction_request", "情報の訂正の申し出",
+    notify.deliver(db, plan, [plan.user_id], "correction_request", "情報の訂正の申し出",
                    f"「{plan.title}」の情報について、参加者から訂正の申し出が届きました。共有の画面で確かめてください。",
-                   target_type="plan", target_id=cast(uuid.UUID, plan.id), direct_ids=[cast(uuid.UUID, plan.user_id)])
+                   target_type="plan", target_id=plan.id, direct_ids=[plan.user_id])
     db.commit()
     db.refresh(c)
     _audit(request, current_user, "data_correction_requested", c)
@@ -372,9 +372,9 @@ def resolve_request(plan_id: str, request_id: str, payload: CorrectionResolve, r
     if payload.note and payload.note.strip():
         c.resolution_note_ciphertext = _enc({"note": payload.note.strip()}, crypto.plan_subject(plan.id))
     label = "対応しました" if payload.status == "resolved" else "見送りました"
-    notify.deliver(db, plan, [cast(uuid.UUID, c.user_id)], "correction_request", f"訂正の申し出: 所有者が{label}",
+    notify.deliver(db, plan, [c.user_id], "correction_request", f"訂正の申し出: 所有者が{label}",
                    f"「{plan.title}」への訂正の申し出に、所有者が{label}。データとプライバシーの画面で確かめられます。",
-                   target_type="plan", target_id=cast(uuid.UUID, plan.id), direct_ids=[cast(uuid.UUID, c.user_id)])
+                   target_type="plan", target_id=plan.id, direct_ids=[c.user_id])
     db.commit()
     db.refresh(c)
     _audit(request, current_user, "data_correction_request_resolved", c, {"status": payload.status})

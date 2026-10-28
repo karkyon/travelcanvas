@@ -177,7 +177,7 @@ class Executor:
     def containers(self) -> Optional[Dict[str, str]]:
         return None
 
-    def json_from(self, proc: subprocess.CompletedProcess) -> Dict[str, object]:
+    def json_from(self, proc: subprocess.CompletedProcess) -> Dict[str, Any]:
         lines = [
             ln for ln in (proc.stdout or b"").decode("utf-8", "replace").splitlines() if ln.strip().startswith("{")
         ]
@@ -219,7 +219,7 @@ class ComposeExecutor(Executor):
             args += ["-e", "OPS_DATABASE_URL"]
         return args + [service]
 
-    def run(self, argv, *, env=None, **kw):  # type: ignore[override]
+    def run(self, argv, *, env=None, **kw):
         full = dict(env or {})
         owner = owner_database_url()
         if owner and "OPS_DATABASE_URL" in list(argv):
@@ -308,7 +308,7 @@ class ComposeExecutor(Executor):
         if proc.returncode != 0:
             return {"docker compose": "unavailable"}
         text = (proc.stdout or b"").decode("utf-8", "replace").strip()
-        items: List[Dict[str, object]] = []
+        items: List[Dict[str, Any]] = []
         if text.startswith("["):
             items = json.loads(text)
         else:
@@ -457,7 +457,7 @@ def git_commit() -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-def facts(ex: Executor, with_files: bool = True) -> Dict[str, object]:
+def facts(ex: Executor, with_files: bool = True) -> Dict[str, Any]:
     args = ["-m", "app.ops.storage_facts"] + ([] if with_files else ["--no-files"])
     return ex.json_from(ex.backend_python(args))
 
@@ -476,16 +476,16 @@ def live_database(ex: Executor) -> str:
     return name
 
 
-def inventory(ex: Executor, database: str, storage_keys: bool = False) -> Dict[str, object]:
+def inventory(ex: Executor, database: str, storage_keys: bool = False) -> Dict[str, Any]:
     args = ["-m", "app.ops.db_inventory", "--database", database] + (["--storage-keys"] if storage_keys else [])
     return ex.json_from(ex.backend_python(args))
 
 
-def archive_listing(path: str, extract_to: Optional[str] = None) -> Dict[str, Dict[str, object]]:
+def archive_listing(path: str, extract_to: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
     """tar.gz の中のファイル一覧(相対パス → size/sha256)。extract_to があれば安全なものだけ展開する。"""
     import hashlib
 
-    out: Dict[str, Dict[str, object]] = {}
+    out: Dict[str, Dict[str, Any]] = {}
     with tarfile.open(path, "r:gz") as tar:
         for member in tar:
             if not member.isfile():
@@ -522,11 +522,11 @@ def archive_listing(path: str, extract_to: Optional[str] = None) -> Dict[str, Di
 # ---------------------------------------------------------------------------
 
 
-def file_info(path: Path) -> Dict[str, object]:
+def file_info(path: Path) -> Dict[str, Any]:
     return {"name": path.name, "size": path.stat().st_size, "sha256": opslib.sha256_file(str(path))}
 
 
-def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, object]:
+def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, Any]:
     started = time.time()
     bid = opslib.new_backup_id(now_utc())
     live = live_database(ex)
@@ -547,7 +547,7 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
             raise OpsError("ダンプの目次が空です")
         ex.uploads_archive(str(source_facts["uploads_root"]), str(partial[1]))
         # [Gate G3] SEC-F5 データ鍵は DB のダンプに入れず、別のファイルへ写す(破棄した鍵は後で全ての世代から消す)
-        has_keys = "data_keys" in (before.get("tables") or {})  # type: ignore[operator]
+        has_keys = "data_keys" in (before.get("tables") or {})
         if has_keys:
             ex.backend_python(["-m", "app.ops.key_escrow", "export"], stdout_path=str(partial[2]))
         archived = archive_listing(str(partial[1]))
@@ -570,15 +570,15 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
             backup_id=bid,
             created_at=now_utc(),
             git_commit=git_commit(),
-            alembic_revision=before.get("alembic_revision"),  # type: ignore[arg-type]
+            alembic_revision=before.get("alembic_revision"),
             source_database=live,
             files=dict({"database": file_info(db_path), "uploads": file_info(up_path)},
                        **({"keys": file_info(keys_path)} if has_keys else {})),
-            table_counts=before.get("tables") or {},  # type: ignore[arg-type]
+            table_counts=before.get("tables") or {},
             upload_files=archived,
-            key_fingerprints=source_facts.get("key_fingerprints") or {},  # type: ignore[arg-type]
+            key_fingerprints=source_facts.get("key_fingerprints") or {},
         )
-        manifest["table_counts_after"] = dict(sorted((after.get("tables") or {}).items()))  # type: ignore[union-attr]
+        manifest["table_counts_after"] = dict(sorted((after.get("tables") or {}).items()))
         manifest["documents_prefix"] = source_facts.get("documents_prefix")
         manifest["verification"] = {
             "dump_entries": entries,
@@ -600,11 +600,11 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
         "backup_id": bid,
         "source_database": live,
         "alembic_revision": manifest["alembic_revision"],
-        "database_size": manifest["files"]["database"]["size"],  # type: ignore[index]
-        "database_sha256": manifest["files"]["database"]["sha256"],  # type: ignore[index]
-        "uploads_size": manifest["files"]["uploads"]["size"],  # type: ignore[index]
+        "database_size": manifest["files"]["database"]["size"],
+        "database_sha256": manifest["files"]["database"]["sha256"],
+        "uploads_size": manifest["files"]["uploads"]["size"],
         "upload_count": len(archived),
-        "tables": len(before.get("tables") or {}),  # type: ignore[arg-type]
+        "tables": len(before.get("tables") or {}),
         "verified": True,
         "duration_seconds": round(time.time() - started, 1),
     }
@@ -620,7 +620,7 @@ def cmd_backup(ex: Executor, dest: Path, prune: bool = False) -> Dict[str, objec
     return result
 
 
-def cmd_purge_escrow(ex: Executor, dest: Path) -> Dict[str, object]:
+def cmd_purge_escrow(ex: Executor, dest: Path) -> Dict[str, Any]:
     """[Gate G3] SEC-F5 破棄したデータ鍵を、全ての世代のバックアップの鍵の写しから消す(目録のハッシュも直す)。"""
     proc = ex.backend_python(["-m", "app.ops.key_escrow", "destroyed-ids"], check=False)
     if proc.returncode != 0:
@@ -633,7 +633,7 @@ def cmd_purge_escrow(ex: Executor, dest: Path) -> Dict[str, object]:
         if not kp.is_file() or not destroyed:
             continue
         lines, removed = opslib.purge_escrow_lines(
-            kp.read_text(encoding="utf-8").splitlines(), destroyed)  # type: ignore[arg-type]
+            kp.read_text(encoding="utf-8").splitlines(), destroyed)
         if not removed:
             continue
         tmp = kp.with_name("." + kp.name + ".partial")
@@ -655,13 +655,13 @@ def cmd_purge_escrow(ex: Executor, dest: Path) -> Dict[str, object]:
                 tmp.unlink()
         removed_total += removed
         rewritten += 1
-    result: Dict[str, object] = {"ok": True, "destroyed_keys": len(destroyed), "removed_from_backups": removed_total,
-                                 "backups_rewritten": rewritten}
+    result: Dict[str, Any] = {"ok": True, "destroyed_keys": len(destroyed), "removed_from_backups": removed_total,
+                              "backups_rewritten": rewritten}
     log("鍵の写しの整理: 破棄した鍵 %d、写しから消した数 %d(%d 世代)" % (len(destroyed), removed_total, rewritten))
     return result
 
 
-def load_manifest(dest: Path, bid: str) -> Dict[str, object]:
+def load_manifest(dest: Path, bid: str) -> Dict[str, Any]:
     path = dest / opslib.backup_file_name(bid, "manifest")
     if not path.is_file():
         raise OpsError("バックアップ %s の目録がありません" % bid)
@@ -670,7 +670,7 @@ def load_manifest(dest: Path, bid: str) -> Dict[str, object]:
 
 def cmd_verify_one(dest: Path, bid: str) -> List[str]:
     manifest = load_manifest(dest, bid)
-    actual: Dict[str, Dict[str, object]] = {}
+    actual: Dict[str, Dict[str, Any]] = {}
     for role in ("database", "uploads", "keys"):
         path = dest / opslib.backup_file_name(bid, role)
         if path.is_file():
@@ -712,7 +712,7 @@ def cmd_prune(dest: Path, dry_run: bool) -> List[str]:
 
 def cmd_restore(
     ex: Executor, dest: Path, bid: str, target: str, *, files_to: Optional[str] = None
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     live = live_database(ex)
     opslib.check_drill_database_name(target, live)
     problems = cmd_verify_one(dest, bid)
@@ -730,9 +730,9 @@ def cmd_restore(
     restored = inventory(ex, target, storage_keys=True)
     counts = opslib.compare_table_counts(
         manifest.get("table_counts") or {},
-        manifest.get("table_counts_after") or manifest.get("table_counts") or {},  # type: ignore[arg-type]
+        manifest.get("table_counts_after") or manifest.get("table_counts") or {},
         restored.get("tables") or {},
-    )  # type: ignore[arg-type]
+    )
     tmp_ctx = tempfile.TemporaryDirectory(prefix="tc-restore-files-")
     try:
         extract_dir = files_to or tmp_ctx.name
@@ -742,10 +742,10 @@ def cmd_restore(
         listing = archive_listing(str(dest / opslib.backup_file_name(bid, "uploads")), extract_to=extract_dir)
     finally:
         tmp_ctx.cleanup()
-    files_cmp = opslib.compare_file_listings(manifest.get("upload_files") or {}, listing)  # type: ignore[arg-type]
+    files_cmp = opslib.compare_file_listings(manifest.get("upload_files") or {}, listing)
     orphans = opslib.documents_without_files(
         restored.get("storage_keys") or [],
-        listing.keys(),  # type: ignore[arg-type]
+        listing.keys(),
         str(manifest.get("documents_prefix") or ""),
     )
     files_cmp["documents_without_files"] = len(orphans)
@@ -754,7 +754,7 @@ def cmd_restore(
     )
     current_fp = facts(ex, with_files=False).get("key_fingerprints") or {}
     backup_fp = manifest.get("key_fingerprints") or {}
-    mismatches = opslib.fingerprint_mismatches(backup_fp, current_fp)  # type: ignore[arg-type]
+    mismatches = opslib.fingerprint_mismatches(backup_fp, current_fp)
     alembic_match = restored.get("alembic_revision") == manifest.get("alembic_revision")
     ok = bool(counts["ok"] and files_cmp["ok"] and decrypt.get("ok") and alembic_match and not mismatches)
     result = {
@@ -821,13 +821,13 @@ def migration_graph_at(rev: str) -> Dict[str, Tuple[str, ...]]:
     return graph
 
 
-def cmd_rollback_plan(target_rev: str) -> Dict[str, object]:
+def cmd_rollback_plan(target_rev: str) -> Dict[str, Any]:
     plan = opslib.rollback_plan(migration_graph_from_tree(), migration_graph_at(target_rev))
     plan["target"] = target_rev
     return plan
 
 
-def migration_roundtrip(ex: Executor, target: str) -> Dict[str, object]:
+def migration_roundtrip(ex: Executor, target: str) -> Dict[str, Any]:
     """復元先 DB で、最新の migration を1つ戻して再適用する(実データ上で downgrade が通ることの確認)。"""
     before = inventory(ex, target)
     start_rev = before.get("alembic_revision")
@@ -840,7 +840,7 @@ def migration_roundtrip(ex: Executor, target: str) -> Dict[str, object]:
         and mid != start_rev
         and after.get("alembic_revision") == start_rev
         and len(after.get("tables") or {}) == len(before.get("tables") or {})
-    )  # type: ignore[arg-type]
+    )
     return {
         "ok": ok,
         "from": start_rev,
@@ -848,7 +848,7 @@ def migration_roundtrip(ex: Executor, target: str) -> Dict[str, object]:
         "upgraded_to": after.get("alembic_revision"),
         "tables_before": len(before.get("tables") or {}),
         "tables_after": len(after.get("tables") or {}),
-    }  # type: ignore[arg-type]
+    }
 
 
 def cmd_drill(
@@ -860,17 +860,17 @@ def cmd_drill(
     target: str,
     report: Optional[str],
     keep_db: bool,
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     started_at = now_utc()
     t0 = time.time()
-    result: Dict[str, object] = {
+    result: Dict[str, Any] = {
         "drill_id": opslib.new_backup_id(started_at).replace("tc-", "drill-"),
         "started_at": started_at.isoformat().replace("+00:00", "Z"),
         "environment": "%s(%s)" % (socket.gethostname(), ex.mode),
         "git_commit": git_commit(),
         "errors": [],
     }
-    errors: List[str] = result["errors"]  # type: ignore[assignment]
+    errors: List[str] = result["errors"]
     try:
         if backup_id:
             bid = backup_id
@@ -885,9 +885,9 @@ def cmd_drill(
             "source_database": m.get("source_database"),
             "alembic_revision": m.get("alembic_revision"),
             "database_size": files.get("database", {}).get("size"),
-            "database_sha256": files.get("database", {}).get("sha256"),  # type: ignore[union-attr]
+            "database_sha256": files.get("database", {}).get("sha256"),
             "uploads_size": files.get("uploads", {}).get("size"),
-            "upload_count": len(m.get("upload_files") or {}),  # type: ignore[union-attr,arg-type]
+            "upload_count": len(m.get("upload_files") or {}),
             "verified": not cmd_verify_one(dest, bid),
         }
         restore = cmd_restore(ex, dest, bid, target)
@@ -896,7 +896,7 @@ def cmd_drill(
             errors.append("復元の確認に失敗しました")
         try:
             result["migration_roundtrip"] = migration_roundtrip(ex, target)
-            if not result["migration_roundtrip"]["ok"]:  # type: ignore[index]
+            if not result["migration_roundtrip"]["ok"]:
                 errors.append("migration の往復(downgrade→upgrade)に失敗しました")
         except OpsError as exc:
             result["migration_roundtrip"] = {"ok": False}
@@ -924,11 +924,11 @@ def cmd_drill(
             "ok": not [
                 f
                 for f in mon["findings"]
-                if f["code"] in ("backend_down", "backend_not_ready", "metrics_unavailable")  # type: ignore[index]
+                if f["code"] in ("backend_down", "backend_not_ready", "metrics_unavailable")
             ],
             "findings": mon["findings"],
         }
-        if not result["monitor"]["ok"]:  # type: ignore[index]
+        if not result["monitor"]["ok"]:
             errors.append("監視(/health・/ready・/metrics)の確認に失敗しました")
     except OpsError as exc:
         errors.append(str(exc))
@@ -970,12 +970,12 @@ def http_get(url: str, token: Optional[str] = None, timeout: float = 5.0) -> Tup
         return 0, ""
 
 
-def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -> Dict[str, object]:
+def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -> Dict[str, Any]:
     base = (
         os.environ.get("OPS_BACKEND_URL") or read_dotenv_value("OPS_BACKEND_URL") or "http://127.0.0.1:8001"
     ).rstrip("/")
     token = read_dotenv_value("METRICS_TOKEN")
-    snap: Dict[str, object] = {"at": now_utc().isoformat()}
+    snap: Dict[str, Any] = {"at": now_utc().isoformat()}
     code, _ = http_get(base + "/health")
     snap["health_ok"] = code == 200
     code, body = http_get(base + "/ready")
@@ -1042,15 +1042,15 @@ def cmd_monitor(ex: Executor, dest: Path, *, quiet: bool, record: bool = True) -
     except Exception:  # noqa: BLE001  監視は止めない
         pass
     state_path = state_dir() / "monitor-state.json"
-    prev_state: Dict[str, object] = {}
+    prev_state: Dict[str, Any] = {}
     if state_path.is_file():
         try:
             prev_state = json.loads(state_path.read_text())
         except ValueError:
             prev_state = {}
-    findings = opslib.evaluate_monitor(snap, prev_state.get("snapshot"))  # type: ignore[arg-type]
+    findings = opslib.evaluate_monitor(snap, prev_state.get("snapshot"))
     findings += extra
-    trans = opslib.alert_transitions(prev_state.get("active") or [], findings)  # type: ignore[arg-type]
+    trans = opslib.alert_transitions(prev_state.get("active") or [], findings)
     if record:
         write_json_atomic(state_path, {"snapshot": snap, "active": trans["active"]})
         notify(trans, findings)
@@ -1094,7 +1094,7 @@ def read_secret_lines(path: Optional[str]) -> List[str]:
 
 
 def cmd_log_scan(ex: Executor, *, since: str, services: Sequence[str], secrets_file: Optional[str] = None,
-                 log_file: Optional[str] = None, record: bool = True) -> Dict[str, object]:
+                 log_file: Optional[str] = None, record: bool = True) -> Dict[str, Any]:
     """[Gate O2] backend などのコンテナのログに、個人情報・秘密が出ていないかを検査する(B-009)。
 
     見つけた値そのものは表示・保存しない(種類・行番号・伏せた抜粋だけ)。"""
@@ -1307,7 +1307,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         bid,
                         "OK" if not problems else "NG",
                         m.get("alembic_revision"),
-                        len(m.get("upload_files") or {}),  # type: ignore[arg-type]
+                        len(m.get("upload_files") or {}),
                         "" if not problems else " / ".join(problems),
                     )
                 )
@@ -1328,7 +1328,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             bid = latest_backup(dest) if args.backup == "latest" else args.backup
             res = cmd_restore(ex, dest, bid, args.target_db, files_to=args.files_to)
             summary = {k: v for k, v in res.items() if k != "counts"}
-            summary["counts_ok"] = res["counts"]["ok"]  # type: ignore[index]
+            summary["counts_ok"] = res["counts"]["ok"]
             print(opslib.dumps_json(summary))
             return EXIT_OK if res["ok"] else EXIT_ERROR
         if args.cmd == "drill":
@@ -1344,7 +1344,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return EXIT_OK if res["ok"] else EXIT_ERROR
         if args.cmd == "monitor":
             mon = cmd_monitor(ex, dest, quiet=args.quiet)
-            levels = set(f["level"] for f in mon["findings"])  # type: ignore[index]
+            levels = set(f["level"] for f in mon["findings"])
             return EXIT_CRIT if "critical" in levels else EXIT_WARN if levels else EXIT_OK
         if args.cmd == "purge":
             return cmd_purge(ex)

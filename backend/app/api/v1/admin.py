@@ -13,7 +13,7 @@ User/TravelPlan/OptimizationResultテーブルから実際に取得できる情�
 import math
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_
@@ -204,14 +204,14 @@ async def list_users(
     elif status == "unverified":
         query = query.filter(User.is_verified == False)  # noqa: E712
 
-    sort_column_map = {"created_at": User.created_at, "username": User.username, "email": User.email}
+    sort_column_map: Dict[str, Any] = {"created_at": User.created_at, "username": User.username, "email": User.email}
     sort_column = sort_column_map.get(sort_by, User.created_at)
     query = query.order_by(sort_column.asc() if sort_order == "asc" else sort_column.desc())
 
     total_count = query.count()
     users = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    plan_counts = {}
+    plan_counts: Dict[Any, int] = {}
     if users:
         rows = (
             db.query(TravelPlan.user_id, func.count(TravelPlan.id))
@@ -219,7 +219,7 @@ async def list_users(
             .group_by(TravelPlan.user_id)
             .all()
         )
-        plan_counts = dict(rows)
+        plan_counts = {uid: int(n) for uid, n in rows}
 
     total_pages = math.ceil(total_count / page_size) if total_count else 0
     _audit_admin(request, admin, "admin_users_listed",

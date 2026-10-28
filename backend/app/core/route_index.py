@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
+_iter_route_contexts: Optional[Any]
 try:  # FastAPI 0.13x 以降
     from fastapi.routing import iter_route_contexts as _iter_route_contexts
 except ImportError:  # pragma: no cover - 古い FastAPI(app.routes が展開済み)

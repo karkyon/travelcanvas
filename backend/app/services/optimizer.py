@@ -18,6 +18,7 @@ import hashlib
 import itertools
 from dataclasses import dataclass, replace
 from datetime import datetime, time as time_cls, timezone
+import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.services import feasibility
@@ -78,6 +79,8 @@ def classify(items: Sequence[Item]) -> Tuple[List[str], Dict[str, str], List[str
 
 
 def _dist(a: Item, b: Item) -> float:
+    if a.latitude is None or a.longitude is None or b.latitude is None or b.longitude is None:
+        return math.inf  # 位置の無い予定は並べ替えの対象外(呼び出し元で除いている)
     return haversine_km(a.latitude, a.longitude, b.latitude, b.longitude)
 
 
@@ -145,8 +148,8 @@ def assign_times(items: Sequence[Item], movable: Sequence[str], order: Sequence[
     by_id = {i.id: i for i in items}
     out = {i.id: i.local_start_time for i in items}
     mset = set(movable)
-    slots = sorted((by_id[m].local_start_time for m in movable if parse_local_time(by_id[m].local_start_time)),
-                   key=lambda t: parse_local_time(t))
+    slot_times = [(t, parse_local_time(t)) for t in (by_id[m].local_start_time for m in movable)]
+    slots = [t for t, parsed in sorted(((t, p) for t, p in slot_times if p is not None), key=lambda x: x[1])]
     if not slots:
         return out
     new_seq = [i for i in order if i in mset]

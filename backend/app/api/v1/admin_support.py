@@ -12,6 +12,7 @@
 """
 import uuid
 from datetime import datetime, timezone
+from typing import Dict
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, text
@@ -89,8 +90,9 @@ def admin_operations(request: Request, response: Response, admin: User = Depends
     now = datetime.now(timezone.utc)
     active_links = ((PlanShareLink.revoked_at.is_(None))
                     & ((PlanShareLink.expires_at.is_(None)) | (PlanShareLink.expires_at > now)))
-    hooks = dict(db.query(OrgWebhookDelivery.status, func.count(OrgWebhookDelivery.id))
-                 .group_by(OrgWebhookDelivery.status).all())
+    hook_rows = db.query(OrgWebhookDelivery.status, func.count(OrgWebhookDelivery.id)).group_by(
+        OrgWebhookDelivery.status).all()
+    hooks: Dict[str, int] = {str(st): int(n) for st, n in hook_rows}
     docs_live = Document.deleted_at.is_(None)
     out = {
         "share_links": {

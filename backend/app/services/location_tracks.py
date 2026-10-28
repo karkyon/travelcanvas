@@ -134,7 +134,11 @@ def distance_m(points: List[Dict[str, Any]]) -> float:
 
 def split_range(points: List[Dict[str, Any]], start: datetime, end: datetime) -> Tuple[List[Dict[str, Any]], int]:
     """[start, end] の点を除いた残りと、除いた件数。"""
-    keep = [p for p in points if not (start <= _parse_time(p["t"]) <= end)]
+    def in_range(p: Dict[str, Any]) -> bool:
+        t = _parse_time(p.get("t"))
+        return t is not None and start <= t <= end
+
+    keep = [p for p in points if not in_range(p)]
     return keep, len(points) - len(keep)
 
 
@@ -182,7 +186,8 @@ def clean_cells(raw: List[Dict[str, Any]], window_start: datetime,
         if first is None or last is None or last < first:
             reject("invalid")
             continue
-        if not all(isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in (dwell, samples)):
+        if not (isinstance(dwell, int) and not isinstance(dwell, bool) and dwell >= 0
+                and isinstance(samples, int) and not isinstance(samples, bool) and samples >= 0):
             reject("invalid")
             continue
         if first < window_start - START_TOLERANCE or last > window_end:

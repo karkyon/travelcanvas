@@ -26,8 +26,9 @@ const renderDashboard = () =>
     </MemoryRouter>
   );
 
+// トークンも入れる(トークンの無い会員だと authStore の初期化が /auth/refresh を本当に呼ぶ)
 const login = () => useAuthStore.setState({
-  isAuthenticated: true, isGuest: false,
+  isAuthenticated: true, isGuest: false, token: 'test-access-token', isInitialized: true,
   user: { id: 'u-1', username: 'alice', email: 'a@example.com' } as unknown as User,
 });
 

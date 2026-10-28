@@ -5,6 +5,7 @@ import { expectNoAxeViolations } from './support/axe';
 
 /**
  * [Gate E1] FR-021/044/045 共有リンク・FR-047 旅程の複製の browser E2E。
+ * [Gate G10-Q] FR-044 Guest Travel View: 未ログインの閲覧(合言葉・失効)はこの spec が証拠。
  *
  * 1. 会員が合言葉つきの共有リンクを発行する。QR は端末内で作り、共有 URL を外部へ送らない。
  *    ログインしていない別のブラウザで開くと合言葉の入力を求め(以前は /login へ飛ばされた)、

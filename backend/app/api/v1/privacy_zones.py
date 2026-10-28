@@ -6,7 +6,7 @@
 監査には件数と半径だけを残す(座標・名前は残さない)。
 """
 import uuid
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -60,7 +60,7 @@ def create_zone(request: Request, response: Response, payload: Optional[dict] = 
     if db.query(PrivacyZone).filter(PrivacyZone.user_id == current_user.id).count() >= lp.MAX_ZONES:
         raise _bad("too_many_privacy_zones", f"守る範囲は{lp.MAX_ZONES}件までです", 409)
     try:
-        sealed = lp.seal_center(cast(uuid.UUID, current_user.id), lat, lng)
+        sealed = lp.seal_center(current_user.id, lat, lng)
     except EncryptionNotConfigured:
         raise _bad("encryption_not_configured", "位置の暗号化が設定されていません(管理者に連絡してください)", 503)
     z = PrivacyZone(id=uuid.uuid4(), user_id=current_user.id, label=label, center_ciphertext=sealed, radius_m=radius)

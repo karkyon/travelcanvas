@@ -306,7 +306,7 @@ def list_members(
         for uid in members
     ]
     rank = {"owner": 0, "editor": 1, "viewer": 2}
-    out.sort(key=lambda m: (rank.get(m["role"], 3), m["name"]))
+    out.sort(key=lambda m: (rank.get(str(m["role"]), 3), str(m["name"])))
     return out
 
 
@@ -357,7 +357,7 @@ def _packing_response(item: PackingItem, viewer: User, members: Set[uuid.UUID],
         "source": item.source,
         "suggestion_key": item.suggestion_key,
         "assignee_user_id": str(assignee) if is_member else None,
-        "assignee_name": names.get(assignee) if is_member else None,
+        "assignee_name": names.get(assignee) if is_member and assignee is not None else None,
         "assignee_missing": bool(assignee) and not is_member,
         "revision": item.revision,
         "created_at": _iso(item.created_at),
@@ -609,7 +609,7 @@ def _task_response(db: Session, plan: TravelPlan, t: PreparationTask, viewer: Us
         "completed_at": _iso(t.completed_at),
         "completed_by_name": names.get(t.completed_by_user_id) if t.completed_by_user_id else None,
         "assignee_user_id": str(t.assignee_user_id) if is_member else None,
-        "assignee_name": names.get(t.assignee_user_id) if is_member else None,
+        "assignee_name": names.get(t.assignee_user_id) if is_member and t.assignee_user_id is not None else None,
         "assignee_missing": bool(t.assignee_user_id) and not is_member,
         "related_type": t.related_type,
         "related_id": str(t.related_id) if t.related_id else None,

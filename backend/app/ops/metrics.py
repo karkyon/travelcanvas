@@ -11,7 +11,7 @@ from __future__ import annotations
 import ipaddress
 import threading
 import time
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 LATENCY_BUCKETS: Tuple[float, ...] = (0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0)
 UNMATCHED_ROUTE = "<unmatched>"
@@ -173,7 +173,7 @@ def _fmt(v: float) -> str:
 registry = MetricsRegistry()
 
 
-def route_template(scope: dict) -> str:
+def route_template(scope: Mapping[str, Any]) -> str:
     """要求が当たったルートの型。当たらなかったら ``<unmatched>``。
 
     [Gate S1] 新しい FastAPI では scope["route"].path が取り込み元のルーター内のパス(/api/v1 などの前置きを

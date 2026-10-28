@@ -315,6 +315,20 @@ def test_reservation_changed_in_plan_blocks_and_undo_refuses_after_relink(auth_c
     assert undo.status_code == 409, undo.text
 
 
+def _json_values(node):
+    """JSON の中の値(dict の値・list の要素)をすべて集める。"""
+    out = []
+    if isinstance(node, dict):
+        for v in node.values():
+            out.extend(_json_values(v))
+    elif isinstance(node, list):
+        for v in node:
+            out.extend(_json_values(v))
+    else:
+        out.append(node)
+    return out
+
+
 def test_member_policy_hides_reservation_and_cost_changes(auth_client, make_user, db_session):
     client, owner = auth_client
     p, base, d1, ev, res, seg = _setup(client)
@@ -335,7 +349,9 @@ def test_member_policy_hides_reservation_and_cost_changes(auth_client, make_user
         assert got.status_code == 200, got.text
         body = got.json()
         assert body["resources"]["reservations_hidden"] is True and body["resources"]["reservations"] == []
-        assert body["resources"]["base_reservations"] == [] and "酒蔵見学" not in got.text and "900" not in got.text
+        assert body["resources"]["base_reservations"] == [] and "酒蔵見学" not in got.text
+        # 費用 900 が値として残っていない(文字列 "900" の検索は、乱数の ID・時刻に含まれると誤って落ちる)
+        assert not {str(v) for v in _json_values(body)} & {"900", "900.0", "900.00"}
         assert body["resource_summary"]["reservations_cancel_planned"] == 0
         # 隠した予約の変更を消す・費用を変えることはできない
         cur = body["revision"]

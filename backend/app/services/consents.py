@@ -7,7 +7,7 @@
   (ADR-account-deletion.md §4)。[Gate P13] location は位置の軌跡(FR-038)で使い、撤回すると記録中の軌跡を止める。
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.models.models import User
 
@@ -40,12 +40,13 @@ def view(user: User) -> Dict[str, Any]:
     stored = _stored(user)
     out = []
     for p in PURPOSES:
-        entry = stored.get(p["purpose"]) if isinstance(stored.get(p["purpose"]), dict) else {}
+        found = stored.get(p["purpose"])
+        entry: Dict[str, Any] = found if isinstance(found, dict) else {}
         out.append({**p, "granted": entry.get("granted") is True, "updated_at": entry.get("updated_at")})
     return {"purposes": out}
 
 
-def update(user: User, changes: Dict[str, bool], now: datetime = None) -> List[str]:
+def update(user: User, changes: Dict[str, bool], now: Optional[datetime] = None) -> List[str]:
     """変更された目的の一覧を返す。呼出側でcommitする。"""
     now = now or datetime.now(timezone.utc)
     stored = dict(_stored(user))

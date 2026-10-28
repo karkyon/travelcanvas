@@ -108,11 +108,11 @@ def _purge_memory_files(db: Session, plan_id: uuid.UUID) -> bool:
 
 
 def _row_counts(db: Session, plan_id: uuid.UUID) -> Dict[str, int]:
-    counts = {}
+    counts: Dict[str, int] = {}
     for table in ("travel_days", "travel_events", "reservations", "documents", "travel_segments", "route_options",
                   "memories"):
         sql = text(f"SELECT count(*) FROM {table} WHERE plan_id = :p")
-        counts[table] = int(db.execute(sql, {"p": plan_id}).scalar())
+        counts[table] = int(db.execute(sql, {"p": plan_id}).scalar() or 0)
     return counts
 
 

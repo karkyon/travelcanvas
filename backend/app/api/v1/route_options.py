@@ -13,7 +13,7 @@ CRUD、および候補をTravelSegment(FR-014、Gate M1)として採用する
 import uuid
 from datetime import datetime, timezone as dt_timezone
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.encoders import jsonable_encoder
@@ -643,7 +643,7 @@ def adopt_route_option(
     )
 
     option_before = _option_to_dict(option)
-    changes = []
+    changes: List[tuple] = []
 
     fields = {
         "from_event_id": option.from_event_id,
@@ -658,8 +658,9 @@ def adopt_route_option(
 
     if existing_segment:
         segment_before = _segment_to_dict(existing_segment)
-        existing_segment.distance_km = fields["distance_km"] or existing_segment.distance_km
-        existing_segment.duration_minutes = fields["duration_minutes"] or existing_segment.duration_minutes
+        existing_segment.distance_km = cast(Optional[float], fields["distance_km"]) or existing_segment.distance_km
+        existing_segment.duration_minutes = (cast(Optional[int], fields["duration_minutes"])
+                                             or existing_segment.duration_minutes)
         existing_segment.cost = option.total_cost
         existing_segment.currency = option.currency
         existing_segment.transfer_count = option.transfer_count

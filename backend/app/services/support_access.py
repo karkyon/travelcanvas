@@ -141,9 +141,9 @@ def _plan_projection(db: Session, plan: TravelPlan) -> Dict[str, Any]:
         else None,
     } for r in db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None))
        .order_by(Reservation.start_at).all()]
-    docs = dict(db.query(Document.classification, func.count(Document.id))
-                .filter(Document.plan_id == plan.id, Document.deleted_at.is_(None))
-                .group_by(Document.classification).all())
+    docs: Dict[str, int] = {str(k): int(n) for k, n in db.query(Document.classification, func.count(Document.id))
+                            .filter(Document.plan_id == plan.id, Document.deleted_at.is_(None))
+                            .group_by(Document.classification).all()}
     members = db.query(func.count(PlanCollaborator.id)).filter(PlanCollaborator.plan_id == plan.id,
                                                                PlanCollaborator.status == "accepted").scalar()
     return {

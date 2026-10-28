@@ -25,6 +25,7 @@ JSON blobに日程・イベントを丸ごと保持しており、フロント�
 import uuid
 from datetime import datetime, date as date_cls, timezone as dt_timezone
 from decimal import Decimal
+import math
 from typing import Any, Dict, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
@@ -488,7 +489,7 @@ def _today_event_responses(db: Session, timed_events, hidden=member_policy.EMPTY
         return {}
     event_ids = [t.event.id for t in timed_events]
 
-    reservations = {}
+    reservations: Dict[Any, Reservation] = {}
     for r in db.query(Reservation).filter(Reservation.event_id.in_(event_ids)).order_by(Reservation.created_at).all():
         reservations.setdefault(r.event_id, r)
     ticketed = set()
@@ -501,18 +502,18 @@ def _today_event_responses(db: Session, timed_events, hidden=member_policy.EMPTY
         )
         ticketed = {row[0] for row in rows}
 
-    segments = {}
-    for seg in (
+    segments: Dict[Any, TravelSegment] = {}
+    for seg_row in (
         db.query(TravelSegment)
         .filter(TravelSegment.to_event_id.in_(event_ids), TravelSegment.status != "cancelled")
         .order_by(TravelSegment.created_at)
         .all()
     ):
-        current = segments.get(seg.to_event_id)
+        current = segments.get(seg_row.to_event_id)
         # 採用済み経路(route_option_id)を持つ区間を優先する
-        if current is None or (current.route_option_id is None and seg.route_option_id is not None):
-            segments[seg.to_event_id] = seg
-    legs_by_option = {}
+        if current is None or (current.route_option_id is None and seg_row.route_option_id is not None):
+            segments[seg_row.to_event_id] = seg_row
+    legs_by_option: Dict[Any, List[RouteLeg]] = {}
     option_ids = [s.route_option_id for s in segments.values() if s.route_option_id is not None]
     if option_ids:
         for leg in (
@@ -1579,6 +1580,13 @@ class OptimizationProposalResponse(BaseModel):
     has_improvement: bool = False
 
 
+def _distance_km(a: TravelEvent, b: TravelEvent) -> float:
+    """[Gate G10-Q] 位置の無い予定は最も遠い扱い(呼び出し元で位置のある予定だけを渡している)"""
+    if a.latitude is None or a.longitude is None or b.latitude is None or b.longitude is None:
+        return math.inf
+    return haversine_km(a.latitude, a.longitude, b.latitude, b.longitude)
+
+
 def _nearest_neighbor_order(events: List[TravelEvent]) -> List[TravelEvent]:
     if not events:
         return []
@@ -1588,9 +1596,7 @@ def _nearest_neighbor_order(events: List[TravelEvent]) -> List[TravelEvent]:
         current = ordered[-1]
         nearest_idx = min(
             range(len(remaining)),
-            key=lambda i: haversine_km(
-                current.latitude, current.longitude, remaining[i].latitude, remaining[i].longitude
-            ),
+            key=lambda i: _distance_km(current, remaining[i]),
         )
         ordered.append(remaining.pop(nearest_idx))
     return ordered

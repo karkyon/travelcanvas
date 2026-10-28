@@ -157,7 +157,7 @@ def _memory_view(m: Dict[str, Any], include_location: bool, include_media: bool)
 
 
 def _md_memory(v: Dict[str, Any]) -> List[str]:
-    lines = []
+    lines: List[str] = []
     if v["body"]:
         lines.extend(f"> {line}" if line else ">" for line in v["body"].splitlines())
     if v["has_media"]:
@@ -234,7 +234,7 @@ def build_journal_draft(
     planned = recorded = 0
     for d in sorted(days, key=lambda x: (x["local_date"], str(x["id"]))):
         did = str(d["id"])
-        entries = []
+        entries: List[Dict[str, Any]] = []
         for e in sorted((e for e in events if str(e["day_id"]) == did), key=ev_key):
             planned += 1
             views = [v for v in (view(m) for m in by_event.get(str(e["id"]), [])) if v]

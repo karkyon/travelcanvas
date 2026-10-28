@@ -23,7 +23,7 @@ import threading
 import time
 import uuid
 from collections import OrderedDict, deque
-from typing import Deque, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ redis.call('PEXPIRE', key, window)
 return 1
 """
 
-_state: Dict[str, object] = {"backend": "auto", "client": None, "script": None, "down_until": 0.0, "warned": 0.0}
+_state: Dict[str, Any] = {"backend": "auto", "client": None, "script": None, "down_until": 0.0, "warned": 0.0}
 _state_lock = threading.Lock()
 REDIS_RETRY_SECONDS = 30
 REDIS_TIMEOUT_SECONDS = 0.5

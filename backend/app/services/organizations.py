@@ -141,7 +141,7 @@ def snapshot_changes(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, int]
 def ack_status(db: Session, dist: OrgDistribution) -> Dict[str, Any]:
     members = db.query(OrganizationMember).filter(OrganizationMember.organization_id == dist.organization_id).all()
     acks = db.query(OrgDistributionAck).filter(OrgDistributionAck.distribution_id == dist.id).all()
-    latest = {}
+    latest: Dict[Any, int] = {}
     for a in acks:
         latest[a.user_id] = max(latest.get(a.user_id, 0), a.version)
     acked = sum(1 for m in members if latest.get(m.user_id) == dist.version)

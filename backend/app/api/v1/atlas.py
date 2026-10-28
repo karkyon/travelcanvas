@@ -93,6 +93,8 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
             obs.append({**base, "state": "PLANNED", "kind": "planned", "at": None, "year_at": day_time(e.day_id)})
     for mm in db.query(Memory).filter(Memory.plan_id == plan.id, Memory.author_user_id == user.id,
                                       Memory.latitude.isnot(None)).all():
+        if mm.latitude is None or mm.longitude is None:
+            continue
         if mm.event_id in excluded_events or in_hidden_place(mm.latitude, mm.longitude):
             continue
         obs.append({"lat": mm.latitude, "lng": mm.longitude, "plan_id": str(plan.id), "plan_title": title,

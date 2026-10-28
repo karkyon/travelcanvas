@@ -21,6 +21,7 @@
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
 | [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 4 | 1 | 2 |
+| [gate-g10q-trace.md](gate-g10q-trace.md) | Gate G10-Q トレース(品質: V3 再監査・E2E の不安定の根治・mypy の削減) | 0 | 0 | 0 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-g4-trace.md](gate-g4-trace.md) | Gate G4 トレース(機能: 外部の判断の要らない残り) | 1 | 1 | 0 |
