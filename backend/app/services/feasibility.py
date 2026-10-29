@@ -51,18 +51,26 @@ CURRENCY_UNITS = {"JPY", "USD", "EUR"}
 MINUTE_UNITS = {"minutes": 1, "hours": 60}
 
 # 避けたい移動手段の値(自由入力)を区間のmodeへ対応付ける。長い語を先に照合する。
-TRANSPORT_KEYWORDS: Sequence[Tuple[str, str]] = (
-    ("夜行バス", "bus"), ("高速バス", "bus"), ("新幹線", "train"), ("タクシー", "taxi"), ("フェリー", "ferry"),
-    ("飛行機", "flight"), ("航空", "flight"), ("自転車", "bicycle"), ("レンタカー", "driving"),
-    ("バス", "bus"), ("電車", "train"), ("鉄道", "train"), ("列車", "train"), ("船", "ferry"),
-    ("徒歩", "walking"), ("歩き", "walking"), ("車", "driving"),
-    ("walking", "walking"), ("driving", "driving"), ("train", "train"), ("bus", "bus"), ("ferry", "ferry"),
-    ("flight", "flight"), ("bicycle", "bicycle"), ("taxi", "taxi"), ("mixed", "mixed"),
+# [Gate G11] 1つの語が複数の値に当たる: 「新幹線」は shinkansen と、新幹線と書かれていない鉄道(train。区別できないため
+# 違反の候補に残す)、「バス」は路線バス・高速バスの両方、「高速バス」「夜行バス」は express_bus と、区別する前に保存した bus
+TRANSPORT_KEYWORDS: Sequence[Tuple[str, Tuple[str, ...]]] = (
+    ("夜行バス", ("express_bus", "bus")), ("高速バス", ("express_bus", "bus")), ("路線バス", ("bus",)),
+    ("新幹線", ("shinkansen", "train")), ("タクシー", ("taxi",)), ("フェリー", ("ferry",)),
+    ("ヘリコプター", ("helicopter",)), ("ヘリ", ("helicopter",)),
+    ("飛行機", ("flight",)), ("航空", ("flight",)), ("自転車", ("bicycle",)), ("レンタカー", ("driving",)),
+    ("バス", ("bus", "express_bus")), ("電車", ("train", "shinkansen")), ("鉄道", ("train", "shinkansen")),
+    ("列車", ("train", "shinkansen")), ("船", ("ferry",)),
+    ("徒歩", ("walking",)), ("歩き", ("walking",)), ("車", ("driving",)),
+    ("express_bus", ("express_bus",)), ("shinkansen", ("shinkansen",)), ("helicopter", ("helicopter",)),
+    ("walking", ("walking",)), ("driving", ("driving",)), ("train", ("train",)), ("bus", ("bus",)),
+    ("ferry", ("ferry",)), ("flight", ("flight",)), ("bicycle", ("bicycle",)), ("taxi", ("taxi",)),
+    ("mixed", ("mixed",)),
 )
 
 MODE_LABEL = {
     "walking": "徒歩", "driving": "車", "train": "鉄道", "bus": "バス", "ferry": "船", "flight": "飛行機",
     "bicycle": "自転車", "taxi": "タクシー", "mixed": "複合",
+    "shinkansen": "新幹線", "helicopter": "ヘリ", "express_bus": "高速バス",  # [Gate G11]
 }
 
 PRIVATE_MESSAGE = "秘匿制約を満たしていません(内容は作成者本人にだけ表示されます)"
@@ -1082,9 +1090,9 @@ def _eval_meal_interval(c: EffectiveConstraint, title: Optional[str], snap: Snap
 
 def _modes_for(text: str) -> List[str]:
     lowered = text.strip().lower()
-    for keyword, mode in TRANSPORT_KEYWORDS:
+    for keyword, modes in TRANSPORT_KEYWORDS:
         if keyword.lower() in lowered:
-            return [mode]
+            return list(modes)
     return []
 
 

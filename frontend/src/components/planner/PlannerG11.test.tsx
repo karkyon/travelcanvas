@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-const { getHoursCheck, moveItemBy, handleKeyboardMove } = vi.hoisted(() => ({
-  getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(),
+const { getHoursCheck, moveItemBy, handleKeyboardMove, reorderSchedule } = vi.hoisted(() => ({
+  getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(), reorderSchedule: vi.fn(),
 }));
 vi.mock('@/services/api/g11planner', () => ({ getHoursCheck }));
 // [Gate G11] 段階3: 予定の写真・提供元の状態・編集できるか(この試験では写真なし・閲覧者)
@@ -22,12 +22,18 @@ vi.mock('@/hooks/useDragDrop', () => ({
     handleKeyboardMove, moveItemBy, isItemDragged: () => false,
   }),
 }));
-vi.mock('@/hooks/usePlan', () => ({ usePlan: () => ({ addNewScheduleItem: vi.fn(), deleteScheduleItem: vi.fn() }) }));
+vi.mock('@/hooks/usePlan', () => ({
+  usePlan: () => ({ addNewScheduleItem: vi.fn(), deleteScheduleItem: vi.fn(), reorderSchedule }),
+}));
 vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
 
 import DayView from '@/components/DayView';
 import AllDaysChart from './AllDaysChart';
-import { arrivalLeg, arrivalSegment, buildChart, hoursBadge, unionMinutes, zoneOfEvent } from './plannerModel';
+import {
+  arrivalLeg, arrivalSegment, buildChart, hoursBadge, moveBlockedReason, reorderImpact, segmentRow, titleOfEvent,
+  unionMinutes, zoneOfEvent,
+} from './plannerModel';
+import { LEGEND_MODES } from '@/utils/transportModes';
 import { transportMode, transportText, UNSET_LABEL } from '@/utils/transportModes';
 import { dayShift, zonedParts } from '@/utils/zonedTime';
 import type { TravelSegment } from '@/services/api/types/segments';
@@ -57,11 +63,14 @@ describe('移動手段の名前', () => {
     expect(transportText('train', 75)).toBe('🚃 鉄道 · 1時間15分');
     expect(transportText('shinkansen', 135)).toBe('🚄 新幹線 · 2時間15分');
     expect(transportText('helicopter', null)).toBe('🚁 ヘリ(要手配) · 所要時間未確定');
-    expect(transportText('bus', null)).toBe('🚌 バス · 所要時間未計算');
-    expect(transportText('bus', 0)).toBe('🚌 バス · 0分');
+    expect(transportText('bus', null)).toBe('🚌 路線バス · 所要時間未計算');
+    expect(transportText('bus', 0)).toBe('🚌 路線バス · 0分');
+    expect(transportText('express_bus', 150)).toBe('🚍 高速バス · 2時間30分');
+    expect(transportText('driving', 40)).toBe('🚗 自家用車 · 40分');
+    expect(LEGEND_MODES).toEqual(expect.arrayContaining(['bus', 'express_bus', 'bicycle']));
     expect(transportText(undefined, 10)).toBe(UNSET_LABEL);
     expect(transportText('rocket', 10)).toBe(UNSET_LABEL);
-    expect(transportMode('car').label).toBe('車');
+    expect(transportMode('car').label).toBe('自家用車');
     expect(transportMode('plane').mode).toBe('flight');
     expect(transportMode(null).icon).toBeNull();
   });
@@ -169,6 +178,7 @@ describe('1日の画面(DayView)', () => {
     getHoursCheck.mockReset();
     moveItemBy.mockReset();
     handleKeyboardMove.mockReset();
+    reorderSchedule.mockReset();
   });
 
   const day = (): DaySchedule => ({ id: 'd1', date: '2026-11-14', timezone_id: 'Asia/Tokyo', events: [
@@ -182,7 +192,11 @@ describe('1日の画面(DayView)', () => {
     render(<DayView day={day()} planId="p1" segments={[seg({ from_event_id: 'e1', to_event_id: 'e2', mode: 'taxi', duration_minutes: 12 })]}
       zones={{ e1: 'Asia/Tokyo', e2: 'Asia/Tokyo' }} />);
     expect(screen.getByTestId('day-timezone')).toHaveTextContent('現地時間 · Asia/Tokyo');
-    expect(screen.getAllByTestId('schedule-arrival')[0]).toHaveTextContent('🚕 タクシー · 12分(推定)');
+    // 移動はカードの中ではなく、タイムラインの独立した行(着く予定の前)
+    expect(screen.getByTestId('segment-row')).toHaveTextContent('🚕 タクシー · 12分(推定)「清水寺」から');
+    expect(screen.getByTestId('segment-row')).toHaveAttribute('data-to-event', 'e2');
+    expect(screen.getByTestId('segment-row')).toHaveAttribute('data-mismatch', 'false');
+    expect(screen.queryAllByTestId('schedule-arrival')).toHaveLength(0);
     expect(screen.getAllByTestId('schedule-hours')[0]).toHaveTextContent('営業時間を確認中');
     resolve({ day_id: 'd1', local_date: '2026-11-14', timezone_id: 'Asia/Tokyo', near_minutes: 30, stale_days: 90, events: [
       hours({ event_id: 'e1' }),
@@ -205,5 +219,105 @@ describe('1日の画面(DayView)', () => {
     await waitFor(() => expect(screen.getByTestId('reorder-status')).toHaveTextContent('「清水寺」を2番目へ移しました'));
     await waitFor(() => expect(screen.queryAllByTestId('schedule-hours')).toHaveLength(0));
     expect(screen.queryAllByTestId('schedule-arrival')).toHaveLength(0);
+  });
+
+  it('並べ替えの影響: 順の変化・営業時間・合わなくなった区間を出し、「元に戻す」で動かす前の並びへ', async () => {
+    const before = { day_id: 'd1', local_date: '2026-11-14', timezone_id: 'Asia/Tokyo', near_minutes: 30, stale_days: 90, events: [
+      hours({ event_id: 'e1' }), hours({ event_id: 'e2', status: 'closed', reason: 'after_close', windows: ['17:00〜18:00'] }),
+    ] };
+    getHoursCheck.mockResolvedValue(before);
+    moveItemBy.mockResolvedValue(1);
+    reorderSchedule.mockResolvedValue(undefined);
+    const segs = [seg({ from_event_id: 'e1', to_event_id: 'e2', mode: 'express_bus', duration_minutes: 95 })];
+    const { rerender } = render(<DayView day={day()} planId="p1" segments={segs} />);
+    await waitFor(() => expect(screen.getAllByTestId('schedule-hours')[1]).toHaveAttribute('data-tone', 'bad'));
+    expect(screen.getByTestId('segment-row')).toHaveTextContent('🚍 高速バス · 1時間35分');
+    expect(screen.queryByTestId('reorder-impact')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
+    await waitFor(() => expect(moveItemBy).toHaveBeenCalled());
+    // store が並びを変えた(夕食 → 清水寺)。営業時間の読み直しで、夕食の判定が変わった
+    getHoursCheck.mockResolvedValue({ ...before, events: [hours({ event_id: 'e1' }), hours({ event_id: 'e2' })] });
+    const swapped = { ...day(), events: [day().events[1]!, day().events[0]!] };
+    rerender(<DayView day={swapped} planId="p1" segments={segs} />);
+    const panel = await screen.findByTestId('reorder-impact');
+    expect(within(panel).getByTestId('reorder-impact-moves')).toHaveTextContent('「夕食」 2番目 → 1番目');
+    expect(within(panel).getByTestId('reorder-impact-moves')).toHaveTextContent('「清水寺」 1番目 → 2番目');
+    await waitFor(() => expect(within(panel).getByTestId('reorder-impact-hours'))
+      .toHaveTextContent('「夕食」: ✕ 閉まった後に着く予定(17:00〜18:00) → ✓ 営業時間内 · 09:00〜18:00'));
+    expect(within(panel).getByTestId('reorder-impact-segments')).toHaveTextContent('前後が合わなくなった移動の区間が1件あります(「夕食」へ着く区間)');
+    expect(screen.getByTestId('segment-row')).toHaveAttribute('data-mismatch', 'true');
+    expect(screen.getByTestId('segment-mismatch')).toHaveTextContent('区間は自動では直しません');
+    expect(panel).toHaveTextContent('開始・終了の時刻は自動では変えていません');
+    fireEvent.click(within(panel).getByTestId('reorder-undo'));
+    await waitFor(() => expect(reorderSchedule).toHaveBeenCalledWith('p1', 'd1', ['e1', 'e2']));
+    await waitFor(() => expect(screen.queryByTestId('reorder-impact')).toBeNull());
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('元の並びに戻しました');
+  });
+
+  it('「このままにする」で閉じる。確定(🔒)の予定と、それと入れ替わる移動は押せず、矢印キーでは理由を読み上げる', async () => {
+    getHoursCheck.mockRejectedValue(new Error('offline'));
+    moveItemBy.mockResolvedValue(1);
+    const three = (): DaySchedule => ({ id: 'd1', date: '2026-11-14', timezone_id: 'Asia/Tokyo', events: [
+      { id: 'e1', title: '清水寺', category: 'sightseeing' },
+      { id: 'e2', title: '夕食', category: 'dining' },
+      { id: 'e3', title: '予約の宿', category: 'accommodation', locked: true },
+    ] });
+    const { rerender } = render(<DayView day={three()} planId="p1" />);
+    expect(screen.getByRole('button', { name: '「夕食」を下へ移す' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '「予約の宿」を上へ移す' })).toBeDisabled();
+    fireEvent.keyDown(screen.getByRole('listitem', { name: '予約の宿(上下矢印キーで並べ替え)' }), { key: 'ArrowUp' });
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「予約の宿」は確定(🔒)の予定のため動かせません');
+    expect(handleKeyboardMove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
+    await waitFor(() => expect(moveItemBy).toHaveBeenCalled());
+    const t = three();
+    rerender(<DayView day={{ ...t, events: [t.events[1]!, t.events[0]!, t.events[2]!] }} planId="p1" />);
+    const panel = await screen.findByTestId('reorder-impact');
+    expect(within(panel).getByTestId('reorder-impact-hours')).toHaveTextContent('営業時間を照合できる場所の予定はありません');
+    expect(within(panel).getByTestId('reorder-impact-segments')).toHaveTextContent('この日には予定へ着く移動の区間がありません');
+    fireEvent.click(within(panel).getByTestId('reorder-keep'));
+    expect(screen.queryByTestId('reorder-impact')).toBeNull();
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('この並びのままにしました');
+  });
+});
+
+describe('移動の区間の行・並べ替えの影響の計算', () => {
+  const evs = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }];
+
+  it('区間の出発の予定が直前でなければ合わない。日の最初は同じ日の中から出る時だけ合わない', () => {
+    const toB = seg({ id: 's1', from_event_id: 'a', to_event_id: 'b' });
+    const fromOtherDay = seg({ id: 's2', from_event_id: 'x', to_event_id: 'a' });
+    const fromPlace = seg({ id: 's3', from_event_id: null, from_place_id: 'pl', to_event_id: 'c' });
+    const titles = { ...titleOfEvent([{ id: 'd', date: '2026-11-14', events: evs.map((e) => ({ ...e, category: 'other' as const })) }]), x: '前の日の宿' };
+    const segs = [toB, fromOtherDay, fromPlace];
+    expect(segmentRow(evs, 1, segs, {}, 'Asia/Tokyo', titles)).toMatchObject({ fromTitle: 'A', mismatch: false });
+    expect(segmentRow(evs, 0, segs, {}, 'Asia/Tokyo', titles)).toMatchObject({ fromTitle: '前の日の宿', mismatch: false });
+    expect(segmentRow(evs, 2, segs, {}, 'Asia/Tokyo', titles)).toMatchObject({ fromTitle: null, mismatch: false });
+    const moved = [evs[1]!, evs[0]!, evs[2]!];
+    expect(segmentRow(moved, 0, segs, {}, 'Asia/Tokyo', titles)!.mismatch).toBe(true);  // A が同じ日の後ろにある
+    expect(segmentRow(moved, 1, [], {}, undefined, titles)).toBeNull();
+  });
+
+  it('影響: 動いた予定だけ・営業時間の状態(未照合・確認中・比べられない・変化なし)・区間の数', () => {
+    const segs = [seg({ from_event_id: 'a', to_event_id: 'b' })];
+    const now = [evs[1]!, evs[0]!, evs[2]!];
+    const m = reorderImpact(['a', 'b', 'c'], null, now, null, false, segs);
+    expect(m.moves.map((x) => [x.title, x.from, x.to])).toEqual([['B', 1, 0], ['A', 0, 1]]);
+    expect(m.hours.state).toBe('no_place');
+    expect([m.mismatches, m.segmentCount]).toEqual([['B'], 1]);
+    const placed = now.map((e) => ({ ...e, place_id: 'pl' }));
+    expect(reorderImpact(['a', 'b', 'c'], {}, placed, null, true, []).hours.state).toBe('pending');
+    expect(reorderImpact(['a', 'b', 'c'], null, placed, {}, false, []).hours.state).toBe('no_baseline');
+    const same = { a: hours({ event_id: 'a' }) };
+    expect(reorderImpact(['a', 'b', 'c'], same, placed, same, false, []).hours.state).toBe('unchanged');
+    expect(reorderImpact(['a', 'b', 'c'], null, evs, null, false, []).moves).toEqual([]);
+  });
+
+  it('確定の予定は動かさず、確定の予定と入れ替わる移動もしない', () => {
+    const list = [{ title: 'A' }, { title: 'B', locked: true }, { title: 'C' }];
+    expect(moveBlockedReason(list, 0, 1)).toBe('確定(🔒)の予定「B」と入れ替わるため動かせません');
+    expect(moveBlockedReason(list, 1, -1)).toBe('「B」は確定(🔒)の予定のため動かせません');
+    expect(moveBlockedReason(list, 0, -1)).toBeNull();
+    expect(moveBlockedReason([{ title: 'A' }, { title: 'C' }], 0, 1)).toBeNull();
   });
 });

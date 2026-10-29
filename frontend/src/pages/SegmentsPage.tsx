@@ -21,7 +21,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  PersonStanding, Car, Train, Bus, Ship, Plane, Bike, Car as TaxiIcon,
+  PersonStanding, Car, Train, Bus, BusFront, Ship, Plane, Bike, Car as TaxiIcon,
   Shuffle, Plus, Trash2, Pencil, X, HelpCircle, MapPin,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
@@ -38,9 +38,10 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 const MODE_OPTIONS: { value: SegmentMode; label: string; icon: React.ReactNode }[] = [
   { value: 'walking', label: '徒歩', icon: <PersonStanding size={16} /> },
-  { value: 'driving', label: '車', icon: <Car size={16} /> },
+  { value: 'driving', label: '自家用車', icon: <Car size={16} /> },
   { value: 'train', label: '鉄道', icon: <Train size={16} /> },
-  { value: 'bus', label: 'バス', icon: <Bus size={16} /> },
+  { value: 'bus', label: '路線バス', icon: <Bus size={16} /> },
+  { value: 'express_bus', label: '高速バス', icon: <BusFront size={16} /> },  // [Gate G11]
   { value: 'ferry', label: '船', icon: <Ship size={16} /> },
   { value: 'flight', label: '航空', icon: <Plane size={16} /> },
   { value: 'bicycle', label: '自転車', icon: <Bike size={16} /> },

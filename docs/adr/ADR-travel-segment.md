@@ -283,3 +283,10 @@ backendにはPlaceのplan横断一覧API(Placeはplanに属さないグローバ
 - 概算(`route_estimator.estimate_leg`): shinkansen は 200km/h・迂回 1.1。helicopter は推定しない(None)。以前は知らない mode を
   歩きの速さで推定していたため、ヘリで歩きの所要時間が出るところだった。
 - 画面の名前は `frontend/src/utils/transportModes.ts`(仕様 §4 の表)が正本。
+
+### Gate G11 段階6(2026-10-29): 路線バス・高速バス
+
+- mode の語彙に `express_bus`(高速バス)を足した。migration `c4e8a1f3b7d2`(区間・経路候補の区間の CHECK を広げるだけ)。
+  `bus` は「路線バス」と表示する。区別する前に保存した高速バスは `bus` のまま(推測で直さない)
+- 概算(`route_estimator.estimate_leg`): express_bus は 60km/h・迂回 1.25 の目安(推定として出す)
+- 避けたい移動手段の語(実行可能性)は1つの語を複数の mode に当てる(「高速バス」→ express_bus と bus など。違反の候補を落とさない)

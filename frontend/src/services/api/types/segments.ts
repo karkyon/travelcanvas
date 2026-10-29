@@ -8,7 +8,9 @@
 export type SegmentMode =
   | 'walking' | 'driving' | 'train' | 'bus' | 'ferry' | 'flight' | 'bicycle' | 'taxi' | 'mixed'
   // [Gate G11] 新幹線(明示された時だけ)・ヘリ(要手配)
-  | 'shinkansen' | 'helicopter';
+  | 'shinkansen' | 'helicopter'
+  // [Gate G11] 高速バス(bus は路線バス)
+  | 'express_bus';
 
 export type SegmentStatus = 'planned' | 'confirmed' | 'cancelled';
 

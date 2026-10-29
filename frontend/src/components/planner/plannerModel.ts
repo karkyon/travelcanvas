@@ -80,6 +80,13 @@ export function arrivalSegment(eventId: string, segments: TravelSegment[]): Trav
   return hits.length ? hits[hits.length - 1]! : null;
 }
 
+/** 予定 → 題名(区間の行で、別の日の出発の予定の名前を出す) */
+export function titleOfEvent(days: DaySchedule[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const d of days) for (const e of d.events) out[e.id] = e.title;
+  return out;
+}
+
 export function zoneOfEvent(days: DaySchedule[]): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = {};
   for (const d of days) for (const e of d.events) out[e.id] = d.timezone_id;
@@ -119,6 +126,105 @@ export function arrivalLeg(seg: TravelSegment | null, zones: Record<string, stri
     crossZone,
     zoneUnknown,
   };
+}
+
+// ===================================================================== 移動の区間の行・並べ替えの影響
+
+/**
+ * 区間の出発の予定が、今の並びの直前の予定と違う(並べ替えで合わなくなった)か。
+ * 日の最初の予定は、出発の予定が同じ日の中にある時だけ合わない(前の日の最後から着く区間は合っている)。
+ * 出発が場所だけの区間は判定しない。
+ */
+function segmentMismatch(events: ReadonlyArray<{ id: string }>, index: number, seg: TravelSegment): boolean {
+  const from = seg.from_event_id;
+  if (!from) return false;
+  if (index > 0) return events[index - 1]!.id !== from;
+  return events.some((e) => e.id === from);
+}
+
+export interface SegmentRow {
+  leg: ArrivalLeg;
+  /** 出発の予定の名前(旅行の中に無ければ null) */
+  fromTitle: string | null;
+  mismatch: boolean;
+}
+
+/** [Gate G11] 予定の前に置く移動の区間の行(タイムラインの独立した行。UIX-M03) */
+export function segmentRow(events: ReadonlyArray<{ id: string }>, index: number, segments: TravelSegment[],
+  zones: Record<string, string | undefined>, toZone: string | undefined, titles: Record<string, string>): SegmentRow | null {
+  const ev = events[index];
+  if (!ev) return null;
+  const seg = arrivalSegment(ev.id, segments);
+  const leg = arrivalLeg(seg, zones, toZone);
+  if (!seg || !leg) return null;
+  return {
+    leg,
+    fromTitle: seg.from_event_id ? titles[seg.from_event_id] ?? null : null,
+    mismatch: segmentMismatch(events, index, seg),
+  };
+}
+
+export type ImpactHoursState = 'pending' | 'no_place' | 'no_baseline' | 'unchanged' | 'changed';
+
+export interface ReorderImpactModel {
+  moves: Array<{ id: string; title: string; from: number; to: number }>;
+  hours: { state: ImpactHoursState; changes: Array<{ id: string; title: string; before: string; after: string }> };
+  /** 着く区間が今の並びと合わない予定の名前 */
+  mismatches: string[];
+  /** この日の予定へ着く区間の数 */
+  segmentCount: number;
+}
+
+function hoursLabel(h: EventHoursCheck | undefined): string {
+  const b = hoursBadge(h);
+  return b ? `${b.symbol} ${b.text}` : '照合なし';
+}
+
+/**
+ * [Gate G11] 並べ替えの影響(UIX-M03): 動かす前の並び・営業時間の判定と、今の並び・判定の差。
+ * 開始・終了の時刻は並べ替えで変えないので、営業時間の判定は時刻が同じなら変わらない(変わった時だけ並べる)。
+ */
+export function reorderImpact(baseline: string[], beforeHours: Record<string, EventHoursCheck> | null,
+  events: ReadonlyArray<{ id: string; title: string; place_id?: string }>, afterHours: Record<string, EventHoursCheck> | null,
+  pending: boolean, segments: TravelSegment[]): ReorderImpactModel {
+  const moves = events.map((e, to) => ({ id: e.id, title: e.title, from: baseline.indexOf(e.id), to }))
+    .filter((m) => m.from !== -1 && m.from !== m.to);
+  let state: ImpactHoursState;
+  const changes: ReorderImpactModel['hours']['changes'] = [];
+  if (!events.some((e) => e.place_id)) state = 'no_place';
+  else if (pending || !afterHours) state = 'pending';
+  else if (!beforeHours) state = 'no_baseline';
+  else {
+    for (const e of events) {
+      if (!e.place_id) continue;
+      const b = beforeHours[e.id];
+      const a = afterHours[e.id];
+      if (`${b?.status}|${b?.reason}` !== `${a?.status}|${a?.reason}`) {
+        changes.push({ id: e.id, title: e.title, before: hoursLabel(b), after: hoursLabel(a) });
+      }
+    }
+    state = changes.length ? 'changed' : 'unchanged';
+  }
+  const mismatches: string[] = [];
+  let segmentCount = 0;
+  events.forEach((e, i) => {
+    const seg = arrivalSegment(e.id, segments);
+    if (!seg) return;
+    segmentCount += 1;
+    if (segmentMismatch(events, i, seg)) mismatches.push(e.title);
+  });
+  return { moves, hours: { state, changes }, mismatches, segmentCount };
+}
+
+/** 並べ替えを止める理由(確定の予定は動かさない。確定の予定と入れ替わる移動もしない)。動かせる時は null */
+export function moveBlockedReason(events: ReadonlyArray<{ title: string; locked?: boolean }>, index: number,
+  delta: -1 | 1): string | null {
+  const ev = events[index];
+  const target = events[index + delta];
+  if (!ev || !target) return null;
+  if (ev.locked) return `「${ev.title}」は確定(🔒)の予定のため動かせません`;
+  if (target.locked) return `確定(🔒)の予定「${target.title}」と入れ替わるため動かせません`;
+  return null;
 }
 
 // ===================================================================== 全日程のチャート

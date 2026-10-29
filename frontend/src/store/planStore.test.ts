@@ -400,6 +400,35 @@ describe('reorderScheduleItems', () => {
     expect(mockedApi.moveEvent).toHaveBeenNthCalledWith(1, PLAN_ID, 'b', { sort_order: 0 }, 1, expect.any(String));
     expect(mockedApi.moveEvent).toHaveBeenNthCalledWith(2, PLAN_ID, 'a', { sort_order: 1 }, 2, expect.any(String));
   });
+
+  it('[Gate G11] 位置の変わらない予定(確定の予定を含む)は送らず、送った分だけ revision を進める', async () => {
+    await seedLoadedPlan(4);
+    usePlanStore.setState((s) => ({
+      currentPlan: {
+        ...s.currentPlan!,
+        days: [{
+          ...s.currentPlan!.days[0]!,
+          events: [
+            { id: 'lock', title: '確定', category: 'sightseeing', locked: true, sort_order: 0 },
+            { id: 'a', title: 'A', category: 'sightseeing', sort_order: 1 },
+            { id: 'b', title: 'B', category: 'sightseeing', sort_order: 2 },
+          ],
+        }],
+      },
+    }));
+    mockedApi.moveEvent.mockImplementation((_planId: string, eventId: string) =>
+      Promise.resolve({ id: eventId, day_id: DAY_ID, title: eventId, event_type: 'sightseeing', is_all_day: false, locked: false, sort_order: 0 })
+    );
+
+    await usePlanStore.getState().reorderScheduleItems(0, ['lock', 'b', 'a']);
+
+    expect(mockedApi.moveEvent).toHaveBeenCalledTimes(2);
+    expect(mockedApi.moveEvent).toHaveBeenNthCalledWith(1, PLAN_ID, 'b', { sort_order: 1 }, 4, expect.any(String));
+    expect(mockedApi.moveEvent).toHaveBeenNthCalledWith(2, PLAN_ID, 'a', { sort_order: 2 }, 5, expect.any(String));
+    const plan = usePlanStore.getState().currentPlan!;
+    expect(plan.revision).toBe(6);
+    expect(plan.days[0]!.events.map((e) => [e.id, e.sort_order])).toEqual([['lock', 0], ['b', 1], ['a', 2]]);
+  });
 });
 
 describe('undoLastChange', () => {

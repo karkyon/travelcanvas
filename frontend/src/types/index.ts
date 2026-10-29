@@ -163,6 +163,8 @@ export interface ScheduleItem {
   /** [Gate G11] 場所(営業時間の照合に使う)・最適化から外す固定 */
   place_id?: string;
   locked?: boolean;
+  /** [Gate G11] サーバーの並びの番号(並べ替えで変わらない予定を送らないため) */
+  sort_order?: number;
 }
 
 export interface CreateScheduleItemData {

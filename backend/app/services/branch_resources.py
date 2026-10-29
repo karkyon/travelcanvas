@@ -29,7 +29,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 ALGORITHM_VERSION = "branch-v2"
 MODES = ("walking", "driving", "train", "bus", "ferry", "flight", "bicycle", "taxi", "mixed",
-         "shinkansen", "helicopter")  # [Gate G11] segments.MODES と同じ
+         "shinkansen", "helicopter", "express_bus")  # [Gate G11] segments.MODES と同じ
 SEGMENT_STATUSES = ("planned", "confirmed", "cancelled")
 SEGMENT_FIELDS = (
     "mode", "status", "planned_departure_at", "planned_arrival_at", "last_departure_at", "duration_minutes",
