@@ -25,6 +25,20 @@ async function chooseStyle(page: Page, label: RegExp): Promise<void> {
   await expect(page.getByText('この端末に当て、アカウントにも保存しました')).toBeVisible();
 }
 
+/**
+ * [Gate CI-429] 画面の中の移動(読み直さない)。page.goto は毎回読み直しになり、会員は読み直しのたびに cookie の更新鍵で
+ * アクセストークンを取り直す(POST /auth/refresh)。この試験は 4系統 × 2 × 2幅 × 3画面 = 48回の読み直しを短い間に行い、
+ * CI の速さでは更新の回数の上限(1分 60回)を越えて 429 → 接続元の点数(Gate S6)が 150 に届き、後の全ての試験が 429 になっていた
+ * (PR #13・#15・#17・#18 の 429 の連鎖。実際の点数の 123 点が更新の 429)。利用者の操作(画面の中のリンク)と同じく読み直さずに移る。
+ */
+async function spaGoto(page: Page, path: string): Promise<void> {
+  await page.evaluate((to) => {
+    window.history.pushState({}, '', to);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, path);
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === path);
+}
+
 async function layoutBg(page: Page): Promise<string> {
   return page.evaluate(() => getComputedStyle(document.querySelector('main')?.parentElement ?? document.body).backgroundColor);
 }
@@ -76,11 +90,12 @@ test('見た目の系統 × 明るい・暗い で主な画面に axe の違反�
     await chooseStyle(page, label);
     for (const theme of ['light', 'dark'] as const) {
       await page.evaluate((t) => window.localStorage.setItem('tc.theme', t), theme);
+      await page.reload();  // 明暗は読み込みの時に当てる(系統・明暗の組ごとに1回だけ読み直す)
       for (const width of [1440, 360]) {
         await page.setViewportSize({ width, height: width === 360 ? 780 : 900 });
         for (const s of screens) {
           const where = `${s.name}(${style}・${theme}・${width}px)`;
-          await page.goto(s.path);
+          await spaGoto(page, s.path);
           if (s.h1) await expect(page.getByRole('heading', { level: 1, name: s.h1 }), where).toBeVisible({ timeout: 15_000 });
           else await expect(page.getByRole('heading', { level: 1 }), where).toBeVisible({ timeout: 15_000 });
           await expect(page.locator('html'), where).toHaveAttribute('data-style', style);
