@@ -34,3 +34,5 @@ FE = `frontend/src/components/planning/PlanningUsage.test.tsx`、E2E = `frontend
 | frontend | vitest 906 合格・標準エラー 0 行(1回目は管理の画面の直書きの色のクラスが基準 1,632 を 7 件越えて失敗 → デザインの決まりの色へ直して合格)、tsc 0、lint 0、最初に読む JS 427.93 kB(上限 430 kB) |
 | E2E(全件) | **90 合格・失敗 0・再試行 0**(1回目。新規 `fr059-planning-usage.spec.ts`) |
 | 文書 | DOC-10 r28・V3 再監査 違反 0・trace の目次・エラーの一覧(216 件) |
+
+CI(PR #17): push の run は 5ジョブ合格。pull_request の run の e2e(job 123372260534)は 429 の連鎖で 54 件が失敗 → 1回だけ再実行(job 123381377876)して合格(PR #17 のコメントに記録)。main `d863a94`(新しい clone で tree 一致 `8a1b856`)。連鎖の調査は `docs/trace/gate-ci429-trace.md`。

@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Tuple
 
 WINDOW_SECONDS = 900
+# [Gate G11] threat_guard が実際に足した点数の log(``guard: 点数 +3 rate_limited(/api/v1/auth/register)= 42``)
+SIGNAL = re.compile(r"guard: 点数 \+(?P<w>\d+) (?P<kind>[a-z_]+)\((?P<route>[^)]*)\)= (?P<score>\d+)")
 ACCESS = re.compile(r'"(?P<method>[A-Z]+) (?P<path>\S+) HTTP/[0-9.]+" (?P<status>\d{3})')
 STAMP = re.compile(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?Z')
 UUID = re.compile(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
@@ -75,7 +77,20 @@ def analyse(lines: Iterable[str]) -> dict:
     routes: Counter = Counter()
     points: Counter = Counter()
     blocks: List[str] = []
+    actual: Counter = Counter()
+    actual_before_block: Counter = Counter()
+    actual_total, actual_peak = 0, 0
     for line in lines:
+        s = SIGNAL.search(line)
+        if s:
+            w = int(s.group("w"))
+            key = f'{s.group("kind")} {s.group("route")}'
+            actual[key] += w
+            if not blocks:
+                actual_before_block[key] += w
+            actual_total += w
+            actual_peak = max(actual_peak, int(s.group("score")))
+            continue
         if "接続元を一時遮断しました" in line:
             m = STAMP.search(line)
             detail = line.split("guard:", 1)[-1].strip()
@@ -103,6 +118,8 @@ def analyse(lines: Iterable[str]) -> dict:
         if total > peak:
             peak, peak_at = total, t
     return {
+        "actual": actual, "actual_before_block": actual_before_block, "actual_total": actual_total,
+        "actual_peak": actual_peak,
         "points": sum(w for _, w, _ in events), "routes": routes, "by_points": points, "blocks": blocks,
         "peak": peak if timed else None,
         "peak_at": datetime.fromtimestamp(peak_at, timezone.utc).strftime("%H:%M:%S") if peak_at else None,
@@ -110,7 +127,13 @@ def analyse(lines: Iterable[str]) -> dict:
 
 
 def render(result: dict, top: int = 15) -> str:
-    lines = ["## E2E の接続元の点数の見積もり(Gate S6)", ""]
+    lines = ["## E2E の接続元の点数(Gate S6)", ""]
+    if result["actual_total"]:
+        lines.append(f"- **実際に足した点数**: 合計 {result['actual_total']}・時間窓の点数の最大 {result['actual_peak']}")
+        lines += ["", "| 実際の点数(最初の遮断より前) | 種類と経路の型 |", "|---:|---|"]
+        for key, pts in result["actual_before_block"].most_common(top):
+            lines.append(f"| {pts} | `{key}` |")
+        lines += ["", "以下は access log からの上限の見積もり(遮断の後の 429 も含む)", ""]
     peak = result["peak"]
     lines.append(f"- 点数の合計(上限の見積もり): {result['points']}")
     lines.append(f"- {WINDOW_SECONDS} 秒の窓の最大: {peak if peak is not None else '時刻なし'}"
@@ -137,9 +160,11 @@ def main() -> int:
         with open(summary, "a", encoding="utf-8") as fh:
             fh.write(text)
     if os.environ.get("GITHUB_ACTIONS"):
-        short = [f"合計 {result['points']}・窓の最大 {result['peak']}・遮断 {len(result['blocks'])} 件"]
+        short = [f"実際 合計 {result['actual_total']}・最大 {result['actual_peak']}(遮断の前の内訳)"]
+        short += [f"{pts} {key}" for key, pts in result["actual_before_block"].most_common(8)]
+        short += [f"見積もり 合計 {result['points']}・窓の最大 {result['peak']}・遮断 {len(result['blocks'])} 件"]
         short += result["blocks"][:2]
-        short += [f"{pts} {key}" for key, pts in result["by_points"].most_common(10)]
+        short += [f"{pts} {key}" for key, pts in result["by_points"].most_common(6)]
         print("::notice title=E2E guard report::" + "%0A".join(s.replace("%", "%25") for s in short))
     return 0
 

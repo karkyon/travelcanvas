@@ -236,6 +236,8 @@ def record_signal(ip: Optional[str], signal: str, *, path: Optional[str] = None)
             _rl._mark_down(error)
     if score is None:
         score = _add_score_memory(key, weight, now)
+    # [Gate G11] CI の 429 連鎖の調査: 実際に足した点数・種類・経路の型(ID・値・IP は出さない)。scripts/ci/e2e_guard_report.py が読む
+    logger.warning("guard: 点数 +%d %s(%s)= %d", weight, signal, _route_label(path), score)
     # [Gate S8] 警戒モードの間は閾値を下げる(既定は半分)
     factor = _lockdown_factor()
     warn = int(int(getattr(settings, "GUARD_WARN_SCORE", 60)) * factor)
@@ -310,10 +312,29 @@ def client_ip(request_or_scope) -> Optional[str]:
     return client.host if client else None
 
 
+def _route_label(path: Optional[str]) -> str:
+    """log に出す経路は型だけ(``/api/v1/plans/{plan_id}`` の形。無ければ ``-``)。"""
+    if not path:
+        return "-"
+    return "".join(ch for ch in path if ch.isalnum() or ch in "/{}_-.")[:80] or "-"
+
+
+def _route_of(request_or_scope) -> Optional[str]:
+    scope = getattr(request_or_scope, "scope", request_or_scope)
+    if not isinstance(scope, dict):
+        return None
+    try:
+        from app.ops.metrics import route_template
+
+        return route_template(scope)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def signal(request_or_scope, name: str) -> Optional[str]:
     """ハンドラ・ミドルウェアから明示的に出来事を数える(失敗しても本来の処理を止めない)。"""
     try:
-        return record_signal(client_ip(request_or_scope), name)
+        return record_signal(client_ip(request_or_scope), name, path=_route_of(request_or_scope))
     except Exception:  # noqa: BLE001
         logger.warning("guard: 出来事を数えられませんでした")
         return None
