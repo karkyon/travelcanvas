@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r27** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-29  
+> 文書ID: DOC-10 / 版: **v5.1-r28** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-29  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,8 +14,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `6571fc5`(Gate G11-Planner2 PR #15。この後に、この版を入れる Gate FR059-A(r27)の commit が続く) |
-| Alembic head | `c4e8a1f3b7d2`(単一の head。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス) |
+| 基準commit | `6571fc5`(Gate G11-Planner2 PR #15。この後に Gate FR059-A(r27)・FR059-B(r28)の commit が続く) |
+| Alembic head | `d5f9b2c8e1a3`(単一の head。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 853 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.24 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -63,12 +63,12 @@
 <!-- generated:summary -->
 | 見方 | 値 |
 |---|---|
-| コードがある機能(IMPLEMENTED 以上) | 57/59 = 97% |
-| INTEGRATED 以上 | 57/59 = 97%(うち(部分) 17) |
+| コードがある機能(IMPLEMENTED 以上) | 58/59 = 98% |
+| INTEGRATED 以上 | 58/59 = 98%(うち(部分) 18) |
 | VERIFIED | 38/59 = 64% |
 | RELEASED | 0/59 = 0% |
-| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約80.5% |
-| 未着手(SPECIFIED 以下) | FR-058、FR-059 |
+| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約81.7% |
+| 未着手(SPECIFIED 以下) | FR-058 |
 
 VERIFIED の一覧: 001/002/003/004/005/006/009/010/012/013/016/017/019/020/021/022/023/025/026/027/028/029/031/032/033/034/038/039/040/043/044/045/047/048/050/051/053/057。
 <!-- /generated:summary -->
@@ -139,7 +139,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-056 | 適応型GPS | INTEGRATED(部分) | ✓ | L5 | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | VERIFIED | ✓ | P17・G7 | 実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1) |
 | FR-058 | Entitlement・料金 | SPECIFIED | ✗ | — | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | SPECIFIED | ✗ | FR059-A | サーバー側の原価の守り(1旅行 50円の予約・確定・解放・クラス別 quota・使用の台帳・管理の二者の承認・画面の利用枠。FC-181〜185)は Gate B。正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)、無料の provider の使用の記録(正本 §13 D11)、provider の停止の worker 間の共有(D14) |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -214,7 +214,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | 5h | G11-Media / G12-Self | 旅行の写真の表紙(EXIF の除去・非公開の保存)/ 外部の提供元の要らない残り(Undo・投票・URL の題名・即時の通知・取り込み・埋め込み) | 場合により | なし |
 | 6 | PROD-1・2 | HTTPS・WAF・private origin・Cloud SQL・Redis・GCS・ClamAV・別系統のバックアップ・外部監視・KMS | 場合により | GCP の project・domain・費用 |
 | 7 | MAP-P / OCR-P | 地図・経路・ジオコード・OCR・天気・メールの提供元(**有料のものは FR059-B の合格の後**) | cache 等 | 契約・API キー |
-| 7b | **FR059-A(本版)→ FR059-B** | 外部 API の原価上限(1旅行 50円)・利用者クラス別 quota の正本化(A、docs だけ)→ サーバー側の予約・確定・解放・台帳・管理の二者の承認・画面の利用枠(B、fake provider で受入条件) | B であり | なし(利用者が決定済み) |
+| 7b | **FR059-A(済)→ FR059-B(本版)** | 外部 API の原価上限(1旅行 50円)・利用者クラス別 quota の正本化(A、docs だけ)→ サーバー側の予約・確定・解放・台帳・管理の二者の承認・画面の利用枠(B、fake provider で受入条件) | B であり | なし(利用者が決定済み) |
 | 8 | BILL-1 | FR-058 料金(価格・決済。原価上限は FR-059) | あり | **利用者の決定が必須** |
 | 9 | V3 → RELEASE-1 | (部分)の再監査と VERIFIED への昇格 → staging・負荷・DR・侵入試験・β | なし | 運用の承認 |
 
@@ -243,7 +243,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r24 | 2026-10-28 | `540955d`+G11-Media | Gate G11-Planner(G11 の段階2): 予定ごとの営業時間の照合(`GET /plans/{id}/hours-check`。時間内・閉店間際・最終入場・ラストオーダー・滞在中に閉まる・休業・未確認・古い出典)と予定のカードの帯、予定へ着く移動の名前(新幹線・ヘリを足す。migration `b8d4f6a0c3e5`)・日の現地の時刻帯・時差をまたぐ区間の両端の現地の日時、触って使う並べ替え(上へ・下へ)と再確認の知らせ、全日程の横断チャート。FR の状態の遷移なし(FR-005 の実機のタッチ・FR-014 の外部の時刻表は残る)。`docs/trace/gate-g11-planner-trace.md` |
 | r25 | 2026-10-28 | `b21e47b`+G11-Planner | Gate G11-Discover(G11 の段階3): 外部の画像・SNS の provider の interface(設定で止められる。値を作らない)、Wikimedia Commons の写真の候補(作者・ライセンス・出典。CC0・PD・CC BY・CC BY-SA だけ取り込める)と非公開の記録への取り込み(記録と同じ検査・撮影情報の除去・暗号化。出典を残す)、YouTube・TikTok の公式 oEmbed による SNS の投稿の確認(投稿へ直接つながない。取れない時は URL とメモ)と候補箱への social の保存、予定のカードの写真、近くの検索のカテゴリ・半径・距離・Overpass の正規表現の逃がし。migration なし(G11-Media で用意した列を使う)。FR-007 の gaps を「SNS 以外の URL の題名・画像の取得」に狭めた(部分のまま)。`docs/trace/gate-g11-discover-trace.md`・`docs/adr/ADR-media-providers.md` |
 | r26 | 2026-10-29 | `1c25a37` | Gate G11-Planner2(G11 の段階6): 路線バス・高速バスの区別(migration `c4e8a1f3b7d2` で区間の mode に express_bus)、移動の区間をタイムラインの独立した行に出し並べ替えで合わなくなった区間を知らせる、並べ替えの影響(順・営業時間・区間)と元に戻す、確定の予定を動かさない(確定の予定がある日の並べ替えが 409 で失敗していた不具合を直した)。G11-Style・G11-Intake(段階4・5)はDOC-10 を変えていない。FR の状態の遷移なし。`docs/trace/gate-g11-planner2-trace.md` |
-| **r27** | 2026-10-29 | `6571fc5` | **Gate FR059-A: 外部 API の原価上限(1旅行 50円・全 provider の合計・ちょうど 50円は許可・40円で警告)と利用者クラス別 quota(Guest 0・Free 月1旅行/50円・Trip Pass 対象の1旅行・Plus 月5旅行/250円・Family/Group 人数で増えない・Pro/B2B 契約)を正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` にし、FR-059 を SPECIFIED で登録(全59 FR)。FR-058 は価格・決済に絞った。資料室の追補との差異は同書 §13。docs だけ。`docs/trace/gate-fr059a-trace.md`** |
+| r27 | 2026-10-29 | `6571fc5` | Gate FR059-A: 外部 API の原価上限(1旅行 50円・全 provider の合計・ちょうど 50円は許可・40円で警告)と利用者クラス別 quota(Guest 0・Free 月1旅行/50円・Trip Pass 対象の1旅行・Plus 月5旅行/250円・Family/Group 人数で増えない・Pro/B2B 契約)を正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` にし、FR-059 を SPECIFIED で登録(全59 FR)。FR-058 は価格・決済に絞った。資料室の追補との差異は同書 §13。docs だけ。`docs/trace/gate-fr059a-trace.md` |
+| **r28** | 2026-10-29 | `6571fc5`+FR059-A | **Gate FR059-B: 外部 API の原価の守りをサーバーに実装(migration `d5f9b2c8e1a3`: entitlements・usage_policy_profiles(policy 2026-10-29.1 の6クラス)・usage_budget_accounts・provider_usage_reservations・provider_usage_events)。クラスの解決(Guest 0・Free・Trip Pass・Plus・Family・Pro の契約の例外は二者の承認の後だけ)、旅行・月の口座の行の鍵による原子的な予約(ちょうど 50円は許可)、回数・token の上限、冪等・確定・解放・期限切れの回復、再試行1回、見込みの超過と請求の照合の差で provider を止める、`GET /entitlements`・`GET /plans/{id}/planning-usage`・`POST /plans/{id}/planning-actions/estimate`・管理の申請と承認、旅程・下書き・旅行相談の利用枠の表示。FR-059 を INTEGRATED(部分)(外部の有料 provider は未接続)。`docs/trace/gate-fr059b-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

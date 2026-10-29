@@ -15,6 +15,8 @@ vi.mock('@/services/api/tripIntent', () => ({
   getTripDraft: api.getTripDraft, updateDraftSlots: api.updateDraftSlots, commitTripDraft: api.commitTripDraft,
 }));
 vi.mock('@/services/api/g11discover', () => ({ searchNearby: api.searchNearby }));
+vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
+vi.mock('@/components/planning/PlanningClassSummary', () => ({ default: () => null }));
 vi.mock('./AreaMap', () => ({
   default: ({ pins, onSelect }: { pins: Array<{ name: string; order: number }>; onSelect: (n: string) => void }) => (
     <div data-testid="area-map-mock">

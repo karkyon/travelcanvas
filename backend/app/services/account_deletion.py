@@ -276,6 +276,8 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
 
     db.query(UsageCounter).filter(UsageCounter.subject_type == "user", UsageCounter.subject_id == me).delete(
         synchronize_session=False)
+    # [FR059-B] 外部 API の利用枠の付与・口座・使用の記録の利用者
+    scrub_provider_usage(db, me)
 
     user.username = deleted_name(me)
     user.email = None
@@ -369,3 +371,20 @@ def run_due(db: Session, now: Optional[datetime] = None, limit: int = 50) -> Dic
         record_audit_event(action="account_deleted", resource_type="user", user_id=uid, resource_id=uid,
                            details={"summary": summary, "reason": "scheduled"})
     return counts
+
+
+def scrub_provider_usage(db: Session, user_id) -> None:
+    """[FR059-B] 本人の付与(クラス)・月の口座を消し、予約・使用の記録から本人を外す(金額・旅行は会計の整合のため残す)。"""
+    from app.models.models import Entitlement, ProviderUsageEvent, ProviderUsageReservation, UsageBudgetAccount
+
+    db.query(Entitlement).filter(Entitlement.subject_type == "user", Entitlement.subject_id == user_id).delete(
+        synchronize_session=False)
+    db.query(UsageBudgetAccount).filter(UsageBudgetAccount.scope_type == "user",
+                                        UsageBudgetAccount.scope_id == user_id).delete(synchronize_session=False)
+    db.query(ProviderUsageReservation).filter(ProviderUsageReservation.user_id == user_id).update(
+        {ProviderUsageReservation.user_id: None}, synchronize_session=False)
+    db.query(ProviderUsageReservation).filter(ProviderUsageReservation.billable_owner_user_id == user_id).update(
+        {ProviderUsageReservation.billable_owner_user_id: None}, synchronize_session=False)
+    db.query(ProviderUsageEvent).filter(ProviderUsageEvent.user_id == user_id).update(
+        {ProviderUsageEvent.user_id: None}, synchronize_session=False)
+    db.flush()

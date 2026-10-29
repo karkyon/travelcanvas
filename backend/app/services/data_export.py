@@ -107,6 +107,7 @@ PLAN_TABLES = (
     m.MemoryPublication, m.MemoryTrash,
     m.PlanMovementSettings,
     m.PlanOwnershipTransfer, m.DataCorrection,
+    m.ProviderUsageReservation, m.ProviderUsageEvent,
 )
 
 
@@ -261,6 +262,11 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["plan_ownership_transfers"] = [row(x) for x in q(m.PlanOwnershipTransfer).filter(
         (m.PlanOwnershipTransfer.from_user_id == me) | (m.PlanOwnershipTransfer.to_user_id == me)).all()]
     t["data_corrections"] = [row(x) for x in q(m.DataCorrection).filter(m.DataCorrection.user_id == me).all()]
+    # [FR059-B] 本人が起こした外部 API の予約・使用の記録(金額・量だけ。他のメンバーの記録は出さない)
+    t["provider_usage_reservations"] = [row(x) for x in q(m.ProviderUsageReservation).filter(
+        m.ProviderUsageReservation.user_id == me).all()]
+    t["provider_usage_events"] = [row(x) for x in q(m.ProviderUsageEvent).filter(
+        m.ProviderUsageEvent.user_id == me).all()]
     return t
 
 

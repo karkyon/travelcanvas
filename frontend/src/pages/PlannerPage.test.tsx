@@ -10,6 +10,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
 vi.mock('@/components/PlanHeader', () => ({ default: () => null }));
+vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
 vi.mock('@/components/DayView', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));

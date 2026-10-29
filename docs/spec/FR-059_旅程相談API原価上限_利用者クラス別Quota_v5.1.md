@@ -1,6 +1,6 @@
 # FR-059 旅程相談 API の原価上限(1旅行 50円)と利用者クラス別 Quota(正本)
 
-> 文書ID: SPEC-FR059 / 版: **v5.1-p1**(policy version `2026-10-29.1`) / 状態: APPROVED(利用者の明示の要件。再承認を求めない) /
+> 文書ID: SPEC-FR059 / 版: **v5.1-p2**(policy version `2026-10-29.1`) / 状態: APPROVED(利用者の明示の要件。再承認を求めない)・**サーバー側の守りは Gate FR059-B で実装(fake provider で検証。有料の provider は未接続)** /
 > 改訂日: 2026-10-29  
 > 出典: 資料室の `TravelCanvas_v5.1_仕様追補_旅程API原価上限と利用者クラス別Quota_2026-10-29.md`(以下「追補」)を、
 > 決定・数値を変えずにリポジトリの正本へ移した。追補と違う所は §13 に全て挙げる(無断の差異を作らない)。  
@@ -158,10 +158,10 @@ Family / Group の月の上限・旅行の数は追補に数値が無いため�
 
 | 表 | 主な列 | 目的・制約 |
 |---|---|---|
-| `entitlements` | `subject_type(user/plan/organization)`・`subject_id`・`feature_key`・`status(active/pending/revoked)`・`quota`・`starts_at`・`ends_at`・`source(default/admin/contract/trip_pass/subscription)`・`reason`・`requested_by`・`approved_by` | クラスの付与と quota の上書き。pending は承認まで効かない。`requested_by ≠ approved_by` |
+| `entitlements` | `subject_type(user/plan/organization)`・`subject_id`・`feature_key`・`status(active/pending/revoked)`・`quota`・`starts_at`・`ends_at`・`source(default/admin/contract/trip_pass/subscription)`・`reason`・`requested_by`・`approved_by`・`approved_at` | クラスの付与と quota の上書き。pending は承認まで効かない。`requested_by ≠ approved_by` |
 | `usage_policy_profiles` | `profile_key`・`version`・`currency`・`plan_cap_jpy`・`monthly_cap_jpy`・`plans_per_month`・`feature_quotas`・`fx_rate`・`tax_factor`・`safety_factor`・`provider_price_snapshot`・`status`・`effective_at` | 版ごとに不変。変更は新しい版。unique(profile_key, version) |
-| `usage_budget_accounts` | `scope_type(plan/user/organization)`・`scope_id`・`period_key`(旅行は `plan`、月は `YYYY-MM`)・`policy_version`・`profile_key`・`cap_jpy`・`reserved_jpy`・`settled_jpy`・`plans_used`・`counts`・`revision` | 残りを原子的に管理。unique(scope_type, scope_id, period_key)。`reserved_jpy`・`settled_jpy` は 0 以上(CHECK) |
-| `provider_usage_reservations` | `idempotency_key`・`user_id`・`billable_owner_user_id`・`plan_id`・`organization_id`・`provider`・`operation`・`units`・`max_cost_jpy`・`status(reserved/settled/released)`・`profile_key`・`policy_version`・`expires_at` | unique(user_id, idempotency_key)。二重の予約を防ぐ |
+| `usage_budget_accounts` | `scope_type(plan/user/organization)`・`scope_id`・`period_key`(旅行は `plan`、月は `YYYY-MM`)・`policy_version`・`profile_key`・`cap_jpy`・`reserved_jpy`・`settled_jpy`・`plans_used`・`counted_month`(旅行を月の数に入れた月)・`counts`・`revision` | 残りを原子的に管理。unique(scope_type, scope_id, period_key)。`reserved_jpy`・`settled_jpy` は 0 以上(CHECK) |
+| `provider_usage_reservations` | `idempotency_key`・`user_id`・`billable_owner_user_id`・`plan_id`・`organization_id`・`provider`・`operation`・`units`・`counts`・`max_cost_jpy`・`status(reserved/settled/released)`・`profile_key`・`policy_version`・`plan_account_id`・`monthly_account_id`・`expires_at`・`finished_at` | unique(user_id, idempotency_key)。二重の予約を防ぐ |
 | `provider_usage_events` | `reservation_id`・`user_id`・`plan_id`・`organization_id`・`class_snapshot`・`provider`・`model`・`sku`・`operation`・`input_tokens`・`output_tokens`・`request_count`・`matrix_elements`・`raw_cost`・`raw_currency`・`fx_rate`・`tax_factor`・`estimated_cost_jpy`・`actual_cost_jpy`・`price_version`・`result_code`・`occurred_at` | 原価・失敗・照合の最小の情報。入力の文章・鍵は保存しない |
 
 金額の列は `NUMERIC(12,4)`。利用者の削除では `user_id`・`billable_owner_user_id` を NULL にし(会計の整合は残す)、旅行の削除では
@@ -267,3 +267,10 @@ Gate の順(DOC-09): **Gate A**(本書・DOC-10 の登録。docs だけ)→ **Ga
 | D5 | `POST …/planning-actions:estimate` | `POST …/planning-actions/estimate` | 経路の書き方の統一 |
 | D6 | Pro/B2B の月の枠は「契約で定義」 | 契約の付与が無い間は 0円(呼ばない) | 数値の無い枠は fail closed |
 | D7 | 追補 §2.1 の「GPT-6 Luna 相当」 | 操作 `ai.generate` の単価として保持(モデル名は provider の版に書く) | provider に依存しない |
+| D8 | Trip Pass は「未割当 plan を拒否」 | 割り当てていない旅行は、その利用者自身のクラス(会員は Free)で判定する | 会員は全員 Free を持つため。Pass の枠は割り当てた旅行にだけ使われる(試験 `test_trip_pass_only_for_assigned_plan`) |
+| D9 | 月の口座の scope に organization | 初版は支払う人(利用者)の月の口座。組織でまとめる枠は FR-041・FR-058 と一緒に足す | 組織の契約・請求が未実装 |
+| D10 | エラーの code は大文字(`PLAN_COST_LIMIT_REACHED` 等) | 小文字(`plan_cost_limit_reached` 等) | エラーの一覧(`docs/spec/error-catalog.md`)の生成の規則に合わせる |
+| D11 | 無料の provider・ローカルの処理も使用を記録 | 有料の provider(`cost_guard.run`)だけを記録。無料の provider(Wikimedia・oEmbed・Nominatim・Overpass)は旅行に結びつかない入口のため未記録 | 旅行の単位の記録の口を、各 provider の Gate で足す(DOC-10 FR-059 の gaps) |
+| D12 | — | 旅行を月の数に入れるのは、その月の最初の予約の時(失敗して解放しても戻さない) | 1回の失敗で何度も数え直す攻撃を防ぐ。数えた月は `counted_month` |
+| D13 | — | 月の区切りは UTC(BILL-02 と同じ)。画面には次のリセットの日を UTC と書く | 既存の使用量と同じ |
+| D14 | — | provider の停止(見込みの超過・照合の差)は process の中の印。複数の worker では各 worker が別に判定する | Redis への共有は有料の provider を初めてつなぐ Gate で足す(gaps) |

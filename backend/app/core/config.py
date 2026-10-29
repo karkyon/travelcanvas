@@ -290,6 +290,9 @@ class Settings(BaseSettings):
     # [Gate G11] 旅行相談の方面の位置の照会(地名の照会。空にすると止まり、方面は位置「未照会」で比べる。
     # docs/ux/G11_UIUX全範囲_実装仕様.md §3.5)。Nominatim の利用の条件(1秒に1回)を守る
     TRIP_INTENT_GEOCODER: str = "nominatim"
+    # [FR059-B] 外部 API の原価の予約の期限(秒)。provider の応答が消えた時、この後に解放する
+    # (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §5)
+    COST_GUARD_RESERVATION_TTL_SECONDS: int = 600
 
     # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
     # 文書の上限 + 余白(multipart の区切り等)まで受ける。
