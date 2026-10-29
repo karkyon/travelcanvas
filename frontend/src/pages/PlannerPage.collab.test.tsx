@@ -33,9 +33,10 @@ const plan = (title: string, revision: number, notes?: string): TravelPlan => ({
 
 function setup() {
   const updateScheduleItem = vi.fn();
+  const loadPlan = vi.fn().mockResolvedValue(true);
   usePlanStore.setState({
     plans: [], currentPlan: plan('清水寺', 3), currentDayIndex: 0, isLoading: false, isOfflineData: false,
-    loadPlan: vi.fn().mockResolvedValue(undefined), loadPlans: vi.fn(), clearCurrentPlan: vi.fn(),
+    loadPlan, loadPlans: vi.fn(), clearCurrentPlan: vi.fn(),
     checkOfflineAvailability: vi.fn().mockResolvedValue(false), updateScheduleItem,
   });
   useAuthStore.setState({ isAuthenticated: true, isGuest: false });
@@ -64,7 +65,7 @@ function setup() {
       </MemoryRouter>
     </ToastProvider>,
   );
-  return { updateScheduleItem };
+  return { updateScheduleItem, loadPlan };
 }
 
 describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
@@ -119,5 +120,39 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     expect(await screen.findByText('この予定は、保存する前にほかの人が削除しました。')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
     await waitFor(() => expect(screen.queryByText(/ほかの人が削除しました/)).toBeNull());
+  });
+
+  it('[G11-Conflict] 競合の後に最新を読み直せなかった時は「変わった項目は無い」と言い切らず、読み直してから違いを示す', async () => {
+    const { updateScheduleItem, loadPlan } = setup();
+    fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
+    updateScheduleItem.mockResolvedValueOnce('conflict_unread');
+    fireEvent.change(screen.getByLabelText('メモ'), { target: { value: '朝一番に行く' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    const conflict = await screen.findByTestId('edit-conflict');
+    expect(within(conflict).getByTestId('edit-conflict-unread')).toHaveTextContent('最新の内容を読み直せなかったため');
+    expect(conflict).not.toHaveTextContent('この画面の項目にはありません');
+    expect(conflict).not.toHaveTextContent('削除しました');
+    expect(within(conflict).queryByRole('button', { name: '自分の変更を最新の内容に重ねて保存' })).toBeNull();
+    expect(screen.getByLabelText('メモ')).toHaveValue('朝一番に行く');
+
+    // 読み直しがまた失敗したら、表示はそのまま(古い内容と比べない)
+    loadPlan.mockResolvedValueOnce(false);
+    fireEvent.click(within(conflict).getByRole('button', { name: '最新を読み直して違いを確かめる' }));
+    await waitFor(() => expect(loadPlan).toHaveBeenCalledWith('plan-1'));
+    expect(screen.getByTestId('edit-conflict-unread')).toBeInTheDocument();
+
+    // 読み直せたら、相手が変えた項目を示し、重ねて保存できる
+    loadPlan.mockImplementationOnce(async () => {
+      usePlanStore.setState({ currentPlan: { ...plan('清水寺', 4), days: [{ id: 'd1', date: '2026-11-02',
+        events: [{ id: 'e1', title: '清水寺', category: 'sightseeing', start_time: '09:30' }] }] } as unknown as TravelPlan });
+      return true;
+    });
+    fireEvent.click(within(screen.getByTestId('edit-conflict')).getByRole('button', { name: '最新を読み直して違いを確かめる' }));
+    await waitFor(() => expect(screen.getByTestId('edit-conflict')).toHaveTextContent('開始時刻: ほかの人の値「09:30」'));
+    expect(screen.queryByTestId('edit-conflict-unread')).toBeNull();
+    updateScheduleItem.mockResolvedValueOnce('saved');
+    fireEvent.click(within(screen.getByTestId('edit-conflict')).getByRole('button', { name: '自分の変更を最新の内容に重ねて保存' }));
+    await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(2));
+    expect(updateScheduleItem.mock.calls[1]![1]).toMatchObject({ start_time: '09:30', description: '朝一番に行く' });
   });
 });

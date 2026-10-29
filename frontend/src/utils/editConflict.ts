@@ -21,6 +21,8 @@ const KEYS = Object.keys(FIELD_LABEL) as (keyof EditFields)[];
 export interface EditConflict {
   /** 相手が予定を消した */
   deleted: boolean;
+  /** [G11-Conflict] 競合したが最新を読み直せなかった(latest は null。どの項目が変わったかは分からない) */
+  unread?: boolean;
   theirs: (keyof EditFields)[];
   mine: (keyof EditFields)[];
   both: (keyof EditFields)[];
@@ -35,6 +37,12 @@ export function detectConflict(original: EditFields, mine: EditFields, latest: E
   const changedByMe = KEYS.filter((k) => norm(mine[k]) !== norm(original[k]));
   const both = changedByMe.filter((k) => theirs.includes(k) && norm(mine[k]) !== norm(latest[k]));
   return { deleted: false, theirs, mine: changedByMe, both, latest };
+}
+
+/** [G11-Conflict] 最新を読み直せなかった時。自分が変えた項目だけ分かる(相手の変更・削除は分からない) */
+export function unreadConflict(original: EditFields, mine: EditFields): EditConflict {
+  const changedByMe = KEYS.filter((k) => norm(mine[k]) !== norm(original[k]));
+  return { deleted: false, unread: true, theirs: [], mine: changedByMe, both: [], latest: null };
 }
 
 /** 最新の内容に、自分が変えた項目だけを重ねる */

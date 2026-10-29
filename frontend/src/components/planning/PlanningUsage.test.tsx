@@ -79,6 +79,33 @@ describe('この旅行の利用枠', () => {
     expect(await screen.findByTestId('planning-usage-error')).toHaveTextContent('呼びません');
   });
 
+  it('[G11-Layout] 読み込み中も読めない時も、同じ見出し・帯の枠で場所を確保し、もう一度読める', async () => {
+    let resolve: (u: PlanningUsage) => void = () => undefined;
+    api.getPlanningUsage.mockReturnValueOnce(new Promise<PlanningUsage>((r) => { resolve = r; }));
+    const { unmount } = render(<PlanningUsageMeter planId="p1" />);
+    const loading = screen.getByTestId('planning-usage-loading');
+    expect(loading).toHaveAttribute('aria-busy', 'true');
+    expect(within(loading).getByRole('heading', { name: 'この旅行の AI・外部検索の利用枠' })).toBeInTheDocument();
+    expect(within(loading).getByRole('status')).toHaveTextContent('利用枠を読み込んでいます');
+    // 読み終わる前に値(金額・残り)を作らない
+    expect(screen.queryByRole('meter')).toBeNull();
+    resolve(usage());
+    expect(await screen.findByTestId('planning-usage')).toBeInTheDocument();
+    expect(screen.queryByTestId('planning-usage-loading')).toBeNull();
+    unmount();
+
+    api.getPlanningUsage.mockRejectedValueOnce(new Error('offline'));
+    render(<PlanningUsageMeter planId="p2" />);
+    const failed = await screen.findByTestId('planning-usage-failed');
+    expect(failed).toHaveAttribute('aria-busy', 'false');
+    expect(within(failed).getByRole('heading', { name: 'この旅行の AI・外部検索の利用枠' })).toBeInTheDocument();
+    expect(failed).toHaveTextContent('予定の編集・保存はそのまま使えます');
+    api.getPlanningUsage.mockResolvedValueOnce(usage());
+    fireEvent.click(within(failed).getByRole('button', { name: 'もう一度読む' }));
+    expect(await screen.findByTestId('planning-usage-amount')).toHaveTextContent('0円 / 50円');
+    expect(api.getPlanningUsage).toHaveBeenCalledTimes(3);
+  });
+
   it('旅行相談の入口: クラスと今月の枠', async () => {
     expect(classLine(mine())).toBe('クラス: Plus · 1旅行 50円まで · 今月 13円 / 250円 · 今月の旅行 2 / 5');
     expect(classLine(mine({ class: 'guest' }))).toContain('ゲスト');
