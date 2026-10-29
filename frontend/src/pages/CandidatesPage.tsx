@@ -20,6 +20,7 @@ import { safeExternalUrl } from '@/utils/safeNavigation';
 import NearbyDiscover from './discover/NearbyDiscover';
 import type { BasePoint } from './discover/discoverModel';
 import SocialImportCard, { type SocialCandidateInput } from './discover/SocialImportCard';
+import CandidateVoting from './candidates/CandidateVoting';
 import { createCandidateFromSearch } from '@/services/api';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 
@@ -182,6 +183,10 @@ const CandidatesPage: React.FC = () => {
               </form>
             </Card>
           )}
+
+          {/* [Gate G11 段階8] 家族・グループで候補に投票する(合意形成の投票を使う) */}
+          <CandidateVoting planId={planId} canEdit={canEdit}
+            candidates={(data.items ?? []).filter((c) => c.status === 'open').map((c) => ({ id: c.id, title: c.title }))} />
 
           <section aria-label="候補の一覧" className="mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">

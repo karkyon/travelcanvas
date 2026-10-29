@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('@/services/api', () => ({ ...m, default: { getPlanDetail: m.getPlanDetail } }));
 
+vi.mock('./candidates/CandidateVoting', () => ({ default: () => null }));
 import CandidatesPage from './CandidatesPage';
 
 const dupes = fx.candidates_duplicates as unknown as CandidateList;

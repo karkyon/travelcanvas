@@ -33,6 +33,7 @@
 | [gate-g11-planner2-trace.md](gate-g11-planner2-trace.md) | Gate G11-Planner2 トレース(G11 の段階6: 旅程の画面の残り) | 2 | 1 | 0 |
 | [gate-g11-preview-trace.md](gate-g11-preview-trace.md) | Gate G11-Preview トレース(G11 の段階7: 並べ替えを保存する前の案) | 1 | 0 | 0 |
 | [gate-g11-style-trace.md](gate-g11-style-trace.md) | Gate G11-Style トレース(G11 の段階4: 見た目の系統) | 0 | 0 | 0 |
+| [gate-g11-vote-trace.md](gate-g11-vote-trace.md) | Gate G11-Vote トレース(G11 の段階8: 候補箱の家族・グループの投票) | 0 | 0 | 0 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
 | [gate-g4-trace.md](gate-g4-trace.md) | Gate G4 トレース(機能: 外部の判断の要らない残り) | 1 | 1 | 0 |
@@ -89,7 +90,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 
 | FR | 機能 | 状態 | 主な不足 |
 |---|---|---|---|
-| FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、候補への投票、SNS 以外の URL の題名・画像の取得 |
+| FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-011 | 予約取込 | INTEGRATED(部分) | メール・OCRによる自動抽出 |
 | FR-014 | 移動区間 | INTEGRATED | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
