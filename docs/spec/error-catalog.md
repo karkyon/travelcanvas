@@ -25,6 +25,7 @@
 | `admin_target` | — | — | ほかの管理者はこの画面から操作できません(運用の手順で権限を外してから) | api/v1/admin.py |
 | `alert_target_changed` | 409 | after_reload | — | api/v1/replans.py |
 | `already_adopted` | — | — | この投票はもう採用しています | api/v1/decisions.py |
+| `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
 | `already_resolved` | 409 | no | 既に対応を記録しています | api/v1/corrections.py |
@@ -83,6 +84,7 @@
 | `forbidden` | 403 | no | この場所を使う全ての旅行の編集の権限が無いため、直せません | api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
+| `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
 | `has_relations` | 409 | no | — | api/v1/sync.py |
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
@@ -111,6 +113,7 @@
 | `invalid_scope` | — | — | スコープは | api/v1/organizations.py |
 | `invalid_seat_limit` | — | — | 席の上限(1以上の整数、上限なしは null)を指定してください | api/v1/organizations.py |
 | `invalid_selection` | 422 | no | この案で変わる予定の中から、動かす予定を選んでください | api/v1/optimization.py |
+| `invalid_slots` | — | — | …日目 | api/v1/trip_intents.py |
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
@@ -143,6 +146,7 @@
 | `not_areas_only` | 409 | no | 訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです | api/v1/location_tracks.py |
 | `not_conflicted` | 409 | no | この操作は競合していません | api/v1/sync.py |
 | `not_eligible` | 422 | no | 移譲できるのは、参加済みの会員の共同編集者だけです(招待中・ゲスト・削除の申し込み中の人は選べません) | api/v1/ownership.py |
+| `not_intent_draft` | 404 | no | この旅行は旅行相談から作った下書きではありません | api/v1/trip_intents.py |
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
 | `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |

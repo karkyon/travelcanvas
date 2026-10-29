@@ -110,6 +110,17 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - 候補の縮小画像はサーバーが中継する(`GET /media-providers/images/thumb?provider=&id=`、ログイン必須、`Cache-Control: private, max-age=300`)。サーバーは provider_id から提供元の API で URL を引き直す(利用者の URL を使わない・状態を保存しない)。ブラウザから外部へ直接読みに行かない
 - 予定の写真の一覧: `GET /plans/{plan_id}/event-images`(見える写真だけ。予定 → 写真の記録)
 
+### 2.5 行き先が未定の旅行相談(段階5。2026-10-29 の統合ハンドオフ §3・§4 の範囲 B)
+- `GET /trip-intents/status`: 文章の読み取り(`text_rules`。AI は未接続 `ai_connected: false`)・位置(`nominatim`)・道路・宿・混み具合・方面の提案(全て `null` = 未接続)
+- `POST /trip-intents/extract`(ログイン・ゲスト可): `{text(≤4000), origin?, travel_window?, party_size?, nights?, transport?, highway?, one_way_strength?, room?, budget_scope?, preferences[], areas[]}` → 行ごとに `{key, value, display, source: user_input|text|unspecified, strength: required|preferred|undecided, evidence(文章の該当 ≤40字), question, needs_answer, note, sensitive}` と、文章・画面に書かれた方面 `areas[]`。保存しない・文章をログに残さない
+  - 画面の項目(あなたの入力)を文章より優先する。片道の時間は「希望/絶対条件」、宿泊費は「全員の合計/1人あたり」を問いにする(答えるまで `undecided`。提案 `suggested` は示すだけ)
+  - 旅の理由(記念など)は `sensitive` の行で「個人的な理由」とだけ返す(語を返さない・保存しない)
+- `POST /trip-intents/areas`: `{origin, areas[≤10], one_way_hours?, one_way_strength?}` → 出発地と各方面の位置(Nominatim。1秒に1回・同じ地名は1日覚える。状態 `ok/not_found/unavailable/disabled`)、直線距離(計算値)、`drive/lodging = not_connected`、`quietness = unverified`、`hours = date_pending`、片道の条件の判定は **直線距離 ÷ 時速100km の下限で明らかに超える時だけ** `exceeds`(絶対条件)/`likely_exceeds`(希望)、他は `unknown`。保存しない。設定 `TRIP_INTENT_GEOCODER`(空で止める)
+- `POST /trip-intents/draft`: `{area{name, latitude?, longitude?, provider?, retrieved_at?}, intent{…決まった項目だけ。文章・理由は受け取らない}, search_candidate_ids[≤30](本人の検索結果だけ。他人のは 404), source_urls[≤10](追跡の query を除き、http/https だけ)}` → 旅行(`status=draft`・題「{方面}・1泊2日の旅程案」・`preferences.trip_intent`)と候補箱の候補を作り、候補を日・時間帯に仮に並べる(食べ物は昼食・夕方、宿の欄は空)。日程はまだ作らない
+- `GET /plans/{id}/trip-intent`(viewer 以上): 方面・条件・日と時間帯・並び・候補・確認の一覧(`places selected/none`・`lodging/route not_connected`・`hours date_pending`)。旅行相談の下書きでなければ 404 `not_intent_draft`
+- `PUT /plans/{id}/trip-intent/slots`(editor 以上・If-Match: 旅行の revision): 並びを変える(日の範囲・時間帯・最後の日に宿を置かない・この旅行の候補だけ・重複なし)。前の並びへ戻すのも同じ口(画面の「元に戻す」)
+- `POST /plans/{id}/trip-intent/commit`(editor 以上・If-Match): `{start_date, timezone_id(IANA)}` → 日数分の日と、並べた候補の予定(時刻は未定)を1つの変更として作る(旅程の画面の「元に戻す」1回で戻り、下書きに戻る)。もう日程がある・旅程にした後は 409
+
 ---
 
 ## 3. 画面(段階ごと)
@@ -159,6 +170,16 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - 全ての系統×明暗で `TEXT_PAIRS` の AA(本文 4.5:1・部品 3:1)を試験で確かめる
 - 保存は端末(localStorage `tc.style`)とアカウント(`users.preferences["ui_style"]`、migration なし)。ログインした時はアカウントの値を優先
 - モックの系統の切り替え(上の帯のボタン)は製品には置かない。設定だけ
+
+### 3.5 行き先が未定の旅行相談(段階5。モック: 旅行相談 `intake()` v2。統合ハンドオフ §3)
+- 入口: ダッシュボードの「✦ 条件から旅行先を相談」と「＋ 行き先が決まっている(旅行を作る)」、プランナーの一覧の「✦ 条件から旅行先を相談」。Quick Plan(旅行を作る)は残す
+- `/trip-consult`: 見出し `TRIP DESIGN · 0n / 04`、進み具合(希望を伝える → 内容を確認 → 方面を比較 → 旅程案へ。今いる段に `aria-current="step"`)
+  1. 希望を伝える: 大きな自由文(「例文を入れる」)・出発地・時期・人数・日数(各欄の下に後で何に使うか)・任意の開閉(移動・片道の扱い・部屋・宿泊費の意味・過ごし方)。右に「いま決まっていること」(入力/要確認/未入力)と「条件を指定する」・進み方・未照会の説明。主な操作「入力内容を整理する →」の直前に「まだ旅行も予約も作りません」
+  2. 内容を確認: 行ごとに 読み取った内容(直せる)・扱い(必須/希望/未定)・確認(あなたの入力 / 文章から読み取り · 未確認 + 「合っていれば印」 / 未指定)。**確かめた行だけを条件に使う**。片道の時間と宿泊費の問いは radio。日数が無い・問いが残る時は理由を示して先へ進めない。AI は未接続と書く。個人的な理由は「保存しない」とだけ示す
+  3. 方面を比較: 適用中の条件と「条件を編集」。地図(OpenStreetMap。出発地と位置を照会できた方面。線は直線で「道路の距離・経路ではない」)と一覧を並べる(スマホは地図/一覧の切り替え)。最初は3件・「他の候補も見る」。各方面: 位置の照会の状態と出典・取得時刻、直線距離(計算値)、運転(未照会)、片道の条件(下限の判定)、宿(未照会)、静けさ(未確認)、営業時間(日付と場所の後)。点数は出さない。行を押すと選ぶだけ。比較に残す(♡)・詳しく見る・比較から外す・方面を足す。方面の自動の提案は未接続(作らない)
+  4. 方面の詳細: カテゴリ(観光・食べ物・市場・買い物・絶景・静かに過ごす)・半径・言葉で方面の位置の周りを探し(段階3 の `POST /search/spots`、`sightseeing`・`quiet` を追加)、「旅程案に入れる」で選ぶ。記事・SNS の URL は参考の出典として残すだけ。右の PLAN CHECKLIST(行きたい場所・宿・車の経路・営業時間)。「選んだ候補で旅程案を作る」は押せなくせず、何も選んでいない時は理由を示し、もう一度押すと場所なしの下書きを作る
+  - 入力の途中はこのタブの sessionStorage に覚える(失敗しても文章を失わない)。下書きを作ると消す
+- `/planner/{id}/draft`: 「旅程ドラフト · まだ確定していません」。日のタブ(件数)と「全日程を横断で見る」。時間帯(午前・昼食・午後・夕方・宿)に候補、候補の間に移動の区間の行(移動手段のアイコン+名前 · 経路・所要時間は未照会)。上へ・下へ(44px)・時間帯・日・外す、変えるたびに保存して読み上げ、「元に戻す」。PLAN VALIDATION(移動時間・営業時間・宿は未照会/日付待ち、日程の余裕は置いた数=計算値)。日付と時刻帯を決めて「この並びで旅程にする」→ 旅程の画面(段階2 の営業時間の照合・時差・全日程のチャートへ続く)。旅程にした後・閲覧だけの人は並べ替えられない
 
 ---
 
@@ -222,6 +243,11 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | UIX-M12 | DOC-10 の証拠、DOC-13 の語彙、DOC-11 のプライバシーをこの仕様と合わせる | 全て |
 | UIX-M13 | 表紙の位置の調整(横・縦・拡大)が hero/header/card で同じ見え方になり、保存される | 1 |
 | UIX-M14 | 外部の写真はライセンスの許すものだけ取り込め、作者・ライセンス・出典を表示する | 3 |
+| UIX-M15 | 行き先が未定でも自由文から始められ、Quick Plan の入口も残る。旅行・予約は下書きを作る操作まで作らない | 5 |
+| UIX-M16 | 読み取りは行ごとに あなたの入力/文章から読み取り · 未確認/未指定 を示し、確かめた行だけを条件に使う。片道の時間(希望/絶対条件)・宿泊費(合計/1人あたり)・日付未定 を混同しない。AI が未接続なら AI と言わない。個人的な理由を保存しない | 5 |
+| UIX-M17 | 方面の比較は利用者が挙げた方面だけを、位置の出典・取得時刻つきで地図と一覧に並べ、未照会(運転・宿・混み具合・営業時間)を値にせず、根拠のない点数を出さない。片道の条件は直線距離の下限でだけ判定する | 5 |
+| UIX-M18 | 方面の詳細は 観光・食べ物・市場・買い物・絶景・静かに過ごす で探せ、選んだ方面だけから未確定の下書きを作る(他の方面が混ざらない)。URL は出典としてだけ残る | 5 |
+| UIX-M19 | 下書きは未確定と示し、日のタブ・全日程・移動の区間の行・並べ替え(触る・キーボード)・読み上げ・元に戻す があり、日付を決めると1つの変更として旅程になる(元に戻せる) | 5 |
 
 ---
 
@@ -229,7 +255,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 
 - backend: 表紙の API(権限: 所有者・editor・viewer・他人の非公開・他の旅行の記録・音声の記録・存在しない)、If-Match、SET NULL(記録の削除・ゴミ箱)、複製でコピーしない、`PUT /travel-plans` で変わらない、配信の撮影情報の除去(GPS 付きの JPEG を作って確かめる)、監査に本文・ファイル名が無い。hours-check の各 status(例外の日・深夜営業・最終入場・L.O.・未登録・古い)。provider は `httpx.MockTransport` で外へつながない(ライセンスの判定・redirect の拒否・上限・SSRF)
 - frontend: TripCover の写真・失敗時のグラデーション・重ねのコントラスト、CoverPhotoDialog の権限ごとの表示、ScheduleItem の移動手段の名前と営業時間の帯、全日程のチャート、時差の表示(夜行便・日付変更線)、系統×明暗のトークンの AA と CSS の一致
-- E2E: 表紙の設定→PlanHeader・ダッシュボードに出る→外す、閲覧者に操作が無い、全日程の切り替え、系統の切り替えが再読み込みで続く。各 spec は台帳の証拠に足す
+- E2E: 表紙の設定→PlanHeader・ダッシュボードに出る→外す、閲覧者に操作が無い、全日程の切り替え、系統の切り替えが再読み込みで続く、旅行相談の4段から下書き → 旅程にする。各 spec は台帳の証拠に足す
 - E2E は外部の提供元(OpenStreetMap・oEmbed・Wikimedia Commons)へつながない。外部に頼る応答だけを `page.route` で差し替え(gate-g9 と同じ)、保存は本物の backend を通す。提供元の取り込み・ライセンス・SSRF の守りは backend の試験(`httpx.MockTransport`)で確かめる
 
 ---
@@ -241,6 +267,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - FR-008(場所)・FR-017(実行可能性): 予定のカードの営業時間の照合
 - FR-014(移動区間): 移動手段の語彙・時差の表示
 - FR-010 等の検索の FR: カテゴリ・距離・SNS 取り込み(取り込みの provider は SNS の公式 oEmbed だけ)
+- 旅行相談(段階5)は DOC-10 の FR に無い入口の追加(FR-044 Quick Plan・FR-004 旅行CRUD・FR-007 候補箱を使う)。状態は変えず、trace に証拠を残す
 - 状態を上げるのは、証拠(試験の名前・E2E の spec)を `v1-verification-ledger.json` に足し、CI で合格した時だけ。revision は段階ごとに r23, r24…
 
 ---
@@ -252,7 +279,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | 1 Media | gate/g11-media | migration `a7c3e5f9b2d4`(§1 の全て)・表紙の API・TripCover の写真・CoverPhotoDialog・位置の調整・試験 | **完了**: PR #9、CI 5ジョブ合格、main `b21e47b`(新しい clone で tree 一致)。DOC-10 r23。omega-dev2 は未反映 |
 | 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | **完了**: PR #11、CI 5ジョブ合格、main `ee4368c`(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24。omega-dev2 は未反映 |
 | 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | **完了**: PR #12、CI 5ジョブ合格(run 40683118167・40683094584)、main `4525c0e`(tree 一致)。DOC-10 r25。omega-dev2 は未反映 |
-| 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-style-trace.md`)。migration なし・DOC-10 の変更なし |
-| 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→旅程の下書き)・信頼の状態の表示・provider 未接続の表示(2026-10-29 の統合ハンドオフ §3・§4 の範囲 B。§3.5 に仕様を足す) | 未着手 |
+| 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | **完了**: PR #13、CI 5ジョブ合格(pull_request の run 40783537644 は1回目の e2e が 429 の連鎖で失敗 → 再実行で合格、push の run 40783532270 は合格。`docs/trace/gate-g11-intake-trace.md` に記録)、main `2f6b90a`(tree 一致)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
+| 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→方面の詳細→旅程の下書き→旅程にする)・信頼の状態の表示・provider 未接続の表示(§2.5・§3.5、統合ハンドオフ §3・§4 の範囲 B) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-intake-trace.md`、`docs/adr/ADR-trip-intake.md`)。migration なし・DOC-10 の変更なし |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。

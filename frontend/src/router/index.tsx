@@ -70,6 +70,9 @@ const JourneyPage = lazyPage(() => import('@/pages/JourneyPage'));
 const VisitsPage = lazyPage(() => import('@/pages/VisitsPage'));
 // [Gate C2] 候補箱・場所の詳細(FR-007・FR-008)
 const CandidatesPage = lazyPage(() => import('@/pages/CandidatesPage'));
+// [Gate G11] 行き先が未定の旅行相談・未確定の旅程の下書き(段階5)
+const TripConsultPage = lazyPage(() => import('@/pages/consult/TripConsultPage'));
+const TripDraftPage = lazyPage(() => import('@/pages/consult/TripDraftPage'));
 // [Gate B1] 組織・B2B(FR-041)
 const OrganizationsPage = lazyPage(() => import('@/pages/OrganizationsPage'));
 const OrganizationPage = lazyPage(() => import('@/pages/OrganizationPage'));
@@ -432,6 +435,24 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DistributionPage />
+          </ProtectedRoute>
+        ),
+      },
+
+      // ✦ [Gate G11] 行き先が未定の旅行相談(希望 → 確認 → 方面の比較 → 方面の詳細)と、未確定の旅程の下書き
+      {
+        path: 'trip-consult',
+        element: (
+          <ProtectedRoute>
+            <TripConsultPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'planner/:planId/draft',
+        element: (
+          <ProtectedRoute>
+            <TripDraftPage />
           </ProtectedRoute>
         ),
       },
