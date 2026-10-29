@@ -663,7 +663,12 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
   `provider_suspended`。監査の `provider_usage_suspended`・`entitlement_requested/approved/revoked`。
 - **provider が止まった時:** 見込みの超過・請求の照合の差で止まる(fail closed)。原因(単価の改定・SKU の変更・単位の報告の誤り)を
   確かめ、価格を変えるなら新しい policy の版を作り(`usage_policy_profiles` に行を足す。旧い版は変えない)、正本 §2.2 の検算を
-  試験で通してから backend を作り直す(止める印は process の中なので、作り直しで戻る)。原因が分からないまま戻さない。
+  試験で通してから戻す。止める印は Redis で全ての worker が共有する(FR059-C。backend を作り直しても戻らない)。
+  確認: `python3 scripts/ops/tcops.py security provider-status`。戻す:
+  `python3 scripts/ops/tcops.py security provider-resume --provider <名前> --yes --reason "<原因と確かめた内容>"`
+  (監査 `provider_usage_resumed`。Redis に届かない時は全 worker に伝えられないため戻さない)。原因が分からないまま戻さない。
+  Redis に届かない間に止まった worker は、その worker の中だけで止め、届いた時に共有の印へ送る(`/metrics` の
+  `provider_suspension_unshared`)。
 - **クラス・例外の付与:** 管理の画面「旅程相談の利用枠(クラス)」。申請した管理者とは別の管理者が承認する(MFA の確認が要る)。
   サポートの担当の権限だけでは枠を増やせない。1旅行の 50円を越える例外は Pro の契約だけ。
 - **期限の切れた予約:** 次の予約の前に自動で解放する(10分。`COST_GUARD_RESERVATION_TTL_SECONDS`)。

@@ -16,6 +16,8 @@
     mfa-reset --request <申請のID> --approved-by admin-b@example.com --yes
                                             [Gate G3] 申請した人とは別の管理者が承認して解除する(その人の全端末をログアウト、
                                             本人へ知らせる)。対象の本人は申請も承認もできない
+    provider-status                              [FR059-C] 止まっている有料の provider(全 worker で共有)
+    provider-resume --provider <名前> --yes --reason "…"   原因を確かめてから戻す(Runbook の FR-059)
     grant-admin --email a@example.com --yes [--reason "…"]
                                             [Gate A2] 管理者の権限を付ける(その人の全端末をログアウト。次に管理者の画面を
                                             開く時に多要素認証の設定を求める)
@@ -123,6 +125,27 @@ def _admin_command(args) -> int:
         db.close()
 
 
+def _provider_command(args, shared: bool) -> int:
+    """[FR059-C] D14 有料の provider の停止の確認・再開(共有の印は Redis。届かない時は全 worker に伝えられない)。"""
+    from app.services import cost_guard
+
+    if args.cmd == "provider-status":
+        _print({"redis_shared": shared, "suspended": cost_guard.suspended_providers()})
+        return EXIT_OK
+    if not args.yes:
+        _print({"ok": False, "error": "provider を戻すには --yes も付けてください(原因を確かめてから)"})
+        return EXIT_USAGE
+    if not args.reason.strip():
+        _print({"ok": False, "error": "--reason に原因と確かめた内容を書いてください"})
+        return EXIT_USAGE
+    if not shared:
+        _print({"ok": False, "error": "Redis に届かないため、backend の全プロセスに伝えられません(Runbook §3.7)"})
+        return EXIT_NO_EFFECT
+    cost_guard.resume_provider(args.provider, reason=args.reason)
+    _print({"ok": True, "resumed": args.provider, "suspended": cost_guard.suspended_providers()})
+    return EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="侵害が疑われる時の封じ込め(Runbook §9)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -152,6 +175,11 @@ def main(argv=None) -> int:
     p.add_argument("--email", help="(使えません。以前の形)")
     p.add_argument("--yes", action="store_true", help="外すことの確認")
     p.add_argument("--reason", default="")
+    sub.add_parser("provider-status")
+    p = sub.add_parser("provider-resume")
+    p.add_argument("--provider", required=True)
+    p.add_argument("--yes", action="store_true", help="戻すことの確認")
+    p.add_argument("--reason", default="", help="原因と確かめた内容(監査に残す)")
     for name in ("grant-admin", "revoke-admin"):
         p = sub.add_parser(name)
         p.add_argument("--email", required=True)
@@ -166,6 +194,9 @@ def main(argv=None) -> int:
 
     rate_limiter.use_backend("auto")
     shared = _shared()
+
+    if args.cmd in ("provider-status", "provider-resume"):
+        return _provider_command(args, shared)
 
     if args.cmd == "status":
         state = incident.lockdown_state(fresh=True)

@@ -19,7 +19,7 @@ FE = `frontend/src/components/planning/PlanningUsage.test.tsx`、E2E = `frontend
 | 9 | 画面: 0円 / 50円・80% の警告・上限の停止・未接続・手で続ける方法 | PARTIAL | `components/planning/PlanningUsageMeter.tsx`・`PlanningClassSummary.tsx`、FE(警告・停止・月の上限・読めない時)、E2E(0円 / 50円・未接続・ゲスト 0円・360px・暗い見た目・axe)。80% と停止の実際の画面の E2E は有料 provider の接続の後(fake では画面から使えない) |
 | 10 | 使用の記録に入力の文章・鍵・旅程が無い | IMPLEMENTED | `provider_usage_events` に文章の列が無い。量は整数だけ(文字列は 422)。BE `test_feature_quotas_checked_before_provider`・`test_idempotency_settle_release_and_expiry` |
 | 11 | 無料枠に依らない価格の検算(49.55円 ≤ 50円) | IMPLEMENTED | `worst_case_plan_cost`、BE `test_price_profile_fits_cap_and_unknown_price_fails_closed` |
-| 12 | 実際の請求が見込みを上回った時の alert と provider の停止 | IMPLEMENTED(process の中) | `cost_guard.reconcile`・`_finish`(見込みの超過)、BE `test_reconcile_delta_suspends_provider`。worker 間の共有は D14 |
+| 12 | 実際の請求が見込みを上回った時の alert と provider の停止 | IMPLEMENTED(process の中) | `cost_guard.reconcile`・`_finish`(見込みの超過)、BE `test_reconcile_delta_suspends_provider`。worker 間の共有は D14 ※ **SUPERSEDED BY Gate FR059-C**(停止の印を全ての worker で共有。`gate-fr059c-trace.md`) |
 | 13 | 管理: クラスの付与・Trip Pass の割り当て・Pro の契約の例外は二者の承認(MFA の確認済みの管理者)・理由・監査 | IMPLEMENTED | `app/api/v1/planning_usage.py`、`pages/Admin/AdminEntitlementsPanel.tsx`、BE `test_admin_two_person_approval`、DB の CHECK `ck_entitlements_two_person`、FE |
 | 14 | 利用者の削除: 付与・月の口座を消し、予約・使用の記録から本人を外す(金額は残す) | IMPLEMENTED | `account_deletion.scrub_provider_usage`、BE `test_account_deletion_clears_grants_and_accounts` |
 | 15 | 指標(見込み・実際・予約・拒否・再試行・照合の差) | IMPLEMENTED | `app/ops/metrics.py` `add_provider_usage`(`travelcanvas_provider_usage_*`) |

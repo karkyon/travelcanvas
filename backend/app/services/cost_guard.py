@@ -121,7 +121,10 @@ class Resolution:
 
 _providers_lock = threading.Lock()
 _paid_providers: Dict[str, Dict[str, Any]] = {}
+# [FR059-C] D14 停止の印。正本は Redis(全ての worker・運用のコマンドが同じ印を見る)。Redis を使わない設定・届かない間は
+# このプロセスの中の印で止める。届かない間に付けた印(_unsynced)は、次に届いた時に Redis へ送る(止めた印を失わない)。
 _suspended: Dict[str, str] = {}
+_unsynced: Dict[str, str] = {}
 
 
 def register_provider(name: str, operations: List[str]) -> None:
@@ -134,9 +137,11 @@ def register_provider(name: str, operations: List[str]) -> None:
 
 
 def unregister_provider(name: str) -> None:
+    """登録を外す(このプロセスの印も外す。共有の停止の印は運用者が ``resume_provider`` で外すまで残す)。"""
     with _providers_lock:
         _paid_providers.pop(name, None)
         _suspended.pop(name, None)
+        _unsynced.pop(name, None)
 
 
 def paid_providers() -> Dict[str, Dict[str, Any]]:
@@ -144,22 +149,117 @@ def paid_providers() -> Dict[str, Dict[str, Any]]:
         return {k: dict(v) for k, v in _paid_providers.items()}
 
 
-def suspend_provider(name: str, reason: str) -> None:
-    """請求の照合の差・見込みの超過で止める(運用者が原因を確かめて ``resume_provider`` で戻す)。"""
+def _shared_key() -> str:
+    from app.utils import rate_limiter as _rl
+
+    return f"{_rl.namespace()}:costguard:suspended"
+
+
+def _shared_client():
+    """共有の印に使う Redis(回数制限と同じ接続・名前空間)。使わない設定・届かない間は None。"""
+    from app.utils import rate_limiter as _rl
+
+    if _rl.current_backend() == "memory" or not _rl._redis_available():
+        return None
+    try:
+        return _rl._client()
+    except Exception as error:  # noqa: BLE001
+        _rl._mark_down(error)
+        return None
+
+
+def _shared_failed(error: Exception) -> None:
+    from app.utils import rate_limiter as _rl
+
+    _rl._mark_down(error)
+    _count("provider_suspension_unshared")
+
+
+def _sync_unsynced(client) -> None:
+    """届かない間にこのプロセスで付けた停止の印を Redis へ送る(先に付いている理由は上書きしない)。"""
     with _providers_lock:
-        _suspended[name] = reason[:80]
+        pending = dict(_unsynced)
+    for name, reason in pending.items():
+        client.hsetnx(_shared_key(), name, reason)
+        with _providers_lock:
+            if _unsynced.get(name) == reason:
+                _unsynced.pop(name, None)
+
+
+def suspend_provider(name: str, reason: str) -> bool:
+    """請求の照合の差・見込みの超過で止める(運用者が原因を確かめて ``resume_provider`` で戻す)。
+
+    全ての worker に伝えられた時は True。Redis に届かない時はこのプロセスだけで止め(False)、届いた時に送る。
+    """
+    reason = reason[:80]
+    with _providers_lock:
+        _suspended[name] = reason
+        _unsynced[name] = reason
+    shared = False
+    client = _shared_client()
+    if client is not None:
+        try:
+            _sync_unsynced(client)
+            shared = True
+        except Exception as error:  # noqa: BLE001
+            _shared_failed(error)
     _count("provider_suspended")
-    _audit("provider_usage_suspended", {"provider": name, "reason": reason[:80]})
+    _audit("provider_usage_suspended", {"provider": name, "reason": reason, "shared": shared})
+    return shared
 
 
-def resume_provider(name: str) -> None:
+def resume_provider(name: str, reason: str = "") -> bool:
+    """止めた provider を戻す(全ての worker から印を外せた時は True)。"""
     with _providers_lock:
         _suspended.pop(name, None)
+        _unsynced.pop(name, None)
+    shared = False
+    client = _shared_client()
+    if client is not None:
+        try:
+            client.hdel(_shared_key(), name)
+            shared = True
+        except Exception as error:  # noqa: BLE001
+            _shared_failed(error)
+    _audit("provider_usage_resumed", {"provider": name, "reason": reason[:200], "shared": shared})
+    return shared
 
 
 def is_suspended(name: str) -> bool:
+    """止まっているか。Redis に届く時は Redis の印を正本にする(運用者が別のプロセスから戻した時に、ここの古い印で止め続けない)。
+
+    Redis を使わない設定・届かない時は、このプロセスの印で判定する(fail closed の向き: 止めた印を忘れない)。
+    """
+    client = _shared_client()
+    if client is not None:
+        try:
+            if _unsynced:
+                _sync_unsynced(client)
+            return bool(client.hexists(_shared_key(), name))
+        except Exception as error:  # noqa: BLE001
+            _shared_failed(error)
     with _providers_lock:
         return name in _suspended
+
+
+def suspended_providers() -> Dict[str, str]:
+    """止まっている provider と理由(共有の印とこのプロセスの未送の印)。"""
+    with _providers_lock:
+        local = dict(_suspended)
+        pending = dict(_unsynced)
+    client = _shared_client()
+    if client is None:
+        return local
+    try:
+        raw = client.hgetall(_shared_key()) or {}
+    except Exception as error:  # noqa: BLE001
+        _shared_failed(error)
+        return local
+    out = {(k.decode() if isinstance(k, bytes) else str(k)): (v.decode() if isinstance(v, bytes) else str(v))
+           for k, v in raw.items()}
+    for name, reason in pending.items():
+        out.setdefault(name, reason)
+    return out
 
 
 # ===================================================================== 小さな道具
@@ -835,5 +935,5 @@ def admin_plan_usage(db: Session, plan_id: uuid.UUID) -> Dict[str, Any]:
         "open_reservations": open_count, "not_ok_events": denied,
         "providers": [{**v, "estimated_jpy": money(v["estimated_jpy"]), "actual_jpy": money(v["actual_jpy"])}
                       for v in by_provider.values()],
-        "suspended_providers": sorted(_suspended),
+        "suspended_providers": sorted(suspended_providers()),
     }
