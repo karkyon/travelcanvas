@@ -1,6 +1,6 @@
 """[Gate G1] GOV-01/02/04 DOC-10 の正本(docs/spec/DOC-10_*.md)と、状態の機械が読む正本(docs/trace/fr-status.json)。
 
-- 全58 FR が fr-status.json にあり、状態は判定の段だけ。(部分)は VERIFIED にしない
+- 全59 FR が fr-status.json にあり、状態は判定の段だけ。(部分)は VERIFIED にしない
 - VERIFIED の集合が証拠の台帳(v1-verification-ledger.json)と一致する
 - DOC-10 の表・集計(生成部分)が fr-status.json から作った物と一致する(手で直すと落ちる)
 - DOC-10 に書いた Alembic head が実際の head と一致し、基準 commit が履歴にある(履歴がある時)
@@ -41,7 +41,7 @@ def _status():
 
 def test_every_fr_has_a_valid_state():
     feats = _status()["features"]
-    assert list(feats) == ["FR-%03d" % i for i in range(1, 59)]
+    assert list(feats) == ["FR-%03d" % i for i in range(1, 60)]  # [FR059-A] FR-059 まで
     for fr, f in feats.items():
         assert f["status"] in STATES, fr
         assert f["e2e"] in ("✓", "一部", "✗"), fr
@@ -67,7 +67,7 @@ def test_doc10_generated_parts_match_status(render):
     assert render.rendered(text, render.load_status()) == text, \
         "DOC-10 の表・集計が fr-status.json と違う。python3 scripts/ci/render_doc10.py を実行する"
     rows = re.findall(r"^\| (FR-\d{3}) \|", text, re.M)
-    assert rows == ["FR-%03d" % i for i in range(1, 59)]
+    assert rows == ["FR-%03d" % i for i in range(1, 60)]  # [FR059-A] FR-059 まで
 
 
 def test_doc10_states_migration_head_and_baseline_commit(render):
@@ -90,7 +90,7 @@ def test_doc10_states_migration_head_and_baseline_commit(render):
 
 def test_summary_numbers(render):
     s = render.summary_numbers(render.load_status())
-    assert s["total"] == 58
+    assert s["total"] == 59  # [FR059-A] FR-059 を追加
     assert s["verified"] == len(s["verified_list"])
     assert 0 <= s["weighted_percent"] <= 100
 

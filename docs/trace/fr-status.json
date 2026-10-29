@@ -1,7 +1,7 @@
 {
  "_meta": {
-  "description": "DOC-10 v5.1 の全58 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r26",
+  "description": "DOC-10 v5.1 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
+  "revision": "v5.1-r27",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -473,7 +473,15 @@
    "partial": false,
    "e2e": "✗",
    "gates": "—",
-   "gaps": "価格・有料の範囲の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。料金・支払いは決まるまで実装しない)"
+   "gaps": "価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059)"
+  },
+  "FR-059": {
+   "title": "旅程相談 API の原価上限・クラス別 Quota",
+   "status": "SPECIFIED",
+   "partial": false,
+   "e2e": "✗",
+   "gates": "FR059-A",
+   "gaps": "サーバー側の原価の守り(1旅行 50円の予約・確定・解放・クラス別 quota・使用の台帳・管理の二者の承認・画面の利用枠。FC-181〜185)は Gate B。正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md`"
   }
  }
 }

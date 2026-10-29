@@ -20,6 +20,7 @@
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
+| [gate-fr059a-trace.md](gate-fr059a-trace.md) | Gate FR059-A トレース(外部 API の原価上限・利用者クラス別 quota の正本化) | 1 | 0 | 0 |
 | [gate-g1-trace.md](gate-g1-trace.md) | Gate G1 トレース(正本の統制・鍵の版の切り替え・CI の証拠) | 4 | 1 | 2 |
 | [gate-g10q-trace.md](gate-g10q-trace.md) | Gate G10-Q トレース(品質: V3 再監査・E2E の不安定の根治・mypy の削減) | 0 | 0 | 0 |
 | [gate-g10ux-trace.md](gate-g10ux-trace.md) | Gate G10-UX トレース(UX-5 当日の画面・UX-6 共通の部品・UX-8 暗い見た目を全体へ) | 1 | 1 | 0 |
@@ -104,7 +105,8 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-054 | 予定と実績 | INTEGRATED(部分) | 予定経路と GPS 軌跡の比較 |
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
-| FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。料金・支払いは決まるまで実装しない) |
+| FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | SPECIFIED | サーバー側の原価の守り(1旅行 50円の予約・確定・解放・クラス別 quota・使用の台帳・管理の二者の承認・画面の利用枠。FC-181〜185)は Gate B。正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` |
 
 ## 3. 棚卸しの規則
 
