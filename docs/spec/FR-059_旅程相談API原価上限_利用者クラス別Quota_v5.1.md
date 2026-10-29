@@ -273,4 +273,4 @@ Gate の順(DOC-09): **Gate A**(本書・DOC-10 の登録。docs だけ)→ **Ga
 | D11 | 無料の provider・ローカルの処理も使用を記録 | 有料の provider(`cost_guard.run`)だけを記録。無料の provider(Wikimedia・oEmbed・Nominatim・Overpass)は旅行に結びつかない入口のため未記録 | 旅行の単位の記録の口を、各 provider の Gate で足す(DOC-10 FR-059 の gaps) |
 | D12 | — | 旅行を月の数に入れるのは、その月の最初の予約の時(失敗して解放しても戻さない) | 1回の失敗で何度も数え直す攻撃を防ぐ。数えた月は `counted_month` |
 | D13 | — | 月の区切りは UTC(BILL-02 と同じ)。画面には次のリセットの日を UTC と書く | 既存の使用量と同じ |
-| D14 | — | provider の停止(見込みの超過・照合の差)は process の中の印。複数の worker では各 worker が別に判定する | Redis への共有は有料の provider を初めてつなぐ Gate で足す(gaps) |
+| D14 | — | provider の停止(見込みの超過・照合の差)は Redis の印で全ての worker・運用のコマンドが共有する(回数制限と同じ名前空間)。Redis に届かない間はその process の中の印で止め、届いた時に Redis へ送る(止めた印を失わない)。戻すのは運用者の `tcops.py security provider-resume`(理由が必須・全 worker に伝えられない時は戻さない) | 有料の provider をつなぐ前に入れた(Gate FR059-C)。以前(FR059-B)は process の中の印だけで、止めた worker 以外は呼び続けた |
