@@ -68,6 +68,10 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   const gap = (await gaps.nth(2).boundingBox())!;
   await page.mouse.move(gap.x + gap.width / 2, gap.y + gap.height / 2, { steps: 10 });
   await page.mouse.up();
+  // [Gate G11 段階7] ドラッグは保存する前の案を作る。サーバーの順は「この並びにする」まで変えない
+  await expect(page.getByTestId('reorder-preview')).toContainText('「酒蔵A」 1番目 → 2番目');
+  expect(titles(await send('get', `/plans/${plan.id}`) as Detail)).toEqual(['酒蔵A', '酒蔵B', '酒蔵C', '酒蔵D']);
+  await page.getByTestId('reorder-apply').click();
   await expect(page.getByText('スケジュールを並び替えました')).toBeVisible();
   await expect.poll(async () => titles(await send('get', `/plans/${plan.id}`) as Detail)).toEqual(['酒蔵B', '酒蔵A', '酒蔵C', '酒蔵D']);
 
