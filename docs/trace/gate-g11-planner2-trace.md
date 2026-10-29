@@ -17,6 +17,18 @@ FE = `frontend/src/components/planner/PlannerG11.test.tsx`・`frontend/src/store
 | 6 | 見つけて直したこと: 確定の予定がある日の並べ替えは、位置の変わらない確定の予定にも移動の API を送り 409 で全て失敗していた。位置の変わらない予定は送らない | IMPLEMENTED | `store/planStore.ts` `reorderScheduleItems`・`mapEvent`(sort_order)、FE `planStore.test.ts` |
 | 7 | 先に影響を見せてから適用する方式(プレビュー) | NOT STARTED | 今は保存してから影響を出し、元に戻せる方式(仕様 §3.2 に記録)。1回の変更として記録する並べ替えの API は無い(元に戻すは並べ直し) |
 | 8 | 移動手段のアイコンを OS の絵文字に頼らない(統合ハンドオフの記述) | NOT STARTED | 名前と組にしているので色・絵文字だけには頼っていない。共通のアイコンへの置き換えは別の段階 |
+| 9 | CI の E2E の 429 連鎖(ハンドオフ §3 の 5)の調査: 何の応答が接続元の点数になったかを CI の要約・注記に残す | PARTIAL | `scripts/ci/e2e_guard_report.py`、`.github/workflows/ci.yml` の「E2E の接続元の点数の報告」、BE `test_gate_g11_guard_report.py`。原因は未特定(下の記録) |
+
+## CI の 429 連鎖の記録
+
+- PR #15 の1回目: push の run は e2e 合格、pull_request の run(job 123214120657)は `gate-g4.spec.ts` の COL-05 から 50 件が 429
+  (「短時間に不審な操作が続いた」)で失敗した。PR #13 と同じ形(この時は member-policy から)。再試行(retries 1)も遮断の中で落ちた
+- サンドボックスで全件を Redis の MONITOR で数えた(挙動は変えない): 点数の加算は 41 回・合計 117、うち 60 は最後の
+  `zz-security-challenge.spec.ts`(最初に点数を消してから、わざと点数を上げる試験)。それ以外の合計は 57、900 秒の窓の最大は 95。
+  多いのは `member-policy` 9・`auth-flows` 8・`account-deletion` 5。応答の内訳は 登録の 428 が 29 件・`/auth/me` の 401 が 22 件・登録の 429 が 9 件
+- CI では gate-g4(全 89 件の 36 番目ごろ)までに 150 に届いており、サンドボックスの同じ所(約 27)の5倍以上。CI だけの点数の出どころが
+  あるはずだが、job の log は手元から読めない。次の CI の run で、上の報告が点数の内訳(応答の種類・経路・時刻)を出す
+- 遮断の閾値・点数の付け方・E2E の再試行は変えていない(連鎖を隠さない)
 
 ## 検証(サンドボックス。CI・omega-dev2 とは別)
 

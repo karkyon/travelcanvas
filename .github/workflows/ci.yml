@@ -363,6 +363,11 @@ jobs:
           CI: 'true'
         run: npx playwright test
 
+      # [Gate G11] 429 の連鎖(接続元の点数が CI でだけ遮断に届く)の原因を調べるため、何の応答が点数になったかを要約・注記に残す
+      - name: E2E の接続元の点数の報告
+        if: always()
+        run: docker compose logs -t --no-color backend | python3 scripts/ci/e2e_guard_report.py
+
       # [Gate G3] CI-04 再試行で通った試験(flaky)を合格とは別に数え、spec ごとに issue へ残す(合格の扱いのまま放置しない)
       - name: E2E の再試行(flaky)の記録
         if: always()
