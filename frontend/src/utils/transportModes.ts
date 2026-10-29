@@ -6,6 +6,7 @@
  * - helicopter は「要手配」。所要時間を推定しない
  * - 値が無い・知らない値は「移動手段未設定」(既定の電車のアイコンを出さない)
  * - 古い画面の値(car・plane・subway・boat・tram・transit・other)も同じ表で読む
+ * - bus は路線バス、express_bus は高速バス(区別する前に保存した高速バスは bus のまま。推測で直さない)
  */
 export interface TransportModeInfo {
   /** 正式な値(区間の mode) */
@@ -21,10 +22,11 @@ export interface TransportModeInfo {
 const TABLE: Record<string, Omit<TransportModeInfo, 'mode'>> = {
   walking: { icon: '🚶', label: '徒歩', note: null, estimable: true },
   bicycle: { icon: '🚲', label: '自転車', note: null, estimable: true },
-  bus: { icon: '🚌', label: 'バス', note: null, estimable: true },
+  bus: { icon: '🚌', label: '路線バス', note: null, estimable: true },
+  express_bus: { icon: '🚍', label: '高速バス', note: null, estimable: true },
   train: { icon: '🚃', label: '鉄道', note: null, estimable: true },
   shinkansen: { icon: '🚄', label: '新幹線', note: null, estimable: true },
-  driving: { icon: '🚗', label: '車', note: null, estimable: true },
+  driving: { icon: '🚗', label: '自家用車', note: null, estimable: true },
   taxi: { icon: '🚕', label: 'タクシー', note: null, estimable: true },
   ferry: { icon: '⛴️', label: '船', note: null, estimable: true },
   flight: { icon: '✈️', label: '飛行機', note: null, estimable: true },
@@ -65,5 +67,6 @@ export function durationLabel(minutes: number): string {
   return mm ? `${h}時間${mm}分` : `${h}時間`;
 }
 
-/** 凡例(画面の正本のモックの「🚶 徒歩 / 🚌 バス / 🚄 新幹線 / 🚕 タクシー / 🚗 自家用車 / 🚁 ヘリ(要手配)」) */
-export const LEGEND_MODES = ['walking', 'bus', 'train', 'shinkansen', 'taxi', 'driving', 'flight', 'helicopter'] as const;
+/** 凡例(画面の正本のモックの「🚶 徒歩 / 🚌 路線バス / 🚍 高速バス / 🚄 新幹線 / 🚕 タクシー / 🚗 自家用車 / 🚁 ヘリ(要手配)」) */
+export const LEGEND_MODES = ['walking', 'bicycle', 'bus', 'express_bus', 'train', 'shinkansen', 'taxi', 'driving', 'flight',
+  'helicopter'] as const;

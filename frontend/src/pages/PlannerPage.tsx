@@ -29,7 +29,7 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import AllDaysChart from '@/components/planner/AllDaysChart';
-import { zoneOfEvent } from '@/components/planner/plannerModel';
+import { titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
@@ -955,6 +955,7 @@ const PlannerPage: React.FC = () => {
                 onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
                 segments={segments}
                 zones={zoneOfEvent(currentPlan.days)}
+                titles={titleOfEvent(currentPlan.days)}
               />
             </>
           ) : null}

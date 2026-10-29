@@ -8,7 +8,9 @@ import { apiClient, registerMember } from './support/api';
  *   1. 営業時間を登録した場所の予定に「営業時間内」、閉店の後に着く予定に「閉まった後」の帯が、出典と一緒に出る
  *   2. 予定へ着く移動に名前が出る(新幹線は明示した区間だけ・鉄道は「鉄道」)。日の見出しに現地の時刻帯が出る
  *   3. 時差をまたぐ飛行機の区間は、出発地・到着地の現地の日時を、同じ瞬間から求めて並べる(夏時間の終わった後の UTC−5)
- *   4. 「下へ」のボタンで順を変えると、サーバーの順も変わり、読み上げの知らせが出る
+ *   4. 「下へ」のボタンで順を変えると、サーバーの順も変わり、読み上げの知らせが出る。並べ替えの影響(順の変化・営業時間・
+ *      前後が合わなくなった移動の区間)を出し、「元に戻す」でサーバーの順も元へ戻る。移動はタイムラインの独立した行
+ *   7. 高速バス(express_bus)の区間を保存でき、「🚍 高速バス」と出る(路線バスと区別する)
  *   5. 「全日程」で日を同じ時刻の物差しで並べ、予定を押すとその日の日別へ戻る
  *   6. 幅 360px・暗い見た目で横にはみ出さない。axe 違反 0
  */
@@ -43,6 +45,9 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
   await send('post', `${base}/segments`, {
     from_event_id: kyotoSt, to_event_id: ny, mode: 'flight', planned_departure_at: '2026-11-16T13:45:00Z', duration_minutes: 870,
   });
+  // 7. 2日目の中の高速バス(到着の後の移動)
+  const hotel = (await send('post', `${base}/events`, { day_id: d2.id, title: 'ボストンの宿', local_start_time: '06:00' })).id;
+  await send('post', `${base}/segments`, { from_event_id: ny, to_event_id: hotel, mode: 'express_bus', duration_minutes: 255 });
 
   await page.goto(`/planner/${plan.id}`);
   const list = page.getByRole('list', { name: /の予定$/ });
@@ -57,9 +62,12 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
   await expect(card('夕食').getByTestId('schedule-hours')).toContainText('確認');
   await expect(card('京都駅').getByTestId('schedule-hours')).toHaveCount(0);
 
-  // 2. 移動手段の名前
-  await expect(card('夕食').getByTestId('schedule-arrival')).toContainText('🚃 鉄道 · 25分');
-  await expect(card('京都駅').getByTestId('schedule-arrival')).toContainText('🚄 新幹線 · 15分');
+  // 2. 移動手段の名前(予定の前の独立した行)
+  const segRow = (eventId: string) => list.locator(`[data-testid="segment-row"][data-to-event="${eventId}"]`);
+  await expect(segRow(dinner)).toContainText('🚃 鉄道 · 25分');
+  await expect(segRow(dinner)).toContainText('「清水寺」から');
+  await expect(segRow(kyotoSt)).toContainText('🚄 新幹線 · 15分');
+  await expect(list.getByTestId('segment-mismatch')).toHaveCount(0);
   await expectNoAxeViolations(page, '旅程(営業時間の帯・移動手段)');
 
   // 4. 触る並べ替え(夕食を京都駅の後へ)
@@ -68,12 +76,28 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
   await expect.poll(async () => (await send('get', base)).days[0].events.map((e: { title: string }) => e.title))
     .toEqual(['清水寺', '京都駅', '夕食']);
   await expect(page.getByTestId('reorder-status')).toContainText('確かめました', { timeout: 20_000 });
+  const impact = page.getByTestId('reorder-impact');
+  await expect(impact.getByTestId('reorder-impact-moves')).toContainText('「夕食」 2番目 → 3番目');
+  await expect(impact.getByTestId('reorder-impact-hours')).toContainText('営業時間の判定に変化はありません');
+  await expect(impact.getByTestId('reorder-impact-segments')).toContainText('前後が合わなくなった移動の区間が2件あります');
+  await expect(segRow(dinner)).toHaveAttribute('data-mismatch', 'true');
+  await expectNoAxeViolations(page, '並べ替えの影響');
+  await impact.getByTestId('reorder-undo').click();
+  await expect(page.getByTestId('reorder-status')).toContainText('元の並びに戻しました');
+  await expect.poll(async () => (await send('get', base)).days[0].events.map((e: { title: string }) => e.title))
+    .toEqual(['清水寺', '夕食', '京都駅']);
+  await expect(page.getByTestId('reorder-impact')).toHaveCount(0);
+  await expect(list.getByTestId('segment-mismatch')).toHaveCount(0);
 
   // 3. 時差(2日目)
   await page.locator('[data-day="1"]').first().click();
   await expect(page.getByTestId('day-timezone')).toHaveText('現地時間 · America/New_York', { timeout: 20_000 });
-  const arrival = list.getByRole('listitem', { name: 'ニューヨーク着(上下矢印キーで並べ替え)' }).getByTestId('schedule-cross-zone');
+  const arrival = segRow(ny).getByTestId('schedule-cross-zone');
   await expect(arrival).toHaveText('11/16 22:45 Tokyo(UTC+9)→ 11/16 23:15 New York(UTC−5)');
+  await expect(segRow(ny)).toContainText('「京都駅」から');
+  await expect(segRow(ny)).toHaveAttribute('data-mismatch', 'false');
+  // 7. 高速バス
+  await expect(segRow(hotel)).toContainText('🚍 高速バス · 4時間15分');
 
   // 5. 全日程
   await page.getByTestId('plan-view-all').click();

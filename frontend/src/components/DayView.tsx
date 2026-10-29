@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
-import { arrivalLeg, arrivalSegment, hoursBadge } from './planner/plannerModel';
+import { hoursBadge, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
+import ReorderImpact from './planner/ReorderImpact';
 import EventPhotoDialog from './planner/EventPhotoDialog';
 import { getEventImageMedia, getEventImages, getMediaProviderStatus } from '../services/api/g11discover';
 import type { EventImage } from '../services/api/types/g11discover';
@@ -33,6 +34,8 @@ interface DayViewProps {
   segments?: TravelSegment[];
   /** [Gate G11] 予定 → その日の時刻帯(時差をまたぐ区間の出発地) */
   zones?: Record<string, string | undefined>;
+  /** [Gate G11] 予定 → 題名(区間の行の出発の予定。別の日の予定を含む) */
+  titles?: Record<string, string>;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -47,8 +50,9 @@ const DayView: React.FC<DayViewProps> = ({
   className = '',
   segments = [],
   zones = {},
+  titles,
 }) => {
-  const { addNewScheduleItem, deleteScheduleItem } = usePlan();
+  const { addNewScheduleItem, deleteScheduleItem, reorderSchedule } = usePlan();
   const { dragState, handleDragStart, handleDrop, handleDragEnd, handleKeyboardMove, moveItemBy, isItemDragged } = useDragDrop();
 
   // [Gate G11] 営業時間の照合。予定の順・時刻・場所が変わったら読み直し、読み直すまでは古い判定を「確認中」にする
@@ -116,10 +120,50 @@ const DayView: React.FC<DayViewProps> = ({
     return () => { active = false; };
   }, [canEdit]);
 
+  // [Gate G11] 並べ替えの影響(UIX-M03): 動かす前の並びと営業時間の判定を覚え、差・合わなくなった区間・元に戻すを出す。
+  // 続けて動かした時は最初の並びを覚えたまま(元に戻すと、まとめて最初の並びへ戻る)
+  const [impact, setImpact] = useState<{ order: string[]; hours: Record<string, EventHoursCheck> | null } | null>(null);
+  const [impactBusy, setImpactBusy] = useState(false);
+  const titleMap = useMemo(() => titles ?? Object.fromEntries(day.events.map((e) => [e.id, e.title])), [titles, day.events]);
+  const impactModel = useMemo(() => (impact
+    ? reorderImpact(impact.order, impact.hours, day.events, hours?.byId ?? null, hoursPending, segments) : null),
+  [impact, day.events, hours, hoursPending, segments]);
+  const impactShown = Boolean(impactModel && impactModel.moves.length > 0);
+  useEffect(() => { setImpact(null); }, [day.id]);
+  const rememberBefore = useCallback(() => {
+    setImpact((cur) => (cur && impactShown ? cur : {
+      order: day.events.map((e) => e.id), hours: hoursPending ? null : (hours?.byId ?? {}),
+    }));
+  }, [day.events, hours, hoursPending, impactShown]);
+  const undoReorder = useCallback(async () => {
+    if (!impact) return;
+    const now = day.events.map((e) => e.id);
+    const back = [...impact.order.filter((id) => now.includes(id)), ...now.filter((id) => !impact.order.includes(id))];
+    setImpactBusy(true);
+    try {
+      await reorderSchedule(planId, day.id, back);
+      setImpact(null);
+      setAnnounce('元の並びに戻しました。営業時間と移動を確かめています');
+    } finally {
+      setImpactBusy(false);
+    }
+  }, [impact, day.events, day.id, planId, reorderSchedule]);
+  const keepReorder = useCallback(() => {
+    setImpact(null);
+    setAnnounce('この並びのままにしました');
+  }, []);
+
   const moveBy = useCallback(async (event: ScheduleItemType, delta: -1 | 1) => {
+    const index = day.events.findIndex((e) => e.id === event.id);
+    const blocked = moveBlockedReason(day.events, index, delta);
+    if (blocked) {
+      setAnnounce(blocked);
+      return;
+    }
+    rememberBefore();
     const to = await moveItemBy(event, planId, day.id, delta);
     if (to !== null) setAnnounce(`「${event.title}」を${to + 1}番目へ移しました。営業時間と移動を確かめています`);
-  }, [moveItemBy, planId, day.id]);
+  }, [moveItemBy, planId, day.id, day.events, rememberBefore]);
   const { addToast } = useToast();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -264,6 +308,7 @@ const DayView: React.FC<DayViewProps> = ({
   // ドロップゾーンの処理
   const handleItemDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
     const sourceContainerId = containerId(planId, day.id);
+    rememberBefore();
     handleDrop(e, sourceContainerId, targetIndex, (result) => {
       if (result.success) {
         addToast({
@@ -277,7 +322,7 @@ const DayView: React.FC<DayViewProps> = ({
         });
       }
     });
-  }, [planId, day.id, handleDrop, addToast]);
+  }, [planId, day.id, handleDrop, addToast, rememberBefore]);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -327,6 +372,11 @@ const DayView: React.FC<DayViewProps> = ({
       {/* [Gate G11] 並べ替えの結果と再確認の知らせ(読み上げ) */}
       <p className="sr-only" role="status" aria-live="polite" data-testid="reorder-status">{announce}</p>
 
+      {impactShown && impactModel && (
+        <ReorderImpact dayId={day.id} model={impactModel} busy={impactBusy}
+          onUndo={() => { void undoReorder(); }} onKeep={keepReorder} />
+      )}
+
       {/* スケジュールリスト
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
           aria-required-parent)。予定がある時だけ一覧の役割を与え、間の包みは役割無しにする。 */}
@@ -356,8 +406,30 @@ const DayView: React.FC<DayViewProps> = ({
             </div>
           </Card>
         ) : (
-          day.events.map((event, index) => (
+          day.events.map((event, index) => {
+            const row = segmentRow(day.events, index, segments, zones, day.timezone_id, titleMap);
+            const upBlocked = index === 0 || moveBlockedReason(day.events, index, -1) !== null;
+            const downBlocked = index === day.events.length - 1 || moveBlockedReason(day.events, index, 1) !== null;
+            return (
             <div key={event.id} role="none">
+              {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる) */}
+              {row && (
+                <div role="listitem" data-testid="segment-row" data-to-event={event.id}
+                  data-mismatch={row.mismatch ? 'true' : 'false'}
+                  className={`mb-2 ml-12 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border-l-4 px-2 py-1 text-xs ${
+                    row.mismatch ? 'border-warning bg-warning-soft text-warning' : 'border-cloud-200 bg-cloud-100 text-ink-700'}`}>
+                  <span className="sr-only">移動:</span>
+                  <span>{row.leg.text}</span>
+                  {row.leg.isEstimate && <span>(推定)</span>}
+                  {row.leg.status === 'confirmed' && <span>・確定</span>}
+                  {row.fromTitle && <span>{`「${row.fromTitle}」から`}</span>}
+                  {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
+                  {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
+                  {row.mismatch && (
+                    <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
+                  )}
+                </div>
+              )}
               {/* ドロップゾーン */}
               {dragState.isDragging && (
                 <div
@@ -384,6 +456,15 @@ const DayView: React.FC<DayViewProps> = ({
                 onClick={() => onItemClick?.(event)}
                 onKeyDown={(e) => {
                   if (e.target !== e.currentTarget) return;
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    const blocked = moveBlockedReason(day.events, index, e.key === 'ArrowUp' ? -1 : 1);
+                    if (blocked) {
+                      e.preventDefault();
+                      setAnnounce(blocked);
+                      return;
+                    }
+                    rememberBefore();
+                  }
                   void handleKeyboardMove(e, event, planId, day.id).then((to) => {
                     if (to !== null) setAnnounce(`「${event.title}」を${to + 1}番目へ移しました。営業時間と移動を確かめています`);
                   });
@@ -392,11 +473,11 @@ const DayView: React.FC<DayViewProps> = ({
               >
                 {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え) */}
                 <div className="flex shrink-0 flex-col justify-center gap-1">
-                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={index === 0}
+                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
                     data-testid={`move-up-${event.id}`}
                     className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
                     onClick={(e) => { e.stopPropagation(); void moveBy(event, -1); }}>↑</button>
-                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={index === day.events.length - 1}
+                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
                     data-testid={`move-down-${event.id}`}
                     className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
                     onClick={(e) => { e.stopPropagation(); void moveBy(event, 1); }}>↓</button>
@@ -416,7 +497,7 @@ const DayView: React.FC<DayViewProps> = ({
                   currency={event.currency}
                   category={event.category}
                   priority={priorityToLabel(event.priority)}
-                  travelMethod={event.travel_method}
+                  travelMethod={row ? undefined : event.travel_method}
                   travelTime={event.travel_time}
                   travelCost={event.travel_cost}
                   notes={event.notes}
@@ -426,7 +507,6 @@ const DayView: React.FC<DayViewProps> = ({
                   onEdit={() => onItemEdit?.(event)}
                   onDelete={() => handleDeleteItem(event.id)}
                   onComment={onItemComment ? () => onItemComment(event) : undefined}
-                  arrival={arrivalLeg(arrivalSegment(event.id, segments), zones, day.timezone_id)}
                   hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
                   image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
                   onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
@@ -434,7 +514,8 @@ const DayView: React.FC<DayViewProps> = ({
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
         
         {/* 最後のドロップゾーン */}

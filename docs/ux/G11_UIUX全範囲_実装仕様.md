@@ -54,6 +54,9 @@
 CHECK があり、実装の時に分かった(保存すると 500 になる)。承認済みの §4 の範囲の中の変更として段階2 の PR に入れ、PR と報告に明記する。
 downgrade は shinkansen → train、helicopter → mixed に直してから元に戻す。
 
+段階6 の migration `c4e8a1f3b7d2`(down `b8d4f6a0c3e5`): 同じ CHECK に `express_bus`(高速バス)を足す(§4。統合ハンドオフ §3 の
+「路線バス・高速バス」の区別。承認済みの範囲の中の語彙の追加で、列・既存の値は変えない)。downgrade は express_bus → bus に直して戻す。
+
 ### 1.1 場面ごとの動き(dangling reference を作らない)
 
 | 場面 | 動き |
@@ -145,6 +148,9 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
   - 営業時間の帯: `hours-check` の status ごとに記号と文字(✓ 時間内 / ⚠ 閉店まで◯分 / ⚠ 最終入場 HH:MM を過ぎる / ⚠ L.O. HH:MM を過ぎる / ✕ 休業日・閉店後 / ? 営業時間未確認)と出典・確認日。色だけで伝えない
   - 予定の写真があれば左に小さく出す(段階3)
   - 並べ替え: 既存のドラッグと矢印キーに加え、触って使える「上へ」「下へ」のボタン(各 44px 以上、`aria-label`)。動かした後に aria-live で「◯番目へ移しました。営業時間と移動を確かめています」と知らせ、焦点を動かしたカードに残す。照合が終わるまで古い判定を「確認中」にする
+  - 並べ替えの影響(段階6): 動かした後に「並べ替えの影響」を出す — 順の変化(◯番目 → ◯番目)、営業時間の判定の変化(照合の後。変化なし・確認中・比べられない を区別)、前後が合わなくなった移動の区間の数と行き先、「開始・終了の時刻は自動では変えていない・確定の予定は動かしていない」。「元に戻す」で動かす前の並びへ(続けて動かした時は最初の並びへ)、「このままにする」で閉じる。並べ替えは保存してから影響を出す方式(先に見せて適用する方式ではない。API の 1件ずつの移動と同じ)
+  - 確定(🔒)の予定は動かさない: 確定の予定の「上へ」「下へ」、確定の予定と入れ替わる移動は押せず、矢印キーでは理由を読み上げる。位置の変わらない予定は送らない(以前は確定の予定がある日の並べ替えが 409 で全て失敗した)
+- 移動の区間の行(段階6): 予定へ着く区間を、カードの中ではなくタイムラインの独立した行(予定の前)に出す — 手段のアイコン+名前+所要時間・推定・確定・出発の予定の名前・時差。区間の出発の予定が直前の予定と違う時(並べ替えで合わなくなった時)は「⚠ 前の予定と合っていません(区間は自動では直しません)」
 - 日の見出し: 「現地時間 · Asia/Tokyo」のように IANA の名前を常に出す(端末と同じでも省く)
 - 時差をまたぐ移動(区間の出発と到着の日の timezone_id が違う): 出発地と到着地の日付・時刻・zone を並べ、日付が変わる時は「翌日着」「前日着」の印。同じ1つの UTC の時刻から両方へ変換する。zone が無効なら「時刻帯未確認」
 - 「日別」「全日程」の切り替え(DateNavigation の上): 全日程はモックの「全日程の横断チャート」
@@ -189,10 +195,11 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 |---|---|---|
 | walking | 🚶 徒歩 | |
 | bicycle | 🚲 自転車 | |
-| bus | 🚌 バス | |
+| bus | 🚌 路線バス | 段階6 で名前を「路線バス」に。区別する前に保存した高速バスも bus のまま(推測で直さない) |
+| express_bus | 🚍 高速バス | 新しい値(段階6)。所要時間は推定(60km/h・迂回 1.25 の目安) |
 | train | 🚃 鉄道 | 新幹線と推測しない |
 | shinkansen | 🚄 新幹線 | 新しい値(区間で明示された時だけ) |
-| driving / car | 🚗 車 | |
+| driving / car | 🚗 自家用車 | 段階6 で名前を「自家用車」に(統合ハンドオフの語彙。タクシーと区別) |
 | taxi | 🚕 タクシー | |
 | ferry | ⛴️ 船 | |
 | flight / plane | ✈️ 飛行機 | |
@@ -200,7 +207,9 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | mixed | 🔀 乗り継ぎ | |
 | (空・不明) | 移動手段未設定 | アイコンを出さない |
 
-`segments.py` の MODES と `branch_resources.py` の MODES に `shinkansen`・`helicopter` を足す。`route_estimator` は helicopter の時に推定しない(所要時間 NULL・理由「要手配」)、shinkansen は train と同じ扱いで推定する。
+`segments.py` の MODES と `branch_resources.py` の MODES に `shinkansen`・`helicopter`(段階2)・`express_bus`(段階6)を足す。
+避けたい移動手段の語(実行可能性)は「バス」→ 路線バス・高速バス、「高速バス」「夜行バス」→ express_bus と区別する前の bus、
+「新幹線」→ shinkansen と train、「鉄道」「電車」→ train と shinkansen、「ヘリ」→ helicopter に当てる(違反の候補を落とさない)。`route_estimator` は helicopter の時に推定しない(所要時間 NULL・理由「要手配」)、shinkansen は train と同じ扱いで推定する。
 
 ---
 
@@ -280,6 +289,7 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | 2 Planner | gate/g11-planner | migration `b8d4f6a0c3e5`(§1.0)・hours-check・営業時間の帯・移動手段の名前・shinkansen/helicopter・日の zone・時差の区間・触る並べ替え・全日程のチャート | **完了**: PR #11、CI 5ジョブ合格、main `ee4368c`(`docs/trace/gate-g11-planner-trace.md`)。DOC-10 r24。omega-dev2 は未反映 |
 | 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | **完了**: PR #12、CI 5ジョブ合格(run 40683118167・40683094584)、main `4525c0e`(tree 一致)。DOC-10 r25。omega-dev2 は未反映 |
 | 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | **完了**: PR #13、CI 5ジョブ合格(pull_request の run 40783537644 は1回目の e2e が 429 の連鎖で失敗 → 再実行で合格、push の run 40783532270 は合格。`docs/trace/gate-g11-intake-trace.md` に記録)、main `2f6b90a`(tree 一致)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
-| 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→方面の詳細→旅程の下書き→旅程にする)・信頼の状態の表示・provider 未接続の表示(§2.5・§3.5、統合ハンドオフ §3・§4 の範囲 B) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-intake-trace.md`、`docs/adr/ADR-trip-intake.md`)。migration なし・DOC-10 の変更なし |
+| 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→方面の詳細→旅程の下書き→旅程にする)・信頼の状態の表示・provider 未接続の表示(§2.5・§3.5、統合ハンドオフ §3・§4 の範囲 B) | **完了**: PR #14、CI 5ジョブ×2 run 合格(再試行なし)、main `1c25a37`(tree 一致)(`docs/trace/gate-g11-intake-trace.md`、`docs/adr/ADR-trip-intake.md`)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
+| 6 Planner2 | gate/g11-planner2 | migration `c4e8a1f3b7d2`(§1.0)・路線バス/高速バス(express_bus)・自家用車の名前・移動の区間の独立した行と合わない区間の知らせ・並べ替えの影響と元に戻す・確定の予定を動かさない(§3.2・§4、統合ハンドオフ §3 の残り 1・2) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-planner2-trace.md`)。DOC-10 r26 |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。

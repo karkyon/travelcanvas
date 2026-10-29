@@ -63,6 +63,7 @@ class ExportSegment:
 MODE_LABEL = {
     "walking": "徒歩", "driving": "車", "train": "鉄道", "bus": "バス", "ferry": "船", "flight": "航空",
     "bicycle": "自転車", "taxi": "タクシー", "mixed": "混合",
+    "shinkansen": "新幹線", "helicopter": "ヘリ", "express_bus": "高速バス",  # [Gate G11]
 }
 EVENT_TYPE_LABEL = {
     "sightseeing": "観光", "activity": "アクティビティ", "meal": "食事", "dining": "食事", "restaurant": "食事",

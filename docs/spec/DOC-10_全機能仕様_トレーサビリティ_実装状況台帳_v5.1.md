@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r25** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-28  
+> 文書ID: DOC-10 / 版: **v5.1-r26** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-29  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,8 +14,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `b21e47b`(Gate G11-Media PR #9。この後に Gate G11-Planner(r24)・G11-Discover(r25)の commit が続く) |
-| Alembic head | `b8d4f6a0c3e5`(単一の head。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ) |
+| 基準commit | `1c25a37`(Gate G11-Intake PR #14。この後に、この版を入れる Gate G11-Planner2(r26)の commit が続く) |
+| Alembic head | `c4e8a1f3b7d2`(単一の head。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス) |
 | 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 853 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.24 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -238,7 +238,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r22 | 2026-10-28 | `e39d5e7` | **Gate G10-UX: UX-8 暗い見た目を全ての画面へ・UX-6 共通の部品をデザインの決まりへ・UX-5 当日の画面・issue #7(オフラインの書き込みで共通の「ネットワークエラー」と「端末に保存」が食い違う)。FR の状態の遷移なし。`docs/trace/gate-g10ux-trace.md`** |
 | r23 | 2026-10-28 | `540955d` | Gate G11-Media(G11 の段階1): 旅行の表紙の写真(既存の非公開・暗号化した写真の記録を選ぶ・取り込む、見せる位置と拡大、見える人だけに配信、撮影情報の除去、読めない時は色の表紙)。migration `a7c3e5f9b2d4`(表紙・予定の写真・外部の写真の出典・SNS の候補)。FR-037 は顔の検査・MEMORY MAP が残るため(部分)のまま。仕様 `docs/ux/G11_UIUX全範囲_実装仕様.md`、`docs/trace/gate-g11-media-trace.md` |
 | r24 | 2026-10-28 | `540955d`+G11-Media | Gate G11-Planner(G11 の段階2): 予定ごとの営業時間の照合(`GET /plans/{id}/hours-check`。時間内・閉店間際・最終入場・ラストオーダー・滞在中に閉まる・休業・未確認・古い出典)と予定のカードの帯、予定へ着く移動の名前(新幹線・ヘリを足す。migration `b8d4f6a0c3e5`)・日の現地の時刻帯・時差をまたぐ区間の両端の現地の日時、触って使う並べ替え(上へ・下へ)と再確認の知らせ、全日程の横断チャート。FR の状態の遷移なし(FR-005 の実機のタッチ・FR-014 の外部の時刻表は残る)。`docs/trace/gate-g11-planner-trace.md` |
-| **r25** | 2026-10-28 | `b21e47b`+G11-Planner | **Gate G11-Discover(G11 の段階3): 外部の画像・SNS の provider の interface(設定で止められる。値を作らない)、Wikimedia Commons の写真の候補(作者・ライセンス・出典。CC0・PD・CC BY・CC BY-SA だけ取り込める)と非公開の記録への取り込み(記録と同じ検査・撮影情報の除去・暗号化。出典を残す)、YouTube・TikTok の公式 oEmbed による SNS の投稿の確認(投稿へ直接つながない。取れない時は URL とメモ)と候補箱への social の保存、予定のカードの写真、近くの検索のカテゴリ・半径・距離・Overpass の正規表現の逃がし。migration なし(G11-Media で用意した列を使う)。FR-007 の gaps を「SNS 以外の URL の題名・画像の取得」に狭めた(部分のまま)。`docs/trace/gate-g11-discover-trace.md`・`docs/adr/ADR-media-providers.md`** |
+| r25 | 2026-10-28 | `b21e47b`+G11-Planner | Gate G11-Discover(G11 の段階3): 外部の画像・SNS の provider の interface(設定で止められる。値を作らない)、Wikimedia Commons の写真の候補(作者・ライセンス・出典。CC0・PD・CC BY・CC BY-SA だけ取り込める)と非公開の記録への取り込み(記録と同じ検査・撮影情報の除去・暗号化。出典を残す)、YouTube・TikTok の公式 oEmbed による SNS の投稿の確認(投稿へ直接つながない。取れない時は URL とメモ)と候補箱への social の保存、予定のカードの写真、近くの検索のカテゴリ・半径・距離・Overpass の正規表現の逃がし。migration なし(G11-Media で用意した列を使う)。FR-007 の gaps を「SNS 以外の URL の題名・画像の取得」に狭めた(部分のまま)。`docs/trace/gate-g11-discover-trace.md`・`docs/adr/ADR-media-providers.md` |
+| **r26** | 2026-10-29 | `1c25a37` | **Gate G11-Planner2(G11 の段階6): 路線バス・高速バスの区別(migration `c4e8a1f3b7d2` で区間の mode に express_bus)、移動の区間をタイムラインの独立した行に出し並べ替えで合わなくなった区間を知らせる、並べ替えの影響(順・営業時間・区間)と元に戻す、確定の予定を動かさない(確定の予定がある日の並べ替えが 409 で失敗していた不具合を直した)。G11-Style・G11-Intake(段階4・5)はDOC-10 を変えていない。FR の状態の遷移なし。`docs/trace/gate-g11-planner2-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

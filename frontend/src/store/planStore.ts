@@ -152,6 +152,7 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     // [Gate G11] 営業時間の照合・全日程のチャートの固定の数
     place_id: e.place_id ?? undefined,
     locked: e.locked,
+    sort_order: e.sort_order,
   };
 }
 
@@ -851,11 +852,24 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       let revision = plan.revision!;
       for (let i = 0; i < reorderedEvents.length; i++) {
         const event = reorderedEvents[i]!;
+        // [Gate G11] 既にその位置の番号の予定は送らない(確定の予定が動かない時に、移動の API の 409 で並べ替え全体が
+        // 失敗していた。番号が分からない古いデータは今までどおり送る)
+        if (event.sort_order === i) continue;
         // revisionを1件ずつ連鎖させるため、意図的に逐次awaitする(並列化不可)。
         await apiService.moveEvent(plan.id, event.id, { sort_order: i }, revision, generateIdempotencyKey());
         revision += 1;
       }
-      set((s) => (s.currentPlan ? { currentPlan: { ...s.currentPlan, revision } } : s));
+      set((s) => (s.currentPlan ? {
+        currentPlan: {
+          ...s.currentPlan, revision,
+          days: s.currentPlan.days.map((d) => (d.id === day.id
+            ? { ...d, events: d.events.map((e) => {
+              const at = itemIds.indexOf(e.id);
+              return at === -1 ? e : { ...e, sort_order: at };
+            }) }
+            : d)),
+        },
+      } : s));
     } catch (error) {
       // [Gate G6] OFF-02 通信できない時は並びを端末に溜める(送る時にサーバーの予定の集まりと違えば競合として知らせる)
       if (isNetworkError(error) && enqueue(plan.id, {

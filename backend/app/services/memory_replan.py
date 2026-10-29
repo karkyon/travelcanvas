@@ -33,7 +33,8 @@ MIN_TRANSPORT_SAMPLES = 3
 MIN_TRANSPORT_DELAY = 10
 MAX_BUFFER = 120
 MODE_LABEL = {"walking": "徒歩", "driving": "車", "train": "鉄道", "bus": "バス", "ferry": "船", "flight": "飛行機",
-              "bicycle": "自転車", "taxi": "タクシー", "mixed": "複合"}
+              "bicycle": "自転車", "taxi": "タクシー", "mixed": "複合",
+              "shinkansen": "新幹線", "helicopter": "ヘリ", "express_bus": "高速バス"}  # [Gate G11]
 
 
 def _minutes(hhmm: Optional[str]) -> Optional[int]:

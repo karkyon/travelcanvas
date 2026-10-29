@@ -47,11 +47,11 @@ test('FR-019 案の中の区間・予約の変更、選んだ変更だけの採�
 
   await page.goto(`/planner/${plan.id}/branches/${branch.id}`);
   const panel = page.getByRole('region', { name: '移動区間・予約' });
-  await expect(panel.getByTestId(`branch-segment-${segment.id}`)).toContainText('藤居本家 → 岡村本家(車・15分)');
+  await expect(panel.getByTestId(`branch-segment-${segment.id}`)).toContainText('藤居本家 → 岡村本家(自家用車・15分)');
   // 岡村本家を外すと、付いた区間・予約の扱いを促す
   await page.locator('li', { has: page.locator('input[value="岡村本家"]') }).getByRole('button', { name: '外す' }).click();
   await expect(panel.getByTestId('branch-resources-pending')).toContainText('区間1件・予約1件の扱いを決めてください');
-  await panel.getByRole('button', { name: '藤居本家 → 岡村本家(車・15分)を外す' }).click();
+  await panel.getByRole('button', { name: '藤居本家 → 岡村本家(自家用車・15分)を外す' }).click();
   const res = panel.getByTestId(`branch-reservation-${reservation.id}`);
   await res.getByLabel('取り消す予定にする').check();
   await expect(res).toContainText('採用しても予約先では取り消されません');
@@ -63,7 +63,7 @@ test('FR-019 案の中の区間・予約の変更、選んだ変更だけの採�
   await add.getByLabel('移動手段').selectOption('bus');
   await add.getByLabel('所要時間(分・空なら概算)').fill('20');
   await add.getByRole('button', { name: 'この区間を足す' }).click();
-  await expect(panel).toContainText('追加: 美冨久酒造 → 藤居本家(バス・20分)');
+  await expect(panel).toContainText('追加: 美冨久酒造 → 藤居本家(路線バス・20分)');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByText('分岐案を保存しました')).toBeVisible();
   await expectNoAxeViolations(page, '案の詳細(移動区間・予約)');

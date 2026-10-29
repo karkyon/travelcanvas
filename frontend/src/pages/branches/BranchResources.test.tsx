@@ -84,8 +84,8 @@ describe('BranchResourcesPanel', () => {
     expect(screen.getByTestId('branch-resources-pending')).toHaveTextContent('区間1件・予約1件の扱いを決めてください');
     const s = screen.getByTestId(`branch-segment-${seg.id}`);
     expect(within(s).getByLabelText('移動手段')).toBeDisabled();
-    expect(s).toHaveTextContent('藤居本家 → 岡村本家(車・15分)');
-    fireEvent.click(within(s).getByRole('button', { name: '藤居本家 → 岡村本家(車・15分)を外す' }));
+    expect(s).toHaveTextContent('藤居本家 → 岡村本家(自家用車・15分)');
+    fireEvent.click(within(s).getByRole('button', { name: '藤居本家 → 岡村本家(自家用車・15分)を外す' }));
     const r = screen.getByTestId(`branch-reservation-${rsv.id}`);
     fireEvent.click(within(r).getByLabelText('取り消す予定にする'));
     expect(r).toHaveTextContent('予約先では取り消されません');

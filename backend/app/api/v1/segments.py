@@ -48,7 +48,8 @@ router = APIRouter(prefix="/plans", tags=["segments"])
 POST_ENDPOINT = "POST /v1/plans/segments"
 
 MODES = {"walking", "driving", "train", "bus", "ferry", "flight", "bicycle", "taxi", "mixed",
-         "shinkansen", "helicopter"}  # [Gate G11] 新幹線(明示された時だけ)・ヘリ(要手配。所要時間を推定しない)
+         "shinkansen", "helicopter",  # [Gate G11] 新幹線(明示された時だけ)・ヘリ(要手配。所要時間を推定しない)
+         "express_bus"}  # [Gate G11] 高速バス(bus は路線バス)
 STATUSES = {"planned", "confirmed", "cancelled"}
 
 

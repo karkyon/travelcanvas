@@ -13,7 +13,7 @@ import {
 } from './decode';
 
 const mode = oneOf('walking', 'driving', 'train', 'bus', 'ferry', 'flight', 'bicycle', 'taxi', 'mixed',
-  'shinkansen', 'helicopter');  // [Gate G11]
+  'shinkansen', 'helicopter', 'express_bus');  // [Gate G11]
 const segStatus = oneOf('planned', 'confirmed', 'cancelled');
 
 const baseSegment: Decoder<BaseSegment> = object<BaseSegment>({
