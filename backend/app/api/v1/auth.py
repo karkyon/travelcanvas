@@ -59,9 +59,16 @@ class UserResponse(BaseModel):
     email: str
     user_type: str
     is_verified: bool
+    # [Gate G11] 見た目の系統(users.preferences.ui_style)。ログイン・再読み込み(refresh)の応答にも入れ、
+    # 別の端末でも同じ見た目にする(画面は GET /auth/me を待たずに当てられる)
+    ui_style: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+# [Gate G11] 見た目の系統(frontend の styles/styleIds.ts の STYLE_IDS と同じ)
+UI_STYLES = ("standard", "atlas", "editorial", "daylight", "studio")
 
 
 class TokenResponse(BaseModel):
@@ -308,7 +315,13 @@ def _user_response(user: User) -> UserResponse:
         email=user.email or "",
         user_type=str(user.user_type or "registered"),
         is_verified=bool(user.is_verified),
+        ui_style=_ui_style_of(user),
     )
+
+
+def _ui_style_of(user: User) -> Optional[str]:
+    value = (user.preferences or {}).get("ui_style") if isinstance(user.preferences, dict) else None
+    return value if value in UI_STYLES else None
 
 
 def _access_token_for(user: User, session_id: Union[str, uuid.UUID]) -> str:
@@ -957,6 +970,10 @@ async def update_me(
             # [Gate K1] オフライン鍵の版(offline_pack_key)はサーバーだけが変える。利用者が送った値で
             # 版を戻すと、失効した鍵が再び配られてしまうため、プロフィール更新では受け付けない。
             client_prefs = {k: v for k, v in update_data.preferences.items() if k != "offline_pack_key"}
+            # [Gate G11] 見た目の系統(仕様 §3.4)。決まった名前だけを受け付ける(画面は形の違う値を無視するが、保存もしない)
+            if "ui_style" in client_prefs and client_prefs["ui_style"] not in UI_STYLES:
+                raise HTTPException(status_code=422,
+                                    detail="見た目の系統の名前が正しくありません")
             merged.update(client_prefs)
             current_user.preferences = merged
 

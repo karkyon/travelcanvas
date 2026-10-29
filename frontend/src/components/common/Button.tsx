@@ -37,7 +37,8 @@ const Button = React.forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPro
   // 主な操作は強調色の1色だけ・状態の色は危険だけ。暗い見た目でも同じ名前の色が読める値になる(tokens.css)。
   // フォーカスの枠は決まりの色(--tc-focus)で、押せる部品と地の間に 3:1 以上の差を付ける。
   const baseClasses = [
-    'inline-flex items-center justify-center',
+    // [Gate G11] tc-btn: 見た目の系統(Daylight は高さ 48px・太字)が読む目印
+    'tc-btn inline-flex items-center justify-center',
     'font-medium rounded-lg transition-colors duration-150',
     'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ring-offset-cloud-0',
     'disabled:opacity-50 disabled:cursor-not-allowed',

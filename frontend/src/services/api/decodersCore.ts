@@ -118,6 +118,7 @@ export const user: Decoder<User> = object<User>({
   role: optional(str),
   user_type: optional(str),
   preferences: optional(nullable(record)),
+  ui_style: optional(nullable(str)),
   created_at: str,
   updated_at: optional(str),
 });
@@ -134,6 +135,7 @@ export const authUser: Decoder<AuthUser> = object<AuthUser>({
   email: str,
   user_type: userTypeValue,
   is_verified: bool,
+  ui_style: optional(nullable(str)),
 });
 
 export const authResponse: Decoder<AuthResponse> = object<AuthResponse>({

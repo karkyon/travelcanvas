@@ -34,6 +34,8 @@ export interface AuthUser {
   email: string;
   user_type: string;
   is_verified: boolean;
+  /** [Gate G11] 見た目の系統(users.preferences.ui_style)。未設定・形の違う値は null */
+  ui_style?: string | null;
 }
 
 /**

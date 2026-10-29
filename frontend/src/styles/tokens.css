@@ -293,3 +293,91 @@
   }
 }
 
+/* [Gate G11] 見た目の系統(<html data-style>。設定 → 表示。仕様 §3.4) */
+/* generated:styles:start(tokens.ts の renderStyleCss が作る。手で直さず UPDATE_STYLE_CSS=1 で作り直す) */
+html[data-style='atlas'] {
+  --tc-cloud-50: #f5f4ee;
+  --tc-accent: #385a55;
+  --tc-accent-strong: #2b4642;
+  --tc-accent-soft: #e6efec;
+  --tc-on-accent: #ffffff;
+  --tc-radius-lg: 16px;
+  --tc-radius-xl: 20px;
+}
+@media screen {
+  html[data-style='atlas'][data-theme='dark'] {
+    --tc-cloud-50: #111a2b;
+    --tc-accent: #8fc2b0;
+    --tc-accent-strong: #a9d4c5;
+    --tc-accent-soft: #142a24;
+    --tc-on-accent: #0b1220;
+  }
+}
+html[data-style='editorial'] {
+  --tc-cloud-50: #f7f3f0;
+  --tc-accent: #65463a;
+  --tc-accent-strong: #4f362c;
+  --tc-accent-soft: #f3e9e3;
+  --tc-on-accent: #ffffff;
+}
+@media screen {
+  html[data-style='editorial'][data-theme='dark'] {
+    --tc-cloud-50: #111a2b;
+    --tc-accent: #e2b29c;
+    --tc-accent-strong: #ecc6b4;
+    --tc-accent-soft: #2e1d16;
+    --tc-on-accent: #0b1220;
+  }
+}
+html[data-style='editorial'] :is(h1, h2, h3) {
+  font-family: var(--tc-font-display);
+  letter-spacing: 0.01em;
+}
+html[data-style='daylight'] {
+  --tc-cloud-50: #eef3f8;
+  --tc-accent: #2451a4;
+  --tc-accent-strong: #1b3f82;
+  --tc-accent-soft: #e6eefb;
+  --tc-on-accent: #ffffff;
+  --tc-control-min: 48px;
+}
+@media screen {
+  html[data-style='daylight'][data-theme='dark'] {
+    --tc-cloud-50: #111a2b;
+    --tc-accent: #9cc0f5;
+    --tc-accent-strong: #b8d2f8;
+    --tc-accent-soft: #13254a;
+    --tc-on-accent: #0b1220;
+  }
+}
+html[data-style='daylight'] body {
+  font-weight: 500;
+}
+html[data-style='daylight'] .tc-btn {
+  min-height: var(--tc-control-min);
+  font-weight: 700;
+}
+html[data-style='studio'] {
+  --tc-cloud-50: #f4f6fa;
+  --tc-accent: #4338ca;
+  --tc-accent-strong: #3730a3;
+  --tc-accent-soft: #eceafd;
+  --tc-on-accent: #ffffff;
+  --tc-radius-lg: 14px;
+}
+@media screen {
+  html[data-style='studio'][data-theme='dark'] {
+    --tc-cloud-50: #111a2b;
+    --tc-accent: #a5b4fc;
+    --tc-accent-strong: #c0cafd;
+    --tc-accent-soft: #1e1f4a;
+    --tc-on-accent: #0b1220;
+  }
+}
+html[data-style='studio'] .tc-map-frame {
+  border-radius: var(--tc-radius-xl);
+  border: 1px solid var(--tc-glass-border);
+  box-shadow: var(--tc-glass-shadow);
+  overflow: hidden;
+}
+/* generated:styles:end */
