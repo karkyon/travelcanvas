@@ -19,6 +19,11 @@ import DateNavigation from '@/components/planner/DateNavigation';
 import OptimizationPanel from '@/components/planner/OptimizationPanel';
 import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeImpact';
 import Button from '@/components/common/Button';
+import UiIcon from '@/components/common/UiIcon';
+import {
+  BookOpen, Camera, Compass, Download, Earth, FileText, Footprints, GitBranch, Inbox, Lightbulb, ListChecks, Luggage, Map as MapIcon,
+  MapPin, Pencil, Route, Scale, Share2, Star, Sun, TriangleAlert, Undo2, Upload, Vote, Wallet, WifiOff,
+} from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
@@ -637,22 +642,25 @@ const PlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/today`)}
+                  icon={<UiIcon icon={Sun} />}
                 >
-                  ☀️ 今日
+                  今日
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/alerts`)}
+                  icon={<UiIcon icon={TriangleAlert} />}
                 >
-                  ⚠️ 遅延・休業の対応
+                  遅延・休業の対応
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/track`)}
+                  icon={<UiIcon icon={MapPin} />}
                 >
-                  📍 位置の記録
+                  位置の記録
                 </Button>
               </div>
             </div>
@@ -663,43 +671,49 @@ const PlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}
+                  icon={<UiIcon icon={Star} />}
                 >
-                  ⭐ 候補箱
+                  候補箱
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/constraints`)}
+                  icon={<UiIcon icon={Scale} />}
                 >
-                  ⚖️ 制約
+                  制約
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/segments`)}
+                  icon={<UiIcon icon={Footprints} />}
                 >
-                  🚶 移動区間
+                  移動区間
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/route-options`)}
+                  icon={<UiIcon icon={Route} />}
                 >
-                  🗺️ 経路の比較
+                  経路の比較
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/branches`)}
+                  icon={<UiIcon icon={GitBranch} />}
                 >
-                  🔀 もしもの案
+                  もしもの案
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/memory-replan`)}
+                  icon={<UiIcon icon={Lightbulb} />}
                 >
-                  💡 過去の旅からの提案
+                  過去の旅からの提案
                 </Button>
               </div>
             </div>
@@ -710,36 +724,41 @@ const PlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/reservations`)}
+                  icon={<UiIcon icon={Luggage} />}
                 >
-                  🧳 予約
+                  予約
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/imports`)}
+                  icon={<UiIcon icon={Inbox} />}
                 >
-                  📥 予約取込
+                  予約取込
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/documents`)}
+                  icon={<UiIcon icon={FileText} />}
                 >
-                  📄 文書
+                  文書
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/preparation`)}
+                  icon={<UiIcon icon={ListChecks} />}
                 >
-                  ✅ 準備
+                  準備
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/expenses`)}
+                  icon={<UiIcon icon={Wallet} />}
                 >
-                  💴 予算・費用
+                  予算・費用
                 </Button>
               </div>
             </div>
@@ -750,36 +769,41 @@ const PlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/share/${currentPlan.id}`)}
+                  icon={<UiIcon icon={Share2} />}
                 >
-                  🤝 共有
+                  共有
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/discussion`)}
+                  icon={<UiIcon icon={Vote} />}
                 >
-                  🗳️ 相談・投票
+                  相談・投票
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/corrections`)}
+                  icon={<UiIcon icon={Pencil} />}
                 >
-                  ✏️ 訂正の申し出
+                  訂正の申し出
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/booklet`)}
+                  icon={<UiIcon icon={BookOpen} />}
                 >
-                  📖 しおり・印刷
+                  しおり・印刷
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/exports`)}
+                  icon={<UiIcon icon={Upload} />}
                 >
-                  📤 書き出し
+                  書き出し
                 </Button>
               </div>
             </div>
@@ -790,29 +814,33 @@ const PlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/memories`)}
+                  icon={<UiIcon icon={Camera} />}
                 >
-                  📷 旅の記録
+                  旅の記録
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/journey`)}
+                  icon={<UiIcon icon={Compass} />}
                 >
-                  🧭 振り返り
+                  振り返り
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate(`/planner/${currentPlan.id}/visits`)}
+                  icon={<UiIcon icon={MapIcon} />}
                 >
-                  🗺️ 訪問の地図
+                  訪問の地図
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate('/atlas')}
+                  icon={<UiIcon icon={Earth} />}
                 >
-                  🗺️ 旅の地図
+                  旅の地図
                 </Button>
               </div>
             </div>
@@ -877,15 +905,17 @@ const PlannerPage: React.FC = () => {
               size="sm"
               onClick={() => usePlanStore.getState().undoLastChange()}
               title="直前の変更を取り消す"
+              icon={<UiIcon icon={Undo2} />}
             >
-              ↩ 元に戻す
+              元に戻す
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowMap((prev) => !prev)}
+              icon={<UiIcon icon={MapIcon} />}
             >
-              {showMap ? '地図を隠す' : '🗺 地図を表示'}
+              {showMap ? '地図を隠す' : '地図を表示'}
             </Button>
             <Button
               variant="ghost"
@@ -893,12 +923,13 @@ const PlannerPage: React.FC = () => {
               onClick={handleToggleOfflineSave}
               disabled={isSavingOffline}
               title="このプランを暗号化してこの端末に保存し、オフラインでも閲覧できるようにします"
+              icon={isSavingOffline ? undefined : <UiIcon icon={isOfflineSaved ? WifiOff : Download} />}
             >
               {isSavingOffline
                 ? '保存中...'
                 : isOfflineSaved
-                ? '📴 オフライン保存済み(削除)'
-                : '📥 オフラインで使う'}
+                ? 'オフライン保存済み(削除)'
+                : 'オフラインで使う'}
             </Button>
             {activeDay?.date &&
               new Date(activeDay.date).toDateString() === new Date().toDateString() && (
@@ -910,15 +941,17 @@ const PlannerPage: React.FC = () => {
                     setIsAutoDetectEnabled((prev) => !prev);
                   }}
                   title="現在地が近くのスポットに一定時間留まると、訪問済みにするか提案します(このタブを開いている間のみ動作します)"
+                  icon={<UiIcon icon={MapPin} />}
                 >
-                  {isAutoDetectEnabled ? '📍 自動検出をOFFにする' : '📍 近くのスポットを自動検出する'}
+                  {isAutoDetectEnabled ? '自動検出をOFFにする' : '近くのスポットを自動検出する'}
                 </Button>
               )}
           </div>
 
           {isOfflineData && (
             <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
-              📴 オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
+              <UiIcon icon={WifiOff} className="mr-1 align-[-3px]" />
+              オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
             </div>
           )}
 
@@ -931,7 +964,7 @@ const PlannerPage: React.FC = () => {
           {visitSuggestion && (
             <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3 flex items-center justify-between gap-4">
               <span>
-                📍「{visitSuggestion.title}」の近くに
+                <UiIcon icon={MapPin} className="mr-1 align-[-3px]" />「{visitSuggestion.title}」の近くに
                 {Math.round(visitSuggestion.dwellMs / 60000)}分ほど滞在したようです(信頼度
                 {Math.round(visitSuggestion.confidence * 100)}%)。訪問済みにしますか?
               </span>
@@ -1160,7 +1193,7 @@ const PlannerPage: React.FC = () => {
                       </button>
                     </h3>
                     {plan.destination && (
-                      <p className="text-sm text-ink-700 mb-2">📍 {plan.destination}</p>
+                      <p className="text-sm text-ink-700 mb-2"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />{plan.destination}</p>
                     )}
                     <p className="text-xs text-ink-700">
                       {plan.days?.length ?? 0}日間の日程
@@ -1308,7 +1341,7 @@ const PlannerPage: React.FC = () => {
               >
                 <div className="font-medium text-ink-900">{plan.title}</div>
                 {plan.destination && (
-                  <div className="text-xs text-ink-500">📍 {plan.destination}</div>
+                  <div className="text-xs text-ink-500"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />{plan.destination}</div>
                 )}
               </button>
             ))}

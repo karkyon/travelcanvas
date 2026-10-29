@@ -12,7 +12,7 @@ migration なし・FR の状態の遷移なし。
 | 2 | 移動の区間の行・予定のカードの移動・全日程のチャート・旅程の下書きの区間で、絵文字ではなく SVG のアイコン + 名前 | IMPLEMENTED | `DayView.tsx`・`ScheduleItem.tsx`・`AllDaysChart.tsx`・`TripDraftPage.tsx`、FE、E2E(区間の行に絵文字が無い・`data-mode`) |
 | 3 | アイコンは読み上げから外し、名前を必ず文字で出す。値が無い・知らない値はアイコンを出さない | IMPLEMENTED | FE |
 | 4 | 文字の表示(`transportText`)に絵文字を使わない | IMPLEMENTED | `utils/transportModes.ts`、FE |
-| 5 | 移動手段以外の画面の飾りの絵文字(移動区間の入口の見出しなど) | NOT STARTED | 範囲外(UX-6 の共通の部品の置き換えで扱う) |
+| 5 | 移動手段以外の画面の飾りの絵文字(移動区間の入口の見出しなど) | NOT STARTED | 範囲外(UX-6 の共通の部品の置き換えで扱う) ※ **SUPERSEDED BY Gate UX6-Icons**(旅程の中の移動・基本情報。ほかの画面は `gate-ux6-icons-trace.md` の 6) |
 
 ## 検証(サンドボックス。CI・omega-dev2 とは別)
 

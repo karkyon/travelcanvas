@@ -176,7 +176,7 @@ function inviteRoleSelect(page: Page) {
 }
 
 async function openDocumentsPage(page: Page, planId: string) {
-  await page.getByRole('button', { name: /📄\s*文書/ }).click();
+  await page.getByRole('button', { name: '文書', exact: true }).click();
   await page.waitForURL(new RegExp(`/planner/${planId}/documents$`), { timeout: 15_000 });
   const uploadButton = page.getByRole('button', { name: '新規アップロード' });
   await uploadButton.waitFor({ state: 'visible', timeout: 20_000 });
@@ -208,7 +208,7 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       const suffix = Date.now().toString();
       const planId = await createGuestPlan(page, suffix);
 
-      // 1. プランから「📄 文書」で文書ウォレット画面へ遷移
+      // 1. プランから「文書」で文書ウォレット画面へ遷移
       await openDocumentsPage(page, planId);
       await expect(page.getByText('文書がまだ登録されていません')).toBeVisible();
 
