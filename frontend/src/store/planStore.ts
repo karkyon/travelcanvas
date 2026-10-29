@@ -45,7 +45,8 @@ import {
 } from '@/utils/syncQueue';
 
 // [Gate C1] 予定の保存の結果(FR-020: 競合したら呼出側が入力を残して違いを示す)
-export type ItemSaveResult = 'saved' | 'queued' | 'conflict' | 'failed';
+/** [G11-Conflict] 'conflict_unread': 競合したが最新を読み直せなかった(どの項目が変わったかを示せない) */
+export type ItemSaveResult = 'saved' | 'queued' | 'conflict' | 'conflict_unread' | 'failed';
 
 // [Gate P11] 通信できない時に端末へ溜めたことの案内
 export const OFFLINE_SAVED_MESSAGE = '通信できないため、この変更を端末に保存しました。通信が戻ると自動で送ります';
@@ -68,7 +69,8 @@ interface PlanState {
 
   // Actions
   loadPlans: () => Promise<void>;
-  loadPlan: (planId: string) => Promise<void>;
+  /** 読み直せた(通信で最新の日程を取れた)時だけ true。端末の保存の内容・失敗は false */
+  loadPlan: (planId: string) => Promise<boolean>;
   createPlan: (planData: Partial<TravelPlan>) => Promise<TravelPlan | null>;
   updatePlan: (planId: string, planData: Partial<TravelPlan>) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
@@ -130,7 +132,8 @@ interface PlanState {
   setSyncConflictCount: (planId: string, count: number) => void;
 
   // 内部ヘルパー(export型には含めないが、実装上storeのgetから呼べるようにする)
-  _reconcileOnConflict: (error: unknown, planId: string) => Promise<void>;
+  /** 409 の後に最新を読み直せた時だけ true */
+  _reconcileOnConflict: (error: unknown, planId: string) => Promise<boolean>;
 }
 
 // ===== 正規化API <-> フロントエンド型 の変換 =====
@@ -243,6 +246,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         isLoading: false,
         isOfflineData: false,
       });
+      return Boolean(detail);
     } catch (error) {
       console.error('Load plan error:', error);
 
@@ -263,7 +267,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
             toast('オフラインで保存されたデータを表示しています(最新でない可能性があります)', {
               icon: '📴',
             });
-            return;
+            return false;
           }
         } catch (offlineError) {
           console.error('Offline pack load error:', offlineError);
@@ -272,6 +276,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
       set({ isLoading: false, isOfflineData: false });
       toast.error('プランの読み込みに失敗しました');
+      return false;
     }
   },
 
@@ -777,9 +782,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         }
       }
       set({ currentPlan: plan });
-      await get()._reconcileOnConflict(error, plan.id);
+      const reloaded = await get()._reconcileOnConflict(error, plan.id);
       const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
-      return status === 409 && conflictCode(error) !== 'locked_relation' ? 'conflict' : 'failed';
+      if (status !== 409 || conflictCode(error) === 'locked_relation') return 'failed';
+      // [G11-Conflict] 読み直せなかった時は、古い内容と比べて「変わった項目は無い」と言い切らない
+      return reloaded ? 'conflict' : 'conflict_unread';
     }
   },
 
@@ -1022,16 +1029,19 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     // (何も変更されていない)ため再読み込みせず、ロックの解除方法を案内する。
     if (conflictCode(error) === 'locked_relation') {
       toast.error(LOCKED_RELATION_MESSAGE);
-      return;
+      return false;
     }
     const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
     if (status === 409) {
-      toast.error('他のユーザーまたは別の操作と競合しました。最新の内容を再読み込みしました。');
-      await get().loadPlan(planId);
-    } else {
-      console.error('Plan write error:', error);
-      toast.error('操作に失敗しました');
+      // [G11-Conflict] 読み直した結果で知らせを分ける(読めなかったのに「再読み込みしました」と言わない)
+      const reloaded = await get().loadPlan(planId);
+      if (reloaded) toast.error('他のユーザーまたは別の操作と競合しました。最新の内容を再読み込みしました。');
+      else toast.error('他のユーザーまたは別の操作と競合しました。最新の内容を読み直せませんでした。');
+      return reloaded;
     }
+    console.error('Plan write error:', error);
+    toast.error('操作に失敗しました');
+    return false;
   },
 
   // スポット検索

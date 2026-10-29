@@ -34,6 +34,7 @@ import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
 import PlanningUsageMeter from '@/components/planning/PlanningUsageMeter';
+import type { RouteSummaryStatus } from '@/components/planner/RouteSummaryLine';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
@@ -41,7 +42,7 @@ import PresenceBar from '@/components/planner/PresenceBar';
 import { usePlanPresence } from '@/hooks/usePlanPresence';
 import MemberPolicyNotice from '@/components/planner/MemberPolicyNotice';
 import { othersEditing } from '@/utils/presence';
-import { FIELD_LABEL, detectConflict, mergeMine, type EditConflict, type EditFields } from '@/utils/editConflict';
+import { FIELD_LABEL, detectConflict, mergeMine, unreadConflict, type EditConflict, type EditFields } from '@/utils/editConflict';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -109,6 +110,8 @@ const PlannerPage: React.FC = () => {
   // [Gate #32] PLAN MAP: timelineとMAPの双方向選択同期用
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
+  // [G11-Layout] 移動概算の読み込みの状態(地図の下の行の場所を読み込み中から確保する)
+  const [routePreviewStatus, setRoutePreviewStatus] = useState<RouteSummaryStatus>('off');
   const [showMap, setShowMap] = useState(true);
   // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
   const [planView, setPlanView] = useState<'day' | 'all'>('day');
@@ -188,6 +191,11 @@ const PlannerPage: React.FC = () => {
         setEditConflict(detectConflict(original, fields, latestItem ? fieldsOf(latestItem) : null));
         return;
       }
+      if (result === 'conflict_unread') {
+        // [G11-Conflict] 読み直せなかった: 古い内容と比べて「変わった項目は無い」と言い切らない。入力は残す
+        setEditConflict(unreadConflict(original, fields));
+        return;
+      }
       if (result !== 'failed') closeEditItem();
     } finally {
       setIsSavingItem(false);
@@ -208,6 +216,21 @@ const PlannerPage: React.FC = () => {
     setEditOriginal(latest);
     setEditConflict(null);
     await saveFields(editingItem.id, merged, latest);
+  };
+
+  // [G11-Conflict] 競合した後に最新を読み直せなかった時: もう一度読み直し、読めたら違いを示す
+  const [isRereading, setIsRereading] = useState(false);
+  const handleRereadAfterConflict = async () => {
+    if (!editingItem || !currentPlan) return;
+    setIsRereading(true);
+    try {
+      const ok = await usePlanStore.getState().loadPlan(currentPlan.id);
+      if (!ok) return;
+      const latestItem = usePlanStore.getState().currentPlan?.days.flatMap((d) => d.events).find((e) => e.id === editingItem.id);
+      setEditConflict(detectConflict(editOriginal, editForm, latestItem ? fieldsOf(latestItem) : null));
+    } finally {
+      setIsRereading(false);
+    }
   };
 
   // 競合した後: 自分の入力を捨てて、最新の内容から編集し直す
@@ -447,16 +470,22 @@ const PlannerPage: React.FC = () => {
   useEffect(() => {
     if (!currentPlanId || !activeDayId || isGuest) {
       setRoutePreview(null);
+      setRoutePreviewStatus('off');
       return;
     }
     let cancelled = false;
+    setRoutePreviewStatus('loading');
     apiService
       .getRoutePreview(currentPlanId, activeDayId, 'walking')
       .then((preview) => {
-        if (!cancelled) setRoutePreview(preview);
+        if (cancelled) return;
+        setRoutePreview(preview);
+        setRoutePreviewStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setRoutePreview(null);
+        if (cancelled) return;
+        setRoutePreview(null);
+        setRoutePreviewStatus('failed');
       });
     return () => {
       cancelled = true;
@@ -937,6 +966,7 @@ const PlannerPage: React.FC = () => {
                     day={activeDay}
                     candidates={searchResults}
                     routePreview={routePreview}
+                    routePreviewStatus={routePreviewStatus}
                     selectedEventId={selectedEventId}
                     onSelectEvent={setSelectedEventId}
                     onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
@@ -977,7 +1007,22 @@ const PlannerPage: React.FC = () => {
               {editConflict && (
                 <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-3 text-sm text-red-900 space-y-2"
                   data-testid="edit-conflict">
-                  {editConflict.deleted ? (
+                  {editConflict.unread ? (
+                    <>
+                      <p className="font-medium">
+                        保存する前に、ほかの人かほかの端末がこの旅程を変更しました。あなたの入力は残っています。
+                      </p>
+                      <p data-testid="edit-conflict-unread">
+                        最新の内容を読み直せなかったため、どの項目が変わったか(削除されたかどうかを含む)を示せません。
+                        読み直してから、違いを確かめて保存してください。
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button size="sm" variant="primary" onClick={handleRereadAfterConflict} loading={isRereading}>
+                          最新を読み直して違いを確かめる
+                        </Button>
+                      </div>
+                    </>
+                  ) : editConflict.deleted ? (
                     <p className="font-medium">この予定は、保存する前にほかの人が削除しました。</p>
                   ) : (
                     <>

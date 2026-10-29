@@ -20,7 +20,7 @@
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-ci429-trace.md](gate-ci429-trace.md) | Gate CI-429 トレース(CI の E2E の 429 連鎖の原因の調査) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
-| [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 0 |
+| [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
 | [gate-fr059a-trace.md](gate-fr059a-trace.md) | Gate FR059-A トレース(外部 API の原価上限・利用者クラス別 quota の正本化) | 1 | 0 | 0 |
 | [gate-fr059b-trace.md](gate-fr059b-trace.md) | Gate FR059-B トレース(外部 API の原価の守りのサーバー実装) | 2 | 1 | 0 |
@@ -28,8 +28,9 @@
 | [gate-g10q-trace.md](gate-g10q-trace.md) | Gate G10-Q トレース(品質: V3 再監査・E2E の不安定の根治・mypy の削減) | 0 | 0 | 0 |
 | [gate-g10ux-trace.md](gate-g10ux-trace.md) | Gate G10-UX トレース(UX-5 当日の画面・UX-6 共通の部品・UX-8 暗い見た目を全体へ) | 1 | 1 | 0 |
 | [gate-g11-discover-trace.md](gate-g11-discover-trace.md) | Gate G11-Discover トレース(G11 の段階3: 発見・SNS・外部の写真・予定の写真) | 1 | 0 | 0 |
-| [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 1 | 0 | 0 |
+| [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 1 | 0 | 1 |
 | [gate-g11-intake-trace.md](gate-g11-intake-trace.md) | Gate G11-Intake トレース(G11 の段階5: 行き先が未定の旅行相談) | 2 | 0 | 0 |
+| [gate-g11-layout-trace.md](gate-g11-layout-trace.md) | Gate G11-Layout トレース(旅程の画面の一覧のずれ・競合の後に最新を読み直せない時の表示) | 0 | 1 | 0 |
 | [gate-g11-media-trace.md](gate-g11-media-trace.md) | Gate G11-Media トレース(G11 の段階1: 旅行の表紙の写真) | 2 | 0 | 0 |
 | [gate-g11-planner-trace.md](gate-g11-planner-trace.md) | Gate G11-Planner トレース(G11 の段階2: 旅程の画面) | 1 | 0 | 0 |
 | [gate-g11-planner2-trace.md](gate-g11-planner2-trace.md) | Gate G11-Planner2 トレース(G11 の段階6: 旅程の画面の残り) | 2 | 1 | 0 |

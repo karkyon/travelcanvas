@@ -34,7 +34,7 @@ const makePlan = (days: string[], title = 'trip'): TravelPlan =>
   }) as unknown as TravelPlan;
 
 const setupMocks = () => {
-  const loadPlan = vi.fn<(planId: string) => Promise<void>>().mockResolvedValue(undefined);
+  const loadPlan = vi.fn<(planId: string) => Promise<boolean>>().mockResolvedValue(true);
   const loadPlans = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const clearCurrentPlan = vi.fn<() => void>();
   const checkOfflineAvailability = vi.fn<(planId: string) => Promise<boolean>>().mockResolvedValue(false);

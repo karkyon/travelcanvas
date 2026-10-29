@@ -19,6 +19,7 @@
  * する。
  */
 import React, { useMemo } from 'react';
+import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { DaySchedule, ScheduleItem } from '@/types';
@@ -28,6 +29,8 @@ interface PlanMapProps {
   day: DaySchedule | null;
   candidates?: SpotResult[];
   routePreview?: RoutePreview | null;
+  /** [G11-Layout] 移動概算の読み込みの状態(場所を確保するため。'off' は行を出さない) */
+  routePreviewStatus?: RouteSummaryStatus;
   selectedEventId?: string | null;
   onSelectEvent?: (eventId: string) => void;
   onAddCandidateToItinerary?: (candidateId: string, fallbackTitle: string) => void;
@@ -76,6 +79,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
   day,
   candidates = [],
   routePreview,
+  routePreviewStatus,
   selectedEventId,
   onSelectEvent,
   onAddCandidateToItinerary,
@@ -179,18 +183,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
         </MapContainer>
       </div>
 
-      {routePreview && (
-        <div className="text-xs text-ink-500 px-1">
-          {routePreview.total_distance_km != null && routePreview.total_duration_minutes != null ? (
-            <span>
-              この日の移動概算: 約{routePreview.total_distance_km}km・約{Math.round(routePreview.total_duration_minutes)}分
-              <span className="text-ink-700">(直線距離ベースの概算、確定値ではありません)</span>
-            </span>
-          ) : (
-            <span className="text-ink-700">一部区間の移動概算は算出できません(位置情報不明の地点を含みます)</span>
-          )}
-        </div>
-      )}
+      <RouteSummaryLine status={routePreviewStatus ?? (routePreview ? 'ready' : 'off')} preview={routePreview ?? null} />
 
       {(scheduledUnknown.length > 0 || candidatesUnknown.length > 0) && (
         <div className="text-xs text-ink-500 px-1 space-y-1">

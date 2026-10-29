@@ -325,6 +325,44 @@ describe('updateScheduleItem 409競合', () => {
     // [Gate C1] 呼出側(編集画面)が入力を残して違いを示せるよう、競合したことを返す
     expect(result).toBe('conflict');
   });
+
+  it('[G11-Conflict] 409 の後に最新を読み直せなかった時は conflict_unread を返し、「再読み込みしました」と言わない', async () => {
+    await seedLoadedPlan(1);
+    usePlanStore.setState((s) => ({
+      currentPlan: {
+        ...s.currentPlan!,
+        days: [{ ...s.currentPlan!.days[0]!, events: [{ id: 'event-1', title: '元のタイトル', category: 'sightseeing' }] }],
+      },
+    }));
+    mockedApi.updateEvent.mockRejectedValue({ response: { status: 409 } });
+    mockedApi.getPlan.mockRejectedValue({ response: { status: 503 } });
+    mockedApi.getPlanDetail.mockRejectedValue({ response: { status: 503 } });
+    const { toast } = await import('react-hot-toast');
+    vi.mocked(toast.error).mockClear();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = await usePlanStore.getState().updateScheduleItem('event-1', { title: '新しいタイトル' });
+
+    expect(result).toBe('conflict_unread');
+    expect(consoleError).toHaveBeenCalledWith('Load plan error:', expect.anything());
+    consoleError.mockRestore();
+    // 画面の内容は保存前のまま(楽観的な更新を戻す)
+    expect(usePlanStore.getState().currentPlan?.days[0]!.events[0]!.title).toBe('元のタイトル');
+    const messages = vi.mocked(toast.error).mock.calls.map((c) => String(c[0]));
+    expect(messages).toContain('他のユーザーまたは別の操作と競合しました。最新の内容を読み直せませんでした。');
+    expect(messages.some((m) => m.includes('再読み込みしました'))).toBe(false);
+  });
+
+  it('[G11-Conflict] 日程を読めない時(旅行の情報だけ読めた)は、読み直せたことにしない', async () => {
+    mockedApi.getPlan.mockResolvedValue({ success: true, data: { id: PLAN_ID, title: 'テストプラン', days: [] } });
+    mockedApi.getPlanDetail.mockResolvedValue({ success: false, data: undefined });
+    expect(await usePlanStore.getState().loadPlan(PLAN_ID)).toBe(false);
+    mockedApi.getPlanDetail.mockResolvedValue({
+      success: true,
+      data: { id: PLAN_ID, title: 'テストプラン', revision: 5, days: [] },
+    });
+    expect(await usePlanStore.getState().loadPlan(PLAN_ID)).toBe(true);
+  });
 });
 
 describe('[Gate G7] FR-005 終了時刻(日をまたぐ予定)', () => {

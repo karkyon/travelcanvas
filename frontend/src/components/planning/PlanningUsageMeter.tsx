@@ -5,6 +5,8 @@
  * - 80%(40円)から残りが少ないと知らせ、上限・月の上限では何が止まったか・案と予定が残ること・手で続ける方法を出す
  * - 外部の有料の提供元がつながっていない間は「未接続(0円)」と出す(値を作らない)
  * - 色だけで伝えない(記号と文字)。provider の名前・内部の単価は出さない
+ * - [G11-Layout] 読み込み中・読めない時も同じ枠と行の並びで場所を確保する(読み終わって現れると、下の予定の一覧が
+ *   約 142px 下へずれ、押す・ドラッグの位置が外れていた。docs/trace/gate-g11-layout-trace.md)
  */
 import React, { useEffect, useState } from 'react';
 import { getPlanningUsage } from '@/services/api/planningUsage';
@@ -19,22 +21,48 @@ interface Props {
 const PlanningUsageMeter: React.FC<Props> = ({ planId, className = '' }) => {
   const [usage, setUsage] = useState<PlanningUsage | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
     setFailed(false);
+    setUsage(null);
     getPlanningUsage(planId).then((u) => { if (active) setUsage(u); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [planId]);
+  }, [planId, attempt]);
 
-  if (failed) {
+  const frame = `rounded-xl border border-cloud-200 bg-surface p-3 text-sm text-ink-900 ${className}`.trim();
+  if (failed || !usage) {
+    // 読み終わった時と同じ行の並び(見出し・金額・帯・クラスの行・知らせ・回数)で場所を確保する
     return (
-      <p className={`text-xs text-ink-700 ${className}`.trim()} data-testid="planning-usage-error">
-        AI・外部検索の利用枠を読めませんでした(外部の有料の提供元は呼びません)
-      </p>
+      <section aria-labelledby={`planning-usage-${planId}`} aria-busy={!failed} className={frame}
+        data-testid={failed ? 'planning-usage-failed' : 'planning-usage-loading'}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id={`planning-usage-${planId}`} className="text-sm font-semibold">この旅行の AI・外部検索の利用枠</h2>
+          <p className="font-semibold tabular-nums text-ink-700" aria-hidden="true">— 円 / — 円</p>
+        </div>
+        <div aria-hidden="true" className="mt-2 h-2 w-full rounded-full bg-cloud-100" />
+        {failed ? (
+          <>
+            <p className="mt-1 text-xs text-ink-700" data-testid="planning-usage-error" role="status">
+              AI・外部検索の利用枠を読めませんでした(外部の有料の提供元は呼びません)
+            </p>
+            <p className="mt-1 text-xs text-ink-700">予定の編集・保存はそのまま使えます</p>
+            <button type="button" className="tc-focus-ring mt-2 text-xs font-semibold text-accent underline"
+              onClick={() => setAttempt((n) => n + 1)}>
+              もう一度読む
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-ink-700" role="status">利用枠を読み込んでいます…</p>
+            <p className="mt-1 text-xs text-ink-700" aria-hidden="true">&nbsp;</p>
+            <p className="mt-2 text-xs text-ink-700" aria-hidden="true">&nbsp;</p>
+          </>
+        )}
+      </section>
     );
   }
-  if (!usage) return null;
   const used = usage.plan_used_yen_ceil;
   const cap = usage.plan_cap_yen;
   const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
@@ -45,7 +73,7 @@ const PlanningUsageMeter: React.FC<Props> = ({ planId, className = '' }) => {
     : usage.class === 'trip_pass' ? 'この旅行の Trip Pass' : null;
   return (
     <section aria-labelledby={`planning-usage-${planId}`} data-testid="planning-usage" data-state={usage.state}
-      className={`rounded-xl border border-cloud-200 bg-surface p-3 text-sm text-ink-900 ${className}`.trim()}>
+      className={frame}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id={`planning-usage-${planId}`} className="text-sm font-semibold">この旅行の AI・外部検索の利用枠</h2>
         <p className="font-semibold tabular-nums" data-testid="planning-usage-amount">{`${used}円 / ${cap}円`}</p>
