@@ -203,5 +203,5 @@ def test_v3_audit_rules_hold():
     spec.loader.exec_module(mod)
     summary, problems = mod.audit()
     assert problems == [], problems
-    assert summary["total"] == 58
+    assert summary["total"] == 59  # [FR059-A]
     assert summary["counts"].get("RELEASED", 0) == 0

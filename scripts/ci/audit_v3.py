@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""[Gate G10-Q] V3 再監査: 58 FR の状態(docs/trace/fr-status.json)を、VERIFIED の証拠の台帳
+"""[Gate G10-Q] V3 再監査: 全 FR(FR059-A から 59)の状態(docs/trace/fr-status.json)を、VERIFIED の証拠の台帳
 (docs/trace/v1-verification-ledger.json)と E2E の spec(frontend/e2e)に突き合わせる(標準ライブラリだけ)。
 
     python3 scripts/ci/audit_v3.py            # 集計と検査の結果を Markdown で出す
