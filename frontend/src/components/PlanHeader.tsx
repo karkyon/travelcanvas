@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { usePlan } from '../hooks/usePlan';
 import { useToast } from './common/toastContext';
 import Button from './common/Button';
+import UiIcon from './common/UiIcon';
+import { CalendarDays, MapPin, TriangleAlert, Users, Wallet } from 'lucide-react';
 import Input from './common/Input';
 import Card from './common/Card';
 import Modal from './common/Modal';
@@ -247,19 +249,19 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 {/* 基本情報 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-ink-500">📍 目的地</span>
+                    <span className="text-ink-500"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />目的地</span>
                     <div className="font-medium">{plan.destination || '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-ink-500">📅 期間</span>
+                    <span className="text-ink-500"><UiIcon icon={CalendarDays} size={14} className="mr-1 align-[-2px]" />期間</span>
                     <div className="font-medium">{planStats.daysDiff ? `${planStats.daysDiff}日間` : '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-ink-500">👥 人数</span>
+                    <span className="text-ink-500"><UiIcon icon={Users} size={14} className="mr-1 align-[-2px]" />人数</span>
                     <div className="font-medium">{plan.group_size ? `${plan.group_size}人` : '未設定'}</div>
                   </div>
                   <div>
-                    <span className="text-ink-500">💰 予算</span>
+                    <span className="text-ink-500"><UiIcon icon={Wallet} size={14} className="mr-1 align-[-2px]" />予算</span>
                     <div className="font-medium">{plan.budget !== undefined && plan.budget !== null ? `¥${plan.budget.toLocaleString()}` : '未設定'}</div>
                   </div>
                 </div>
@@ -489,7 +491,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
       >
         <Modal.Body>
           <div className="text-center">
-            <div className="text-4xl mb-4">⚠️</div>
+            <div className="mb-4 flex justify-center text-danger"><UiIcon icon={TriangleAlert} size={36} /></div>
             <p className="text-ink-700 mb-2">
               「{plan.title}」を削除しますか？
             </p>

@@ -132,7 +132,7 @@ test('FR-021・FR-039 所有者の移譲、訂正の申し出と対応、出典�
 
     // 前の所有者(今は閲覧者)が、旅行の中の情報の訂正を申し出る
     await page.goto(`/planner/${plan}`);
-    await page.getByRole('button', { name: '✏️ 訂正の申し出' }).click();
+    await page.getByRole('button', { name: '訂正の申し出', exact: true }).click();
     await page.waitForURL(new RegExp(`/planner/${plan}/corrections$`));
     await page.getByLabel('どの情報か(例: 予約の名義)').fill('予約の名義');
     await page.getByLabel('今の表示(任意)').fill('YAMADA TARO');

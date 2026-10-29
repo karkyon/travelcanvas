@@ -28,7 +28,7 @@
 | [gate-g10q-trace.md](gate-g10q-trace.md) | Gate G10-Q トレース(品質: V3 再監査・E2E の不安定の根治・mypy の削減) | 0 | 0 | 0 |
 | [gate-g10ux-trace.md](gate-g10ux-trace.md) | Gate G10-UX トレース(UX-5 当日の画面・UX-6 共通の部品・UX-8 暗い見た目を全体へ) | 1 | 1 | 0 |
 | [gate-g11-discover-trace.md](gate-g11-discover-trace.md) | Gate G11-Discover トレース(G11 の段階3: 発見・SNS・外部の写真・予定の写真) | 1 | 0 | 0 |
-| [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 1 | 0 | 1 |
+| [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 0 | 0 | 2 |
 | [gate-g11-intake-trace.md](gate-g11-intake-trace.md) | Gate G11-Intake トレース(G11 の段階5: 行き先が未定の旅行相談) | 2 | 0 | 0 |
 | [gate-g11-layout-trace.md](gate-g11-layout-trace.md) | Gate G11-Layout トレース(旅程の画面の一覧のずれ・競合の後に最新を読み直せない時の表示) | 0 | 1 | 0 |
 | [gate-g11-media-trace.md](gate-g11-media-trace.md) | Gate G11-Media トレース(G11 の段階1: 旅行の表紙の写真) | 2 | 0 | 0 |
@@ -85,6 +85,7 @@
 | [gate-s7-trace.md](gate-s7-trace.md) | Gate S7 段階的な計算の確認 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
+| [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |
 | [gate-v2-trace.md](gate-v2-trace.md) | Gate V2 トレース(FR-049 Visited Area Layer・FR-050 訪問判定・信頼度・FR-051 訪問訂正・Privacy除外) | 1 | 0 | 1 |
 
 VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)、全 FR の状態は [fr-status.json](fr-status.json)。
