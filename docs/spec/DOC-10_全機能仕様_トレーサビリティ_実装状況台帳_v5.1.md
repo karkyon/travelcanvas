@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r28** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-29  
+> 文書ID: DOC-10 / 版: **v5.1-r29** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-29  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -87,7 +87,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-004 | 旅行CRUD | VERIFIED | ✓ | B-012・G8 | 本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1) |
 | FR-005 | 日・イベント | VERIFIED | ✓ | B-013・G7・G11 | 実機 mobile のタッチでの並べ替え |
 | FR-006 | NOW/NEXT | VERIFIED | ✓ | L1・L1b | 実機mobile、夜行便のE2E |
-| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像・音声からの候補(OCR・音声認識)、候補への投票、SNS 以外の URL の題名・画像の取得 |
+| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ✓ | C2・G4・G11 | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-009 | 情報内検索・コマンドパレット | VERIFIED | ✓ | C3・G4 | 利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1) |
 | FR-010 | 予約管理 | VERIFIED | ✓ | R3・E1 | 外部予約サービスとの同期、取消期限の通知 |
@@ -244,7 +244,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r25 | 2026-10-28 | `b21e47b`+G11-Planner | Gate G11-Discover(G11 の段階3): 外部の画像・SNS の provider の interface(設定で止められる。値を作らない)、Wikimedia Commons の写真の候補(作者・ライセンス・出典。CC0・PD・CC BY・CC BY-SA だけ取り込める)と非公開の記録への取り込み(記録と同じ検査・撮影情報の除去・暗号化。出典を残す)、YouTube・TikTok の公式 oEmbed による SNS の投稿の確認(投稿へ直接つながない。取れない時は URL とメモ)と候補箱への social の保存、予定のカードの写真、近くの検索のカテゴリ・半径・距離・Overpass の正規表現の逃がし。migration なし(G11-Media で用意した列を使う)。FR-007 の gaps を「SNS 以外の URL の題名・画像の取得」に狭めた(部分のまま)。`docs/trace/gate-g11-discover-trace.md`・`docs/adr/ADR-media-providers.md` |
 | r26 | 2026-10-29 | `1c25a37` | Gate G11-Planner2(G11 の段階6): 路線バス・高速バスの区別(migration `c4e8a1f3b7d2` で区間の mode に express_bus)、移動の区間をタイムラインの独立した行に出し並べ替えで合わなくなった区間を知らせる、並べ替えの影響(順・営業時間・区間)と元に戻す、確定の予定を動かさない(確定の予定がある日の並べ替えが 409 で失敗していた不具合を直した)。G11-Style・G11-Intake(段階4・5)はDOC-10 を変えていない。FR の状態の遷移なし。`docs/trace/gate-g11-planner2-trace.md` |
 | r27 | 2026-10-29 | `6571fc5` | Gate FR059-A: 外部 API の原価上限(1旅行 50円・全 provider の合計・ちょうど 50円は許可・40円で警告)と利用者クラス別 quota(Guest 0・Free 月1旅行/50円・Trip Pass 対象の1旅行・Plus 月5旅行/250円・Family/Group 人数で増えない・Pro/B2B 契約)を正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` にし、FR-059 を SPECIFIED で登録(全59 FR)。FR-058 は価格・決済に絞った。資料室の追補との差異は同書 §13。docs だけ。`docs/trace/gate-fr059a-trace.md` |
-| **r28** | 2026-10-29 | `6571fc5`+FR059-A | **Gate FR059-B: 外部 API の原価の守りをサーバーに実装(migration `d5f9b2c8e1a3`: entitlements・usage_policy_profiles(policy 2026-10-29.1 の6クラス)・usage_budget_accounts・provider_usage_reservations・provider_usage_events)。クラスの解決(Guest 0・Free・Trip Pass・Plus・Family・Pro の契約の例外は二者の承認の後だけ)、旅行・月の口座の行の鍵による原子的な予約(ちょうど 50円は許可)、回数・token の上限、冪等・確定・解放・期限切れの回復、再試行1回、見込みの超過と請求の照合の差で provider を止める、`GET /entitlements`・`GET /plans/{id}/planning-usage`・`POST /plans/{id}/planning-actions/estimate`・管理の申請と承認、旅程・下書き・旅行相談の利用枠の表示。FR-059 を INTEGRATED(部分)(外部の有料 provider は未接続)。`docs/trace/gate-fr059b-trace.md`** |
+| r28 | 2026-10-29 | `6571fc5`+FR059-A | Gate FR059-B: 外部 API の原価の守りをサーバーに実装(migration `d5f9b2c8e1a3`: entitlements・usage_policy_profiles(policy 2026-10-29.1 の6クラス)・usage_budget_accounts・provider_usage_reservations・provider_usage_events)。クラスの解決(Guest 0・Free・Trip Pass・Plus・Family・Pro の契約の例外は二者の承認の後だけ)、旅行・月の口座の行の鍵による原子的な予約(ちょうど 50円は許可)、回数・token の上限、冪等・確定・解放・期限切れの回復、再試行1回、見込みの超過と請求の照合の差で provider を止める、`GET /entitlements`・`GET /plans/{id}/planning-usage`・`POST /plans/{id}/planning-actions/estimate`・管理の申請と承認、旅程・下書き・旅行相談の利用枠の表示。FR-059 を INTEGRATED(部分)(外部の有料 provider は未接続)。`docs/trace/gate-fr059b-trace.md` |
+| **r29** | 2026-10-29 | `6571fc5`+FR059-B | **Gate G11-Vote(G11 の段階8): 候補箱で家族・グループが候補に投票する(合意形成 FR-022 の投票の選択肢を候補にする仕組みを使う。新しい表なし)。FR-007 の gaps から「候補への投票」を外した(OCR・音声認識・URL の題名が残るため(部分)のまま)。間の Gate CI-429(接続元の点数の log)・G11-Preview(並べ替えの案)は DOC-10 を変えていない。`docs/trace/gate-g11-vote-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

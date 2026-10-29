@@ -167,6 +167,8 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 - SNS から取り込む: URL を貼る →「URL を確かめる」→ 確認のカード(SNS の名前・作者・題名・取得時刻・場所の候補と確からしさ「低」「中」)→ 利用者が直す →「候補箱へ追加」(source_kind=social)。取れない時は「URL とメモを出典として保存」に切り替え、取れたように見せない
 - 場所の写真の提案: 予定・候補の「写真を探す」→ 外部の画像の候補(作者・ライセンス・出典のページ・取得日)→「この予定のカードに使う」「旅行の表紙に使う」→ 非公開の記録として取り込み → 設定
 
+- 家族・グループの候補への投票(段階8): 候補箱の上部に「家族・グループで投票」。新しい表は作らず、合意形成(FR-022)の投票で選択肢を候補にしたもの(`candidate_id`)を使う。編集できる人が「候補 N件で投票を始める」(20件まで)、メンバー(閲覧の人も。ゲスト・共有の閲覧は不可)が候補ごとに 行きたい・行ってもいい・気になる点がある(理由が要る)・行きたくない(理由が要る)を付け、もう一度押すと取り消す。件数は名前つきの投票なら全員の合計、匿名は3人の回答まで出さない。投票の後に足した候補は「この投票に入っていません」と示す。締切・決定・旅程への反映は話し合いの画面(既存)
+
 ### 3.4 見た目の系統(段階4。モックの4案を製品の設定へ)
 - 設定 → 表示 に「見た目の系統」: 標準(G10 のまま)・Atlas・Editorial・Daylight・Studio。明るい・暗い・端末に合わせる とは別の軸(組み合わせ 5×3)
 - 当て方: `<html data-style="atlas">` と CSS 変数(`--tc-accent` など)の上書きだけ(画面の部品は変えない)。系統ごとに明暗の両方の値を `tokens.ts` に持ち、`tokens.css` に生成して一致を試験する
@@ -291,7 +293,8 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | **完了**: PR #12、CI 5ジョブ合格(run 40683118167・40683094584)、main `4525c0e`(tree 一致)。DOC-10 r25。omega-dev2 は未反映 |
 | 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | **完了**: PR #13、CI 5ジョブ合格(pull_request の run 40783537644 は1回目の e2e が 429 の連鎖で失敗 → 再実行で合格、push の run 40783532270 は合格。`docs/trace/gate-g11-intake-trace.md` に記録)、main `2f6b90a`(tree 一致)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
 | 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→方面の詳細→旅程の下書き→旅程にする)・信頼の状態の表示・provider 未接続の表示(§2.5・§3.5、統合ハンドオフ §3・§4 の範囲 B) | **完了**: PR #14、CI 5ジョブ×2 run 合格(再試行なし)、main `1c25a37`(tree 一致)(`docs/trace/gate-g11-intake-trace.md`、`docs/adr/ADR-trip-intake.md`)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
-| 7 Preview | gate/g11-reorder-preview | 並べ替えを保存する前の案(触る・矢印キー・ドラッグ)・案の影響・この並びにする/やめる(§3.2) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-preview-trace.md`)。migration なし・DOC-10 の変更なし |
+| 7 Preview | gate/g11-reorder-preview | 並べ替えを保存する前の案(触る・矢印キー・ドラッグ)・案の影響・この並びにする/やめる(§3.2) | **完了**: PR #19、CI 全ジョブ合格・再実行なし(e2e 2 run とも 90 passed)、main `9e1a491`(tree 一致)。`docs/trace/gate-g11-preview-trace.md`。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
+| 8 Vote | gate/g11-family-vote | 候補箱で家族・グループが候補に投票(FR-007 の gaps。合意形成の投票を使う・新しい表なし)(§3.3) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-vote-trace.md`)。DOC-10 r29(FR-007 の gaps) |
 | 6 Planner2 | gate/g11-planner2 | migration `c4e8a1f3b7d2`(§1.0)・路線バス/高速バス(express_bus)・自家用車の名前・移動の区間の独立した行と合わない区間の知らせ・並べ替えの影響と元に戻す・確定の予定を動かさない(§3.2・§4、統合ハンドオフ §3 の残り 1・2) | **完了**: PR #15、main `6571fc5`(新しい clone で tree 一致 `13d789f`)。CI: 1回目の commit `c4afe25` は push の run の e2e 合格・pull_request の run(job 123214120657)の e2e が 429 の連鎖で 50 件失敗(再実行せず PR #15 に記録)、2回目の commit `7805b5a`(接続元の点数の報告を追加)は 2 run とも 5ジョブ合格・再試行なし(job 123324852401・123324759863。PR #15 のコメント)。`docs/trace/gate-g11-planner2-trace.md`。DOC-10 r26。omega-dev2 は利用者が 6571fc5 へ更新(画面の確認は別に記録) |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。

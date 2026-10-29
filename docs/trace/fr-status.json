@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r28",
+  "revision": "v5.1-r29",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -65,7 +65,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "C2・G11",
-   "gaps": "画像・音声からの候補(OCR・音声認識)、候補への投票、SNS 以外の URL の題名・画像の取得"
+   "gaps": "画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得"
   },
   "FR-008": {
    "title": "場所の一元管理",

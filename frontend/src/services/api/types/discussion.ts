@@ -30,6 +30,8 @@ export interface PollOption {
   event_id: string | null;
   event_label: string | null;
   event_missing: boolean;
+  /** [Gate G11] 候補箱の候補を選択肢にした時の候補(古い応答には無い) */
+  candidate_id?: string | null;
   state: OptionState;
   score: number | null;
   counts: Record<VoteValue, number> | null;

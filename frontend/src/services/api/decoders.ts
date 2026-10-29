@@ -914,6 +914,7 @@ const pollOption: Decoder<PollOption> = object<PollOption>({
   event_id: nullable(str),
   event_label: nullable(str),
   event_missing: bool,
+  candidate_id: optional(nullable(str)),  // [Gate G11] 候補箱の投票
   state: oneOf('pending', 'blocked', 'has_concerns', 'agreed'),
   score: nullable(int),
   counts: nullable(object({
