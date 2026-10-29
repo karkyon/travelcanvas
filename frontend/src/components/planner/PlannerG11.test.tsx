@@ -61,20 +61,20 @@ const hours = (over: Partial<EventHoursCheck>): EventHoursCheck => ({
 
 describe('移動手段の名前', () => {
   it('アイコンと名前を組にし、鉄道を新幹線と言わず、ヘリは要手配、不明は未設定', () => {
-    expect(transportText('walking', 18)).toBe('🚶 徒歩 · 18分');
-    expect(transportText('train', 75)).toBe('🚃 鉄道 · 1時間15分');
-    expect(transportText('shinkansen', 135)).toBe('🚄 新幹線 · 2時間15分');
-    expect(transportText('helicopter', null)).toBe('🚁 ヘリ(要手配) · 所要時間未確定');
-    expect(transportText('bus', null)).toBe('🚌 路線バス · 所要時間未計算');
-    expect(transportText('bus', 0)).toBe('🚌 路線バス · 0分');
-    expect(transportText('express_bus', 150)).toBe('🚍 高速バス · 2時間30分');
-    expect(transportText('driving', 40)).toBe('🚗 自家用車 · 40分');
+    expect(transportText('walking', 18)).toBe('徒歩 · 18分');
+    expect(transportText('train', 75)).toBe('鉄道 · 1時間15分');
+    expect(transportText('shinkansen', 135)).toBe('新幹線 · 2時間15分');
+    expect(transportText('helicopter', null)).toBe('ヘリ(要手配) · 所要時間未確定');
+    expect(transportText('bus', null)).toBe('路線バス · 所要時間未計算');
+    expect(transportText('bus', 0)).toBe('路線バス · 0分');
+    expect(transportText('express_bus', 150)).toBe('高速バス · 2時間30分');
+    expect(transportText('driving', 40)).toBe('自家用車 · 40分');
     expect(LEGEND_MODES).toEqual(expect.arrayContaining(['bus', 'express_bus', 'bicycle']));
     expect(transportText(undefined, 10)).toBe(UNSET_LABEL);
     expect(transportText('rocket', 10)).toBe(UNSET_LABEL);
     expect(transportMode('car').label).toBe('自家用車');
     expect(transportMode('plane').mode).toBe('flight');
-    expect(transportMode(null).icon).toBeNull();
+    expect(transportMode(null).mode).toBeNull();  // [Gate G11 段階9] 値が無ければアイコンを出さない(TransportIcon)
   });
 });
 
@@ -103,7 +103,7 @@ describe('現地時間・時差', () => {
   it('時差をまたぐ到着の区間は両端の現地の時刻、同じ時刻帯なら出さない', () => {
     const s = seg({ mode: 'flight', duration_minutes: 870, planned_departure_at: '2026-09-19T13:45:00Z', to_event_id: 'e2' });
     const leg = arrivalLeg(s, { e1: 'Asia/Tokyo', e2: 'America/New_York' }, 'America/New_York')!;
-    expect(leg.text).toBe('✈️ 飛行機 · 14時間30分');
+    expect(leg.text).toBe('飛行機 · 14時間30分');
     expect(leg.crossZone!.text).toBe('9/19 22:45 Tokyo(UTC+9)→ 9/20 00:15 New York(UTC−4)・翌日着');
     expect(arrivalLeg(seg({}), { e1: 'Asia/Tokyo' }, 'Asia/Tokyo')!.crossZone).toBeNull();
     expect(arrivalLeg(null, {}, 'Asia/Tokyo')).toBeNull();
@@ -195,7 +195,7 @@ describe('1日の画面(DayView)', () => {
       zones={{ e1: 'Asia/Tokyo', e2: 'Asia/Tokyo' }} />);
     expect(screen.getByTestId('day-timezone')).toHaveTextContent('現地時間 · Asia/Tokyo');
     // 移動はカードの中ではなく、タイムラインの独立した行(着く予定の前)
-    expect(screen.getByTestId('segment-row')).toHaveTextContent('🚕 タクシー · 12分(推定)「清水寺」から');
+    expect(screen.getByTestId('segment-row')).toHaveTextContent('タクシー · 12分(推定)「清水寺」から');
     expect(screen.getByTestId('segment-row')).toHaveAttribute('data-to-event', 'e2');
     expect(screen.getByTestId('segment-row')).toHaveAttribute('data-mismatch', 'false');
     expect(screen.queryAllByTestId('schedule-arrival')).toHaveLength(0);
@@ -241,7 +241,7 @@ describe('1日の画面(DayView)', () => {
     const segs = [seg({ from_event_id: 'e1', to_event_id: 'e2', mode: 'express_bus', duration_minutes: 95 })];
     const { rerender } = render(<DayView day={day()} planId="p1" segments={segs} />);
     await waitFor(() => expect(screen.getAllByTestId('schedule-hours')[1]).toHaveAttribute('data-tone', 'bad'));
-    expect(screen.getByTestId('segment-row')).toHaveTextContent('🚍 高速バス · 1時間35分');
+    expect(screen.getByTestId('segment-row')).toHaveTextContent('高速バス · 1時間35分');
     fireEvent.keyDown(screen.getByRole('listitem', { name: '清水寺(上下矢印キーで並べ替え)' }), { key: 'ArrowDown' });
     const preview = screen.getByTestId('reorder-preview');
     expect(within(preview).getByTestId('reorder-preview-segments'))

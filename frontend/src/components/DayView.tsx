@@ -5,6 +5,7 @@ import type { TravelSegment } from '../services/api/types/segments';
 import { hoursBadge, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
+import TransportIcon from './common/TransportIcon';
 import EventPhotoDialog from './planner/EventPhotoDialog';
 import { getEventImageMedia, getEventImages, getMediaProviderStatus } from '../services/api/g11discover';
 import type { EventImage } from '../services/api/types/g11discover';
@@ -471,6 +472,7 @@ const DayView: React.FC<DayViewProps> = ({
                   className={`mb-2 ml-12 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border-l-4 px-2 py-1 text-xs ${
                     row.mismatch ? 'border-warning bg-warning-soft text-warning' : 'border-cloud-200 bg-cloud-100 text-ink-700'}`}>
                   <span className="sr-only">移動:</span>
+                  <TransportIcon mode={row.leg.mode} />
                   <span>{row.leg.text}</span>
                   {row.leg.isEstimate && <span>(推定)</span>}
                   {row.leg.status === 'confirmed' && <span>・確定</span>}

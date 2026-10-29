@@ -16,6 +16,7 @@ import PlanningUsageMeter from '@/components/planning/PlanningUsageMeter';
 import { commitTripDraft, getTripDraft, updateDraftSlots } from '@/services/api/tripIntent';
 import type { DraftPart, DraftSlot, TripDraft } from '@/services/api/types/tripIntent';
 import { transportMode } from '@/utils/transportModes';
+import TransportIcon from '@/components/common/TransportIcon';
 import { PART_ORDER, dayCounts, moveSlot, partsOfDay, placeSlot, removeSlot, retrievedLabel, sortSlots } from './consultModel';
 
 const PART_LABEL: Record<DraftPart, string> = { morning: '午前', lunch: '昼食', afternoon: '午後', evening: '夕方・夕食', stay: '宿' };
@@ -205,7 +206,7 @@ const TripDraftPage: React.FC = () => {
                         {s !== firstInDay && (
                           <li aria-label="移動の区間" className="ml-4 text-xs text-ink-700" data-testid="draft-segment">
                             <span className="rounded-full bg-cloud-100 px-2 py-1">
-                              {`${modeInfo.icon ? `${modeInfo.icon} ` : ''}${modeInfo.label} · 経路・所要時間は未照会`}
+                              <TransportIcon mode={modeInfo.mode} /> {`${modeInfo.label} · 経路・所要時間は未照会`}
                             </span>
                           </li>
                         )}

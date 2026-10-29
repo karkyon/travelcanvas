@@ -249,7 +249,7 @@ describe('未確定の旅程の下書き', () => {
     renderDraft();
     expect(await screen.findByTestId('draft-banner')).toHaveTextContent('旅程ドラフト · まだ確定していません');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('伊勢・1泊2日の旅程案');
-    expect(screen.getByTestId('draft-segment')).toHaveTextContent('🚗 自家用車 · 経路・所要時間は未照会');
+    expect(screen.getByTestId('draft-segment')).toHaveTextContent('自家用車 · 経路・所要時間は未照会');
     expect(screen.getByTestId('draft-validation')).toHaveTextContent('未照会(道路の提供元が未接続)');
     expect(screen.getByRole('tab', { name: /1日目/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('参考の出典(場所は未確認 · 候補箱で確かめる)')).toBeInTheDocument();

@@ -8,6 +8,7 @@
  * 空き時間・移動の合計は重なりを二重に数えない(plannerModel.unionMinutes)。
  */
 import React, { useMemo } from 'react';
+import TransportIcon from '../common/TransportIcon';
 import type { DaySchedule } from '@/types';
 import type { TravelSegment } from '@/services/api/types/segments';
 import { buildChart, type ChartDay } from './plannerModel';
@@ -70,7 +71,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
                   <span className="font-semibold">{hm(e.start ?? 0)}</span>{' '}
                   <span>{e.title}</span>
                   {!e.endKnown && <span className="text-ink-700">(終了未設定)</span>}
-                  {e.modeText && <span className="block text-ink-700">{e.modeText}</span>}
+                  {e.modeText && <span className="block text-ink-700"><TransportIcon mode={e.mode} size={12} /> {e.modeText}</span>}
                 </button>
               </li>
             );

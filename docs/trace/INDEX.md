@@ -27,6 +27,7 @@
 | [gate-g10q-trace.md](gate-g10q-trace.md) | Gate G10-Q トレース(品質: V3 再監査・E2E の不安定の根治・mypy の削減) | 0 | 0 | 0 |
 | [gate-g10ux-trace.md](gate-g10ux-trace.md) | Gate G10-UX トレース(UX-5 当日の画面・UX-6 共通の部品・UX-8 暗い見た目を全体へ) | 1 | 1 | 0 |
 | [gate-g11-discover-trace.md](gate-g11-discover-trace.md) | Gate G11-Discover トレース(G11 の段階3: 発見・SNS・外部の写真・予定の写真) | 1 | 0 | 0 |
+| [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 1 | 0 | 0 |
 | [gate-g11-intake-trace.md](gate-g11-intake-trace.md) | Gate G11-Intake トレース(G11 の段階5: 行き先が未定の旅行相談) | 2 | 0 | 0 |
 | [gate-g11-media-trace.md](gate-g11-media-trace.md) | Gate G11-Media トレース(G11 の段階1: 旅行の表紙の写真) | 2 | 0 | 0 |
 | [gate-g11-planner-trace.md](gate-g11-planner-trace.md) | Gate G11-Planner トレース(G11 の段階2: 旅程の画面) | 1 | 0 | 0 |

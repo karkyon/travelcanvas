@@ -194,21 +194,23 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 
 ## 4. 移動手段の名前(DOC-13 の語彙に足す)
 
-| 値 | 表示 | 備考 |
+| 値 | 表示(アイコン · 名前) | 備考 |
 |---|---|---|
-| walking | 🚶 徒歩 | |
-| bicycle | 🚲 自転車 | |
-| bus | 🚌 路線バス | 段階6 で名前を「路線バス」に。区別する前に保存した高速バスも bus のまま(推測で直さない) |
-| express_bus | 🚍 高速バス | 新しい値(段階6)。所要時間は推定(60km/h・迂回 1.25 の目安) |
-| train | 🚃 鉄道 | 新幹線と推測しない |
-| shinkansen | 🚄 新幹線 | 新しい値(区間で明示された時だけ) |
-| driving / car | 🚗 自家用車 | 段階6 で名前を「自家用車」に(統合ハンドオフの語彙。タクシーと区別) |
-| taxi | 🚕 タクシー | |
-| ferry | ⛴️ 船 | |
-| flight / plane | ✈️ 飛行機 | |
-| helicopter | 🚁 ヘリ(要手配) | 新しい値。所要時間は「未確定」とし、推定しない |
-| mixed | 🔀 乗り継ぎ | |
+| walking | Footprints · 徒歩 | |
+| bicycle | Bike · 自転車 | |
+| bus | Bus · 路線バス | 段階6 で名前を「路線バス」に。区別する前に保存した高速バスも bus のまま(推測で直さない) |
+| express_bus | BusFront · 高速バス | 新しい値(段階6)。所要時間は推定(60km/h・迂回 1.25 の目安) |
+| train | TrainFront · 鉄道 | 新幹線と推測しない |
+| shinkansen | TrainFrontTunnel · 新幹線 | 新しい値(区間で明示された時だけ) |
+| driving / car | Car · 自家用車 | 段階6 で名前を「自家用車」に(統合ハンドオフの語彙。タクシーと区別) |
+| taxi | CarTaxiFront · タクシー | |
+| ferry | Ship · 船 | |
+| flight / plane | Plane · 飛行機 | |
+| helicopter | ヘリの形(lucide に無いため同じ線の太さで描く) · ヘリ(要手配) | 新しい値。所要時間は「未確定」とし、推定しない |
+| mixed | Shuffle · 乗り継ぎ | |
 | (空・不明) | 移動手段未設定 | アイコンを出さない |
+
+段階9: アイコンは OS の絵文字に頼らず、既存のアイコンの系統(lucide)の SVG で描く(`components/common/TransportIcon.tsx`)。アイコンは読み上げから外し、名前を必ず文字で出す(色・形だけで伝えない)。
 
 `segments.py` の MODES と `branch_resources.py` の MODES に `shinkansen`・`helicopter`(段階2)・`express_bus`(段階6)を足す。
 避けたい移動手段の語(実行可能性)は「バス」→ 路線バス・高速バス、「高速バス」「夜行バス」→ express_bus と区別する前の bus、
@@ -293,8 +295,9 @@ downgrade は shinkansen → train、helicopter → mixed に直してから元�
 | 3 Discover | gate/g11-discover | provider の interface・Wikimedia Commons・SNS oEmbed・social-preview・import-external・予定の写真・カテゴリ・距離・Overpass の逃がし | **完了**: PR #12、CI 5ジョブ合格(run 40683118167・40683094584)、main `4525c0e`(tree 一致)。DOC-10 r25。omega-dev2 は未反映 |
 | 4 Style | gate/g11-style | 4つの系統の tokens・`data-style`・設定・アカウントへの保存・AA の試験 | **完了**: PR #13、CI 5ジョブ合格(pull_request の run 40783537644 は1回目の e2e が 429 の連鎖で失敗 → 再実行で合格、push の run 40783532270 は合格。`docs/trace/gate-g11-intake-trace.md` に記録)、main `2f6b90a`(tree 一致)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
 | 5 Intake | gate/g11-intake | 行き先が未定の旅行相談(希望を伝える→条件の確認→方面の比較→方面の詳細→旅程の下書き→旅程にする)・信頼の状態の表示・provider 未接続の表示(§2.5・§3.5、統合ハンドオフ §3・§4 の範囲 B) | **完了**: PR #14、CI 5ジョブ×2 run 合格(再試行なし)、main `1c25a37`(tree 一致)(`docs/trace/gate-g11-intake-trace.md`、`docs/adr/ADR-trip-intake.md`)。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
-| 7 Preview | gate/g11-reorder-preview | 並べ替えを保存する前の案(触る・矢印キー・ドラッグ)・案の影響・この並びにする/やめる(§3.2) | **完了**: PR #19、CI 全ジョブ合格・再実行なし(e2e 2 run とも 90 passed)、main `9e1a491`(tree 一致)。`docs/trace/gate-g11-preview-trace.md`。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
-| 8 Vote | gate/g11-family-vote | 候補箱で家族・グループが候補に投票(FR-007 の gaps。合意形成の投票を使う・新しい表なし)(§3.3) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-vote-trace.md`)。DOC-10 r29(FR-007 の gaps) |
 | 6 Planner2 | gate/g11-planner2 | migration `c4e8a1f3b7d2`(§1.0)・路線バス/高速バス(express_bus)・自家用車の名前・移動の区間の独立した行と合わない区間の知らせ・並べ替えの影響と元に戻す・確定の予定を動かさない(§3.2・§4、統合ハンドオフ §3 の残り 1・2) | **完了**: PR #15、main `6571fc5`(新しい clone で tree 一致 `13d789f`)。CI: 1回目の commit `c4afe25` は push の run の e2e 合格・pull_request の run(job 123214120657)の e2e が 429 の連鎖で 50 件失敗(再実行せず PR #15 に記録)、2回目の commit `7805b5a`(接続元の点数の報告を追加)は 2 run とも 5ジョブ合格・再試行なし(job 123324852401・123324759863。PR #15 のコメント)。`docs/trace/gate-g11-planner2-trace.md`。DOC-10 r26。omega-dev2 は利用者が 6571fc5 へ更新(画面の確認は別に記録) |
+| 7 Preview | gate/g11-reorder-preview | 並べ替えを保存する前の案(触る・矢印キー・ドラッグ)・案の影響・この並びにする/やめる(§3.2) | **完了**: PR #19、CI 全ジョブ合格・再実行なし(e2e 2 run とも 90 passed)、main `9e1a491`(tree 一致)。`docs/trace/gate-g11-preview-trace.md`。migration なし・DOC-10 の変更なし。omega-dev2 は未反映 |
+| 8 Vote | gate/g11-family-vote | 候補箱で家族・グループが候補に投票(FR-007 の gaps。合意形成の投票を使う・新しい表なし)(§3.3) | **完了**: PR #20、CI 全ジョブ合格(e2e 2 run とも 90 passed。gate-g7:26 のドラッグが 2 run とも1回目に失敗し Playwright の CI の再試行1回で合格 = flaky。原因は別の Gate で直す)、main `e2851af`(tree 一致)。`docs/trace/gate-g11-vote-trace.md`。DOC-10 r29(FR-007 の gaps)。omega-dev2 は未反映 |
+| 9 Icons | gate/g11-transport-icons | 移動手段のアイコンを OS の絵文字から lucide の SVG へ(§4) | 実装済み・PR で CI の確認中(`docs/trace/gate-g11-icons-trace.md`)。migration なし・DOC-10 の変更なし |
 
 各段階の記録は `docs/trace/gate-g11-<段階>-trace.md` に残す。
