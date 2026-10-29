@@ -154,6 +154,13 @@ export class ApiCore {
   // 削除の後、完了の画面がログイン状態を消すまでの間に、会員の定期の取得(見出しの未読数など)が失効したトークンで
   // 401 → 更新も 401 → /login へ移ることがあった(account-deletion の E2E の不安定の原因)。
   private authRedirectSuppressed: boolean = false;
+  // [Gate CI-429] 更新(POST /auth/refresh)は同時に1本だけ送る。以前は同時に 401 になった要求の数だけ送っていた
+  // (失効したセッションの画面が見出しの未読数・ダッシュボードを定期に取ると、更新が1分に 60 回を越えて 429 になり、
+  // 1回 3点ずつ接続元の点数(Gate S6)が積もって、その接続元の全ての API が 15分止まった。CI の E2E の 429 連鎖の原因。
+  // 同じ接続元の家族・会社の利用者も巻き込む)。更新が 401(セッションが無効)の後は、新しいトークンを得るまで送らない。
+  // 429・その他の失敗の後は少し待つ(Retry-After があればその秒数)。
+  private refreshInFlight: Promise<string | null> | null = null;
+  private refreshBlockedUntil = 0;
 
   constructor() {
     this.client = axios.create({
@@ -270,21 +277,13 @@ export class ApiCore {
           // refresh自体を試みない。
         ) {
           originalRequest._retry = true;
-          try {
-            // [Gate A1] 元のリクエストが共通エラー処理を行わない指定なら、refresh失敗時も同様にする
-            // (refresh自体の401で/loginへ強制遷移しないため)。
-            const refreshResponse = await this.client.post('/auth/refresh', undefined, {
-              skipGlobalErrorHandler: originalRequest.skipGlobalErrorHandler,
-            });
-            const newAccessToken = (refreshResponse.data as { access_token?: string })?.access_token;
-            if (newAccessToken) {
-              this.setAccessToken(newAccessToken);
-              originalRequest.headers = originalRequest.headers || {};
-              (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${newAccessToken}`;
-              return this.client.request(originalRequest);
-            }
-          } catch {
-            this.clearAccessToken();
+          // [Gate A1] 元のリクエストが共通エラー処理を行わない指定なら、refresh失敗時も同様にする
+          // (refresh自体の401で/loginへ強制遷移しないため)。
+          const newAccessToken = await this.refreshAccessToken(originalRequest.skipGlobalErrorHandler === true);
+          if (newAccessToken) {
+            originalRequest.headers = originalRequest.headers || {};
+            (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${newAccessToken}`;
+            return this.client.request(originalRequest);
           }
         }
 
@@ -338,7 +337,37 @@ export class ApiCore {
   // 静かに失敗していた実害バグ。authStore.tsから同期できるよう公開する。
   setAccessToken(accessToken: string, options: { persist?: boolean } = {}): void {
     this.setTokens(accessToken, options.persist === true);
+    this.refreshBlockedUntil = 0;  // [Gate CI-429] 新しいトークンを得たら更新を再び許す
   }
+
+  /**
+   * [Gate CI-429] cookie の更新鍵でアクセストークンを取り直す(同時に1本だけ)。取れなければ null。
+   * 401(セッションが無効)の後は新しいトークンを得るまで、429 の後は Retry-After(無ければ 60 秒)、その他は 5 秒送らない。
+   */
+  // 公開の API の面(メソッドの一覧)に出さないため、プロトタイプのメソッドではなく関数のプロパティにする
+  private refreshAccessToken = (silent: boolean): Promise<string | null> => {
+    if (Date.now() < this.refreshBlockedUntil) return Promise.resolve(null);
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.client.post('/auth/refresh', undefined, { skipGlobalErrorHandler: silent })
+        .then((response) => {
+          const token = (response.data as { access_token?: string })?.access_token ?? null;
+          if (token) this.setAccessToken(token);
+          return token;
+        })
+        .catch((error: AxiosError) => {
+          const status = error.response?.status;
+          const retryAfter = Number(error.response?.headers?.['retry-after']);
+          this.refreshBlockedUntil = status === 401 ? Number.POSITIVE_INFINITY
+            : Date.now() + (status === 429 ? (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 60) : 5) * 1000;
+          this.clearAccessToken();
+          return null;
+        })
+        .finally(() => {
+          this.refreshInFlight = null;
+        });
+    }
+    return this.refreshInFlight;
+  };
 
   /** [Gate S5] 会員としてログイン中か(トークンが無くても 401 で cookie から取り直す) */
   setMemberSession(isMember: boolean): void {

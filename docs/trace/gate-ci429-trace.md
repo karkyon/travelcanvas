@@ -21,7 +21,8 @@
 |---|---|---|---|
 | 1 | threat_guard が点数を足すたびに、足した点数・種類・経路の型・合計を log に出す(ID・値・IP は出さない) | IMPLEMENTED | `app/services/threat_guard.py` `record_signal`・`signal`、BE `test_guard_logs_route_template_without_ids_or_ip` |
 | 2 | CI の報告で、実際の点数の合計・最大と、**最初の遮断より前**の内訳(種類と経路の型)を出す(遮断の後の 429 で見積もりが埋もれない) | IMPLEMENTED | `scripts/ci/e2e_guard_report.py`、BE `test_actual_signals_before_first_block` |
-| 3 | 原因の特定と直し | NOT STARTED | 次の CI の run の実際の内訳で決める |
+| 3 | **原因の特定**: PR #18 の1回目の CI(2 run とも 50 件が 429)で、遮断の前の実際の点数の 123 点が `rate_limited /api/v1/auth/refresh`(41回)。画面の 401 の処理が、同時に 401 になった要求の数だけ `POST /auth/refresh` を送っていた。失効したセッションの画面の定期の取得(見出しの未読数・ダッシュボード)で更新が 1分 60 回を越えて 429 → 1回 3点 → 150 で遮断 | IMPLEMENTED | PR #18 のコメント、CI の要約(実際の点数) |
+| 4 | **直し**: 更新は同時に1本だけ。更新が 401 の後は新しいトークンを得るまで送らない、429 の後は Retry-After(無ければ 60 秒)、その他は 5 秒送らない。閾値・点数の付け方・E2E の再試行は変えない | IMPLEMENTED | `frontend/src/services/api/core.ts` `refreshAccessToken`、FE `core.refresh.test.ts`(同時の 401 が5本でも更新は1本・401 の後は送らない・429 は Retry-After) |
 
 ## 検証(サンドボックス。CI・omega-dev2 とは別)
 
@@ -30,3 +31,12 @@
 | 全検証 | backend pytest 1,298 合格(新規 2)・flake8・mypy 0・vitest・build 合格 |
 | E2E(全件) | **90 合格・失敗 0・再試行 0** |
 | 実際の点数(新しい log) | 合計 117・最大 60。多いのは `invalid_token /api/v1/auth/me` 66(22回)・`rate_limited /api/v1/auth/register` 27(9回)・`login_failed` 5、残りは権限の試験の 403/404 が 2 点ずつ |
+
+### 直しの後(サンドボックス)
+
+| 検査 | 結果(2026-10-29) |
+|---|---|
+| 全検証 | vitest 909 合格・標準エラー 0 行(1回目は API の公開面の試験がメソッドの数の増加で失敗 → 更新の関数をプロパティにして合格)・backend・build 合格 |
+| E2E(全件) | 89 合格・**1 失敗**: `gate-g7.spec.ts` のドラッグの並べ替えで「並び替えました」が出なかった(issue #10 の既知の不安定と同じ形。段階2 の trace にも記録。更新の直しはドラッグに関わらない)。同じ spec を単独で1回再実行して 3 合格。隠さずここと PR に記録する |
+| 実際の点数 | 合計 114・最大 60、`rate_limited /api/v1/auth/refresh` は 0(サンドボックスでは以前から 0) |
+
