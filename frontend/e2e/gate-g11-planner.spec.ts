@@ -11,7 +11,7 @@ import { apiClient, registerMember } from './support/api';
  *   4. 「下へ」のボタンは保存する前の案を作る(前後が合わなくなる区間を先に示し、サーバーの順は変えない)。「やめる」で何も変えず、
  *      「この並びにする」で保存し、実際の影響(順の変化・営業時間・区間)を出し、「元に戻す」でサーバーの順も元へ戻る。
  *      移動はタイムラインの独立した行
- *   7. 高速バス(express_bus)の区間を保存でき、「🚍 高速バス」と出る(路線バスと区別する)
+ *   7. 高速バス(express_bus)の区間を保存でき、「高速バス」とアイコン(絵文字ではない)が出る(路線バスと区別する)
  *   5. 「全日程」で日を同じ時刻の物差しで並べ、予定を押すとその日の日別へ戻る
  *   6. 幅 360px・暗い見た目で横にはみ出さない。axe 違反 0
  */
@@ -65,9 +65,9 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
 
   // 2. 移動手段の名前(予定の前の独立した行)
   const segRow = (eventId: string) => list.locator(`[data-testid="segment-row"][data-to-event="${eventId}"]`);
-  await expect(segRow(dinner)).toContainText('🚃 鉄道 · 25分');
+  await expect(segRow(dinner)).toContainText('鉄道 · 25分');
   await expect(segRow(dinner)).toContainText('「清水寺」から');
-  await expect(segRow(kyotoSt)).toContainText('🚄 新幹線 · 15分');
+  await expect(segRow(kyotoSt)).toContainText('新幹線 · 15分');
   await expect(list.getByTestId('segment-mismatch')).toHaveCount(0);
   await expectNoAxeViolations(page, '旅程(営業時間の帯・移動手段)');
 
@@ -113,7 +113,9 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
   await expect(segRow(ny)).toContainText('「京都駅」から');
   await expect(segRow(ny)).toHaveAttribute('data-mismatch', 'false');
   // 7. 高速バス
-  await expect(segRow(hotel)).toContainText('🚍 高速バス · 4時間15分');
+  await expect(segRow(hotel)).toContainText('高速バス · 4時間15分');
+  await expect(segRow(hotel).getByTestId('transport-icon')).toHaveAttribute('data-mode', 'express_bus');
+  expect(await segRow(hotel).textContent()).not.toMatch(/\p{Extended_Pictographic}/u);  // 絵文字に頼らない
 
   // 5. 全日程
   await page.getByTestId('plan-view-all').click();

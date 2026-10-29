@@ -64,6 +64,8 @@ export function hoursBadge(h: EventHoursCheck | null | undefined, pending = fals
 }
 
 export interface ArrivalLeg {
+  /** [Gate G11 段階9] アイコン(TransportIcon)のための mode */
+  mode: string | null;
   modeLabel: string;
   text: string;
   isEstimate: boolean;
@@ -119,6 +121,7 @@ export function arrivalLeg(seg: TravelSegment | null, zones: Record<string, stri
     }
   }
   return {
+    mode: mode.mode,
     modeLabel: mode.label,
     text: transportText(seg.mode, seg.duration_minutes),
     isEstimate: seg.is_estimate,
@@ -245,6 +248,7 @@ export interface ChartEvent {
   /** 終わりが分からない時は表示のための目安(60分)で、文字では「終了未設定」 */
   endKnown: boolean;
   modeText: string | null;
+  mode: string | null;
 }
 
 export interface ChartDay {
@@ -311,7 +315,7 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       const endKnown = end !== null && start !== null && end >= start;
       const item: ChartEvent = {
         id: e.id, title: e.title, start, end: endKnown ? end : start !== null ? Math.min(24 * 60, start + DEFAULT_STAY) : null,
-        endKnown, modeText: seg ? transportText(seg.mode, seg.duration_minutes) : null,
+        endKnown, modeText: seg ? transportText(seg.mode, seg.duration_minutes) : null, mode: seg ? seg.mode : null,
       };
       if (start === null) {
         untimed.push(item);

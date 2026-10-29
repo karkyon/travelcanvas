@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { safeExternalUrl, safeTelHref } from '@/utils/safeNavigation';
 import { transportText } from '@/utils/transportModes';
+import TransportIcon from '../common/TransportIcon';
 import type { ArrivalLeg, HoursBadge } from './plannerModel';
 import { 
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
@@ -247,6 +248,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {arrival ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
               data-testid="schedule-arrival">
+              <TransportIcon mode={arrival.mode} />
               <span>{arrival.text}</span>
               {arrival.isEstimate && <span>(推定)</span>}
               {arrival.status === 'confirmed' && <span>・確定</span>}
@@ -256,6 +258,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           ) : travelMethod ? (
             <div className="flex items-center gap-2 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
               data-testid="schedule-arrival">
+              <TransportIcon mode={travelMethod} />
               <span>{transportText(travelMethod, travelTime ?? null)}</span>
               {travelCost ? <span>• {formatCurrency(travelCost)}</span> : null}
             </div>
