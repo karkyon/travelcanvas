@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page, type Request } from '@playwright/test';
 import { apiClient, registerAccount, type Send } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -19,6 +19,28 @@ type Detail = { revision: number; days: Array<{ id: string; events: Array<Record
 async function member(page: Page, label: string): Promise<{ send: Send; apiBase: string; token: string }> {
   const a = await registerAccount(page, { prefix: 'g7', label, password: PASSWORD });
   return { send: apiClient(page.request, a.apiBase, a.token), apiBase: a.apiBase, token: a.token };
+}
+
+/** 読み込み中の要求の数(更新を受け取り続ける常時の接続 `/events/stream` は数えない) */
+function trackPendingRequests(page: Page): () => number {
+  const open = new Set<Request>();
+  const counted = (r: Request) => !r.url().includes('/events/stream');
+  page.on('request', (r) => { if (counted(r)) open.add(r); });
+  page.on('requestfinished', (r) => open.delete(r));
+  page.on('requestfailed', (r) => open.delete(r));
+  return () => open.size;
+}
+
+/** 読み込み中の要求が無く、要素の位置が続けて同じになるまで待つ(画面の配置が決まってから座標を測る) */
+async function waitLayoutSettled(page: Page, el: Locator, pending: () => number): Promise<void> {
+  let last = '';
+  await expect.poll(async () => {
+    const box = await el.boundingBox();
+    const now = `${pending()}|${box ? Math.round(box.y) : 'none'}`;
+    const settled = pending() === 0 && now === last;
+    last = now;
+    return settled;
+  }, { message: '画面の配置が決まらない(読み込み中の要求が残る・位置が動き続ける)', intervals: [150], timeout: 20_000 }).toBe(true);
 }
 
 const titles = (d: Detail, day = 0) => d.days[day]!.events.slice().sort((x, y) => x.sort_order - y.sort_order).map((e) => e.title);
@@ -53,10 +75,14 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   await expectNoAxeViolations(page, '制約(移動・滞在の既定・日ごとの疲れ)');
 
   // 2. ドラッグで並べ替え(酒蔵A を 酒蔵C の前へ)
+  const pending = trackPendingRequests(page);
   await page.goto(`/planner/${plan.id}`);
   const list = page.getByRole('list', { name: /の予定$/ });
   const source = list.getByRole('listitem', { name: '酒蔵A(上下矢印キーで並べ替え)' });
   await expect(source).toBeVisible();
+  // 一覧の上の非同期の表示(利用枠・表紙など)が読み終わって位置が決まってから座標を測る。
+  // 読み終わる前に測ると、表示が現れて一覧が下へずれ、落とし先の座標が古くなる(#10 の見立て。サンドボックスで再現・確認。docs/trace/gate-e2e-drag-trace.md)
+  await waitLayoutSettled(page, source, pending);
   // 並べ替える予定を画面に出してから、実際のマウスでドラッグする(座標は画面の中だけ)
   await source.hover();
   const box = (await source.boundingBox())!;
