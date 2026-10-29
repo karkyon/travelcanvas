@@ -17,6 +17,8 @@ vi.mock('@/services/api/g11discover', () => ({
 vi.mock('@/services/api/g11', () => ({ getPlanCover: vi.fn().mockResolvedValue({ cover: null, can_edit: false }) }));
 vi.mock('@/hooks/useDragDrop', () => ({
   containerId: (p: string, d: string) => `${p}:${d}`,
+  reorderArray: (a: string[], id: string, to: number) => { const n = a.filter((x) => x !== id); n.splice(to, 0, id); return n; },
+  finalIndexForGap: (o: string[], id: string, gap: number) => (o.indexOf(id) >= 0 && gap > o.indexOf(id) ? gap - 1 : gap),
   useDragDrop: () => ({
     dragState: { isDragging: false }, handleDragStart: vi.fn(), handleDrop: vi.fn(), handleDragEnd: vi.fn(),
     handleKeyboardMove, moveItemBy, isItemDragged: () => false,
@@ -208,55 +210,67 @@ describe('1日の画面(DayView)', () => {
     expect(getHoursCheck).toHaveBeenCalledWith('p1', 'd1');
   });
 
-  it('上へ・下へのボタン(端は押せない)で入れ替え、読み上げで知らせる。営業時間の失敗は画面を壊さない', async () => {
+  it('上へ・下へ(端は押せない)は保存する前の案を作り、読み上げで知らせる。「やめる」で何も変えない', async () => {
     getHoursCheck.mockRejectedValue(new Error('offline'));
-    moveItemBy.mockResolvedValue(1);
     render(<DayView day={day()} planId="p1" />);
     expect(screen.getByRole('button', { name: '「清水寺」を上へ移す' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '「夕食」を下へ移す' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
-    await waitFor(() => expect(moveItemBy).toHaveBeenCalledWith(expect.objectContaining({ id: 'e1' }), 'p1', 'd1', 1));
-    await waitFor(() => expect(screen.getByTestId('reorder-status')).toHaveTextContent('「清水寺」を2番目へ移しました'));
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「清水寺」を2番目へ動かす案にしました。まだ保存していません');
+    const preview = screen.getByTestId('reorder-preview');
+    expect(preview).toHaveTextContent('並べ替えの案(まだ保存していません)');
+    expect(within(preview).getByTestId('reorder-preview-moves')).toHaveTextContent('「清水寺」 1番目 → 2番目');
+    expect(screen.getAllByRole('listitem').map((li) => li.getAttribute('aria-label')).filter(Boolean))
+      .toEqual(['夕食(上下矢印キーで並べ替え)', '清水寺(上下矢印キーで並べ替え)']);  // 案の並びで見せる
+    expect(reorderSchedule).not.toHaveBeenCalled();
+    expect(moveItemBy).not.toHaveBeenCalled();
+    fireEvent.click(within(preview).getByTestId('reorder-cancel'));
+    expect(screen.queryByTestId('reorder-preview')).toBeNull();
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('並べ替えの案をやめました(保存していません)');
+    expect(screen.getAllByRole('listitem', { name: /上下矢印キー/ })[0]).toHaveAttribute('aria-label', '清水寺(上下矢印キーで並べ替え)');
     await waitFor(() => expect(screen.queryAllByTestId('schedule-hours')).toHaveLength(0));
-    expect(screen.queryAllByTestId('schedule-arrival')).toHaveLength(0);
+    expect(reorderSchedule).not.toHaveBeenCalled();
   });
 
-  it('並べ替えの影響: 順の変化・営業時間・合わなくなった区間を出し、「元に戻す」で動かす前の並びへ', async () => {
+  it('案で前後が合わなくなる区間を先に示し、「この並びにする」で1回に保存 → 実際の影響 → 「元に戻す」', async () => {
     const before = { day_id: 'd1', local_date: '2026-11-14', timezone_id: 'Asia/Tokyo', near_minutes: 30, stale_days: 90, events: [
       hours({ event_id: 'e1' }), hours({ event_id: 'e2', status: 'closed', reason: 'after_close', windows: ['17:00〜18:00'] }),
     ] };
     getHoursCheck.mockResolvedValue(before);
-    moveItemBy.mockResolvedValue(1);
     reorderSchedule.mockResolvedValue(undefined);
     const segs = [seg({ from_event_id: 'e1', to_event_id: 'e2', mode: 'express_bus', duration_minutes: 95 })];
     const { rerender } = render(<DayView day={day()} planId="p1" segments={segs} />);
     await waitFor(() => expect(screen.getAllByTestId('schedule-hours')[1]).toHaveAttribute('data-tone', 'bad'));
     expect(screen.getByTestId('segment-row')).toHaveTextContent('🚍 高速バス · 1時間35分');
-    expect(screen.queryByTestId('reorder-impact')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
-    await waitFor(() => expect(moveItemBy).toHaveBeenCalled());
-    // store が並びを変えた(夕食 → 清水寺)。営業時間の読み直しで、夕食の判定が変わった
+    fireEvent.keyDown(screen.getByRole('listitem', { name: '清水寺(上下矢印キーで並べ替え)' }), { key: 'ArrowDown' });
+    const preview = screen.getByTestId('reorder-preview');
+    expect(within(preview).getByTestId('reorder-preview-segments'))
+      .toHaveTextContent('前後が合わなくなる移動の区間が1件あります(「夕食」へ着く区間)');
+    expect(within(preview).getByTestId('reorder-preview-hours')).toHaveTextContent('営業時間の判定は変わりません');
+    expect(screen.getByTestId('segment-mismatch')).toHaveTextContent('区間は自動では直しません');  // 案の並びで先に見える
+    fireEvent.click(within(preview).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSchedule).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1']));
+    expect(reorderSchedule).toHaveBeenCalledTimes(1);
+    // store が並びを保存した。営業時間の読み直しで、夕食の判定が変わった
     getHoursCheck.mockResolvedValue({ ...before, events: [hours({ event_id: 'e1' }), hours({ event_id: 'e2' })] });
     const swapped = { ...day(), events: [day().events[1]!, day().events[0]!] };
     rerender(<DayView day={swapped} planId="p1" segments={segs} />);
     const panel = await screen.findByTestId('reorder-impact');
+    expect(screen.queryByTestId('reorder-preview')).toBeNull();
     expect(within(panel).getByTestId('reorder-impact-moves')).toHaveTextContent('「夕食」 2番目 → 1番目');
-    expect(within(panel).getByTestId('reorder-impact-moves')).toHaveTextContent('「清水寺」 1番目 → 2番目');
     await waitFor(() => expect(within(panel).getByTestId('reorder-impact-hours'))
       .toHaveTextContent('「夕食」: ✕ 閉まった後に着く予定(17:00〜18:00) → ✓ 営業時間内 · 09:00〜18:00'));
-    expect(within(panel).getByTestId('reorder-impact-segments')).toHaveTextContent('前後が合わなくなった移動の区間が1件あります(「夕食」へ着く区間)');
-    expect(screen.getByTestId('segment-row')).toHaveAttribute('data-mismatch', 'true');
-    expect(screen.getByTestId('segment-mismatch')).toHaveTextContent('区間は自動では直しません');
-    expect(panel).toHaveTextContent('開始・終了の時刻は自動では変えていません');
+    expect(within(panel).getByTestId('reorder-impact-segments')).toHaveTextContent('前後が合わなくなった移動の区間が1件あります');
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('この並びを保存しました');
     fireEvent.click(within(panel).getByTestId('reorder-undo'));
-    await waitFor(() => expect(reorderSchedule).toHaveBeenCalledWith('p1', 'd1', ['e1', 'e2']));
+    await waitFor(() => expect(reorderSchedule).toHaveBeenLastCalledWith('p1', 'd1', ['e1', 'e2']));
     await waitFor(() => expect(screen.queryByTestId('reorder-impact')).toBeNull());
     expect(screen.getByTestId('reorder-status')).toHaveTextContent('元の並びに戻しました');
   });
 
-  it('「このままにする」で閉じる。確定(🔒)の予定と、それと入れ替わる移動は押せず、矢印キーでは理由を読み上げる', async () => {
+  it('確定(🔒)の予定と、それと入れ替わる移動は案にもしない(ボタンは押せず、矢印キー・ドラッグは理由を出す)。「このままにする」', async () => {
     getHoursCheck.mockRejectedValue(new Error('offline'));
-    moveItemBy.mockResolvedValue(1);
+    reorderSchedule.mockResolvedValue(undefined);
     const three = (): DaySchedule => ({ id: 'd1', date: '2026-11-14', timezone_id: 'Asia/Tokyo', events: [
       { id: 'e1', title: '清水寺', category: 'sightseeing' },
       { id: 'e2', title: '夕食', category: 'dining' },
@@ -267,17 +281,30 @@ describe('1日の画面(DayView)', () => {
     expect(screen.getByRole('button', { name: '「予約の宿」を上へ移す' })).toBeDisabled();
     fireEvent.keyDown(screen.getByRole('listitem', { name: '予約の宿(上下矢印キーで並べ替え)' }), { key: 'ArrowUp' });
     expect(screen.getByTestId('reorder-status')).toHaveTextContent('「予約の宿」は確定(🔒)の予定のため動かせません');
-    expect(handleKeyboardMove).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('reorder-preview')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
-    await waitFor(() => expect(moveItemBy).toHaveBeenCalled());
+    fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSchedule).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1', 'e3']));
     const t = three();
     rerender(<DayView day={{ ...t, events: [t.events[1]!, t.events[0]!, t.events[2]!] }} planId="p1" />);
     const panel = await screen.findByTestId('reorder-impact');
     expect(within(panel).getByTestId('reorder-impact-hours')).toHaveTextContent('営業時間を照合できる場所の予定はありません');
-    expect(within(panel).getByTestId('reorder-impact-segments')).toHaveTextContent('この日には予定へ着く移動の区間がありません');
     fireEvent.click(within(panel).getByTestId('reorder-keep'));
     expect(screen.queryByTestId('reorder-impact')).toBeNull();
     expect(screen.getByTestId('reorder-status')).toHaveTextContent('この並びのままにしました');
+  });
+
+  it('予定が変わると案を取り消す(保存していない)', async () => {
+    getHoursCheck.mockRejectedValue(new Error('offline'));
+    const { rerender } = render(<DayView day={day()} planId="p1" />);
+    fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
+    expect(screen.getByTestId('reorder-preview')).toBeInTheDocument();
+    rerender(<DayView day={{ ...day(), events: [day().events[0]!] }} planId="p1" />);
+    expect(screen.queryByTestId('reorder-preview')).toBeNull();
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('予定が変わったため、並べ替えの案を取り消しました');
+    expect(reorderSchedule).not.toHaveBeenCalled();
+    await waitFor(() => expect(getHoursCheck).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryAllByTestId('schedule-hours')).toHaveLength(0));
   });
 });
 

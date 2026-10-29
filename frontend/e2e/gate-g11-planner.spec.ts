@@ -8,8 +8,9 @@ import { apiClient, registerMember } from './support/api';
  *   1. 営業時間を登録した場所の予定に「営業時間内」、閉店の後に着く予定に「閉まった後」の帯が、出典と一緒に出る
  *   2. 予定へ着く移動に名前が出る(新幹線は明示した区間だけ・鉄道は「鉄道」)。日の見出しに現地の時刻帯が出る
  *   3. 時差をまたぐ飛行機の区間は、出発地・到着地の現地の日時を、同じ瞬間から求めて並べる(夏時間の終わった後の UTC−5)
- *   4. 「下へ」のボタンで順を変えると、サーバーの順も変わり、読み上げの知らせが出る。並べ替えの影響(順の変化・営業時間・
- *      前後が合わなくなった移動の区間)を出し、「元に戻す」でサーバーの順も元へ戻る。移動はタイムラインの独立した行
+ *   4. 「下へ」のボタンは保存する前の案を作る(前後が合わなくなる区間を先に示し、サーバーの順は変えない)。「やめる」で何も変えず、
+ *      「この並びにする」で保存し、実際の影響(順の変化・営業時間・区間)を出し、「元に戻す」でサーバーの順も元へ戻る。
+ *      移動はタイムラインの独立した行
  *   7. 高速バス(express_bus)の区間を保存でき、「🚍 高速バス」と出る(路線バスと区別する)
  *   5. 「全日程」で日を同じ時刻の物差しで並べ、予定を押すとその日の日別へ戻る
  *   6. 幅 360px・暗い見た目で横にはみ出さない。axe 違反 0
@@ -71,8 +72,23 @@ test('旅程: 営業時間の帯・移動手段の名前・時差・触る並べ
   await expectNoAxeViolations(page, '旅程(営業時間の帯・移動手段)');
 
   // 4. 触る並べ替え(夕食を京都駅の後へ)
+  const original = ['清水寺', '夕食', '京都駅'];
+  const serverOrder = async () => (await send('get', base)).days[0].events.map((e: { title: string }) => e.title);
+  // 案(保存しない) → やめる
   await page.getByRole('button', { name: '「夕食」を下へ移す' }).click();
-  await expect(page.getByTestId('reorder-status')).toContainText('「夕食」を3番目へ移しました');
+  await expect(page.getByTestId('reorder-status')).toContainText('「夕食」を3番目へ動かす案にしました。まだ保存していません');
+  const preview = page.getByTestId('reorder-preview');
+  await expect(preview.getByTestId('reorder-preview-segments')).toContainText('前後が合わなくなる移動の区間が2件あります');
+  await expect(preview.getByTestId('reorder-preview-hours')).toContainText('営業時間の判定は変わりません');
+  await expectNoAxeViolations(page, '並べ替えの案');
+  expect(await serverOrder()).toEqual(original);
+  await preview.getByTestId('reorder-cancel').click();
+  await expect(page.getByTestId('reorder-preview')).toHaveCount(0);
+  await expect(list.getByTestId('segment-mismatch')).toHaveCount(0);
+  // 案 → この並びにする
+  await page.getByRole('button', { name: '「夕食」を下へ移す' }).click();
+  await page.getByTestId('reorder-preview').getByTestId('reorder-apply').click();
+  await expect(page.getByTestId('reorder-status')).toContainText('この並びを保存しました');
   await expect.poll(async () => (await send('get', base)).days[0].events.map((e: { title: string }) => e.title))
     .toEqual(['清水寺', '京都駅', '夕食']);
   await expect(page.getByTestId('reorder-status')).toContainText('確かめました', { timeout: 20_000 });
