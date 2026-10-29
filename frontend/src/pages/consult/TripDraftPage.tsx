@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
+import PlanningUsageMeter from '@/components/planning/PlanningUsageMeter';
 import { commitTripDraft, getTripDraft, updateDraftSlots } from '@/services/api/tripIntent';
 import type { DraftPart, DraftSlot, TripDraft } from '@/services/api/types/tripIntent';
 import { transportMode } from '@/utils/transportModes';
@@ -244,6 +245,8 @@ const TripDraftPage: React.FC = () => {
       <p aria-live="polite" className="sr-only" data-testid="draft-live">{message}</p>
       {message && <p className="mt-2 text-xs text-ink-700" aria-hidden="true">{message}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg bg-danger-soft p-3 text-sm text-danger">{error}</p>}
+      {/* [FR059-B] この旅行の AI・外部検索の利用枠(旅行の予算とは別) */}
+      <PlanningUsageMeter planId={planId} className="mt-3" />
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <section aria-labelledby={`${id}-days`} className="rounded-2xl border border-cloud-200 bg-surface p-4">
           <h2 id={`${id}-days`} className="sr-only">日ごとの下書き</h2>

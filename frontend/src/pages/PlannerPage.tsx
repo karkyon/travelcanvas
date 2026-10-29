@@ -33,6 +33,7 @@ import { titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
+import PlanningUsageMeter from '@/components/planning/PlanningUsageMeter';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
@@ -589,6 +590,8 @@ const PlannerPage: React.FC = () => {
           />
 
           <PlanHeader plan={currentPlan} className="mb-4" onDelete={() => navigate('/planner')} />
+          {/* [FR059-B] この旅行の AI・外部検索の利用枠(旅行の予算とは別) */}
+          <PlanningUsageMeter planId={currentPlan.id} className="mb-4" />
 
           {/* [Gate #25] 共有ページ・最適化パネルはどちらも実装済みだったが、
               どこからもリンクされておらずUIから一度も到達できなかった。

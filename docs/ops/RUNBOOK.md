@@ -653,3 +653,19 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 | 2026-10-26 | 16 | Gate G7: 移動・滞在の既定・最終の便・日をまたぐ予定・案の比較・猶予つきのアカウントの削除(§8.13)、定期実行 account-deletions(§2.1) |
 | 2026-10-22 | 12 | Gate G3: 画面の本番用の配信・データ鍵と鍵の破棄による削除・バックアップの鍵の写し(§4.1・§8.9)、TOTP の鍵と解除の二者の確認(§8.3)、エラーの問い合わせ番号・性能の検査(§8.9)。定期実行を登録済みなら `schedule install` をもう一度実行すると `keys purge-escrow` が足される |
 | 2026-10-20 | 10 | Gate G1: 暗号化の鍵の版の切り替え(`tcops.py keys`、§8.2、`docs/ops/KEY-INVENTORY.md`)、main の保護の設定の記録(`ci_gate.py export`、§9)、CI の試験結果の保存と台帳の照合(§9) |
+
+## FR-059 外部 API の原価の守り(Gate FR059-B)
+
+正本: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` §9。
+
+- **見るもの:** `/metrics` の `travelcanvas_provider_usage_*`(見込み・実際・予約・拒否・再試行・照合の差)と、
+  `travelcanvas_security_events_total{kind="provider_usage_plan_alert"}`(旅行の枠の 90%)・`provider_usage_over_estimate`・
+  `provider_suspended`。監査の `provider_usage_suspended`・`entitlement_requested/approved/revoked`。
+- **provider が止まった時:** 見込みの超過・請求の照合の差で止まる(fail closed)。原因(単価の改定・SKU の変更・単位の報告の誤り)を
+  確かめ、価格を変えるなら新しい policy の版を作り(`usage_policy_profiles` に行を足す。旧い版は変えない)、正本 §2.2 の検算を
+  試験で通してから backend を作り直す(止める印は process の中なので、作り直しで戻る)。原因が分からないまま戻さない。
+- **クラス・例外の付与:** 管理の画面「旅程相談の利用枠(クラス)」。申請した管理者とは別の管理者が承認する(MFA の確認が要る)。
+  サポートの担当の権限だけでは枠を増やせない。1旅行の 50円を越える例外は Pro の契約だけ。
+- **期限の切れた予約:** 次の予約の前に自動で解放する(10分。`COST_GUARD_RESERVATION_TTL_SECONDS`)。
+- **鍵:** 有料 provider の鍵は環境・用途ごとに分け、TravelCanvas 専用の project で予算・期限・責任者を決める。CI・開発は fake。
+

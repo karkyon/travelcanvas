@@ -17,6 +17,7 @@ from app.api.v1 import (
     privacy_zones, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers,
     trip_intents,
+    planning_usage,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -603,6 +604,10 @@ app.include_router(media_providers.plan_router, prefix="/api/v1")
 # [Gate G11] 行き先が未定の旅行相談(段階5)
 app.include_router(trip_intents.router, prefix="/api/v1")
 app.include_router(trip_intents.plan_router, prefix="/api/v1")
+# [FR059-B] 旅程相談の外部 API の利用枠(1旅行 50円・クラス別 quota・管理の二者の承認)
+app.include_router(planning_usage.router, prefix="/api/v1")
+app.include_router(planning_usage.plan_router, prefix="/api/v1")
+app.include_router(planning_usage.admin_router, prefix="/api/v1")
 
 
 @app.exception_handler(org_external.ApiError)

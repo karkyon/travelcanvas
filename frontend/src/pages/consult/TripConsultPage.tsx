@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '@/components/common/Button';
+import PlanningClassSummary from '@/components/planning/PlanningClassSummary';
 import { compareAreas, createTripDraft, extractIntent } from '@/services/api/tripIntent';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
@@ -577,6 +578,8 @@ const TripConsultPage: React.FC = () => {
         </div>
       </div>
       <Stepper step={step} />
+      {/* [FR059-B] 自分のクラスと今月の旅程相談の枠(旅行ごとの枠は下書き・旅程で出す) */}
+      <PlanningClassSummary className="mt-2" />
       {step === 'brief' && (
         <BriefStep brief={state.brief} onChange={(b) => setState((s) => ({ ...s, brief: b }))} onSubmit={() => void extract()}
           busy={busy === 'extract'} error={error} />

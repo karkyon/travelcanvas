@@ -45,6 +45,8 @@ class MetricsRegistry:
         self._rate_limiter_fallbacks = 0
         # [Gate S4] 防御が働いた回数(種類ごと)。攻撃の兆候・監査の書き込み失敗を外から見張るため
         self._security_events: Dict[str, int] = {}
+        # [FR059-B] 外部 API の原価(円)・拒否・再試行(操作ごと)。利用者・旅行の ID は入れない
+        self._provider_usage: Dict[Tuple[str, str], float] = {}
 
     def reset(self) -> None:
         with self._lock:
@@ -57,6 +59,21 @@ class MetricsRegistry:
             self._rate_limited.clear()
             self._rate_limiter_fallbacks = 0
             self._security_events.clear()
+            self._provider_usage.clear()
+
+    PROVIDER_USAGE_METRICS = ("estimated_jpy", "actual_jpy", "reserved_jpy", "denied_total", "retry_total",
+                              "reconciliation_delta_jpy")
+
+    def add_provider_usage(self, metric: str, operation: str, value: float) -> None:
+        """[FR059-B] provider_usage_<metric>{operation}。metric は固定の名前だけ。"""
+        if metric not in self.PROVIDER_USAGE_METRICS:
+            return
+        operation = "".join(ch for ch in operation if ch.isalnum() or ch in "._")[:32] or "unknown"
+        with self._lock:
+            key = (metric, operation)
+            if key not in self._provider_usage and len(self._provider_usage) >= 200:
+                return
+            self._provider_usage[key] = self._provider_usage.get(key, 0.0) + float(value)
 
     def observe(self, method: str, route: str, status_code: int, seconds: float) -> None:
         method = method.upper() if method else "OTHER"
@@ -115,6 +132,7 @@ class MetricsRegistry:
             rate_limited = dict(self._rate_limited)
             fallbacks = self._rate_limiter_fallbacks
             security_events = dict(self._security_events)
+            provider_usage = dict(self._provider_usage)
         lines = [
             "# HELP travelcanvas_http_requests_total HTTP requests by method, route template and status class.",
             "# TYPE travelcanvas_http_requests_total counter",
@@ -160,6 +178,14 @@ class MetricsRegistry:
         ]
         for kind, n in sorted(security_events.items()):
             lines.append('travelcanvas_security_events_total{kind="%s"} %d' % (_escape(kind), n))
+        if provider_usage:
+            lines += [
+                "# HELP travelcanvas_provider_usage External API cost (JPY) and counts by operation (FR-059).",
+                "# TYPE travelcanvas_provider_usage counter",
+            ]
+            for (metric, operation), value in sorted(provider_usage.items()):
+                lines.append('travelcanvas_provider_usage_%s{operation="%s"} %s'
+                             % (metric, _escape(operation), _fmt(value)))
         for name, value in sorted((extra_gauges or {}).items()):
             lines.append("# TYPE %s gauge" % name)
             lines.append("%s %s" % (name, _fmt(float(value))))

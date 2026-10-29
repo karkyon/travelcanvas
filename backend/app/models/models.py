@@ -3576,3 +3576,174 @@ class OpsJobRun(Base):
     __table_args__ = (
         Index("ix_ops_job_runs_job_started", "job", "started_at"),
     )
+
+
+# ===================================================================== [FR059-B] 外部 API の原価上限・利用者クラス別 quota
+# 正本: docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §7。金額は NUMERIC(12,4)(円)。
+
+class Entitlement(Base):
+    """[FR059-B] クラスの付与と quota の上書き(subject: user / plan / organization)。
+
+    管理者が作ると pending。別の管理者が承認すると active(二者の承認。requested_by ≠ approved_by)。"""
+    __tablename__ = "entitlements"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_type: Mapped[str] = mapped_column(String(12), nullable=False)
+    subject_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    feature_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending", server_default="pending")
+    quota: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="admin", server_default="admin")
+    reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("subject_type IN ('user', 'plan', 'organization')", name="ck_entitlements_subject"),
+        CheckConstraint("status IN ('pending', 'active', 'revoked')", name="ck_entitlements_status"),
+        CheckConstraint("source IN ('default', 'admin', 'contract', 'trip_pass', 'subscription')",
+                        name="ck_entitlements_source"),
+        CheckConstraint("quota IS NULL OR quota >= 0", name="ck_entitlements_quota"),
+        CheckConstraint("approved_by IS NULL OR requested_by IS NULL OR approved_by <> requested_by",
+                        name="ck_entitlements_two_person"),
+        Index("ix_entitlements_subject", "subject_type", "subject_id", "feature_key"),
+    )
+
+
+class UsagePolicyProfile(Base):
+    """[FR059-B] 利用者クラスごとの上限と価格の版(不変。変更は新しい version)。"""
+    __tablename__ = "usage_policy_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="JPY", server_default="JPY")
+    plan_cap_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    monthly_cap_jpy: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    plans_per_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    feature_quotas: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fx_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    tax_factor: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    safety_factor: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    provider_price_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="active", server_default="active")
+    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("profile_key", "version", name="uq_usage_policy_profiles_key_version"),
+        CheckConstraint("status IN ('draft', 'active', 'retired')", name="ck_usage_policy_profiles_status"),
+        CheckConstraint("plan_cap_jpy >= 0 AND (monthly_cap_jpy IS NULL OR monthly_cap_jpy >= 0)",
+                        name="ck_usage_policy_profiles_caps"),
+    )
+
+
+class UsageBudgetAccount(Base):
+    """[FR059-B] 旅行(period_key='plan')・月(period_key='YYYY-MM')の口座。行の鍵で原子的に予約する。"""
+    __tablename__ = "usage_budget_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    scope_type: Mapped[str] = mapped_column(String(12), nullable=False)
+    scope_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    period_key: Mapped[str] = mapped_column(String(7), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    profile_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    cap_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    reserved_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False, default=0, server_default="0")
+    settled_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False, default=0, server_default="0")
+    plans_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    counted_month: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("scope_type", "scope_id", "period_key", name="uq_usage_budget_accounts_scope"),
+        CheckConstraint("scope_type IN ('plan', 'user', 'organization')", name="ck_usage_budget_accounts_scope"),
+        CheckConstraint("period_key = 'plan' OR period_key ~ '^[0-9]{4}-[0-9]{2}$'",
+                        name="ck_usage_budget_accounts_period"),
+        CheckConstraint("reserved_jpy >= 0 AND settled_jpy >= 0 AND cap_jpy >= 0 AND plans_used >= 0",
+                        name="ck_usage_budget_accounts_amounts"),
+    )
+
+
+class ProviderUsageReservation(Base):
+    """[FR059-B] provider を呼ぶ前の原価の予約。unique(user_id, idempotency_key) で二重の予約を防ぐ。"""
+    __tablename__ = "provider_usage_reservations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    idempotency_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    billable_owner_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    operation: Mapped[str] = mapped_column(String(32), nullable=False)
+    units: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    counts: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    max_cost_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="reserved", server_default="reserved")
+    profile_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan_account_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usage_budget_accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    monthly_account_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usage_budget_accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_provider_usage_reservations_idem"),
+        CheckConstraint("status IN ('reserved', 'settled', 'released')", name="ck_provider_usage_reservations_status"),
+        CheckConstraint("max_cost_jpy >= 0", name="ck_provider_usage_reservations_cost"),
+        Index("ix_provider_usage_reservations_open", "status", "expires_at"),
+    )
+
+
+class ProviderUsageEvent(Base):
+    """[FR059-B] 使用の記録(原価・失敗・照合の最小の情報)。入力の文章・旅程・鍵は保存しない。"""
+    __tablename__ = "provider_usage_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reservation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("provider_usage_reservations.id", ondelete="SET NULL"), nullable=True,
+        index=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    organization_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    class_snapshot: Mapped[str] = mapped_column(String(16), nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    sku: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    operation: Mapped[str] = mapped_column(String(32), nullable=False)
+    input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    request_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    matrix_elements: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    raw_cost: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 8), nullable=True)
+    raw_currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    fx_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    tax_factor: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 4), nullable=True)
+    estimated_cost_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    actual_cost_jpy: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4), nullable=True)
+    price_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    result_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_provider_usage_events_provider_time", "provider", "occurred_at"),
+    )

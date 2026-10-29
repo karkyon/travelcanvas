@@ -9,6 +9,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ScheduleItem } from '@/types';
 
 vi.mock('@/components/PlanHeader', () => ({ default: () => null }));
+vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));
 vi.mock('@/components/planner/PlanMap', () => ({ default: () => null }));
