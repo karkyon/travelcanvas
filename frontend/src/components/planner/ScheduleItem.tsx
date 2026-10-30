@@ -4,7 +4,7 @@ import { transportText } from '@/utils/transportModes';
 import TransportIcon from '../common/TransportIcon';
 import type { ArrivalLeg, HoursBadge } from './plannerModel';
 import { 
-  Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
+  MapPin, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, AlertTriangle, MessageSquare,
 } from 'lucide-react';
 import UiIcon from '@/components/common/UiIcon';
@@ -61,6 +61,8 @@ interface ScheduleItemProps {
   onPhoto?: (id: string) => void;
   /** [UX-6] 確定の予定(並べ替えで位置を変えない)。行に「確定」の印を出す */
   locked?: boolean;
+  /** [Gate MockScreens] 選んでいる予定(地図と選んだ予定の欄と同じ予定) */
+  selected?: boolean;
 }
 
 const CATEGORY_MARKS: Record<string, [LucideIcon, string]> = {
@@ -111,6 +113,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   image,
   onPhoto,
   locked = false,
+  selected = false,
 }) => {
   void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -131,15 +134,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
         <span className="sr-only">{`${label}: `}</span>
       </span>
     );
-  };
-
-  const getPriorityColor = (prio: string) => {
-    switch (prio) {
-      case 'high': return 'border-red-500 bg-red-50';
-      case 'medium': return 'border-yellow-500 bg-yellow-50';
-      case 'low': return 'border-green-500 bg-green-50';
-      default: return 'border-gray-300 bg-surface';
-    }
   };
 
   const formatCurrency = (amount?: number) => {
@@ -176,201 +170,132 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
     setIsEditing(false);
   };
 
-  const baseClasses = `
-    relative bg-surface border rounded-xl p-4 mb-3 cursor-grab transition-all duration-200
-    ${isDragging ? 'opacity-80 scale-105 rotate-1 shadow-xl z-50' : 'hover:shadow-md'}
-    ${isNext ? 'border-orange-400 bg-orange-50 shadow-lg' : ''}
-    ${isCompleted ? 'opacity-60 bg-gray-50' : ''}
-    ${isDelayed ? 'border-red-400 bg-red-50' : getPriorityColor(priority)}
-    ${isEditing ? 'border-blue-400 bg-blue-50' : ''}
-  `;
+  const subParts = [
+    locationName || null,
+    duration > 0 ? `滞在 ${formatDuration(duration)}` : null,
+    cost ? formatCurrency(cost) : null,
+  ].filter(Boolean);
+  const timeText = formatTime(startTime) || '未定';
+  const endText = endTime
+    ? `〜${formatTime(endTime)}${endDayOffset ? (endDayOffset === 1 ? '(翌日)' : `(${endDayOffset}日後)`) : ''}`
+    : '';
+  const iconBtn = 'tc-focus-ring tc-event-icon';
 
   return (
     <div
       ref={dragRef}
-      className={baseClasses}
+      className={`tc-event${selected ? ' is-selected' : ''}${isNext ? ' is-next' : ''}${isDragging ? ' is-dragging' : ''}`
+        + `${isCompleted ? ' is-done' : ''}${isDelayed ? ' is-delayed' : ''}${isEditing ? ' is-editing' : ''}`}
       style={style}
+      data-priority={priority}
       onClick={() => setIsExpanded(!isExpanded)}
     >
-      {/* Next Badge */}
-      {isNext && (
-        <div className="absolute -top-2 -right-2 bg-orange-700 text-white text-xs font-bold px-2 py-1 rounded-full">
-          NEXT
+      {/* [Gate MockScreens] モックの event-row: 時刻・点と線・予定の中身 */}
+      <div className="tc-event-time">
+        <span>{timeText}</span>
+        {endText && <small>{endText}</small>}
+      </div>
+      <div className="tc-event-dot" aria-hidden="true" />
+      <div className="tc-event-info">
+        <div className="tc-event-topline">
+          <div className="tc-event-title">
+            {categoryMark(category)}{isEditing ? (
+              <input
+                type="text"
+                value={editData.title}
+                onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                className="border-b border-blue-400 bg-transparent focus:outline-hidden"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="予定の題"
+              />
+            ) : title}
+            {locked && (
+              <span data-testid="schedule-locked" className="tc-event-lock">
+                <UiIcon icon={IcLock} size={12} />確定
+              </span>
+            )}
+          </div>
+          {isNext && <span className="tc-pill tc-pill--live tc-event-next">NEXT</span>}
+          {isDelayed && (
+            <span className="tc-pill tc-pill--warn"><AlertTriangle size={12} aria-hidden="true" />遅れ</span>
+          )}
+            {/* 操作(名前は読み上げにも出す)。[Gate MockScreens] 押しても何も起きない「共有」は、共有の先がある時だけ出す */}
+            <div className="tc-event-tools" onClick={(e) => e.stopPropagation()}>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                className={iconBtn} title="編集" aria-label="編集">
+                <Edit3 size={14} aria-hidden="true" />
+              </button>
+              {onPhoto && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onPhoto(id); }}
+                  className={iconBtn} title="写真" aria-label="この予定の写真を選ぶ" data-testid={`schedule-photo-${id}`}>
+                  <UiIcon icon={IcImage} size={14} />
+                </button>
+              )}
+              {onComment && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onComment(id); }}
+                  className={iconBtn} title="コメント" aria-label="この予定へのコメント">
+                  <MessageSquare size={14} aria-hidden="true" />
+                </button>
+              )}
+              {onShare && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onShare(id); }}
+                  className={iconBtn} title="共有" aria-label="共有">
+                  <Share2 size={14} aria-hidden="true" />
+                </button>
+              )}
+              <button type="button" onClick={(e) => { e.stopPropagation(); onDelete?.(id); }}
+                className={`${iconBtn} is-danger`} title="削除" aria-label="削除">
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
         </div>
-      )}
+        {subParts.length > 0 && <small className="tc-event-sub">{subParts.join(' · ')}</small>}
+        {rating && (
+          <small className="tc-event-sub"><Star size={11} className="text-yellow-400 fill-current inline align-[-1px]" /> {rating}</small>
+        )}
 
-      {/* Delay Warning */}
-      {isDelayed && (
-        <div className="absolute -top-2 -left-2 bg-red-500 text-white p-1 rounded-full">
-          <AlertTriangle size={12} />
-        </div>
-      )}
+        {/* [Gate G11] この予定へ着く移動(アイコンと名前・所要時間・推定か・時差)。区間が無ければ以前の移動の値 */}
+        {arrival ? (
+          <div className="tc-event-mode" data-testid="schedule-arrival">
+            <TransportIcon mode={arrival.mode} />
+            <span>{arrival.text}</span>
+            {arrival.isEstimate && <span>(推定)</span>}
+            {arrival.status === 'confirmed' && <span>・確定</span>}
+            {arrival.crossZone && <span data-testid="schedule-cross-zone">{arrival.crossZone.text}</span>}
+            {arrival.zoneUnknown && <span>・時刻帯未確認</span>}
+          </div>
+        ) : travelMethod ? (
+          <div className="tc-event-mode" data-testid="schedule-arrival">
+            <TransportIcon mode={travelMethod} />
+            <span>{transportText(travelMethod, travelTime ?? null)}</span>
+            {travelCost ? <span>• {formatCurrency(travelCost)}</span> : null}
+          </div>
+        ) : null}
 
-      {/* Main Content */}
-      <div className="flex items-start justify-between gap-3">
+        {/* [Gate G11] 営業時間の照合(記号と文字。色だけで伝えない) */}
+        {hours && (
+          <p className={`tc-event-hours is-${hours.tone}`} data-testid="schedule-hours" data-tone={hours.tone}>
+            <span aria-hidden="true">{hours.symbol}</span>
+            <span>{hours.text}</span>
+            {hours.sourceText && <span className="opacity-90">({hours.sourceText})</span>}
+          </p>
+        )}
+
+        {description && !isExpanded && (
+          <p className="tc-event-desc">{description}</p>
+        )}
+
         {/* [Gate G11] 予定のカードの写真(非公開の記録を権限付きで読んだ一時の URL) */}
         {image && (
-          <figure className="m-0 w-20 shrink-0 sm:w-28" data-testid="schedule-image">
-            <img src={image.src} alt="" className="aspect-[4/3] w-full rounded-md object-cover" />
-            {image.credit && <figcaption className="mt-0.5 text-[10px] leading-tight text-ink-700 break-words">{image.credit}</figcaption>}
+          <figure className="tc-event-photo" data-testid="schedule-image">
+            <img src={image.src} alt="" />
+            {image.credit && <figcaption>{image.credit}</figcaption>}
           </figure>
         )}
-        <div className="flex-1 min-w-0">
-          {/* Time and Title */}
-          {/* [UX-6] 狭い幅(360px)では時刻と題を折り返す(以前は題が1文字ずつ折れていた) */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
-            <div className="flex items-center gap-1 text-sm font-semibold text-ink-700">
-              <Clock size={14} />
-              <span>{formatTime(startTime)}-{formatTime(endTime)}{endTime && endDayOffset ? (endDayOffset === 1 ? '(翌日)' : `(${endDayOffset}日後)`) : ''}</span>
-            </div>
-            <div className="text-lg font-semibold text-ink-900">
-              {categoryMark(category)}{isEditing ? (
-                <input
-                  type="text"
-                  value={editData.title}
-                  onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                  className="border-b border-blue-400 bg-transparent focus:outline-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : title}
-              {locked && (
-                <span data-testid="schedule-locked"
-                  className="ml-2 inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-cloud-200 px-1.5 align-middle text-xs font-semibold text-ink-700">
-                  <UiIcon icon={IcLock} size={12} />確定
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Location and Basic Info */}
-          <div className="flex items-center gap-4 text-sm text-ink-700 mb-2">
-            <div className="flex items-center gap-1">
-              <MapPin size={12} />
-              <span>{locationName}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock size={12} />
-              <span>滞在: {formatDuration(duration)}</span>
-            </div>
-            {cost && (
-              <div className="flex items-center gap-1">
-                <DollarSign size={12} />
-                <span>{formatCurrency(cost)}</span>
-              </div>
-            )}
-            {rating && (
-              <div className="flex items-center gap-1">
-                <Star size={12} className="text-yellow-400 fill-current" />
-                <span>{rating}</span>
-              </div>
-            )}
-          </div>
-
-          {/* [Gate G11] この予定へ着く移動(アイコンと名前・所要時間・推定か・時差)。区間が無ければ以前の移動の値 */}
-          {arrival ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
-              data-testid="schedule-arrival">
-              <TransportIcon mode={arrival.mode} />
-              <span>{arrival.text}</span>
-              {arrival.isEstimate && <span>(推定)</span>}
-              {arrival.status === 'confirmed' && <span>・確定</span>}
-              {arrival.crossZone && <span data-testid="schedule-cross-zone">{arrival.crossZone.text}</span>}
-              {arrival.zoneUnknown && <span>・時刻帯未確認</span>}
-            </div>
-          ) : travelMethod ? (
-            <div className="flex items-center gap-2 text-xs text-ink-700 bg-cloud-100 px-2 py-1 rounded-sm mb-2"
-              data-testid="schedule-arrival">
-              <TransportIcon mode={travelMethod} />
-              <span>{transportText(travelMethod, travelTime ?? null)}</span>
-              {travelCost ? <span>• {formatCurrency(travelCost)}</span> : null}
-            </div>
-          ) : null}
-
-          {/* [Gate G11] 営業時間の照合(記号と文字。色だけで伝えない) */}
-          {hours && (
-            <p className={`flex flex-wrap items-center gap-x-1 text-xs px-2 py-1 rounded-sm mb-2 ${
-              hours.tone === 'good' ? 'text-success bg-success-soft' : hours.tone === 'warn' ? 'text-warning bg-warning-soft'
-                : hours.tone === 'bad' ? 'text-danger bg-danger-soft' : 'text-ink-700 bg-cloud-100'}`}
-            data-testid="schedule-hours" data-tone={hours.tone}>
-              <span aria-hidden="true">{hours.symbol}</span>
-              <span>{hours.text}</span>
-              {hours.sourceText && <span className="opacity-90">({hours.sourceText})</span>}
-            </p>
-          )}
-
-          {/* Description */}
-          {description && !isExpanded && (
-            <p className="text-sm text-ink-700 line-clamp-1">{description}</p>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1 ml-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            className="p-1 text-ink-500 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors"
-            title="編集"
-          >
-            <Edit3 size={14} />
-          </button>
-          {onPhoto && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPhoto(id);
-              }}
-              className="p-1 text-ink-700 hover:bg-cloud-100 rounded-sm transition-colors"
-              title="写真"
-              aria-label="この予定の写真を選ぶ"
-              data-testid={`schedule-photo-${id}`}
-            >
-              <UiIcon icon={IcImage} size={16} />
-            </button>
-          )}
-          {onComment && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onComment(id);
-              }}
-              className="p-1 text-ink-700 hover:text-indigo-700 hover:bg-indigo-50 rounded-sm transition-colors"
-              title="コメント"
-              aria-label="この予定へのコメント"
-            >
-              <MessageSquare size={14} />
-            </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onShare?.(id);
-            }}
-            className="p-1 text-ink-500 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
-            title="共有"
-          >
-            <Share2 size={14} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.(id);
-            }}
-            className="p-1 text-ink-500 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
-            title="削除"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <div className="tc-event-expanded" onClick={(e) => e.stopPropagation()}>
           {/* Description */}
           {description && (
             <div className="mb-3">
@@ -463,14 +388,8 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
         </div>
       )}
 
-      {/* Completed Overlay */}
-      {isCompleted && (
-        <div className="absolute top-2 right-2">
-          <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center">
-            <span className="text-xs">✓</span>
-          </div>
-        </div>
-      )}
+      {isCompleted && <span className="tc-pill tc-pill--good tc-event-done">✓ 済</span>}
+      </div>
     </div>
   );
 };

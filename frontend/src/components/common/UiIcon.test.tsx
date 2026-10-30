@@ -16,9 +16,6 @@ const EMOJI = /\p{Emoji_Presentation}|\u{FE0F}|(?=\p{Extended_Pictographic})[\u{
 
 // 除外(理由つき)。docs/trace/gate-ux6-icons2-trace.md
 const EXCLUDED: Record<string, string> = {
-  'components/SpotSearch.tsx': 'どこからも使われていない部品(画面に出ない)',
-  'components/ImageSearch.tsx': 'どこからも使われていない部品(画面に出ない)',
-  'components/VoiceSearch.tsx': 'どこからも使われていない部品(画面に出ない)',
   'components/layout/Header.tsx': 'どこからも使われていない部品(画面に出ない)',
   'components/Navbar.tsx': 'どこからも使われていない部品(画面に出ない)',
   'components/common/MapView.tsx': 'どこからも使われていない部品(画面に出ない)',

@@ -115,7 +115,7 @@ export const useSearch = () => {
           search_metadata: response.data?.search_metadata,
         };
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'AI検索に失敗しました');
+        setError(err instanceof Error ? err.message : '検索に失敗しました');
         throw err;
       } finally {
         setLoading(false);

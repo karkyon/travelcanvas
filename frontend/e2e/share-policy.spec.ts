@@ -30,7 +30,7 @@ test('共有の項目: 発行前に見える内容を確かめ、機密は確認
   });
 
   await page.goto(`/share/${planId}`);
-  await expect(page.getByRole('heading', { name: /プラン共有・権限設定/, level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '見せる範囲を決めて共有', level: 1 })).toBeVisible();
 
   // 1. 発行前のプレビュー(標準)
   const preview = page.getByRole('region', { name: '閲覧者に見える内容' });

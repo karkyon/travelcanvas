@@ -12,6 +12,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import PageHead from '@/components/shell/PageHead';
+import Landscape from '@/components/shell/Landscape';
+import { useTripContext } from '@/hooks/useTripContext';
 import api, {
   createJournalDraft, createMemory, deleteMemory, getMemories, getMemoryMedia, updateMemory, uploadMemory,
 } from '@/services/api';
@@ -47,7 +50,7 @@ const MemoryMedia: React.FC<{ planId: string; memory: TravelMemory; alt: string 
   if (failed) return <p className="text-sm text-red-800">ファイルを読み込めませんでした</p>;
   if (!url) return <p className="text-sm text-ink-700">読み込み中…</p>;
   if (memory.kind === 'photo') {
-    return <img src={url} alt={alt} className="max-h-64 rounded-lg border border-gray-200" />;
+    return <img src={url} alt={alt} className="tc-memory-img" />;
   }
   return <audio controls src={url} aria-label={alt} className="w-full" />;
 };
@@ -67,6 +70,7 @@ const showTime = (iso: string | null): string => {
 const MemoriesPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  const trip = useTripContext(planId);
   const [data, setData] = useState<MemoryList | null>(null);
   const [days, setDays] = useState<NormalizedDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -260,15 +264,34 @@ const MemoriesPage: React.FC = () => {
 
   if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
+  const memories = data?.memories ?? [];
+  const counts = {
+    total: memories.length,
+    photo: memories.filter((m) => m.kind === 'photo').length,
+    events: new Set(memories.map((m) => m.event_id).filter(Boolean)).size,
+  };
+  const focusById = (id: string) => {
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el?.focus({ preventScroll: true });
+  };
+
   const describe = (m: TravelMemory) => [eventLabel(m, days), m.place_name, showTime(m.occurred_at)].filter(Boolean).join('・');
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">旅の記録</h1>
-      <p className="text-sm text-ink-700 mt-1">
-        予定ごとにメモ・写真・音声メモ・動画のURLを残し、旅行記の下書きを作れます。記録は最初「自分だけ」に見えます。
-      </p>
+    <div className="tc-page tc-memory">
+      {/* [Gate MockScreens] モックの記録: page-head・旅のふり返り(記録の数)・写真とメモのカード・公開前チェック */}
+      <PageHead
+        eyebrow="MEMORY · 旅の記録"
+        title="旅のあとも、地図に思い出が残る"
+        sub="予定ごとにメモ・写真・音声メモ・動画のURLを残し、旅行記の下書きを作れます。記録は最初「自分だけ」に見えます。"
+        actions={<>
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>
+          {data?.can_create && (
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => focusById('memory-add-title')}>＋ 写真・メモを追加</button>
+          )}
+        </>}
+      />
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
       {lastDeleted && (
@@ -281,10 +304,112 @@ const MemoriesPage: React.FC = () => {
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : (
         <>
+          <section className="tc-memory-hero" aria-labelledby="memory-hero-title">
+            <div className="tc-memory-art">
+              <Landscape />
+              <span className="tc-photo-source">記録のイメージ</span>
+            </div>
+            <div className="tc-memory-copy">
+              <p className="tc-label">{['JOURNEY REVIEW', trip.destination?.toUpperCase()].filter(Boolean).join(' · ')}</p>
+              <h2 id="memory-hero-title">{trip.title ?? '旅のふり返り'}</h2>
+              {(trip.startDate || trip.endDate) && (
+                <p>{[trip.startDate, trip.endDate].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' — ')}</p>
+              )}
+              <div className="tc-memory-stats">
+                <span className="tc-pill">{`記録 ${counts.total}件`}</span>
+                <span className="tc-pill">{`写真 ${counts.photo}枚`}</span>
+                <span className="tc-pill tc-pill--good">{`予定のうち記録あり ${counts.events}件`}</span>
+              </div>
+              <div className="tc-memory-actions">
+                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => focusById('journal-draft-title')}>旅行記の下書きへ</button>
+                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>日程を見る</button>
+              </div>
+            </div>
+          </section>
+
+          <div className="tc-memory-layout">
+          <section aria-label="記録の一覧" className="tc-memory-list">
+            {groups.length === 0 ? (
+              <div className="tc-card tc-kit-empty text-center">まだ記録はありません。</div>
+            ) : groups.map((g) => (
+              <section key={g.key} aria-label={g.label} className="mb-5">
+                <h2 className="tc-section-title mb-2">{g.label}</h2>
+                <ul className="tc-memory-grid">
+                  {g.memories.map((m) => (
+                    <li key={m.id} className="tc-card tc-memory-card">
+                      <div className={`tc-memory-thumb is-${m.kind}`}>
+                        {m.has_media && planId && m.kind === 'photo' ? (
+                          <MemoryMedia planId={planId} memory={m}
+                            alt={`${KIND_LABEL[m.kind]}${m.body ? `: ${m.body.slice(0, 40)}` : ''}`} />
+                        ) : (
+                          <span aria-hidden="true">{KIND_LABEL[m.kind]}</span>
+                        )}
+                      </div>
+                      <div className="tc-memory-body">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <b className="text-ink-900">{KIND_LABEL[m.kind]}</b>
+                          <span className={`tc-pill ${m.visibility === 'private' ? 'tc-pill--good' : 'tc-pill--blue'}`}>{VISIBILITY_LABEL[m.visibility]}</span>
+                          {!m.by_me && <span className="text-ink-700">{`${m.author_name}さんの記録`}</span>}
+                          {!m.include_in_journal && <span className="text-ink-700">旅行記に使わない</span>}
+                          {m.size !== null && <span className="text-ink-700">{formatSize(m.size)}</span>}
+                        </div>
+                        {describe(m) && <p className="text-xs text-ink-700">{describe(m)}</p>}
+                        {m.has_media && planId && m.kind !== 'photo' && (
+                          <MemoryMedia planId={planId} memory={m}
+                            alt={`${KIND_LABEL[m.kind]}${m.body ? `: ${m.body.slice(0, 40)}` : ''}`} />
+                        )}
+                        {safeExternalUrl(m.video_url) && (
+                          <a href={safeExternalUrl(m.video_url) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm text-accent-strong underline break-all">
+                            動画を開く(外部のサイト)
+                          </a>
+                        )}
+                        {editing === m.id ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm text-ink-900">
+                              メモを編集
+                              <textarea className="block w-full mt-1 border rounded-sm px-2 py-1" rows={3} maxLength={5000}
+                                value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                            </label>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="primary" onClick={() => change(m, { body: editBody }, 'メモを変更しました')}>保存</Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>やめる</Button>
+                            </div>
+                          </div>
+                        ) : m.body && <p className="text-sm text-ink-900 whitespace-pre-wrap">{m.body}</p>}
+                        <div className="tc-memory-tools">
+                          {m.can_edit && editing !== m.id && (
+                            <>
+                              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => { setEditing(m.id); setEditBody(m.body ?? ''); }}>
+                                メモを編集
+                              </button>
+                              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => change(
+                                m, { visibility: m.visibility === 'private' ? 'members' : 'private' },
+                                m.visibility === 'private' ? 'メンバーに公開しました' : '自分だけに戻しました',
+                              )}>
+                                {m.visibility === 'private' ? 'メンバーに公開する' : '自分だけにする'}
+                              </button>
+                              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => change(
+                                m, { include_in_journal: !m.include_in_journal },
+                                m.include_in_journal ? '旅行記に使わないようにしました' : '旅行記に使うようにしました',
+                              )}>
+                                {m.include_in_journal ? '旅行記に使わない' : '旅行記に使う'}
+                              </button>
+                            </>
+                          )}
+                          {m.can_delete && <Button size="sm" variant="danger" onClick={() => remove(m)}>削除</Button>}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </section>
+
           {data?.can_create && (
-            <Card padding="md" className="mt-6">
+            <aside className="tc-card tc-memory-form">
               <form onSubmit={submit} aria-label="記録を追加" className="space-y-3">
-                <h2 className="font-semibold text-ink-900">記録を追加</h2>
+                <h2 id="memory-add-title" tabIndex={-1} className="tc-section-title">記録を追加</h2>
                 <fieldset>
                   <legend className="text-sm text-ink-900">種類</legend>
                   <div className="flex flex-wrap gap-3 mt-1">
@@ -351,82 +476,19 @@ const MemoriesPage: React.FC = () => {
                 </label>
                 <Button type="submit" variant="primary" size="sm" disabled={busy}>{busy ? '記録しています…' : '記録する'}</Button>
               </form>
-            </Card>
+            </aside>
           )}
+          </div>
 
-          <section aria-label="記録の一覧" className="mt-6">
-            {groups.length === 0 ? (
-              <Card padding="lg" className="text-center text-ink-700">まだ記録はありません。</Card>
-            ) : groups.map((g) => (
-              <section key={g.key} aria-label={g.label} className="mt-4">
-                <h2 className="font-semibold text-ink-900">{g.label}</h2>
-                <ul className="mt-2 space-y-2">
-                  {g.memories.map((m) => (
-                    <li key={m.id}>
-                      <Card padding="md" className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                          <span className="font-medium text-ink-900">{KIND_LABEL[m.kind]}</span>
-                          <span className="px-2 py-0.5 rounded-sm bg-gray-100 text-ink-900">{VISIBILITY_LABEL[m.visibility]}</span>
-                          {!m.by_me && <span className="text-ink-700">{`${m.author_name}さんの記録`}</span>}
-                          {!m.include_in_journal && <span className="text-ink-700">旅行記に使わない</span>}
-                          {m.size !== null && <span className="text-ink-700">{formatSize(m.size)}</span>}
-                        </div>
-                        {describe(m) && <p className="text-sm text-ink-700">{describe(m)}</p>}
-                        {m.has_media && planId && (
-                          <MemoryMedia planId={planId} memory={m}
-                            alt={`${KIND_LABEL[m.kind]}${m.body ? `: ${m.body.slice(0, 40)}` : ''}`} />
-                        )}
-                        {safeExternalUrl(m.video_url) && (
-                          <a href={safeExternalUrl(m.video_url) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-800 underline break-all">
-                            動画を開く(外部のサイト)
-                          </a>
-                        )}
-                        {editing === m.id ? (
-                          <div className="space-y-2">
-                            <label className="block text-sm text-ink-900">
-                              メモを編集
-                              <textarea className="block w-full mt-1 border rounded-sm px-2 py-1" rows={3} maxLength={5000}
-                                value={editBody} onChange={(e) => setEditBody(e.target.value)} />
-                            </label>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="primary" onClick={() => change(m, { body: editBody }, 'メモを変更しました')}>保存</Button>
-                              <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>やめる</Button>
-                            </div>
-                          </div>
-                        ) : m.body && <p className="text-ink-900 whitespace-pre-wrap">{m.body}</p>}
-                        <div className="flex flex-wrap gap-2">
-                          {m.can_edit && editing !== m.id && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => { setEditing(m.id); setEditBody(m.body ?? ''); }}>
-                                メモを編集
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => change(
-                                m, { visibility: m.visibility === 'private' ? 'members' : 'private' },
-                                m.visibility === 'private' ? 'メンバーに公開しました' : '自分だけに戻しました',
-                              )}>
-                                {m.visibility === 'private' ? 'メンバーに公開する' : '自分だけにする'}
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => change(
-                                m, { include_in_journal: !m.include_in_journal },
-                                m.include_in_journal ? '旅行記に使わないようにしました' : '旅行記に使うようにしました',
-                              )}>
-                                {m.include_in_journal ? '旅行記に使わない' : '旅行記に使う'}
-                              </Button>
-                            </>
-                          )}
-                          {m.can_delete && <Button size="sm" variant="danger" onClick={() => remove(m)}>削除</Button>}
-                        </div>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </section>
+          {/* モックの「公開前チェック」: 下書きを作る時に、同行者の名前・予約番号・電話番号・位置を確かめる */}
+          <div className="tc-card tc-memory-check">
+            <p><b>公開前チェック</b><span>同行者の名前・予約番号・電話番号・位置情報・写真の顔を、下書きを作る時に確かめます</span></p>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => { void makeDraft(); focusById('journal-draft-title'); }}>チェックする</button>
+          </div>
 
           <Card padding="md" className="mt-8">
             <section aria-label="旅行記の下書き" className="space-y-3">
-              <h2 className="font-semibold text-ink-900">旅行記の下書き</h2>
+              <h2 id="journal-draft-title" tabIndex={-1} className="font-semibold text-ink-900">旅行記の下書き</h2>
               <p className="text-sm text-ink-700">
                 予定と記録から下書きを作ります(旅程は変わりません)。コピーかファイルの保存で使えます。
                 ページとして公開する時は、下の「旅行記を公開する」を使ってください。

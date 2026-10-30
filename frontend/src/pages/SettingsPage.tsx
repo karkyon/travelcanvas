@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
   CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge
@@ -37,7 +37,7 @@ interface SettingsTab {
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isGuest } = useAuthStore();
   // [Gate S11] ?tab=security で開く(管理者の画面の「多要素認証を設定する」から来た時)
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'profile');
@@ -661,6 +661,7 @@ const SettingsPage: React.FC = () => {
   ];
 
   const handleSave = async () => {
+    if (isGuest) return;  // ゲストは保存のボタンを出さない(上の案内)
     setIsSaving(true);
     try {
       if (emailChanging && !emailChangePassword) {
@@ -763,6 +764,22 @@ const SettingsPage: React.FC = () => {
           </p>
         </div>
 
+        {/* [Gate Honesty] 監査 Gate App UX: 以前はゲストが入力して保存を押した後に「ログインが必要」と知らせていた。
+            保存できないことを先に示し、入力は消さない(保存のボタンの代わりにアカウントを作る入口を出す) */}
+        {isGuest && (
+          <div role="note" className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm" data-testid="settings-guest-notice">
+            <p className="font-semibold">ゲストの間は、アカウントの設定(名前・メール・通知・パスワードなど)を保存できません。</p>
+            <p className="mt-1">
+              見た目(明るい・暗い・系統)はこの端末にすぐ反映されます。入力した内容はこの画面にいる間は残ります。
+              アカウントを作ると、旅行もそのまま引き継いで保存できます。
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <Link to="/guest/upgrade" className="font-semibold underline underline-offset-2">アカウントを作って保存する</Link>
+              <Link to="/login" className="underline underline-offset-2">登録済みの方はログイン</Link>
+            </div>
+          </div>
+        )}
+
         {/* メッセージ表示 */}
         {message && (
           <div role={message.type === 'error' ? 'alert' : 'status'} className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
@@ -823,7 +840,13 @@ const SettingsPage: React.FC = () => {
               {renderActiveTab()}
               
               {/* 保存ボタン([Gate C1] 非公開の条件のタブは自分の保存ボタンを持つため出さない) */}
-              {activeTab !== 'conditions' && <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
+              {activeTab !== 'conditions' && isGuest && (
+                <div className="flex flex-wrap items-center justify-end gap-3 mt-8 pt-6 border-t border-gray-200" data-testid="settings-guest-save">
+                  <p className="text-sm text-ink-700">ゲストの間は保存できません。</p>
+                  <Link to="/guest/upgrade" className="tc-focus-ring tc-mbtn tc-mbtn--primary">アカウントを作って保存する</Link>
+                </div>
+              )}
+              {activeTab !== 'conditions' && !isGuest && <div className="flex justify-end mt-8 pt-6 border-t border-gray-200">
                 <button
                   onClick={handleSave}
                   disabled={isSaving}

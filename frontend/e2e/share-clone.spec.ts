@@ -46,7 +46,7 @@ test('共有リンク: 合言葉つきで発行し、QRは端末内で作り、�
 
   const external = recordExternalRequests(page);
   await page.goto(`/share/${planId}`);
-  await expect(page.getByRole('heading', { name: /プラン共有・権限設定/, level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '見せる範囲を決めて共有', level: 1 })).toBeVisible();
   await expectNoAxeViolations(page, '共有設定(発行前)');
 
   // 1. 合言葉つきで発行

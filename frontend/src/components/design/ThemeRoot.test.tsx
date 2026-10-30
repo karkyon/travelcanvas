@@ -32,18 +32,21 @@ describe('ThemeRoot (Gate G10-UX)', () => {
     expect(resolveTheme('light', true)).toBe('light');
   });
 
-  it('[Gate G11] 見た目の系統を <html data-style> に当て、端末に保存する(標準は保存を消す)', () => {
+  it('[Gate G11] 見た目の系統を <html data-style> に当て、端末に保存する(既定の Atlas は保存を消す)', () => {
     render(<ThemeRoot />);
     const html = document.documentElement;
     expect(html.getAttribute('data-style')).toBe('standard');
+    act(() => useThemeStore.getState().setStyle('studio'));
+    expect(html.getAttribute('data-style')).toBe('studio');
+    expect(window.localStorage.getItem('tc.style')).toBe('studio');
     act(() => useThemeStore.getState().setStyle('atlas'));
     expect(html.getAttribute('data-style')).toBe('atlas');
-    expect(window.localStorage.getItem('tc.style')).toBe('atlas');
+    expect(window.localStorage.getItem('tc.style')).toBeNull();
     act(() => useThemeStore.getState().setPreference('dark'));
     expect(html.getAttribute('data-theme')).toBe('dark');
     expect(html.getAttribute('data-style')).toBe('atlas');
     act(() => useThemeStore.getState().setStyle('standard'));
-    expect(window.localStorage.getItem('tc.style')).toBeNull();
+    expect(window.localStorage.getItem('tc.style')).toBe('standard');
   });
 
   it('[Gate G11] 会員はアカウントに保存した系統を優先し、形の違う値は無視する。ゲストには当てない', () => {

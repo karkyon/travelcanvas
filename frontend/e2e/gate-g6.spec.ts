@@ -69,7 +69,7 @@ test('LOC-02・OFF-01・MEM-01 守る範囲・端末の失効・旅行記の公�
 
   // 3. 旅行記の公開
   await page.goto(`/planner/${plan.id}/memories`);
-  await expect(page.getByRole('heading', { name: '旅の記録', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '旅のあとも、地図に思い出が残る', level: 1 })).toBeVisible();
   const publish = page.getByRole('region', { name: '旅行記の公開' });
   await publish.getByLabel('地名と大まかな移動(約1km)だけ').check();
   await publish.getByLabel(/写真を含める/).check();

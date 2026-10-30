@@ -22,7 +22,7 @@ test('予約: 予約番号は伏せて一覧し、キーボードで詳細を開
   await send('post', `/plans/${planId}/days`, { local_date: '2026-11-02', timezone_id: 'Asia/Tokyo' });
 
   await page.goto(`/planner/${planId}/reservations`);
-  await expect(page.getByRole('heading', { name: '予約一覧', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '旅の情報を、ひとつの場所へ', level: 1 })).toBeVisible();
   await expect(page.getByText('予約がまだ登録されていません')).toBeVisible();
   await expectNoAxeViolations(page, '予約一覧(空)');
 

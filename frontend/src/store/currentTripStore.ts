@@ -5,13 +5,19 @@
  */
 import { create } from 'zustand';
 
-export interface CurrentTrip { id: string; title: string }
+export interface CurrentTrip { id: string; title: string; start_date?: string | null; end_date?: string | null }
 
 export const useCurrentTripStore = create<{ trip: CurrentTrip | null }>(() => ({ trip: null }));
 
-export function publishCurrentTrip(plan: { id?: string | null; title?: string | null } | null | undefined): void {
-  const next = plan?.id ? { id: String(plan.id), title: plan.title || '' } : null;
+export function publishCurrentTrip(
+  plan: { id?: string | null; title?: string | null; start_date?: string | null; end_date?: string | null } | null | undefined,
+): void {
+  // [Gate AppShell] 上の帯の旅行の切り替えに日付も出す
+  const next = plan?.id
+    ? { id: String(plan.id), title: plan.title || '', start_date: plan.start_date ?? null, end_date: plan.end_date ?? null }
+    : null;
   const prev = useCurrentTripStore.getState().trip;
-  if (prev?.id === next?.id && prev?.title === next?.title) return;
+  if (prev?.id === next?.id && prev?.title === next?.title && (prev?.start_date ?? null) === (next?.start_date ?? null)
+    && (prev?.end_date ?? null) === (next?.end_date ?? null)) return;
   useCurrentTripStore.setState({ trip: next });
 }

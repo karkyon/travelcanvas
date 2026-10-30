@@ -29,7 +29,7 @@ test('情報内検索: Ctrl+K で開き、予定・今日・予約番号の末�
   await send('post', `/plans/${planId}/candidates`, { title: '清水坂の茶店' });
 
   await page.goto(`/planner/${planId}/candidates`);
-  await expect(page.getByRole('heading', { name: '候補箱', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '近くの「行きたい」を集める', level: 1 })).toBeVisible();
 
   // 1. Ctrl+K → 検索 → Enter で開く
   await page.keyboard.press('Control+k');

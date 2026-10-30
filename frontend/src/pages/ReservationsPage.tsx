@@ -19,7 +19,6 @@ import {
   Users, X, CalendarDays, Lock, Unlock, Link2, QrCode,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
-import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -46,6 +45,8 @@ import type {
   Ticket, TicketCreateData,
 } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import PageHead from '@/components/shell/PageHead';
+import TripKitNav from '@/components/shell/TripKitNav';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
   { value: 'accommodation', label: '宿泊', icon: <Building2 size={16} /> },
@@ -451,71 +452,79 @@ const ReservationsPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
-            ← プランへ戻る
-          </Button>
-          <h1 className="text-2xl font-bold text-ink-900">予約一覧</h1>
-        </div>
-        <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
-          新規予約
-        </Button>
-      </div>
+    <div className="tc-page">
+      {/* [Gate MockScreens] モックの旅行箱: page-head・切り替え・予約の一覧と秘密情報の扱い */}
+      <PageHead
+        eyebrow="TRIP KIT · 旅行箱"
+        title="旅の情報を、ひとつの場所へ"
+        sub="予約・チケット・持ち物・準備を旅行の文脈にまとめます。予約番号・PIN は必要な時だけ表示します。"
+        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+      />
+      <TripKitNav planId={planId} />
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
+      <div className="tc-kit-grid">
+      <section className="tc-card tc-kit-card" aria-labelledby="kit-reservations-title">
+        <div className="tc-section-row">
+          <h2 id="kit-reservations-title" className="tc-section-title">旅行にひもづく予約</h2>
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setIsCreateOpen(true)}>
+            <Plus size={15} aria-hidden="true" />新規予約
+          </button>
+        </div>
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : reservations.length === 0 ? (
-        <Card padding="lg" className="text-center text-ink-700">
-          予約がまだ登録されていません。「新規予約」から追加できます。
-        </Card>
+        <div className="tc-kit-empty">
+          <p className="font-semibold text-ink-900">予約がまだ登録されていません。</p>
+          <p>「新規予約」から追加するか、確認メールを<button type="button" className="tc-mini-link" onClick={() => navigate(`/planner/${planId}/imports`)}>予約の取込</button>で読み込めます。</p>
+        </div>
       ) : (
-        <ul className="space-y-3" aria-label="予約">
+        <ul className="tc-kit-list" aria-label="予約">
           {reservations.map((r) => (
             <li key={r.id}>
               {/* [Gate E1] 以前は <div onClick> でキーボードから開けなかった。ボタンにして
                   Tab で移動・Enter/Space で詳細を開けるようにする。 */}
-              <Card padding="none" hover>
+              <div className="tc-kit-row">
                 <button
                   type="button"
                   onClick={() => openDetail(r)}
                   aria-haspopup="dialog"
-                  className="w-full text-left p-4 rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="tc-focus-ring tc-kit-open"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-ink-700" aria-hidden="true">{typeIcon(r.type)}</span>
-                      <div>
-                        <div className="font-medium text-ink-900">
-                          {r.provider_name || typeLabel(r.type)}
-                        </div>
-                        <div className="text-sm text-ink-700">
-                          {typeLabel(r.type)} ・ {formatDateTime(r.start_at)}
-                          {r.confirmation_number_masked && ` ・ 予約番号 ${r.confirmation_number_masked}`}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-ink-700">
-                      {STATUS_LABEL[r.status] ?? r.status}
-                    </span>
-                  </div>
+                  <span className="tc-kit-icon" aria-hidden="true">{typeIcon(r.type)}</span>
+                  <span className="min-w-0">
+                    <b>{r.provider_name || typeLabel(r.type)}</b>
+                    <small>{typeLabel(r.type)} ・ {formatDateTime(r.start_at)}</small>
+                    {r.confirmation_number_masked && <small>{`予約番号 ${r.confirmation_number_masked}`}</small>}
+                  </span>
+                  <span className="tc-pill">{STATUS_LABEL[r.status] ?? r.status}</span>
                 </button>
                 {/* [Gate G4] COL-03 この予約へのコメント */}
-                <div className="px-4 pb-3">
-                  <button type="button" className="text-sm text-indigo-800 underline"
-                    onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
-                  >この予約へのコメント</button>
-                </div>
-              </Card>
+                <button type="button" className="tc-focus-ring tc-mini-link tc-kit-comment"
+                  onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
+                >この予約へのコメント</button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      </section>
+      <aside className="tc-card tc-kit-card tc-kit-side" aria-labelledby="kit-secret-title">
+        <h2 id="kit-secret-title" className="tc-section-title">秘密情報の扱い</h2>
+        <ul>
+          <li><Lock size={16} aria-hidden="true" /><span><b>番号は初めは伏せて表示</b><small>予約番号・PIN は詳細で「表示」を押した時だけ、権限のある人に出します。</small></span></li>
+          <li><Link2 size={16} aria-hidden="true" /><span><b>予約を予定につなぐ</b><small>詳細から旅程の予定へつなぐと、予定とチケットを一緒に確かめられます。</small></span></li>
+          <li><TicketIcon size={16} aria-hidden="true" /><span><b>チケットも同じ場所に</b><small>QR・バーコードの中身も、表示を押した時だけ出します。</small></span></li>
+        </ul>
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm w-full justify-center" onClick={() => navigate(`/share/${planId}`)}>
+          共有される情報を確認
+        </button>
+      </aside>
+      </div>
 
       {/* 新規予約作成 */}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="新規予約" size="md">

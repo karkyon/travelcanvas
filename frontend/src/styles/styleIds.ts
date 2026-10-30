@@ -11,3 +11,6 @@ export const STYLE_PREF_KEY = 'ui_style';
 export function isStyleId(value: unknown): value is StyleId {
   return typeof value === 'string' && (STYLE_IDS as readonly string[]).includes(value);
 }
+
+/** [Gate MockScreens] 既定の系統は UI/UX モックと同じ Atlas(標準は設定で選べる) */
+export const DEFAULT_STYLE: StyleId = 'atlas';

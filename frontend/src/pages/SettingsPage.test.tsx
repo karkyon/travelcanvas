@@ -7,7 +7,7 @@
  * セキュリティのタブに「ログイン中の端末」を置いたため、作り直しのたびに一覧を読み直す問題も起きる。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -31,6 +31,7 @@ vi.mock('@/utils/offlinePack', () => ({
 }));
 
 import SettingsPage from './SettingsPage';
+import { useAuthStore } from '@/store/authStore';
 
 beforeEach(() => {
   getCurrentUser.mockResolvedValue({ data: { preferences: {} } });
@@ -68,5 +69,20 @@ describe('SettingsPage (Gate S9)', () => {
     expect(await screen.findByRole('list', { name: 'ログイン中の端末' })).toHaveTextContent('Chrome / Windows');
     await userEvent.type(screen.getByLabelText('現在のパスワード'), 'abcdef');
     expect(getSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it('[Gate Honesty] ゲスト: 保存できないことを先に示し、保存のボタンの代わりにアカウントを作る入口。入力は残る', async () => {
+    const prev = useAuthStore.getState();
+    useAuthStore.setState({ isGuest: true });
+    try {
+      renderPage();
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });  // 設定の読み込みを終える
+      expect(screen.getByTestId('settings-guest-notice')).toHaveTextContent('ゲストの間は、アカウントの設定');
+      expect(screen.queryByRole('button', { name: '保存' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('settings-guest-save')).toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: 'アカウントを作って保存する' })[0]).toHaveAttribute('href', '/guest/upgrade');
+    } finally {
+      act(() => useAuthStore.setState({ isGuest: prev.isGuest }));
+    }
   });
 });

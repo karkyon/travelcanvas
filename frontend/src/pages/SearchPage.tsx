@@ -1,47 +1,31 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Camera, Mic, Search, MapPin, Star, Clock, DollarSign, Globe, Zap, Target } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+/**
+ * スポット検索(/search)。
+ *
+ * [Gate Honesty] 監査 2026-10-30: 以前は「AI がインターネットを解析」「AI 画像解析」「AI 音声認識」「AI 検索エンジンが待機中」
+ * 「AI 信頼度」と書き、値段の段階(¥¥)を全ての結果に既定値で付けていた。実際は次のとおりのため、画面の言葉を実際に合わせる:
+ *   - 文字の検索: サーバーの /search/spots が公開のデータ(Wikipedia・OpenStreetMap の Nominatim・Overpass)をキーワードで引く。
+ *     AI・有料の提供元は使っていない(未接続)。並びは提供元が返した順
+ *   - 写真から探す・声で探す: 未実装(押しても何も解析しない)。準備中と示し、送る操作を出さない
+ *   - 評価・値段・所要時間・費用は提供元から来ないため出さない(作った値を見せない)
+ */
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, MapPin, Globe, Camera, Mic, Info } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { searchSpots, searchByImage, searchByVoice } from '../services/api';
+import { searchSpots } from '../services/api';
 import UiIcon from '@/components/common/UiIcon';
 import type { LucideIcon } from 'lucide-react';
-import { infoToastIcon } from '@/components/common/toastIcons';
-import { IcBot, IcCoffee, IcHotel, IcLandmark, IcMapPin, IcShopping, IcTrees, IcUtensils } from '@/components/common/uiIcons';
+import PageHead from '@/components/shell/PageHead';
+import { IcCoffee, IcHotel, IcLandmark, IcMapPin, IcShopping, IcTrees, IcUtensils } from '@/components/common/uiIcons';
 
 interface SearchResult {
   id: string;
   name: string;
   description: string;
   category: string;
-  location?: {
-    latitude?: number;
-    longitude?: number;
-    address?: string;
-  };
+  provider?: string;
+  location?: { latitude?: number; longitude?: number; address?: string };
   address?: string;
-  rating?: number;
-  price_level?: string;
-  price_range?: string;
-  estimated_duration?: number;
-  estimated_cost?: number;
-  ai_confidence?: number;
-  ai_relevance_score?: number;
-  web_source?: string;
-  distance_km?: number;
-  popularity_score?: number;
-}
-
-// [Gate M9-FE-B1] searchSpots(テキスト検索)はsearch_metadataの全フィールドを
-// 返すが、searchByImage/searchByVoice(services/api.tsのUnavailableSearchResult、
-// 未実装のためsearch_metadataは常にundefined)とも共用するstateのため、
-// 画面が実際に参照する3フィールドのみを全てoptionalとして定義する。
-// confidenceは元々どの検索結果にも実在しないフィールドで、以前から
-// 常にundefinedのまま(実害なし)だった挙動を維持する。
-interface SearchMetadataDisplay {
-  search_type?: string;
-  ranking_factors?: string[];
-  confidence?: number;
 }
 
 const SPOT_TYPE_MARKS: Record<string, [LucideIcon, string]> = {
@@ -54,292 +38,80 @@ const SPOT_TYPE_MARKS: Record<string, [LucideIcon, string]> = {
   default: [IcMapPin, 'スポット'],
 };
 
+const PROVIDER_LABEL: Record<string, string> = {
+  wikipedia: 'Wikipedia',
+  nominatim: 'OpenStreetMap(Nominatim)',
+  overpass: 'OpenStreetMap(Overpass)',
+};
+
+type Mode = 'text' | 'image' | 'voice';
+type Status =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'done'; results: SearchResult[] }
+  | { kind: 'error'; message: string };
+
+const MODES: Array<{ key: Mode; label: string; icon: LucideIcon; ready: boolean }> = [
+  { key: 'text', label: '言葉で探す', icon: Search, ready: true },
+  { key: 'image', label: '写真から探す', icon: Camera, ready: false },
+  { key: 'voice', label: '声で探す', icon: Mic, ready: false },
+];
+
+function loadSearchPreferences(): { maxResults: number; area: { latitude: number; longitude: number } | null } {
+  // [Gate #22] /search/settings で保存した候補数・優先エリアを検索に使う
+  try {
+    const saved = JSON.parse(localStorage.getItem('search_preferences') || 'null');
+    const lat = saved?.preferredArea?.latitude;
+    const lng = saved?.preferredArea?.longitude;
+    return {
+      maxResults: Number(saved?.searchSettings?.maxResults) || 5,
+      area: typeof lat === 'number' && typeof lng === 'number' ? { latitude: lat, longitude: lng } : null,
+    };
+  } catch {
+    return { maxResults: 5, area: null };
+  }
+}
+
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchType, setSearchType] = useState<'text' | 'image' | 'voice'>('text');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [searchMetadata, setSearchMetadata] = useState<SearchMetadataDisplay | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
-  // [Gate #22] SearchSettingsPage.tsx(/search/settings)で保存した検索設定
-  // (優先エリア・候補数)は localStorage には保存されていたが、SearchPage.tsx側は
-  // 一切読み込んでおらず、常にmax_results:5・東京固定のデフォルト位置決め打ちで
-  // 検索していた実害バグ。設定を読み込んで実際の検索条件に反映する。
-  const loadSearchPreferences = () => {
-    try {
-      const saved = localStorage.getItem('search_preferences');
-      if (saved) return JSON.parse(saved);
-    } catch (error) {
-      console.error('検索設定読み込みエラー:', error);
-    }
-    return null;
-  };
-  const searchPreferences = loadSearchPreferences();
-  const maxResults: number = searchPreferences?.searchSettings?.maxResults ?? 5;
-  const [userLocation, setUserLocation] = useState({
-    latitude: searchPreferences?.preferredArea?.latitude ?? 35.6762,
-    longitude: searchPreferences?.preferredArea?.longitude ?? 139.6503
-  });
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [mode, setMode] = useState<Mode>('text');
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [prefs] = useState(loadSearchPreferences);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(prefs.area);
+  const [locationNote, setLocationNote] = useState<string>(prefs.area ? `検索の設定の座標(${prefs.area.latitude.toFixed(2)}, ${prefs.area.longitude.toFixed(2)})の近くを先に探します` : '');
 
-  // 位置情報取得
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-          console.log('📍 現在位置を取得しました:', position.coords);
-        },
-        (error) => {
-          console.log('📍 位置情報取得に失敗、デフォルト位置（東京）を使用:', error);
-        }
-      );
-    }
-  }, []);
+    if (prefs.area || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude });
+        setLocationNote('今いる場所の近くを先に探します(位置は検索の時だけ送ります)');
+      },
+      () => setLocationNote('位置を使わずに探します'),
+    );
+  }, [prefs.area]);
 
-  const handleTextSearch = async () => {
-    if (!searchQuery.trim()) {
-      toast.error('検索キーワードを入力してください');
+  const run = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!query.trim()) {
+      setStatus({ kind: 'error', message: '探す言葉を入れてください' });
       return;
     }
-    
-    setIsLoading(true);
-    setHasSearched(true);
-    
-    try {
-      console.log('🤖 AI検索実行:', searchQuery);
-      toast('AI検索エンジンが動作中...');
-      
-      const response = await searchSpots({
-        query: searchQuery,
-        location: userLocation,
-        max_results: maxResults
-      });
-      
-      console.log('✅ AI検索レスポンス:', response);
-      
-      if (response.success && response.data?.spots) {
-        setSearchResults(response.data.spots);
-        setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
-        toast.success(`AI分析により${response.data.spots.length}件の最適なスポットを発見！`);
-      } else {
-        setSearchResults([]);
-        setSearchMetadata(null);
-        toast('検索条件に合うスポットが見つかりませんでした');
-      }
-    } catch (error) {
-      console.error('AI検索エラー:', error);
-      setSearchResults([]);
-      setSearchMetadata(null);
-      toast.error('AI検索中にエラーが発生しました');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-    
-    setUploadedImages(prev => [...prev, ...files].slice(0, 20));
-    
-    if (files[0]) {
-      handleImageSearch(files[0]);
-    }
-  };
-
-  const handleImageSearch = async (imageFile: File) => {
-    setIsLoading(true);
-    setHasSearched(true);
-    
-    try {
-      console.log('🖼️ AI画像解析開始:', imageFile.name);
-      toast('AI画像解析中... 物体検出・スポット特定中');
-      
-      const response = await searchByImage(imageFile, userLocation);
-      
-      console.log('✅ AI画像解析レスポンス:', response);
-      
-      if (response.success && response.data?.spots) {
-        setSearchResults(response.data.spots);
-        setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
-        
-        if (response.data.image_analysis) {
-          const analysis = response.data.image_analysis;
-          toast.success(`AI画像解析完了: ${analysis.detected_objects?.join(', ')} を検出`);
-        } else {
-          toast.success(`AI画像解析により${response.data.spots.length}件のスポットを特定！`);
-        }
-      } else {
-        setSearchResults([]);
-        setSearchMetadata(null);
-        toast('画像から関連スポットを特定できませんでした');
-      }
-    } catch (error) {
-      console.error('AI画像解析エラー:', error);
-      setSearchResults([]);
-      setSearchMetadata(null);
-      toast.error('AI画像解析中にエラーが発生しました');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const startVoiceRecording = async () => {
-    try {
-      console.log('🎤 AI音声認識開始...');
-      
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('このブラウザは音声録音をサポートしていません');
-      }
-
-      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        throw new Error('音声録音にはHTTPS接続が必要です');
-      }
-
-      setIsRecording(true);
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        } 
-      });
-      
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-      
-      const audioChunks: Blob[] = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
-      
-      mediaRecorder.onstop = async () => {
-        try {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          await handleVoiceSearch(audioBlob);
-        } catch (error) {
-          console.error('音声処理エラー:', error);
-          toast.error('音声の処理中にエラーが発生しました');
-        } finally {
-          stream.getTracks().forEach(track => track.stop());
-          setIsRecording(false);
-        }
-      };
-      
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
-      
-      // 自動停止タイマー（30秒後）
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-        }
-      }, 30000);
-      
-      console.log('✅ AI音声録音が開始されました');
-      toast.success('AI音声認識開始（30秒で自動停止）');
-      
-    } catch (error) {
-      console.error('音声録音エラー:', error);
-      setIsRecording(false);
-      
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('音声録音に失敗しました');
-      }
-    }
-  };
-
-  const stopVoiceRecording = () => {
-    try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-        console.log('🛑 AI音声録音を停止しました');
-        toast('音声録音を停止、AI解析中...', { icon: infoToastIcon() });
-      }
-    } catch (error) {
-      console.error('音声録音停止エラー:', error);
-      setIsRecording(false);
-    }
-  };
-
-  const handleVoiceSearch = async (audioBlob: Blob) => {
-    if (!audioBlob || audioBlob.size === 0) {
-      toast.error('音声データが空です');
+    setStatus({ kind: 'loading' });
+    const response = await searchSpots({ query: query.trim(), location: location ?? undefined, max_results: prefs.maxResults });
+    if (!response.success) {
+      setStatus({ kind: 'error', message: '検索できませんでした。時間をおいてもう一度試してください。' });
       return;
     }
-
-    setIsLoading(true);
-    setHasSearched(true);
-    
-    try {
-      console.log('🤖 AI音声解析実行中...', { 
-        blobSize: audioBlob.size, 
-        blobType: audioBlob.type 
-      });
-      
-      toast('AI音声認識・自然言語処理中...');
-      
-      const response = await searchByVoice(audioBlob, {
-        location: userLocation,
-        language: 'ja',
-        max_results: maxResults
-      });
-      
-      console.log('✅ AI音声解析レスポンス:', response);
-      
-      if (response.success && response.data) {
-        if (response.data.transcribed_text) {
-          setSearchQuery(response.data.transcribed_text);
-        }
-        if (response.data.spots) {
-          setSearchResults(response.data.spots);
-          setSearchMetadata((response.data.search_metadata as SearchMetadataDisplay | undefined) || null);
-          toast.success(`音声認識成功: "${response.data.transcribed_text}" → ${response.data.spots.length}件のスポットを発見！`);
-        } else {
-          setSearchResults([]);
-          setSearchMetadata(null);
-          toast('音声から関連スポットを見つけられませんでした');
-        }
-      } else {
-        setSearchResults([]);
-        setSearchMetadata(null);
-        toast.error(response.message || 'AI音声解析に失敗しました');
-      }
-      
-    } catch (error) {
-      console.error('AI音声解析エラー:', error);
-      setSearchResults([]);
-      setSearchMetadata(null);
-      toast.error('AI音声解析中にエラーが発生しました');
-    } finally {
-      setIsLoading(false);
-    }
+    setStatus({ kind: 'done', results: (response.data?.spots as SearchResult[] | undefined) ?? [] });
   };
 
   const addSpotToPlan = (spot: SearchResult) => {
-    // [Gate #16] 以前はここで即座に成功トーストを出していたが、実際には
-    // PlannerPage側で何も受け取っておらず何も保存されない偽の成功表示だった。
-    // 実際の追加処理・成功通知はPlannerPage側の受け取りロジックで行う。
+    // [Gate #16] 追加と成功の知らせは旅程の画面の受け取り(PlannerPage)で行う
     navigate('/planner', { state: { newSpot: spot } });
   };
 
-  // [UX-6] 種類の印は読み上げから外し、種類の名前を読み上げ用の文字で出す
   const categoryMark = (category: string) => {
     const [icon, label] = SPOT_TYPE_MARKS[category] ?? SPOT_TYPE_MARKS.default!;
     return (
@@ -350,333 +122,116 @@ const SearchPage: React.FC = () => {
     );
   };
 
-  const getPriceLevelText = (level: string) => {
-    switch (level) {
-      case 'free': return '無料';
-      // [UX-6] 値段の段階は「¥」の数で出す(以前は OS の絵文字 💰 の数)
-      case 'low': return '¥';
-      case 'medium': return '¥¥';
-      case 'high': return '¥¥¥';
-      default: return '¥';
-    }
-  };
-
-  const removeUploadedImage = (index: number) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
-  };
+  const current = MODES.find((m) => m.key === mode)!;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* ヘッダー */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-ink-900 mb-4">
-            <UiIcon icon={IcBot} size={28} className="mr-2 align-[-4px]" />AIスポット検索
-          </h1>
-          <p className="text-ink-700">
-            高度なAI技術でインターネット上の情報を解析し、あなたに最適な旅行スポットをランキング表示
-          </p>
-          <div className="mt-2 flex justify-center items-center gap-4 text-sm text-ink-500">
-            <span className="flex items-center gap-1"><Globe size={14} /> Web情報統合</span>
-            <span className="flex items-center gap-1"><Zap size={14} /> AI分析</span>
-            <span className="flex items-center gap-1"><Target size={14} /> 位置最適化</span>
-          </div>
+    <div className="min-h-screen bg-cloud-50">
+      <div className="tc-page">
+        <PageHead
+          eyebrow="DISCOVER · 発見"
+          title="スポット検索"
+          sub="キーワードで、公開の地図・百科事典のデータ(Wikipedia・OpenStreetMap)から場所の候補を探します。"
+          actions={<Link to="/search/settings" className="tc-focus-ring tc-mbtn tc-mbtn--sm">検索の設定</Link>}
+        />
+
+        <p className="tc-card px-4 py-3 mb-4 text-sm text-ink-700 flex gap-2" data-testid="search-honesty">
+          <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>
+            AI・有料の検索の提供元はまだつながっていません(未接続)。結果は提供元が返した順に並べ、評価や値段は付けません。
+          </span>
+        </p>
+
+        <div role="tablist" aria-label="探し方" className="flex flex-wrap gap-2 mb-4">
+          {MODES.map(({ key, label, icon: Icon, ready }) => (
+            <button key={key} type="button" role="tab" id={`search-tab-${key}`} aria-selected={mode === key}
+              aria-controls={`search-panel-${key}`} onClick={() => setMode(key)}
+              className={`tc-focus-ring tc-mbtn tc-mbtn--sm ${mode === key ? 'tc-mbtn--primary' : ''}`}>
+              <Icon size={14} aria-hidden="true" />{label}
+              {!ready && <span className="tc-pill tc-pill--warn ml-1">準備中</span>}
+            </button>
+          ))}
         </div>
 
-        {/* 検索タイプ選択 */}
-        <div className="bg-surface rounded-xl shadow-xs p-6 mb-8">
-          <div className="flex flex-wrap gap-4 mb-6">
-            <button
-              onClick={() => setSearchType('text')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                searchType === 'text'
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
-              }`}
-            >
-              <Search size={18} />
-              AIテキスト検索
-            </button>
-            <button
-              onClick={() => setSearchType('image')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                searchType === 'image'
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
-              }`}
-            >
-              <Camera size={18} />
-              AI画像解析
-            </button>
-            <button
-              onClick={() => setSearchType('voice')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                searchType === 'voice'
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-surface text-ink-700 border-gray-300 hover:border-blue-300'
-              }`}
-            >
-              <Mic size={18} />
-              AI音声認識
-            </button>
-          </div>
-
-          {/* テキスト検索 */}
-          {searchType === 'text' && (
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="例: 渋谷の美味しいラーメン店、東京の観光地、カフェでゆっくりしたい..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyPress={(e) => e.key === 'Enter' && handleTextSearch()}
-                />
-              </div>
-              <button
-                onClick={handleTextSearch}
-                disabled={!searchQuery.trim() || isLoading}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isLoading ? <LoadingSpinner size="small" /> : <Search size={18} />}
-                AI検索
+        <section role="tabpanel" id={`search-panel-${mode}`} aria-labelledby={`search-tab-${mode}`} className="tc-card p-5 mb-6">
+          {current.ready ? (
+            <form onSubmit={run} className="flex flex-col sm:flex-row gap-3" role="search">
+              <label htmlFor="search-q" className="sr-only">探す言葉</label>
+              <input id="search-q" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="例: 清水寺、金沢 市場、海の見えるカフェ"
+                className="tc-focus-ring flex-1 min-h-11 rounded-xl border border-cloud-200 bg-cloud-0 px-4 text-ink-900" />
+              <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={status.kind === 'loading'}>
+                <Search size={16} aria-hidden="true" />探す
+              </button>
+            </form>
+          ) : (
+            <div data-testid={`search-unavailable-${mode}`}>
+              <p className="font-semibold text-ink-900">{`${current.label}は準備中です`}</p>
+              <p className="text-sm text-ink-700 mt-1">
+                {mode === 'image'
+                  ? '写真から場所を見つける仕組み(画像の解析)はまだありません。写真を送っても解析しないため、ここでは受け付けていません。'
+                  : '声から場所を探す仕組み(音声の文字起こし)はまだありません。録音しても解析しないため、ここでは受け付けていません。'}
+              </p>
+              <button type="button" onClick={() => setMode('text')} className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-3">
+                言葉で探す
               </button>
             </div>
           )}
+          {current.ready && locationNote && <p className="text-xs text-ink-500 mt-2">{locationNote}</p>}
+        </section>
 
-          {/* 画像検索 */}
-          {searchType === 'image' && (
-            <div>
-              <div 
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Camera size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-ink-700 mb-2">
-                  写真をアップロードしてAI画像解析
-                </p>
-                <p className="text-sm text-ink-500">
-                  建物、料理、風景等を自動認識してスポットを特定
-                </p>
-                <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                  画像を選択
-                </button>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              
-              {/* アップロード済み画像プレビュー */}
-              {uploadedImages.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm text-ink-700 mb-2">解析済み画像:</p>
-                  <div className="grid grid-cols-6 gap-2">
-                    {uploadedImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`Analyzed ${index + 1}`}
-                          className="w-full h-16 object-cover rounded-sm border"
-                        />
-                        <button
-                          onClick={() => removeUploadedImage(index)}
-                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+        <div aria-live="polite">
+          {status.kind === 'loading' && (
+            <div className="flex items-center justify-center py-12" role="status">
+              <LoadingSpinner size="lg" />
+              <span className="ml-3 text-ink-700">探しています…</span>
             </div>
           )}
-
-          {/* 音声検索 */}
-          {searchType === 'voice' && (
-            <div className="text-center">
-              <div className="inline-flex flex-col items-center">
-                <button
-                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  disabled={isLoading}
-                  className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl transition-all ${
-                    isRecording 
-                      ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  } disabled:opacity-50`}
-                >
-                  <Mic size={32} />
-                </button>
-                <p className="mt-4 text-ink-700">
-                  {isRecording ? 'AI音声認識中... クリックで停止' : 'AI音声認識を開始'}
-                </p>
-                <p className="text-sm text-ink-500 mt-1">
-                  自然な話し言葉で検索内容を話してください
-                </p>
-                {searchQuery && (
-                  <div className="mt-3 bg-gray-100 px-4 py-2 rounded-lg">
-                    <p className="text-sm text-ink-700">認識結果:</p>
-                    <p className="font-medium">「{searchQuery}」</p>
-                  </div>
-                )}
+          {status.kind === 'error' && (
+            <p role="alert" className="tc-card px-4 py-3 text-sm text-danger">{status.message}</p>
+          )}
+          {status.kind === 'done' && status.results.length === 0 && (
+            <div className="tc-card p-8 text-center text-ink-700" data-testid="search-empty">
+              <Search size={36} className="mx-auto mb-3 opacity-50" aria-hidden="true" />
+              <p className="font-medium">候補が見つかりませんでした</p>
+              <p className="text-sm mt-1">言葉を変えるか、地名を足して試してください。</p>
+            </div>
+          )}
+          {status.kind === 'done' && status.results.length > 0 && (
+            <section aria-labelledby="search-results-title">
+              <div className="tc-section-row mb-3">
+                <h2 id="search-results-title" className="tc-section-title">{`見つかった候補(${status.results.length}件)`}</h2>
+                <span className="text-xs text-ink-500">提供元が返した順</span>
               </div>
+              <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {status.results.map((spot) => (
+                  <li key={spot.id} className="tc-card p-5 flex flex-col gap-2">
+                    <h3 className="font-semibold text-lg text-ink-900 break-words">{categoryMark(spot.category)}{spot.name}</h3>
+                    <p className="text-xs text-ink-700 flex items-center gap-1">
+                      <MapPin size={12} aria-hidden="true" />{spot.location?.address || spot.address || '住所の情報なし'}
+                    </p>
+                    {spot.provider && (
+                      <p className="text-xs text-ink-700 flex items-center gap-1">
+                        <Globe size={12} aria-hidden="true" />{`出典: ${PROVIDER_LABEL[spot.provider] ?? spot.provider}`}
+                      </p>
+                    )}
+                    <div className="mt-auto pt-2">
+                      <button type="button" onClick={() => addSpotToPlan(spot)} className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary"
+                        aria-label={`「${spot.name}」をプランに追加`}>
+                        プランに追加
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {status.kind === 'idle' && (
+            <div className="tc-card p-8 text-center text-ink-700">
+              <p className="font-medium">行きたい場所の名前や、地名と種類(「金沢 市場」など)を入れて探してください。</p>
+              <p className="text-sm mt-1">見つかった候補は、旅程に追加すると地図と日程に並びます。</p>
             </div>
           )}
         </div>
-
-        {/* 検索メタデータ表示 */}
-        {searchMetadata && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap size={16} className="text-blue-600" />
-              <span className="font-medium text-blue-800">AI検索情報</span>
-            </div>
-            <div className="text-sm text-blue-700">
-              <p>検索タイプ: {searchMetadata.search_type}</p>
-              {searchMetadata.ranking_factors && (
-                <p>ランキング要素: {searchMetadata.ranking_factors.join(', ')}</p>
-              )}
-              {searchMetadata.confidence && (
-                <p>AI信頼度: {Math.round(searchMetadata.confidence * 100)}%</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 検索結果 */}
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <LoadingSpinner />
-            <span className="ml-3 text-ink-700">AI分析中...</span>
-          </div>
-        ) : hasSearched && searchResults.length === 0 ? (
-          <div className="text-center py-12 text-ink-500">
-            <Search size={48} className="mx-auto mb-4 opacity-50" />
-            <p>AI検索結果が見つかりませんでした</p>
-            <p className="text-sm mt-2">別の検索条件で試してみてください</p>
-          </div>
-        ) : searchResults.length > 0 ? (
-          <div className="space-y-6">
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-ink-900">AI推奨スポット（上位{searchResults.length}件）</h2>
-              <p className="text-sm text-ink-700">AIアルゴリズムによって最適化された順序で表示</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {searchResults.map((spot, index) => (
-                <div key={spot.id} className="bg-surface rounded-xl shadow-xs hover:shadow-md transition-shadow p-6 relative">
-                  {/* AIランキングバッジ */}
-                  <div className="absolute -top-2 -left-2 bg-linear-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                    {index + 1}
-                  </div>
-                  
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-lg text-ink-900 mb-1">
-                        {categoryMark(spot.category)}{spot.name}
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm text-ink-500">
-                        {spot.rating && (
-                          <>
-                            <Star size={14} className="text-yellow-400 fill-current" />
-                            <span>{spot.rating}</span>
-                            <span>•</span>
-                          </>
-                        )}
-                        <span>{getPriceLevelText(spot.price_level || spot.price_range || 'medium')}</span>
-                        {spot.distance_km && (
-                          <>
-                            <span>•</span>
-                            <span>{spot.distance_km.toFixed(1)}km</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* AI信頼度表示 */}
-                    <div className="flex flex-col items-end gap-1">
-                      {spot.ai_confidence && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
-                          AI信頼度: {Math.round(spot.ai_confidence * 100)}%
-                        </span>
-                      )}
-                      {spot.ai_relevance_score && (
-                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-sm">
-                          関連度: {spot.ai_relevance_score}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <p className="text-ink-700 text-sm mb-3 line-clamp-2">
-                    {spot.description}
-                  </p>
-                  
-                  <div className="flex items-center gap-4 text-xs text-ink-500 mb-3">
-                    <div className="flex items-center gap-1">
-                      <MapPin size={12} />
-                      <span>{spot.location?.address || spot.address || '住所情報なし'}</span>
-                    </div>
-                  </div>
-
-                  {/* Web情報源表示 */}
-                  {spot.web_source && (
-                    <div className="text-xs text-ink-700 mb-3 flex items-center gap-1">
-                      <Globe size={12} />
-                      <span>情報源: {spot.web_source}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-4 text-xs">
-                      {spot.estimated_duration && (
-                        <div className="flex items-center gap-1">
-                          <Clock size={12} />
-                          <span>{spot.estimated_duration}分</span>
-                        </div>
-                      )}
-                      {spot.estimated_cost !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <DollarSign size={12} />
-                          <span>¥{spot.estimated_cost}</span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => addSpotToPlan(spot)}
-                      className="px-3 py-1 bg-linear-to-r from-blue-500 to-purple-600 text-white text-xs rounded-sm hover:from-blue-600 hover:to-purple-700 transition-colors"
-                    >
-                      プランに追加
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : !hasSearched ? (
-          <div className="text-center py-12 text-ink-500">
-            <div className="mb-4">
-              <div className="flex justify-center items-center gap-4 mb-4">
-                <Search size={32} className="text-blue-500" />
-                <Zap size={32} className="text-purple-500" />
-                <Target size={32} className="text-green-500" />
-              </div>
-            </div>
-            <p className="text-lg font-medium">AI検索エンジンが待機中</p>
-            <p className="text-sm mt-2">上記の検索機能を使ってスポットを探してみましょう</p>
-            <div className="mt-4 text-xs text-ink-700">
-              <p>• テキスト検索: 自然言語での検索</p>
-              <p>• 画像解析: 写真からスポット特定</p>
-              <p>• 音声認識: 話し言葉での検索</p>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );

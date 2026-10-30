@@ -14,6 +14,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import PageHead from '@/components/shell/PageHead';
+import TripKitNav from '@/components/shell/TripKitNav';
 import {
   createPackingItem, createPreparationTask, deletePackingItem, deletePreparationTask, extractApiErrorDetailMessage,
   getPackingItems, getPackingSuggestions, getPlanMembers, getPreparationTasks, getReadiness, updatePackingItem,
@@ -290,14 +292,15 @@ const PreparationPage: React.FC = () => {
     setTaskForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
-          ← プランへ戻る
-        </Button>
-        <h1 className="text-2xl font-bold text-ink-900">出発前の準備</h1>
-        <p className="text-sm text-ink-700 mt-1">準備状況・持ち物・準備タスクをまとめて確認します。</p>
-      </div>
+    <div className="tc-page">
+      <PageHead
+        eyebrow="TRIP KIT · 旅行箱"
+        title="出発前の準備"
+        sub="準備状況・持ち物・準備タスクをまとめて確認します。"
+        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+      />
+      <TripKitNav planId={planId} />
+      <div className="tc-card tc-kit-card">
 
       <div role="tablist" aria-label="準備の表示切替" className="flex gap-2 mb-4 border-b">
         {TABS.map((t) => (
@@ -309,7 +312,7 @@ const PreparationPage: React.FC = () => {
             aria-selected={tab === t.id}
             aria-controls={`prep-panel-${t.id}`}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}
+            className={`tc-focus-ring px-4 py-2 -mb-px border-b-2 font-semibold ${tab === t.id ? 'border-accent text-accent-strong' : 'border-transparent text-ink-700'}`}
           >
             {t.label}
             {t.id === 'readiness' && readiness && !readiness.is_ready ? `(${readiness.counts.total})` : ''}
@@ -364,6 +367,8 @@ const PreparationPage: React.FC = () => {
           )}
         </div>
       )}
+
+      </div>
 
       <Modal isOpen={isPackingFormOpen} onClose={() => setIsPackingFormOpen(false)} title={packingEditing ? '持ち物の編集' : '持ち物の追加'} size="md">
         <form onSubmit={submitPacking} noValidate>

@@ -8,6 +8,9 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import PageHead from '@/components/shell/PageHead';
+import { useTripContext } from '@/hooks/useTripContext';
+import Landscape from '@/components/shell/Landscape';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -44,6 +47,8 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ja-JP',
 const CandidatesPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  // [Gate MockScreens] 上の帯の旅行の切り替えに、この旅行の名前を出す
+  useTripContext(planId);
   const [data, setData] = useState<CandidateList | null>(null);
   const [days, setDays] = useState<NormalizedDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,13 +142,14 @@ const CandidatesPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">候補箱</h1>
-      <p className="text-sm text-ink-700 mt-1">
-        行きたい場所・気になる店を、まだ予定にしないで貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。
-        URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。
-      </p>
+    <div className="tc-page tc-discover">
+      {/* [Gate MockScreens] モックの発見: 近くを探す・SNS の投稿を2列、見つけた候補をカードで、候補箱へ */}
+      <PageHead
+        eyebrow="DISCOVER · 発見・候補箱"
+        title="近くの「行きたい」を集める"
+        sub="行きたい場所・気になる店を、まだ予定にしないで候補箱に貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。"
+        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+      />
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
 
@@ -152,45 +158,14 @@ const CandidatesPage: React.FC = () => {
       ) : data && (
         <>
           {canEdit && (
-            <div className="mt-4 space-y-4">
+            <div className="tc-discover-tools">
               <NearbyDiscover bases={bases} canEdit={canEdit} onAddCandidate={addFromNearby} />
               <SocialImportCard planId={planId} canEdit={canEdit} onSave={addFromSocial} />
             </div>
           )}
-          {canEdit && (
-            <Card className="mt-4 p-4">
-              <form aria-label="候補を追加" onSubmit={add} className="space-y-3">
-                <h2 className="text-lg font-semibold text-ink-900">候補を追加</h2>
-                <label className="block text-sm text-ink-900">名前
-                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.title} maxLength={200}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                </label>
-                <label className="block text-sm text-ink-900">URL(任意)
-                  <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.source_url} inputMode="url"
-                    onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://" />
-                </label>
-                <label className="block text-sm text-ink-900">メモ(任意)
-                  <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.note} maxLength={2000}
-                    rows={2} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-                </label>
-                <label className="block text-sm text-ink-900">優先度
-                  <select className="ml-2 border rounded-sm px-2 py-1 text-ink-900" value={form.priority}
-                    onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}>
-                    {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
-                  </select>
-                </label>
-                <Button type="submit" disabled={busy}>候補に追加</Button>
-              </form>
-            </Card>
-          )}
-
-          {/* [Gate G11 段階8] 家族・グループで候補に投票する(合意形成の投票を使う) */}
-          <CandidateVoting planId={planId} canEdit={canEdit}
-            candidates={(data.items ?? []).filter((c) => c.status === 'open').map((c) => ({ id: c.id, title: c.title }))} />
-
-          <section aria-label="候補の一覧" className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg font-semibold text-ink-900">候補({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
+          <section aria-label="候補の一覧" className="mt-6">
+            <div className="tc-section-row flex-wrap mb-3">
+              <h2 className="tc-section-title text-base">候補箱({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
               <label className="text-sm text-ink-900 inline-flex items-center gap-1">
                 <input type="checkbox" checked={showDismissed} onChange={() => setShowDismissed((v) => !v)} />
                 見送り・まとめた候補も出す({data.counts.dismissed}件)
@@ -199,13 +174,18 @@ const CandidatesPage: React.FC = () => {
             {data.duplicate_pairs > 0 && (
               <p className="text-sm text-amber-900">重複の可能性がある候補が {data.duplicate_pairs}組あります(自動では消しません)。</p>
             )}
-            {items.length === 0 && <p className="text-ink-700">候補はまだありません。</p>}
+            {items.length === 0 && <p className="tc-card tc-kit-empty">候補はまだありません。近くを探すか、SNS の投稿・URL から入れられます。</p>}
+            <div className="tc-discover-grid">
             {items.map((c) => {
               const headingId = `cand-${c.id}`;
               const s = scheduling[c.id] ?? { day_id: days[0]?.id ?? '', time: '' };
               return (
-                <Card key={c.id} className="p-4">
-                  <article aria-labelledby={headingId}>
+                <Card key={c.id} className="tc-discover-card">
+                  <div className="tc-discover-art" aria-hidden="true">
+                    <Landscape />
+                    <span className="tc-photo-source">{`${SOURCE_KIND_LABEL[c.source_kind] ?? c.source_kind} · 画像のイメージ`}</span>
+                  </div>
+                  <article aria-labelledby={headingId} className="p-4">
                     <div className="flex flex-wrap items-baseline gap-2">
                       <h3 id={headingId} className="font-semibold text-ink-900">{c.title}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
@@ -277,7 +257,41 @@ const CandidatesPage: React.FC = () => {
                 </Card>
               );
             })}
+            </div>
           </section>
+
+          <div className="tc-discover-tools mt-6">
+          {canEdit && (
+              <Card className="p-4">
+                <form aria-label="候補を追加" onSubmit={add} className="space-y-3">
+                  <h2 className="text-lg font-semibold text-ink-900">候補を追加</h2>
+                  <label className="block text-sm text-ink-900">名前
+                    <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.title} maxLength={200}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  </label>
+                  <label className="block text-sm text-ink-900">URL(任意)
+                    <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.source_url} inputMode="url"
+                      onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://" />
+                  </label>
+                  <label className="block text-sm text-ink-900">メモ(任意)
+                    <textarea className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.note} maxLength={2000}
+                      rows={2} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+                  </label>
+                  <label className="block text-sm text-ink-900">優先度
+                    <select className="ml-2 border rounded-sm px-2 py-1 text-ink-900" value={form.priority}
+                      onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}>
+                      {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+                    </select>
+                  </label>
+                  <Button type="submit" disabled={busy}>候補に追加</Button>
+                </form>
+              </Card>
+            )}
+  
+            {/* [Gate G11 段階8] 家族・グループで候補に投票する(合意形成の投票を使う) */}
+            <CandidateVoting planId={planId} canEdit={canEdit}
+              candidates={(data.items ?? []).filter((c) => c.status === 'open').map((c) => ({ id: c.id, title: c.title }))} />
+          </div>
         </>
       )}
     </div>

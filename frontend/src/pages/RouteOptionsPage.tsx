@@ -28,6 +28,8 @@ import type {
 import { describeRouteOptionDeletion } from '@/store/itemDeletionMessages';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import UiIcon from '@/components/common/UiIcon';
+import PageHead from '@/components/shell/PageHead';
+import { useTripContext } from '@/hooks/useTripContext';
 import { IcRoute } from '@/components/common/uiIcons';
 
 function generateIdempotencyKey(): string {
@@ -93,6 +95,8 @@ function formToPayload(form: OptionFormState): RouteOptionCreateData {
 const RouteOptionsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  // [Gate MockScreens] 上の帯の旅行の切り替えに、この旅行の名前を出す
+  useTripContext(planId);
 
   const [options, setOptions] = useState<RouteOption[]>([]);
   const [days, setDays] = useState<NormalizedDay[]>([]);
@@ -199,18 +203,20 @@ const RouteOptionsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-4">
-          ← プランへ戻る
-        </Button>
-
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold"><UiIcon icon={IcRoute} size={20} className="mr-2 align-[-4px]" />経路の比較</h1>
-          <Button variant="primary" size="sm" onClick={openCreateForm} disabled={allEvents.length < 2}>
-            <Plus size={16} className="mr-1" /> 候補を追加
-          </Button>
-        </div>
+    <div className="tc-page tc-optimize">
+      <div>
+        {/* [Gate MockScreens] モックの比較: 候補を並べ、所要時間・距離・費用の数字で見比べてから採用する */}
+        <PageHead
+          eyebrow="PLAN · 経路の比較"
+          title="ルートを、見比べて決める"
+          sub="経路の候補を、所要時間・距離・費用・乗換で見比べてから採用します。採用するまで今の旅程は変わりません。外部の経路検索は未接続のため、候補の数字は手で入力します。"
+          actions={<>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程に戻る</button>
+            <Button variant="primary" size="sm" onClick={openCreateForm} disabled={allEvents.length < 2}>
+              <Plus size={16} className="mr-1" /> 候補を追加
+            </Button>
+          </>}
+        />
 
         {error && (
           <Card className="mb-4 bg-red-50 border-red-200">
@@ -232,30 +238,35 @@ const RouteOptionsPage: React.FC = () => {
         )}
 
         {options.length === 0 ? (
-          <Card>
-            <p className="text-sm text-ink-500 text-center py-8">まだ経路候補がありません</p>
-          </Card>
+          <div className="tc-card tc-kit-empty text-center">
+            <UiIcon icon={IcRoute} size={28} className="mx-auto" />
+            <p className="font-semibold text-ink-900">まだ経路候補がありません</p>
+            <p>「候補を追加」で、2つの予定の間の行き方を数字で入れると、ここで並べて見比べられます。</p>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="tc-compare-grid">
             {options.map((option) => (
-              <Card key={option.id} className={option.status === 'adopted' ? 'border-green-400' : ''}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      {eventLabel(allEvents, option.from_event_id)} → {eventLabel(allEvents, option.to_event_id)}
-                      {option.status === 'adopted' && (
-                        <span className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full">採用済み</span>
-                      )}
-                      {option.status === 'discarded' && (
-                        <span className="text-xs text-ink-500 bg-gray-100 px-2 py-0.5 rounded-full">見送り</span>
-                      )}
+              <article key={option.id} className={`tc-card tc-compare-card ${option.status === 'adopted' ? 'is-current' : ''}`}
+                aria-label={`${eventLabel(allEvents, option.from_event_id)}から${eventLabel(allEvents, option.to_event_id)}への経路候補`}>
+                <div>
+                  <div>
+                    <div className="tc-section-row">
+                      <p className="tc-label">{option.status === 'adopted' ? 'CURRENT · 採用中' : option.status === 'discarded' ? 'DISCARDED · 見送り' : 'OPTION · 候補'}</p>
+                      {option.status === 'adopted' && <span className="tc-pill tc-pill--good">採用済み</span>}
+                      {option.status === 'discarded' && <span className="tc-pill">見送り</span>}
                     </div>
-                    <div className="mt-1 text-xs text-ink-500 flex flex-wrap gap-x-3 gap-y-1">
-                      {option.total_duration_minutes != null && <span>約{Math.round(option.total_duration_minutes)}分</span>}
-                      {option.total_distance_km != null && <span>{option.total_distance_km.toFixed(1)}km</span>}
-                      {option.total_cost != null && <span>{option.total_cost} {option.currency}</span>}
+                    <h2 className="tc-compare-title">
+                      {eventLabel(allEvents, option.from_event_id)} → {eventLabel(allEvents, option.to_event_id)}
+                    </h2>
+                    <div className="tc-compare-metrics">
+                      <span><b>{option.total_duration_minutes != null ? `${Math.round(option.total_duration_minutes)}分` : '—'}</b><small>所要時間</small></span>
+                      <span><b>{option.total_distance_km != null ? `${option.total_distance_km.toFixed(1)}km` : '—'}</b><small>距離</small></span>
+                      <span><b>{option.total_cost != null ? `${option.total_cost} ${option.currency}` : '—'}</b><small>費用</small></span>
+                    </div>
+                    <div className="mt-2 text-xs text-ink-500 flex flex-wrap gap-x-3 gap-y-1">
                       {option.transfer_count != null && <span>乗換{option.transfer_count}回</span>}
                       {option.walking_minutes != null && <span>徒歩{Math.round(option.walking_minutes)}分</span>}
+                      <span>手で入力した値</span>
                     </div>
                     <div className="mt-1 flex gap-3 text-xs text-ink-700">
                       {option.accessibility_score != null && (
@@ -280,21 +291,26 @@ const RouteOptionsPage: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-1">
+                  <div className="tc-compare-actions">
                     {option.status !== 'adopted' && (
-                      <Button variant="ghost" size="sm" onClick={() => handleAdopt(option)} aria-label="この経路候補を採用">
-                        <CheckCircle2 size={14} className="text-green-600" />
-                      </Button>
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => handleAdopt(option)} aria-label="この経路候補を採用">
+                        <CheckCircle2 size={16} aria-hidden="true" />この案を採用する
+                      </button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(option)} aria-label="この経路候補を削除">
-                      <Trash2 size={14} className="text-red-500" />
-                    </Button>
+                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => handleDelete(option)} aria-label="この経路候補を削除">
+                      <Trash2 size={14} aria-hidden="true" />削除
+                    </button>
                   </div>
                 </div>
-              </Card>
+              </article>
             ))}
           </div>
         )}
+
+        <div className="tc-card tc-memory-check">
+          <p><b>確認する条件</b><span>予約の固定・営業時間・休みたい時間は、旅行の条件で決めます。1日の並べ替えは旅程の「この日の並べ替え(検証つき)」から。</span></p>
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/constraints`)}>条件を編集</button>
+        </div>
       </div>
 
       <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title="経路候補を追加">

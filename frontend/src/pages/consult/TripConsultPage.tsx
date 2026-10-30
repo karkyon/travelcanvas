@@ -232,6 +232,20 @@ const BriefStep: React.FC<{
         <div className="rounded-2xl border border-cloud-200 bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest text-accent">YOUR TRIP BRIEF</p>
           <h3 className="mt-1 font-semibold text-ink-900">いま決まっていること</h3>
+          {/* [Gate MockScreens] モックの brief の地図(飾り。実際の地図・方面ではないことを書く) */}
+          <div className="tc-brief-map" aria-hidden="true">
+            <svg viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" focusable="false">
+              <rect width="320" height="150" fill="#e8eee7" />
+              <path d="M0 112C60 98 92 120 150 104S250 70 320 82V150H0z" fill="#d5e3ea" />
+              <path d="M-10 40 330 64M40 -10 70 160M180 -10 160 160M250 -10 300 160" stroke="#fff" strokeWidth="7" fill="none" />
+              <path d="M0 40 320 64M40 0 70 150M180 0 160 150" stroke="#dfe5ea" strokeWidth="2" fill="none" />
+              <path d="M78 104C120 92 150 66 190 58S250 44 268 36" stroke="#4a6558" strokeWidth="3" strokeDasharray="6 6" fill="none" />
+              <circle cx="78" cy="104" r="7" fill="#ef765b" stroke="#fff" strokeWidth="3" />
+              <circle cx="190" cy="58" r="5" fill="#4a6558" />
+              <circle cx="268" cy="36" r="5" fill="#4a6558" />
+            </svg>
+            <span className="tc-photo-source">候補方面の範囲のイメージ(実際の地図ではありません)</span>
+          </div>
           <dl className="mt-3 divide-y divide-cloud-200">
             {summary.map((s) => (
               <div key={s.label} className="py-2">

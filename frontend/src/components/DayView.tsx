@@ -6,6 +6,7 @@ import { hoursBadge, moveBlockedReason, reorderImpact, segmentRow } from './plan
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
 import TransportIcon from './common/TransportIcon';
+import { LEGEND_MODES, transportMode } from '../utils/transportModes';
 import EventPhotoDialog from './planner/EventPhotoDialog';
 import { getEventImageMedia, getEventImages, getMediaProviderStatus } from '../services/api/g11discover';
 import type { EventImage } from '../services/api/types/g11discover';
@@ -15,7 +16,6 @@ import { usePlan } from '../hooks/usePlan';
 import { useDragDrop, containerId, finalIndexForGap, reorderArray } from '../hooks/useDragDrop';
 import { useToast } from './common/toastContext';
 import Button from './common/Button';
-import Card from './common/Card';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
 import Input from './common/Input';
@@ -40,6 +40,18 @@ interface DayViewProps {
   zones?: Record<string, string | undefined>;
   /** [Gate G11] 予定 → 題名(区間の行の出発の予定。別の日の予定を含む) */
   titles?: Record<string, string>;
+  /** [Gate MockScreens] 時間の流れの見出しの小見出し(例: DAY 1 · 現地の時刻) */
+  headerLabel?: string;
+  /** [Gate MockScreens] 見出しの下の日のタブ(旅程の画面が渡す) */
+  dayTabs?: React.ReactNode;
+  /** [Gate MockScreens] 「ルートを見る」(経路の比較へ) */
+  onOpenRoute?: () => void;
+  /** [Gate MockScreens] 選んでいる予定(行を強調する) */
+  selectedEventId?: string | null;
+  /** [Gate MockScreens] 営業時間の照合の結果(選んだ予定の欄へ渡す) */
+  onHoursChange?: (byId: Record<string, EventHoursCheck>, pending: boolean) => void;
+  /** [Gate MockScreens] 値が変わるたびに「予定を追加」を開く(見出しの「＋ 予定を追加」) */
+  addSignal?: number;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -55,6 +67,12 @@ const DayView: React.FC<DayViewProps> = ({
   segments = [],
   zones = {},
   titles,
+  headerLabel,
+  dayTabs,
+  onOpenRoute,
+  selectedEventId = null,
+  onHoursChange,
+  addSignal = 0,
 }) => {
   const { addNewScheduleItem, deleteScheduleItem, reorderSchedule } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
@@ -80,8 +98,16 @@ const DayView: React.FC<DayViewProps> = ({
   }, [planId, day.id, hoursKey, day.events]);
   const hoursPending = !hours || hours.key !== hoursKey;
   useEffect(() => {
+    onHoursChange?.(hours?.byId ?? {}, hoursPending);
+  }, [hours, hoursPending, onHoursChange]);
+  useEffect(() => {
     if (!hoursPending && announce.endsWith('確かめています')) setAnnounce(announce.replace('確かめています', '確かめました'));
   }, [hoursPending, announce]);
+
+  // [Gate MockScreens] 旅程の見出しの「＋ 予定を追加」から開く
+  useEffect(() => {
+    if (addSignal > 0) setIsAddModalOpen(true);
+  }, [addSignal]);
 
   // [Gate G11] 予定のカードの写真(見える写真だけ。一時の URL)
   const [images, setImages] = useState<Record<string, EventImage>>({});
@@ -375,40 +401,39 @@ const DayView: React.FC<DayViewProps> = ({
   }, [planId, day.id, view, byId, handleDragEnd, propose, addToast]);
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* デイヘッダー */}
-      <Card variant={isActive ? "elevated" : "default"} padding="md">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-ink-900">
-              {day.date} ({getDayOfWeek(day.date)})
-            </h3>
-            {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
-            <p className="text-xs text-ink-700" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
-            <div className="flex items-center space-x-4 text-sm text-ink-700 mt-1">
-              <span><UiIcon icon={IcMapPin} size={14} className="mr-1 align-[-3px]" />{timeStats.eventCount}件</span>
-              <span><UiIcon icon={IcTimer} size={14} className="mr-1 align-[-3px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
-              <span><UiIcon icon={IcWallet} size={14} className="mr-1 align-[-3px]" />¥{timeStats.totalCost.toLocaleString()}</span>
-              {timeStats.totalTravelTime > 0 && (
-                <span><UiIcon icon={IcFootprints} size={14} className="mr-1 align-[-3px]" />移動{timeStats.totalTravelTime}分</span>
-              )}
-            </div>
+    <div className={`tc-dayview ${className}`.trim()}>
+      {/* [Gate MockScreens] モックの timeline-card の見出し: 小見出し・日の題・ルートを見る・日のタブ・現地時間・集計・移動手段の凡例 */}
+      <div className="tc-day-head" data-active={isActive ? 'true' : 'false'}>
+        <div className="tc-section-row">
+          <div className="min-w-0">
+            {headerLabel && <p className="tc-label">{headerLabel}</p>}
+            <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
           </div>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setIsAddModalOpen(true)}
-            leftIcon={
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-            }
-          >
-            追加
-          </Button>
+          {onOpenRoute && (
+            <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る <span aria-hidden="true">↗</span></button>
+          )}
         </div>
-      </Card>
+        {dayTabs}
+        {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
+        <p className="tc-day-meta" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
+        <div className="tc-day-stats">
+          <span><UiIcon icon={IcMapPin} size={13} className="mr-1 align-[-2px]" />{timeStats.eventCount}件</span>
+          {timeStats.totalDuration > 0 && (
+            <span><UiIcon icon={IcTimer} size={13} className="mr-1 align-[-2px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
+          )}
+          {timeStats.totalCost > 0 && (
+            <span><UiIcon icon={IcWallet} size={13} className="mr-1 align-[-2px]" />¥{timeStats.totalCost.toLocaleString()}</span>
+          )}
+          {timeStats.totalTravelTime > 0 && (
+            <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
+          )}
+        </div>
+        <ul className="tc-event-legend" aria-label="移動手段の印">
+          {LEGEND_MODES.map((m) => (
+            <li key={m}><TransportIcon mode={m} size={12} />{transportMode(m).label}</li>
+          ))}
+        </ul>
+      </div>
 
       {photoFor && (
         <EventPhotoDialog isOpen onClose={() => setPhotoFor(null)} planId={planId} eventId={photoFor.id}
@@ -436,17 +461,17 @@ const DayView: React.FC<DayViewProps> = ({
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
           aria-required-parent)。予定がある時だけ一覧の役割を与え、間の包みは役割無しにする。 */}
       <div
-        className="space-y-3"
+        className="tc-event-list"
         role={day.events.length > 0 ? 'list' : undefined}
         aria-label={day.events.length > 0 ? `${day.date}の予定` : undefined}
       >
         {day.events.length === 0 ? (
           /* 空の状態 */
-          <Card variant="outlined" padding="lg">
-            <div className="text-center py-8 text-ink-500">
-              <div className="mb-3 flex justify-center"><UiIcon icon={IcCalendar} size={40} /></div>
-              <p className="text-lg font-medium mb-2">まだスケジュールがありません</p>
-              <p className="text-sm mb-4">スポットを追加してプランを作成しましょう</p>
+          <div className="tc-day-empty">
+            <div className="text-center py-6 text-ink-500">
+              <div className="mb-2 flex justify-center"><UiIcon icon={IcCalendar} size={32} /></div>
+              <p className="text-base font-semibold text-ink-900 mb-1">まだスケジュールがありません</p>
+              <p className="text-sm mb-4">行きたい場所を予定にすると、地図と選んだ予定の欄に出ます</p>
               <Button
                 variant="primary"
                 onClick={() => setIsAddModalOpen(true)}
@@ -459,7 +484,7 @@ const DayView: React.FC<DayViewProps> = ({
                 最初のスケジュールを追加
               </Button>
             </div>
-          </Card>
+          </div>
         ) : (
           view.map((event, index) => {
             const row = segmentRow(view, index, segments, zones, day.timezone_id, titleMap);
@@ -471,8 +496,7 @@ const DayView: React.FC<DayViewProps> = ({
               {row && (
                 <div role="listitem" data-testid="segment-row" data-to-event={event.id}
                   data-mismatch={row.mismatch ? 'true' : 'false'}
-                  className={`mb-2 ml-12 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border-l-4 px-2 py-1 text-xs ${
-                    row.mismatch ? 'border-warning bg-warning-soft text-warning' : 'border-cloud-200 bg-cloud-100 text-ink-700'}`}>
+                  className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
                   <span className="sr-only">移動:</span>
                   <TransportIcon mode={row.leg.mode} />
                   <span>{row.leg.text}</span>
@@ -517,19 +541,8 @@ const DayView: React.FC<DayViewProps> = ({
                     moveBy(event, e.key === 'ArrowUp' ? -1 : 1);
                   }
                 }}
-                className={`flex items-stretch gap-2 ${isItemDragged(event.id) ? 'opacity-50' : ''}`.trim()}
+                className={`tc-event-row ${isItemDragged(event.id) ? 'opacity-50' : ''}`.trim()}
               >
-                {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え) */}
-                <div className="flex shrink-0 flex-col justify-center gap-1">
-                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
-                    data-testid={`move-up-${event.id}`}
-                    className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
-                    onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
-                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
-                    data-testid={`move-down-${event.id}`}
-                    className="min-h-11 min-w-11 rounded-md border border-cloud-200 bg-surface text-ink-700 disabled:opacity-40"
-                    onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
-                </div>
                 <div className="min-w-0 flex-1">
                 <ScheduleItem
                   id={event.id}
@@ -559,7 +572,17 @@ const DayView: React.FC<DayViewProps> = ({
                   hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
                   image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
                   onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
+                  selected={selectedEventId === event.id}
                 />
+                </div>
+                {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え)。[Gate MockScreens] モックの event-actions(右) */}
+                <div className="tc-event-actions">
+                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
+                    data-testid={`move-up-${event.id}`} className="tc-focus-ring"
+                    onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
+                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
+                    data-testid={`move-down-${event.id}`} className="tc-focus-ring"
+                    onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
                 </div>
               </div>
             </div>
@@ -582,6 +605,12 @@ const DayView: React.FC<DayViewProps> = ({
           />
         )}
       </div>
+
+      {day.events.length > 0 && (
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-add-event" onClick={() => setIsAddModalOpen(true)}>
+          ＋ 日程に追加する
+        </button>
+      )}
 
       {/* スケジュール追加モーダル */}
       <Modal

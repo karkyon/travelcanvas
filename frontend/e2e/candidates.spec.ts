@@ -26,7 +26,7 @@ test('候補箱: URL で足し、重複をまとめ、旅程に追加し、場�
 
   // 1. URL で足す
   await page.goto(`/planner/${planId}/candidates`);
-  await expect(page.getByRole('heading', { name: '候補箱', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '近くの「行きたい」を集める', level: 1 })).toBeVisible();
   const form = page.getByRole('form', { name: '候補を追加' });
   await form.getByLabel('URL(任意)').fill('https://www.kiyomizudera.or.jp/?utm_source=e2e&utm_medium=x');
   await form.getByLabel('優先度').selectOption('1');
