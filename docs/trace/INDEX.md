@@ -21,6 +21,7 @@
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-ci-redis-trace.md](gate-ci-redis-trace.md) | Gate CI-Redis トレース(CI の backend ジョブで Redis を使う試験を必ず実行する) | 0 | 0 | 0 |
 | [gate-ci429-trace.md](gate-ci429-trace.md) | Gate CI-429 トレース(CI の E2E の 429 連鎖の原因の調査) | 0 | 0 | 0 |
+| [gate-doc10rev-trace.md](gate-doc10rev-trace.md) | Gate DOC10-Rev トレース(DOC-10 の版の食い違いの解消・状態の監査表) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
