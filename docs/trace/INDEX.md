@@ -32,12 +32,13 @@
 | [gate-g11-discover-trace.md](gate-g11-discover-trace.md) | Gate G11-Discover トレース(G11 の段階3: 発見・SNS・外部の写真・予定の写真) | 1 | 0 | 0 |
 | [gate-g11-icons-trace.md](gate-g11-icons-trace.md) | Gate G11-Icons トレース(G11 の段階9: 移動手段のアイコン) | 0 | 0 | 2 |
 | [gate-g11-intake-trace.md](gate-g11-intake-trace.md) | Gate G11-Intake トレース(G11 の段階5: 行き先が未定の旅行相談) | 2 | 0 | 0 |
-| [gate-g11-layout-trace.md](gate-g11-layout-trace.md) | Gate G11-Layout トレース(旅程の画面の一覧のずれ・競合の後に最新を読み直せない時の表示) | 0 | 1 | 0 |
+| [gate-g11-layout-trace.md](gate-g11-layout-trace.md) | Gate G11-Layout トレース(旅程の画面の一覧のずれ・競合の後に最新を読み直せない時の表示) | 0 | 0 | 1 |
 | [gate-g11-media-trace.md](gate-g11-media-trace.md) | Gate G11-Media トレース(G11 の段階1: 旅行の表紙の写真) | 2 | 0 | 0 |
 | [gate-g11-planner-trace.md](gate-g11-planner-trace.md) | Gate G11-Planner トレース(G11 の段階2: 旅程の画面) | 1 | 0 | 0 |
 | [gate-g11-planner2-trace.md](gate-g11-planner2-trace.md) | Gate G11-Planner2 トレース(G11 の段階6: 旅程の画面の残り) | 2 | 1 | 0 |
 | [gate-g11-preview-trace.md](gate-g11-preview-trace.md) | Gate G11-Preview トレース(G11 の段階7: 並べ替えを保存する前の案) | 1 | 0 | 0 |
 | [gate-g11-style-trace.md](gate-g11-style-trace.md) | Gate G11-Style トレース(G11 の段階4: 見た目の系統) | 0 | 0 | 0 |
+| [gate-g11-usage-layout-trace.md](gate-g11-usage-layout-trace.md) | Gate G11-UsageLayout トレース(利用枠の知らせの状態で予定の一覧が動く問題) | 0 | 0 | 0 |
 | [gate-g11-vote-trace.md](gate-g11-vote-trace.md) | Gate G11-Vote トレース(G11 の段階8: 候補箱の家族・グループの投票) | 0 | 0 | 0 |
 | [gate-g2-trace.md](gate-g2-trace.md) | Gate G2 トレース(DB の権限の分離・依存のメジャー更新・外部サービスの要らない「(部分)」の解消) | 3 | 0 | 0 |
 | [gate-g3-trace.md](gate-g3-trace.md) | Gate G3 トレース(基盤・品質: 外部の判断の要らない残り) | 1 | 1 | 0 |
