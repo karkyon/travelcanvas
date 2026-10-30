@@ -31,6 +31,8 @@ interface PlanHeaderProps {
   onDuplicate?: () => void;
   onDelete?: () => void;
   className?: string;
+  /** [Gate MockScreens] 旅行の名前の見出しの段(旅程の画面では page-head が h1 のため 2) */
+  headingLevel?: 1 | 2;
 }
 
 const PlanHeader: React.FC<PlanHeaderProps> = ({
@@ -39,6 +41,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
   onOptimize,
   onDuplicate,
   onDelete,
+  headingLevel = 1,
   className = ''
 }) => {
   const { updatePlanDetails, duplicatePlan, deletePlan } = usePlan();
@@ -223,7 +226,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                       <span className="rounded-full border border-white px-2 py-0.5" role="status">オフライン(保存済みの内容)</span>
                     )}
                   </div>
-                  <h1 className="mt-2 text-2xl font-bold break-words" style={{ fontFamily: 'var(--tc-font-display)' }}>{plan.title}</h1>
+                  {React.createElement(`h${headingLevel}`, { className: 'mt-2 text-2xl font-bold break-words', style: { fontFamily: 'var(--tc-font-display)' } }, plan.title)}
                   <p className="mt-1 text-sm">
                     {[plan.destination || null, `${formatDate(firstDate(plan))} 〜 ${formatDate(lastDate(plan))}`]
                       .filter(Boolean).join('・')}

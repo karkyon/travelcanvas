@@ -117,7 +117,9 @@ test('UX-2・UX-3・UX-4 旅行中を焦点に、全ての幅・暗い見た目�
   await page.getByTestId(`trip-card-${upcoming}`).click();
   await expect(page).toHaveURL(new RegExp(`/planner/${upcoming}$`));
   const cover = page.getByTestId('trip-header-cover');
-  await expect(cover.getByRole('heading', { level: 1 })).toHaveText('京都 紅葉の1泊2日');
+  // [Gate MockScreens] 旅程の画面の h1 は page-head(旅行の名前)。表紙の名前は2段目
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('京都 紅葉の1泊2日');
+  await expect(cover.getByRole('heading', { level: 2 })).toHaveText('京都 紅葉の1泊2日');
   await expect(page.getByTestId('header-current-trip')).toContainText('京都 紅葉の1泊2日');
   await expectHeaderStable(page, '旅行の画面 1024px');
   for (const w of [360, 1440]) {

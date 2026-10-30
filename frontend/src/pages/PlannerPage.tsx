@@ -9,13 +9,12 @@
  * /planner        -> プラン一覧 + 新規作成
  * /planner/:planId -> 選択したプランの日程編集画面(PlanHeader + 日タブ + DayView)
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
 import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
-import DateNavigation from '@/components/planner/DateNavigation';
 import OptimizationPanel from '@/components/planner/OptimizationPanel';
 import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeImpact';
 import Button from '@/components/common/Button';
@@ -34,7 +33,8 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import AllDaysChart from '@/components/planner/AllDaysChart';
-import { titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+import { hoursBadge, segmentRow, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
@@ -71,6 +71,15 @@ const getDayOfWeek = (dateStr?: string): string => {
   if (Number.isNaN(d.getTime())) return '';
   return labels[d.getDay()] || '';
 };
+
+/** [Gate MockScreens] 旅行の期間(日程の最初と最後。無ければ開始・終了の日) */
+function planDateRange(plan: { days: Array<{ date?: string }>; start_date?: string; end_date?: string }): string {
+  const first = plan.days[0]?.date || plan.start_date;
+  const last = plan.days[plan.days.length - 1]?.date || plan.end_date;
+  if (!first) return '';
+  const fmt = (d: string) => `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日`;
+  return last && last !== first ? `${fmt(first)} — ${fmt(last)}` : fmt(first);
+}
 
 const PlannerPage: React.FC = () => {
   const { planId } = useParams<{ planId?: string }>();
@@ -133,6 +142,12 @@ const PlannerPage: React.FC = () => {
   const [showMap, setShowMap] = useState(true);
   // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
   const [planView, setPlanView] = useState<'day' | 'all'>('day');
+  // [Gate MockScreens] 見出しの「＋ 予定を追加」→ DayView の追加を開く。営業時間の照合を選んだ予定の欄へ渡す
+  const [addSignal, setAddSignal] = useState(0);
+  const [dayHours, setDayHours] = useState<{ byId: Record<string, EventHoursCheck>; pending: boolean }>({ byId: {}, pending: false });
+  const handleHoursChange = useCallback((byId: Record<string, EventHoursCheck>, pending: boolean) => {
+    setDayHours({ byId, pending });
+  }, []);
   const [segments, setSegments] = useState<TravelSegment[]>([]);
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
@@ -608,20 +623,36 @@ const PlannerPage: React.FC = () => {
     }
 
     const activeDay = currentPlan.days[currentDayIndex];
+    // [Gate MockScreens] 選んだ予定(未選択なら最初の予定。モックと同じく右の欄は空にしない)
+    const selectedEvent = activeDay
+      ? activeDay.events.find((e) => e.id === selectedEventId) ?? activeDay.events[0] ?? null : null;
+    const selectedIndex = activeDay && selectedEvent ? activeDay.events.findIndex((e) => e.id === selectedEvent.id) : -1;
+    const selectedArrival = activeDay && selectedIndex >= 0
+      ? segmentRow(activeDay.events, selectedIndex, segments, zoneOfEvent(currentPlan.days), activeDay.timezone_id,
+        titleOfEvent(currentPlan.days))?.leg ?? null
+      : null;
 
     return (
       <div className="min-h-screen bg-cloud-50">
         <div className="tc-page">
-          {/* [Gate AppShell] モックの旅程の画面: 見出し・操作の行・3列(時間の流れ・地図・選んだ予定) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="min-w-0">
-              <p className="tc-eyebrow">PLAN · 旅程を組み立てる</p>
-              <p className="tc-subhead mt-1">地図と日程は同じ場所のデータでつながっています。予定を選ぶと地図と詳細が一緒に切り替わります。</p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/planner')}>
-              ← プラン一覧へ戻る
-            </Button>
-          </div>
+          {/* [Gate MockScreens] モックの旅程の画面: page-head・plan-controls・3列(時間の流れ・地図・選んだ予定) */}
+          <PageHead
+            eyebrow="PLAN · 旅程を組み立てる"
+            titleId="planner-trip-title"
+            title={currentPlan.title}
+            sub={<>
+              {[currentPlan.destination, planDateRange(currentPlan)].filter(Boolean).join(' · ')}
+              {currentPlan.destination || planDateRange(currentPlan) ? ' — ' : ''}
+              営業時間・移動手段・現地時間を予定カードで確認。ドラッグまたは↑↓で順番を入れ替えます。
+            </>}
+            actions={<>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← プラン一覧</button>
+              {activeDay && planView === 'day' && (
+                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => setAddSignal((n) => n + 1)}
+                  data-testid="planner-add-event">＋ 予定を追加</button>
+              )}
+            </>}
+          />
 
           <SyncStatusBar planId={currentPlan.id} />
 
@@ -638,7 +669,205 @@ const PlannerPage: React.FC = () => {
             isReloading={isReloadingPlan}
           />
 
-          <PlanHeader plan={currentPlan} className="mb-4" onDelete={() => navigate('/planner')} />
+
+
+
+
+          {/* [Gate G11] 日別 / 全日程の切り替え(全日程は同じ時刻の物差しで日を並べる)。[Gate MockScreens] モックの plan-controls に日の操作をまとめる */}
+          <div className="tc-plan-controls" data-testid="plan-controls">
+            {currentPlan.days.length > 0 && (
+              <div className="tc-seg" role="group" aria-label="旅程の表示">
+                <button type="button" className="tc-focus-ring tc-day-tab" aria-pressed={planView === 'day'}
+                  onClick={() => setPlanView('day')} data-testid="plan-view-day">日別</button>
+                <button type="button" className="tc-focus-ring tc-day-tab" aria-pressed={planView === 'all'}
+                  onClick={() => setPlanView('all')} data-testid="plan-view-all">全日程</button>
+              </div>
+            )}
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}>
+              <UiIcon icon={Star} />近くを発見・候補
+            </button>
+            <span className="tc-plan-controls-sep" aria-hidden="true" />
+            <Button variant="outline" size="sm" onClick={addDay}>
+              ＋ 日を追加
+            </Button>
+            {currentPlan.days.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeDay(currentDayIndex)}
+              >
+                この日を削除
+              </Button>
+            )}
+            {/* [Gate #31.5C] Gate #29 APIが持つ直近1件のUndoを画面から呼べる
+                ようにする。編集操作は全て正規化APIを経由するようになった
+                ため、ここから正しくUndoできる。 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => usePlanStore.getState().undoLastChange()}
+              title="直前の変更を取り消す"
+              icon={<UiIcon icon={Undo2} />}
+            >
+              元に戻す
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMap((prev) => !prev)}
+              icon={<UiIcon icon={MapIcon} />}
+            >
+              {showMap ? '地図を隠す' : '地図を表示'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleOfflineSave}
+              disabled={isSavingOffline}
+              title="このプランを暗号化してこの端末に保存し、オフラインでも閲覧できるようにします"
+              icon={isSavingOffline ? undefined : <UiIcon icon={isOfflineSaved ? WifiOff : Download} />}
+            >
+              {isSavingOffline
+                ? '保存中...'
+                : isOfflineSaved
+                ? 'オフライン保存済み(削除)'
+                : 'オフラインで使う'}
+            </Button>
+            {activeDay?.date &&
+              new Date(activeDay.date).toDateString() === new Date().toDateString() && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setAutoDetectError(null);
+                    setIsAutoDetectEnabled((prev) => !prev);
+                  }}
+                  title="現在地が近くのスポットに一定時間留まると、訪問済みにするか提案します(このタブを開いている間のみ動作します)"
+                  icon={<UiIcon icon={MapPin} />}
+                >
+                  {isAutoDetectEnabled ? '自動検出をOFFにする' : '近くのスポットを自動検出する'}
+                </Button>
+              )}
+          </div>
+
+          {isOfflineData && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
+              <UiIcon icon={WifiOff} className="mr-1 align-[-3px]" />
+              オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
+            </div>
+          )}
+
+          {autoDetectError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
+              {autoDetectError}
+            </div>
+          )}
+
+          {visitSuggestion && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+              <span>
+                <UiIcon icon={MapPin} className="mr-1 align-[-3px]" />「{visitSuggestion.title}」の近くに
+                {Math.round(visitSuggestion.dwellMs / 60000)}分ほど滞在したようです(信頼度
+                {Math.round(visitSuggestion.confidence * 100)}%)。訪問済みにしますか?
+              </span>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="primary" onClick={handleConfirmVisitSuggestion}>
+                  訪問済みにする
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setVisitSuggestion(null)}>
+                  無視
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {currentPlan.days.length === 0 ? (
+            <Card>
+              <div className="p-8 text-center text-ink-500">
+                <p className="mb-4">まだ日程がありません</p>
+                <Button variant="primary" onClick={addDay}>
+                  最初の日を追加
+                </Button>
+              </div>
+            </Card>
+          ) : planView === 'all' ? (
+            <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
+              onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }} />
+          ) : activeDay ? (
+            <div className={`tc-planner-layout${showMap ? '' : ' tc-planner-layout--nomap'}`} data-testid="planner-layout">
+              <section className="tc-card tc-timeline-card" aria-label={`${currentDayIndex + 1}日目の予定`}>
+                <DayView
+                  headerLabel={`${(currentPlan.destination || 'TRIP').toUpperCase()} · DAY ${currentDayIndex + 1} · LOCAL TIME`}
+                  dayTabs={(
+                    <div className="tc-day-tabs" role="group" aria-label="日を選ぶ">
+                      {currentPlan.days.map((d, i) => (
+                        <button key={d.id} type="button" className="tc-focus-ring tc-day-tab" aria-pressed={i === currentDayIndex}
+                          onClick={() => setCurrentDay(i)} data-testid={`day-tab-${i}`}>
+                          {d.date ? `${d.date.slice(5).replace('-', '/')} ${getDayOfWeek(d.date)}` : `${i + 1}日目`}
+                          <span className="sr-only">{`(${d.events.length}件)`}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  onOpenRoute={() => navigate(`/planner/${currentPlan.id}/route-options`)}
+                  selectedEventId={selectedEvent?.id ?? null}
+                  onHoursChange={handleHoursChange}
+                  addSignal={addSignal}
+                  day={activeDay}
+                  planId={currentPlan.id}
+                  isActive
+                  onItemClick={(item) => {
+                    setSelectedEventId(item.id);
+                    openEditItem(item);
+                  }}
+                  onItemEdit={openEditItem}
+                  onItemDelete={handleDeleteItem}
+                  onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
+                  segments={segments}
+                  zones={zoneOfEvent(currentPlan.days)}
+                  titles={titleOfEvent(currentPlan.days)}
+                />
+              </section>
+              {showMap && (
+                <div className="tc-map-frame tc-route-map min-w-0" data-testid="planner-map">
+                  <div className="tc-map-toolbar" aria-hidden="true">
+                    <span className="tc-map-chip">⌖ {activeDay.date ? `${activeDay.date.slice(5).replace('-', '/')} ${getDayOfWeek(activeDay.date)}` : `${currentDayIndex + 1}日目`} · MAP</span>
+                  </div>
+                  <div className="tc-map-legend" aria-hidden="true">
+                    <span className="tc-pill tc-pill--blue">● 予定</span>
+                    <span className="tc-pill">☆ 候補</span>
+                  </div>
+                  <PlanMap
+                    day={activeDay}
+                    height={530}
+                    candidates={searchResults}
+                    routePreview={routePreview}
+                    routePreviewStatus={routePreviewStatus}
+                    selectedEventId={selectedEvent?.id ?? null}
+                    onSelectEvent={setSelectedEventId}
+                    onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
+                      addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
+                    }
+                  />
+                </div>
+              )}
+              <SelectedEventCard
+                planId={currentPlan.id}
+                dayNumber={currentDayIndex + 1}
+                event={selectedEvent}
+                onEdit={openEditItem}
+                hours={selectedEvent ? hoursBadge(dayHours.byId[selectedEvent.id], dayHours.pending && Boolean(selectedEvent.place_id)) : null}
+                arrival={selectedArrival}
+              />
+            </div>
+          ) : null}
+
+          {/* 最適化(経路の提案・適用・戻す)は3列の下に置く */}
+          <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mt-6" />
+
+          <section className="tc-plan-more" aria-labelledby="plan-more-title">
+            <h2 id="plan-more-title" className="tc-section-title">旅行の情報と、この旅行のほかの画面</h2>
+            <PlanHeader plan={currentPlan} className="mb-4" headingLevel={2} onDelete={() => navigate('/planner')} />
           {/* [FR059-B] この旅行の AI・外部検索の利用枠(旅行の予算とは別) */}
           <PlanningUsageMeter planId={currentPlan.id} className="mb-4" />
 
@@ -860,202 +1089,8 @@ const PlannerPage: React.FC = () => {
               </div>
             </div>
           </nav>
+          </section>
 
-
-
-          {/* [Gate G11] 日別 / 全日程の切り替え(全日程は同じ時刻の物差しで日を並べる)。[Gate AppShell] モックの plan-controls */}
-          {currentPlan.days.length > 0 && (
-            <div className="tc-plan-controls">
-              <div className="flex gap-2" role="group" aria-label="旅程の表示">
-                <Button size="sm" variant={planView === 'day' ? 'primary' : 'outline'} aria-pressed={planView === 'day'}
-                  onClick={() => setPlanView('day')} data-testid="plan-view-day">日別</Button>
-                <Button size="sm" variant={planView === 'all' ? 'primary' : 'outline'} aria-pressed={planView === 'all'}
-                  onClick={() => setPlanView('all')} data-testid="plan-view-all">全日程</Button>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}
-                icon={<UiIcon icon={Star} />}>近くを発見・候補</Button>
-            </div>
-          )}
-
-          {/* 日タブナビゲーション + 日ごとの概要(スポット数・所要時間・予算) */}
-          {currentPlan.days.length > 0 && (
-            <DateNavigation
-              className="mb-4 rounded-lg overflow-hidden"
-              currentDay={currentDayIndex}
-              onDayChange={setCurrentDay}
-              travelDates={{
-                startDate: currentPlan.days[0]?.date || currentPlan.start_date || '',
-                endDate: currentPlan.days[currentPlan.days.length - 1]?.date || currentPlan.end_date || '',
-              }}
-              days={currentPlan.days.map((day, index) => ({
-                index,
-                date: day.date || '',
-                dayOfWeek: getDayOfWeek(day.date),
-                isActive: index === currentDayIndex,
-                isCompleted: false,
-                eventCount: day.events.length,
-                status: index === currentDayIndex ? 'current' : 'upcoming',
-                highlights: day.events.slice(0, 3).map((e) => e.title),
-                totalCost: day.events.reduce((sum, e) => sum + (e.cost || 0), 0),
-                totalDuration: day.events.reduce((sum, e) => sum + (e.duration || 0), 0),
-              }))}
-            />
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Button variant="outline" size="sm" onClick={addDay}>
-              ＋ 日を追加
-            </Button>
-            {currentPlan.days.length > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeDay(currentDayIndex)}
-              >
-                この日を削除
-              </Button>
-            )}
-            {/* [Gate #31.5C] Gate #29 APIが持つ直近1件のUndoを画面から呼べる
-                ようにする。編集操作は全て正規化APIを経由するようになった
-                ため、ここから正しくUndoできる。 */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => usePlanStore.getState().undoLastChange()}
-              title="直前の変更を取り消す"
-              icon={<UiIcon icon={Undo2} />}
-            >
-              元に戻す
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowMap((prev) => !prev)}
-              icon={<UiIcon icon={MapIcon} />}
-            >
-              {showMap ? '地図を隠す' : '地図を表示'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleToggleOfflineSave}
-              disabled={isSavingOffline}
-              title="このプランを暗号化してこの端末に保存し、オフラインでも閲覧できるようにします"
-              icon={isSavingOffline ? undefined : <UiIcon icon={isOfflineSaved ? WifiOff : Download} />}
-            >
-              {isSavingOffline
-                ? '保存中...'
-                : isOfflineSaved
-                ? 'オフライン保存済み(削除)'
-                : 'オフラインで使う'}
-            </Button>
-            {activeDay?.date &&
-              new Date(activeDay.date).toDateString() === new Date().toDateString() && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setAutoDetectError(null);
-                    setIsAutoDetectEnabled((prev) => !prev);
-                  }}
-                  title="現在地が近くのスポットに一定時間留まると、訪問済みにするか提案します(このタブを開いている間のみ動作します)"
-                  icon={<UiIcon icon={MapPin} />}
-                >
-                  {isAutoDetectEnabled ? '自動検出をOFFにする' : '近くのスポットを自動検出する'}
-                </Button>
-              )}
-          </div>
-
-          {isOfflineData && (
-            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
-              <UiIcon icon={WifiOff} className="mr-1 align-[-3px]" />
-              オフラインで保存されたデータを表示しています。最新の内容と異なる場合があります。
-            </div>
-          )}
-
-          {autoDetectError && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
-              {autoDetectError}
-            </div>
-          )}
-
-          {visitSuggestion && (
-            <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3 flex items-center justify-between gap-4">
-              <span>
-                <UiIcon icon={MapPin} className="mr-1 align-[-3px]" />「{visitSuggestion.title}」の近くに
-                {Math.round(visitSuggestion.dwellMs / 60000)}分ほど滞在したようです(信頼度
-                {Math.round(visitSuggestion.confidence * 100)}%)。訪問済みにしますか?
-              </span>
-              <div className="flex gap-2 shrink-0">
-                <Button size="sm" variant="primary" onClick={handleConfirmVisitSuggestion}>
-                  訪問済みにする
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setVisitSuggestion(null)}>
-                  無視
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {currentPlan.days.length === 0 ? (
-            <Card>
-              <div className="p-8 text-center text-ink-500">
-                <p className="mb-4">まだ日程がありません</p>
-                <Button variant="primary" onClick={addDay}>
-                  最初の日を追加
-                </Button>
-              </div>
-            </Card>
-          ) : planView === 'all' ? (
-            <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
-              onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }} />
-          ) : activeDay ? (
-            <div className={`tc-planner-layout${showMap ? '' : ' tc-planner-layout--nomap'}`} data-testid="planner-layout">
-              <section className="tc-card tc-timeline-card" aria-label={`${currentDayIndex + 1}日目の予定`}>
-                <p className="tc-label">{`DAY ${currentDayIndex + 1}${activeDay.date ? ` · ${activeDay.date}` : ''} · 現地の時刻`}</p>
-                <DayView
-                  day={activeDay}
-                  planId={currentPlan.id}
-                  isActive
-                  onItemClick={(item) => {
-                    setSelectedEventId(item.id);
-                    openEditItem(item);
-                  }}
-                  onItemEdit={openEditItem}
-                  onItemDelete={handleDeleteItem}
-                  onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
-                  segments={segments}
-                  zones={zoneOfEvent(currentPlan.days)}
-                  titles={titleOfEvent(currentPlan.days)}
-                />
-              </section>
-              {showMap && (
-                <div className="tc-map-frame min-w-0">
-                  <PlanMap
-                    day={activeDay}
-                    height={530}
-                    candidates={searchResults}
-                    routePreview={routePreview}
-                    routePreviewStatus={routePreviewStatus}
-                    selectedEventId={selectedEventId}
-                    onSelectEvent={setSelectedEventId}
-                    onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
-                      addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
-                    }
-                  />
-                </div>
-              )}
-              <SelectedEventCard
-                planId={currentPlan.id}
-                dayNumber={currentDayIndex + 1}
-                event={activeDay.events.find((e) => e.id === selectedEventId) ?? null}
-                onEdit={openEditItem}
-              />
-            </div>
-          ) : null}
-
-          {/* 最適化(経路の提案・適用・戻す)は3列の下に置く */}
-          <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mt-6" />
         </div>
 
         {/* スケジュールアイテム編集モーダル(Gate #18)。[Gate C1] 共同編集の競合を示す */}

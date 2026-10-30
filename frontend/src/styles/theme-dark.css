@@ -49,12 +49,10 @@
     [data-theme='dark'] .border-green-400 { border-color: #197d45; }
     [data-theme='dark'] .border-indigo-200 { border-color: #2c326f; }
     [data-theme='dark'] .border-orange-300 { border-color: #7d411b; }
-    [data-theme='dark'] .border-orange-400 { border-color: #9a4c1a; }
     [data-theme='dark'] .border-pink-300 { border-color: #772c5a; }
     [data-theme='dark'] .border-purple-200 { border-color: #472b72; }
     [data-theme='dark'] .border-red-200 { border-color: #62252e; }
     [data-theme='dark'] .border-red-300 { border-color: #782a31; }
-    [data-theme='dark'] .border-red-400 { border-color: #943036; }
     [data-theme='dark'] .border-slate-300 { border-color: #33415c; }
     [data-theme='dark'] .border-slate-500 { border-color: #64748b; }
     [data-theme='dark'] .border-yellow-200 { border-color: #604f17; }
@@ -69,7 +67,6 @@
     [data-theme='dark'] .hover\:bg-gray-200:hover { background-color: #24324a; }
     [data-theme='dark'] .hover\:bg-gray-50:hover { background-color: #0f1726; }
     [data-theme='dark'] .hover\:bg-green-50:hover { background-color: #0f2f2a; }
-    [data-theme='dark'] .hover\:bg-indigo-50:hover { background-color: #191f41; }
     [data-theme='dark'] .hover\:bg-pink-50:hover { background-color: #2f1b33; }
     [data-theme='dark'] .hover\:bg-red-50:hover { background-color: #2f1a26; }
     [data-theme='dark'] .hover\:border-blue-200:hover { border-color: #1d3d71; }
@@ -85,13 +82,11 @@
     [data-theme='dark'] .hover\:text-blue-700:hover { color: #bfdbfe; }
     [data-theme='dark'] .hover\:text-blue-800:hover { color: #bfdbfe; }
     [data-theme='dark'] .hover\:text-blue-900:hover { color: #bfdbfe; }
-    [data-theme='dark'] .hover\:text-green-500:hover { color: #86efac; }
     [data-theme='dark'] .hover\:text-green-700:hover { color: #bbf7d0; }
     [data-theme='dark'] .hover\:text-green-900:hover { color: #bbf7d0; }
     [data-theme='dark'] .hover\:text-indigo-700:hover { color: #c7d2fe; }
     [data-theme='dark'] .hover\:text-pink-700:hover { color: #fbcfe8; }
     [data-theme='dark'] .hover\:text-purple-700:hover { color: #e9d5ff; }
-    [data-theme='dark'] .hover\:text-red-500:hover { color: #fca5a5; }
     [data-theme='dark'] .hover\:text-red-600:hover { color: #fca5a5; }
     [data-theme='dark'] .hover\:text-red-700:hover { color: #fecaca; }
     [data-theme='dark'] .hover\:text-red-800:hover { color: #fecaca; }
