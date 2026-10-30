@@ -18,6 +18,7 @@ from app.api.v1 import (
     media_providers,
     trip_intents,
     planning_usage,
+    admin_ops,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -608,6 +609,8 @@ app.include_router(trip_intents.plan_router, prefix="/api/v1")
 app.include_router(planning_usage.router, prefix="/api/v1")
 app.include_router(planning_usage.plan_router, prefix="/api/v1")
 app.include_router(planning_usage.admin_router, prefix="/api/v1")
+# [Gate OpsCMS] 運用コンソール(外部 API の接続・原価の台帳・Cloud の環境・Fake の家族旅行の試験)
+app.include_router(admin_ops.router, prefix="/api/v1")
 
 
 @app.exception_handler(org_external.ApiError)

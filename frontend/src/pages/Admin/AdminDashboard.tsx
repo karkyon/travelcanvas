@@ -247,6 +247,15 @@ const AdminDashboard: React.FC = () => {
             <span className="mb-2" aria-hidden="true"><UiIcon icon={IcFlag} size={24} /></span>
             <span className="text-sm">濫用への対応</span>
           </Button>
+          {/* [Gate OpsCMS] 外部 API の接続・原価の台帳・Cloud・Fake の試験 */}
+          <Button
+            onClick={() => navigate('/admin/ops')}
+            variant="outline"
+            className="flex flex-col items-center p-4 h-auto"
+          >
+            <span className="mb-2" aria-hidden="true"><UiIcon icon={IcActivity} size={24} /></span>
+            <span className="text-sm">運用コンソール(API・原価)</span>
+          </Button>
         </div>
       </Card>
 
