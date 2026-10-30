@@ -15,7 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `6571fc5`(Gate G11-Planner2 PR #15。この後に Gate FR059-A(r27)・FR059-B(r28)の commit が続く) |
-| Alembic head | `d5f9b2c8e1a3`(単一の head。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
+| Alembic head | `f2a6d8c4b9e1`(単一の head。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(サンドボックス、G10-UX) | backend pytest 1239 合格・2 飛ばし(G10-Q から backend の変更なし) / frontend vitest 853 合格(169 ファイル)・標準エラー 0 行 / E2E 81 合格・再試行 0(本番用の配信 static-server.mjs。通常・計算の確認を常に求める設定の両方)/ **mypy の誤り 0 件**(G10-Q で 1,382 → 0、基準は空)/ 毎晩の perf(予定 10,000・通知 100,000)合格 / 最初に読む JS 426.24 kB(上限 430 kB) |
 | GitHub Actions(H1 `16f1aa9`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -247,6 +247,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r28 | 2026-10-29 | `6571fc5`+FR059-A | Gate FR059-B: 外部 API の原価の守りをサーバーに実装(migration `d5f9b2c8e1a3`: entitlements・usage_policy_profiles(policy 2026-10-29.1 の6クラス)・usage_budget_accounts・provider_usage_reservations・provider_usage_events)。クラスの解決(Guest 0・Free・Trip Pass・Plus・Family・Pro の契約の例外は二者の承認の後だけ)、旅行・月の口座の行の鍵による原子的な予約(ちょうど 50円は許可)、回数・token の上限、冪等・確定・解放・期限切れの回復、再試行1回、見込みの超過と請求の照合の差で provider を止める、`GET /entitlements`・`GET /plans/{id}/planning-usage`・`POST /plans/{id}/planning-actions/estimate`・管理の申請と承認、旅程・下書き・旅行相談の利用枠の表示。FR-059 を INTEGRATED(部分)(外部の有料 provider は未接続)。`docs/trace/gate-fr059b-trace.md` |
 | r29 | 2026-10-29 | `6571fc5`+FR059-B | Gate G11-Vote(G11 の段階8): 候補箱で家族・グループが候補に投票する(合意形成 FR-022 の投票の選択肢を候補にする仕組みを使う。新しい表なし)。FR-007 の gaps から「候補への投票」を外した(OCR・音声認識・URL の題名が残るため(部分)のまま)。間の Gate CI-429(接続元の点数の log)・G11-Preview(並べ替えの案)は DOC-10 を変えていない。`docs/trace/gate-g11-vote-trace.md` |
 | **r30** | 2026-10-30 | `b75c645`+G11-Layout | **Gate FR059-C: FR-059 正本 §13 D14 provider の停止(見込みの超過・請求の照合の差)を Redis の印で全ての worker・運用のコマンドが共有する(届かない間は process の中で止め、届いた時に送る)。運用者の再開 `tcops.py security provider-resume`(理由が必須)。FR-059 の gaps から D14 を外した(外部の有料 provider は未接続のため INTEGRATED(部分)のまま)。間の Gate G11-Layout(一覧のずれ・競合の後の読み直し)・UX6-Icons(旅程の中の移動の絵文字)は DOC-10 を変えていない。`docs/trace/gate-fr059c-trace.md`** |
+| r31 | 2026-10-30 | `7855f17`+OpsSecrets | Gate AppShell(#33)・Gate OpsCMS(#35)・Gate OpsSecrets: UI/UX モックの画面、運用コンソール `/admin/ops`(外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験)、運用コンソールから API キーを暗号化して登録(migration `e8b4c2a7f1d3`: provider_secrets・`f2a6d8c4b9e1`: 外部キーの索引)。FR の状態は変えない(有料の provider は未接続)。`docs/trace/gate-appshell-trace.md`・`docs/trace/gate-opscms-trace.md` |
 
 ## 10. 台帳の更新の規則
 

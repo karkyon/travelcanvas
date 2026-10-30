@@ -23,7 +23,7 @@ migration なし(既存の FR-059 の表 usage_budget_accounts・provider_usage_
 
 | # | 要件 | 状態 | 証拠 |
 |---|---|---|---|
-| 12 | 運用コンソールから API キーを登録する(管理者 + 多要素認証・理由が必須・監査)。ENCRYPTION_KEY で暗号化して保存し、平文を返す API は無い | IMPLEMENTED | `backend/app/services/provider_secrets.py`・`POST /admin/ops/secrets/{slot}`、migration `e8b4c2a7f1d3`、BE `test_gate_opscms.py` |
+| 12 | 運用コンソールから API キーを登録する(管理者 + 多要素認証・理由が必須・監査)。ENCRYPTION_KEY で暗号化して保存し、平文を返す API は無い | IMPLEMENTED | `backend/app/services/provider_secrets.py`・`POST /admin/ops/secrets/{slot}`、migration `e8b4c2a7f1d3`・索引 `f2a6d8c4b9e1`、BE `test_gate_opscms.py` |
 | 13 | 画面・応答・監査には末尾4文字・版・出典(cms/env)だけ。入力は password の欄で、保存の後は空にする | IMPLEMENTED | FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts`(ページの HTML に値が無い) |
 | 14 | 新しい版で前の版は入れ替え済み(有効は slot ごとに1つ)・無効にすると .env の値へ戻る | IMPLEMENTED | BE |
 | 15 | 鍵の列は `*_ciphertext`(鍵の点検・掛け直し `tcops.py keys` の対象) | IMPLEMENTED | `provider_secrets.secret_ciphertext` |
