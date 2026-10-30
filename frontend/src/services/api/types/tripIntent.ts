@@ -6,7 +6,7 @@ export type IntentSource = 'user_input' | 'text' | 'unspecified';
 export type IntentStrength = 'required' | 'preferred' | 'undecided';
 
 export interface IntentQuestion {
-  id: 'one_way_strength' | 'budget_scope';
+  id: 'one_way_strength' | 'budget_scope' | 'party_size';
   text: string;
   options: Array<{ value: string; label: string }>;
   suggested: string | null;
@@ -39,6 +39,7 @@ export interface ExtractInput {
   text: string;
   origin?: string;
   travel_window?: string;
+  date_status?: 'window' | 'fixed';
   party_size?: number;
   nights?: number;
   transport?: 'car' | 'public' | 'undecided';

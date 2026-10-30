@@ -86,6 +86,35 @@ def test_extract_main_scenario_marks_sources_and_questions(client, users):
     assert all(a["source"] == "user_input" for a in body["areas"])
 
 
+def test_extract_party_conflict_between_field_and_text_is_asked_not_guessed(client, users):
+    """[Gate G11] 入力欄は1人・文章は「家族4人」の時、どちらかを黙って使わない(利用者に選んでもらう)"""
+    owner, _ = users
+    _as(owner)
+    items = _items(client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "party_size": 1}).json())
+    party = items["party_size"]
+    assert party["value"] is None and party["needs_answer"]
+    assert party["question"]["id"] == "party_size"
+    assert [o["value"] for o in party["question"]["options"]] == ["4", "1"]
+    assert "入力欄は1人" in party["display"] and "文章は4人" in party["display"]
+    # 同じ人数なら問わない(あなたの入力として使う)
+    same = _items(client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "party_size": 4}).json())
+    assert same["party_size"]["value"] == 4 and same["party_size"]["source"] == "user_input"
+
+
+def test_extract_fixed_date_from_screen_stays_fixed(client, users):
+    """[Gate G11] 画面で「日付が決まっている」+「11/28」は、決まっている日付として返す(以前は未確定扱い)"""
+    owner, _ = users
+    _as(owner)
+    items = _items(client.post("/api/v1/trip-intents/extract", json={
+        "text": SAMPLE, "travel_window": "11/28", "date_status": "fixed"}).json())
+    assert items["dates"]["value"] == {"status": "fixed", "text": "11/28"}
+    assert items["dates"]["display"] == "11/28 · 決まっている日付" and items["dates"]["source"] == "user_input"
+    window = _items(client.post("/api/v1/trip-intents/extract", json={
+        "text": SAMPLE, "travel_window": "約1か月後の週末", "date_status": "window"}).json())
+    assert window["dates"]["value"]["status"] == "window"
+    assert client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "date_status": "soon"}).status_code == 422
+
+
 def test_extract_fields_override_text_and_answers_close_questions(client, users):
     owner, _ = users
     _as(owner)
@@ -166,6 +195,9 @@ def test_nominatim_geocode_maps_statuses():
     def handler(request: httpx.Request) -> httpx.Response:
         q = request.url.params["q"]
         assert request.url.host == "nominatim.openstreetmap.org"
+        assert request.url.params["countrycodes"] == "jp"  # [Gate GeocodeJP] 日本の地名として照会する
+        if q == "国外":
+            return httpx.Response(200, json=[{"lat": "31.23", "lon": "121.47", "display_name": "国外の同じ名前"}])
         if q == "伊勢":
             return httpx.Response(200, json=[{"lat": "34.48", "lon": "136.70", "display_name": "伊勢市, 三重県",
                                               "osm_type": "relation", "osm_id": 1}])
@@ -178,6 +210,17 @@ def test_nominatim_geocode_maps_statuses():
     assert ok.status == "ok" and ok.label == "伊勢市" and ok.source_url.endswith("/relation/1")
     assert asyncio.run(ti.nominatim_geocode("無い", transport=t)).status == "not_found"
     assert asyncio.run(ti.nominatim_geocode("混む", transport=t)).status == "unavailable"
+    assert asyncio.run(ti.nominatim_geocode("国外", transport=t)).status == "not_found"  # 日本の範囲の外は使わない
+
+
+def test_hirakata_to_ise_fukui_shiga_is_within_three_hours_lower_bound():
+    """[Gate GeocodeJP] 枚方から伊勢・福井・滋賀は直線で 100〜150km 程度。直線距離の下限で「3時間を超える」とは言わない。"""
+    pts = {"枚方": (34.8146, 135.6510), "伊勢": (34.4875, 136.7093), "福井": (36.0641, 136.2196),
+           "滋賀": (35.0045, 135.8686)}
+    for name in ("伊勢", "福井", "滋賀"):
+        km = ti.haversine_km(*pts["枚方"], *pts[name])
+        assert km < 300, (name, km)
+        assert ti.limit_check(km, 3.0, "required")["status"] == "unknown", name
 
 
 # ============================================================ 下書き → 並び → 旅程

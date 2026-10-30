@@ -137,3 +137,27 @@ async def test_search_overpass_failure_returns_empty_list():
     client = _FakeClient(post_response=None, raise_on_post=True)
     results = await search_provider.search_overpass("cafe", 34.68, 135.52, client=client)
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_search_overpass_reads_ways_by_center_and_links_the_right_type():
+    """[Gate G11] 神社・城などの敷地(way・relation)は center の位置で返す(以前は点だけを探していた)"""
+    fixture = {"elements": [
+        {"type": "way", "id": 5, "center": {"lat": 34.455, "lon": 136.725},
+         "tags": {"name": "皇大神宮", "historic": "yes"}},
+    ]}
+    client = _FakeClient(post_response=_FakeResponse(fixture))
+    results = await search_provider.search_overpass("", 34.48, 136.71, client=client, category="sightseeing")
+    assert results[0]["latitude"] == 34.455 and results[0]["longitude"] == 136.725
+    assert results[0]["source_url"] == "https://www.openstreetmap.org/way/5"
+    assert results[0]["external_id"] == "way/5"
+
+
+@pytest.mark.asyncio
+async def test_search_all_providers_reports_unavailable_instead_of_zero(monkeypatch):
+    """[Gate G11] 提供元が落ちた時は「0件」ではなく unavailable に名前を残す"""
+    async def boom(*a, **k):
+        raise RuntimeError("down")
+    monkeypatch.setattr(search_provider, "search_overpass", boom)
+    res = await search_provider.search_all_providers("", 34.48, 136.71, 10, category="sightseeing")
+    assert list(res) == [] and res.unavailable == ["overpass"]

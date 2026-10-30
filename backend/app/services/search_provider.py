@@ -156,9 +156,13 @@ async def search_overpass(
     radius_km: float = 5.0,
     client: Optional[httpx.AsyncClient] = None,
     category: str = "all",
+    raise_errors: bool = False,
 ) -> List[Dict[str, Any]]:
     """Overpass API(OpenStreetMap POI検索、APIキー不要)。座標が無ければ
-    範囲を絞れないため空リストを返す(失敗ではなく仕様上の制約)。"""
+    範囲を絞れないため空リストを返す(失敗ではなく仕様上の制約)。
+
+    [Gate G11] 点(node)だけでなく、建物・敷地(way・relation)も探す(神社・城などは敷地で登録されている)。
+    raise_errors=True の時は、提供元の失敗を「0件」にせず呼び手へ伝える。"""
     if latitude is None or longitude is None:
         return []
 
@@ -166,13 +170,13 @@ async def search_overpass(
     radius_m = int(radius_km * 1000)
     name_filter = f'["name"~"{overpass_regex(query)}",i]' if query and query.strip() else '["name"]'
     tags = CATEGORY_TAGS.get(category) or [""]
-    selectors = "\n".join(f"      node{tag}{name_filter}(around:{radius_m},{latitude},{longitude});" for tag in tags)
+    selectors = "\n".join(f"      nwr{tag}{name_filter}(around:{radius_m},{latitude},{longitude});" for tag in tags)
     overpass_query = f"""
-    [out:json][timeout:8];
+    [out:json][timeout:15];
     (
 {selectors}
     );
-    out body 20;
+    out center 30;
     """
 
     owns_client = client is None
@@ -188,26 +192,42 @@ async def search_overpass(
             name = tags.get("name")
             if not name:
                 continue
+            center = element.get("center") or {}
+            kind = element.get("type") or "node"
             results.append({
                 "provider": "overpass",
-                "external_id": str(element.get("id")),
+                "external_id": str(element.get("id")) if kind == "node" else f"{kind}/{element.get('id')}",
                 "name": name,
                 "category": (tags.get("amenity") or tags.get("tourism") or tags.get("shop") or tags.get("leisure")
                              or tags.get("historic")),
-                "latitude": element.get("lat"),
-                "longitude": element.get("lon"),
+                "latitude": element.get("lat", center.get("lat")),
+                "longitude": element.get("lon", center.get("lon")),
                 "address": tags.get("addr:full") or None,
                 "raw_payload": element,
-                "source_url": f"https://www.openstreetmap.org/node/{element.get('id')}",
+                "source_url": f"https://www.openstreetmap.org/{kind}/{element.get('id')}",
                 "retrieved_at": retrieved_at,
             })
         return results
     except Exception as exc:  # noqa: BLE001
         logger.warning("Overpass search failed (query length %d): %s", len(query or ""), type(exc).__name__)
+        if raise_errors:
+            raise
         return []
     finally:
         if owns_client:
             await client.aclose()
+
+
+class ProviderResults(list):
+    """[Gate G11] 結果の一覧。応答しなかった提供元を unavailable に持つ(失敗を「見つからない」にしない)"""
+
+    def __init__(self, items: List[Dict[str, Any]], unavailable: List[str]):
+        super().__init__(items)
+        self.unavailable = unavailable
+
+
+# [Gate G11] カテゴリで探す Overpass は公開の server が遅いことがあるため、待つ時間を長くする
+OVERPASS_TIMEOUT = httpx.Timeout(20.0)
 
 
 async def search_all_providers(
@@ -223,13 +243,14 @@ async def search_all_providers(
     絶対にダミーデータを生成しない。"""
     import asyncio
 
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=OVERPASS_TIMEOUT if category != "all" else REQUEST_TIMEOUT) as client:
         results: List[Any]
         if category != "all":
             # [Gate G11] カテゴリで絞る時は、タグで絞れる OpenStreetMap(近くの場所)だけを使う
             names: tuple = ("overpass",)
             results = list(await asyncio.gather(
-                search_overpass(query, latitude, longitude, radius_km, client=client, category=category),
+                search_overpass(query, latitude, longitude, radius_km, client=client, category=category,
+                                raise_errors=True),
                 return_exceptions=True))
         else:
             names = ("wikipedia", "nominatim", "overpass")
@@ -239,9 +260,11 @@ async def search_all_providers(
             results = list(await asyncio.gather(wiki_task, nominatim_task, overpass_task, return_exceptions=True))
 
     combined: List[Dict[str, Any]] = []
+    unavailable: List[str] = []
     for provider_name, r in zip(names, results):
         if isinstance(r, BaseException):
             logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
+            unavailable.append(provider_name)
             continue
         combined.extend(r)
-    return combined
+    return ProviderResults(combined, unavailable)

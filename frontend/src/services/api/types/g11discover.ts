@@ -22,6 +22,8 @@ export interface NearbySearch {
   base: { latitude: number; longitude: number } | null;
   total: number;
   candidates: NearbyResult[];
+  /** 応答しなかった提供元(0件と区別する) */
+  unavailable_providers?: string[];
 }
 
 export interface MediaProviderStatus {

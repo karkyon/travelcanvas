@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
 
 export interface AreaPin {
   name: string;

@@ -29,6 +29,10 @@ GEOCODE_INTERVAL_S = 1.0
 GEOCODE_CACHE_TTL_S = 24 * 3600
 # 高速道路で出せる速さの上限の目安(km/h)。直線距離をこれで割った時間は、実際の運転時間の下限になる
 LOWER_BOUND_SPEED_KMH = 100.0
+# [Gate GeocodeJP] 旅行相談の出発地・方面は日本の地名として照会する(以前は国を絞らず、「伊勢」「滋賀」が国外の同じ名前の
+# 場所に当たり、枚方から 1900〜2700km と出て「片道3時間を超える」と誤って示していた)。日本の範囲の外の結果は使わない
+GEOCODE_COUNTRIES = "jp"
+JAPAN_BBOX = (20.0, 46.0, 122.0, 154.0)  # 大まかな外枠(南・北の緯度, 西・東の経度)。主な絞り込みは countrycodes
 MAX_AREAS = 10
 
 SOURCES = ("user_input", "text", "unspecified")
@@ -210,7 +214,15 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
 
     party_field = fields.get("party_size")
     party_text, pm = _party(t)
-    if party_field:
+    if party_field and party_text and int(party_field) != party_text:
+        # [Gate G11] 入力欄と文章が違う時は、どちらかを黙って選ばない(利用者に選んでもらう)
+        items.append(_item("party_size", "人数", None, f"入力欄は{int(party_field)}人、文章は{party_text}人", "text",
+                           "required", _snippet(t, pm), {
+                               "id": "party_size", "text": f"人数は何人ですか(入力欄は{int(party_field)}人、文章は{party_text}人)",
+                               "options": [{"value": str(party_text), "label": f"{party_text}人(文章)"},
+                                           {"value": str(int(party_field)), "label": f"{int(party_field)}人(入力欄)"}],
+                               "suggested": None, "hint": "宿を「何人で1部屋か」で探す時の条件になります"}))
+    elif party_field:
         items.append(_item("party_size", "人数", int(party_field), f"大人{int(party_field)}人", "user_input", "required"))
     elif party_text:
         items.append(_item("party_size", "人数", party_text, f"{party_text}人", "text", "required", _snippet(t, pm)))
@@ -294,8 +306,11 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
                            "user_input", "required"))
     elif window_field or window:
         disp = window_field or window or ""
-        items.append(_item("dates", "日程", {"status": "window" if status != "fixed" else "fixed", "text": disp},
-                           f"{disp} · 日付は未確定", "user_input" if window_field else "text", "undecided",
+        # [Gate G11] 画面で「日付が決まっている」を選んだ時は、その扱いを残す(以前は「おおよその時期」にしていた)
+        fixed = (fields.get("date_status") == "fixed") if window_field else status == "fixed"
+        items.append(_item("dates", "日程", {"status": "fixed" if fixed else "window", "text": disp},
+                           f"{disp} · 決まっている日付" if fixed else f"{disp} · 日付は未確定",
+                           "user_input" if window_field else "text", "required" if fixed else "undecided",
                            None if window_field else _snippet(t, dm),
                            note="宿の空室・料金と営業日は、日付が決まってから照会します"))
     else:
@@ -373,7 +388,8 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, transport=transport, follow_redirects=False,
                                          headers={"User-Agent": USER_AGENT}) as client:
                 resp = await client.get(GEOCODE_URL, params={"q": q, "format": "json", "limit": "1",
-                                                             "accept-language": "ja"})
+                                                             "accept-language": "ja",
+                                                             "countrycodes": GEOCODE_COUNTRIES})
             if resp.status_code != 200:
                 return GeocodeResult(status="unavailable", provider="nominatim")
             data = resp.json()
@@ -387,6 +403,11 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
             lat, lng = float(item["lat"]), float(item["lon"])
         except (KeyError, TypeError, ValueError):
             return GeocodeResult(status="unavailable", provider="nominatim")
+        south, north, west, east = JAPAN_BBOX
+        if not (south <= lat <= north and west <= lng <= east):
+            result = GeocodeResult(status="not_found", provider="nominatim", retrieved_at=now())
+            _cache[q] = (time.monotonic(), result)
+            return result
         result = GeocodeResult(
             status="ok", latitude=lat, longitude=lng,
             label=str(item.get("display_name") or q).split(",")[0][:80], provider="nominatim",
