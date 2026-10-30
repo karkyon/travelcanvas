@@ -222,7 +222,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             {/* 操作(名前は読み上げにも出す)。[Gate MockScreens] 押しても何も起きない「共有」は、共有の先がある時だけ出す */}
             <div className="tc-event-tools" onClick={(e) => e.stopPropagation()}>
               <button type="button" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                className={iconBtn} title="編集" aria-label={`「${title}」をこの場で編集`}>
+                className={iconBtn} title="編集" aria-label="編集">
                 <Edit3 size={14} aria-hidden="true" />
               </button>
               {onPhoto && (
@@ -239,12 +239,12 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               )}
               {onShare && (
                 <button type="button" onClick={(e) => { e.stopPropagation(); onShare(id); }}
-                  className={iconBtn} title="共有" aria-label={`「${title}」を共有`}>
+                  className={iconBtn} title="共有" aria-label="共有">
                   <Share2 size={14} aria-hidden="true" />
                 </button>
               )}
               <button type="button" onClick={(e) => { e.stopPropagation(); onDelete?.(id); }}
-                className={`${iconBtn} is-danger`} title="削除" aria-label={`「${title}」を削除`}>
+                className={`${iconBtn} is-danger`} title="削除" aria-label="削除">
                 <Trash2 size={14} aria-hidden="true" />
               </button>
             </div>

@@ -484,7 +484,7 @@
 :root[data-style='atlas']:not([data-theme='dark']) .tc-card { background: #fffefa; border-color: #e6e3d9; }
 :root[data-style='atlas']:not([data-theme='dark']) .tc-topbar { background: rgba(255, 255, 255, .94); border-bottom-color: #e6e3d9; }
 :root[data-style='atlas']:not([data-theme='dark']) .tc-rail { background: #fff; border-right-color: #e6e3d9; }
-:root[data-style='atlas']:not([data-theme='dark']) .tc-rail a { color: #778096; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-rail a { color: #5f6878; }
 :root[data-style='atlas']:not([data-theme='dark']) .tc-rail a:hover,
 :root[data-style='atlas']:not([data-theme='dark']) .tc-rail a[aria-current='page'] { background: #eaf0e8; color: #315b50; }
 :root[data-style='atlas']:not([data-theme='dark']) .tc-eyebrow { color: #477163; }
