@@ -56,6 +56,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     const openai = page.getByTestId('ops-provider-openai');
     await expect(openai).toContainText('契約・課金は未確認');
     await expect(openai).toContainText('無効(送らない)');
+    await expect(openai).toContainText('未実装(送らない)'); // 鍵があっても接続(adapter)が無ければ送らない
     await expect(page.getByTestId('ops-provider-fake')).toContainText('試験用(外へ送らない)');
     expect(await page.content()).not.toMatch(/sk-[A-Za-z0-9]{8,}/);
     await expectNoAxeViolations(page, '運用コンソール(提供元)');
@@ -91,6 +92,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await slot.getByRole('button', { name: '暗号化して保存' }).click();
     await expect(page.getByRole('status').filter({ hasText: '末尾 WXYZ' })).toBeVisible({ timeout: 15_000 });
     await expect(slot).toContainText('この画面で登録');
+    await expect(page.getByTestId('ops-secret-storage')).toContainText('GCP Secret Manager には登録しません');
     expect(await page.content()).not.toContain(secretValue);
     await expectNoAxeViolations(page, '運用コンソール(鍵の登録)');
     await slot.getByRole('button', { name: '登録を無効にする' }).click();

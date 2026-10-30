@@ -61,7 +61,7 @@
 | [gate-m3-fr015-trace.md](gate-m3-fr015-trace.md) | Gate M3 FR-015 トレーサビリティ表 | 1 | 5 | 1 |
 | [gate-o1-trace.md](gate-o1-trace.md) | Gate O1 B-010 トレーサビリティ表 | 2 | 0 | 1 |
 | [gate-o2-trace.md](gate-o2-trace.md) | Gate O2 B-009 トレーサビリティ表 | 1 | 1 | 0 |
-| [gate-opscms-trace.md](gate-opscms-trace.md) | Gate OpsCMS トレース(運用コンソール: 外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験) | 4 | 0 | 0 |
+| [gate-opscms-trace.md](gate-opscms-trace.md) | Gate OpsCMS トレース(運用コンソール: 外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験) | 5 | 0 | 0 |
 | [gate-p1-trace.md](gate-p1-trace.md) | Gate P1 FR-025・FR-026 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-p10-trace.md](gate-p10-trace.md) | Gate P10 FR-030/FR-031 トレーサビリティ表 | 3 | 0 | 0 |
 | [gate-p11-trace.md](gate-p11-trace.md) | Gate P11 FR-033 トレーサビリティ表 | 2 | 0 | 0 |

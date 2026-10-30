@@ -28,6 +28,7 @@ export interface OpsProvider {
   price_profile: 'known' | 'partial' | 'unavailable'; policy_version: string | null;
   live_calls: 'test_only' | 'ready' | 'disabled'; month_usage: OpsUsageTotal | null; notes: string;
   secret_slot?: string | null; secret_source?: 'cms' | 'env' | null; secret_version?: number | null; secret_last4?: string | null;
+  secret_storage?: string | null; adapter?: 'fake' | 'implemented' | 'not_implemented';
 }
 export interface OpsProviders { as_of: string; providers: OpsProvider[]; rule: string }
 export interface OpsLedgerRow {
@@ -75,6 +76,7 @@ const provider: Decoder<OpsProvider> = object<OpsProvider>({
   live_calls: oneOf('test_only', 'ready', 'disabled'), month_usage: nullable(total), notes: str,
   secret_slot: optional(nullable(str)), secret_source: optional(nullable(oneOf('cms', 'env'))),
   secret_version: optional(nullable(int)), secret_last4: optional(nullable(str)),
+  secret_storage: optional(nullable(str)), adapter: optional(oneOf('fake', 'implemented', 'not_implemented')),
 });
 
 const ledgerRow: Decoder<OpsLedgerRow> = object<OpsLedgerRow>({
@@ -144,9 +146,12 @@ export interface OpsSecretHistory {
 export interface OpsSecretSlot {
   slot: string; label: string; providers: string[]; env: string; hint: string;
   status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
-  registered_at: string | null; history: OpsSecretHistory[];
+  registered_at: string | null; history: OpsSecretHistory[]; in_use?: boolean; in_use_note?: string;
 }
-export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string }
+export interface OpsSecretStorage {
+  location: string; not_secret_manager: string; backup: string; rotation: string; fallback: string;
+}
+export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string; storage?: OpsSecretStorage }
 export interface OpsSecretResult {
   slot: string; status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null;
   last4: string | null; registered_at: string | null;
@@ -159,7 +164,7 @@ const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
 const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
   slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing'),
   source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
-  history: arrayOf(secretHistory),
+  history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
   slot: str, status: oneOf('configured', 'missing'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
@@ -168,8 +173,9 @@ const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
 
 export async function getOpsSecrets(): Promise<OpsSecrets> {
   const r = await api.get('/admin/ops/secrets', SILENT);
-  return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str }),
-    'GET /admin/ops/secrets');
+  return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str,
+    storage: optional(object<OpsSecretStorage>({ location: str, not_secret_manager: str, backup: str, rotation: str,
+      fallback: str })) }), 'GET /admin/ops/secrets');
 }
 
 /** 鍵を登録する(新しい版)。応答に鍵の値は含まれない。 */
