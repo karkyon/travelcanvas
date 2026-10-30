@@ -50,9 +50,12 @@ def test_providers_never_return_secret_values(auth_client, db_session, audits, m
     rows = {p["name"]: p for p in r.json()["providers"]}
     assert set(rows) == {"openai", "google_maps_js", "google_places", "google_routes", "fake"}
     assert rows["openai"]["secret"] == "configured" and rows["openai"]["contract"] == "unverified"
+    assert rows["openai"]["secret_source"] == "env" and rows["openai"]["secret_last4"] == "3456"
     assert rows["openai"]["live_calls"] == "disabled"  # 登録されていない(契約・Gate が先)
-    assert rows["google_places"]["secret"] == "not_defined"
+    assert rows["google_places"]["secret"] in ("missing", "configured")
+    assert rows["google_places"]["secret_slot"] == "google_maps_server_key"
     assert rows["fake"]["kind"] == "fake" and rows["fake"]["live_calls"] == "test_only"
+    assert rows["fake"]["secret"] == "not_needed"
     assert rows["fake"]["price_profile"] == "known"
     monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
     rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
@@ -127,3 +130,61 @@ def test_family_fake_run_refused_in_production(auth_client, db_session, audits, 
     monkeypatch.setattr(settings, "APP_ENV", "production")
     r = client.post("/api/v1/admin/ops/test-runs/family-fake", json={"reason": "x"})
     assert r.status_code == 403 and r.json()["detail"]["code"] == "fake_test_disabled"
+
+
+# ===================================================================== 鍵の登録(Gate OpsSecrets)
+
+def test_register_secret_encrypts_never_returns_value_and_audits(auth_client, db_session, audits, monkeypatch):
+    from app.models.models import ProviderSecret
+    from app.services import provider_secrets as ps
+
+    client, user = auth_client
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-env-fallback-value-0000")
+    value = "sk-cms-registered-secret-ABCD1234"
+    # 管理者でなければ 403
+    url = "/api/v1/admin/ops/secrets/openai_api_key"
+    assert client.post(url, json={"value": value, "reason": "x"}).status_code == 403
+    _admin(db_session, user)
+    assert client.post("/api/v1/admin/ops/secrets/openai_api_key", json={"value": value}).status_code == 422  # 理由
+    r = client.post("/api/v1/admin/ops/secrets/openai_api_key", json={"value": "short", "reason": "登録"})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "invalid_secret_value"
+    assert client.post("/api/v1/admin/ops/secrets/rocket", json={"value": value, "reason": "x"}).status_code == 404
+    r = client.post("/api/v1/admin/ops/secrets/openai_api_key", json={"value": value, "reason": "初回の登録"})
+    assert r.status_code == 201, r.text
+    assert value not in r.text and "cms-registered" not in r.text
+    body = r.json()
+    assert body["source"] == "cms" and body["version"] == 1 and body["last4"] == "1234"
+    row = db_session.query(ProviderSecret).filter_by(slot="openai_api_key", status="active").one()
+    assert value.encode() not in bytes(row.secret_ciphertext)  # 平文で持たない
+    assert ps.resolve(db_session, "openai_api_key") == value  # サーバーの中だけで読める
+    # 一覧・提供元の画面にも値を出さない
+    listing = client.get("/api/v1/admin/ops/secrets")
+    assert listing.status_code == 200 and value not in listing.text
+    rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
+    assert rows["openai"]["secret_source"] == "cms" and rows["openai"]["secret_version"] == 1
+    # 監査には版と理由だけ
+    reg = [a for a in audits if a["action"] == "ops_secret_registered"]
+    assert reg and value not in str(reg) and reg[0]["details"]["version"] == 1
+    # 新しい版: 前の版は superseded、有効は1つ
+    r = client.post(url, json={"value": "sk-second-version-WXYZ9876", "reason": "入れ替え"})
+    assert r.json()["version"] == 2 and r.json()["last4"] == "9876"
+    statuses = {x.version: x.status for x in db_session.query(ProviderSecret).filter_by(slot="openai_api_key")}
+    assert statuses == {1: "superseded", 2: "active"}
+    # 無効にすると .env の値へ戻る
+    assert client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={}).status_code == 422
+    r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "漏えいの疑い"})
+    assert r.status_code == 200 and r.json()["source"] == "env"
+    assert ps.resolve(db_session, "openai_api_key") == "sk-env-fallback-value-0000"
+    r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "二度目"})
+    assert r.status_code == 409
+    assert any(a["action"] == "ops_secret_disabled" for a in audits)
+
+
+def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypatch):
+    client, user = auth_client
+    _admin(db_session, user)
+    monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+    slots = {s["slot"]: s for s in client.get("/api/v1/admin/ops/secrets").json()["slots"]}
+    assert set(slots) == {"openai_api_key", "google_maps_browser_key", "google_maps_server_key"}
+    assert slots["google_maps_server_key"]["status"] == "missing"
+    assert slots["google_maps_server_key"]["providers"] == ["google_places", "google_routes"]

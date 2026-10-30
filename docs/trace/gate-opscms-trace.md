@@ -18,3 +18,13 @@ migration なし(既存の FR-059 の表 usage_budget_accounts・provider_usage_
 | 9 | 実の提供元(OpenAI・Maps JavaScript・Places (New)・Routes)の adapter・live の1回の確認・請求の照合の画面 | NOT STARTED | 契約・鍵・Secret Manager は利用者の操作が先(Runbook §2) |
 | 10 | GCP の Cloud Billing・Service Usage・Secret Manager をアプリから読む | NOT STARTED | 実行のアカウントの権限を足す判断が要る(最小の権限) |
 | 11 | 価格の版の変更の画面(差分・理由・試算) | NOT STARTED | 版は今 migration で入れる。画面からの変更は別の Gate |
+
+## Gate OpsSecrets(鍵の登録。利用者の承認 2026-10-30: 表 provider_secrets を足す)
+
+| # | 要件 | 状態 | 証拠 |
+|---|---|---|---|
+| 12 | 運用コンソールから API キーを登録する(管理者 + 多要素認証・理由が必須・監査)。ENCRYPTION_KEY で暗号化して保存し、平文を返す API は無い | IMPLEMENTED | `backend/app/services/provider_secrets.py`・`POST /admin/ops/secrets/{slot}`、migration `e8b4c2a7f1d3`・索引 `f2a6d8c4b9e1`、BE `test_gate_opscms.py` |
+| 13 | 画面・応答・監査には末尾4文字・版・出典(cms/env)だけ。入力は password の欄で、保存の後は空にする | IMPLEMENTED | FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts`(ページの HTML に値が無い) |
+| 14 | 新しい版で前の版は入れ替え済み(有効は slot ごとに1つ)・無効にすると .env の値へ戻る | IMPLEMENTED | BE |
+| 15 | 鍵の列は `*_ciphertext`(鍵の点検・掛け直し `tcops.py keys` の対象) | IMPLEMENTED | `provider_secrets.secret_ciphertext` |
+| 16 | 登録した鍵で外部の API へ送る(提供元の adapter) | NOT STARTED | 提供元の Gate(契約・価格の確認の後) |

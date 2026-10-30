@@ -33,6 +33,7 @@ from app.models.models import (
     ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
 )
 from app.services import cost_guard as cg
+from app.services import provider_secrets as ps
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/admin/ops", tags=["admin-ops"])
@@ -50,13 +51,13 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
      "notes": "ChatGPT の契約と API の課金は別。API の組織・プロジェクト・支出の上限は OpenAI Platform で確認する"},
     {"name": "google_maps_js", "label": "Google Maps JavaScript API", "purpose": "ブラウザの地図の表示",
      "operations": ["map.load"], "secret_setting": None,
-     "notes": "ブラウザ用の鍵は HTTP referrer と許可 API で制限する(この版のコードに鍵の設定の項目は無い)"},
+     "notes": "ブラウザ用の鍵は HTTP referrer と許可 API で制限する(鍵は「秘密情報・権限」で登録)"},
     {"name": "google_places", "label": "Places API (New)", "purpose": "候補の検索・詳細・写真",
      "operations": ["places.search", "places.details", "places.photo"], "secret_setting": None,
-     "notes": "Field Mask と SKU を固定してから有効にする(この版のコードにサーバー用の鍵の設定の項目は無い)"},
+     "notes": "Field Mask と SKU を固定してから有効にする(サーバー用の鍵は「秘密情報・権限」で登録)"},
     {"name": "google_routes", "label": "Routes API", "purpose": "車の経路・所要時間",
      "operations": ["routes.element"], "secret_setting": None,
-     "notes": "経路の要素の数を旅行の上限に入れて予約する(この版のコードに鍵の設定の項目は無い)"},
+     "notes": "経路の要素の数を旅行の上限に入れて予約する(サーバー用の鍵は Places と共通)"},
     {"name": FAKE_PROVIDER, "label": "Fake Provider", "purpose": "上限・quota・失敗の試験(課金なし)",
      "operations": list(cg.OPERATIONS), "secret_setting": None,
      "notes": "外へは何も送らない。使用の額は試験の値で、実の請求とは混ぜない"},
@@ -188,11 +189,13 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
     rows = []
     for p in PROVIDER_CATALOG:
         name = p["name"]
-        setting = p["secret_setting"]
-        if setting is None:
-            secret = "not_defined" if name != FAKE_PROVIDER else "not_needed"
+        slot = ps.slot_for_provider(name)
+        if slot is None:
+            secret, secret_info, setting = "not_needed", None, None
         else:
-            secret = "configured" if getattr(settings, setting, None) else "missing"
+            secret_info = ps.state(db, slot)
+            secret = secret_info["status"]
+            setting = ps.SLOTS[slot]["env"]
         ops_known = [price["known"].get(op, False) for op in p["operations"]]
         price_state = "unavailable" if not price["known"] else ("known" if all(ops_known) else "partial")
         is_fake = name == FAKE_PROVIDER
@@ -204,7 +207,10 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
             "registered": is_fake or name in registered,
             "suspended": name in suspended, "suspended_reason": suspended.get(name),
             "contract": "not_billable" if is_fake else "unverified",
-            "secret": secret, "secret_setting": setting,
+            "secret": secret, "secret_setting": setting, "secret_slot": slot,
+            "secret_source": secret_info["source"] if secret_info else None,
+            "secret_version": secret_info["version"] if secret_info else None,
+            "secret_last4": secret_info["last4"] if secret_info else None,
             "price_profile": price_state, "policy_version": price["policy_version"],
             "live_calls": "test_only" if is_fake else ("ready" if live_ready else "disabled"),
             "month_usage": totals.get(name),
@@ -309,7 +315,8 @@ def ops_cloud(admin: User = Depends(require_admin)):
     unavailable = [
         {"key": "billing", "label": "Cloud Billing の請求額・予算", "reason": "アプリから Cloud Billing API を読んでいません"},
         {"key": "services", "label": "有効な Google の API", "reason": "アプリから Service Usage API を読んでいません"},
-        {"key": "secrets", "label": "Secret Manager の版", "reason": "アプリから Secret Manager の一覧を読んでいません"},
+        {"key": "secrets", "label": "Secret Manager の版",
+         "reason": "アプリから Secret Manager の一覧を読んでいません(この画面で登録した鍵は「秘密情報・権限」)"},
     ]
     return {"as_of": _iso(_now()), "items": items, "unavailable": unavailable,
             "note": "GCP の予算は通知で、課金を自動で止める上限ではありません"}
@@ -403,3 +410,44 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
         "settled_steps": summary["settled_steps"], "denied_steps": summary["denied_steps"]})
     return {"as_of": _iso(_now()), "case": FAMILY_CASE, "summary": summary, "steps": steps,
             "note": "Fake の提供元の試験です。外部の API へは送っていません。額は価格の版での見込みで、実の請求ではありません"}
+
+
+# ===================================================================== 鍵の登録(Gate OpsSecrets)
+
+@router.get("/secrets")
+def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """鍵の状態(値は返さない)。出典は cms(この画面で登録)か env(.env)。"""
+    slots = []
+    for slot, spec in ps.SLOTS.items():
+        slots.append({"slot": slot, "label": spec["label"], "providers": spec["providers"], "env": spec["env"],
+                      "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot)})
+    return {"as_of": _iso(_now()), "slots": slots,
+            "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。使う順: この画面で登録した有効な版 → .env の値"}
+
+
+@router.post("/secrets/{slot}", status_code=201)
+def ops_register_secret(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                        admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    try:
+        row = ps.register(db, slot, payload.get("value") if isinstance(payload, dict) else None, reason, admin.id)
+    except ps.SecretError as error:
+        status_code = 503 if error.code == "secret_encryption_unavailable" else 422
+        raise _bad(error.code, error.message, status_code)
+    _audit(request, admin, "ops_secret_registered", {"slot": slot, "version": row.version, "reason": reason[:200]})
+    return {"slot": slot, **ps.state(db, slot)}
+
+
+@router.post("/secrets/{slot}/disable")
+def ops_disable_secret(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                       admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    row = ps.disable(db, slot, admin.id)
+    if row is None:
+        raise _bad("secret_not_registered", "この画面で登録した有効な鍵はありません", 409)
+    _audit(request, admin, "ops_secret_disabled", {"slot": slot, "version": row.version, "reason": reason[:200]})
+    return {"slot": slot, **ps.state(db, slot)}

@@ -13,6 +13,13 @@
 | Cloud Billing の請求額・予算・有効な API・Secret Manager の版 | アプリから読んでいない(画面は「未取得」)。Cloud Console で確認する |
 | Cloud Run・DB・Redis(GCP) | このリポジトリの workflow は backend の image の push まで。接続の値が無いまま deploy して「稼働」と扱わない |
 
+## 1.5 鍵の登録(運用コンソール)
+
+`/admin/ops` → 秘密情報・権限 → 「鍵を登録する」。鍵は貼り付けて「暗号化して保存」。サーバーの ENCRYPTION_KEY で暗号化して
+`provider_secrets` に入れ、画面・応答・ログ・監査には末尾4文字と版だけを出す。使う順は「この画面で登録した有効な版 → .env の値」。
+入れ替えは新しい版を登録(前の版は自動で入れ替え済み)。漏えいの疑いの時は「登録を無効にする」(.env の値があればそれへ戻る)。
+ENCRYPTION_KEY を入れ替える時は `tcops.py keys rekey` が鍵の暗号文も掛け直す。GCP の Cloud Run では Secret Manager を使ってもよい(.env と同じ扱い)。
+
 ## 2. 接続の順番(提供元ごと。各段で課金の状態を確かめる)
 
 1. **契約・請求先**: OpenAI は ChatGPT の契約と API の課金が別。OpenAI Platform の組織・プロジェクト・支出の上限を決める。

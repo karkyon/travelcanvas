@@ -10,8 +10,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
 import {
-  getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, runOpsFamilyFake, setOpsProviderSuspended,
-  type OpsCloud, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
+  disableOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
+  runOpsFamilyFake, setOpsProviderSuspended,
+  type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
 } from '@/services/api/opsConsole';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
@@ -356,30 +357,124 @@ const RunsTab: React.FC = () => {
 };
 
 // ===================================================================== 秘密情報・権限
+/** [Gate OpsSecrets] 鍵の登録: 値は送るだけ(画面に二度と出さない)。登録・無効化は理由が必須で監査に残る。 */
+const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void }> = ({ slot, onDone }) => {
+  const [value, setValue] = useState('');
+  const [reason, setReason] = useState('');
+  const [mode, setMode] = useState<'register' | 'disable' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = `secret-${slot.slot}`;
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === 'register') {
+        const st = await registerOpsSecret(slot.slot, value, reason.trim());
+        onDone(`${slot.label} を登録しました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})`);
+      } else {
+        await disableOpsSecret(slot.slot, reason.trim());
+        onDone(`${slot.label} の登録を無効にしました`);
+      }
+      setValue('');
+      setReason('');
+      setMode(null);
+    } catch (e) {
+      setValue('');
+      setError(errorDetailMessage(e, '保存できませんでした'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (mode === null) {
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setMode('register')}>
+          {slot.source === 'cms' ? '新しい鍵に入れ替える' : '鍵を登録する'}
+        </button>
+        {slot.source === 'cms' && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('disable')}>登録を無効にする</button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <form className="tc-ops-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}
+      aria-label={`${slot.label} を${mode === 'register' ? '登録' : '無効に'}する`} autoComplete="off">
+      {mode === 'register' && (
+        <>
+          <label htmlFor={`${id}-value`}>{`${slot.label}(貼り付け。保存の後は表示しません)`}</label>
+          <input id={`${id}-value`} type="password" value={value} autoComplete="new-password" spellCheck={false}
+            maxLength={512} onChange={(e) => setValue(e.target.value)} data-testid={`${id}-value`} />
+        </>
+      )}
+      <label htmlFor={`${id}-reason`}>理由(監査に残ります)</label>
+      <input id={`${id}-reason`} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+      {error && <p role="alert" className="text-danger text-sm">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary"
+          disabled={busy || !reason.trim() || (mode === 'register' && value.trim().length < 8)}>
+          {mode === 'register' ? '暗号化して保存' : '無効にする'}
+        </button>
+        <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => { setValue(''); setReason(''); setMode(null); setError(null); }}>やめる</button>
+      </div>
+    </form>
+  );
+};
+
+const SOURCE_LABEL: Record<string, string> = { cms: 'この画面で登録', env: 'サーバーの .env' };
+
 const SecretsTab: React.FC = () => {
-  const { data, error, loading, reload } = useLoad<OpsProviders>(getOpsProviders);
+  const { data, error, loading, reload } = useLoad<OpsSecrets>(getOpsSecrets);
+  const [msg, setMsg] = useState<string | null>(null);
   if (loading) return <Loading />;
   if (error || !data) return <Failed message={error ?? '読み込めませんでした'} onRetry={() => void reload()} />;
   return (
     <div className="tc-ops-two">
       <article className="tc-card tc-ops-panel">
-        <h2 className="tc-section-title">鍵の設定の状態</h2>
-        <p className="tc-ops-desc">鍵の値は画面・応答・ログに出しません。設定があるかどうかだけを表示します。</p>
-        <ul className="tc-ops-rows">
-          {data.providers.filter((p) => p.kind === 'paid').map((p) => (
-            <li key={p.name}><span>{p.label}<small>{p.secret_setting ?? '設定の項目なし'}</small></span>
-              <span className={`tc-pill ${SECRET_LABEL[p.secret]?.tone ?? ''}`}>{SECRET_LABEL[p.secret]?.text}</span></li>
+        <h2 className="tc-section-title">API キーの登録</h2>
+        <p className="tc-ops-desc">{data.note}</p>
+        {msg && <p role="status" className="tc-ops-callout">{msg}</p>}
+        <ul className="tc-ops-secrets">
+          {data.slots.map((s) => (
+            <li key={s.slot} data-testid={`ops-secret-${s.slot}`}>
+              <div className="tc-section-row">
+                <span><b>{s.label}</b><small>{s.hint}</small><small>{`使う提供元: ${s.providers.join('・')} · .env の名前: ${s.env}`}</small></span>
+                <span className={`tc-pill ${s.status === 'configured' ? 'tc-pill--good' : 'tc-pill--warn'}`}>
+                  {s.status === 'configured' ? '設定あり' : '未設定'}
+                </span>
+              </div>
+              {s.status === 'configured' && (
+                <p className="tc-ops-desc">
+                  {`出典: ${SOURCE_LABEL[s.source ?? ''] ?? '—'}${s.version ? ` · 版 ${s.version}` : ''}${s.last4 ? ` · 末尾 ${s.last4}` : ''}`}
+                  {s.registered_at ? ` · ${new Date(s.registered_at).toLocaleString('ja-JP')}` : ''}
+                </p>
+              )}
+              <SecretForm slot={s} onDone={(m) => { setMsg(m); void reload(); }} />
+              {s.history.length > 0 && (
+                <details className="mt-2 text-xs text-ink-700">
+                  <summary>登録の履歴</summary>
+                  <ul>
+                    {s.history.map((h) => (
+                      <li key={h.version}>{`版 ${h.version} · ${h.status === 'active' ? '有効' : h.status === 'superseded' ? '入れ替え済み' : '無効'} · 末尾 ${h.last4} · ${h.reason}`}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </li>
           ))}
         </ul>
+        <p className="tc-ops-asof">鍵を登録しても、外部の API へ送るのは提供元の接続(adapter)を入れて登録した後です。今は全て「送信: 無効」のままです。</p>
       </article>
       <article className="tc-card tc-ops-panel">
         <h2 className="tc-section-title">権限と記録</h2>
         <ul className="tc-ops-rows">
           <li><span>この画面</span><b>管理者 + 多要素認証</b></li>
+          <li><span>鍵の登録・無効化</span><b>理由が必須 · 監査に記録(値は記録しない)</b></li>
+          <li><span>保存の方法</span><b>サーバーの ENCRYPTION_KEY で暗号化</b></li>
+          <li><span>使う順</span><b>この画面で登録した有効な版 → .env</b></li>
+          <li><span>鍵の入れ替え</span><b>新しい版を登録 → 前の版は自動で入れ替え済み</b></li>
           <li><span>提供元を止める・戻す・試験</span><b>理由が必須 · 監査に記録</b></li>
-          <li><span>利用者のクラスの例外</span><b>別の管理者の承認(二者)</b></li>
-          <li><span>鍵の保管</span><b>Secret Manager(実行のアカウントだけが読む)</b></li>
-          <li><span>鍵の入れ替え</span><b>新しい版 → 接続の確認 → 切り替え → 古い版を無効</b></li>
         </ul>
         <Link to="/admin/audit-logs" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-3 inline-flex">監査ログを見る</Link>
       </article>

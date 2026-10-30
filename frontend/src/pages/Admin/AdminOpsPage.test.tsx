@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 
 const api = vi.hoisted(() => ({
   getOpsOverview: vi.fn(), getOpsProviders: vi.fn(), getOpsLedger: vi.fn(), getOpsCloud: vi.fn(),
-  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(),
+  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(),
+  disableOpsSecret: vi.fn(),
 }));
 vi.mock('@/services/api/opsConsole', () => api);
 
@@ -98,5 +99,32 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読む' }));
     expect(await screen.findByText('今月の Fake の試験の額')).toBeInTheDocument();
+  });
+
+  it('秘密情報: 鍵は password の欄で送り、保存の後は欄を空にして値を出さない。理由が無ければ送れない', async () => {
+    const slots = {
+      as_of: 'x', note: '鍵の値は出しません',
+      slots: [{ slot: 'openai_api_key', label: 'OpenAI の API キー', providers: ['openai'], env: 'OPENAI_API_KEY', hint: 'sk-',
+        status: 'missing', source: null, version: null, last4: null, registered_at: null, history: [] }],
+    };
+    api.getOpsSecrets.mockResolvedValue(slots);
+    api.registerOpsSecret.mockResolvedValue({ slot: 'openai_api_key', status: 'configured', source: 'cms', version: 1,
+      last4: '1234', registered_at: null });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    const row = await screen.findByTestId('ops-secret-openai_api_key');
+    expect(within(row).getByText('未設定')).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole('button', { name: '鍵を登録する' }));
+    const input = within(row).getByTestId('secret-openai_api_key-value') as HTMLInputElement;
+    expect(input.type).toBe('password');
+    fireEvent.change(input, { target: { value: 'sk-test-value-ABCD1234' } });
+    const save = within(row).getByRole('button', { name: '暗号化して保存' });
+    expect(save).toBeDisabled();
+    fireEvent.change(within(row).getByLabelText('理由(監査に残ります)'), { target: { value: '初回の登録' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(api.registerOpsSecret).toHaveBeenCalledWith('openai_api_key', 'sk-test-value-ABCD1234', '初回の登録'));
+    expect(await screen.findByText(/版 1 · 末尾 1234/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('sk-test-value-ABCD1234');
+    expect(screen.queryByTestId('secret-openai_api_key-value')).toBeNull();
   });
 });

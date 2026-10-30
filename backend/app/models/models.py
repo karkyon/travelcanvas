@@ -3747,3 +3747,32 @@ class ProviderUsageEvent(Base):
     __table_args__ = (
         Index("ix_provider_usage_events_provider_time", "provider", "occurred_at"),
     )
+
+
+class ProviderSecret(Base):
+    """[Gate OpsSecrets] 運用コンソールで登録した外部 API の鍵(ENCRYPTION_KEY で暗号化)。平文は持たない・返さない。
+
+    slot ごとに有効(active)な版は1つ。新しい版を登録すると前の版は superseded、無効にすると disabled。
+    画面・応答・監査には末尾4文字と版だけを出す。
+    """
+    __tablename__ = "provider_secrets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slot: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="active", server_default="active")
+    secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    last4: Mapped[str] = mapped_column(String(4), nullable=False)
+    reason: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    disabled_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    disabled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("slot", "version", name="uq_provider_secrets_slot_version"),
+        CheckConstraint("status IN ('active', 'superseded', 'disabled')", name="ck_provider_secrets_status"),
+        Index("uq_provider_secrets_one_active", "slot", unique=True, postgresql_where=text("status = 'active'")),
+    )

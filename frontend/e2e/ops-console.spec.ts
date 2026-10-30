@@ -81,6 +81,23 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await expect(page.getByText('Fake の試験').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('[運用の試験]')).toHaveCount(0);
 
+    // 5. 鍵の登録(Gate OpsSecrets): password の欄で送り、保存の後は値を出さない(末尾4文字と版だけ)
+    await page.getByRole('tab', { name: '秘密情報・権限' }).click();
+    const slot = page.getByTestId('ops-secret-google_maps_server_key');
+    await slot.getByRole('button', { name: /鍵を登録する|新しい鍵に入れ替える/ }).click();
+    const secretValue = `e2e-not-a-real-key-${Date.now()}-WXYZ`;
+    await slot.getByTestId('secret-google_maps_server_key-value').fill(secretValue);
+    await slot.getByLabel('理由(監査に残ります)').fill('E2E の登録の確認');
+    await slot.getByRole('button', { name: '暗号化して保存' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '末尾 WXYZ' })).toBeVisible({ timeout: 15_000 });
+    await expect(slot).toContainText('この画面で登録');
+    expect(await page.content()).not.toContain(secretValue);
+    await expectNoAxeViolations(page, '運用コンソール(鍵の登録)');
+    await slot.getByRole('button', { name: '登録を無効にする' }).click();
+    await slot.getByLabel('理由(監査に残ります)').fill('E2E の後始末');
+    await slot.getByRole('button', { name: '無効にする' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '無効にしました' })).toBeVisible({ timeout: 15_000 });
+
     // スマホの幅
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('tab', { name: '概要' }).click();

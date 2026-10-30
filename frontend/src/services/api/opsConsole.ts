@@ -27,6 +27,7 @@ export interface OpsProvider {
   contract: 'not_billable' | 'unverified'; secret: OpsSecretState; secret_setting: string | null;
   price_profile: 'known' | 'partial' | 'unavailable'; policy_version: string | null;
   live_calls: 'test_only' | 'ready' | 'disabled'; month_usage: OpsUsageTotal | null; notes: string;
+  secret_slot?: string | null; secret_source?: 'cms' | 'env' | null; secret_version?: number | null; secret_last4?: string | null;
 }
 export interface OpsProviders { as_of: string; providers: OpsProvider[]; rule: string }
 export interface OpsLedgerRow {
@@ -72,6 +73,8 @@ const provider: Decoder<OpsProvider> = object<OpsProvider>({
   secret: oneOf('configured', 'missing', 'not_defined', 'not_needed'), secret_setting: nullable(str),
   price_profile: oneOf('known', 'partial', 'unavailable'), policy_version: nullable(str),
   live_calls: oneOf('test_only', 'ready', 'disabled'), month_usage: nullable(total), notes: str,
+  secret_slot: optional(nullable(str)), secret_source: optional(nullable(oneOf('cms', 'env'))),
+  secret_version: optional(nullable(int)), secret_last4: optional(nullable(str)),
 });
 
 const ledgerRow: Decoder<OpsLedgerRow> = object<OpsLedgerRow>({
@@ -130,4 +133,52 @@ export async function runOpsFamilyFake(reason: string): Promise<OpsFamilyRun> {
   return decodeResponse(r.data, object<OpsFamilyRun>({
     as_of: str, case: record, summary, steps: arrayOf(step), note: str,
   }), 'POST /admin/ops/test-runs/family-fake');
+}
+
+// ===================================================================== 鍵の登録(Gate OpsSecrets)。値は送るだけで、受け取らない
+
+export interface OpsSecretHistory {
+  version: number; status: 'active' | 'superseded' | 'disabled'; last4: string; reason: string;
+  created_at: string | null; disabled_at: string | null;
+}
+export interface OpsSecretSlot {
+  slot: string; label: string; providers: string[]; env: string; hint: string;
+  status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
+  registered_at: string | null; history: OpsSecretHistory[];
+}
+export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string }
+export interface OpsSecretResult {
+  slot: string; status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null;
+  last4: string | null; registered_at: string | null;
+}
+
+const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
+  version: int, status: oneOf('active', 'superseded', 'disabled'), last4: str, reason: str,
+  created_at: nullable(str), disabled_at: nullable(str),
+});
+const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
+  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing'),
+  source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
+  history: arrayOf(secretHistory),
+});
+const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
+  slot: str, status: oneOf('configured', 'missing'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
+  last4: nullable(str), registered_at: nullable(str),
+});
+
+export async function getOpsSecrets(): Promise<OpsSecrets> {
+  const r = await api.get('/admin/ops/secrets', SILENT);
+  return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str }),
+    'GET /admin/ops/secrets');
+}
+
+/** 鍵を登録する(新しい版)。応答に鍵の値は含まれない。 */
+export async function registerOpsSecret(slot: string, value: string, reason: string): Promise<OpsSecretResult> {
+  const r = await api.post(`/admin/ops/secrets/${encodeURIComponent(slot)}`, { value, reason }, SILENT);
+  return decodeResponse(r.data, secretResult, 'POST /admin/ops/secrets/{slot}');
+}
+
+export async function disableOpsSecret(slot: string, reason: string): Promise<OpsSecretResult> {
+  const r = await api.post(`/admin/ops/secrets/${encodeURIComponent(slot)}/disable`, { reason }, SILENT);
+  return decodeResponse(r.data, secretResult, 'POST /admin/ops/secrets/{slot}/disable');
 }
