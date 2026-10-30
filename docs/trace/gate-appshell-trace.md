@@ -38,6 +38,7 @@ migration なし・API の変更なし・FR の状態の遷移なし(DOC-10 は�
 | 23 | 発見: 近くを探す・SNS の投稿の2列、候補箱をカード(画像は「画像のイメージ」と明示) | IMPLEMENTED | `pages/CandidatesPage.tsx`、E2E `candidates`・`gate-g11-discover` |
 | 24 | 比較: 候補を所要時間・距離・費用の数字で並べ「この案を採用する」。外部の経路検索は未接続(数字は手で入力)と明示 | IMPLEMENTED | `pages/RouteOptionsPage.tsx` |
 | 25 | 旅行の中の画面を直に開いても上の帯に旅行の名前(旅行を読み、切り替えへ写す) | IMPLEMENTED | `hooks/useTripContext.ts` |
+| 27 | 旅行相談の「いま決まっていること」にモックの地図(飾り。「候補方面の範囲のイメージ(実際の地図ではありません)」と書く) | IMPLEMENTED | `pages/consult/TripConsultPage.tsx` |
 | 26 | モックの「天気」「利用者の写真の枚数の例」「架空の予約」は出さない(取れない値・作った値) | IMPLEMENTED | 値を作らない |
 
 ## 正直さ(Gate Honesty)・ゲスト
@@ -49,7 +50,7 @@ migration なし・API の変更なし・FR の状態の遷移なし(DOC-10 は�
 | 15 | 全ての結果に付けていた値段の段階(既定の ¥¥)を外し、出典を出す。0件・失敗は文で伝える | IMPLEMENTED | FE `SearchPage.test.tsx` |
 | 16 | 検索の設定: 題を「検索の設定」に。検索に使う項目(候補数・座標)と使わない項目(趣味・予算など=準備中)を示す | IMPLEMENTED | `pages/SearchSettingsPage.tsx` |
 | 17 | ゲストの設定: 以前は保存を押した後に「ログインが必要」と知らせた → 先に保存できないことを示し、保存のボタンの代わりにアカウントを作る・ログインの入口。入力は消さない | IMPLEMENTED | `pages/SettingsPage.tsx`、FE `SettingsPage.test.tsx` |
-| 18 | 使われていない部品(VoiceSearch・ImageSearch・SpotSearch)の AI の言葉 | NOT STARTED | 画面から到達しない。部品を消すかは別に判断する |
+| 18 | 使われていない部品(VoiceSearch・ImageSearch・SpotSearch)の AI の言葉 | IMPLEMENTED | どこからも使われていない部品を消した(画面に出ない AI の言葉が残らない)。FE `UiIcon.test.tsx` の除外も外した |
 
 ## 地図
 

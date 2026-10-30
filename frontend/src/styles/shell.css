@@ -473,3 +473,7 @@
 /* ===== [Gate MockScreens] クイックのページ ===== */
 .tc-quick-page .tc-quick-layout { margin-top: 4px; }
 .tc-quick-submit { margin-top: 16px; display: flex; justify-content: flex-start; }
+
+/* ===== [Gate MockScreens] 旅行相談の brief の地図(飾り) ===== */
+.tc-brief-map { position: relative; height: 130px; margin: 10px -4px 4px; border-radius: 12px; overflow: hidden; }
+.tc-brief-map svg { width: 100%; height: 100%; display: block; }

@@ -806,7 +806,7 @@ const PlannerPage: React.FC = () => {
                     <div className="tc-day-tabs" role="group" aria-label="日を選ぶ">
                       {currentPlan.days.map((d, i) => (
                         <button key={d.id} type="button" className="tc-focus-ring tc-day-tab" aria-pressed={i === currentDayIndex}
-                          onClick={() => setCurrentDay(i)} data-testid={`day-tab-${i}`}>
+                          onClick={() => setCurrentDay(i)} data-testid={`day-tab-${i}`} data-day={i}>
                           {d.date ? `${d.date.slice(5).replace('-', '/')} ${getDayOfWeek(d.date)}` : `${i + 1}日目`}
                           <span className="sr-only">{`(${d.events.length}件)`}</span>
                         </button>
