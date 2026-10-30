@@ -32,7 +32,7 @@ test('UX-8 設定で選んだ暗い見た目が全ての画面に効き、読み
   await expect(page.getByLabel('テーマ')).toHaveValue('dark');
 
   const screens = [
-    { name: 'ダッシュボード', path: '/dashboard', h1: 'ダッシュボード' },
+    { name: 'ダッシュボード', path: '/dashboard', h1: '次の旅を、楽しみに変える' },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' },
     { name: '今日', path: `/planner/${planId}/today`, h1: '今日' },
     { name: '予約', path: `/planner/${planId}/reservations`, h1: null },

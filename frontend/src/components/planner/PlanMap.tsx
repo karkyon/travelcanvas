@@ -35,6 +35,8 @@ interface PlanMapProps {
   onSelectEvent?: (eventId: string) => void;
   onAddCandidateToItinerary?: (candidateId: string, fallbackTitle: string) => void;
   className?: string;
+  /** [Gate AppShell] 地図の高さ(旅程の3列では 530px) */
+  height?: number;
 }
 
 function _divIcon(html: string, size: [number, number] = [28, 28]) {
@@ -84,6 +86,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
   onSelectEvent,
   onAddCandidateToItinerary,
   className = '',
+  height = 420,
 }) => {
   const scheduledWithCoords = useMemo(
     () => (day?.events ?? []).filter(
@@ -124,7 +127,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 420 }}>
+      <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height }}>
         <MapContainer
           center={hasAnyKnownLocation ? allPositions[0] : defaultCenter}
           zoom={13}

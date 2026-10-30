@@ -20,7 +20,8 @@ import { getDashboard } from '@/services/api/g9';
 import type { DashboardSummary } from '@/services/api/types/g9';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
-import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
+import PageHead from '@/components/shell/PageHead';
+import { EmptyHero, FocusPanels, QuickActions, TripContinue, TripHero, TripList, TripStats } from './dashboard/DashboardParts';
 
 type LoadState =
   | { kind: 'loading' }
@@ -73,26 +74,32 @@ const DashboardPage: React.FC = () => {
   const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
 
   return (
-    <div data-theme={theme} className="min-h-[calc(100vh-4rem)] bg-cloud-50 text-ink-900" data-testid="dashboard">
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
-        <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-ink-900">ダッシュボード</h1>
-            <p className="text-sm text-ink-700 break-words">{`${name}さん、次にすることをまとめました。`}</p>
-          </div>
-          <label className="text-sm text-ink-700 flex items-center gap-2">
-            表示
-            <select value={preference} onChange={(e) => setPreference(e.target.value as ThemePreference)}
-              className="tc-focus-ring rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-1 text-ink-900">
-              <option value="system">端末に合わせる</option>
-              <option value="light">明るい</option>
-              <option value="dark">暗い</option>
-            </select>
-          </label>
-        </div>
+    <div data-theme={theme} className="min-h-[calc(100vh-4.5rem)] bg-cloud-50 text-ink-900" data-testid="dashboard">
+      <div className="tc-page">
+        {/* [Gate AppShell] モックのホーム: 見出し・旅の表紙・4つの数・旅のつづき/次に決めること/できること */}
+        <PageHead
+          eyebrow="YOUR JOURNEY · ホーム"
+          title="次の旅を、楽しみに変える"
+          sub={`${name}さん、次にすることをまとめました。日程も予約も旅の準備も、この旅のページから一緒に進められます。`}
+          actions={(
+            <nav aria-label="新しい旅を始める" className="tc-page-actions" data-testid="dashboard-start">
+              <Link to="/planner?new=1" className="tc-focus-ring tc-mbtn">＋ 旅行をつくる<span className="sr-only">(行き先が決まっている)</span></Link>
+              <Link to="/trip-consult" className="tc-focus-ring tc-mbtn tc-mbtn--primary">✦ 条件から旅行先を相談</Link>
+              <label className="text-sm text-ink-700 flex items-center gap-2">
+                表示
+                <select value={preference} onChange={(e) => setPreference(e.target.value as ThemePreference)}
+                  className="tc-focus-ring rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-2 text-ink-900">
+                  <option value="system">端末に合わせる</option>
+                  <option value="light">明るい</option>
+                  <option value="dark">暗い</option>
+                </select>
+              </label>
+            </nav>
+          )}
+        />
 
         {state.kind === 'loading' && (
-          <Surface variant="quiet" role="status" aria-live="polite" className="min-h-[11rem]" data-testid="dashboard-loading">
+          <Surface variant="quiet" role="status" aria-live="polite" className="min-h-[16rem]" data-testid="dashboard-loading">
             <p className="text-sm text-ink-700">読み込み中…</p>
           </Surface>
         )}
@@ -115,21 +122,25 @@ const DashboardPage: React.FC = () => {
           </Surface>
         )}
 
-        {/* [Gate G11] 旅の始め方を2つ(行き先が未定なら相談から・決まっていれば旅行を作る) */}
-        <nav aria-label="新しい旅を始める" className="mb-4 flex flex-wrap gap-2" data-testid="dashboard-start">
-          <Link to="/trip-consult" className="tc-focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
-            ✦ 条件から旅行先を相談
-          </Link>
-          <Link to="/planner" className="tc-focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border border-cloud-200 bg-cloud-0 px-4 text-sm font-medium text-ink-900 hover:bg-cloud-100">
-            ＋ 行き先が決まっている(旅行を作る)
-          </Link>
-        </nav>
         {data && !focusTrip && <EmptyHero isGuest={data.is_guest} />}
         {data && focusTrip && data.focus && (
           <>
             <TripHero trip={focusTrip} />
-            <div className="mt-4"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
-            <QuickActions trip={focusTrip} />
+            <TripStats trip={focusTrip} focus={data.focus} />
+            <div className="tc-dash-grid">
+              <div className="tc-dash-col">
+                <TripContinue trip={focusTrip} />
+                <section className="tc-card tc-focus-list" aria-labelledby="dash-next">
+                  <div className="tc-section-row">
+                    <h2 id="dash-next" className="tc-section-title">次に決めること</h2>
+                  </div>
+                  <div className="mt-3"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
+                </section>
+              </div>
+              <div className="tc-dash-col">
+                <QuickActions trip={focusTrip} />
+              </div>
+            </div>
           </>
         )}
         {data && data.trips.length > 0 && <TripList trips={data.trips} />}
@@ -139,7 +150,7 @@ const DashboardPage: React.FC = () => {
           <ul className="mt-2 flex flex-wrap gap-2">
             {OTHER_LINKS.map(({ to, label, icon: Icon }) => (
               <li key={to}>
-                <Link to={to} className="tc-focus-ring inline-flex items-center gap-2 rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900 hover:bg-cloud-100">
+                <Link to={to} className="tc-focus-ring tc-mbtn tc-mbtn--sm">
                   <Icon size={16} aria-hidden="true" />{label}
                 </Link>
               </li>

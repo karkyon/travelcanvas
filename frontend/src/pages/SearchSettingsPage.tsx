@@ -166,10 +166,14 @@ const SearchSettingsPage: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-ink-900 mb-4 flex items-center justify-center gap-3">
             <Settings size={32} className="text-blue-500" />
-            AI検索設定
+            検索の設定
           </h1>
           <p className="text-ink-700">
-            あなたの趣味・志向と旅行スタイルを設定して、最適なスポット検索を実現
+            この端末だけに保存します。いまスポット検索に使うのは「候補数」と、エリアの座標(既定は東京付近)だけです。
+          </p>
+          <p className="mt-2 text-sm text-ink-700" data-testid="search-settings-honesty">
+            趣味・志向・予算・旅のスタイル・時間・エリアの名前と半径は、まだ検索の結果に使っていません(準備中)。
+            AI・有料の検索の提供元もつながっていません(未接続)。
           </p>
         </div>
 
@@ -180,6 +184,9 @@ const SearchSettingsPage: React.FC = () => {
               <MapPin size={24} className="text-green-500" />
               旅行エリア設定
             </h2>
+            <p className="-mt-4 mb-4 text-xs text-ink-700">
+              {`検索では座標(${preferences.preferredArea.latitude.toFixed(2)}, ${preferences.preferredArea.longitude.toFixed(2)})の近くを先に探します。名前と半径はまだ使いません(準備中)。`}
+            </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -220,6 +227,7 @@ const SearchSettingsPage: React.FC = () => {
             <h2 className="text-xl font-bold text-ink-900 mb-6 flex items-center gap-2">
               <Heart size={24} className="text-red-500" />
               趣味・志向設定
+              <span className="tc-pill tc-pill--warn">準備中・まだ検索に使いません</span>
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -252,6 +260,7 @@ const SearchSettingsPage: React.FC = () => {
             <h2 className="text-xl font-bold text-ink-900 mb-6">
               <UiIcon icon={IcSearch} size={20} className="mr-1 align-[-3px]" />検索詳細設定
             </h2>
+            <p className="-mt-4 mb-4 text-xs text-ink-700">候補数は検索に使います。予算・旅のスタイル・時間はまだ使いません(準備中)。</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>

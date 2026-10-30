@@ -39,23 +39,22 @@ describe('Header (Gate G9 UX-3)', () => {
     useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都 紅葉の1泊2日' } });
   });
 
-  it('高さは一定・項目名は折り返さない・AI検索は1か所', async () => {
+  it('[Gate AppShell] 上の帯は高さが一定(72px の行)。画面の移動は左の帯へ移し、上の帯には置かない', async () => {
     await renderAt('/dashboard');
     const header = screen.getByTestId('global-header');
-    expect(header.querySelector('.h-16')).not.toBeNull();
-    const nav = screen.getByRole('navigation', { name: '主なメニュー' });
-    for (const link of Array.from(nav.querySelectorAll('a'))) expect(link.className).toContain('whitespace-nowrap');
-    expect(screen.getAllByRole('link', { name: /AI検索/ })).toHaveLength(1);
-    // jsdom は CSS を当てないため、読み上げ用(sr-only)と見た目用の2つの名前がつながって見える
-    expect(within(nav).getByRole('link', { name: /^ダッシュボード/ })).toHaveAttribute('aria-current', 'page');
+    expect(header.querySelector('.tc-topbar-row')).not.toBeNull();
+    expect(within(header).queryByRole('navigation', { name: '主なメニュー' })).not.toBeInTheDocument();
     expect(header.querySelector('.animate-pulse')).toBeNull();
     expect(screen.queryByTestId('header-current-trip')).not.toBeInTheDocument();
+    // 旅行の外では旅行の一覧への入口(押すと一覧へ)
+    expect(screen.getByTestId('header-trip-picker')).toHaveAttribute('href', '/planner');
   });
 
   it('旅行の中では今開いている旅行を示す', async () => {
     await renderAt(`/planner/${PLAN}/today`);
     expect(screen.getByTestId('header-current-trip')).toHaveTextContent('京都 紅葉の1泊2日');
     expect(screen.getByTestId('header-current-trip')).toHaveAttribute('href', `/planner/${PLAN}`);
+    expect(screen.queryByTestId('header-trip-picker')).not.toBeInTheDocument();
   });
 
   it('別の旅行の画面では示さない', async () => {
@@ -69,17 +68,23 @@ describe('Header (Gate G9 UX-3)', () => {
     expect(userBtn).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(userBtn);
     expect(userBtn).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('link', { name: '設定' })).toBeInTheDocument();
+    // [Gate AppShell] メニューは開いた時に読み込む
+    expect(await screen.findByRole('link', { name: '設定' })).toBeInTheDocument();
     const menuBtn = screen.getByRole('button', { name: 'メニューを開く' });
     fireEvent.click(menuBtn);
     await waitFor(() => expect(screen.getByRole('button', { name: 'メニューを閉じる' })).toHaveAttribute('aria-expanded', 'true'));
+    // スマホのメニューは左の帯と同じ全ての項目を出す
+    const mobile = await screen.findByRole('navigation', { name: '主なメニュー(スマホ)' });
+    for (const name of ['ホーム', '旅程', '発見', '今日', '旅行箱', '共有', '記録', '旅行相談', 'クイック', '比較', '設定']) {
+      expect(within(mobile).getByRole('link', { name })).toBeInTheDocument();
+    }
   });
 
   it('[Gate G10-UX] UX-8 ユーザーのメニューで見た目(明るい・暗い・端末)を選べ、選んだものを aria-pressed で示す', async () => {
     useThemeStore.setState({ preference: 'system' });
     await renderAt('/dashboard');
     fireEvent.click(screen.getByRole('button', { name: /^alice/ }));
-    const group = screen.getByRole('group', { name: '表示' });
+    const group = await screen.findByRole('group', { name: '表示' });
     expect(within(group).getByRole('button', { name: '端末' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(within(group).getByRole('button', { name: '暗い' }));
     expect(useThemeStore.getState().preference).toBe('dark');

@@ -5,7 +5,7 @@ import { seedBaseline } from '../ux/baselineData';
 
 /**
  * [Gate G9 後半] UX-2 旅行の表紙・UX-3 見出しと移動・UX-4 文脈型ダッシュボードを、実際のブラウザで確かめる。
- *   1. 旅行が無い時は「旅行を始める」。見出しは高さが一定(64px)で、項目名を折り返さない(360〜1440px)
+ *   1. 旅行が無い時は「旅行を始める」。見出しは高さが一定(72px。スマホは 60px)で、項目名を折り返さない(360〜1440px)
  *   2. 旅行中・旅行前・旅行後の旅行がある時は旅行中を焦点にし、NOW/NEXT・準備・遅延と休業・操作(最大4つ)・段階ごとの一覧を出す。
  *      360/390/768/1024/1440px・暗い見た目で、横にはみ出さず axe 違反が無い。旅行の画面は表紙の見出しと「今開いている旅行」を示す
  *   3. 閲覧だけの参加者には招待の操作を出さない
@@ -40,13 +40,15 @@ async function trip(send: Send, title: string, offsets: number[], events: Array<
 }
 
 async function expectHeaderStable(page: Page, where: string): Promise<void> {
+  // [Gate AppShell] UI/UX モックの上の帯: 高さは 72px(760px 以下は 60px)で一定。画面の移動は左の帯(スマホは下の帯)
   const header = page.getByTestId('global-header');
-  const bar = header.locator('div.h-16').first();
-  expect((await bar.boundingBox())!.height, `${where} 見出しの高さ`).toBe(64);
-  for (const link of await header.getByRole('navigation', { name: '主なメニュー' }).getByRole('link').all()) {
+  const bar = header.locator('.tc-topbar-row').first();
+  const width = page.viewportSize()!.width;
+  expect((await bar.boundingBox())!.height, `${where} 見出しの高さ`).toBe(width <= 760 ? 60 : 72);
+  for (const link of await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link').all()) {
     if (!(await link.isVisible())) continue;
     const box = (await link.boundingBox())!;
-    expect(box.height, `${where} ${await link.getAttribute('href')} の項目名は1行`).toBeLessThanOrEqual(44);
+    expect(box.height, `${where} ${await link.getAttribute('href')} の項目名は1行`).toBeLessThanOrEqual(62);
   }
 }
 
@@ -172,14 +174,15 @@ test('UX-4 API の失敗は再試行で直り、オフラインはつながる�
   await page.unroute('**/api/v1/dashboard');
 
   // 旅程の一覧を一度開いて(画面の塊を読み込んでおく)、オフラインでダッシュボードへ戻る
-  await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link', { name: 'プランナー' }).click();
+  // [Gate AppShell] 旅行の外では、上の帯の「旅行を選ぶ」が旅程の一覧へ移る
+  await page.getByTestId('header-trip-picker').click();
   await expect(page).toHaveURL(/\/planner$/);
   // URL は先に変わり、画面の塊を読み込む間はダッシュボードの見出しが残る。プランナーの見出しが出て
   // ダッシュボードが閉じたことを確かめてから切る(閉じる前に切ると、開いたままのダッシュボードへ戻るだけで読み直さない)
   await expect(page.getByRole('heading', { level: 1, name: 'プランナー' })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: 'ダッシュボード' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1, name: '次の旅を、楽しみに変える' })).toHaveCount(0);
   await context.setOffline(true);
-  await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link', { name: 'ダッシュボード' }).click();
+  await page.getByRole('navigation', { name: '主なメニュー' }).getByRole('link', { name: 'ホーム' }).click();
   await expect(page.getByTestId('dashboard-offline')).toContainText('オフラインです');
   await expectNoAxeViolations(page, 'ダッシュボード(オフライン)');
   await context.setOffline(false);

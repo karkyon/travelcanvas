@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, CalendarClock, CheckCircle2, ListChecks, Ticket, Users } from 'lucide-react';
 import Surface from '@/components/design/Surface';
 import TripCover from '@/components/trip/TripCover';
+import Landscape from '@/components/shell/Landscape';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import type { DashboardFocus, DashboardTrip } from '@/services/api/types/g9';
@@ -17,30 +18,36 @@ import {
   tripDateLabel,
 } from './dashboardModel';
 
-const onCoverLink = 'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold bg-cloud-0 text-ink-900 '
-  + 'hover:bg-cloud-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
-const actionLink = 'tc-focus-ring flex items-center justify-between gap-2 rounded-lg border border-cloud-200 bg-cloud-0 '
-  + 'px-4 py-3 text-sm font-medium text-ink-900 hover:bg-cloud-100';
+const actionLink = 'tc-focus-ring flex flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-ink-900 hover:bg-cloud-100';
 
 const SEVERITY_LABEL: Record<string, string> = { high: '重要', medium: '確認', low: '参考' };
 
 // ------------------------------------------------------------------ 表紙(最上段)
 
 export const EmptyHero: React.FC<{ isGuest: boolean }> = ({ isGuest }) => (
-  <TripCover as="section" size="hero" tripTitle="travelcanvas" aria-labelledby="dash-hero-empty" data-testid="dashboard-hero">
-    <p className="text-sm font-medium">ようこそ</p>
-    <h2 id="dash-hero-empty" className="mt-1 text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'var(--tc-font-display)' }}>
-      最初の旅行を始めましょう
-    </h2>
-    <p className="mt-2 text-sm max-w-xl">
-      行き先と日付だけで始められます。予約・チケット・準備・費用は、あとから同じ旅行にまとまります。
-    </p>
-    <div className="mt-4 flex flex-wrap gap-2">
-      <Link to="/planner" className={onCoverLink}>旅行を作る</Link>
-      {isGuest && <Link to="/guest/upgrade" className={onCoverLink}>アカウントを作って保存する</Link>}
+  <section className="tc-home-hero" aria-labelledby="dash-hero-empty" data-testid="dashboard-hero">
+    <div className="tc-home-hero-art"><Landscape /></div>
+    <div className="tc-home-hero-copy">
+      <p className="tc-eyebrow">FIRST JOURNEY · ようこそ</p>
+      <h2 id="dash-hero-empty">最初の旅行を始めましょう</h2>
+      <p>行き先と日付だけで始められます。予約・チケット・準備・費用は、あとから同じ旅行にまとまります。</p>
+      <div className="tc-home-hero-actions">
+        <Link to="/planner?new=1" className="tc-focus-ring tc-mbtn tc-mbtn--primary">旅行を作る →</Link>
+        <Link to="/trip-consult" className="tc-focus-ring tc-mbtn">行き先から相談する</Link>
+        {isGuest && <Link to="/guest/upgrade" className="tc-focus-ring tc-mbtn">アカウントを作って保存する</Link>}
+      </div>
     </div>
-  </TripCover>
+  </section>
 );
+
+/** 表紙の写真(あれば)。無ければモックの山並みの絵 */
+const HeroArt: React.FC<{ photo: ReturnType<typeof useCoverPhoto>['photo']; onError: () => void }> = ({ photo, onError }) => {
+  if (!photo) return <Landscape />;
+  return (
+    <img src={photo.src} alt="" onError={onError} data-testid="trip-cover-photo"
+      style={{ objectPosition: `${photo.focusX * 100}% ${photo.focusY * 100}%` }} />
+  );
+};
 
 /** [Gate G11] 旅行のカード(表紙の写真があれば写真、無い・読めない時はグラデーション) */
 const TripCard: React.FC<{ trip: DashboardTrip }> = ({ trip: t }) => {
@@ -55,34 +62,91 @@ const TripCard: React.FC<{ trip: DashboardTrip }> = ({ trip: t }) => {
   );
 };
 
+const HERO_EYEBROW: Record<DashboardTrip['phase'], string> = {
+  upcoming: 'NEXT JOURNEY', ongoing: 'ON THE ROAD', past: 'AFTER THE TRIP', undated: 'NEXT JOURNEY',
+};
+
 export const TripHero: React.FC<{ trip: DashboardTrip }> = ({ trip }) => {
-  const coverPhoto = useCoverPhoto(trip.id, trip.cover);  // [Gate G11] 表紙の写真(無い・読めない時はグラデーション)
+  const coverPhoto = useCoverPhoto(trip.id, trip.cover);  // [Gate G11] 表紙の写真(無い・読めない時は山並みの絵)
   const primary = trip.phase === 'ongoing'
     ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' }
     : { to: `/planner/${trip.id}`, label: '旅程を開く' };
+  const second = trip.phase === 'past'
+    ? { to: `/planner/${trip.id}/memories`, label: '旅の記録を見る' }
+    : trip.phase === 'ongoing'
+      ? { to: `/planner/${trip.id}`, label: '旅程を開く' }
+      : { to: `/planner/${trip.id}/preparation`, label: '準備を見る' };
   return (
-    <TripCover as="section" size="hero" destination={trip.destination} tripTitle={trip.title} startDate={trip.start_date}
-      aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}
-      photo={coverPhoto.photo} onPhotoError={coverPhoto.onError}>
-      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-        <span className="rounded-full border border-white px-2 py-0.5" data-testid="dashboard-phase">{PHASE_LABEL[trip.phase]}</span>
-        <span>{statusLabel(trip)}</span>
-      </p>
-      <h2 id="dash-hero-title" className="mt-2 text-2xl sm:text-3xl font-bold break-words"
-        style={{ fontFamily: 'var(--tc-font-display)' }}>
-        {trip.title}
-      </h2>
-      <p className="mt-1 text-sm">
-        {[trip.destination, tripDateLabel(trip)].filter(Boolean).join('・')}
-      </p>
-      <p className="mt-1 text-sm flex items-center gap-1">
-        <Users size={14} aria-hidden="true" />
-        {`${trip.member_count}人・あなたは${ROLE_LABEL[trip.role]}`}
-      </p>
-      <div className="mt-4">
-        <Link to={safeInternalPath(primary.to) ?? '/dashboard'} className={onCoverLink}>{primary.label}</Link>
+    <section className="tc-home-hero" aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}
+      data-has-photo={coverPhoto.photo ? 'true' : undefined}>
+      <div className="tc-home-hero-art"><HeroArt photo={coverPhoto.photo} onError={coverPhoto.onError} /></div>
+      <div className="tc-home-hero-copy">
+        <p className="tc-eyebrow">
+          {`${HERO_EYEBROW[trip.phase]} · `}<span data-testid="dashboard-phase">{PHASE_LABEL[trip.phase]}</span>{` · ${statusLabel(trip)}`}
+        </p>
+        <h2 id="dash-hero-title">{trip.title}</h2>
+        <div className="tc-home-hero-badges">
+          <span className="tc-pill">{tripDateLabel(trip)}</span>
+          {trip.destination && <span className="tc-pill">{trip.destination}</span>}
+          <span className="tc-pill"><Users size={13} aria-hidden="true" />{`${trip.member_count}人・あなたは${ROLE_LABEL[trip.role]}`}</span>
+        </div>
+        <div className="tc-home-hero-actions">
+          <Link to={safeInternalPath(primary.to) ?? '/dashboard'} className="tc-focus-ring tc-mbtn tc-mbtn--primary">{primary.label} →</Link>
+          <Link to={safeInternalPath(second.to) ?? '/dashboard'} className="tc-focus-ring tc-mbtn">{second.label}</Link>
+        </div>
       </div>
-    </TripCover>
+    </section>
+  );
+};
+
+/** モックの4つの数(この旅行の実際の値だけ。値が無い時は「—」) */
+export const TripStats: React.FC<{ trip: DashboardTrip; focus: DashboardFocus }> = ({ trip, focus }) => {
+  const r = focus.readiness;
+  const a = focus.alerts;
+  const items: Array<{ key: string; value: string; unit?: string; label: string }> = [
+    { key: 'days', value: trip.total_days ? String(trip.total_days) : String(trip.day_count || '—'), unit: '日', label: '旅程の日数' },
+    { key: 'members', value: String(trip.member_count), unit: '人', label: '一緒に計画' },
+    { key: 'ready', value: r ? String(r.total) : '—', unit: r ? '件' : undefined, label: r?.high ? `確認が要る準備(重要 ${r.high})` : '確認が要る準備' },
+    { key: 'alerts', value: a ? String(a.active + a.detected) : '—', unit: a ? '件' : undefined, label: '遅延・休業の知らせ' },
+  ];
+  return (
+    <ul className="tc-stats" aria-label="この旅行の数" data-testid="dashboard-stats">
+      {items.map((i) => (
+        <li key={i.key} className="tc-card tc-stat">
+          <strong className="tc-numeric">{i.value}{i.unit && <span>{i.unit}</span>}</strong>
+          <small>{i.label}</small>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+/** 旅のつづき(モックの trip-card)。旅行中は何日目かを線で示す(旅行前・後は線を出さない: 値が無いため) */
+export const TripContinue: React.FC<{ trip: DashboardTrip }> = ({ trip }) => {
+  const coverPhoto = useCoverPhoto(trip.id, trip.cover);
+  const progress = trip.phase === 'ongoing' && trip.total_days ? Math.min(1, (trip.day_number ?? 1) / trip.total_days) : null;
+  return (
+    <section className="tc-card tc-focus-list" aria-labelledby="dash-continue">
+      <div className="tc-section-row">
+        <h2 id="dash-continue" className="tc-section-title">旅のつづき</h2>
+        <Link to={`/planner/${trip.id}`} className="tc-focus-ring tc-mini-link">旅程を編集 →</Link>
+      </div>
+      <div className="tc-trip-card">
+        <div className="tc-trip-thumb">
+          {coverPhoto.photo
+            ? <img src={coverPhoto.photo.src} alt="" onError={coverPhoto.onError} />
+            : <Landscape />}
+        </div>
+        <div className="tc-trip-copy">
+          <h3>{trip.title}</h3>
+          <p>{[tripDateLabel(trip), trip.destination, `${trip.member_count}人`].filter(Boolean).join(' · ')}</p>
+          {progress !== null && (
+            <div className="tc-trip-line" role="img" aria-label={statusLabel(trip)}><i style={{ width: `${progress * 100}%` }} /></div>
+          )}
+        </div>
+        <Link to={`/planner/${trip.id}`} className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${trip.title}」をひらく`}>ひらく</Link>
+      </div>
+    </section>
   );
 };
 
@@ -210,7 +274,7 @@ const AfterTripCard: React.FC<{ trip: DashboardTrip }> = ({ trip }) => (
 );
 
 export const FocusPanels: React.FC<{ focus: DashboardFocus; trip: DashboardTrip }> = ({ focus, trip }) => (
-  <div className="grid gap-4 md:grid-cols-3" data-testid="dashboard-focus">
+  <div className="grid gap-4 sm:grid-cols-2" data-testid="dashboard-focus">
     {focus.phase === 'ongoing' && <NowNextCard focus={focus} trip={trip} />}
     {focus.phase !== 'past' && <ReadinessCard focus={focus} trip={trip} />}
     {(focus.phase === 'ongoing' || focus.phase === 'upcoming') && <AlertsCard focus={focus} trip={trip} />}
@@ -222,10 +286,14 @@ export const QuickActions: React.FC<{ trip: DashboardTrip }> = ({ trip }) => {
   const actions = quickActions(trip);
   if (actions.length === 0) return null;
   return (
-    <nav aria-label="この旅行の操作" className="mt-4">
-      <ul className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <nav aria-label="この旅行の操作" className="tc-card tc-focus-list">
+      <div className="tc-section-row">
+        <h2 className="tc-section-title">この旅行でできること</h2>
+        <span className="tc-pill tc-pill--good">{PHASE_LABEL[trip.phase]}</span>
+      </div>
+      <ul>
         {actions.map((a) => (
-          <li key={a.key}>
+          <li key={a.key} className="tc-focus-row">
             <Link to={safeInternalPath(a.to) ?? '/dashboard'} className={actionLink}>
               <span>{a.label}</span><span aria-hidden="true">→</span>
             </Link>

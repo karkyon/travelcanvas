@@ -55,7 +55,7 @@ test('見た目の系統: 設定で選ぶと全ての画面に当たり、読み
   await chooseStyle(page, /^Atlas/);
   await expect(page.locator('html')).toHaveAttribute('data-style', 'atlas');
   await page.goto('/dashboard');
-  await expect(page.getByRole('heading', { level: 1, name: 'ダッシュボード' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { level: 1, name: '次の旅を、楽しみに変える' })).toBeVisible({ timeout: 15_000 });
   expect(await layoutBg(page)).toBe(PAGE_BG.atlas);
   const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--tc-accent').trim());
   expect(accent).toBe('#385a55');
@@ -81,7 +81,7 @@ test('見た目の系統 × 明るい・暗い で主な画面に axe の違反�
   test.setTimeout(900_000);
   const { planId } = await seedBaseline(page, 'g11styleaxe');
   const screens = [
-    { name: 'ダッシュボード', path: '/dashboard', h1: 'ダッシュボード' },
+    { name: 'ダッシュボード', path: '/dashboard', h1: '次の旅を、楽しみに変える' },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' },
     { name: '設定', path: '/settings?tab=preferences', h1: null },
   ];
