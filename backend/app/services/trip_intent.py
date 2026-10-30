@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import math
 import re
 import time
@@ -364,6 +365,8 @@ class GeocodeResult:
 
 Geocoder = Callable[[str], Awaitable[GeocodeResult]]
 _cache: Dict[str, Tuple[float, GeocodeResult]] = {}
+# [Gate FR059-D11] この要求の中で Nominatim へ実際に送った回数(cache から返した時は数えない)
+_network_calls: contextvars.ContextVar[int] = contextvars.ContextVar("trip_intent_geocode_calls", default=0)
 _lock = asyncio.Lock()
 _last_call = 0.0
 _override: Optional[Geocoder] = None
@@ -384,6 +387,7 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
         if wait > 0 and transport is None:
             await asyncio.sleep(wait)
         _last_call = time.monotonic()
+        _network_calls.set(_network_calls.get() + 1)
         try:
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, transport=transport, follow_redirects=False,
                                          headers={"User-Agent": USER_AGENT}) as client:
@@ -453,6 +457,7 @@ async def compare_areas(origin: str, areas: List[str], one_way_hours: Optional[f
     geocode: Geocoder = _override or nominatim_geocode
     if not enabled:
         geocode = _disabled
+    _network_calls.set(0)
     o = await geocode(origin) if origin else GeocodeResult(status="unavailable")
     out: List[Dict[str, Any]] = []
     for name in areas[:MAX_AREAS]:
@@ -470,6 +475,7 @@ async def compare_areas(origin: str, areas: List[str], one_way_hours: Optional[f
             "hours": {"status": "date_pending", "note": "営業時間は日付と行き先の場所が決まってから照会します"},
         })
     return {"origin": {"query": origin, **o.to_dict()}, "areas": out, "retrieved_at": now().isoformat(),
+            "_geocode_calls": _network_calls.get(),
             "providers": {"geocode": "nominatim" if enabled else None, "route": None, "lodging": None, "crowd": None,
                           "destination_suggestions": None}}
 

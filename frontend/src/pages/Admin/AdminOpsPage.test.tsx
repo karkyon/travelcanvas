@@ -19,6 +19,8 @@ const overview = {
   live_usage: { providers: {}, estimated_jpy: '0.0000', label: 'y' },
   connected_paid_providers: [], suspended_providers: {}, plan_accounts: { total: 1, by_state: { ops_alert: 1 } },
   open_reservations: 0, cloud_billing: { status: 'unavailable', message: 'Cloud Billing の請求額・予算はアプリから取得していません' },
+  free_usage: { providers: { overpass: { requests: 3, events: 3 }, nominatim: { requests: 2, events: 1 } }, requests: 5,
+    label: '無料の provider へ送った回数' },
 };
 const providers = {
   as_of: 'x', rule: '揃うまで送らない',
@@ -52,6 +54,8 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(screen.getByText(/Cloud Billing の請求額・予算はアプリから取得していません/)).toBeInTheDocument();
     expect(screen.getByText(/課金を自動で止める上限ではありません/)).toBeInTheDocument();
     expect(screen.getByText('運用に知らせ(45円〜)')).toBeInTheDocument();
+    expect(screen.getByTestId('ops-free-usage')).toHaveTextContent('5回');
+    expect(screen.getByTestId('ops-free-usage')).toHaveTextContent('overpass・nominatim · 0円 · 50円の枠の外');
   });
 
   it('提供元: 鍵は「設定あり」とだけ出し、止めるには理由が要る', async () => {

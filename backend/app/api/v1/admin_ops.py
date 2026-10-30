@@ -33,6 +33,7 @@ from app.models.models import (
     ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
 )
 from app.services import cost_guard as cg
+from app.services import free_usage
 from app.services import provider_secrets as ps
 from app.services.audit_service import record_audit_event
 
@@ -128,13 +129,14 @@ def _price_state(db: Session) -> Dict[str, Any]:
 def _event_totals(db: Session, since: Optional[datetime] = None) -> Dict[str, Dict[str, Any]]:
     q = db.query(ProviderUsageEvent.provider, func.count(ProviderUsageEvent.id),
                  func.coalesce(func.sum(ProviderUsageEvent.estimated_cost_jpy), 0),
-                 func.coalesce(func.sum(ProviderUsageEvent.actual_cost_jpy), 0))
+                 func.coalesce(func.sum(ProviderUsageEvent.actual_cost_jpy), 0),
+                 func.coalesce(func.sum(func.coalesce(ProviderUsageEvent.request_count, 1)), 0))
     if since is not None:
         q = q.filter(ProviderUsageEvent.occurred_at >= since)
     out: Dict[str, Dict[str, Any]] = {}
-    for provider, n, est, act in q.group_by(ProviderUsageEvent.provider).all():
+    for provider, n, est, act, reqs in q.group_by(ProviderUsageEvent.provider).all():
         out[provider] = {"events": int(n), "estimated_jpy": cg.money(Decimal(est)),
-                         "actual_jpy": cg.money(Decimal(act))}
+                         "actual_jpy": cg.money(Decimal(act)), "requests": int(reqs)}
     return out
 
 
@@ -161,7 +163,8 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
     totals = _event_totals(db, month_start)
     fake = totals.get(FAKE_PROVIDER, {"events": 0, "estimated_jpy": cg.money(Decimal(0)),
                                       "actual_jpy": cg.money(Decimal(0))})
-    live = {k: v for k, v in totals.items() if k != FAKE_PROVIDER and not k.startswith("fake")}
+    free = {k: v for k, v in totals.items() if k in free_usage.FREE_PROVIDERS}
+    live = {k: v for k, v in totals.items() if k != FAKE_PROVIDER and not k.startswith("fake") and k not in free}
     live_est = sum((Decimal(v["estimated_jpy"]) for v in live.values()), Decimal(0))
     accounts = db.query(UsageBudgetAccount).filter(UsageBudgetAccount.scope_type == "plan").all()
     states: Dict[str, int] = {}
@@ -179,6 +182,10 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
         "fake_usage": {**fake, "label": "Fake の試験の額(実の請求ではない)"},
         "live_usage": {"providers": live, "estimated_jpy": cg.money(live_est),
                        "label": "アプリの見込みの原価(実の請求とは別。照合は請求の明細が届いてから)"},
+        # [Gate FR059-D11] 無料の provider へ送った回数(0円。50円の枠には入れない。利用規約・回数の制限の確認用)
+        "free_usage": {"providers": {k: {"requests": v["requests"], "events": v["events"]} for k, v in free.items()},
+                       "requests": sum(v["requests"] for v in free.values()),
+                       "label": "無料の provider(OpenStreetMap・Wikipedia・Wikimedia・oEmbed)へ送った回数。0円で、50円の枠には入れない"},
         "connected_paid_providers": sorted(cg.paid_providers()),
         "suspended_providers": cg.suspended_providers(),
         "plan_accounts": {"total": len(accounts), "by_state": states},

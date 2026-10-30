@@ -63,6 +63,23 @@
 検算: `$0.2176 × 180 × 1.10 × 1.15 = 49.55円 ≤ 50円`(全ての上限を同時に使っても 50円以内)。価格の版を変える時は、同じ計算を
 試験(`test_price_profile_fits_cap`)で再び確かめ、50円を越える版は有効にしない。field mask などで単価の高い SKU になる要求は送らない。
 
+#### 2.2.1 公開の単価の再確認(2026-10-31、Gate FR059-D11。価格の版は変えない)
+
+価格の版 `2026-10-29.1` の単価が、今の公開の単価**以上**(= 見込みが実際より高めで、50円の枠が甘くならない)かを確かめた。
+単価は保証ではなく、provider が変える。接続(adapter)の Gate の前に、もう一度この表を確かめる。
+
+| 操作 | 版の単価 | 2026-10-31 の公開の単価 | 判定 | 出典 |
+|---|---|---|---|---|
+| `ai.generate` | 入力 $0.10/M・出力 $0.50/M | 例: gpt-5-nano 入力 $0.05/M・出力 $0.40/M | 版のほうが高い(安全側)。**使う model は未決定**。推論の token は出力として課金されるため、出力の上限 2,000 token に推論も含めて制限する | developers.openai.com/api/docs/models/gpt-5-nano |
+| `ai.web_search` | $10/1,000回 + 入力 token | $10/1,000回、検索で得た内容の token は model の単価で課金 | 同じ | developers.openai.com/api/docs/pricing(2026-10-26 に第三者が読んだ記録で確認。公式のページはこちらから直接は読めなかった) |
+| `places.search` | $35/1,000回 | Nearby Search Pro・Text Search Pro $32/1,000回 | 版のほうが高い。Enterprise の項目(評価・営業時間など)を field mask に入れると高い SKU になるため、版を変えずに入れない | developers.google.com/maps/billing-and-pricing/pricing |
+| `places.details` | $20/1,000回 | Essentials $5・Pro $17・Enterprise $20 | 同じ(Enterprise で計算) | 同上 |
+| `places.photo` | $7/1,000回 | Place Details Photos $7 | 同じ | 同上 |
+| `routes.element` | $5/1,000単位 | Compute Routes / Route Matrix Essentials $5、Pro $10 | Essentials だけ。交通を考える経路(Pro)は単価が2倍のため、版を変えずに使わない | 同上 |
+| `map.load` | $7/1,000回 | Dynamic Maps $7 | 同じ。ただし今のアプリの画面は Google Maps を読み込まない | 同上 |
+
+無料の月の枠(Essentials 10,000・Pro 5,000・Enterprise 1,000)は、上の規則どおり上限の計算の前提にしない。
+
 ### 2.3 呼び出しの規則
 
 - 1文字ごとの自動の検索・裏での繰り返し・自動の再試行による二重の課金をしない。呼び出しは利用者の明示の操作(「候補を作る」
@@ -270,7 +287,7 @@ Gate の順(DOC-09): **Gate A**(本書・DOC-10 の登録。docs だけ)→ **Ga
 | D8 | Trip Pass は「未割当 plan を拒否」 | 割り当てていない旅行は、その利用者自身のクラス(会員は Free)で判定する | 会員は全員 Free を持つため。Pass の枠は割り当てた旅行にだけ使われる(試験 `test_trip_pass_only_for_assigned_plan`) |
 | D9 | 月の口座の scope に organization | 初版は支払う人(利用者)の月の口座。組織でまとめる枠は FR-041・FR-058 と一緒に足す | 組織の契約・請求が未実装 |
 | D10 | エラーの code は大文字(`PLAN_COST_LIMIT_REACHED` 等) | 小文字(`plan_cost_limit_reached` 等) | エラーの一覧(`docs/spec/error-catalog.md`)の生成の規則に合わせる |
-| D11 | 無料の provider・ローカルの処理も使用を記録 | 有料の provider(`cost_guard.run`)だけを記録。無料の provider(Wikimedia・oEmbed・Nominatim・Overpass)は旅行に結びつかない入口のため未記録 | 旅行の単位の記録の口を、各 provider の Gate で足す(DOC-10 FR-059 の gaps) |
+| D11 | 無料の provider・ローカルの処理も使用を記録 | **Gate FR059-D11(2026-10-31)**: 無料の provider(Nominatim・Overpass・Wikipedia・Wikimedia Commons・oEmbed)へ外へ送った回数を `provider_usage_events` に 0円・価格の版 `free` で記録する(`app/services/free_usage.py`)。言葉・URL・座標・結果は残さない。旅行が分かる時は plan_id、相談の入口(旅行の前)は利用者だけ。記録の失敗で機能を止めない。運用コンソールの概要は「無料の提供元への送信」として有料の見込みと分けて出す | SNS の oEmbed の題名から地名を照合する Nominatim の呼び出し(`social.py` の中)は、oEmbed の1回に含めて別には数えない。ローカルの処理(画像の縮小など)は記録しない |
 | D12 | — | 旅行を月の数に入れるのは、その月の最初の予約の時(失敗して解放しても戻さない) | 1回の失敗で何度も数え直す攻撃を防ぐ。数えた月は `counted_month` |
 | D13 | — | 月の区切りは UTC(BILL-02 と同じ)。画面には次のリセットの日を UTC と書く | 既存の使用量と同じ |
 | D14 | — | provider の停止(見込みの超過・照合の差)は Redis の印で全ての worker・運用のコマンドが共有する(回数制限と同じ名前空間)。Redis に届かない間はその process の中の印で止め、届いた時に Redis へ送る(止めた印を失わない)。戻すのは運用者の `tcops.py security provider-resume`(理由が必須・全 worker に伝えられない時は戻さない) | 有料の provider をつなぐ前に入れた(Gate FR059-C)。以前(FR059-B)は process の中の印だけで、止めた worker 以外は呼び続けた |

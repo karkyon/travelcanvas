@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.models.models import FieldSource, Place, SearchCandidate, SourceRecord, User
-from app.services import place_access
+from app.services import free_usage, place_access
 from app.services.search_provider import search_all_providers
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -92,6 +92,13 @@ async def search_spots(
         (body.query or "").strip(), body.latitude, body.longitude, body.radius_km, **extra
     )
     unavailable = list(getattr(raw_results, "unavailable", []) or [])
+    # [Gate FR059-D11] 無料の provider にも外へ送った回数を残す(言葉・座標・結果は残さない)
+    by_provider: dict = {}
+    for r in raw_results:
+        by_provider[r.get("provider")] = by_provider.get(r.get("provider"), 0) + 1
+    for name in getattr(raw_results, "called", []) or []:
+        code = "unavailable" if name in unavailable else ("ok" if by_provider.get(name) else "empty")
+        free_usage.record(db, current_user, name, "search.spots", result_code=code)
     raw_results = raw_results[: max(1, min(body.max_results, 50))]
 
     candidates = []

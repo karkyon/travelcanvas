@@ -34,6 +34,7 @@ from app.models.models import (
     Place, PlanCandidate, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan, User,
 )
 from app.services import candidates as cs
+from app.services import free_usage
 from app.services import trip_intent as ti
 from app.services.audit_service import record_audit_event
 
@@ -99,12 +100,21 @@ class AreasIn(BaseModel):
 
 
 @router.post("/areas")
-async def compare_areas(body: AreasIn, current_user: User = Depends(get_current_user_or_guest)):
+async def compare_areas(body: AreasIn, current_user: User = Depends(get_current_user_or_guest),
+                        db: Session = Depends(get_db)):
     names = list(dict.fromkeys(a.strip() for a in body.areas if a.strip()))
     if not names or any(len(a) > 40 for a in names):
         raise _bad("invalid_field", "方面の名前を1〜40文字で入力してください")
-    return await ti.compare_areas(body.origin.strip(), names, body.one_way_hours, body.one_way_strength,
-                                  enabled=_geocoder_enabled())
+    result = await ti.compare_areas(body.origin.strip(), names, body.one_way_hours, body.one_way_strength,
+                                    enabled=_geocoder_enabled())
+    # [Gate FR059-D11] 地名の照会(Nominatim)へ実際に送った回数を残す(地名は残さない)
+    calls = int(result.pop("_geocode_calls", 0) or 0)
+    if calls:
+        failed = any(a["geocode"]["status"] == "unavailable" for a in result["areas"])
+        free_usage.record(db, current_user, "nominatim", "geocode.areas", request_count=calls,
+                          result_code="unavailable" if failed else "ok")
+        db.commit()
+    return result
 
 
 class IntentIn(BaseModel):

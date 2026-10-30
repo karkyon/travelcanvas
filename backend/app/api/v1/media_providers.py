@@ -25,6 +25,7 @@ from app.core.plan_access import require_plan_access
 from app.models.models import User
 from app.services import candidates as cs
 from app.services.audit_service import record_audit_event
+from app.services import free_usage
 from app.services.media_providers import ProviderUnavailable, now
 from app.services.media_providers import registry
 from app.services.media_providers.wikimedia import IMAGE_MIMES
@@ -62,6 +63,13 @@ def _unavailable(e: ProviderUnavailable) -> HTTPException:
     return _bad(code, msg, status)
 
 
+def _record_free(db: Session, user: User, provider: str, operation: str, code: str, plan_id=None) -> None:
+    """[Gate FR059-D11] 無料の provider へ送った1回を記録する(言葉・画像の ID・URL は残さない)"""
+    if provider in free_usage.FREE_PROVIDERS:
+        free_usage.record(db, user, provider, operation, result_code=code, plan_id=plan_id)
+        db.commit()
+
+
 @router.get("/media-providers/status")
 def media_status(current_user: User = Depends(get_current_user_or_guest)):
     return registry.status()
@@ -71,7 +79,7 @@ def media_status(current_user: User = Depends(get_current_user_or_guest)):
 async def search_images(q: Optional[str] = Query(None, max_length=200),
                         lat: Optional[float] = Query(None, ge=-90, le=90),
                         lng: Optional[float] = Query(None, ge=-180, le=180),
-                        current_user: User = Depends(get_current_user_or_guest)):
+                        current_user: User = Depends(get_current_user_or_guest), db: Session = Depends(get_db)):
     if (lat is None) != (lng is None):
         raise _bad("invalid_field", "緯度と経度は両方を指定してください")
     if not (q and q.strip()) and lat is None:
@@ -79,24 +87,35 @@ async def search_images(q: Optional[str] = Query(None, max_length=200),
     results: List[Dict[str, Any]] = []
     unavailable: List[Dict[str, str]] = []
     for name, p in registry.image_providers().items():
+        code = "ok"
         try:
-            results.extend(c.to_dict() for c in await p.search(q, lat, lng, 12))
+            found = [c.to_dict() for c in await p.search(q, lat, lng, 12)]
+            results.extend(found)
+            code = "ok" if found else "empty"
         except ProviderUnavailable as e:
             unavailable.append({"provider": name, "reason": e.code})
+            code = "unavailable"
         except Exception:  # noqa: BLE001 - 1つの提供元の失敗で他を止めない。値は作らない
             logger.warning("image provider %s failed", name)
             unavailable.append({"provider": name, "reason": "network"})
+            code = "unavailable"
+        if name in free_usage.FREE_PROVIDERS:  # [Gate FR059-D11] 無料の provider の使用の記録
+            free_usage.record(db, current_user, name, "images.search", result_code=code)
+    db.commit()
     return {"images": results, "unavailable": unavailable, "retrieved_at": now().isoformat()}
 
 
 @router.get("/media-providers/images/thumb")
 async def image_thumb(provider: str = Query(..., max_length=40), id: str = Query(..., max_length=260),
-                      current_user: User = Depends(get_current_user_or_guest)) -> Response:
+                      current_user: User = Depends(get_current_user_or_guest),
+                      db: Session = Depends(get_db)) -> Response:
     p = _provider(provider)
     try:
         img = await p.thumbnail(id, THUMB_MAX_BYTES)
     except ProviderUnavailable as e:
+        _record_free(db, current_user, provider, "images.thumb", "unavailable")
         raise _unavailable(e)
+    _record_free(db, current_user, provider, "images.thumb", "ok")
     if img.mime not in IMAGE_MIMES:
         raise _bad("unsupported_type", "対応していない形式の画像です")
     return Response(content=img.content, media_type=img.mime, headers={
@@ -123,7 +142,9 @@ async def import_external(plan_id: str, payload: ImportExternal, request: Reques
     try:
         img = await p.fetch(payload.provider_id, settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
     except ProviderUnavailable as e:
+        _record_free(db, current_user, payload.provider, "images.fetch", "unavailable", plan.id)
         raise _unavailable(e)
+    _record_free(db, current_user, payload.provider, "images.fetch", "ok", plan.id)
     ext = MIME_EXT.get(img.mime)
     if ext is None:
         raise _bad("unsupported_type", "対応していない形式の画像です")
@@ -159,4 +180,17 @@ async def social_preview(plan_id: str, payload: SocialPreviewIn, db: Session = D
     if not url:
         raise _bad("invalid_field", "URL を入力してください")
     preview = await registry.social_provider().preview(url)
+    if preview.status in ("ok", "unavailable"):  # 外へ送った時だけ(未対応・無効は送っていない)
+        free_usage.record(db, current_user, "oembed", "social.preview", plan_id=_plan_uuid(plan_id),
+                          result_code="ok" if preview.status == "ok" else "unavailable")
+        db.commit()
     return preview.to_dict()
+
+
+def _plan_uuid(plan_id: str):
+    import uuid as _uuid
+
+    try:
+        return _uuid.UUID(str(plan_id))
+    except ValueError:
+        return None

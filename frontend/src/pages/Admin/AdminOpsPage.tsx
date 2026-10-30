@@ -109,6 +109,13 @@ const OverviewTab: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
           <p className="tc-ops-kpi-value">{yen(data.live_usage.estimated_jpy)}</p>
           <p className="tc-ops-kpi-sub">アプリの見込み · 請求との照合は明細が届いてから</p>
         </article>
+        {data.free_usage && (
+          <article className="tc-card tc-ops-kpi" data-testid="ops-free-usage">
+            <p className="tc-ops-kpi-head">今月の無料の提供元への送信</p>
+            <p className="tc-ops-kpi-value">{`${data.free_usage.requests}回`}</p>
+            <p className="tc-ops-kpi-sub">{`${Object.keys(data.free_usage.providers).join('・') || 'なし'} · 0円 · 50円の枠の外`}</p>
+          </article>
+        )}
         <article className="tc-card tc-ops-kpi">
           <p className="tc-ops-kpi-head">1旅行の上限</p>
           <p className="tc-ops-kpi-value">{yen(data.thresholds.hard_cap_jpy)}<small> / 旅行</small></p>
