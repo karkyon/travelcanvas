@@ -16,7 +16,10 @@ const btn = 'min-h-11 px-3 py-2 rounded-lg text-sm disabled:opacity-50';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FEATURES: Record<'user' | 'plan', Array<{ value: string; label: string; quota?: boolean }>> = {
   user: [
-    { value: 'trip_planning.class.plus', label: 'クラス Plus(月5旅行・250円)' },
+    { value: 'trip_planning.class.trip', label: 'クラス Trip(行先を見つける: 場所・経路の少ない回数、AI なし)' },
+    { value: 'trip_planning.class.journey', label: 'クラス Journey(計画を一緒に考える: 制限つき AI・限られた API)' },
+    { value: 'trip_planning.class.explorer', label: 'クラス Explorer(比較して深掘りする: 最大の検索・AI の枠)' },
+    { value: 'trip_planning.class.plus', label: '旧クラス Plus(月5旅行・250円)' },
     { value: 'trip_planning.class.family', label: 'クラス Family/Group(支払う人の月の枠)' },
     { value: 'trip_planning.class.pro', label: 'クラス Pro/B2B(契約)' },
     { value: 'trip_planning.cost_jpy_per_month', label: 'Pro の契約: 月の上限(円)', quota: true },
@@ -95,7 +98,7 @@ const AdminEntitlementsPanel: React.FC = () => {
             <table className="w-full text-sm mb-4" data-testid="ent-grants">
               <thead><tr className="text-left text-ink-700"><th>付与</th><th>状態</th><th>理由</th><th>操作</th></tr></thead>
               <tbody>
-                {data.grants.length === 0 && <tr><td colSpan={4} className="py-2 text-ink-700">付与はありません(会員は Free)</td></tr>}
+                {data.grants.length === 0 && <tr><td colSpan={4} className="py-2 text-ink-700">付与はありません(会員は Free: 外部の AI・有料の検索なし)</td></tr>}
                 {data.grants.map((g) => (
                   <tr key={g.id} className="border-t border-cloud-200">
                     <td className="py-2">{g.feature_key}{g.quota !== null ? ` = ${g.quota}` : ''}</td>

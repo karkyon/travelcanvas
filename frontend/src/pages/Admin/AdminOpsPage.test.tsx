@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 const api = vi.hoisted(() => ({
   getOpsOverview: vi.fn(), getOpsProviders: vi.fn(), getOpsLedger: vi.fn(), getOpsCloud: vi.fn(),
   runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(),
-  disableOpsSecret: vi.fn(),
+  disableOpsSecret: vi.fn(), getOpsTiers: vi.fn(), switchOpsTestTier: vi.fn(),
 }));
 vi.mock('@/services/api/opsConsole', () => api);
 
@@ -95,7 +95,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(within(summary).getByText('13回目 · 回数の上限')).toBeInTheDocument();
     expect(within(summary).getByText('0回')).toBeInTheDocument();
     expect(within(summary).getByText('二重に数えない')).toBeInTheDocument();
-    expect(api.runOpsFamilyFake).toHaveBeenCalledWith('家族旅行の Fake の試験');
+    expect(api.runOpsFamilyFake).toHaveBeenCalledWith('家族旅行の Fake の試験', 'explorer');
   });
 
   it('読めない時は失敗を伝え、もう一度読める(作った値を出さない)', async () => {
@@ -137,5 +137,60 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(await screen.findByText(/版 1 · 末尾 1234/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('sk-test-value-ABCD1234');
     expect(screen.queryByTestId('secret-openai_api_key-value')).toBeNull();
+  });
+
+  it('[Gate FR059-Tiers] 会員クラス: 4つのクラスの比較・機能の表・試験の切り替え(理由つき)', async () => {
+    const t = (key: string, label: string, subtitle: string, ops: string[], worst: string, monthly: string | null) => ({
+      key, label, subtitle, summary: 's', operations: ops, ai: ops.some((o) => o.startsWith('ai.')), paid_api: ops.length > 0,
+      profile: 'known', policy_version: '2026-10-31.1', plan_cap_jpy: '50.0000', monthly_cap_jpy: monthly,
+      plans_per_month: monthly ? 5 : null, quotas: {}, worst_case_plan_jpy: worst, fits_plan_cap: true,
+    });
+    api.getOpsTiers.mockResolvedValue({
+      as_of: 'x', policy_version: '2026-10-31.1', rule: 'どのクラスでも 1旅行の有料の原価は 50円まで',
+      tiers: [t('free', 'Free', '自分でつくる', [], '0.0000', null),
+        t('trip', 'Trip', '行先を見つける', ['places.search'], '28.2348', '150.0000'),
+        t('journey', 'Journey', '計画を一緒に考える', ['places.search', 'ai.generate'], '29.6010', '150.0000'),
+        t('explorer', 'Explorer', '比較して深掘りする', ['places.search', 'ai.generate', 'ai.web_search'], '49.5480', '250.0000')],
+      features: [{ key: 'ai_planning', label: 'AI による旅程の案', free: '—', trip: '—', journey: '△', explorer: '△',
+        enforcement: 'server', note: '明示の操作の時だけ' }],
+      legacy: [{ legacy: 'Plus', rule: '一律に変えない' }],
+      thresholds: { user_warning_jpy: '40.0000', ops_alert_jpy: '45.0000', hard_cap_jpy: '50.0000' },
+      test_switch: { enabled: true, hours: 24, note: '開発環境の試験だけ' },
+    });
+    api.switchOpsTestTier.mockResolvedValue({ user_id: 'u', requested: 'journey', before: 'free',
+      effective: { class: 'journey', class_label: 'Journey' }, revoked_test_grants: 0, expires_in_hours: 24,
+      note: '新しいクラスの試験の付与は 24時間で切れます。' });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '会員クラス' }));
+    const table = await screen.findByTestId('ops-tiers-table');
+    expect(table).toHaveTextContent('なし(手入力・無料の検索だけ)');
+    expect(table).toHaveTextContent('¥49.55');
+    expect(within(table).getAllByText('50円以内')).toHaveLength(4);
+    expect(screen.getByTestId('ops-tiers-features')).toHaveTextContent('サーバーが断る');
+    expect(screen.getByText(/¥40 で利用者に警告 · ¥45 で運用に知らせ · ¥50 を越える見込み/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('理由(監査に残ります)'), { target: { value: '' } });
+    expect(screen.getByRole('button', { name: '切り替える' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('理由(監査に残ります)'), { target: { value: '家族旅行の確認' } });
+    fireEvent.click(screen.getByRole('button', { name: '切り替える' }));
+    expect(await screen.findByTestId('ops-tier-result')).toHaveTextContent('今のクラス: Journey(以前: free)');
+    expect(api.switchOpsTestTier).toHaveBeenCalledWith('journey', '家族旅行の確認');
+  });
+
+  it('[Gate FR059-Tiers] Fake の試験はクラスを選んで実行する', async () => {
+    api.runOpsFamilyFake.mockResolvedValue({ as_of: 'x', case: {}, note: 'Fake', steps: [{ n: 1, operation: 'ai.generate',
+      label: 'AI の案の作成', units: {}, result: 'denied', reason: 'tier_feature_not_included', plan_total_jpy: '0.0000',
+      state: 'ok' }],
+    summary: { tier: 'trip', plan_id: 'p', class: 'trip', policy_version: '2026-10-31.1', plan_cap_jpy: '50.0000',
+      final_total_jpy: '0.0000', never_over_cap: true, first_user_warning_step: null, first_ops_alert_step: null,
+      first_denial: { n: 1, reason: 'tier_feature_not_included' }, settled_steps: 0, denied_steps: 1,
+      idempotency_replay: {}, provider: 'fake', external_calls: 0 } });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: 'テスト実行' }));
+    fireEvent.change(await screen.findByLabelText('試験の利用者のクラス'), { target: { value: 'trip' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fake で原価の上限を試す' }));
+    const summary = await screen.findByTestId('ops-run-summary');
+    expect(summary).toHaveTextContent('Trip(行先を見つける)');
+    expect(summary).toHaveTextContent('1回目 · クラスに含まない');
+    expect(api.runOpsFamilyFake).toHaveBeenCalledWith('家族旅行の Fake の試験', 'trip');
   });
 });

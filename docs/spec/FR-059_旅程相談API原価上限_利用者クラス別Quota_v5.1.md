@@ -1,6 +1,6 @@
 # FR-059 旅程相談 API の原価上限(1旅行 50円)と利用者クラス別 Quota(正本)
 
-> 文書ID: SPEC-FR059 / 版: **v5.1-p2**(policy version `2026-10-29.1`) / 状態: APPROVED(利用者の明示の要件。再承認を求めない)・**サーバー側の守りは Gate FR059-B で実装(fake provider で検証。有料の provider は未接続)** /
+> 文書ID: SPEC-FR059 / 版: **v5.1-p3**(policy version `2026-10-29.1`・会員の機能クラス `2026-10-31.1`) / 状態: APPROVED(利用者の明示の要件。再承認を求めない)・**サーバー側の守りは Gate FR059-B で実装(fake provider で検証。有料の provider は未接続)** /
 > 改訂日: 2026-10-29  
 > 出典: 資料室の `TravelCanvas_v5.1_仕様追補_旅程API原価上限と利用者クラス別Quota_2026-10-29.md`(以下「追補」)を、
 > 決定・数値を変えずにリポジトリの正本へ移した。追補と違う所は §13 に全て挙げる(無断の差異を作らない)。  
@@ -14,6 +14,8 @@
   抑える。50円は目安ではなく、provider へ要求を送る前にサーバーが強制する上限(hard cap)。
 - 利用者クラス(Free・Trip Pass・Plus・Family/Group・Pro/B2B・Guest)ごとに、旅行の数・月の合計・呼び出しの回数を決める。
   クラスを上げても 1旅行 50円は増えない。
+- **[Gate FR059-Tiers 2026-10-31]** 会員の機能クラス **Free / Trip / Journey / Explorer** を実装した(§3.2〜§3.5)。
+  新しい Free は外部の AI・有料の検索を含まない。価格・販売・決済は FR-058 のまま未決定(この版では課金しない)。
 - 有料の provider は、本書の Gate B(サーバー側の予約・確定・解放・クラス別 quota・価格台帳・監査・停止・手動の代替)が CI に合格して
   main に入るまで**つながない**。価格が分からない provider は呼ばない(fail closed)。
 - 「旅行の予算」(宿・交通・食事など旅行そのものの費用。FR-027)と「この旅行の AI・外部検索の利用枠」(本書)を混ぜない。
@@ -107,11 +109,81 @@
 
 Family / Group の月の上限・旅行の数は追補に数値が無いため、初版は **Plus と同じ 250円・5旅行**とする(§13 の差異 D3)。
 
+> **2026-10-31 以降の Free は §3.2 の Free(AI なし・有料の検索なし)。** 上の表の Free の行(AI 5回・月1旅行)は policy
+> `2026-10-29.1` の記録で、migration `a1d3f5b7c9e2` で retired にした(行は残す。以前の予約の確定は版で引く)。
+
+### 3.2 会員の機能クラス Free / Trip / Journey / Explorer(policy `2026-10-31.1`、Gate FR059-Tiers)
+
+利用者の指示(2026-10-31「4クラス実装・本日テスト一括指示」)で、提案の4段階を実装した。`jaurny` は誤記で `journey`。
+4つのクラスは**外部の有料 API・AI をどこまで使うかの段階**で、旅行の日数(日帰り・長期)の種類ではない(日数は旅行のデータ)。
+`trip` は1回の旅、`journey` は一連の旅程・過程、`explorer` は探索する人。旅行の中の権限(owner/editor/viewer/guest)・認証の
+ゲスト・Family/Group の共同利用・Pro/B2B の契約・Trip Pass とは別の Entitlement(`trip_planning.class.<free|trip|journey|explorer>`)。
+
+| クラス | 日本語の副題 | 含む有料の操作(この外はサーバーが provider の前で 403 `tier_feature_not_included`) | 1旅行 | 月の上限 | 旅行/月 |
+|---|---|---|---:|---:|---:|
+| **Free** | 自分でつくる | なし(手入力・保存・無料の地図と検索だけ。0円) | 50円(使わない) | なし | なし |
+| **Trip** | 行先を見つける | 場所の検索・詳細・写真・経路・地図。**AI なし** | 50円 | 150円 | 5 |
+| **Journey** | 計画を一緒に考える | Trip + AI の案の作成(制限つき)。**Web 検索なし** | 50円 | 150円 | 5 |
+| **Explorer** | 比較して深掘りする | Journey + AI の Web 検索(追加の調査) | 50円 | 250円 | 5 |
+
+機械が読む正本は `backend/app/services/membership_tiers.py`(含む操作・回数・機能の表・移行の表)と `usage_policy_profiles` の
+版 `2026-10-31.1`。両者の一致は `backend/tests/test_gate_fr059_tiers.py::test_policy_profiles_match_machine_readable_policy` が
+確かめる。**価格は設定しない**(FR-058)。付与は管理者の二者の承認、または開発環境だけの試験の切り替え(§3.5)。
+
+### 3.3 回数の上限と検算(価格の版の単価は §2.2 と同じ。円 = USD × 180 × 1.10 × 1.15 = 227.7)
+
+| feature | Free | Trip | Journey | Explorer | 1回の額(円) |
+|---|---:|---:|---:|---:|---:|
+| `ai_calls_per_plan`(10,000 / 2,000 token まで) | 0 | 0 | 3 | 5 | 0.4554 |
+| `web_searches_per_plan` | 0 | 0 | 0 | 2 | 2.4592 |
+| `places_searches_per_plan` | 0 | 2 | 2 | 3 | 7.9695 |
+| `place_details_per_plan` | 0 | 1 | 1 | 2 | 4.5540 |
+| `photos_per_plan` | 0 | 1 | 1 | 2 | 1.5939 |
+| `route_elements_per_plan` | 0 | 4 | 4 | 4 | 1.1385 |
+| `dynamic_map_loads_per_plan` | 0 | 1 | 1 | 1 | 1.5939 |
+| **全ての上限を同時に使った額** | **0円** | **28.23円** | **29.60円** | **49.55円** | |
+| 月の旅行の数 × その額 | — | 141.2円 ≤ 150円 | 148.0円 ≤ 150円 | 247.7円 ≤ 250円 | |
+
+Trip・Journey は §2.1 の「原則 30円以下」に収め、Explorer は以前の全体の上限(49.55円)と同じ。月の上限は「月の旅行の数を全て
+上限まで使っても越えない」額にした(数値の無い枠を作らない。変える時は新しい版と同じ PR で本書を直す)。
+
+### 3.4 共通の規則(全てのクラス)
+
+- 1旅行の有料の原価は **50円まで**(上のクラスでも越えない)。40円(80%)で利用者の警告、45円(90%)で運用の知らせ、
+  確定 + 予約中 + 今回の見込みが 50円を越える要求は provider へ送る前に断る(ちょうど 50円は許可)。
+- 無料の提供元(OpenStreetMap・Wikipedia など)は 0円の送信の回数として別に記録する(D11)。無料から有料へ自動で切り替えない。
+- クラスに含まない操作は**口座も予約も作らずに**断る(`tier_feature_not_included`、本文に `included_from`・`fallbacks`)。
+  手での編集・保存した候補・公式サイトの確認で続けられると案内する。
+- 解決の順: Guest → 旅行の Trip Pass → Pro の契約 > **Explorer > Journey > Trip** > Plus > Family > Free(既定)。
+  同じ feature の quota を足し合わせない。共同編集の人の呼び出しも所有者(支払う人)のクラス・旅行の台帳で数える。
+- 機能の表(画面・運用コンソールの「会員クラス」)のうち、サーバーが断るのは有料の API・AI の操作。保存の数・オフライン・
+  書き出しの △ は**既存の機能の上限のまま**(クラス別の制限は未実装と表に書く)。予約・決済・会員の販売は全てのクラスで —(FR-058)。
+
+### 3.5 旧クラスからの移行・付与・試験の切り替え
+
+| 現行の概念 | 新しいモデルでの扱い |
+|---|---|
+| Guest / Anonymous | 認証・一時利用の主体として維持(0円)。Free とは別。新しいクラスを付けても Guest |
+| Free(2026-10-29.1: AI 5回・月1旅行) | 新しい Free(AI なし・有料の検索なし)。付与の無い会員は全員これ。以前の版の記録は版のまま |
+| Trip Pass | 旅行への割り当てとして維持(その旅行だけ以前の枠)。販売は FR-058 まで無効 |
+| Plus | 付与は残し、以前の枠のまま。Journey・Explorer へは**一律に変えない**(管理者が新しいクラスを付けた時だけ) |
+| Family / Group | 支払う人の枠として維持。人数で API の枠を増やさない |
+| Pro / B2B | 契約の付与として維持。契約の枠が無い間は 0円(fail closed)。Explorer へ自動で変えない |
+| Admin / Support | 権限の役割。管理者であることは有料の機能を使う根拠にしない |
+| owner / editor / viewer / guest | 旅行の中のデータの権限。クラスと別に両方を確かめる |
+
+- 正式な付与: `POST /admin/entitlements`(`trip_planning.class.trip|journey|explorer`)→ 別の管理者が承認(二者の承認・理由・監査)。
+- 開発環境の試験: `POST /admin/ops/test-tier`(管理者 + 多要素認証・理由が必須・**24時間で切れる**・監査 `ops_test_tier_switched`・
+  以前の試験の付与だけを取り消す・本番/staging は 403 `test_tier_disabled`)。正式な付与は消さない(優先される時はそう表示)。
+- 運用コンソール `GET /admin/ops/tiers`: クラスの比較(価格の版から読む最大の見込み額・50円以内か)・機能の表・移行の表・閾値。
+- Fake の家族旅行の試験 `POST /admin/ops/test-runs/family-fake` は `tier` を選べる(既定 Explorer)。外部への送信 0回。
+- rollback: migration `a1d3f5b7c9e2` の downgrade で 2026-10-31.1 の行を消し、以前の Free を active に戻す(付与・記録は消さない)。
+
 ### 3.1 feature key(quota は整数。単位と期間は key で固定)
 
 | feature_key | 単位 | 初期値 |
 |---|---|---|
-| `trip_planning.class.<free|trip_pass|plus|family|pro>` | クラスの付与(quota なし) | — |
+| `trip_planning.class.<free|trip|journey|explorer|trip_pass|plus|family|pro>` | クラスの付与(quota なし) | — |
 | `trip_planning.plans_per_month` | 旅行/月 | Free 1・Plus 5・Family 5・Pro 契約 |
 | `trip_planning.cost_jpy_per_plan` | 円/旅行 | 50 |
 | `trip_planning.cost_jpy_per_month` | 円/月 | Free 50・Plus 250・Family 250・Pro 契約 |
@@ -290,4 +362,5 @@ Gate の順(DOC-09): **Gate A**(本書・DOC-10 の登録。docs だけ)→ **Ga
 | D11 | 無料の provider・ローカルの処理も使用を記録 | **Gate FR059-D11(2026-10-31)**: 無料の provider(Nominatim・Overpass・Wikipedia・Wikimedia Commons・oEmbed)へ外へ送った回数を `provider_usage_events` に 0円・価格の版 `free` で記録する(`app/services/free_usage.py`)。言葉・URL・座標・結果は残さない。旅行が分かる時は plan_id、相談の入口(旅行の前)は利用者だけ。記録の失敗で機能を止めない。運用コンソールの概要は「無料の提供元への送信」として有料の見込みと分けて出す | SNS の oEmbed の題名から地名を照合する Nominatim の呼び出し(`social.py` の中)は、oEmbed の1回に含めて別には数えない。ローカルの処理(画像の縮小など)は記録しない |
 | D12 | — | 旅行を月の数に入れるのは、その月の最初の予約の時(失敗して解放しても戻さない) | 1回の失敗で何度も数え直す攻撃を防ぐ。数えた月は `counted_month` |
 | D13 | — | 月の区切りは UTC(BILL-02 と同じ)。画面には次のリセットの日を UTC と書く | 既存の使用量と同じ |
+| D15 | 提案(6.3・6.4)「4クラスは提案止まり」 | **実装した(Gate FR059-Tiers、2026-10-31)**。価格・販売・決済は持たない | 利用者が 2026-10-31 に実装を指示した(§3.2〜§3.5) |
 | D14 | — | provider の停止(見込みの超過・照合の差)は Redis の印で全ての worker・運用のコマンドが共有する(回数制限と同じ名前空間)。Redis に届かない間はその process の中の印で止め、届いた時に Redis へ送る(止めた印を失わない)。戻すのは運用者の `tcops.py security provider-resume`(理由が必須・全 worker に伝えられない時は戻さない) | 有料の provider をつなぐ前に入れた(Gate FR059-C)。以前(FR059-B)は process の中の印だけで、止めた worker 以外は呼び続けた |

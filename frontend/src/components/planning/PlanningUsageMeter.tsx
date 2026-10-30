@@ -13,7 +13,7 @@
 import React, { useEffect, useState } from 'react';
 import { getPlanningUsage } from '@/services/api/planningUsage';
 import type { PlanningUsage } from '@/services/api/types/planningUsage';
-import { usageMessage, yen } from './planningUsageModel';
+import { tierName, usageMessage, yen } from './planningUsageModel';
 
 interface Props {
   planId: string;
@@ -91,7 +91,7 @@ const PlanningUsageMeter: React.FC<Props> = ({ planId, className = '' }) => {
     ? `月の枠 ${yen(usage.monthly_used_jpy)}円 / ${yen(usage.monthly_cap_jpy)}円`
       + (usage.plans_per_month !== null ? ` · 今月の旅行 ${usage.plans_used_this_month} / ${usage.plans_per_month}` : '')
     : usage.class === 'trip_pass' ? 'この旅行の Trip Pass' : null;
-  const classText = `クラス: ${usage.class_label}${monthly ? ` · ${monthly}` : ''} · 旅行の費用(予算)には足しません`;
+  const classText = `クラス: ${tierName(usage)}${monthly ? ` · ${monthly}` : ''} · 旅行の費用(予算)には足しません`;
   const unconnected = !usage.providers_connected && usage.state !== 'guest' && !msg;
   const unconnectedText = '外部の有料の提供元(AI・場所・経路)は未接続です(0円)。いまは無料の照会と手での編集だけを使います';
   return (
@@ -132,7 +132,9 @@ const PlanningUsageMeter: React.FC<Props> = ({ planId, className = '' }) => {
           {usage.state !== 'guest' && (
             <ul className="grid gap-1 sm:grid-cols-2" data-testid="planning-usage-calls">
               {usage.calls.map((c) => (
-                <li key={c.operation}>{`${c.label}: 残り ${c.remaining} / ${c.limit}`}</li>
+                <li key={c.operation} data-included={c.included === false ? 'false' : 'true'}>
+                  {c.included === false ? `${c.label}: このクラスに含まない` : `${c.label}: 残り ${c.remaining} / ${c.limit}`}
+                </li>
               ))}
             </ul>
           )}

@@ -82,6 +82,27 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await expect(page.getByText('Fake の試験').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('[運用の試験]')).toHaveCount(0);
 
+    // [Gate FR059-Tiers] 会員クラス: 4つのクラスの比較・機能の表・試験の切り替え(理由つき・監査・24時間)
+    await page.getByRole('tab', { name: '会員クラス' }).click();
+    const tiers = page.getByTestId('ops-tiers-table');
+    await expect(tiers).toBeVisible({ timeout: 15_000 });
+    for (const name of ['Free', 'Trip', 'Journey', 'Explorer']) await expect(tiers).toContainText(name);
+    await expect(tiers.getByText('50円以内')).toHaveCount(4);
+    await expect(page.getByTestId('ops-tiers-features')).toContainText('予約・決済・会員の販売');
+    await expectNoAxeViolations(page, '運用コンソール(会員クラス)');
+    await page.getByLabel('自分のアカウントのクラス').selectOption('journey');
+    await page.getByRole('button', { name: '切り替える' }).click();
+    await expect(page.getByTestId('ops-tier-result')).toContainText('今のクラス: Journey', { timeout: 15_000 });
+    await page.getByLabel('自分のアカウントのクラス').selectOption('free');
+    await page.getByRole('button', { name: '切り替える' }).click();
+    await expect(page.getByTestId('ops-tier-result')).toContainText('今のクラス: Free', { timeout: 15_000 });
+    // Free の試験の利用者は有料の操作を全て送る前に断られ、0円
+    await page.getByRole('tab', { name: 'テスト実行' }).click();
+    await page.getByLabel('試験の利用者のクラス').selectOption('free');
+    await page.getByRole('button', { name: 'Fake で原価の上限を試す' }).click();
+    await expect(page.getByTestId('ops-run-summary')).toContainText('Free(自分でつくる)', { timeout: 30_000 });
+    await expect(page.getByTestId('ops-run-summary')).toContainText('クラスに含まない');
+
     // 5. 鍵の登録(Gate OpsSecrets): password の欄で送り、保存の後は値を出さない(末尾4文字と版だけ)
     await page.getByRole('tab', { name: '秘密情報・権限' }).click();
     const slot = page.getByTestId('ops-secret-google_maps_server_key');

@@ -7,8 +7,10 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  * [FR059-B] FR-059 旅程相談の外部 API の原価上限(1旅行 50円)と利用者クラス別 quota
  * (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §6・§8・§11)。
  *
- *   1. 会員(Free)の旅程の画面に「この旅行の AI・外部検索の利用枠 0円 / 50円」が旅行の予算とは別に出る。未接続(0円)と出る
- *   2. 自分のクラス(GET /entitlements)は Free・1旅行 50円・月 50円・月1旅行。見積もりは provider を呼ばず、予約しない
+ *   1. 会員(Free)の旅程の画面に「この旅行の AI・外部検索の利用枠 0円 / 50円」が旅行の予算とは別に出る。
+ *      [Gate FR059-Tiers] Free は「自分でつくる」クラスで、外部の AI・有料の検索を使わない(0円)と出る(上限に達したとは言わない)
+ *   2. 自分のクラス(GET /entitlements)は Free(policy 2026-10-31.1)。見積もりは provider を呼ばず、予約せず、
+ *      Free には含まない(tier_feature_not_included)と返す
  *   3. 上限・クラスを要求で送っても受け付けない(サーバーが決める)。閲覧の人は見積もりできない
  *   4. 旅行相談の入口にクラスと今月の枠が出る
  *   5. ゲストの旅行は 0円(外部の AI・有料の検索を使わない)と出る
@@ -25,13 +27,15 @@ test('FR-059 旅程相談の利用枠: 0円 / 50円・クラス・見積もり�
 
   // 2. クラス・見積もり
   const mine = await send('get', '/entitlements');
-  expect(mine).toMatchObject({ class: 'free', plan_cap_jpy: '50.0000', monthly_cap_jpy: '50.0000', plans_per_month: 1,
-    policy_version: '2026-10-29.1', providers_connected: false });
+  expect(mine).toMatchObject({ class: 'free', plan_cap_jpy: '50.0000', monthly_cap_jpy: null, plans_per_month: null,
+    policy_version: '2026-10-31.1', providers_connected: false,
+    tier: { key: 'free', subtitle: '自分でつくる', ai: false, paid_api: false, operations: [] } });
   const est = await send('post', `/plans/${plan.id}/planning-actions/estimate`,
     { operation: 'places.search', units: { requests: 1 } });
-  expect(est).toMatchObject({ max_cost_jpy: '7.9695', max_cost_yen_ceil: 8, allowed: true, connected: false });
+  expect(est).toMatchObject({ max_cost_jpy: '7.9695', max_cost_yen_ceil: 8, allowed: false,
+    reason: 'tier_feature_not_included', connected: false });
   const usage = await send('get', `/plans/${plan.id}/planning-usage`);
-  expect(usage).toMatchObject({ plan_used_yen_ceil: 0, plan_cap_yen: 50, state: 'ok', plans_used_this_month: 0 });
+  expect(usage).toMatchObject({ plan_used_yen_ceil: 0, plan_cap_yen: 50, state: 'manual_only', plans_used_this_month: 0 });
 
   // 3. 上限・クラスは要求で変えられない
   const forged = await page.context().request.post(`${me.apiBase}/plans/${plan.id}/planning-actions/estimate`, {
@@ -46,16 +50,17 @@ test('FR-059 旅程相談の利用枠: 0円 / 50円・クラス・見積もり�
   const meter = page.getByTestId('planning-usage');
   await expect(meter).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('planning-usage-amount')).toHaveText('0円 / 50円');
-  await expect(meter).toContainText('クラス: Free');
+  await expect(meter).toHaveAttribute('data-state', 'manual_only');
+  await expect(meter).toContainText('クラス: Free(自分でつくる)');
   await expect(meter).toContainText('旅行の費用(予算)には足しません');
-  await expect(page.getByTestId('planning-usage-unconnected')).toContainText('未接続です(0円)');
+  await expect(page.getByTestId('planning-usage-message')).toContainText('外部の AI・有料の検索を使いません(0円)');
   await expect(page.getByRole('meter', { name: 'この旅行の AI・外部検索の利用枠の使用' })).toHaveAttribute('aria-valuenow', '0');
   await expectNoAxeViolations(page, '旅程の画面の利用枠');
 
   // 4. 旅行相談の入口
   await page.goto('/trip-consult');
-  await expect(page.getByTestId('planning-class-summary')).toContainText('クラス: Free · 1旅行 50円まで · 今月 0円 / 50円',
-    { timeout: 20_000 });
+  await expect(page.getByTestId('planning-class-summary')).toContainText(
+    'クラス: Free(自分でつくる) · 外部の AI・有料の検索なし(0円)', { timeout: 20_000 });
 
   // 6. 360px・暗い見た目
   await page.evaluate(() => window.localStorage.setItem('tc.theme', 'dark'));

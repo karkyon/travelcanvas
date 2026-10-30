@@ -6,15 +6,21 @@ import type { AxiosRequestConfig } from 'axios';
 import { api } from './index';
 import { arrayOf, bool, decodeResponse, int, nullable, object, oneOf, optional, record, str, type Decoder } from './decode';
 import type {
-  AdminEntitlements, EntitlementFeature, EntitlementGrant, MyEntitlements, PlanningCallQuota, PlanningUsage,
+  AdminEntitlements, EntitlementFeature, EntitlementGrant, MyEntitlements, PlanningCallQuota, PlanningUsage, TierInfo,
 } from './types/planningUsage';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
-const CLASSES = ['guest', 'free', 'trip_pass', 'plus', 'family', 'pro'] as const;
-const STATES = ['ok', 'warning', 'limit_reached', 'monthly_limit_reached', 'monthly_plans_reached', 'guest'] as const;
+const CLASSES = ['guest', 'free', 'trip', 'journey', 'explorer', 'trip_pass', 'plus', 'family', 'pro'] as const;
+const STATES = ['ok', 'warning', 'limit_reached', 'monthly_limit_reached', 'monthly_plans_reached', 'guest',
+  'manual_only'] as const;
 
 const call: Decoder<PlanningCallQuota> = object<PlanningCallQuota>({
-  operation: str, label: str, feature: str, limit: int, used: int, remaining: int,
+  operation: str, label: str, feature: str, limit: int, used: int, remaining: int, included: optional(bool),
+});
+
+const tier: Decoder<TierInfo> = object<TierInfo>({
+  key: nullable(oneOf('free', 'trip', 'journey', 'explorer')), label: nullable(str), subtitle: nullable(str),
+  summary: nullable(str), operations: arrayOf(str), ai: bool, paid_api: bool,
 });
 
 const planningUsage: Decoder<PlanningUsage> = object<PlanningUsage>({
@@ -23,7 +29,7 @@ const planningUsage: Decoder<PlanningUsage> = object<PlanningUsage>({
   plan_used_yen_ceil: int, plan_cap_yen: int, warn_at_jpy: str, state: oneOf(...STATES),
   monthly_cap_jpy: nullable(str), monthly_used_jpy: nullable(str), plans_per_month: nullable(int),
   plans_used_this_month: int, counted_this_month: bool, reset_at: nullable(str), calls: arrayOf(call),
-  connected_operations: arrayOf(str), providers_connected: bool, fallbacks: arrayOf(str),
+  connected_operations: arrayOf(str), providers_connected: bool, fallbacks: arrayOf(str), tier: optional(tier),
 });
 
 const feature: Decoder<EntitlementFeature> = object<EntitlementFeature>({ feature: str, quota: nullable(int) });
@@ -32,7 +38,7 @@ const mine: Decoder<MyEntitlements> = object<MyEntitlements>({
   class: oneOf(...CLASSES), class_label: str, class_source: str, profile_key: str, policy_version: str,
   currency: oneOf('JPY'), plan_cap_jpy: str, monthly_cap_jpy: nullable(str), monthly_used_jpy: str,
   plans_per_month: nullable(int), plans_used_this_month: int, reset_at: str, features: arrayOf(feature),
-  providers_connected: bool, as_of: str,
+  providers_connected: bool, as_of: str, tier: optional(tier),
 });
 
 const grant: Decoder<EntitlementGrant> = object<EntitlementGrant>({

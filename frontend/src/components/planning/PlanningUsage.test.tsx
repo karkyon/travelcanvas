@@ -13,7 +13,7 @@ vi.mock('@/services/api/planningUsage', () => api);
 
 import PlanningUsageMeter from './PlanningUsageMeter';
 import PlanningClassSummary from './PlanningClassSummary';
-import { classLine, usageMessage } from './planningUsageModel';
+import { classLine, tierName, usageMessage } from './planningUsageModel';
 import AdminEntitlementsPanel from '@/pages/Admin/AdminEntitlementsPanel';
 import type { MyEntitlements, PlanningUsage } from '@/services/api/types/planningUsage';
 
@@ -151,6 +151,69 @@ describe('この旅行の利用枠', () => {
     api.getMyEntitlements.mockResolvedValue(mine());
     render(<PlanningClassSummary />);
     expect(await screen.findByTestId('planning-class-summary')).toHaveTextContent('外部の有料の提供元は未接続(0円)');
+  });
+});
+
+describe('[Gate FR059-Tiers] 会員の機能クラス', () => {
+  const tier = (key: 'free' | 'trip' | 'journey' | 'explorer', subtitle: string, operations: string[]) => ({
+    key, label: key.charAt(0).toUpperCase() + key.slice(1), subtitle, summary: 's', operations,
+    ai: operations.some((o) => o.startsWith('ai.')), paid_api: operations.length > 0,
+  });
+
+  it('Free は手で作るクラスとして案内し、0円・外部の AI なしと出す(上限に達したとは言わない)', async () => {
+    const free = usage({ state: 'manual_only', policy_version: '2026-10-31.1', monthly_cap_jpy: null,
+      monthly_used_jpy: null, plans_per_month: null, tier: tier('free', '自分でつくる', []),
+      calls: [{ operation: 'ai.generate', label: 'AI の案の作成', feature: 'trip_planning.ai_calls_per_plan', limit: 0,
+        used: 0, remaining: 0, included: false }] });
+    const m = usageMessage(free)!;
+    expect(m.tone).toBe('muted');
+    expect(m.text).toContain('外部の AI・有料の検索を使いません(0円)');
+    expect(m.text).toContain('手入力・保存・無料の地図と検索');
+    api.getPlanningUsage.mockResolvedValue(free);
+    render(<PlanningUsageMeter planId="p1" />);
+    expect(await screen.findByTestId('planning-usage')).toHaveAttribute('data-state', 'manual_only');
+    expect(screen.getByTestId('planning-usage-class')).toHaveTextContent('クラス: Free(自分でつくる)');
+    expect(screen.getByTestId('planning-usage-message')).toHaveAttribute('role', 'status');
+    expect(within(screen.getByTestId('planning-usage-calls')).getByText('AI の案の作成: このクラスに含まない'))
+      .toBeInTheDocument();
+  });
+
+  it('クラスの名前に日本語の副題を付け、旧クラスはそのまま', () => {
+    expect(tierName({ class_label: 'Journey', tier: tier('journey', '計画を一緒に考える', ['ai.generate']) }))
+      .toBe('Journey(計画を一緒に考える)');
+    expect(tierName({ class_label: 'Plus', tier: { ...tier('free', 'x', []), key: null, subtitle: null } })).toBe('Plus');
+    expect(tierName({ class_label: 'Plus' })).toBe('Plus');
+    expect(classLine(mine({ class: 'free', class_label: 'Free', monthly_cap_jpy: null, plans_per_month: null,
+      tier: tier('free', '自分でつくる', []) }))).toBe('クラス: Free(自分でつくる) · 外部の AI・有料の検索なし(0円)');
+    expect(classLine(mine({ class: 'explorer', class_label: 'Explorer',
+      tier: tier('explorer', '比較して深掘りする', ['ai.generate', 'ai.web_search']) })))
+      .toBe('クラス: Explorer(比較して深掘りする) · 1旅行 50円まで · 今月 13円 / 250円 · 今月の旅行 2 / 5');
+  });
+
+  it('含む操作は残りの回数を出す', async () => {
+    api.getPlanningUsage.mockResolvedValue(usage({ class: 'trip', class_label: 'Trip',
+      tier: tier('trip', '行先を見つける', ['places.search']),
+      calls: [
+        { operation: 'places.search', label: '場所の検索', feature: 'f', limit: 2, used: 1, remaining: 1, included: true },
+        { operation: 'ai.generate', label: 'AI の案の作成', feature: 'g', limit: 0, used: 0, remaining: 0, included: false },
+      ] }));
+    render(<PlanningUsageMeter planId="p1" />);
+    const calls = await screen.findByTestId('planning-usage-calls');
+    expect(within(calls).getByText('場所の検索: 残り 1 / 2')).toBeInTheDocument();
+    expect(within(calls).getByText('AI の案の作成: このクラスに含まない')).toBeInTheDocument();
+  });
+
+  it('管理の付与に 4つのクラスを出す(旧クラスと分ける)', async () => {
+    api.adminListEntitlements.mockResolvedValue({ grants: [] });
+    render(<AdminEntitlementsPanel />);
+    fireEvent.change(screen.getByLabelText('ID'), { target: { value: '11111111-1111-4111-8111-111111111111' } });
+    fireEvent.click(screen.getByRole('button', { name: '表示' }));
+    const select = await screen.findByLabelText('付与する内容');
+    const values = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(values).toEqual(expect.arrayContaining(['trip_planning.class.trip', 'trip_planning.class.journey',
+      'trip_planning.class.explorer']));
+    expect(screen.getByText(/旧クラス Plus/)).toBeInTheDocument();
+    expect(screen.getByText(/会員は Free: 外部の AI・有料の検索なし/)).toBeInTheDocument();
   });
 });
 
