@@ -192,6 +192,7 @@
 | `scheduled` | 409 | no | 予定に配置済みの候補は、予定を消すと候補に戻ります | api/v1/candidates.py |
 | `seat_limit_below_members` | 409 | no | 今のメンバー(…人)より少なくはできません。先にメンバーを外してください | api/v1/organizations.py |
 | `seat_limit_reached` | 409 | no | 席の上限(…人)に達しています。上限を見直すか、メンバーを外してください | api/v1/organizations.py |
+| `secret_not_registered` | 409 | no | この画面で登録した有効な鍵はありません | api/v1/admin_ops.py |
 | `self_target` | — | — | 自分自身のアカウントはこの画面から操作できません | api/v1/admin.py |
 | `sensitive_creator_only` | 403 | no | 機密情報を含む版は作成者だけが表示できます | api/v1/booklet.py |
 | `sensitive_requires_owner` | — | — | 予約番号・住所・電話・参加者名を含めた出力は旅行の所有者だけが作成できます | api/v1/booklet.py |
@@ -229,6 +230,7 @@
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unknown_planning_operation` | — | — | 知らない操作です | api/v1/planning_usage.py |
 | `unknown_provider` | 404 | no | 知らない提供元です | api/v1/admin_ops.py |
+| `unknown_secret_slot` | 404 | no | 知らない鍵の種類です | api/v1/admin_ops.py |
 | `unlock_reason_required` | 422 | no | 締めを解除する理由を200文字までで入力してください | api/v1/finance_ledger.py |
 | `unsupported_platform` | — | — | 対応していない SNS の URL です | api/v1/candidates.py |
 | `unsupported_type` | — | — | 対応していない形式の画像です | api/v1/media_providers.py |

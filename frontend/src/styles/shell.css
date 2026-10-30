@@ -529,3 +529,9 @@
 .tc-ops-asof { font-size: 11px; color: var(--tc-ink-500); margin: 10px 0 0; }
 @media (max-width: 1100px) { .tc-ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tc-ops-two { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 480px) { .tc-ops-kpis { grid-template-columns: minmax(0, 1fr); } }
+
+.tc-ops-secrets { list-style: none; margin: 10px 0 0; padding: 0; }
+.tc-ops-secrets > li { padding: 14px 0; border-bottom: 1px solid var(--tc-cloud-200); }
+.tc-ops-secrets > li:last-child { border-bottom: 0; }
+.tc-ops-secrets b { display: block; font-size: 14px; color: var(--tc-ink-900); }
+.tc-ops-secrets small { display: block; font-size: 11px; color: var(--tc-ink-500); }
