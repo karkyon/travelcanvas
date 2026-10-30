@@ -18,6 +18,8 @@ import {
   CONFIDENCE_LABEL, KIND_OPTIONS, REPLAN_STATE_LABEL, SOURCE_LABEL, STATUS_LABEL, alertFormToPayload, emptyAlertForm,
   formatObserved, needsDelay, needsEvent, replanErrorInfo, type AlertForm,
 } from './replan/replanModel';
+import UiIcon from '@/components/common/UiIcon';
+import { IcSun } from '@/components/common/uiIcons';
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
 
@@ -173,7 +175,8 @@ const AlertsPage: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="flex flex-wrap gap-2 mb-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)}>← プランへ戻る</Button>
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/today`)}>☀️ 今日の画面</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/today`)}
+          icon={<UiIcon icon={IcSun} />}>今日の画面</Button>
       </div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink-900">遅延・休業などへの対応</h1>

@@ -27,6 +27,8 @@ import type {
 } from '@/services/api';
 import { describeRouteOptionDeletion } from '@/store/itemDeletionMessages';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import UiIcon from '@/components/common/UiIcon';
+import { IcRoute } from '@/components/common/uiIcons';
 
 function generateIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -204,7 +206,7 @@ const RouteOptionsPage: React.FC = () => {
         </Button>
 
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">🗺️ 経路の比較</h1>
+          <h1 className="text-xl font-bold"><UiIcon icon={IcRoute} size={20} className="mr-2 align-[-4px]" />経路の比較</h1>
           <Button variant="primary" size="sm" onClick={openCreateForm} disabled={allEvents.length < 2}>
             <Plus size={16} className="mr-1" /> 候補を追加
           </Button>

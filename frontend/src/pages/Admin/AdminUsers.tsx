@@ -20,6 +20,8 @@ import { apiErrorMessage } from '../../utils/apiError';
 import type { AdminUserAction, AdminUserRow } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { USER_TYPES } from '../../config/constants';
+import UiIcon from '@/components/common/UiIcon';
+import { IcBadgeCheck, IcBarChart, IcClipboard, IcCopy, IcMailX, IcPause, IcPlay } from '@/components/common/uiIcons';
 
 // [Gate A2] 応答の形は services/api の adminUsersPage で検査する
 type AdminUser = AdminUserRow;
@@ -106,7 +108,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
           <>
             {/* 基本情報 */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">📋 基本情報</h3>
+              <h3 className="text-lg font-semibold mb-3"><UiIcon icon={IcClipboard} size={18} className="mr-1 align-[-3px]" />基本情報</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-medium text-ink-700">ユーザーID:</span>
@@ -165,7 +167,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
             {/* 統計情報 */}
             {statistics && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">📊 統計情報</h3>
+                <h3 className="text-lg font-semibold mb-3"><UiIcon icon={IcBarChart} size={18} className="mr-1 align-[-3px]" />統計情報</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-blue-50 p-3 rounded-lg">
                     <div className="text-sm text-blue-600 font-medium">アカウント経過日数</div>
@@ -212,8 +214,9 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                   variant="outline"
                   className="text-red-700 border-red-300 hover:bg-red-50"
                   disabled={loading || user.is_self || user.is_admin}
+                  icon={<UiIcon icon={IcPause} />}
                 >
-                  ⏸️ アカウント停止
+                  アカウント停止
                 </Button>
               ) : (
                 <Button
@@ -221,14 +224,16 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                   variant="outline"
                   className="text-green-700 border-green-300 hover:bg-green-50"
                   disabled={loading || user.is_self || user.is_admin}
+                  icon={<UiIcon icon={IcPlay} />}
                 >
-                  ▶️ アカウント復活
+                  アカウント復活
                 </Button>
               )}
 
               {user.is_verified ? (
-                <Button onClick={() => handleUserAction('unverify')} variant="outline" disabled={loading || user.is_self || user.is_admin}>
-                  📧 認証解除
+                <Button onClick={() => handleUserAction('unverify')} variant="outline" disabled={loading || user.is_self || user.is_admin}
+                  icon={<UiIcon icon={IcMailX} />}>
+                  認証解除
                 </Button>
               ) : (
                 <Button
@@ -236,13 +241,15 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ user, isOpen, onClose
                   variant="outline"
                   className="text-blue-700 border-blue-300 hover:bg-blue-50"
                   disabled={loading || user.is_self || user.is_admin}
+                  icon={<UiIcon icon={IcBadgeCheck} />}
                 >
-                  ✅ 手動認証
+                  手動認証
                 </Button>
               )}
 
-              <Button onClick={() => navigator.clipboard.writeText(user.id)} variant="outline" disabled={loading}>
-                📋 IDコピー
+              <Button onClick={() => navigator.clipboard.writeText(user.id)} variant="outline" disabled={loading}
+                icon={<UiIcon icon={IcCopy} />}>
+                IDコピー
               </Button>
             </div>
           </>
@@ -360,7 +367,7 @@ const AdminUsers: React.FC = () => {
             <Input
               type="text"
               aria-label="ユーザー名・メールアドレス・IDで検索"
-              placeholder="🔍 ユーザー名、メールアドレス、IDで検索..."
+              placeholder="ユーザー名、メールアドレス、IDで検索..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />

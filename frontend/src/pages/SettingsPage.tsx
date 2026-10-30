@@ -23,6 +23,8 @@ import {
   clearAllOfflinePacks,
   type OfflinePackSummary,
 } from '@/utils/offlinePack';
+import UiIcon from '@/components/common/UiIcon';
+import { IcSettings } from '@/components/common/uiIcons';
 
 interface SettingsTab {
   id: string;
@@ -754,7 +756,7 @@ const SettingsPage: React.FC = () => {
             ← ダッシュボードに戻る
           </button>
           <h1 className="text-3xl font-bold text-ink-900 mb-4">
-            ⚙️ 設定
+            <UiIcon icon={IcSettings} size={28} className="mr-2 align-[-4px]" />設定
           </h1>
           <p className="text-ink-700">
             アカウント情報、通知設定、プライバシー設定を管理

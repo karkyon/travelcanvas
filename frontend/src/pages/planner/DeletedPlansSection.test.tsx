@@ -52,7 +52,7 @@ describe('DeletedPlansSection (Gate B-012)', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     const ul = await openList();
     expect(within(ul).getAllByRole('listitem')).toHaveLength(list.length);
-    expect(within(ul).getByText('📍 京都')).toBeInTheDocument();
+    expect(within(ul).getByText('京都')).toBeInTheDocument();
     expect(within(ul).getAllByText(/に完全に削除されます|まもなく完全に削除されます/)).toHaveLength(list.length);
     expect(screen.getByRole('button', { name: '閉じる' })).toHaveAttribute('aria-expanded', 'true');
   });

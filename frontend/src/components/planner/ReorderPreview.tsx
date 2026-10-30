@@ -34,7 +34,7 @@ const ReorderPreview: React.FC<Props> = ({ dayId, model, busy, onApply, onCancel
             : `⚠ この並びにすると、前後が合わなくなる移動の区間が${mismatches.length}件あります(${mismatches.map((t) => `「${t}」`).join('')}へ着く区間)。区間は自動では直しません`}
       </p>
       <p data-testid="reorder-preview-hours">
-        開始・終了の時刻は変えないため、営業時間の判定は変わりません(保存の後にもう一度確かめます)。確定(🔒)の予定は動かしません。
+        開始・終了の時刻は変えないため、営業時間の判定は変わりません(保存の後にもう一度確かめます)。確定の予定は動かしません。
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" className="min-h-11" onClick={onApply} disabled={busy} data-testid="reorder-apply">

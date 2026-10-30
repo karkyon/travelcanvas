@@ -32,6 +32,8 @@ import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
 import MemberPolicyPanel from '@/components/share/MemberPolicyPanel';
 import OwnershipTransferPanel from '@/components/share/OwnershipTransferPanel';
 import LocalQrCode from '../components/share/LocalQrCode';
+import UiIcon from '@/components/common/UiIcon';
+import { IcLightbulb, IcShare } from '@/components/common/uiIcons';
 
 const PRESET_BUTTONS: Array<{ value: SharePreset; label: string }> = [
   { value: 'minimal', label: '最小限' }, { value: 'standard', label: '標準' }, { value: 'all', label: 'すべて(機密を除く)' },
@@ -309,7 +311,7 @@ const SharePage: React.FC = () => {
             ← プランナーに戻る
           </button>
           <h1 className="text-3xl font-bold text-ink-900 mb-4">
-            🤝 プラン共有・権限設定
+            <UiIcon icon={IcShare} size={28} className="mr-2 align-[-4px]" />プラン共有・権限設定
           </h1>
           <p className="text-ink-700">
             URL共有、QRコード、メール招待で柔軟な共有が可能です
@@ -486,8 +488,8 @@ const SharePage: React.FC = () => {
                     onChange={(e) => setPermission(e.target.value as 'view' | 'edit')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="view">👀 閲覧のみ</option>
-                    <option value="edit">✏️ 編集可能(将来対応。現在は閲覧のみ動作)</option>
+                    <option value="view">閲覧のみ</option>
+                    <option value="edit">編集可能(将来対応。現在は閲覧のみ動作)</option>
                   </select>
                 </div>
 
@@ -645,8 +647,8 @@ const SharePage: React.FC = () => {
                     onChange={(e) => setInviteRole(e.target.value as 'viewer' | 'editor')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="viewer">👀 閲覧のみ</option>
-                    <option value="editor">✏️ 編集可能</option>
+                    <option value="viewer">閲覧のみ</option>
+                    <option value="editor">編集可能</option>
                   </select>
                 </div>
 
@@ -770,7 +772,7 @@ const SharePage: React.FC = () => {
           <div className="flex items-start gap-2">
             <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
             <div className="text-sm text-yellow-800">
-              <p className="font-medium mb-1">💡 共有時の注意事項</p>
+              <p className="font-medium mb-1"><UiIcon icon={IcLightbulb} className="mr-1 align-[-3px]" />共有時の注意事項</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>共有URLは発行直後の画面でしか表示されません。必ずその場でコピーしてください</li>
                 <li>パスコード保護を設定することを強く推奨します</li>

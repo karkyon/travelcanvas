@@ -7,6 +7,8 @@ import { spotApiService, SpotResponse } from '../services/spotApi';
 import Button from './common/Button';
 import Card from './common/Card';
 import { useToast } from './common/toastContext';
+import UiIcon from '@/components/common/UiIcon';
+import { IcEye, IcMapPin } from '@/components/common/uiIcons';
 
 interface SpotListProps {
   onSpotSelect?: (spot: SpotResponse) => void;
@@ -240,12 +242,12 @@ const SpotList: React.FC<SpotListProps> = ({ onSpotSelect, refreshTrigger }) => 
                   
                   {spot.address && (
                     <p className="text-ink-500 text-xs mb-2">
-                      📍 {spot.address}
+                      <UiIcon icon={IcMapPin} size={12} className="mr-1 align-[-3px]" />{spot.address}
                     </p>
                   )}
                   
                   <div className="flex justify-between items-center text-xs text-ink-500">
-                    <span>👀 {spot.visit_count}回表示</span>
+                    <span><UiIcon icon={IcEye} size={12} className="mr-1 align-[-3px]" />{spot.visit_count}回表示</span>
                     <span>{formatDate(spot.created_at)}</span>
                   </div>
                 </div>

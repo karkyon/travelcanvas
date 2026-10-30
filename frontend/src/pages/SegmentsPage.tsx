@@ -35,6 +35,8 @@ import type {
   NormalizedDay, NormalizedEvent, PlaceDetail,
 } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import UiIcon from '@/components/common/UiIcon';
+import { IcFootprints } from '@/components/common/uiIcons';
 
 const MODE_OPTIONS: { value: SegmentMode; label: string; icon: React.ReactNode }[] = [
   { value: 'walking', label: '徒歩', icon: <PersonStanding size={16} /> },
@@ -347,7 +349,7 @@ const SegmentsPage: React.FC = () => {
         </Button>
 
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">🚶 移動区間</h1>
+          <h1 className="text-xl font-bold"><UiIcon icon={IcFootprints} size={20} className="mr-2 align-[-4px]" />移動区間</h1>
           <Button variant="primary" size="sm" onClick={openCreateForm} disabled={allEvents.length < 2}>
             <Plus size={16} className="mr-1" /> 追加
           </Button>

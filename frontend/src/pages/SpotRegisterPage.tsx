@@ -12,6 +12,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpotRegistration from '@/components/SpotRegistration';
+import UiIcon from '@/components/common/UiIcon';
+import { IcPlus } from '@/components/common/uiIcons';
 
 const SpotRegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,7 +30,7 @@ const SpotRegisterPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-3xl font-bold text-ink-900">➕ スポット登録</h1>
+          <h1 className="text-3xl font-bold text-ink-900"><UiIcon icon={IcPlus} size={28} className="mr-2 align-[-4px]" />スポット登録</h1>
         </div>
 
         <SpotRegistration

@@ -50,7 +50,7 @@ const ReorderImpact: React.FC<Props> = ({ dayId, model, busy, onUndo, onKeep }) 
             : `⚠ 前後が合わなくなった移動の区間が${mismatches.length}件あります(${mismatches.map((t) => `「${t}」`).join('')}へ着く区間)。区間は自動では直しません`}
       </p>
       <p className="text-xs text-ink-700">
-        並びは保存済みです。開始・終了の時刻は自動では変えていません。確定(🔒)の予定は動かしていません。
+        並びは保存済みです。開始・終了の時刻は自動では変えていません。確定の予定は動かしていません。
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" className="min-h-11" onClick={onUndo} disabled={busy} data-testid="reorder-undo">
