@@ -123,6 +123,9 @@ jobs:
       # [Gate G1] DEP-05 bundle の上限(最初に読む JS 430kB(Gate G9 Q03 で 450 から下げた)・gzip 150kB、1つの塊 500kB)
       - name: Bundle budget (ブロッキング)
         run: python3 ../scripts/ci/check_bundle_budget.py --dist dist
+      # [Gate OpsSecrets-Clarity] 配布物にサーバーの秘密・source map が入っていないこと
+      - name: Bundle secrets check
+        run: python3 ../scripts/ci/check_bundle_secrets.py --dist dist
 
       # [Gate G3] DEP-04 試験の出力に想定外のエラー・警告を残さない(標準エラー 0 行)。CI-02 結果(JUnit)と
       # coverage を残す。再試行はしない(vitest.config.ts の retry: 0)

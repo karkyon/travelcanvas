@@ -188,3 +188,73 @@ def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypa
     assert set(slots) == {"openai_api_key", "google_maps_browser_key", "google_maps_server_key"}
     assert slots["google_maps_server_key"]["status"] == "missing"
     assert slots["google_maps_server_key"]["providers"] == ["google_places", "google_routes"]
+
+
+def test_key_present_is_not_connected_without_adapter(auth_client, db_session, audits, monkeypatch):
+    """[Gate OpsSecrets-Clarity] 鍵・提供元の登録・価格が揃っても、adapter が無ければ送らない(鍵あり≠接続済み)"""
+    client, user = auth_client
+    _admin(db_session, user)
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-test-not-a-real-key-123456")
+    cg.register_provider("openai", ["ai.generate"])
+    try:
+        rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
+    finally:
+        cg.unregister_provider("openai")
+    assert rows["openai"]["registered"] is True and rows["openai"]["secret"] == "configured"
+    assert rows["openai"]["adapter"] == "not_implemented"
+    assert rows["openai"]["live_calls"] == "disabled"
+    assert rows["openai"]["secret_storage"] == "サーバーの環境変数(.env)"
+    assert rows["fake"]["adapter"] == "fake"
+    assert all(p["adapter"] == "not_implemented" for n, p in rows.items() if n != "fake")
+    assert admin_ops.ADAPTERS_IMPLEMENTED == frozenset()
+
+
+def test_secrets_state_storage_is_app_db_not_secret_manager(auth_client, db_session, audits):
+    client, user = auth_client
+    _admin(db_session, user)
+    body = client.get("/api/v1/admin/ops/secrets").json()
+    assert "アプリの DB" in body["storage"]["location"] and "暗号化" in body["storage"]["location"]
+    assert "Secret Manager には登録しません" in body["storage"]["not_secret_manager"]
+    assert "ENCRYPTION_KEY を失うと復号できない" in body["storage"]["backup"]
+    for slot in body["slots"]:
+        assert slot["in_use"] is False and "まだこの鍵を使いません" in slot["in_use_note"]
+
+
+def test_provider_secrets_column_is_covered_by_rekey(db_session):
+    """ENCRYPTION_KEY の掛け直し(tcops rekey)が provider_secrets の暗号文も対象にする"""
+    from app.ops.decrypt_check import encrypted_columns
+
+    cols = encrypted_columns(db_session.connection())
+    assert {"table": "provider_secrets", "column": "secret_ciphertext"} in cols
+
+
+def test_bundle_secret_check_catches_server_keys(tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "check_bundle_secrets.py"
+    spec = importlib.util.spec_from_file_location("check_bundle_secrets", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "ok.js").write_text("const a = 'hello';")
+    assert mod.scan(tmp_path, False) == []
+    (tmp_path / "assets" / "bad.js").write_text('const k = "sk-proj-abcdefghijklmnopqrstuvwxyz012345";')
+    (tmp_path / "assets" / "x.js.map").write_text("{}")
+    (tmp_path / "assets" / "g.js").write_text('k="AIza' + "A" * 35 + '"')
+    problems = mod.scan(tmp_path, False)
+    assert any("openai_key" in p for p in problems) and any("source map" in p for p in problems)
+    assert any("Google の鍵" in p for p in problems)
+    assert not any("Google の鍵" in p for p in mod.scan(tmp_path, True))
+    assert "sk-proj-abcdefghij" not in " ".join(problems)  # 値は出さない
+
+
+def test_no_code_sends_to_paid_hosts_without_an_adapter():
+    """fail closed: adapter が無い間、アプリのコードに有料の提供元の送り先(host)が無い(cost_guard を通らない送信を作らない)"""
+    import re
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    hosts = re.compile(r"api\.openai\.com|places\.googleapis\.com|routes\.googleapis\.com|maps\.googleapis\.com")
+    found = [str(p.relative_to(app_dir)) for p in app_dir.rglob("*.py") if hosts.search(p.read_text(encoding="utf-8"))]
+    assert found == [], "adapter の Gate の前に有料の送り先がある: %s" % found

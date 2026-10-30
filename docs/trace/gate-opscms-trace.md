@@ -28,3 +28,17 @@ migration なし(既存の FR-059 の表 usage_budget_accounts・provider_usage_
 | 14 | 新しい版で前の版は入れ替え済み(有効は slot ごとに1つ)・無効にすると .env の値へ戻る | IMPLEMENTED | BE |
 | 15 | 鍵の列は `*_ciphertext`(鍵の点検・掛け直し `tcops.py keys` の対象) | IMPLEMENTED | `provider_secrets.secret_ciphertext` |
 | 16 | 登録した鍵で外部の API へ送る(提供元の adapter) | NOT STARTED | 提供元の Gate(契約・価格の確認の後) |
+
+## Gate OpsSecrets-Clarity(監査 2026-10-30 の Gate B: 鍵の保存先・接続の状態を誤解させない)
+
+| # | 要件 | 状態 | 証拠 |
+|---|---|---|---|
+| 17 | 鍵の保存先を画面に出す: アプリの DB(`provider_secrets`・ENCRYPTION_KEY で暗号化)/ .env。**GCP Secret Manager には登録しない**と明記。DB のバックアップに暗号文が入ること・ENCRYPTION_KEY を失うと復号できないこと・鍵の掛け直しの対象・無効にした後の .env への戻り | IMPLEMENTED | `GET /admin/ops/secrets` の `storage`、BE `test_secrets_state_storage_is_app_db_not_secret_manager`、FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts` |
+| 18 | 「鍵あり」と「接続済み」を分ける: 提供元ごとに接続(adapter)の列。adapter が無ければ鍵・登録・価格が揃っても送信は無効 | IMPLEMENTED | `ADAPTERS_IMPLEMENTED`(今は空)、BE `test_key_present_is_not_connected_without_adapter` |
+| 19 | 鍵ごとに「アプリがまだ使っていない」を示す | IMPLEMENTED | `in_use`・`in_use_note` |
+| 20 | Google Maps のブラウザ用の鍵: アプリの画面は今 Google Maps を読み込まない(地図は OpenStreetMap)。登録しても画面へ配る経路は無いと明記 | IMPLEMENTED | `PROVIDER_CATALOG` の notes。`frontend/src/components/common/MapView.tsx` はどの画面からも使われていない |
+| 21 | 画面の配布物(frontend/dist)にサーバーの秘密・source map が入らないことを CI で確かめる。Google の形の鍵も今は入る理由が無いので落とす | IMPLEMENTED | `scripts/ci/check_bundle_secrets.py`・`.github/workflows/ci.yml`、BE `test_bundle_secret_check_catches_server_keys` |
+| 22 | ENCRYPTION_KEY の掛け直し(tcops rekey)が provider_secrets を対象にする | IMPLEMENTED | BE `test_provider_secrets_column_is_covered_by_rekey` |
+| 23 | fail closed: adapter の Gate の前に、アプリのコードに有料の送り先(api.openai.com・*.googleapis.com)が無い | IMPLEMENTED | BE `test_no_code_sends_to_paid_hosts_without_an_adapter` |
+| 24 | ブラウザ用の鍵を画面へ配る経路(referrer で制限した公開の鍵として) | NOT STARTED | Google Maps を画面で使う判断の後 |
+
