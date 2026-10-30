@@ -49,6 +49,7 @@ export interface OpsRunStep {
   reason?: string; max_cost_jpy?: string; plan_total_jpy: string; state: string;
 }
 export interface OpsRunSummary {
+  tier?: string; included_operations?: string[];
   plan_id: string; class: string; policy_version: string; plan_cap_jpy: string; final_total_jpy: string;
   never_over_cap: boolean; first_user_warning_step: number | null; first_ops_alert_step: number | null;
   first_denial: { n: number; reason: string } | null; settled_steps: number; denied_steps: number;
@@ -100,6 +101,7 @@ const step: Decoder<OpsRunStep> = object<OpsRunStep>({
 });
 
 const summary: Decoder<OpsRunSummary> = object<OpsRunSummary>({
+  tier: optional(str), included_operations: optional(arrayOf(str)),
   plan_id: str, class: str, policy_version: str, plan_cap_jpy: str, final_total_jpy: str, never_over_cap: bool,
   first_user_warning_step: nullable(int), first_ops_alert_step: nullable(int),
   first_denial: nullable(object({ n: int, reason: str })), settled_steps: int, denied_steps: int,
@@ -135,8 +137,8 @@ export async function getOpsCloud(): Promise<OpsCloud> {
   }), 'GET /admin/ops/cloud');
 }
 
-export async function runOpsFamilyFake(reason: string): Promise<OpsFamilyRun> {
-  const r = await api.post('/admin/ops/test-runs/family-fake', { reason }, SILENT);
+export async function runOpsFamilyFake(reason: string, tier: OpsTier = 'explorer'): Promise<OpsFamilyRun> {
+  const r = await api.post('/admin/ops/test-runs/family-fake', { reason, tier }, SILENT);
   return decodeResponse(r.data, object<OpsFamilyRun>({
     as_of: str, case: record, summary, steps: arrayOf(step), note: str,
   }), 'POST /admin/ops/test-runs/family-fake');
@@ -192,4 +194,62 @@ export async function registerOpsSecret(slot: string, value: string, reason: str
 export async function disableOpsSecret(slot: string, reason: string): Promise<OpsSecretResult> {
   const r = await api.post(`/admin/ops/secrets/${encodeURIComponent(slot)}/disable`, { reason }, SILENT);
   return decodeResponse(r.data, secretResult, 'POST /admin/ops/secrets/{slot}/disable');
+}
+
+// ===================================================================== 会員の機能クラス(Gate FR059-Tiers)
+
+export type OpsTier = 'free' | 'trip' | 'journey' | 'explorer';
+export const OPS_TIERS: OpsTier[] = ['free', 'trip', 'journey', 'explorer'];
+export type OpsMark = '○' | '△' | '—';
+export interface OpsTierRow {
+  key: OpsTier; label: string; subtitle: string; summary: string; operations: string[]; ai: boolean; paid_api: boolean;
+  profile: 'known' | 'unavailable'; policy_version?: string; plan_cap_jpy?: string; monthly_cap_jpy?: string | null;
+  plans_per_month?: number | null; quotas?: Record<string, unknown>; worst_case_plan_jpy?: string; fits_plan_cap?: boolean;
+}
+export interface OpsTierFeature {
+  key: string; label: string; free: OpsMark; trip: OpsMark; journey: OpsMark; explorer: OpsMark;
+  enforcement: 'server' | 'existing' | 'none'; note: string; operations?: string[];
+}
+export interface OpsTiers {
+  as_of: string; policy_version: string; tiers: OpsTierRow[]; features: OpsTierFeature[];
+  legacy: Array<{ legacy: string; rule: string }>;
+  thresholds: { user_warning_jpy: string; ops_alert_jpy: string; hard_cap_jpy: string }; rule: string;
+  test_switch: { enabled: boolean; hours: number; note: string };
+}
+export interface OpsTestTierResult {
+  user_id: string; requested: OpsTier; before: string; effective: { class: string; class_label: string };
+  revoked_test_grants: number; expires_in_hours: number | null; note: string;
+}
+
+const tierKey = oneOf<OpsTier>('free', 'trip', 'journey', 'explorer');
+const mark = oneOf<OpsMark>('○', '△', '—');
+const tierRow: Decoder<OpsTierRow> = object<OpsTierRow>({
+  key: tierKey, label: str, subtitle: str, summary: str, operations: arrayOf(str), ai: bool, paid_api: bool,
+  profile: oneOf('known', 'unavailable'), policy_version: optional(str), plan_cap_jpy: optional(str),
+  monthly_cap_jpy: optional(nullable(str)), plans_per_month: optional(nullable(int)), quotas: optional(record),
+  worst_case_plan_jpy: optional(str), fits_plan_cap: optional(bool),
+});
+const tierFeature: Decoder<OpsTierFeature> = object<OpsTierFeature>({
+  key: str, label: str, free: mark, trip: mark, journey: mark, explorer: mark,
+  enforcement: oneOf('server', 'existing', 'none'), note: str, operations: optional(arrayOf(str)),
+});
+
+export async function getOpsTiers(): Promise<OpsTiers> {
+  const r = await api.get('/admin/ops/tiers', SILENT);
+  return decodeResponse(r.data, object<OpsTiers>({
+    as_of: str, policy_version: str, tiers: arrayOf(tierRow), features: arrayOf(tierFeature),
+    legacy: arrayOf(object({ legacy: str, rule: str })),
+    thresholds: object({ user_warning_jpy: str, ops_alert_jpy: str, hard_cap_jpy: str }), rule: str,
+    test_switch: object({ enabled: bool, hours: int, note: str }),
+  }), 'GET /admin/ops/tiers');
+}
+
+/** 開発環境だけ: 利用者(既定は自分)のクラスを試験のために切り替える(理由が必須・24時間・監査)。 */
+export async function switchOpsTestTier(tier: OpsTier, reason: string, userId?: string): Promise<OpsTestTierResult> {
+  const r = await api.post('/admin/ops/test-tier', { tier, reason, ...(userId ? { user_id: userId } : {}) }, SILENT);
+  return decodeResponse(r.data, object<OpsTestTierResult>({
+    user_id: str, requested: tierKey, before: str,
+    effective: object<{ class: string; class_label: string }>({ class: str, class_label: str }),
+    revoked_test_grants: int, expires_in_hours: nullable(int), note: str,
+  }), 'POST /admin/ops/test-tier');
 }

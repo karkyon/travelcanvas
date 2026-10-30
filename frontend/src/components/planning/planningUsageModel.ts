@@ -16,6 +16,10 @@ export function usageMessage(u: PlanningUsage): { symbol: string; tone: 'muted' 
   switch (u.state) {
     case 'guest':
       return { symbol: 'ⓘ', tone: 'muted', text: 'ゲスト・共有の閲覧では外部の AI・有料の検索を使いません(0円)。会員になると使えます' };
+    case 'manual_only':
+      return { symbol: 'ⓘ', tone: 'muted',
+        text: `${u.class_label} のクラスでは外部の AI・有料の検索を使いません(0円)。`
+          + '手入力・保存・無料の地図と検索で旅行を作れます' };
     case 'warning':
       return { symbol: '⚠', tone: 'warn',
         text: `この旅行の旅程相談の枠が残り少なくなっています(残り ${remaining}円)。次の操作の前に最大額を確かめます` };
@@ -33,9 +37,16 @@ export function usageMessage(u: PlanningUsage): { symbol: string; tone: 'muted' 
   }
 }
 
+/** [Gate FR059-Tiers] クラスの名前(4つのクラスは日本語の副題つき。例: Journey(計画を一緒に考える)) */
+export function tierName(e: Pick<MyEntitlements, 'class_label' | 'tier'>): string {
+  return e.tier?.key && e.tier.subtitle ? `${e.class_label}(${e.tier.subtitle})` : e.class_label;
+}
+
 export function classLine(e: MyEntitlements): string {
   if (e.class === 'guest') return 'ゲストでは外部の AI・有料の検索を使いません(0円)';
-  const parts = [`クラス: ${e.class_label}`, `1旅行 ${yen(e.plan_cap_jpy)}円まで`];
+  const parts = [`クラス: ${tierName(e)}`];
+  if (e.tier?.key === 'free') parts.push('外部の AI・有料の検索なし(0円)');
+  else parts.push(`1旅行 ${yen(e.plan_cap_jpy)}円まで`);
   if (e.monthly_cap_jpy !== null) parts.push(`今月 ${yen(e.monthly_used_jpy)}円 / ${yen(e.monthly_cap_jpy)}円`);
   if (e.plans_per_month !== null) parts.push(`今月の旅行 ${e.plans_used_this_month} / ${e.plans_per_month}`);
   return parts.join(' · ');

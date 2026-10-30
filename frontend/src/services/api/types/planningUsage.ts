@@ -2,9 +2,23 @@
  * [FR059-B] 旅程相談の外部 API の利用枠の型(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §8)。
  * 金額は "12.0000" の文字列(円・小数 4 桁)。表示は *_yen_ceil(円の切り上げ)を使う。
  */
-export type UsageClass = 'guest' | 'free' | 'trip_pass' | 'plus' | 'family' | 'pro';
+export type UsageClass =
+  | 'guest' | 'free' | 'trip' | 'journey' | 'explorer' | 'trip_pass' | 'plus' | 'family' | 'pro';
+/** [Gate FR059-Tiers] 会員の機能クラス(外部の有料 API・AI をどこまで使えるか。旅行の日数の種類ではない) */
+export type MembershipTier = 'free' | 'trip' | 'journey' | 'explorer';
 export type PlanningUsageState =
-  | 'ok' | 'warning' | 'limit_reached' | 'monthly_limit_reached' | 'monthly_plans_reached' | 'guest';
+  | 'ok' | 'warning' | 'limit_reached' | 'monthly_limit_reached' | 'monthly_plans_reached' | 'guest' | 'manual_only';
+
+/** 4つのクラスの説明。旧クラス(Plus・Trip Pass など)は key が null */
+export interface TierInfo {
+  key: MembershipTier | null;
+  label: string | null;
+  subtitle: string | null;
+  summary: string | null;
+  operations: string[];
+  ai: boolean;
+  paid_api: boolean;
+}
 
 export interface PlanningCallQuota {
   operation: string;
@@ -13,6 +27,8 @@ export interface PlanningCallQuota {
   limit: number;
   used: number;
   remaining: number;
+  /** このクラスに含む操作か(含まない操作は provider の前で断る) */
+  included?: boolean;
 }
 
 export interface PlanningUsage {
@@ -40,6 +56,7 @@ export interface PlanningUsage {
   connected_operations: string[];
   providers_connected: boolean;
   fallbacks: string[];
+  tier?: TierInfo;
 }
 
 export interface EntitlementFeature {
@@ -63,6 +80,7 @@ export interface MyEntitlements {
   features: EntitlementFeature[];
   providers_connected: boolean;
   as_of: string;
+  tier?: TierInfo;
 }
 
 export interface EntitlementGrant {

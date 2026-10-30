@@ -1,6 +1,7 @@
 /**
  * [Gate OpsCMS] 運用コンソール(管理者だけ)。利用者の指示「TravelCanvas API運用CMS」と CMS のモック(2026-10-30)の構成:
- * 概要 / API・契約と接続 / 原価・利用台帳 / Cloud 環境 / テスト実行(Fake の家族旅行) / 秘密情報・権限。監査はログの画面へ。
+ * 概要 / API・契約と接続 / 原価・利用台帳 / 会員クラス / Cloud 環境 / テスト実行(Fake の家族旅行) / 秘密情報・権限。監査はログの画面へ。
+ * [Gate FR059-Tiers] 会員クラス: Free / Trip / Journey / Explorer の機能・回数・最大の見込み額の表と、開発環境の試験の切り替え。
  *
  * - 値は全て backend の実データ。取れない値は「取得していない」「未確認」と書く(作った数を出さない)
  * - Fake の試験の額と、実の提供元の見込みの原価を同じ欄に混ぜない。GCP の予算は通知で、課金を止める上限ではないと書く
@@ -11,16 +12,18 @@ import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
 import {
   disableOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
-  runOpsFamilyFake, setOpsProviderSuspended,
+  runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier,
+  type OpsTier, type OpsTiers, type OpsTestTierResult,
   type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
 } from '@/services/api/opsConsole';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
-type Tab = 'overview' | 'providers' | 'ledger' | 'cloud' | 'runs' | 'secrets';
+type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets';
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: '概要' },
   { id: 'providers', label: 'API・契約と接続' },
   { id: 'ledger', label: '原価・利用台帳' },
+  { id: 'tiers', label: '会員クラス' },
   { id: 'cloud', label: 'Cloud 環境' },
   { id: 'runs', label: 'テスト実行' },
   { id: 'secrets', label: '秘密情報・権限' },
@@ -58,6 +61,8 @@ const ADAPTER_LABEL: Record<string, { text: string; tone: string }> = {
   not_implemented: { text: '未実装(送らない)', tone: 'tc-pill--warn' },
 };
 const DENIAL_LABEL: Record<string, string> = {
+  tier_feature_not_included: 'クラスに含まない', plan_cost_limit_reached: '1旅行の額の上限',
+  monthly_quota_exceeded: '月の額の上限',
   feature_quota_exceeded: '回数の上限', plan_cost_limit_exceeded: '1旅行の額の上限', per_call_limit_exceeded: '1回の量の上限',
   monthly_cost_limit_exceeded: '月の額の上限', monthly_plan_quota_exceeded: '月の旅行の数の上限',
 };
@@ -298,8 +303,119 @@ const CloudTab: React.FC = () => {
 };
 
 // ===================================================================== テスト実行(Fake の家族旅行)
+const OPS_TIERS: OpsTier[] = ['free', 'trip', 'journey', 'explorer'];
+const TIER_NAME: Record<OpsTier, string> = {
+  free: 'Free(自分でつくる)', trip: 'Trip(行先を見つける)', journey: 'Journey(計画を一緒に考える)',
+  explorer: 'Explorer(比較して深掘りする)',
+};
+const ENFORCEMENT_LABEL: Record<string, string> = {
+  server: 'サーバーが断る', existing: '既存の上限のまま', none: '未実装(FR-058)',
+};
+
+// ===================================================================== 会員クラス(Gate FR059-Tiers)
+const TiersTab: React.FC = () => {
+  const { data, error, loading, reload } = useLoad(getOpsTiers);
+  const [tier, setTier] = useState<OpsTier>('journey');
+  const [reason, setReason] = useState('家族旅行の画面の確認');
+  const [result, setResult] = useState<OpsTestTierResult | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (loading && !data) return <Loading />;
+  if (error || !data) return <Failed message={error ?? '読み込めませんでした'} onRetry={() => void reload()} />;
+  const t: OpsTiers = data;
+  const switchTier = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      setResult(await switchOpsTestTier(tier, reason.trim()));
+    } catch (e) {
+      setMsg(errorDetailMessage(e, '切り替えられませんでした'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-4" data-testid="ops-tiers">
+      <article className="tc-card tc-ops-panel">
+        <div className="tc-section-row"><div><h2 className="tc-section-title">会員クラスの比較</h2>
+          <p className="tc-ops-desc">{`価格の版 ${t.policy_version} · ${t.rule}`}</p></div>
+          <span className="tc-pill tc-pill--blue">価格・販売は未決定</span></div>
+        <div className="tc-ops-table-wrap">
+          <table className="tc-ops-table" data-testid="ops-tiers-table">
+            <thead><tr><th>クラス</th><th>含む操作</th><th>1旅行の上限</th><th>月の枠</th><th>最大の見込み</th></tr></thead>
+            <tbody>
+              {t.tiers.map((r) => (
+                <tr key={r.key}>
+                  <td><b>{r.label}</b><br /><small>{r.subtitle}</small></td>
+                  <td>{r.operations.length === 0 ? 'なし(手入力・無料の検索だけ)' : `${r.ai ? 'AI あり' : 'AI なし'} · ${r.operations.length} 種類`}</td>
+                  <td>{yen(r.plan_cap_jpy)}</td>
+                  <td>{r.monthly_cap_jpy ? `${yen(r.monthly_cap_jpy)} · ${r.plans_per_month ?? '—'}旅行` : '—'}</td>
+                  <td>{r.profile === 'known'
+                    ? <>{yen(r.worst_case_plan_jpy)} <span className={`tc-pill ${r.fits_plan_cap ? 'tc-pill--good' : 'tc-pill--bad'}`}>{r.fits_plan_cap ? '50円以内' : '超える'}</span></>
+                    : '価格の版を読めない'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="tc-ops-asof">{`¥${Number(t.thresholds.user_warning_jpy)} で利用者に警告 · ¥${Number(t.thresholds.ops_alert_jpy)} で運用に知らせ · ¥${Number(t.thresholds.hard_cap_jpy)} を越える見込みは送る前に断る(全てのクラスで同じ)`}</p>
+      </article>
+      <article className="tc-card tc-ops-panel">
+        <h2 className="tc-section-title">機能の開放(○ 標準 · △ 制限つき · — 対象外)</h2>
+        <div className="tc-ops-table-wrap">
+          <table className="tc-ops-table" data-testid="ops-tiers-features">
+            <thead><tr><th>機能</th>{OPS_TIERS.map((k) => <th key={k}>{t.tiers.find((r) => r.key === k)?.label ?? k}</th>)}<th>強制</th></tr></thead>
+            <tbody>
+              {t.features.map((f) => (
+                <tr key={f.key}>
+                  <td>{f.label}<br /><small>{f.note}</small></td>
+                  {OPS_TIERS.map((k) => <td key={k} aria-label={`${k}: ${f[k]}`}>{f[k]}</td>)}
+                  <td>{ENFORCEMENT_LABEL[f.enforcement] ?? f.enforcement}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </article>
+      <div className="tc-ops-two">
+        <article className="tc-card tc-ops-panel">
+          <h2 className="tc-section-title">試験のためにクラスを切り替える</h2>
+          {t.test_switch.enabled ? (
+            <form className="tc-ops-form" aria-label="クラスの試験の切り替え" onSubmit={(e) => { e.preventDefault(); void switchTier(); }}>
+              <label htmlFor="ops-tier-select">自分のアカウントのクラス</label>
+              <select id="ops-tier-select" value={tier} onChange={(e) => setTier(e.target.value as OpsTier)}>
+                {OPS_TIERS.map((k) => <option key={k} value={k}>{TIER_NAME[k]}</option>)}
+              </select>
+              <label htmlFor="ops-tier-reason">理由(監査に残ります)</label>
+              <input id="ops-tier-reason" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+              <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={busy || !reason.trim()}>
+                {busy ? '切り替えています…' : '切り替える'}
+              </button>
+            </form>
+          ) : <p className="tc-ops-desc">本番・staging では試験の切り替えはできません。正式な付与は管理の画面の二者の承認で行います。</p>}
+          <p className="tc-ops-asof">{`${t.test_switch.note}。試験の付与は ${t.test_switch.hours} 時間で切れます。有料の提供元はつながらず、旅行のデータは消えません。`}</p>
+          {msg && <p role="alert" className="text-danger text-sm mt-2">{msg}</p>}
+          {result && (
+            <p role="status" className="text-sm mt-2" data-testid="ops-tier-result">
+              {`今のクラス: ${result.effective.class_label}(以前: ${result.before})。${result.note}`}
+            </p>
+          )}
+        </article>
+        <article className="tc-card tc-ops-panel">
+          <h2 className="tc-section-title">旧クラス・役割の扱い</h2>
+          <ul className="tc-ops-rows">
+            {t.legacy.map((l) => <li key={l.legacy}><span>{l.legacy}</span><small>{l.rule}</small></li>)}
+          </ul>
+        </article>
+      </div>
+    </div>
+  );
+};
+
+// ===================================================================== テスト実行(Fake の家族旅行)
 const RunsTab: React.FC = () => {
   const [reason, setReason] = useState('家族旅行の Fake の試験');
+  const [runTier, setRunTier] = useState<OpsTier>('explorer');
   const [run, setRun] = useState<OpsFamilyRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -307,7 +423,7 @@ const RunsTab: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      setRun(await runOpsFamilyFake(reason.trim()));
+      setRun(await runOpsFamilyFake(reason.trim(), runTier));
     } catch (e) {
       setError(errorDetailMessage(e, '試験を実行できませんでした'));
     } finally {
@@ -328,6 +444,10 @@ const RunsTab: React.FC = () => {
           <li><span>API の原価の条件</span><b>¥40 警告 · ¥45 運用 · ¥50 上限</b></li>
         </ul>
         <form className="tc-ops-form" onSubmit={(e) => { e.preventDefault(); void start(); }} aria-label="Fake の試験を実行">
+          <label htmlFor="ops-run-tier">試験の利用者のクラス</label>
+          <select id="ops-run-tier" value={runTier} onChange={(e) => setRunTier(e.target.value as OpsTier)}>
+            {OPS_TIERS.map((k) => <option key={k} value={k}>{TIER_NAME[k]}</option>)}
+          </select>
           <label htmlFor="ops-run-reason">実行の理由(監査に残ります)</label>
           <input id="ops-run-reason" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
           <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={busy || !reason.trim()}>
@@ -343,6 +463,7 @@ const RunsTab: React.FC = () => {
           <>
             <ul className="tc-ops-rows" data-testid="ops-run-summary">
               <li><span>最後の合計</span><b>{`${yen(s.final_total_jpy)} / ${yen(s.plan_cap_jpy)}`}</b></li>
+              {s.tier && <li><span>試験の利用者のクラス</span><b>{TIER_NAME[s.tier as OpsTier] ?? s.tier}</b></li>}
               <li><span>上限を越えなかった</span><span className={`tc-pill ${s.never_over_cap ? 'tc-pill--good' : 'tc-pill--bad'}`}>{s.never_over_cap ? 'はい' : 'いいえ'}</span></li>
               <li><span>利用者の警告(40円〜)</span><b>{s.first_user_warning_step ? `${s.first_user_warning_step}回目から` : '届かず'}</b></li>
               <li><span>運用の知らせ(45円〜)</span><b>{s.first_ops_alert_step ? `${s.first_ops_alert_step}回目から` : '届かず'}</b></li>
@@ -536,6 +657,7 @@ const AdminOpsPage: React.FC = () => {
         {tab === 'overview' && <OverviewTab onGo={setTab} />}
         {tab === 'providers' && <ProvidersTab />}
         {tab === 'ledger' && <LedgerTab />}
+        {tab === 'tiers' && <TiersTab />}
         {tab === 'cloud' && <CloudTab />}
         {tab === 'runs' && <RunsTab />}
         {tab === 'secrets' && <SecretsTab />}

@@ -10,7 +10,10 @@
 - GET  /admin/ops/ledger                : 旅行ごとの口座(確定・予約中・残り・状態・提供元別)。旅行の題・相談の文章は返さない
 - GET  /admin/ops/cloud                 : 実行環境から読める値だけ(GCP の請求・予算・有効な API はアプリから取得していない=unavailable)
 - POST /admin/ops/test-runs/family-fake : 枚方発・大人4人の家族旅行の条件で、Fake の提供元に原価の予約→確定を上限まで繰り返す
-                                          (外へは何も送らない。本番の環境では断る)
+                                          (外へは何も送らない。本番の環境では断る)。``tier`` で Free/Trip/Journey/Explorer を選ぶ
+- GET  /admin/ops/tiers                 : [Gate FR059-Tiers] 4つのクラスの機能・回数・月の枠・最大の見込み額・旧クラスの移行の表
+- POST /admin/ops/test-tier             : [Gate FR059-Tiers] 開発環境だけ、利用者(既定は自分)のクラスを試験のために切り替える
+                                          (理由が必須・24時間で切れる・監査。本番・staging では断る。有料の提供元はつながない)
 
 鍵の平文を返す API は作らない(設定の有無の真偽だけ)。管理者の多要素認証(require_admin)を全てに掛ける。
 """
@@ -18,7 +21,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -30,9 +33,10 @@ from app.api.v1.admin import require_admin
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import (
-    ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
+    Entitlement, ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
 )
 from app.services import cost_guard as cg
+from app.services import membership_tiers as mt
 from app.services import free_usage
 from app.services import provider_secrets as ps
 from app.services.audit_service import record_audit_event
@@ -365,11 +369,20 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
     if settings.is_production:
         raise _bad("fake_test_disabled", "本番・staging の環境では Fake の試験を実行しません", 403)
     reason = _reason(payload)
+    tier = payload.get("tier", "explorer") if isinstance(payload, dict) else "explorer"
+    if tier not in mt.TIERS:
+        raise _bad("invalid_tier", "tier は free・trip・journey・explorer のどれかです")
     tester = User(id=uuid.uuid4(), email=f"ops-fake-{uuid.uuid4().hex[:12]}@ops.invalid",
                   username=f"opsfake{uuid.uuid4().hex[:10]}", hashed_password="!", user_type=UserType.REGISTERED,
                   is_active=False, is_verified=False)
     db.add(tester)
     db.flush()
+    if tier != "free":
+        # 試験だけの利用者(ログインできない)に、選んだクラスを付ける。実在の利用者の付与は二者の承認の経路だけ
+        db.add(Entitlement(id=uuid.uuid4(), subject_type="user", subject_id=tester.id,
+                           feature_key=cg.FEATURE_PREFIX + "class." + tier, status="active", source="admin",
+                           reason="[ops fake] 試験の利用者", requested_by=admin.id))
+        db.flush()
     plan = TravelPlan(id=uuid.uuid4(), user_id=tester.id, title="[運用の試験] 家族旅行(Fake)")
     db.add(plan)
     db.commit()
@@ -380,6 +393,7 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
     denied_streak = 0
     first_key: Optional[str] = None
     first_id: Optional[str] = None
+    first_op = cycle[0]
     for i in range(60):
         op = cycle[i % len(cycle)]
         units = _fake_units(op, res.quotas)
@@ -392,7 +406,7 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
             step["result"] = "settled"
             denied_streak = 0
             if first_key is None:
-                first_key, first_id = key, str(row.id)
+                first_key, first_id, first_op = key, str(row.id), op
         except cg.CostGuardError as error:
             step["result"] = "denied"
             step["reason"] = error.code
@@ -408,7 +422,8 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
     if first_key is not None:
         acc_before = cg._peek(db, "plan", plan.id, "plan")
         before = Decimal(acc_before.settled_jpy) if acc_before else Decimal(0)
-        again = cg.reserve(db, plan, tester, cycle[0], FAKE_PROVIDER, _fake_units(cycle[0], res.quotas), first_key)
+        # 最初に確定した操作と同じ内容で同じ鍵を送る(クラスによって最初に確定する操作が違う)
+        again = cg.reserve(db, plan, tester, first_op, FAKE_PROVIDER, _fake_units(first_op, res.quotas), first_key)
         acc_after = cg._peek(db, "plan", plan.id, "plan")
         after = Decimal(acc_after.settled_jpy) if acc_after else Decimal(0)
         replay = {"checked": True, "same_reservation": str(again.id) == first_id, "status": again.status,
@@ -419,7 +434,8 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
     first_alert = next((s["n"] for s in steps if s["state"] in ("ops_alert", "limit_reached")), None)
     first_denial = next((s for s in steps if s["result"] == "denied"), None)
     summary = {
-        "plan_id": str(plan.id), "class": res.profile_key, "policy_version": res.policy_version,
+        "plan_id": str(plan.id), "class": res.profile_key, "policy_version": res.policy_version, "tier": tier,
+        "included_operations": list(mt.operations_for(res.profile_key)),
         "plan_cap_jpy": cg.money(res.plan_cap), "final_total_jpy": cg.money(final_total),
         "never_over_cap": final_total <= res.plan_cap,
         "first_user_warning_step": first_warn, "first_ops_alert_step": first_alert,
@@ -429,10 +445,81 @@ def ops_family_fake_run(request: Request, payload: Dict[str, Any] = Body(default
         "idempotency_replay": replay, "provider": FAKE_PROVIDER, "external_calls": 0,
     }
     _audit(request, admin, "ops_fake_test_run", {
-        "plan_id": str(plan.id), "reason": reason[:200], "final_total_jpy": summary["final_total_jpy"],
+        "plan_id": str(plan.id), "reason": reason[:200], "tier": tier, "final_total_jpy": summary["final_total_jpy"],
         "settled_steps": summary["settled_steps"], "denied_steps": summary["denied_steps"]})
     return {"as_of": _iso(_now()), "case": FAMILY_CASE, "summary": summary, "steps": steps,
             "note": "Fake の提供元の試験です。外部の API へは送っていません。額は価格の版での見込みで、実の請求ではありません"}
+
+
+# ===================================================================== 会員の機能クラス(Gate FR059-Tiers)
+
+TEST_TIER_TAG = "[test-tier]"
+TEST_TIER_HOURS = 24
+
+
+@router.get("/tiers")
+def ops_tiers(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return {"as_of": _iso(_now()), **cg.tier_matrix(db),
+            "test_switch": {"enabled": not settings.is_production, "hours": TEST_TIER_HOURS,
+                            "note": "開発環境の試験だけ。実在の利用者の正式な付与は「管理の画面 → 利用枠(クラス)」の二者の承認"}}
+
+
+def _test_tier_grants(db: Session, user_id: uuid.UUID) -> List[Entitlement]:
+    keys = [cg.FEATURE_PREFIX + "class." + t for t in mt.TIERS]
+    return (db.query(Entitlement)
+            .filter(Entitlement.subject_type == "user", Entitlement.subject_id == user_id,
+                    Entitlement.feature_key.in_(keys), Entitlement.status == "active",
+                    Entitlement.reason.like(TEST_TIER_TAG + "%"))
+            .with_for_update().all())
+
+
+@router.post("/test-tier")
+def ops_test_tier(request: Request, payload: Dict[str, Any] = Body(...), admin: User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    """開発環境だけ: 利用者(既定は自分)の機能クラスを試験のために切り替える。以前の試験の付与は取り消す。
+
+    有料の提供元の接続・価格・1旅行 50円は変えない(Fake・無料の提供元だけで差を確かめる)。家族の旅行のデータは消さない。
+    """
+    if settings.is_production:
+        raise _bad("test_tier_disabled", "本番・staging の環境ではクラスの試験の切り替えをしません", 403)
+    reason = _reason(payload)
+    tier = payload.get("tier")
+    if tier not in mt.TIERS:
+        raise _bad("invalid_tier", "tier は free・trip・journey・explorer のどれかです")
+    raw_user = payload.get("user_id")
+    try:
+        target_id = uuid.UUID(str(raw_user)) if raw_user else admin.id
+    except ValueError:
+        raise _bad("invalid_user", "user_id が正しくありません")
+    target = db.get(User, target_id)
+    if target is None:
+        raise _bad("user_not_found", "利用者が見つかりません", 404)
+    before = cg.user_class(db, target)[0]
+    now = _now()
+    revoked = 0
+    for g in _test_tier_grants(db, target.id):
+        g.status = "revoked"
+        g.updated_at = now
+        revoked += 1
+    grant_id: Optional[str] = None
+    if tier != "free":
+        g = Entitlement(id=uuid.uuid4(), subject_type="user", subject_id=target.id,
+                        feature_key=cg.FEATURE_PREFIX + "class." + tier, status="active", source="admin",
+                        reason=f"{TEST_TIER_TAG} {reason}"[:200], requested_by=admin.id,
+                        ends_at=now + timedelta(hours=TEST_TIER_HOURS))
+        db.add(g)
+        grant_id = str(g.id)
+    db.commit()
+    effective = cg.user_summary(db, target)
+    _audit(request, admin, "ops_test_tier_switched", {
+        "target_user_id": str(target.id), "tier": tier, "before": before, "after": effective["class"],
+        "revoked_test_grants": revoked, "grant_id": grant_id, "reason": reason[:200]})
+    note = ("新しいクラスの試験の付与は 24時間で切れます。" if tier != "free" else "試験の付与を外しました。")
+    if effective["class"] != tier:
+        note += f"今の有効なクラスは {effective['class_label']}(他の正式な付与が優先されています)"
+    return {"user_id": str(target.id), "requested": tier, "before": before, "effective": effective,
+            "revoked_test_grants": revoked, "expires_in_hours": TEST_TIER_HOURS if tier != "free" else None,
+            "note": note}
 
 
 # ===================================================================== 鍵の登録(Gate OpsSecrets)

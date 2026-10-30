@@ -28,6 +28,9 @@ const STATES: Array<[string, Record<string, unknown> | 'error', string]> = [
   ['残り少ない', { state: 'warning', plan_used_yen_ceil: 41, plan_used_jpy: '41.0000', plan_remaining_jpy: '9.0000', providers_connected: true }, '残り少なくなっています'],
   ['上限', { state: 'limit_reached', plan_used_yen_ceil: 50, plan_used_jpy: '50.0000', plan_remaining_jpy: '0.0000', providers_connected: true }, '外部の AI・有料の検索を止めました'],
   ['月の上限', { state: 'monthly_plans_reached', providers_connected: true }, '今月の旅程相談の枠'],
+  ['Free(手で作る)', { state: 'manual_only', monthly_cap_jpy: null, monthly_used_jpy: null, plans_per_month: null,
+    tier: { key: 'free', label: 'Free', subtitle: '自分でつくる', summary: 's', operations: [], ai: false, paid_api: false } },
+    '外部の AI・有料の検索を使いません(0円)'],
   ['ゲスト', { state: 'guest', class: 'guest', class_label: 'Guest', monthly_cap_jpy: null, plans_per_month: null, plan_cap_yen: 0, plan_cap_jpy: '0.0000' }, 'ゲスト'],
   ['読めない', 'error', '読めませんでした'],
 ];

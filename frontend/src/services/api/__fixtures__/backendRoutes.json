@@ -42,7 +42,8 @@
   "captured_at_head_g11_intake": "gate/g11-intake (+Gate G11 trip-intents・plans/{plan_id}/trip-intent)",
   "captured_at_head_fr059": "gate/fr059-cost-guard (+FR059-B entitlements・planning-usage・planning-actions/estimate・admin/entitlements・admin/planning-usage)",
   "captured_at_head_opscms": "gate/ops-cms (+Gate OpsCMS admin/ops/overview・providers・suspend/resume・ledger・cloud・test-runs/family-fake)",
-  "captured_at_head_opssecrets": "gate/ops-secrets (+Gate OpsSecrets admin/ops/secrets・secrets/{slot}・disable)"
+  "captured_at_head_opssecrets": "gate/ops-secrets (+Gate OpsSecrets admin/ops/secrets・secrets/{slot}・disable)",
+  "captured_at_head_fr059_tiers": "39aac73 (+Gate FR059-Tiers: GET /admin/ops/tiers・POST /admin/ops/test-tier)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -100,6 +101,7 @@
   "GET /api/v1/admin/ops/overview",
   "GET /api/v1/admin/ops/providers",
   "GET /api/v1/admin/ops/secrets",
+  "GET /api/v1/admin/ops/tiers",
   "GET /api/v1/admin/planning-usage",
   "GET /api/v1/admin/stats/system",
   "GET /api/v1/admin/support-grants",
@@ -293,6 +295,7 @@
   "POST /api/v1/admin/ops/secrets/{slot}",
   "POST /api/v1/admin/ops/secrets/{slot}/disable",
   "POST /api/v1/admin/ops/test-runs/family-fake",
+  "POST /api/v1/admin/ops/test-tier",
   "POST /api/v1/admin/users/manage",
   "POST /api/v1/auth/change-password",
   "POST /api/v1/auth/guest",

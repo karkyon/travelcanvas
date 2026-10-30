@@ -8,6 +8,8 @@
 - 予約を commit してから provider を呼び、結果で確定(``settle``)か解放(``release``)する。どちらも冪等
 - 価格が分からない・provider が止められている時は呼ばない(fail closed)。再試行は1回まで(``run``)
 - 金額は Decimal(小数 4 桁)。表示は円の切り上げ。使用の記録に入力の文章・旅程・鍵を残さない
+- [Gate FR059-Tiers] 会員の機能クラス Free / Trip / Journey / Explorer(``membership_tiers``)。クラスに含まない操作は
+  口座を作る前に 403 ``tier_feature_not_included``(新しい Free は外部の AI・有料の検索を含まない)
 """
 from __future__ import annotations
 
@@ -23,21 +25,24 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.services import membership_tiers as mt
 from app.models.models import (
     Entitlement, ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, UsagePolicyProfile, User,
 )
 
 logger = logging.getLogger(__name__)
 
-POLICY_VERSION = "2026-10-29.1"
+POLICY_VERSION = "2026-10-29.1"  # 旧クラス(Trip Pass・Plus・Family・Pro・Guest)の版
+TIER_POLICY_VERSION = mt.TIER_POLICY_VERSION  # 4つのクラスの版
 Q4 = Decimal("0.0001")
 WARN_RATIO = Decimal("0.8")
 ALERT_RATIO = Decimal("0.9")
-CLASS_PRIORITY = ("pro", "plus", "family", "free")  # 最も有利な順(同じ feature を足し合わせない)
-USER_CLASSES = ("free", "plus", "family", "pro")
+# 解決の順(同じ feature を足し合わせない)。Pro の契約 > 管理者が付与した新しいクラス > 旧クラスの付与 > Free(既定)
+CLASS_PRIORITY = ("pro", "explorer", "journey", "trip", "plus", "family", "free")
+USER_CLASSES = ("free", "trip", "journey", "explorer", "plus", "family", "pro")
 PLAN_CLASSES = ("trip_pass",)
-CLASS_LABEL = {"guest": "Guest", "free": "Free", "trip_pass": "Trip Pass", "plus": "Plus", "family": "Family/Group",
-               "pro": "Pro/B2B"}
+CLASS_LABEL = {"guest": "Guest", "free": "Free", "trip": "Trip", "journey": "Journey", "explorer": "Explorer",
+               "trip_pass": "Trip Pass", "plus": "Plus", "family": "Family/Group", "pro": "Pro/B2B"}
 QUOTA_FEATURES = ("cost_jpy_per_plan", "cost_jpy_per_month", "plans_per_month", "ai_calls_per_plan",
                   "ai_input_tokens_per_call", "ai_output_tokens_per_call", "web_searches_per_plan",
                   "places_searches_per_plan", "place_details_per_plan", "photos_per_plan", "route_elements_per_plan",
@@ -578,6 +583,23 @@ def _check_quotas(res: Resolution, operation: str, units: Dict[str, int], need: 
     return None
 
 
+def _tier_denial(res: Resolution, operation: str) -> Optional[CostGuardError]:
+    """[Gate FR059-Tiers] クラスに含まない操作(新しい Free の AI・有料の検索、Trip の AI など)を provider の前で断る。"""
+    if res.profile_key == "guest" or not mt.is_tier(res.profile_key):
+        return None
+    if operation in mt.TIER_OPERATIONS[res.profile_key]:
+        return None
+    needed = next((t for t in mt.TIERS if operation in mt.TIER_OPERATIONS[t]), None)
+    label = OPERATIONS[operation]["label"]
+    message = ("%s では「%s」を使いません。手での編集・保存・無料の地図と検索は続けられます"
+               % (mt.TIER_LABEL[res.profile_key], label))
+    if needed is not None:
+        message += "(%s 以上のクラスに含まれます)" % mt.TIER_LABEL[needed]
+    return CostGuardError("tier_feature_not_included", 403, message,
+                          extra={"class": res.profile_key, "operation": operation,
+                                 "included_from": needed, "fallbacks": list(FALLBACKS)})
+
+
 def _denial(db: Session, res: Resolution, plan: TravelPlan, operation: str, units: Dict[str, int], need: Dict[str, int],
             cost: Decimal, plan_acc: Optional[UsageBudgetAccount], monthly_acc: Optional[UsageBudgetAccount],
             month: str) -> Optional[CostGuardError]:
@@ -585,6 +607,9 @@ def _denial(db: Session, res: Resolution, plan: TravelPlan, operation: str, unit
     if res.profile_key == "guest":
         return CostGuardError("guest_provider_forbidden", 403,
                               "ゲスト・共有の閲覧からは外部の AI・有料の検索を使いません。会員になると使えます")
+    tier = _tier_denial(res, operation)
+    if tier is not None:
+        return tier
     quota = _check_quotas(res, operation, units, need, plan_acc)
     if quota is not None:
         quota.usage = _usage_body(res, plan_acc, cost, monthly_acc)
@@ -651,6 +676,12 @@ def reserve(db: Session, plan: TravelPlan, caller: User, operation: str, provide
             raise CostGuardError("idempotency_conflict", 409, "同じ Idempotency-Key で違う操作が送られました")
         return existing
     res = resolve(db, plan, caller)
+    tier = _tier_denial(res, operation)
+    if tier is not None:
+        # クラスに含まない操作は口座も作らない(何も変えない)
+        _count("provider_usage_denied")
+        _add_metric("denied_total", operation, Decimal(1))
+        raise tier
     cost = cost_of(res.profile, operation, norm)
     need = counts_for(operation, norm)
     release_expired(db, plan.id)
@@ -838,8 +869,11 @@ def plan_summary(db: Session, plan: TravelPlan, caller: User) -> Dict[str, Any]:
     used = Decimal(plan_acc.settled_jpy) if plan_acc else Decimal(0)
     reserved = Decimal(plan_acc.reserved_jpy) if plan_acc else Decimal(0)
     total = used + reserved
+    included = set(mt.operations_for(res.profile_key))
     if res.profile_key == "guest":
         state = "guest"
+    elif not included:
+        state = "manual_only"  # 新しい Free: 外部の AI・有料の検索を含まない(0円)
     elif total >= res.plan_cap:
         state = "limit_reached"
     elif res.monthly_cap is not None and monthly_acc is not None and \
@@ -860,7 +894,8 @@ def plan_summary(db: Session, plan: TravelPlan, caller: User) -> Dict[str, Any]:
         limit = int(res.quotas.get(key, 0))
         calls.append({"operation": operation, "label": spec["label"], "feature": FEATURE_PREFIX + key,
                       "limit": limit, "used": int(counts.get(key, 0)),
-                      "remaining": max(0, limit - int(counts.get(key, 0)))})
+                      "remaining": max(0, limit - int(counts.get(key, 0))),
+                      "included": operation in included and res.profile_key != "guest"})
     connected = sorted({op for p in paid_providers().values() for op in p["operations"]})
     body = {
         "plan_id": str(plan.id), "class": res.profile_key, "class_label": CLASS_LABEL[res.profile_key],
@@ -878,7 +913,7 @@ def plan_summary(db: Session, plan: TravelPlan, caller: User) -> Dict[str, Any]:
         "reset_at": (_now() + timedelta(seconds=seconds_to_next_month())).replace(microsecond=0).isoformat()
         if res.monthly_cap is not None else None,
         "calls": calls, "connected_operations": connected, "providers_connected": bool(connected),
-        "fallbacks": list(FALLBACKS),
+        "fallbacks": list(FALLBACKS), "tier": mt.tier_info(res.profile_key),
     }
     return body
 
@@ -906,7 +941,7 @@ def user_summary(db: Session, user: User) -> Dict[str, Any]:
         "plans_used_this_month": int(monthly_acc.plans_used) if monthly_acc else 0,
         "reset_at": (_now() + timedelta(seconds=seconds_to_next_month())).replace(microsecond=0).isoformat(),
         "features": features, "providers_connected": bool(paid_providers()),
-        "as_of": _now().replace(microsecond=0).isoformat(),
+        "as_of": _now().replace(microsecond=0).isoformat(), "tier": mt.tier_info(res.profile_key),
     }
 
 
@@ -937,3 +972,27 @@ def admin_plan_usage(db: Session, plan_id: uuid.UUID) -> Dict[str, Any]:
                       for v in by_provider.values()],
         "suspended_providers": sorted(suspended_providers()),
     }
+
+
+def tier_matrix(db: Session) -> Dict[str, Any]:
+    """[Gate FR059-Tiers] 4つのクラスの比較(運用コンソール・試験)。値は有効な価格の版から読む(作った数を出さない)。"""
+    tiers: List[Dict[str, Any]] = []
+    for key in mt.TIERS:
+        try:
+            profile = load_profile(db, key)
+        except CostGuardError:
+            tiers.append({**mt.tier_info(key), "profile": "unavailable"})
+            continue
+        worst = worst_case_plan_cost(profile)
+        tiers.append({
+            **mt.tier_info(key), "profile": "known", "policy_version": profile.version,
+            "plan_cap_jpy": money(Decimal(profile.plan_cap_jpy)),
+            "monthly_cap_jpy": money(Decimal(profile.monthly_cap_jpy)) if profile.monthly_cap_jpy is not None else None,
+            "plans_per_month": profile.plans_per_month, "quotas": dict(profile.feature_quotas or {}),
+            "worst_case_plan_jpy": money(worst), "fits_plan_cap": worst <= Decimal(profile.plan_cap_jpy),
+        })
+    return {"policy_version": TIER_POLICY_VERSION, "tiers": tiers, "features": mt.FEATURE_MATRIX,
+            "legacy": mt.LEGACY_MAPPING,
+            "thresholds": {"user_warning_jpy": money(Decimal(50) * WARN_RATIO),
+                           "ops_alert_jpy": money(Decimal(50) * ALERT_RATIO), "hard_cap_jpy": money(Decimal(50))},
+            "rule": "どのクラスでも 1旅行の有料の原価は 50円まで。価格・販売・決済は未決定(FR-058)。有料の提供元は未接続"}

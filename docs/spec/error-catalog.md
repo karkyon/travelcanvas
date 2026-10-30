@@ -123,11 +123,13 @@
 | `invalid_selection` | 422 | no | この案で変わる予定の中から、動かす予定を選んでください | api/v1/optimization.py |
 | `invalid_slots` | — | — | …日目 | api/v1/trip_intents.py |
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
+| `invalid_tier` | 403 | no | tier は free・trip・journey・explorer のどれかです | api/v1/admin_ops.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
 | `invalid_url` | — | — | https:// で始まる URL を入力してください(ユーザー名・パスワードは含めない) | api/v1/organizations.py |
 | `invalid_usage_key` | 422 | no | subject_type・metric の値が正しくありません | api/v1/admin.py |
 | `invalid_usage_limit` | 422 | no | 上限は0以上の整数か、既定に戻す null です | api/v1/admin.py |
+| `invalid_user` | — | — | user_id が正しくありません | api/v1/admin_ops.py |
 | `invalid_value` | — | — | 時刻は HH:MM で入力してください | services/private_profile.py |
 | `last_owner` | 409 | no | 組織には owner が1人以上必要です | api/v1/organizations.py |
 | `location_off` | 409 | no | この旅行は「位置を記録しない」設定です。記録するには設定を変えてください | api/v1/location_tracks.py |
@@ -202,6 +204,7 @@
 | `storage_failed` | 503 | later | ファイルの保存に失敗しました。しばらくしてから再試行してください | api/v1/memories.py |
 | `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
+| `test_tier_disabled` | 403 | no | 本番・staging の環境ではクラスの試験の切り替えをしません | api/v1/admin_ops.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |
@@ -235,7 +238,7 @@
 | `unsupported_platform` | — | — | 対応していない SNS の URL です | api/v1/candidates.py |
 | `unsupported_type` | — | — | 対応していない形式の画像です | api/v1/media_providers.py |
 | `usage_reason_required` | 422 | no | 上書きの理由を200文字までで入力してください | api/v1/admin.py |
-| `user_not_found` | 404 | no | このメールアドレスの会員が見つかりません。先に会員登録してもらってください | api/v1/organizations.py |
+| `user_not_found` | 404 | no | 利用者が見つかりません | api/v1/admin_ops.py, api/v1/organizations.py |
 | `username_taken` | 409 | no | この表示名は既に使われています | api/v1/corrections.py |
 | `valid_until_required` | 422 | no | 機密情報を含む版には有効期限が必要です | api/v1/booklet.py |
 | `void_reason_required` | 422 | no | 取り消す理由を200文字までで入力してください | api/v1/finance_ledger.py |

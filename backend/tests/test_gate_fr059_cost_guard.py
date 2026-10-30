@@ -4,7 +4,8 @@
 
 検証する主な性質(provider は fake。外へつながない):
 - 価格の版の検算: 全ての回数の上限を同時に使っても 50円以下(49.55円)。単価の無い操作は呼ばない(503)
-- クラス: Guest は 403、Free は月1旅行・Plus は月5旅行(6つ目は 429、月が変わると再開)、Trip Pass は割り当てた旅行だけ、
+- クラス: Guest は 403、Free は外部の AI・有料の検索を含まない(403 tier_feature_not_included。Gate FR059-Tiers)、
+  Plus は月5旅行(6つ目は 429、月が変わると再開)、Trip Pass は割り当てた旅行だけ、
   Family/Group は4人でも1旅行 50円、Pro の例外は二者の承認の後だけ。user_type・要求の本文では増えない
 - 境界: 残り 12円に 15円は 429(例の usage と fallbacks)、ちょうど 50円は許可。回数・token の上限は provider の前で断る
 - 冪等: 同じ Idempotency-Key は同じ予約、違う操作は 409。確定・解放は二度目に何もしない。期限切れは解放
@@ -75,13 +76,15 @@ def _ai(db, plan, caller, i=2000, o=500):
 # ===================================================================== 価格の版
 
 def test_price_profile_fits_cap_and_unknown_price_fails_closed(db_session):
-    for key in ("free", "plus", "family", "trip_pass", "pro"):
+    for key in ("plus", "family", "trip_pass", "pro", "explorer"):
         profile = cg.load_profile(db_session, key)
         worst = cg.worst_case_plan_cost(profile)
         assert worst <= Decimal(profile.plan_cap_jpy) == Decimal(50), key
         assert Decimal("49.5") <= worst <= Decimal("49.6")  # 追補の検算 49.55円(切り上げの誤差の内)
     assert cg.worst_case_plan_cost(cg.load_profile(db_session, "guest")) == 0
-    profile = cg.load_profile(db_session, "free")
+    assert cg.worst_case_plan_cost(cg.load_profile(db_session, "free")) == 0  # 新しい Free は有料の操作を含まない
+    assert cg.load_profile(db_session, "free").version == cg.TIER_POLICY_VERSION
+    profile = cg.load_profile(db_session, "plus")
     assert profile.version == cg.POLICY_VERSION
     broken = UsagePolicyProfile(profile_key="free", version="x", plan_cap_jpy=50, feature_quotas={}, fx_rate=180,
                                 tax_factor=Decimal("1.1"), safety_factor=Decimal("1.15"),
@@ -93,7 +96,7 @@ def test_price_profile_fits_cap_and_unknown_price_fails_closed(db_session):
 
 # ===================================================================== クラス
 
-def test_guest_is_zero_and_free_is_one_plan_per_month(db_session, monkeypatch):
+def test_guest_is_zero_and_free_has_no_paid_operations(db_session):
     guest = _user(db_session, UserType.GUEST)
     gplan = _plan(db_session, guest)
     with pytest.raises(cg.CostGuardError) as e:
@@ -105,16 +108,20 @@ def test_guest_is_zero_and_free_is_one_plan_per_month(db_session, monkeypatch):
         _ai(db_session, shared, guest)  # ゲストは他人の旅行からも呼べない
     assert cg.user_summary(db_session, guest)["class"] == "guest"
 
-    a, b = _plan(db_session, member), _plan(db_session, member)
-    assert _ai(db_session, a, member).status == "reserved"
-    assert _ai(db_session, a, member).status == "reserved"  # 同じ旅行は数を増やさない
-    with pytest.raises(cg.CostGuardError) as e:
-        _ai(db_session, b, member)
-    assert e.value.code == "monthly_plan_quota_exceeded" and e.value.status == 429 and e.value.retry_after
-    monkeypatch.setattr(cg, "month_key", lambda now=None: "2099-01")
-    assert _ai(db_session, b, member).status == "reserved"  # 月が変わると再開
+    a = _plan(db_session, member)
+    for op, units in (("ai.generate", {"input_tokens": 10, "output_tokens": 10}), ("places.search", {"requests": 1}),
+                      ("routes.element", {"elements": 1}), ("ai.web_search", {"requests": 1})):
+        with pytest.raises(cg.CostGuardError) as e:
+            cg.reserve(db_session, a, member, op, FAKE, units, _key())
+        assert e.value.code == "tier_feature_not_included" and e.value.status == 403, op
+    # 口座も予約も作らない(何も変えない)
+    assert db_session.query(UsageBudgetAccount).filter(
+        UsageBudgetAccount.scope_id.in_([a.id, member.id])).count() == 0
+    assert db_session.query(ProviderUsageReservation).filter_by(plan_id=a.id).count() == 0
     summary = cg.user_summary(db_session, member)
-    assert summary["class"] == "free" and summary["plans_per_month"] == 1 and summary["plan_cap_jpy"] == "50.0000"
+    assert summary["class"] == "free" and summary["plans_per_month"] is None and summary["plan_cap_jpy"] == "50.0000"
+    assert summary["tier"]["key"] == "free" and summary["tier"]["ai"] is False and summary["tier"]["paid_api"] is False
+    assert cg.plan_summary(db_session, a, member)["state"] == "manual_only"
 
 
 def test_plus_five_plans_then_sixth_denied_and_user_type_does_not_raise(db_session, monkeypatch):
@@ -144,12 +151,14 @@ def test_trip_pass_only_for_assigned_plan(db_session):
     member = _user(db_session)
     first, passed, other = _plan(db_session, member), _plan(db_session, member), _plan(db_session, member)
     _grant(db_session, "plan", passed.id, "class.trip_pass", source="trip_pass")
-    assert _ai(db_session, first, member).status == "reserved"  # Free の今月の1旅行
+    with pytest.raises(cg.CostGuardError) as e:
+        _ai(db_session, first, member)  # Free は AI を含まない
+    assert e.value.code == "tier_feature_not_included"
     r = _ai(db_session, passed, member)
     assert r.status == "reserved" and r.profile_key == "trip_pass" and r.monthly_account_id is None
     with pytest.raises(cg.CostGuardError) as e:
-        _ai(db_session, other, member)  # Pass を割り当てていない旅行は Free(今月は使い切った)
-    assert e.value.code == "monthly_plan_quota_exceeded"
+        _ai(db_session, other, member)  # Pass を割り当てていない旅行は Free のまま
+    assert e.value.code == "tier_feature_not_included"
     assert cg.plan_summary(db_session, passed, member)["class"] == "trip_pass"
 
 
@@ -236,6 +245,7 @@ def test_exactly_fifty_is_allowed(db_session):
 
 def test_feature_quotas_checked_before_provider(db_session):
     member = _user(db_session)
+    _grant(db_session, "user", member.id, "class.explorer")  # 4つのクラスで全ての操作を含むクラス
     plan = _plan(db_session, member)
     with pytest.raises(cg.CostGuardError) as e:
         _ai(db_session, plan, member, i=10001)
@@ -267,6 +277,7 @@ def test_feature_quotas_checked_before_provider(db_session):
 
 def test_idempotency_settle_release_and_expiry(db_session):
     member = _user(db_session)
+    _grant(db_session, "user", member.id, "class.explorer")  # 4つのクラスで全ての操作を含むクラス
     plan = _plan(db_session, member)
     key = _key()
     r1 = cg.reserve(db_session, plan, member, "places.search", FAKE, {"requests": 1}, key)
@@ -294,12 +305,13 @@ def test_idempotency_settle_release_and_expiry(db_session):
     events = db_session.query(ProviderUsageEvent).filter_by(plan_id=plan.id).all()
     assert sorted(e.result_code for e in events) == ["expired", "ok", "provider_error"]
     for e in events:  # 使用の記録は数と金額だけ
-        assert e.provider == FAKE and e.sku and e.price_version == cg.POLICY_VERSION
+        assert e.provider == FAKE and e.sku and e.price_version == cg.TIER_POLICY_VERSION
         assert e.estimated_cost_jpy >= 0
 
 
 def test_run_retry_once_release_on_failure_and_suspend(db_session):
     member = _user(db_session)
+    _grant(db_session, "user", member.id, "class.explorer")  # 4つのクラスで全ての操作を含むクラス
     plan = _plan(db_session, member)
     calls = []
 
@@ -347,6 +359,7 @@ def test_run_retry_once_release_on_failure_and_suspend(db_session):
 
 def test_reconcile_delta_suspends_provider(db_session):
     member = _user(db_session)
+    _grant(db_session, "user", member.id, "class.explorer")  # 4つのクラスで全ての操作を含むクラス
     plan = _plan(db_session, member)
     payload, _ = cg.run(db_session, plan, member, "places.search", FAKE, {"requests": 1}, _key(),
                         lambda u: cg.ProviderResult(units={"requests": 1}))
@@ -419,14 +432,20 @@ def test_api_entitlements_usage_estimate_and_roles(auth_client, make_user, db_se
     client, owner = auth_client
     plan = client.post("/api/v1/travel-plans/", json={"title": "利用枠"}).json()["id"]
     me = client.get("/api/v1/entitlements").json()
-    assert me["class"] == "free" and me["plan_cap_jpy"] == "50.0000" and me["monthly_cap_jpy"] == "50.0000"
+    assert me["class"] == "free" and me["plan_cap_jpy"] == "50.0000" and me["monthly_cap_jpy"] is None
     assert me["providers_connected"] is True  # 試験では fake を登録している
     usage = client.get(f"/api/v1/plans/{plan}/planning-usage").json()
-    assert usage["plan_used_yen_ceil"] == 0 and usage["plan_cap_yen"] == 50 and usage["state"] == "ok"
+    assert usage["plan_used_yen_ceil"] == 0 and usage["plan_cap_yen"] == 50 and usage["state"] == "manual_only"
     assert {c["operation"] for c in usage["calls"]} == set(cg.OPERATIONS)
+    assert not any(c["included"] for c in usage["calls"])
+    est = client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
+                      json={"operation": "places.search", "units": {"requests": 1}}).json()
+    assert est["max_cost_jpy"] == "7.9695" and est["allowed"] is False and est["reason"] == "tier_feature_not_included"
+    _grant(db_session, "user", owner.id, "class.trip")
     est = client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
                       json={"operation": "places.search", "units": {"requests": 1}}).json()
     assert est["max_cost_jpy"] == "7.9695" and est["max_cost_yen_ceil"] == 8 and est["allowed"] is True
+    assert client.get(f"/api/v1/plans/{plan}/planning-usage").json()["state"] == "ok"
     assert client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
                        json={"operation": "places.search", "plan_cap": "9999"}).status_code == 422
     assert client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
