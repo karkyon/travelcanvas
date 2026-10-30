@@ -8,7 +8,8 @@ import { arrayOf, bool, decodeResponse, int, nullable, object, oneOf, optional, 
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
-export interface OpsUsageTotal { events: number; estimated_jpy: string; actual_jpy: string }
+export interface OpsUsageTotal { events: number; estimated_jpy: string; actual_jpy: string; requests?: number }
+export interface OpsFreeUsage { providers: Record<string, unknown>; requests: number; label: string }
 export interface OpsOverview {
   as_of: string; environment: string; policy_version: string; month: string;
   thresholds: { user_warning_jpy: string; ops_alert_jpy: string; hard_cap_jpy: string };
@@ -19,6 +20,7 @@ export interface OpsOverview {
   plan_accounts: { total: number; by_state: Record<string, unknown> };
   open_reservations: number;
   cloud_billing: { status: string; message: string };
+  free_usage?: OpsFreeUsage;
 }
 export type OpsSecretState = 'configured' | 'missing' | 'not_defined' | 'not_needed';
 export interface OpsProvider {
@@ -28,6 +30,7 @@ export interface OpsProvider {
   price_profile: 'known' | 'partial' | 'unavailable'; policy_version: string | null;
   live_calls: 'test_only' | 'ready' | 'disabled'; month_usage: OpsUsageTotal | null; notes: string;
   secret_slot?: string | null; secret_source?: 'cms' | 'env' | null; secret_version?: number | null; secret_last4?: string | null;
+  secret_storage?: string | null; adapter?: 'fake' | 'implemented' | 'not_implemented';
 }
 export interface OpsProviders { as_of: string; providers: OpsProvider[]; rule: string }
 export interface OpsLedgerRow {
@@ -55,16 +58,19 @@ export interface OpsFamilyRun {
   as_of: string; case: Record<string, unknown>; summary: OpsRunSummary; steps: OpsRunStep[]; note: string;
 }
 
-const total: Decoder<OpsUsageTotal> = object<OpsUsageTotal>({ events: int, estimated_jpy: str, actual_jpy: str });
+const total: Decoder<OpsUsageTotal> = object<OpsUsageTotal>({ events: int, estimated_jpy: str, actual_jpy: str,
+  requests: optional(int) });
 
 const overview: Decoder<OpsOverview> = object<OpsOverview>({
   as_of: str, environment: str, policy_version: str, month: str,
   thresholds: object({ user_warning_jpy: str, ops_alert_jpy: str, hard_cap_jpy: str }),
-  fake_usage: object<OpsUsageTotal & { label: string }>({ events: int, estimated_jpy: str, actual_jpy: str, label: str }),
+  fake_usage: object<OpsUsageTotal & { label: string }>({ events: int, estimated_jpy: str, actual_jpy: str,
+    requests: optional(int), label: str }),
   live_usage: object({ providers: record, estimated_jpy: str, label: str }),
   connected_paid_providers: arrayOf(str), suspended_providers: record,
   plan_accounts: object({ total: int, by_state: record }), open_reservations: int,
   cloud_billing: object({ status: str, message: str }),
+  free_usage: optional(object<OpsFreeUsage>({ providers: record, requests: int, label: str })),
 });
 
 const provider: Decoder<OpsProvider> = object<OpsProvider>({
@@ -75,6 +81,7 @@ const provider: Decoder<OpsProvider> = object<OpsProvider>({
   live_calls: oneOf('test_only', 'ready', 'disabled'), month_usage: nullable(total), notes: str,
   secret_slot: optional(nullable(str)), secret_source: optional(nullable(oneOf('cms', 'env'))),
   secret_version: optional(nullable(int)), secret_last4: optional(nullable(str)),
+  secret_storage: optional(nullable(str)), adapter: optional(oneOf('fake', 'implemented', 'not_implemented')),
 });
 
 const ledgerRow: Decoder<OpsLedgerRow> = object<OpsLedgerRow>({
@@ -144,9 +151,12 @@ export interface OpsSecretHistory {
 export interface OpsSecretSlot {
   slot: string; label: string; providers: string[]; env: string; hint: string;
   status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
-  registered_at: string | null; history: OpsSecretHistory[];
+  registered_at: string | null; history: OpsSecretHistory[]; in_use?: boolean; in_use_note?: string;
 }
-export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string }
+export interface OpsSecretStorage {
+  location: string; not_secret_manager: string; backup: string; rotation: string; fallback: string;
+}
+export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string; storage?: OpsSecretStorage }
 export interface OpsSecretResult {
   slot: string; status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null;
   last4: string | null; registered_at: string | null;
@@ -159,7 +169,7 @@ const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
 const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
   slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing'),
   source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
-  history: arrayOf(secretHistory),
+  history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
   slot: str, status: oneOf('configured', 'missing'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
@@ -168,8 +178,9 @@ const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
 
 export async function getOpsSecrets(): Promise<OpsSecrets> {
   const r = await api.get('/admin/ops/secrets', SILENT);
-  return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str }),
-    'GET /admin/ops/secrets');
+  return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str,
+    storage: optional(object<OpsSecretStorage>({ location: str, not_secret_manager: str, backup: str, rotation: str,
+      fallback: str })) }), 'GET /admin/ops/secrets');
 }
 
 /** 鍵を登録する(新しい版)。応答に鍵の値は含まれない。 */

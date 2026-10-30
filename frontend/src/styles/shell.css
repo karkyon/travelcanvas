@@ -499,7 +499,7 @@
 .tc-ops-tabs a { text-decoration: none; display: inline-flex; align-items: center; }
 .tc-ops-tabs [aria-selected="true"] { background: var(--tc-accent); color: var(--tc-on-accent); }
 .tc-ops-grid { display: grid; gap: 14px; }
-.tc-ops-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tc-ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .tc-ops-kpi { padding: 17px 18px; min-height: 112px; }
 .tc-ops-kpi-head { font-size: 12px; color: var(--tc-ink-500); margin: 0; }
 .tc-ops-kpi-value { font-size: 27px; font-weight: 800; letter-spacing: -.03em; margin: 6px 0 2px; color: var(--tc-ink-900); font-variant-numeric: tabular-nums; }

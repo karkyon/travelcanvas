@@ -21,9 +21,11 @@
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-ci-redis-trace.md](gate-ci-redis-trace.md) | Gate CI-Redis トレース(CI の backend ジョブで Redis を使う試験を必ず実行する) | 0 | 0 | 0 |
 | [gate-ci429-trace.md](gate-ci429-trace.md) | Gate CI-429 トレース(CI の E2E の 429 連鎖の原因の調査) | 0 | 0 | 0 |
+| [gate-doc10rev-trace.md](gate-doc10rev-trace.md) | Gate DOC10-Rev トレース(DOC-10 の版の食い違いの解消・状態の監査表) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
+| [gate-fr059-d11-trace.md](gate-fr059-d11-trace.md) | Gate FR059-D11 トレース(無料の provider の使用の記録・公開の単価の再確認) | 2 | 0 | 0 |
 | [gate-fr059a-trace.md](gate-fr059a-trace.md) | Gate FR059-A トレース(外部 API の原価上限・利用者クラス別 quota の正本化) | 1 | 0 | 0 |
 | [gate-fr059b-trace.md](gate-fr059b-trace.md) | Gate FR059-B トレース(外部 API の原価の守りのサーバー実装) | 2 | 1 | 1 |
 | [gate-fr059c-trace.md](gate-fr059c-trace.md) | Gate FR059-C トレース(FR-059 正本 §13 D14: provider の停止を全ての worker で共有する) | 2 | 0 | 0 |
@@ -61,7 +63,7 @@
 | [gate-m3-fr015-trace.md](gate-m3-fr015-trace.md) | Gate M3 FR-015 トレーサビリティ表 | 1 | 5 | 1 |
 | [gate-o1-trace.md](gate-o1-trace.md) | Gate O1 B-010 トレーサビリティ表 | 2 | 0 | 1 |
 | [gate-o2-trace.md](gate-o2-trace.md) | Gate O2 B-009 トレーサビリティ表 | 1 | 1 | 0 |
-| [gate-opscms-trace.md](gate-opscms-trace.md) | Gate OpsCMS トレース(運用コンソール: 外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験) | 4 | 0 | 0 |
+| [gate-opscms-trace.md](gate-opscms-trace.md) | Gate OpsCMS トレース(運用コンソール: 外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験) | 5 | 0 | 0 |
 | [gate-p1-trace.md](gate-p1-trace.md) | Gate P1 FR-025・FR-026 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-p10-trace.md](gate-p10-trace.md) | Gate P10 FR-030/FR-031 トレーサビリティ表 | 3 | 0 | 0 |
 | [gate-p11-trace.md](gate-p11-trace.md) | Gate P11 FR-033 トレーサビリティ表 | 2 | 0 | 0 |
@@ -122,7 +124,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
 | FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)、無料の provider の使用の記録(正本 §13 D11) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
 
 ## 3. 棚卸しの規則
 

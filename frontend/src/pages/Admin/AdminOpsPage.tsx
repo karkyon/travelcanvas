@@ -42,7 +42,7 @@ const StatePill: React.FC<{ state: string }> = ({ state }) => {
 };
 
 const SECRET_LABEL: Record<string, { text: string; tone: string }> = {
-  configured: { text: '設定あり(値は表示しない)', tone: 'tc-pill--good' },
+  configured: { text: '鍵あり(値は表示しない)', tone: 'tc-pill--blue' },
   missing: { text: '未設定', tone: 'tc-pill--warn' },
   not_defined: { text: 'コードに設定の項目なし', tone: '' },
   not_needed: { text: '不要', tone: '' },
@@ -51,6 +51,11 @@ const LIVE_LABEL: Record<string, { text: string; tone: string }> = {
   test_only: { text: '試験用(外へ送らない)', tone: 'tc-pill--blue' },
   ready: { text: '送信できる', tone: 'tc-pill--good' },
   disabled: { text: '無効(送らない)', tone: '' },
+};
+const ADAPTER_LABEL: Record<string, { text: string; tone: string }> = {
+  fake: { text: '試験用', tone: 'tc-pill--blue' },
+  implemented: { text: '実装済み', tone: 'tc-pill--good' },
+  not_implemented: { text: '未実装(送らない)', tone: 'tc-pill--warn' },
 };
 const DENIAL_LABEL: Record<string, string> = {
   feature_quota_exceeded: '回数の上限', plan_cost_limit_exceeded: '1旅行の額の上限', per_call_limit_exceeded: '1回の量の上限',
@@ -104,6 +109,13 @@ const OverviewTab: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
           <p className="tc-ops-kpi-value">{yen(data.live_usage.estimated_jpy)}</p>
           <p className="tc-ops-kpi-sub">アプリの見込み · 請求との照合は明細が届いてから</p>
         </article>
+        {data.free_usage && (
+          <article className="tc-card tc-ops-kpi" data-testid="ops-free-usage">
+            <p className="tc-ops-kpi-head">今月の無料の提供元への送信</p>
+            <p className="tc-ops-kpi-value">{`${data.free_usage.requests}回`}</p>
+            <p className="tc-ops-kpi-sub">{`${Object.keys(data.free_usage.providers).join('・') || 'なし'} · 0円 · 50円の枠の外`}</p>
+          </article>
+        )}
         <article className="tc-card tc-ops-kpi">
           <p className="tc-ops-kpi-head">1旅行の上限</p>
           <p className="tc-ops-kpi-value">{yen(data.thresholds.hard_cap_jpy)}<small> / 旅行</small></p>
@@ -172,7 +184,7 @@ const ProvidersTab: React.FC = () => {
       {msg && <p role="status" className="tc-ops-callout">{msg}</p>}
       <div className="tc-ops-table-wrap">
         <table className="tc-ops-table">
-          <thead><tr><th>提供元 / API</th><th>用途</th><th>契約・請求</th><th>価格の版</th><th>鍵</th><th>送信</th><th>今月</th><th /></tr></thead>
+          <thead><tr><th>提供元 / API</th><th>用途</th><th>契約・請求</th><th>価格の版</th><th>鍵(保存先)</th><th>接続(adapter)</th><th>送信</th><th>今月</th><th /></tr></thead>
           <tbody>
             {data.providers.map((p) => (
               <tr key={p.name} data-testid={`ops-provider-${p.name}`}>
@@ -183,7 +195,10 @@ const ProvidersTab: React.FC = () => {
                 <td><span className={`tc-pill ${p.price_profile === 'known' ? 'tc-pill--good' : 'tc-pill--warn'}`}>
                   {p.price_profile === 'known' ? `単価あり(${p.policy_version ?? '—'})` : p.price_profile === 'partial' ? '一部の単価なし' : '読めない'}</span></td>
                 <td><span className={`tc-pill ${SECRET_LABEL[p.secret]?.tone ?? ''}`}>{SECRET_LABEL[p.secret]?.text ?? p.secret}</span>
+                  {p.secret_storage && <><br /><small>{p.secret_storage}</small></>}
                   {p.secret_setting && <><br /><code>{p.secret_setting}</code></>}</td>
+                <td><span className={`tc-pill ${ADAPTER_LABEL[p.adapter ?? 'not_implemented']?.tone ?? ''}`}>
+                  {ADAPTER_LABEL[p.adapter ?? 'not_implemented']?.text}</span></td>
                 <td><span className={`tc-pill ${LIVE_LABEL[p.live_calls]?.tone ?? ''}`}>{LIVE_LABEL[p.live_calls]?.text}</span>
                   {p.suspended && <><br /><span className="tc-pill tc-pill--bad">止めている</span></>}</td>
                 <td>{p.month_usage ? `${p.month_usage.events}件 · ${yen(p.month_usage.estimated_jpy)}` : '—'}</td>
@@ -213,7 +228,8 @@ const ProvidersTab: React.FC = () => {
         <li><b>契約・請求先を確かめる</b>OpenAI は ChatGPT の契約と API の課金が別。Google は Cloud の請求先と予算</li>
         <li><b>必要な API だけ有効にする</b>使わない API は有効にしない</li>
         <li><b>制限付きの鍵を作る</b>ブラウザ用(referrer・許可 API)とサーバー用を分ける</li>
-        <li><b>Secret Manager に入れる</b>Cloud Run の実行のアカウントだけが読める。画面・ログ・Git に出さない</li>
+        <li><b>鍵を置く</b>この画面の「秘密情報・権限」で登録するとアプリの DB に暗号化して入る。Cloud Run では Secret Manager から環境変数で渡す別の経路もある。画面・ログ・Git に出さない</li>
+        <li><b>提供元の接続(adapter)を入れる</b>コードの Gate。入るまでは鍵があっても送らない</li>
         <li><b>1回だけの少額の確認</b>見込みの額と残りの枠を確かめてから、1回ずつ</li>
       </ol>
       <p className="tc-ops-asof">この画面は OpenAI Platform・Google Cloud の契約の状態を読みません(未確認と表示)。</p>
@@ -440,8 +456,8 @@ const SecretsTab: React.FC = () => {
             <li key={s.slot} data-testid={`ops-secret-${s.slot}`}>
               <div className="tc-section-row">
                 <span><b>{s.label}</b><small>{s.hint}</small><small>{`使う提供元: ${s.providers.join('・')} · .env の名前: ${s.env}`}</small></span>
-                <span className={`tc-pill ${s.status === 'configured' ? 'tc-pill--good' : 'tc-pill--warn'}`}>
-                  {s.status === 'configured' ? '設定あり' : '未設定'}
+                <span className={`tc-pill ${s.status === 'configured' ? 'tc-pill--blue' : 'tc-pill--warn'}`}>
+                  {s.status === 'configured' ? '鍵あり' : '未設定'}
                 </span>
               </div>
               {s.status === 'configured' && (
@@ -450,6 +466,7 @@ const SecretsTab: React.FC = () => {
                   {s.registered_at ? ` · ${new Date(s.registered_at).toLocaleString('ja-JP')}` : ''}
                 </p>
               )}
+              {s.in_use_note && <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>}
               <SecretForm slot={s} onDone={(m) => { setMsg(m); void reload(); }} />
               {s.history.length > 0 && (
                 <details className="mt-2 text-xs text-ink-700">
@@ -471,11 +488,19 @@ const SecretsTab: React.FC = () => {
         <ul className="tc-ops-rows">
           <li><span>この画面</span><b>管理者 + 多要素認証</b></li>
           <li><span>鍵の登録・無効化</span><b>理由が必須 · 監査に記録(値は記録しない)</b></li>
-          <li><span>保存の方法</span><b>サーバーの ENCRYPTION_KEY で暗号化</b></li>
+          <li><span>保存先</span><b>{data.storage?.location ?? 'アプリの DB(ENCRYPTION_KEY で暗号化)'}</b></li>
           <li><span>使う順</span><b>この画面で登録した有効な版 → .env</b></li>
           <li><span>鍵の入れ替え</span><b>新しい版を登録 → 前の版は自動で入れ替え済み</b></li>
           <li><span>提供元を止める・戻す・試験</span><b>理由が必須 · 監査に記録</b></li>
         </ul>
+        {data.storage && (
+          <ul className="tc-ops-desc mt-3 list-disc space-y-1 pl-5" data-testid="ops-secret-storage">
+            <li>{data.storage.not_secret_manager}</li>
+            <li>{data.storage.backup}</li>
+            <li>{data.storage.rotation}</li>
+            <li>{data.storage.fallback}</li>
+          </ul>
+        )}
         <Link to="/admin/audit-logs" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-3 inline-flex">監査ログを見る</Link>
       </article>
     </div>
@@ -494,7 +519,7 @@ const AdminOpsPage: React.FC = () => {
       />
       <div className="tc-ops-banner" role="note">
         <b>有料の外部 API はまだ接続していません。</b>
-        今は Fake の提供元で原価の上限を確かめる段階です。OpenAI・Google Maps の契約・鍵・Secret Manager が揃うまで、外へは送りません。
+        今は Fake の提供元で原価の上限を確かめる段階です。契約の確認・提供元の接続(adapter)・価格の確認が揃うまで、鍵があっても外へは送りません。
       </div>
       <div className="tc-kit-nav">
       <div className="tc-kit-tabs tc-ops-tabs" role="tablist" aria-label="運用コンソールの画面">

@@ -33,6 +33,7 @@ from app.models.models import (
     ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
 )
 from app.services import cost_guard as cg
+from app.services import free_usage
 from app.services import provider_secrets as ps
 from app.services.audit_service import record_audit_event
 
@@ -44,6 +45,16 @@ USER_WARN_JPY = Decimal(40)
 OPS_ALERT_JPY = Decimal(45)
 HARD_CAP_JPY = Decimal(50)
 
+# [Gate OpsSecrets-Clarity] 有料の提供元へ実際に送るコード(adapter)が入っている提供元。今は無い。
+# 鍵・登録・価格が揃っても、ここに無い提供元は「送信: 無効」(fail closed)。adapter を入れる Gate でここへ足す
+ADAPTERS_IMPLEMENTED: frozenset = frozenset()
+
+# 鍵の保存先(画面に出す言葉)。運用コンソールで登録した鍵はアプリの DB に入る(GCP Secret Manager ではない)
+SECRET_STORAGE = {
+    "cms": "アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)",
+    "env": "サーバーの環境変数(.env)",
+}
+
 # 提供元の一覧(用途と、使う鍵の設定の名前)。鍵の値は読まない・返さない(設定の有無だけ)
 PROVIDER_CATALOG: List[Dict[str, Any]] = [
     {"name": "openai", "label": "OpenAI · Responses API", "purpose": "旅行相談・案の作成",
@@ -51,7 +62,8 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
      "notes": "ChatGPT の契約と API の課金は別。API の組織・プロジェクト・支出の上限は OpenAI Platform で確認する"},
     {"name": "google_maps_js", "label": "Google Maps JavaScript API", "purpose": "ブラウザの地図の表示",
      "operations": ["map.load"], "secret_setting": None,
-     "notes": "ブラウザ用の鍵は HTTP referrer と許可 API で制限する(鍵は「秘密情報・権限」で登録)"},
+     "notes": "アプリの画面は今 Google Maps を読み込まない(地図は OpenStreetMap)。ブラウザ用の鍵を画面へ配る経路が無いため、"
+              "登録しても使われない。使う時はブラウザに見える公開の鍵として HTTP referrer と許可 API で制限する"},
     {"name": "google_places", "label": "Places API (New)", "purpose": "候補の検索・詳細・写真",
      "operations": ["places.search", "places.details", "places.photo"], "secret_setting": None,
      "notes": "Field Mask と SKU を固定してから有効にする(サーバー用の鍵は「秘密情報・権限」で登録)"},
@@ -117,13 +129,14 @@ def _price_state(db: Session) -> Dict[str, Any]:
 def _event_totals(db: Session, since: Optional[datetime] = None) -> Dict[str, Dict[str, Any]]:
     q = db.query(ProviderUsageEvent.provider, func.count(ProviderUsageEvent.id),
                  func.coalesce(func.sum(ProviderUsageEvent.estimated_cost_jpy), 0),
-                 func.coalesce(func.sum(ProviderUsageEvent.actual_cost_jpy), 0))
+                 func.coalesce(func.sum(ProviderUsageEvent.actual_cost_jpy), 0),
+                 func.coalesce(func.sum(func.coalesce(ProviderUsageEvent.request_count, 1)), 0))
     if since is not None:
         q = q.filter(ProviderUsageEvent.occurred_at >= since)
     out: Dict[str, Dict[str, Any]] = {}
-    for provider, n, est, act in q.group_by(ProviderUsageEvent.provider).all():
+    for provider, n, est, act, reqs in q.group_by(ProviderUsageEvent.provider).all():
         out[provider] = {"events": int(n), "estimated_jpy": cg.money(Decimal(est)),
-                         "actual_jpy": cg.money(Decimal(act))}
+                         "actual_jpy": cg.money(Decimal(act)), "requests": int(reqs)}
     return out
 
 
@@ -150,7 +163,8 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
     totals = _event_totals(db, month_start)
     fake = totals.get(FAKE_PROVIDER, {"events": 0, "estimated_jpy": cg.money(Decimal(0)),
                                       "actual_jpy": cg.money(Decimal(0))})
-    live = {k: v for k, v in totals.items() if k != FAKE_PROVIDER and not k.startswith("fake")}
+    free = {k: v for k, v in totals.items() if k in free_usage.FREE_PROVIDERS}
+    live = {k: v for k, v in totals.items() if k != FAKE_PROVIDER and not k.startswith("fake") and k not in free}
     live_est = sum((Decimal(v["estimated_jpy"]) for v in live.values()), Decimal(0))
     accounts = db.query(UsageBudgetAccount).filter(UsageBudgetAccount.scope_type == "plan").all()
     states: Dict[str, int] = {}
@@ -168,6 +182,10 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
         "fake_usage": {**fake, "label": "Fake の試験の額(実の請求ではない)"},
         "live_usage": {"providers": live, "estimated_jpy": cg.money(live_est),
                        "label": "アプリの見込みの原価(実の請求とは別。照合は請求の明細が届いてから)"},
+        # [Gate FR059-D11] 無料の provider へ送った回数(0円。50円の枠には入れない。利用規約・回数の制限の確認用)
+        "free_usage": {"providers": {k: {"requests": v["requests"], "events": v["events"]} for k, v in free.items()},
+                       "requests": sum(v["requests"] for v in free.values()),
+                       "label": "無料の provider(OpenStreetMap・Wikipedia・Wikimedia・oEmbed)へ送った回数。0円で、50円の枠には入れない"},
         "connected_paid_providers": sorted(cg.paid_providers()),
         "suspended_providers": cg.suspended_providers(),
         "plan_accounts": {"total": len(accounts), "by_state": states},
@@ -199,8 +217,9 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
         ops_known = [price["known"].get(op, False) for op in p["operations"]]
         price_state = "unavailable" if not price["known"] else ("known" if all(ops_known) else "partial")
         is_fake = name == FAKE_PROVIDER
-        live_ready = (not is_fake) and name in registered and secret == "configured" and price_state == "known" \
-            and name not in suspended
+        adapter = "fake" if is_fake else ("implemented" if name in ADAPTERS_IMPLEMENTED else "not_implemented")
+        live_ready = (not is_fake) and adapter == "implemented" and name in registered and secret == "configured" \
+            and price_state == "known" and name not in suspended
         rows.append({
             "name": name, "label": p["label"], "purpose": p["purpose"], "operations": p["operations"],
             "kind": "fake" if is_fake else "paid",
@@ -211,13 +230,17 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
             "secret_source": secret_info["source"] if secret_info else None,
             "secret_version": secret_info["version"] if secret_info else None,
             "secret_last4": secret_info["last4"] if secret_info else None,
+            "secret_storage": (SECRET_STORAGE.get(secret_info["source"])
+                               if secret_info and secret_info["source"] else None),
+            "adapter": adapter,
             "price_profile": price_state, "policy_version": price["policy_version"],
             "live_calls": "test_only" if is_fake else ("ready" if live_ready else "disabled"),
             "month_usage": totals.get(name),
             "notes": p["notes"],
         })
     return {"as_of": _iso(_now()), "providers": rows,
-            "rule": "契約の確認・価格の版・鍵・提供元の登録の全てが揃うまで、有料の提供元へは送らない(fail closed)"}
+            "rule": "契約の確認・価格の版・鍵・提供元の接続(adapter)・提供元の登録の全てが揃うまで、有料の提供元へは送らない"
+                    "(fail closed)。鍵があるだけでは接続していません"}
 
 
 @router.post("/providers/{name}/suspend")
@@ -419,10 +442,24 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
     """鍵の状態(値は返さない)。出典は cms(この画面で登録)か env(.env)。"""
     slots = []
     for slot, spec in ps.SLOTS.items():
+        used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
         slots.append({"slot": slot, "label": spec["label"], "providers": spec["providers"], "env": spec["env"],
-                      "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot)})
+                      "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot),
+                      "in_use": bool(used_by),
+                      "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
+                      else "アプリはまだこの鍵を使いません(提供元の接続 adapter が未実装。外へは送りません)"})
     return {"as_of": _iso(_now()), "slots": slots,
-            "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。使う順: この画面で登録した有効な版 → .env の値"}
+            "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。使う順: この画面で登録した有効な版 → .env の値",
+            "storage": {
+                "location": SECRET_STORAGE["cms"],
+                "not_secret_manager": "GCP Secret Manager には登録しません。Secret Manager の鍵は Cloud Run の環境変数として"
+                                      "読み込む別の経路です(この画面からは見えません)",
+                "backup": "DB のバックアップには暗号文が入ります。ENCRYPTION_KEY を失うと復号できないため、ENCRYPTION_KEY は"
+                          "DB と別の場所に保管します",
+                "rotation": "ENCRYPTION_KEY の入れ替えは tcops の鍵の掛け直し(暗号化した全ての *_ciphertext 列)が"
+                            "provider_secrets も対象にします",
+                "fallback": "無効にすると .env の値へ戻ります(.env にも無ければ未設定)",
+            }}
 
 
 @router.post("/secrets/{slot}", status_code=201)
