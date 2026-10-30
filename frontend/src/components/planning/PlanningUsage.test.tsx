@@ -106,6 +106,45 @@ describe('この旅行の利用枠', () => {
     expect(api.getPlanningUsage).toHaveBeenCalledTimes(3);
   });
 
+  it('[G11-UsageLayout] 全ての状態で同じ行の並び(見出し・帯・クラス 1行・知らせ 2行分・詳しく)。全文は「詳しく」と読み上げで読める', async () => {
+    const rows = (box: HTMLElement) => Array.from(box.children).map((el) => el.className.split(' ')
+      .filter((c) => /^(mt-\d|h-\d+)$/.test(c)).join(' '));
+    const shape: string[][] = [];
+    const states: Array<Partial<PlanningUsage>> = [
+      {}, { state: 'warning', plan_remaining_jpy: '9.0000', providers_connected: true },
+      { state: 'limit_reached', plan_used_yen_ceil: 50, providers_connected: true },
+      { state: 'monthly_plans_reached', providers_connected: true },
+      { state: 'guest', class: 'guest', class_label: 'Guest' },
+    ];
+    for (const over of states) {
+      api.getPlanningUsage.mockResolvedValueOnce(usage(over));
+      const { unmount } = render(<PlanningUsageMeter planId="p1" />);
+      const box = await screen.findByTestId('planning-usage');
+      shape.push(rows(box));
+      expect(screen.getByTestId('planning-usage-class').className).toContain('truncate');
+      const msg = screen.queryByTestId('planning-usage-message');
+      if (msg) {
+        // 見た目は 2行まで。全文は要素の中(読み上げ)と「詳しく」の中にある
+        expect(msg.className).toContain('h-10');
+        expect(within(screen.getByTestId('planning-usage-details')).getByText(usageMessage(usage(over))!.text)).toBeInTheDocument();
+      }
+      unmount();
+    }
+    let resolve: (u: PlanningUsage) => void = () => undefined;
+    api.getPlanningUsage.mockReturnValueOnce(new Promise<PlanningUsage>((r) => { resolve = r; }));
+    const { unmount } = render(<PlanningUsageMeter planId="p1" />);
+    shape.push(rows(screen.getByTestId('planning-usage-loading')));
+    resolve(usage());
+    await screen.findByTestId('planning-usage');
+    unmount();
+    api.getPlanningUsage.mockRejectedValueOnce(new Error('offline'));
+    render(<PlanningUsageMeter planId="p2" />);
+    shape.push(rows(await screen.findByTestId('planning-usage-failed')));
+    // 7 つの状態の全てで、行の数・高さ・余白が同じ
+    expect(new Set(shape.map((x) => x.join('|'))).size).toBe(1);
+    expect(shape[0]).toEqual(['h-5', 'mt-2 h-2', 'mt-1 h-4', 'mt-2 h-10', 'mt-2']);
+  });
+
   it('旅行相談の入口: クラスと今月の枠', async () => {
     expect(classLine(mine())).toBe('クラス: Plus · 1旅行 50円まで · 今月 13円 / 250円 · 今月の旅行 2 / 5');
     expect(classLine(mine({ class: 'guest' }))).toContain('ゲスト');
