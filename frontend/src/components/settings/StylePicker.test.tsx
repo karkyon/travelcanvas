@@ -22,7 +22,10 @@ describe('StylePicker (Gate G11)', () => {
     expect(screen.getByRole('radio', { name: /標準/ })).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('radio', { name: /Atlas/ }));
     expect(useThemeStore.getState().style).toBe('atlas');
-    expect(window.localStorage.getItem('tc.style')).toBe('atlas');
+    // [Gate MockScreens] Atlas は既定の系統(端末の保存を消す)。標準を選ぶと 'standard' を保存する
+    expect(window.localStorage.getItem('tc.style')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /標準/ }));
+    expect(window.localStorage.getItem('tc.style')).toBe('standard');
     expect(await screen.findByText(/この端末に当てました/)).toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
   });

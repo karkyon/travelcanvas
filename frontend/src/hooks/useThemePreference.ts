@@ -8,7 +8,7 @@
  */
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { STYLE_KEY, isStyleId, type StyleId } from '@/styles/styleIds';
+import { DEFAULT_STYLE, STYLE_KEY, isStyleId, type StyleId } from '@/styles/styleIds';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export const THEME_KEY = 'tc.theme';
@@ -33,9 +33,9 @@ function systemDark(): boolean {
 function readStyle(): StyleId {
   try {
     const v = window.localStorage.getItem(STYLE_KEY);
-    return isStyleId(v) ? v : 'standard';
+    return isStyleId(v) ? v : DEFAULT_STYLE;
   } catch {
-    return 'standard';
+    return DEFAULT_STYLE;
   }
 }
 
@@ -52,7 +52,7 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>((set) => ({
   preference: typeof window === 'undefined' ? 'system' : read(),
   systemDark: typeof window === 'undefined' ? false : systemDark(),
-  style: typeof window === 'undefined' ? 'standard' : readStyle(),
+  style: typeof window === 'undefined' ? DEFAULT_STYLE : readStyle(),
   setPreference: (p) => {
     set({ preference: p });
     try {
@@ -67,7 +67,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
     if (!isStyleId(s)) return;
     set({ style: s });
     try {
-      if (s === 'standard') window.localStorage.removeItem(STYLE_KEY);
+      if (s === DEFAULT_STYLE) window.localStorage.removeItem(STYLE_KEY);
       else window.localStorage.setItem(STYLE_KEY, s);
     } catch {
       // 保存できない環境では、この画面を開いている間だけ有効

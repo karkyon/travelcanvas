@@ -74,7 +74,8 @@ test('見た目の系統: 設定で選ぶと全ての画面に当たり、読み
   // 標準へ戻すと G10 のままの見た目
   await chooseStyle(page, /^標準/);
   await expect(page.locator('html')).toHaveAttribute('data-style', 'standard');
-  expect(await page.evaluate(() => window.localStorage.getItem('tc.style'))).toBeNull();
+  // [Gate MockScreens] 既定はモックと同じ Atlas。標準は選んだ時だけ端末に保存する
+  expect(await page.evaluate(() => window.localStorage.getItem('tc.style'))).toBe('standard');
 });
 
 test('見た目の系統 × 明るい・暗い で主な画面に axe の違反が無く、360px で崩れない', async ({ page }) => {

@@ -477,3 +477,16 @@
 /* ===== [Gate MockScreens] 旅行相談の brief の地図(飾り) ===== */
 .tc-brief-map { position: relative; height: 130px; margin: 10px -4px 4px; border-radius: 12px; overflow: hidden; }
 .tc-brief-map svg { width: 100%; height: 100%; display: block; }
+
+/* ===== [Gate MockScreens] Atlas(既定)= UI/UX モックの [data-theme="atlas"] と同じ書体・面・線・左の帯 ===== */
+:root[data-style='atlas'] { --tc-font-body: 'DM Sans', 'Noto Sans JP', system-ui, sans-serif; --tc-font-display: 'DM Sans', 'Noto Sans JP', system-ui, sans-serif; }
+:root[data-style='atlas'] body { font-family: var(--tc-font-body); font-size: 14px; color: #232a36; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-card { background: #fffefa; border-color: #e6e3d9; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-topbar { background: rgba(255, 255, 255, .94); border-bottom-color: #e6e3d9; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-rail { background: #fff; border-right-color: #e6e3d9; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-rail a { color: #778096; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-rail a:hover,
+:root[data-style='atlas']:not([data-theme='dark']) .tc-rail a[aria-current='page'] { background: #eaf0e8; color: #315b50; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-eyebrow { color: #477163; }
+:root[data-style='atlas']:not([data-theme='dark']) .tc-pill { border-color: #e6e3d9; }
+:root[data-style='atlas'] h1, :root[data-style='atlas'] h2, :root[data-style='atlas'] h3 { letter-spacing: -.02em; }
