@@ -106,9 +106,11 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
     await expect(nowCard.getByText(/^残り \d+分$/)).toBeVisible();
     await expect(nextCard.getByRole('heading', { name: titles.next })).toBeVisible();
     await expect(nextCard.getByTestId('today-countdown')).toHaveText(/^(まもなく|\d+分後|\d+時間(\d+分)?後)$/);
-    const later = page.getByRole('list', { name: 'この後の予定' });
+    // [Gate MockScreens] 今日の旅程: 今日の予定を全て出し、今と次を文字で示す
+    const later = page.getByRole('list', { name: '今日の旅程' });
     await expect(later.getByText(titles.later)).toBeVisible();
-    await expect(later.getByText(titles.next)).toHaveCount(0); // 次の予定は一覧に重ねない
+    await expect(later.locator('li[data-state="NEXT"]')).toContainText(titles.next);
+    await expect(later.locator('li[data-state="NOW"]')).toContainText(titles.now);
     await expect(page.getByTestId('today-summary')).toHaveText(/済んだ予定 1件/);
     await expect(page.getByTestId('today-sync')).toHaveText('最新');
     await expectNoAxeViolations(page, '当日(明るい・390px)');
@@ -126,13 +128,13 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
 
     // 簡易表示: 今と次だけ。読み直しても続く
     await page.getByRole('button', { name: '簡易表示' }).click();
-    await expect(page.getByRole('list', { name: 'この後の予定' })).toHaveCount(0);
+    await expect(page.getByRole('list', { name: '今日の旅程' })).toHaveCount(0);
     await page.reload();
     await expect(nowCard.getByRole('heading', { name: titles.now })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: '簡易表示: 入' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('list', { name: 'この後の予定' })).toHaveCount(0);
+    await expect(page.getByRole('list', { name: '今日の旅程' })).toHaveCount(0);
     await page.getByRole('button', { name: '簡易表示: 入' }).click();
-    await expect(page.getByRole('list', { name: 'この後の予定' })).toBeVisible();
+    await expect(page.getByRole('list', { name: '今日の旅程' })).toBeVisible();
 
     // 暗い見た目でも読める(この端末の選択)
     await page.evaluate(() => window.localStorage.setItem('tc.theme', 'dark'));

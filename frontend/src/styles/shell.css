@@ -311,3 +311,60 @@
   .tc-map-legend { left: 9px; bottom: 9px; }
   .tc-day-title { font-size: 18px; }
 }
+
+/* ===== [Gate MockScreens] 今日: live-hero・now-card・今日の旅程・旅の操作 ===== */
+.tc-pill--bad { background: var(--tc-danger-soft); color: var(--tc-danger); }
+.tc-pill--coral { background: var(--tc-coral-soft, #fde9e3); color: var(--tc-coral-strong, #b23c22); }
+.tc-mbtn--coral { background: #c24a2c; color: #fff; border-color: #c24a2c; }
+.tc-mbtn--coral:hover { filter: brightness(.95); }
+.tc-live-hero { position: relative; overflow: hidden; padding: 21px 24px; border-radius: 22px; margin-bottom: 16px;
+  background: linear-gradient(120deg, #2b477c, #286b9c); color: #fff; }
+.tc-live-hero::after { content: attr(data-day); position: absolute; right: 30px; top: -27px; font-size: 170px; line-height: 1; font-weight: 800;
+  color: rgba(255, 255, 255, .07); pointer-events: none; }
+.tc-live-hero .tc-eyebrow { color: #b6d9ff; }
+.tc-live-title { font-size: 22px; font-weight: 800; margin: 6px 0; font-family: var(--tc-font-display); overflow-wrap: anywhere; }
+.tc-live-meta { margin: 0; color: #d6e6f7; font-size: 13px; }
+.tc-live-sync { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); z-index: 1; background: rgba(255, 255, 255, .16);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 700; }
+.tc-today-summary-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.tc-today-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.tc-today-grid.is-simple { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+.tc-today-main { display: grid; gap: 16px; }
+.tc-now-card { padding: 20px; border-left: 4px solid #ef765b; }
+.tc-now-card.is-next { border-left-color: #36a0d6; }
+.tc-big-time { font-size: 35px; font-weight: 800; letter-spacing: -.04em; line-height: 1.15; margin: 7px 0 2px; color: var(--tc-ink-900); font-variant-numeric: tabular-nums; }
+.tc-now-title { font-size: 21px; font-weight: 800; margin: 4px 0; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-now-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--tc-ink-500); font-size: 13px; margin: 4px 0 8px; }
+.tc-now-depart { font-size: 14px; font-weight: 700; color: var(--tc-ink-900); margin: 0 0 8px; }
+.tc-now-countdown { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; font-weight: 800; color: var(--tc-ink-900); }
+.tc-now-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tc-now-actions .tc-mbtn { min-height: 48px; }
+.tc-today-list { padding: 17px; }
+.tc-today-list ol { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--tc-cloud-200); }
+.tc-today-list li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 0;
+  border-bottom: 1px solid var(--tc-cloud-200); font-size: 13px; }
+.tc-today-list li b { display: block; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-today-list li small { color: var(--tc-ink-500); font-size: 11px; }
+.tc-today-list li[data-state="済"] { opacity: .6; }
+.tc-today-time { font-weight: 800; color: var(--tc-ink-700); font-variant-numeric: tabular-nums; font-size: 12px; }
+.tc-today-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.tc-today-empty { padding: 28px; display: grid; justify-items: center; gap: 6px; text-align: center; color: var(--tc-ink-500); }
+.tc-today-actions { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 16px 18px; border-radius: 18px; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); }
+@media (max-width: 900px) {
+  .tc-today-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 639px) {
+  .tc-today { padding-bottom: 120px; }
+  .tc-today-actions { position: fixed; inset: auto 0 calc(67px + env(safe-area-inset-bottom)) 0; z-index: 44; border-radius: 0;
+    border-width: 1px 0 0; padding: 10px 16px; }
+  .tc-today-actions > div { width: 100%; }
+  .tc-today-actions button { white-space: nowrap; font-size: 15px; padding-inline: 12px; }
+  .tc-live-hero { padding: 17px; }
+  .tc-live-title { font-size: 19px; }
+  .tc-live-sync { position: static; transform: none; display: inline-block; margin-top: 8px; }
+  .tc-big-time { font-size: 31px; }
+  .tc-now-card { padding: 16px; }
+  .tc-today-list li { grid-template-columns: 80px minmax(0, 1fr); }
+  .tc-today-tags { grid-column: 2; justify-content: flex-start; }
+}

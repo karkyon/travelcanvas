@@ -21,17 +21,19 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ListChecks, RefreshCw, WifiOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ListChecks, RefreshCw, WifiOff, CalendarDays } from 'lucide-react';
 import Button from '@/components/common/Button';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Surface from '@/components/design/Surface';
+import PageHead from '@/components/shell/PageHead';
+import { useTripContext } from '@/hooks/useTripContext';
 import { getToday } from '@/services/api';
 import type { TodayResponse } from '@/services/api';
 import { currentOfflineSession } from '@/utils/offlineSession';
 import {
   computeTodayFlow, computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
-import { EventCard, LaterList } from './today/TodayParts';
+import { DayList, EventCard } from './today/TodayParts';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 // [Gate L1] DOC-04 §16に準拠し、当日画面は一定間隔で自動更新する
@@ -67,12 +69,21 @@ interface Snapshot {
 }
 
 const Notice: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Surface variant="solid" padding="lg" className="text-center text-ink-700 text-lg">{children}</Surface>
+  <Surface variant="solid" padding="lg" className="text-center text-ink-700 text-base">{children}</Surface>
 );
+
+const WEEKDAY_EN = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+/** 現地の日付(YYYY-MM-DD)の曜日・日 */
+function dayParts(date: string | null): { weekday: string; day: string } | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const d = new Date(`${date}T12:00:00Z`);
+  return { weekday: WEEKDAY_EN[d.getUTCDay()] ?? '', day: String(d.getUTCDate()) };
+}
 
 const TodayPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  const trip = useTripContext(planId);
 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [isStale, setIsStale] = useState(false);
@@ -174,120 +185,134 @@ const TodayPage: React.FC = () => {
     : '';
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
+  const parts = dayParts(data?.today_date ?? null);
+  const nowLocal = data ? formatTimeInZone(new Date(nowMs).toISOString(), timeZone) : null;
+  const syncedAt = snapshot ? formatTimeInZone(new Date(snapshot.fetchedAt).toISOString(), timeZone) : null;
+  const allToday = data?.events ?? [];
+
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-cloud-50 text-ink-900" data-testid="today">
-      <div className="max-w-2xl mx-auto px-4 pt-4 pb-28 sm:pb-8">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="min-w-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-1 -ml-2">
-              ← プランへ戻る
-            </Button>
-            <h1 className="text-2xl font-bold text-ink-900">今日</h1>
-            {data?.today_date && (
-              <p className="text-sm text-ink-700 mt-1">
-                {data.today_date}
-                {showZoneNote && ` ・ 時刻は現地時間(${timeZone})`}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {data && (
-              <span
-                className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full border ${isStale
-                  ? 'bg-warning-soft text-warning border-warning' : 'bg-success-soft text-success border-success'}`}
-                data-testid="today-sync"
-              >
-                {isStale ? <WifiOff size={14} aria-hidden="true" /> : <CheckCircle2 size={14} aria-hidden="true" />}
-                {isStale ? '保存済み' : '最新'}
-              </span>
-            )}
+    <div className="tc-page tc-today" data-testid="today">
+      {/* [Gate MockScreens] モックの今日: page-head(つながりの状態・最終同期)・live-hero・NOW/NEXT・今日の旅程・旅の操作 */}
+      <PageHead
+        eyebrow="LIVE · 当日"
+        title="今日"
+        sub={data ? (
+          <>
+            {data.today_date && <span>{data.today_date}</span>}
+            {nowLocal && <span>{` · 現地 ${nowLocal}`}</span>}
+            {showZoneNote && <span>{` ・ 時刻は現地時間(${timeZone})`}</span>}
+            {syncedAt && <span>{` · 最終同期 ${syncedAt}`}</span>}
+          </>
+        ) : '今いる予定と次の予定を、現地の時刻で出します。'}
+        actions={<>
+          {data && (
+            <span className={`tc-pill ${isStale ? 'tc-pill--warn' : 'tc-pill--good'}`} data-testid="today-sync">
+              {isStale ? <WifiOff size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+              {isStale ? '保存済み' : '最新'}
+            </span>
+          )}
+          <button type="button" onClick={load} aria-label="更新" className="tc-focus-ring tc-mbtn tc-mbtn--sm">
+            <RefreshCw size={15} aria-hidden="true" /><span aria-hidden="true">更新</span>
+          </button>
+        </>}
+      />
+
+      {isStale && snapshot && (
+        <div role="status" className="mb-4 p-3 rounded-lg bg-warning-soft text-warning border border-warning text-sm flex items-start gap-2">
+          <WifiOff size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>
+            {offline ? 'オフラインのため、' : '最新の当日情報を取得できないため、'}
+            保存済みの情報を表示しています(最終取得 {formatTimeInZone(new Date(snapshot.fetchedAt).toISOString(), timeZone)})
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-danger-soft text-danger border border-danger text-sm">{error}</div>
+      )}
+
+      {data && view?.isCurrentDay && (data.today_date || view.nowEvent) && (
+        <section className="tc-live-hero" aria-label="今日の旅" data-day={parts?.day ?? ''}>
+          <p className="tc-eyebrow">
+            {[parts?.weekday, trip.destination?.toUpperCase()].filter(Boolean).join(' · ') || 'TODAY'}
+          </p>
+          <p className="tc-live-title">{trip.title ?? '今日の旅'}</p>
+          <p className="tc-live-meta">
+            {`今日の予定 ${allToday.length}件`}
+            {flow && flow.doneCount > 0 ? ` · 済んだ予定 ${flow.doneCount}件` : ''}
+          </p>
+          <span className="tc-live-sync">{isStale ? '● 保存済み' : '● 同期済'}</span>
+        </section>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-16" role="status" aria-label="読み込み中"><LoadingSpinner size="lg" /></div>
+      ) : !data || !view ? null : !view.isCurrentDay ? (
+        <Notice>保存済みの当日情報は{data.today_date}のものです。通信できる場所で更新してください。</Notice>
+      ) : !data.today_date && !view.nowEvent ? (
+        <div className="tc-card tc-today-empty">
+          <CalendarDays size={28} aria-hidden="true" />
+          <p className="font-semibold text-ink-900">今日の日程は登録されていません。</p>
+          <p className="text-sm text-ink-500">旅行の日付の当日になると、今いる予定と次の予定がここに出ます。</p>
+        </div>
+      ) : (
+        <>
+          <div className="tc-today-summary-row">
+            <p className="text-sm text-ink-700" data-testid="today-summary">
+              {flow && flow.doneCount > 0 ? `済んだ予定 ${flow.doneCount}件` : '今日の予定'}
+              {flow && !simple && flow.later.length > 0 ? ` ・ この後 ${flow.later.length}件` : ''}
+            </p>
             <button
               type="button"
-              onClick={load}
-              aria-label="更新"
-              className="tc-focus-ring inline-flex items-center justify-center w-11 h-11 rounded-lg text-ink-700 hover:bg-cloud-100"
+              onClick={toggleSimple}
+              aria-pressed={simple}
+              className="tc-focus-ring tc-mbtn tc-mbtn--sm"
             >
-              <RefreshCw size={20} aria-hidden="true" />
+              <ListChecks size={15} aria-hidden="true" />
+              {simple ? '簡易表示: 入' : '簡易表示'}
             </button>
           </div>
-        </div>
+          <div className={`tc-today-grid ${simple ? 'is-simple' : ''}`}>
+            <div className="tc-today-main">
+              {view.nowEvent ? (
+                <EventCard kind="now" event={view.nowEvent} timeZone={timeZone} planId={planId} progress={flow?.nowProgress} />
+              ) : (
+                <Notice>現在進行中の予定はありません</Notice>
+              )}
 
-        {isStale && snapshot && (
-          <div role="status" className="mb-4 p-3 rounded-lg bg-warning-soft text-warning border border-warning text-sm flex items-start gap-2">
-            <WifiOff size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span>
-              {offline ? 'オフラインのため、' : '最新の当日情報を取得できないため、'}
-              保存済みの情報を表示しています(最終取得 {formatTimeInZone(new Date(snapshot.fetchedAt).toISOString(), timeZone)})
-            </span>
-          </div>
-        )}
-
-        {error && (
-          <div role="alert" className="mb-4 p-3 rounded-lg bg-danger-soft text-danger border border-danger text-sm">{error}</div>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center py-16" role="status" aria-label="読み込み中"><LoadingSpinner size="lg" /></div>
-        ) : !data || !view ? null : !view.isCurrentDay ? (
-          <Notice>保存済みの当日情報は{data.today_date}のものです。通信できる場所で更新してください。</Notice>
-        ) : !data.today_date && !view.nowEvent ? (
-          <Notice>今日の日程は登録されていません。</Notice>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-ink-700" data-testid="today-summary">
-                {flow && flow.doneCount > 0 ? `済んだ予定 ${flow.doneCount}件` : '今日の予定'}
-                {flow && !simple && flow.later.length > 0 ? ` ・ この後 ${flow.later.length}件` : ''}
-              </p>
-              <button
-                type="button"
-                onClick={toggleSimple}
-                aria-pressed={simple}
-                className="tc-focus-ring inline-flex items-center gap-1 min-h-11 px-3 rounded-lg border border-cloud-200 bg-cloud-0 text-sm text-ink-900 hover:bg-cloud-100"
-              >
-                <ListChecks size={16} aria-hidden="true" />
-                {simple ? '簡易表示: 入' : '簡易表示'}
-              </button>
+              {view.nextEvent ? (
+                <EventCard kind="next" event={view.nextEvent} timeZone={timeZone} countdown={nextCountdown} planId={planId} />
+              ) : data.today_date ? (
+                <Notice>本日、これ以降の予定はありません</Notice>
+              ) : null}
             </div>
-
-            {view.nowEvent ? (
-              <EventCard kind="now" event={view.nowEvent} timeZone={timeZone} planId={planId} progress={flow?.nowProgress} />
-            ) : (
-              <Notice>現在進行中の予定はありません</Notice>
+            {!simple && allToday.length > 0 && (
+              <DayList events={allToday} timeZone={timeZone} nowId={view.nowEvent?.id ?? null}
+                nextId={view.nextEvent?.id ?? null} doneIds={new Set(flow?.doneIds ?? [])} />
             )}
-
-            {view.nextEvent ? (
-              <EventCard kind="next" event={view.nextEvent} timeZone={timeZone} countdown={nextCountdown} planId={planId} />
-            ) : data.today_date ? (
-              <Notice>本日、これ以降の予定はありません</Notice>
-            ) : null}
-
-            {!simple && flow && <LaterList events={flow.later} timeZone={timeZone} />}
           </div>
-        )}
+        </>
+      )}
 
-        {/* 親指の届く所(スマホでは画面の下に固定。広い画面では本文の下) */}
-        <nav
-          aria-label="当日の操作"
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-cloud-200 bg-cloud-0/95 px-4 py-3 sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0"
-          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-        >
-          <div className="max-w-2xl mx-auto flex gap-2">
-            <Button
-              variant="outline"
-              size="lg"
-              className="flex-1 sm:flex-none"
-              icon={<AlertTriangle size={20} />}
-              onClick={() => navigate(`/planner/${planId}/alerts`)}
-            >
-              遅延・休業などの対応
-            </Button>
-            <Button variant="secondary" size="lg" className="sm:flex-none" onClick={() => navigate(`/planner/${planId}`)}>
-              プランへ
-            </Button>
-          </div>
-        </nav>
-      </div>
+      {/* モックの「旅の操作をひとつに」。親指の届く所(スマホでは画面の下に固定。広い画面では本文の下) */}
+      <nav aria-label="当日の操作" className="tc-today-actions"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+        <p className="tc-section-title hidden sm:block">旅の操作をひとつに</p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 sm:flex-none"
+            icon={<AlertTriangle size={20} />}
+            onClick={() => navigate(`/planner/${planId}/alerts`)}
+          >
+            遅延・休業などの対応
+          </Button>
+          <Button variant="secondary" size="lg" className="sm:flex-none" onClick={() => navigate(`/planner/${planId}`)}>
+            プランへ
+          </Button>
+        </div>
+      </nav>
     </div>
   );
 };

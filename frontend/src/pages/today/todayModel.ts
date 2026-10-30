@@ -131,6 +131,8 @@ export interface TodayFlow {
   later: TodayEvent[];
   /** 今日すでに終わった予定の数(前日から続く予定は除く) */
   doneCount: number;
+  /** [Gate MockScreens] 終わった予定の id(今日の旅程の「済」) */
+  doneIds: string[];
 }
 
 export function computeTodayFlow(res: TodayResponse, view: TodayView, nowMs: number): TodayFlow {
@@ -158,18 +160,18 @@ export function computeTodayFlow(res: TodayResponse, view: TodayView, nowMs: num
     ? timed.filter((t) => t.start > nextT.start && t.e.id !== view.nowEvent?.id).map((t) => t.e)
     : [];
   const todayStart = res.today_date ? timed.filter((t) => localDateIn(t.start, res.timezone_id) === res.today_date) : [];
-  const doneCount = todayStart.filter((t) => {
+  const done = todayStart.filter((t) => {
     const end = endOf(t);
     return t.e.id !== view.nowEvent?.id && end != null && end <= nowMs;
-  }).length;
-  return { nowProgress, later, doneCount };
+  });
+  return { nowProgress, later, doneCount: done.length, doneIds: done.map((t) => t.e.id) };
 }
 
 /** [Gate G10-UX] UX-5 状態は色だけで伝えない(文字を必ず付ける)。暗い見た目でも読める決まりの色 */
-export const TRANSPORT_LABELS: Record<string, { text: string; className: string } | undefined> = {
-  delayed: { text: '遅延', className: 'bg-danger-soft text-danger border border-danger' },
-  cancelled: { text: '運休', className: 'bg-danger-solid text-white' },
-  on_time: { text: '定刻', className: 'bg-success-soft text-success border border-success' },
+export const TRANSPORT_LABELS: Record<string, { text: string; className: string; tone: string } | undefined> = {
+  delayed: { text: '遅延', className: 'bg-danger-soft text-danger border border-danger', tone: 'tc-pill--bad' },
+  cancelled: { text: '運休', className: 'bg-danger-solid text-white', tone: 'tc-pill--bad' },
+  on_time: { text: '定刻', className: 'bg-success-soft text-success border border-success', tone: 'tc-pill--good' },
 };
 
 // ===== オフライン表示用の保存(端末内のみ。失敗しても表示は継続する) =====

@@ -16,7 +16,10 @@ const { getToday, getOfflinePackKey } = vi.hoisted(() => ({
     algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-05-01T00:00:00Z',
   })),
 }));
-vi.mock('@/services/api', () => ({ getToday, getOfflinePackKey }));
+vi.mock('@/services/api', () => ({
+  getToday, getOfflinePackKey,
+  travelAPI: { getPlan: vi.fn(async () => ({ success: true, data: { id: 'plan-l1b', title: '京都の旅', destination: '京都' } })) },
+}));
 // [Gate K1] 当日画面の保存は利用者ごとの鍵で暗号化する(offlineVault)
 const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
@@ -67,7 +70,7 @@ describe('TodayPage (Gate L1b)', () => {
     getToday.mockResolvedValue(data);
     renderPage();
 
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
     const now = card('NOW');
     expect(within(now).getByText('ホテル')).toBeInTheDocument();
     expect(within(now).getByText('08:00')).toBeInTheDocument();
@@ -86,7 +89,7 @@ describe('TodayPage (Gate L1b)', () => {
     deviceZone('Asia/Tokyo');
     getToday.mockResolvedValue(data);
     renderPage();
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
     expect(screen.getByText('2026-05-01')).toBeInTheDocument();
     expect(screen.queryByText(/時刻は現地時間/)).not.toBeInTheDocument();
   });
@@ -109,11 +112,11 @@ describe('TodayPage (Gate L1b)', () => {
   it('表示中に取得が失敗しても表示を消さず、保存済み表示であることを示す', async () => {
     getToday.mockResolvedValueOnce(data).mockRejectedValueOnce(new Error('Network Error'));
     renderPage();
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
 
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
     expect(await screen.findByText(/保存済みの情報を表示しています/)).toBeInTheDocument();
-    expect(screen.getByText('京都駅')).toBeInTheDocument();
+    expect(within(card('NEXT')).getByText('京都駅')).toBeInTheDocument();
   });
 
   it('保存済みの当日情報が別の日のものならNOW/NEXTを出さない', async () => {
@@ -152,28 +155,30 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     vi.restoreAllMocks();
   });
 
-  it('NEXT の後の予定を出し、NOW・NEXT は一覧に重ねない。簡易表示では今と次だけ(端末に覚える)', async () => {
+  it('今日の旅程に今日の予定を全て出し、NOW・NEXT を文字で示す。簡易表示では今と次だけ(端末に覚える)', async () => {
     getToday.mockResolvedValue(withLater);
     const first = renderPage();
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
-    const list = screen.getByRole('list', { name: 'この後の予定' });
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
+    const list = screen.getByRole('list', { name: '今日の旅程' });
     expect(within(list).getByText('祇園')).toBeInTheDocument();
-    expect(within(list).queryByText('京都駅')).toBeNull();
+    expect(within(list).getByText('京都駅').closest('li')).toHaveAttribute('data-state', 'NEXT');
+    expect(within(list).getByText('ホテル').closest('li')).toHaveAttribute('data-state', 'NOW');
     expect(within(list).getByText('チケット')).toBeInTheDocument();
+    expect(await screen.findByText('京都の旅')).toBeInTheDocument();
     expect(screen.getByTestId('today-summary')).toHaveTextContent('この後 1件');
     expect(screen.getByTestId('today-sync')).toHaveTextContent('最新');
 
     const toggle = screen.getByRole('button', { name: '簡易表示' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(toggle);
-    expect(screen.queryByRole('list', { name: 'この後の予定' })).toBeNull();
+    expect(screen.queryByRole('list', { name: '今日の旅程' })).toBeNull();
     expect(screen.getByRole('button', { name: '簡易表示: 入' })).toHaveAttribute('aria-pressed', 'true');
     expect(window.localStorage.getItem('tc.today.simple')).toBe('1');
     first.unmount();
 
     renderPage();
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'この後の予定' })).toBeNull();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
+    expect(screen.queryByRole('list', { name: '今日の旅程' })).toBeNull();
   });
 
   it('NOW の残りの時間と進み(終わりは次の予定の開始)を、数値つきの進みの棒で出す', async () => {
@@ -189,7 +194,7 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
   it('保存済みの表示の時は、つながりの状態を「保存済み」と文字で示す。当日の操作は画面の下にまとめる', async () => {
     getToday.mockResolvedValueOnce(base);
     renderPage();
-    expect(await screen.findByText('ホテル')).toBeInTheDocument();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
     getToday.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
     expect(await screen.findByText(/保存済みの情報を表示しています/)).toBeInTheDocument();
