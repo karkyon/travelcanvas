@@ -40,7 +40,8 @@
   "captured_at_head_g8": "sandbox/g8 (+Gate G8 adoption-preview・ownership-transfer・ownership-transfers・privacy/corrections・correction-requests・admin/ops/jobs)",
   "captured_at_head_g11": "gate/g11-discover (+Gate G11 cover・hours-check・event-images・events/{id}/image・media-providers・import-external・social-preview)",
   "captured_at_head_g11_intake": "gate/g11-intake (+Gate G11 trip-intents・plans/{plan_id}/trip-intent)",
-  "captured_at_head_fr059": "gate/fr059-cost-guard (+FR059-B entitlements・planning-usage・planning-actions/estimate・admin/entitlements・admin/planning-usage)"
+  "captured_at_head_fr059": "gate/fr059-cost-guard (+FR059-B entitlements・planning-usage・planning-actions/estimate・admin/entitlements・admin/planning-usage)",
+  "captured_at_head_opscms": "gate/ops-cms (+Gate OpsCMS admin/ops/overview・providers・suspend/resume・ledger・cloud・test-runs/family-fake)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -92,7 +93,11 @@
   "GET /api/v1/admin/entitlements",
   "GET /api/v1/admin/operations",
   "GET /api/v1/admin/operations/share-links",
+  "GET /api/v1/admin/ops/cloud",
   "GET /api/v1/admin/ops/jobs",
+  "GET /api/v1/admin/ops/ledger",
+  "GET /api/v1/admin/ops/overview",
+  "GET /api/v1/admin/ops/providers",
   "GET /api/v1/admin/planning-usage",
   "GET /api/v1/admin/stats/system",
   "GET /api/v1/admin/support-grants",
@@ -281,6 +286,9 @@
   "POST /api/v1/admin/entitlements/{grant_id}/approve",
   "POST /api/v1/admin/entitlements/{grant_id}/revoke",
   "POST /api/v1/admin/operations/share-links/{link_id}/revoke",
+  "POST /api/v1/admin/ops/providers/{name}/resume",
+  "POST /api/v1/admin/ops/providers/{name}/suspend",
+  "POST /api/v1/admin/ops/test-runs/family-fake",
   "POST /api/v1/admin/users/manage",
   "POST /api/v1/auth/change-password",
   "POST /api/v1/auth/guest",

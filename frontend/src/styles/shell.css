@@ -490,3 +490,42 @@
 :root[data-style='atlas']:not([data-theme='dark']) .tc-eyebrow { color: #477163; }
 :root[data-style='atlas']:not([data-theme='dark']) .tc-pill { border-color: #e6e3d9; }
 :root[data-style='atlas'] h1, :root[data-style='atlas'] h2, :root[data-style='atlas'] h3 { letter-spacing: -.02em; }
+
+/* ===== [Gate OpsCMS] 運用コンソール(CMS のモック: 帯・KPI・表・手順) ===== */
+.tc-ops-banner { margin: 0 0 16px; padding: 12px 16px; border-radius: 14px; background: var(--tc-warning-soft); color: var(--tc-ink-900);
+  border: 1px solid var(--tc-cloud-200); font-size: 13px; }
+.tc-ops-banner b { display: block; margin-bottom: 2px; }
+.tc-ops-tabs { margin-bottom: 14px; flex-wrap: wrap; }
+.tc-ops-tabs a { text-decoration: none; display: inline-flex; align-items: center; }
+.tc-ops-tabs [aria-selected="true"] { background: var(--tc-accent); color: var(--tc-on-accent); }
+.tc-ops-grid { display: grid; gap: 14px; }
+.tc-ops-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tc-ops-kpi { padding: 17px 18px; min-height: 112px; }
+.tc-ops-kpi-head { font-size: 12px; color: var(--tc-ink-500); margin: 0; }
+.tc-ops-kpi-value { font-size: 27px; font-weight: 800; letter-spacing: -.03em; margin: 6px 0 2px; color: var(--tc-ink-900); font-variant-numeric: tabular-nums; }
+.tc-ops-kpi-value small { font-size: 13px; color: var(--tc-ink-500); font-weight: 600; }
+.tc-ops-kpi-sub { font-size: 11px; color: var(--tc-ink-500); margin: 0; }
+.tc-ops-two { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.tc-ops-panel { padding: 18px 20px; }
+.tc-ops-desc { font-size: 12px; color: var(--tc-ink-500); margin: 4px 0 8px; }
+.tc-ops-callout { border-left: 3px solid var(--tc-info); background: var(--tc-info-soft); padding: 10px 12px; border-radius: 0 10px 10px 0;
+  font-size: 12px; color: var(--tc-ink-900); margin: 10px 0; }
+.tc-ops-rows { list-style: none; margin: 8px 0 0; padding: 0; }
+.tc-ops-rows li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--tc-cloud-200); font-size: 13px; color: var(--tc-ink-900); }
+.tc-ops-rows li:last-child { border-bottom: 0; }
+.tc-ops-rows small { display: block; font-size: 11px; color: var(--tc-ink-500); }
+.tc-ops-rows code, .tc-ops-table code { font-size: 11px; color: var(--tc-ink-700); overflow-wrap: anywhere; }
+.tc-ops-table-wrap { overflow-x: auto; margin-top: 8px; }
+.tc-ops-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.tc-ops-table th { text-align: left; color: var(--tc-ink-500); font-weight: 700; background: var(--tc-cloud-100); white-space: nowrap; }
+.tc-ops-table td, .tc-ops-table th { padding: 9px 10px; border-bottom: 1px solid var(--tc-cloud-200); vertical-align: top; color: var(--tc-ink-900); }
+.tc-ops-form { display: grid; gap: 6px; margin-top: 14px; font-size: 13px; }
+.tc-ops-form label { font-weight: 700; color: var(--tc-ink-900); }
+.tc-ops-form input { border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 9px 11px; background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-ops-form .tc-mbtn { justify-self: start; }
+.tc-ops-steps { margin: 16px 0 0; padding-left: 20px; font-size: 12px; color: var(--tc-ink-700); display: grid; gap: 6px; }
+.tc-ops-steps b { display: block; color: var(--tc-ink-900); }
+.tc-ops-asof { font-size: 11px; color: var(--tc-ink-500); margin: 10px 0 0; }
+@media (max-width: 1100px) { .tc-ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tc-ops-two { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .tc-ops-kpis { grid-template-columns: minmax(0, 1fr); } }

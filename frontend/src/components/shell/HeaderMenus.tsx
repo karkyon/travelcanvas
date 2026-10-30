@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, User, Brain, LogOut, Building2 } from 'lucide-react';
+import { Settings, User, Brain, LogOut, Building2, ShieldCheck, Activity } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemePreference, type ThemePreference } from '../../hooks/useThemePreference';
 import { railItems } from './railItems';
@@ -18,6 +18,7 @@ const THEME_CHOICES: Array<{ value: ThemePreference; label: string }> = [
 
 export const UserMenu: React.FC<{ onClose: () => void; onLogout: () => void }> = ({ onClose, onLogout }) => {
   const { user, isGuest } = useAuthStore();
+  const isAdmin = !isGuest && (user?.user_type === 'admin' || user?.user_type === 'super_admin' || user?.is_superuser === true);
   const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   return (
     <div className="absolute right-0 mt-2 w-60 bg-cloud-0 text-ink-900 rounded-lg shadow-lg border border-cloud-200 py-1 z-10">
@@ -57,6 +58,19 @@ export const UserMenu: React.FC<{ onClose: () => void; onLogout: () => void }> =
         <Settings size={16} className="inline mr-2" aria-hidden="true" />
         設定
       </Link>
+      {/* [Gate OpsCMS] 管理者だけ: 管理の画面・運用コンソール(開くと多要素認証の確認がある) */}
+      {isAdmin && (
+        <>
+          <Link to="/admin" className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors" onClick={onClose}>
+            <ShieldCheck size={16} className="inline mr-2" aria-hidden="true" />
+            管理の画面
+          </Link>
+          <Link to="/admin/ops" className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors" onClick={onClose}>
+            <Activity size={16} className="inline mr-2" aria-hidden="true" />
+            運用コンソール(API・原価)
+          </Link>
+        </>
+      )}
       <Link
         to="/search/settings"
         className="block px-4 py-2 text-sm text-ink-700 hover:bg-cloud-100 transition-colors"

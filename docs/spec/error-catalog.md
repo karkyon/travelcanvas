@@ -82,6 +82,7 @@
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
 | `expired` | 410 | no | この版は有効期限が切れています | api/v1/booklet.py |
+| `fake_test_disabled` | 403 | no | 本番・staging の環境では Fake の試験を実行しません | api/v1/admin_ops.py |
 | `file_too_large` | 413 | no | ファイルが大きすぎます(上限 …MB) | api/v1/memories.py |
 | `finance_locked` | 409 | no | 精算を締めているため変更できません。所有者が締めを解除してから変更してください | api/v1/finance.py, api/v1/finance_ledger.py |
 | `finance_not_locked` | 409 | no | 精算は締めていません | api/v1/finance_ledger.py |
@@ -157,6 +158,7 @@
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
 | `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |
+| `ops_reason_required` | — | — | 理由を200文字までで入力してください | api/v1/admin_ops.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
 | `organization_not_found` | 404 | no | 組織が見つかりません | services/organizations.py |
 | `outside_trip_period` | 409 | no | 位置の記録は旅行の期間中(前日から最終日まで)だけ始められます | api/v1/location_tracks.py |
@@ -226,6 +228,7 @@
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unknown_planning_operation` | — | — | 知らない操作です | api/v1/planning_usage.py |
+| `unknown_provider` | 404 | no | 知らない提供元です | api/v1/admin_ops.py |
 | `unlock_reason_required` | 422 | no | 締めを解除する理由を200文字までで入力してください | api/v1/finance_ledger.py |
 | `unsupported_platform` | — | — | 対応していない SNS の URL です | api/v1/candidates.py |
 | `unsupported_type` | — | — | 対応していない形式の画像です | api/v1/media_providers.py |
