@@ -166,6 +166,9 @@ def test_nominatim_geocode_maps_statuses():
     def handler(request: httpx.Request) -> httpx.Response:
         q = request.url.params["q"]
         assert request.url.host == "nominatim.openstreetmap.org"
+        assert request.url.params["countrycodes"] == "jp"  # [Gate GeocodeJP] 日本の地名として照会する
+        if q == "国外":
+            return httpx.Response(200, json=[{"lat": "31.23", "lon": "121.47", "display_name": "国外の同じ名前"}])
         if q == "伊勢":
             return httpx.Response(200, json=[{"lat": "34.48", "lon": "136.70", "display_name": "伊勢市, 三重県",
                                               "osm_type": "relation", "osm_id": 1}])
@@ -178,6 +181,17 @@ def test_nominatim_geocode_maps_statuses():
     assert ok.status == "ok" and ok.label == "伊勢市" and ok.source_url.endswith("/relation/1")
     assert asyncio.run(ti.nominatim_geocode("無い", transport=t)).status == "not_found"
     assert asyncio.run(ti.nominatim_geocode("混む", transport=t)).status == "unavailable"
+    assert asyncio.run(ti.nominatim_geocode("国外", transport=t)).status == "not_found"  # 日本の範囲の外は使わない
+
+
+def test_hirakata_to_ise_fukui_shiga_is_within_three_hours_lower_bound():
+    """[Gate GeocodeJP] 枚方から伊勢・福井・滋賀は直線で 100〜150km 程度。直線距離の下限で「3時間を超える」とは言わない。"""
+    pts = {"枚方": (34.8146, 135.6510), "伊勢": (34.4875, 136.7093), "福井": (36.0641, 136.2196),
+           "滋賀": (35.0045, 135.8686)}
+    for name in ("伊勢", "福井", "滋賀"):
+        km = ti.haversine_km(*pts["枚方"], *pts[name])
+        assert km < 300, (name, km)
+        assert ti.limit_check(km, 3.0, "required")["status"] == "unknown", name
 
 
 # ============================================================ 下書き → 並び → 旅程

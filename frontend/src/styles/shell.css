@@ -535,3 +535,8 @@
 .tc-ops-secrets > li:last-child { border-bottom: 0; }
 .tc-ops-secrets b { display: block; font-size: 14px; color: var(--tc-ink-900); }
 .tc-ops-secrets small { display: block; font-size: 11px; color: var(--tc-ink-500); }
+
+/* ===== [Gate AdminLayout] 管理の画面の余白(.tc-page と同じ。中で .tc-page を使う画面は二重にしない) ===== */
+.tc-admin-page { min-width: 0; padding: 24px clamp(16px, 3vw, 42px) 60px; max-width: 1660px; width: 100%; margin: 0 auto; }
+.tc-admin-page > .tc-page { padding: 0; }
+@media (max-width: 760px) { .tc-admin-page { padding: 17px 13px 40px; } }

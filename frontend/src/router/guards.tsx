@@ -40,7 +40,8 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   // [Gate S11] 管理者の画面は多要素認証を通したセッションだけ(backend の require_admin と同じ条件)
   return (
     <Suspense fallback={null}>
-      <AdminMfaGate>{children}</AdminMfaGate>
+      {/* [Gate AdminLayout] 管理の画面も殻(上の帯・左の帯)との間に旅程などと同じ余白をとる */}
+      <AdminMfaGate><div className="tc-admin-page">{children}</div></AdminMfaGate>
     </Suspense>
   );
 };

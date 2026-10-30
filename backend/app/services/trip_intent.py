@@ -29,6 +29,10 @@ GEOCODE_INTERVAL_S = 1.0
 GEOCODE_CACHE_TTL_S = 24 * 3600
 # 高速道路で出せる速さの上限の目安(km/h)。直線距離をこれで割った時間は、実際の運転時間の下限になる
 LOWER_BOUND_SPEED_KMH = 100.0
+# [Gate GeocodeJP] 旅行相談の出発地・方面は日本の地名として照会する(以前は国を絞らず、「伊勢」「滋賀」が国外の同じ名前の
+# 場所に当たり、枚方から 1900〜2700km と出て「片道3時間を超える」と誤って示していた)。日本の範囲の外の結果は使わない
+GEOCODE_COUNTRIES = "jp"
+JAPAN_BBOX = (20.0, 46.0, 122.0, 154.0)  # 大まかな外枠(南・北の緯度, 西・東の経度)。主な絞り込みは countrycodes
 MAX_AREAS = 10
 
 SOURCES = ("user_input", "text", "unspecified")
@@ -373,7 +377,8 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, transport=transport, follow_redirects=False,
                                          headers={"User-Agent": USER_AGENT}) as client:
                 resp = await client.get(GEOCODE_URL, params={"q": q, "format": "json", "limit": "1",
-                                                             "accept-language": "ja"})
+                                                             "accept-language": "ja",
+                                                             "countrycodes": GEOCODE_COUNTRIES})
             if resp.status_code != 200:
                 return GeocodeResult(status="unavailable", provider="nominatim")
             data = resp.json()
@@ -387,6 +392,11 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
             lat, lng = float(item["lat"]), float(item["lon"])
         except (KeyError, TypeError, ValueError):
             return GeocodeResult(status="unavailable", provider="nominatim")
+        south, north, west, east = JAPAN_BBOX
+        if not (south <= lat <= north and west <= lng <= east):
+            result = GeocodeResult(status="not_found", provider="nominatim", retrieved_at=now())
+            _cache[q] = (time.monotonic(), result)
+            return result
         result = GeocodeResult(
             status="ok", latitude=lat, longitude=lng,
             label=str(item.get("display_name") or q).split(",")[0][:80], provider="nominatim",
