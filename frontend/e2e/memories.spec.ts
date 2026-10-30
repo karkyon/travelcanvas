@@ -53,7 +53,7 @@ test('旅の記録: メモと写真を予定に記録し、公開範囲を変え
   await post(`/plans/${planId}/events`, { day_id: d2.id, title: '美術館', local_start_time: '10:00' });
 
   await page.goto(`/planner/${planId}/memories`);
-  await expect(page.getByRole('heading', { name: '旅の記録', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '旅のあとも、地図に思い出が残る', level: 1 })).toBeVisible();
   await expect(page.getByText('まだ記録はありません。')).toBeVisible();
 
   // 1. メモ

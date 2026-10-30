@@ -51,7 +51,7 @@ const SelectedEventCard: React.FC<Props> = ({ planId, dayNumber, event, onEdit, 
           <div className="tc-detail-actions">
             {map ? (
               <a href={safeExternalUrl(map) ?? undefined} target="_blank" rel="noopener noreferrer" className="tc-focus-ring tc-mbtn tc-mbtn--sm">
-                <MapPinned size={14} aria-hidden="true" />↗ 地図<span className="sr-only">(外の地図を新しいタブで開く)</span>
+                <MapPinned size={14} aria-hidden="true" />地図 <span aria-hidden="true">↗</span><span className="sr-only">(外の地図を新しいタブで開く)</span>
               </a>
             ) : (
               <span className="tc-mbtn tc-mbtn--sm is-disabled" aria-disabled="true" title="位置が登録されていません">

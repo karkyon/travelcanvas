@@ -33,7 +33,9 @@ import MemberPolicyPanel from '@/components/share/MemberPolicyPanel';
 import OwnershipTransferPanel from '@/components/share/OwnershipTransferPanel';
 import LocalQrCode from '../components/share/LocalQrCode';
 import UiIcon from '@/components/common/UiIcon';
-import { IcLightbulb, IcShare } from '@/components/common/uiIcons';
+import PageHead from '@/components/shell/PageHead';
+import { useTripContext } from '@/hooks/useTripContext';
+import { IcLightbulb } from '@/components/common/uiIcons';
 
 const PRESET_BUTTONS: Array<{ value: SharePreset; label: string }> = [
   { value: 'minimal', label: '最小限' }, { value: 'standard', label: '標準' }, { value: 'all', label: 'すべて(機密を除く)' },
@@ -47,6 +49,8 @@ const WITHHELD_LABEL: Array<[keyof ShareWithheld, string]> = [
 const SharePage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  // [Gate MockScreens] 上の帯の旅行の切り替えに、この旅行の名前を出す
+  useTripContext(planId);
 
   const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
   // [Gate #30] 生の共有URLはDBに保存されないため、作成直後のこの1回しか
@@ -300,23 +304,15 @@ const SharePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* ヘッダー */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/planner')}
-            className="text-blue-700 hover:text-blue-900 mb-4"
-          >
-            ← プランナーに戻る
-          </button>
-          <h1 className="text-3xl font-bold text-ink-900 mb-4">
-            <UiIcon icon={IcShare} size={28} className="mr-2 align-[-4px]" />プラン共有・権限設定
-          </h1>
-          <p className="text-ink-700">
-            URL共有、QRコード、メール招待で柔軟な共有が可能です
-          </p>
-        </div>
+    <div className="tc-page tc-share">
+      <div>
+        {/* [Gate MockScreens] モックの共有: 左に共有リンクの設定、右に相手の画面(ゲスト表示)の確認。下に一緒に計画する人 */}
+        <PageHead
+          eyebrow="TOGETHER · 共有"
+          title="見せる範囲を決めて共有"
+          sub="発行の前に相手の画面を確認できます。予約番号・PIN・チケット・文書・正確な位置は、どの設定でも共有に含めません。"
+          actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(planId ? `/planner/${planId}` : '/planner')}>← 旅程に戻る</button>}
+        />
 
         {/* メッセージ表示 */}
         {message && (
@@ -330,8 +326,8 @@ const SharePage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* 左列: 共有設定 */}
+        <div className="tc-share-grid">
+          {/* 左列: 共有リンクの設定 */}
           <div className="space-y-6">
             {/* URL共有 */}
             <div className="bg-surface rounded-xl shadow-xs p-6">
@@ -613,7 +609,43 @@ const SharePage: React.FC = () => {
             </div>
           </div>
 
-          {/* 右列: コラボレーター管理 */}
+          {/* 右列: 相手の画面の確認(共有前プレビュー) */}
+          <div className="tc-share-preview-col">
+            {/* [Gate F45] 共有前プレビュー(閲覧者に見える内容。使用回数を消費しない) */}
+            <section className="tc-guest-preview" aria-labelledby="share-preview-heading">
+              <div className="tc-guest-bar" aria-hidden="true"><span>● TravelCanvas · ゲスト表示</span><span className="tc-pill tc-pill--blue">閲覧のみ</span></div>
+              <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-ink-900 mb-1 flex items-center gap-2">
+                <Eye size={20} aria-hidden="true" />
+                閲覧者に見える内容
+              </h2>
+              <p className="text-sm text-ink-700 mb-4" aria-live="polite">
+                {previewOf ? `発行済みのリンク「...${previewOf}」で見える内容です。` : '今の設定で発行すると見える内容です。'}
+                確認しても使用回数は減りません。
+              </p>
+              {previewError && <p role="alert" className="text-sm text-red-800 mb-3">{previewError}</p>}
+              {!previewOf && needsAck && (
+                <p className="text-sm text-amber-900 mb-3">機密の項目を見せることを確認すると、見える内容を表示します。</p>
+              )}
+              {preview && (
+                <>
+                  {WITHHELD_LABEL.some(([k]) => preview.withheld[k] > 0) && (
+                    <p className="text-sm text-ink-900 mb-4">
+                      見せない情報: {WITHHELD_LABEL.filter(([k]) => preview.withheld[k] > 0).map(([k, label]) => `${label} ${preview.withheld[k]}件`).join('・')}
+                    </p>
+                  )}
+                  <div className="tc-guest-frame">
+                    <SharedPlanView plan={preview.view} titleLevel={3} />
+                  </div>
+                </>
+              )}
+            </section>
+
+          </div>
+        </div>
+
+        <h2 className="tc-section-title tc-share-sub">一緒に計画する人</h2>
+        <div className="tc-share-grid tc-share-grid--even">
+          {/* 招待・参加者 */}
           <div className="space-y-6">
             {/* メール招待 */}
             <div className="bg-surface rounded-xl shadow-xs p-6">
@@ -739,36 +771,8 @@ const SharePage: React.FC = () => {
           </div>
         </div>
 
-        {/* [Gate F45] 共有前プレビュー(閲覧者に見える内容。使用回数を消費しない) */}
-        <section className="mt-8 bg-surface rounded-xl shadow-xs p-6" aria-labelledby="share-preview-heading">
-          <h2 id="share-preview-heading" ref={previewHeading} tabIndex={-1} className="text-lg font-semibold text-ink-900 mb-1 flex items-center gap-2">
-            <Eye size={20} aria-hidden="true" />
-            閲覧者に見える内容
-          </h2>
-          <p className="text-sm text-ink-700 mb-4" aria-live="polite">
-            {previewOf ? `発行済みのリンク「...${previewOf}」で見える内容です。` : '今の設定で発行すると見える内容です。'}
-            確認しても使用回数は減りません。
-          </p>
-          {previewError && <p role="alert" className="text-sm text-red-800 mb-3">{previewError}</p>}
-          {!previewOf && needsAck && (
-            <p className="text-sm text-amber-900 mb-3">機密の項目を見せることを確認すると、見える内容を表示します。</p>
-          )}
-          {preview && (
-            <>
-              {WITHHELD_LABEL.some(([k]) => preview.withheld[k] > 0) && (
-                <p className="text-sm text-ink-900 mb-4">
-                  見せない情報: {WITHHELD_LABEL.filter(([k]) => preview.withheld[k] > 0).map(([k, label]) => `${label} ${preview.withheld[k]}件`).join('・')}
-                </p>
-              )}
-              <div className="border border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
-                <SharedPlanView plan={preview.view} titleLevel={3} />
-              </div>
-            </>
-          )}
-        </section>
-
         {/* 注意事項 */}
-        <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="mt-8 p-4 rounded-lg bg-warning-soft border border-warning">
           <div className="flex items-start gap-2">
             <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
             <div className="text-sm text-yellow-800">

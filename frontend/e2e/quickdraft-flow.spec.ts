@@ -88,7 +88,7 @@ test('匿名ゲスト開始 → QuickDraft作成 → reload → プランが永�
   await page.waitForURL(/\/planner\/[0-9a-fA-F-]{36}$/, { timeout: 15_000 });
   const planUrl = page.url();
 
-  await expect(page.getByRole('heading', { name: planTitle })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: planTitle })).toBeVisible();
   await expect(page.getByText(eventTitle).first()).toBeVisible();
 
   // 7. anonymous device tokenがlocalStorageへ保存されていることを確認
@@ -102,7 +102,7 @@ test('匿名ゲスト開始 → QuickDraft作成 → reload → プランが永�
   //    検証する(クライアント側のoptimistic stateではないことの確認)
   await page.reload();
   await expect(page).toHaveURL(planUrl);
-  await expect(page.getByRole('heading', { name: planTitle })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: planTitle })).toBeVisible();
   await expect(page.getByText(eventTitle).first()).toBeVisible();
 
   // 9. プラン一覧に戻っても、作成したプランが表示され続けることを確認

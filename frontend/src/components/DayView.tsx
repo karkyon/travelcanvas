@@ -410,7 +410,7 @@ const DayView: React.FC<DayViewProps> = ({
             <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
           </div>
           {onOpenRoute && (
-            <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る ↗</button>
+            <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る <span aria-hidden="true">↗</span></button>
           )}
         </div>
         {dayTabs}

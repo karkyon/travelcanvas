@@ -115,11 +115,15 @@ const PlannerPage: React.FC = () => {
   const { isGuest } = useAuthStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  // [Gate AppShell] 左の帯の「クイック」・ホームの「旅行をつくる」(/planner?new=1)は作成の画面を開く
+  const [isQuickPage, setIsQuickPage] = useState(false);
+  useEffect(() => {
+    if (planId) setIsQuickPage(false);
+  }, [planId]);
+  // [Gate AppShell][Gate MockScreens] 左の帯の「クイック」・ホームの「旅行をつくる」(/planner?new=1)はクイックのページを開く
   const wantsNew = !planId && searchParams.get('new') === '1';
   useEffect(() => {
     if (!wantsNew) return;
-    setIsCreateModalOpen(true);
+    setIsQuickPage(true);
     const next = new URLSearchParams(searchParams);
     next.delete('new');
     setSearchParams(next, { replace: true });
@@ -1205,6 +1209,122 @@ const PlannerPage: React.FC = () => {
     );
   }
 
+  // [Gate MockScreens] クイック(モックの QUICK PLAN)の入力と旅行カードの予告。作成の画面と、クイックのページで同じものを使う
+  const quickLayout = (
+          <div className="tc-quick-layout">
+            <div className="tc-card tc-quick-form">
+              <div className="tc-section-row mb-2">
+                <h3 className="tc-section-title">旅行の基本</h3>
+                <span className="tc-pill tc-pill--blue">かんたん入力</span>
+              </div>
+              <div className="space-y-4">
+                <Input
+                  label="旅行の名前(任意、未入力なら自動で名付けます)"
+                  value={newPlanTitle}
+                  onChange={(e) => setNewPlanTitle(e.target.value)}
+                  placeholder="例: 東京旅行"
+                  fullWidth
+                  autoFocus
+                />
+                <Input
+                  label="行き先(任意)"
+                  value={newPlanDestination}
+                  onChange={(e) => setNewPlanDestination(e.target.value)}
+                  placeholder="例: 東京"
+                  fullWidth
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="出発日(任意)"
+                    type="date"
+                    value={newPlanStartDate}
+                    onChange={(e) => setNewPlanStartDate(e.target.value)}
+                    fullWidth
+                  />
+                  <Input
+                    label="帰着日(任意)"
+                    type="date"
+                    value={newPlanEndDate}
+                    onChange={(e) => setNewPlanEndDate(e.target.value)}
+                    fullWidth
+                  />
+                </div>
+                <div className="pt-2 border-t border-cloud-200">
+                  <p className="text-sm font-medium text-ink-700 mb-3">最初に行きたい場所・予定(任意)</p>
+                  <div className="space-y-3">
+                    <Input
+                      label="予定名"
+                      value={newEventTitle}
+                      onChange={(e) => setNewEventTitle(e.target.value)}
+                      placeholder="例: ホテルチェックイン"
+                      fullWidth
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="時刻(任意)"
+                        type="time"
+                        value={newEventTime}
+                        onChange={(e) => setNewEventTime(e.target.value)}
+                        fullWidth
+                      />
+                      <Input
+                        label="場所(任意)"
+                        value={newEventLocation}
+                        onChange={(e) => setNewEventLocation(e.target.value)}
+                        placeholder="例: 東京駅"
+                        fullWidth
+                      />
+                    </div>
+                    <p className="text-xs text-ink-500">場所がまだ決まらなくても旅行を作れます。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <aside className="tc-card tc-quick-preview" aria-label="旅行カードの予告">
+              <p className="tc-label">旅行カード · プレビュー</p>
+              <div className="tc-preview-card">
+                <div className="tc-trip-thumb" style={{ width: '100%', height: 122 }}><Landscape /></div>
+                <span className="tc-pill tc-pill--good mt-3">新しい旅行</span>
+                <h3 data-testid="quick-preview-title">{newPlanTitle.trim() || (newPlanDestination.trim() ? `${newPlanDestination.trim()}の旅` : '名前は保存の時に付きます')}</h3>
+                <p className="text-xs text-ink-500">
+                  {[newPlanDestination.trim() || '行き先は未定',
+                    newPlanStartDate ? `${newPlanStartDate}${newPlanEndDate && newPlanEndDate !== newPlanStartDate ? `〜${newPlanEndDate}` : ''}` : '日付は未定']
+                    .join(' · ')}
+                </p>
+                {newEventTitle.trim() && (
+                  <p className="text-xs text-ink-700 mt-1">{`最初の予定: ${newEventTime ? `${newEventTime} ` : ''}${newEventTitle.trim()}`}</p>
+                )}
+                <p className="text-xs text-ink-500 mt-2">行きたい場所から、あとで予定を整えられます。</p>
+              </div>
+              <ol className="mt-4" aria-label="旅行ができるまで">
+                {['① 旅行を作る', '② 場所を集める', '③ 日程に並べる', '④ みんなと共有'].map((t) => (
+                  <li key={t} className="tc-step-chip">{t}</li>
+                ))}
+              </ol>
+            </aside>
+          </div>
+  );
+
+  // [Gate MockScreens] 左の帯の「クイック」・ホームの「旅行をつくる」(/planner?new=1)は、モックと同じくページで開く
+  if (isQuickPage) {
+    return (
+      <div className="tc-page tc-quick-page">
+        <PageHead
+          eyebrow="QUICK PLAN · クイック"
+          title="まず、行きたい気持ちから"
+          sub="目的地と日付だけで保存できます。時刻や予約はあとから追加できます。"
+          actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsQuickPage(false)}>旅程の一覧へ</button>}
+        />
+        <form onSubmit={(e) => { e.preventDefault(); void handleCreatePlan(); }} aria-label="クイックで旅行を作る">
+          {quickLayout}
+          <div className="tc-quick-submit">
+            <Button variant="primary" type="submit" loading={isCreating}>この旅を保存して旅程へ →</Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   // ===== 一覧画面 =====
   return (
     <div className="min-h-screen bg-cloud-50">
@@ -1318,98 +1438,7 @@ const PlannerPage: React.FC = () => {
         <Modal.Body>
           <p className="tc-eyebrow">QUICK PLAN · まず、行きたい気持ちから</p>
           <p className="tc-subhead mb-4">目的地と日付だけで保存できます。時刻や予約はあとから追加できます。</p>
-          <div className="tc-quick-layout">
-            <div className="tc-card tc-quick-form">
-              <div className="tc-section-row mb-2">
-                <h3 className="tc-section-title">旅行の基本</h3>
-                <span className="tc-pill tc-pill--blue">かんたん入力</span>
-              </div>
-              <div className="space-y-4">
-                <Input
-                  label="旅行の名前(任意、未入力なら自動で名付けます)"
-                  value={newPlanTitle}
-                  onChange={(e) => setNewPlanTitle(e.target.value)}
-                  placeholder="例: 東京旅行"
-                  fullWidth
-                  autoFocus
-                />
-                <Input
-                  label="行き先(任意)"
-                  value={newPlanDestination}
-                  onChange={(e) => setNewPlanDestination(e.target.value)}
-                  placeholder="例: 東京"
-                  fullWidth
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="出発日(任意)"
-                    type="date"
-                    value={newPlanStartDate}
-                    onChange={(e) => setNewPlanStartDate(e.target.value)}
-                    fullWidth
-                  />
-                  <Input
-                    label="帰着日(任意)"
-                    type="date"
-                    value={newPlanEndDate}
-                    onChange={(e) => setNewPlanEndDate(e.target.value)}
-                    fullWidth
-                  />
-                </div>
-                <div className="pt-2 border-t border-cloud-200">
-                  <p className="text-sm font-medium text-ink-700 mb-3">最初に行きたい場所・予定(任意)</p>
-                  <div className="space-y-3">
-                    <Input
-                      label="予定名"
-                      value={newEventTitle}
-                      onChange={(e) => setNewEventTitle(e.target.value)}
-                      placeholder="例: ホテルチェックイン"
-                      fullWidth
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        label="時刻(任意)"
-                        type="time"
-                        value={newEventTime}
-                        onChange={(e) => setNewEventTime(e.target.value)}
-                        fullWidth
-                      />
-                      <Input
-                        label="場所(任意)"
-                        value={newEventLocation}
-                        onChange={(e) => setNewEventLocation(e.target.value)}
-                        placeholder="例: 東京駅"
-                        fullWidth
-                      />
-                    </div>
-                    <p className="text-xs text-ink-500">場所がまだ決まらなくても旅行を作れます。</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <aside className="tc-card tc-quick-preview" aria-label="旅行カードの予告">
-              <p className="tc-label">旅行カード · プレビュー</p>
-              <div className="tc-preview-card">
-                <div className="tc-trip-thumb" style={{ width: '100%', height: 122 }}><Landscape /></div>
-                <span className="tc-pill tc-pill--good mt-3">新しい旅行</span>
-                <h3 data-testid="quick-preview-title">{newPlanTitle.trim() || (newPlanDestination.trim() ? `${newPlanDestination.trim()}の旅` : '名前は保存の時に付きます')}</h3>
-                <p className="text-xs text-ink-500">
-                  {[newPlanDestination.trim() || '行き先は未定',
-                    newPlanStartDate ? `${newPlanStartDate}${newPlanEndDate && newPlanEndDate !== newPlanStartDate ? `〜${newPlanEndDate}` : ''}` : '日付は未定']
-                    .join(' · ')}
-                </p>
-                {newEventTitle.trim() && (
-                  <p className="text-xs text-ink-700 mt-1">{`最初の予定: ${newEventTime ? `${newEventTime} ` : ''}${newEventTitle.trim()}`}</p>
-                )}
-                <p className="text-xs text-ink-500 mt-2">行きたい場所から、あとで予定を整えられます。</p>
-              </div>
-              <ol className="mt-4" aria-label="旅行ができるまで">
-                {['① 旅行を作る', '② 場所を集める', '③ 日程に並べる', '④ みんなと共有'].map((t) => (
-                  <li key={t} className="tc-step-chip">{t}</li>
-                ))}
-              </ol>
-            </aside>
-          </div>
+          {quickLayout}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
