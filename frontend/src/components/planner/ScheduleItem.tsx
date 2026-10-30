@@ -219,6 +219,35 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {isDelayed && (
             <span className="tc-pill tc-pill--warn"><AlertTriangle size={12} aria-hidden="true" />遅れ</span>
           )}
+            {/* 操作(名前は読み上げにも出す)。[Gate MockScreens] 押しても何も起きない「共有」は、共有の先がある時だけ出す */}
+            <div className="tc-event-tools" onClick={(e) => e.stopPropagation()}>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                className={iconBtn} title="編集" aria-label={`「${title}」をこの場で編集`}>
+                <Edit3 size={14} aria-hidden="true" />
+              </button>
+              {onPhoto && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onPhoto(id); }}
+                  className={iconBtn} title="写真" aria-label="この予定の写真を選ぶ" data-testid={`schedule-photo-${id}`}>
+                  <UiIcon icon={IcImage} size={14} />
+                </button>
+              )}
+              {onComment && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onComment(id); }}
+                  className={iconBtn} title="コメント" aria-label="この予定へのコメント">
+                  <MessageSquare size={14} aria-hidden="true" />
+                </button>
+              )}
+              {onShare && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); onShare(id); }}
+                  className={iconBtn} title="共有" aria-label={`「${title}」を共有`}>
+                  <Share2 size={14} aria-hidden="true" />
+                </button>
+              )}
+              <button type="button" onClick={(e) => { e.stopPropagation(); onDelete?.(id); }}
+                className={`${iconBtn} is-danger`} title="削除" aria-label={`「${title}」を削除`}>
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
         </div>
         {subParts.length > 0 && <small className="tc-event-sub">{subParts.join(' · ')}</small>}
         {rating && (
@@ -264,35 +293,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           </figure>
         )}
 
-        {/* 操作(名前は読み上げにも出す)。[Gate MockScreens] 押しても何も起きない「共有」は、共有の先がある時だけ出す */}
-        <div className="tc-event-tools">
-          <button type="button" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-            className={iconBtn} title="編集" aria-label={`「${title}」をこの場で編集`}>
-            <Edit3 size={14} aria-hidden="true" />
-          </button>
-          {onPhoto && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onPhoto(id); }}
-              className={iconBtn} title="写真" aria-label="この予定の写真を選ぶ" data-testid={`schedule-photo-${id}`}>
-              <UiIcon icon={IcImage} size={14} />
-            </button>
-          )}
-          {onComment && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onComment(id); }}
-              className={iconBtn} title="コメント" aria-label="この予定へのコメント">
-              <MessageSquare size={14} aria-hidden="true" />
-            </button>
-          )}
-          {onShare && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onShare(id); }}
-              className={iconBtn} title="共有" aria-label={`「${title}」を共有`}>
-              <Share2 size={14} aria-hidden="true" />
-            </button>
-          )}
-          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete?.(id); }}
-            className={`${iconBtn} is-danger`} title="削除" aria-label={`「${title}」を削除`}>
-            <Trash2 size={14} aria-hidden="true" />
-          </button>
-        </div>
       {/* Expanded Content */}
       {isExpanded && (
         <div className="tc-event-expanded" onClick={(e) => e.stopPropagation()}>
