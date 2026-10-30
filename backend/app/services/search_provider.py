@@ -221,9 +221,11 @@ async def search_overpass(
 class ProviderResults(list):
     """[Gate G11] 結果の一覧。応答しなかった提供元を unavailable に持つ(失敗を「見つからない」にしない)"""
 
-    def __init__(self, items: List[Dict[str, Any]], unavailable: List[str]):
+    def __init__(self, items: List[Dict[str, Any]], unavailable: List[str], called: Optional[List[str]] = None):
         super().__init__(items)
         self.unavailable = unavailable
+        # [Gate FR059-D11] 外へ送った提供元(無料の provider の使用の記録に使う)
+        self.called = list(called or [])
 
 
 # [Gate G11] カテゴリで探す Overpass は公開の server が遅いことがあるため、待つ時間を長くする
@@ -267,4 +269,5 @@ async def search_all_providers(
             unavailable.append(provider_name)
             continue
         combined.extend(r)
-    return ProviderResults(combined, unavailable)
+    called = [n for n in names if not (n == "overpass" and (latitude is None or longitude is None))]
+    return ProviderResults(combined, unavailable, called)

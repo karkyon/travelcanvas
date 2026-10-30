@@ -8,7 +8,8 @@ import { arrayOf, bool, decodeResponse, int, nullable, object, oneOf, optional, 
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
-export interface OpsUsageTotal { events: number; estimated_jpy: string; actual_jpy: string }
+export interface OpsUsageTotal { events: number; estimated_jpy: string; actual_jpy: string; requests?: number }
+export interface OpsFreeUsage { providers: Record<string, unknown>; requests: number; label: string }
 export interface OpsOverview {
   as_of: string; environment: string; policy_version: string; month: string;
   thresholds: { user_warning_jpy: string; ops_alert_jpy: string; hard_cap_jpy: string };
@@ -19,6 +20,7 @@ export interface OpsOverview {
   plan_accounts: { total: number; by_state: Record<string, unknown> };
   open_reservations: number;
   cloud_billing: { status: string; message: string };
+  free_usage?: OpsFreeUsage;
 }
 export type OpsSecretState = 'configured' | 'missing' | 'not_defined' | 'not_needed';
 export interface OpsProvider {
@@ -56,16 +58,19 @@ export interface OpsFamilyRun {
   as_of: string; case: Record<string, unknown>; summary: OpsRunSummary; steps: OpsRunStep[]; note: string;
 }
 
-const total: Decoder<OpsUsageTotal> = object<OpsUsageTotal>({ events: int, estimated_jpy: str, actual_jpy: str });
+const total: Decoder<OpsUsageTotal> = object<OpsUsageTotal>({ events: int, estimated_jpy: str, actual_jpy: str,
+  requests: optional(int) });
 
 const overview: Decoder<OpsOverview> = object<OpsOverview>({
   as_of: str, environment: str, policy_version: str, month: str,
   thresholds: object({ user_warning_jpy: str, ops_alert_jpy: str, hard_cap_jpy: str }),
-  fake_usage: object<OpsUsageTotal & { label: string }>({ events: int, estimated_jpy: str, actual_jpy: str, label: str }),
+  fake_usage: object<OpsUsageTotal & { label: string }>({ events: int, estimated_jpy: str, actual_jpy: str,
+    requests: optional(int), label: str }),
   live_usage: object({ providers: record, estimated_jpy: str, label: str }),
   connected_paid_providers: arrayOf(str), suspended_providers: record,
   plan_accounts: object({ total: int, by_state: record }), open_reservations: int,
   cloud_billing: object({ status: str, message: str }),
+  free_usage: optional(object<OpsFreeUsage>({ providers: record, requests: int, label: str })),
 });
 
 const provider: Decoder<OpsProvider> = object<OpsProvider>({
