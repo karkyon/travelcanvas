@@ -3,6 +3,14 @@ name: GCP dev image publish
 on:
   workflow_dispatch:
     inputs:
+      project_id:
+        description: "Target Google Cloud project ID"
+        required: true
+        type: string
+      project_number:
+        description: "Target Google Cloud project number"
+        required: true
+        type: string
       deploy_service:
         description: "Run DB migration and deploy private Cloud Run service"
         required: true
@@ -22,22 +30,21 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PROJECT_ID: travelcanvas-development
   REGION: asia-northeast1
   REPOSITORY: travelcanvas-dev
   IMAGE: backend
   SERVICE_NAME: travelcanvas-dev-backend
   MIGRATION_JOB: travelcanvas-dev-migrate
-  WORKLOAD_IDENTITY_PROVIDER: projects/142651556966/locations/global/workloadIdentityPools/github-actions/providers/github
-  SERVICE_ACCOUNT: tc-dev-deployer@travelcanvas-development.iam.gserviceaccount.com
-  RUNTIME_SERVICE_ACCOUNT: tc-dev-runtime@travelcanvas-development.iam.gserviceaccount.com
-  MIGRATOR_SERVICE_ACCOUNT: tc-dev-migrator@travelcanvas-development.iam.gserviceaccount.com
 
 jobs:
   publish-backend-image:
     name: Publish immutable backend image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      PROJECT_ID: ${{ inputs.project_id }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ format('projects/{0}/locations/global/workloadIdentityPools/github-actions/providers/github', inputs.project_number) }}
+      SERVICE_ACCOUNT: ${{ format('tc-dev-deployer@{0}.iam.gserviceaccount.com', inputs.project_id) }}
     permissions:
       contents: read
       id-token: write
@@ -49,12 +56,17 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Refuse non-main execution
+      - name: Validate target and refuse non-main execution
         shell: bash
+        env:
+          TARGET_PROJECT_ID: ${{ inputs.project_id }}
+          TARGET_PROJECT_NUMBER: ${{ inputs.project_number }}
         run: |
           set -euo pipefail
           test "${GITHUB_REF}" = "refs/heads/main"
           test "${GITHUB_REPOSITORY}" = "karkyon/travelcanvas"
+          [[ "${TARGET_PROJECT_ID}" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "${TARGET_PROJECT_NUMBER}" =~ ^[0-9]+$ ]]
 
       - name: Authenticate to Google Cloud without a service-account key
         id: auth
@@ -108,6 +120,12 @@ jobs:
     needs: publish-backend-image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      PROJECT_ID: ${{ inputs.project_id }}
+      WORKLOAD_IDENTITY_PROVIDER: ${{ format('projects/{0}/locations/global/workloadIdentityPools/github-actions/providers/github', inputs.project_number) }}
+      SERVICE_ACCOUNT: ${{ format('tc-dev-deployer@{0}.iam.gserviceaccount.com', inputs.project_id) }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ format('tc-dev-runtime@{0}.iam.gserviceaccount.com', inputs.project_id) }}
+      MIGRATOR_SERVICE_ACCOUNT: ${{ format('tc-dev-migrator@{0}.iam.gserviceaccount.com', inputs.project_id) }}
     permissions:
       contents: read
       id-token: write
