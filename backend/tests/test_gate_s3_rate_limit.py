@@ -17,17 +17,7 @@ import redis as redis_lib
 from app.core.config import settings
 from app.ops import metrics
 from app.utils import rate_limiter as rl
-
-
-def _redis_reachable() -> bool:
-    try:
-        redis_lib.Redis.from_url(settings.REDIS_URL, socket_timeout=0.5, socket_connect_timeout=0.5).ping()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
-needs_redis = pytest.mark.skipif(not _redis_reachable(), reason="Redis に届かない環境(CI の backend ジョブ等)")
+from tests.redis_support import needs_redis
 
 
 @pytest.fixture()
