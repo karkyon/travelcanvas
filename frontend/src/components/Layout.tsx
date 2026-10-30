@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import RecordingIndicator from './location/RecordingIndicator';
 
@@ -11,9 +11,11 @@ const PageLoading = () => (
 );
 
 const Layout = () => {
+  // [Gate LP] LP(/)は景色の上に自分の案内(lp-nav)を持つため、全体の見出しの帯を出さない
+  const { pathname } = useLocation();
   return (
     <div className="min-h-screen bg-cloud-50 text-ink-900">
-      <Header />
+      {pathname !== '/' && <Header />}
       {/* [Gate L5] 位置の記録中であることを全ての画面で示す(CA-014) */}
       <RecordingIndicator />
       <main>

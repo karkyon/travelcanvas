@@ -59,8 +59,9 @@ describe('router (Gate M9-FE-C3)', () => {
       () => new Promise<{ default: () => JSX.Element }>((resolve) => (resolvePage = resolve))
     );
     const memory = createMemoryRouter(
-      [{ path: '/', element: <Layout />, children: [{ index: true, element: <LazyPage /> }] }],
-      { initialEntries: ['/'] }
+      // [Gate LP] ランディング(/)は全体の見出しを出さないため、ほかの画面で確かめる
+      [{ path: '/', element: <Layout />, children: [{ path: 'dashboard', element: <LazyPage /> }] }],
+      { initialEntries: ['/dashboard'] }
     );
     render(<RouterProvider router={memory} />);
     expect(screen.getByText('HEADER')).toBeInTheDocument();

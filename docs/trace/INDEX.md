@@ -54,6 +54,7 @@
 | [gate-l3-fr017-trace.md](gate-l3-fr017-trace.md) | Gate L3 FR-017 トレーサビリティ表 | 0 | 1 | 3 |
 | [gate-l4-fr018-trace.md](gate-l4-fr018-trace.md) | Gate L4 FR-018 トレーサビリティ表 | 1 | 0 | 1 |
 | [gate-l5-trace.md](gate-l5-trace.md) | Gate L5 Local-first Location・適応型GPS記録 トレーサビリティ表 | 2 | 0 | 1 |
+| [gate-lp-trace.md](gate-lp-trace.md) | Gate LP トレース(ランディングを景色の主画面・動く画面イメージ・旅の流れ・正直な料金へ作り直す) | 0 | 0 | 0 |
 | [gate-m1-fr014-trace.md](gate-m1-fr014-trace.md) | Gate M1 FR-014 トレーサビリティ表 | 0 | 22 | 0 |
 | [gate-m3-fr015-trace.md](gate-m3-fr015-trace.md) | Gate M3 FR-015 トレーサビリティ表 | 1 | 5 | 1 |
 | [gate-o1-trace.md](gate-o1-trace.md) | Gate O1 B-010 トレーサビリティ表 | 2 | 0 | 1 |
