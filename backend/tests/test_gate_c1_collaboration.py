@@ -25,6 +25,7 @@ from app.core import crypto as crypto_module
 from app.core.auth import AuthResult, get_current_user
 from app.core.config import settings
 from app.main import app
+from tests.redis_support import needs_redis
 from app.models.models import PlanCollaborator, PlanConstraint, PrivateProfileLink, UserPrivateProfile
 from app.services import account_deletion as ad
 from app.services import data_export as dx
@@ -185,17 +186,7 @@ def test_presence_access_and_hygiene(auth_client, make_user, db_session):
     assert other[0]["role"] == "viewer" and other[0]["editing"] is None
 
 
-def _redis_reachable() -> bool:
-    try:
-        import redis
-
-        redis.Redis.from_url(settings.REDIS_URL, socket_timeout=0.3, socket_connect_timeout=0.3).ping()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
-@pytest.mark.skipif(not _redis_reachable(), reason="Redis に届かない環境(CI の backend ジョブ等)")
+@needs_redis
 def test_presence_in_redis_is_shared_and_expires(monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_NAMESPACE", f"tc-test-{uuid.uuid4().hex[:8]}")
     rl.set_redis_client_for_testing(None)

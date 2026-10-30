@@ -173,11 +173,24 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
+      # [Gate CI-Redis] 以前は Redis が無く、Redis を使う試験(回数制限の共有・共同編集の知らせ・FR-059 の停止の共有)が
+      # 全て飛ばされたまま合格になっていた。使い捨ての Redis を置き、TC_REQUIRE_REDIS=1 で飛ばさず実行する。
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
     env:
       # CI専用の非秘密な固定値。本番/開発環境の値とは一切関係が無く、
       # このジョブの使い捨てPostgreSQLコンテナにのみ通用する。
       DATABASE_URL: postgresql://travelcanvas_app:ci-only-not-a-real-secret@localhost:5432/travelcanvas_test
       JWT_SECRET_KEY: ci-only-dummy-jwt-secret-not-used-anywhere-else
+      REDIS_URL: redis://localhost:6379/0
+      TC_REQUIRE_REDIS: "1"
     steps:
       # [Gate G1] GOV-01 DOC-10 の基準 commit が履歴にあるかを確かめるため、履歴を全部取る
       - uses: actions/checkout@v5
@@ -252,6 +265,16 @@ jobs:
 
       - name: VERIFIED の証拠の合格の照合 (ブロッキング)
         run: python3 ../scripts/ci/check_ledger_results.py backend --junit ../ci-results/backend-junit.xml
+
+      # [Gate CI-Redis] Redis を使う試験が実行されて合格したこと・Redis の理由の飛ばしが 0 件であること(飛ばした試験は全て一覧に出す)
+      - name: Redis を使う試験の実行の確認 (ブロッキング)
+        if: always()
+        run: >-
+          python3 ../scripts/ci/check_required_tests.py --junit ../ci-results/backend-junit.xml
+          --forbid-skip-reason Redis
+          --require tests/test_gate_fr059c_shared_suspension.py
+          --require tests/test_gate_s3_rate_limit.py
+          --min-run 17
 
       - name: Upload backend test results
         if: always()

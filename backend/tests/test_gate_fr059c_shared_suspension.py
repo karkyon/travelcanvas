@@ -6,9 +6,15 @@
 - Redis を使わない設定(試験・CI の backend ジョブ)・届かない時: このプロセスの印で止める(止めた印を忘れない)
 - 届かない間に付けた印は、届いた時に Redis へ送る
 
-Redis を使う試験は試験ごとに別の名前空間を使い、終わったら消す。Redis に届かない環境では Redis の試験だけを飛ばす。
+Redis を使う試験は試験ごとに別の名前空間を使い、終わったら消す。Redis に届かない環境では Redis の試験だけを飛ばす
+(CI は TC_REQUIRE_REDIS=1 で飛ばさない。tests/redis_support.py)。
 """
+import json
+import os
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import pytest
 import redis as redis_lib
@@ -17,19 +23,33 @@ from app.core.config import settings
 from app.ops import metrics
 from app.services import cost_guard as cg
 from app.utils import rate_limiter as rl
+from tests.redis_support import needs_redis
 
 P = "fake-paid-provider"
+BACKEND = Path(__file__).resolve().parents[1]
+
+# 別の process(別の worker と同じ: プロセスの中の印を持たない)で、同じ名前空間の共有の印を読み書きする
+_WORKER = r"""
+import json, sys
+from app.core.config import settings
+from app.utils import rate_limiter as rl
+from app.services import cost_guard as cg
+settings.RATE_LIMIT_NAMESPACE = sys.argv[1]
+rl.use_backend("redis")
+action, name = sys.argv[2], sys.argv[3]
+if action == "suspend":
+    print(json.dumps({"shared": cg.suspend_provider(name, "settled_over_estimate")}))
+elif action == "resume":
+    print(json.dumps({"shared": cg.resume_provider(name, reason="worker")}))
+else:
+    print(json.dumps({"suspended": cg.is_suspended(name), "all": cg.suspended_providers()}))
+"""
 
 
-def _redis_reachable() -> bool:
-    try:
-        redis_lib.Redis.from_url(settings.REDIS_URL, socket_timeout=0.5, socket_connect_timeout=0.5).ping()
-        return True
-    except Exception:  # noqa: BLE001
-        return False
-
-
-needs_redis = pytest.mark.skipif(not _redis_reachable(), reason="Redis に届かない環境(CI の backend ジョブ等)")
+def _worker(namespace: str, action: str, name: str = P) -> dict:
+    out = subprocess.run([sys.executable, "-c", _WORKER, namespace, action, name], cwd=str(BACKEND),
+                         env=dict(os.environ), capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(out.stdout.strip().splitlines()[-1])
 
 
 @pytest.fixture(autouse=True)
@@ -92,6 +112,32 @@ def test_suspension_while_redis_is_down_is_kept_and_sent_later(shared, monkeypat
     assert cg.is_suspended(P)
     assert shared.hget(cg._shared_key(), P) == b"settled_over_estimate"
     assert cg._unsynced == {}
+
+
+@needs_redis
+def test_suspension_and_resume_cross_real_processes(shared):
+    """別の process(別の worker)で止めると、この process でも止まり、この process で戻すと別の process でも戻る。"""
+    ns = settings.RATE_LIMIT_NAMESPACE
+    assert _worker(ns, "suspend") == {"shared": True}
+    assert cg._suspended == {}  # この process の印は無い(共有の印だけで止まる)
+    assert cg.is_suspended(P)
+    assert cg.suspended_providers() == {P: "settled_over_estimate"}
+    assert cg.resume_provider(P, reason="確認済み") is True
+    assert _worker(ns, "status") == {"suspended": False, "all": {}}
+
+
+@needs_redis
+def test_namespaces_are_isolated(shared, monkeypatch):
+    """名前空間(環境ごとの RATE_LIMIT_NAMESPACE)が違えば、停止の印は混ざらない。"""
+    ns = settings.RATE_LIMIT_NAMESPACE
+    other = f"tc-test-{uuid.uuid4().hex[:8]}"
+    try:
+        assert _worker(other, "suspend") == {"shared": True}
+        assert not cg.is_suspended(P)
+        assert _worker(other, "status")["suspended"] is True
+        assert _worker(ns, "status") == {"suspended": False, "all": {}}
+    finally:
+        shared.delete(f"{other}:costguard:suspended")
 
 
 @needs_redis
