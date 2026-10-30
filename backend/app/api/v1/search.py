@@ -91,6 +91,7 @@ async def search_spots(
     raw_results = await search_all_providers(
         (body.query or "").strip(), body.latitude, body.longitude, body.radius_km, **extra
     )
+    unavailable = list(getattr(raw_results, "unavailable", []) or [])
     raw_results = raw_results[: max(1, min(body.max_results, 50))]
 
     candidates = []
@@ -134,6 +135,8 @@ async def search_spots(
                  if body.latitude is not None and body.longitude is not None else None),
         "total": len(candidates),
         "candidates": [{**_candidate_to_dict(c), **_distance(c, body)} for c in candidates],
+        # [Gate G11] 応答しなかった提供元(0件と区別する。画面は「見つからない」と言わない)
+        "unavailable_providers": unavailable,
     }
 
 

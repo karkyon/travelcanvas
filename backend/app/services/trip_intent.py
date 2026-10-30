@@ -214,7 +214,15 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
 
     party_field = fields.get("party_size")
     party_text, pm = _party(t)
-    if party_field:
+    if party_field and party_text and int(party_field) != party_text:
+        # [Gate G11] 入力欄と文章が違う時は、どちらかを黙って選ばない(利用者に選んでもらう)
+        items.append(_item("party_size", "人数", None, f"入力欄は{int(party_field)}人、文章は{party_text}人", "text",
+                           "required", _snippet(t, pm), {
+                               "id": "party_size", "text": f"人数は何人ですか(入力欄は{int(party_field)}人、文章は{party_text}人)",
+                               "options": [{"value": str(party_text), "label": f"{party_text}人(文章)"},
+                                           {"value": str(int(party_field)), "label": f"{int(party_field)}人(入力欄)"}],
+                               "suggested": None, "hint": "宿を「何人で1部屋か」で探す時の条件になります"}))
+    elif party_field:
         items.append(_item("party_size", "人数", int(party_field), f"大人{int(party_field)}人", "user_input", "required"))
     elif party_text:
         items.append(_item("party_size", "人数", party_text, f"{party_text}人", "text", "required", _snippet(t, pm)))
@@ -298,8 +306,11 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
                            "user_input", "required"))
     elif window_field or window:
         disp = window_field or window or ""
-        items.append(_item("dates", "日程", {"status": "window" if status != "fixed" else "fixed", "text": disp},
-                           f"{disp} · 日付は未確定", "user_input" if window_field else "text", "undecided",
+        # [Gate G11] 画面で「日付が決まっている」を選んだ時は、その扱いを残す(以前は「おおよその時期」にしていた)
+        fixed = (fields.get("date_status") == "fixed") if window_field else status == "fixed"
+        items.append(_item("dates", "日程", {"status": "fixed" if fixed else "window", "text": disp},
+                           f"{disp} · 決まっている日付" if fixed else f"{disp} · 日付は未確定",
+                           "user_input" if window_field else "text", "required" if fixed else "undecided",
                            None if window_field else _snippet(t, dm),
                            note="宿の空室・料金と営業日は、日付が決まってから照会します"))
     else:

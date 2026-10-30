@@ -16,7 +16,7 @@ const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const anyValue: Decoder<unknown> = (v) => v;
 
 const question: Decoder<IntentQuestion> = object<IntentQuestion>({
-  id: oneOf('one_way_strength', 'budget_scope'), text: str,
+  id: oneOf('one_way_strength', 'budget_scope', 'party_size'), text: str,
   options: arrayOf(object<{ value: string; label: string }>({ value: str, label: str })),
   suggested: nullable(str), hint: nullable(str),
 });

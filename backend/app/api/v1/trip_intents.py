@@ -65,6 +65,8 @@ class ExtractIn(BaseModel):
     text: str = Field("", max_length=4000)
     origin: Optional[str] = Field(None, max_length=100)
     travel_window: Optional[str] = Field(None, max_length=60)
+    # [Gate G11] 画面の「旅行の時期」(日付が決まっている / おおよその時期)
+    date_status: Optional[Literal["window", "fixed"]] = None
     start_date: Optional[date_cls] = None
     party_size: Optional[int] = Field(None, ge=1, le=30)
     nights: Optional[int] = Field(None, ge=0, le=14)

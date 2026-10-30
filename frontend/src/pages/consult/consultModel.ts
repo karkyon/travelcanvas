@@ -90,6 +90,8 @@ export interface ReviewState {
   strength: Record<ReviewKey, IntentStrength>;
   evidence: Partial<Record<ReviewKey, string | null>>;
   personal: boolean;
+  /** 入力欄と文章が食い違った行の選択肢(人数など)。選ぶまで条件に使わない */
+  conflicts?: Partial<Record<ReviewKey, Array<{ value: string; label: string }>>>;
 }
 
 export interface ConsultState {
@@ -145,7 +147,8 @@ export function extractInputOf(brief: BriefForm): ExtractInput {
   return {
     text: brief.text,
     ...(brief.origin.trim() ? { origin: brief.origin.trim() } : {}),
-    ...(brief.travelWindow !== 'undecided' && brief.windowText.trim() ? { travel_window: brief.windowText.trim() } : {}),
+    ...(brief.travelWindow !== 'undecided' && brief.windowText.trim()
+      ? { travel_window: brief.windowText.trim(), date_status: brief.travelWindow } : {}),
     ...(n(brief.partySize) ? { party_size: n(brief.partySize) } : {}),
     ...(brief.nights !== '' ? { nights: Number(brief.nights) } : {}),
     ...(brief.transport !== 'undecided' ? { transport: brief.transport, highway: brief.highway } : {}),
@@ -178,6 +181,9 @@ export function initReview(ex: IntentExtraction): ReviewState {
     evidence[k] = it?.evidence ?? null;
   }
   const oneWay = get('one_way');
+  const conflicts: Partial<Record<ReviewKey, Array<{ value: string; label: string }>>> = {};
+  const partyQ = get('party_size')?.question;
+  if (partyQ && partyQ.id === 'party_size') conflicts.party_size = partyQ.options;
   return {
     values: {
       origin: typeof get('origin')?.value === 'string' ? (get('origin')!.value as string) : '',
@@ -196,14 +202,15 @@ export function initReview(ex: IntentExtraction): ReviewState {
       travel_window: dates?.text ?? '',
       preferences: Array.isArray(get('preferences')?.value) ? (get('preferences')!.value as string[]) : [],
     },
-    sources, confirmed, strength, evidence,
+    sources, confirmed, strength, evidence, conflicts,
     personal: ex.items.some((i) => i.sensitive),
   };
 }
 
-/** 未確定の問い(片道の時間・宿泊費の範囲)が残っているか */
-export function openQuestions(r: ReviewState): Array<'one_way' | 'budget'> {
-  const out: Array<'one_way' | 'budget'> = [];
+/** 未確定の問い(人数の食い違い・片道の時間・宿泊費の範囲)が残っているか */
+export function openQuestions(r: ReviewState): Array<'party_size' | 'one_way' | 'budget'> {
+  const out: Array<'party_size' | 'one_way' | 'budget'> = [];
+  if (r.conflicts?.party_size && r.values.party_size === null) out.push('party_size');
   if (r.values.one_way_hours && r.values.one_way_strength === 'undecided') out.push('one_way');
   if (r.values.budget_min_man !== null && r.values.budget_scope === 'undecided') out.push('budget');
   return out;

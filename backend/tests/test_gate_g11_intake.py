@@ -86,6 +86,35 @@ def test_extract_main_scenario_marks_sources_and_questions(client, users):
     assert all(a["source"] == "user_input" for a in body["areas"])
 
 
+def test_extract_party_conflict_between_field_and_text_is_asked_not_guessed(client, users):
+    """[Gate G11] 入力欄は1人・文章は「家族4人」の時、どちらかを黙って使わない(利用者に選んでもらう)"""
+    owner, _ = users
+    _as(owner)
+    items = _items(client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "party_size": 1}).json())
+    party = items["party_size"]
+    assert party["value"] is None and party["needs_answer"]
+    assert party["question"]["id"] == "party_size"
+    assert [o["value"] for o in party["question"]["options"]] == ["4", "1"]
+    assert "入力欄は1人" in party["display"] and "文章は4人" in party["display"]
+    # 同じ人数なら問わない(あなたの入力として使う)
+    same = _items(client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "party_size": 4}).json())
+    assert same["party_size"]["value"] == 4 and same["party_size"]["source"] == "user_input"
+
+
+def test_extract_fixed_date_from_screen_stays_fixed(client, users):
+    """[Gate G11] 画面で「日付が決まっている」+「11/28」は、決まっている日付として返す(以前は未確定扱い)"""
+    owner, _ = users
+    _as(owner)
+    items = _items(client.post("/api/v1/trip-intents/extract", json={
+        "text": SAMPLE, "travel_window": "11/28", "date_status": "fixed"}).json())
+    assert items["dates"]["value"] == {"status": "fixed", "text": "11/28"}
+    assert items["dates"]["display"] == "11/28 · 決まっている日付" and items["dates"]["source"] == "user_input"
+    window = _items(client.post("/api/v1/trip-intents/extract", json={
+        "text": SAMPLE, "travel_window": "約1か月後の週末", "date_status": "window"}).json())
+    assert window["dates"]["value"]["status"] == "window"
+    assert client.post("/api/v1/trip-intents/extract", json={"text": SAMPLE, "date_status": "soon"}).status_code == 422
+
+
 def test_extract_fields_override_text_and_answers_close_questions(client, users):
     owner, _ = users
     _as(owner)

@@ -22,6 +22,7 @@ import React, { useMemo } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
 import type { DaySchedule, ScheduleItem } from '@/types';
 import type { SpotResult, RoutePreview } from '@/services/api';
 

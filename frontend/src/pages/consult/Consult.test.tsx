@@ -28,7 +28,7 @@ vi.mock('./AreaMap', () => ({
 import TripConsultPage from './TripConsultPage';
 import TripDraftPage from './TripDraftPage';
 import {
-  EXAMPLE_TEXT, initReview, intentOf, loadState, moveSlot, openQuestions, placeSlot, removeSlot, sortSlots,
+  EMPTY_BRIEF, EXAMPLE_TEXT, extractInputOf, initReview, intentOf, loadState, moveSlot, openQuestions, placeSlot, removeSlot, sortSlots,
 } from './consultModel';
 import type { IntentExtraction, TripDraft } from '@/services/api/types/tripIntent';
 
@@ -89,6 +89,28 @@ describe('確認の決まり(consultModel)', () => {
     expect(ok.origin).toBe('枚方');
     expect(ok).toMatchObject({ budget_min: 60000, budget_max: 80000, budget_scope: 'total' });
     expect(JSON.stringify(ok)).not.toContain('記念');
+  });
+
+  it('人数が入力欄と文章で違う時は黙って選ばず、選ぶまで条件に使わない', () => {
+    const ex: IntentExtraction = { ...EXTRACTION, items: EXTRACTION.items.map((i) => (i.key === 'party_size'
+      ? item('party_size', { value: null, display: '入力欄は1人、文章は4人', strength: 'required', needs_answer: true,
+        question: { id: 'party_size', text: 'q', options: [{ value: '4', label: '4人(文章)' }, { value: '1', label: '1人(入力欄)' }],
+          suggested: null, hint: null } }) : i)) as IntentExtraction['items'] };
+    const r = initReview(ex);
+    expect(r.values.party_size).toBeNull();
+    expect(r.conflicts?.party_size?.map((o) => o.label)).toEqual(['4人(文章)', '1人(入力欄)']);
+    expect(openQuestions(r)).toEqual(['party_size', 'one_way', 'budget']);
+    expect(intentOf(r).party_size).toBeNull();
+    const chosen = { ...r, values: { ...r.values, party_size: 4 }, confirmed: { ...r.confirmed, party_size: true } };
+    expect(openQuestions(chosen)).toEqual(['one_way', 'budget']);
+    expect(intentOf(chosen).party_size).toBe(4);
+  });
+
+  it('時期の欄で「日付が決まっている」を選んだら、その扱いで送る', () => {
+    expect(extractInputOf({ ...EMPTY_BRIEF, text: 'x', travelWindow: 'fixed', windowText: '11/28' }))
+      .toMatchObject({ travel_window: '11/28', date_status: 'fixed' });
+    expect(extractInputOf({ ...EMPTY_BRIEF, text: 'x', travelWindow: 'undecided', windowText: '11/28' }))
+      .not.toHaveProperty('date_status');
   });
 
   it('下書きの並び: 同じ時間帯の中で入れ替え、端では隣の時間帯へ移る。最後の日に宿は無い', () => {
@@ -168,19 +190,24 @@ describe('旅行相談の流れ', () => {
     expect(api.createTripDraft).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('area-open-伊勢'));
 
-    // 4. 方面の詳細: 探す → 選ぶ → 何も選ばずに押すと理由を示す → 下書き
+    // 4. 方面の詳細: 行き先は決まっている。開いたら観光を自動で探す → 選ぶ → 下書き
     expect(await screen.findByText('SELECTED AREA · 伊勢')).toBeInTheDocument();
-    expect(screen.getByTestId('consult-results-idle')).toHaveTextContent('まだ探していません');
-    fireEvent.click(screen.getByTestId('consult-create-draft'));
-    expect(screen.getByText(/行きたい場所がまだ選ばれていません/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '行き先は「伊勢」に決めました' })).toBeInTheDocument();
+    expect(screen.getByTestId('consult-area-decided')).toHaveTextContent('選ばなくても、伊勢の旅程案を作れます');
+    await waitFor(() => expect(api.searchNearby).toHaveBeenCalledWith(expect.objectContaining({ category: 'sightseeing',
+      latitude: 34.4, radius_km: 10 })));
+    expect(await screen.findByTestId('consult-result-sc1')).toHaveTextContent('伊勢神宮');
+    expect(screen.getByTestId('consult-check-0')).toHaveTextContent('伊勢');
+    expect(screen.getByTestId('consult-create-draft')).toHaveTextContent('伊勢で旅程案を作る');
+    expect(screen.queryByText(/行きたい場所がまだ選ばれていません/)).not.toBeInTheDocument();
     expect(api.createTripDraft).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('consult-category-quiet'));
     fireEvent.click(screen.getByTestId('consult-search'));
     await waitFor(() => expect(api.searchNearby).toHaveBeenCalledWith(expect.objectContaining({ category: 'quiet',
       latitude: 34.4, radius_km: 10 })));
     fireEvent.click(await screen.findByTestId('consult-pick-sc1'));
-    expect(screen.getByTestId('consult-check-0')).toHaveTextContent('1件 選択');
-    expect(screen.getByTestId('consult-check-1')).toHaveTextContent('未照会');
+    expect(screen.getByTestId('consult-check-1')).toHaveTextContent('1件 選択');
+    expect(screen.getByTestId('consult-check-2')).toHaveTextContent('未照会');
     fireEvent.change(screen.getByLabelText('見つけた記事・SNS の投稿を参考に足す'), { target: { value: 'javascript:alert(1)' } });
     fireEvent.click(screen.getByRole('button', { name: '出典として足す' }));
     expect(screen.getByText(/http:\/\/ か https:\/\//)).toBeInTheDocument();

@@ -129,7 +129,8 @@ const BriefStep: React.FC<{
             <div>
               <label htmlFor={`${id}-party`} className="text-sm font-semibold text-ink-900">人数(大人)</label>
               <input id={`${id}-party`} type="number" min={1} max={30} inputMode="numeric" value={brief.partySize}
-                onChange={(e) => set('partySize', e.target.value)} className={field} aria-describedby={`${id}-party-help`} />
+                onChange={(e) => set('partySize', e.target.value)} className={field} aria-describedby={`${id}-party-help`}
+                onWheel={(e) => e.currentTarget.blur()} placeholder="例: 4(文章に書いた人数でも可)" />
               <p id={`${id}-party-help`} className={help}>宿を「何人で1部屋か」の条件で探す時に使います。</p>
             </div>
             <div>
@@ -335,8 +336,18 @@ const ReviewStep: React.FC<{
   const editor: Record<ReviewKey, React.ReactNode> = {
     origin: <input aria-label="出発地" value={v.origin} maxLength={100} className={field}
       onChange={(e) => update('origin', { origin: e.target.value })} />,
-    party_size: <input aria-label="人数" type="number" min={1} max={30} value={v.party_size ?? ''} className={field}
-      onChange={(e) => update('party_size', { party_size: e.target.value ? Number(e.target.value) : null })} />,
+    party_size: review.conflicts?.party_size && v.party_size === null ? (
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-ink-900">入力欄と文章で人数が違います</p>
+        <p className="text-xs text-ink-700">どちらで探すかを選んでください。選ぶまで人数の条件に使いません。</p>
+        {choice('人数の選び方', '', review.conflicts.party_size.map((o) => [o.value, o.label] as [string, string]), (val) =>
+          update('party_size', { party_size: Number(val) }))}
+      </div>
+    ) : (
+      <input aria-label="人数" type="number" min={1} max={30} value={v.party_size ?? ''} className={field}
+        onWheel={(e) => e.currentTarget.blur()}
+        onChange={(e) => update('party_size', { party_size: e.target.value ? Number(e.target.value) : null })} />
+    ),
     nights: (
       <select aria-label="旅行の日数" value={v.nights ?? ''} className={field}
         onChange={(e) => update('nights', { nights: e.target.value === '' ? null : Number(e.target.value) })}>
@@ -387,7 +398,8 @@ const ReviewStep: React.FC<{
     ) : <p className="text-sm text-ink-700">未指定</p>,
     dates: (
       <div className="space-y-1">
-        <p className="text-sm text-ink-900">{v.travel_window ? `${v.travel_window} · 日付は未確定` : '未定'}</p>
+        <p className="text-sm text-ink-900">{v.travel_window
+          ? `${v.travel_window} · ${v.date_status === 'fixed' ? '決まっている日付' : '日付は未確定'}` : '未定'}</p>
         <p className="text-xs text-ink-700">宿の空室・料金と営業日は、日付が決まってから照会します。比べるのは日付が無くても続けられます。</p>
       </div>
     ),
@@ -430,7 +442,7 @@ const ReviewStep: React.FC<{
           </div>
           {REVIEW_KEYS.map((key) => {
             const pending = (key === 'one_way' && open.includes('one_way')) || (key === 'budget' && open.includes('budget'))
-              || (key === 'nights' && missingNights);
+              || (key === 'party_size' && open.includes('party_size')) || (key === 'nights' && missingNights);
             return (
               <div role="row" key={key} data-testid={`review-row-${key}`}
                 className={`grid gap-2 border-t border-cloud-200 px-3 py-3 md:grid-cols-[7rem_minmax(0,1fr)_7rem_12rem] ${pending ? 'bg-warning-soft' : ''}`}>
@@ -453,6 +465,7 @@ const ReviewStep: React.FC<{
         {(open.length > 0 || missingNights) && (
           <p role="status" className="mt-3 text-sm text-warning">
             {missingNights ? '旅行の日数を選んでください。' : ''}
+            {open.includes('party_size') ? '人数を、入力欄と文章のどちらにするか選んでください。' : ''}
             {open.includes('one_way') ? '片道の時間が「希望」か「絶対条件」かを選んでください。' : ''}
             {open.includes('budget') ? '宿泊費が「全員の合計」か「1人あたり」かを選んでください。' : ''}
           </p>

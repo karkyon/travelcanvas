@@ -50,9 +50,14 @@ async function stubExternal(page: Page) {
   });
   await page.route('**/api/v1/search/spots', async (route) => {
     const body = route.request().postDataJSON();
-    expect(body).toMatchObject({ category: 'quiet', latitude: 34.4875, longitude: 136.7091, radius_km: 10 });
-    await route.fulfill({ json: { query: '', category: 'quiet', radius_km: 10, base: { latitude: 34.4875, longitude: 136.7091 },
-      total: 1, candidates: [{ id: 'sc-e2e', provider: 'overpass', name: '倭姫宮の森', category: 'park',
+    // 開いた時は観光(自動)、その後に「静かに過ごす」で探す
+    expect(['sightseeing', 'quiet']).toContain(body.category);
+    expect(body).toMatchObject({ latitude: 34.4875, longitude: 136.7091, radius_km: 10 });
+    const quiet = body.category === 'quiet';
+    await route.fulfill({ json: { query: '', category: body.category, radius_km: 10,
+      base: { latitude: 34.4875, longitude: 136.7091 },
+      total: 1, candidates: [{ id: quiet ? 'sc-e2e' : 'sc-e2e-sight', provider: 'overpass',
+        name: quiet ? '倭姫宮の森' : '皇大神宮', category: quiet ? 'park' : 'attraction',
         location: { latitude: 34.49, longitude: 136.71, address: null }, retrieved_at: AT, distance_m: 2300, within_radius: true,
         radius_guaranteed: true }] } });
   });
@@ -113,6 +118,9 @@ test('旅行相談: 希望 → 確認 → 方面の比較 → 方面の詳細 �
   await page.getByRole('button', { name: /他の候補も見る\(\+1\)/ }).click();
   await expect(page.getByTestId('area-row-淡路島')).toBeVisible();
   await expect(page.getByTestId('areas-map').locator('.leaflet-marker-icon')).toHaveCount(4); // 出発地 + 位置のある3方面
+  // 地図の CSS が効いている(無いと地図の画像が枠の外へばらばらに並ぶ)
+  await expect(page.getByTestId('areas-map').locator('.leaflet-tile').first()).toHaveCSS('position', 'absolute');
+  await expect(page.getByTestId('areas-map').locator('.leaflet-container')).toHaveCSS('overflow', 'hidden');
   await page.getByTestId('area-row-福井').getByRole('button', { name: /福井/ }).first().click();
   await expect(page.getByTestId('area-row-福井')).toHaveAttribute('data-selected', 'true');
   await expectNoAxeViolations(page, '旅行相談: 方面を比較');
@@ -120,14 +128,17 @@ test('旅行相談: 希望 → 確認 → 方面の比較 → 方面の詳細 �
 
   // 4. 方面の詳細
   await expect(page.getByText('SELECTED AREA · 伊勢')).toBeVisible();
-  await page.getByTestId('consult-create-draft').click();
-  await expect(page.getByText(/行きたい場所がまだ選ばれていません/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: '行き先は「伊勢」に決めました' })).toBeVisible();
+  // 開いたら観光の場所を自動で探す(空の画面で止めない)
+  await expect(page.getByTestId('consult-result-sc-e2e-sight')).toContainText('皇大神宮');
+  await expect(page.getByTestId('consult-create-draft')).toHaveText(/伊勢で旅程案を作る/);
   await page.getByTestId('consult-category-quiet').click();
   await page.getByTestId('consult-search').click();
   await expect(page.getByTestId('consult-result-sc-e2e')).toContainText('出典: OpenStreetMap');
   await page.getByTestId('consult-pick-sc-e2e').click();
-  await expect(page.getByTestId('consult-check-0')).toContainText('1件 選択');
-  await expect(page.getByTestId('consult-check-1')).toContainText('未照会');
+  await expect(page.getByTestId('consult-check-0')).toContainText('伊勢');
+  await expect(page.getByTestId('consult-check-1')).toContainText('1件 選択');
+  await expect(page.getByTestId('consult-check-2')).toContainText('未照会');
   // 差し替えた検索結果は backend に無いため外し、場所なしで下書きを作る(本人の検索結果だけを使う決まりは backend の試験)
   await page.getByTestId('consult-pick-sc-e2e').click();
   await page.getByLabel('見つけた記事・SNS の投稿を参考に足す').fill('https://example.com/ise-trip?utm_source=sns');
@@ -206,7 +217,6 @@ test('旅行相談と下書き: 360px・明暗で横にはみ出さず axe 違�
     await expect(page.getByText('SELECTED AREA · 伊勢')).toBeVisible();
     await expectNoOverflow(page, `方面の詳細(${theme})`);
     await expectNoAxeViolations(page, `方面の詳細(360px・${theme})`);
-    await page.getByTestId('consult-create-draft').click();
     await page.getByTestId('consult-create-draft').click();
     await expect(page.getByTestId('draft-banner')).toContainText('まだ確定していません', { timeout: 20_000 });
     await expectNoOverflow(page, `旅程の下書き(${theme})`);

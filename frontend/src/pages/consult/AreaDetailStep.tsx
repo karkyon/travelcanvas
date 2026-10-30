@@ -6,8 +6,10 @@
  * - 記事・SNS の URL は「参考の出典」として残すだけ(中身は取りに行かない。場所は旅程案の候補箱で確かめる)
  * - 右の確認の一覧: 行きたい場所・宿・車の経路・営業時間を、選択済み/未照会/日付待ち で示す(未照会を成功の色にしない)
  * - 「選んだ候補で旅程案を作る」で初めて旅行(未確定の下書き)を作る。何も選んでいない時は押せなくせず、何が要るかを示す
+ * - 方面(行き先)はこの画面に来た時点で決まっている。開いたら観光の場所を自動で探す。立ち寄る場所は任意
+ *   (場所なしで作ると、日・時間帯の枠だけの下書きになる)。提供元が応答しない時は「見つからない」と言わない
  */
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import Button from '@/components/common/Button';
 import { searchNearby } from '@/services/api/g11discover';
 import type { DiscoverCategory, NearbyResult } from '@/services/api/types/g11discover';
@@ -40,7 +42,6 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
   const [searchError, setSearchError] = useState<string | null>(null);
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [needPlaces, setNeedPlaces] = useState(false);
   const picked = Object.values(state.picked);
 
   const search = async (e?: React.FormEvent) => {
@@ -52,6 +53,9 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
       const r = await searchNearby({ query: query.trim(), category: category as DiscoverCategory, latitude: base.latitude,
         longitude: base.longitude, radius_km: radius });
       setResults([...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)));
+      if (r.candidates.length === 0 && (r.unavailable_providers ?? []).length > 0) {
+        setSearchError('場所の提供元(OpenStreetMap)が応答しませんでした。見つからなかったのではありません。時間をおいて「候補を探す」をもう一度押してください');
+      }
     } catch (err) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       setResults([]);
@@ -79,17 +83,19 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
     if (!state.urls.includes(v)) onUrls([...state.urls, v]);
   };
 
-  const create = () => {
-    if (picked.length === 0 && !needPlaces) {
-      setNeedPlaces(true);
-      searchRef.current?.focus();
-      return;
-    }
-    onCreate();
-  };
+  // 方面を開いたら、その周りの観光の場所を一度だけ自動で探す(空の画面で止めない)
+  const autoSearched = useRef(false);
+  useEffect(() => {
+    if (autoSearched.current || !base) return;
+    autoSearched.current = true;
+    void search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base?.latitude, base?.longitude]);
 
   const check = [
-    { label: '行きたい場所', sub: '観光・食事・買い物から選ぶ', status: picked.length ? `${picked.length}件 選択` : '未選択',
+    { label: '行き先(方面)', sub: '方面の比較で選んだ', status: state.selectedArea ?? '未選択',
+      tone: state.selectedArea ? 'ok' : 'pending' },
+    { label: '立ち寄る場所', sub: '観光・食事・買い物から選ぶ(任意)', status: picked.length ? `${picked.length}件 選択` : '未選択(任意)',
       tone: picked.length ? 'ok' : 'pending' },
     { label: '宿を探す', sub: '何人で1部屋・予算で照会', status: '未照会(提供元が未接続)', tone: 'pending' },
     { label: '車の経路', sub: '高速・運転時間・休憩', status: '未照会(提供元が未接続)', tone: 'pending' },
@@ -101,8 +107,10 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-widest text-accent">{`SELECTED AREA · ${state.selectedArea ?? ''}`}</p>
-          <h2 className="mt-1 text-lg font-bold text-ink-900">この方面で行き先を見つける</h2>
-          <p className="text-sm text-ink-700">候補を選んで比べられます。旅程に入れるのは、日付を決めて確かめた後です。</p>
+          <h2 className="mt-1 text-lg font-bold text-ink-900">{`行き先は「${state.selectedArea ?? ''}」に決めました`}</h2>
+          <p className="text-sm text-ink-700" data-testid="consult-area-decided">
+            {`${state.selectedArea ?? ''}の中で立ち寄りたい場所を選べます(任意)。選ばなくても、${state.selectedArea ?? ''}の旅程案を作れます。`}
+          </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onBack}>← 方面の比較へ戻る</Button>
       </div>
@@ -140,21 +148,18 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
                 : '方面の位置が未照会のため、周りを探せません。方面の比較に戻って位置を照会するか、場所を選ばずに下書きを作れます。'}
             </p>
           </form>
-          {needPlaces && picked.length === 0 && (
-            <p role="status" className="m-4 rounded-lg border border-warning bg-warning-soft p-3 text-sm text-ink-900">
-              行きたい場所がまだ選ばれていません。上で探して「旅程案に入れる」を押すと、下書きの日・時間帯に並べます。
-              場所なしで下書きだけ作る時は、もう一度「旅程案を作る」を押してください。
-            </p>
-          )}
           {searchError && <p role="alert" className="m-4 rounded-lg bg-danger-soft p-3 text-sm text-danger">{searchError}</p>}
           <div className="p-4">
             {results === null ? (
               <div className="py-6 text-center text-sm text-ink-700" data-testid="consult-results-idle">
-                <p className="font-semibold text-ink-900">まだ探していません</p>
+                <p className="font-semibold text-ink-900">{searching ? `${state.selectedArea ?? ''}の周りを探しています…` : 'まだ探していません'}</p>
                 <p>カテゴリと半径を選んで「候補を探す」を押すと、場所・距離・出典・取得時刻つきの候補がここに並びます。</p>
               </div>
             ) : results.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-700">見つかりませんでした。半径・カテゴリ・言葉を変えてください。</p>
+              searchError ? null
+                : <p className="py-6 text-center text-sm text-ink-700" data-testid="consult-results-empty">
+                  {`${state.selectedArea ?? ''}の半径${radius}kmに、このカテゴリの場所は見つかりませんでした。半径・カテゴリ・言葉を変えてください。`}
+                </p>
             ) : (
               <>
                 <h4 className="text-sm font-semibold text-ink-900" aria-live="polite">{`見つかった場所 ${results.length}件 · 出典つき`}</h4>
@@ -219,11 +224,13 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
           <p className="mt-2 text-xs text-ink-700">全てを確かめる前でも下書きは作れます。確かめていない項目は「未照会」「日付待ち」のまま残します。</p>
           {error && <p role="alert" className="mt-2 rounded-lg bg-danger-soft p-2 text-xs text-danger">{error}</p>}
           <p id={`${id}-next`} className="mt-3 text-xs text-ink-700">
-            押すと、この方面だけの未確定の旅程案(旅行)を作ります。日付・予約はまだ決めません。
+            {picked.length
+              ? `押すと、${state.selectedArea ?? ''}の未確定の旅程案(旅行)を作り、選んだ${picked.length}件を日・時間帯に並べます。日付・予約はまだ決めません。`
+              : `押すと、${state.selectedArea ?? ''}の未確定の旅程案(旅行)を作ります。立ち寄る場所はまだ無いため、日・時間帯の枠だけの下書きです(後から足せます)。`}
           </p>
-          <Button type="button" fullWidth className="mt-2" onClick={create} loading={busy} disabled={busy}
+          <Button type="button" fullWidth className="mt-2" onClick={onCreate} loading={busy} disabled={busy}
             aria-describedby={`${id}-next`} data-testid="consult-create-draft">
-            選んだ候補で旅程案を作る →
+            {`${state.selectedArea ?? 'この方面'}で旅程案を作る →`}
           </Button>
         </aside>
       </div>

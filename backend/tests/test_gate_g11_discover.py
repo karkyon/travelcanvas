@@ -302,6 +302,7 @@ def test_nearby_search_validation_distance_and_escape(auth_client, monkeypatch):
     assert r.status_code == 200, r.text
     rows = r.json()["candidates"]
     assert captured == {"query": "", "category": "food", "radius": 1}
+    assert r.json()["unavailable_providers"] == []
     assert (rows[0]["distance_m"], rows[0]["within_radius"], rows[0]["radius_guaranteed"]) == (56, True, True)
     assert rows[1]["within_radius"] is False and rows[1]["radius_guaranteed"] is False
     assert rows[2]["distance_m"] is None and r.json()["base"] == {"latitude": 35.0, "longitude": 135.7}
