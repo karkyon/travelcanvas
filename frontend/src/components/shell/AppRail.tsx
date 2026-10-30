@@ -10,6 +10,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { railItems } from './railItems';
 import { useCurrentTripStore } from '../../store/currentTripStore';
+import { safeInternalPath } from '../../utils/safeNavigation';
 
 const AppRail: React.FC = () => {
   const { pathname } = useLocation();
@@ -22,7 +23,7 @@ const AppRail: React.FC = () => {
         const active = match(pathname);
         const pending = needsTrip && !trip;
         return (
-          <Link key={key} to={to} aria-current={active ? 'page' : undefined} className="tc-focus-ring"
+          <Link key={key} to={safeInternalPath(to) ?? '/dashboard'} aria-current={active ? 'page' : undefined} className="tc-focus-ring"
             data-testid={`rail-${key}`} title={pending ? `${label}(旅行を選ぶと開きます)` : label}>
             <Icon size={20} aria-hidden="true" />
             <span>{label}</span>

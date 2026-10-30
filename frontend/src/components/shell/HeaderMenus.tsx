@@ -8,6 +8,7 @@ import { Settings, User, Brain, LogOut, Building2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemePreference, type ThemePreference } from '../../hooks/useThemePreference';
 import { railItems } from './railItems';
+import { safeInternalPath } from '../../utils/safeNavigation';
 
 const THEME_CHOICES: Array<{ value: ThemePreference; label: string }> = [
   { value: 'light', label: '明るい' },
@@ -103,7 +104,7 @@ export const MobileMenu: React.FC<{ pathname: string; tripId: string | null; onC
       {railItems(tripId, pathname).map(({ key, label, icon: Icon, to, match }) => (
         <li key={key}>
           <Link
-            to={to}
+            to={safeInternalPath(to) ?? '/dashboard'}
             aria-current={match(pathname) ? 'page' : undefined}
             className="tc-focus-ring flex items-center gap-3 px-3 py-3 text-base font-medium rounded-lg text-ink-700 hover:text-ink-900 hover:bg-cloud-100"
             onClick={onClose}
