@@ -23,9 +23,22 @@ migration なし・API の変更なし・FR の状態の遷移なし(DOC-10 は�
 |---|---|---|---|
 | 8 | ホーム: page-head「YOUR JOURNEY / 次の旅を、楽しみに変える」・旅の表紙(写真が無ければモックの山並み)・4つの数(実際の値だけ: 日数・人数・確認が要る準備・遅延と休業)・旅のつづき・次に決めること・この旅行でできること | IMPLEMENTED | `pages/DashboardPage.tsx`・`dashboard/DashboardParts.tsx`、FE `DashboardPage.test.tsx`、E2E `gate-g9.spec.ts` |
 | 9 | 旅程の一覧: page-head。空の時は始め方を2つ(行き先が決まっている → クイック / まだ → 旅行相談) | IMPLEMENTED | `pages/PlannerPage.tsx`(`planner-empty`) |
-| 10 | 旅程: 「PLAN · 旅程を組み立てる」・操作の行(日別/全日程/近くを発見)・3列(予定の流れ・地図・選んだ予定)。地図と選んだ予定は読み進めても見えたまま。1180px 以下は2列、760px 以下は縦 | IMPLEMENTED | `PlannerPage.tsx`・`components/planner/SelectedEventCard.tsx` |
-| 11 | 選んだ予定の欄は実際の値(時刻・場所・メモ・確定)だけ。営業時間・移動の時間のような確かめていない値は出さない | IMPLEMENTED | `SelectedEventCard.tsx` |
-| 12 | クイックの作成: 左に入力(旅行の名前・行き先・出発日・帰着日・最初の予定)、右に旅行カードの予告と①〜④。モックの「誰と行く」「旅のテーマ」は保存先が無いため出さない(入力を捨てる欄を作らない) | IMPLEMENTED | `PlannerPage.tsx`、E2E `quickdraft-flow.spec.ts` |
+| 10 | 旅程: page-head(旅行の名前が h1・期間・「＋ 予定を追加」)・plan-controls(日別/全日程・近くを発見・日の操作を1行)・3列(時間の流れのカード「行き先 · DAY n · LOCAL TIME」・日のタブ・移動手段の凡例・時刻と点と線の予定の行・↑↓は右・「＋ 日程に追加する」/ 地図に日の印と凡例 / 選んだ予定)。表紙・利用枠・ほかの画面への移動は3列の後。1180px 以下は2列、760px 以下は縦(地図が上・300px) | IMPLEMENTED | `PlannerPage.tsx`・`components/DayView.tsx`・`planner/ScheduleItem.tsx`・`planner/SelectedEventCard.tsx`、FE `PlannerG11.test.tsx`、E2E `gate-g9`・`gate-g10-ux`・`ux-baseline`・`gate-ux6-icons` |
+| 11 | 選んだ予定の欄(未選択なら最初の予定): 時刻・場所・営業時間の照合(この画面で照合した結果。登録が無ければ「未登録」)・出典・この予定へ着く移動(区間が無ければ「区間なし」)・確定。地図は位置がある時だけ外の地図を開く | IMPLEMENTED | `SelectedEventCard.tsx` |
+| 12 | クイック(左の帯・ホームの「旅行をつくる」はモックと同じくページ、「＋ 新しいプラン」は作成の画面): 左に入力(旅行の名前・行き先・出発日・帰着日・最初の予定)、右に旅行カードの予告と①〜④。モックの「誰と行く」「旅のテーマ」は保存先が無いため出さない(入力を捨てる欄を作らない) | IMPLEMENTED | `PlannerPage.tsx`、E2E `quickdraft-flow.spec.ts` |
+
+## 旅行の中の画面(UI/UX モック)
+
+| # | 要件 | 状態 | 証拠 |
+|---|---|---|---|
+| 19 | 今日: page-head(つながりの状態・現地の時刻・最終同期)・live-hero(曜日・行き先・旅行の名前・今日の予定の数。天気など取れない値は出さない)・NOW(大きな時刻・残りと進み・地図)・NEXT(出発まで)・今日の旅程(全ての予定。済・NOW・NEXT・チケットを文字で)・旅の操作 | IMPLEMENTED | `pages/TodayPage.tsx`・`today/TodayParts.tsx`、FE `TodayPage.test.tsx`、E2E `gate-g10-ux`・`today-mode-mobile` |
+| 20 | 旅行箱: 予約・チケット / 準備・持ち物 / 予算・費用 / 文書 / 予約の取込 の切り替えと旅行の期間。予約の一覧と「秘密情報の扱い」(番号は伏せて表示・予約を予定につなぐ・チケット) | IMPLEMENTED | `components/shell/TripKitNav.tsx`・`pages/ReservationsPage.tsx`・`PreparationPage.tsx` |
+| 21 | 共有: 左に共有リンクの設定、右に相手の画面(ゲスト表示。使用回数を減らさない共有前プレビュー)、下に一緒に計画する人 | IMPLEMENTED | `pages/SharePage.tsx`、FE `SharePage.test.tsx`・`SharePage.f45.test.tsx` |
+| 22 | 記録: ふり返りの帯(記録・写真・記録のある予定の数は実際の数)・写真とメモのカード・記録を追加の欄・公開前チェック(下書きの確認へ) | IMPLEMENTED | `pages/MemoriesPage.tsx`、FE `MemoriesPage.test.tsx`、E2E `memories`・`gate-g6` |
+| 23 | 発見: 近くを探す・SNS の投稿の2列、候補箱をカード(画像は「画像のイメージ」と明示) | IMPLEMENTED | `pages/CandidatesPage.tsx`、E2E `candidates`・`gate-g11-discover` |
+| 24 | 比較: 候補を所要時間・距離・費用の数字で並べ「この案を採用する」。外部の経路検索は未接続(数字は手で入力)と明示 | IMPLEMENTED | `pages/RouteOptionsPage.tsx` |
+| 25 | 旅行の中の画面を直に開いても上の帯に旅行の名前(旅行を読み、切り替えへ写す) | IMPLEMENTED | `hooks/useTripContext.ts` |
+| 26 | モックの「天気」「利用者の写真の枚数の例」「架空の予約」は出さない(取れない値・作った値) | IMPLEMENTED | 値を作らない |
 
 ## 正直さ(Gate Honesty)・ゲスト
 
