@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Heart, Settings, Save, RotateCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import UiIcon from '@/components/common/UiIcon';
+import type { LucideIcon } from 'lucide-react';
+import { IcBath, IcDrama, IcLandmark, IcMoonStar, IcSearch, IcShopping, IcTarget, IcTrees, IcTrophy, IcUtensils } from '@/components/common/uiIcons';
 
 interface SearchPreferences {
   // 地理的設定
@@ -32,6 +35,17 @@ interface SearchPreferences {
     duration: string;          // 'short' | 'half-day' | 'full-day' | 'multi-day'
   };
 }
+
+const INTEREST_ICONS: Record<string, LucideIcon> = {
+  nature: IcTrees,
+  culture: IcLandmark,
+  food: IcUtensils,
+  shopping: IcShopping,
+  entertainment: IcDrama,
+  sports: IcTrophy,
+  relaxation: IcBath,
+  nightlife: IcMoonStar,
+};
 
 const defaultPreferences: SearchPreferences = {
   preferredArea: {
@@ -133,15 +147,16 @@ const SearchSettingsPage: React.FC = () => {
     }));
   };
 
+  // [UX-6] 名前は文字だけ(設定の要約にも使う)。印は INTEREST_ICONS(読み上げから外す)
   const interestLabels = {
-    nature: '🌲 自然・公園',
-    culture: '🏛️ 文化・歴史',
-    food: '🍜 グルメ・食事',
-    shopping: '🛍️ ショッピング',
-    entertainment: '🎭 エンターテイメント',
-    sports: '⚽ スポーツ・アクティビティ',
-    relaxation: '♨️ リラクゼーション',
-    nightlife: '🌃 ナイトライフ'
+    nature: '自然・公園',
+    culture: '文化・歴史',
+    food: 'グルメ・食事',
+    shopping: 'ショッピング',
+    entertainment: 'エンターテイメント',
+    sports: 'スポーツ・アクティビティ',
+    relaxation: 'リラクゼーション',
+    nightlife: 'ナイトライフ'
   };
 
   return (
@@ -211,6 +226,7 @@ const SearchSettingsPage: React.FC = () => {
               {Object.entries(preferences.interests).map(([key, value]) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-ink-700 mb-2">
+                    <UiIcon icon={INTEREST_ICONS[key] ?? IcTarget} className="mr-1 align-[-3px]" />
                     {interestLabels[key as keyof typeof interestLabels]} 
                     <span className="ml-2 text-blue-600 font-bold">{value}/10</span>
                   </label>
@@ -234,7 +250,7 @@ const SearchSettingsPage: React.FC = () => {
           {/* 検索設定 */}
           <div className="bg-surface rounded-xl shadow-xs p-6">
             <h2 className="text-xl font-bold text-ink-900 mb-6">
-              🔍 検索詳細設定
+              <UiIcon icon={IcSearch} size={20} className="mr-1 align-[-3px]" />検索詳細設定
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -340,7 +356,7 @@ const SearchSettingsPage: React.FC = () => {
 
           {/* 設定プレビュー */}
           <div className="bg-blue-50 rounded-xl p-6">
-            <h3 className="font-bold text-blue-900 mb-4">🎯 現在の設定プレビュー</h3>
+            <h3 className="font-bold text-blue-900 mb-4"><UiIcon icon={IcTarget} className="mr-1 align-[-3px]" />現在の設定プレビュー</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <strong>検索エリア:</strong> {preferences.preferredArea.name}（半径{preferences.preferredArea.radius}km）

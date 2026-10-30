@@ -12,6 +12,8 @@ import Card from '@/components/common/Card';
 import { extractApiErrorDetailMessage, getDeletedPlans, purgePlan, restorePlan } from '@/services/api';
 import type { DeletedPlanSummary } from '@/services/api';
 import { formatDate, purgeNotice } from './planTrashModel';
+import UiIcon from '@/components/common/UiIcon';
+import { IcMapPin } from '@/components/common/uiIcons';
 
 function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
@@ -113,7 +115,7 @@ const DeletedPlansSection: React.FC<DeletedPlansSectionProps> = ({ refreshKey = 
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-medium text-ink-900">{item.title}</div>
-                    {item.destination && <div className="text-sm text-ink-700">📍 {item.destination}</div>}
+                    {item.destination && <div className="text-sm text-ink-700"><UiIcon icon={IcMapPin} size={14} className="mr-1 align-[-3px]" />{item.destination}</div>}
                     <div className="text-xs text-ink-700 mt-1">
                       削除日: {formatDate(item.deleted_at)} ・ {purgeNotice(item.purge_after)}
                     </div>

@@ -225,8 +225,8 @@ export function moveBlockedReason(events: ReadonlyArray<{ title: string; locked?
   const ev = events[index];
   const target = events[index + delta];
   if (!ev || !target) return null;
-  if (ev.locked) return `「${ev.title}」は確定(🔒)の予定のため動かせません`;
-  if (target.locked) return `確定(🔒)の予定「${target.title}」と入れ替わるため動かせません`;
+  if (ev.locked) return `「${ev.title}」は確定の予定のため動かせません`;
+  if (target.locked) return `確定の予定「${target.title}」と入れ替わるため動かせません`;
   return null;
 }
 

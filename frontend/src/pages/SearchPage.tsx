@@ -4,6 +4,10 @@ import { Camera, Mic, Search, MapPin, Star, Clock, DollarSign, Globe, Zap, Targe
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots, searchByImage, searchByVoice } from '../services/api';
+import UiIcon from '@/components/common/UiIcon';
+import type { LucideIcon } from 'lucide-react';
+import { infoToastIcon } from '@/components/common/toastIcons';
+import { IcBot, IcCoffee, IcHotel, IcLandmark, IcMapPin, IcShopping, IcTrees, IcUtensils } from '@/components/common/uiIcons';
 
 interface SearchResult {
   id: string;
@@ -39,6 +43,16 @@ interface SearchMetadataDisplay {
   ranking_factors?: string[];
   confidence?: number;
 }
+
+const SPOT_TYPE_MARKS: Record<string, [LucideIcon, string]> = {
+  restaurant: [IcUtensils, '飲食店'],
+  tourist_attraction: [IcLandmark, '観光地'],
+  shopping_mall: [IcShopping, '買い物'],
+  lodging: [IcHotel, '宿泊'],
+  park: [IcTrees, '公園'],
+  cafe: [IcCoffee, 'カフェ'],
+  default: [IcMapPin, 'スポット'],
+};
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -256,7 +270,7 @@ const SearchPage: React.FC = () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
         console.log('🛑 AI音声録音を停止しました');
-        toast('音声録音を停止、AI解析中...', { icon: 'ℹ️' });
+        toast('音声録音を停止、AI解析中...', { icon: infoToastIcon() });
       }
     } catch (error) {
       console.error('音声録音停止エラー:', error);
@@ -325,25 +339,25 @@ const SearchPage: React.FC = () => {
     navigate('/planner', { state: { newSpot: spot } });
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'restaurant': return '🍜';
-      case 'tourist_attraction': return '🏛️';
-      case 'shopping_mall': return '🛍️';
-      case 'lodging': return '🏨';
-      case 'park': return '🌳';
-      case 'cafe': return '☕';
-      default: return '📍';
-    }
+  // [UX-6] 種類の印は読み上げから外し、種類の名前を読み上げ用の文字で出す
+  const categoryMark = (category: string) => {
+    const [icon, label] = SPOT_TYPE_MARKS[category] ?? SPOT_TYPE_MARKS.default!;
+    return (
+      <>
+        <UiIcon icon={icon} size={18} className="mr-1 align-[-3px]" />
+        <span className="sr-only">{`${label}: `}</span>
+      </>
+    );
   };
 
   const getPriceLevelText = (level: string) => {
     switch (level) {
       case 'free': return '無料';
-      case 'low': return '💰';
-      case 'medium': return '💰💰';
-      case 'high': return '💰💰💰';
-      default: return '💰';
+      // [UX-6] 値段の段階は「¥」の数で出す(以前は OS の絵文字 💰 の数)
+      case 'low': return '¥';
+      case 'medium': return '¥¥';
+      case 'high': return '¥¥¥';
+      default: return '¥';
     }
   };
 
@@ -357,7 +371,7 @@ const SearchPage: React.FC = () => {
         {/* ヘッダー */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-ink-900 mb-4">
-            🤖 AIスポット検索
+            <UiIcon icon={IcBot} size={28} className="mr-2 align-[-4px]" />AIスポット検索
           </h1>
           <p className="text-ink-700">
             高度なAI技術でインターネット上の情報を解析し、あなたに最適な旅行スポットをランキング表示
@@ -565,7 +579,7 @@ const SearchPage: React.FC = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-lg text-ink-900 mb-1">
-                        {getCategoryIcon(spot.category)} {spot.name}
+                        {categoryMark(spot.category)}{spot.name}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-ink-500">
                         {spot.rating && (

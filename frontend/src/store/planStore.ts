@@ -264,9 +264,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
               isLoading: false,
               isOfflineData: true,
             });
-            toast('オフラインで保存されたデータを表示しています(最新でない可能性があります)', {
-              icon: '📴',
-            });
+            // [UX-6] 知らせの印(以前は OS の絵文字 📴)は付けない。文で伝える(最初に読む JS を増やさない)
+            toast('オフラインで保存されたデータを表示しています(最新でない可能性があります)');
             return false;
           }
         } catch (offlineError) {
@@ -539,7 +538,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         entity_type: 'day', action: 'create', temp_id: tempId, label: localDate, fields: { local_date: localDate },
       })) {
         get().refreshSyncState(plan.id);
-        toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+        toast(OFFLINE_SAVED_MESSAGE);
         return;
       }
       set({ currentPlan: plan });
@@ -651,7 +650,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         });
         if (queued) {
           get().refreshSyncState(plan.id);
-          toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+          toast(OFFLINE_SAVED_MESSAGE);
           return;
         }
       }
@@ -777,7 +776,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         });
         if (queued) {
           get().refreshSyncState(plan.id);
-          toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+          toast(OFFLINE_SAVED_MESSAGE);
           return 'queued';
         }
       }
@@ -884,7 +883,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         fields: { day_id: day.id, order: reorderedEvents.map((e) => e.id) },
       })) {
         get().refreshSyncState(plan.id);
-        toast(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+        toast(OFFLINE_SAVED_MESSAGE);
         return;
       }
       set({ currentPlan: plan });

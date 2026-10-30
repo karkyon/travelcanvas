@@ -11,6 +11,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpotList from '@/components/SpotList';
+import UiIcon from '@/components/common/UiIcon';
+import { IcClipboard } from '@/components/common/uiIcons';
 
 const SpotListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,7 +29,7 @@ const SpotListPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-3xl font-bold text-ink-900">📋 スポット一覧</h1>
+          <h1 className="text-3xl font-bold text-ink-900"><UiIcon icon={IcClipboard} size={28} className="mr-2 align-[-4px]" />スポット一覧</h1>
         </div>
 
         <SpotList

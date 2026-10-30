@@ -20,6 +20,8 @@ import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
 import Input from './common/Input';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
+import UiIcon from '@/components/common/UiIcon';
+import { IcCalendar, IcFootprints, IcMapPin, IcTimer, IcWallet } from '@/components/common/uiIcons';
 
 interface DayViewProps {
   day: DaySchedule;
@@ -365,8 +367,8 @@ const DayView: React.FC<DayViewProps> = ({
     const order = view.map((x) => x.id);
     const next = reorderArray(order, itemId, finalIndexForGap(order, itemId, targetIndex));
     if (view.some((x, i) => x.locked && next[i] !== x.id)) {
-      setAnnounce('確定(🔒)の予定の位置が変わるため、この並べ替えはできません');
-      addToast({ type: 'error', message: '確定(🔒)の予定の位置は変えられません' });
+      setAnnounce('確定の予定の位置が変わるため、この並べ替えはできません');
+      addToast({ type: 'error', message: '確定の予定の位置は変えられません' });
       return;
     }
     propose(next, `「${byId[itemId]!.title}」を${next.indexOf(itemId) + 1}番目へ動かす案にしました。まだ保存していません`);
@@ -384,11 +386,11 @@ const DayView: React.FC<DayViewProps> = ({
             {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
             <p className="text-xs text-ink-700" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
             <div className="flex items-center space-x-4 text-sm text-ink-700 mt-1">
-              <span>📍 {timeStats.eventCount}件</span>
-              <span>⏱️ {Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
-              <span>💰 ¥{timeStats.totalCost.toLocaleString()}</span>
+              <span><UiIcon icon={IcMapPin} size={14} className="mr-1 align-[-3px]" />{timeStats.eventCount}件</span>
+              <span><UiIcon icon={IcTimer} size={14} className="mr-1 align-[-3px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
+              <span><UiIcon icon={IcWallet} size={14} className="mr-1 align-[-3px]" />¥{timeStats.totalCost.toLocaleString()}</span>
               {timeStats.totalTravelTime > 0 && (
-                <span>🚶 移動{timeStats.totalTravelTime}分</span>
+                <span><UiIcon icon={IcFootprints} size={14} className="mr-1 align-[-3px]" />移動{timeStats.totalTravelTime}分</span>
               )}
             </div>
           </div>
@@ -442,7 +444,7 @@ const DayView: React.FC<DayViewProps> = ({
           /* 空の状態 */
           <Card variant="outlined" padding="lg">
             <div className="text-center py-8 text-ink-500">
-              <div className="text-4xl mb-3">📅</div>
+              <div className="mb-3 flex justify-center"><UiIcon icon={IcCalendar} size={40} /></div>
               <p className="text-lg font-medium mb-2">まだスケジュールがありません</p>
               <p className="text-sm mb-4">スポットを追加してプランを作成しましょう</p>
               <Button
@@ -542,6 +544,7 @@ const DayView: React.FC<DayViewProps> = ({
                   cost={event.cost}
                   currency={event.currency}
                   category={event.category}
+                  locked={Boolean(event.locked)}
                   priority={priorityToLabel(event.priority)}
                   travelMethod={row ? undefined : event.travel_method}
                   travelTime={event.travel_time}

@@ -22,6 +22,9 @@ import { toast } from 'react-hot-toast';
 import AdminUsagePanel from './AdminUsagePanel';
 import AdminEntitlementsPanel from './AdminEntitlementsPanel';
 import AdminJobsPanel from './AdminJobsPanel';
+import UiIcon from '@/components/common/UiIcon';
+import type { LucideIcon } from 'lucide-react';
+import { IcActivity, IcBarChart, IcCalendar, IcCheck, IcClipboard, IcEarth, IcFlag, IcLifeBuoy, IcRefresh, IcScroll, IcShieldCheck, IcUser, IcUserCheck, IcUserPlus, IcUsers, IcZap } from '@/components/common/uiIcons';
 
 // [Gate A2] 応答の形は services/api の adminSystemStats で検査する
 type SystemStats = AdminSystemStats;
@@ -30,7 +33,7 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
-  icon: string;
+  icon: LucideIcon;
   color: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'gray';
 }
 
@@ -47,7 +50,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, subtitle, icon, c
   return (
     <Card className={`p-6 ${colorClasses[color]}`}>
       <div className="flex items-center space-x-3">
-        <div className="text-2xl">{icon}</div>
+        <div className="shrink-0"><UiIcon icon={icon} size={28} /></div>
         <div>
           <p className="text-sm font-medium">{title}</p>
           <p className="text-2xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</p>
@@ -129,41 +132,41 @@ const AdminDashboard: React.FC = () => {
               更新中...
             </>
           ) : (
-            <>🔄 更新</>
+            <><UiIcon icon={IcRefresh} className="mr-1 align-[-3px]" />更新</>
           )}
         </Button>
       </div>
 
       {/* ユーザー統計 */}
       <div>
-        <h2 className="text-xl font-semibold text-ink-900 mb-4">👥 ユーザー統計</h2>
+        <h2 className="text-xl font-semibold text-ink-900 mb-4"><UiIcon icon={IcUsers} size={20} className="mr-1 align-[-3px]" />ユーザー統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="総ユーザー数"
             value={stats.users.total_users}
             subtitle={`内 認証済み: ${stats.users.verified_users}名`}
-            icon="👤"
+            icon={IcUser}
             color="blue"
           />
           <MetricCard
             title="アクティブユーザー"
             value={stats.users.active_users}
             subtitle="停止していないユーザー"
-            icon="✨"
+            icon={IcUserCheck}
             color="green"
           />
           <MetricCard
             title="新規登録"
             value={stats.users.new_users_30d}
             subtitle="過去30日間"
-            icon="🆕"
+            icon={IcUserPlus}
             color="purple"
           />
           <MetricCard
             title="管理者ユーザー"
             value={stats.users.user_types.admin}
             subtitle="user_type=adminの人数"
-            icon="🛡️"
+            icon={IcShieldCheck}
             color="yellow"
           />
         </div>
@@ -171,16 +174,16 @@ const AdminDashboard: React.FC = () => {
 
       {/* プラン統計 */}
       <div>
-        <h2 className="text-xl font-semibold text-ink-900 mb-4">📋 プラン統計</h2>
+        <h2 className="text-xl font-semibold text-ink-900 mb-4"><UiIcon icon={IcClipboard} size={20} className="mr-1 align-[-3px]" />プラン統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard title="総プラン数" value={stats.travel_plans.total_plans} icon="📊" color="blue" />
-          <MetricCard title="アクティブプラン" value={stats.travel_plans.active_plans} icon="🔥" color="green" />
-          <MetricCard title="完了プラン" value={stats.travel_plans.completed_plans} icon="✅" color="purple" />
+          <MetricCard title="総プラン数" value={stats.travel_plans.total_plans} icon={IcBarChart} color="blue" />
+          <MetricCard title="アクティブプラン" value={stats.travel_plans.active_plans} icon={IcActivity} color="green" />
+          <MetricCard title="完了プラン" value={stats.travel_plans.completed_plans} icon={IcCheck} color="purple" />
           <MetricCard
             title="平均日数"
             value={`${stats.travel_plans.average_duration_days.toFixed(1)}日`}
             subtitle="開始日・終了日が両方設定されているプランのみ集計"
-            icon="📅"
+            icon={IcCalendar}
             color="gray"
           />
         </div>
@@ -188,7 +191,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* 人気デスティネーション */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-ink-900 mb-4">🌍 人気デスティネーション</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4"><UiIcon icon={IcEarth} size={18} className="mr-1 align-[-3px]" />人気デスティネーション</h3>
         {stats.travel_plans.popular_destinations.length === 0 ? (
           <p className="text-sm text-ink-700">デスティネーションが設定されたプランがまだありません</p>
         ) : (
@@ -210,14 +213,14 @@ const AdminDashboard: React.FC = () => {
 
       {/* クイックアクション */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-ink-900 mb-4">⚡ クイックアクション</h3>
+        <h3 className="text-lg font-semibold text-ink-900 mb-4"><UiIcon icon={IcZap} size={18} className="mr-1 align-[-3px]" />クイックアクション</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Button
             onClick={() => navigate('/admin/users')}
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
           >
-            <span className="text-2xl mb-2" aria-hidden="true">👥</span>
+            <span className="mb-2" aria-hidden="true"><UiIcon icon={IcUsers} size={24} /></span>
             <span className="text-sm">ユーザー管理</span>
           </Button>
           <Button
@@ -225,7 +228,7 @@ const AdminDashboard: React.FC = () => {
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
           >
-            <span className="text-2xl mb-2" aria-hidden="true">📜</span>
+            <span className="mb-2" aria-hidden="true"><UiIcon icon={IcScroll} size={24} /></span>
             <span className="text-sm">監査ログ</span>
           </Button>
           <Button
@@ -233,7 +236,7 @@ const AdminDashboard: React.FC = () => {
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
           >
-            <span className="text-2xl mb-2" aria-hidden="true">🛟</span>
+            <span className="mb-2" aria-hidden="true"><UiIcon icon={IcLifeBuoy} size={24} /></span>
             <span className="text-sm">運用とサポート</span>
           </Button>
           <Button
@@ -241,7 +244,7 @@ const AdminDashboard: React.FC = () => {
             variant="outline"
             className="flex flex-col items-center p-4 h-auto"
           >
-            <span className="text-2xl mb-2" aria-hidden="true">🚩</span>
+            <span className="mb-2" aria-hidden="true"><UiIcon icon={IcFlag} size={24} /></span>
             <span className="text-sm">濫用への対応</span>
           </Button>
         </div>

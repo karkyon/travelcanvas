@@ -13,6 +13,8 @@ import { coverFor } from '@/styles/tokens';
 import {
   GEOCODE_LABEL, LIMIT_LABEL, retrievedLabel, straightLabel, type ConsultState,
 } from './consultModel';
+import UiIcon from '@/components/common/UiIcon';
+import { IcCar } from '@/components/common/uiIcons';
 
 const AreaMap = lazy(() => import('./AreaMap'));
 const INITIAL = 3;
@@ -155,7 +157,7 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                           : GEOCODE_LABEL[a.geocode.status]}</dd></div>
                       <div><dt className="inline font-semibold text-ink-900">距離: </dt>
                         <dd className="inline">{straightLabel(a.straight_km, r.values.origin)}</dd></div>
-                      <div><dt className="inline font-semibold text-ink-900">🚗 運転: </dt><dd className="inline">実走行時間・高速料金は未照会</dd></div>
+                      <div><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt><dd className="inline">実走行時間・高速料金は未照会</dd></div>
                       <div data-testid={`area-limit-${a.name}`}>
                         <dt className="inline font-semibold text-ink-900">片道の条件: </dt>
                         <dd className={`inline ${limit === 'exceeds' || limit === 'likely_exceeds' ? 'font-semibold text-warning' : ''}`}>

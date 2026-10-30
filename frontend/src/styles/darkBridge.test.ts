@@ -11,7 +11,7 @@ import { contrastRatio, darkColor } from './tokens';
 const SRC = resolve(__dirname, '..');
 const CSS = resolve(__dirname, 'theme-dark.css');
 /** [Gate G10-UX] UX-6 画面に直に書いた Tailwind の色のクラスの数の上限(増やさない) */
-const MAX_DIRECT_COLOR_CLASSES = 1632;
+const MAX_DIRECT_COLOR_CLASSES = 1630;  // [UX6-Icons2] 1,632 → 1,630(ランディングのアイコンを決まりの色 text-accent に)
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

@@ -20,6 +20,8 @@ import {
   clearState, draftInputOf, extractInputOf, initReview, loadState, openQuestions, saveState,
   type BriefForm, type ConsultState, type ConsultStep, type ReviewKey, type ReviewState,
 } from './consultModel';
+import UiIcon from '@/components/common/UiIcon';
+import { IcLock } from '@/components/common/uiIcons';
 
 const field = 'tc-focus-ring w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-ink-900 min-h-11';
 const help = 'mt-1 text-xs text-ink-700';
@@ -404,7 +406,7 @@ const ReviewStep: React.FC<{
         </div>
         {review.personal && (
           <p className="mb-3 rounded-lg border border-cloud-200 p-3 text-xs text-ink-700" data-testid="review-personal">
-            🔒 文章に個人的な旅の理由がありました。確認のためだけに示し、旅行・共有の予定には書きません。
+            <UiIcon icon={IcLock} size={14} className="mr-1 align-[-3px]" />文章に個人的な旅の理由がありました。確認のためだけに示し、旅行・共有の予定には書きません。
           </p>
         )}
         <div role="table" aria-label="読み取った条件" className="overflow-hidden rounded-xl border border-cloud-200">

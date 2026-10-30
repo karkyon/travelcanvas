@@ -6,6 +6,8 @@
 import React, { Component, ReactNode } from 'react';
 import Button from './Button';
 import Card from './Card';
+import UiIcon from '@/components/common/UiIcon';
+import { IcHome, IcRefresh, IcRotate, IcSend, IcTriangleAlert, IcWrench } from '@/components/common/uiIcons';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -240,7 +242,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         <div className="min-h-screen bg-linear-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
           <Card className="max-w-2xl w-full p-8 text-center">
             <div className="mb-6">
-              <div className="text-6xl mb-4">🚨</div>
+              <div className="mb-4 flex justify-center text-danger"><UiIcon icon={IcTriangleAlert} size={56} /></div>
               <h1 className="text-3xl font-bold text-ink-900 mb-2">
                 予期しないエラーが発生しました
               </h1>
@@ -258,22 +260,25 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 onClick={this.handleReset}
                 variant="primary"
                 className="w-full"
+                icon={<UiIcon icon={IcRefresh} />}
               >
-                🔄 再試行
+                再試行
               </Button>
               <Button
                 onClick={this.handleReload}
                 variant="secondary"
                 className="w-full"
+                icon={<UiIcon icon={IcRotate} />}
               >
-                🔃 ページ更新
+                ページ更新
               </Button>
               <Button
                 onClick={this.handleGoHome}
                 variant="outline"
                 className="w-full"
+                icon={<UiIcon icon={IcHome} />}
               >
-                🏠 ホームに戻る
+                ホームに戻る
               </Button>
             </div>
 
@@ -282,8 +287,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 onClick={this.handleSendReport}
                 variant="ghost"
                 className="text-sm"
+                icon={<UiIcon icon={IcSend} />}
               >
-                📤 エラーレポートを送信
+                エラーレポートを送信
               </Button>
             </div>
 
@@ -291,7 +297,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             {(showErrorDetails || process.env.NODE_ENV === 'development') && error && (
               <details className="text-left bg-gray-50 p-4 rounded-lg mt-6">
                 <summary className="cursor-pointer font-semibold text-ink-700 mb-2">
-                  🔧 エラー詳細（技術者向け）
+                  <UiIcon icon={IcWrench} className="mr-1 align-[-3px]" />エラー詳細（技術者向け）
                 </summary>
                 <div className="space-y-4">
                   <div>

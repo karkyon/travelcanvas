@@ -2,6 +2,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import UiIcon from '@/components/common/UiIcon';
+import { IcBot, IcLuggage, IcMap, IcSmartphone } from '@/components/common/uiIcons';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ const LandingPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-ink-900 mb-8">
-            <span className="text-blue-600">🧳 TravelCanvas</span>
+            <span className="text-blue-600"><UiIcon icon={IcLuggage} size={44} className="mr-2 align-[-6px]" />TravelCanvas</span>
             <br />
             <span className="bg-linear-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
               AI旅行プランナー
@@ -70,7 +72,7 @@ const LandingPage = () => {
         
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="text-center p-8 bg-surface rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <div className="text-5xl mb-6">🤖</div>
+            <div className="mb-6 flex justify-center text-accent"><UiIcon icon={IcBot} size={48} /></div>
             <h3 className="text-xl font-semibold text-ink-900 mb-4">AI最適化</h3>
             <p className="text-ink-700 leading-relaxed">
               AIがあなたの好みを学習し、最適な旅行プランを自動生成します
@@ -78,7 +80,7 @@ const LandingPage = () => {
           </div>
           
           <div className="text-center p-8 bg-surface rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <div className="text-5xl mb-6">🗺️</div>
+            <div className="mb-6 flex justify-center text-accent"><UiIcon icon={IcMap} size={48} /></div>
             <h3 className="text-xl font-semibold text-ink-900 mb-4">スマートルート</h3>
             <p className="text-ink-700 leading-relaxed">
               効率的な移動ルートと時間配分で、旅行を最大限に楽しめます
@@ -86,7 +88,7 @@ const LandingPage = () => {
           </div>
           
           <div className="text-center p-8 bg-surface rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <div className="text-5xl mb-6">📱</div>
+            <div className="mb-6 flex justify-center text-accent"><UiIcon icon={IcSmartphone} size={48} /></div>
             <h3 className="text-xl font-semibold text-ink-900 mb-4">簡単操作</h3>
             <p className="text-ink-700 leading-relaxed">
               直感的なインターフェースで、誰でも簡単に旅行プランを作成できます

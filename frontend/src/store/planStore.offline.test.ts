@@ -59,7 +59,7 @@ describe('planStore オフライン編集 (Gate P11)', () => {
     expect(q[2]!.temp_id).toBe(events[1]!.id);
     expect(q[2]!.fields).toMatchObject({ day_id: 'd1', title: 'カフェ', local_start_time: '15:30' });
     expect(usePlanStore.getState().pendingSyncCount).toBe(3);
-    expect(m.toast).toHaveBeenCalledWith(OFFLINE_SAVED_MESSAGE, { icon: '📴' });
+    expect(m.toast).toHaveBeenCalledWith(OFFLINE_SAVED_MESSAGE);
   });
 
   it('サーバーが答えた失敗(409など)は溜めずに元へ戻す', async () => {

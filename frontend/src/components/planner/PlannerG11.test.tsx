@@ -268,7 +268,7 @@ describe('1日の画面(DayView)', () => {
     expect(screen.getByTestId('reorder-status')).toHaveTextContent('元の並びに戻しました');
   });
 
-  it('確定(🔒)の予定と、それと入れ替わる移動は案にもしない(ボタンは押せず、矢印キー・ドラッグは理由を出す)。「このままにする」', async () => {
+  it('確定の予定と、それと入れ替わる移動は案にもしない(ボタンは押せず、矢印キー・ドラッグは理由を出す)。「このままにする」', async () => {
     getHoursCheck.mockRejectedValue(new Error('offline'));
     reorderSchedule.mockResolvedValue(undefined);
     const three = (): DaySchedule => ({ id: 'd1', date: '2026-11-14', timezone_id: 'Asia/Tokyo', events: [
@@ -280,7 +280,7 @@ describe('1日の画面(DayView)', () => {
     expect(screen.getByRole('button', { name: '「夕食」を下へ移す' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '「予約の宿」を上へ移す' })).toBeDisabled();
     fireEvent.keyDown(screen.getByRole('listitem', { name: '予約の宿(上下矢印キーで並べ替え)' }), { key: 'ArrowUp' });
-    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「予約の宿」は確定(🔒)の予定のため動かせません');
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「予約の宿」は確定の予定のため動かせません');
     expect(screen.queryByTestId('reorder-preview')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
     fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
@@ -342,8 +342,8 @@ describe('移動の区間の行・並べ替えの影響の計算', () => {
 
   it('確定の予定は動かさず、確定の予定と入れ替わる移動もしない', () => {
     const list = [{ title: 'A' }, { title: 'B', locked: true }, { title: 'C' }];
-    expect(moveBlockedReason(list, 0, 1)).toBe('確定(🔒)の予定「B」と入れ替わるため動かせません');
-    expect(moveBlockedReason(list, 1, -1)).toBe('「B」は確定(🔒)の予定のため動かせません');
+    expect(moveBlockedReason(list, 0, 1)).toBe('確定の予定「B」と入れ替わるため動かせません');
+    expect(moveBlockedReason(list, 1, -1)).toBe('「B」は確定の予定のため動かせません');
     expect(moveBlockedReason(list, 0, -1)).toBeNull();
     expect(moveBlockedReason([{ title: 'A' }, { title: 'C' }], 0, 1)).toBeNull();
   });

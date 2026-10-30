@@ -88,6 +88,7 @@
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |
+| [gate-ux6-icons2-trace.md](gate-ux6-icons2-trace.md) | Gate UX6-Icons2 トレース(画面に出る残りの飾りの絵文字を共通のアイコンへ・確定の予定の印) | 1 | 1 | 0 |
 | [gate-v2-trace.md](gate-v2-trace.md) | Gate V2 トレース(FR-049 Visited Area Layer・FR-050 訪問判定・信頼度・FR-051 訪問訂正・Privacy除外) | 1 | 0 | 1 |
 
 VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)、全 FR の状態は [fr-status.json](fr-status.json)。

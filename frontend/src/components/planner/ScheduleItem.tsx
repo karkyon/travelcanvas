@@ -7,6 +7,9 @@ import {
   Clock, MapPin, DollarSign, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, AlertTriangle, MessageSquare,
 } from 'lucide-react';
+import UiIcon from '@/components/common/UiIcon';
+import type { LucideIcon } from 'lucide-react';
+import { IcDrama, IcHotel, IcImage, IcLandmark, IcLock, IcMapPin, IcShopping, IcTarget, IcTrain, IcUtensils } from '@/components/common/uiIcons';
 
 interface ScheduleItemProps {
   id: string;
@@ -56,7 +59,20 @@ interface ScheduleItemProps {
   image?: { src: string; credit: string | null } | null;
   /** [Gate G11] 予定の写真を選ぶ(編集できる人だけ) */
   onPhoto?: (id: string) => void;
+  /** [UX-6] 確定の予定(並べ替えで位置を変えない)。行に「確定」の印を出す */
+  locked?: boolean;
 }
+
+const CATEGORY_MARKS: Record<string, [LucideIcon, string]> = {
+  sightseeing: [IcLandmark, '観光'],
+  food: [IcUtensils, '食事'],
+  shopping: [IcShopping, '買い物'],
+  accommodation: [IcHotel, '宿泊'],
+  transport: [IcTrain, '交通'],
+  activity: [IcTarget, 'アクティビティ'],
+  entertainment: [IcDrama, 'エンターテイメント'],
+  default: [IcMapPin, '予定'],
+};
 
 const ScheduleItem: React.FC<ScheduleItemProps> = ({
   id,
@@ -94,6 +110,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   hours,
   image,
   onPhoto,
+  locked = false,
 }) => {
   void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -105,17 +122,15 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
     notes: notes || ''
   });
 
-  const getCategoryIcon = (cat: string) => {
-    switch (cat) {
-      case 'sightseeing': return '🏛️';
-      case 'food': return '🍜';
-      case 'shopping': return '🛍️';
-      case 'accommodation': return '🏨';
-      case 'transport': return '🚃';
-      case 'activity': return '🎯';
-      case 'entertainment': return '🎭';
-      default: return '📍';
-    }
+  // [UX-6] カテゴリの印は読み上げから外し、名前を読み上げ用の文字で出す(以前は OS の絵文字の名前が読まれていた)
+  const categoryMark = (cat: string) => {
+    const [icon, label] = CATEGORY_MARKS[cat] ?? CATEGORY_MARKS.default!;
+    return (
+      <span data-testid="schedule-category" data-category={cat || 'default'}>
+        <UiIcon icon={icon} size={18} className="mr-1 align-[-3px]" />
+        <span className="sr-only">{`${label}: `}</span>
+      </span>
+    );
   };
 
   const getPriorityColor = (prio: string) => {
@@ -202,13 +217,14 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
         )}
         <div className="flex-1 min-w-0">
           {/* Time and Title */}
-          <div className="flex items-center gap-3 mb-2">
+          {/* [UX-6] 狭い幅(360px)では時刻と題を折り返す(以前は題が1文字ずつ折れていた) */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
             <div className="flex items-center gap-1 text-sm font-semibold text-ink-700">
               <Clock size={14} />
               <span>{formatTime(startTime)}-{formatTime(endTime)}{endTime && endDayOffset ? (endDayOffset === 1 ? '(翌日)' : `(${endDayOffset}日後)`) : ''}</span>
             </div>
             <div className="text-lg font-semibold text-ink-900">
-              {getCategoryIcon(category)} {isEditing ? (
+              {categoryMark(category)}{isEditing ? (
                 <input
                   type="text"
                   value={editData.title}
@@ -217,6 +233,12 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : title}
+              {locked && (
+                <span data-testid="schedule-locked"
+                  className="ml-2 inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full border border-cloud-200 px-1.5 align-middle text-xs font-semibold text-ink-700">
+                  <UiIcon icon={IcLock} size={12} />確定
+                </span>
+              )}
             </div>
           </div>
 
@@ -306,7 +328,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               aria-label="この予定の写真を選ぶ"
               data-testid={`schedule-photo-${id}`}
             >
-              🖼
+              <UiIcon icon={IcImage} size={16} />
             </button>
           )}
           {onComment && (
