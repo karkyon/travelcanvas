@@ -45,7 +45,11 @@ const StatePill: React.FC<{ state: string }> = ({ state }) => {
 };
 
 const SECRET_LABEL: Record<string, { text: string; tone: string }> = {
-  configured: { text: '鍵あり(値は表示しない)', tone: 'tc-pill--blue' },
+  configured: { text: '登録済み・提供元の認証は未確認(値は表示しない)', tone: 'tc-pill--blue' },
+  disabled: { text: '無効化済み(送らない)', tone: 'tc-pill--warn' },
+  placeholder: { text: 'サンプル値(使えない)', tone: 'tc-pill--bad' },
+  invalid: { text: '形が正しくない(使えない)', tone: 'tc-pill--bad' },
+  decrypt_failed: { text: '復号できない(使えない)', tone: 'tc-pill--bad' },
   missing: { text: '未設定', tone: 'tc-pill--warn' },
   not_defined: { text: 'コードに設定の項目なし', tone: '' },
   not_needed: { text: '不要', tone: '' },

@@ -49,8 +49,9 @@ def test_providers_never_return_secret_values(auth_client, db_session, audits, m
     assert "sk-test-not-a-real-key" not in r.text
     rows = {p["name"]: p for p in r.json()["providers"]}
     assert set(rows) == {"openai", "google_maps_js", "google_places", "google_routes", "fake"}
-    assert rows["openai"]["secret"] == "configured" and rows["openai"]["contract"] == "unverified"
-    assert rows["openai"]["secret_source"] == "env" and rows["openai"]["secret_last4"] == "3456"
+    # .env に値があっても取得元ではない → 鍵なし(以前は configured と表示していた)
+    assert rows["openai"]["secret"] == "missing" and rows["openai"]["contract"] == "unverified"
+    assert rows["openai"]["secret_source"] is None and rows["openai"]["secret_last4"] is None  # .env の末尾は出さない
     assert rows["openai"]["live_calls"] == "disabled"  # 登録されていない(契約・Gate が先)
     assert rows["google_places"]["secret"] in ("missing", "configured")
     assert rows["google_places"]["secret_slot"] == "google_maps_server_key"
@@ -163,21 +164,26 @@ def test_register_secret_encrypts_never_returns_value_and_audits(auth_client, db
     rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
     assert rows["openai"]["secret_source"] == "cms" and rows["openai"]["secret_version"] == 1
     # 監査には版と理由だけ
-    reg = [a for a in audits if a["action"] == "ops_secret_registered"]
-    assert reg and value not in str(reg) and reg[0]["details"]["version"] == 1
+    from app.models.models import AuditLog
+    reg = [a for a in db_session.query(AuditLog).filter_by(action="ops_secret_registered")]
+    assert reg and value not in str([a.details for a in reg]) and reg[0].details["version"] == 1
     # 新しい版: 前の版は superseded、有効は1つ
     r = client.post(url, json={"value": "sk-second-version-WXYZ9876", "reason": "入れ替え"})
     assert r.json()["version"] == 2 and r.json()["last4"] == "9876"
     statuses = {x.version: x.status for x in db_session.query(ProviderSecret).filter_by(slot="openai_api_key")}
     assert statuses == {1: "superseded", 2: "active"}
-    # 無効にすると .env の値へ戻る
+    # 無効にしても .env の値へは戻らない(無効化は保持され、取得は拒否)
     assert client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={}).status_code == 422
     r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "漏えいの疑い"})
-    assert r.status_code == 200 and r.json()["source"] == "env"
-    assert ps.resolve(db_session, "openai_api_key") == "sk-env-fallback-value-0000"
+    assert r.status_code == 200 and r.json()["status"] == "disabled" and r.json()["source"] is None
+    with pytest.raises(ps.SecretUnavailable) as exc:
+        ps.resolve(db_session, "openai_api_key")
+    assert exc.value.code == "secret_disabled"
     r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "二度目"})
     assert r.status_code == 409
-    assert any(a["action"] == "ops_secret_disabled" for a in audits)
+    from app.models.models import AuditLog
+    actions = {x.action for x in db_session.query(AuditLog).filter(AuditLog.resource_type == "ops_console")}
+    assert {"ops_secret_registered", "ops_secret_disabled"} <= actions  # 鍵の変更と同じ transaction で監査が入る
 
 
 def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypatch):
@@ -195,15 +201,21 @@ def test_key_present_is_not_connected_without_adapter(auth_client, db_session, a
     client, user = auth_client
     _admin(db_session, user)
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-test-not-a-real-key-123456")
+    # .env に本物の値があっても取得元ではない → 鍵なし
     cg.register_provider("openai", ["ai.generate"])
     try:
+        before = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
+        assert before["openai"]["secret"] == "missing" and before["openai"]["secret_source"] is None
+        from app.services import provider_secrets as ps
+        ps.register(db_session, "openai_api_key", "sk-cms-registered-secret-ABCD1234", "試験", user.id)
         rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
     finally:
         cg.unregister_provider("openai")
     assert rows["openai"]["registered"] is True and rows["openai"]["secret"] == "configured"
     assert rows["openai"]["adapter"] == "not_implemented"
     assert rows["openai"]["live_calls"] == "disabled"
-    assert rows["openai"]["secret_storage"] == "サーバーの環境変数(.env)"
+    assert rows["openai"]["secret_storage"] == "アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)"
+    assert rows["openai"]["secret_provider_auth"] == "unverified"
     assert rows["fake"]["adapter"] == "fake"
     assert all(p["adapter"] == "not_implemented" for n, p in rows.items() if n != "fake")
     assert admin_ops.ADAPTERS_IMPLEMENTED == frozenset()

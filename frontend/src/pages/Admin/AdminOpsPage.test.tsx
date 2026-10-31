@@ -28,7 +28,7 @@ const providers = {
     { name: 'openai', label: 'OpenAI · Responses API', purpose: '旅行相談', operations: ['ai.generate'], kind: 'paid',
       registered: false, suspended: false, suspended_reason: null, contract: 'unverified', secret: 'configured',
       secret_setting: 'OPENAI_API_KEY', price_profile: 'known', policy_version: '2026-10-29.1', live_calls: 'disabled',
-      month_usage: null, notes: '', adapter: 'not_implemented', secret_storage: 'サーバーの環境変数(.env)' },
+      month_usage: null, notes: '', adapter: 'not_implemented', secret_storage: 'アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)' },
     { name: 'fake', label: 'Fake Provider', purpose: '試験', operations: ['ai.generate'], kind: 'fake', registered: true,
       suspended: false, suspended_reason: null, contract: 'not_billable', secret: 'not_needed', secret_setting: null,
       price_profile: 'known', policy_version: '2026-10-29.1', live_calls: 'test_only',
@@ -63,7 +63,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: 'API・契約と接続' }));
     const row = await screen.findByTestId('ops-provider-openai');
-    expect(within(row).getByText('鍵あり(値は表示しない)')).toBeInTheDocument();
+    expect(within(row).getByText('登録済み・提供元の認証は未確認(値は表示しない)')).toBeInTheDocument();
     expect(within(row).getByText('未実装(送らない)')).toBeInTheDocument();
     expect(within(row).getByText('契約・課金は未確認')).toBeInTheDocument();
     expect(within(row).getByText('無効(送らない)')).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     const slots = {
       as_of: 'x', note: '鍵の値は出しません',
       storage: { location: 'アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)', not_secret_manager: 'GCP Secret Manager には登録しません',
-        backup: 'ENCRYPTION_KEY を失うと復号できない', rotation: '掛け直し', fallback: '.env へ戻る' },
+        backup: 'ENCRYPTION_KEY を失うと復号できない', rotation: '掛け直し', fallback: '.env へは戻らない' },
       slots: [{ slot: 'openai_api_key', label: 'OpenAI の API キー', providers: ['openai'], env: 'OPENAI_API_KEY', hint: 'sk-',
         status: 'missing', source: null, version: null, last4: null, registered_at: null, history: [], in_use: false,
         in_use_note: 'アプリはまだこの鍵を使いません' }],

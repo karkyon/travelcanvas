@@ -18,7 +18,6 @@ const EMOJI = /\p{Emoji_Presentation}|\u{FE0F}|(?=\p{Extended_Pictographic})[\u{
 const EXCLUDED: Record<string, string> = {
   'components/layout/Header.tsx': 'どこからも使われていない部品(画面に出ない)',
   'components/Navbar.tsx': 'どこからも使われていない部品(画面に出ない)',
-  'components/common/MapView.tsx': 'どこからも使われていない部品(画面に出ない)',
   'utils/index.ts': '参照の無い対応表(categoryIcons・getCategoryIcon。画面に出ない)',
   'config/constants.ts': '参照の無い対応表(CATEGORY_ICONS・TRANSPORT_ICONS・PRIORITY_ICONS。画面に出ない)',
 };

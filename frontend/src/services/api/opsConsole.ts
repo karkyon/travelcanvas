@@ -22,7 +22,9 @@ export interface OpsOverview {
   cloud_billing: { status: string; message: string };
   free_usage?: OpsFreeUsage;
 }
-export type OpsSecretState = 'configured' | 'missing' | 'not_defined' | 'not_needed';
+export type OpsSecretState = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed'
+  | 'not_defined' | 'not_needed';
+export type OpsSecretKeyStatus = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed';
 export interface OpsProvider {
   name: string; label: string; purpose: string; operations: string[]; kind: 'fake' | 'paid';
   registered: boolean; suspended: boolean; suspended_reason: string | null;
@@ -152,7 +154,7 @@ export interface OpsSecretHistory {
 }
 export interface OpsSecretSlot {
   slot: string; label: string; providers: string[]; env: string; hint: string;
-  status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
+  status: OpsSecretKeyStatus; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
   registered_at: string | null; history: OpsSecretHistory[]; in_use?: boolean; in_use_note?: string;
 }
 export interface OpsSecretStorage {
@@ -160,7 +162,7 @@ export interface OpsSecretStorage {
 }
 export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string; storage?: OpsSecretStorage }
 export interface OpsSecretResult {
-  slot: string; status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null;
+  slot: string; status: OpsSecretKeyStatus; source: 'cms' | 'env' | null; version: number | null;
   last4: string | null; registered_at: string | null;
 }
 
@@ -169,12 +171,12 @@ const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
   created_at: nullable(str), disabled_at: nullable(str),
 });
 const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
-  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing'),
+  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed'),
   source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
   history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
-  slot: str, status: oneOf('configured', 'missing'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
+  slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
   last4: nullable(str), registered_at: nullable(str),
 });
 
