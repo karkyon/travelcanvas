@@ -542,7 +542,7 @@ def ops_test_tier(request: Request, payload: Dict[str, Any] = Body(...), admin: 
 
 @router.get("/secrets")
 def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """鍵の状態(値は返さない)。出典は cms(この画面で登録)か env(.env)。"""
+    """鍵の状態(値は返さない)。取得元は cms(この画面で登録した有効な版)だけ。.env は移行の検出だけ(env_legacy)。"""
     slots = []
     for slot, spec in ps.SLOTS.items():
         used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
@@ -562,8 +562,8 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
             "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。取得元はこの画面で登録した有効な版だけです(.env へは戻りません)。「登録済み」は提供元が鍵を認めたという意味ではありません",
             "storage": {
                 "location": SECRET_STORAGE["cms"],
-                "not_secret_manager": "GCP Secret Manager には登録しません。Secret Manager の鍵は Cloud Run の環境変数として"
-                                      "読み込む別の経路です(この画面からは見えません)",
+                "not_secret_manager": "GCP Secret Manager には登録しません(Secret Manager への接続は未実装の別 Gate。"
+                                      "接続後も環境変数を経由しない)",
                 "backup": "DB のバックアップには暗号文が入ります。ENCRYPTION_KEY を失うと復号できないため、ENCRYPTION_KEY は"
                           "DB と別の場所に保管します",
                 "rotation": "ENCRYPTION_KEY の入れ替えは tcops の鍵の掛け直し(暗号化した全ての *_ciphertext 列)が"

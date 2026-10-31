@@ -236,6 +236,9 @@ def register(db: Session, slot: str, value: Any, reason: str, actor_id: uuid.UUI
         raise SecretError("placeholder_secret", "サンプルの値(CHANGE_ME など)は鍵として登録できません。提供元で発行した本物の鍵を入力してください")
     if fmt != "acceptable":
         raise SecretError("invalid_secret_value", f"鍵は空白を含まない {MIN_LEN}〜{MAX_LEN} 文字で入力してください")
+    if value in (reason or ""):
+        # 理由は監査・履歴に平文で残る。鍵を貼った時は保存しない(値は応答に出さない)
+        raise SecretError("reason_contains_secret", "理由の欄に鍵の値が含まれています。理由には鍵を書かないでください")
     try:
         ciphertext = crypto.encrypt_payload(value.encode("utf-8"))
     except Exception:  # noqa: BLE001 - ENCRYPTION_KEY が無い

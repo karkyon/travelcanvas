@@ -322,3 +322,40 @@ def test_concurrent_registration_leaves_exactly_one_active_version():
         assert len({version for version, _ in rows}) == len(rows), rows
     finally:
         clean()
+
+
+def test_reason_containing_the_key_is_rejected_and_nothing_is_stored(admin_client, db_session):
+    client, _ = admin_client
+    r = client.post(f"/api/v1/admin/ops/secrets/{SLOT}", json={"value": REAL_A, "reason": f"貼り間違い {REAL_A}"})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "reason_contains_secret"
+    assert REAL_A not in r.text
+    assert db_session.query(ProviderSecret).filter_by(slot=SLOT).count() == 0
+    assert db_session.query(AuditLog).filter_by(action="ops_secret_registered").count() == 0
+
+
+def test_storage_text_does_not_describe_an_env_path(admin_client):
+    client, _ = admin_client
+    storage = client.get("/api/v1/admin/ops/secrets").json()["storage"]
+    assert "環境変数として" not in storage["not_secret_manager"]
+    assert "GCP Secret Manager には登録しません" in storage["not_secret_manager"]
+
+
+def test_providers_list_works_when_backend_is_unset(admin_client, monkeypatch):
+    """omega-dev2 の既定(SECRET_BACKEND 未設定)でも提供元の一覧は 200 で、鍵は backend_unavailable(送らない)"""
+    client, _ = admin_client
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "")
+    r = client.get("/api/v1/admin/ops/providers")
+    assert r.status_code == 200
+    rows = {p["name"]: p for p in r.json()["providers"]}
+    assert rows["openai"]["secret"] == "backend_unavailable" and rows["openai"]["live_calls"] == "disabled"
+
+
+def test_frontend_decoder_accepts_every_secret_state_the_backend_returns():
+    """backend の状態の一覧と frontend の decoder(OPS_SECRET_STATES)を揃える"""
+    src = (_REPO / "backend/app/services/provider_secrets.py").read_text(encoding="utf-8")
+    states = set(re.findall(r'update\(status="([a-z_]+)"', src)) | set(re.findall(r'": \("([a-z_]+)", ', src))
+    states |= {"missing", "configured", "backend_unavailable"}
+    ts = (_REPO / "frontend/src/services/api/opsConsole.ts").read_text(encoding="utf-8")
+    block = ts.split("export const OPS_SECRET_STATES", 1)[1].split(";", 1)[0]
+    accepted = set(re.findall(r"'([a-z_]+)'", block))
+    assert states <= accepted, states - accepted

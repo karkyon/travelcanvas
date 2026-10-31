@@ -332,6 +332,9 @@ jobs:
           DB_APP_PASSWORD=ci-only-dummy-app-role-password-0123456789
           APP_DATABASE_URL=postgresql://tc_app:ci-only-dummy-app-role-password-0123456789@postgres:5432/travelcanvas
           VITE_API_URL=http://localhost:8001
+          # [Gate SecretPolicy] アプリ側に既定の保管先は無い(未設定なら鍵を取得も送信もしない)。
+          # E2E の使い捨てスタックだけ、暫定の db_encrypted を明示する
+          SECRET_BACKEND=db_encrypted
           EOF
 
       - name: Build & start full stack (postgres/redis/backend/frontend)

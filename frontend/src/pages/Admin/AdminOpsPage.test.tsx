@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const api = vi.hoisted(() => ({
   getOpsOverview: vi.fn(), getOpsProviders: vi.fn(), getOpsLedger: vi.fn(), getOpsCloud: vi.fn(),
-  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(),
+  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(), importOpsSecretFromEnv: vi.fn(),
   disableOpsSecret: vi.fn(), getOpsTiers: vi.fn(), switchOpsTestTier: vi.fn(),
 }));
 vi.mock('@/services/api/opsConsole', () => api);
@@ -106,6 +106,44 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(await screen.findByText('今月の Fake の試験の額')).toBeInTheDocument();
   });
 
+  it('秘密情報: 保管先が暫定・未接続を示し、状態を「鍵あり」とまとめず、旧 .env は明示の取り込みだけ', async () => {
+    const base = { slot: 'openai_api_key', label: 'OpenAI の API キー', providers: ['openai'], env: 'OPENAI_API_KEY', hint: 'sk-',
+      source: null, version: null, last4: null, registered_at: null, history: [], in_use: false };
+    api.getOpsSecrets.mockResolvedValue({
+      as_of: 'x', note: 'n', backend: 'db_encrypted', backend_note: '暫定: DB に暗号化。「高セキュリティ移行完了」ではありません',
+      slots: [
+        { ...base, status: 'disabled', env_legacy: { present: true, placeholder: false, importable: true } },
+        { ...base, slot: 'google_maps_server_key', label: 'サーバー用', status: 'placeholder',
+          env_legacy: { present: true, placeholder: true, importable: false } },
+      ],
+    });
+    api.importOpsSecretFromEnv.mockResolvedValue({ slot: 'openai_api_key', status: 'configured', source: 'cms', version: 2,
+      last4: 'BBBB', registered_at: null });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    expect(await screen.findByTestId('ops-secret-backend')).toHaveTextContent('保管先: 暫定(DB に暗号化)');
+    const a = screen.getByTestId('ops-secret-openai_api_key');
+    expect(within(a).getByText('無効化済み(送らない)')).toBeInTheDocument();
+    expect(screen.queryByText('鍵あり')).toBeNull();
+    expect(within(screen.getByTestId('ops-secret-google_maps_server_key')).getByText('サンプル値(使えない)')).toBeInTheDocument();
+    expect(screen.getByTestId('ops-secret-legacy-google_maps_server_key')).toHaveTextContent('サンプル値');
+    expect(within(screen.getByTestId('ops-secret-google_maps_server_key'))
+      .queryByRole('button', { name: '旧 .env から取り込む' })).toBeNull();
+    fireEvent.click(within(a).getByRole('button', { name: '旧 .env から取り込む' }));
+    const go = within(a).getByRole('button', { name: '取り込んで暗号化して保存' });
+    expect(go).toBeDisabled();
+    fireEvent.change(within(a).getByLabelText('理由(監査に残ります)'), { target: { value: '移行' } });
+    fireEvent.click(go);
+    await waitFor(() => expect(api.importOpsSecretFromEnv).toHaveBeenCalledWith('openai_api_key', '移行'));
+  });
+
+  it('秘密情報: 保管先が未設定なら「未接続(送らない)」と出す', async () => {
+    api.getOpsSecrets.mockResolvedValue({ as_of: 'x', note: 'n', backend: 'unset', backend_note: '未設定です。送りません', slots: [] });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    expect(await screen.findByTestId('ops-secret-backend')).toHaveTextContent('保管先: 未接続(送らない)');
+  });
+
   it('秘密情報: 鍵は password の欄で送り、保存の後は欄を空にして値を出さない。理由が無ければ送れない', async () => {
     const slots = {
       as_of: 'x', note: '鍵の値は出しません',
@@ -125,6 +163,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(screen.getByTestId('ops-secret-use-openai_api_key')).toHaveTextContent('まだこの鍵を使いません');
     expect(screen.getByTestId('ops-secret-storage')).toHaveTextContent('GCP Secret Manager には登録しません');
     expect(screen.getByText('アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)')).toBeInTheDocument();
+    expect(screen.queryByText(/→ \.env/)).toBeNull(); // .env へ戻る順を書かない
     fireEvent.click(within(row).getByRole('button', { name: '鍵を登録する' }));
     const input = within(row).getByTestId('secret-openai_api_key-value') as HTMLInputElement;
     expect(input.type).toBe('password');
