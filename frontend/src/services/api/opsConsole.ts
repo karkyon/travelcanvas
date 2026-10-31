@@ -22,7 +22,12 @@ export interface OpsOverview {
   cloud_billing: { status: string; message: string };
   free_usage?: OpsFreeUsage;
 }
-export type OpsSecretState = 'configured' | 'missing' | 'not_defined' | 'not_needed';
+export type OpsSecretState = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed' | 'backend_unavailable'
+  | 'not_defined' | 'not_needed';
+export type OpsSecretKeyStatus = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed'
+  | 'backend_unavailable';
+export const OPS_SECRET_STATES: OpsSecretState[] = ['configured', 'missing', 'disabled', 'placeholder', 'invalid',
+  'decrypt_failed', 'backend_unavailable', 'not_defined', 'not_needed'];
 export interface OpsProvider {
   name: string; label: string; purpose: string; operations: string[]; kind: 'fake' | 'paid';
   registered: boolean; suspended: boolean; suspended_reason: string | null;
@@ -77,7 +82,8 @@ const overview: Decoder<OpsOverview> = object<OpsOverview>({
 const provider: Decoder<OpsProvider> = object<OpsProvider>({
   name: str, label: str, purpose: str, operations: arrayOf(str), kind: oneOf('fake', 'paid'), registered: bool,
   suspended: bool, suspended_reason: nullable(str), contract: oneOf('not_billable', 'unverified'),
-  secret: oneOf('configured', 'missing', 'not_defined', 'not_needed'), secret_setting: nullable(str),
+  // backend の provider_secrets.state が返す全ての状態(登録済み・無効化・サンプル値・形の誤り・復号不能・保管先が未接続)
+  secret: oneOf(...OPS_SECRET_STATES), secret_setting: nullable(str),
   price_profile: oneOf('known', 'partial', 'unavailable'), policy_version: nullable(str),
   live_calls: oneOf('test_only', 'ready', 'disabled'), month_usage: nullable(total), notes: str,
   secret_slot: optional(nullable(str)), secret_source: optional(nullable(oneOf('cms', 'env'))),
@@ -152,15 +158,21 @@ export interface OpsSecretHistory {
 }
 export interface OpsSecretSlot {
   slot: string; label: string; providers: string[]; env: string; hint: string;
-  status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
+  status: OpsSecretKeyStatus; source: 'cms' | 'env' | null; version: number | null; last4: string | null;
   registered_at: string | null; history: OpsSecretHistory[]; in_use?: boolean; in_use_note?: string;
+  env_legacy?: OpsSecretEnvLegacy;
 }
+/** 旧 .env に値があるか(値は受け取らない)。取得元ではなく、明示の取り込みの判断だけに使う */
+export interface OpsSecretEnvLegacy { present: boolean; placeholder: boolean; importable: boolean }
 export interface OpsSecretStorage {
   location: string; not_secret_manager: string; backup: string; rotation: string; fallback: string;
 }
-export interface OpsSecrets { as_of: string; slots: OpsSecretSlot[]; note: string; storage?: OpsSecretStorage }
+export interface OpsSecrets {
+  as_of: string; slots: OpsSecretSlot[]; note: string; storage?: OpsSecretStorage;
+  backend?: string; backend_note?: string;
+}
 export interface OpsSecretResult {
-  slot: string; status: 'configured' | 'missing'; source: 'cms' | 'env' | null; version: number | null;
+  slot: string; status: OpsSecretKeyStatus; source: 'cms' | 'env' | null; version: number | null;
   last4: string | null; registered_at: string | null;
 }
 
@@ -169,18 +181,22 @@ const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
   created_at: nullable(str), disabled_at: nullable(str),
 });
 const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
-  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing'),
+  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',
+    'backend_unavailable'),
   source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
   history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
+  env_legacy: optional(object<OpsSecretEnvLegacy>({ present: bool, placeholder: bool, importable: bool })),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
-  slot: str, status: oneOf('configured', 'missing'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
+  slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',
+    'backend_unavailable'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
   last4: nullable(str), registered_at: nullable(str),
 });
 
 export async function getOpsSecrets(): Promise<OpsSecrets> {
   const r = await api.get('/admin/ops/secrets', SILENT);
   return decodeResponse(r.data, object<OpsSecrets>({ as_of: str, slots: arrayOf(secretSlot), note: str,
+    backend: optional(str), backend_note: optional(str),
     storage: optional(object<OpsSecretStorage>({ location: str, not_secret_manager: str, backup: str, rotation: str,
       fallback: str })) }), 'GET /admin/ops/secrets');
 }
@@ -189,6 +205,12 @@ export async function getOpsSecrets(): Promise<OpsSecrets> {
 export async function registerOpsSecret(slot: string, value: string, reason: string): Promise<OpsSecretResult> {
   const r = await api.post(`/admin/ops/secrets/${encodeURIComponent(slot)}`, { value, reason }, SILENT);
   return decodeResponse(r.data, secretResult, 'POST /admin/ops/secrets/{slot}');
+}
+
+/** 旧 .env の値を新しい版として取り込む(明示操作)。値は送らず・受け取らない。 */
+export async function importOpsSecretFromEnv(slot: string, reason: string): Promise<OpsSecretResult> {
+  const r = await api.post(`/admin/ops/secrets/${encodeURIComponent(slot)}/import-env`, { reason }, SILENT);
+  return decodeResponse(r.data, secretResult, 'POST /admin/ops/secrets/{slot}/import-env');
 }
 
 export async function disableOpsSecret(slot: string, reason: string): Promise<OpsSecretResult> {

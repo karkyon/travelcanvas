@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
 import {
-  disableOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
+  disableOpsSecret, importOpsSecretFromEnv, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
   runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier,
   type OpsTier, type OpsTiers, type OpsTestTierResult,
   type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
@@ -45,7 +45,12 @@ const StatePill: React.FC<{ state: string }> = ({ state }) => {
 };
 
 const SECRET_LABEL: Record<string, { text: string; tone: string }> = {
-  configured: { text: '鍵あり(値は表示しない)', tone: 'tc-pill--blue' },
+  configured: { text: '登録済み・提供元の認証は未確認(値は表示しない)', tone: 'tc-pill--blue' },
+  disabled: { text: '無効化済み(送らない)', tone: 'tc-pill--warn' },
+  placeholder: { text: 'サンプル値(使えない)', tone: 'tc-pill--bad' },
+  invalid: { text: '形が正しくない(使えない)', tone: 'tc-pill--bad' },
+  decrypt_failed: { text: '復号できない(使えない)', tone: 'tc-pill--bad' },
+  backend_unavailable: { text: '保管先が未接続(送らない)', tone: 'tc-pill--bad' },
   missing: { text: '未設定', tone: 'tc-pill--warn' },
   not_defined: { text: 'コードに設定の項目なし', tone: '' },
   not_needed: { text: '不要', tone: '' },
@@ -498,7 +503,7 @@ const RunsTab: React.FC = () => {
 const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void }> = ({ slot, onDone }) => {
   const [value, setValue] = useState('');
   const [reason, setReason] = useState('');
-  const [mode, setMode] = useState<'register' | 'disable' | null>(null);
+  const [mode, setMode] = useState<'register' | 'disable' | 'import' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = `secret-${slot.slot}`;
@@ -509,6 +514,9 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
       if (mode === 'register') {
         const st = await registerOpsSecret(slot.slot, value, reason.trim());
         onDone(`${slot.label} を登録しました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})`);
+      } else if (mode === 'import') {
+        const st = await importOpsSecretFromEnv(slot.slot, reason.trim());
+        onDone(`${slot.label} を旧 .env から取り込みました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})`);
       } else {
         await disableOpsSecret(slot.slot, reason.trim());
         onDone(`${slot.label} の登録を無効にしました`);
@@ -532,12 +540,16 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
         {slot.source === 'cms' && (
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('disable')}>登録を無効にする</button>
         )}
+        {slot.env_legacy?.importable && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('import')}>旧 .env から取り込む</button>
+        )}
       </div>
     );
   }
   return (
     <form className="tc-ops-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}
-      aria-label={`${slot.label} を${mode === 'register' ? '登録' : '無効に'}する`} autoComplete="off">
+      aria-label={`${slot.label} を${mode === 'register' ? '登録' : mode === 'import' ? '旧 .env から取り込み' : '無効に'}する`}
+      autoComplete="off">
       {mode === 'register' && (
         <>
           <label htmlFor={`${id}-value`}>{`${slot.label}(貼り付け。保存の後は表示しません)`}</label>
@@ -551,7 +563,7 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
       <div className="flex gap-2">
         <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary"
           disabled={busy || !reason.trim() || (mode === 'register' && value.trim().length < 8)}>
-          {mode === 'register' ? '暗号化して保存' : '無効にする'}
+          {mode === 'register' ? '暗号化して保存' : mode === 'import' ? '取り込んで暗号化して保存' : '無効にする'}
         </button>
         <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => { setValue(''); setReason(''); setMode(null); setError(null); }}>やめる</button>
       </div>
@@ -559,7 +571,17 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
   );
 };
 
-const SOURCE_LABEL: Record<string, string> = { cms: 'この画面で登録', env: 'サーバーの .env' };
+const SOURCE_LABEL: Record<string, string> = { cms: 'この画面で登録' };
+const SecretPill: React.FC<{ status: string }> = ({ status }) => {
+  const s = SECRET_LABEL[status] ?? { text: status, tone: '' };
+  return <span className={`tc-pill ${s.tone}`} data-testid="ops-secret-status">{s.text}</span>;
+};
+const legacyNote = (l: OpsSecrets['slots'][number]['env_legacy']): string | null => {
+  if (!l?.present) return null;
+  if (l.placeholder) return '旧 .env にサンプル値(CHANGE_ME など)が残っています。使いません。本物の鍵を登録してください';
+  return l.importable ? '旧 .env に値があります(取得元ではありません。使う時は「旧 .env から取り込む」)'
+    : '旧 .env の値は形が正しくないため使えません';
+};
 
 const SecretsTab: React.FC = () => {
   const { data, error, loading, reload } = useLoad<OpsSecrets>(getOpsSecrets);
@@ -571,15 +593,20 @@ const SecretsTab: React.FC = () => {
       <article className="tc-card tc-ops-panel">
         <h2 className="tc-section-title">API キーの登録</h2>
         <p className="tc-ops-desc">{data.note}</p>
+        {data.backend_note && (
+          <p className={`tc-ops-callout${data.backend === 'db_encrypted' ? '' : ' tc-ops-callout--bad'}`}
+            data-testid="ops-secret-backend">
+            <b>{data.backend === 'db_encrypted' ? '保管先: 暫定(DB に暗号化)' : '保管先: 未接続(送らない)'}</b>
+            {` ${data.backend_note}`}
+          </p>
+        )}
         {msg && <p role="status" className="tc-ops-callout">{msg}</p>}
         <ul className="tc-ops-secrets">
           {data.slots.map((s) => (
             <li key={s.slot} data-testid={`ops-secret-${s.slot}`}>
               <div className="tc-section-row">
                 <span><b>{s.label}</b><small>{s.hint}</small><small>{`使う提供元: ${s.providers.join('・')} · .env の名前: ${s.env}`}</small></span>
-                <span className={`tc-pill ${s.status === 'configured' ? 'tc-pill--blue' : 'tc-pill--warn'}`}>
-                  {s.status === 'configured' ? '鍵あり' : '未設定'}
-                </span>
+                <SecretPill status={s.status} />
               </div>
               {s.status === 'configured' && (
                 <p className="tc-ops-desc">
@@ -588,6 +615,9 @@ const SecretsTab: React.FC = () => {
                 </p>
               )}
               {s.in_use_note && <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>}
+              {legacyNote(s.env_legacy) && (
+                <p className="tc-ops-desc" data-testid={`ops-secret-legacy-${s.slot}`}>{legacyNote(s.env_legacy)}</p>
+              )}
               <SecretForm slot={s} onDone={(m) => { setMsg(m); void reload(); }} />
               {s.history.length > 0 && (
                 <details className="mt-2 text-xs text-ink-700">
@@ -610,7 +640,7 @@ const SecretsTab: React.FC = () => {
           <li><span>この画面</span><b>管理者 + 多要素認証</b></li>
           <li><span>鍵の登録・無効化</span><b>理由が必須 · 監査に記録(値は記録しない)</b></li>
           <li><span>保存先</span><b>{data.storage?.location ?? 'アプリの DB(ENCRYPTION_KEY で暗号化)'}</b></li>
-          <li><span>使う順</span><b>この画面で登録した有効な版 → .env</b></li>
+          <li><span>取得元</span><b>この画面で登録した有効な版だけ(.env へは戻らない)</b></li>
           <li><span>鍵の入れ替え</span><b>新しい版を登録 → 前の版は自動で入れ替え済み</b></li>
           <li><span>提供元を止める・戻す・試験</span><b>理由が必須 · 監査に記録</b></li>
         </ul>

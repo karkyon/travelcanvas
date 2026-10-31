@@ -212,6 +212,9 @@ class Settings(BaseSettings):
     # ため、未設定時はQuickDraft関連呼び出し時にのみ明確なエラーを返す設計
     # とする(backend/app/core/crypto.py参照)。
     ENCRYPTION_KEY: Optional[str] = None
+    # 外部 API 鍵の保管先(非秘密・**明示選択**。未設定は「選ばれていない」で、鍵の取得も送信もしない。
+    # 自動探索・障害時の切替もしない)。db_encrypted は開発・LAN 受入だけの暫定、最終は gcp_secret_manager
+    SECRET_BACKEND: str = ""
     # [Gate G1] SEC-F1 前の鍵(カンマ区切り)。復号だけに使う。鍵を替える時は、今の ENCRYPTION_KEY をここへ移し、
     # 新しい鍵を ENCRYPTION_KEY に入れて `tcops.py keys rekey` で掛け直す。全件が今の鍵になったら外す(失効)。
     # 手順は docs/ops/KEY-INVENTORY.md・Runbook §8.2。

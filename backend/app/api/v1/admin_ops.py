@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.admin import require_admin
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.models import AuditLog
 from app.models.models import (
     Entitlement, ProviderUsageEvent, ProviderUsageReservation, TravelPlan, UsageBudgetAccount, User, UserType,
 )
@@ -56,7 +57,6 @@ ADAPTERS_IMPLEMENTED: frozenset = frozenset()
 # 鍵の保存先(画面に出す言葉)。運用コンソールで登録した鍵はアプリの DB に入る(GCP Secret Manager ではない)
 SECRET_STORAGE = {
     "cms": "アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)",
-    "env": "サーバーの環境変数(.env)",
 }
 
 # 提供元の一覧(用途と、使う鍵の設定の名前)。鍵の値は読まない・返さない(設定の有無だけ)
@@ -103,6 +103,20 @@ def _audit(request: Request, admin: User, action: str, details: Dict[str, Any]) 
     record_audit_event(action=action, resource_type="ops_console", user_id=admin.id, resource_id=admin.id,
                        ip_address=request.client.host if request.client else None,
                        user_agent=request.headers.get("user-agent", "")[:255], details=details)
+
+
+def _audit_in_tx(request: Request, admin: User, action: str, base: Dict[str, Any]):
+    """鍵の変更と同じ transaction で監査を書く hook(監査が書けなければ鍵も変えない)。"""
+    def hook(db: Session, row: Any) -> None:
+        db.add(AuditLog(id=uuid.uuid4(), user_id=admin.id, action=action, resource_type="ops_console",
+                        resource_id=admin.id, ip_address=request.client.host if request.client else None,
+                        user_agent=request.headers.get("user-agent", "")[:255],
+                        details={**base, "version": row.version}))
+    return hook
+
+
+_SECRET_ERROR_STATUS = {"secret_backend_unavailable": 503, "secret_encryption_unavailable": 503,
+                        "audit_unavailable": 503, "secret_conflict": 409}
 
 
 def _reason(payload: Any) -> str:
@@ -236,6 +250,8 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
             "secret_last4": secret_info["last4"] if secret_info else None,
             "secret_storage": (SECRET_STORAGE.get(secret_info["source"])
                                if secret_info and secret_info["source"] else None),
+            "secret_format": secret_info["format"] if secret_info else None,
+            "secret_provider_auth": secret_info["provider_auth"] if secret_info else None,
             "adapter": adapter,
             "price_profile": price_state, "policy_version": price["policy_version"],
             "live_calls": "test_only" if is_fake else ("ready" if live_ready else "disabled"),
@@ -526,7 +542,7 @@ def ops_test_tier(request: Request, payload: Dict[str, Any] = Body(...), admin: 
 
 @router.get("/secrets")
 def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """鍵の状態(値は返さない)。出典は cms(この画面で登録)か env(.env)。"""
+    """鍵の状態(値は返さない)。取得元は cms(この画面で登録した有効な版)だけ。.env は移行の検出だけ(env_legacy)。"""
     slots = []
     for slot, spec in ps.SLOTS.items():
         used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
@@ -536,16 +552,23 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
                       "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
                       else "アプリはまだこの鍵を使いません(提供元の接続 adapter が未実装。外へは送りません)"})
     return {"as_of": _iso(_now()), "slots": slots,
-            "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。使う順: この画面で登録した有効な版 → .env の値",
+            "backend": ps.backend(),
+            "backend_note": ("暫定: ENCRYPTION_KEY で暗号化して DB に保管しています。最終の正本は GCP Secret Manager で、"
+                             "実行ID・最小権限・版の固定が整うまでは「高セキュリティ移行完了」ではありません。"
+                             "有料の提供元へは adapter が未接続のため、鍵を登録しても送信しません"
+                             if ps.backend() == "db_encrypted" else
+                             "保管先(SECRET_BACKEND)が未設定・未接続・不正です。鍵は取得せず、どの提供元へも送りません"
+                             "(DB・.env へは自動で切り替えません)"),
+            "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。取得元はこの画面で登録した有効な版だけです(.env へは戻りません)。「登録済み」は提供元が鍵を認めたという意味ではありません",
             "storage": {
                 "location": SECRET_STORAGE["cms"],
-                "not_secret_manager": "GCP Secret Manager には登録しません。Secret Manager の鍵は Cloud Run の環境変数として"
-                                      "読み込む別の経路です(この画面からは見えません)",
+                "not_secret_manager": "GCP Secret Manager には登録しません(Secret Manager への接続は未実装の別 Gate。"
+                                      "接続後も環境変数を経由しない)",
                 "backup": "DB のバックアップには暗号文が入ります。ENCRYPTION_KEY を失うと復号できないため、ENCRYPTION_KEY は"
                           "DB と別の場所に保管します",
                 "rotation": "ENCRYPTION_KEY の入れ替えは tcops の鍵の掛け直し(暗号化した全ての *_ciphertext 列)が"
                             "provider_secrets も対象にします",
-                "fallback": "無効にすると .env の値へ戻ります(.env にも無ければ未設定)",
+                "fallback": "無効にしても .env の値へは戻りません(無効化は保持され、その提供元へは送りません)。旧 .env の鍵を使う時は「旧 .env から取り込む」を明示操作します",
             }}
 
 
@@ -556,11 +579,26 @@ def ops_register_secret(slot: str, request: Request, payload: Dict[str, Any] = B
         raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
     reason = _reason(payload)
     try:
-        row = ps.register(db, slot, payload.get("value") if isinstance(payload, dict) else None, reason, admin.id)
+        ps.register(db, slot, payload.get("value") if isinstance(payload, dict) else None, reason, admin.id,
+                    _audit_in_tx(request, admin, "ops_secret_registered", {"slot": slot, "reason": reason[:200]}))
     except ps.SecretError as error:
-        status_code = 503 if error.code == "secret_encryption_unavailable" else 422
-        raise _bad(error.code, error.message, status_code)
-    _audit(request, admin, "ops_secret_registered", {"slot": slot, "version": row.version, "reason": reason[:200]})
+        raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
+    return {"slot": slot, **ps.state(db, slot)}
+
+
+@router.post("/secrets/{slot}/import-env", status_code=201)
+def ops_import_env_secret(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                          admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """旧 .env の値を新しい版として取り込む(明示操作)。サンプル値は拒否。.env の値は消さず、応答に出さない。"""
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    try:
+        ps.import_from_env(db, slot, reason, admin.id,
+                           _audit_in_tx(request, admin, "ops_secret_imported_from_env",
+                                        {"slot": slot, "reason": reason[:200]}))
+    except ps.SecretError as error:
+        raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
     return {"slot": slot, **ps.state(db, slot)}
 
 
@@ -570,8 +608,11 @@ def ops_disable_secret(slot: str, request: Request, payload: Dict[str, Any] = Bo
     if slot not in ps.SLOTS:
         raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
     reason = _reason(payload)
-    row = ps.disable(db, slot, admin.id)
+    try:
+        row = ps.disable(db, slot, admin.id,
+                         _audit_in_tx(request, admin, "ops_secret_disabled", {"slot": slot, "reason": reason[:200]}))
+    except ps.SecretError as error:
+        raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
     if row is None:
         raise _bad("secret_not_registered", "この画面で登録した有効な鍵はありません", 409)
-    _audit(request, admin, "ops_secret_disabled", {"slot": slot, "version": row.version, "reason": reason[:200]})
     return {"slot": slot, **ps.state(db, slot)}
