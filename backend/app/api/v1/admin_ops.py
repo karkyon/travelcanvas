@@ -115,7 +115,8 @@ def _audit_in_tx(request: Request, admin: User, action: str, base: Dict[str, Any
     return hook
 
 
-_SECRET_ERROR_STATUS = {"secret_encryption_unavailable": 503, "audit_unavailable": 503, "secret_conflict": 409}
+_SECRET_ERROR_STATUS = {"secret_backend_unavailable": 503, "secret_encryption_unavailable": 503,
+                        "audit_unavailable": 503, "secret_conflict": 409}
 
 
 def _reason(payload: Any) -> str:
@@ -551,6 +552,13 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
                       "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
                       else "アプリはまだこの鍵を使いません(提供元の接続 adapter が未実装。外へは送りません)"})
     return {"as_of": _iso(_now()), "slots": slots,
+            "backend": ps.backend(),
+            "backend_note": ("暫定: ENCRYPTION_KEY で暗号化して DB に保管しています。最終の正本は GCP Secret Manager で、"
+                             "実行ID・最小権限・版の固定が整うまでは「高セキュリティ移行完了」ではありません。"
+                             "有料の提供元へは adapter が未接続のため、鍵を登録しても送信しません"
+                             if ps.backend() == "db_encrypted" else
+                             "保管先(SECRET_BACKEND)が未設定・未接続・不正です。鍵は取得せず、どの提供元へも送りません"
+                             "(DB・.env へは自動で切り替えません)"),
             "note": "鍵の値は画面・応答・ログ・監査に出しません(末尾4文字と版だけ)。取得元はこの画面で登録した有効な版だけです(.env へは戻りません)。「登録済み」は提供元が鍵を認めたという意味ではありません",
             "storage": {
                 "location": SECRET_STORAGE["cms"],

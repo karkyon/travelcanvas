@@ -50,6 +50,7 @@ const SECRET_LABEL: Record<string, { text: string; tone: string }> = {
   placeholder: { text: 'サンプル値(使えない)', tone: 'tc-pill--bad' },
   invalid: { text: '形が正しくない(使えない)', tone: 'tc-pill--bad' },
   decrypt_failed: { text: '復号できない(使えない)', tone: 'tc-pill--bad' },
+  backend_unavailable: { text: '保管先が未接続(送らない)', tone: 'tc-pill--bad' },
   missing: { text: '未設定', tone: 'tc-pill--warn' },
   not_defined: { text: 'コードに設定の項目なし', tone: '' },
   not_needed: { text: '不要', tone: '' },

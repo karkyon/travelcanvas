@@ -200,8 +200,9 @@ def test_no_code_outside_provider_secrets_reads_provider_key_settings():
 
 
 def test_frontend_has_no_static_google_maps_key_path():
+    needle = "VITE_GOOGLE_MAPS_API_KEY"
     hits = [str(p.relative_to(_REPO)) for p in (_REPO / "frontend" / "src").rglob("*")
-            if p.is_file() and p.suffix in (".ts", ".tsx") and "VITE_GOOGLE_MAPS_API_KEY" in p.read_text(encoding="utf-8")]
+            if p.is_file() and p.suffix in (".ts", ".tsx") and needle in p.read_text(encoding="utf-8")]
     assert hits == [], hits
     for name in (".env.example", "docker-compose.yml"):
         assert "VITE_GOOGLE_MAPS_API_KEY" not in (_REPO / name).read_text(encoding="utf-8")
@@ -211,3 +212,113 @@ def test_env_example_has_no_active_provider_key_lines():
     text = (_REPO / ".env.example").read_text(encoding="utf-8")
     for name in ("OPENAI_API_KEY", "GOOGLE_PLACES_API_KEY", "GOOGLE_MAPS_API_KEY", "WEATHER_API_KEY"):
         assert not re.search(rf"^{name}=", text, re.M), name
+
+
+@pytest.mark.parametrize("mode", ["", "gcp_secret_manager", "typo-mode", "ENV"])
+def test_unconnected_or_invalid_backend_fails_closed_without_switching(db_session, monkeypatch, admin_user_id, mode):
+    ps.register(db_session, SLOT, REAL_A, "登録", admin_user_id)  # 既定(db_encrypted)で登録済みでも
+    monkeypatch.setattr(settings, "SECRET_BACKEND", mode)
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", REAL_B)
+    assert ps.backend_ready() is False
+    with pytest.raises(ps.SecretUnavailable) as exc:
+        ps.resolve(db_session, SLOT)
+    assert exc.value.code == "secret_backend_unavailable"  # DB の鍵にも .env にも黙って切り替えない
+    st = ps.state(db_session, SLOT)
+    assert st["status"] == "backend_unavailable" and st["last4"] is None and REAL_A not in str(st)
+    for call in (lambda: ps.register(db_session, SLOT, REAL_B, "x", admin_user_id),
+                 lambda: ps.import_from_env(db_session, SLOT, "x", admin_user_id),
+                 lambda: ps.disable(db_session, SLOT, admin_user_id)):
+        with pytest.raises(ps.SecretError) as err:
+            call()
+        assert err.value.code == "secret_backend_unavailable"
+
+
+def test_app_has_no_default_backend_and_db_encrypted_must_be_chosen(monkeypatch):
+    from app.core.config import Settings
+    assert Settings.model_fields["SECRET_BACKEND"].default == ""  # アプリ側の既定は「選ばれていない」
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "")
+    assert ps.backend() == "unset" and ps.backend_ready() is False
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "db_encrypted")
+    assert ps.backend_ready() is True
+
+
+def test_db_encrypted_is_reported_as_interim_in_the_console(admin_client, monkeypatch):
+    client, _ = admin_client
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "db_encrypted")
+    assert ps.backend_ready() is True
+    body = client.get("/api/v1/admin/ops/secrets").json()
+    assert body["backend"] == "db_encrypted" and "暫定" in body["backend_note"]
+    assert "送信しません" in body["backend_note"]
+    assert "移行完了" in body["backend_note"]  # 暫定のまま「完了」と言わないことを明記している
+
+
+def test_backend_unavailable_is_503_in_the_api(admin_client, monkeypatch):
+    client, _ = admin_client
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "gcp_secret_manager")
+    r = client.post(f"/api/v1/admin/ops/secrets/{SLOT}", json={"value": REAL_A, "reason": "x"})
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "secret_backend_unavailable"
+    body = client.get("/api/v1/admin/ops/secrets").json()
+    assert body["backend"] == "gcp_secret_manager" and body["slots"][0]["status"] == "backend_unavailable"
+
+
+def test_secret_values_never_appear_in_responses_audit_or_logs(admin_client, db_session, caplog, monkeypatch):
+    import logging
+    caplog.set_level(logging.DEBUG)
+    client, _ = admin_client
+    registered, from_env = "sk-proj-LEAKCHECK-9f8e7d6c5b4a", "sk-proj-ENVLEAK-1a2b3c4d5e6f"
+    url = f"/api/v1/admin/ops/secrets/{SLOT}"
+    seen = [client.post(url, json={"value": registered, "reason": "登録"}).text,
+            client.post(url, json={"value": "CHANGE_ME_LEAK_CHECK", "reason": "拒否される"}).text]
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", from_env)
+    seen.append(client.post(f"{url}/import-env", json={"reason": "移行"}).text)
+    seen += [client.get("/api/v1/admin/ops/secrets").text, client.get("/api/v1/admin/ops/providers").text,
+             client.post(f"{url}/disable", json={"reason": "停止"}).text,
+             client.get("/api/v1/admin/ops/secrets").text]
+    audits = str([(a.action, a.details) for a in db_session.query(AuditLog).filter_by(resource_type="ops_console")])
+    haystack = "\n".join(seen) + audits + caplog.text
+    for value in (registered, from_env, "CHANGE_ME_LEAK_CHECK"):
+        assert value not in haystack, "秘密値・入力値が応答・監査・ログに出ている"
+    assert "ops_secret_disabled" in audits and "ops_secret_imported_from_env" in audits
+
+
+def test_concurrent_registration_leaves_exactly_one_active_version():
+    """実トランザクション(別々の接続)で同時に登録しても、有効な版は1つ・版の番号は重複せず、500 にならない。"""
+    import threading
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+    from app.core.database import engine
+
+    slot = "google_maps_browser_key"
+    maker = sessionmaker(bind=engine)
+    barrier, outcomes = threading.Barrier(2), []
+
+    def clean():
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM provider_secrets WHERE slot = :s"), {"s": slot})
+
+    def work(value):
+        db = maker()
+        try:
+            barrier.wait(timeout=15)
+            try:
+                ps.register(db, slot, value, "同時登録", None)
+                outcomes.append("ok")
+            except ps.SecretError as error:
+                outcomes.append(error.code)
+        finally:
+            db.close()
+
+    clean()
+    try:
+        values = ("AIza-concurrent-AAAA1111", "AIza-concurrent-BBBB2222")
+        threads = [threading.Thread(target=work, args=(v,)) for v in values]
+        [t.start() for t in threads]
+        [t.join(timeout=30) for t in threads]
+        assert len(outcomes) == 2 and "ok" in outcomes and set(outcomes) <= {"ok", "secret_conflict"}, outcomes
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT version, status FROM provider_secrets WHERE slot = :s ORDER BY version"),
+                                {"s": slot}).all()
+        assert sum(1 for _, status in rows if status == "active") == 1, rows
+        assert len({version for version, _ in rows}) == len(rows), rows
+    finally:
+        clean()

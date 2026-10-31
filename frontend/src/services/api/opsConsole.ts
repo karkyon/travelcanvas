@@ -22,9 +22,10 @@ export interface OpsOverview {
   cloud_billing: { status: string; message: string };
   free_usage?: OpsFreeUsage;
 }
-export type OpsSecretState = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed'
+export type OpsSecretState = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed' | 'backend_unavailable'
   | 'not_defined' | 'not_needed';
-export type OpsSecretKeyStatus = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed';
+export type OpsSecretKeyStatus = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed'
+  | 'backend_unavailable';
 export interface OpsProvider {
   name: string; label: string; purpose: string; operations: string[]; kind: 'fake' | 'paid';
   registered: boolean; suspended: boolean; suspended_reason: string | null;
@@ -171,12 +172,14 @@ const secretHistory: Decoder<OpsSecretHistory> = object<OpsSecretHistory>({
   created_at: nullable(str), disabled_at: nullable(str),
 });
 const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
-  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed'),
+  slot: str, label: str, providers: arrayOf(str), env: str, hint: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',
+    'backend_unavailable'),
   source: nullable(oneOf('cms', 'env')), version: nullable(int), last4: nullable(str), registered_at: nullable(str),
   history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
-  slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
+  slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',
+    'backend_unavailable'), source: nullable(oneOf('cms', 'env')), version: nullable(int),
   last4: nullable(str), registered_at: nullable(str),
 });
 

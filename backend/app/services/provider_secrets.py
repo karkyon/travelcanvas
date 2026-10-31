@@ -38,6 +38,10 @@ SLOTS: Dict[str, Dict[str, Any]] = {
 }
 MIN_LEN, MAX_LEN = 8, 512
 
+# 保管先。db_encrypted は暫定(ENCRYPTION_KEY で暗号化した provider_secrets 表)。最終の正本は gcp_secret_manager だが、
+# 実行ID・最小IAM・版の固定・復旧が整うまで未接続(選ばれたら鍵を取得せず fail closed。db_encrypted へ黙って戻らない)
+BACKENDS = ("db_encrypted", "gcp_secret_manager")
+
 # 全体がこの値(大文字・- は _ に正規化)ならサンプル。本物の鍵に偶然含まれる部分文字列では拒否しない
 _PLACEHOLDER_EXACT = frozenset({
     "PLACEHOLDER", "EXAMPLE", "SAMPLE", "DUMMY", "TODO", "TBD", "NONE", "NULL", "NIL", "UNDEFINED", "EMPTY",
@@ -50,6 +54,18 @@ _PLACEHOLDER_PATTERNS = (re.compile(r"^X{4,}$"), re.compile(r"^\*{3,}$"), re.com
                          re.compile(r"^<.*>$"), re.compile(r"^\$\{.*\}$"), re.compile(r"^\{\{.*\}\}$"))
 
 
+def backend() -> str:
+    """設定で明示された保管先。未設定は unset、知らない値は invalid(どちらも使えない扱い)。自動で別の保管先へ切り替えない。"""
+    value = (getattr(settings, "SECRET_BACKEND", None) or "").strip().lower()
+    if not value:
+        return "unset"  # 明示されていない。既定の保管先は無い(DB へも自動で選ばない)
+    return value if value in BACKENDS else "invalid"
+
+
+def backend_ready() -> bool:
+    return backend() == "db_encrypted"
+
+
 class SecretError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -59,7 +75,7 @@ class SecretError(ValueError):
 
 class SecretUnavailable(RuntimeError):
     """送信に使える鍵が無い。code は secret_missing / secret_disabled / secret_decrypt_failed /
-    secret_placeholder / secret_invalid。呼び出し側は送らない(.env など別の取得元へ戻らない)。"""
+    secret_placeholder / secret_invalid / secret_backend_unavailable。呼び出し側は送らない(.env など別の取得元へ戻らない)。"""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -107,6 +123,10 @@ def legacy_env_info(slot: str) -> Dict[str, Any]:
     return {"present": True, "placeholder": fmt == "placeholder", "importable": fmt == "acceptable"}
 
 
+def _iso(moment: Optional[datetime]) -> Optional[str]:
+    return moment.replace(microsecond=0).isoformat() if moment else None
+
+
 def _active(db: Session, slot: str) -> Optional[ProviderSecret]:
     return (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "active")
             .first())
@@ -136,6 +156,8 @@ def resolve(db: Session, slot: str) -> str:
     有効な登録版だけが取得元。無い・無効化済み・復号不能・サンプル値は SecretUnavailable(送らない)。"""
     if slot not in SLOTS:
         raise SecretUnavailable("secret_missing")
+    if not backend_ready():
+        raise SecretUnavailable("secret_backend_unavailable")
     row = _active(db, slot)
     if row is None:
         latest = _latest(db, slot)
@@ -149,16 +171,18 @@ def state(db: Session, slot: str) -> Dict[str, Any]:
     placeholder / invalid / decrypt_failed。configured は「提供元が認めた」ではない(provider_auth は unverified)。"""
     out: Dict[str, Any] = {"status": "missing", "source": None, "version": None, "last4": None, "registered_at": None,
                            "format": None, "retrieval": None, "provider_auth": "unverified",
-                           "env_legacy": legacy_env_info(slot)}
+                           "backend": backend(), "env_legacy": legacy_env_info(slot)}
+    if not backend_ready():
+        out["status"] = "backend_unavailable"  # 保管先が未接続・不正。鍵があるかは言わない(取得もしない)
+        return out
     row = _active(db, slot)
     if row is None:
         latest = _latest(db, slot)
         if latest is not None and latest.status == "disabled":
             out.update(status="disabled", version=latest.version, last4=latest.last4,
-                       registered_at=latest.created_at.replace(microsecond=0).isoformat() if latest.created_at else None)
+                       registered_at=_iso(latest.created_at))
         return out
-    out.update(source="cms", version=row.version, last4=row.last4,
-               registered_at=row.created_at.replace(microsecond=0).isoformat() if row.created_at else None)
+    out.update(source="cms", version=row.version, last4=row.last4, registered_at=_iso(row.created_at))
     try:
         _read_active(row)
         out.update(status="configured", format="acceptable", retrieval="readable")
@@ -202,6 +226,8 @@ def register(db: Session, slot: str, value: Any, reason: str, actor_id: uuid.UUI
     """新しい版を有効にし、前の有効な版を superseded にする。サンプル値・形が正しくない値は何も変えずに SecretError。"""
     if slot not in SLOTS:
         raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
+    if not backend_ready():
+        raise SecretError("secret_backend_unavailable", "鍵の保管先(SECRET_BACKEND)が未接続か不正なため、操作できません")
     if not isinstance(value, str):
         raise SecretError("invalid_secret_value", "鍵は文字列で入力してください")
     value = value.strip()
@@ -242,6 +268,8 @@ def import_from_env(db: Session, slot: str, reason: str, actor_id: uuid.UUID,
     サンプル値・形が正しくない値は register と同じ検査で拒否。.env の値は消さない・値を応答に出さない。"""
     if slot not in SLOTS:
         raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
+    if not backend_ready():
+        raise SecretError("secret_backend_unavailable", "鍵の保管先(SECRET_BACKEND)が未接続か不正なため、操作できません")
     raw = _legacy_env_raw(slot)
     if raw is None:
         raise SecretError("env_value_missing", "旧 .env に取り込める値がありません")
@@ -253,6 +281,8 @@ def disable(db: Session, slot: str, actor_id: uuid.UUID,
     """有効な版を無効にする。以後 resolve は SecretUnavailable(.env・古い版へは戻らない)。無ければ None。"""
     if slot not in SLOTS:
         raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
+    if not backend_ready():
+        raise SecretError("secret_backend_unavailable", "鍵の保管先(SECRET_BACKEND)が未接続か不正なため、操作できません")
     row = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "active")
            .with_for_update().first())
     if row is None:

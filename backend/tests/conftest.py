@@ -29,6 +29,7 @@ import tempfile as _tempfile  # noqa: E402
 for _name, _value in (
     ("CORS_ORIGINS", "http://localhost:4173,http://127.0.0.1:4173"),
     ("ENCRYPTION_KEY", "test-only-encryption-key-for-pytest-0123456789abcdef"),
+    ("SECRET_BACKEND", "db_encrypted"),  # 試験では暫定の保管先を明示する(アプリ側に既定は無い)
     ("LOOKUP_INDEX_KEY", "test-only-lookup-index-key-for-pytest-0123456789abcdef"),
     ("DOCUMENT_DOWNLOAD_SIGNING_KEY", "test-only-download-signing-key-for-pytest-0123456789"),
 ):
