@@ -4,7 +4,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }));
 vi.mock('./index', () => ({ api }));
 
-import { OPS_SECRET_STATES, getOpsProviders, getOpsSecrets, importOpsSecretFromEnv } from './opsConsole';
+import {
+  OPS_SECRET_STATES, activateOpsSecret, getOpsProviders, getOpsSecrets, importOpsSecretFromEnv, verifyOpsSecret,
+} from './opsConsole';
 
 const provider = (secret: string) => ({
   name: 'openai', label: 'OpenAI', purpose: 'p', operations: ['ai.generate'], kind: 'paid', registered: false,
@@ -43,5 +45,19 @@ describe('opsConsole decoder (Gate SecretPolicy)', () => {
       registered_at: null } });
     await importOpsSecretFromEnv('openai_api_key', '移行');
     expect(api.post).toHaveBeenCalledWith('/admin/ops/secrets/openai_api_key/import-env', { reason: '移行' }, expect.anything());
+  });
+
+  it('確認・有効化は版と理由だけを送る(鍵の値は送らない)', async () => {
+    api.post.mockResolvedValueOnce({ data: { slot: 's', version: 2, provider_auth: 'rejected', code: 'invalid_key',
+      results: [{ check: 'openai:ai.generate', code: 'invalid_key', label: 'キー無効' }], estimated_cost_jpy: '0.0300' } });
+    const out = await verifyOpsSecret('openai_api_key', 2, '確認');
+    expect(out.results[0]!.label).toBe('キー無効');
+    expect(api.post).toHaveBeenLastCalledWith('/admin/ops/secrets/openai_api_key/verify', { version: 2, reason: '確認' },
+      expect.anything());
+    api.post.mockResolvedValueOnce({ data: { slot: 's', status: 'configured', source: 'cms', version: 2, last4: 'BBBB',
+      registered_at: null, candidate: null } });
+    await activateOpsSecret('openai_api_key', 2, 1, '切替');
+    expect(api.post).toHaveBeenLastCalledWith('/admin/ops/secrets/openai_api_key/activate',
+      { version: 2, expected_active_version: 1, reason: '切替' }, expect.anything());
   });
 });

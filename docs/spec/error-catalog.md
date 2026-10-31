@@ -43,7 +43,7 @@
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
-| `candidate_not_found` | 409 | after_reload | この候補は今の旅程では選べません。もう一度候補を計算してください | api/v1/optimization.py |
+| `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py |
 | `candidate_unavailable` | 409 | no | この案は使えません | api/v1/replans.py |
 | `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `changed_since` | 409 | no | 訂正の後に値が変わっているため取り消せません(新しく訂正してください) | api/v1/corrections.py |
@@ -78,7 +78,8 @@
 | `entitlement_subject_not_found` | 404 | no | 対象の利用者が見つかりません | api/v1/planning_usage.py |
 | `event_locked` | — | — | 予定「%s」はロックされているため外せません | api/v1/decisions.py |
 | `event_missing` | — | — | 決定した予定が旅程から消えています | api/v1/decisions.py |
-| `event_not_found` | — | — | 指定した予定が見つかりません | api/v1/memories.py |
+| `event_not_found` | 404 | no | 指定した予定が見つかりません | api/v1/memories.py, api/v1/paid_actions.py |
+| `event_without_location` | 404 | no | 場所(座標)の無い予定の経路は調べられません(送っていません) | api/v1/paid_actions.py |
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
 | `expired` | 410 | no | この版は有効期限が切れています | api/v1/booklet.py |
@@ -92,9 +93,10 @@
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
 | `has_relations` | 409 | no | — | api/v1/sync.py |
-| `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py |
+| `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
 | `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
+| `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_branch_resources` | 422 | no | — | api/v1/branches.py |
 | `invalid_branch_selection` | 422 | no | 比べる分岐案を1〜…つ選んでください | api/v1/branches.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
@@ -105,6 +107,7 @@
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |
+| `invalid_input` | — | — | … を入力してください | api/v1/paid_actions.py |
 | `invalid_item` | 422 | no | 項目の形式が不正です | services/private_profile.py |
 | `invalid_items` | — | — | items は一覧で指定してください | services/private_profile.py |
 | `invalid_kind` | 422 | no | 記録の種類が不正です | api/v1/memories.py, services/private_profile.py |
@@ -174,6 +177,8 @@
 | `profile_unreadable` | 409 | no | 保存済みの内容を復号できないため変更できません | api/v1/private_profile.py |
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
 | `provider_disabled` | 404 | no | この画像の提供元は使えません(止めてあります) | api/v1/media_providers.py |
+| `provider_not_ready` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
+| `provider_rejected` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |

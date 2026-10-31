@@ -39,7 +39,9 @@ from app.models.models import (
 from app.services import cost_guard as cg
 from app.services import membership_tiers as mt
 from app.services import free_usage
+from app.services import provider_calls as pc
 from app.services import provider_secrets as ps
+from app.services import provider_verification as pv
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/admin/ops", tags=["admin-ops"])
@@ -50,9 +52,9 @@ USER_WARN_JPY = Decimal(40)
 OPS_ALERT_JPY = Decimal(45)
 HARD_CAP_JPY = Decimal(50)
 
-# [Gate OpsSecrets-Clarity] 有料の提供元へ実際に送るコード(adapter)が入っている提供元。今は無い。
-# 鍵・登録・価格が揃っても、ここに無い提供元は「送信: 無効」(fail closed)。adapter を入れる Gate でここへ足す
-ADAPTERS_IMPLEMENTED: frozenset = frozenset()
+# [Gate ProviderConnect] 有料の提供元へ実際に送るコード(adapter)が入っている提供元。実装の正本
+# (provider_calls.ADAPTERS)から作る(ここへ名前だけを足さない)。鍵の確認・登録・価格が揃うまでは「送信: 無効」
+ADAPTERS_IMPLEMENTED: frozenset = frozenset(pc.ADAPTERS)
 
 # 鍵の保存先(画面に出す言葉)。運用コンソールで登録した鍵はアプリの DB に入る(GCP Secret Manager ではない)
 SECRET_STORAGE = {
@@ -116,7 +118,8 @@ def _audit_in_tx(request: Request, admin: User, action: str, base: Dict[str, Any
 
 
 _SECRET_ERROR_STATUS = {"secret_backend_unavailable": 503, "secret_encryption_unavailable": 503,
-                        "audit_unavailable": 503, "secret_conflict": 409}
+                        "audit_unavailable": 503, "secret_conflict": 409, "candidate_not_found": 409,
+                        "candidate_not_verified": 409}
 
 
 def _reason(payload: Any) -> str:
@@ -204,7 +207,11 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
         "free_usage": {"providers": {k: {"requests": v["requests"], "events": v["events"]} for k, v in free.items()},
                        "requests": sum(v["requests"] for v in free.values()),
                        "label": "無料の provider(OpenStreetMap・Wikipedia・Wikimedia・oEmbed)へ送った回数。0円で、50円の枠には入れない"},
-        "connected_paid_providers": sorted(cg.paid_providers()),
+        # [Gate ProviderConnect] 送れる状態の有料の提供元(adapter・登録・鍵の確認・停止していない)。登録だけでは入れない
+        "connected_paid_providers": sorted(
+            n for n, spec in cg.paid_providers().items()
+            if n != FAKE_PROVIDER and not cg.is_suspended(n) and any(pc.ready(db, n, op) for op in spec["operations"])),
+        "implemented_adapters": sorted(pc.ADAPTERS),
         "suspended_providers": cg.suspended_providers(),
         "plan_accounts": {"total": len(accounts), "by_state": states},
         "open_reservations": open_res,
@@ -236,8 +243,13 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
         price_state = "unavailable" if not price["known"] else ("known" if all(ops_known) else "partial")
         is_fake = name == FAKE_PROVIDER
         adapter = "fake" if is_fake else ("implemented" if name in ADAPTERS_IMPLEMENTED else "not_implemented")
+        verification = secret_info.get("verification") if secret_info else None
+        verified_ops = [((verification or {}).get("capabilities") or {}).get(f"{name}:{op}") == "accepted"
+                        for op in p["operations"] if name in pc.ADAPTERS and op in pc.ADAPTERS[name]["operations"]]
+        secret_verified = verification is not None and verification["state"] == "accepted" and bool(verified_ops) \
+            and all(verified_ops)
         live_ready = (not is_fake) and adapter == "implemented" and name in registered and secret == "configured" \
-            and price_state == "known" and name not in suspended
+            and secret_verified and price_state == "known" and name not in suspended
         rows.append({
             "name": name, "label": p["label"], "purpose": p["purpose"], "operations": p["operations"],
             "kind": "fake" if is_fake else "paid",
@@ -252,15 +264,17 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
                                if secret_info and secret_info["source"] else None),
             "secret_format": secret_info["format"] if secret_info else None,
             "secret_provider_auth": secret_info["provider_auth"] if secret_info else None,
+            "secret_verification": (verification or {}).get("state") if secret_info else None,
             "adapter": adapter,
+            "adapter_operations": list(pc.ADAPTERS.get(name, {}).get("operations", [])),
             "price_profile": price_state, "policy_version": price["policy_version"],
             "live_calls": "test_only" if is_fake else ("ready" if live_ready else "disabled"),
             "month_usage": totals.get(name),
             "notes": p["notes"],
         })
     return {"as_of": _iso(_now()), "providers": rows,
-            "rule": "契約の確認・価格の版・鍵・提供元の接続(adapter)・提供元の登録の全てが揃うまで、有料の提供元へは送らない"
-                    "(fail closed)。鍵があるだけでは接続していません"}
+            "rule": "価格の版・鍵・鍵の有効性の確認(この設定・期限内)・提供元の接続(adapter)・提供元の登録の全てが揃うまで、"
+                    "有料の提供元へは送らない(fail closed)。送るのは利用者の明示の操作の時だけ。契約・請求は提供元の画面で確認する"}
 
 
 @router.post("/providers/{name}/suspend")
@@ -548,14 +562,21 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
         used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
         slots.append({"slot": slot, "label": spec["label"], "providers": spec["providers"], "env": spec["env"],
                       "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot),
+                      "verify_supported": slot in pc.SLOT_CHECKS,
                       "in_use": bool(used_by),
                       "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
                       else "アプリはまだこの鍵を使いません(提供元の接続 adapter が未実装。外へは送りません)"})
-    return {"as_of": _iso(_now()), "slots": slots,
+    try:
+        verify_budget: Optional[Dict[str, Any]] = pv.budget(db)
+    except Exception:  # noqa: BLE001 - 表の未作成など。枠が読めない時は確認ボタンを出さない
+        db.rollback()
+        verify_budget = None
+    return {"as_of": _iso(_now()), "slots": slots, "verify_budget": verify_budget,
+            "model": pc.openai_model(),
             "backend": ps.backend(),
             "backend_note": ("暫定: ENCRYPTION_KEY で暗号化して DB に保管しています。最終の正本は GCP Secret Manager で、"
                              "実行ID・最小権限・版の固定が整うまでは「高セキュリティ移行完了」ではありません。"
-                             "有料の提供元へは adapter が未接続のため、鍵を登録しても送信しません"
+                             "鍵を登録しただけでは送信しません(有効性の確認が通り、利用者が明示の操作をした時だけ送ります)"
                              if ps.backend() == "db_encrypted" else
                              "保管先(SECRET_BACKEND)が未設定・未接続・不正です。鍵は取得せず、どの提供元へも送りません"
                              "(DB・.env へは自動で切り替えません)"),
@@ -615,4 +636,69 @@ def ops_disable_secret(slot: str, request: Request, payload: Dict[str, Any] = Bo
         raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
     if row is None:
         raise _bad("secret_not_registered", "この画面で登録した有効な鍵はありません", 409)
+    return {"slot": slot, **ps.state(db, slot)}
+
+
+# ===================================================================== 鍵の有効性の確認・候補の有効化(Gate ProviderConnect)
+
+def _verify_audit(request: Request, admin: User, reason: str):
+    def hook(db: Session, summary: Dict[str, Any]) -> None:
+        db.add(AuditLog(id=uuid.uuid4(), user_id=admin.id, action="ops_secret_verified", resource_type="ops_console",
+                        resource_id=admin.id, ip_address=request.client.host if request.client else None,
+                        user_agent=request.headers.get("user-agent", "")[:255],
+                        details={"slot": summary["slot"], "version": summary["version"],
+                                 "provider_auth": summary["provider_auth"], "code": summary["code"],
+                                 "checks": {r["check"]: r["code"] for r in summary["results"]},
+                                 "estimated_cost_jpy": summary["estimated_cost_jpy"], "reason": reason[:200]}))
+    return hook
+
+
+@router.post("/secrets/{slot}/verify")
+def ops_verify_secret(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                      admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """鍵の有効性を提供元へ最小の要求で確かめる(明示の操作。費用は管理者の確認の日の枠で予約)。鍵の値は返さない。"""
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    version = payload.get("version") if isinstance(payload, dict) else None
+    try:
+        summary = pv.verify(db, slot, version, reason, admin.id, _verify_audit(request, admin, reason))
+    except pv.VerifyError as error:
+        raise HTTPException(status_code=error.status, detail={"code": error.code, "message": error.message,
+                                                              **error.extra})
+    return {**summary, "state": {"slot": slot, **ps.state(db, slot)}}
+
+
+@router.post("/secrets/{slot}/activate")
+def ops_activate_secret(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                        admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """確認が通った候補を有効にする(今の有効な版を条件にする。違えば 409)。"""
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    body = payload if isinstance(payload, dict) else {}
+    try:
+        base = {"slot": slot, "reason": reason[:200], "previous": body.get("expected_active_version")}
+        ps.activate(db, slot, body.get("version"), body.get("expected_active_version"), admin.id,
+                    _audit_in_tx(request, admin, "ops_secret_activated", base))
+    except ps.SecretError as error:
+        raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
+    return {"slot": slot, **ps.state(db, slot)}
+
+
+@router.post("/secrets/{slot}/discard")
+def ops_discard_candidate(slot: str, request: Request, payload: Dict[str, Any] = Body(...),
+                          admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """候補を捨てる(有効な版は変えない)。"""
+    if slot not in ps.SLOTS:
+        raise _bad("unknown_secret_slot", "知らない鍵の種類です", 404)
+    reason = _reason(payload)
+    try:
+        row = ps.discard_candidate(db, slot, admin.id,
+                                   _audit_in_tx(request, admin, "ops_secret_candidate_discarded",
+                                                {"slot": slot, "reason": reason[:200]}))
+    except ps.SecretError as error:
+        raise _bad(error.code, error.message, _SECRET_ERROR_STATUS.get(error.code, 422))
+    if row is None:
+        raise _bad("candidate_not_found", "捨てる候補はありません", 409)
     return {"slot": slot, **ps.state(db, slot)}

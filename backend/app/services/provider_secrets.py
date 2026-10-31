@@ -15,7 +15,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -138,7 +138,7 @@ def _latest(db: Session, slot: str) -> Optional[ProviderSecret]:
 
 
 def _read_active(row: ProviderSecret) -> str:
-    """有効な版を復号して形を検査する。使えなければ SecretUnavailable(.env へは戻らない)。"""
+    """版を復号して形を検査する(有効な版・候補の版)。使えなければ SecretUnavailable(.env へは戻らない)。"""
     try:
         plain = crypto.decrypt_payload(bytes(row.secret_ciphertext)).decode("utf-8")
     except Exception:  # noqa: BLE001 - 値・例外の内容は出さない
@@ -160,10 +160,89 @@ def resolve(db: Session, slot: str) -> str:
         raise SecretUnavailable("secret_backend_unavailable")
     row = _active(db, slot)
     if row is None:
-        latest = _latest(db, slot)
+        latest = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status != "pending")
+                  .order_by(ProviderSecret.version.desc()).first())
         raise SecretUnavailable("secret_disabled" if latest is not None and latest.status == "disabled"
                                 else "secret_missing")
     return _read_active(row)
+
+
+def resolve_for_send(db: Session, provider: str, operation: str) -> Tuple[str, int]:
+    """有料の提供元へ送る直前だけに使う。有効な版が「この設定で・この操作で・期限内に」確認済みの時だけ鍵を返す。
+    未確認・期限切れ・設定の変更・拒否は SecretUnavailable(送らない)。保管先・.env の切り替えはしない。"""
+    slot = slot_for_provider(provider)
+    if slot is None:
+        raise SecretUnavailable("secret_missing")
+    key = resolve(db, slot)
+    row = _active(db, slot)
+    assert row is not None
+    view = verification_view(row)
+    cap = view["capabilities"].get(f"{provider}:{operation}")
+    if view["state"] == "expired":
+        raise SecretUnavailable("secret_verification_expired")
+    if view["state"] == "stale":
+        raise SecretUnavailable("secret_verification_stale")
+    if view["provider_auth"] != "accepted" or cap != "accepted":
+        raise SecretUnavailable("secret_unverified" if row.provider_auth in ("unverified", "inconclusive")
+                                else "secret_rejected")
+    return key, row.version
+
+
+def record_send_rejection(db: Session, provider: str, operation: str, version: int, code: str) -> None:
+    """送信の時に提供元が鍵を断った(401/403 など)。その版の確認を rejected にし、次の送信を止める。"""
+    slot = slot_for_provider(provider)
+    row = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.version == version)
+           .with_for_update().first())
+    if row is None:
+        return
+    caps = dict(row.capabilities or {})
+    caps[f"{provider}:{operation}"] = code
+    row.capabilities = caps
+    row.provider_auth = "rejected"
+    row.verify_code = code[:40]
+    db.commit()
+
+
+def _pending(db: Session, slot: str) -> Optional[ProviderSecret]:
+    return (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "pending")
+            .first())
+
+
+def _aware(moment: Optional[datetime]) -> Optional[datetime]:
+    if moment is None:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def verification_view(row: ProviderSecret, now: Optional[datetime] = None) -> Dict[str, Any]:
+    """版の確認の状態(値は含まない)。state: unverified / accepted / rejected / inconclusive / expired / stale
+    (stale = 確認の後に送り先・モデル・field mask が変わった)。capabilities は提供元:操作 → 結果のコード。"""
+    from app.services import provider_calls as pc  # 循環 import を避ける
+    now = now or datetime.now(timezone.utc)
+    auth = row.provider_auth or "unverified"
+    view_state = auth
+    expires = _aware(row.verify_expires_at)
+    if auth == "accepted":
+        if row.verified_config != pc.config_hash(row.slot):
+            view_state = "stale"
+        elif expires is None or expires <= now:
+            view_state = "expired"
+    return {"state": view_state, "provider_auth": auth, "code": row.verify_code,
+            "verified_at": _iso(_aware(row.verified_at)), "expires_at": _iso(expires),
+            "capabilities": dict(row.capabilities or {})}
+
+
+def _candidate_view(row: Optional[ProviderSecret]) -> Optional[Dict[str, Any]]:
+    if row is None:
+        return None
+    fmt = "acceptable"
+    try:
+        _read_active(row)
+    except SecretUnavailable as error:
+        names = {"secret_decrypt_failed": "decrypt_failed", "secret_placeholder": "placeholder"}
+        fmt = names.get(error.code, "malformed")
+    return {"version": row.version, "last4": row.last4, "registered_at": _iso(row.created_at), "format": fmt,
+            "verification": verification_view(row)}
 
 
 def state(db: Session, slot: str) -> Dict[str, Any]:
@@ -171,18 +250,22 @@ def state(db: Session, slot: str) -> Dict[str, Any]:
     placeholder / invalid / decrypt_failed。configured は「提供元が認めた」ではない(provider_auth は unverified)。"""
     out: Dict[str, Any] = {"status": "missing", "source": None, "version": None, "last4": None, "registered_at": None,
                            "format": None, "retrieval": None, "provider_auth": "unverified",
-                           "backend": backend(), "env_legacy": legacy_env_info(slot)}
+                           "backend": backend(), "env_legacy": legacy_env_info(slot),
+                           "verification": None, "candidate": None}
     if not backend_ready():
         out["status"] = "backend_unavailable"  # 保管先が未接続・不正。鍵があるかは言わない(取得もしない)
         return out
+    out["candidate"] = _candidate_view(_pending(db, slot))
     row = _active(db, slot)
     if row is None:
-        latest = _latest(db, slot)
+        latest = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status != "pending")
+                  .order_by(ProviderSecret.version.desc()).first())
         if latest is not None and latest.status == "disabled":
             out.update(status="disabled", version=latest.version, last4=latest.last4,
                        registered_at=_iso(latest.created_at))
         return out
-    out.update(source="cms", version=row.version, last4=row.last4, registered_at=_iso(row.created_at))
+    out.update(source="cms", version=row.version, last4=row.last4, registered_at=_iso(row.created_at),
+               verification=verification_view(row), provider_auth=row.provider_auth or "unverified")
     try:
         _read_active(row)
         out.update(status="configured", format="acceptable", retrieval="readable")
@@ -223,7 +306,9 @@ def _commit(db: Session, row: ProviderSecret, on_before_commit: Optional[Hook]) 
 
 def register(db: Session, slot: str, value: Any, reason: str, actor_id: uuid.UUID,
              on_before_commit: Optional[Hook] = None) -> ProviderSecret:
-    """新しい版を有効にし、前の有効な版を superseded にする。サンプル値・形が正しくない値は何も変えずに SecretError。"""
+    """新しい版を登録する。有効な版が無ければ有効(ただし未確認=送らない)、有効な版があれば候補(pending)にして
+    有効な版はそのまま残す(新しい鍵が無効でも、動いている鍵を壊さない)。前の候補は superseded。
+    サンプル値・形が正しくない値は何も変えずに SecretError。"""
     if slot not in SLOTS:
         raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
     if not backend_ready():
@@ -247,12 +332,17 @@ def register(db: Session, slot: str, value: Any, reason: str, actor_id: uuid.UUI
                .with_for_update().first())
     next_version = int(db.query(func.coalesce(func.max(ProviderSecret.version), 0))
                        .filter(ProviderSecret.slot == slot).scalar() or 0) + 1
+    new_status = "active"
     if current is not None:
-        current.status = "superseded"
-        current.disabled_at = datetime.now(timezone.utc)
-        current.disabled_by = actor_id
-        db.flush()
-    row = ProviderSecret(id=uuid.uuid4(), slot=slot, version=next_version, status="active",
+        new_status = "pending"
+        previous = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "pending")
+                    .with_for_update().first())
+        if previous is not None:
+            previous.status = "superseded"
+            previous.disabled_at = datetime.now(timezone.utc)
+            previous.disabled_by = actor_id
+            db.flush()
+    row = ProviderSecret(id=uuid.uuid4(), slot=slot, version=next_version, status=new_status,
                          secret_ciphertext=ciphertext, last4=value[-4:], reason=reason[:200], created_by=actor_id)
     db.add(row)
     try:
@@ -295,3 +385,67 @@ def disable(db: Session, slot: str, actor_id: uuid.UUID,
     row.disabled_by = actor_id
     _commit(db, row, on_before_commit)
     return row
+
+
+def activate(db: Session, slot: str, version: Any, expected_active_version: Any, actor_id: uuid.UUID,
+             on_before_commit: Optional[Hook] = None) -> ProviderSecret:
+    """候補(pending)の版を有効にする。条件: この設定で・期限内に提供元の確認が accepted。今の有効な版が
+    expected_active_version と同じ(違えば 409。並列の切り替えで他人の操作を上書きしない)。前の有効な版は superseded。"""
+    if slot not in SLOTS:
+        raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
+    if not backend_ready():
+        raise SecretError("secret_backend_unavailable", "鍵の保管先(SECRET_BACKEND)が未接続か不正なため、操作できません")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise SecretError("invalid_version", "有効にする版を指定してください")
+    if expected_active_version is not None and (isinstance(expected_active_version, bool)
+                                                or not isinstance(expected_active_version, int)):
+        raise SecretError("invalid_version", "今の有効な版の指定が正しくありません")
+    current = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "active")
+               .with_for_update().first())
+    if (current.version if current is not None else None) != expected_active_version:
+        raise SecretError("secret_conflict", "有効な版が画面を開いた後に変わりました。画面を読み直してください")
+    row = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.version == version)
+           .with_for_update().first())
+    if row is None or row.status != "pending":
+        raise SecretError("candidate_not_found", "この版は有効にできる候補ではありません")
+    if verification_view(row)["state"] != "accepted":
+        raise SecretError("candidate_not_verified",
+                          "この候補は提供元の確認がまだ通っていません(未確認・期限切れ・設定の変更・拒否)。先に「有効性を確認」してください")
+    if current is not None:
+        current.status = "superseded"
+        current.disabled_at = datetime.now(timezone.utc)
+        current.disabled_by = actor_id
+        db.flush()
+    row.status = "active"
+    _commit(db, row, on_before_commit)
+    db.refresh(row)
+    return row
+
+
+def discard_candidate(db: Session, slot: str, actor_id: uuid.UUID,
+                      on_before_commit: Optional[Hook] = None) -> Optional[ProviderSecret]:
+    """候補(pending)を捨てる(disabled)。有効な版は変えない。候補が無ければ None。"""
+    if slot not in SLOTS:
+        raise SecretError("unknown_secret_slot", "知らない鍵の種類です")
+    if not backend_ready():
+        raise SecretError("secret_backend_unavailable", "鍵の保管先(SECRET_BACKEND)が未接続か不正なため、操作できません")
+    row = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.status == "pending")
+           .with_for_update().first())
+    if row is None:
+        return None
+    row.status = "disabled"
+    row.disabled_at = datetime.now(timezone.utc)
+    row.disabled_by = actor_id
+    _commit(db, row, on_before_commit)
+    return row
+
+
+def read_version_for_verify(db: Session, slot: str, version: int) -> Tuple[ProviderSecret, str]:
+    """確認(管理者の明示の操作)だけで使う。有効な版か候補の版を復号する。"""
+    if not backend_ready():
+        raise SecretUnavailable("secret_backend_unavailable")
+    row = (db.query(ProviderSecret).filter(ProviderSecret.slot == slot, ProviderSecret.version == version,
+                                           ProviderSecret.status.in_(("active", "pending"))).first())
+    if row is None:
+        raise SecretUnavailable("secret_missing")
+    return row, _read_active(row)

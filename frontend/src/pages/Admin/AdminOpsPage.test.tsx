@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const api = vi.hoisted(() => ({
   getOpsOverview: vi.fn(), getOpsProviders: vi.fn(), getOpsLedger: vi.fn(), getOpsCloud: vi.fn(),
-  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(), importOpsSecretFromEnv: vi.fn(),
+  runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(), importOpsSecretFromEnv: vi.fn(), verifyOpsSecret: vi.fn(), activateOpsSecret: vi.fn(), discardOpsSecret: vi.fn(),
   disableOpsSecret: vi.fn(), getOpsTiers: vi.fn(), switchOpsTestTier: vi.fn(),
 }));
 vi.mock('@/services/api/opsConsole', () => api);
@@ -135,6 +135,42 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     fireEvent.change(within(a).getByLabelText('理由(監査に残ります)'), { target: { value: '移行' } });
     fireEvent.click(go);
     await waitFor(() => expect(api.importOpsSecretFromEnv).toHaveBeenCalledWith('openai_api_key', '移行'));
+  });
+
+  it('秘密情報: 確認は明示の操作・候補は確認が通るまで有効にできない・有効な版は残る', async () => {
+    const v = (state: string) => ({ state, provider_auth: state, code: null, verified_at: null,
+      expires_at: state === 'accepted' ? '2026-11-04T00:00:00+00:00' : null, capabilities: {} });
+    const slot = (candState: string) => ({ slot: 'openai_api_key', label: 'OpenAI の API キー', providers: ['openai'],
+      env: 'OPENAI_API_KEY', hint: 'sk-', status: 'configured', source: 'cms', version: 1, last4: 'AAAA', registered_at: null,
+      history: [], in_use: true, verify_supported: true, verification: v('accepted'),
+      candidate: { version: 2, last4: 'BBBB', registered_at: null, format: 'acceptable', verification: v(candState) } });
+    api.getOpsSecrets.mockResolvedValueOnce({ as_of: 'x', note: 'n', backend: 'db_encrypted', backend_note: '暫定', model: 'gpt-5-nano',
+      verify_budget: { cap_jpy: '50.0000', used_jpy: '6.1000', remaining_jpy: '43.9000', day: '2026-11-01', note: 'n' },
+      slots: [slot('unverified')] });
+    api.getOpsSecrets.mockResolvedValue({ as_of: 'x', note: 'n', backend: 'db_encrypted', backend_note: '暫定',
+      slots: [slot('accepted')] });
+    api.verifyOpsSecret.mockResolvedValue({ slot: 'openai_api_key', version: 2, provider_auth: 'accepted', code: 'accepted',
+      results: [{ check: 'openai:ai.generate', code: 'accepted', label: '利用可能(この操作で確認)' }], estimated_cost_jpy: '0.0300' });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    expect(await screen.findByTestId('ops-verify-budget')).toHaveTextContent('6.1000円 / 50.0000円');
+    expect(screen.getByTestId('ops-secret-verify-openai_api_key')).toHaveTextContent('確認済み(期限内)');
+    const row = screen.getByTestId('ops-secret-openai_api_key');
+    expect(screen.getByTestId('ops-secret-candidate-openai_api_key')).toHaveTextContent('候補: 版 2 · 末尾 BBBB');
+    expect(within(row).queryByRole('button', { name: '候補を有効にする' })).toBeNull();
+    expect(api.verifyOpsSecret).not.toHaveBeenCalled(); // 画面を開いただけでは確認しない
+    fireEvent.click(within(row).getByRole('button', { name: '候補の有効性を確認' }));
+    fireEvent.change(within(row).getByLabelText('理由(監査に残ります)'), { target: { value: '入れ替え' } });
+    fireEvent.click(within(row).getByRole('button', { name: '提供元へ確認を送る' }));
+    await waitFor(() => expect(api.verifyOpsSecret).toHaveBeenCalledWith('openai_api_key', 2, '入れ替え'));
+    expect(await screen.findByRole('status')).toHaveTextContent('利用可能(この操作で確認)');
+    api.activateOpsSecret.mockResolvedValue({ slot: 'openai_api_key', status: 'configured', source: 'cms', version: 2,
+      last4: 'BBBB', registered_at: null });
+    const row2 = await screen.findByTestId('ops-secret-openai_api_key');
+    fireEvent.click(await within(row2).findByRole('button', { name: '候補を有効にする' }));
+    fireEvent.change(within(row2).getByLabelText('理由(監査に残ります)'), { target: { value: '切替' } });
+    fireEvent.click(within(row2).getByRole('button', { name: '有効にする' }));
+    await waitFor(() => expect(api.activateOpsSecret).toHaveBeenCalledWith('openai_api_key', 2, 1, '切替'));
   });
 
   it('秘密情報: 保管先が未設定なら「未接続(送らない)」と出す', async () => {

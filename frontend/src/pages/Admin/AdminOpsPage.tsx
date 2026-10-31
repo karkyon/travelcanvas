@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
 import {
-  disableOpsSecret, importOpsSecretFromEnv, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
+  disableOpsSecret, importOpsSecretFromEnv, verifyOpsSecret, activateOpsSecret, discardOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
   runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier,
   type OpsTier, type OpsTiers, type OpsTestTierResult,
   type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
@@ -500,10 +500,32 @@ const RunsTab: React.FC = () => {
 
 // ===================================================================== 秘密情報・権限
 /** [Gate OpsSecrets] 鍵の登録: 値は送るだけ(画面に二度と出さない)。登録・無効化は理由が必須で監査に残る。 */
+const FORM_VERB: Record<string, string> = {
+  register: '登録', import: '旧 .env から取り込み', disable: '無効に', verify: '確認', verify_candidate: '確認',
+  activate: '有効に', discard: '捨て',
+};
+const FORM_SUBMIT: Record<string, string> = {
+  register: '暗号化して保存', import: '取り込んで暗号化して保存', disable: '無効にする',
+  verify: '提供元へ確認を送る', verify_candidate: '提供元へ確認を送る', activate: '有効にする', discard: '捨てる',
+};
+const VERIFY_LABEL: Record<string, { text: string; tone: string }> = {
+  unverified: { text: '未確認(送らない)', tone: 'tc-pill--warn' },
+  accepted: { text: '確認済み(期限内)', tone: 'tc-pill--good' },
+  rejected: { text: '提供元が拒否(送らない)', tone: 'tc-pill--bad' },
+  inconclusive: { text: '未判定(到達できない・混雑)', tone: 'tc-pill--warn' },
+  expired: { text: '確認の期限切れ(送らない)', tone: 'tc-pill--warn' },
+  stale: { text: '設定が変わった(確認し直す)', tone: 'tc-pill--warn' },
+};
+const VerifyPill: React.FC<{ state: string; testId?: string }> = ({ state, testId }) => {
+  const v = VERIFY_LABEL[state] ?? { text: state, tone: '' };
+  return <span className={`tc-pill ${v.tone}`} data-testid={testId}>{v.text}</span>;
+};
+
 const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void }> = ({ slot, onDone }) => {
   const [value, setValue] = useState('');
   const [reason, setReason] = useState('');
-  const [mode, setMode] = useState<'register' | 'disable' | 'import' | null>(null);
+  const [mode, setMode] = useState<'register' | 'disable' | 'import' | 'verify' | 'verify_candidate' | 'activate' | 'discard'
+    | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = `secret-${slot.slot}`;
@@ -513,10 +535,22 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
     try {
       if (mode === 'register') {
         const st = await registerOpsSecret(slot.slot, value, reason.trim());
-        onDone(`${slot.label} を登録しました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})`);
+        onDone(st.candidate
+          ? `${slot.label} を候補として保存しました(版 ${st.candidate.version} · 末尾 ${st.candidate.last4})。確認して有効にするまで今の版を使います`
+          : `${slot.label} を登録しました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})。有効性の確認が通るまで送りません`);
       } else if (mode === 'import') {
         const st = await importOpsSecretFromEnv(slot.slot, reason.trim());
         onDone(`${slot.label} を旧 .env から取り込みました(版 ${st.version ?? '—'} · 末尾 ${st.last4 ?? '—'})`);
+      } else if (mode === 'verify' || mode === 'verify_candidate') {
+        const version = mode === 'verify' ? slot.version : slot.candidate?.version;
+        const out = await verifyOpsSecret(slot.slot, version ?? -1, reason.trim());
+        onDone(`${slot.label}(版 ${out.version})の確認: ${out.results.map((x) => x.label).join('・')}(見込み ${out.estimated_cost_jpy}円)`);
+      } else if (mode === 'activate') {
+        const st = await activateOpsSecret(slot.slot, slot.candidate?.version ?? -1, slot.version, reason.trim());
+        onDone(`${slot.label} の版 ${st.version ?? '—'} を有効にしました`);
+      } else if (mode === 'discard') {
+        await discardOpsSecret(slot.slot, reason.trim());
+        onDone(`${slot.label} の候補を捨てました(有効な版はそのまま)`);
       } else {
         await disableOpsSecret(slot.slot, reason.trim());
         onDone(`${slot.label} の登録を無効にしました`);
@@ -543,12 +577,24 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
         {slot.env_legacy?.importable && (
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('import')}>旧 .env から取り込む</button>
         )}
+        {slot.verify_supported && slot.source === 'cms' && slot.status === 'configured' && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('verify')}>有効性を確認</button>
+        )}
+        {slot.verify_supported && slot.candidate && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('verify_candidate')}>候補の有効性を確認</button>
+        )}
+        {slot.candidate?.verification.state === 'accepted' && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setMode('activate')}>候補を有効にする</button>
+        )}
+        {slot.candidate && (
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('discard')}>候補を捨てる</button>
+        )}
       </div>
     );
   }
   return (
     <form className="tc-ops-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}
-      aria-label={`${slot.label} を${mode === 'register' ? '登録' : mode === 'import' ? '旧 .env から取り込み' : '無効に'}する`}
+      aria-label={`${slot.label} を${FORM_VERB[mode]}する`}
       autoComplete="off">
       {mode === 'register' && (
         <>
@@ -563,7 +609,7 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
       <div className="flex gap-2">
         <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--primary"
           disabled={busy || !reason.trim() || (mode === 'register' && value.trim().length < 8)}>
-          {mode === 'register' ? '暗号化して保存' : mode === 'import' ? '取り込んで暗号化して保存' : '無効にする'}
+          {FORM_SUBMIT[mode]}
         </button>
         <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => { setValue(''); setReason(''); setMode(null); setError(null); }}>やめる</button>
       </div>
@@ -600,6 +646,12 @@ const SecretsTab: React.FC = () => {
             {` ${data.backend_note}`}
           </p>
         )}
+        {data.verify_budget && (
+          <p className="tc-ops-desc" data-testid="ops-verify-budget">
+            {`鍵の確認の今日の枠: ${data.verify_budget.used_jpy}円 / ${data.verify_budget.cap_jpy}円(残り ${data.verify_budget.remaining_jpy}円)`}
+            {data.model ? ` · AI のモデル ${data.model}` : ''}
+          </p>
+        )}
         {msg && <p role="status" className="tc-ops-callout">{msg}</p>}
         <ul className="tc-ops-secrets">
           {data.slots.map((s) => (
@@ -612,6 +664,19 @@ const SecretsTab: React.FC = () => {
                 <p className="tc-ops-desc">
                   {`出典: ${SOURCE_LABEL[s.source ?? ''] ?? '—'}${s.version ? ` · 版 ${s.version}` : ''}${s.last4 ? ` · 末尾 ${s.last4}` : ''}`}
                   {s.registered_at ? ` · ${new Date(s.registered_at).toLocaleString('ja-JP')}` : ''}
+                </p>
+              )}
+              {s.verification && (
+                <p className="tc-ops-desc" data-testid={`ops-secret-verify-${s.slot}`}>
+                  <VerifyPill state={s.verification.state} />
+                  {s.verification.expires_at ? ` · 期限 ${new Date(s.verification.expires_at).toLocaleString('ja-JP')}` : ''}
+                </p>
+              )}
+              {s.candidate && (
+                <p className="tc-ops-desc" data-testid={`ops-secret-candidate-${s.slot}`}>
+                  {`候補: 版 ${s.candidate.version} · 末尾 ${s.candidate.last4} · `}
+                  <VerifyPill state={s.candidate.verification.state} />
+                  {' · 有効な版はそのまま使われます(確認が通った候補だけ有効にできます)'}
                 </p>
               )}
               {s.in_use_note && <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>}
@@ -632,7 +697,7 @@ const SecretsTab: React.FC = () => {
             </li>
           ))}
         </ul>
-        <p className="tc-ops-asof">鍵を登録しても、外部の API へ送るのは提供元の接続(adapter)を入れて登録した後です。今は全て「送信: 無効」のままです。</p>
+        <p className="tc-ops-asof">鍵を登録しただけでは送りません。「有効性を確認」が通った鍵だけを、利用者が旅行の中で明示の操作をした時に使います(会員のクラスと 1旅行 50円の枠の中)。</p>
       </article>
       <article className="tc-card tc-ops-panel">
         <h2 className="tc-section-title">権限と記録</h2>
@@ -669,8 +734,9 @@ const AdminOpsPage: React.FC = () => {
         actions={<Link to="/admin" className="tc-focus-ring tc-mbtn tc-mbtn--sm">← 管理の画面</Link>}
       />
       <div className="tc-ops-banner" role="note">
-        <b>有料の外部 API はまだ接続していません。</b>
-        今は Fake の提供元で原価の上限を確かめる段階です。契約の確認・提供元の接続(adapter)・価格の確認が揃うまで、鍵があっても外へは送りません。
+        <b>有料の外部 API は、鍵の有効性の確認が通るまで送りません。</b>
+        OpenAI・Places・Routes の接続(adapter)は入っています。鍵の登録 → 有効性の確認(費用は確認の日の枠)→ 利用者の明示の操作
+        (会員のクラス・1旅行 50円の枠の中)の順で、揃った時だけ送ります。契約・請求は提供元の画面で確認します。
       </div>
       <div className="tc-kit-nav">
       <div className="tc-kit-tabs tc-ops-tabs" role="tablist" aria-label="運用コンソールの画面">

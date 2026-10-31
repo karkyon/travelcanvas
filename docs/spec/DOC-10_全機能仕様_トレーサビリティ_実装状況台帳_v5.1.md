@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r33** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-10-31  
+> 文書ID: DOC-10 / 版: **v5.1-r34** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-01  
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -15,7 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `ad041f5`(PR #37 Gate GeocodeJP。2026-10-31 に r31 の版をそろえた時点の main) |
-| Alembic head | `a1d3f5b7c9e2`(単一の head。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
+| Alembic head | `b7e3c9d1f5a2`(単一の head。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(`ad041f5`) | backend pytest 1322 合格・2 飛ばし(サンドボックス) / frontend vitest 943 合格(185 ファイル、サンドボックス) / E2E 99 合格・flaky 0(GitHub Actions の main の push run 41070234927 の e2e ジョブ) / mypy の誤り 0 件(基準は空) / 最初に読む JS 429.46 kB(上限 430 kB) |
 | GitHub Actions(`ad041f5`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41070234927)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -139,7 +139,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-056 | 適応型GPS | INTEGRATED(部分) | ✓ | L5 | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | VERIFIED | ✓ | P17・G7 | 実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1) |
 | FR-058 | Entitlement・料金 | SPECIFIED | ✗ | — | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -249,7 +249,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r30 | 2026-10-30 | `b75c645`+G11-Layout | Gate FR059-C: FR-059 正本 §13 D14 provider の停止(見込みの超過・請求の照合の差)を Redis の印で全ての worker・運用のコマンドが共有する(届かない間は process の中で止め、届いた時に送る)。運用者の再開 `tcops.py security provider-resume`(理由が必須)。FR-059 の gaps から D14 を外した(外部の有料 provider は未接続のため INTEGRATED(部分)のまま)。間の Gate G11-Layout(一覧のずれ・競合の後の読み直し)・UX6-Icons(旅程の中の移動の絵文字)は DOC-10 を変えていない。`docs/trace/gate-fr059c-trace.md` |
 | r31 | 2026-10-31 | `ad041f5` | Gate AppShell(#33)・Gate OpsCMS(#35)・Gate OpsSecrets: UI/UX モックの画面、運用コンソール `/admin/ops`(外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験)、運用コンソールから API キーを暗号化して登録(migration `e8b4c2a7f1d3`: provider_secrets・`f2a6d8c4b9e1`: 外部キーの索引)。FR の状態は変えない(有料の provider は未接続)。`docs/trace/gate-appshell-trace.md`・`docs/trace/gate-opscms-trace.md` 間の Gate GeocodeJP(#37: 旅行相談の地名を日本で照会・地図の CSS・人数の食い違い・方面の詳細・近くの検索の失敗の表示・管理の画面の余白)も FR の状態を変えていない(`docs/trace/gate-geocodejp-trace.md`)。**Gate DOC10-Rev(2026-10-31)**: r31 の行を書いたのに版の表示と `fr-status.json` が r30 のままだった食い違いを直し、版の表示・`fr-status.json` の revision・変更履歴の最後の行が一致することを CI で確かめる(`test_doc10_revision_matches_status_and_changelog`) |
 | r32 | 2026-10-31 | main+FR059-D11 | Gate OpsSecrets-Clarity(#39)・Gate FR059-D11: 運用コンソールに鍵の保存先(アプリの DB・Secret Manager ではない)と接続(adapter)の列、配布物の秘密の CI の検査。FR-059 正本 §13 D11: 無料の provider(Nominatim・Overpass・Wikipedia・Wikimedia Commons・oEmbed)へ送った回数を 0円・価格の版 free で記録し、FR-059 の gaps から D11 を外した。§2.2.1 で価格の版の単価が 2026-10-31 の公開の単価以上であることを確かめた(版は変えない)。外部の有料 provider は未接続のため INTEGRATED(部分)のまま。`docs/trace/gate-opscms-trace.md`・`docs/trace/gate-fr059-d11-trace.md` |
-| **r33** | 2026-10-31 | `39aac73`+FR059-Tiers | **Gate FR059-Tiers: 会員の機能クラス Free(自分でつくる)・Trip(行先を見つける)・Journey(計画を一緒に考える)・Explorer(比較して深掘りする)を実装(FR-059 正本 §3.2〜§3.5・migration `a1d3f5b7c9e2`: 価格の版 2026-10-31.1、以前の Free(AI 5回)は retired)。クラスに含まない有料の操作は provider の前で 403 `tier_feature_not_included`(新しい Free は AI・有料の検索なし)、全てのクラスで 1旅行 50円・40円の警告・45円の運用の知らせ。旧クラス(Plus・Trip Pass・Family・Pro)は一律に変えない。運用コンソールに「会員クラス」(比較・機能の表・移行の表・開発環境の試験の切り替え)、Fake の試験のクラスの選択。価格・販売・決済(FR-058)は持たない。FR-059 は外部の有料 provider が未接続のため INTEGRATED(部分)のまま。`docs/trace/gate-fr059-tiers-trace.md`** |
+| r33 | 2026-10-31 | `39aac73`+FR059-Tiers | Gate FR059-Tiers: 会員の機能クラス Free(自分でつくる)・Trip(行先を見つける)・Journey(計画を一緒に考える)・Explorer(比較して深掘りする)を実装(FR-059 正本 §3.2〜§3.5・migration `a1d3f5b7c9e2`: 価格の版 2026-10-31.1、以前の Free(AI 5回)は retired)。クラスに含まない有料の操作は provider の前で 403 `tier_feature_not_included`(新しい Free は AI・有料の検索なし)、全てのクラスで 1旅行 50円・40円の警告・45円の運用の知らせ。旧クラス(Plus・Trip Pass・Family・Pro)は一律に変えない。運用コンソールに「会員クラス」(比較・機能の表・移行の表・開発環境の試験の切り替え)、Fake の試験のクラスの選択。価格・販売・決済(FR-058)は持たない。FR-059 は外部の有料 provider が未接続のため INTEGRATED(部分)のまま。`docs/trace/gate-fr059-tiers-trace.md` |
+| **r34** | 2026-11-01 | `1db0815`+ProviderConnect | **Gate SecretPolicy・Gate ProviderConnect: 外部 API の鍵の取得元を登録した有効な版だけにし(.env への fallback の廃止・サンプル値の拒否・保管先 SECRET_BACKEND の明示)、新しい鍵は候補として保存して、提供元への最小の要求で有効性を確かめてから有効にする(migration `b7e3c9d1f5a2`)。確認の費用は管理者の確認の日の枠(50円/日)。OpenAI Responses・Places Text Search・Routes computeRoutes の adapter を旅行の中の明示の操作(AI に聞く・Google で場所を探す・経路を調べる)へ接続し、会員のクラス・1旅行 50円・停止・確認済みの鍵を送る前に確かめる。時間切れは見込みで確定、鍵の拒否は次の送信を止める。FR-059 は実の鍵での受入・請求の照合が未実施のため INTEGRATED(部分)のまま。`docs/trace/gate-secretpolicy-trace.md`・`docs/trace/gate-providerconnect-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

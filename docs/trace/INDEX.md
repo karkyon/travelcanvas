@@ -82,6 +82,7 @@
 | [gate-p7-trace.md](gate-p7-trace.md) | Gate P7 FR-019 トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-p8-trace.md](gate-p8-trace.md) | Gate P8 FR-036 カレンダー取込 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-p9-trace.md](gate-p9-trace.md) | Gate P9 FR-039 アカウント削除・同意撤回 トレーサビリティ表 | 2 | 0 | 0 |
+| [gate-providerconnect-trace.md](gate-providerconnect-trace.md) | Gate ProviderConnect — 鍵の有効性の確認・候補の有効化・OpenAI / Places / Routes の実接続 | 0 | 0 | 0 |
 | [gate-q1-trace.md](gate-q1-trace.md) | Gate Q1 トレース(写真の撮影情報の除去・V2 の CI の e2e の不安定の修正) | 0 | 0 | 0 |
 | [gate-r2-trace.md](gate-r2-trace.md) | Gate R2 Trace表（QuickDraft） | 0 | 1 | 1 |
 | [gate-s1-trace.md](gate-s1-trace.md) | Gate S1 セキュリティ基盤の仕上げ トレーサビリティ表 | 1 | 1 | 1 |
@@ -126,7 +127,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
 | FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
 
 ## 3. 棚卸しの規則
 

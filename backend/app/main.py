@@ -19,6 +19,7 @@ from app.api.v1 import (
     trip_intents,
     planning_usage,
     admin_ops,
+    paid_actions,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -611,6 +612,11 @@ app.include_router(planning_usage.plan_router, prefix="/api/v1")
 app.include_router(planning_usage.admin_router, prefix="/api/v1")
 # [Gate OpsCMS] 運用コンソール(外部 API の接続・原価の台帳・Cloud の環境・Fake の家族旅行の試験)
 app.include_router(admin_ops.router, prefix="/api/v1")
+# [Gate ProviderConnect] 有料の提供元の明示の操作(AI の案・場所の検索・経路)。実装済みの adapter を登録する
+# (登録しても送らない。送るのは利用者の明示の操作で、鍵の確認・クラス・50円の上限が揃った時だけ)
+app.include_router(paid_actions.router, prefix="/api/v1")
+from app.services import provider_calls as _provider_calls  # noqa: E402
+_provider_calls.register_all()
 
 
 @app.exception_handler(org_external.ApiError)

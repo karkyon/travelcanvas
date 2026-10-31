@@ -98,6 +98,11 @@ class ProviderTransientError(Exception):
         self.retry_safe = retry_safe
 
 
+class ProviderAmbiguousError(Exception):
+    """[Gate ProviderConnect] 時間切れなど、提供元が受け取ったか分からない。課金されていないと決め付けず、
+    予約の見込みの額で確定する(解放しない)。再試行もしない。"""
+
+
 @dataclass
 class ProviderResult:
     """provider が実際に使った単位(token・回数など)。課金の明細の値があれば raw_cost(provider の通貨)。"""
@@ -147,6 +152,28 @@ def unregister_provider(name: str) -> None:
         _paid_providers.pop(name, None)
         _suspended.pop(name, None)
         _unsynced.pop(name, None)
+
+
+# [Gate ProviderConnect] 「接続済み」の判定の追加の条件(鍵の確認が通っているか)。provider_calls が入れる。
+# 無い時(試験の Fake だけの時)は登録=接続とみなす
+_ready_check: Optional[Callable[[Session, str, str], bool]] = None
+
+
+def set_ready_check(fn: Optional[Callable[[Session, str, str], bool]]) -> None:
+    global _ready_check
+    _ready_check = fn
+
+
+def connected_operations(db: Session) -> List[str]:
+    """利用者に「接続済み」と見せてよい操作(登録済み・停止していない・鍵の確認が通っている)。"""
+    out = set()
+    for name, spec in paid_providers().items():
+        if is_suspended(name):
+            continue
+        for op in spec["operations"]:
+            if _ready_check is None or _ready_check(db, name, op):
+                out.add(op)
+    return sorted(out)
 
 
 def paid_providers() -> Dict[str, Dict[str, Any]]:
@@ -654,7 +681,7 @@ def estimate(db: Session, plan: TravelPlan, caller: User, operation: str, units:
         "allowed": denial is None, "reason": denial.code if denial else None,
         "needs_confirmation": denial is None and (Decimal(usage["plan_used"]) + Decimal(usage["plan_reserved"]) + cost)
         >= res.plan_cap * WARN_RATIO,
-        "connected": any(operation in p["operations"] for p in paid_providers().values()),
+        "connected": operation in connected_operations(db),
         "usage": usage,
     }
 
@@ -820,6 +847,11 @@ def run(db: Session, plan: TravelPlan, caller: User, operation: str, provider: s
             release(db, row.id, "provider_error")
             raise CostGuardError("provider_unavailable", 503,
                                  "提供元から応答がありません。枠は使っていません。手で続けられます")
+        except ProviderAmbiguousError:
+            settle(db, row.id, dict(row.units), "provider_timeout")
+            raise CostGuardError("provider_timeout", 503,
+                                 "提供元の応答が時間内に来ませんでした。届いた可能性があるため、枠は見込みの額で数えました。"
+                                 "手で続けられます")
         except Exception:
             release(db, row.id, "provider_error")
             raise
@@ -896,7 +928,7 @@ def plan_summary(db: Session, plan: TravelPlan, caller: User) -> Dict[str, Any]:
                       "limit": limit, "used": int(counts.get(key, 0)),
                       "remaining": max(0, limit - int(counts.get(key, 0))),
                       "included": operation in included and res.profile_key != "guest"})
-    connected = sorted({op for p in paid_providers().values() for op in p["operations"]})
+    connected = connected_operations(db)
     body = {
         "plan_id": str(plan.id), "class": res.profile_key, "class_label": CLASS_LABEL[res.profile_key],
         "class_source": res.class_source, "policy_version": res.policy_version, "currency": "JPY",
@@ -940,7 +972,7 @@ def user_summary(db: Session, user: User) -> Dict[str, Any]:
         "plans_per_month": res.plans_per_month,
         "plans_used_this_month": int(monthly_acc.plans_used) if monthly_acc else 0,
         "reset_at": (_now() + timedelta(seconds=seconds_to_next_month())).replace(microsecond=0).isoformat(),
-        "features": features, "providers_connected": bool(paid_providers()),
+        "features": features, "providers_connected": bool(connected_operations(db)),
         "as_of": _now().replace(microsecond=0).isoformat(), "tier": mt.tier_info(res.profile_key),
     }
 
