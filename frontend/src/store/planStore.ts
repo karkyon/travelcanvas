@@ -43,6 +43,7 @@ import {
 import {
   applyResults, deviceId, enqueue, isNetworkError, loadConflictCount, loadQueue, saveConflictCount, toPayload,
 } from '@/utils/syncQueue';
+import { nextDayDate } from '@/utils/nextDayDate';
 
 // [Gate C1] 予定の保存の結果(FR-020: 競合したら呼出側が入力を残して違いを示す)
 /** [G11-Conflict] 'conflict_unread': 競合したが最新を読み直せなかった(どの項目が変わったかを示せない) */
@@ -519,9 +520,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     }
 
     const plan = state.currentPlan;
-    const localDate = new Date(Date.now() + plan.days.length * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0]!;
+    // 最後の日の翌日(日が無ければ端末の今日)。「今日+日数」だと既存の日と同じ日付になり、サーバーで統合されて日が増えなかった
+    const localDate = nextDayDate(plan.days.map((d) => d.date));
     const tempId = generateTempId('day');
     const optimisticDay: DaySchedule = { id: tempId, date: localDate, events: [] };
 

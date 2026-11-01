@@ -62,7 +62,6 @@ cp .env.example .env.local
 ```bash
 # 必須設定
 VITE_API_BASE_URL=https://api.travelcanvas.app/api/v1
-VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 
 # オプション設定
 VITE_ENABLE_AI_FEATURES=true

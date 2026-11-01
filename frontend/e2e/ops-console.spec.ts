@@ -46,7 +46,8 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     // 1. 概要
     await page.goto('/admin/ops');
     await expect(page.getByRole('heading', { level: 1, name: '運用の状態を、ひと目で。' })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('有料の外部 API はまだ接続していません。')).toBeVisible();
+    await expect(page.getByText('有料の外部 API は、鍵の有効性の確認が通るまで送りません。')).toBeVisible();
+    await expect(page.getByText('未接続(外へは送らない)')).toBeVisible(); // 鍵の確認が無い間は送れる提供元が 0
     await expect(page.getByText('今月の Fake の試験の額')).toBeVisible();
     await expect(page.getByText(/Cloud Billing の請求額・予算はアプリから取得していません/)).toBeVisible();
     await expectNoAxeViolations(page, '運用コンソール(概要)');
@@ -56,7 +57,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     const openai = page.getByTestId('ops-provider-openai');
     await expect(openai).toContainText('契約・課金は未確認');
     await expect(openai).toContainText('無効(送らない)');
-    await expect(openai).toContainText('未実装(送らない)'); // 鍵があっても接続(adapter)が無ければ送らない
+    await expect(openai).toContainText('実装済み'); // adapter は入っているが、鍵の確認が無い間は送らない(上の「無効(送らない)」)
     await expect(page.getByTestId('ops-provider-fake')).toContainText('試験用(外へ送らない)');
     expect(await page.content()).not.toMatch(/sk-[A-Za-z0-9]{8,}/);
     await expectNoAxeViolations(page, '運用コンソール(提供元)');
@@ -105,6 +106,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
 
     // 5. 鍵の登録(Gate OpsSecrets): password の欄で送り、保存の後は値を出さない(末尾4文字と版だけ)
     await page.getByRole('tab', { name: '秘密情報・権限' }).click();
+    await expect(page.getByTestId('ops-secret-backend')).toContainText('保管先: 暫定(DB に暗号化)');
     const slot = page.getByTestId('ops-secret-google_maps_server_key');
     await slot.getByRole('button', { name: /鍵を登録する|新しい鍵に入れ替える/ }).click();
     const secretValue = `e2e-not-a-real-key-${Date.now()}-WXYZ`;
@@ -113,6 +115,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await slot.getByRole('button', { name: '暗号化して保存' }).click();
     await expect(page.getByRole('status').filter({ hasText: '末尾 WXYZ' })).toBeVisible({ timeout: 15_000 });
     await expect(slot).toContainText('この画面で登録');
+    await expect(slot).toContainText('登録済み・提供元の認証は未確認');
     await expect(page.getByTestId('ops-secret-storage')).toContainText('GCP Secret Manager には登録しません');
     expect(await page.content()).not.toContain(secretValue);
     await expectNoAxeViolations(page, '運用コンソール(鍵の登録)');
@@ -120,6 +123,7 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await slot.getByLabel('理由(監査に残ります)').fill('E2E の後始末');
     await slot.getByRole('button', { name: '無効にする' }).click();
     await expect(page.getByRole('status').filter({ hasText: '無効にしました' })).toBeVisible({ timeout: 15_000 });
+    await expect(slot).toContainText('無効化済み(送らない)');
 
     // スマホの幅
     await page.setViewportSize({ width: 390, height: 844 });

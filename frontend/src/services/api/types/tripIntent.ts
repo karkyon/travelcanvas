@@ -2,7 +2,8 @@
  * [Gate G11] 行き先が未定の旅行相談の型(docs/ux/G11_UIUX全範囲_実装仕様.md §2.5・§3.5)。
  * backend/app/api/v1/trip_intents.py・app/services/trip_intent.py。
  */
-export type IntentSource = 'user_input' | 'text' | 'unspecified';
+/** [Gate ConsultAI] 'ai': AI の読み取り(未確認。確かめるまで条件に使わない) */
+export type IntentSource = 'user_input' | 'text' | 'unspecified' | 'ai';
 export type IntentStrength = 'required' | 'preferred' | 'undecided';
 
 export interface IntentQuestion {
@@ -97,10 +98,20 @@ export interface IntentPayload {
   budget_min: number | null;
   budget_max: number | null;
   budget_scope: 'total' | 'per_person' | 'undecided';
+  /** [Gate ConsultAI] 予算の対象・期間・上限か目安か(旅行全体の額を宿泊費にしない) */
+  budget_target: BudgetTarget;
+  budget_period: BudgetPeriod;
+  budget_kind: BudgetKind;
   date_status: 'undecided' | 'window' | 'fixed';
   travel_window: string | null;
   preferences: string[];
+  /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
+  notes: string[];
 }
+
+export type BudgetTarget = 'lodging' | 'transport' | 'food' | 'trip_total' | 'other' | 'undecided';
+export type BudgetPeriod = 'per_night' | 'all_nights' | 'whole_trip' | 'undecided';
+export type BudgetKind = 'cap' | 'guide' | 'undecided';
 
 export interface DraftInput {
   area: { name: string; latitude: number | null; longitude: number | null; provider: 'nominatim' | null;
@@ -108,6 +119,8 @@ export interface DraftInput {
   intent: IntentPayload;
   search_candidate_ids: string[];
   source_urls: string[];
+  /** [Gate ConsultAI] AI・Google を使った相談(使った額・回数を旅行の枠へ移す) */
+  consult_session_id?: string;
 }
 
 export type DraftPart = 'morning' | 'lunch' | 'afternoon' | 'evening' | 'stay';

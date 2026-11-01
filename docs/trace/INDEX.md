@@ -21,6 +21,7 @@
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |
 | [gate-ci-redis-trace.md](gate-ci-redis-trace.md) | Gate CI-Redis トレース(CI の backend ジョブで Redis を使う試験を必ず実行する) | 0 | 0 | 0 |
 | [gate-ci429-trace.md](gate-ci429-trace.md) | Gate CI-429 トレース(CI の E2E の 429 連鎖の原因の調査) | 0 | 0 | 0 |
+| [gate-consultai-trace.md](gate-consultai-trace.md) | Gate ConsultAI — 旅行相談の AI の読み取り・方面の案・Google の場所と経路(旅行を作る前の相談の口座) | 0 | 0 | 0 |
 | [gate-doc10rev-trace.md](gate-doc10rev-trace.md) | Gate DOC10-Rev トレース(DOC-10 の版の食い違いの解消・状態の監査表) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
@@ -82,6 +83,7 @@
 | [gate-p7-trace.md](gate-p7-trace.md) | Gate P7 FR-019 トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-p8-trace.md](gate-p8-trace.md) | Gate P8 FR-036 カレンダー取込 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-p9-trace.md](gate-p9-trace.md) | Gate P9 FR-039 アカウント削除・同意撤回 トレーサビリティ表 | 2 | 0 | 0 |
+| [gate-providerconnect-trace.md](gate-providerconnect-trace.md) | Gate ProviderConnect — 鍵の有効性の確認・候補の有効化・OpenAI / Places / Routes の実接続 | 0 | 0 | 0 |
 | [gate-q1-trace.md](gate-q1-trace.md) | Gate Q1 トレース(写真の撮影情報の除去・V2 の CI の e2e の不安定の修正) | 0 | 0 | 0 |
 | [gate-r2-trace.md](gate-r2-trace.md) | Gate R2 Trace表（QuickDraft） | 0 | 1 | 1 |
 | [gate-s1-trace.md](gate-s1-trace.md) | Gate S1 セキュリティ基盤の仕上げ トレーサビリティ表 | 1 | 1 | 1 |
@@ -95,6 +97,7 @@
 | [gate-s7-trace.md](gate-s7-trace.md) | Gate S7 段階的な計算の確認 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
+| [gate-secretpolicy-trace.md](gate-secretpolicy-trace.md) | Gate SecretPolicy — 外部 API 鍵の取得元の一本化 | 0 | 0 | 0 |
 | [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |
 | [gate-ux6-icons2-trace.md](gate-ux6-icons2-trace.md) | Gate UX6-Icons2 トレース(画面に出る残りの飾りの絵文字を共通のアイコンへ・確定の予定の印) | 1 | 1 | 0 |
 | [gate-v2-trace.md](gate-v2-trace.md) | Gate V2 トレース(FR-049 Visited Area Layer・FR-050 訪問判定・信頼度・FR-051 訪問訂正・Privacy除外) | 1 | 0 | 1 |
@@ -125,7 +128,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
 | FR-058 | Entitlement・料金 | SPECIFIED | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | 外部の有料 provider は未接続(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
 
 ## 3. 棚卸しの規則
 

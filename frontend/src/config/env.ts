@@ -18,7 +18,6 @@ interface EnvironmentConfig {
   GUEST_STORAGE_KEY: string;
   
   // 外部サービス設定
-  GOOGLE_MAPS_API_KEY: string;
   GOOGLE_ANALYTICS_ID?: string;
   SENTRY_DSN?: string;
   HOTJAR_ID?: string;
@@ -59,8 +58,7 @@ interface EnvironmentConfig {
 function validateEnvironment(): EnvironmentConfig {
   const requiredVars = [
     'VITE_API_BASE_URL',
-    'VITE_WS_URL',
-    'VITE_GOOGLE_MAPS_API_KEY'
+    'VITE_WS_URL'
   ];
 
   // 必須環境変数のチェック
@@ -98,7 +96,6 @@ function validateEnvironment(): EnvironmentConfig {
     GUEST_STORAGE_KEY: import.meta.env.VITE_GUEST_STORAGE_KEY || 'travelcanvas_guest',
     
     // 外部サービス設定
-    GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     GOOGLE_ANALYTICS_ID: import.meta.env.VITE_GOOGLE_ANALYTICS_ID,
     SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
     HOTJAR_ID: import.meta.env.VITE_HOTJAR_ID,

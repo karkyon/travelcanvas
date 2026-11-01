@@ -42,8 +42,11 @@ def summarize(paths: List[str]) -> Tuple[dict, List[Tuple[str, str]]]:
 def render(title: str, totals: dict, failed: List[Tuple[str, str]]) -> str:
     ok = not totals["failures"] and not totals["errors"]
     lines = ["### %s %s" % ("✅" if ok else "❌", title), "",
-             "| 試験 | 失敗 | エラー | 飛ばし |", "|---:|---:|---:|---:|",
-             "| %d | %d | %d | %d |" % (totals["tests"], totals["failures"], totals["errors"], totals["skipped"]), ""]
+             # [監査 A09] 総数と合格を分ける(総数 1,463・飛ばし 1 を「1,463 合格」と読ませない)
+             "| 総数 | 合格 | 失敗 | エラー | 飛ばし |", "|---:|---:|---:|---:|---:|",
+             "| %d | %d | %d | %d | %d |" % (
+                 totals["tests"], max(0, totals["tests"] - totals["failures"] - totals["errors"] - totals["skipped"]),
+                 totals["failures"], totals["errors"], totals["skipped"]), ""]
     if failed:
         lines += ["落ちた試験(最大50件):", ""]
         for name, msg in failed[:50]:

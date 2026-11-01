@@ -29,6 +29,7 @@ import tempfile as _tempfile  # noqa: E402
 for _name, _value in (
     ("CORS_ORIGINS", "http://localhost:4173,http://127.0.0.1:4173"),
     ("ENCRYPTION_KEY", "test-only-encryption-key-for-pytest-0123456789abcdef"),
+    ("SECRET_BACKEND", "db_encrypted"),  # 試験では暫定の保管先を明示する(アプリ側に既定は無い)
     ("LOOKUP_INDEX_KEY", "test-only-lookup-index-key-for-pytest-0123456789abcdef"),
     ("DOCUMENT_DOWNLOAD_SIGNING_KEY", "test-only-download-signing-key-for-pytest-0123456789"),
 ):
@@ -86,6 +87,13 @@ def _guard_off_by_default(monkeypatch):
     _guard.reset_all()
     yield
     _guard.reset_all()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_github_summary(monkeypatch, tmp_path):
+    """[監査 A09] CI の検査の道具の自己試験が、偽の結果を本物の GitHub の要約(GITHUB_STEP_SUMMARY)へ書かないようにする。"""
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "step-summary.md"))
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "github-output.txt"))
 
 
 @pytest.fixture(autouse=True)

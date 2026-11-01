@@ -24,8 +24,8 @@ migration なし(既存の FR-059 の表 usage_budget_accounts・provider_usage_
 | # | 要件 | 状態 | 証拠 |
 |---|---|---|---|
 | 12 | 運用コンソールから API キーを登録する(管理者 + 多要素認証・理由が必須・監査)。ENCRYPTION_KEY で暗号化して保存し、平文を返す API は無い | IMPLEMENTED | `backend/app/services/provider_secrets.py`・`POST /admin/ops/secrets/{slot}`、migration `e8b4c2a7f1d3`・索引 `f2a6d8c4b9e1`、BE `test_gate_opscms.py` |
-| 13 | 画面・応答・監査には末尾4文字・版・出典(cms/env)だけ。入力は password の欄で、保存の後は空にする | IMPLEMENTED | FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts`(ページの HTML に値が無い) |
-| 14 | 新しい版で前の版は入れ替え済み(有効は slot ごとに1つ)・無効にすると .env の値へ戻る | IMPLEMENTED | BE |
+| 13 | 画面・応答・監査には末尾4文字・版・状態・出典(cms)だけ。入力は password の欄で、保存の後は空にする | IMPLEMENTED | FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts`(ページの HTML に値が無い) |
+| 14 | 新しい版で前の版は入れ替え済み(有効は slot ごとに1つ)・無効にしても .env の値へは戻らない(Gate SecretPolicy で変更) | IMPLEMENTED | BE `test_gate_secretpolicy.py` |
 | 15 | 鍵の列は `*_ciphertext`(鍵の点検・掛け直し `tcops.py keys` の対象) | IMPLEMENTED | `provider_secrets.secret_ciphertext` |
 | 16 | 登録した鍵で外部の API へ送る(提供元の adapter) | NOT STARTED | 提供元の Gate(契約・価格の確認の後) |
 
@@ -33,7 +33,7 @@ migration なし(既存の FR-059 の表 usage_budget_accounts・provider_usage_
 
 | # | 要件 | 状態 | 証拠 |
 |---|---|---|---|
-| 17 | 鍵の保存先を画面に出す: アプリの DB(`provider_secrets`・ENCRYPTION_KEY で暗号化)/ .env。**GCP Secret Manager には登録しない**と明記。DB のバックアップに暗号文が入ること・ENCRYPTION_KEY を失うと復号できないこと・鍵の掛け直しの対象・無効にした後の .env への戻り | IMPLEMENTED | `GET /admin/ops/secrets` の `storage`、BE `test_secrets_state_storage_is_app_db_not_secret_manager`、FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts` |
+| 17 | 鍵の保存先を画面に出す: アプリの DB(`provider_secrets`・ENCRYPTION_KEY で暗号化)/ .env。**GCP Secret Manager には登録しない**と明記。DB のバックアップに暗号文が入ること・ENCRYPTION_KEY を失うと復号できないこと・鍵の掛け直しの対象・無効にしても .env へは戻らないこと | IMPLEMENTED | `GET /admin/ops/secrets` の `storage`、BE `test_secrets_state_storage_is_app_db_not_secret_manager`、FE `AdminOpsPage.test.tsx`、E2E `ops-console.spec.ts` |
 | 18 | 「鍵あり」と「接続済み」を分ける: 提供元ごとに接続(adapter)の列。adapter が無ければ鍵・登録・価格が揃っても送信は無効 | IMPLEMENTED | `ADAPTERS_IMPLEMENTED`(今は空)、BE `test_key_present_is_not_connected_without_adapter` |
 | 19 | 鍵ごとに「アプリがまだ使っていない」を示す | IMPLEMENTED | `in_use`・`in_use_note` |
 | 20 | Google Maps のブラウザ用の鍵: アプリの画面は今 Google Maps を読み込まない(地図は OpenStreetMap)。登録しても画面へ配る経路は無いと明記 | IMPLEMENTED | `PROVIDER_CATALOG` の notes。`frontend/src/components/common/MapView.tsx` はどの画面からも使われていない |

@@ -108,6 +108,7 @@ PLAN_TABLES = (
     m.PlanMovementSettings,
     m.PlanOwnershipTransfer, m.DataCorrection,
     m.ProviderUsageReservation, m.ProviderUsageEvent,
+    m.TripConsultSession,
 )
 
 
@@ -267,6 +268,9 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
         m.ProviderUsageReservation.user_id == me).all()]
     t["provider_usage_events"] = [row(x) for x in q(m.ProviderUsageEvent).filter(
         m.ProviderUsageEvent.user_id == me).all()]
+    # [Gate ConsultAI] この旅行を作った旅行相談(本人の分だけ。相談の文章・AI の結果は元から保存していない)
+    t["trip_consult_sessions"] = [row(x) for x in q(m.TripConsultSession).filter(
+        m.TripConsultSession.user_id == me).all()]
     return t
 
 

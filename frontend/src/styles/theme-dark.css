@@ -63,7 +63,6 @@
     [data-theme='dark'] .hover\:bg-blue-100:hover { background-color: #162b4f; }
     [data-theme='dark'] .hover\:bg-blue-50:hover { background-color: #132442; }
     [data-theme='dark'] .hover\:bg-gray-100:hover { background-color: #162236; }
-    [data-theme='dark'] .hover\:bg-gray-200:hover { background-color: #24324a; }
     [data-theme='dark'] .hover\:bg-gray-50:hover { background-color: #0f1726; }
     [data-theme='dark'] .hover\:bg-green-50:hover { background-color: #0f2f2a; }
     [data-theme='dark'] .hover\:bg-pink-50:hover { background-color: #2f1b33; }

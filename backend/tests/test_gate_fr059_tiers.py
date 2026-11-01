@@ -428,8 +428,9 @@ def test_ops_test_tier_switch(auth_client, make_user, db_session, ops_audits, mo
     actions = [a["action"] for a in ops_audits]
     assert actions.count("ops_test_tier_switched") == 4
     assert all("reason" in a["details"] for a in ops_audits if a["action"] == "ops_test_tier_switched")
-    # 有料の提供元の接続は変えない
-    assert not any(k != FAKE for k in cg.paid_providers())
+    # 有料の提供元の接続は変えない(登録されているのは実装済みの adapter と Fake だけ)
+    from app.services import provider_calls as pc
+    assert set(cg.paid_providers()) <= set(pc.ADAPTERS) | {FAKE}
     monkeypatch.setattr(settings, "APP_ENV", "production")
     r = client.post("/api/v1/admin/ops/test-tier", json={"tier": "journey", "reason": "x"})
     assert r.status_code == 403 and r.json()["detail"]["code"] == "test_tier_disabled"

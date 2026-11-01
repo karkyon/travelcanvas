@@ -36,3 +36,16 @@ export function revokeAdmin(email: string): void {
 export function resetThreatScores(): void {
   ops(['unblock-all']);
 }
+
+/**
+ * [Gate ConsultAI] CI の E2E だけ: 模擬の提供元(PROVIDER_HTTP_STUB)で、模擬の鍵を登録・確認し、
+ * その会員に会員のクラスと AI の同意を付ける(実の API へは送らない)
+ */
+export function e2eStubReady(email: string, tier: 'trip' | 'journey' | 'explorer' = 'journey'): void {
+  ops(['e2e-stub-ready', '--email', email, '--tier', tier, '--yes']);
+}
+
+/** [Gate ConsultAI] 模擬の鍵を無効にする(後の試験に「接続済み」を残さない) */
+export function e2eStubReset(): void {
+  ops(['e2e-stub-reset', '--yes']);
+}

@@ -212,6 +212,9 @@ class Settings(BaseSettings):
     # ため、未設定時はQuickDraft関連呼び出し時にのみ明確なエラーを返す設計
     # とする(backend/app/core/crypto.py参照)。
     ENCRYPTION_KEY: Optional[str] = None
+    # 外部 API 鍵の保管先(非秘密・**明示選択**。未設定は「選ばれていない」で、鍵の取得も送信もしない。
+    # 自動探索・障害時の切替もしない)。db_encrypted は開発・LAN 受入だけの暫定、最終は gcp_secret_manager
+    SECRET_BACKEND: str = ""
     # [Gate G1] SEC-F1 前の鍵(カンマ区切り)。復号だけに使う。鍵を替える時は、今の ENCRYPTION_KEY をここへ移し、
     # 新しい鍵を ENCRYPTION_KEY に入れて `tcops.py keys rekey` で掛け直す。全件が今の鍵になったら外す(失効)。
     # 手順は docs/ops/KEY-INVENTORY.md・Runbook §8.2。
@@ -293,6 +296,16 @@ class Settings(BaseSettings):
     # [FR059-B] 外部 API の原価の予約の期限(秒)。provider の応答が消えた時、この後に解放する
     # (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §5)
     COST_GUARD_RESERVATION_TTL_SECONDS: int = 600
+    # [Gate ProviderConnect] 使う OpenAI のモデル(非秘密。変えると以前の鍵の確認は使えなくなる)・確認の期限・
+    # 管理者の確認の日の枠(全ての提供元の合計。旅行の 50円とは別。初期の方針)
+    OPENAI_MODEL: str = "gpt-5-nano"
+    PROVIDER_VERIFY_TTL_HOURS: int = 72
+    OPS_VERIFY_DAILY_CAP_JPY: int = 50
+    # [Gate ConsultAI] 試験用の模擬の提供元(CI の E2E だけ)。真の時、外への送信を全てアプリの中の決まった応答へ差し替える
+    # (実の API へは送らない・課金されない)。本番・ステージング(is_production)では起動を拒む。画面には「模擬」と出す
+    PROVIDER_HTTP_STUB: bool = False
+    # [Gate ConsultAI] 旅行相談の AI の相談の期限(日)。期限を過ぎた相談では送らない
+    CONSULT_SESSION_TTL_DAYS: int = 7
 
     # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
     # 文書の上限 + 余白(multipart の区切り等)まで受ける。

@@ -2,7 +2,7 @@
  * PlanMap - PLAN MAP基礎(Gate #32)
  *
  * [Gate #32] 監査是正: 既存のMapView.tsx(Google Maps JavaScript API)は
- * VITE_GOOGLE_MAPS_API_KEY未提供のままどのページからも呼ばれておらず、
+ * ブラウザ用の鍵が未提供のままどのページからも呼ばれておらず(Gate SecretPolicy で削除済み)、
  * ghost codeだった。v5.1仕様のGate #32セクションが明示する「provider
  * 非依存adapter」「APIキーなしfixture route provider」という方針に従い、
  * Leaflet + OpenStreetMapタイル(APIキー不要、Gate #31のNominatim/

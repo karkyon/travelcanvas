@@ -92,16 +92,19 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("report")
     ap.add_argument("--issue", action="store_true")
+    # [監査 A09] リリースの判定: 失敗・flaky(再試行で合格)・結果の欠落・壊れた結果・0 件なら非 0 で終わる
+    ap.add_argument("--release-gate", action="store_true")
     args = ap.parse_args(argv)
+    gate = 1 if args.release_gate else 0
     p = Path(args.report)
     if not p.is_file():
         print("[e2e-flaky] 結果のファイルがありません: %s" % p)
-        return 0
+        return gate
     try:
         counts, flaky = collect(json.loads(p.read_text(encoding="utf-8")))
     except (ValueError, OSError) as e:
         print("[e2e-flaky] 結果を読めません: %s" % e)
-        return 0
+        return gate
     text = summary(counts, flaky)
     out = os.environ.get("GITHUB_STEP_SUMMARY")
     if out:
@@ -118,6 +121,14 @@ def main(argv=None) -> int:
             print("[e2e-flaky] issue を %d 件作成・追記しました" % n)
         except Exception as e:  # noqa: BLE001 - issue の作成の失敗で CI を落とさない
             print("[e2e-flaky] issue を作れませんでした: %s" % e)
+    if args.release_gate:
+        total = sum(counts.values())
+        if total == 0 or counts.get("failed", 0) or counts.get("flaky", 0):
+            print("::error::E2E のリリース判定: 失敗 %d・flaky %d・総数 %d(失敗・flaky・0 件はリリースしない)"
+                  % (counts.get("failed", 0), counts.get("flaky", 0), total))
+            return 1
+        print("[e2e-flaky] リリース判定: 合格 %d・失敗 0・flaky 0・飛ばし %d"
+              % (counts.get("passed", 0), counts.get("skipped", 0)))
     return 0
 
 

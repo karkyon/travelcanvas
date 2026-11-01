@@ -3667,12 +3667,29 @@ class UsageBudgetAccount(Base):
 
     __table_args__ = (
         UniqueConstraint("scope_type", "scope_id", "period_key", name="uq_usage_budget_accounts_scope"),
-        CheckConstraint("scope_type IN ('plan', 'user', 'organization')", name="ck_usage_budget_accounts_scope"),
+        CheckConstraint("scope_type IN ('plan', 'user', 'organization', 'consult')",
+                        name="ck_usage_budget_accounts_scope"),
         CheckConstraint("period_key = 'plan' OR period_key ~ '^[0-9]{4}-[0-9]{2}$'",
                         name="ck_usage_budget_accounts_period"),
         CheckConstraint("reserved_jpy >= 0 AND settled_jpy >= 0 AND cap_jpy >= 0 AND plans_used >= 0",
                         name="ck_usage_budget_accounts_amounts"),
     )
+
+
+class TripConsultSession(Base):
+    """[Gate ConsultAI] 旅行を作る前の相談(AI の読み取り・方面の案・場所の検索・経路)。原価は usage_budget_accounts の
+    scope_type='consult'(1相談 = 1旅行と同じ 50円・回数の枠)。相談の文章・結果は保存しない。下書きを作ると plan_id を入れて閉じ、
+    使った額・回数はその旅行の口座へ移す。"""
+    __tablename__ = "trip_consult_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProviderUsageReservation(Base):
@@ -3703,6 +3720,9 @@ class ProviderUsageReservation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate ConsultAI] 送信権を取った時刻(1予約で送るのは1回だけ)と、要求の指紋(入力の hash。入力そのものは持たない)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    request_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="uq_provider_usage_reservations_idem"),
@@ -3770,9 +3790,46 @@ class ProviderSecret(Base):
     disabled_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     disabled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate ProviderConnect] 提供元の確認の結果(この版で・この設定で・この期限まで)。登録しただけでは unverified
+    provider_auth: Mapped[str] = mapped_column(String(16), nullable=False, default="unverified",
+                                               server_default="unverified")
+    verify_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    verify_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_config: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    capabilities: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("slot", "version", name="uq_provider_secrets_slot_version"),
-        CheckConstraint("status IN ('active', 'superseded', 'disabled')", name="ck_provider_secrets_status"),
+        CheckConstraint("status IN ('active', 'pending', 'superseded', 'disabled')", name="ck_provider_secrets_status"),
+        CheckConstraint("provider_auth IN ('unverified', 'accepted', 'rejected', 'inconclusive')",
+                        name="ck_provider_secrets_provider_auth"),
         Index("uq_provider_secrets_one_active", "slot", unique=True, postgresql_where=text("status = 'active'")),
+        Index("uq_provider_secrets_one_pending", "slot", unique=True, postgresql_where=text("status = 'pending'")),
+    )
+
+
+class ProviderSecretVerification(Base):
+    """[Gate ProviderConnect] 鍵の有効性の確認の1回(管理者の明示の操作)。見込みの額は送る前に予約し、日の枠で数える。
+    鍵の値・提供元の本文は持たない(固定の結果のコードだけ)。"""
+    __tablename__ = "provider_secret_verifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slot: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    operation: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="reserved", server_default="reserved")
+    result_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    estimated_cost_jpy: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    ops_day: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    reason: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('reserved', 'finished')", name="ck_provider_secret_verifications_status"),
+        Index("ix_provider_secret_verifications_slot_created", "slot", "created_at"),
     )

@@ -49,8 +49,9 @@ def test_providers_never_return_secret_values(auth_client, db_session, audits, m
     assert "sk-test-not-a-real-key" not in r.text
     rows = {p["name"]: p for p in r.json()["providers"]}
     assert set(rows) == {"openai", "google_maps_js", "google_places", "google_routes", "fake"}
-    assert rows["openai"]["secret"] == "configured" and rows["openai"]["contract"] == "unverified"
-    assert rows["openai"]["secret_source"] == "env" and rows["openai"]["secret_last4"] == "3456"
+    # .env に値があっても取得元ではない → 鍵なし(以前は configured と表示していた)
+    assert rows["openai"]["secret"] == "missing" and rows["openai"]["contract"] == "unverified"
+    assert rows["openai"]["secret_source"] is None and rows["openai"]["secret_last4"] is None  # .env の末尾は出さない
     assert rows["openai"]["live_calls"] == "disabled"  # 登録されていない(契約・Gate が先)
     assert rows["google_places"]["secret"] in ("missing", "configured")
     assert rows["google_places"]["secret_slot"] == "google_maps_server_key"
@@ -163,21 +164,28 @@ def test_register_secret_encrypts_never_returns_value_and_audits(auth_client, db
     rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
     assert rows["openai"]["secret_source"] == "cms" and rows["openai"]["secret_version"] == 1
     # 監査には版と理由だけ
-    reg = [a for a in audits if a["action"] == "ops_secret_registered"]
-    assert reg and value not in str(reg) and reg[0]["details"]["version"] == 1
-    # 新しい版: 前の版は superseded、有効は1つ
+    from app.models.models import AuditLog
+    reg = [a for a in db_session.query(AuditLog).filter_by(action="ops_secret_registered")]
+    assert reg and value not in str([a.details for a in reg]) and reg[0].details["version"] == 1
+    # [Gate ProviderConnect] 新しい版は候補(pending)。有効な版(1)はそのまま(確認して有効化するまで入れ替えない)
     r = client.post(url, json={"value": "sk-second-version-WXYZ9876", "reason": "入れ替え"})
-    assert r.json()["version"] == 2 and r.json()["last4"] == "9876"
+    cand = r.json()["candidate"]
+    assert r.json()["version"] == 1 and cand["version"] == 2 and cand["last4"] == "9876"
     statuses = {x.version: x.status for x in db_session.query(ProviderSecret).filter_by(slot="openai_api_key")}
-    assert statuses == {1: "superseded", 2: "active"}
-    # 無効にすると .env の値へ戻る
+    assert statuses == {1: "active", 2: "pending"}
+    assert ps.resolve(db_session, "openai_api_key") == value
+    # 無効にしても .env の値へは戻らない(無効化は保持され、取得は拒否)
     assert client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={}).status_code == 422
     r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "漏えいの疑い"})
-    assert r.status_code == 200 and r.json()["source"] == "env"
-    assert ps.resolve(db_session, "openai_api_key") == "sk-env-fallback-value-0000"
+    assert r.status_code == 200 and r.json()["status"] == "disabled" and r.json()["source"] is None
+    with pytest.raises(ps.SecretUnavailable) as exc:
+        ps.resolve(db_session, "openai_api_key")
+    assert exc.value.code == "secret_disabled"
     r = client.post("/api/v1/admin/ops/secrets/openai_api_key/disable", json={"reason": "二度目"})
     assert r.status_code == 409
-    assert any(a["action"] == "ops_secret_disabled" for a in audits)
+    from app.models.models import AuditLog
+    actions = {x.action for x in db_session.query(AuditLog).filter(AuditLog.resource_type == "ops_console")}
+    assert {"ops_secret_registered", "ops_secret_disabled"} <= actions  # 鍵の変更と同じ transaction で監査が入る
 
 
 def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypatch):
@@ -195,18 +203,27 @@ def test_key_present_is_not_connected_without_adapter(auth_client, db_session, a
     client, user = auth_client
     _admin(db_session, user)
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-test-not-a-real-key-123456")
+    # .env に本物の値があっても取得元ではない → 鍵なし
     cg.register_provider("openai", ["ai.generate"])
     try:
+        before = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
+        assert before["openai"]["secret"] == "missing" and before["openai"]["secret_source"] is None
+        from app.services import provider_secrets as ps
+        ps.register(db_session, "openai_api_key", "sk-cms-registered-secret-ABCD1234", "試験", user.id)
         rows = {p["name"]: p for p in client.get("/api/v1/admin/ops/providers").json()["providers"]}
     finally:
         cg.unregister_provider("openai")
     assert rows["openai"]["registered"] is True and rows["openai"]["secret"] == "configured"
-    assert rows["openai"]["adapter"] == "not_implemented"
+    # [Gate ProviderConnect] adapter は入ったが、鍵の有効性の確認が無い間は送らない(鍵あり≠接続済み)
+    assert rows["openai"]["adapter"] == "implemented" and rows["openai"]["secret_verification"] == "unverified"
     assert rows["openai"]["live_calls"] == "disabled"
-    assert rows["openai"]["secret_storage"] == "サーバーの環境変数(.env)"
+    assert rows["openai"]["secret_storage"] == "アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)"
+    assert rows["openai"]["secret_provider_auth"] == "unverified"
     assert rows["fake"]["adapter"] == "fake"
-    assert all(p["adapter"] == "not_implemented" for n, p in rows.items() if n != "fake")
-    assert admin_ops.ADAPTERS_IMPLEMENTED == frozenset()
+    from app.services import provider_calls as pc
+    assert admin_ops.ADAPTERS_IMPLEMENTED == frozenset(pc.ADAPTERS)  # 実装の正本から作る(名前だけを足さない)
+    assert {n for n, p in rows.items() if p["adapter"] == "implemented"} == set(pc.ADAPTERS)
+    assert rows["google_maps_js"]["adapter"] == "not_implemented"
 
 
 def test_secrets_state_storage_is_app_db_not_secret_manager(auth_client, db_session, audits):
@@ -216,8 +233,12 @@ def test_secrets_state_storage_is_app_db_not_secret_manager(auth_client, db_sess
     assert "アプリの DB" in body["storage"]["location"] and "暗号化" in body["storage"]["location"]
     assert "Secret Manager には登録しません" in body["storage"]["not_secret_manager"]
     assert "ENCRYPTION_KEY を失うと復号できない" in body["storage"]["backup"]
-    for slot in body["slots"]:
-        assert slot["in_use"] is False and "まだこの鍵を使いません" in slot["in_use_note"]
+    by_slot = {s["slot"]: s for s in body["slots"]}
+    # adapter のある鍵は「使っている提供元」、ブラウザ用の鍵は使わない(今の地図は OpenStreetMap)
+    assert by_slot["openai_api_key"]["in_use"] is True and "openai" in by_slot["openai_api_key"]["in_use_note"]
+    assert by_slot["google_maps_server_key"]["in_use"] is True
+    assert by_slot["google_maps_browser_key"]["in_use"] is False
+    assert by_slot["google_maps_browser_key"]["verify_supported"] is False
 
 
 def test_provider_secrets_column_is_covered_by_rekey(db_session):
@@ -250,11 +271,11 @@ def test_bundle_secret_check_catches_server_keys(tmp_path):
 
 
 def test_no_code_sends_to_paid_hosts_without_an_adapter():
-    """fail closed: adapter が無い間、アプリのコードに有料の提供元の送り先(host)が無い(cost_guard を通らない送信を作らない)"""
+    """有料の提供元の送り先(host)は provider_http.py の許可の一覧だけ(cost_guard・鍵の確認を通らない送信を作らない)"""
     import re
     from pathlib import Path
 
     app_dir = Path(__file__).resolve().parents[1] / "app"
     hosts = re.compile(r"api\.openai\.com|places\.googleapis\.com|routes\.googleapis\.com|maps\.googleapis\.com")
     found = [str(p.relative_to(app_dir)) for p in app_dir.rglob("*.py") if hosts.search(p.read_text(encoding="utf-8"))]
-    assert found == [], "adapter の Gate の前に有料の送り先がある: %s" % found
+    assert found == ["services/provider_http.py"], "許可の一覧の外に有料の送り先がある: %s" % found

@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -53,7 +53,7 @@ jobs:
       - name: Python dependencies (pip-audit, ブロッキング)
         run: python scripts/security/audit_deps.py python
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -75,7 +75,7 @@ jobs:
 
       - name: Upload SBOM
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sbom-${{ github.sha }}
           path: ci-results/
@@ -91,7 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -144,7 +144,7 @@ jobs:
 
       - name: Upload frontend test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-tests-${{ github.sha }}
           path: ci-results/
@@ -200,7 +200,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -281,7 +281,7 @@ jobs:
 
       - name: Upload backend test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-junit-${{ github.sha }}
           path: ci-results/
@@ -332,6 +332,12 @@ jobs:
           DB_APP_PASSWORD=ci-only-dummy-app-role-password-0123456789
           APP_DATABASE_URL=postgresql://tc_app:ci-only-dummy-app-role-password-0123456789@postgres:5432/travelcanvas
           VITE_API_URL=http://localhost:8001
+          # [Gate SecretPolicy] アプリ側に既定の保管先は無い(未設定なら鍵を取得も送信もしない)。
+          # E2E の使い捨てスタックだけ、暫定の db_encrypted を明示する
+          SECRET_BACKEND=db_encrypted
+          # [Gate ConsultAI] 試験用の模擬の提供元(外の API へは送らない・課金なし)。旅行相談の AI・Google の E2E
+          # (zz-consult-ai.spec.ts)が模擬の鍵を登録・確認して使う。本番・ステージングでは backend が起動を拒む
+          PROVIDER_HTTP_STUB=true
           EOF
 
       - name: Build & start full stack (postgres/redis/backend/frontend)
@@ -368,7 +374,7 @@ jobs:
           docker compose logs frontend
           exit 1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
@@ -401,6 +407,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/e2e_flaky_report.py frontend/e2e-results/report.json --issue
 
+      # [監査 A09] 失敗・flaky(再試行で合格)・結果の欠落・0 件があれば止める(上の記録は issue を作るだけで落とさない)
+      - name: E2E のリリース判定 (ブロッキング・flaky 0)
+        run: python3 scripts/ci/e2e_flaky_report.py frontend/e2e-results/report.json --release-gate
+
       # [Gate G1] GOV-03 VERIFIED の E2E の証拠(spec ごと)がこの実行で合格したかを照合する
       - name: VERIFIED の E2E の証拠の照合 (ブロッキング)
         run: python3 scripts/ci/check_ledger_results.py e2e --junit frontend/e2e-results/junit.xml
@@ -408,7 +418,7 @@ jobs:
       # [Gate G1] CI-02 E2E の結果(JUnit・HTML の報告)を合否に関わらず残す
       - name: Upload Playwright results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-${{ github.sha }}
           path: |

@@ -5,11 +5,18 @@
 - POST /trip-intents/extract                      : 文章と画面の項目から、確かめる条件の一覧(保存しない。文章はログに残さない)
 - POST /trip-intents/areas                        : 書かれた方面の位置(地名の照会)・直線距離・照会の状態(保存しない)
 - POST /trip-intents/draft                        : 選んだ方面と候補で、未確定の旅程の下書き(旅行)を作る
+- [Gate ConsultAI] 旅行を作る前の相談で外部の提供元を使う(押した時だけ・Idempotency-Key・相談の口座で 50円と回数):
+  POST /trip-intents/ai/session        : 相談を始める(送らない)
+  GET  /trip-intents/ai/status         : 同意・クラス・鍵の確認・模擬かどうか・相談の口座(送らない)
+  POST /trip-intents/ai/extract        : 文章を AI(OpenAI Responses・構造化の出力)で読み取る。「AI · 未確認」として返す
+  POST /trip-intents/ai/places-search  : Google で場所を探す(方面の位置の近く)。保存しない
+  POST /trip-intents/ai/route          : Google で出発地から方面への経路を調べる。保存しない
 - GET  /plans/{plan_id}/trip-intent               : 下書き(方面・条件・日と時間帯の並び・照会の状態)
 - PUT  /plans/{plan_id}/trip-intent/slots         : 下書きの並びを変える(If-Match: 旅行の revision。前の並びへ戻すのも同じ口)
 - POST /plans/{plan_id}/trip-intent/commit        : 日付を決めて、下書きの並びを旅程(日・予定)にする(1回の変更として元に戻せる)
 
-文章からの読み取りは決まった規則だけ(AI は未接続)。運転時間・宿・混み具合・営業時間の値は作らない。
+規則の読み取り(/extract)は送らない。AI の読み取り(/ai/extract)は同意・クラス・枠・確認済みの鍵が揃った時だけ送る。
+運転時間・宿・混み具合・営業時間の値は作らない(経路は Google の結果だけを、出典と時刻つきで示す)。
 旅の個人的な理由は保存しない。監査には件数と方面の数だけを残す(文章・地名は残さない)。
 """
 import uuid
@@ -19,7 +26,7 @@ from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -31,10 +38,17 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    Place, PlanCandidate, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan, User,
+    Place, PlanCandidate, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan, TripConsultSession, User,
 )
 from app.services import candidates as cs
+from app.services import consents
+from app.services import consult_ai
+from app.services import cost_guard as cg
 from app.services import free_usage
+from app.services import membership_tiers as mt
+from app.services import provider_calls as pc
+from app.services import provider_secrets as ps
+from app.services import provider_stub
 from app.services import trip_intent as ti
 from app.services.audit_service import record_audit_event
 
@@ -54,6 +68,7 @@ def _geocoder_enabled() -> bool:
 
 @router.get("/status")
 def intent_status(current_user: User = Depends(get_current_user_or_guest)):
+    # 規則の読み取りの口の状態(AI の読み取りは /ai/status)
     return {
         "extractor": "text_rules", "ai_connected": False,
         "providers": {"geocode": "nominatim" if _geocoder_enabled() else None, "route": None, "lodging": None,
@@ -131,9 +146,15 @@ class IntentIn(BaseModel):
     budget_min: Optional[int] = Field(None, ge=0, le=10_000_000)
     budget_max: Optional[int] = Field(None, ge=0, le=10_000_000)
     budget_scope: Literal["total", "per_person", "undecided"] = "undecided"
+    # [Gate ConsultAI] 予算の対象・期間・上限か目安か(旅行全体の額を宿泊費にしない)
+    budget_target: Literal["lodging", "transport", "food", "trip_total", "other", "undecided"] = "undecided"
+    budget_period: Literal["per_night", "all_nights", "whole_trip", "undecided"] = "undecided"
+    budget_kind: Literal["cap", "guide", "undecided"] = "undecided"
     date_status: Literal["undecided", "window", "fixed"] = "undecided"
     travel_window: Optional[str] = Field(None, max_length=60)
     preferences: List[str] = Field(default_factory=list, max_length=10)
+    # [Gate ConsultAI] 決まった項目に分けられない希望(その他)。利用者が確かめた分だけ下書きへ残す
+    notes: List[str] = Field(default_factory=list, max_length=ti.MAX_NOTES)
 
 
 class AreaIn(BaseModel):
@@ -151,6 +172,8 @@ class DraftIn(BaseModel):
     intent: IntentIn
     search_candidate_ids: List[uuid.UUID] = Field(default_factory=list, max_length=30)
     source_urls: List[str] = Field(default_factory=list, max_length=10)
+    # [Gate ConsultAI] AI・場所の検索・経路を使った相談。使った額・回数をこの旅行の口座へ移し、相談を閉じる
+    consult_session_id: Optional[uuid.UUID] = None
 
 
 def _title(area: str, nights: int) -> str:
@@ -160,6 +183,8 @@ def _title(area: str, nights: int) -> str:
 @router.post("/draft", status_code=201)
 def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     intent = body.intent.model_dump()
+    notes = [" ".join(n.split())[:100] for n in intent.get("notes") or [] if isinstance(n, str) and n.strip()]
+    intent["notes"] = list(dict.fromkeys(notes))[:ti.MAX_NOTES]
     if set(intent["preferences"]) - set(ti.PREFERENCES):
         raise _bad("invalid_field", "過ごし方の項目が正しくありません")
     lo, hi = intent["budget_min"], intent["budget_max"]
@@ -190,10 +215,26 @@ def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: Use
         area_name = cs.clean_text(body.area.name, 40, "方面", required=True) or ""
     except cs.CandidateInputError as e:
         raise _bad(e.code, str(e))
+    session = None
+    if body.consult_session_id is not None:
+        # 本人の開いている相談だけを移す(期限切れでも使った分は移す。他の人の・閉じた相談は無視して下書きは作る)
+        session = (db.query(TripConsultSession)
+                   .filter(TripConsultSession.id == body.consult_session_id,
+                           TripConsultSession.user_id == current_user.id,
+                           TripConsultSession.plan_id.is_(None), TripConsultSession.closed_at.is_(None))
+                   .with_for_update().first())
     plan = TravelPlan(user_id=current_user.id, title=_title(area_name, intent["nights"]), destination=area_name,
                       status="draft")
     db.add(plan)
     db.flush()
+    moved = None
+    if session is not None:
+        moved = cg.adopt_consult_account(db, session.id, plan)
+        if moved is None:
+            db.rollback()
+            raise _bad("consult_pending", "外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください",
+                       409)
+        session.plan_id, session.closed_at = plan.id, ti.now()
     rows: List[PlanCandidate] = []
     for sc in picked:
         src = db.query(SourceRecord).filter(SourceRecord.candidate_id == sc.id).order_by(
@@ -230,7 +271,8 @@ def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: Use
     }}
     db.commit()
     record_audit_event(action="trip_intent.draft", resource_type="travel_plan", user_id=current_user.id,
-                       resource_id=plan.id, details={"candidates": len(rows), "nights": intent["nights"]})
+                       resource_id=plan.id, details={"candidates": len(rows), "nights": intent["nights"],
+                                                     "consult_usage_moved_jpy": moved["moved_jpy"] if moved else None})
     return {"plan_id": str(plan.id), "revision": plan.revision, "candidates": len(rows)}
 
 
@@ -400,3 +442,186 @@ def commit_draft(plan_id: str, body: CommitIn, db: Session = Depends(get_db),
     return {"plan_id": str(plan.id), "revision": revision,
             "days": [{"id": str(days[d].id), "local_date": days[d].local_date.isoformat()} for d in sorted(days)],
             "events": len(slots)}
+
+
+# ===================================================================== [Gate ConsultAI] 旅行を作る前の相談で外部の提供元を使う
+
+_SECRET_MESSAGE = {
+    "secret_unverified": "管理者が鍵の有効性をまだ確かめていないため、送りません",
+    "secret_verification_expired": "鍵の確認の期限が切れたため、送りません(管理者が確認し直します)",
+    "secret_verification_stale": "設定が変わったため、鍵の確認をやり直すまで送りません",
+    "secret_rejected": "提供元が鍵を受け付けていないため、送りません",
+}
+_CONSENT_MESSAGE = "AI の利用に同意していないため、相談の文章を AI へ送りません。同意するか、AI を使わずに読み取ってください"
+
+
+def _ai_bad(code: str, message: str, status: int = 422, extra: Optional[Dict[str, Any]] = None) -> HTTPException:
+    return HTTPException(status_code=status, detail={"code": code, "message": message,
+                                                     "fallbacks": list(cg.FALLBACKS), **(extra or {})})
+
+
+def _session(db: Session, user: User, session_id: Any) -> TripConsultSession:
+    try:
+        sid = uuid.UUID(str(session_id))
+    except (ValueError, TypeError):
+        raise _ai_bad("consult_not_found", "相談が見つかりません。最初からやり直してください", 404)
+    row = db.query(TripConsultSession).filter(TripConsultSession.id == sid,
+                                              TripConsultSession.user_id == user.id).first()
+    if row is None:
+        raise _ai_bad("consult_not_found", "相談が見つかりません。最初からやり直してください", 404)
+    if row.plan_id is not None or row.closed_at is not None:
+        raise _ai_bad("consult_closed", "この相談からはもう旅程の下書きを作りました。新しい相談を始めてください", 409)
+    expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=dt_timezone.utc)
+    if expires <= ti.now():
+        raise _ai_bad("consult_expired", "相談の期限が切れました。最初からやり直してください", 409)
+    return row
+
+
+def _idem(value: Optional[str]) -> str:
+    key = (value or "").strip()
+    if not key or len(key) > 80:
+        raise _ai_bad("idempotency_key_required", "Idempotency-Key(80文字まで)が要ります")
+    return key
+
+
+def _send_guard(fn):
+    try:
+        return fn()
+    except cg.CostGuardError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail())
+    except ps.SecretUnavailable as error:
+        message = _SECRET_MESSAGE.get(error.code, "外部の提供元の準備が整っていないため、送りません。手で続けられます")
+        raise _ai_bad("provider_not_ready", message, 503, {"reason": error.code})
+    except pc.ProviderRejected as error:
+        raise _ai_bad("provider_rejected", "提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます",
+                      503, {"reason": error.code})
+    except consult_ai.ConsultAIError as error:
+        raise _ai_bad(error.code, error.message, error.status)
+
+
+def _ai_audit(action: str, user: User, session: TripConsultSession, details: Dict[str, Any]) -> None:
+    # 文章・地名・結果は残さない(件数と分類だけ)
+    record_audit_event(action=action, resource_type="trip_consult", user_id=user.id, resource_id=session.id,
+                       details=details)
+
+
+@router.post("/ai/session", status_code=201)
+def start_consult(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    row = TripConsultSession(id=uuid.uuid4(), user_id=current_user.id,
+                             expires_at=ti.now() + timedelta(days=int(settings.CONSULT_SESSION_TTL_DAYS)))
+    db.add(row)
+    db.commit()
+    return {"session_id": str(row.id), "expires_at": row.expires_at.isoformat()}
+
+
+@router.get("/ai/status")
+def consult_ai_status(session_id: Optional[str] = None, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)):
+    """送らずに、AI・場所の検索・経路を今使えるか(と使えない理由)を返す。鍵の値・相談の文章は返さない。"""
+    klass, _src = cg.user_class(db, current_user)
+    ops: Dict[str, Any] = {}
+    for operation, provider in (("ai.generate", "openai"), ("places.search", "google_places"),
+                                ("routes.element", "google_routes")):
+        included = klass != "guest" and (not mt.is_tier(klass) or operation in mt.TIER_OPERATIONS[klass])
+        reason = None
+        try:
+            ps.resolve_for_send(db, provider, operation)
+            key_ready = True
+        except ps.SecretUnavailable as error:
+            key_ready, reason = False, error.code
+        suspended = cg.is_suspended(provider)
+        ops[operation] = {"provider": provider, "included": included, "key_ready": key_ready,
+                          "suspended": suspended, "reason": reason if not key_ready else None,
+                          "ready": included and key_ready and not suspended}
+    body: Dict[str, Any] = {
+        "class": klass, "class_label": cg.CLASS_LABEL.get(klass, klass),
+        "consent": {"ai_processing": consents.has_consent(current_user, "ai_processing")},
+        "operations": ops, "stub": provider_stub.enabled(), "model": pc.openai_model(),
+        "max_text_chars": consult_ai.MAX_TEXT_CHARS,
+    }
+    if session_id:
+        try:
+            s = _session(db, current_user, session_id)
+            body["usage"] = cg.consult_usage(db, s.id, current_user)
+        except HTTPException as error:
+            body["session_error"] = (error.detail or {}).get("code") if isinstance(error.detail, dict) else None
+    return body
+
+
+class AiExtractIn(ExtractIn):
+    session_id: uuid.UUID
+
+
+@router.post("/ai/extract")
+def consult_ai_extract(body: AiExtractIn, idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                       db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    session = _session(db, current_user, body.session_id)
+    key = _idem(idempotency_key)
+    if not consents.has_consent(current_user, "ai_processing"):
+        raise _ai_bad("consent_required", _CONSENT_MESSAGE, 403)
+    if len(body.text.strip()) > consult_ai.MAX_TEXT_CHARS:
+        raise _ai_bad("input_too_long", f"AI へ送る文章は {consult_ai.MAX_TEXT_CHARS} 文字までです")
+    fields = body.model_dump(exclude={"text", "session_id"}, exclude_none=True)
+    result, usage = _send_guard(lambda: consult_ai.extract(db, session, current_user, body.text, fields, key))
+    _ai_audit("trip_consult.ai_extract", current_user, session,
+              {"items_from_ai": sum(1 for i in result["items"] if i["source"] == "ai"),
+               "suggested_areas": len(result["suggested_areas"]), "result": "ok"})
+    return {**result, "usage": usage, "saved": False, "stub": provider_stub.enabled(),
+            "notice": "AI の読み取りです(未確認)。確かめた行だけを条件に使います。営業時間・料金・混み具合は AI に作らせていません"}
+
+
+def _num(payload: Dict[str, Any], name: str, lo: float, hi: float, required: bool = True) -> Optional[float]:
+    value = payload.get(name)
+    if value is None and not required:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not lo <= float(value) <= hi:
+        raise _ai_bad("invalid_input", f"{name} の値が正しくありません")
+    return float(value)
+
+
+def _coord(payload: Dict[str, Any], name: str, limit: float) -> float:
+    value = _num(payload, name, -limit, limit)
+    assert value is not None  # required=True
+    return value
+
+
+@router.post("/ai/places-search")
+def consult_places(payload: Dict[str, Any] = Body(...),
+                   idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    body = payload if isinstance(payload, dict) else {}
+    session = _session(db, current_user, body.get("session_id"))
+    query = body.get("query")
+    if not isinstance(query, str) or not query.strip() or len(query) > 120:
+        raise _ai_bad("invalid_input", "探す言葉を 1〜120 文字で入力してください")
+    lat = _num(body, "latitude", -90, 90, required=False)
+    lng = _num(body, "longitude", -180, 180, required=False)
+    if (lat is None) != (lng is None):
+        raise _ai_bad("invalid_input", "緯度と経度は両方を指定してください")
+    key = _idem(idempotency_key)
+    places, usage = _send_guard(lambda: pc.places_search(db, None, current_user, query.strip(), lat, lng, key,
+                                                         consult_id=session.id))
+    _ai_audit("trip_consult.places_search", current_user, session, {"results": len(places)})
+    return {"results": places, "usage": usage, "saved": False, "attribution": "Google",
+            "retrieved_at": ti.now().isoformat(), "stub": provider_stub.enabled(),
+            "notice": "Google の検索の結果です(営業時間・料金は未確認)。旅行には保存していません"}
+
+
+@router.post("/ai/route")
+def consult_route(payload: Dict[str, Any] = Body(...),
+                  idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                  db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    body = payload if isinstance(payload, dict) else {}
+    session = _session(db, current_user, body.get("session_id"))
+    mode = body.get("mode") or "driving"
+    if mode not in pc.ROUTE_MODES:
+        raise _ai_bad("invalid_input", "移動の手段は driving・walking・bicycling・transit のどれかです")
+    origin = (_coord(body, "origin_latitude", 90), _coord(body, "origin_longitude", 180))
+    dest = (_coord(body, "dest_latitude", 90), _coord(body, "dest_longitude", 180))
+    key = _idem(idempotency_key)
+    summary, usage = _send_guard(lambda: pc.route_between(db, None, current_user, origin, dest, mode, key,
+                                                          consult_id=session.id))
+    _ai_audit("trip_consult.route", current_user, session, {"found": summary is not None, "mode": mode})
+    return {"result": summary, "mode": mode, "usage": usage, "saved": False, "attribution": "Google",
+            "retrieved_at": ti.now().isoformat(), "stub": provider_stub.enabled(),
+            "notice": "Google の経路の結果です(出発の時刻・渋滞は考えていません)。旅行には保存していません"}

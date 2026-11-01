@@ -7,8 +7,8 @@
  * - 入力の途中の状態はこのタブの間だけ覚える(sessionStorage。写真・記事を足しに行って戻っても消えない)
  */
 import type {
-  AreasResult, DraftInput, DraftPart, DraftSlot, ExtractInput, IntentExtraction, IntentItem, IntentPayload, IntentSource,
-  IntentStrength,
+  AreasResult, BudgetKind, BudgetPeriod, BudgetTarget, DraftInput, DraftPart, DraftSlot, ExtractInput, IntentExtraction,
+  IntentItem, IntentPayload, IntentSource, IntentStrength,
 } from '@/services/api/types/tripIntent';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 
@@ -24,6 +24,7 @@ export const STEPS: Array<{ id: ConsultStep; title: string; sub: string }> = [
 export const SOURCE_LABEL: Record<IntentSource | 'confirmed', string> = {
   user_input: 'あなたの入力',
   text: '文章から読み取り · 未確認',
+  ai: 'AI の読み取り · 未確認',
   unspecified: '未指定',
   confirmed: 'あなたが確認',
 };
@@ -74,10 +75,21 @@ export interface ReviewValues {
   budget_min_man: number | null;
   budget_max_man: number | null;
   budget_scope: 'total' | 'per_person' | 'undecided';
+  budget_target: BudgetTarget;
+  budget_period: BudgetPeriod;
+  budget_kind: BudgetKind;
   date_status: 'undecided' | 'window' | 'fixed';
   travel_window: string;
   preferences: string[];
 }
+
+export const BUDGET_TARGET_LABEL: Record<BudgetTarget, string> = {
+  lodging: '宿泊費', transport: '交通費', food: '食費', trip_total: '旅行全体', other: 'その他', undecided: '未定',
+};
+export const BUDGET_PERIOD_LABEL: Record<BudgetPeriod, string> = {
+  per_night: '1泊分', all_nights: '全泊分', whole_trip: '旅行全体', undecided: '未定',
+};
+export const BUDGET_KIND_LABEL: Record<BudgetKind, string> = { cap: '上限', guide: '目安', undecided: '未定' };
 
 export const REVIEW_KEYS = ['origin', 'party_size', 'nights', 'transport', 'one_way', 'room', 'budget', 'dates',
   'preferences'] as const;
@@ -92,6 +104,10 @@ export interface ReviewState {
   personal: boolean;
   /** 入力欄と文章が食い違った行の選択肢(人数など)。選ぶまで条件に使わない */
   conflicts?: Partial<Record<ReviewKey, Array<{ value: string; label: string }>>>;
+  /** [Gate ConsultAI] 確かめた行に、追加の相談で違う値が出た時の変更案(採用するまで変えない) */
+  proposals?: Partial<Record<ReviewKey, { from: string; to: string; values: Partial<ReviewValues> }>>;
+  /** [Gate ConsultAI] その他の希望(決まった項目に分けられない希望。利用者が残した分だけ下書きへ) */
+  notes?: string[];
 }
 
 export interface ConsultState {
@@ -105,6 +121,16 @@ export interface ConsultState {
   savedAreas: string[];
   picked: Record<string, NearbyResult>;
   urls: string[];
+  /** [Gate ConsultAI] AI・Google を使う相談の ID(サーバーが発行。下書きを作ると閉じる) */
+  consultSessionId?: string | null;
+  /** [Gate ConsultAI] AI が挙げた方面の案(未確認。利用者が足すまで比べない) */
+  suggestedAreas?: Array<{ name: string; reason: string }>;
+  /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
+  unknowns?: string[];
+  /** [Gate ConsultAI] 入力の仕方(AI に自由に相談 / 項目ごとに入力)。同じ下書きを使う */
+  mode?: 'free' | 'fields';
+  /** [Gate ConsultAI] 確認の画面の直前の状態(「直前の変更を元に戻す」用。最大10) */
+  history?: Array<{ review: ReviewState; areaNames: string[] }>;
 }
 
 export const INITIAL_STATE: ConsultState = {
@@ -167,7 +193,8 @@ function item(ex: IntentExtraction, key: string): IntentItem | undefined {
 export function initReview(ex: IntentExtraction): ReviewState {
   const get = (k: string) => item(ex, k);
   const tr = get('transport')?.value as { mode?: string; highway?: boolean } | null | undefined;
-  const budget = get('budget')?.value as { min?: number; max?: number; scope?: string | null } | null | undefined;
+  const budget = get('budget')?.value as { min?: number; max?: number; scope?: string | null; target?: string;
+    period?: string; kind?: string } | null | undefined;
   const dates = get('dates')?.value as { status?: string; text?: string } | null | undefined;
   const sources = {} as Record<ReviewKey, IntentSource>;
   const confirmed = {} as Record<ReviewKey, boolean>;
@@ -198,21 +225,73 @@ export function initReview(ex: IntentExtraction): ReviewState {
       budget_min_man: typeof budget?.min === 'number' ? budget.min / 10000 : null,
       budget_max_man: typeof budget?.max === 'number' ? budget.max / 10000 : null,
       budget_scope: budget?.scope === 'total' || budget?.scope === 'per_person' ? budget.scope : 'undecided',
+      budget_target: (budget?.target && budget.target in BUDGET_TARGET_LABEL ? budget.target : 'undecided') as BudgetTarget,
+      budget_period: (budget?.period && budget.period in BUDGET_PERIOD_LABEL ? budget.period : 'undecided') as BudgetPeriod,
+      budget_kind: (budget?.kind && budget.kind in BUDGET_KIND_LABEL ? budget.kind : 'undecided') as BudgetKind,
       date_status: dates?.status === 'window' || dates?.status === 'fixed' ? dates.status : 'undecided',
       travel_window: dates?.text ?? '',
       preferences: Array.isArray(get('preferences')?.value) ? (get('preferences')!.value as string[]) : [],
     },
     sources, confirmed, strength, evidence, conflicts,
     personal: ex.items.some((i) => i.sensitive),
+    notes: [...((ex as { notes?: string[] }).notes ?? [])],
   };
 }
+
+const show = (v: unknown): string => (Array.isArray(v) ? v.join('、') || '(なし)' : v === null || v === '' ? '未定' : String(v));
+
+/**
+ * [Gate ConsultAI] 追加の相談(再読み取り)の結果を、今の確認の画面へ重ねる。
+ * - 確かめた行・自分で直した行は消さない。新しい読み取りで値が違えば「変更案」として示す(採用するまで変えない)
+ * - まだ確かめていない行は新しい読み取りで置き換える
+ * - その他の希望は足し合わせる(消さない)
+ */
+export function mergeReview(prev: ReviewState, next: ReviewState): ReviewState {
+  const out: ReviewState = {
+    ...next, values: { ...next.values }, sources: { ...next.sources }, confirmed: { ...next.confirmed },
+    strength: { ...next.strength }, evidence: { ...next.evidence }, proposals: { ...(prev.proposals ?? {}) },
+    notes: Array.from(new Set([...(prev.notes ?? []), ...(next.notes ?? [])])).slice(0, 10),
+    personal: prev.personal || next.personal,
+  };
+  for (const k of REVIEW_KEYS) {
+    if (!prev.confirmed[k]) continue;
+    const keys = REVIEW_FIELDS[k];
+    const before: Partial<ReviewValues> = {};
+    const after: Partial<ReviewValues> = {};
+    for (const f of keys) {
+      (before as Record<string, unknown>)[f] = prev.values[f];
+      (after as Record<string, unknown>)[f] = next.values[f];
+    }
+    // 確かめた値はそのまま残す
+    Object.assign(out.values, before);
+    out.sources[k] = prev.sources[k];
+    out.confirmed[k] = true;
+    out.strength[k] = prev.strength[k];
+    out.evidence[k] = prev.evidence[k];
+    const nextSpecified = next.sources[k] !== 'unspecified';
+    const differs = keys.some((f) => JSON.stringify(prev.values[f]) !== JSON.stringify(next.values[f]));
+    if (nextSpecified && differs) {
+      out.proposals![k] = { from: keys.map((f) => show(prev.values[f])).join(' · '),
+        to: keys.map((f) => show(next.values[f])).join(' · '), values: after };
+    }
+  }
+  return out;
+}
+
+/** 行の値(変更案の比較・採用に使う) */
+export const REVIEW_FIELDS: Record<ReviewKey, Array<keyof ReviewValues>> = {
+  origin: ['origin'], party_size: ['party_size'], nights: ['nights'], transport: ['transport', 'highway'],
+  one_way: ['one_way_hours', 'one_way_strength'], room: ['room'],
+  budget: ['budget_min_man', 'budget_max_man', 'budget_scope', 'budget_target', 'budget_period', 'budget_kind'],
+  dates: ['date_status', 'travel_window'], preferences: ['preferences'],
+};
 
 /** 未確定の問い(人数の食い違い・片道の時間・宿泊費の範囲)が残っているか */
 export function openQuestions(r: ReviewState): Array<'party_size' | 'one_way' | 'budget'> {
   const out: Array<'party_size' | 'one_way' | 'budget'> = [];
   if (r.conflicts?.party_size && r.values.party_size === null) out.push('party_size');
   if (r.values.one_way_hours && r.values.one_way_strength === 'undecided') out.push('one_way');
-  if (r.values.budget_min_man !== null && r.values.budget_scope === 'undecided') out.push('budget');
+  if (r.values.budget_min_man !== null && r.values.budget_scope === 'undecided' && !r.confirmed.budget) out.push('budget');
   return out;
 }
 
@@ -223,7 +302,8 @@ export function intentOf(r: ReviewState): IntentPayload {
   return {
     origin: ok('origin') && v.origin.trim() ? v.origin.trim() : null,
     party_size: ok('party_size') ? v.party_size : null,
-    nights: v.nights ?? 1,
+    // [監査 A06] 確かめていない日数は使わない(確認の画面は日数を確かめるまで先へ進めない)
+    nights: ok('nights') && v.nights !== null ? v.nights : 0,
     transport: ok('transport') ? v.transport : 'undecided',
     highway: ok('transport') ? v.highway : false,
     one_way_hours: ok('one_way') ? v.one_way_hours : null,
@@ -232,9 +312,13 @@ export function intentOf(r: ReviewState): IntentPayload {
     budget_min: ok('budget') && v.budget_min_man !== null ? Math.round(v.budget_min_man * 10000) : null,
     budget_max: ok('budget') && v.budget_max_man !== null ? Math.round(v.budget_max_man * 10000) : null,
     budget_scope: ok('budget') ? v.budget_scope : 'undecided',
+    budget_target: ok('budget') ? v.budget_target : 'undecided',
+    budget_period: ok('budget') ? v.budget_period : 'undecided',
+    budget_kind: ok('budget') ? v.budget_kind : 'undecided',
     date_status: ok('dates') ? v.date_status : 'undecided',
     travel_window: ok('dates') && v.travel_window.trim() ? v.travel_window.trim().slice(0, 60) : null,
     preferences: ok('preferences') ? v.preferences.filter((p) => p in PREFERENCE_LABEL) : [],
+    notes: (r.notes ?? []).map((n) => n.trim()).filter(Boolean).slice(0, 10),
   };
 }
 
@@ -253,6 +337,7 @@ export function draftInputOf(state: ConsultState): DraftInput | null {
     intent: intentOf(state.review),
     search_candidate_ids: Object.keys(state.picked).slice(0, 30),
     source_urls: state.urls.slice(0, 10),
+    ...(state.consultSessionId ? { consult_session_id: state.consultSessionId } : {}),
   };
 }
 

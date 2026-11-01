@@ -14,7 +14,8 @@ from app.models.models import User
 KEY = "privacy_consents"
 PURPOSES: List[Dict[str, Any]] = [
     {"purpose": "ai_processing", "label": "AIによる文書・候補の処理",
-     "description": "予約メールや文書の読み取り、旅程案の作成に外部のAIを使うこと。", "in_use": False},
+     "description": "旅行相談の文章の読み取り・方面の案、旅程案の作成に外部のAI(OpenAI)を使うこと。"
+                    "同意するまで、相談の文章をAIへ送りません。", "in_use": True},
     {"purpose": "location", "label": "位置情報の利用",
      "description": "旅の記録のために位置の軌跡を記録すること(旅行ごとに自分で開始・停止でき、本人だけが見られます)。",
      "in_use": True},
