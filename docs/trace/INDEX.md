@@ -12,6 +12,7 @@
 | trace | 題 | NOT STARTED | PARTIAL | SUPERSEDED |
 |---|---|---|---|---|
 | [gate-a2-trace.md](gate-a2-trace.md) | Gate A2 トレース(FR-040 管理・監査)と E2E の安定化 | 0 | 0 | 2 |
+| [gate-admin-uat-trace.md](gate-admin-uat-trace.md) | Gate AdminUAT — 管理画面の鍵の表示の食い違いの解消と、旅行相談の UAT(実 AI・音声)を成立させる準備 | 0 | 0 | 0 |
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |

@@ -453,3 +453,23 @@ def test_draft_keeps_budget_meaning_and_notes(auth_client, db_session):
     bad = client.post("/api/v1/trip-intents/draft", json={"area": {"name": "城崎"}, "intent": {
         "nights": 1, "budget_target": "hotel"}})
     assert bad.status_code == 422
+
+
+def test_contradictions_are_returned_not_resolved():
+    """[Gate AdminUAT U05] 食い違う希望は片方に決めず、確かめてほしいこととして返す(重複・長すぎ・型違いは捨てる)"""
+    assert "contradictions" in consult_ai.SCHEMA["required"]
+    assert "片方に決めず" in consult_ai.INSTRUCTIONS
+    data = dict(GOOD)
+    data["nights"] = {"value": None, "evidence": None}
+    data["contradictions"] = ["日帰りと1泊が食い違っています。どちらですか", "日帰りと1泊が食い違っています。どちらですか", 3]
+    out = consult_ai.merge("日帰りがいい。でも1泊したい。", {}, data)
+    assert out["contradictions"] == ["日帰りと1泊が食い違っています。どちらですか"]
+    nights = next(i for i in out["items"] if i["key"] == "nights")
+    assert nights["value"] in (None, 0) or nights["source"] != "ai"
+    assert consult_ai.merge(TEXT, {}, dict(GOOD))["contradictions"] == []
+
+
+def test_stub_reports_contradiction_for_day_trip_and_overnight():
+    ans = provider_stub._ai_answer("【相談の文章】\n日帰りか1泊かは迷っています")
+    assert ans["contradictions"] and "食い違" in ans["contradictions"][0]
+    assert provider_stub._ai_answer("【相談の文章】\n1泊2日")["contradictions"] == []

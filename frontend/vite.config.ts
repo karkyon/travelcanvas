@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     name: 'tc-security-headers',
     configurePreviewServer(server) {
       server.middlewares.use((req, res, next) => {
-        const headers = securityHeaders(apiUrlForHost(apiUrl, req.headers.host), production)
+        const headers = securityHeaders(apiUrlForHost(apiUrl, req.headers.host, req.headers['x-forwarded-proto'] === 'https' ? 'https:' : 'http:'), production)
         for (const [k, v] of Object.entries(headers)) res.setHeader(k, v)
         next()
       })

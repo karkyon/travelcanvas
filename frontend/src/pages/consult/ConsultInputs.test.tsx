@@ -88,3 +88,14 @@ describe('その他の希望', () => {
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
 });
+
+describe('[Gate AdminUAT U05] 食い違う希望', () => {
+  it('AI が見つけた食い違いを、片方に決めずに「確かめてほしいこと」として出す', async () => {
+    const { SuggestedAreasPanel } = await import('./ConsultAiPanels');
+    render(<SuggestedAreasPanel suggestions={[]} unknowns={[]} areaNames={[]} onToggle={vi.fn()}
+      contradictions={['日帰りと泊まりが食い違っています。どちらですか']} />);
+    expect(screen.getByTestId('consult-ai-contradictions')).toHaveTextContent('日帰りと泊まりが食い違っています');
+    expect(screen.getByRole('heading', { name: /確かめてほしいこと/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('consult-ai-suggestions')).toBeNull();
+  });
+});

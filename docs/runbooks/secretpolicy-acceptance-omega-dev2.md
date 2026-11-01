@@ -71,7 +71,8 @@ OpenAI の残高・Google の課金とキーの制限(API 制限・送信元 IP)
 
 
 ## 3d. 旅行相談の AI(http://192.168.1.11:4173/trip-consult)
-前提: 3b で OpenAI とGoogle のサーバー用の鍵が「確認済み(期限内・72時間)」。試験の会員に Journey 以上(3c の 1)。
+前提: 3b で OpenAI とGoogle のサーバー用の鍵が「登録済み・接続確認済み」(確認期限つき・72時間)。試験の会員に Journey 以上(3c の 1)。
+運用コンソールの概要「旅行相談の UAT の準備(このアカウント)」が全て OK であること(足りない項目は表の「変える場所」で直す)。
 1. 「AI で読み取る」の枠に、会員のクラス・AI の状態・同意の印が出る。同意の印が無ければ印を付ける(設定のプライバシーでも同じ)。
    状態が「使えます(gpt-5-nano)」でない時は、出ている理由(クラス・鍵の確認・停止)を直す。「模擬」の帯が出たら `.env` に
    `PROVIDER_HTTP_STUB` が入っているので外して backend を再起動する。
@@ -84,6 +85,10 @@ OpenAI の残高・Google の課金とキーの制限(API 制限・送信元 IP)
 5. 「○○で旅程案を作る」→ 下書き(未確定)。旅程の利用枠(50円)に相談で使った分が入っている(50円を越えない)。
 6. 「原価の台帳」に openai・google_places・google_routes の行。相談の文章・AI の結果は保存されていない(監査は件数だけ)。
 7. 送る前に断る確認: 同意の印を外す →「AI で読み取る」が押せない。Free の会員では「Free のクラスには含まれません」。
+
+## 3e. 旅行相談の UAT(実 AI・文字と音声)
+シナリオ U01〜U12・入力例・音声の https の入口(`bash scripts/ops/uat_https.sh up`)・利用台帳の照合は
+`docs/runbooks/consult-uat-omega-dev2.md`。音声は `https://192.168.1.11:4443/trip-consult`(端末に UAT のルート証明書を入れる)。
 
 ## 4. 反映の道具と巻き戻し
 反映は `TC_EXPECT_HEAD=<SHA> bash scripts/ops/consultai_apply.sh push`(push → 統合 PR → CI)と、merge の後の

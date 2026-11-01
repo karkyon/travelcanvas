@@ -75,7 +75,7 @@ function cacheControl(rel) {
 }
 
 /**
- * @param {{ root: string, headersFor: (host: string | undefined) => Record<string, string>,
+ * @param {{ root: string, headersFor: (host: string | undefined, proto?: string) => Record<string, string>,
  *           allowedHosts: string[], hostnameOf: (h: string | undefined) => string | undefined }} opts
  */
 export function createStaticServer(opts) {
@@ -96,7 +96,9 @@ export function createStaticServer(opts) {
   return createServer(async (req, res) => {
     const host = req.headers.host;
     const name = opts.hostnameOf(host);
-    const security = opts.headersFor(host);
+    // [Gate AdminUAT] UAT の https の入口(caddy)を通った時は、CSP の API の通信先も同じ https の入口にする
+    const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' ? 'https:' : 'http:';
+    const security = opts.headersFor(host, proto);
     const send = (status, body, extra = {}) => {
       res.writeHead(status, { ...security, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store',
         ...extra });
@@ -180,7 +182,7 @@ async function main() {
   const production = (env.APP_ENV || '').toLowerCase() === 'production';
   const server = createStaticServer({
     root: env.TC_STATIC_ROOT || path.join(here, '..', 'dist'),
-    headersFor: (host) => sh.securityHeaders(sh.apiUrlForHost(apiUrl, host), production),
+    headersFor: (host, proto) => sh.securityHeaders(sh.apiUrlForHost(apiUrl, host, proto), production),
     allowedHosts: sh.allowedHosts(env.TC_PUBLIC_HOSTS),
     hostnameOf: sh.hostnameOf,
   });

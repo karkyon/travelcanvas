@@ -40,6 +40,8 @@ INSTRUCTIONS = (
     "budget の target は何の費用か(宿泊費 lodging・交通費 transport・食費 food・旅行全体 trip_total・その他 other)。"
     "書かれていなければ undecided にし、宿泊費と決め付けないでください。period・kind も同じです。"
     "other_wishes には、上のどの項目にも入らない希望(例: 何もしない時間がほしい、地元の市場)を、文章の言葉に近い形で短く書いてください。"
+    "利用者の希望どうしが食い違う時(例: 日帰りと1泊、人数の違う書き方、上限の違う予算)は、片方に決めず、"
+    "contradictions に「〜と〜が食い違っています。どちらですか」の形で短く書き、その項目の value は null にしてください。"
 )
 
 
@@ -78,6 +80,7 @@ SCHEMA: Dict[str, Any] = _obj({
     "areas_suggested": {"type": "array", "items": _obj({"name": {"type": "string"}, "reason": {"type": "string"}})},
     "unknowns": {"type": "array", "items": {"type": "string"}},
     "other_wishes": {"type": "array", "items": {"type": "string"}},
+    "contradictions": {"type": "array", "items": {"type": "string"}},
 })
 TEXT_FORMAT: Dict[str, Any] = {"type": "json_schema", "name": "trip_intent", "schema": SCHEMA, "strict": True}
 
@@ -269,9 +272,11 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
             break
     unknowns = [u for u in (_str(x, 60) for x in (data.get("unknowns") or [])) if u][:5]
     notes = list(dict.fromkeys(n for n in (_str(x, 100) for x in (data.get("other_wishes") or [])) if n))[:ti.MAX_NOTES]
+    # [Gate AdminUAT U05] 食い違う希望は勝手に片方へ寄せず、確かめてほしいこととして返す
+    contradictions = list(dict.fromkeys(c for c in (_str(x, 80) for x in (data.get("contradictions") or [])) if c))[:5]
     nights = next((x["value"] for x in items if x["key"] == "nights" and isinstance(x["value"], int)), None)
     return {"items": items, "areas": areas, "suggested_areas": suggested, "unknowns": unknowns, "notes": notes,
-            "nights": nights, "extractor": EXTRACTOR, "ai_connected": True}
+            "contradictions": contradictions, "nights": nights, "extractor": EXTRACTOR, "ai_connected": True}
 
 
 # ===================================================================== 送る

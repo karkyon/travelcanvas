@@ -1,0 +1,34 @@
+# [Gate AdminUAT] 開発の UAT 用の https の入口(音声入力はブラウザが安全な接続でしか使わせないため)。
+# docker compose --profile uat-https up -d uat-https で起動する。本番では使わない(自己署名の CA。本番は正式な証明書)。
+# - TC_UAT_SITES(例 "https://192.168.1.11:4443, https://omega-dev2:4443")の名前で、caddy の内部 CA の証明書を出す
+# - /api/*・/health・/ready は backend へ、他は画面(frontend)へ。/metrics・/docs は通さない
+# - http://<名前>:4480/travelcanvas-uat-root.crt で内部 CA のルート証明書(公開の証明書。秘密鍵ではない)を配る
+{
+	admin off
+	skip_install_trust
+	default_sni {$TC_UAT_DEFAULT_SNI}
+}
+
+{$TC_UAT_SITES} {
+	tls internal
+	encode gzip
+	@backend path /api/* /health /ready
+	handle @backend {
+		reverse_proxy backend:8000
+	}
+	handle {
+		reverse_proxy frontend:4173
+	}
+}
+
+http://:4480 {
+	handle /travelcanvas-uat-root.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	handle {
+		respond "TravelCanvas UAT: /travelcanvas-uat-root.crt" 404
+	}
+}

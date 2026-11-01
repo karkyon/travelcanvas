@@ -26,13 +26,19 @@ export function hostnameOf(host: string | undefined | null): string | undefined 
  * API も同じ名前に向ける(ポートと方式はそのまま)。以前は画面を他の PC から開くと、ブラウザがその PC 自身の
  * localhost:8001 を呼んで何も動かなかった。設定が localhost 以外(本番のドメイン)なら変えない。
  */
-export function apiUrlForHost(apiUrl: string | undefined, pageHost: string | undefined | null): string {
+export function apiUrlForHost(apiUrl: string | undefined, pageHost: string | undefined | null,
+  pageProtocol?: string | null): string {
   const raw = apiUrl || 'http://localhost:8001';
   const name = hostnameOf(pageHost);
   if (!name || LOOPBACK.has(name)) return raw;
   try {
     const u = new URL(raw);
     if (!LOOPBACK.has(u.hostname)) return raw;
+    // [Gate AdminUAT] 開発の UAT の https の入口(caddy。/api・/health は backend へ、他は画面へ)から開いた時は、
+    // http の API を呼ぶと混在で止まるため、同じ入口(同じオリジン)の API を使う(パスはそのまま)
+    if (pageProtocol === 'https:' && u.protocol === 'http:' && pageHost) {
+      return `https://${pageHost}${u.pathname.replace(/\/+$/, '')}`;
+    }
     u.hostname = name;
     return u.toString().replace(/\/+$/, '');
   } catch {

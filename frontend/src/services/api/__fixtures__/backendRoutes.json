@@ -46,7 +46,8 @@
   "captured_at_head_providerconnect": "gate/provider-connect (+verify・activate・discard・plans/{plan_id}/paid/*)",
   "captured_at_head_secretpolicy": "gate/secretpolicy (+Gate SecretPolicy admin/ops/secrets/{slot}/import-env)",
   "captured_at_head_fr059_tiers": "39aac73 (+Gate FR059-Tiers: GET /admin/ops/tiers・POST /admin/ops/test-tier)",
-  "captured_at_head_consult_ai": "gate/provider-connect (+Gate ConsultAI: /trip-intents/ai/session・status・extract・places-search・route)"
+  "captured_at_head_consult_ai": "gate/provider-connect (+Gate ConsultAI: /trip-intents/ai/session・status・extract・places-search・route)",
+  "captured_at_head_admin_uat": "gate/admin-ops-uat (+Gate AdminUAT: GET /admin/ops/uat-readiness)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -105,6 +106,7 @@
   "GET /api/v1/admin/ops/providers",
   "GET /api/v1/admin/ops/secrets",
   "GET /api/v1/admin/ops/tiers",
+  "GET /api/v1/admin/ops/uat-readiness",
   "GET /api/v1/admin/planning-usage",
   "GET /api/v1/admin/stats/system",
   "GET /api/v1/admin/support-grants",

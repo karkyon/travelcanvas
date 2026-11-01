@@ -50,6 +50,14 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await expect(page.getByText('未接続(外へは送らない)')).toBeVisible(); // 鍵の確認が無い間は送れる提供元が 0
     await expect(page.getByText('今月の Fake の試験の額')).toBeVisible();
     await expect(page.getByText(/Cloud Billing の請求額・予算はアプリから取得していません/)).toBeVisible();
+    // [Gate AdminUAT] このアカウントの旅行相談の UAT の準備(今の値・変える場所)。CI は模擬の提供元なので「実の提供元」ではない
+    const uat = page.getByTestId('ops-uat-readiness');
+    await expect(uat).toBeVisible({ timeout: 15_000 });
+    await expect(uat.getByTestId('ops-uat-ready')).toHaveText('足りない項目があります');
+    await expect(uat.getByTestId('ops-uat-class')).toContainText('運用コンソール › 会員クラス');
+    await expect(uat.getByTestId('ops-uat-consent')).toContainText('未同意');
+    await expect(uat.getByTestId('ops-uat-real_provider')).toContainText('模擬(PROVIDER_HTTP_STUB)');
+    await expect(uat.getByRole('link', { name: '旅行相談を開く' })).toHaveAttribute('href', '/trip-consult');
     await expectNoAxeViolations(page, '運用コンソール(概要)');
 
     // 2. 提供元
@@ -99,7 +107,8 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await expect(page.getByTestId('ops-tier-result')).toContainText('今のクラス: Free', { timeout: 15_000 });
     // Free の試験の利用者は有料の操作を全て送る前に断られ、0円
     await page.getByRole('tab', { name: 'テスト実行' }).click();
-    await page.getByLabel('試験の利用者のクラス').selectOption('free');
+    await expect(page.getByTestId('ops-run-fake-note')).toContainText('実 AI の接続の確認にはなりません');
+    await page.getByLabel(/試験用の利用者のクラス/).selectOption('free');
     await page.getByRole('button', { name: 'Fake で原価の上限を試す' }).click();
     await expect(page.getByTestId('ops-run-summary')).toContainText('Free(自分でつくる)', { timeout: 30_000 });
     await expect(page.getByTestId('ops-run-summary')).toContainText('クラスに含まない');
@@ -115,7 +124,11 @@ test('運用コンソール: 未接続の明示・鍵を出さない・Fake の�
     await slot.getByRole('button', { name: '暗号化して保存' }).click();
     await expect(page.getByRole('status').filter({ hasText: '末尾 WXYZ' })).toBeVisible({ timeout: 15_000 });
     await expect(slot).toContainText('この画面で登録');
-    await expect(slot).toContainText('登録済み・提供元の認証は未確認');
+    await expect(slot.getByTestId('ops-secret-status')).toHaveText('登録済み・接続は未確認(送らない)');
+    await expect(slot).not.toContainText('本物の鍵を登録');
+    // 使わない鍵(Google のブラウザ用)は「設定不要」(未設定の警告にしない)
+    await expect(page.getByTestId('ops-secret-google_maps_browser_key').getByTestId('ops-secret-status'))
+      .toHaveText('現在の構成では使用しません。設定不要');
     await expect(page.getByTestId('ops-secret-storage')).toContainText('GCP Secret Manager には登録しません');
     expect(await page.content()).not.toContain(secretValue);
     await expectNoAxeViolations(page, '運用コンソール(鍵の登録)');

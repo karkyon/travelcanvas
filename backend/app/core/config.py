@@ -82,6 +82,8 @@ def production_problems(s) -> List[str]:
     # [Gate H1] 本番では http の追加の名前を許さない(https の CORS_ORIGINS だけにする)
     if (getattr(s, "TC_PUBLIC_HOSTS", "") or "").strip():
         problems.append("TC_PUBLIC_HOSTS が設定されている(http の画面を許す。本番では CORS_ORIGINS に https で書く)")
+    if (getattr(s, "TC_UAT_HTTPS_PORT", "") or "").strip():
+        problems.append("TC_UAT_HTTPS_PORT が設定されている(開発の UAT 用の自己署名の入口。本番では使わない)")
     # [Gate S11] 本番で管理者の多要素認証を外さない
     if not getattr(s, "ADMIN_MFA_REQUIRED", True):
         problems.append("ADMIN_MFA_REQUIRED=false(管理者がパスワードだけで入れる)")
@@ -325,6 +327,9 @@ class Settings(BaseSettings):
     # [Gate H1] 画面を開いてよい名前(omega-dev2・LAN の IP 等、カンマ区切り)。各名前の http://<名前>:4173 を
     # CORS の許可に足す(docker-compose.yml の CORS_ORIGINS は localhost だけで、他の PC から開くと API を呼べなかった)
     TC_PUBLIC_HOSTS: str = ""
+    # [Gate AdminUAT] 開発の UAT 用の https の入口(docker compose --profile uat-https の caddy)のポート。
+    # 設定した時だけ、TC_PUBLIC_HOSTS の各名前の https://<名前>:<port> を CORS・CSRF の許可に足す(音声入力は安全な接続が要る)
+    TC_UAT_HTTPS_PORT: str = ""
 
     # アプリケーション設定
     DEBUG: bool = True
@@ -393,6 +398,11 @@ class Settings(BaseSettings):
                 origin = f"http://{host}:4173"
                 if origin not in out:
                     out.append(origin)
+                port = (self.TC_UAT_HTTPS_PORT or "").strip()
+                if re.fullmatch(r"[0-9]{2,5}", port):
+                    secure = f"https://{host}:{port}"
+                    if secure not in out:
+                        out.append(secure)
         return out
 
     @property

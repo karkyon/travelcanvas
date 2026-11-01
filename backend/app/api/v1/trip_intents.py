@@ -518,6 +518,18 @@ def start_consult(db: Session = Depends(get_db), current_user: User = Depends(ge
 def consult_ai_status(session_id: Optional[str] = None, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user_or_guest)):
     """送らずに、AI・場所の検索・経路を今使えるか(と使えない理由)を返す。鍵の値・相談の文章は返さない。"""
+    body = ai_readiness(db, current_user)
+    if session_id:
+        try:
+            s = _session(db, current_user, session_id)
+            body["usage"] = cg.consult_usage(db, s.id, current_user)
+        except HTTPException as error:
+            body["session_error"] = (error.detail or {}).get("code") if isinstance(error.detail, dict) else None
+    return body
+
+
+def ai_readiness(db: Session, current_user: User) -> Dict[str, Any]:
+    """[Gate AdminUAT] 旅行相談の AI・場所・経路を、この利用者が今使えるか(送らない)。運用の UAT の準備の表示と共用。"""
     klass, _src = cg.user_class(db, current_user)
     ops: Dict[str, Any] = {}
     for operation, provider in (("ai.generate", "openai"), ("places.search", "google_places"),
@@ -539,12 +551,6 @@ def consult_ai_status(session_id: Optional[str] = None, db: Session = Depends(ge
         "operations": ops, "stub": provider_stub.enabled(), "model": pc.openai_model(),
         "max_text_chars": consult_ai.MAX_TEXT_CHARS,
     }
-    if session_id:
-        try:
-            s = _session(db, current_user, session_id)
-            body["usage"] = cg.consult_usage(db, s.id, current_user)
-        except HTTPException as error:
-            body["session_error"] = (error.detail or {}).get("code") if isinstance(error.detail, dict) else None
     return body
 
 

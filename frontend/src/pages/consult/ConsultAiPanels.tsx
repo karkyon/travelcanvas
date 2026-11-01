@@ -74,11 +74,24 @@ export const AiReadPanel: React.FC<{
 
 export const SuggestedAreasPanel: React.FC<{
   suggestions: Array<{ name: string; reason: string }>; unknowns: string[]; areaNames: string[];
+  contradictions?: string[];
   onToggle: (name: string, on: boolean) => void;
-}> = ({ suggestions, unknowns, areaNames, onToggle }) => {
+}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [] }) => {
   const id = useId();
-  if (suggestions.length === 0 && unknowns.length === 0) return null;
+  if (suggestions.length === 0 && unknowns.length === 0 && contradictions.length === 0) return null;
   return (
+    <>
+    {contradictions.length > 0 && (
+      <section aria-labelledby={`${id}-c`} data-testid="consult-ai-contradictions"
+        className="mt-4 rounded-2xl border border-warning bg-surface p-4 text-sm">
+        <h3 id={`${id}-c`} className="font-semibold text-ink-900">確かめてほしいこと(希望が食い違っています)</h3>
+        <p className="text-xs text-ink-700">
+          AI はどちらかに決めていません。上の行を選び直すか、「追加で伝える・変える」でどちらかを伝えてください。
+        </p>
+        <ul className="mt-1 list-disc pl-5 text-sm text-ink-900">{contradictions.map((c) => <li key={c}>{c}</li>)}</ul>
+      </section>
+    )}
+    {(suggestions.length > 0 || unknowns.length > 0) && (
     <section aria-labelledby={`${id}-h`} data-testid="consult-ai-suggestions"
       className="mt-4 rounded-2xl border border-cloud-200 bg-surface p-4 text-sm">
       <h3 id={`${id}-h`} className="font-semibold text-ink-900">AI の方面の案(未確認)</h3>
@@ -108,6 +121,8 @@ export const SuggestedAreasPanel: React.FC<{
         </div>
       )}
     </section>
+    )}
+    </>
   );
 };
 

@@ -37,6 +37,8 @@ export interface OpsProvider {
   secret_slot?: string | null; secret_source?: 'cms' | 'env' | null; secret_version?: number | null; secret_last4?: string | null;
   secret_storage?: string | null; adapter?: 'fake' | 'implemented' | 'not_implemented';
   secret_verification?: string | null; adapter_operations?: string[];
+  /** [Gate AdminUAT] 今の構成でこの提供元へ送るか(false の鍵は「設定不要」) */
+  secret_required?: boolean;
 }
 export interface OpsProviders { as_of: string; providers: OpsProvider[]; rule: string }
 export interface OpsLedgerRow {
@@ -91,6 +93,7 @@ const provider: Decoder<OpsProvider> = object<OpsProvider>({
   secret_version: optional(nullable(int)), secret_last4: optional(nullable(str)),
   secret_storage: optional(nullable(str)), adapter: optional(oneOf('fake', 'implemented', 'not_implemented')),
   secret_verification: optional(nullable(str)), adapter_operations: optional(arrayOf(str)),
+  secret_required: optional(bool),
 });
 
 const ledgerRow: Decoder<OpsLedgerRow> = object<OpsLedgerRow>({
@@ -164,6 +167,8 @@ export interface OpsSecretSlot {
   registered_at: string | null; history: OpsSecretHistory[]; in_use?: boolean; in_use_note?: string;
   env_legacy?: OpsSecretEnvLegacy;
   verification?: OpsSecretVerification | null; candidate?: OpsSecretCandidate | null; verify_supported?: boolean;
+  /** [Gate AdminUAT] 今の構成で使う鍵か / 止めている提供元(鍵の確認とは別の制限) */
+  required?: boolean; suspended_providers?: string[];
 }
 /** [Gate ProviderConnect] 版の有効性の確認(値は含まない)。state は期限・設定の変更も含めた今の判定 */
 export type OpsVerifyState = 'unverified' | 'accepted' | 'rejected' | 'inconclusive' | 'expired' | 'stale';
@@ -216,6 +221,7 @@ const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
   history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
   env_legacy: optional(object<OpsSecretEnvLegacy>({ present: bool, placeholder: bool, importable: bool })),
   verification: optional(nullable(verification)), candidate: optional(nullable(candidate)), verify_supported: optional(bool),
+  required: optional(bool), suspended_providers: optional(arrayOf(str)),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
   slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',
@@ -329,4 +335,21 @@ export async function switchOpsTestTier(tier: OpsTier, reason: string, userId?: 
     effective: object<{ class: string; class_label: string }>({ class: str, class_label: str }),
     revoked_test_grants: int, expires_in_hours: nullable(int), note: str,
   }), 'POST /admin/ops/test-tier');
+}
+
+// ===================================================================== 旅行相談の UAT の準備(Gate AdminUAT)
+
+export interface OpsUatCheck { key: string; label: string; value: string; ok: boolean; need: string; where: string | null }
+export interface OpsUatReadiness {
+  as_of: string; account: string; class: string; ready: boolean; model: string; checks: OpsUatCheck[];
+  consult_path: string; note: string;
+}
+
+/** ログイン中のこのアカウントで、旅行相談の実 AI の UAT ができるか(送らない) */
+export async function getOpsUatReadiness(): Promise<OpsUatReadiness> {
+  const r = await api.get('/admin/ops/uat-readiness', SILENT);
+  return decodeResponse(r.data, object<OpsUatReadiness>({
+    as_of: str, account: str, class: str, ready: bool, model: str, consult_path: str, note: str,
+    checks: arrayOf(object<OpsUatCheck>({ key: str, label: str, value: str, ok: bool, need: str, where: nullable(str) })),
+  }), 'GET /admin/ops/uat-readiness');
 }

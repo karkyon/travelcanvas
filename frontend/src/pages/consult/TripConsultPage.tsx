@@ -578,7 +578,7 @@ const TripConsultPage: React.FC = () => {
 
   /** 確認の画面へ新しい読み取りを入れる。前の確認があれば重ねて(確かめた行は残す)、元に戻せるよう履歴に積む */
   const applyExtraction = (ex: IntentExtraction & { suggested_areas?: Array<{ name: string; reason: string }>;
-    unknowns?: string[] }) => {
+    unknowns?: string[]; contradictions?: string[] }) => {
     setState((s) => {
       const fresh = initReview(ex);
       const review = s.review ? mergeReview(s.review, fresh) : fresh;
@@ -587,7 +587,7 @@ const TripConsultPage: React.FC = () => {
       const history = s.review ? [...(s.history ?? []), { review: s.review, areaNames: s.areaNames }].slice(-10) : [];
       return { ...s, extraction: ex, review, areaNames, areas: null, step: 'review', history,
         suggestedAreas: (ex.suggested_areas ?? []).map(({ name, reason }) => ({ name, reason })),
-        unknowns: ex.unknowns ?? [] };
+        unknowns: ex.unknowns ?? [], contradictions: ex.contradictions ?? [] };
     });
     requestAnimationFrame?.(() => headingRef.current?.focus());
   };
@@ -790,7 +790,8 @@ const TripConsultPage: React.FC = () => {
             }} />} />
       )}
       {step === 'review' && state.review && (
-        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []} areaNames={state.areaNames}
+        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
+          contradictions={state.contradictions ?? []} areaNames={state.areaNames}
           onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)
             : s.areaNames.filter((n) => n !== name) }))} />
       )}

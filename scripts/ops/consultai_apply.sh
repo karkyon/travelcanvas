@@ -8,6 +8,11 @@
 #       3/3 CI   : workflow「CI」・期待の SHA・push の実行を待ち、成功を確かめる
 #       途中で止まっても、同じコマンドをもう一度実行すれば終わった段は飛ばして続きから進む
 #
+#   TC_EXPECT_HEAD=<40桁> bash consultai_apply.sh merge
+#       統合の PR を squash で merge する(このリポジトリは merge commit を許さない。--merge は使わない)。
+#       PR の head が期待の SHA・その CI が success の時だけ。--match-head-commit で別の commit を merge しない。
+#       済みなら飛ばし、main の merge commit の CI(push)を待って成功を確かめる
+#
 #   TC_EXPECT_HEAD=<40桁> bash consultai_apply.sh deploy
 #       0 事前の確認(何も変えない): origin/main に期待の変更が入っているか(merge・squash のどちらでも)、
 #         未追跡のファイルが新しいファイルとぶつからないか、.env の模擬の設定が無いか
@@ -18,17 +23,20 @@
 #
 # - git reset --hard / git clean / docker compose down -v / volume の削除はしない。強制 push はしない
 # - .env へ API キーを足さない。ENCRYPTION_KEY は変えない
+# - 別の Gate でも使える: TC_BRANCH・TC_TRACE(PR の本文)・TC_PR_TITLE・TC_BUNDLE_GLOB・TC_OLD_PR(空なら閉じない)
 set -uo pipefail
 
 REPO="${TC_REPO:-$HOME/projects/travelcanvas}"
-BRANCH="gate/provider-connect"
-OLD_PR="${TC_OLD_PR:-43}"
+BRANCH="${TC_BRANCH:-gate/provider-connect}"
+OLD_PR="${TC_OLD_PR-43}"
+BUNDLE_GLOB="${TC_BUNDLE_GLOB:-consultai_*.bundle}"
+PR_TITLE="${TC_PR_TITLE:-Gate SecretPolicy・ProviderConnect・ConsultAI: 鍵の確認・旅行相談の AI と Google}"
 EXPECT="${TC_EXPECT_HEAD:-}"
 LAN_HOST="${TC_LAN_HOST:-192.168.1.11}"
 API="${TC_API:-http://127.0.0.1:8001}"
 WEB="${TC_WEB:-http://127.0.0.1:4173}"
 ART="${TC_ARTIFACTS:-$HOME/tc-artifacts}"
-TRACE="docs/trace/gate-consultai-trace.md"
+TRACE="${TC_TRACE:-docs/trace/gate-consultai-trace.md}"
 
 die() { echo "NG: $*" >&2; exit 1; }
 step() { echo "== $*"; }
@@ -41,7 +49,7 @@ http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$@" || echo 
 find_bundle() {
   # 期待の SHA を gate/provider-connect に持つ bundle だけを使う(新しさでは選ばない)
   local f tip
-  for f in "$REPO"/consultai_*.bundle "$HOME"/consultai_*.bundle "$HOME"/Downloads/consultai_*.bundle; do
+  for f in "$REPO"/$BUNDLE_GLOB "$HOME"/$BUNDLE_GLOB "$HOME"/Downloads/$BUNDLE_GLOB; do
     [ -f "$f" ] || continue
     git bundle verify "$f" >/dev/null 2>&1 || continue
     tip="$(git bundle list-heads "$f" "refs/heads/$BRANCH" 2>/dev/null | awk '{print $1}' | head -1)"
@@ -59,7 +67,7 @@ cmd_push() {
     step "1/3 push: 済み(origin/$BRANCH = ${EXPECT:0:7})"
   else
     local B
-    B="$(find_bundle)" || die "1/3 push: ${EXPECT:0:7} を持つ consultai_*.bundle がありません(travelcanvas・ホーム・Downloads を探しました)"
+    B="$(find_bundle)" || die "1/3 push: ${EXPECT:0:7} を持つ $BUNDLE_GLOB がありません(travelcanvas・ホーム・Downloads を探しました)"
     git fetch -q "$B" "refs/heads/$BRANCH:refs/tmp/consultai" || die "1/3 push: bundle の基点がありません(git fetch origin の後でも足りない)"
     [ "$(git rev-parse refs/tmp/consultai)" = "$EXPECT" ] || { git update-ref -d refs/tmp/consultai; die "1/3 push: bundle の SHA が違います"; }
     if [ -n "$remote" ] && ! git merge-base --is-ancestor "$remote" "$EXPECT"; then
@@ -84,7 +92,7 @@ cmd_push() {
     body="$(mktemp)"
     git show "$EXPECT:$TRACE" > "$body" 2>/dev/null || die "2/3 PR: ${EXPECT:0:7} に $TRACE がありません"
     gh pr create --base main --head "$BRANCH" \
-      --title "Gate SecretPolicy・ProviderConnect・ConsultAI: 鍵の確認・旅行相談の AI と Google" --body-file "$body" \
+      --title "$PR_TITLE" --body-file "$body" \
       || { rm -f "$body"; die "2/3 PR: 作成に失敗(push は済み。もう一度このコマンドで続きから)"; }
     rm -f "$body"
     pr="$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')"
@@ -92,7 +100,8 @@ cmd_push() {
   head="$(gh pr view "$pr" --json headRefOid -q .headRefOid)"
   [ "$head" = "$EXPECT" ] || die "2/3 PR: PR #$pr の head が ${head:0:7}(期待 ${EXPECT:0:7})"
   step "2/3 PR: #$pr(head ${EXPECT:0:7}・base main)"
-  if [ "$(gh pr view "$OLD_PR" --json state -q .state 2>/dev/null || true)" = "OPEN" ] && [ "$OLD_PR" != "$pr" ]; then
+  if [ -n "$OLD_PR" ] && [ "$(gh pr view "$OLD_PR" --json state -q .state 2>/dev/null || true)" = "OPEN" ] \
+     && [ "$OLD_PR" != "$pr" ]; then
     gh pr close "$OLD_PR" --comment "PR #$pr に統合しました(同じ SecretPolicy の commit を含み、CI はそちらで確認します)" \
       && echo "   古い PR #$OLD_PR を閉じました"
   fi
@@ -106,7 +115,40 @@ cmd_push() {
   done
   [ -n "$run" ] || die "3/3 CI: ${EXPECT:0:7} の CI の実行が見つかりません(もう一度このコマンドで続きから)"
   gh run watch "$run" --exit-status >/dev/null || die "3/3 CI: 失敗(run $run)。merge・反映しないでください"
-  step "3/3 CI: 成功(run $run)。PR #$pr を GitHub で merge してから: TC_EXPECT_HEAD=$EXPECT bash $0 deploy"
+  step "3/3 CI: 成功(run $run)。次: TC_EXPECT_HEAD=$EXPECT bash $0 merge(squash で merge → main の CI)"
+}
+
+cmd_merge() {
+  command -v gh >/dev/null 2>&1 || die "merge: gh がありません(GitHub の画面で Squash and merge してから deploy)"
+  local pr state head c oid run i
+  pr="$(gh pr list --head "$BRANCH" --state all --json number -q '.[0].number' 2>/dev/null || true)"
+  [ -n "$pr" ] || die "merge: $BRANCH の PR がありません(先に push)"
+  state="$(gh pr view "$pr" --json state -q .state 2>/dev/null || true)"
+  if [ "$state" = "MERGED" ]; then
+    step "merge: PR #$pr は merge 済み"
+  else
+    [ "$state" = "OPEN" ] || die "merge: PR #$pr が $state です"
+    head="$(gh pr view "$pr" --json headRefOid -q .headRefOid)"
+    [ "$head" = "$EXPECT" ] || die "merge: PR #$pr の head が ${head:0:7}(期待 ${EXPECT:0:7})。merge しません"
+    c="$(gh run list --workflow CI --branch "$BRANCH" --event push --limit 20 --json headSha,conclusion \
+        -q ".[] | select(.headSha == \"$EXPECT\") | .conclusion" 2>/dev/null | head -1)"
+    [ "$c" = "success" ] || die "merge: ${EXPECT:0:7} の CI が success ではありません(${c:-未実行})。merge しません"
+    # このリポジトリは merge commit を許さない(--merge は失敗する)。squash で、期待の head の時だけ
+    gh pr merge "$pr" --squash --match-head-commit "$EXPECT" || die "merge: PR #$pr を merge できません"
+    step "merge: PR #$pr を squash で merge"
+  fi
+  oid="$(gh pr view "$pr" --json mergeCommit -q '.mergeCommit.oid // empty' 2>/dev/null || true)"
+  [[ "$oid" =~ ^[0-9a-f]{40}$ ]] || die "merge: merge の commit を確かめられません"
+  run=""
+  for i in $(seq 1 60); do
+    run="$(gh run list --workflow CI --branch main --event push --commit "$oid" --limit 1 --json databaseId \
+          -q '.[0].databaseId // empty' 2>/dev/null || true)"
+    [ -n "$run" ] && break
+    sleep 10
+  done
+  [ -n "$run" ] || die "merge: main ${oid:0:7} の CI が見つかりません(反映しないでください。もう一度このコマンドで続きから)"
+  gh run watch "$run" --exit-status >/dev/null || die "merge: main ${oid:0:7} の CI が失敗(run $run)。反映しないでください"
+  step "merge: main ${oid:0:7} の CI 成功(run $run)。次: TC_EXPECT_HEAD=$EXPECT bash $0 deploy"
 }
 
 env_true() {  # .env の最後の値を真偽として読む(1/true/yes/on)
@@ -197,7 +239,8 @@ cmd_deploy() {
   echo "3: LAN の画面から API を呼べる(CORS http://$LAN_HOST:4173)"
   echo "OK: main ${TARGET:0:7} を反映(DB $CUR・バックアップ $BK・記録 $STATE)"
   echo "    旅行相談: http://$LAN_HOST:4173/trip-consult   運用: http://$LAN_HOST:4173/admin/ops"
-  echo "    次: /admin/ops で OpenAI と Google(サーバー用)の鍵の「有効性を確認」(登録済みの版。再入力は不要)"
+  echo "    次: /admin/ops の概要「旅行相談の UAT の準備」を確かめる(鍵が確認済みで期限内なら確認し直さない。再入力は不要)"
+  echo "    音声の UAT: bash scripts/ops/uat_https.sh up → https://$LAN_HOST:4443/trip-consult(docs/runbooks/consult-uat-omega-dev2.md)"
 }
 
 fail_after() {
@@ -213,6 +256,7 @@ fail_after() {
 
 case "${1:-}" in
   push) cmd_push ;;
+  merge) cmd_merge ;;
   deploy) cmd_deploy ;;
-  *) echo "使い方: TC_EXPECT_HEAD=<SHA> bash $0 push | deploy"; exit 2 ;;
+  *) echo "使い方: TC_EXPECT_HEAD=<SHA> bash $0 push | merge | deploy"; exit 2 ;;
 esac

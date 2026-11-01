@@ -127,6 +127,8 @@ export interface ConsultState {
   suggestedAreas?: Array<{ name: string; reason: string }>;
   /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
   unknowns?: string[];
+  /** [Gate AdminUAT U05] AI が見つけた、希望どうしの食い違い(勝手に決めず、利用者に確かめる) */
+  contradictions?: string[];
   /** [Gate ConsultAI] 入力の仕方(AI に自由に相談 / 項目ごとに入力)。同じ下書きを使う */
   mode?: 'free' | 'fields';
   /** [Gate ConsultAI] 確認の画面の直前の状態(「直前の変更を元に戻す」用。最大10) */

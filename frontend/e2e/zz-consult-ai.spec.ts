@@ -89,8 +89,10 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     await expect(page.getByLabel('その他の希望 1')).toHaveValue('何もしない時間がほしい');
     await page.getByTestId('consult-undo').click();
     await expect(page.getByTestId('review-proposal-party_size')).toHaveCount(0);
-    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。何もしない時間もほしい');
+    // [Gate AdminUAT U05] 食い違う希望(日帰りと泊まり)は AI が片方に決めず「確かめてほしいこと」に出す
+    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。日帰りか1泊かは迷っています。何もしない時間もほしい');
     await page.getByTestId('consult-followup-ai').click();
+    await expect(page.getByTestId('consult-ai-contradictions')).toContainText('食い違っています', { timeout: 20_000 });
     await page.getByTestId('review-proposal-accept-party_size').click();
     await expect(page.getByTestId('review-row-party_size').getByLabel('人数', { exact: true })).toHaveValue('3');
     const suggest = page.getByTestId('consult-suggest-城崎温泉');
