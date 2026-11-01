@@ -122,7 +122,7 @@ describe('候補を探す(入口は1つ)', () => {
     expect(screen.getByTestId('consult-search-using')).toHaveTextContent('検索元: Google(有料・この相談の利用枠)');
     fireEvent.click(screen.getByTestId('consult-search'));
     await waitFor(() => expect(api.consultPlaces).toHaveBeenCalledWith('sid', '食べ物 伊勢',
-      { latitude: 34.4875, longitude: 136.7091 }, expect.any(String)));
+      { latitude: 34.4875, longitude: 136.7091 }, expect.any(String), 10));
     expect(api.searchNearby).not.toHaveBeenCalled();
     const row = await screen.findByTestId('consult-result-P1');
     expect(row).toHaveTextContent('出典: Google');
@@ -156,5 +156,73 @@ describe('候補を探す(入口は1つ)', () => {
     fireEvent.click(screen.getByTestId('consult-search-retry'));
     expect(await screen.findByTestId('consult-results-empty')).toHaveTextContent('Google で探しました');
     expect(api.consultPlaces.mock.calls[0]![3]).toBe(api.consultPlaces.mock.calls[1]![3]);
+  });
+
+  const gResult = () => ({ results: [], usage: usage(), attribution: 'Google', retrieved_at: '2026-11-01T00:00:00+00:00',
+    notice: '', stub: false });
+
+  it('[F03] 応答が届かなかった(通信・時間切れ・5xx)後のやり直しは同じキー(二度課金しない)', async () => {
+    api.consultPlaces.mockRejectedValueOnce(new Error('Network Error'))
+      .mockRejectedValueOnce({ response: { status: 503, data: { detail: { code: 'provider_timeout', message: '時間切れ' } } } })
+      .mockResolvedValueOnce(gResult());
+    setup();
+    fireEvent.click(screen.getByTestId('consult-source-google'));
+    fireEvent.click(screen.getByTestId('consult-search'));
+    expect(await screen.findByTestId('consult-search-error')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('consult-search-retry'));
+    await waitFor(() => expect(api.consultPlaces).toHaveBeenCalledTimes(2));
+    fireEvent.click(await screen.findByTestId('consult-search-retry'));
+    expect(await screen.findByTestId('consult-results-empty')).toBeInTheDocument();
+    const keys = api.consultPlaces.mock.calls.map((c) => c[3]);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it('[F03] 済んだ要求(idempotent_replay)は原価計上済みと示し、探し直しは新しい検索(新しいキー)', async () => {
+    api.consultPlaces.mockRejectedValueOnce(new Error('Network Error'))
+      .mockRejectedValueOnce({ response: { status: 409, data: { detail: { code: 'idempotent_replay', message: '済み' } } } })
+      .mockResolvedValueOnce(gResult());
+    setup();
+    fireEvent.click(screen.getByTestId('consult-source-google'));
+    fireEvent.click(screen.getByTestId('consult-search'));
+    await screen.findByTestId('consult-search-error');
+    fireEvent.click(screen.getByTestId('consult-search-retry'));
+    await waitFor(() => expect(screen.getByTestId('consult-search-error')).toHaveTextContent('原価は計上されています'));
+    expect(screen.getByTestId('consult-search-retry')).toHaveTextContent('新しい検索として探す(有料・1回)');
+    fireEvent.click(screen.getByTestId('consult-search-retry'));
+    await screen.findByTestId('consult-results-empty');
+    const keys = api.consultPlaces.mock.calls.map((c) => c[3]);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[1]);
+  });
+
+  it('[F03] 送る前に断られた(4xx)後は新しいキー', async () => {
+    api.consultPlaces.mockRejectedValueOnce({ response: { status: 429, data: { detail: { code: 'feature_quota_exceeded',
+      message: '回数の上限' } } } }).mockResolvedValueOnce(gResult());
+    setup();
+    fireEvent.click(screen.getByTestId('consult-source-google'));
+    fireEvent.click(screen.getByTestId('consult-search'));
+    expect(await screen.findByTestId('consult-search-error')).toHaveTextContent('回数の上限');
+    fireEvent.click(screen.getByTestId('consult-search-retry'));
+    await screen.findByTestId('consult-results-empty');
+    expect(api.consultPlaces.mock.calls[0]![3]).not.toBe(api.consultPlaces.mock.calls[1]![3]);
+  });
+
+  it('[F04] Google にも検索範囲を送り、範囲は優先だけと示す', async () => {
+    api.consultPlaces.mockResolvedValue(gResult());
+    setup();
+    fireEvent.click(screen.getByTestId('consult-source-google'));
+    fireEvent.change(screen.getByLabelText('検索範囲'), { target: { value: '5' } });
+    expect(screen.getByTestId('consult-search-using')).toHaveTextContent('半径5km');
+    expect(screen.getByTestId('consult-search-using')).toHaveTextContent('範囲の外の場所も出ることがあります');
+    fireEvent.click(screen.getByTestId('consult-search'));
+    await waitFor(() => expect(api.consultPlaces).toHaveBeenCalledWith('sid', '観光 伊勢', expect.anything(), expect.any(String), 5));
+  });
+
+  it('[F06] 一部だけの結果は「完全な結果」と区別して示す', async () => {
+    api.searchNearby.mockResolvedValue({ ...ok([spot('s1', '皇大神宮')]), partial_providers: ['overpass'] });
+    setup();
+    fireEvent.click(screen.getByTestId('consult-search'));
+    expect(await screen.findByTestId('consult-results-partial')).toHaveTextContent('一部だけの結果');
+    expect(screen.getByTestId('consult-result-s1')).toBeInTheDocument();
   });
 });

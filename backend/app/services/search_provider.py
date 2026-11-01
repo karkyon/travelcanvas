@@ -21,14 +21,21 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = httpx.Timeout(8.0)
 
-# [Gate SearchUAT] OpenStreetMap の公開の server(FOSSGIS の Overpass・Nominatim)は、送り手を示す User-Agent を求める。
-# 2026-04 頃から overpass-api.de は、識別できない User-Agent(httpx の既定 "python-httpx/…" を含む)の要求に
-# HTTP 406 を返す。以前の Overpass の要求は User-Agent を付けておらず、旅行相談の「候補を探す」が全て失敗していた
+# [Gate SearchUAT] OpenStreetMap の公開の server(FOSSGIS の Overpass・Nominatim)の利用条件は、送り手を示す User-Agent を
+# 求める(他の利用者の報告では、2026-04 頃から識別できない User-Agent の要求に overpass-api.de が HTTP 406 を返す)。
+# 以前の Overpass の要求は User-Agent を付けていなかった(コードで確かめた不足)。omega-dev2 の「候補を探す」の失敗の
+# 原因の候補の1つで、実環境の原因は scripts/ops/search_diag.sh の同じ要求の比較で確かめる(まだ確定していない)
 USER_AGENT = "TravelCanvas/1.0 (+https://github.com/karkyon/travelcanvas)"
 HEADERS = {"User-Agent": USER_AGENT}
 
 # 提供元の失敗の分類(「該当なし」と区別する。画面・利用の記録・運用の調査で同じ言葉を使う)
 ERROR_CODES = ("blocked", "rate_limited", "timeout", "server_error", "network", "unreadable", "provider_timeout")
+
+
+class OverpassResults(list):
+    """[Gate SearchUAT F06] Overpass の結果。partial=True は server の処理が途中で止まり、一部だけの結果(完全ではない)。"""
+
+    partial = False
 
 
 class SearchProviderError(Exception):
@@ -204,17 +211,7 @@ async def search_overpass(
     from app.core.config import settings
 
     url = (getattr(settings, "OVERPASS_URL", "") or "").strip() or "https://overpass-api.de/api/interpreter"
-    radius_m = int(radius_km * 1000)
-    name_filter = f'["name"~"{overpass_regex(query)}",i]' if query and query.strip() else '["name"]'
-    tags = CATEGORY_TAGS.get(category) or [""]
-    selectors = "\n".join(f"      nwr{tag}{name_filter}(around:{radius_m},{latitude},{longitude});" for tag in tags)
-    overpass_query = f"""
-    [out:json][timeout:15];
-    (
-{selectors}
-    );
-    out center 30;
-    """
+    overpass_query = build_overpass_query(query, latitude, longitude, radius_km, category)
 
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
@@ -223,15 +220,23 @@ async def search_overpass(
                                  headers={**HEADERS, "Accept": "application/json"})
         resp.raise_for_status()
         data = resp.json()
-        if not isinstance(data, dict):
-            raise SearchProviderError("unreadable", resp.status_code, "not an object")
-        remark = str(data.get("remark") or "")
-        if "runtime error" in remark.lower() and not data.get("elements"):
-            # 200 でも、server の時間切れ・メモリ不足の時は remark だけで要素が無い(「該当なし」ではない)
-            raise SearchProviderError("provider_timeout", resp.status_code, "remark")
+        # [Gate SearchUAT F06] 正しい応答は elements の配列を持つ。elements: [] だけが「該当なし」
+        if not isinstance(data, dict) or not isinstance(data.get("elements"), list):
+            raise SearchProviderError("unreadable", resp.status_code, "no elements array")
+        elements = data["elements"]
+        remark = str(data.get("remark") or "").lower()
+        if remark and not elements:
+            # 200 でも、server の時間切れ・メモリ不足の時は remark だけで要素が無い(「該当なし」ではない)。
+            # 本文はログに出さず、決まった分類にする
+            kind = "provider_timeout" if ("timed out" in remark or "runtime error" in remark) else "server_error"
+            raise SearchProviderError(kind, resp.status_code, "remark")
         retrieved_at = _now()
-        results = []
-        for element in data.get("elements", []):
+        results = OverpassResults()
+        # remark つきで要素がある = 途中で止まった一部だけの結果(完全な結果と区別する)
+        results.partial = bool(remark)
+        for element in elements:
+            if not isinstance(element, dict):
+                continue
             tags = element.get("tags", {})
             name = tags.get("name")
             if not name:
@@ -265,13 +270,30 @@ async def search_overpass(
             await client.aclose()
 
 
+def build_overpass_query(query: str, latitude: float, longitude: float, radius_km: float, category: str) -> str:
+    """Overpass の問い合わせの本文(アプリと運用の診断が同じものを使う)。"""
+    radius_m = int(radius_km * 1000)
+    name_filter = f'["name"~"{overpass_regex(query)}",i]' if query and query.strip() else '["name"]'
+    tags = CATEGORY_TAGS.get(category) or [""]
+    selectors = "\n".join(f"      nwr{tag}{name_filter}(around:{radius_m},{latitude},{longitude});" for tag in tags)
+    return f"""
+    [out:json][timeout:15];
+    (
+{selectors}
+    );
+    out center 30;
+    """
+
+
 class ProviderResults(list):
     """[Gate G11] 結果の一覧。応答しなかった提供元を unavailable に持つ(失敗を「見つからない」にしない)"""
 
     def __init__(self, items: List[Dict[str, Any]], unavailable: List[str], called: Optional[List[str]] = None,
-                 errors: Optional[Dict[str, str]] = None):
+                 errors: Optional[Dict[str, str]] = None, partial: Optional[List[str]] = None):
         super().__init__(items)
         self.unavailable = unavailable
+        # [Gate SearchUAT F06] 一部だけを返した提供元(server の処理が途中で止まった)
+        self.partial = list(partial or [])
         # [Gate SearchUAT] 応答しなかった提供元の失敗の分類(blocked・rate_limited・timeout など)
         self.errors = dict(errors or {})
         # [Gate FR059-D11] 外へ送った提供元(無料の provider の使用の記録に使う)
@@ -314,12 +336,15 @@ async def search_all_providers(
     combined: List[Dict[str, Any]] = []
     unavailable: List[str] = []
     errors: Dict[str, str] = {}
+    partial: List[str] = []
     for provider_name, r in zip(names, results):
         if isinstance(r, BaseException):
             logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
             unavailable.append(provider_name)
             errors[provider_name] = classify_error(r).code
             continue
+        if getattr(r, "partial", False):
+            partial.append(provider_name)
         combined.extend(r)
     called = [n for n in names if not (n == "overpass" and (latitude is None or longitude is None))]
-    return ProviderResults(combined, unavailable, called, errors)
+    return ProviderResults(combined, unavailable, called, errors, partial)

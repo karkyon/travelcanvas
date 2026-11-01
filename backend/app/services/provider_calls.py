@@ -138,11 +138,18 @@ def fingerprint(*parts: Any) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
+# [Gate SearchUAT F04] 場所の検索の範囲(Text Search の locationBias の円の半径。範囲を優先するだけで、範囲外も返り得る)
+PLACES_DEFAULT_RADIUS_M = 20000.0
+PLACES_MAX_RADIUS_M = 50000.0
+
+
 def _places_request(key: str, query: str, mask: str, max_results: int,
-                    lat: Optional[float] = None, lng: Optional[float] = None) -> ph.ProviderResponse:
+                    lat: Optional[float] = None, lng: Optional[float] = None,
+                    radius_m: Optional[float] = None) -> ph.ProviderResponse:
     payload: Dict[str, Any] = {"textQuery": query, "languageCode": "ja", "regionCode": "JP", "pageSize": max_results}
     if lat is not None and lng is not None:
-        payload["locationBias"] = {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 20000.0}}
+        radius = min(PLACES_MAX_RADIUS_M, max(100.0, float(radius_m or PLACES_DEFAULT_RADIUS_M)))
+        payload["locationBias"] = {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": radius}}
     return ph.post_json("google.places.search_text",
                         {"X-Goog-Api-Key": key, "X-Goog-FieldMask": mask, "Content-Type": "application/json"},
                         payload)
@@ -258,15 +265,18 @@ def ai_suggest(db: Session, plan: TravelPlan, caller: User, prompt: str, idempot
 
 def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: str, lat: Optional[float],
                   lng: Optional[float], idempotency_key: str,
-                  consult_id: Optional[uuid.UUID] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+                  consult_id: Optional[uuid.UUID] = None,
+                  radius_m: Optional[float] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     def call(units: Dict[str, int]) -> cg.ProviderResult:
         resp = _send(db, "google_places", "places.search",
-                     lambda key: _places_request(key, query, PLACES_FIELD_MASK, PLACES_MAX_RESULTS, lat, lng))
+                     lambda key: _places_request(key, query, PLACES_FIELD_MASK, PLACES_MAX_RESULTS, lat, lng,
+                                                 radius_m))
         return cg.ProviderResult(units={"requests": 1}, payload=_places_items(resp.body))
 
     return cg.run(db, plan, caller, "places.search", "google_places", {"requests": 1}, idempotency_key, call,
                   consult_id=consult_id,
-                  fingerprint=fingerprint("google_places", str(plan.id if plan else consult_id), query, lat, lng))
+                  fingerprint=fingerprint("google_places", str(plan.id if plan else consult_id), query, lat, lng,
+                                          radius_m))
 
 
 def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin: Tuple[float, float],

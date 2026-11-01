@@ -47,9 +47,12 @@ case "$1 $2" in
      shift 2; while [ $# -gt 0 ]; do [ "$1" = "--body-file" ] && cp "$2" "$S/body"; shift; done
      echo 7 > "$S/pr"; echo "https://example/pull/7" ;;
   "pr view") if [ "$3" = "43" ]; then echo OPEN
+     elif echo "$*" | grep -q mergeStateStatus; then echo "状態 BLOCKED・レビュー 不要・merge 可否 MERGEABLE"
      elif echo "$*" | grep -q mergeCommit; then cat "$S/merge_oid" 2>/dev/null
      elif echo "$*" | grep -q -- "--json state"; then cat "$S/pr_state" 2>/dev/null || echo OPEN
      else cat "$S/pr_head" 2>/dev/null || echo "$EXPECT_FOR_STUB"; fi ;;
+  "pr checks") if [ -f "$S/pr_checks" ]; then cat "$S/pr_checks"
+     else echo '[{"name":"e2e","state":"SUCCESS","bucket":"pass","link":"https://example/e2e"}]'; fi ;;
   "pr merge") echo "$*" >> "$S/merges"; [ -f "$S/fail_merge" ] && exit 1
      echo MERGED > "$S/pr_state"; echo 1111111111111111111111111111111111111111 > "$S/merge_oid" ;;
   "pr close") echo "$3" >> "$S/closed" ;;
@@ -143,7 +146,8 @@ def test_push_from_old_tree_reads_pr_body_from_new_sha_and_resumes(env):
     assert r.returncode == 0, r.stdout + r.stderr
     assert git(env["origin"], "rev-parse", BR) == env["new"]
     assert (env["state"] / "body").read_text() == "# Gate ConsultAI の本文\n"  # 古い作業ツリーに trace は無い
-    assert "1/3 push: 完了" in r.stdout and "2/3 PR: #7" in r.stdout and "3/3 CI: 成功" in r.stdout
+    assert "1/3 push: 完了" in r.stdout and "2/3 PR: #7" in r.stdout
+    assert "3/3 CI: push の CI 成功" in r.stdout and "4/4 PR の検査: 成功" in r.stdout
     assert (env["state"] / "closed").read_text().strip() == "43"
     # もう一度: push と PR の作成は飛ばす(重複の PR を作らない)
     r2 = run(env, "push")
@@ -306,3 +310,37 @@ def test_other_gate_branch_trace_and_bundle_names(env):
     assert git(env["origin"], "rev-parse", other) == sha
     assert (env["state"] / "body").read_text() == "# Gate AdminUAT\n"
     assert "--title Gate AdminUAT" in calls(env) and not (env["state"] / "closed").exists()
+
+
+FLAKY = '[{"name":"e2e","state":"FAILURE","bucket":"fail","link":"https://example/runs/390"},' \
+        '{"name":"frontend","state":"SUCCESS","bucket":"pass","link":""}]'
+
+
+def test_push_stops_when_pr_side_checks_fail(env):
+    """[Gate MergeGate] push 側の CI が成功でも、PR 側の検査(E2E の flaky など)が失敗なら次へ進めない(PR #45 の CI #390)"""
+    (env["state"] / "pr_checks").write_text(FLAKY)
+    r = run(env, "push")
+    assert r.returncode != 0
+    assert "3/3 CI: push の CI 成功" in r.stdout and "e2e: FAILURE https://example/runs/390" in r.stderr
+    assert "4/4 PR の検査: 成功" not in r.stdout
+
+
+def test_merge_refuses_when_pr_checks_fail_and_explains_github_refusal(env):
+    assert run(env, "push").returncode == 0
+    (env["state"] / "pr_checks").write_text(FLAKY)
+    r = run(env, "merge")
+    assert r.returncode != 0 and "検査が成功していません" in r.stderr
+    assert not (env["state"] / "merges").exists()
+    (env["state"] / "pr_checks").unlink()
+    (env["state"] / "fail_merge").write_text("1")
+    r = run(env, "merge")
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "--admin" in r.stderr
+    assert "--admin" not in (env["state"] / "merges").read_text()
+
+
+def test_pending_checks_are_waited_for(env):
+    (env["state"] / "pr_checks").write_text('[{"name":"e2e","state":"PENDING","bucket":"pending","link":""}]')
+    e = dict(env)
+    e["env"] = {**env["env"], "TC_CHECK_WAIT": "1", "TC_CHECK_INTERVAL": "0"}
+    r = run(e, "push")
+    assert r.returncode != 0 and "時間内に終わりません" in r.stderr

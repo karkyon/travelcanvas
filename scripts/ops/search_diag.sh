@@ -3,7 +3,8 @@
 #
 #   bash scripts/ops/search_diag.sh
 #
-# 1. backend コンテナの中から、アプリと同じ要求で伊勢の周りを探す(app.ops.search_diag。外への要求は 4 回)
+# 1. backend コンテナの中から、アプリと同じ要求で伊勢の周りを探し、同じ本文で User-Agent だけを変えた比較をする
+#    (app.ops.search_diag。外への要求は 6 回。原因は比較・反映前のログ・画面の検索の結果を合わせて判断する)
 # 2. backend のログ(直近 72 時間)の「Overpass search failed」を、例外の型・分類・HTTP の状態ごとに数える
 #    (ログに検索語・座標は出していない)
 # 結果は ~/tc-artifacts/search-diag-<日時>.txt にも残す。鍵・.env の値は読まない。

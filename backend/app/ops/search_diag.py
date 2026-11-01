@@ -5,10 +5,12 @@
 実環境(omega-dev2 の backend コンテナ)から、次を確かめて結果を出す(鍵・利用者の検索語は扱わない):
 1. 送り先の名前解決(DNS)
 2. アプリと同じ要求(User-Agent つき)で、伊勢の周り 10km の 観光・食べ物・市場 を探す: HTTP の状態・時間・件数・失敗の分類
-3. 比較: 以前のアプリと同じ「User-Agent を付けない」要求を1回だけ送り、HTTP の状態を見る(原因の切り分け)
+3. 比較(原因の切り分け): 同じ送り先・同じ本文(伊勢 10km の観光)で、User-Agent だけを変えて順に3回送る
+   (アプリの User-Agent → 付けない(以前のアプリと同じ) → アプリの User-Agent)。各回の時刻・HTTP の状態・時間を残す。
+   回数制限・混雑の時刻の差も見るため、前後をアプリの User-Agent で挟む。差が出ても、それだけで原因と断定しない
 4. 利用の記録(provider_usage_events)の Overpass の結果の内訳(直近 7 日。件数だけ)
 
-外への要求は合計 4 回(無料の公開 server。連打しない)。終了の値: 2 の全てが成功(0件を含む)なら 0、それ以外は 1。
+外への要求は合計 6 回(無料の公開 server。間を空けて順に送る)。終了の値: 2 の全てが成功(0件を含む)なら 0、それ以外は 1。
 """
 from __future__ import annotations
 
@@ -59,18 +61,29 @@ async def probe_app(category: str) -> Dict[str, Any]:
                 "ms": round((time.monotonic() - t) * 1000)}
 
 
-async def probe_without_user_agent(url: str) -> Dict[str, Any]:
-    """以前のアプリの要求(User-Agent なし = httpx の既定)を1回。状態だけを見る(結果は使わない)。"""
-    q = ('[out:json][timeout:15];(nwr["tourism"~"^(attraction|museum)$"]["name"]'
-         f'(around:10000,{ISE[0]},{ISE[1]}););out center 5;')
-    t = time.monotonic()
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
-            resp = await client.post(url, data={"data": q})
-        return {"status": resp.status_code, "content_type": resp.headers.get("content-type", "")[:40],
-                "ms": round((time.monotonic() - t) * 1000)}
-    except Exception as exc:  # noqa: BLE001
-        return {"status": None, "error": type(exc).__name__, "ms": round((time.monotonic() - t) * 1000)}
+async def compare_user_agent(url: str, pause: float = 2.0) -> List[Dict[str, Any]]:
+    """同じ送り先・同じ本文で、User-Agent だけを変えて順に送る(アプリ → なし → アプリ)。状態と時間だけを見る。"""
+    from app.services import search_provider as sp
+
+    body = sp.build_overpass_query("", ISE[0], ISE[1], 10.0, "sightseeing")
+    out: List[Dict[str, Any]] = []
+    for label, headers in (("app_user_agent", {**sp.HEADERS, "Accept": "application/json"}),
+                           ("no_user_agent", {"Accept": "application/json"}),
+                           ("app_user_agent", {**sp.HEADERS, "Accept": "application/json"})):
+        if out:
+            await asyncio.sleep(pause)
+        t = time.monotonic()
+        at = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        try:
+            # 付けない時は httpx の既定(python-httpx/…)になる(以前のアプリと同じ)
+            async with httpx.AsyncClient(timeout=sp.OVERPASS_TIMEOUT) as client:
+                resp = await client.post(url, data={"data": body}, headers=headers)
+            out.append({"request": label, "at": at, "status": resp.status_code,
+                        "ms": round((time.monotonic() - t) * 1000)})
+        except Exception as exc:  # noqa: BLE001
+            out.append({"request": label, "at": at, "status": None, "error": type(exc).__name__,
+                        "ms": round((time.monotonic() - t) * 1000)})
+    return out
 
 
 def usage_breakdown(days: int = 7) -> Dict[str, Any]:
@@ -100,13 +113,18 @@ CODE_LABEL = {
 def conclusion(report: Dict[str, Any]) -> List[str]:
     out: List[str] = []
     app = report["app_requests"]
-    legacy = report["legacy_request_without_user_agent"]
+    pair = report["user_agent_comparison"]
+    with_ua = [p.get("status") for p in pair if p["request"] == "app_user_agent"]
+    without_ua = [p.get("status") for p in pair if p["request"] == "no_user_agent"]
     if not report["dns"]["ok"]:
         out.append("名前解決に失敗: backend コンテナから送り先の名前を引けません(DNS・ネットワークの設定)")
     if all(p["ok"] for p in app):
         out.append("アプリの要求(User-Agent つき)は全て成功: " + "、".join(f"{p['category']} {p['count']}件" for p in app))
-        if legacy.get("status") in (403, 406):
-            out.append(f"User-Agent なしの要求は HTTP {legacy['status']}: 以前の失敗の原因は User-Agent が無いことと一致")
+        if all(s == 200 for s in with_ua) and without_ua and all(s in (403, 406) for s in without_ua):
+            out.append(f"同じ本文で User-Agent だけを変えると、付けない要求だけが HTTP {without_ua[0]}(前後の付けた要求は 200)。"
+                       "以前の失敗(User-Agent なし)と矛盾しない。反映前のログの分類と合わせて原因を判断する")
+        elif without_ua and all(s == 200 for s in without_ua):
+            out.append("User-Agent なしでも 200: User-Agent は今の失敗の原因ではない可能性が高い(他の原因を調べる)")
     else:
         codes = sorted({p["code"] for p in app if not p["ok"]})
         out.append("アプリの要求が失敗: " + "、".join(CODE_LABEL.get(c, c) for c in codes))
@@ -118,7 +136,7 @@ async def run() -> Dict[str, Any]:
     report: Dict[str, Any] = {"at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(), "endpoint": url,
                               "dns": dns_check(url)}
     report["app_requests"] = [await probe_app(c) for c in CATEGORIES]
-    report["legacy_request_without_user_agent"] = await probe_without_user_agent(url)
+    report["user_agent_comparison"] = await compare_user_agent(url)
     report["usage_events"] = usage_breakdown()
     report["conclusion"] = conclusion(report)
     return report
@@ -139,8 +157,8 @@ def main(argv: List[str] | None = None) -> int:
         for p in report["app_requests"]:
             print(f"  アプリの要求 伊勢 10km {p['category']}: "
                   + (f"OK {p['count']}件" if p["ok"] else f"NG {p['code']} HTTP {p['status']}") + f" ({p['ms']}ms)")
-        lg = report["legacy_request_without_user_agent"]
-        print(f"  比較: User-Agent なし: HTTP {lg.get('status')} {lg.get('error', '')} ({lg['ms']}ms)")
+        for p in report["user_agent_comparison"]:
+            print(f"  比較 {p['at']} {p['request']}: HTTP {p.get('status')} {p.get('error', '')} ({p['ms']}ms)")
         print(f"  利用の記録(直近 {report['usage_events']['days']} 日の Overpass): "
               f"{report['usage_events'].get('by_result', report['usage_events'].get('error'))}")
         for line in report["conclusion"]:

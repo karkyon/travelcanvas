@@ -25,6 +25,20 @@ export function operationBlocker(status: ConsultAiStatus | null, op: ConsultOper
   return null;
 }
 
+/**
+ * [Gate SearchUAT F03] 失敗の後、同じ入力のやり直しに同じ Idempotency-Key を使うか。
+ * 応答が届かなかった(通信の切断・時間切れ)・サーバーの 5xx・処理中(request_in_progress)は、サーバーが提供元へ
+ * 送った後かもしれない。新しいキーで送り直すと別の要求として二度目の原価が掛かり得るため、同じキーを使う
+ * (サーバーは済んだ要求を送らずに idempotent_replay で返す)。送る前に断られた 4xx は新しいキーでよい。
+ */
+export function keepIdempotencyKey(error: unknown): boolean {
+  const res = (error as { response?: { status?: number; data?: { detail?: unknown } } } | null)?.response;
+  if (!res || typeof res.status !== 'number') return true;
+  if (res.status >= 500) return true;
+  const code = (res.data?.detail as { code?: unknown } | undefined)?.code;
+  return code === 'request_in_progress';
+}
+
 export const usageLabel = (u: ConsultUsage | undefined | null): string | null =>
   u ? `この相談の利用枠: 使用 ¥${Math.ceil(Number(u.plan_used))} / 上限 ¥${Math.round(Number(u.plan_cap))}` : null;
 

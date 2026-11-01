@@ -125,8 +125,9 @@ export async function aiExtract(sessionId: string, input: ExtractInput, key: str
 }
 
 export async function consultPlaces(sessionId: string, query: string, at: { latitude: number; longitude: number } | null,
-  key: string): Promise<ConsultPlacesResult> {
-  const r = await api.post('/trip-intents/ai/places-search', { session_id: sessionId, query, ...(at ?? {}) }, withKey(key));
+  key: string, radiusKm?: number): Promise<ConsultPlacesResult> {
+  const r = await api.post('/trip-intents/ai/places-search',
+    { session_id: sessionId, query, ...(at ?? {}), ...(at && radiusKm ? { radius_km: radiusKm } : {}) }, withKey(key));
   return decodeResponse(r.data, object<ConsultPlacesResult>({
     results: arrayOf(place), usage, attribution: str, retrieved_at: str, notice: str, stub: bool,
   }), 'POST /trip-intents/ai/places-search');

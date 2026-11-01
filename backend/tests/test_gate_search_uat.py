@@ -1,7 +1,8 @@
 """[Gate SearchUAT] 旅行相談の「候補を探す」(OpenStreetMap・Overpass)の失敗の是正。
 
-実環境(omega-dev2)の失敗: Overpass への要求に User-Agent が無く(httpx の既定)、公開 server(overpass-api.de)が
-識別できない要求を HTTP 406 で断っていた。失敗は全て「提供元が応答しない」になり、原因を区別できなかった。
+実環境(omega-dev2)の失敗の原因は未確定(scripts/ops/search_diag.sh の同じ要求の比較で確かめる)。コードで確かめた不足:
+Overpass への要求に User-Agent が無かった(公開 server の利用条件は識別できる User-Agent を求める)。失敗は全て
+「提供元が応答しない」になり、原因を区別できなかった。
 - 要求は識別できる User-Agent をつける(Nominatim・Wikipedia も同じ)
 - 失敗を分類する(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout)。
   200 でも remark の runtime error だけで要素が無い応答は「該当なし」にしない
@@ -51,6 +52,11 @@ def test_overpass_request_identifies_the_app():
     (httpx.Response(200, text="<html>busy</html>"), "unreadable"),
     (httpx.Response(200, json={"elements": [], "remark": "runtime error: Query timed out in \"query\""}),
      "provider_timeout"),
+    # [F06] 必須の構造が無い・型が違う応答は「該当なし」にしない。分類できない remark は決まった分類へ
+    (httpx.Response(200, json={}), "unreadable"),
+    (httpx.Response(200, json={"elements": "x"}), "unreadable"),
+    (httpx.Response(200, json=[]), "unreadable"),
+    (httpx.Response(200, json={"elements": [], "remark": "something odd"}), "server_error"),
 ])
 def test_failures_are_classified_not_reported_as_empty(response, code):
     with pytest.raises(sp.SearchProviderError) as e:
@@ -73,7 +79,24 @@ def test_timeout_and_network_errors_are_classified():
 
 
 def test_successful_empty_answer_is_empty_not_error():
-    assert _run(lambda request: httpx.Response(200, json={"elements": []})) == []
+    out = _run(lambda request: httpx.Response(200, json={"elements": []}))
+    assert out == [] and out.partial is False
+
+
+def test_runtime_error_with_some_elements_is_partial_not_complete():
+    """[F06] remark つきで要素がある応答は「一部だけ」(完全な結果と区別する)"""
+    body = {"remark": "runtime error: Query timed out", "elements": [
+        {"type": "node", "id": 1, "lat": 34.4, "lon": 136.7, "tags": {"name": "伊勢市駅前", "tourism": "attraction"}},
+        "broken"]}
+    out = _run(lambda request: httpx.Response(200, json=body))
+    assert [r["name"] for r in out] == ["伊勢市駅前"] and out.partial is True
+
+    async def partial(*a, **kw):
+        return out
+    from unittest import mock
+    with mock.patch.object(sp, "search_overpass", partial):
+        res = asyncio.run(sp.search_all_providers("", 34.4, 136.7, 10.0, category="sightseeing"))
+    assert res.partial == ["overpass"] and res.unavailable == []
 
 
 def test_api_returns_failure_code_and_records_it(auth_client, db_session, monkeypatch):
@@ -130,16 +153,20 @@ def test_search_diag_reports_cause(monkeypatch, capsys):
         report = {"at": "2026-11-01T00:00:00+00:00", "endpoint": "https://overpass-api.de/api/interpreter",
                   "dns": {"host": "overpass-api.de", "ok": True, "addresses": ["1.2.3.4"], "ms": 3},
                   "app_requests": [{"category": c, "ok": True, "count": 12, "ms": 900} for c in sd.CATEGORIES],
-                  "legacy_request_without_user_agent": {"status": 406, "content_type": "text/html", "ms": 200},
+                  "user_agent_comparison": [
+                      {"request": "app_user_agent", "at": "00:00:01", "status": 200, "ms": 900},
+                      {"request": "no_user_agent", "at": "00:00:04", "status": 406, "ms": 200},
+                      {"request": "app_user_agent", "at": "00:00:07", "status": 200, "ms": 900}],
                   "usage_events": {"days": 7, "by_result": {"unavailable": 5}}}
         report["conclusion"] = sd.conclusion(report)
         return report
     monkeypatch.setattr(sd, "run", fake_run)
     assert sd.main([]) == 0
     out = capsys.readouterr().out
-    assert "User-Agent なしの要求は HTTP 406" in out and "sightseeing 12件" in out
+    assert "付けない要求だけが HTTP 406" in out and "sightseeing 12件" in out
+    assert "原因" in out and "断定" not in out
     bad = {"dns": {"ok": True}, "app_requests": [{"category": "food", "ok": False, "code": "rate_limited"}],
-           "legacy_request_without_user_agent": {"status": 429}}
+           "user_agent_comparison": [{"request": "no_user_agent", "status": 429}]}
     assert sd.conclusion(bad) == ["アプリの要求が失敗: 回数の制限(429)"]
 
 
@@ -155,3 +182,50 @@ def test_ops_scripts_run_the_diagnosis_without_reading_secrets():
     # 反映の前にログの失敗の型を残し(作り直すと消える)、反映の後に診断を実行する
     assert apply.index("predeploy-search-log") < apply.index("docker compose up -d --build")
     assert apply.index("bash scripts/ops/search_diag.sh") > apply.index("docker compose up -d --build")
+
+
+def test_e2e_rate_limit_reset_is_test_only(monkeypatch):
+    """[Gate AuthE2E] 試験の環境だけで回数制限の記録を消せる(本番では断る)"""
+    import importlib.util
+    from pathlib import Path
+
+    from app.core.config import settings
+    from app.utils import rate_limiter as rl
+    spec = importlib.util.spec_from_file_location(
+        "security_incident", Path(__file__).resolve().parents[1] / "scripts" / "security_incident.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rl.use_backend("memory")
+    try:
+        for _ in range(5):
+            assert rl.check_rate_limit("register:10.0.0.9", 5, 60)
+        assert not rl.check_rate_limit("register:10.0.0.9", 5, 60)
+        monkeypatch.setattr(mod.rate_limiter, "use_backend", lambda name: None)
+        monkeypatch.setattr(settings, "APP_ENV", "production")
+        assert mod.main(["e2e-reset-rate-limits", "--yes"]) == mod.EXIT_FAIL
+        assert not rl.check_rate_limit("register:10.0.0.9", 5, 60)
+        monkeypatch.setattr(settings, "APP_ENV", "development")
+        assert mod.main(["e2e-reset-rate-limits"]) == mod.EXIT_USAGE
+        mod.main(["e2e-reset-rate-limits", "--yes"])
+        assert rl.check_rate_limit("register:10.0.0.9", 5, 60)
+    finally:
+        rl.use_backend("auto")
+        rl._rate_limit_storage.clear()
+
+
+def test_user_agent_comparison_sends_the_same_body_and_only_changes_the_header(monkeypatch):
+    """[F05] 比較は同じ送り先・同じ本文で、User-Agent だけを変えて順に送る(アプリ → なし → アプリ)"""
+    from app.ops import search_diag as sd
+    seen = []
+
+    def handler(request):
+        seen.append((request.headers.get("user-agent", ""), request.content))
+        return httpx.Response(406 if "TravelCanvas" not in request.headers.get("user-agent", "") else 200)
+    real = httpx.AsyncClient
+    monkeypatch.setattr(sd.httpx, "AsyncClient",
+                        lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    out = asyncio.run(sd.compare_user_agent("https://overpass.example/api/interpreter", pause=0))
+    assert [o["request"] for o in out] == ["app_user_agent", "no_user_agent", "app_user_agent"]
+    assert [o["status"] for o in out] == [200, 406, 200]
+    assert len({body for _ua, body in seen}) == 1  # 本文は同じ
+    assert "TravelCanvas" in seen[0][0] and "TravelCanvas" not in seen[1][0]

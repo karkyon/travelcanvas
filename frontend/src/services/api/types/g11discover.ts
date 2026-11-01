@@ -26,6 +26,8 @@ export interface NearbySearch {
   unavailable_providers?: string[];
   /** [Gate SearchUAT] 応答しなかった理由の分類(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout) */
   provider_errors?: Record<string, string>;
+  /** [Gate SearchUAT F06] 一部だけの結果を返した提供元(処理が途中で止まった。完全な結果ではない) */
+  partial_providers?: string[];
 }
 
 export interface MediaProviderStatus {

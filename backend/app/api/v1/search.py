@@ -150,6 +150,8 @@ async def search_spots(
         "unavailable_providers": unavailable,
         # [Gate SearchUAT] 失敗の分類(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout)
         "provider_errors": errors,
+        # [Gate SearchUAT F06] 一部だけの結果(提供元の処理が途中で止まった。完全な結果ではない)
+        "partial_providers": list(getattr(raw_results, "partial", []) or []),
     }
 
 

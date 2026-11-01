@@ -38,7 +38,7 @@ async function stubGeocode(page: Page) {
       })),
     } });
   });
-  // [Gate SearchUAT] 1回目(開いた時の自動の検索)は提供元が断る(実環境の 406 と同じ分類)。2回目は成功・該当なし
+  // [Gate SearchUAT] 1回目(開いた時の自動の検索)は提供元が断る(分類 blocked)。2回目は成功・該当なし
   let spots = 0;
   await page.route('**/api/v1/search/spots', (route) => {
     spots += 1;

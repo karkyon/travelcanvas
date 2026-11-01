@@ -636,9 +636,12 @@ def consult_places(payload: Dict[str, Any] = Body(...),
     lng = _num(body, "longitude", -180, 180, required=False)
     if (lat is None) != (lng is None):
         raise _ai_bad("invalid_input", "緯度と経度は両方を指定してください")
+    # [Gate SearchUAT F04] 画面で選んだ検索範囲(Google は範囲を優先するだけで、範囲外も返り得る)
+    radius_km = _num(body, "radius_km", 0.1, 50, required=False)
     key = _idem(idempotency_key)
     places, usage = _send_guard(lambda: pc.places_search(db, None, current_user, query.strip(), lat, lng, key,
-                                                         consult_id=session.id))
+                                                         consult_id=session.id,
+                                                         radius_m=radius_km * 1000 if radius_km else None))
     _ai_audit("trip_consult.places_search", current_user, session, {"results": len(places)})
     return {"results": places, "usage": usage, "saved": False, "attribution": "Google",
             "retrieved_at": ti.now().isoformat(), "stub": provider_stub.enabled(),

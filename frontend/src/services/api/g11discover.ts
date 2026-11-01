@@ -34,7 +34,7 @@ const nearbySearch: Decoder<NearbySearch> = object<NearbySearch>({
   query: str, category: str, radius_km: num,
   base: nullable(object<{ latitude: number; longitude: number }>({ latitude: num, longitude: num })),
   total: int, candidates: arrayOf(nearby), unavailable_providers: optional(arrayOf(str)),
-  provider_errors: optional(stringRecord),
+  provider_errors: optional(stringRecord), partial_providers: optional(arrayOf(str)),
 });
 
 export async function searchNearby(input: { query: string; category: DiscoverCategory; latitude: number | null;

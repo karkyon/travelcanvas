@@ -25,6 +25,7 @@ import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultA
 import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
+import { keepIdempotencyKey } from './consultAiModel';
 import {
   BRIEF_PREFS, EXAMPLE_TEXT, INITIAL_STATE, PREFERENCE_LABEL, REVIEW_KEYS, SOURCE_LABEL, STEPS, STRENGTH_LABEL,
   BUDGET_KIND_LABEL, BUDGET_PERIOD_LABEL, BUDGET_TARGET_LABEL, mergeReview,
@@ -652,7 +653,8 @@ const TripConsultPage: React.FC = () => {
       applyExtraction(ex);
     } catch (e) {
       const code = consultErrorCode(e);
-      if (code !== 'request_in_progress') pendingKey.current = null; // 処理中の時だけ、次も同じキーで確かめる
+      // [Gate SearchUAT F03] 送ったかもしれない失敗(通信・時間切れ・5xx・処理中)は、次も同じキーで確かめる(二度課金しない)
+      if (!keepIdempotencyKey(e)) pendingKey.current = null;
       if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
         sessionRef.current = null;
         setState((s) => ({ ...s, consultSessionId: null }));

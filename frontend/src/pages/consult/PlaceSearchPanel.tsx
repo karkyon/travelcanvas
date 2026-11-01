@@ -8,6 +8,10 @@
  * - 「該当なし」と「提供元の失敗(分類つき)」を分ける。失敗しても入力・前の結果・選んだ候補を残し、もう一度探せる
  * - 結果は検索元を問わず同じ並び・同じ「旅程案に入れる」。出典・取得時刻・未確認のことを示す
  * - 二重押しで二度送らない(押している間は押せない。Google は同じ入力の再試行に同じ Idempotency-Key を使う)
+ * - [F03] 送ったかもしれない失敗(通信・時間切れ・5xx・処理中)の後も同じキーを使う(新しいキーにすると二度課金し得る)。
+ *   サーバーが「その要求は済んだ」(idempotent_replay)と答えたら、結果は受け取れなかったが原価は計上済みと示し、
+ *   新しい検索として探し直すかは利用者が選ぶ
+ * - [F04] Google にも画面の検索範囲を送る(範囲を優先するだけで、範囲外も返り得ると示す)
  */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import Button from '@/components/common/Button';
@@ -21,7 +25,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
   CONSULT_CATEGORIES, retrievedLabel, searchErrorMessage, type ConsultCategory, type GooglePick, type SearchSource,
 } from './consultModel';
-import { googleSearchAvailability } from './consultAiModel';
+import { googleSearchAvailability, keepIdempotencyKey } from './consultAiModel';
 
 const RADII = [2, 5, 10, 20];
 
@@ -59,8 +63,9 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   const [shown, setShown] = useState<SearchSource>('osm');
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const [failure, setFailure] = useState<{ source: SearchSource; message: string } | null>(null);
+  const [failure, setFailure] = useState<{ source: SearchSource; message: string; replayed?: boolean } | null>(null);
   const [empty, setEmpty] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
   const pendingKey = useRef<{ sig: string; key: string } | null>(null);
   const avail = googleSearchAvailability(google.status, google.usage);
   const catLabel = CONSULT_CATEGORIES.find((c) => c.id === category)?.label ?? '';
@@ -74,6 +79,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
       setFailure({ source: 'osm', message: searchErrorMessage(r.provider_errors?.overpass) });
       return; // 前の結果は残す
     }
+    setPartial((r.partial_providers ?? []).includes('overpass'));
     setOsm({ rows: [...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)),
       label: `${catLabel}${query.trim() ? `「${query.trim()}」` : ''} · ${areaName}の周り ${radius}km` });
     setShown('osm');
@@ -82,18 +88,25 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
 
   const runGoogle = async () => {
     const text = [query.trim(), catLabel, areaName].filter(Boolean).join(' ').slice(0, 120);
-    const sig = JSON.stringify([text, base]);
+    const sid = await google.ensureSession();
+    const sig = JSON.stringify([sid, text, base, radius]);
     if (pendingKey.current?.sig !== sig) pendingKey.current = { sig, key: newIdempotencyKey() };
     try {
-      const r = await consultPlaces(await google.ensureSession(), text, base, pendingKey.current.key);
+      const r = await consultPlaces(sid, text, base, pendingKey.current.key, radius);
       pendingKey.current = null;
       google.onUsage(r.usage);
       setGResults({ rows: r.results.map((p) => ({ place_id: p.place_id, name: p.name, address: p.address,
-        maps_uri: p.maps_uri, retrieved_at: r.retrieved_at })), label: `「${text}」· ${areaName}の周りを優先` });
+        maps_uri: p.maps_uri, retrieved_at: r.retrieved_at })), label: `「${text}」· ${areaName}の周り ${radius}km を優先` });
       setShown('google');
       if (r.results.length === 0) setEmpty(`Google で探しました: 「${text}」に合う場所は見つかりませんでした(該当なし)。言葉を変えてください。`);
     } catch (e) {
-      if (consultErrorCode(e) !== 'request_in_progress') pendingKey.current = null; // 処理中の時だけ、同じキーで確かめ直す
+      if (consultErrorCode(e) === 'idempotent_replay') {
+        // 同じ要求はサーバーで済んでいる(原価は計上済み)。結果はこの画面に届かなかった。探し直しは新しい検索(利用者が選ぶ)
+        pendingKey.current = null;
+        setFailure({ source: 'google', replayed: true, message: 'この Google の検索は送信済みで、原価は計上されています。結果をこの画面で受け取れませんでした(入力と選んだ候補はそのままです)。探し直すと新しい検索として1回分を使います' });
+        return;
+      }
+      if (!keepIdempotencyKey(e)) pendingKey.current = null; // 送る前に断られた時だけ、新しいキーにする
       setFailure({ source: 'google', message: `${errorDetailMessage(e, 'Google で探せませんでした')}(入力と選んだ候補はそのままです)` });
     }
   };
@@ -109,6 +122,11 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     try {
       if (which === 'osm') await runOsm(); else await runGoogle();
     } catch (err) {
+      if (which === 'google') {
+        // ensureSession など、Google の検索の前の失敗(送っていない)
+        setFailure({ source: 'google', message: `${errorDetailMessage(err, 'Google で探せませんでした')}(入力と選んだ候補はそのままです)` });
+        return;
+      }
       const status = (err as { response?: { status?: number } })?.response?.status;
       setFailure({ source: which, message: status === 401 || status === 403
         ? '場所の検索はログインした会員の機能です。ゲストの方は、場所を選ばずに下書きを作り、あとで足せます'
@@ -199,7 +217,8 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
           <p className="text-xs text-ink-700" data-testid="consult-search-using">
             {source === 'osm' && !base
               ? '方面の位置が未照会のため、OpenStreetMap では周りを探せません。方面の比較に戻って位置を照会するか、場所を選ばずに下書きを作れます。'
-              : `検索元: ${sourceName} · ${areaName}の周り${source === 'osm' ? ` 半径${radius}km` : '(半径は目安)'}`}
+              : `検索元: ${sourceName} · ${areaName}の周り 半径${radius}km${source === 'google'
+                ? '(Google は範囲を優先して探します。範囲の外の場所も出ることがあります)' : ''}`}
           </p>
         </div>
       </form>
@@ -208,7 +227,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
           <p>{failure.message}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void search(failure.source)}
-              data-testid="consult-search-retry">もう一度探す</Button>
+              data-testid="consult-search-retry">{failure.replayed ? '新しい検索として探す(有料・1回)' : 'もう一度探す'}</Button>
             {failure.source === 'osm' && (avail.ok ? (
               <Button type="button" size="sm" variant="outline" disabled={busy}
                 onClick={() => { setSource('google'); void search('google'); }} data-testid="consult-search-google">
@@ -229,6 +248,11 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
         ) : (
           <>
             {empty && <p className="py-3 text-sm text-ink-700" data-testid="consult-results-empty">{empty}</p>}
+            {partial && shown === 'osm' && (
+              <p className="py-2 text-sm text-warning" data-testid="consult-results-partial">
+                OpenStreetMap の処理が途中で止まったため、一部だけの結果です(他にも場所がある可能性があります)。範囲を小さくするか、もう一度探してください。
+              </p>
+            )}
             {rows.length > 0 && (
               <>
                 <h4 className="text-sm font-semibold text-ink-900" aria-live="polite">
