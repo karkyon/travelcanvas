@@ -30,8 +30,13 @@ def _ev(m: Any) -> Any:
 
 def _ai_answer(text: str) -> Dict[str, Any]:
     body = text.split("【相談の文章】", 1)[-1]
-    ex = ti.extract(body, {})
+    first, *added = body.split("【追加】")
+    ex = ti.extract(first, {})
     by = {i["key"]: i for i in ex["items"]}
+    for extra in added:  # 追加で伝えた内容は、読み取れた項目だけ上書きする(変更の相談の模擬)
+        for it in ti.extract(extra, {})["items"]:
+            if it["source"] == "text":
+                by[it["key"]] = it
 
     def val(key: str) -> Any:
         it = by.get(key)
@@ -51,6 +56,7 @@ def _ai_answer(text: str) -> Dict[str, Any]:
         "one_way_hours": {"value": val("one_way"), "evidence": evid("one_way")},
         "room": {"value": val("room"), "evidence": evid("room")},
         "budget": {"min_yen": budget.get("min"), "max_yen": budget.get("max"), "scope": None,
+                   "target": budget.get("target") or "undecided", "period": "undecided", "kind": "undecided",
                    "evidence": evid("budget")},
         "dates": {"status": dates.get("status") if dates.get("status") in ("fixed", "window") else "undecided",
                   "text": dates.get("text"), "evidence": evid("dates")},
@@ -58,6 +64,7 @@ def _ai_answer(text: str) -> Dict[str, Any]:
         "areas_mentioned": [a["name"] for a in ex["areas"]],
         "areas_suggested": STUB_SUGGESTIONS,
         "unknowns": ["模擬の提供元の答えです"],
+        "other_wishes": ["何もしない時間がほしい"] if "何もしない" in body else [],
     }
 
 

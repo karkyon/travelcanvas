@@ -93,8 +93,9 @@ describe('確認の決まり(consultModel)', () => {
     const i = intentOf(r);
     expect(i.origin).toBeNull();
     expect(i.party_size).toBeNull();
-    expect(i.nights).toBe(1);
+    expect(i.nights).toBe(0); // [監査 A06] 確かめていない日数は使わない(画面は確かめるまで進めない)
     expect(i.one_way_hours).toBeNull();
+    expect(intentOf({ ...r, confirmed: { ...r.confirmed, nights: true } }).nights).toBe(1);
     const ok = intentOf({ ...r, confirmed: { ...r.confirmed, origin: true, budget: true },
       values: { ...r.values, budget_scope: 'total' } });
     expect(ok.origin).toBe('枚方');
@@ -179,9 +180,12 @@ describe('旅行相談の流れ', () => {
     expect(screen.getByTestId('review-personal')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('片道の時間が「希望」か「絶対条件」か');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: '片道の時間の扱い' })).getByRole('radio', { name: /希望/ }));
-    fireEvent.click(within(screen.getByRole('radiogroup', { name: '宿泊費の範囲' })).getByRole('radio', { name: /全員の合計/ }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: '予算は誰の分か' })).getByRole('radio', { name: /全員の合計/ }));
     fireEvent.click(screen.getByTestId('review-confirm-origin'));
     expect(screen.queryByText(/片道の時間が「希望」か/)).not.toBeInTheDocument();
+    // [監査 A06] 日数は確かめるまで比較へ進めない
+    expect(screen.getByTestId('consult-compare')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('review-confirm-nights'));
     fireEvent.click(screen.getByTestId('consult-compare'));
     await waitFor(() => expect(api.compareAreas).toHaveBeenCalledWith({ origin: '枚方', areas: ['伊勢', '福井', '滋賀', '淡路島'],
       one_way_hours: 3, one_way_strength: 'preferred' }));

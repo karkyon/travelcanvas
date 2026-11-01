@@ -37,6 +37,9 @@ INSTRUCTIONS = (
     "営業時間・料金・空室・混雑・所要時間・距離の数値は書かないでください(確かめていないため)。"
     "人の名前・連絡先・住所の番地などの個人の情報は出力しないでください。"
     "unknowns には、旅行を考えるのにまだ決まっていない大事なこと(例: 日付、予算)を短く書いてください。"
+    "budget の target は何の費用か(宿泊費 lodging・交通費 transport・食費 food・旅行全体 trip_total・その他 other)。"
+    "書かれていなければ undecided にし、宿泊費と決め付けないでください。period・kind も同じです。"
+    "other_wishes には、上のどの項目にも入らない希望(例: 何もしない時間がほしい、地元の市場)を、文章の言葉に近い形で短く書いてください。"
 )
 
 
@@ -64,13 +67,17 @@ SCHEMA: Dict[str, Any] = _obj({
     "room": _obj({"value": {"type": ["string", "null"], "enum": ["same_room", "multiple_rooms", None]},
                   "evidence": _ev()}),
     "budget": _obj({"min_yen": _nullable("integer"), "max_yen": _nullable("integer"),
-                    "scope": {"type": ["string", "null"], "enum": ["total", "per_person", None]}, "evidence": _ev()}),
+                    "scope": {"type": ["string", "null"], "enum": ["total", "per_person", None]},
+                    "target": {"type": "string", "enum": list(ti.BUDGET_TARGETS)},
+                    "period": {"type": "string", "enum": list(ti.BUDGET_PERIODS)},
+                    "kind": {"type": "string", "enum": list(ti.BUDGET_KINDS)}, "evidence": _ev()}),
     "dates": _obj({"status": {"type": "string", "enum": ["fixed", "window", "undecided"]},
                    "text": _nullable("string"), "evidence": _ev()}),
     "preferences": {"type": "array", "items": {"type": "string", "enum": PREF_KEYS}},
     "areas_mentioned": {"type": "array", "items": {"type": "string"}},
     "areas_suggested": {"type": "array", "items": _obj({"name": {"type": "string"}, "reason": {"type": "string"}})},
     "unknowns": {"type": "array", "items": {"type": "string"}},
+    "other_wishes": {"type": "array", "items": {"type": "string"}},
 })
 TEXT_FORMAT: Dict[str, Any] = {"type": "json_schema", "name": "trip_intent", "schema": SCHEMA, "strict": True}
 
@@ -180,7 +187,10 @@ def ai_fields(data: Dict[str, Any], norm_text: str) -> Tuple[Dict[str, Any], Dic
         hi = hi if hi is not None else lo
         assert lo is not None and hi is not None
         f["_budget"] = {"min": min(lo, hi), "max": max(lo, hi),
-                        "scope": b.get("scope") if b.get("scope") in ("total", "per_person") else None}
+                        "scope": b.get("scope") if b.get("scope") in ("total", "per_person") else None,
+                        "target": b.get("target") if b.get("target") in ti.BUDGET_TARGETS else "undecided",
+                        "period": b.get("period") if b.get("period") in ti.BUDGET_PERIODS else "undecided",
+                        "kind": b.get("kind") if b.get("kind") in ti.BUDGET_KINDS else "undecided"}
         ev["budget"] = _in_text(norm_text, b.get("evidence"))
     d = part("dates")
     if d.get("status") in ("fixed", "window"):
@@ -199,12 +209,13 @@ def _budget_item(b: Dict[str, Any], evidence: Optional[str]) -> Dict[str, Any]:
     lo, hi = int(b["min"]), int(b["max"])
     man = (lambda y: f"{y / 10000:g}万円")
     disp = f"{man(lo)}〜{man(hi)}" if lo != hi else man(lo)
-    q = {"id": "budget_scope", "text": f"{disp}は、全員の合計(1部屋・1泊)ですか、1人あたりですか",
+    q = {"id": "budget_scope", "text": f"{disp}は、全員の合計ですか、1人あたりですか(未定でも続けられます)",
          "options": [{"value": "total", "label": "全員の合計"}, {"value": "per_person", "label": "1人あたり"}],
          "suggested": b.get("scope"),
-         "hint": "宿を探す時の条件になります。税・食事の有無は宿を照会する時に確かめます"}
-    return ti._item("budget", "宿泊費の目安", {"min": lo, "max": hi, "scope": None}, disp, "ai", "preferred",
-                    evidence, q)
+         "hint": "何の費用か(宿泊費・旅行全体など)と期間も、確認の画面で選べます"}
+    value = {"min": lo, "max": hi, "scope": None, "target": b.get("target", "undecided"),
+             "period": b.get("period", "undecided"), "kind": b.get("kind", "undecided")}
+    return ti._item("budget", "予算", value, disp, "ai", "preferred", evidence, q)
 
 
 AI_KEYS = {
@@ -257,9 +268,10 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
         if len(suggested) >= MAX_SUGGESTIONS:
             break
     unknowns = [u for u in (_str(x, 60) for x in (data.get("unknowns") or [])) if u][:5]
+    notes = list(dict.fromkeys(n for n in (_str(x, 100) for x in (data.get("other_wishes") or [])) if n))[:ti.MAX_NOTES]
     nights = next((x["value"] for x in items if x["key"] == "nights" and isinstance(x["value"], int)), None)
-    return {"items": items, "areas": areas, "suggested_areas": suggested, "unknowns": unknowns, "nights": nights,
-            "extractor": EXTRACTOR, "ai_connected": True}
+    return {"items": items, "areas": areas, "suggested_areas": suggested, "unknowns": unknowns, "notes": notes,
+            "nights": nights, "extractor": EXTRACTOR, "ai_connected": True}
 
 
 # ===================================================================== 送る
@@ -284,7 +296,8 @@ def extract(db: Session, session: TripConsultSession, caller: User, text: str, u
                                  result_code="ok" if data is not None else "malformed")
 
     data, usage = cg.run(db, None, caller, "ai.generate", "openai", reserve_units(prompt), idempotency_key, call,
-                         consult_id=session.id)
+                         consult_id=session.id,
+                         fingerprint=pc.fingerprint("openai", "consult.extract", str(session.id), prompt))
     if data is None:
         raise ConsultAIError("ai_output_invalid", 502,
                              "AI の応答を読めませんでした(使った分は枠に数えました)。文章は消えていません。"

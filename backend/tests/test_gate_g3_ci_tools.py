@@ -67,7 +67,7 @@ def test_junit_summary_lists_failures(tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(out))
     assert js.main(["--title", "backend", str(xml), str(tmp_path / "missing.xml")]) == 0
     text = out.read_text()
-    assert "❌ backend" in text and "| 3 | 1 | 0 | 1 |" in text
+    assert "❌ backend" in text and "| 3 | 1 | 1 | 0 | 1 |" in text  # 総数・合格・失敗・エラー・飛ばし
     assert "`tests.a::bad` — assert 1 == 2" in text
 
 
@@ -141,6 +141,22 @@ def test_e2e_flaky_report_counts_retried_tests_separately(tmp_path, monkeypatch,
     out = capsys.readouterr().out
     assert "::warning file=frontend/a.spec.ts::E2E flaky" in out and "| 1 | 1 | 1 | 1 |" in out
     assert fr.main([str(tmp_path / "none.json")]) == 0
+    # [監査 A09] リリースの判定は失敗・flaky・欠落・壊れた結果・0 件で非 0
+    assert fr.main([str(p), "--release-gate"]) == 1
+    assert fr.main([str(tmp_path / "none.json"), "--release-gate"]) == 1
+    broken = tmp_path / "broken.json"
+    broken.write_text("{not json")
+    assert fr.main([str(broken), "--release-gate"]) == 1
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"suites": []}))
+    assert fr.main([str(empty), "--release-gate"]) == 1
+    good = tmp_path / "good.json"
+    good.write_text(json.dumps({"suites": [{"file": "b.spec.ts", "specs": [
+        {"title": "ok", "tests": [{"status": "expected", "results": [{"status": "passed"}]}]}]}]}))
+    assert fr.main([str(good), "--release-gate"]) == 0
+    # 自己試験の偽の結果は、試験ごとの一時の要約へ書かれる(本物の CI の要約へは出ない)
+    import os
+    assert "tmp" in os.environ["GITHUB_STEP_SUMMARY"] or str(tmp_path) in os.environ["GITHUB_STEP_SUMMARY"]
 
 
 @needs_repo

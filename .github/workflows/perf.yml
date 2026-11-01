@@ -39,8 +39,8 @@ jobs:
       TC_PERF_RECORDS: '100000'
       TC_PERF_OUT: ../ci-results/perf
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -62,7 +62,7 @@ jobs:
         run: python3 ../scripts/ci/junit_summary.py --title "perf" ../ci-results/perf-junit.xml
       - name: Upload perf results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: perf-${{ github.sha }}
           path: ci-results/

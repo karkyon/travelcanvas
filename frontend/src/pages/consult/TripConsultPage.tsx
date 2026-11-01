@@ -20,11 +20,14 @@ import {
   aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage,
 } from '@/services/api/consultAi';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import type { IntentExtraction } from '@/services/api/types/tripIntent';
 import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
+import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
 import {
   BRIEF_PREFS, EXAMPLE_TEXT, INITIAL_STATE, PREFERENCE_LABEL, REVIEW_KEYS, SOURCE_LABEL, STEPS, STRENGTH_LABEL,
+  BUDGET_KIND_LABEL, BUDGET_PERIOD_LABEL, BUDGET_TARGET_LABEL, mergeReview,
   clearState, draftInputOf, extractInputOf, initReview, loadState, openQuestions, saveState,
   type BriefForm, type ConsultState, type ConsultStep, type ReviewKey, type ReviewState,
 } from './consultModel';
@@ -64,8 +67,8 @@ const Stepper: React.FC<{ step: ConsultStep }> = ({ step }) => {
 
 const BriefStep: React.FC<{
   brief: BriefForm; onChange: (b: BriefForm) => void; onSubmit: () => void; busy: boolean; error: string | null;
-  aiSlot?: React.ReactNode;
-}> = ({ brief, onChange, onSubmit, busy, error, aiSlot }) => {
+  aiSlot?: React.ReactNode; mode: 'free' | 'fields'; onMode: (m: 'free' | 'fields') => void;
+}> = ({ brief, onChange, onSubmit, busy, error, aiSlot, mode, onMode }) => {
   const id = useId();
   const optRef = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof BriefForm>(k: K, v: BriefForm[K]) => onChange({ ...brief, [k]: v });
@@ -99,6 +102,16 @@ const BriefStep: React.FC<{
           <span className="rounded-full border border-cloud-200 px-2 py-1 text-xs text-ink-700">保存前の相談</span>
         </div>
         <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); onSubmit(); }} aria-label="旅行の希望">
+          {/* [Gate ConsultAI] 入力の仕方(同じ下書きを使う。切り替えても書いた内容は消えない) */}
+          <div role="radiogroup" aria-label="入力の仕方" className="grid grid-cols-2 gap-1 rounded-xl border border-cloud-200 p-1">
+            {([['free', 'AI に自由に相談'], ['fields', '項目ごとに入力']] as const).map(([m, label]) => (
+              <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => onMode(m)}
+                data-testid={`consult-mode-${m}`}
+                className={`tc-focus-ring min-h-11 rounded-lg px-2 text-sm ${mode === m ? 'bg-accent-soft font-semibold text-ink-900' : 'text-ink-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div>
             <div className="flex items-center justify-between gap-2">
               <label htmlFor={`${id}-text`} className="text-sm font-semibold text-ink-900">希望・事情</label>
@@ -109,8 +122,11 @@ const BriefStep: React.FC<{
               aria-describedby={`${id}-text-help`} className={`${field} leading-relaxed`}
               placeholder="例: 家族4人で1泊2日。枚方から車で片道3時間くらいまで。人が多すぎない所。伊勢、福井、滋賀などが候補。" />
             <p id={`${id}-text-help`} className={help}>
-              箇条書きでも大丈夫です。未定のことは「未定」と書いてください。次の画面で、読み取った内容を自分で確かめ・直せます。
+              文字で入力: 箇条書き・思いつきの断片でも大丈夫です。行き先・日程が未定でも始められます。次の画面で、読み取った内容を自分で確かめ・直せます。
             </p>
+            <div className="mt-2">
+              <VoiceInput onAdd={(t) => set('text', brief.text ? `${brief.text}\n${t}` : t)} />
+            </div>
           </div>
           <p className="flex items-center gap-2 text-xs font-semibold text-ink-700">候補を探すのに使う基本の情報</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -155,7 +171,7 @@ const BriefStep: React.FC<{
               <p id={`${id}-nights-help`} className={help}>日数をもとに、無理のない下書きの枠(午前・昼食・午後…)を作ります。</p>
             </div>
           </div>
-          <details ref={optRef} className="rounded-xl border border-cloud-200 bg-cloud-0">
+          <details ref={optRef} key={mode} open={mode === 'fields' || undefined} className="rounded-xl border border-cloud-200 bg-cloud-0">
             <summary className="tc-focus-ring flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 text-sm font-semibold text-ink-900">
               移動・宿・過ごし方をもう少し指定する<span className="text-xs font-normal text-ink-700">任意 · いつでも変更できます</span>
             </summary>
@@ -233,7 +249,7 @@ const BriefStep: React.FC<{
               AI を使わず、決まった規則で入力内容を整理し、あなたが確かめる条件の一覧を作ります。まだ旅行も予約も作りません。
             </p>
             <Button type="submit" loading={busy} disabled={busy} aria-describedby={`${id}-next`} className="w-full sm:w-auto"
-              data-testid="consult-extract">
+              variant={mode === 'free' ? 'outline' : undefined} data-testid="consult-extract">
               入力内容を整理する →
             </Button>
           </div>
@@ -295,13 +311,13 @@ const BriefStep: React.FC<{
 
 const ROW_LABEL: Record<ReviewKey, string> = {
   origin: '出発地', party_size: '人数', nights: '旅行の日数', transport: '移動手段', one_way: '片道の移動時間', room: '部屋',
-  budget: '宿泊費の目安', dates: '日程', preferences: '過ごし方',
+  budget: '予算', dates: '日程', preferences: '過ごし方',
 };
 
 const ReviewStep: React.FC<{
   review: ReviewState; onChange: (r: ReviewState) => void; onBack: () => void; onNext: () => void; busy: boolean;
-  error: string | null; aiConnected: boolean;
-}> = ({ review, onChange, onBack, onNext, busy, error, aiConnected }) => {
+  error: string | null; aiConnected: boolean; extras?: React.ReactNode;
+}> = ({ review, onChange, onBack, onNext, busy, error, aiConnected, extras }) => {
   const id = useId();
   const v = review.values;
   const update = (key: ReviewKey, patch: Partial<ReviewState['values']>) =>
@@ -310,7 +326,16 @@ const ReviewStep: React.FC<{
     onChange({ ...review, strength: { ...review.strength, [key]: s } });
   const confirm = (key: ReviewKey, on: boolean) => onChange({ ...review, confirmed: { ...review.confirmed, [key]: on } });
   const open = openQuestions(review);
-  const missingNights = v.nights === null;
+  // [監査 A06] 日数は確かめるまで先へ進めない(AI・文章の読み取りの値を黙って使わない)
+  const missingNights = v.nights === null || !review.confirmed.nights;
+  const proposals = review.proposals ?? {};
+  const acceptProposal = (key: ReviewKey, on: boolean) => {
+    const p = proposals[key];
+    const rest = { ...proposals };
+    delete rest[key];
+    onChange({ ...review, values: on && p ? { ...v, ...p.values } : v, proposals: rest,
+      confirmed: { ...review.confirmed, [key]: true } });
+  };
 
   const status = (key: ReviewKey) => {
     const src = review.sources[key];
@@ -399,11 +424,18 @@ const ReviewStep: React.FC<{
       <div className="space-y-2">
         <p className="text-sm font-semibold text-ink-900">
           {v.budget_min_man === v.budget_max_man ? `${v.budget_min_man}万円` : `${v.budget_min_man}〜${v.budget_max_man}万円`}
+          {` · ${BUDGET_TARGET_LABEL[v.budget_target]}`}
         </p>
-        <p className="text-xs text-ink-700">「全員の合計(1部屋・1泊)」か「1人あたり」かで、探す宿が変わります。</p>
-        {choice('宿泊費の範囲', v.budget_scope, [['total', '全員の合計'], ['per_person', '1人あたり']], (val) =>
-          onChange({ ...review, values: { ...v, budget_scope: val as 'total' | 'per_person' },
+        <p className="text-xs text-ink-700">何の費用か・誰の分か・どの期間かで、探す宿や比べ方が変わります。未定のままでも続けられます。</p>
+        {choice('予算は誰の分か', v.budget_scope, [['total', '全員の合計'], ['per_person', '1人あたり'], ['undecided', '未定']],
+          (val) => onChange({ ...review, values: { ...v, budget_scope: val as ReviewState['values']['budget_scope'] },
             confirmed: { ...review.confirmed, budget: true } }))}
+        {choice('予算の対象', v.budget_target, Object.entries(BUDGET_TARGET_LABEL) as Array<[string, string]>,
+          (val) => update('budget', { budget_target: val as ReviewState['values']['budget_target'] }))}
+        {choice('予算の期間', v.budget_period, Object.entries(BUDGET_PERIOD_LABEL) as Array<[string, string]>,
+          (val) => update('budget', { budget_period: val as ReviewState['values']['budget_period'] }))}
+        {choice('上限か目安か', v.budget_kind, Object.entries(BUDGET_KIND_LABEL) as Array<[string, string]>,
+          (val) => update('budget', { budget_kind: val as ReviewState['values']['budget_kind'] }))}
       </div>
     ) : <p className="text-sm text-ink-700">未指定</p>,
     dates: (
@@ -461,6 +493,18 @@ const ReviewStep: React.FC<{
                   {ROW_LABEL[key]}{pending && <span className="block text-[11px] font-normal text-warning">要回答</span>}
                 </span>
                 <span role="cell" className="min-w-0">
+                  {proposals[key] && (
+                    <span className="mb-2 block rounded-lg border border-accent bg-accent-soft p-2 text-xs text-ink-900"
+                      data-testid={`review-proposal-${key}`}>
+                      {`変更案: ${proposals[key]!.from} → ${proposals[key]!.to}`}
+                      <span className="mt-1 flex gap-2">
+                        <button type="button" className="tc-focus-ring min-h-11 rounded-lg border border-cloud-200 bg-cloud-0 px-2"
+                          onClick={() => acceptProposal(key, true)} data-testid={`review-proposal-accept-${key}`}>変更を採用</button>
+                        <button type="button" className="tc-focus-ring min-h-11 rounded-lg px-2 underline"
+                          onClick={() => acceptProposal(key, false)}>今のままにする</button>
+                      </span>
+                    </span>
+                  )}
                   {editor[key]}
                   {review.evidence[key] && (review.sources[key] === 'text' || review.sources[key] === 'ai') && (
                     <span className="mt-1 block text-[11px] text-ink-700 break-words">{`文章の該当: 「${review.evidence[key]}」`}</span>
@@ -475,12 +519,14 @@ const ReviewStep: React.FC<{
         {error && <p role="alert" className="mt-3 rounded-lg bg-danger-soft p-3 text-sm text-danger">{error}</p>}
         {(open.length > 0 || missingNights) && (
           <p role="status" className="mt-3 text-sm text-warning">
-            {missingNights ? '旅行の日数を選んでください。' : ''}
+            {missingNights ? '旅行の日数を選ぶか、合っていれば印を付けてください。' : ''}
             {open.includes('party_size') ? '人数を、入力欄と文章のどちらにするか選んでください。' : ''}
             {open.includes('one_way') ? '片道の時間が「希望」か「絶対条件」かを選んでください。' : ''}
-            {open.includes('budget') ? '宿泊費が「全員の合計」か「1人あたり」かを選んでください。' : ''}
+            {open.includes('budget') ? '予算が「全員の合計」か「1人あたり」かを選んでください(未定でも構いません)。' : ''}
           </p>
         )}
+        <NotesEditor notes={review.notes ?? []} onChange={(notes) => onChange({ ...review, notes })} />
+        {extras}
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Button type="button" variant="ghost" onClick={onBack}>← 入力へ戻る</Button>
           <div className="flex flex-col gap-1 sm:items-end">
@@ -521,6 +567,35 @@ const TripConsultPage: React.FC = () => {
   const [consentBusy, setConsentBusy] = useState(false);
   const [consultUsage, setConsultUsage] = useState<ConsultUsage | null>(null);
   const sessionRef = useRef<string | null>(state.consultSessionId ?? null);
+  // 同じ入力の再送(処理中・通信の失敗)は同じ Idempotency-Key を使う(二度送らない)。入力が変われば新しいキー
+  const pendingKey = useRef<{ input: string; key: string } | null>(null);
+  const keyFor = (input: unknown): string => {
+    const sig = JSON.stringify(input);
+    if (pendingKey.current?.input === sig) return pendingKey.current.key;
+    pendingKey.current = { input: sig, key: newIdempotencyKey() };
+    return pendingKey.current.key;
+  };
+
+  /** 確認の画面へ新しい読み取りを入れる。前の確認があれば重ねて(確かめた行は残す)、元に戻せるよう履歴に積む */
+  const applyExtraction = (ex: IntentExtraction & { suggested_areas?: Array<{ name: string; reason: string }>;
+    unknowns?: string[] }) => {
+    setState((s) => {
+      const fresh = initReview(ex);
+      const review = s.review ? mergeReview(s.review, fresh) : fresh;
+      const own = ex.areas.map((a) => a.name);
+      const areaNames = s.review ? Array.from(new Set([...s.areaNames, ...own])).slice(0, 10) : own;
+      const history = s.review ? [...(s.history ?? []), { review: s.review, areaNames: s.areaNames }].slice(-10) : [];
+      return { ...s, extraction: ex, review, areaNames, areas: null, step: 'review', history,
+        suggestedAreas: (ex.suggested_areas ?? []).map(({ name, reason }) => ({ name, reason })),
+        unknowns: ex.unknowns ?? [] };
+    });
+    requestAnimationFrame?.(() => headingRef.current?.focus());
+  };
+  const undo = () => setState((s) => {
+    const h = [...(s.history ?? [])];
+    const last = h.pop();
+    return last ? { ...s, review: last.review, areaNames: last.areaNames, history: h, areas: null } : s;
+  });
 
   useEffect(() => { saveState(state); }, [state]);
 
@@ -560,8 +635,9 @@ const TripConsultPage: React.FC = () => {
     }
   };
 
-  const aiRead = async () => {
-    if (!state.brief.text.trim()) {
+  const aiRead = async (briefOverride?: BriefForm) => {
+    const brief = briefOverride ?? state.brief;
+    if (!brief.text.trim()) {
       setError('AI に読み取らせる希望の文章を入力してください');
       return;
     }
@@ -569,14 +645,14 @@ const TripConsultPage: React.FC = () => {
     setError(null);
     try {
       const sid = await ensureSession();
-      const ex = await aiExtract(sid, extractInputOf(state.brief), newIdempotencyKey());
+      const input = extractInputOf(brief);
+      const ex = await aiExtract(sid, input, keyFor({ sid, input }));
+      pendingKey.current = null;
       setConsultUsage(ex.usage);
-      const own = ex.areas.map((a) => a.name);
-      setState((s) => ({ ...s, extraction: ex, review: initReview(ex), areaNames: own, areas: null, step: 'review',
-        suggestedAreas: ex.suggested_areas.map(({ name, reason }) => ({ name, reason })), unknowns: ex.unknowns }));
-      requestAnimationFrame?.(() => headingRef.current?.focus());
+      applyExtraction(ex);
     } catch (e) {
       const code = consultErrorCode(e);
+      if (code !== 'request_in_progress') pendingKey.current = null; // 処理中の時だけ、次も同じキーで確かめる
       if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
         sessionRef.current = null;
         setState((s) => ({ ...s, consultSessionId: null }));
@@ -594,17 +670,17 @@ const TripConsultPage: React.FC = () => {
     requestAnimationFrame?.(() => headingRef.current?.focus());
   }, []);
 
-  const extract = async () => {
-    if (!state.brief.text.trim() && !state.brief.origin.trim()) {
+  const extract = async (briefOverride?: BriefForm) => {
+    const b = briefOverride ?? state.brief;
+    if (!b.text.trim() && !b.origin.trim()) {
       setError('希望の文章か、出発地を入力してください');
       return;
     }
     setBusy('extract');
     setError(null);
     try {
-      const ex = await extractIntent(extractInputOf(state.brief));
-      setState((s) => ({ ...s, extraction: ex, review: initReview(ex), areaNames: ex.areas.map((a) => a.name),
-        areas: null, step: 'review', suggestedAreas: [], unknowns: [] }));
+      const ex = await extractIntent(extractInputOf(briefOverride ?? state.brief));
+      applyExtraction(ex);
       requestAnimationFrame?.(() => headingRef.current?.focus());
     } catch {
       setError('入力内容を整理できませんでした。文章は消えていません。時間をおいてもう一度お試しください');
@@ -625,7 +701,8 @@ const TripConsultPage: React.FC = () => {
     setBusy('areas');
     setError(null);
     try {
-      const r = await compareAreas({ origin: review.values.origin, areas: list,
+      // [監査 A06] 確かめていない出発地は使わない(位置の照会をしない)
+      const r = await compareAreas({ origin: review.confirmed.origin ? review.values.origin : '', areas: list,
         one_way_hours: review.confirmed.one_way ? review.values.one_way_hours : null,
         one_way_strength: review.confirmed.one_way ? review.values.one_way_strength : null });
       setState((s) => ({ ...s, areas: r, selectedArea: s.selectedArea && list.includes(s.selectedArea) ? s.selectedArea : list[0] ?? null }));
@@ -693,15 +770,24 @@ const TripConsultPage: React.FC = () => {
       <PlanningClassSummary className="mt-2" />
       {step === 'brief' && (
         <BriefStep brief={state.brief} onChange={(b) => setState((s) => ({ ...s, brief: b }))} onSubmit={() => void extract()}
-          busy={busy === 'extract'} error={error}
+          busy={busy === 'extract'} error={error} mode={state.mode ?? 'free'}
+          onMode={(m) => setState((s) => ({ ...s, mode: m }))}
           aiSlot={<AiReadPanel status={aiStatus} statusError={aiStatusError} busy={busy === 'ai'} consentBusy={consentBusy}
             usage={consultUsage} textLength={state.brief.text.trim().length} onConsent={(on) => void setConsent(on)}
-            onRead={() => void aiRead()} />} />
+            onRead={() => void aiRead()} primary={(state.mode ?? 'free') === 'free'} />} />
       )}
       {step === 'review' && reviewReady && state.review && (
         <ReviewStep review={state.review} onChange={(r) => setState((s) => ({ ...s, review: r }))} onBack={() => go('brief')}
           onNext={() => void compare()} busy={busy === 'areas'} error={error}
-          aiConnected={Boolean(state.extraction?.ai_connected)} />
+          aiConnected={Boolean(state.extraction?.ai_connected)}
+          extras={<FollowUp busy={busy === 'ai' || busy === 'extract'} canUndo={(state.history ?? []).length > 0} onUndo={undo}
+            aiReady={Boolean(aiStatus?.operations['ai.generate'].ready && aiStatus.consent.ai_processing)}
+            onSend={(text, useAi) => {
+              // 追加の文章は相談の文章の後ろへ足す(原文は消さない)。確かめた行は重ねる時に残す
+              const brief = { ...state.brief, text: `${state.brief.text.trim()}\n【追加】${text}`.slice(0, 4000) };
+              setState((s) => ({ ...s, brief }));
+              void (useAi ? aiRead(brief) : extract(brief));
+            }} />} />
       )}
       {step === 'review' && state.review && (
         <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []} areaNames={state.areaNames}

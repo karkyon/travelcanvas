@@ -146,9 +146,15 @@ class IntentIn(BaseModel):
     budget_min: Optional[int] = Field(None, ge=0, le=10_000_000)
     budget_max: Optional[int] = Field(None, ge=0, le=10_000_000)
     budget_scope: Literal["total", "per_person", "undecided"] = "undecided"
+    # [Gate ConsultAI] 予算の対象・期間・上限か目安か(旅行全体の額を宿泊費にしない)
+    budget_target: Literal["lodging", "transport", "food", "trip_total", "other", "undecided"] = "undecided"
+    budget_period: Literal["per_night", "all_nights", "whole_trip", "undecided"] = "undecided"
+    budget_kind: Literal["cap", "guide", "undecided"] = "undecided"
     date_status: Literal["undecided", "window", "fixed"] = "undecided"
     travel_window: Optional[str] = Field(None, max_length=60)
     preferences: List[str] = Field(default_factory=list, max_length=10)
+    # [Gate ConsultAI] 決まった項目に分けられない希望(その他)。利用者が確かめた分だけ下書きへ残す
+    notes: List[str] = Field(default_factory=list, max_length=ti.MAX_NOTES)
 
 
 class AreaIn(BaseModel):
@@ -177,6 +183,8 @@ def _title(area: str, nights: int) -> str:
 @router.post("/draft", status_code=201)
 def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     intent = body.intent.model_dump()
+    notes = [" ".join(n.split())[:100] for n in intent.get("notes") or [] if isinstance(n, str) and n.strip()]
+    intent["notes"] = list(dict.fromkeys(notes))[:ti.MAX_NOTES]
     if set(intent["preferences"]) - set(ti.PREFERENCES):
         raise _bad("invalid_field", "過ごし方の項目が正しくありません")
     lo, hi = intent["budget_min"], intent["budget_max"]

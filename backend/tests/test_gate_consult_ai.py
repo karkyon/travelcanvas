@@ -293,3 +293,163 @@ def test_stub_answers_are_deterministic_and_refused_in_production(monkeypatch):
         provider_stub.install()
     monkeypatch.setattr(settings, "PROVIDER_HTTP_STUB", False)
     assert provider_stub.install() is False
+
+
+# ===================================================================== [監査 A02/A03] 二重送信・usage 不明
+
+def _committed_consult(tier="journey"):
+    """実の PostgreSQL へ commit した会員・相談(並行の試験は別々の接続を使うため、試験の transaction の外に置く)。"""
+    from app.core.database import SessionLocal
+    from app.api.v1.auth import hash_password  # noqa: E402
+    from app.models.models import User, UserType
+    s = SessionLocal()
+    user = User(id=uuid.uuid4(), email=f"cc_{uuid.uuid4().hex[:10]}@example.com",
+                username=f"cc_{uuid.uuid4().hex[:10]}",
+                hashed_password=hash_password("TestPass123!"), user_type=UserType.REGISTERED, is_active=True,
+                is_verified=True)
+    s.add(user)
+    s.flush()
+    s.add(Entitlement(id=uuid.uuid4(), subject_type="user", subject_id=user.id,
+                      feature_key=cg.FEATURE_PREFIX + "class." + tier, status="active", source="admin"))
+    sess = TripConsultSession(id=uuid.uuid4(), user_id=user.id, expires_at=cg._now() + cg.timedelta(days=1))
+    s.add(sess)
+    s.commit()
+    ids = (user.id, sess.id)
+    s.close()
+    return ids
+
+
+def _cleanup(user_id, consult_id):
+    from sqlalchemy import text as _t
+    from app.core.database import engine
+    with engine.begin() as conn:
+        conn.execute(_t("DELETE FROM provider_usage_events WHERE user_id = :u"), {"u": user_id})
+        conn.execute(_t("DELETE FROM provider_usage_reservations WHERE user_id = :u"), {"u": user_id})
+        conn.execute(_t("DELETE FROM usage_budget_accounts WHERE scope_id IN (:u, :c)"),
+                     {"u": user_id, "c": consult_id})
+        conn.execute(_t("DELETE FROM entitlements WHERE subject_id = :u"), {"u": user_id})
+        conn.execute(_t("DELETE FROM users WHERE id = :u"), {"u": user_id})
+
+
+def test_concurrent_same_key_sends_once_on_real_postgres():
+    """同じ Idempotency-Key の2つの要求を、別々の DB 接続で同時に送る → 外部送信 1回・予約 1件・確定 1回。"""
+    import threading
+    import time
+    from app.core.database import SessionLocal
+    from app.models.models import User
+
+    cg.register_provider("fake_concurrency", ["ai.generate"])
+    user_id, consult_id = _committed_consult()
+    sent = []
+    barrier = threading.Barrier(2)
+    outcomes = []
+
+    def call(units):
+        sent.append(1)
+        time.sleep(0.5)  # 1つ目が送っている間に2つ目が来る
+        return cg.ProviderResult(units={"input_tokens": 100, "output_tokens": 50})
+
+    def worker():
+        db = SessionLocal()
+        try:
+            caller = db.get(User, user_id)
+            barrier.wait()
+            cg.run(db, None, caller, "ai.generate", "fake_concurrency", {"input_tokens": 500, "output_tokens": 200},
+                   "same-key-concurrent", call, consult_id=consult_id, fingerprint="fp-1")
+            outcomes.append("ok")
+        except cg.CostGuardError as error:
+            outcomes.append(error.code)
+        finally:
+            db.close()
+    try:
+        threads = [threading.Thread(target=worker) for _ in range(2)]
+        [t.start() for t in threads]
+        [t.join(30) for t in threads]
+        assert len(sent) == 1, outcomes
+        assert sorted(outcomes) == ["ok", "request_in_progress"] or sorted(outcomes) == ["idempotent_replay", "ok"]
+        db = SessionLocal()
+        rows = db.query(ProviderUsageReservation).filter_by(user_id=user_id).all()
+        assert len(rows) == 1 and rows[0].status == "settled" and rows[0].sent_at is not None
+        assert db.query(ProviderUsageEvent).filter_by(user_id=user_id).count() == 1
+        acc = db.query(UsageBudgetAccount).filter_by(scope_type="consult", scope_id=consult_id).one()
+        assert acc.counts.get("ai_calls_per_plan") == 1 and Decimal(acc.reserved_jpy) == 0
+        db.close()
+        # 同じキーで違う内容 → 衝突(送らない)
+        db = SessionLocal()
+        try:
+            cg.run(db, None, db.get(User, user_id), "ai.generate", "fake_concurrency",
+                   {"input_tokens": 500, "output_tokens": 200}, "same-key-concurrent", call, consult_id=consult_id,
+                   fingerprint="fp-other")
+            raise AssertionError("衝突にならなかった")
+        except cg.CostGuardError as error:
+            assert error.code == "idempotency_conflict"
+        finally:
+            db.close()
+        assert len(sent) == 1
+    finally:
+        cg.unregister_provider("fake_concurrency")
+        _cleanup(user_id, consult_id)
+
+
+@pytest.mark.parametrize("usage", [None, {}, {"input_tokens": -1, "output_tokens": 5},
+                                   {"input_tokens": "10", "output_tokens": 5}])
+def test_unknown_usage_is_settled_at_the_reserved_amount(admin, db_session, net, usage):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    body = _ai_body(GOOD)
+    if usage is None:
+        body.pop("usage")
+    else:
+        body["usage"] = usage
+    net.set("api.openai.com", 200, body)
+    r = _extract(client, _session(client))
+    assert r.status_code == 200, r.text
+    row = db_session.query(ProviderUsageReservation).one()
+    ev = db_session.query(ProviderUsageEvent).filter_by(provider="openai").one()
+    assert ev.result_code == "usage_unknown"
+    assert ev.input_tokens == row.units["input_tokens"] and ev.output_tokens == row.units["output_tokens"]
+    assert Decimal(ev.estimated_cost_jpy) == Decimal(row.max_cost_jpy)  # 0 円にしない
+
+
+def test_local_error_after_send_is_not_released(admin, db_session, net, monkeypatch):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+
+    def boom(_body):
+        raise RuntimeError("parse bug")
+    monkeypatch.setattr(consult_ai, "parse_output", boom)
+    with pytest.raises(RuntimeError):
+        _extract(client, _session(client))
+    row = db_session.query(ProviderUsageReservation).one()
+    assert row.status == "settled"
+    assert db_session.query(ProviderUsageEvent).filter_by(provider="openai").one().result_code == "local_error"
+
+
+def test_budget_meaning_and_other_wishes_are_kept():
+    """[監査 A07/A08] 旅行全体の額を宿泊費にしない・分類できない希望(その他)を捨てない"""
+    from app.services import trip_intent as ti
+    rule = {i["key"]: i for i in ti.extract("大人4人。予算は旅行全体で8万円。", {})["items"]}
+    assert rule["budget"]["label"] == "予算" and rule["budget"]["value"]["target"] == "trip_total"
+    data = dict(GOOD)
+    data["budget"] = {"min_yen": 80000, "max_yen": 80000, "scope": None, "target": "trip_total",
+                      "period": "whole_trip", "kind": "cap", "evidence": None}
+    data["other_wishes"] = ["何もしない時間もほしい", "地元の市場", "何もしない時間もほしい"]
+    out = consult_ai.merge("大阪から家族でゆっくり。温泉と地元の市場。何もしない時間もほしい。予算は旅行全体で8万円。", {}, data)
+    budget = next(i for i in out["items"] if i["key"] == "budget")
+    assert budget["value"]["target"] == "trip_total" and budget["value"]["kind"] == "cap"
+    assert out["notes"] == ["何もしない時間もほしい", "地元の市場"]
+
+
+def test_draft_keeps_budget_meaning_and_notes(auth_client, db_session):
+    client, _user = auth_client
+    r = client.post("/api/v1/trip-intents/draft", json={"area": {"name": "城崎温泉"}, "intent": {
+        "nights": 1, "budget_min": 80000, "budget_max": 80000, "budget_scope": "total", "budget_target": "trip_total",
+        "budget_period": "whole_trip", "budget_kind": "cap", "notes": ["何もしない時間", " 何もしない時間 ", "市場"]}})
+    assert r.status_code == 201, r.text
+    d = client.get(f"/api/v1/plans/{r.json()['plan_id']}/trip-intent").json()
+    assert d["intent"]["budget_target"] == "trip_total" and d["intent"]["notes"] == ["何もしない時間", "市場"]
+    bad = client.post("/api/v1/trip-intents/draft", json={"area": {"name": "城崎"}, "intent": {
+        "nights": 1, "budget_target": "hotel"}})
+    assert bad.status_code == 422

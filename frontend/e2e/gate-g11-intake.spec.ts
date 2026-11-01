@@ -95,11 +95,12 @@ test('旅行相談: 希望 → 確認 → 方面の比較 → 方面の詳細 �
   await expect(page.getByTestId('review-personal')).toBeVisible();
   await expect(page.getByTestId('review-row-origin')).toContainText(/あなたの入力/);
   await expect(page.getByTestId('review-row-party_size')).toContainText('文章から読み取り · 未確認');
-  await expect(page.getByTestId('consult-compare')).toBeEnabled();
+  await expect(page.getByTestId('consult-compare')).toBeDisabled(); // 日数を確かめるまで進めない(監査 A06)
   await expect(page.getByRole('status').filter({ hasText: '片道の時間が「希望」か「絶対条件」か' })).toBeVisible();
   await page.getByRole('radiogroup', { name: '片道の時間の扱い' }).getByRole('radio', { name: /希望/ }).click();
-  await page.getByRole('radiogroup', { name: '宿泊費の範囲' }).getByRole('radio', { name: /全員の合計/ }).click();
+  await page.getByRole('radiogroup', { name: '予算は誰の分か' }).getByRole('radio', { name: /全員の合計/ }).click();
   await page.getByTestId('review-confirm-party_size').check();
+  await page.getByTestId('review-confirm-nights').check();
   await expect(page.getByRole('status').filter({ hasText: '片道の時間が' })).toHaveCount(0);
   await expectNoAxeViolations(page, '旅行相談: 内容を確認');
   await page.getByTestId('consult-compare').click();
@@ -208,7 +209,8 @@ test('旅行相談と下書き: 360px・明暗で横にはみ出さず axe 違�
     await expectNoOverflow(page, `内容を確認(${theme})`);
     await expectNoAxeViolations(page, `内容を確認(360px・${theme})`);
     await page.getByRole('radiogroup', { name: '片道の時間の扱い' }).getByRole('radio', { name: /絶対条件/ }).click();
-    await page.getByRole('radiogroup', { name: '宿泊費の範囲' }).getByRole('radio', { name: /1人あたり/ }).click();
+    await page.getByRole('radiogroup', { name: '予算は誰の分か' }).getByRole('radio', { name: /1人あたり/ }).click();
+    await page.getByTestId('review-confirm-nights').check();
     await page.getByTestId('consult-compare').click();
     await expect(page.getByTestId('area-row-伊勢')).toBeVisible();
     await expectNoOverflow(page, `方面を比較(${theme})`);

@@ -27,4 +27,3 @@ export function operationBlocker(status: ConsultAiStatus | null, op: ConsultOper
 
 export const usageLabel = (u: ConsultUsage | undefined | null): string | null =>
   u ? `この相談の利用枠: 使用 ¥${Math.ceil(Number(u.plan_used))} / 上限 ¥${Math.round(Number(u.plan_cap))}` : null;
-

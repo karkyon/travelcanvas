@@ -98,10 +98,20 @@ export interface IntentPayload {
   budget_min: number | null;
   budget_max: number | null;
   budget_scope: 'total' | 'per_person' | 'undecided';
+  /** [Gate ConsultAI] 予算の対象・期間・上限か目安か(旅行全体の額を宿泊費にしない) */
+  budget_target: BudgetTarget;
+  budget_period: BudgetPeriod;
+  budget_kind: BudgetKind;
   date_status: 'undecided' | 'window' | 'fixed';
   travel_window: string | null;
   preferences: string[];
+  /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
+  notes: string[];
 }
+
+export type BudgetTarget = 'lodging' | 'transport' | 'food' | 'trip_total' | 'other' | 'undecided';
+export type BudgetPeriod = 'per_night' | 'all_nights' | 'whole_trip' | 'undecided';
+export type BudgetKind = 'cap' | 'guide' | 'undecided';
 
 export interface DraftInput {
   area: { name: string; latitude: number | null; longitude: number | null; provider: 'nominatim' | null;

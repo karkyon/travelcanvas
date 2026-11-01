@@ -22,6 +22,7 @@ from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy import or_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -98,6 +99,13 @@ class ProviderTransientError(Exception):
         self.retry_safe = retry_safe
 
 
+class NotSentError(Exception):
+    """[Gate ConsultAI] 提供元へ送っていない(または提供元が課金せずに断った)と確かな例外の印。``run`` は予約を解放する。
+    それ以外の例外は「送ったかもしれない」として、予約の見込みの額で確定する(解放して再送できる形にしない)。"""
+
+    not_sent = True
+
+
 class ProviderAmbiguousError(Exception):
     """[Gate ProviderConnect] 時間切れなど、提供元が受け取ったか分からない。課金されていないと決め付けず、
     予約の見込みの額で確定する(解放しない)。再試行もしない。"""
@@ -105,8 +113,9 @@ class ProviderAmbiguousError(Exception):
 
 @dataclass
 class ProviderResult:
-    """provider が実際に使った単位(token・回数など)。課金の明細の値があれば raw_cost(provider の通貨)。"""
-    units: Dict[str, int]
+    """provider が実際に使った単位(token・回数など)。課金の明細の値があれば raw_cost(provider の通貨)。
+    [Gate ConsultAI] ``units`` が None は「使った量が分からない」(0 ではない)。予約の見込みの額で確定する。"""
+    units: Optional[Dict[str, int]]
     result_code: str = "ok"
     payload: Any = None
     model: Optional[str] = None
@@ -583,10 +592,13 @@ def release_expired(db: Session, plan_id: Optional[uuid.UUID] = None, now: Optio
                                                      ProviderUsageReservation.expires_at < now)
     if plan_id is not None:
         q = q.filter(ProviderUsageReservation.plan_id == plan_id)
-    ids = [r[0] for r in q.limit(200).all()]
-    for rid in ids:
-        release(db, rid, "expired")
-    return len(ids)
+    rows = q.add_columns(ProviderUsageReservation.sent_at, ProviderUsageReservation.units).limit(200).all()
+    for rid, sent_at, units in rows:
+        if sent_at is not None:
+            settle(db, rid, dict(units or {}), "expired_after_send")  # 送った後に応答が消えた(課金されたかもしれない)
+        else:
+            release(db, rid, "expired")
+    return len(rows)
 
 
 # ===================================================================== 予約・確定・解放(§5)
@@ -699,7 +711,7 @@ def _scope_of(plan: Optional[TravelPlan], consult_id: Optional[uuid.UUID]) -> Tu
 
 def reserve(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, provider: str,
             units: Dict[str, Any], idempotency_key: str,
-            consult_id: Optional[uuid.UUID] = None) -> ProviderUsageReservation:
+            consult_id: Optional[uuid.UUID] = None, fingerprint: Optional[str] = None) -> ProviderUsageReservation:
     """最大の見込み額を予約して commit する。断る時は CostGuardError(何も変えない)。
 
     [Gate ConsultAI] ``consult_id`` は旅行を作る前の相談の口座(1相談 = 1旅行と同じ 50円・回数の枠)。"""
@@ -710,17 +722,9 @@ def reserve(db: Session, plan: Optional[TravelPlan], caller: User, operation: st
         raise CostGuardError("provider_suspended", 503,
                              "この提供元は費用の確認のため止めています。手で続けられます")
     norm = normalize_units(operation, units)
-    existing = (db.query(ProviderUsageReservation)
-                .filter(ProviderUsageReservation.user_id == caller.id,
-                        ProviderUsageReservation.idempotency_key == idempotency_key).first())
+    existing = _existing(db, caller, idempotency_key)
     if existing is not None:
-        same_scope = existing.plan_id == (plan.id if plan is not None else None)
-        if same_scope and plan is None:
-            acc = db.get(UsageBudgetAccount, existing.plan_account_id) if existing.plan_account_id else None
-            same_scope = acc is not None and acc.scope_type == scope_type and acc.scope_id == scope_id
-        if not same_scope or existing.operation != operation or existing.units != norm:
-            raise CostGuardError("idempotency_conflict", 409, "同じ Idempotency-Key で違う操作が送られました")
-        return existing
+        return _same_request(db, existing, plan, scope_type, scope_id, operation, norm, fingerprint)
     res = resolve(db, plan, caller)
     tier = _tier_denial(res, operation)
     if tier is not None:
@@ -769,15 +773,54 @@ def reserve(db: Session, plan: Optional[TravelPlan], caller: User, operation: st
         counts=need, max_cost_jpy=cost,
         status="reserved", profile_key=res.profile_key, policy_version=res.policy_version,
         plan_account_id=plan_acc.id, monthly_account_id=monthly_acc.id if monthly_acc else None,
-        expires_at=_now() + timedelta(seconds=ttl))
+        expires_at=_now() + timedelta(seconds=ttl), request_hash=fingerprint)
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 同じ Idempotency-Key の要求が同時に予約した(unique(user_id, idempotency_key))。こちらの口座の変更は取り消し、
+        # 先に入った予約を同じ要求として扱う(送信権は run の claim で一方だけが取る)
+        db.rollback()
+        existing = _existing(db, caller, idempotency_key)
+        if existing is None:
+            raise
+        return _same_request(db, existing, plan, scope_type, scope_id, operation, norm, fingerprint)
     _add_metric("reserved_jpy", operation, cost)
     used = Decimal(plan_acc.settled_jpy) + Decimal(plan_acc.reserved_jpy)
     if used >= res.plan_cap * ALERT_RATIO and res.plan_cap > 0:
         _count("provider_usage_plan_alert")
         logger.warning("cost_guard: 旅行の利用枠が 90%% を越えました(policy %s・%s)", res.policy_version, operation)
     return row
+
+
+def _existing(db: Session, caller: User, idempotency_key: str) -> Optional[ProviderUsageReservation]:
+    return (db.query(ProviderUsageReservation)
+            .filter(ProviderUsageReservation.user_id == caller.id,
+                    ProviderUsageReservation.idempotency_key == idempotency_key).populate_existing().first())
+
+
+def _same_request(db: Session, existing: ProviderUsageReservation, plan: Optional[TravelPlan], scope_type: str,
+                  scope_id: uuid.UUID, operation: str, norm: Dict[str, int],
+                  fingerprint: Optional[str]) -> ProviderUsageReservation:
+    """同じ Idempotency-Key の2回目。範囲・操作・量・要求の指紋(入力の hash)が全て同じ時だけ同じ要求として返す。"""
+    same_scope = existing.plan_id == (plan.id if plan is not None else None)
+    if same_scope and plan is None:
+        acc = db.get(UsageBudgetAccount, existing.plan_account_id) if existing.plan_account_id else None
+        same_scope = acc is not None and acc.scope_type == scope_type and acc.scope_id == scope_id
+    if (not same_scope or existing.operation != operation or existing.units != norm
+            or (existing.request_hash or None) != (fingerprint or None)):
+        raise CostGuardError("idempotency_conflict", 409, "同じ Idempotency-Key で違う操作・内容が送られました")
+    return existing
+
+
+def claim_send(db: Session, reservation_id: uuid.UUID) -> bool:
+    """[Gate ConsultAI] この予約で提供元へ送る権利を原子的に1つだけ取る(取れたら True)。commit する。
+    同じ予約を返された後続の要求(同じ Idempotency-Key の並行・再送)は False になり、送らない。"""
+    got = db.execute(text(
+        "UPDATE provider_usage_reservations SET sent_at = now() "
+        "WHERE id = :id AND status = 'reserved' AND sent_at IS NULL RETURNING id"), {"id": reservation_id}).first()
+    db.commit()
+    return got is not None
 
 
 def _finish(db: Session, reservation_id: uuid.UUID, settle_units: Optional[Dict[str, int]], result_code: str,
@@ -845,7 +888,7 @@ def release(db: Session, reservation_id: uuid.UUID, result_code: str = "released
 
 def run(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, provider: str, units: Dict[str, Any],
         idempotency_key: str, call: Callable[[Dict[str, int]], ProviderResult],
-        consult_id: Optional[uuid.UUID] = None) -> Tuple[Any, Dict[str, Any]]:
+        consult_id: Optional[uuid.UUID] = None, fingerprint: Optional[str] = None) -> Tuple[Any, Dict[str, Any]]:
     """予約 → 呼び出し → 確定/解放。provider の一時的な失敗は、二重の課金にならない時だけ1回再試行する。
 
     [Gate ConsultAI] ``consult_id`` を渡すと、旅行を作る前の相談の口座で数える(``reserve`` と同じ)。"""
@@ -854,10 +897,15 @@ def run(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, p
         raise CostGuardError("provider_not_connected", 503, "外部の有料の提供元は未接続です。手で続けられます")
     if operation not in paid_providers()[provider]["operations"]:
         raise CostGuardError("unknown_planning_operation", 422, "この提供元はこの操作を扱いません")
-    row = reserve(db, plan, caller, operation, provider, units, idempotency_key, consult_id=consult_id)
+    row = reserve(db, plan, caller, operation, provider, units, idempotency_key, consult_id=consult_id,
+                  fingerprint=fingerprint)
     if row.status != "reserved":
         raise CostGuardError("idempotent_replay", 409, "同じ操作は既に終わっています(二度目は呼びません)",
                              extra={"reservation_status": row.status})
+    if not claim_send(db, row.id):
+        raise CostGuardError("request_in_progress", 409,
+                             "同じ操作を処理しています(二度目は送りません)。少し待ってから結果を確かめてください",
+                             extra={"reservation_status": "reserved"})
     attempts = 0
     while True:
         try:
@@ -876,10 +924,17 @@ def run(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, p
             raise CostGuardError("provider_timeout", 503,
                                  "提供元の応答が時間内に来ませんでした。届いた可能性があるため、枠は見込みの額で数えました。"
                                  "手で続けられます")
-        except Exception:
-            release(db, row.id, "provider_error")
+        except Exception as error:
+            if getattr(error, "not_sent", False):
+                release(db, row.id, "provider_error")  # 鍵が無い・提供元が課金せずに断った(送っていない)
+            else:
+                # 送った後の想定外の失敗(応答の読み取りの不具合など)。課金の有無が分からないため見込みで数える
+                settle(db, row.id, dict(row.units), "local_error")
             raise
-    settled = settle(db, row.id, result.units, result.result_code, result.model, result.raw_cost)
+    units_used = result.units if result.units is not None else dict(row.units)
+    code = result.result_code if result.units is not None else (
+        "usage_unknown" if result.result_code == "ok" else f"{result.result_code}_usage_unknown"[:32])
+    settled = settle(db, row.id, units_used, code, result.model, result.raw_cost)
     res = resolve(db, plan, caller)
     plan_acc = _peek(db, scope_type, scope_id, "plan")
     usage = _usage_body(res, plan_acc)

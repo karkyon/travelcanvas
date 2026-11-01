@@ -77,6 +77,8 @@ class SecretUnavailable(RuntimeError):
     """送信に使える鍵が無い。code は secret_missing / secret_disabled / secret_decrypt_failed /
     secret_placeholder / secret_invalid / secret_backend_unavailable。呼び出し側は送らない(.env など別の取得元へ戻らない)。"""
 
+    not_sent = True  # [Gate ConsultAI] 鍵が取れない時は送っていない(cost_guard.run は予約を解放する)
+
     def __init__(self, code: str):
         super().__init__(code)
         self.code = code

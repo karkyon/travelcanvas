@@ -85,7 +85,14 @@ OpenAI の残高・Google の課金とキーの制限(API 制限・送信元 IP)
 6. 「原価の台帳」に openai・google_places・google_routes の行。相談の文章・AI の結果は保存されていない(監査は件数だけ)。
 7. 送る前に断る確認: 同意の印を外す →「AI で読み取る」が押せない。Free の会員では「Free のクラスには含まれません」。
 
-## 4. 巻き戻し
-問題があれば、反映前の SHA へ `git checkout <SHA>` して `docker compose up -d --build`。
-`c3e5a7b9d1f4` を戻す時は `docker compose run --rm migrate alembic downgrade b7e3c9d1f5a2`(相談の口座を消してから制約を戻す。
-使用の記録 provider_usage_events は消えない)。
+## 4. 反映の道具と巻き戻し
+反映は `TC_EXPECT_HEAD=<SHA> bash scripts/ops/consultai_apply.sh push`(push → 統合 PR → CI)と、merge の後の
+`TC_EXPECT_HEAD=<SHA> bash scripts/ops/consultai_apply.sh deploy` で行う。deploy は何かを変える前に、main に変更が入っているか
+(merge・squash)・main の CI・未追跡のファイルの衝突・`.env` の模擬の設定を確かめ、元の branch・SHA・DB の revision・
+退避(stash)・バックアップの ID を `~/tc-artifacts/deploy-<日時>.state` に残す。
+
+巻き戻しは決め打ちの downgrade をしない(元のコードが知らない revision に DB を下げない・相談の口座を消さない)。
+1. 原因を直して前へ進める(推奨)。
+2. DB の revision が変わっていなければ、state の `prev_sha` へ `git checkout` して `docker compose up -d --build`。
+3. DB も戻す必要がある時は、元のコードで `python3 scripts/ops/tcops.py restore <backup>`(バックアップの後のデータは消える)。
+4. 退避した変更は `git stash list` で確かめて `git stash pop`。

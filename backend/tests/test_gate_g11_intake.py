@@ -76,7 +76,8 @@ def test_extract_main_scenario_marks_sources_and_questions(client, users):
     assert items["one_way"]["strength"] == "undecided" and items["one_way"]["question"]["suggested"] == "preferred"
     assert items["room"]["value"] == "same_room"
     # 6〜8万円: 全員の合計か1人あたりかを確かめる(「4人で」から合計を提案するが決めない)
-    assert items["budget"]["value"] == {"min": 60000, "max": 80000, "scope": None}
+    assert items["budget"]["value"] == {"min": 60000, "max": 80000, "scope": None, "target": "lodging",
+                                        "period": "undecided", "kind": "undecided"}
     assert items["budget"]["question"]["suggested"] == "total"
     assert items["dates"]["source"] == "unspecified" and "日付が決まってから" in items["dates"]["note"]
     assert {"quiet", "calm", "food", "flexible_meals"} <= set(items["preferences"]["value"])

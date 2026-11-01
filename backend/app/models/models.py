@@ -3720,6 +3720,9 @@ class ProviderUsageReservation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate ConsultAI] 送信権を取った時刻(1予約で送るのは1回だけ)と、要求の指紋(入力の hash。入力そのものは持たない)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    request_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="uq_provider_usage_reservations_idem"),

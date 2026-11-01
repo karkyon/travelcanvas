@@ -41,6 +41,11 @@ STRENGTHS = ("required", "preferred", "undecided")
 TRANSPORTS = ("car", "public", "undecided")
 ROOMS = ("same_room", "multiple_rooms", "undecided")
 BUDGET_SCOPES = ("total", "per_person", "undecided")
+# [Gate ConsultAI] 予算の対象・期間・上限か目安か(「旅行全体で8万円」を宿泊費にしない)
+BUDGET_TARGETS = ("lodging", "transport", "food", "trip_total", "other", "undecided")
+BUDGET_PERIODS = ("per_night", "all_nights", "whole_trip", "undecided")
+BUDGET_KINDS = ("cap", "guide", "undecided")
+MAX_NOTES = 10
 DATE_STATUSES = ("undecided", "window", "fixed")
 PREFERENCES = {
     "quiet": "人混みを避けて静かに",
@@ -145,6 +150,19 @@ def _room(text: str) -> Tuple[Optional[str], Optional[re.Match]]:
     if m:
         return "multiple_rooms", m
     return None, None
+
+
+def budget_target(text: str) -> str:
+    """文章の書き方から予算の対象(分からなければ undecided。宿泊費と決め付けない)"""
+    if re.search(r"旅行全体|全体で|総額|旅費|全部で|込みで", text):
+        return "trip_total"
+    if re.search(r"宿泊|宿代|宿は|宿の|ホテル代|1泊", text):
+        return "lodging"
+    if re.search(r"交通費|ガソリン|高速代", text):
+        return "transport"
+    if re.search(r"食費|食事代", text):
+        return "food"
+    return "undecided"
 
 
 def _budget(text: str) -> Tuple[Optional[int], Optional[int], Optional[str], Optional[re.Match]]:
@@ -290,14 +308,16 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         scope = scope_field if scope_field in ("total", "per_person") else None
         disp = f"{lo // 10000}〜{hi // 10000}万円" if lo != hi else f"{lo // 10000}万円"
         q = None if scope else {
-            "id": "budget_scope", "text": f"{disp}は、全員の合計(1部屋・1泊)ですか、1人あたりですか",
+            "id": "budget_scope", "text": f"{disp}は、全員の合計ですか、1人あたりですか(未定でも続けられます)",
             "options": [{"value": "total", "label": "全員の合計"}, {"value": "per_person", "label": "1人あたり"}],
             "suggested": scope_text,
-            "hint": "宿を探す時の条件になります。税・食事の有無は宿を照会する時に確かめます"}
-        items.append(_item("budget", "宿泊費の目安", {"min": lo, "max": hi, "scope": scope}, disp, "text", "preferred",
-                           _snippet(t, bm), q))
+            "hint": "何の費用か(宿泊費・旅行全体など)と期間も、確認の画面で選べます"}
+        near = t[max(0, bm.start() - 15):bm.end() + 8] if bm else t
+        value = {"min": lo, "max": hi, "scope": scope, "target": budget_target(near), "period": "undecided",
+                 "kind": "undecided"}
+        items.append(_item("budget", "予算", value, disp, "text", "preferred", _snippet(t, bm), q))
     else:
-        items.append(_item("budget", "宿泊費の目安", None, "未指定", "unspecified"))
+        items.append(_item("budget", "予算", None, "未指定", "unspecified"))
 
     status, window, dm = _dates(t)
     window_field = (fields.get("travel_window") or "").strip()

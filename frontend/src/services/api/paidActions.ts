@@ -63,4 +63,3 @@ export function paidErrorCode(error: unknown): string | null {
   const code = (detail as { code?: unknown } | null | undefined)?.code;
   return typeof code === 'string' ? code : null;
 }
-

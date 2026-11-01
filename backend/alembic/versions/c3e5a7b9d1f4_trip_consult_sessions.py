@@ -8,6 +8,7 @@ Create Date: 2026-11-01 12:00:00.000000
 
 - trip_consult_sessions: 相談(利用者・期限・下書きにした旅行)。相談の文章・AI の結果は保存しない
 - usage_budget_accounts.scope_type に 'consult' を足す(1相談 = 1旅行と同じ 50円・回数の枠で予約・確定する)
+- provider_usage_reservations に sent_at(送信権を取った時刻。1予約で送るのは1回)・request_hash(要求の指紋)
 - downgrade は相談の口座を消してから制約を戻す(相談の使用の記録 provider_usage_events は消さない)
 """
 from typing import Sequence, Union
@@ -39,9 +40,13 @@ def upgrade() -> None:
     op.drop_constraint('ck_usage_budget_accounts_scope', 'usage_budget_accounts', type_='check')
     op.create_check_constraint('ck_usage_budget_accounts_scope', 'usage_budget_accounts',
                                "scope_type IN ('plan', 'user', 'organization', 'consult')")
+    op.add_column('provider_usage_reservations', sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True))
+    op.add_column('provider_usage_reservations', sa.Column('request_hash', sa.String(64), nullable=True))
 
 
 def downgrade() -> None:
+    op.drop_column('provider_usage_reservations', 'request_hash')
+    op.drop_column('provider_usage_reservations', 'sent_at')
     op.execute("UPDATE provider_usage_reservations SET plan_account_id = NULL WHERE plan_account_id IN "
                "(SELECT id FROM usage_budget_accounts WHERE scope_type = 'consult')")
     op.execute("DELETE FROM usage_budget_accounts WHERE scope_type = 'consult'")

@@ -79,8 +79,20 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     await expect(page.getByTestId('review-row-party_size')).toContainText('AI の読み取り · 未確認');
     await expect(page.getByTestId('review-row-party_size')).toContainText('文章の該当:');
     await page.getByRole('radiogroup', { name: '片道の時間の扱い' }).getByRole('radio', { name: /希望/ }).click();
-    await page.getByRole('radiogroup', { name: '宿泊費の範囲' }).getByRole('radio', { name: /全員の合計/ }).click();
+    await page.getByRole('radiogroup', { name: '予算は誰の分か' }).getByRole('radio', { name: /全員の合計/ }).click();
     await page.getByTestId('review-confirm-party_size').check();
+    await page.getByTestId('review-confirm-nights').check();
+    // 追加で伝える: 確かめた人数は変えず「変更案」を出す。元に戻す → もう一度 → 採用。その他の希望を残す
+    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。何もしない時間もほしい');
+    await page.getByTestId('consult-followup-ai').click();
+    await expect(page.getByTestId('review-proposal-party_size')).toContainText('4 → 3', { timeout: 20_000 });
+    await expect(page.getByLabel('その他の希望 1')).toHaveValue('何もしない時間がほしい');
+    await page.getByTestId('consult-undo').click();
+    await expect(page.getByTestId('review-proposal-party_size')).toHaveCount(0);
+    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。何もしない時間もほしい');
+    await page.getByTestId('consult-followup-ai').click();
+    await page.getByTestId('review-proposal-accept-party_size').click();
+    await expect(page.getByTestId('review-row-party_size').getByLabel('人数', { exact: true })).toHaveValue('3');
     const suggest = page.getByTestId('consult-suggest-城崎温泉');
     await expect(suggest).toHaveText('比較に足す');
     await suggest.click();

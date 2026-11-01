@@ -54,7 +54,7 @@ SLOT_CHECKS: Dict[str, List[Tuple[str, str]]] = {
 }
 
 
-class ProviderRejected(Exception):
+class ProviderRejected(cg.NotSentError):
     """提供元が鍵・権限・課金の理由で断った(固定のコード)。予約は解放する。"""
 
     def __init__(self, code: str):
@@ -118,14 +118,24 @@ def _openai_text(body: Any) -> str:
     return "\n".join(p for p in parts if p).strip()
 
 
-def _openai_usage(body: Any) -> Dict[str, int]:
+def _openai_usage(body: Any) -> Optional[Dict[str, int]]:
+    """使った token。usage が無い・形が違う・負の値の時は None(「0」ではなく「分からない」。見込みの額で確定する)。"""
     usage = body.get("usage") if isinstance(body, dict) else None
-    usage = usage if isinstance(usage, dict) else {}
-
-    def num(name: str) -> int:
+    if not isinstance(usage, dict):
+        return None
+    out: Dict[str, int] = {}
+    for name in ("input_tokens", "output_tokens"):
         value = usage.get(name)
-        return int(value) if isinstance(value, int) and value >= 0 else 0
-    return {"input_tokens": num("input_tokens"), "output_tokens": num("output_tokens")}
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        out[name] = value
+    return out
+
+
+def fingerprint(*parts: Any) -> str:
+    """要求の指紋(同じ Idempotency-Key で違う内容を送った時に見分ける)。入力そのものは保存しない。"""
+    raw = json.dumps(parts, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _places_request(key: str, query: str, mask: str, max_results: int,
@@ -242,7 +252,8 @@ def ai_suggest(db: Session, plan: TravelPlan, caller: User, prompt: str, idempot
         return cg.ProviderResult(units=used, payload={"text": out, "model": openai_model()}, model=openai_model())
 
     return cg.run(db, plan, caller, "ai.generate", "openai",
-                  {"input_tokens": reserve_input, "output_tokens": AI_MAX_OUTPUT_TOKENS}, idempotency_key, call)
+                  {"input_tokens": reserve_input, "output_tokens": AI_MAX_OUTPUT_TOKENS}, idempotency_key, call,
+                  fingerprint=fingerprint("openai", "ai.generate", str(plan.id), text))
 
 
 def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: str, lat: Optional[float],
@@ -254,7 +265,8 @@ def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: 
         return cg.ProviderResult(units={"requests": 1}, payload=_places_items(resp.body))
 
     return cg.run(db, plan, caller, "places.search", "google_places", {"requests": 1}, idempotency_key, call,
-                  consult_id=consult_id)
+                  consult_id=consult_id,
+                  fingerprint=fingerprint("google_places", str(plan.id if plan else consult_id), query, lat, lng))
 
 
 def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin: Tuple[float, float],
@@ -265,4 +277,5 @@ def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin:
         return cg.ProviderResult(units={"elements": 1}, payload=_route_summary(resp.body))
 
     return cg.run(db, plan, caller, "routes.element", "google_routes", {"elements": 1}, idempotency_key, call,
-                  consult_id=consult_id)
+                  consult_id=consult_id,
+                  fingerprint=fingerprint("google_routes", str(plan.id if plan else consult_id), origin, dest, mode))

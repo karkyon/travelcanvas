@@ -28,8 +28,8 @@ export const StubBanner: React.FC<{ status: ConsultAiStatus | null }> = ({ statu
 export const AiReadPanel: React.FC<{
   status: ConsultAiStatus | null; statusError: string | null; busy: boolean; consentBusy: boolean;
   usage: ConsultUsage | null; textLength: number;
-  onConsent: (on: boolean) => void; onRead: () => void;
-}> = ({ status, statusError, busy, consentBusy, usage, textLength, onConsent, onRead }) => {
+  onConsent: (on: boolean) => void; onRead: () => void; primary?: boolean;
+}> = ({ status, statusError, busy, consentBusy, usage, textLength, onConsent, onRead, primary = true }) => {
   const id = useId();
   const blocker = operationBlocker(status, 'ai.generate', true);
   const tooLong = status ? textLength > status.max_text_chars : false;
@@ -40,7 +40,8 @@ export const AiReadPanel: React.FC<{
       <h3 id={`${id}-h`} className="font-semibold">AI で読み取る(押した時だけ・未確認として示します)</h3>
       <p className="mt-1 text-xs text-ink-700">
         相談の文章を AI(OpenAI)へ送り、条件を整理します。結果は「AI の読み取り · 未確認」と示し、あなたが確かめた行だけを条件に使います。
-        営業時間・料金・混み具合は AI に作らせません。文章と結果は保存しません。
+        営業時間・料金・混み具合は AI に作らせません。相談の文章と AI の結果はサーバーに保存しません
+        (入力の途中は、この端末のこのタブの間だけ一時的に残します。タブを閉じるか「最初からやり直す」で消えます)。
       </p>
       <StubBanner status={status} />
       {statusError && <p role="alert" className="mt-2 text-xs text-danger">{statusError}</p>}
@@ -60,7 +61,8 @@ export const AiReadPanel: React.FC<{
       {tooLong && <p className="mt-1 text-xs text-warning">AI へ送る文章は {status?.max_text_chars} 文字までです</p>}
       <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-ink-700">使えない時も、下の「入力内容を整理する」(AI を使わない読み取り)で続けられます。</span>
-        <Button type="button" onClick={onRead} loading={busy} disabled={!canRead} data-testid="consult-ai-extract">
+        <Button type="button" onClick={onRead} loading={busy} disabled={!canRead} data-testid="consult-ai-extract"
+          variant={primary ? undefined : 'outline'}>
           {busy ? 'AI が読み取っています…' : 'AI で読み取る →'}
         </Button>
       </div>

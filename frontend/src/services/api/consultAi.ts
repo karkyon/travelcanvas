@@ -34,6 +34,8 @@ export interface ConsultAiStatus {
 export interface AiExtraction extends IntentExtraction {
   suggested_areas: Array<{ name: string; reason: string; source: 'ai_suggested' }>;
   unknowns: string[];
+  /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
+  notes: string[];
   model: string;
   usage: ConsultUsage;
   notice: string;
@@ -90,7 +92,7 @@ const extraction: Decoder<AiExtraction> = object<AiExtraction>({
   areas: arrayOf(object<{ name: string; source: 'user_input' }>({ name: str, source: oneOf('user_input') })),
   suggested_areas: arrayOf(object<{ name: string; reason: string; source: 'ai_suggested' }>({
     name: str, reason: str, source: oneOf('ai_suggested') })),
-  unknowns: arrayOf(str), nights: nullable(int), extractor: str, ai_connected: bool, model: str, usage,
+  unknowns: arrayOf(str), notes: arrayOf(str), nights: nullable(int), extractor: str, ai_connected: bool, model: str, usage,
   notice: str, stub: bool,
 });
 
@@ -146,4 +148,3 @@ export function consultErrorCode(error: unknown): string | null {
   const code = (detail as { code?: unknown } | null | undefined)?.code;
   return typeof code === 'string' ? code : null;
 }
-

@@ -90,6 +90,13 @@ def _guard_off_by_default(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_github_summary(monkeypatch, tmp_path):
+    """[監査 A09] CI の検査の道具の自己試験が、偽の結果を本物の GitHub の要約(GITHUB_STEP_SUMMARY)へ書かないようにする。"""
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "step-summary.md"))
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "github-output.txt"))
+
+
+@pytest.fixture(autouse=True)
 def _metrics_token_from_env_is_ignored(monkeypatch):
     """[Gate G2] .env に METRICS_TOKEN がある環境(omega-dev2 の本番相当の設定)でも、/metrics の試験が同じに動くようにする。
     METRICS_TOKEN の試験は、それぞれ自分で設定する(monkeypatch はこの後に効く)。"""
