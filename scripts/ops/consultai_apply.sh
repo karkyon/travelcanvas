@@ -37,6 +37,10 @@ case "${1:-}" in
       gh pr view "$BRANCH" --json url,state -q '.url + " " + .state' 2>/dev/null \
         || gh pr create --base main --head "$BRANCH" --title "Gate SecretPolicy・ProviderConnect・ConsultAI: 鍵の確認・旅行相談の AI と Google" \
              --body-file docs/trace/gate-consultai-trace.md
+      # SecretPolicy の PR #43 は同じ commit を含むこの PR に統合する(二重の PR を残さない)
+      if [ "$(gh pr view 43 --json state -q .state 2>/dev/null || true)" = "OPEN" ]; then
+        gh pr close 43 --comment "gate/provider-connect の PR に統合しました(SecretPolicy の commit を含み、CI はそちらで確認します)"
+      fi
       sleep 15
       RUN="$(gh run list --branch "$BRANCH" --limit 1 --json databaseId -q '.[0].databaseId')"
       gh run watch "$RUN" --exit-status && echo "OK: CI 成功(run $RUN)。PR を main へ merge してから: bash $0 deploy" \
