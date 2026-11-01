@@ -2,9 +2,11 @@
 # [Gate ConsultAI] omega-dev2 での取り込み・反映(秘密の値は表示しない)。
 #
 #   bash consultai_apply.sh push     bundle を検証して gate/provider-connect へ push(fast-forward だけ)し、CI を待つ
-#   bash consultai_apply.sh deploy   main へ merge した後: 退避の確認 → バックアップ → main を反映 → migration・health・ready を確認
+#   bash consultai_apply.sh deploy   main へ merge した後: 変更の退避 → バックアップ → main を反映 → migration・health・ready を確認
+#   (このファイルと bundle は travelcanvas のフォルダー・ホーム・~/Downloads のどこに置いてもよい)
 #
-# - git reset --hard / git clean / docker compose down -v は使わない。作業ツリーが dirty なら止まる
+# - git reset --hard / git clean / docker compose down -v は使わない
+# - 追跡しているファイルの変更は消さずに退避する(~/tc-artifacts/ へ差分を保存し、git stash にも残す)。未追跡のファイルはそのまま
 # - 強制 push はしない(fast-forward でなければ止まる)
 set -euo pipefail
 
@@ -14,9 +16,10 @@ EXPECT_HEAD="${TC_EXPECT_HEAD:-}"
 cd "$REPO"
 
 find_bundle() {
-  for f in "$REPO"/consultai_*.bundle "$HOME"/consultai_*.bundle "$HOME"/Downloads/consultai_*.bundle; do
-    [ -f "$f" ] && { echo "$f"; return 0; }
-  done
+  # 一番新しい consultai_*.bundle(古いものが残っていても新しい方を使う)
+  local f
+  f="$(ls -t "$REPO"/consultai_*.bundle "$HOME"/consultai_*.bundle "$HOME"/Downloads/consultai_*.bundle 2>/dev/null | head -1)"
+  [ -n "$f" ] && [ -f "$f" ] && { echo "$f"; return 0; }
   return 1
 }
 
@@ -51,7 +54,13 @@ case "${1:-}" in
     fi
     ;;
   deploy)
-    [ -z "$(git status --porcelain)" ] || { echo "ERROR: 作業ツリーに変更があります。退避してから実行してください"; git status --short; exit 1; }
+    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+      TS="$(date +%Y%m%d-%H%M%S)"
+      mkdir -p "$HOME/tc-artifacts"
+      git diff HEAD > "$HOME/tc-artifacts/predeploy-$TS.patch"
+      git stash push -m "consultai deploy 前の退避 $TS" >/dev/null
+      echo "INFO: 追跡ファイルの変更を退避しました(~/tc-artifacts/predeploy-$TS.patch と git stash)。戻す時は git stash pop"
+    fi
     grep -q '^PROVIDER_HTTP_STUB=' .env && { echo "ERROR: .env に PROVIDER_HTTP_STUB があります(CI だけの模擬)。外してから"; exit 1; } || true
     if ! grep -q '^SECRET_BACKEND=' .env; then
       # 非秘密の 1 行(暫定の DB 暗号化の保管先を明示する。無いと鍵を取得も送信もしない)
