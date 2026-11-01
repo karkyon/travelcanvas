@@ -17,6 +17,7 @@ from app.core.auth import get_current_active_user
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import TravelEvent, User
+from app.services import consents
 from app.services import cost_guard as cg
 from app.services import provider_calls as pc
 from app.services import provider_secrets as ps
@@ -81,6 +82,9 @@ def ai_suggest(plan_id: str, payload: Dict[str, Any] = Body(...),
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
     prompt = _text(payload, "prompt", pc.AI_MAX_PROMPT_CHARS)
     key = _key(idempotency_key)
+    if not consents.has_consent(current_user, "ai_processing"):
+        # [Gate ConsultAI] AI の利用の同意が無ければ送らない(枠も使わない)
+        raise _bad("consent_required", "AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます", 403)
     result, usage = _run(lambda: pc.ai_suggest(db, plan, current_user, prompt, key))
     return {"result": result, "usage": usage, "saved": False,
             "notice": "AI の案です。営業時間・料金・空きは確かめていません(要確認)。旅行には保存していません"}

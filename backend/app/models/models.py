@@ -3667,12 +3667,29 @@ class UsageBudgetAccount(Base):
 
     __table_args__ = (
         UniqueConstraint("scope_type", "scope_id", "period_key", name="uq_usage_budget_accounts_scope"),
-        CheckConstraint("scope_type IN ('plan', 'user', 'organization')", name="ck_usage_budget_accounts_scope"),
+        CheckConstraint("scope_type IN ('plan', 'user', 'organization', 'consult')",
+                        name="ck_usage_budget_accounts_scope"),
         CheckConstraint("period_key = 'plan' OR period_key ~ '^[0-9]{4}-[0-9]{2}$'",
                         name="ck_usage_budget_accounts_period"),
         CheckConstraint("reserved_jpy >= 0 AND settled_jpy >= 0 AND cap_jpy >= 0 AND plans_used >= 0",
                         name="ck_usage_budget_accounts_amounts"),
     )
+
+
+class TripConsultSession(Base):
+    """[Gate ConsultAI] 旅行を作る前の相談(AI の読み取り・方面の案・場所の検索・経路)。原価は usage_budget_accounts の
+    scope_type='consult'(1相談 = 1旅行と同じ 50円・回数の枠)。相談の文章・結果は保存しない。下書きを作ると plan_id を入れて閉じ、
+    使った額・回数はその旅行の口座へ移す。"""
+    __tablename__ = "trip_consult_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProviderUsageReservation(Base):

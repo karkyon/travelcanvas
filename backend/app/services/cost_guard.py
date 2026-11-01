@@ -627,7 +627,8 @@ def _tier_denial(res: Resolution, operation: str) -> Optional[CostGuardError]:
                                  "included_from": needed, "fallbacks": list(FALLBACKS)})
 
 
-def _denial(db: Session, res: Resolution, plan: TravelPlan, operation: str, units: Dict[str, int], need: Dict[str, int],
+def _denial(db: Session, res: Resolution, plan: Optional[TravelPlan], operation: str, units: Dict[str, int],
+            need: Dict[str, int],
             cost: Decimal, plan_acc: Optional[UsageBudgetAccount], monthly_acc: Optional[UsageBudgetAccount],
             month: str) -> Optional[CostGuardError]:
     """断る理由(無ければ None)。§5 の 4 の順。"""
@@ -686,9 +687,23 @@ def estimate(db: Session, plan: TravelPlan, caller: User, operation: str, units:
     }
 
 
-def reserve(db: Session, plan: TravelPlan, caller: User, operation: str, provider: str, units: Dict[str, Any],
-            idempotency_key: str) -> ProviderUsageReservation:
-    """最大の見込み額を予約して commit する。断る時は CostGuardError(何も変えない)。"""
+def _scope_of(plan: Optional[TravelPlan], consult_id: Optional[uuid.UUID]) -> Tuple[str, uuid.UUID]:
+    """[Gate ConsultAI] 口座の範囲。旅行(plan)か、旅行を作る前の相談(consult)。どちらか一方だけ。"""
+    if (plan is None) == (consult_id is None):
+        raise ValueError("plan と consult_id のどちらか一方を指定する")
+    if plan is not None:
+        return "plan", plan.id
+    assert consult_id is not None
+    return "consult", consult_id
+
+
+def reserve(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, provider: str,
+            units: Dict[str, Any], idempotency_key: str,
+            consult_id: Optional[uuid.UUID] = None) -> ProviderUsageReservation:
+    """最大の見込み額を予約して commit する。断る時は CostGuardError(何も変えない)。
+
+    [Gate ConsultAI] ``consult_id`` は旅行を作る前の相談の口座(1相談 = 1旅行と同じ 50円・回数の枠)。"""
+    scope_type, scope_id = _scope_of(plan, consult_id)
     if not idempotency_key or len(idempotency_key) > 80:
         raise CostGuardError("idempotency_key_required", 422, "Idempotency-Key(80文字まで)が要ります")
     if is_suspended(provider):
@@ -699,7 +714,11 @@ def reserve(db: Session, plan: TravelPlan, caller: User, operation: str, provide
                 .filter(ProviderUsageReservation.user_id == caller.id,
                         ProviderUsageReservation.idempotency_key == idempotency_key).first())
     if existing is not None:
-        if existing.plan_id != plan.id or existing.operation != operation or existing.units != norm:
+        same_scope = existing.plan_id == (plan.id if plan is not None else None)
+        if same_scope and plan is None:
+            acc = db.get(UsageBudgetAccount, existing.plan_account_id) if existing.plan_account_id else None
+            same_scope = acc is not None and acc.scope_type == scope_type and acc.scope_id == scope_id
+        if not same_scope or existing.operation != operation or existing.units != norm:
             raise CostGuardError("idempotency_conflict", 409, "同じ Idempotency-Key で違う操作が送られました")
         return existing
     res = resolve(db, plan, caller)
@@ -711,13 +730,13 @@ def reserve(db: Session, plan: TravelPlan, caller: User, operation: str, provide
         raise tier
     cost = cost_of(res.profile, operation, norm)
     need = counts_for(operation, norm)
-    release_expired(db, plan.id)
+    release_expired(db, plan.id if plan is not None else None)
     month = month_key()
     monthly_acc = None
     if res.monthly_scope is not None and res.profile_key != "guest":
         monthly_acc = _account(db, res.monthly_scope[0], res.monthly_scope[1], month, res,
                                res.monthly_cap or Decimal(0))
-    plan_acc = _account(db, "plan", plan.id, "plan", res, res.plan_cap) if res.profile_key != "guest" else None
+    plan_acc = _account(db, scope_type, scope_id, "plan", res, res.plan_cap) if res.profile_key != "guest" else None
     denial = _denial(db, res, plan, operation, norm, need, cost, plan_acc, monthly_acc, month)
     if denial is not None:
         db.commit()  # 口座の行の鍵を外す(作った空の口座は残してよい。要求の他の変更はまだ無い)
@@ -746,7 +765,8 @@ def reserve(db: Session, plan: TravelPlan, caller: User, operation: str, provide
     ttl = int(getattr(settings, "COST_GUARD_RESERVATION_TTL_SECONDS", 600))
     row = ProviderUsageReservation(
         id=uuid.uuid4(), idempotency_key=idempotency_key, user_id=caller.id, billable_owner_user_id=res.payer_id,
-        plan_id=plan.id, provider=provider, operation=operation, units=norm, counts=need, max_cost_jpy=cost,
+        plan_id=plan.id if plan is not None else None, provider=provider, operation=operation, units=norm,
+        counts=need, max_cost_jpy=cost,
         status="reserved", profile_key=res.profile_key, policy_version=res.policy_version,
         plan_account_id=plan_acc.id, monthly_account_id=monthly_acc.id if monthly_acc else None,
         expires_at=_now() + timedelta(seconds=ttl))
@@ -823,14 +843,18 @@ def release(db: Session, reservation_id: uuid.UUID, result_code: str = "released
     return _finish(db, reservation_id, None, result_code)
 
 
-def run(db: Session, plan: TravelPlan, caller: User, operation: str, provider: str, units: Dict[str, Any],
-        idempotency_key: str, call: Callable[[Dict[str, int]], ProviderResult]) -> Tuple[Any, Dict[str, Any]]:
-    """予約 → 呼び出し → 確定/解放。provider の一時的な失敗は、二重の課金にならない時だけ1回再試行する。"""
+def run(db: Session, plan: Optional[TravelPlan], caller: User, operation: str, provider: str, units: Dict[str, Any],
+        idempotency_key: str, call: Callable[[Dict[str, int]], ProviderResult],
+        consult_id: Optional[uuid.UUID] = None) -> Tuple[Any, Dict[str, Any]]:
+    """予約 → 呼び出し → 確定/解放。provider の一時的な失敗は、二重の課金にならない時だけ1回再試行する。
+
+    [Gate ConsultAI] ``consult_id`` を渡すと、旅行を作る前の相談の口座で数える(``reserve`` と同じ)。"""
+    scope_type, scope_id = _scope_of(plan, consult_id)
     if provider not in paid_providers():
         raise CostGuardError("provider_not_connected", 503, "外部の有料の提供元は未接続です。手で続けられます")
     if operation not in paid_providers()[provider]["operations"]:
         raise CostGuardError("unknown_planning_operation", 422, "この提供元はこの操作を扱いません")
-    row = reserve(db, plan, caller, operation, provider, units, idempotency_key)
+    row = reserve(db, plan, caller, operation, provider, units, idempotency_key, consult_id=consult_id)
     if row.status != "reserved":
         raise CostGuardError("idempotent_replay", 409, "同じ操作は既に終わっています(二度目は呼びません)",
                              extra={"reservation_status": row.status})
@@ -857,10 +881,65 @@ def run(db: Session, plan: TravelPlan, caller: User, operation: str, provider: s
             raise
     settled = settle(db, row.id, result.units, result.result_code, result.model, result.raw_cost)
     res = resolve(db, plan, caller)
-    plan_acc = _peek(db, "plan", plan.id, "plan")
+    plan_acc = _peek(db, scope_type, scope_id, "plan")
     usage = _usage_body(res, plan_acc)
     usage["reservation_status"] = settled.status
+    usage["scope"] = scope_type
     return result.payload, usage
+
+
+def consult_usage(db: Session, consult_id: uuid.UUID, caller: User) -> Dict[str, Any]:
+    """[Gate ConsultAI] 相談の口座の今の使用(呼ばない・予約しない)。"""
+    res = resolve(db, None, caller)
+    month = month_key()
+    monthly_acc = _peek(db, res.monthly_scope[0], res.monthly_scope[1], month) if res.monthly_scope else None
+    body = _usage_body(res, _peek(db, "consult", consult_id, "plan"), None, monthly_acc)
+    body["scope"] = "consult"
+    return body
+
+
+def adopt_consult_account(db: Session, consult_id: uuid.UUID, plan: TravelPlan) -> Optional[Dict[str, Any]]:
+    """[Gate ConsultAI] 相談から作った旅行の口座へ、相談で使った額・回数・数えた月を移す(1旅行の 50円は相談と合わせて)。
+
+    相談の口座は 0 にせず ``cap_jpy`` を使った額に固定して閉じる(以後この相談では送れない)。呼出側が commit する。
+    予約中(応答待ち)の分があれば移さない(None。応答が終わってから下書きを作る)。"""
+    src = (db.query(UsageBudgetAccount)
+           .filter(UsageBudgetAccount.scope_type == "consult", UsageBudgetAccount.scope_id == consult_id,
+                   UsageBudgetAccount.period_key == "plan").with_for_update().populate_existing().first())
+    if src is None:
+        return {"moved_jpy": money(Decimal(0)), "counts": {}}
+    if Decimal(src.reserved_jpy) > 0:
+        return None
+    db.execute(text(
+        "INSERT INTO usage_budget_accounts "
+        "(id, scope_type, scope_id, period_key, policy_version, profile_key, cap_jpy) "
+        "VALUES (:id, 'plan', :s, 'plan', :v, :k, :c) ON CONFLICT (scope_type, scope_id, period_key) DO NOTHING"),
+        {"id": uuid.uuid4(), "s": plan.id, "v": src.policy_version, "k": src.profile_key, "c": src.cap_jpy})
+    dst = (db.query(UsageBudgetAccount)
+           .filter(UsageBudgetAccount.scope_type == "plan", UsageBudgetAccount.scope_id == plan.id,
+                   UsageBudgetAccount.period_key == "plan").with_for_update().populate_existing().one())
+    moved = Decimal(src.settled_jpy)
+    dst.settled_jpy = Decimal(dst.settled_jpy) + moved
+    counts = dict(dst.counts or {})
+    for k, n in (src.counts or {}).items():
+        counts[k] = int(counts.get(k, 0)) + int(n)
+    dst.counts = counts
+    if src.counted_month and not dst.counted_month:
+        dst.counted_month = src.counted_month  # 相談で数えた月は、旅行でもう一度は数えない
+    dst.revision += 1
+    dst.updated_at = _now()
+    src.cap_jpy = Decimal(src.settled_jpy)
+    src.revision += 1
+    src.updated_at = _now()
+    db.query(ProviderUsageReservation).filter(ProviderUsageReservation.plan_account_id == src.id,
+                                              ProviderUsageReservation.plan_id.is_(None)).update(
+        {ProviderUsageReservation.plan_id: plan.id}, synchronize_session=False)
+    db.query(ProviderUsageEvent).filter(
+        ProviderUsageEvent.reservation_id.in_(
+            db.query(ProviderUsageReservation.id).filter(ProviderUsageReservation.plan_account_id == src.id)),
+        ProviderUsageEvent.plan_id.is_(None)).update({ProviderUsageEvent.plan_id: plan.id},
+                                                     synchronize_session=False)
+    return {"moved_jpy": money(moved), "counts": dict(src.counts or {})}
 
 
 # ===================================================================== 照合(請求の明細)

@@ -1,7 +1,9 @@
 # Gate SecretPolicy 受入手順(omega-dev2 / 192.168.1.11)
 
-対象: PR「Gate SecretPolicy」「Gate ProviderConnect」を main へ入れた後の LAN 受入。
-**migration が 1つある**(`b7e3c9d1f5a2`: 鍵の確認の列・確認の記録の表。既存の鍵は消さず unverified のまま)。
+対象: PR「Gate SecretPolicy」「Gate ProviderConnect」「Gate ConsultAI」を main へ入れた後の LAN 受入。
+**migration が 2つある**(`b7e3c9d1f5a2`: 鍵の確認の列・確認の記録の表。既存の鍵は消さず unverified のまま。
+`c3e5a7b9d1f4`: 旅行相談の相談の表 trip_consult_sessions・口座の範囲 consult)。
+**`.env` に `PROVIDER_HTTP_STUB` を入れない**(CI の E2E だけの模擬の提供元。入っていると実の API へ送らない。画面に「模擬」と出る)。
 秘密の値・`.env` の中身・`docker compose config` の展開結果は、表示も貼り付けもしない。
 
 ## 0-a. 事前の注意
@@ -27,7 +29,7 @@ git fetch origin && git checkout main && git pull --ff-only
 git rev-parse HEAD                    # PR の merge commit と一致を確認
 docker compose up -d --build          # migrate サービスが alembic upgrade head を実行する
 docker compose ps -a                   # migrate が Exited (0)
-docker compose exec -T backend alembic current   # b7e3c9d1f5a2 (head)
+docker compose exec -T backend alembic current   # c3e5a7b9d1f4 (head)
 ```
 
 ## 2. 確認(値は出さない)
@@ -68,5 +70,22 @@ OpenAI の残高・Google の課金とキーの制限(API 制限・送信元 IP)
 6. 数日後、OpenAI・Google の請求の明細と「原価の台帳」の見込みを照らし合わせる(請求が未確定の間は未確定と記録)。
 
 
+## 3d. 旅行相談の AI(http://192.168.1.11:4173/trip-consult)
+前提: 3b で OpenAI とGoogle のサーバー用の鍵が「確認済み(期限内・72時間)」。試験の会員に Journey 以上(3c の 1)。
+1. 「AI で読み取る」の枠に、会員のクラス・AI の状態・同意の印が出る。同意の印が無ければ印を付ける(設定のプライバシーでも同じ)。
+   状態が「使えます(gpt-5-nano)」でない時は、出ている理由(クラス・鍵の確認・停止)を直す。「模擬」の帯が出たら `.env` に
+   `PROVIDER_HTTP_STUB` が入っているので外して backend を再起動する。
+2. 希望・事情に「家族4人で1泊2日。枚方から車で片道3時間くらいまで。宿泊費は4人で6〜8万円。2026年11月28日に出発。
+   人が多すぎない所。伊勢、福井、滋賀などが候補。」、出発地に「大阪府枚方市」→「AI で読み取る」を1回。
+3. 確認の画面: 「AI(OpenAI)の読み取りです」。AI の行は「AI の読み取り · 未確認 · 合っていれば印」で、印を付けた行だけ条件に使う。
+   片道の時間・宿泊費の範囲を選ぶ。「AI の方面の案(未確認)」から1つ「比較に足す」。
+4. 「この条件で方面を比較する」→ 方面を1つ開く →「Google で調べる」で「探す」を1回・「経路を調べる」を1回。
+   「提供: Google · 取得 …」と出る。場所を1つ「参考の出典に足す」。
+5. 「○○で旅程案を作る」→ 下書き(未確定)。旅程の利用枠(50円)に相談で使った分が入っている(50円を越えない)。
+6. 「原価の台帳」に openai・google_places・google_routes の行。相談の文章・AI の結果は保存されていない(監査は件数だけ)。
+7. 送る前に断る確認: 同意の印を外す →「AI で読み取る」が押せない。Free の会員では「Free のクラスには含まれません」。
+
 ## 4. 巻き戻し
-問題があれば、反映前の SHA へ `git checkout <SHA>` して `docker compose up -d --build`。DB の形は変わっていないので、DB の戻しは不要。
+問題があれば、反映前の SHA へ `git checkout <SHA>` して `docker compose up -d --build`。
+`c3e5a7b9d1f4` を戻す時は `docker compose run --rm migrate alembic downgrade b7e3c9d1f5a2`(相談の口座を消してから制約を戻す。
+使用の記録 provider_usage_events は消えない)。

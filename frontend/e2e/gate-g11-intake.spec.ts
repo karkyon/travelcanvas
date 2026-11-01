@@ -9,7 +9,7 @@ import { apiClient, registerMember } from './support/api';
  * (方面の位置・近くの検索・地図の画像)だけを page.route で差し替え、文章の読み取り・下書き・並び・旅程にする は本物の
  * backend を通す。地名の照会の決まり(1秒に1回・状態)は backend の試験(test_gate_g11_intake.py)で確かめる。
  *
- *   1. ダッシュボードの入口 → 希望を伝える(例文・出発地)→ 内容を確認(AI 未接続・未確認の行・問い)
+ *   1. ダッシュボードの入口 → 希望を伝える(例文・出発地)→ 内容を確認(AI を使わない読み取り・未確認の行・問い)
  *   2. 方面を比較: 地図と一覧(3件+他)、未照会の表示、選ぶだけでは旅程にしない
  *   3. 方面の詳細: カテゴリで探し、選ぶ・外す、URL は出典、何も選ばない時の説明 → 下書き(本物)
  *   4. 下書き: 未確定・候補を置く・上下・読み上げ・元に戻す・全日程 → 日付を決めて旅程にする(本物)
@@ -91,7 +91,7 @@ test('旅行相談: 希望 → 確認 → 方面の比較 → 方面の詳細 �
 
   // 2. 内容を確認(本物の読み取り)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('読み取った内容を確認してください');
-  await expect(page.getByText(/AI の読み取りは未接続/)).toBeVisible();
+  await expect(page.getByText(/AI は使っていません/)).toBeVisible();
   await expect(page.getByTestId('review-personal')).toBeVisible();
   await expect(page.getByTestId('review-row-origin')).toContainText(/あなたの入力/);
   await expect(page.getByTestId('review-row-party_size')).toContainText('文章から読み取り · 未確認');

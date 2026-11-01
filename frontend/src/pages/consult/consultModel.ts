@@ -24,6 +24,7 @@ export const STEPS: Array<{ id: ConsultStep; title: string; sub: string }> = [
 export const SOURCE_LABEL: Record<IntentSource | 'confirmed', string> = {
   user_input: 'あなたの入力',
   text: '文章から読み取り · 未確認',
+  ai: 'AI の読み取り · 未確認',
   unspecified: '未指定',
   confirmed: 'あなたが確認',
 };
@@ -105,6 +106,12 @@ export interface ConsultState {
   savedAreas: string[];
   picked: Record<string, NearbyResult>;
   urls: string[];
+  /** [Gate ConsultAI] AI・Google を使う相談の ID(サーバーが発行。下書きを作ると閉じる) */
+  consultSessionId?: string | null;
+  /** [Gate ConsultAI] AI が挙げた方面の案(未確認。利用者が足すまで比べない) */
+  suggestedAreas?: Array<{ name: string; reason: string }>;
+  /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
+  unknowns?: string[];
 }
 
 export const INITIAL_STATE: ConsultState = {
@@ -253,6 +260,7 @@ export function draftInputOf(state: ConsultState): DraftInput | null {
     intent: intentOf(state.review),
     search_candidate_ids: Object.keys(state.picked).slice(0, 30),
     source_urls: state.urls.slice(0, 10),
+    ...(state.consultSessionId ? { consult_session_id: state.consultSessionId } : {}),
   };
 }
 

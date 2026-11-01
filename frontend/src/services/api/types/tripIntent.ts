@@ -2,7 +2,8 @@
  * [Gate G11] 行き先が未定の旅行相談の型(docs/ux/G11_UIUX全範囲_実装仕様.md §2.5・§3.5)。
  * backend/app/api/v1/trip_intents.py・app/services/trip_intent.py。
  */
-export type IntentSource = 'user_input' | 'text' | 'unspecified';
+/** [Gate ConsultAI] 'ai': AI の読み取り(未確認。確かめるまで条件に使わない) */
+export type IntentSource = 'user_input' | 'text' | 'unspecified' | 'ai';
 export type IntentStrength = 'required' | 'preferred' | 'undecided';
 
 export interface IntentQuestion {
@@ -108,6 +109,8 @@ export interface DraftInput {
   intent: IntentPayload;
   search_candidate_ids: string[];
   source_urls: string[];
+  /** [Gate ConsultAI] AI・Google を使った相談(使った額・回数を旅行の枠へ移す) */
+  consult_session_id?: string;
 }
 
 export type DraftPart = 'morning' | 'lunch' | 'afternoon' | 'evening' | 'stay';

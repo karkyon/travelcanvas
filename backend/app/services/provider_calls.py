@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
@@ -94,11 +95,17 @@ def register_all() -> None:
 
 # ===================================================================== 要求の組み立てと応答の読み取り
 
-def _openai_request(key: str, text: str, max_output_tokens: int) -> ph.ProviderResponse:
+def _openai_request(key: str, text: str, max_output_tokens: int, instructions: str = AI_INSTRUCTIONS,
+                    text_format: Optional[Dict[str, Any]] = None) -> ph.ProviderResponse:
+    payload: Dict[str, Any] = {"model": openai_model(), "instructions": instructions, "input": text,
+                               "max_output_tokens": max_output_tokens, "store": False}
+    if text_format is not None:
+        # [Gate ConsultAI] 構造化の出力(JSON Schema strict)。推論のモデルは最小の推論にして出力の枠を答えに使う
+        payload["text"] = {"format": text_format}
+        if openai_model().startswith(("gpt-5", "o")):
+            payload["reasoning"] = {"effort": "minimal"}
     return ph.post_json("openai.responses",
-                        {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                        {"model": openai_model(), "instructions": AI_INSTRUCTIONS, "input": text,
-                         "max_output_tokens": max_output_tokens, "store": False})
+                        {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, payload)
 
 
 def _openai_text(body: Any) -> str:
@@ -199,6 +206,12 @@ VERIFY_UNITS: Dict[str, Dict[str, int]] = {
 
 # ===================================================================== 業務の操作(利用者の明示の操作)
 
+def send(db: Session, provider: str, operation: str, request: Callable[[str], ph.ProviderResponse]
+         ) -> ph.ProviderResponse:
+    """[Gate ConsultAI] 確認済みの鍵で送る(旅行相談の adapter からも使う)。"""
+    return _send(db, provider, operation, request)
+
+
 def _send(db: Session, provider: str, operation: str, request: Callable[[str], ph.ProviderResponse]
           ) -> ph.ProviderResponse:
     key, version = ps.resolve_for_send(db, provider, operation)
@@ -232,21 +245,24 @@ def ai_suggest(db: Session, plan: TravelPlan, caller: User, prompt: str, idempot
                   {"input_tokens": reserve_input, "output_tokens": AI_MAX_OUTPUT_TOKENS}, idempotency_key, call)
 
 
-def places_search(db: Session, plan: TravelPlan, caller: User, query: str, lat: Optional[float],
-                  lng: Optional[float], idempotency_key: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: str, lat: Optional[float],
+                  lng: Optional[float], idempotency_key: str,
+                  consult_id: Optional[uuid.UUID] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     def call(units: Dict[str, int]) -> cg.ProviderResult:
         resp = _send(db, "google_places", "places.search",
                      lambda key: _places_request(key, query, PLACES_FIELD_MASK, PLACES_MAX_RESULTS, lat, lng))
         return cg.ProviderResult(units={"requests": 1}, payload=_places_items(resp.body))
 
-    return cg.run(db, plan, caller, "places.search", "google_places", {"requests": 1}, idempotency_key, call)
+    return cg.run(db, plan, caller, "places.search", "google_places", {"requests": 1}, idempotency_key, call,
+                  consult_id=consult_id)
 
 
-def route_between(db: Session, plan: TravelPlan, caller: User, origin: Tuple[float, float],
-                  dest: Tuple[float, float], mode: str, idempotency_key: str
-                  ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin: Tuple[float, float],
+                  dest: Tuple[float, float], mode: str, idempotency_key: str,
+                  consult_id: Optional[uuid.UUID] = None) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     def call(units: Dict[str, int]) -> cg.ProviderResult:
         resp = _send(db, "google_routes", "routes.element", lambda key: _routes_request(key, origin, dest, mode))
         return cg.ProviderResult(units={"elements": 1}, payload=_route_summary(resp.body))
 
-    return cg.run(db, plan, caller, "routes.element", "google_routes", {"elements": 1}, idempotency_key, call)
+    return cg.run(db, plan, caller, "routes.element", "google_routes", {"elements": 1}, idempotency_key, call,
+                  consult_id=consult_id)

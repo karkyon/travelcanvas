@@ -52,7 +52,8 @@
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
-| `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py |
+| `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py, api/v1/paid_actions.py |
+| `consult_pending` | 409 | no | 外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください | api/v1/trip_intents.py |
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |

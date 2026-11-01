@@ -18,6 +18,10 @@
                                             本人へ知らせる)。対象の本人は申請も承認もできない
     provider-status                              [FR059-C] 止まっている有料の provider(全 worker で共有)
     provider-resume --provider <名前> --yes --reason "…"   原因を確かめてから戻す(Runbook の FR-059)
+    e2e-stub-ready --email a@example.com --tier journey --yes
+                                            [Gate ConsultAI] CI の E2E だけ(PROVIDER_HTTP_STUB が真・本番でない時)。
+                                            模擬の鍵を登録して模擬の提供元で確認し、その人に会員のクラスと AI の同意を付ける
+    e2e-stub-reset --yes                    [Gate ConsultAI] 上の模擬の鍵を無効にする(後の試験へ残さない)
     grant-admin --email a@example.com --yes [--reason "…"]
                                             [Gate A2] 管理者の権限を付ける(その人の全端末をログアウト。次に管理者の画面を
                                             開く時に多要素認証の設定を求める)
@@ -146,6 +150,58 @@ def _provider_command(args, shared: bool) -> int:
     return EXIT_OK
 
 
+STUB_KEYS = {"openai_api_key": "stub-e2e-openai-0001", "google_maps_server_key": "stub-e2e-google-0001"}
+
+
+def _stub_command(args) -> int:
+    """[Gate ConsultAI] CI の E2E の模擬の提供元の準備(本番・PROVIDER_HTTP_STUB が偽の時は何もしない)。"""
+    import uuid as _uuid
+    from app.core.config import settings
+    from app.models.models import Entitlement, ProviderSecret, User
+    from app.services import consents, cost_guard, provider_secrets as ps, provider_stub, provider_verification as pv
+
+    if not args.yes:
+        _print({"ok": False, "error": "--yes も付けてください"})
+        return EXIT_USAGE
+    if not provider_stub.enabled() or settings.is_production:
+        _print({"ok": False, "error": "PROVIDER_HTTP_STUB が有効な試験の環境でだけ使えます"})
+        return EXIT_FAIL
+    provider_stub.install()
+    pv.MIN_INTERVAL_SECONDS = 0
+    db = SessionLocal()
+    try:
+        if args.cmd == "e2e-stub-reset":
+            for slot in STUB_KEYS:
+                row = ps._active(db, slot)
+                if row is not None and row.created_by is not None:
+                    ps.disable(db, slot, row.created_by)
+            _print({"ok": True, "disabled": list(STUB_KEYS)})
+            return EXIT_OK
+        user = db.query(User).filter(User.email == args.email.strip().lower()).first()
+        if user is None:
+            _print({"ok": False, "error": "利用者が見つかりません"})
+            return EXIT_FAIL
+        key = cost_guard.FEATURE_PREFIX + "class." + args.tier
+        if not db.query(Entitlement).filter(Entitlement.subject_type == "user", Entitlement.subject_id == user.id,
+                                            Entitlement.feature_key == key, Entitlement.status == "active").first():
+            db.add(Entitlement(id=_uuid.uuid4(), subject_type="user", subject_id=user.id, feature_key=key,
+                               status="active", source="admin"))
+        consents.update(user, {"ai_processing": True})
+        db.commit()
+        out = {}
+        for slot, value in STUB_KEYS.items():
+            row = db.query(ProviderSecret).filter(ProviderSecret.slot == slot,
+                                                  ProviderSecret.status == "active").first()
+            if row is None:
+                row = ps.register(db, slot, value, "e2e の模擬の鍵", user.id)
+            summary = pv.verify(db, slot, row.version, "e2e の模擬の確認", user.id)
+            out[slot] = summary["provider_auth"]
+        _print({"ok": all(v == "accepted" for v in out.values()), "verified": out, "tier": args.tier})
+        return EXIT_OK if all(v == "accepted" for v in out.values()) else EXIT_FAIL
+    finally:
+        db.close()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="侵害が疑われる時の封じ込め(Runbook §9)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -180,6 +236,12 @@ def main(argv=None) -> int:
     p.add_argument("--provider", required=True)
     p.add_argument("--yes", action="store_true", help="戻すことの確認")
     p.add_argument("--reason", default="", help="原因と確かめた内容(監査に残す)")
+    p = sub.add_parser("e2e-stub-ready")
+    p.add_argument("--email", required=True)
+    p.add_argument("--tier", default="journey", choices=("trip", "journey", "explorer"))
+    p.add_argument("--yes", action="store_true")
+    p = sub.add_parser("e2e-stub-reset")
+    p.add_argument("--yes", action="store_true")
     for name in ("grant-admin", "revoke-admin"):
         p = sub.add_parser(name)
         p.add_argument("--email", required=True)
@@ -191,6 +253,8 @@ def main(argv=None) -> int:
         return _mfa_command(args)
     if args.cmd in ("grant-admin", "revoke-admin"):
         return _admin_command(args)
+    if args.cmd in ("e2e-stub-ready", "e2e-stub-reset"):
+        return _stub_command(args)
 
     rate_limiter.use_backend("auto")
     shared = _shared()

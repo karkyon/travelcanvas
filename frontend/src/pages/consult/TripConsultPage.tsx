@@ -4,7 +4,9 @@
  *
  * 希望を伝える → 内容を確認 → 方面を比較 → 旅程案へ(方面の詳細 → 未確定の下書き)。
  * - 各段で「今どこか・戻る先・主な操作・押すと何が起きるか」を示す。旅行・予約は下書きを作るまで作らない
- * - 文章からの読み取りは決まった規則だけ(AI は未接続)。利用者が確かめた行だけを条件に使う
+ * - [Gate ConsultAI] 文章の読み取りは「AI で読み取る」(同意・クラス・利用枠・確認済みの鍵が揃った時だけ送る)か、
+ *   AI を使わない決まった規則。どちらも利用者が確かめた行だけを条件に使う。AI の方面の案は足した時だけ比べる
+ * - 方面の詳細で「Google で場所を探す」「経路を調べる」(押した時だけ・相談の利用枠から・保存しない)
  * - 運転時間・宿・混み具合・営業時間は値を作らず「未照会」「日付待ち」「提供元が未接続」と文字で示す
  * - 行き先が決まっている人は「旅行を作る」(Quick Plan)へ進める
  */
@@ -13,6 +15,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import PlanningClassSummary from '@/components/planning/PlanningClassSummary';
 import { compareAreas, createTripDraft, extractIntent } from '@/services/api/tripIntent';
+import { updateConsents } from '@/services/api';
+import {
+  aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage,
+} from '@/services/api/consultAi';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
 import {
@@ -56,7 +64,8 @@ const Stepper: React.FC<{ step: ConsultStep }> = ({ step }) => {
 
 const BriefStep: React.FC<{
   brief: BriefForm; onChange: (b: BriefForm) => void; onSubmit: () => void; busy: boolean; error: string | null;
-}> = ({ brief, onChange, onSubmit, busy, error }) => {
+  aiSlot?: React.ReactNode;
+}> = ({ brief, onChange, onSubmit, busy, error, aiSlot }) => {
   const id = useId();
   const optRef = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof BriefForm>(k: K, v: BriefForm[K]) => onChange({ ...brief, [k]: v });
@@ -216,11 +225,12 @@ const BriefStep: React.FC<{
             <p className="font-semibold text-ink-900">写真・記事・SNS は、方面を選んだ後に「参考の出典」として足せます</p>
             <p className="text-xs">URL を足しても、それだけで旅程には入りません(出典として残し、場所は確かめてから使います)。</p>
           </div>
+          {aiSlot}
           {error && <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger">{error}</p>}
           <div className="flex flex-col gap-3 border-t border-cloud-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-ink-700" id={`${id}-next`}>
               <span className="block font-semibold text-ink-900">次に行うこと</span>
-              入力内容を整理し、あなたが確かめる条件の一覧を作ります。まだ旅行も予約も作りません。
+              AI を使わず、決まった規則で入力内容を整理し、あなたが確かめる条件の一覧を作ります。まだ旅行も予約も作りません。
             </p>
             <Button type="submit" loading={busy} disabled={busy} aria-describedby={`${id}-next`} className="w-full sm:w-auto"
               data-testid="consult-extract">
@@ -310,7 +320,7 @@ const ReviewStep: React.FC<{
       <label className="flex min-h-11 items-center gap-2 text-xs text-ink-900">
         <input type="checkbox" checked={review.confirmed[key]} onChange={(e) => confirm(key, e.target.checked)}
           data-testid={`review-confirm-${key}`} />
-        {review.confirmed[key] ? SOURCE_LABEL.confirmed : `${SOURCE_LABEL.text} · 合っていれば印`}
+        {review.confirmed[key] ? SOURCE_LABEL.confirmed : `${src === 'ai' ? SOURCE_LABEL.ai : SOURCE_LABEL.text} · 合っていれば印`}
       </label>
     );
   };
@@ -426,8 +436,9 @@ const ReviewStep: React.FC<{
         <div className="mb-4 rounded-xl bg-cloud-100 p-3">
           <h2 id={`${id}-h`} className="font-semibold text-ink-900">希望を条件に整理しました</h2>
           <p className="text-xs text-ink-700">
-            {aiConnected ? 'AI の読み取りです。' : '文章の書き方から決まった規則で拾った候補です(AI の読み取りは未接続)。'}
-            「文章から読み取り · 未確認」の行は、印を付けるか値を直すまで条件に使いません。
+            {aiConnected
+              ? 'AI(OpenAI)の読み取りです。営業時間・料金・混み具合は AI に作らせていません。「AI の読み取り · 未確認」の行は、印を付けるか値を直すまで条件に使いません。'
+              : '文章の書き方から決まった規則で拾った候補です(AI は使っていません)。「文章から読み取り · 未確認」の行は、印を付けるか値を直すまで条件に使いません。'}
           </p>
         </div>
         {review.personal && (
@@ -451,7 +462,7 @@ const ReviewStep: React.FC<{
                 </span>
                 <span role="cell" className="min-w-0">
                   {editor[key]}
-                  {review.evidence[key] && review.sources[key] === 'text' && (
+                  {review.evidence[key] && (review.sources[key] === 'text' || review.sources[key] === 'ai') && (
                     <span className="mt-1 block text-[11px] text-ink-700 break-words">{`文章の該当: 「${review.evidence[key]}」`}</span>
                   )}
                 </span>
@@ -504,8 +515,78 @@ const TripConsultPage: React.FC = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // [Gate ConsultAI] AI・Google の状態(送らずに取る)と、この相談の利用枠
+  const [aiStatus, setAiStatus] = useState<ConsultAiStatus | null>(null);
+  const [aiStatusError, setAiStatusError] = useState<string | null>(null);
+  const [consentBusy, setConsentBusy] = useState(false);
+  const [consultUsage, setConsultUsage] = useState<ConsultUsage | null>(null);
+  const sessionRef = useRef<string | null>(state.consultSessionId ?? null);
 
   useEffect(() => { saveState(state); }, [state]);
+
+  const refreshAiStatus = useCallback(async () => {
+    try {
+      const st = await getConsultAiStatus(sessionRef.current);
+      if (st.session_error) {
+        sessionRef.current = null;
+        setState((s) => ({ ...s, consultSessionId: null }));
+      }
+      setAiStatus(st);
+      setAiStatusError(null);
+      if (st.usage) setConsultUsage(st.usage);
+    } catch {
+      setAiStatusError('AI・Google の状態を取得できませんでした。AI を使わない読み取りで続けられます');
+    }
+  }, []);
+  useEffect(() => { void refreshAiStatus(); }, [refreshAiStatus]);
+
+  const ensureSession = useCallback(async (): Promise<string> => {
+    if (sessionRef.current) return sessionRef.current;
+    const r = await startConsult();
+    sessionRef.current = r.session_id;
+    setState((s) => ({ ...s, consultSessionId: r.session_id }));
+    return r.session_id;
+  }, []);
+
+  const setConsent = async (on: boolean) => {
+    setConsentBusy(true);
+    try {
+      await updateConsents({ ai_processing: on });
+      await refreshAiStatus();
+    } catch {
+      setAiStatusError('同意を保存できませんでした。もう一度お試しください');
+    } finally {
+      setConsentBusy(false);
+    }
+  };
+
+  const aiRead = async () => {
+    if (!state.brief.text.trim()) {
+      setError('AI に読み取らせる希望の文章を入力してください');
+      return;
+    }
+    setBusy('ai');
+    setError(null);
+    try {
+      const sid = await ensureSession();
+      const ex = await aiExtract(sid, extractInputOf(state.brief), newIdempotencyKey());
+      setConsultUsage(ex.usage);
+      const own = ex.areas.map((a) => a.name);
+      setState((s) => ({ ...s, extraction: ex, review: initReview(ex), areaNames: own, areas: null, step: 'review',
+        suggestedAreas: ex.suggested_areas.map(({ name, reason }) => ({ name, reason })), unknowns: ex.unknowns }));
+      requestAnimationFrame?.(() => headingRef.current?.focus());
+    } catch (e) {
+      const code = consultErrorCode(e);
+      if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
+        sessionRef.current = null;
+        setState((s) => ({ ...s, consultSessionId: null }));
+      }
+      setError(`${errorDetailMessage(e, 'AI で読み取れませんでした')}。文章は消えていません。「入力内容を整理する」で AI を使わずに続けられます`);
+      void refreshAiStatus();
+    } finally {
+      setBusy(null);
+    }
+  };
   const go = useCallback((step: ConsultStep) => {
     setError(null);
     setState((s) => ({ ...s, step }));
@@ -523,7 +604,7 @@ const TripConsultPage: React.FC = () => {
     try {
       const ex = await extractIntent(extractInputOf(state.brief));
       setState((s) => ({ ...s, extraction: ex, review: initReview(ex), areaNames: ex.areas.map((a) => a.name),
-        areas: null, step: 'review' }));
+        areas: null, step: 'review', suggestedAreas: [], unknowns: [] }));
       requestAnimationFrame?.(() => headingRef.current?.focus());
     } catch {
       setError('入力内容を整理できませんでした。文章は消えていません。時間をおいてもう一度お試しください');
@@ -562,6 +643,7 @@ const TripConsultPage: React.FC = () => {
     setError(null);
     try {
       const r = await createTripDraft(input);
+      sessionRef.current = null;
       clearState();
       navigate(`/planner/${encodeURIComponent(r.plan_id)}/draft`);
     } catch {
@@ -572,7 +654,7 @@ const TripConsultPage: React.FC = () => {
 
   const reset = () => {
     clearState();
-    setState(INITIAL_STATE);
+    setState({ ...INITIAL_STATE, consultSessionId: sessionRef.current });
     setError(null);
   };
 
@@ -611,12 +693,20 @@ const TripConsultPage: React.FC = () => {
       <PlanningClassSummary className="mt-2" />
       {step === 'brief' && (
         <BriefStep brief={state.brief} onChange={(b) => setState((s) => ({ ...s, brief: b }))} onSubmit={() => void extract()}
-          busy={busy === 'extract'} error={error} />
+          busy={busy === 'extract'} error={error}
+          aiSlot={<AiReadPanel status={aiStatus} statusError={aiStatusError} busy={busy === 'ai'} consentBusy={consentBusy}
+            usage={consultUsage} textLength={state.brief.text.trim().length} onConsent={(on) => void setConsent(on)}
+            onRead={() => void aiRead()} />} />
       )}
       {step === 'review' && reviewReady && state.review && (
         <ReviewStep review={state.review} onChange={(r) => setState((s) => ({ ...s, review: r }))} onBack={() => go('brief')}
           onNext={() => void compare()} busy={busy === 'areas'} error={error}
           aiConnected={Boolean(state.extraction?.ai_connected)} />
+      )}
+      {step === 'review' && state.review && (
+        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []} areaNames={state.areaNames}
+          onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)
+            : s.areaNames.filter((n) => n !== name) }))} />
       )}
       {step === 'areas' && state.review && (
         <AreasStep state={state} busy={busy === 'areas'} error={error}
@@ -640,6 +730,18 @@ const TripConsultPage: React.FC = () => {
           onUrls={(urls) => setState((s) => ({ ...s, urls }))}
           onCreate={() => void createDraft()} />
       )}
+      {step === 'detail' && state.review && state.selectedArea && (() => {
+        const o = state.areas?.origin;
+        const a = state.areas?.areas.find((x) => x.name === state.selectedArea);
+        const pt = (g: { status: string; latitude: number | null; longitude: number | null } | undefined) =>
+          g && g.status === 'ok' && g.latitude !== null && g.longitude !== null ? { latitude: g.latitude, longitude: g.longitude } : null;
+        return (
+          <ConsultLookupPanel key={state.selectedArea} status={aiStatus} ensureSession={ensureSession} areaName={state.selectedArea}
+            originLabel={state.review.values.origin} origin={pt(o)} area={pt(a?.geocode)} urls={state.urls}
+            onUrls={(urls) => setState((s) => ({ ...s, urls }))} onUsage={setConsultUsage}
+            initialMode={state.review.values.transport === 'public' ? 'transit' : 'driving'} />
+        );
+      })()}
     </div>
   );
 };

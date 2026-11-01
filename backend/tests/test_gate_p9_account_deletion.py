@@ -213,9 +213,9 @@ def test_consents(auth_client, db_session, audit_calls):
     purposes = res.json()["purposes"]
     assert [p["purpose"] for p in purposes] == ["ai_processing", "location", "analytics", "marketing_email"]
     assert all(p["granted"] is False and p["updated_at"] is None for p in purposes)
-    # [Gate P13] 位置情報は軌跡の記録(FR-038)で使う。他の目的はまだ処理を行う機能が無い
+    # [Gate P13] 位置情報は軌跡の記録(FR-038)で使う。[Gate ConsultAI] AI は旅行相談の読み取り・旅行の中の「AI に聞く」で使う
     assert {p["purpose"]: p["in_use"] for p in purposes} == {
-        "ai_processing": False, "location": True, "analytics": False, "marketing_email": False}
+        "ai_processing": True, "location": True, "analytics": False, "marketing_email": False}
     res = client.put("/api/v1/privacy/consents", json={"consents": {"ai_processing": True, "location": False}})
     assert res.status_code == 200, res.text
     got = {p["purpose"]: p for p in res.json()["purposes"]}

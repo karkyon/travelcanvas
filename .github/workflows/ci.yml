@@ -335,6 +335,9 @@ jobs:
           # [Gate SecretPolicy] アプリ側に既定の保管先は無い(未設定なら鍵を取得も送信もしない)。
           # E2E の使い捨てスタックだけ、暫定の db_encrypted を明示する
           SECRET_BACKEND=db_encrypted
+          # [Gate ConsultAI] 試験用の模擬の提供元(外の API へは送らない・課金なし)。旅行相談の AI・Google の E2E
+          # (zz-consult-ai.spec.ts)が模擬の鍵を登録・確認して使う。本番・ステージングでは backend が起動を拒む
+          PROVIDER_HTTP_STUB=true
           EOF
 
       - name: Build & start full stack (postgres/redis/backend/frontend)

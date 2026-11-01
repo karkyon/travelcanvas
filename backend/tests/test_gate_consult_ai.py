@@ -1,0 +1,295 @@
+"""[Gate ConsultAI] 旅行相談の AI の読み取り・方面の案・場所の検索・経路(相談の口座)。
+
+外への通信は httpx.MockTransport(実の API は呼ばない。ここでの成功は「提供元が鍵を認めた」証明ではない)。
+"""
+import json
+import uuid
+from decimal import Decimal
+
+import httpx
+import pytest
+
+from app.core.config import settings
+from app.models.models import (Entitlement, ProviderUsageEvent, ProviderUsageReservation, TravelPlan,
+                               TripConsultSession, UsageBudgetAccount)
+from app.services import consents
+from app.services import consult_ai
+from app.services import cost_guard as cg
+from app.services import provider_http as ph
+from app.services import provider_stub
+from tests.test_gate_providerconnect import OPENAI_KEY, Fake, _ready  # noqa: F401  (fixture の部品)
+
+TEXT = "家族4人で1泊2日。枚方から車で片道3時間くらいまで。予算は6〜8万円。11月28日に出発。伊勢や福井などが候補。"
+
+
+def _ai_body(data, usage=(900, 250), status="completed"):
+    return {"status": status, "output": [{"type": "message", "content": [
+        {"type": "output_text", "text": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)}]}],
+        "usage": {"input_tokens": usage[0], "output_tokens": usage[1]}}
+
+
+GOOD = {
+    "origin": {"value": "大阪府枚方市", "evidence": "枚方から"},
+    "party_size": {"value": 4, "evidence": "家族4人"},
+    "nights": {"value": 1, "evidence": "1泊2日"},
+    "transport": {"mode": "car", "highway": None, "evidence": "車で"},
+    "one_way_hours": {"value": 3, "evidence": "片道3時間くらい"},
+    "room": {"value": None, "evidence": None},
+    "budget": {"min_yen": 60000, "max_yen": 80000, "scope": "total", "evidence": "予算は6〜8万円"},
+    "dates": {"status": "fixed", "text": "11月28日", "evidence": "11月28日に出発"},
+    "preferences": ["onsen", "not_a_key"],
+    "areas_mentioned": ["伊勢", "福井", "架空の町"],
+    "areas_suggested": [{"name": "城崎温泉", "reason": "車で行ける温泉地"}, {"name": "伊勢", "reason": "重複"}],
+    "unknowns": ["宿の種類"],
+}
+
+
+@pytest.fixture()
+def net(monkeypatch):
+    fake = Fake()
+    fake.set("api.openai.com", 200, _ai_body(GOOD))
+    fake.set("places.googleapis.com", 200, {"places": [{"id": "pid1", "displayName": {"text": "城崎温泉"},
+                                                        "formattedAddress": "兵庫県豊岡市",
+                                                        "location": {"latitude": 35.62, "longitude": 134.81},
+                                                        "googleMapsUri": "https://maps.google.com/?cid=1"}]})
+    fake.set("routes.googleapis.com", 200, {"routes": [{"duration": "9000s", "distanceMeters": 180000}]})
+    ph.set_transport(httpx.MockTransport(fake.handler))
+    from app.services import provider_calls as pc
+    pc.register_all()  # 他の試験が登録を外していても、実装済みの adapter を登録した状態で始める
+    from app.services import provider_verification as pv
+    monkeypatch.setattr(pv, "MIN_INTERVAL_SECONDS", 0)
+    yield fake
+    ph.set_transport(None)
+
+
+@pytest.fixture()
+def admin(auth_client, db_session, monkeypatch):
+    client, user = auth_client
+    user.user_type = "admin"
+    db_session.flush()
+    monkeypatch.setattr(settings, "ADMIN_MFA_REQUIRED", False)
+    monkeypatch.setattr(settings, "SECRET_BACKEND", "db_encrypted")
+    return client, user
+
+
+def _tier(db, user, tier="journey", consent=True):
+    if tier != "free":
+        db.add(Entitlement(id=uuid.uuid4(), subject_type="user", subject_id=user.id,
+                           feature_key=cg.FEATURE_PREFIX + "class." + tier, status="active", source="admin"))
+    consents.update(user, {"ai_processing": consent})
+    db.flush()
+
+
+def _session(client):
+    r = client.post("/api/v1/trip-intents/ai/session")
+    assert r.status_code == 201, r.text
+    return r.json()["session_id"]
+
+
+def _extract(client, sid, text=TEXT, key=None, **fields):
+    return client.post("/api/v1/trip-intents/ai/extract", json={"session_id": sid, "text": text, **fields},
+                       headers={"Idempotency-Key": key or uuid.uuid4().hex})
+
+
+# ===================================================================== 送らない(断る)
+
+def test_no_consent_sends_nothing(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user, consent=False)
+    r = _extract(client, _session(client))
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "consent_required"
+    assert net.requests == [] and db_session.query(ProviderUsageReservation).count() == 0
+
+
+def test_free_class_and_unverified_key_send_nothing(admin, db_session, net):
+    client, user = admin
+    _tier(db_session, user, "journey")
+    sid = _session(client)
+    r = _extract(client, sid)  # 鍵が無い・確認していない
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "provider_not_ready"
+    assert net.requests == []
+    status = client.get(f"/api/v1/trip-intents/ai/status?session_id={sid}").json()
+    assert status["operations"]["ai.generate"]["ready"] is False and status["consent"]["ai_processing"] is True
+    assert status["stub"] is False
+
+    db_session.query(Entitlement).filter(Entitlement.subject_id == user.id).delete()
+    db_session.flush()
+    _ready(client, db_session, user, net)
+    r = _extract(client, sid)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "tier_feature_not_included"
+    assert net.requests == []
+
+
+def test_idempotency_and_session_ownership(admin, db_session, net, make_user):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    r = client.post("/api/v1/trip-intents/ai/extract", json={"session_id": sid, "text": TEXT})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "idempotency_key_required"
+    other, _pw = make_user()
+    foreign = TripConsultSession(id=uuid.uuid4(), user_id=other.id, expires_at=cg._now() + cg.timedelta(days=1))
+    db_session.add(foreign)
+    db_session.flush()
+    r = _extract(client, str(foreign.id))
+    assert r.status_code == 404 and r.json()["detail"]["code"] == "consult_not_found"
+    assert net.requests == []
+    assert _extract(client, sid, key="same-key").status_code == 200
+    again = _extract(client, sid, key="same-key")
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "idempotent_replay"
+    assert len(net.requests) == 1
+
+
+# ===================================================================== 送る(成功)
+
+def test_ai_extract_marks_ai_rows_unconfirmed_and_records_without_text(admin, db_session, net, caplog, monkeypatch):
+    from app.api.v1 import trip_intents
+    audits = []
+    monkeypatch.setattr(trip_intents, "record_audit_event", lambda **kw: audits.append(kw))
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    r = _extract(client, sid, party_size=4)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["extractor"] == "openai_responses" and body["ai_connected"] is True and body["saved"] is False
+    items = {i["key"]: i for i in body["items"]}
+    assert items["party_size"]["source"] == "user_input"  # あなたの入力が優先
+    assert items["origin"]["source"] == "ai" and items["origin"]["value"] == "大阪府枚方市"
+    assert items["origin"]["evidence"] == "枚方から" and items["origin"]["strength"] == "undecided"
+    assert items["nights"]["value"] == 1 and items["transport"]["value"]["mode"] == "car"
+    assert items["budget"]["source"] == "ai" and items["budget"]["value"]["min"] == 60000
+    assert items["budget"]["question"]["suggested"] == "total"  # 範囲は利用者が選ぶ(AI の推定は提案だけ)
+    assert items["one_way"]["question"]["id"] == "one_way_strength"
+    assert items["preferences"]["value"] == ["onsen"]  # 知らない値は捨てる
+    names = [a["name"] for a in body["areas"]]
+    assert names == ["伊勢", "福井"]  # 文章に無い「架空の町」は方面にしない
+    assert body["suggested_areas"] == [{"name": "城崎温泉", "reason": "車で行ける温泉地", "source": "ai_suggested"}]
+    assert body["usage"]["scope"] == "consult" and Decimal(body["usage"]["plan_used"]) > 0
+    assert OPENAI_KEY not in r.text
+    sent = json.loads(net.requests[0].content)
+    assert sent["text"]["format"]["type"] == "json_schema" and sent["text"]["format"]["strict"] is True
+    assert sent["store"] is False and "家族4人" in sent["input"]
+    assert sent["reasoning"] == {"effort": "minimal"}
+    ev = db_session.query(ProviderUsageEvent).filter_by(provider="openai").one()
+    assert ev.plan_id is None and ev.input_tokens == 900 and ev.result_code == "ok"
+    audit = next(a for a in audits if a["action"] == "trip_consult.ai_extract")
+    dumped = json.dumps(audit["details"], ensure_ascii=False)
+    assert "枚方" not in dumped and "伊勢" not in dumped
+    assert "家族4人" not in caplog.text and OPENAI_KEY not in caplog.text
+
+
+def test_evidence_not_in_text_is_dropped_and_values_out_of_range_are_ignored():
+    data = dict(GOOD)
+    data["origin"] = {"value": "京都市", "evidence": "京都から出発"}  # 文章に無い根拠
+    data["party_size"] = {"value": 99, "evidence": "家族4人"}  # 範囲の外
+    out = consult_ai.merge(TEXT, {}, data)
+    items = {i["key"]: i for i in out["items"]}
+    assert items["origin"]["source"] == "ai" and items["origin"]["evidence"] is None
+    assert items["party_size"]["source"] == "text"  # AI の値は捨て、規則の読み取り(未確認)のまま
+
+
+@pytest.mark.parametrize("body", [
+    _ai_body("{not json"), _ai_body(GOOD, status="incomplete"),
+    {"status": "completed", "output": [{"type": "message", "content": [{"type": "refusal", "refusal": "no"}]}],
+     "usage": {"input_tokens": 10, "output_tokens": 5}},
+])
+def test_unreadable_output_is_counted_and_reported(admin, db_session, net, body):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    net.set("api.openai.com", 200, body)
+    r = _extract(client, _session(client))
+    assert r.status_code == 502 and r.json()["detail"]["code"] == "ai_output_invalid"
+    ev = db_session.query(ProviderUsageEvent).filter_by(provider="openai").one()
+    assert ev.result_code == "malformed"
+    assert db_session.query(ProviderUsageReservation).one().status == "settled"
+
+
+def test_timeout_and_5xx(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    net.set("api.openai.com", exc=httpx.ReadTimeout("t"))
+    r = _extract(client, sid)
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "provider_timeout"
+    assert db_session.query(ProviderUsageReservation).one().status == "settled"  # 届いた可能性(見込みで数える)
+    net.set("api.openai.com", 503, None)
+    r = _extract(client, sid)
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "provider_unavailable"
+    assert db_session.query(ProviderUsageReservation).filter_by(status="released").count() == 1
+
+
+def test_ai_call_quota_and_cap_are_enforced_per_consult(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user, "journey")  # AI 3回 / 相談
+    sid = _session(client)
+    for _ in range(3):
+        assert _extract(client, sid).status_code == 200
+    r = _extract(client, sid)
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "feature_quota_exceeded"
+    assert len(net.requests) == 3
+    acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="consult").one()
+    assert Decimal(acc.settled_jpy) <= Decimal(acc.cap_jpy) == Decimal(50)
+
+
+def test_places_route_then_draft_moves_usage_and_closes_consult(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    assert _extract(client, sid).status_code == 200
+    r = client.post("/api/v1/trip-intents/ai/places-search",
+                    json={"session_id": sid, "query": "温泉", "latitude": 35.6, "longitude": 134.8},
+                    headers={"Idempotency-Key": uuid.uuid4().hex})
+    assert r.status_code == 200, r.text
+    assert r.json()["results"][0]["name"] == "城崎温泉" and r.json()["attribution"] == "Google"
+    r = client.post("/api/v1/trip-intents/ai/route",
+                    json={"session_id": sid, "origin_latitude": 34.81, "origin_longitude": 135.65,
+                          "dest_latitude": 35.62, "dest_longitude": 134.81, "mode": "driving"},
+                    headers={"Idempotency-Key": uuid.uuid4().hex})
+    assert r.status_code == 200 and r.json()["result"] == {"duration_minutes": 150.0, "distance_km": 180.0}
+    used = Decimal(r.json()["usage"]["plan_used"])
+    r = client.post("/api/v1/trip-intents/ai/route", json={"session_id": sid, "origin_latitude": 999,
+                                                           "origin_longitude": 1, "dest_latitude": 1,
+                                                           "dest_longitude": 1},
+                    headers={"Idempotency-Key": uuid.uuid4().hex})
+    assert r.status_code == 422 and len(net.requests) == 3
+    d = client.post("/api/v1/trip-intents/draft", json={
+        "area": {"name": "城崎温泉"}, "intent": {"nights": 1}, "consult_session_id": sid})
+    assert d.status_code == 201, d.text
+    plan_id = uuid.UUID(d.json()["plan_id"])
+    plan_acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="plan", scope_id=plan_id).one()
+    assert Decimal(plan_acc.settled_jpy) == used
+    assert plan_acc.counts.get("ai_calls_per_plan") == 1 and plan_acc.counted_month
+    assert db_session.query(ProviderUsageEvent).filter(ProviderUsageEvent.plan_id == plan_id).count() == 3
+    assert db_session.get(TravelPlan, plan_id) is not None
+    r = _extract(client, sid)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "consult_closed"
+    assert len(net.requests) == 3
+    # 閉じた相談・他の人の相談の ID を付けても下書きは作れる(使った額は二度移さない)
+    d2 = client.post("/api/v1/trip-intents/draft", json={
+        "area": {"name": "伊勢"}, "intent": {"nights": 0}, "consult_session_id": sid})
+    assert d2.status_code == 201
+    acc2 = db_session.query(UsageBudgetAccount).filter_by(scope_type="plan",
+                                                          scope_id=uuid.UUID(d2.json()["plan_id"])).first()
+    assert acc2 is None
+
+
+def test_stub_answers_are_deterministic_and_refused_in_production(monkeypatch):
+    req = httpx.Request("POST", "https://api.openai.com/v1/responses", json={
+        "input": consult_ai.input_text(TEXT, {}), "text": {"format": consult_ai.TEXT_FORMAT}})
+    data = consult_ai.parse_output(provider_stub.handler(req).json())
+    assert data is not None and data["party_size"]["value"] == 4 and data["areas_suggested"]
+    out = consult_ai.merge(TEXT, {}, data)
+    assert any(i["source"] == "ai" for i in out["items"])
+    monkeypatch.setattr(settings, "PROVIDER_HTTP_STUB", True)
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    with pytest.raises(RuntimeError):
+        provider_stub.install()
+    monkeypatch.setattr(settings, "PROVIDER_HTTP_STUB", False)
+    assert provider_stub.install() is False

@@ -15,6 +15,17 @@ vi.mock('@/services/api/tripIntent', () => ({
   getTripDraft: api.getTripDraft, updateDraftSlots: api.updateDraftSlots, commitTripDraft: api.commitTripDraft,
 }));
 vi.mock('@/services/api/g11discover', () => ({ searchNearby: api.searchNearby }));
+// [Gate ConsultAI] AI・Google の状態は「鍵の確認がまだ」(この試験は AI を使わない読み取りの経路)
+vi.mock('@/services/api/consultAi', () => {
+  const op = { provider: 'openai', included: true, key_ready: false, suspended: false, reason: 'secret_unverified', ready: false };
+  return {
+    getConsultAiStatus: vi.fn().mockResolvedValue({
+      class: 'journey', class_label: 'Journey', consent: { ai_processing: false }, stub: false, model: 'gpt-5-nano',
+      max_text_chars: 3000, operations: { 'ai.generate': op, 'places.search': op, 'routes.element': op } }),
+    startConsult: vi.fn(), aiExtract: vi.fn(), consultPlaces: vi.fn(), consultRoute: vi.fn(),
+    newIdempotencyKey: () => 'k', consultErrorCode: () => null,
+  };
+});
 vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
 vi.mock('@/components/planning/PlanningClassSummary', () => ({ default: () => null }));
 vi.mock('./AreaMap', () => ({
@@ -163,8 +174,8 @@ describe('旅行相談の流れ', () => {
     await waitFor(() => expect(api.extractIntent).toHaveBeenCalledWith(expect.objectContaining({
       text: EXAMPLE_TEXT, origin: '大阪府枚方市' })));
 
-    // 2. 確認: AI は未接続と書く。問いに答えるまで先へ進めない。個人的な理由は保存しないと示す
-    expect(await screen.findByText(/AI の読み取りは未接続/)).toBeInTheDocument();
+    // 2. 確認: AI を使っていないと書く。問いに答えるまで先へ進めない。個人的な理由は保存しないと示す
+    expect(await screen.findByText(/AI は使っていません/)).toBeInTheDocument();
     expect(screen.getByTestId('review-personal')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('片道の時間が「希望」か「絶対条件」か');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: '片道の時間の扱い' })).getByRole('radio', { name: /希望/ }));

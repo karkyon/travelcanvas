@@ -617,6 +617,9 @@ app.include_router(admin_ops.router, prefix="/api/v1")
 app.include_router(paid_actions.router, prefix="/api/v1")
 from app.services import provider_calls as _provider_calls  # noqa: E402
 _provider_calls.register_all()
+# [Gate ConsultAI] 試験用の模擬の提供元(CI の E2E だけ。本番・ステージングでは起動を拒む)
+from app.services import provider_stub as _provider_stub  # noqa: E402
+_provider_stub.install()
 
 
 @app.exception_handler(org_external.ApiError)

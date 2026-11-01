@@ -301,6 +301,11 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-5-nano"
     PROVIDER_VERIFY_TTL_HOURS: int = 72
     OPS_VERIFY_DAILY_CAP_JPY: int = 50
+    # [Gate ConsultAI] 試験用の模擬の提供元(CI の E2E だけ)。真の時、外への送信を全てアプリの中の決まった応答へ差し替える
+    # (実の API へは送らない・課金されない)。本番・ステージング(is_production)では起動を拒む。画面には「模擬」と出す
+    PROVIDER_HTTP_STUB: bool = False
+    # [Gate ConsultAI] 旅行相談の AI の相談の期限(日)。期限を過ぎた相談では送らない
+    CONSULT_SESSION_TTL_DAYS: int = 7
 
     # [Gate S4] 要求の本文の上限(バイト。app/core/body_limit.py)。ファイルを受け取る口だけは
     # 文書の上限 + 余白(multipart の区切り等)まで受ける。

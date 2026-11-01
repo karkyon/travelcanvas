@@ -71,6 +71,8 @@ def _plan(db, owner, tier="journey"):
     if tier != "free":
         db.add(Entitlement(id=uuid.uuid4(), subject_type="user", subject_id=owner.id,
                            feature_key=cg.FEATURE_PREFIX + "class." + tier, status="active", source="admin"))
+    from app.services import consents
+    consents.update(owner, {"ai_processing": True})
     plan = TravelPlan(id=uuid.uuid4(), user_id=owner.id, title="家族旅行")
     db.add(plan)
     db.flush()
