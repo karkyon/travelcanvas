@@ -24,6 +24,8 @@ export interface NearbySearch {
   candidates: NearbyResult[];
   /** 応答しなかった提供元(0件と区別する) */
   unavailable_providers?: string[];
+  /** [Gate SearchUAT] 応答しなかった理由の分類(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout) */
+  provider_errors?: Record<string, string>;
 }
 
 export interface MediaProviderStatus {

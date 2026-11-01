@@ -20,6 +20,7 @@
 旅の個人的な理由は保存しない。監査には件数と方面の数だけを残す(文章・地名は残さない)。
 """
 import uuid
+from urllib.parse import urlsplit
 from datetime import date as date_cls
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
@@ -53,6 +54,9 @@ from app.services import trip_intent as ti
 from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/trip-intents", tags=["trip-intents"])
+
+# [Gate SearchUAT] Google の場所の URL として受け付ける名前(他の URL は place ID から作り直す)
+GOOGLE_MAPS_HOSTS = frozenset({"maps.google.com", "www.google.com", "google.com", "goo.gl", "maps.app.goo.gl"})
 plan_router = APIRouter(prefix="/plans", tags=["trip-intents"])
 
 KEY = "trip_intent"
@@ -166,11 +170,20 @@ class AreaIn(BaseModel):
     retrieved_at: Optional[datetime] = None
 
 
+class GooglePlacePick(BaseModel):
+    """[Gate SearchUAT] 旅行相談で選んだ Google の場所。Google の利用条件により、保存するのは place ID(無期限で可)と
+    Google マップの URL だけ。名前・住所・位置は保存しない(下書きでは「Google の場所」とし、開いて確かめる)。"""
+    model_config = ConfigDict(extra="forbid")
+    place_id: str = Field(..., min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_-]+$")
+    maps_uri: Optional[str] = Field(None, max_length=2000)
+
+
 class DraftIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     area: AreaIn
     intent: IntentIn
     search_candidate_ids: List[uuid.UUID] = Field(default_factory=list, max_length=30)
+    google_places: List[GooglePlacePick] = Field(default_factory=list, max_length=30)
     source_urls: List[str] = Field(default_factory=list, max_length=10)
     # [Gate ConsultAI] AI・場所の検索・経路を使った相談。使った額・回数をこの旅行の口座へ移し、相談を閉じる
     consult_session_id: Optional[uuid.UUID] = None
@@ -250,6 +263,25 @@ def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: Use
                                   provider=sc.provider, external_id=sc.external_id, retrieved_at=sc.retrieved_at,
                                   category=sc.category, address=sc.address, latitude=sc.latitude,
                                   longitude=sc.longitude, priority=2, status="open"))
+    seen_google: set = set()
+    for g in body.google_places:
+        if g.place_id in seen_google:
+            continue
+        seen_google.add(g.place_id)
+        try:
+            maps = cs.canonical_url(g.maps_uri) if g.maps_uri else None
+        except cs.CandidateInputError:
+            maps = None
+        if maps and urlsplit(maps).hostname not in GOOGLE_MAPS_HOSTS:
+            maps = None
+        maps = maps or f"https://www.google.com/maps/place/?q=place_id:{g.place_id}"
+        if maps in urls:
+            urls.remove(maps)
+        rows.append(PlanCandidate(plan_id=plan.id, created_by_user_id=current_user.id,
+                                  title="Google の場所(名前は Google マップで確認)", source_kind="search",
+                                  source_url=maps, provider="google_places", external_id=g.place_id,
+                                  retrieved_at=ti.now(), priority=2, status="open",
+                                  note="旅行相談で Google の検索から選んだ場所。Google の利用条件により名前・住所・位置は保存していません"))
     for url in urls:
         rows.append(PlanCandidate(plan_id=plan.id, created_by_user_id=current_user.id,
                                   title=(cs.url_label(url) or "参考の記事・投稿")[:200], source_kind="url",

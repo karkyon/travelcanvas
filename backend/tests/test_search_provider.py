@@ -37,7 +37,9 @@ class _FakeClient:
             raise RuntimeError("simulated network failure")
         return self._get_response
 
-    async def post(self, url, data=None):
+    async def post(self, url, data=None, headers=None):
+        # [Gate SearchUAT] 送った User-Agent を残す(識別できない要求は公開の server が 406 で断る)
+        self.post_headers = headers
         if self._raise_on_post:
             raise RuntimeError("simulated network failure")
         return self._post_response

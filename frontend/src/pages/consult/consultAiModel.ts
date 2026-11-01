@@ -27,3 +27,28 @@ export function operationBlocker(status: ConsultAiStatus | null, op: ConsultOper
 
 export const usageLabel = (u: ConsultUsage | undefined | null): string | null =>
   u ? `この相談の利用枠: 使用 ¥${Math.ceil(Number(u.plan_used))} / 上限 ¥${Math.round(Number(u.plan_cap))}` : null;
+
+/**
+ * [Gate SearchUAT] 「候補を探す」の検索元 Google を今使えるか。使えなければ理由と解決の操作(検索欄の近くに出す)。
+ * 鍵の確認・会員クラス・停止はサーバーの判定(/trip-intents/ai/status)、利用枠はこの相談の使用額。
+ */
+export function googleSearchAvailability(status: ConsultAiStatus | null, usage: ConsultUsage | null):
+  { ok: boolean; reason: string | null; fix: string | null; usage: string | null } {
+  if (!status) return { ok: false, reason: '利用の条件を確かめています', fix: null, usage: null };
+  const s = status.operations['places.search'];
+  const deny = (reason: string, fix: string | null) => ({ ok: false, reason, fix, usage: null });
+  if (status.class === 'guest') return deny('ゲストでは使えません', 'ログインまたは会員登録すると使えます');
+  if (!s.included) {
+    return deny(`${status.class_label} のクラスには Google の検索が含まれません`,
+      'Trip 以上のクラスで使えます(試験では管理者が 運用コンソール › 会員クラス で切り替え)');
+  }
+  if (s.suspended) return deny('費用の確認のため、運用者が Google の検索を止めています', '運用者が 運用コンソール › API・契約と接続 で戻すと使えます');
+  if (!s.key_ready) {
+    return deny(REASON_LABEL[s.reason ?? ''] ?? '提供元の準備が整っていません',
+      '管理者が 運用コンソール › 秘密情報・権限 で鍵の「有効性を確認」をすると使えます(鍵の再入力は不要)');
+  }
+  if (usage && Number(usage.plan_remaining) <= 0) {
+    return deny('この相談の利用枠(上限)に達しました', 'OpenStreetMap(無料)で探せます。下書きを作ると旅行の枠に移ります');
+  }
+  return { ok: true, reason: null, fix: null, usage: usageLabel(usage) };
+}

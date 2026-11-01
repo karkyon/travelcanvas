@@ -814,8 +814,14 @@ const TripConsultPage: React.FC = () => {
             if (on) picked[r.id] = r; else delete picked[r.id];
             return { ...s, picked };
           })}
+          onPickGoogle={(g, on) => setState((s) => {
+            const pickedGoogle = { ...(s.pickedGoogle ?? {}) };
+            if (on) pickedGoogle[g.place_id] = g; else delete pickedGoogle[g.place_id];
+            return { ...s, pickedGoogle };
+          })}
           onUrls={(urls) => setState((s) => ({ ...s, urls }))}
-          onCreate={() => void createDraft()} />
+          onCreate={() => void createDraft()}
+          google={{ status: aiStatus, usage: consultUsage, ensureSession, onUsage: setConsultUsage }} />
       )}
       {step === 'detail' && state.review && state.selectedArea && (() => {
         const o = state.areas?.origin;
@@ -824,8 +830,7 @@ const TripConsultPage: React.FC = () => {
           g && g.status === 'ok' && g.latitude !== null && g.longitude !== null ? { latitude: g.latitude, longitude: g.longitude } : null;
         return (
           <ConsultLookupPanel key={state.selectedArea} status={aiStatus} ensureSession={ensureSession} areaName={state.selectedArea}
-            originLabel={state.review.values.origin} origin={pt(o)} area={pt(a?.geocode)} urls={state.urls}
-            onUrls={(urls) => setState((s) => ({ ...s, urls }))} onUsage={setConsultUsage}
+            originLabel={state.review.values.origin} origin={pt(o)} area={pt(a?.geocode)} onUsage={setConsultUsage}
             initialMode={state.review.values.transport === 'public' ? 'transit' : 'driving'} />
         );
       })()}

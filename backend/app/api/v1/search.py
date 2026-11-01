@@ -92,12 +92,16 @@ async def search_spots(
         (body.query or "").strip(), body.latitude, body.longitude, body.radius_km, **extra
     )
     unavailable = list(getattr(raw_results, "unavailable", []) or [])
+    errors = dict(getattr(raw_results, "errors", {}) or {})
     # [Gate FR059-D11] 無料の provider にも外へ送った回数を残す(言葉・座標・結果は残さない)
     by_provider: dict = {}
     for r in raw_results:
         by_provider[r.get("provider")] = by_provider.get(r.get("provider"), 0) + 1
     for name in getattr(raw_results, "called", []) or []:
-        code = "unavailable" if name in unavailable else ("ok" if by_provider.get(name) else "empty")
+        if name in unavailable:
+            code = errors.get(name) or "unavailable"
+        else:
+            code = "ok" if by_provider.get(name) else "empty"
         free_usage.record(db, current_user, name, "search.spots", result_code=code)
     raw_results = raw_results[: max(1, min(body.max_results, 50))]
 
@@ -144,6 +148,8 @@ async def search_spots(
         "candidates": [{**_candidate_to_dict(c), **_distance(c, body)} for c in candidates],
         # [Gate G11] 応答しなかった提供元(0件と区別する。画面は「見つからない」と言わない)
         "unavailable_providers": unavailable,
+        # [Gate SearchUAT] 失敗の分類(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout)
+        "provider_errors": errors,
     }
 
 

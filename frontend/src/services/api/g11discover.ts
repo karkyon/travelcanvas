@@ -22,10 +22,19 @@ const nearby: Decoder<NearbyResult> = object<NearbyResult>({
   retrieved_at: nullable(str), distance_m: nullable(int), within_radius: nullable(bool), radius_guaranteed: bool,
 });
 
+/** 値が全て文字列の辞書(提供元 → 失敗の分類) */
+const stringRecord: Decoder<Record<string, string>> = (v, path) => {
+  const r = record(v, path);
+  const out: Record<string, string> = {};
+  for (const [k, x] of Object.entries(r)) out[k] = str(x, `${path}.${k}`);
+  return out;
+};
+
 const nearbySearch: Decoder<NearbySearch> = object<NearbySearch>({
   query: str, category: str, radius_km: num,
   base: nullable(object<{ latitude: number; longitude: number }>({ latitude: num, longitude: num })),
   total: int, candidates: arrayOf(nearby), unavailable_providers: optional(arrayOf(str)),
+  provider_errors: optional(stringRecord),
 });
 
 export async function searchNearby(input: { query: string; category: DiscoverCategory; latitude: number | null;

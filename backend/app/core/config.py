@@ -330,6 +330,8 @@ class Settings(BaseSettings):
     # [Gate AdminUAT] 開発の UAT 用の https の入口(docker compose --profile uat-https の caddy)のポート。
     # 設定した時だけ、TC_PUBLIC_HOSTS の各名前の https://<名前>:<port> を CORS・CSRF の許可に足す(音声入力は安全な接続が要る)
     TC_UAT_HTTPS_PORT: str = ""
+    # [Gate SearchUAT] OpenStreetMap の場所の検索(Overpass)の送り先。空なら公開の overpass-api.de
+    OVERPASS_URL: str = ""
 
     # アプリケーション設定
     DEBUG: bool = True

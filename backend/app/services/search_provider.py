@@ -21,6 +21,41 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = httpx.Timeout(8.0)
 
+# [Gate SearchUAT] OpenStreetMap の公開の server(FOSSGIS の Overpass・Nominatim)は、送り手を示す User-Agent を求める。
+# 2026-04 頃から overpass-api.de は、識別できない User-Agent(httpx の既定 "python-httpx/…" を含む)の要求に
+# HTTP 406 を返す。以前の Overpass の要求は User-Agent を付けておらず、旅行相談の「候補を探す」が全て失敗していた
+USER_AGENT = "TravelCanvas/1.0 (+https://github.com/karkyon/travelcanvas)"
+HEADERS = {"User-Agent": USER_AGENT}
+
+# 提供元の失敗の分類(「該当なし」と区別する。画面・利用の記録・運用の調査で同じ言葉を使う)
+ERROR_CODES = ("blocked", "rate_limited", "timeout", "server_error", "network", "unreadable", "provider_timeout")
+
+
+class SearchProviderError(Exception):
+    """[Gate SearchUAT] 提供元が結果を返さなかった(0件ではない)。code は ERROR_CODES、status は HTTP の状態。"""
+
+    def __init__(self, code: str, status: Optional[int] = None, detail: str = ""):
+        super().__init__(f"{code} status={status} {detail}".strip())
+        self.code, self.status, self.detail = code, status, detail
+
+
+def classify_error(exc: BaseException) -> SearchProviderError:
+    """例外を分類する(利用者の入力・URL は含めない)。"""
+    if isinstance(exc, SearchProviderError):
+        return exc
+    if isinstance(exc, httpx.TimeoutException):
+        return SearchProviderError("timeout", None, type(exc).__name__)
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code
+        kind = ("rate_limited" if code == 429 else "blocked" if code in (400, 401, 403, 406)
+                else "provider_timeout" if code == 504 else "server_error")
+        return SearchProviderError(kind, code)
+    if isinstance(exc, (httpx.ConnectError, httpx.NetworkError, httpx.RemoteProtocolError)):
+        return SearchProviderError("network", None, type(exc).__name__)
+    if isinstance(exc, ValueError):  # JSON でない応答(HTML の障害の画面など)
+        return SearchProviderError("unreadable", None, type(exc).__name__)
+    return SearchProviderError("network", None, type(exc).__name__)
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -39,7 +74,7 @@ async def search_wikipedia(query: str, client: Optional[httpx.AsyncClient] = Non
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
     try:
-        resp = await client.get(url, params=params)
+        resp = await client.get(url, params=params, headers=HEADERS)
         resp.raise_for_status()
         data = resp.json()
         titles = data[1] if len(data) > 1 else []
@@ -93,7 +128,7 @@ async def search_nominatim(
     client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
     try:
         resp = await client.get(
-            url, params=params, headers={"User-Agent": "TravelCanvas/1.0 (search adapter)"}
+            url, params=params, headers=HEADERS
         )
         resp.raise_for_status()
         data = resp.json()
@@ -166,7 +201,9 @@ async def search_overpass(
     if latitude is None or longitude is None:
         return []
 
-    url = "https://overpass-api.de/api/interpreter"
+    from app.core.config import settings
+
+    url = (getattr(settings, "OVERPASS_URL", "") or "").strip() or "https://overpass-api.de/api/interpreter"
     radius_m = int(radius_km * 1000)
     name_filter = f'["name"~"{overpass_regex(query)}",i]' if query and query.strip() else '["name"]'
     tags = CATEGORY_TAGS.get(category) or [""]
@@ -182,9 +219,16 @@ async def search_overpass(
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
     try:
-        resp = await client.post(url, data={"data": overpass_query})
+        resp = await client.post(url, data={"data": overpass_query},
+                                 headers={**HEADERS, "Accept": "application/json"})
         resp.raise_for_status()
         data = resp.json()
+        if not isinstance(data, dict):
+            raise SearchProviderError("unreadable", resp.status_code, "not an object")
+        remark = str(data.get("remark") or "")
+        if "runtime error" in remark.lower() and not data.get("elements"):
+            # 200 でも、server の時間切れ・メモリ不足の時は remark だけで要素が無い(「該当なし」ではない)
+            raise SearchProviderError("provider_timeout", resp.status_code, "remark")
         retrieved_at = _now()
         results = []
         for element in data.get("elements", []):
@@ -209,9 +253,12 @@ async def search_overpass(
             })
         return results
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Overpass search failed (query length %d): %s", len(query or ""), type(exc).__name__)
+        err = classify_error(exc)
+        # [Gate O2] 検索語・座標・URL は出さない。分類・HTTP の状態・例外の型だけ(運用の調査に使う)
+        logger.warning("Overpass search failed (query length %d): %s code=%s status=%s", len(query or ""),
+                       type(exc).__name__, err.code, err.status)
         if raise_errors:
-            raise
+            raise err from exc
         return []
     finally:
         if owns_client:
@@ -221,9 +268,12 @@ async def search_overpass(
 class ProviderResults(list):
     """[Gate G11] 結果の一覧。応答しなかった提供元を unavailable に持つ(失敗を「見つからない」にしない)"""
 
-    def __init__(self, items: List[Dict[str, Any]], unavailable: List[str], called: Optional[List[str]] = None):
+    def __init__(self, items: List[Dict[str, Any]], unavailable: List[str], called: Optional[List[str]] = None,
+                 errors: Optional[Dict[str, str]] = None):
         super().__init__(items)
         self.unavailable = unavailable
+        # [Gate SearchUAT] 応答しなかった提供元の失敗の分類(blocked・rate_limited・timeout など)
+        self.errors = dict(errors or {})
         # [Gate FR059-D11] 外へ送った提供元(無料の provider の使用の記録に使う)
         self.called = list(called or [])
 
@@ -263,11 +313,13 @@ async def search_all_providers(
 
     combined: List[Dict[str, Any]] = []
     unavailable: List[str] = []
+    errors: Dict[str, str] = {}
     for provider_name, r in zip(names, results):
         if isinstance(r, BaseException):
             logger.warning("%s provider raised: %s", provider_name, type(r).__name__)
             unavailable.append(provider_name)
+            errors[provider_name] = classify_error(r).code
             continue
         combined.extend(r)
     called = [n for n in names if not (n == "overpass" and (latitude is None or longitude is None))]
-    return ProviderResults(combined, unavailable, called)
+    return ProviderResults(combined, unavailable, called, errors)

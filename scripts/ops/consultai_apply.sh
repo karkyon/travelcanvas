@@ -195,6 +195,11 @@ cmd_deploy() {
     echo "target_sha=$TARGET"; echo "expect_sha=$EXPECT"; } > "$STATE"
   chmod 600 "$STATE"
   echo "1: 元の状態を記録: $STATE(branch $PREV_BRANCH・${PREV:0:7}・DB ${DBREV:-unknown})"
+  # [Gate SearchUAT] コンテナを作り直すと前のログが消えるため、外部の検索の失敗の記録(型・分類だけ)を先に残す
+  docker compose logs --since 72h --no-color backend 2>/dev/null \
+    | grep -o 'Overpass search failed (query length [0-9]*): .*' | sed -E 's/\(query length [0-9]*\): //' \
+    | sort | uniq -c | sort -rn > "$ART/predeploy-search-log-$TS.txt" 2>/dev/null || true
+  echo "1: 反映前の場所の検索の失敗の記録: $ART/predeploy-search-log-$TS.txt($(wc -l < "$ART/predeploy-search-log-$TS.txt" 2>/dev/null || echo 0) 種類)"
   # ---- 2 退避・設定・バックアップ
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     git diff HEAD --binary > "$ART/predeploy-$TS.patch"; chmod 600 "$ART/predeploy-$TS.patch"
@@ -240,6 +245,10 @@ cmd_deploy() {
   echo "OK: main ${TARGET:0:7} を反映(DB $CUR・バックアップ $BK・記録 $STATE)"
   echo "    旅行相談: http://$LAN_HOST:4173/trip-consult   運用: http://$LAN_HOST:4173/admin/ops"
   echo "    次: /admin/ops の概要「旅行相談の UAT の準備」を確かめる(鍵が確認済みで期限内なら確認し直さない。再入力は不要)"
+  if [ -f scripts/ops/search_diag.sh ]; then
+    echo "4: 場所の検索(OpenStreetMap)の診断(外への要求 4 回)"
+    bash scripts/ops/search_diag.sh || echo "4: 場所の検索の診断に NG があります(上の結果。反映は済んでいます)"
+  fi
   echo "    音声の UAT: bash scripts/ops/uat_https.sh up → https://$LAN_HOST:4443/trip-consult(docs/runbooks/consult-uat-omega-dev2.md)"
 }
 
