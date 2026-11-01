@@ -45,3 +45,14 @@ describe('画面を開いた名前に合わせる (Gate H1)', () => {
     expect(vite).not.toMatch(/preview:\s*{\s*headers:/);
   });
 });
+
+describe('[Gate AdminUAT] UAT の https の入口から開いた時', () => {
+  it('http の API は混在で止まるため、同じ https の入口(同じオリジン)を使う', () => {
+    expect(apiUrlForHost('http://localhost:8001', '192.168.1.11:4443', 'https:')).toBe('https://192.168.1.11:4443');
+    expect(apiUrlForHost('http://localhost:8001/api/v1', 'omega-dev2:4443', 'https:')).toBe('https://omega-dev2:4443/api/v1');
+    // http の入口・設定が本番のドメインの時は変えない
+    expect(apiUrlForHost('http://localhost:8001', '192.168.1.11:4173', 'http:')).toBe('http://192.168.1.11:8001');
+    expect(apiUrlForHost('https://api.example.jp', '192.168.1.11:4443', 'https:')).toBe('https://api.example.jp');
+    expect(apiUrlForHost('http://localhost:8001', 'localhost:4443', 'https:')).toBe('http://localhost:8001');
+  });
+});

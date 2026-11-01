@@ -8,7 +8,8 @@ import { e2eStubReady, e2eStubReset } from './support/admin';
  *
  *   1. Free・同意なし: 画面は押せず理由を示す。API も送らずに断る(同意 → クラス)
  *   2. 模擬の鍵を確認・Journey: 「AI で読み取る」→ AI の行は未確認 → AI の方面の案を足す → 比較 → 方面の詳細で
- *      Google の場所の検索・経路(押した時だけ・出典と時刻)→ 場所を出典に足して下書き → 相談の利用額が旅行の枠へ移る
+ *      「候補を探す」(OpenStreetMap の失敗 → もう一度 → 該当なし → 検索元 Google を選ぶ)・経路(押した時だけ・出典と時刻)
+ *      → Google の場所を旅程案に入れて下書き(place ID と URL だけ)→ 相談の利用額が旅行の枠へ移る
  *   3. 失敗の経路: 時間切れ(見込みで数える)・同じ Idempotency-Key の再送(二度送らない)・回数の上限(送る前に断る)
  *   4. 模擬の鍵を無効にすると、送らずに理由を示す
  * 実の API の受入(実の鍵・請求の照合)は omega-dev2 で行う。ここでの成功は実の API の成功ではない。
@@ -37,8 +38,16 @@ async function stubGeocode(page: Page) {
       })),
     } });
   });
-  await page.route('**/api/v1/search/spots', (route) => route.fulfill({ json: {
-    query: '', category: 'sightseeing', radius_km: 10, base: { latitude: 34.4875, longitude: 136.7091 }, total: 0, candidates: [] } }));
+  // [Gate SearchUAT] 1回目(開いた時の自動の検索)は提供元が断る(分類 blocked)。2回目は成功・該当なし
+  let spots = 0;
+  await page.route('**/api/v1/search/spots', (route) => {
+    spots += 1;
+    const failed = spots === 1;
+    return route.fulfill({ json: {
+      query: '', category: 'sightseeing', radius_km: 10, base: { latitude: 34.4875, longitude: 136.7091 }, total: 0,
+      candidates: [], unavailable_providers: failed ? ['overpass'] : [],
+      provider_errors: failed ? { overpass: 'blocked' } : {} } });
+  });
 }
 
 test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 → Google の場所と経路 → 下書き(模擬の提供元)', async ({ page }) => {
@@ -89,8 +98,10 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     await expect(page.getByLabel('その他の希望 1')).toHaveValue('何もしない時間がほしい');
     await page.getByTestId('consult-undo').click();
     await expect(page.getByTestId('review-proposal-party_size')).toHaveCount(0);
-    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。何もしない時間もほしい');
+    // [Gate AdminUAT U05] 食い違う希望(日帰りと泊まり)は AI が片方に決めず「確かめてほしいこと」に出す
+    await page.getByTestId('consult-followup-text').fill('やっぱり3人で行きます。日帰りか1泊かは迷っています。何もしない時間もほしい');
     await page.getByTestId('consult-followup-ai').click();
+    await expect(page.getByTestId('consult-ai-contradictions')).toContainText('食い違っています', { timeout: 20_000 });
     await page.getByTestId('review-proposal-accept-party_size').click();
     await expect(page.getByTestId('review-row-party_size').getByLabel('人数', { exact: true })).toHaveValue('3');
     const suggest = page.getByTestId('consult-suggest-城崎温泉');
@@ -104,13 +115,24 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     await expect(page.getByTestId('area-row-城崎温泉')).toBeVisible();
     await page.getByTestId('area-open-伊勢').click();
 
-    // 方面の詳細: Google の場所・経路(押した時だけ)
+    // 方面の詳細: 場所の検索の入口は「候補を探す」の1つ(Google の別の検索の欄は無い)。経路は別
+    const search = page.getByTestId('consult-place-search');
+    await expect(search.getByTestId('consult-search-error')).toContainText('要求を受け付けませんでした', { timeout: 20_000 });
+    await expect(search.getByTestId('consult-search-error')).toContainText('該当なしではありません');
+    // 無料の検索の失敗から自動で有料へ切り替えない(切り替えの案内だけ)
+    await expect(search.getByTestId('consult-search-google')).toBeVisible();
+    await expect(page.getByTestId('consult-places-search')).toHaveCount(0);
+    await search.getByTestId('consult-search-retry').click();
+    await expect(search.getByTestId('consult-results-empty')).toContainText('該当なし');
+    await expect(search.getByTestId('consult-google-availability')).toContainText('使えます');
+    await search.getByTestId('consult-source-google').check();
+    await expect(search.getByTestId('consult-search-using')).toContainText('検索元: Google');
+    await search.getByTestId('consult-search').click();
+    await expect(search).toContainText('模擬の場所 1', { timeout: 20_000 });
+    await expect(search).toContainText('出典: Google');
+    await search.getByRole('button', { name: '旅程案に入れる' }).first().click();
+    await expect(page.getByTestId('consult-picked')).toContainText('出典: Google');
     const lookup = page.getByTestId('consult-lookup');
-    await expect(lookup).toBeVisible({ timeout: 20_000 });
-    await lookup.getByTestId('consult-places-search').click();
-    await expect(lookup.getByTestId('consult-places-result')).toContainText('模擬の場所 1');
-    await expect(lookup.getByTestId('consult-places-result')).toContainText('提供: Google');
-    await lookup.getByRole('button', { name: '参考の出典に足す' }).first().click();
     await lookup.getByTestId('consult-route').click();
     await expect(lookup.getByTestId('consult-route-result')).toContainText('車: 約 150 分 · 180 km');
     await expect(lookup.getByTestId('consult-route-result')).toContainText('提供: Google');
@@ -118,7 +140,7 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     await page.getByTestId('consult-create-draft').click();
     await expect(page).toHaveURL(/\/planner\/[^/]+\/draft$/, { timeout: 20_000 });
     const planId = page.url().split('/planner/')[1]!.split('/')[0]!;
-    await expect(page.getByText('https://maps.google.com/?cid=1001')).toBeVisible();
+    await expect(page.getByTestId('draft-google-place').first()).toContainText('https://maps.google.com/?cid=1001');
     const usage = await send('get', `/plans/${planId}/planning-usage`);
     expect(Number(JSON.stringify(usage).match(/"plan_used(?:_jpy)?":"([0-9.]+)"/)?.[1] ?? '0')).toBeGreaterThan(0);
 

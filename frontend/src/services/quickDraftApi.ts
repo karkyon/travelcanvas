@@ -75,6 +75,7 @@ function resolveApiBaseUrl(): string {
   const raw = apiUrlForHost(
     import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8001',
     typeof window !== 'undefined' ? window.location.host : undefined,
+    typeof window !== 'undefined' ? window.location.protocol : undefined,
   );
   const trimmed = raw.replace(/\/+$/, '');
   return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`;

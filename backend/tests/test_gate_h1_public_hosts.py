@@ -27,3 +27,17 @@ def test_preflight_from_public_host_is_allowed(client, monkeypatch):
     evil = {"Origin": "http://evil.example:4173", "Access-Control-Request-Method": "POST"}
     r = client.options("/api/v1/auth/login", headers=evil)
     assert r.headers.get("access-control-allow-origin") is None
+
+
+def test_uat_https_port_adds_https_origins_only_when_set():
+    """[Gate AdminUAT] 音声の UAT 用の https の入口(caddy)。ポートを設定した時だけ https://<名前>:<port> を足す"""
+    s = Settings(CORS_ORIGINS="http://localhost:4173", TC_PUBLIC_HOSTS="192.168.1.11,omega-dev2",
+                 TC_UAT_HTTPS_PORT="4443")
+    assert s.cors_allowed_origins == [
+        "http://localhost:4173", "http://192.168.1.11:4173", "https://192.168.1.11:4443",
+        "http://omega-dev2:4173", "https://omega-dev2:4443"]
+    assert "https://192.168.1.11:4443" not in Settings(
+        CORS_ORIGINS="http://localhost:4173", TC_PUBLIC_HOSTS="192.168.1.11", TC_UAT_HTTPS_PORT="").cors_allowed_origins
+    bad = Settings(CORS_ORIGINS="http://localhost:4173", TC_PUBLIC_HOSTS="192.168.1.11", TC_UAT_HTTPS_PORT="44;3")
+    assert not any(o.startswith("https://") for o in bad.cors_allowed_origins)
+    assert any("TC_UAT_HTTPS_PORT" in p for p in production_problems(Settings(TC_UAT_HTTPS_PORT="4443")))

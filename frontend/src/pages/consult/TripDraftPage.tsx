@@ -145,9 +145,14 @@ const TripDraftPage: React.FC = () => {
           <div className="min-w-0">
             <p className="font-semibold text-ink-900 break-words">{c.title}</p>
             <p className="text-xs text-ink-700">
-              {[c.category, c.provider === 'overpass' ? `出典: OpenStreetMap ${retrievedLabel(c.retrieved_at)}` : null]
+              {[c.category, c.provider === 'overpass' ? `出典: OpenStreetMap ${retrievedLabel(c.retrieved_at)}`
+                : c.provider === 'google_places' ? `出典: Google ${retrievedLabel(c.retrieved_at)}` : null]
                 .filter(Boolean).join(' · ')}
             </p>
+            {c.provider === 'google_places' && c.source_url && (
+              // [Gate SearchUAT] Google の利用条件により名前・住所は保存しない。Google マップの URL で確かめる
+              <p className="text-xs text-ink-700 break-all" data-testid="draft-google-place">{`Google マップ: ${c.source_url}`}</p>
+            )}
             <p className="text-xs text-warning">時刻 · 営業時間は未照会(日付を決めた後に旅程の画面で照合)</p>
           </div>
           {canEdit && (

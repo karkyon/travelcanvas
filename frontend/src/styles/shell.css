@@ -498,7 +498,8 @@
 .tc-ops-tabs { margin-bottom: 14px; flex-wrap: wrap; }
 .tc-ops-tabs a { text-decoration: none; display: inline-flex; align-items: center; }
 .tc-ops-tabs [aria-selected="true"] { background: var(--tc-accent); color: var(--tc-on-accent); }
-.tc-ops-grid { display: grid; gap: 14px; }
+.tc-ops-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.tc-ops-desc { overflow-wrap: anywhere; }
 .tc-ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .tc-ops-kpi { padding: 17px 18px; min-height: 112px; }
 .tc-ops-kpi-head { font-size: 12px; color: var(--tc-ink-500); margin: 0; }

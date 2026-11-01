@@ -12,6 +12,7 @@
 | trace | 題 | NOT STARTED | PARTIAL | SUPERSEDED |
 |---|---|---|---|---|
 | [gate-a2-trace.md](gate-a2-trace.md) | Gate A2 トレース(FR-040 管理・監査)と E2E の安定化 | 0 | 0 | 2 |
+| [gate-admin-uat-trace.md](gate-admin-uat-trace.md) | Gate AdminUAT — 管理画面の鍵の表示の食い違いの解消と、旅行相談の UAT(実 AI・音声)を成立させる準備 | 0 | 0 | 0 |
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |
@@ -97,6 +98,7 @@
 | [gate-s7-trace.md](gate-s7-trace.md) | Gate S7 段階的な計算の確認 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
+| [gate-search-uat-trace.md](gate-search-uat-trace.md) | Gate SearchUAT — 旅行相談の場所の検索の入口の統一と、検索の失敗(OpenStreetMap)の是正 | 0 | 0 | 0 |
 | [gate-secretpolicy-trace.md](gate-secretpolicy-trace.md) | Gate SecretPolicy — 外部 API 鍵の取得元の一本化 | 0 | 0 | 0 |
 | [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |
 | [gate-ux6-icons2-trace.md](gate-ux6-icons2-trace.md) | Gate UX6-Icons2 トレース(画面に出る残りの飾りの絵文字を共通のアイコンへ・確定の予定の印) | 1 | 1 | 0 |

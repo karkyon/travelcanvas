@@ -18,7 +18,7 @@ export function speechSupport(w: Window | undefined = typeof window !== 'undefin
     ?? (w as unknown as { webkitSpeechRecognition?: RecognitionCtor }).webkitSpeechRecognition) ?? null;
   if (!ctor) return { ctor: null, reason: 'このブラウザは音声入力に対応していません(Chrome・Edge・Safari で使えます)' };
   if (w.isSecureContext === false) {
-    return { ctor: null, reason: '安全な接続(https)でないため、ブラウザがマイクを使わせません。文字で入力してください' };
+    return { ctor: null, reason: '安全な接続(https)でないため、ブラウザがマイクを使わせません。https の試験用の入口(例 https://…:4443)から開くと使えます。今は文字で入力してください' };
   }
   return { ctor, reason: null };
 }

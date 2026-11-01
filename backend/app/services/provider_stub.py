@@ -65,6 +65,7 @@ def _ai_answer(text: str) -> Dict[str, Any]:
         "areas_suggested": STUB_SUGGESTIONS,
         "unknowns": ["模擬の提供元の答えです"],
         "other_wishes": ["何もしない時間がほしい"] if "何もしない" in body else [],
+        "contradictions": ["日帰りと泊まりが食い違っています。どちらですか"] if "日帰り" in body and "泊" in body else [],
     }
 
 

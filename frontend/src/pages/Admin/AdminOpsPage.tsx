@@ -2,6 +2,8 @@
  * [Gate OpsCMS] 運用コンソール(管理者だけ)。利用者の指示「TravelCanvas API運用CMS」と CMS のモック(2026-10-30)の構成:
  * 概要 / API・契約と接続 / 原価・利用台帳 / 会員クラス / Cloud 環境 / テスト実行(Fake の家族旅行) / 秘密情報・権限。監査はログの画面へ。
  * [Gate FR059-Tiers] 会員クラス: Free / Trip / Journey / Explorer の機能・回数・最大の見込み額の表と、開発環境の試験の切り替え。
+ * [Gate AdminUAT] 鍵の表示は登録と接続確認から1つに決める(opsSecretDisplay)。旧 .env は「旧設定の詳細」へ畳む。
+ *   使わない鍵は「設定不要」。Fake の試験のクラスはログイン中の会員クラスと別。概要に旅行相談の UAT の準備を出す。
  *
  * - 値は全て backend の実データ。取れない値は「取得していない」「未確認」と書く(作った数を出さない)
  * - Fake の試験の額と、実の提供元の見込みの原価を同じ欄に混ぜない。GCP の予算は通知で、課金を止める上限ではないと書く
@@ -12,11 +14,13 @@ import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
 import {
   disableOpsSecret, importOpsSecretFromEnv, verifyOpsSecret, activateOpsSecret, discardOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
-  runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier,
+  runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier, getOpsUatReadiness,
+  type OpsUatReadiness,
   type OpsTier, type OpsTiers, type OpsTestTierResult,
   type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
 } from '@/services/api/opsConsole';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { formatJaDateTime, legacyDisplay, providerSecretDisplay, restrictionNote, secretDisplay } from './opsSecretDisplay';
 
 type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets';
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -25,7 +29,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'ledger', label: '原価・利用台帳' },
   { id: 'tiers', label: '会員クラス' },
   { id: 'cloud', label: 'Cloud 環境' },
-  { id: 'runs', label: 'テスト実行' },
+  { id: 'runs', label: 'テスト実行(Fake)' },
   { id: 'secrets', label: '秘密情報・権限' },
 ];
 
@@ -44,17 +48,6 @@ const StatePill: React.FC<{ state: string }> = ({ state }) => {
   return <span className={`tc-pill ${s.tone}`}>{s.text}</span>;
 };
 
-const SECRET_LABEL: Record<string, { text: string; tone: string }> = {
-  configured: { text: '登録済み・提供元の認証は未確認(値は表示しない)', tone: 'tc-pill--blue' },
-  disabled: { text: '無効化済み(送らない)', tone: 'tc-pill--warn' },
-  placeholder: { text: 'サンプル値(使えない)', tone: 'tc-pill--bad' },
-  invalid: { text: '形が正しくない(使えない)', tone: 'tc-pill--bad' },
-  decrypt_failed: { text: '復号できない(使えない)', tone: 'tc-pill--bad' },
-  backend_unavailable: { text: '保管先が未接続(送らない)', tone: 'tc-pill--bad' },
-  missing: { text: '未設定', tone: 'tc-pill--warn' },
-  not_defined: { text: 'コードに設定の項目なし', tone: '' },
-  not_needed: { text: '不要', tone: '' },
-};
 const LIVE_LABEL: Record<string, { text: string; tone: string }> = {
   test_only: { text: '試験用(外へ送らない)', tone: 'tc-pill--blue' },
   ready: { text: '送信できる', tone: 'tc-pill--good' },
@@ -159,8 +152,51 @@ const OverviewTab: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
           )}
         </article>
       </div>
+      <UatReadinessPanel onGo={onGo} />
       <p className="tc-ops-asof">{`取得 ${new Date(data.as_of).toLocaleString('ja-JP')} · 環境 ${data.environment}`}</p>
     </div>
+  );
+};
+
+/** [Gate AdminUAT] ログイン中のこのアカウントで、旅行相談の実 AI の UAT ができるか。項目ごとに今の値と変える場所 */
+const UatReadinessPanel: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
+  const { data, error, loading, reload } = useLoad<OpsUatReadiness>(getOpsUatReadiness);
+  if (loading && !data) return <Loading />;
+  if (error || !data) return <Failed message={error ?? '読み込めませんでした'} onRetry={() => void reload()} />;
+  return (
+    <article className="tc-card tc-ops-panel" data-testid="ops-uat-readiness" aria-labelledby="ops-uat-h">
+      <div className="tc-section-row">
+        <div>
+          <h2 id="ops-uat-h" className="tc-section-title">旅行相談の UAT の準備(このアカウント)</h2>
+          <p className="tc-ops-desc">{`ログイン中: ${data.account} · AI のモデル ${data.model}`}</p>
+        </div>
+        <span className={`tc-pill ${data.ready ? 'tc-pill--good' : 'tc-pill--warn'}`} data-testid="ops-uat-ready">
+          {data.ready ? '実 AI で相談できます' : '足りない項目があります'}
+        </span>
+      </div>
+      <div className="tc-ops-table-wrap">
+        <table className="tc-ops-table">
+          <thead><tr><th>項目</th><th>今の値</th><th>判定</th><th>変える場所</th></tr></thead>
+          <tbody>
+            {data.checks.map((c) => (
+              <tr key={c.key} data-testid={`ops-uat-${c.key}`}>
+                <td><b>{c.label}</b><br /><small>{c.need}</small></td>
+                <td>{c.value}</td>
+                <td><span className={`tc-pill ${c.ok ? 'tc-pill--good' : 'tc-pill--warn'}`}>{c.ok ? 'OK' : '要対応'}</span></td>
+                <td>{c.where ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        <Link to="/trip-consult" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary">旅行相談を開く</Link>
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => onGo('secrets')}>秘密情報・権限へ</button>
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => onGo('tiers')}>会員クラスへ</button>
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => void reload()}>読み直す</button>
+      </div>
+      <p className="tc-ops-asof">{data.note}</p>
+    </article>
   );
 };
 
@@ -204,9 +240,11 @@ const ProvidersTab: React.FC = () => {
                   {p.contract === 'unverified' ? '契約・課金は未確認' : '料金なし'}</span></td>
                 <td><span className={`tc-pill ${p.price_profile === 'known' ? 'tc-pill--good' : 'tc-pill--warn'}`}>
                   {p.price_profile === 'known' ? `単価あり(${p.policy_version ?? '—'})` : p.price_profile === 'partial' ? '一部の単価なし' : '読めない'}</span></td>
-                <td><span className={`tc-pill ${SECRET_LABEL[p.secret]?.tone ?? ''}`}>{SECRET_LABEL[p.secret]?.text ?? p.secret}</span>
-                  {p.secret_storage && <><br /><small>{p.secret_storage}</small></>}
-                  {p.secret_setting && <><br /><code>{p.secret_setting}</code></>}</td>
+                <td>{(() => {
+                  const d = providerSecretDisplay(p);
+                  return <span className={`tc-pill ${d.tone}`} data-testid={`ops-provider-secret-${p.name}`}>{d.text}</span>;
+                })()}
+                  {p.secret_storage && <><br /><small>{p.secret_storage}</small></>}</td>
                 <td><span className={`tc-pill ${ADAPTER_LABEL[p.adapter ?? 'not_implemented']?.tone ?? ''}`}>
                   {ADAPTER_LABEL[p.adapter ?? 'not_implemented']?.text}</span></td>
                 <td><span className={`tc-pill ${LIVE_LABEL[p.live_calls]?.tone ?? ''}`}>{LIVE_LABEL[p.live_calls]?.text}</span>
@@ -387,7 +425,7 @@ const TiersTab: React.FC = () => {
           <h2 className="tc-section-title">試験のためにクラスを切り替える</h2>
           {t.test_switch.enabled ? (
             <form className="tc-ops-form" aria-label="クラスの試験の切り替え" onSubmit={(e) => { e.preventDefault(); void switchTier(); }}>
-              <label htmlFor="ops-tier-select">自分のアカウントのクラス</label>
+              <label htmlFor="ops-tier-select">ログイン中の自分のアカウントのクラス(実際に変わります・24時間)</label>
               <select id="ops-tier-select" value={tier} onChange={(e) => setTier(e.target.value as OpsTier)}>
                 {OPS_TIERS.map((k) => <option key={k} value={k}>{TIER_NAME[k]}</option>)}
               </select>
@@ -439,8 +477,12 @@ const RunsTab: React.FC = () => {
   return (
     <div className="tc-ops-two">
       <article className="tc-card tc-ops-panel">
-        <div className="tc-section-row"><h2 className="tc-section-title">家族4人の旅行相談の試験</h2>
+        <div className="tc-section-row"><h2 className="tc-section-title">家族4人の旅行相談の試験(Fake)</h2>
           <span className="tc-pill tc-pill--blue">Fake · 外へ送らない</span></div>
+        <p className="tc-ops-callout" data-testid="ops-run-fake-note">
+          この試験は Fake 専用です。成功しても実 AI の接続の確認にはなりません(実の接続は「秘密情報・権限」の「有効性を確認」と、
+          旅行相談の画面で確かめます)。下のクラスは試験用に作る利用者のクラスで、ログイン中のあなたの会員クラスは変わりません。
+        </p>
         <ul className="tc-ops-rows">
           <li><span>出発地 / 旅行者</span><b>大阪府枚方市 · 大人4人</b></li>
           <li><span>旅行の条件<small>1泊2日 / 自家用車・高速道路</small></span><b>片道3時間以内</b></li>
@@ -449,7 +491,7 @@ const RunsTab: React.FC = () => {
           <li><span>API の原価の条件</span><b>¥40 警告 · ¥45 運用 · ¥50 上限</b></li>
         </ul>
         <form className="tc-ops-form" onSubmit={(e) => { e.preventDefault(); void start(); }} aria-label="Fake の試験を実行">
-          <label htmlFor="ops-run-tier">試験の利用者のクラス</label>
+          <label htmlFor="ops-run-tier">試験用の利用者のクラス(Fake 試験専用。あなたのクラスは変わりません)</label>
           <select id="ops-run-tier" value={runTier} onChange={(e) => setRunTier(e.target.value as OpsTier)}>
             {OPS_TIERS.map((k) => <option key={k} value={k}>{TIER_NAME[k]}</option>)}
           </select>
@@ -468,13 +510,13 @@ const RunsTab: React.FC = () => {
           <>
             <ul className="tc-ops-rows" data-testid="ops-run-summary">
               <li><span>最後の合計</span><b>{`${yen(s.final_total_jpy)} / ${yen(s.plan_cap_jpy)}`}</b></li>
-              {s.tier && <li><span>試験の利用者のクラス</span><b>{TIER_NAME[s.tier as OpsTier] ?? s.tier}</b></li>}
+              {s.tier && <li><span>試験用の利用者のクラス(Fake)</span><b>{TIER_NAME[s.tier as OpsTier] ?? s.tier}</b></li>}
               <li><span>上限を越えなかった</span><span className={`tc-pill ${s.never_over_cap ? 'tc-pill--good' : 'tc-pill--bad'}`}>{s.never_over_cap ? 'はい' : 'いいえ'}</span></li>
               <li><span>利用者の警告(40円〜)</span><b>{s.first_user_warning_step ? `${s.first_user_warning_step}回目から` : '届かず'}</b></li>
               <li><span>運用の知らせ(45円〜)</span><b>{s.first_ops_alert_step ? `${s.first_ops_alert_step}回目から` : '届かず'}</b></li>
               <li><span>最初に断った理由<small>provider へ送る前</small></span><b>{s.first_denial ? `${s.first_denial.n}回目 · ${DENIAL_LABEL[s.first_denial.reason] ?? s.first_denial.reason}` : '—'}</b></li>
               <li><span>同じ Idempotency-Key の再送</span><b>{s.idempotency_replay.double_counted === false ? '二重に数えない' : '要確認'}</b></li>
-              <li><span>外部への送信</span><b>{`${s.external_calls}回`}</b></li>
+              <li><span>外部への送信</span><b>{`${s.external_calls}回(実 AI の確認ではない)`}</b></li>
             </ul>
             <div className="tc-ops-table-wrap mt-3">
               <table className="tc-ops-table">
@@ -574,11 +616,14 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
         {slot.source === 'cms' && (
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('disable')}>登録を無効にする</button>
         )}
-        {slot.env_legacy?.importable && (
+        {slot.env_legacy?.importable && (slot.required ?? true) && (
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('import')}>旧 .env から取り込む</button>
         )}
         {slot.verify_supported && slot.source === 'cms' && slot.status === 'configured' && (
-          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('verify')}>有効性を確認</button>
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('verify')}
+            data-testid={`ops-secret-verify-btn-${slot.slot}`}>
+            {slot.verification?.state === 'accepted' ? '確認し直す(期限内は不要)' : '有効性を確認'}
+          </button>
         )}
         {slot.verify_supported && slot.candidate && (
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setMode('verify_candidate')}>候補の有効性を確認</button>
@@ -618,17 +663,6 @@ const SecretForm: React.FC<{ slot: OpsSecretSlot; onDone: (msg: string) => void 
 };
 
 const SOURCE_LABEL: Record<string, string> = { cms: 'この画面で登録' };
-const SecretPill: React.FC<{ status: string }> = ({ status }) => {
-  const s = SECRET_LABEL[status] ?? { text: status, tone: '' };
-  return <span className={`tc-pill ${s.tone}`} data-testid="ops-secret-status">{s.text}</span>;
-};
-const legacyNote = (l: OpsSecrets['slots'][number]['env_legacy']): string | null => {
-  if (!l?.present) return null;
-  if (l.placeholder) return '旧 .env にサンプル値(CHANGE_ME など)が残っています。使いません。本物の鍵を登録してください';
-  return l.importable ? '旧 .env に値があります(取得元ではありません。使う時は「旧 .env から取り込む」)'
-    : '旧 .env の値は形が正しくないため使えません';
-};
-
 const SecretsTab: React.FC = () => {
   const { data, error, loading, reload } = useLoad<OpsSecrets>(getOpsSecrets);
   const [msg, setMsg] = useState<string | null>(null);
@@ -656,33 +690,49 @@ const SecretsTab: React.FC = () => {
         <ul className="tc-ops-secrets">
           {data.slots.map((s) => (
             <li key={s.slot} data-testid={`ops-secret-${s.slot}`}>
-              <div className="tc-section-row">
-                <span><b>{s.label}</b><small>{s.hint}</small><small>{`使う提供元: ${s.providers.join('・')} · .env の名前: ${s.env}`}</small></span>
-                <SecretPill status={s.status} />
-              </div>
-              {s.status === 'configured' && (
-                <p className="tc-ops-desc">
-                  {`出典: ${SOURCE_LABEL[s.source ?? ''] ?? '—'}${s.version ? ` · 版 ${s.version}` : ''}${s.last4 ? ` · 末尾 ${s.last4}` : ''}`}
-                  {s.registered_at ? ` · ${new Date(s.registered_at).toLocaleString('ja-JP')}` : ''}
-                </p>
-              )}
-              {s.verification && (
-                <p className="tc-ops-desc" data-testid={`ops-secret-verify-${s.slot}`}>
-                  <VerifyPill state={s.verification.state} />
-                  {s.verification.expires_at ? ` · 期限 ${new Date(s.verification.expires_at).toLocaleString('ja-JP')}` : ''}
-                </p>
-              )}
-              {s.candidate && (
-                <p className="tc-ops-desc" data-testid={`ops-secret-candidate-${s.slot}`}>
-                  {`候補: 版 ${s.candidate.version} · 末尾 ${s.candidate.last4} · `}
-                  <VerifyPill state={s.candidate.verification.state} />
-                  {' · 有効な版はそのまま使われます(確認が通った候補だけ有効にできます)'}
-                </p>
-              )}
-              {s.in_use_note && <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>}
-              {legacyNote(s.env_legacy) && (
-                <p className="tc-ops-desc" data-testid={`ops-secret-legacy-${s.slot}`}>{legacyNote(s.env_legacy)}</p>
-              )}
+              {(() => {
+                const d = secretDisplay(s);
+                const legacy = legacyDisplay(s);
+                return (
+                  <>
+                    <div className="tc-section-row">
+                      <span><b>{s.label}</b><small>{s.hint}</small><small>{`使う提供元: ${s.providers.join('・')}`}</small></span>
+                      <span className={`tc-pill ${d.tone}`} data-testid="ops-secret-status">{d.text}</span>
+                    </div>
+                    {d.detail && <p className="tc-ops-desc" data-testid={`ops-secret-detail-${s.slot}`}>{d.detail}</p>}
+                    {s.status === 'configured' && (
+                      <p className="tc-ops-desc">
+                        {`出典: ${SOURCE_LABEL[s.source ?? ''] ?? '—'}${s.version ? ` · 版 ${s.version}` : ''}${s.last4 ? ` · 末尾 ${s.last4}` : ''}`}
+                        {s.registered_at ? ` · 登録 ${formatJaDateTime(s.registered_at) ?? ''}` : ''}
+                        {s.verification?.verified_at ? ` · 確認 ${formatJaDateTime(s.verification.verified_at) ?? ''}` : ''}
+                      </p>
+                    )}
+                    {s.candidate && (
+                      <p className="tc-ops-desc" data-testid={`ops-secret-candidate-${s.slot}`}>
+                        {`候補: 版 ${s.candidate.version} · 末尾 ${s.candidate.last4} · `}
+                        <VerifyPill state={s.candidate.verification.state} />
+                        {' · 有効な版はそのまま使われます(確認が通った候補だけ有効にできます)'}
+                      </p>
+                    )}
+                    {(s.required ?? true) && s.status === 'configured' && (
+                      <p className="tc-ops-desc" data-testid={`ops-secret-restrict-${s.slot}`}>{restrictionNote(s)}</p>
+                    )}
+                    {s.in_use_note && (s.required ?? true) && (
+                      <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>
+                    )}
+                    {legacy.prominent && (
+                      <p className="tc-ops-callout" data-testid={`ops-secret-legacy-${s.slot}`}>{legacy.prominent}</p>
+                    )}
+                    {legacy.detail && (
+                      <details className="mt-1 text-xs text-ink-700" data-testid={`ops-secret-legacy-detail-${s.slot}`}>
+                        <summary>旧設定の詳細</summary>
+                        <p>{legacy.detail}</p>
+                        <p>{`旧 .env の名前: ${s.env}(参照しません。.env へ鍵を書かないでください)`}</p>
+                      </details>
+                    )}
+                  </>
+                );
+              })()}
               <SecretForm slot={s} onDone={(m) => { setMsg(m); void reload(); }} />
               {s.history.length > 0 && (
                 <details className="mt-2 text-xs text-ink-700">

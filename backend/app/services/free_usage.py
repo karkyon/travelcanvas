@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 
 FREE_PROVIDERS = frozenset({"nominatim", "overpass", "wikipedia", "wikimedia_commons", "oembed"})
 FREE_PRICE_VERSION = "free"
-RESULT_CODES = frozenset({"ok", "empty", "unavailable", "error"})
+RESULT_CODES = frozenset({"ok", "empty", "unavailable", "error",
+                          # [Gate SearchUAT] 提供元の失敗の分類(search_provider.ERROR_CODES)
+                          "blocked", "rate_limited", "timeout", "server_error", "network", "unreadable",
+                          "provider_timeout"})
 
 
 def record(db: Session, user: Optional[User], provider: str, operation: str, *, request_count: int = 1,

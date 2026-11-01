@@ -36,6 +36,8 @@ export interface AiExtraction extends IntentExtraction {
   unknowns: string[];
   /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
   notes: string[];
+  /** [Gate AdminUAT U05] 食い違う希望(AI は片方に決めない。利用者に確かめる) */
+  contradictions?: string[];
   model: string;
   usage: ConsultUsage;
   notice: string;
@@ -92,7 +94,7 @@ const extraction: Decoder<AiExtraction> = object<AiExtraction>({
   areas: arrayOf(object<{ name: string; source: 'user_input' }>({ name: str, source: oneOf('user_input') })),
   suggested_areas: arrayOf(object<{ name: string; reason: string; source: 'ai_suggested' }>({
     name: str, reason: str, source: oneOf('ai_suggested') })),
-  unknowns: arrayOf(str), notes: arrayOf(str), nights: nullable(int), extractor: str, ai_connected: bool, model: str, usage,
+  unknowns: arrayOf(str), notes: arrayOf(str), contradictions: optional(arrayOf(str)), nights: nullable(int), extractor: str, ai_connected: bool, model: str, usage,
   notice: str, stub: bool,
 });
 
@@ -123,8 +125,9 @@ export async function aiExtract(sessionId: string, input: ExtractInput, key: str
 }
 
 export async function consultPlaces(sessionId: string, query: string, at: { latitude: number; longitude: number } | null,
-  key: string): Promise<ConsultPlacesResult> {
-  const r = await api.post('/trip-intents/ai/places-search', { session_id: sessionId, query, ...(at ?? {}) }, withKey(key));
+  key: string, radiusKm?: number): Promise<ConsultPlacesResult> {
+  const r = await api.post('/trip-intents/ai/places-search',
+    { session_id: sessionId, query, ...(at ?? {}), ...(at && radiusKm ? { radius_km: radiusKm } : {}) }, withKey(key));
   return decodeResponse(r.data, object<ConsultPlacesResult>({
     results: arrayOf(place), usage, attribution: str, retrieved_at: str, notice: str, stub: bool,
   }), 'POST /trip-intents/ai/places-search');

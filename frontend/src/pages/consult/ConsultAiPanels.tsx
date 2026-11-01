@@ -11,7 +11,7 @@ import React, { useId, useState } from 'react';
 import Button from '@/components/common/Button';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  consultPlaces, consultRoute, newIdempotencyKey, type ConsultAiStatus, type ConsultPlace,
+  consultRoute, newIdempotencyKey, type ConsultAiStatus,
   type ConsultRouteMode, type ConsultRouteResult, type ConsultUsage,
 } from '@/services/api/consultAi';
 import { retrievedLabel } from './consultModel';
@@ -74,11 +74,24 @@ export const AiReadPanel: React.FC<{
 
 export const SuggestedAreasPanel: React.FC<{
   suggestions: Array<{ name: string; reason: string }>; unknowns: string[]; areaNames: string[];
+  contradictions?: string[];
   onToggle: (name: string, on: boolean) => void;
-}> = ({ suggestions, unknowns, areaNames, onToggle }) => {
+}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [] }) => {
   const id = useId();
-  if (suggestions.length === 0 && unknowns.length === 0) return null;
+  if (suggestions.length === 0 && unknowns.length === 0 && contradictions.length === 0) return null;
   return (
+    <>
+    {contradictions.length > 0 && (
+      <section aria-labelledby={`${id}-c`} data-testid="consult-ai-contradictions"
+        className="mt-4 rounded-2xl border border-warning bg-surface p-4 text-sm">
+        <h3 id={`${id}-c`} className="font-semibold text-ink-900">確かめてほしいこと(希望が食い違っています)</h3>
+        <p className="text-xs text-ink-700">
+          AI はどちらかに決めていません。上の行を選び直すか、「追加で伝える・変える」でどちらかを伝えてください。
+        </p>
+        <ul className="mt-1 list-disc pl-5 text-sm text-ink-900">{contradictions.map((c) => <li key={c}>{c}</li>)}</ul>
+      </section>
+    )}
+    {(suggestions.length > 0 || unknowns.length > 0) && (
     <section aria-labelledby={`${id}-h`} data-testid="consult-ai-suggestions"
       className="mt-4 rounded-2xl border border-cloud-200 bg-surface p-4 text-sm">
       <h3 id={`${id}-h`} className="font-semibold text-ink-900">AI の方面の案(未確認)</h3>
@@ -108,98 +121,54 @@ export const SuggestedAreasPanel: React.FC<{
         </div>
       )}
     </section>
+    )}
+    </>
   );
 };
 
-// ------------------------------------------------------------------ 方面の詳細: Google で調べる
+// ------------------------------------------------------------------ 方面の詳細: 出発地からの経路(Google)
+// [Gate SearchUAT] 場所の検索は「候補を探す」(PlaceSearchPanel)へまとめた。ここは目的の違う経路だけ
 
 const MODE_LABEL: Record<ConsultRouteMode, string> = { driving: '車', walking: '徒歩', bicycling: '自転車', transit: '公共交通' };
 type Point = { latitude: number; longitude: number };
 
 export const ConsultLookupPanel: React.FC<{
   status: ConsultAiStatus | null; ensureSession: () => Promise<string>; areaName: string; originLabel: string;
-  origin: Point | null; area: Point | null; urls: string[]; onUrls: (urls: string[]) => void;
-  onUsage: (u: ConsultUsage) => void; initialMode: ConsultRouteMode;
-}> = ({ status, ensureSession, areaName, originLabel, origin, area, urls, onUrls, onUsage, initialMode }) => {
+  origin: Point | null; area: Point | null; onUsage: (u: ConsultUsage) => void; initialMode: ConsultRouteMode;
+}> = ({ status, ensureSession, areaName, originLabel, origin, area, onUsage, initialMode }) => {
   const id = useId();
-  const [query, setQuery] = useState(`${areaName} 観光`);
   const [mode, setMode] = useState<ConsultRouteMode>(initialMode);
-  const [busy, setBusy] = useState<'places' | 'route' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [places, setPlaces] = useState<{ results: ConsultPlace[]; at: string; attribution: string } | null>(null);
   const [route, setRoute] = useState<ConsultRouteResult | null>(null);
-  const placesBlocker = operationBlocker(status, 'places.search');
   const routeBlocker = operationBlocker(status, 'routes.element') ?? (!origin ? '出発地の位置が照会できていません'
     : !area ? 'この方面の位置が照会できていません' : null);
 
-  const run = async (kind: 'places' | 'route', fn: (sid: string, key: string) => Promise<void>) => {
+  const run = async (fn: (sid: string, key: string) => Promise<void>) => {
     if (busy) return;
-    setBusy(kind);
+    setBusy(true);
     setError(null);
     try {
       await fn(await ensureSession(), newIdempotencyKey());
     } catch (e) {
-      setError(`${errorDetailMessage(e, '送れませんでした')}。手で候補を足して続けられます`);
+      setError(`${errorDetailMessage(e, '送れませんでした')}。経路を調べずに続けられます`);
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
   return (
     <section aria-labelledby={`${id}-h`} data-testid="consult-lookup"
       className="mt-4 rounded-2xl border border-cloud-200 bg-surface p-4 text-sm text-ink-900">
-      <h3 id={`${id}-h`} className="font-semibold">Google で調べる(押した時だけ・この相談の利用枠から)</h3>
-      <p className="text-xs text-ink-700">結果は保存しません。場所は「参考の出典に足す」で下書きの候補(未確認)にできます。</p>
+      <h3 id={`${id}-h`} className="font-semibold">出発地からの経路(Google・有料・押した時だけ・この相談の利用枠から)</h3>
+      <p className="text-xs text-ink-700">場所の検索は上の「候補を探す」で行います。経路の結果は保存しません。</p>
       <StubBanner status={status} />
       {error && <p role="alert" className="mt-2 text-sm text-danger" data-testid="consult-lookup-error">{error}</p>}
-
-      <form className="mt-3" aria-label="Google で場所を探す" onSubmit={(e) => {
-        e.preventDefault();
-        void run('places', async (sid, key) => {
-          const r = await consultPlaces(sid, query.trim(), area, key);
-          setPlaces({ results: r.results, at: r.retrieved_at, attribution: r.attribution });
-          onUsage(r.usage);
-        });
-      }}>
-        <label htmlFor={`${id}-q`} className="block text-xs font-semibold">Google で場所を探す({areaName} の近く)</label>
-        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-          <input id={`${id}-q`} value={query} maxLength={120} onChange={(e) => setQuery(e.target.value)}
-            className="tc-focus-ring min-h-11 w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3" />
-          <Button type="submit" loading={busy === 'places'} disabled={busy !== null || !query.trim() || Boolean(placesBlocker)}
-            data-testid="consult-places-search">
-            {busy === 'places' ? '探しています…' : '探す'}
-          </Button>
-        </div>
-        {placesBlocker && <p className="mt-1 text-xs text-ink-700">使えません: {placesBlocker}</p>}
-        {places && (
-          <div className="mt-2" data-testid="consult-places-result">
-            <ul className="space-y-1">
-              {places.results.map((p) => {
-                const added = Boolean(p.maps_uri && urls.includes(p.maps_uri));
-                return (
-                  <li key={p.place_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cloud-200 p-2">
-                    <span className="min-w-0"><b>{p.name}</b>{p.address ? <span className="block text-xs text-ink-700">{p.address}</span> : null}</span>
-                    {p.maps_uri && (
-                      <button type="button" disabled={added || urls.length >= 10} aria-pressed={added}
-                        onClick={() => onUrls([...urls, p.maps_uri as string])}
-                        className="tc-focus-ring min-h-11 rounded-lg border border-cloud-200 px-3 text-xs">
-                        {added ? '出典に足しました' : '参考の出典に足す'}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-              {places.results.length === 0 && <li>見つかりませんでした</li>}
-            </ul>
-            <p className="mt-1 text-xs text-ink-700">{`提供: ${places.attribution} · ${retrievedLabel(places.at)} · 営業時間・料金は未確認`}</p>
-          </div>
-        )}
-      </form>
 
       <form className="mt-4" aria-label="Google で経路を調べる" onSubmit={(e) => {
         e.preventDefault();
         if (!origin || !area) return;
-        void run('route', async (sid, key) => {
+        void run(async (sid, key) => {
           const r = await consultRoute(sid, origin, area, mode, key);
           setRoute(r);
           onUsage(r.usage);
@@ -213,9 +182,9 @@ export const ConsultLookupPanel: React.FC<{
               {(Object.keys(MODE_LABEL) as ConsultRouteMode[]).map((m) => <option key={m} value={m}>{MODE_LABEL[m]}</option>)}
             </select>
           </label>
-          <Button type="submit" loading={busy === 'route'} disabled={busy !== null || Boolean(routeBlocker)}
+          <Button type="submit" loading={busy} disabled={busy || Boolean(routeBlocker)}
             data-testid="consult-route">
-            {busy === 'route' ? '調べています…' : '経路を調べる'}
+            {busy ? '調べています…' : '経路を調べる'}
           </Button>
         </div>
         {routeBlocker && <p className="mt-1 text-xs text-ink-700">使えません: {routeBlocker}</p>}

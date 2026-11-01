@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { registerMember } from './support/api';
-import { resetThreatScores } from './support/admin';
+import { resetAuthLimits, resetThreatScores } from './support/admin';
 
 /**
  * [Gate S7] SEC-07 計算の確認の browser E2E。
@@ -20,6 +20,41 @@ import { resetThreatScores } from './support/admin';
  * この試験が確かめるのは「点数 30 の接続元が、画面の自動の計算で通る」こと。
  */
 
+/**
+ * [Gate AuthE2E] 認証の応答の列を記録する(状態・待った時間・失敗の理由の文)。以前は失敗すると
+ * 「waitForURL が 100 秒で時間切れ」だけが残り、登録が 429(回数制限)・428 の解き直しの上限・500 のどれで止まったか
+ * 分からなかった(PR #45 の CI #390)。
+ */
+interface AuthLog { statuses: number[]; notes: string[] }
+
+function recordAuth(page: Page, path: string): AuthLog {
+  const log: AuthLog = { statuses: [], notes: [] };
+  const started = Date.now();
+  page.on('response', (r) => {
+    if (!new URL(r.url()).pathname.endsWith(path)) return;
+    log.statuses.push(r.status());
+    const at = `${((Date.now() - started) / 1000).toFixed(1)}s`;
+    const difficulty = r.headers()['x-tc-challenge-difficulty'];
+    if (r.status() === 200) {
+      log.notes.push(`${at} 200`);
+      return;
+    }
+    void r.text().then((t) => log.notes.push(`${at} ${r.status()}${difficulty ? ` d=${difficulty}` : ''} ${t.slice(0, 160)}`))
+      .catch(() => log.notes.push(`${at} ${r.status()}`));
+  });
+  return log;
+}
+
+/** 認証の最後の応答(428 の解き直しが終わった後)を待ち、200 でなければ応答の列を示して止める(100 秒を待たない) */
+async function expectAuthDone(page: Page, log: AuthLog, label: string): Promise<void> {
+  await expect.poll(() => {
+    const last = log.statuses[log.statuses.length - 1];
+    return last !== undefined && last !== 428 ? 'done' : log.statuses.length > 3 ? 'done' : 'waiting';
+  }, { message: `${label}: 応答 ${JSON.stringify(log.notes)}`, timeout: 100_000 }).toBe('done');
+  expect(log.statuses[log.statuses.length - 1], `${label}: 応答 ${JSON.stringify(log.notes)}`).toBe(200);
+  await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+}
+
 function expectSolvedSequence(statuses: number[]) {
   expect(statuses.length).toBeGreaterThanOrEqual(2);
   expect(statuses[0]).toBe(428);
@@ -32,6 +67,9 @@ const PASSWORD = 'Gate-E1-TestPass-1';
 test('怪しい接続元でも、画面のログイン・登録は自動の計算の確認を経て通る', async ({ page }) => {
   test.setTimeout(240_000);
   resetThreatScores();
+  // [Gate AuthE2E] 前の試験の登録・ログインの回数(1分5回・接続元ごと)を消す。CI は全ての試験が同じ接続元から
+  // 登録するため、直前の試験の登録とこの試験の登録が同じ1分に重なると 429 になり得た(試験だけの初期化。本番の制限は変えない)
+  resetAuthLimits();
   const member = await registerMember(page, 'chal');
 
   // 1. 偽のトークンで10回(無効なトークン 3点 × 10 = 30点 → 確認が要る)
@@ -44,18 +82,16 @@ test('怪しい接続元でも、画面のログイン・登録は自動の計�
   await page.context().clearCookies();
   await page.evaluate(() => window.localStorage.clear());
   await page.goto('/login');
-  const loginStatuses: number[] = [];
+  const login = recordAuth(page, '/auth/login');
+  const loginStatuses = login.statuses;
   const solvedHeaders: (string | undefined)[] = [];
   page.on('response', (r) => {
-    if (new URL(r.url()).pathname.endsWith('/auth/login')) {
-      loginStatuses.push(r.status());
-      solvedHeaders.push(r.request().headers()['x-tc-challenge-solution']);
-    }
+    if (new URL(r.url()).pathname.endsWith('/auth/login')) solvedHeaders.push(r.request().headers()['x-tc-challenge-solution']);
   });
   await page.locator('#email').fill(member.email);
   await page.locator('#password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 100_000 });
+  await expectAuthDone(page, login, 'ログイン');
   expectSolvedSequence(loginStatuses);
   expect(solvedHeaders[0]).toBeUndefined();
   expect(solvedHeaders[solvedHeaders.length - 1]).toMatch(/^\d+$/);
@@ -66,10 +102,9 @@ test('怪しい接続元でも、画面のログイン・登録は自動の計�
   await page.context().clearCookies();
   await page.evaluate(() => window.localStorage.clear());
   const suffix = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
-  const registerStatuses: number[] = [];
-  page.on('response', (r) => {
-    if (new URL(r.url()).pathname.endsWith('/auth/register')) registerStatuses.push(r.status());
-  });
+  resetAuthLimits(); // この試験の最初の登録(registerMember)の回数も消して、登録の回数制限と切り離す
+  const register = recordAuth(page, '/auth/register');
+  const registerStatuses = register.statuses;
   let bumped = false;
   await page.route('**/auth/register', async (route) => {
     if (!bumped && route.request().headers()['x-tc-challenge-solution']) {
@@ -86,7 +121,7 @@ test('怪しい接続元でも、画面のログイン・登録は自動の計�
   await page.locator('#password').fill(PASSWORD);
   await page.locator('#confirmPassword').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create Account' }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 100_000 });
+  await expectAuthDone(page, register, '会員登録');
   expectSolvedSequence(registerStatuses);
   expect(bumped).toBe(true);
   expect(registerStatuses).toEqual([428, 428, 200]);

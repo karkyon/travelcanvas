@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 const api = vi.hoisted(() => ({
   getOpsOverview: vi.fn(), getOpsProviders: vi.fn(), getOpsLedger: vi.fn(), getOpsCloud: vi.fn(),
   runOpsFamilyFake: vi.fn(), setOpsProviderSuspended: vi.fn(), getOpsSecrets: vi.fn(), registerOpsSecret: vi.fn(), importOpsSecretFromEnv: vi.fn(), verifyOpsSecret: vi.fn(), activateOpsSecret: vi.fn(), discardOpsSecret: vi.fn(),
-  disableOpsSecret: vi.fn(), getOpsTiers: vi.fn(), switchOpsTestTier: vi.fn(),
+  disableOpsSecret: vi.fn(), getOpsTiers: vi.fn(), switchOpsTestTier: vi.fn(), getOpsUatReadiness: vi.fn(),
 }));
 vi.mock('@/services/api/opsConsole', () => api);
 
@@ -36,6 +36,18 @@ const providers = {
   ],
 };
 
+const uat = (ready: boolean) => ({
+  as_of: 'x', account: 'admin@example.test', class: ready ? 'journey' : 'free', ready, model: 'gpt-5-nano',
+  consult_path: '/trip-consult', note: 'この表示は送信しません',
+  checks: [
+    { key: 'class', label: '会員クラス', value: ready ? 'Journey' : 'Free', ok: ready, need: 'Journey・Explorer',
+      where: '運用コンソール › 会員クラス › 試験のためにクラスを切り替える(開発環境・24時間)' },
+    { key: 'consent', label: 'AI の利用の同意', value: ready ? '同意済み' : '未同意', ok: ready, need: '同意',
+      where: '旅行相談の画面 › 「AI で読み取る」の同意のチェック' },
+    { key: 'ai.generate', label: 'AI の読み取り(OpenAI)', value: '使える', ok: true, need: '鍵', where: null },
+  ],
+});
+
 const renderPage = () => render(<MemoryRouter><AdminOpsPage /></MemoryRouter>);
 
 describe('AdminOpsPage (Gate OpsCMS)', () => {
@@ -43,6 +55,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     Object.values(api).forEach((f) => f.mockReset());
     api.getOpsOverview.mockResolvedValue(overview);
     api.getOpsProviders.mockResolvedValue(providers);
+    api.getOpsUatReadiness.mockResolvedValue(uat(false));
   });
 
   it('概要: Fake の額と実の提供元の見込みを別の欄に出し、Cloud の請求は取得していないと書く', async () => {
@@ -63,7 +76,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: 'API・契約と接続' }));
     const row = await screen.findByTestId('ops-provider-openai');
-    expect(within(row).getByText('登録済み・提供元の認証は未確認(値は表示しない)')).toBeInTheDocument();
+    expect(within(row).getByText('登録済み・接続は未確認(送らない)')).toBeInTheDocument();
     expect(within(row).getByText('未実装(送らない)')).toBeInTheDocument();
     expect(within(row).getByText('契約・課金は未確認')).toBeInTheDocument();
     expect(within(row).getByText('無効(送らない)')).toBeInTheDocument();
@@ -86,14 +99,14 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
         plan_total_jpy: '0.4554', state: 'ok' }],
     });
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: 'テスト実行' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'テスト実行(Fake)' }));
     expect(screen.getByText('大阪府枚方市 · 大人4人')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Fake で原価の上限を試す' }));
     const summary = await screen.findByTestId('ops-run-summary');
     expect(within(summary).getByText('¥49.55 / ¥50')).toBeInTheDocument();
     expect(within(summary).getByText('7回目から')).toBeInTheDocument();
     expect(within(summary).getByText('13回目 · 回数の上限')).toBeInTheDocument();
-    expect(within(summary).getByText('0回')).toBeInTheDocument();
+    expect(within(summary).getByText('0回(実 AI の確認ではない)')).toBeInTheDocument();
     expect(within(summary).getByText('二重に数えない')).toBeInTheDocument();
     expect(api.runOpsFamilyFake).toHaveBeenCalledWith('家族旅行の Fake の試験', 'explorer');
   });
@@ -126,7 +139,8 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(within(a).getByText('無効化済み(送らない)')).toBeInTheDocument();
     expect(screen.queryByText('鍵あり')).toBeNull();
     expect(within(screen.getByTestId('ops-secret-google_maps_server_key')).getByText('サンプル値(使えない)')).toBeInTheDocument();
-    expect(screen.getByTestId('ops-secret-legacy-google_maps_server_key')).toHaveTextContent('サンプル値');
+    expect(screen.getByTestId('ops-secret-legacy-google_maps_server_key')).toHaveTextContent('まだ登録されていません');
+    expect(screen.getByTestId('ops-secret-legacy-detail-google_maps_server_key')).toHaveTextContent('サンプル値');
     expect(within(screen.getByTestId('ops-secret-google_maps_server_key'))
       .queryByRole('button', { name: '旧 .env から取り込む' })).toBeNull();
     fireEvent.click(within(a).getByRole('button', { name: '旧 .env から取り込む' }));
@@ -154,7 +168,9 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
     expect(await screen.findByTestId('ops-verify-budget')).toHaveTextContent('6.1000円 / 50.0000円');
-    expect(screen.getByTestId('ops-secret-verify-openai_api_key')).toHaveTextContent('確認済み(期限内)');
+    expect(within(screen.getByTestId('ops-secret-openai_api_key')).getByTestId('ops-secret-status'))
+      .toHaveTextContent('登録済み・接続確認済み');
+    expect(screen.getByTestId('ops-secret-detail-openai_api_key')).toHaveTextContent(/確認期限：2026年11月4日 \d+時00分/);
     const row = screen.getByTestId('ops-secret-openai_api_key');
     expect(screen.getByTestId('ops-secret-candidate-openai_api_key')).toHaveTextContent('候補: 版 2 · 末尾 BBBB');
     expect(within(row).queryByRole('button', { name: '候補を有効にする' })).toBeNull();
@@ -195,7 +211,7 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
     const row = await screen.findByTestId('ops-secret-openai_api_key');
-    expect(within(row).getByText('未設定')).toBeInTheDocument();
+    expect(within(row).getByText('未登録(必要)')).toBeInTheDocument();
     expect(screen.getByTestId('ops-secret-use-openai_api_key')).toHaveTextContent('まだこの鍵を使いません');
     expect(screen.getByTestId('ops-secret-storage')).toHaveTextContent('GCP Secret Manager には登録しません');
     expect(screen.getByText('アプリの DB(provider_secrets 表・ENCRYPTION_KEY で暗号化)')).toBeInTheDocument();
@@ -260,12 +276,91 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
       first_denial: { n: 1, reason: 'tier_feature_not_included' }, settled_steps: 0, denied_steps: 1,
       idempotency_replay: {}, provider: 'fake', external_calls: 0 } });
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: 'テスト実行' }));
-    fireEvent.change(await screen.findByLabelText('試験の利用者のクラス'), { target: { value: 'trip' } });
+    fireEvent.click(await screen.findByRole('tab', { name: 'テスト実行(Fake)' }));
+    expect(screen.getByTestId('ops-run-fake-note')).toHaveTextContent('実 AI の接続の確認にはなりません');
+    fireEvent.change(await screen.findByLabelText(/試験用の利用者のクラス/), { target: { value: 'trip' } });
     fireEvent.click(screen.getByRole('button', { name: 'Fake で原価の上限を試す' }));
     const summary = await screen.findByTestId('ops-run-summary');
     expect(summary).toHaveTextContent('Trip(行先を見つける)');
     expect(summary).toHaveTextContent('1回目 · クラスに含まない');
     expect(api.runOpsFamilyFake).toHaveBeenCalledWith('家族旅行の Fake の試験', 'trip');
+  });
+
+  it('[Gate AdminUAT] DB 登録済み + 旧 .env にサンプル値 + 接続確認済み: 矛盾も再登録の案内も出さない', async () => {
+    api.getOpsSecrets.mockResolvedValue({ as_of: 'x', note: 'n', backend: 'db_encrypted', backend_note: '暫定',
+      slots: [{ slot: 'openai_api_key', label: 'OpenAI の API キー', providers: ['openai'], env: 'OPENAI_API_KEY', hint: 'sk-',
+        status: 'configured', source: 'cms', version: 3, last4: 'AAAA', registered_at: '2026-11-01T05:00:00+00:00', history: [],
+        in_use: true, required: true, suspended_providers: [], verify_supported: true, in_use_note: '使っている提供元: openai',
+        env_legacy: { present: true, placeholder: true, importable: false },
+        verification: { state: 'accepted', provider_auth: 'accepted', code: 'accepted', verified_at: '2026-11-01T06:00:00+00:00',
+          expires_at: '2026-11-04T06:00:00+00:00', capabilities: {} } },
+      { slot: 'google_maps_browser_key', label: 'Google Maps のブラウザ用キー', providers: ['google_maps_js'],
+        env: 'GOOGLE_MAPS_API_KEY', hint: 'OSM', status: 'missing', source: null, version: null, last4: null, registered_at: null,
+        history: [], in_use: false, required: false, suspended_providers: [],
+        in_use_note: '現在の構成では使用しません。設定不要', env_legacy: { present: true, placeholder: true, importable: false } }],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    const row = await screen.findByTestId('ops-secret-openai_api_key');
+    const status = within(row).getAllByTestId('ops-secret-status');
+    expect(status).toHaveLength(1);
+    expect(status[0]).toHaveTextContent('登録済み・接続確認済み');
+    expect(status[0]?.className).toContain('tc-pill--good');
+    expect(row).toHaveTextContent('CMSで登録したキーをDBから取得します。確認期限：');
+    expect(row.textContent).not.toMatch(/未確認|本物の鍵を登録|鍵を登録してください/);
+    expect(screen.queryByTestId('ops-secret-legacy-openai_api_key')).toBeNull();
+    const legacy = screen.getByTestId('ops-secret-legacy-detail-openai_api_key');
+    expect(legacy.tagName).toBe('DETAILS');
+    expect(legacy).toHaveTextContent('旧設定の詳細');
+    expect(legacy).toHaveTextContent('旧.envにサンプル値が残っていますが、使用していません。現在のDB登録キーの利用には影響しません。');
+    expect(screen.getByTestId('ops-secret-restrict-openai_api_key')).toHaveTextContent('提供元の停止: なし');
+    expect(within(row).getByRole('button', { name: '確認し直す(期限内は不要)' })).toBeInTheDocument();
+    // 使わない鍵は「設定不要」(警告の色にしない・登録を促さない)
+    const browser = screen.getByTestId('ops-secret-google_maps_browser_key');
+    const pill = within(browser).getByTestId('ops-secret-status');
+    expect(pill).toHaveTextContent('現在の構成では使用しません。設定不要');
+    expect(pill.className).not.toMatch(/warn|bad/);
+    expect(screen.queryByTestId('ops-secret-legacy-google_maps_browser_key')).toBeNull();
+  });
+
+  it('[Gate AdminUAT] 提供元を止めている時は、鍵の確認とは別に制限として出す', async () => {
+    api.getOpsSecrets.mockResolvedValue({ as_of: 'x', note: 'n', backend: 'db_encrypted', backend_note: '暫定',
+      slots: [{ slot: 'openai_api_key', label: 'OpenAI', providers: ['openai'], env: 'OPENAI_API_KEY', hint: '',
+        status: 'configured', source: 'cms', version: 1, last4: 'AAAA', registered_at: null, history: [], required: true,
+        suspended_providers: ['openai'], verification: { state: 'accepted', provider_auth: 'accepted', code: null,
+          verified_at: null, expires_at: '2026-11-04T06:00:00+00:00', capabilities: {} } }],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: '秘密情報・権限' }));
+    expect(await screen.findByTestId('ops-secret-restrict-openai_api_key')).toHaveTextContent('提供元を止めています: openai');
+    expect(within(screen.getByTestId('ops-secret-openai_api_key')).getByTestId('ops-secret-status'))
+      .toHaveTextContent('登録済み・接続確認済み');
+  });
+
+  it('[Gate AdminUAT] 提供元の表: 使わない鍵は「設定不要」、確認済みは「接続確認済み」', async () => {
+    api.getOpsProviders.mockResolvedValue({ ...providers, providers: [
+      { ...providers.providers[0], adapter: 'implemented', secret_verification: 'accepted', secret_required: true, live_calls: 'ready' },
+      { ...providers.providers[0], name: 'google_maps_js', label: 'Google Maps JavaScript API', secret: 'missing',
+        secret_required: false, secret_verification: null },
+    ] });
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: 'API・契約と接続' }));
+    expect(await screen.findByTestId('ops-provider-secret-openai')).toHaveTextContent('登録済み・接続確認済み');
+    const js = screen.getByTestId('ops-provider-secret-google_maps_js');
+    expect(js).toHaveTextContent('現在の構成では使用しません。設定不要');
+    expect(js.className).not.toMatch(/warn|bad/);
+  });
+
+  it('[Gate AdminUAT] 概要: このアカウントの UAT の準備を、今の値と変える場所つきで出す', async () => {
+    renderPage();
+    const panel = await screen.findByTestId('ops-uat-readiness');
+    expect(within(panel).getByTestId('ops-uat-ready')).toHaveTextContent('足りない項目があります');
+    expect(within(panel).getByTestId('ops-uat-class')).toHaveTextContent('Free');
+    expect(within(panel).getByTestId('ops-uat-class')).toHaveTextContent('運用コンソール › 会員クラス');
+    expect(within(panel).getByTestId('ops-uat-consent')).toHaveTextContent('未同意');
+    expect(within(panel).getByRole('link', { name: '旅行相談を開く' })).toHaveAttribute('href', '/trip-consult');
+    api.getOpsUatReadiness.mockResolvedValue(uat(true));
+    fireEvent.click(within(panel).getByRole('button', { name: '読み直す' }));
+    expect(await within(panel).findByText('実 AI で相談できます')).toBeInTheDocument();
   });
 });

@@ -157,6 +157,28 @@ services:
       retries: 10
       start_period: 300s
 
+  # [Gate AdminUAT] 開発の UAT 用の https の入口(任意)。音声入力(Web Speech)は https でしか使えないため。
+  # `bash scripts/ops/uat_https.sh up` で起動する(.env に TC_UAT_SITES・TC_UAT_DEFAULT_SNI・TC_UAT_HTTPS_PORT を足し、
+  # 証明書の確認まで行う)。自己署名の内部 CA。本番・staging では使わない。既定では起動しない
+  uat-https:
+    image: caddy:2.8.4-alpine
+    profiles: ["uat-https"]
+    restart: unless-stopped
+    environment:
+      TC_UAT_SITES: ${TC_UAT_SITES:-https://localhost:4443}
+      TC_UAT_DEFAULT_SNI: ${TC_UAT_DEFAULT_SNI:-localhost}
+    volumes:
+      - ./scripts/ops/uat-https/Caddyfile:/etc/caddy/Caddyfile:ro
+      - travelcanvas_uat_caddy:/data
+    ports:
+      - "4443:4443"
+      - "4480:4480"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - travelcanvas_net
+
 volumes:
   travelcanvas_clamav:
     name: travelcanvas_clamav
@@ -166,6 +188,8 @@ volumes:
     name: travelcanvas_redisdata
   travelcanvas_uploads:
     name: travelcanvas_uploads
+  travelcanvas_uat_caddy:
+    name: travelcanvas_uat_caddy
 
 networks:
   travelcanvas_net:

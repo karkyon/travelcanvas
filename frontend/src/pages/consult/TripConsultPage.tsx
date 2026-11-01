@@ -25,6 +25,7 @@ import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultA
 import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
+import { keepIdempotencyKey } from './consultAiModel';
 import {
   BRIEF_PREFS, EXAMPLE_TEXT, INITIAL_STATE, PREFERENCE_LABEL, REVIEW_KEYS, SOURCE_LABEL, STEPS, STRENGTH_LABEL,
   BUDGET_KIND_LABEL, BUDGET_PERIOD_LABEL, BUDGET_TARGET_LABEL, mergeReview,
@@ -578,7 +579,7 @@ const TripConsultPage: React.FC = () => {
 
   /** 確認の画面へ新しい読み取りを入れる。前の確認があれば重ねて(確かめた行は残す)、元に戻せるよう履歴に積む */
   const applyExtraction = (ex: IntentExtraction & { suggested_areas?: Array<{ name: string; reason: string }>;
-    unknowns?: string[] }) => {
+    unknowns?: string[]; contradictions?: string[] }) => {
     setState((s) => {
       const fresh = initReview(ex);
       const review = s.review ? mergeReview(s.review, fresh) : fresh;
@@ -587,7 +588,7 @@ const TripConsultPage: React.FC = () => {
       const history = s.review ? [...(s.history ?? []), { review: s.review, areaNames: s.areaNames }].slice(-10) : [];
       return { ...s, extraction: ex, review, areaNames, areas: null, step: 'review', history,
         suggestedAreas: (ex.suggested_areas ?? []).map(({ name, reason }) => ({ name, reason })),
-        unknowns: ex.unknowns ?? [] };
+        unknowns: ex.unknowns ?? [], contradictions: ex.contradictions ?? [] };
     });
     requestAnimationFrame?.(() => headingRef.current?.focus());
   };
@@ -652,7 +653,8 @@ const TripConsultPage: React.FC = () => {
       applyExtraction(ex);
     } catch (e) {
       const code = consultErrorCode(e);
-      if (code !== 'request_in_progress') pendingKey.current = null; // 処理中の時だけ、次も同じキーで確かめる
+      // [Gate SearchUAT F03] 送ったかもしれない失敗(通信・時間切れ・5xx・処理中)は、次も同じキーで確かめる(二度課金しない)
+      if (!keepIdempotencyKey(e)) pendingKey.current = null;
       if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
         sessionRef.current = null;
         setState((s) => ({ ...s, consultSessionId: null }));
@@ -790,7 +792,8 @@ const TripConsultPage: React.FC = () => {
             }} />} />
       )}
       {step === 'review' && state.review && (
-        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []} areaNames={state.areaNames}
+        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
+          contradictions={state.contradictions ?? []} areaNames={state.areaNames}
           onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)
             : s.areaNames.filter((n) => n !== name) }))} />
       )}
@@ -813,8 +816,14 @@ const TripConsultPage: React.FC = () => {
             if (on) picked[r.id] = r; else delete picked[r.id];
             return { ...s, picked };
           })}
+          onPickGoogle={(g, on) => setState((s) => {
+            const pickedGoogle = { ...(s.pickedGoogle ?? {}) };
+            if (on) pickedGoogle[g.place_id] = g; else delete pickedGoogle[g.place_id];
+            return { ...s, pickedGoogle };
+          })}
           onUrls={(urls) => setState((s) => ({ ...s, urls }))}
-          onCreate={() => void createDraft()} />
+          onCreate={() => void createDraft()}
+          google={{ status: aiStatus, usage: consultUsage, ensureSession, onUsage: setConsultUsage }} />
       )}
       {step === 'detail' && state.review && state.selectedArea && (() => {
         const o = state.areas?.origin;
@@ -823,8 +832,7 @@ const TripConsultPage: React.FC = () => {
           g && g.status === 'ok' && g.latitude !== null && g.longitude !== null ? { latitude: g.latitude, longitude: g.longitude } : null;
         return (
           <ConsultLookupPanel key={state.selectedArea} status={aiStatus} ensureSession={ensureSession} areaName={state.selectedArea}
-            originLabel={state.review.values.origin} origin={pt(o)} area={pt(a?.geocode)} urls={state.urls}
-            onUrls={(urls) => setState((s) => ({ ...s, urls }))} onUsage={setConsultUsage}
+            originLabel={state.review.values.origin} origin={pt(o)} area={pt(a?.geocode)} onUsage={setConsultUsage}
             initialMode={state.review.values.transport === 'public' ? 'transit' : 'driving'} />
         );
       })()}

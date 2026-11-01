@@ -120,6 +120,8 @@ export interface ConsultState {
   selectedArea: string | null;
   savedAreas: string[];
   picked: Record<string, NearbyResult>;
+  /** [Gate SearchUAT] 選んだ Google の場所(この画面の表示だけ。下書きへは place ID と URL だけを渡す) */
+  pickedGoogle?: Record<string, GooglePick>;
   urls: string[];
   /** [Gate ConsultAI] AI・Google を使う相談の ID(サーバーが発行。下書きを作ると閉じる) */
   consultSessionId?: string | null;
@@ -127,6 +129,8 @@ export interface ConsultState {
   suggestedAreas?: Array<{ name: string; reason: string }>;
   /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
   unknowns?: string[];
+  /** [Gate AdminUAT U05] AI が見つけた、希望どうしの食い違い(勝手に決めず、利用者に確かめる) */
+  contradictions?: string[];
   /** [Gate ConsultAI] 入力の仕方(AI に自由に相談 / 項目ごとに入力)。同じ下書きを使う */
   mode?: 'free' | 'fields';
   /** [Gate ConsultAI] 確認の画面の直前の状態(「直前の変更を元に戻す」用。最大10) */
@@ -336,6 +340,8 @@ export function draftInputOf(state: ConsultState): DraftInput | null {
     },
     intent: intentOf(state.review),
     search_candidate_ids: Object.keys(state.picked).slice(0, 30),
+    google_places: Object.values(state.pickedGoogle ?? {}).slice(0, 30)
+      .map((g) => ({ place_id: g.place_id, maps_uri: g.maps_uri })),
     source_urls: state.urls.slice(0, 10),
     ...(state.consultSessionId ? { consult_session_id: state.consultSessionId } : {}),
   };
@@ -436,4 +442,29 @@ export function removeSlot(slots: DraftSlot[], candidateId: string): DraftSlot[]
 
 export function dayCounts(slots: DraftSlot[], totalDays: number): number[] {
   return Array.from({ length: totalDays }, (_, i) => slots.filter((s) => s.day === i + 1).length);
+}
+
+// ----------------------------------------------------------------- [Gate SearchUAT] 場所の検索(入口は1つ)
+
+/** 選んだ Google の場所(表示用。名前・住所は Google の結果をこの画面で見せるだけで、下書きには保存しない) */
+export interface GooglePick {
+  place_id: string; name: string; address: string | null; maps_uri: string | null; retrieved_at: string;
+}
+
+export type SearchSource = 'osm' | 'google';
+
+/** 提供元の失敗の分類 → 利用者への言葉(「見つからない」と言わない。何が起きたかと、次にできること) */
+export const SEARCH_ERROR_LABEL: Record<string, string> = {
+  blocked: '検索の提供元(OpenStreetMap)が要求を受け付けませんでした。アプリ側の設定の問題のため、運用者に連絡してください',
+  rate_limited: '検索の提供元(OpenStreetMap)の回数の制限に達しました。1分ほど待ってから、もう一度探してください',
+  timeout: '検索の提供元(OpenStreetMap)が時間内に答えませんでした(混雑)。半径を小さくするか、もう一度探してください',
+  provider_timeout: '検索の提供元(OpenStreetMap)の処理が時間切れになりました(混雑)。半径を小さくするか、もう一度探してください',
+  server_error: '検索の提供元(OpenStreetMap)で障害が起きています。時間をおいてもう一度探してください',
+  network: '検索の提供元(OpenStreetMap)に接続できませんでした(通信)。もう一度探してください',
+  unreadable: '検索の提供元(OpenStreetMap)の応答を読めませんでした。もう一度探してください',
+};
+
+export function searchErrorMessage(code: string | null | undefined): string {
+  return `${SEARCH_ERROR_LABEL[code ?? ''] ?? '検索の提供元(OpenStreetMap)が答えませんでした。もう一度探してください'}`
+    + '(該当なしではありません。入力と選んだ候補はそのままです)';
 }

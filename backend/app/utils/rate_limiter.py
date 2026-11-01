@@ -190,6 +190,22 @@ def _redis_count(key: str, window_seconds: int, now: float) -> int:
     return int(client.zcount(k, int((now - window_seconds) * 1000) + 1, "+inf"))
 
 
+def reset_all_for_tests() -> int:
+    """[Gate AuthE2E] 試験の環境だけ: 全ての回数制限の記録を消す(呼び手が本番でないことを確かめる)。消したキーの数。"""
+    with _memory_lock:
+        removed = len(_rate_limit_storage)
+        _rate_limit_storage.clear()
+    if _redis_available():
+        try:
+            client = _client()
+            for k in client.scan_iter(match=f"{namespace()}:rl:*", count=500):
+                client.delete(k)
+                removed += 1
+        except Exception as error:  # noqa: BLE001
+            _mark_down(error)
+    return removed
+
+
 # ---------------------------------------------------------------- 監視
 
 def _count_denied(key: str) -> None:

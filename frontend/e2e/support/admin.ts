@@ -38,6 +38,14 @@ export function resetThreatScores(): void {
 }
 
 /**
+ * [Gate AuthE2E] 試験の環境だけ: 登録・ログインの回数制限(1分5回・接続元ごと)の記録を消す。
+ * CI は全ての試験が同じ接続元から登録するため、試験の順と速さで前の試験の回数が残る。本番では使えない(backend が断る)
+ */
+export function resetAuthLimits(): void {
+  ops(['e2e-reset-rate-limits', '--yes']);
+}
+
+/**
  * [Gate ConsultAI] CI の E2E だけ: 模擬の提供元(PROVIDER_HTTP_STUB)で、模擬の鍵を登録・確認し、
  * その会員に会員のクラスと AI の同意を付ける(実の API へは送らない)
  */

@@ -22,6 +22,8 @@
                                             [Gate ConsultAI] CI の E2E だけ(PROVIDER_HTTP_STUB が真・本番でない時)。
                                             模擬の鍵を登録して模擬の提供元で確認し、その人に会員のクラスと AI の同意を付ける
     e2e-stub-reset --yes                    [Gate ConsultAI] 上の模擬の鍵を無効にする(後の試験へ残さない)
+    e2e-reset-rate-limits --yes             [Gate AuthE2E] 試験の環境だけ(本番では断る): 回数制限(登録・ログイン等)の
+                                            記録を消す。E2E は全ての試験が同じ接続元から登録するため、前の試験の回数が残る
     grant-admin --email a@example.com --yes [--reason "…"]
                                             [Gate A2] 管理者の権限を付ける(その人の全端末をログアウト。次に管理者の画面を
                                             開く時に多要素認証の設定を求める)
@@ -214,6 +216,8 @@ def main(argv=None) -> int:
     p = sub.add_parser("unblock")
     p.add_argument("--ip", required=True)
     sub.add_parser("unblock-all")
+    p = sub.add_parser("e2e-reset-rate-limits")
+    p.add_argument("--yes", action="store_true")
     p = sub.add_parser("revoke-sessions")
     p.add_argument("--email")
     p.add_argument("--all", action="store_true")
@@ -289,6 +293,19 @@ def main(argv=None) -> int:
     if args.cmd == "unblock":
         threat_guard.reset(args.ip)
         _print({"ok": True, "unblocked": 1, "shared": shared})
+        return EXIT_OK if shared else EXIT_NO_EFFECT
+
+    if args.cmd == "e2e-reset-rate-limits":
+        from app.core.config import settings
+
+        if not args.yes:
+            _print({"ok": False, "error": "--yes も付けてください"})
+            return EXIT_USAGE
+        if settings.is_production:
+            _print({"ok": False, "error": "本番・ステージングでは回数制限を消せません(試験の環境だけ)"})
+            return EXIT_FAIL
+        removed = rate_limiter.reset_all_for_tests()
+        _print({"ok": True, "removed_keys": removed, "shared": shared})
         return EXIT_OK if shared else EXIT_NO_EFFECT
 
     if args.cmd == "unblock-all":

@@ -118,6 +118,8 @@ export interface DraftInput {
     retrieved_at: string | null };
   intent: IntentPayload;
   search_candidate_ids: string[];
+  /** [Gate SearchUAT] 選んだ Google の場所(place ID と Google マップの URL だけ。名前・住所・位置は送らない・保存しない) */
+  google_places?: Array<{ place_id: string; maps_uri: string | null }>;
   source_urls: string[];
   /** [Gate ConsultAI] AI・Google を使った相談(使った額・回数を旅行の枠へ移す) */
   consult_session_id?: string;

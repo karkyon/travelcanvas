@@ -257,6 +257,8 @@ def ops_providers(admin: User = Depends(require_admin), db: Session = Depends(ge
             "suspended": name in suspended, "suspended_reason": suspended.get(name),
             "contract": "not_billable" if is_fake else "unverified",
             "secret": secret, "secret_setting": setting, "secret_slot": slot,
+            # [Gate AdminUAT] 今の構成でこの提供元へ送るか(adapter が無い提供元の鍵は「設定不要」で、未設定の警告にしない)
+            "secret_required": (not is_fake) and slot is not None and name in ADAPTERS_IMPLEMENTED,
             "secret_source": secret_info["source"] if secret_info else None,
             "secret_version": secret_info["version"] if secret_info else None,
             "secret_last4": secret_info["last4"] if secret_info else None,
@@ -552,20 +554,84 @@ def ops_test_tier(request: Request, payload: Dict[str, Any] = Body(...), admin: 
             "note": note}
 
 
+# ===================================================================== 旅行相談の UAT の準備(Gate AdminUAT)
+
+_OP_LABEL = {"ai.generate": "AI の読み取り(OpenAI)", "places.search": "場所の検索(Google Places)",
+             "routes.element": "経路(Google Routes)"}
+_KEY_REASON = {
+    "secret_missing": "鍵が登録されていません", "secret_unverified": "鍵の接続確認がまだです",
+    "secret_verification_expired": "鍵の接続確認の期限が切れています", "secret_rejected": "提供元が鍵を拒否しました",
+    "secret_verification_stale": "確認の後に設定が変わりました(確認し直す)",
+    "secret_disabled": "鍵を無効にしています", "secret_decrypt_failed": "鍵を復号できません",
+    "secret_placeholder": "鍵がサンプル値です", "secret_invalid": "鍵の形が正しくありません",
+    "secret_backend_unavailable": "鍵の保管先が未接続です",
+}
+
+
+@router.get("/uat-readiness")
+def ops_uat_readiness(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """ログイン中のこのアカウントで、旅行相談の実 AI の UAT ができるか(送らない・鍵の値は返さない)。
+    項目ごとに、今の値・合否・変える場所を返す。模擬(PROVIDER_HTTP_STUB)の時は実 AI ではないと返す。"""
+    from app.api.v1 import trip_intents  # 循環 import を避ける
+
+    r = trip_intents.ai_readiness(db, admin)
+    klass = r["class"]
+    checks: List[Dict[str, Any]] = []
+    ai_included = r["operations"]["ai.generate"]["included"]
+    checks.append({
+        "key": "class", "label": "会員クラス", "value": r["class_label"], "ok": ai_included,
+        "need": "AI の読み取りは Journey・Explorer(Trip は場所・経路だけ)",
+        "where": "運用コンソール › 会員クラス › 試験のためにクラスを切り替える(開発環境・24時間)",
+    })
+    checks.append({
+        "key": "consent", "label": "AI の利用の同意", "value": "同意済み" if r["consent"]["ai_processing"] else "未同意",
+        "ok": bool(r["consent"]["ai_processing"]),
+        "need": "相談の文章を AI へ送ることへの同意",
+        "where": "旅行相談の画面 › 「AI で読み取る」の同意のチェック(設定 › プライバシー で撤回できる)",
+    })
+    for op, o in r["operations"].items():
+        if o["suspended"]:
+            value, where = "提供元を止めています", "運用コンソール › API・契約と接続 › 戻す"
+        elif not o["key_ready"]:
+            value = _KEY_REASON.get(o["reason"] or "", o["reason"] or "鍵を使えません")
+            where = "運用コンソール › 秘密情報・権限 › 有効性を確認(登録済みの鍵は再入力しない)"
+        elif not o["included"]:
+            value, where = "このクラスに含まない", "運用コンソール › 会員クラス"
+        else:
+            value, where = "使える", None
+        checks.append({"key": op, "label": _OP_LABEL.get(op, op), "value": value, "ok": bool(o["ready"]),
+                       "need": "鍵の接続確認済み・提供元を止めていない・クラスに含む", "where": where})
+    checks.append({
+        "key": "real_provider", "label": "送り先", "value": "模擬(PROVIDER_HTTP_STUB)" if r["stub"] else "実の提供元",
+        "ok": not r["stub"], "need": "実 AI の UAT は模擬を切る",
+        "where": ".env の PROVIDER_HTTP_STUB を外して backend を作り直す" if r["stub"] else None,
+    })
+    ready = all(c["ok"] for c in checks)
+    return {"as_of": _iso(_now()), "account": admin.email, "class": klass, "ready": ready,
+            "model": r["model"], "checks": checks, "consult_path": "/trip-consult",
+            "note": ("この表示は送信しません(鍵の確認・会員クラス・同意・提供元の停止を読むだけ)。"
+                     "鍵の接続確認と、会員クラス・1旅行 50円の枠による利用の制限は別です")}
+
+
 # ===================================================================== 鍵の登録(Gate OpsSecrets)
 
 @router.get("/secrets")
 def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     """鍵の状態(値は返さない)。取得元は cms(この画面で登録した有効な版)だけ。.env は移行の検出だけ(env_legacy)。"""
     slots = []
+    suspended = cg.suspended_providers()
     for slot, spec in ps.SLOTS.items():
         used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
         slots.append({"slot": slot, "label": spec["label"], "providers": spec["providers"], "env": spec["env"],
                       "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot),
                       "verify_supported": slot in pc.SLOT_CHECKS,
                       "in_use": bool(used_by),
+                      # [Gate AdminUAT] 使わない鍵は「設定不要」。未設定でも警告にしない
+                      "required": bool(used_by),
+                      # 鍵の確認とは別の、利用の制限(提供元を止めている)。会員クラス・枠は利用者ごと(UAT の準備で見る)
+                      "suspended_providers": [p for p in spec["providers"] if p in suspended],
                       "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
-                      else "アプリはまだこの鍵を使いません(提供元の接続 adapter が未実装。外へは送りません)"})
+                      else "現在の構成では使用しません。設定不要(アプリはこの鍵を使わず、外へも送りません)"})
     try:
         verify_budget: Optional[Dict[str, Any]] = pv.budget(db)
     except Exception:  # noqa: BLE001 - 表の未作成など。枠が読めない時は確認ボタンを出さない

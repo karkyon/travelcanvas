@@ -44,7 +44,7 @@ beforeAll(async () => {
   symlinkSync(join(outside, 'secret.txt'), join(root, 'link.txt'));
   server = createStaticServer({
     root,
-    headersFor: (host) => securityHeaders(apiUrlForHost('http://localhost:8001', host), false),
+    headersFor: (host, proto) => securityHeaders(apiUrlForHost('http://localhost:8001', host, proto), false),
     allowedHosts: allowedHosts('omega-dev2'),
     hostnameOf,
   });
@@ -78,6 +78,13 @@ describe('本番用の配信 (Gate G3 DEP-03)', () => {
     expect(r.headers['content-security-policy']).toContain('connect-src \'self\' http://omega-dev2:8001');
     const ip = await get('/', { Host: '192.168.1.11:4173' });
     expect(ip.headers['content-security-policy']).toContain('http://192.168.1.11:8001');
+  });
+
+  it('[Gate AdminUAT] https の入口(caddy)を通った時は、同じ https の入口を CSP の通信先にする', async () => {
+    const r = await get('/', { Host: '192.168.1.11:4443', 'X-Forwarded-Proto': 'https' });
+    expect(r.status).toBe(200);
+    expect(r.headers['content-security-policy']).toContain("connect-src 'self' https://192.168.1.11:4443");
+    expect(r.headers['content-security-policy']).not.toContain('http://192.168.1.11');
   });
 
   it('許していない名前は 403(DNS の付け替えでの攻撃を防ぐ)', async () => {

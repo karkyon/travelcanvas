@@ -453,3 +453,53 @@ def test_draft_keeps_budget_meaning_and_notes(auth_client, db_session):
     bad = client.post("/api/v1/trip-intents/draft", json={"area": {"name": "城崎"}, "intent": {
         "nights": 1, "budget_target": "hotel"}})
     assert bad.status_code == 422
+
+
+def test_contradictions_are_returned_not_resolved():
+    """[Gate AdminUAT U05] 食い違う希望は片方に決めず、確かめてほしいこととして返す(重複・長すぎ・型違いは捨てる)"""
+    assert "contradictions" in consult_ai.SCHEMA["required"]
+    assert "片方に決めず" in consult_ai.INSTRUCTIONS
+    data = dict(GOOD)
+    data["nights"] = {"value": None, "evidence": None}
+    data["contradictions"] = ["日帰りと1泊が食い違っています。どちらですか", "日帰りと1泊が食い違っています。どちらですか", 3]
+    out = consult_ai.merge("日帰りがいい。でも1泊したい。", {}, data)
+    assert out["contradictions"] == ["日帰りと1泊が食い違っています。どちらですか"]
+    nights = next(i for i in out["items"] if i["key"] == "nights")
+    assert nights["value"] in (None, 0) or nights["source"] != "ai"
+    assert consult_ai.merge(TEXT, {}, dict(GOOD))["contradictions"] == []
+
+
+def test_stub_reports_contradiction_for_day_trip_and_overnight():
+    ans = provider_stub._ai_answer("【相談の文章】\n日帰りか1泊かは迷っています")
+    assert ans["contradictions"] and "食い違" in ans["contradictions"][0]
+    assert provider_stub._ai_answer("【相談の文章】\n1泊2日")["contradictions"] == []
+
+
+def test_places_resend_after_lost_response_sends_once_and_uses_radius(admin, db_session, net):
+    """[Gate SearchUAT F03/F04] 応答を受け取れなかった後に同じ Idempotency-Key で送り直しても、Google へは1回だけ・
+    確定は1回(済んだ要求として断る)。画面の検索範囲は locationBias の半径として送る"""
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    key = uuid.uuid4().hex
+    body = {"session_id": sid, "query": "伊勢 食べ物", "latitude": 34.4875, "longitude": 136.7091, "radius_km": 5}
+    first = client.post("/api/v1/trip-intents/ai/places-search", json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 200, first.text  # 画面には届かなかった(通信が切れた)と考える
+    sent = [r for r in net.requests if r.url.host == "places.googleapis.com"]
+    assert len(sent) == 1
+    bias = json.loads(sent[0].content)["locationBias"]["circle"]
+    assert bias["radius"] == 5000.0 and bias["center"] == {"latitude": 34.4875, "longitude": 136.7091}
+    again = client.post("/api/v1/trip-intents/ai/places-search", json=body, headers={"Idempotency-Key": key})
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "idempotent_replay"
+    assert len([r for r in net.requests if r.url.host == "places.googleapis.com"]) == 1
+    rows = db_session.query(ProviderUsageReservation).filter(
+        ProviderUsageReservation.provider == "google_places").all()
+    assert len(rows) == 1 and rows[0].status == "settled"
+    # 違う範囲は違う要求(同じキーでは使えない)
+    other = client.post("/api/v1/trip-intents/ai/places-search", json={**body, "radius_km": 10},
+                        headers={"Idempotency-Key": key})
+    assert other.status_code == 409 and other.json()["detail"]["code"] == "idempotency_conflict"
+    bad = client.post("/api/v1/trip-intents/ai/places-search", json={**body, "radius_km": 99},
+                      headers={"Idempotency-Key": uuid.uuid4().hex})
+    assert bad.status_code == 422
