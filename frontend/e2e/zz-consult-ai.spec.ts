@@ -156,8 +156,13 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     expect((await r.json()).detail.code).toBe('idempotent_replay');
     r = await raw('/trip-intents/ai/extract', { session_id: s1, text: 'E2E_BROKEN 家族旅行' });
     expect(r.status()).toBe(502);
+    // [Gate F07-4] Journey は 1相談 AI 10回(送った要求の数: 時間切れ・成功・読めない応答も 1回)。11回目は送る前に断る
+    for (let i = 0; i < 7; i += 1) {
+      r = await raw('/trip-intents/ai/extract', { session_id: s1, text: `家族4人で1泊2日 ${i}` });
+      expect(r.status()).toBe(200);
+    }
     r = await raw('/trip-intents/ai/extract', { session_id: s1, text: '家族4人で1泊2日' });
-    expect(r.status()).toBe(429); // Journey は 1相談 AI 3回(時間切れ・成功・読めない応答)。4回目は送る前に断る
+    expect(r.status()).toBe(429);
     expect((await r.json()).detail.code).toBe('feature_quota_exceeded');
     const st = await send('get', `/trip-intents/ai/status?session_id=${s1}`);
     expect(Number(st.usage.plan_used)).toBeLessThanOrEqual(50);

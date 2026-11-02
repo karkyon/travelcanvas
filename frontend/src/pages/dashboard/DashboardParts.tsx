@@ -10,6 +10,7 @@ import { AlertTriangle, CalendarClock, CheckCircle2, ListChecks, Ticket, Users }
 import Surface from '@/components/design/Surface';
 import TripCover from '@/components/trip/TripCover';
 import Landscape from '@/components/shell/Landscape';
+import HeroVideoBackground from '@/components/home/HeroVideoBackground';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import type { DashboardFocus, DashboardTrip } from '@/services/api/types/g9';
@@ -26,7 +27,8 @@ const SEVERITY_LABEL: Record<string, string> = { high: '重要', medium: '確認
 
 export const EmptyHero: React.FC<{ isGuest: boolean }> = ({ isGuest }) => (
   <section className="tc-home-hero" aria-labelledby="dash-hero-empty" data-testid="dashboard-hero">
-    <div className="tc-home-hero-art"><Landscape /></div>
+    {/* [Gate HomeHeroVideo] 背景だけを動画に(素材が無い・読めない・動きを減らす設定では以前の絵・静止画) */}
+    <div className="tc-home-hero-art"><HeroVideoBackground fallback={<Landscape />} /></div>
     <div className="tc-home-hero-copy">
       <p className="tc-eyebrow">FIRST JOURNEY · ようこそ</p>
       <h2 id="dash-hero-empty">最初の旅行を始めましょう</h2>

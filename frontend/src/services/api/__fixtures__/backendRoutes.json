@@ -47,6 +47,7 @@
   "captured_at_head_secretpolicy": "gate/secretpolicy (+Gate SecretPolicy admin/ops/secrets/{slot}/import-env)",
   "captured_at_head_fr059_tiers": "39aac73 (+Gate FR059-Tiers: GET /admin/ops/tiers・POST /admin/ops/test-tier)",
   "captured_at_head_consult_ai": "gate/provider-connect (+Gate ConsultAI: /trip-intents/ai/session・status・extract・places-search・route)",
+  "captured_at_head_f07_turn": "gate/f07-turn (+Gate F07-Turn: POST /trip-intents/ai/turn)",
   "captured_at_head_admin_uat": "gate/admin-ops-uat (+Gate AdminUAT: GET /admin/ops/uat-readiness)"
  },
  "routes": [
@@ -476,6 +477,7 @@
   "POST /api/v1/trip-intents/ai/places-search",
   "POST /api/v1/trip-intents/ai/route",
   "POST /api/v1/trip-intents/ai/session",
+  "POST /api/v1/trip-intents/ai/turn",
   "POST /api/v1/trip-intents/areas",
   "POST /api/v1/trip-intents/draft",
   "POST /api/v1/trip-intents/extract",

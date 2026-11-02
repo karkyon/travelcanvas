@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 
 export function hostAllowed(hostname: string | undefined, allowed: string[]): boolean;
 export function resolveInside(root: string, urlPath: string): string | null;
+export function parseRange(header: string | undefined, size: number): { start: number; end: number } | 'invalid' | null;
 export function createStaticServer(opts: {
   root: string;
   headersFor: (host: string | undefined, proto?: string) => Record<string, string>;

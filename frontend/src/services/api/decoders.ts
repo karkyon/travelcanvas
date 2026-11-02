@@ -1777,9 +1777,12 @@ export const adminSystemStats: Decoder<AdminSystemStats> = object<AdminSystemSta
   users: object({
     total_users: nonNegativeInt, active_users: nonNegativeInt, verified_users: nonNegativeInt, new_users_30d: nonNegativeInt,
     user_types: object({ guest: nonNegativeInt, registered: nonNegativeInt, premium: nonNegativeInt, admin: nonNegativeInt }),
+    test_accounts: optional(nonNegativeInt), registered_excluding_tests: optional(nonNegativeInt),
+    breakdown_note: optional(str),
   }),
   travel_plans: object({
     total_plans: nonNegativeInt, active_plans: nonNegativeInt, completed_plans: nonNegativeInt, draft_plans: nonNegativeInt,
+    test_plans: optional(nonNegativeInt), guest_plans: optional(nonNegativeInt),
     average_duration_days: num,
     popular_destinations: arrayOf(object({ destination: str, count: nonNegativeInt })),
   }),

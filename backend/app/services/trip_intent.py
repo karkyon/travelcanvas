@@ -411,7 +411,9 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
         try:
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, transport=transport, follow_redirects=False,
                                          headers={"User-Agent": USER_AGENT}) as client:
-                resp = await client.get(GEOCODE_URL, params={"q": q, "format": "json", "limit": "1",
+                # [Gate AreaGeo] 以前は 1 件目(limit=1)だけを使い、「滋賀」が北海道の小さな地名になった。
+                # 5 件を取り、行政の区域・市町村・観光地を優先して重要度(importance)の高いものを選ぶ
+                resp = await client.get(GEOCODE_URL, params={"q": q, "format": "json", "limit": "5",
                                                              "accept-language": "ja",
                                                              "countrycodes": GEOCODE_COUNTRIES})
             if resp.status_code != 200:
@@ -422,7 +424,7 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
     if not isinstance(data, list) or not data:
         result = GeocodeResult(status="not_found", provider="nominatim", retrieved_at=now())
     else:
-        item = data[0]
+        item = best_match(data)
         try:
             lat, lng = float(item["lat"]), float(item["lon"])
         except (KeyError, TypeError, ValueError):
@@ -440,6 +442,37 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
             retrieved_at=now())
     _cache[q] = (time.monotonic(), result)
     return result
+
+
+_PLACE_KINDS = frozenset({"state", "province", "region", "city", "town", "village", "municipality", "county",
+                          "administrative", "tourism", "attraction", "island", "archipelago", "lake", "mountain",
+                          "hot_spring", "resort", "national_park", "protected_area"})
+
+
+def best_match(items: List[Any]) -> Dict[str, Any]:
+    """Nominatim の候補から、行政の区域・市町村・観光地を優先し、重要度の高い1件を選ぶ。"""
+    rows = [i for i in items if isinstance(i, dict)]
+
+    def score(i: Dict[str, Any]) -> Tuple[int, float]:
+        kinds = {str(i.get("addresstype") or ""), str(i.get("type") or ""), str(i.get("class") or "")}
+        try:
+            importance = float(i.get("importance") or 0)
+        except (TypeError, ValueError):
+            importance = 0.0
+        return (1 if kinds & _PLACE_KINDS else 0, importance)
+    return max(rows, key=score) if rows else {}
+
+
+async def gazetteer_or(geocode: "Geocoder", name: str) -> GeocodeResult:
+    """[Gate AreaGeo] よく使う方面・出発地は内蔵の地名表で決める(送らない)。表に無い地名だけ照会する。"""
+    from app.services import jp_gazetteer
+
+    hit = jp_gazetteer.lookup(name)
+    if hit is not None:
+        lat, lng = float(hit["latitude"]), float(hit["longitude"])  # type: ignore[arg-type]
+        return GeocodeResult(status="ok", latitude=lat, longitude=lng, label=str(hit["label"]), provider="gazetteer",
+                             source_url=None, retrieved_at=now())
+    return await geocode(name)
 
 
 def set_geocoder_for_testing(geocoder: Optional[Geocoder]) -> None:
@@ -478,18 +511,28 @@ async def compare_areas(origin: str, areas: List[str], one_way_hours: Optional[f
     if not enabled:
         geocode = _disabled
     _network_calls.set(0)
-    o = await geocode(origin) if origin else GeocodeResult(status="unavailable")
+    o = await gazetteer_or(geocode, origin) if origin else GeocodeResult(status="unavailable")
     out: List[Dict[str, Any]] = []
     for name in areas[:MAX_AREAS]:
-        g = await geocode(name)
+        g = await gazetteer_or(geocode, name)
         straight = None
         if o.status == "ok" and g.status == "ok" and None not in (o.latitude, o.longitude, g.latitude, g.longitude):
             straight = round(haversine_km(o.latitude, o.longitude, g.latitude, g.longitude),  # type: ignore[arg-type]
                              1)
+        check = limit_check(straight, one_way_hours, one_way_strength)
+        geo = g.to_dict()
+        # [Gate AreaGeo] 照会の結果が条件から大きく外れる(直線だけで片道の上限の2倍を越える・上限が無い時は 600km 超)時は、
+        # 同じ文字の別の地名を拾った疑いが強い。地図の範囲から外し、地名(県名など)を足して照会し直すよう示す
+        far_km = one_way_hours * LOWER_BOUND_SPEED_KMH * 2 if one_way_hours else 600
+        far = straight is not None and straight > far_km
+        if g.status == "ok" and far:
+            geo["suspect"] = True
+            geo["suspect_note"] = ("照会した位置が出発地から遠すぎます(直線 %d km)。同じ名前の別の場所の可能性があります。"
+                                   "県名を付けて(例: 滋賀県)足し直してください" % int(straight or 0))
         out.append({
-            "name": name, "source": "user_input", "geocode": g.to_dict(), "straight_km": straight,
+            "name": name, "source": "user_input", "geocode": geo, "straight_km": straight,
             "drive": {"status": "not_connected", "note": "実走行時間・高速料金は道路の提供元が未接続のため未照会"},
-            "limit_check": limit_check(straight, one_way_hours, one_way_strength),
+            "limit_check": check,
             "lodging": {"status": "not_connected", "note": "4人1室の料金・空室は宿の提供元が未接続(日付が決まっても照会できません)"},
             "quietness": {"status": "unverified", "note": "混み具合のデータは未接続。静かかどうかは確かめていません"},
             "hours": {"status": "date_pending", "note": "営業時間は日付と行き先の場所が決まってから照会します"},

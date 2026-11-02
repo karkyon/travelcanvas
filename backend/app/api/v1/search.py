@@ -91,6 +91,7 @@ async def search_spots(
     raw_results = await search_all_providers(
         (body.query or "").strip(), body.latitude, body.longitude, body.radius_km, **extra
     )
+    meta = raw_results
     unavailable = list(getattr(raw_results, "unavailable", []) or [])
     errors = dict(getattr(raw_results, "errors", {}) or {})
     # [Gate FR059-D11] 無料の provider にも外へ送った回数を残す(言葉・座標・結果は残さない)
@@ -151,7 +152,11 @@ async def search_spots(
         # [Gate SearchUAT] 失敗の分類(blocked・rate_limited・timeout・server_error・network・unreadable・provider_timeout)
         "provider_errors": errors,
         # [Gate SearchUAT F06] 一部だけの結果(提供元の処理が途中で止まった。完全な結果ではない)
-        "partial_providers": list(getattr(raw_results, "partial", []) or []),
+        "partial_providers": list(getattr(meta, "partial", []) or []),
+        # [Gate SearchUAT-S3] 429 の後の待機の残り(秒)。この間はアプリから送らない(画面は「○秒後に」と示す)
+        "provider_retry_after": dict(getattr(meta, "retry_after", {}) or {}),
+        # [Gate SearchUAT-S3] 保存した結果を使った提供元(外へ送っていない)。stale は提供元の失敗の時の「前の結果」
+        "cached_providers": dict(getattr(meta, "cached", {}) or {}),
     }
 
 

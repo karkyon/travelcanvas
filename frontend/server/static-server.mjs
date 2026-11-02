@@ -29,6 +29,8 @@ const TYPES = {
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
@@ -66,6 +68,26 @@ export function resolveInside(root, urlPath) {
   const full = path.resolve(root, ...parts);
   if (full !== root && !full.startsWith(root + path.sep)) return null;
   return full;
+}
+
+/** `bytes=a-b`・`bytes=a-`・`bytes=-n` の1つの範囲だけ。無い・複数は null(全体を返す)。範囲外は 'invalid' */
+export function parseRange(header, size) {
+  if (!header) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
+  if (!m || (m[1] === '' && m[2] === '')) return null;
+  let start;
+  let end;
+  if (m[1] === '') {
+    const n = Number(m[2]);
+    if (n === 0) return 'invalid';
+    start = Math.max(0, size - n);
+    end = size - 1;
+  } else {
+    start = Number(m[1]);
+    end = m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
+  }
+  if (start >= size || start > end) return 'invalid';
+  return { start, end };
 }
 
 function cacheControl(rel) {
@@ -160,6 +182,26 @@ export function createStaticServer(opts) {
         res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', 'Content-Length': body.length });
         res.end(req.method === 'HEAD' ? undefined : body);
         return;
+      }
+      // [Gate HomeHeroVideo] 動画は範囲の要求(Range)に答える(Safari は範囲で読めない動画を再生しない)
+      if (type.startsWith('video/')) {
+        headers['Accept-Ranges'] = 'bytes';
+        const range = parseRange(req.headers.range, found.st.size);
+        if (range === 'invalid') {
+          res.writeHead(416, { ...headers, 'Content-Range': `bytes */${found.st.size}` });
+          res.end();
+          return;
+        }
+        if (range) {
+          res.writeHead(206, { ...headers, 'Content-Range': `bytes ${range.start}-${range.end}/${found.st.size}`,
+            'Content-Length': range.end - range.start + 1 });
+          if (req.method === 'HEAD') {
+            res.end();
+            return;
+          }
+          createReadStream(found.file, range).on('error', () => res.destroy()).pipe(res);
+          return;
+        }
       }
       res.writeHead(200, { ...headers, 'Content-Length': found.st.size });
       if (req.method === 'HEAD') {

@@ -142,9 +142,9 @@ const AdminDashboard: React.FC = () => {
         <h2 className="text-xl font-semibold text-ink-900 mb-4"><UiIcon icon={IcUsers} size={20} className="mr-1 align-[-3px]" />ユーザー統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
-            title="総ユーザー数"
+            title="総ユーザー数(ゲスト・試験を含む)"
             value={stats.users.total_users}
-            subtitle={`内 認証済み: ${stats.users.verified_users}名`}
+            subtitle={`登録 ${stats.users.registered_excluding_tests ?? stats.users.user_types.registered + stats.users.user_types.premium}名 · ゲスト ${stats.users.user_types.guest}名 · 管理者 ${stats.users.user_types.admin}名 · 運用の試験 ${stats.users.test_accounts ?? 0}名 · 認証済み ${stats.users.verified_users}名`}
             icon={IcUser}
             color="blue"
           />
@@ -172,11 +172,17 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {stats.users.breakdown_note && (
+        <p className="text-xs text-ink-700" data-testid="admin-stats-note">{stats.users.breakdown_note}</p>
+      )}
+
       {/* プラン統計 */}
       <div>
         <h2 className="text-xl font-semibold text-ink-900 mb-4"><UiIcon icon={IcClipboard} size={20} className="mr-1 align-[-3px]" />プラン統計</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard title="総プラン数" value={stats.travel_plans.total_plans} icon={IcBarChart} color="blue" />
+          <MetricCard title="総プラン数(ゲスト・試験を含む)" value={stats.travel_plans.total_plans}
+            subtitle={`下書き ${stats.travel_plans.draft_plans} · 進行中 ${stats.travel_plans.active_plans} · 完了 ${stats.travel_plans.completed_plans} · ゲスト ${stats.travel_plans.guest_plans ?? 0} · 運用の試験 ${stats.travel_plans.test_plans ?? 0}`}
+            icon={IcBarChart} color="blue" />
           <MetricCard title="アクティブプラン" value={stats.travel_plans.active_plans} icon={IcActivity} color="green" />
           <MetricCard title="完了プラン" value={stats.travel_plans.completed_plans} icon={IcCheck} color="purple" />
           <MetricCard

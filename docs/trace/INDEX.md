@@ -14,6 +14,7 @@
 | [gate-a2-trace.md](gate-a2-trace.md) | Gate A2 トレース(FR-040 管理・監査)と E2E の安定化 | 0 | 0 | 2 |
 | [gate-admin-uat-trace.md](gate-admin-uat-trace.md) | Gate AdminUAT — 管理画面の鍵の表示の食い違いの解消と、旅行相談の UAT(実 AI・音声)を成立させる準備 | 0 | 0 | 0 |
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
+| [gate-area-geo-trace.md](gate-area-geo-trace.md) | Gate AreaGeo — 方面の位置の誤り(③が北海道)・地図の範囲・観光の検索が空(UAT 2026-11-02 15:30 の指摘) | 0 | 0 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |
 | [gate-b1-trace.md](gate-b1-trace.md) | Gate B1 トレース(FR-041 組織・B2B / FR-042 API・Webhook の最小形) | 2 | 1 | 3 |
@@ -26,6 +27,7 @@
 | [gate-doc10rev-trace.md](gate-doc10rev-trace.md) | Gate DOC10-Rev トレース(DOC-10 の版の食い違いの解消・状態の監査表) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
+| [gate-f07-turn-trace.md](gate-f07-turn-trace.md) | Gate F07-Turn — 旅行相談の会話の1ターン(追加・訂正・削除・取消・矛盾・複数の予算) | 0 | 1 | 0 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
 | [gate-fr059-d11-trace.md](gate-fr059-d11-trace.md) | Gate FR059-D11 トレース(無料の provider の使用の記録・公開の単価の再確認) | 2 | 0 | 0 |
 | [gate-fr059-tiers-trace.md](gate-fr059-tiers-trace.md) | Gate FR059-Tiers トレース(会員の機能クラス Free / Trip / Journey / Explorer) | 3 | 0 | 0 |
@@ -56,6 +58,7 @@
 | [gate-g9b-trace.md](gate-g9b-trace.md) | Gate G9 後半 トレース(UX-2 旅行の表紙・UX-3 見出しと移動・UX-4 文脈型ダッシュボード) | 2 | 0 | 0 |
 | [gate-geocodejp-trace.md](gate-geocodejp-trace.md) | Gate GeocodeJP・AdminLayout トレース(旅行相談の地名を日本で照会・管理の画面の余白) | 1 | 0 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
+| [gate-home-hero-video-trace.md](gate-home-hero-video-trace.md) | Gate HomeHeroVideo — HOME の「最初の旅行を始めましょう」の背景の動画(仕組み。素材は受け取り待ち) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
 | [gate-l3-fr017-trace.md](gate-l3-fr017-trace.md) | Gate L3 FR-017 トレーサビリティ表 | 0 | 1 | 3 |
@@ -98,6 +101,7 @@
 | [gate-s7-trace.md](gate-s7-trace.md) | Gate S7 段階的な計算の確認 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
+| [gate-search-uat-s3-trace.md](gate-search-uat-s3-trace.md) | Gate SearchUAT-S3 — 無料の検索の復旧・診断の修正・原価の表示と料金版・AI 10回(UAT の開始の準備) | 0 | 1 | 0 |
 | [gate-search-uat-trace.md](gate-search-uat-trace.md) | Gate SearchUAT — 旅行相談の場所の検索の入口の統一と、検索の失敗(OpenStreetMap)の是正 | 0 | 0 | 0 |
 | [gate-secretpolicy-trace.md](gate-secretpolicy-trace.md) | Gate SecretPolicy — 外部 API 鍵の取得元の一本化 | 0 | 0 | 0 |
 | [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |

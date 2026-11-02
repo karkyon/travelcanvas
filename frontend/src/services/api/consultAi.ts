@@ -145,6 +145,46 @@ export async function consultRoute(sessionId: string, origin: { latitude: number
   }), 'POST /trip-intents/ai/route');
 }
 
+// ----------------------------------------------------------------- [Gate F07] 会話の1ターン
+
+export type TurnField = 'origin' | 'party_size' | 'nights' | 'transport' | 'highway' | 'one_way_hours' | 'room' | 'dates';
+export interface TurnBudget {
+  min_yen: number | null; max_yen: number | null; unit: 'total' | 'per_person' | 'undecided'; people: number | null;
+  target: string; period: string; kind: string;
+}
+export interface TurnChange {
+  id: string; op: string; evidence: string; needs_confirmation: boolean;
+  field?: TurnField; before?: unknown; after?: unknown; target_id?: string; preference?: string; label?: string;
+  area?: string;
+}
+export interface TurnResult {
+  changes: TurnChange[]; conflicts: Array<{ about: string; question: string }>; questions: string[]; dropped: number;
+  revision: number; base_revision: number; usage: ConsultUsage; saved: boolean; stub: boolean; notice: string;
+}
+/** 画面が持つ今の条件(値・確認の状態・ID だけ。根拠の文・過去の発言は送らない) */
+export interface TurnState {
+  revision: number;
+  fields: Partial<Record<TurnField, { value: unknown; confirmed: boolean }>>;
+  budgets: Array<TurnBudget & { id: string; confirmed: boolean }>;
+  notes: Array<{ id: string; text: string; confirmed: boolean }>;
+  areas: Array<{ name: string; status: 'candidate' | 'decided' }>;
+  preferences: string[];
+}
+
+const turnChange: Decoder<TurnChange> = object<TurnChange>({
+  id: str, op: str, evidence: str, needs_confirmation: bool, field: optional(str) as Decoder<TurnField | undefined>,
+  before: optional(anyValue), after: optional(anyValue), target_id: optional(str), preference: optional(str),
+  label: optional(str), area: optional(str),
+});
+
+export async function consultTurn(sessionId: string, utterance: string, state: TurnState, key: string): Promise<TurnResult> {
+  const r = await api.post('/trip-intents/ai/turn', { session_id: sessionId, utterance, state }, withKey(key));
+  return decodeResponse(r.data, object<TurnResult>({
+    changes: arrayOf(turnChange), conflicts: arrayOf(object({ about: str, question: str })), questions: arrayOf(str),
+    dropped: int, revision: int, base_revision: int, usage, saved: bool, stub: bool, notice: str,
+  }), 'POST /trip-intents/ai/turn');
+}
+
 /** 断られた理由の code(画面は理由を出し、AI を使わずに続けられると案内する) */
 export function consultErrorCode(error: unknown): string | null {
   const detail = (error as { response?: { data?: { detail?: unknown } } } | null)?.response?.data?.detail;

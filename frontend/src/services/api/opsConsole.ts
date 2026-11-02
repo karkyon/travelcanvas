@@ -21,6 +21,20 @@ export interface OpsOverview {
   open_reservations: number;
   cloud_billing: { status: string; message: string };
   free_usage?: OpsFreeUsage;
+  /** [Gate SearchUAT-S3] 管理者の鍵の確認の見込み(今月)。旅行・相談の 50円の枠とは別 */
+  key_verification_usage?: { checks: number; estimated_jpy: string; daily_cap_jpy: string; label: string };
+  /** [Gate SearchUAT-S3] 提供元の請求額(明細を取り込んでいないので未照合) */
+  provider_invoice?: { status: string; label: string };
+  /** [Gate SearchUAT-S3] 計上の根拠(料金版・SKU・単価・換算) */
+  price_basis?: OpsPriceBasis;
+}
+export interface OpsPriceRow {
+  operation: string; label: string; sku: string | null; unit: string; usd: string; jpy: string;
+  field_mask: string | null; basis: string | null;
+}
+export interface OpsPriceBasis {
+  status: string; policy_version?: string; checked_at?: string | null; fx_rate?: string; tax_factor?: string;
+  safety_factor?: string; jpy_per_usd?: string; sources?: Record<string, unknown>; rows?: OpsPriceRow[]; note?: string;
 }
 export type OpsSecretState = 'configured' | 'missing' | 'disabled' | 'placeholder' | 'invalid' | 'decrypt_failed' | 'backend_unavailable'
   | 'not_defined' | 'not_needed';
@@ -80,6 +94,15 @@ const overview: Decoder<OpsOverview> = object<OpsOverview>({
   plan_accounts: object({ total: int, by_state: record }), open_reservations: int,
   cloud_billing: object({ status: str, message: str }),
   free_usage: optional(object<OpsFreeUsage>({ providers: record, requests: int, label: str })),
+  key_verification_usage: optional(object({ checks: int, estimated_jpy: str, daily_cap_jpy: str, label: str })),
+  provider_invoice: optional(object({ status: str, label: str })),
+  price_basis: optional(object<OpsPriceBasis>({
+    status: str, policy_version: optional(str), checked_at: optional(nullable(str)), fx_rate: optional(str),
+    tax_factor: optional(str), safety_factor: optional(str), jpy_per_usd: optional(str), sources: optional(record),
+    rows: optional(arrayOf(object<OpsPriceRow>({ operation: str, label: str, sku: nullable(str), unit: str, usd: str,
+      jpy: str, field_mask: nullable(str), basis: nullable(str) }))),
+    note: optional(str),
+  })),
 });
 
 const provider: Decoder<OpsProvider> = object<OpsProvider>({
@@ -288,6 +311,8 @@ export interface OpsTierRow {
   key: OpsTier; label: string; subtitle: string; summary: string; operations: string[]; ai: boolean; paid_api: boolean;
   profile: 'known' | 'unavailable'; policy_version?: string; plan_cap_jpy?: string; monthly_cap_jpy?: string | null;
   plans_per_month?: number | null; quotas?: Record<string, unknown>; worst_case_plan_jpy?: string; fits_plan_cap?: boolean;
+  /** [Gate F07-4] 月の枠で、各旅行の回数の上限を全て使った時に入る旅行の数(月の旅行の数の上限は保証しない) */
+  plans_at_full_use?: number | null;
 }
 export interface OpsTierFeature {
   key: string; label: string; free: OpsMark; trip: OpsMark; journey: OpsMark; explorer: OpsMark;
@@ -310,7 +335,7 @@ const tierRow: Decoder<OpsTierRow> = object<OpsTierRow>({
   key: tierKey, label: str, subtitle: str, summary: str, operations: arrayOf(str), ai: bool, paid_api: bool,
   profile: oneOf('known', 'unavailable'), policy_version: optional(str), plan_cap_jpy: optional(str),
   monthly_cap_jpy: optional(nullable(str)), plans_per_month: optional(nullable(int)), quotas: optional(record),
-  worst_case_plan_jpy: optional(str), fits_plan_cap: optional(bool),
+  worst_case_plan_jpy: optional(str), fits_plan_cap: optional(bool), plans_at_full_use: optional(nullable(int)),
 });
 const tierFeature: Decoder<OpsTierFeature> = object<OpsTierFeature>({
   key: str, label: str, free: mark, trip: mark, journey: mark, explorer: mark,

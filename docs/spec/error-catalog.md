@@ -184,7 +184,7 @@
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
-| `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py, api/v1/privacy.py |
+| `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py, api/v1/privacy.py, service |
 | `reauth_failed` | 403 | no | パスワードが正しくありません | api/v1/corrections.py, api/v1/ownership.py, api/v1/privacy.py |
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |

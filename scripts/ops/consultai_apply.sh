@@ -287,8 +287,11 @@ cmd_deploy() {
   echo "    旅行相談: http://$LAN_HOST:4173/trip-consult   運用: http://$LAN_HOST:4173/admin/ops"
   echo "    次: /admin/ops の概要「旅行相談の UAT の準備」を確かめる(鍵が確認済みで期限内なら確認し直さない。再入力は不要)"
   if [ -f scripts/ops/search_diag.sh ]; then
-    echo "4: 場所の検索(OpenStreetMap)の診断(外への要求 6 回。反映の成否とは別の結果)"
-    bash scripts/ops/search_diag.sh || echo "4: 場所の検索の診断に NG があります(上の結果。反映は済んでいます)"
+    # [Gate SearchUAT-S3] 標準の診断は外へ 1 回(検索ではない状態の照会)。検索の確かめは --probe を明示した時だけ
+    echo "4: 場所の検索(OpenStreetMap)の診断(外への要求 1 回・状態の照会だけ。反映の成否とは別の結果)"
+    TC_PREDEPLOY_LOG="$ART/predeploy-search-log-$TS.txt" bash scripts/ops/search_diag.sh \
+      || echo "4: 場所の検索の診断に NG があります(上の結果。反映は済んでいます)"
+    echo "    検索の確かめ(外へ最大 3 回・必要な時だけ): bash scripts/ops/search_diag.sh --probe"
   fi
   echo "    音声の UAT: bash scripts/ops/uat_https.sh up → https://$LAN_HOST:4443/trip-consult(docs/runbooks/consult-uat-omega-dev2.md)"
 }

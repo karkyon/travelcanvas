@@ -220,3 +220,7 @@ frontend/e2e-results/
 
 # [Gate G3] DEP-03 frontend の build の段が作る(src/config/securityHeaders.ts から)
 frontend/server/securityHeaders.mjs
+
+# [Gate HomeHeroVideo] 社内 UAT の見た目の確認だけに配備先へ置く表紙の動画(透かし入りのプレビュー等)。公開リポジトリに入れない
+frontend/public/hero/local/
+frontend/src/config/heroVideos.local.json

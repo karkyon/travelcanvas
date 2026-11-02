@@ -17,6 +17,11 @@ import UiIcon from '@/components/common/UiIcon';
 import { IcCar } from '@/components/common/uiIcons';
 
 const AreaMap = lazy(() => import('./AreaMap'));
+
+/** [Gate AreaGeo] 地図に置かない方面(遠すぎる照会の結果・直線だけで片道の上限を越える) */
+function offMap(a: { geocode: { suspect?: boolean }; limit_check: { status: string } }): boolean {
+  return Boolean(a.geocode.suspect) || a.limit_check.status === 'exceeds' || a.limit_check.status === 'likely_exceeds';
+}
 const INITIAL = 3;
 
 interface Props {
@@ -45,8 +50,11 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
   const origin = result?.origin.status === 'ok' && result.origin.latitude !== null && result.origin.longitude !== null
     ? { label: result.origin.label ?? r.values.origin, latitude: result.origin.latitude, longitude: result.origin.longitude }
     : null;
+  // [Gate AreaGeo] 地図に置くのは、位置が確かで条件から大きく外れない方面だけ(遠すぎる照会の結果・片道の上限を
+  // 直線だけで越える方面は一覧に理由を出し、地図の範囲を広げない。以前は「滋賀」が北海道に置かれ地図が日本全体に縮んだ)
   const pins = useMemo(() => rows.map((a, i) => ({ a, order: i + 1 }))
-    .filter(({ a }) => a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null)
+    .filter(({ a }) => a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null
+      && !offMap(a))
     .map(({ a, order }) => ({ name: a.name, order, latitude: a.geocode.latitude!, longitude: a.geocode.longitude!,
       selected: a.name === state.selectedArea })), [rows, state.selectedArea]);
   const conditions = [
@@ -106,7 +114,7 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
               <p className="text-xs text-ink-700">出発地からの位置 · 線は直線で、道路の距離・経路ではありません</p>
             </div>
           </div>
-          <div className="tc-map-frame h-72 sm:h-96" data-testid="areas-map">
+          <div className="tc-map-frame h-80 sm:h-[28rem] lg:h-[34rem]" data-testid="areas-map">
             {pins.length > 0 || origin ? (
               <Suspense fallback={<p className="p-4 text-sm text-ink-700">地図を読み込んでいます…</p>}>
                 <AreaMap origin={origin} pins={pins} onSelect={onSelect} />
@@ -153,8 +161,13 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                     <dl className="mt-1 grid gap-0.5 text-xs text-ink-700">
                       <div><dt className="inline font-semibold text-ink-900">位置: </dt>
                         <dd className="inline">{a.geocode.status === 'ok'
-                          ? `${a.geocode.label ?? a.name} · OpenStreetMap ${retrievedLabel(a.geocode.retrieved_at)}`
+                          ? `${a.geocode.label ?? a.name} · ${a.geocode.provider === 'gazetteer' ? '内蔵の地名表(県庁・市役所などの代表点)' : `OpenStreetMap ${retrievedLabel(a.geocode.retrieved_at)}`}`
                           : GEOCODE_LABEL[a.geocode.status]}</dd></div>
+                      {a.geocode.suspect && (
+                        <div className="font-semibold text-warning" data-testid={`area-suspect-${a.name}`}>
+                          {`⚠ ${a.geocode.suspect_note ?? '照会した位置が遠すぎます。地名を確かめてください'}(地図には置いていません)`}
+                        </div>
+                      )}
                       <div><dt className="inline font-semibold text-ink-900">距離: </dt>
                         <dd className="inline">{straightLabel(a.straight_km, r.values.origin)}</dd></div>
                       <div><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt><dd className="inline">実走行時間・高速料金は未照会</dd></div>

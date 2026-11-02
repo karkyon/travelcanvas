@@ -60,6 +60,9 @@ export interface Geocode {
   provider: string | null;
   source_url: string | null;
   retrieved_at: string | null;
+  /** [Gate AreaGeo] 照会した位置が出発地から遠すぎる(同じ名前の別の場所の疑い)。地図に置かない */
+  suspect?: boolean;
+  suspect_note?: string;
 }
 
 export interface StatusNote {
@@ -107,6 +110,9 @@ export interface IntentPayload {
   preferences: string[];
   /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
   notes: string[];
+  /** [Gate F07] 確かめた予算の全て(額・全員か1人あたりか・何人分か・対象・期間・上限か目安か) */
+  budgets?: Array<{ min_yen: number | null; max_yen: number | null; unit: 'total' | 'per_person' | 'undecided';
+    people: number | null; target: string; period: string; kind: string }>;
 }
 
 export type BudgetTarget = 'lodging' | 'transport' | 'food' | 'trip_total' | 'other' | 'undecided';

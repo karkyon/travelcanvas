@@ -9,7 +9,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *
  *   1. 会員(Free)の旅程の画面に「この旅行の AI・外部検索の利用枠 0円 / 50円」が旅行の予算とは別に出る。
  *      [Gate FR059-Tiers] Free は「自分でつくる」クラスで、外部の AI・有料の検索を使わない(0円)と出る(上限に達したとは言わない)
- *   2. 自分のクラス(GET /entitlements)は Free(policy 2026-10-31.1)。見積もりは provider を呼ばず、予約せず、
+ *   2. 自分のクラス(GET /entitlements)は Free(policy 2026-11-02.1)。見積もりは provider を呼ばず、予約せず、
  *      Free には含まない(tier_feature_not_included)と返す
  *   3. 上限・クラスを要求で送っても受け付けない(サーバーが決める)。閲覧の人は見積もりできない
  *   4. 旅行相談の入口にクラスと今月の枠が出る
@@ -28,11 +28,12 @@ test('FR-059 旅程相談の利用枠: 0円 / 50円・クラス・見積もり�
   // 2. クラス・見積もり
   const mine = await send('get', '/entitlements');
   expect(mine).toMatchObject({ class: 'free', plan_cap_jpy: '50.0000', monthly_cap_jpy: null, plans_per_month: null,
-    policy_version: '2026-10-31.1', providers_connected: false,
+    policy_version: '2026-11-02.1', providers_connected: false,
     tier: { key: 'free', subtitle: '自分でつくる', ai: false, paid_api: false, operations: [] } });
   const est = await send('post', `/plans/${plan.id}/planning-actions/estimate`,
     { operation: 'places.search', units: { requests: 1 } });
-  expect(est).toMatchObject({ max_cost_jpy: '7.9695', max_cost_yen_ceil: 8, allowed: false,
+  // [Gate SearchUAT-S3] 場所の検索は Text Search Pro $0.032(7.2864円。以前の版は Enterprise $0.035 = 7.9695円)
+  expect(est).toMatchObject({ max_cost_jpy: '7.2864', max_cost_yen_ceil: 8, allowed: false,
     reason: 'tier_feature_not_included', connected: false });
   const usage = await send('get', `/plans/${plan.id}/planning-usage`);
   expect(usage).toMatchObject({ plan_used_yen_ceil: 0, plan_cap_yen: 50, state: 'manual_only', plans_used_this_month: 0 });

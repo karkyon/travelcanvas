@@ -175,6 +175,40 @@ def _state_of(total: Decimal, cap: Decimal) -> str:
     return "ok"
 
 
+def _verification_month(db: Session, since: datetime) -> Dict[str, Any]:
+    """[Gate SearchUAT-S3] 管理者の鍵の確認の見込み(今月)。旅行の 50円の枠とは別の日の枠で数える。"""
+    from app.models.models import ProviderSecretVerification
+    from app.services import provider_verification as pv
+
+    n, est = (db.query(func.count(ProviderSecretVerification.id),
+                       func.coalesce(func.sum(ProviderSecretVerification.estimated_cost_jpy), 0))
+              .filter(ProviderSecretVerification.created_at >= since).one())
+    return {"checks": int(n), "estimated_jpy": cg.money(Decimal(est)), "daily_cap_jpy": cg.money(pv.daily_cap()),
+            "label": "管理者の鍵の確認(日の枠・日本時間)。旅行・相談の 50円の枠には入れない。提供元の請求額ではない"}
+
+
+def _price_basis(db: Session) -> Dict[str, Any]:
+    """[Gate SearchUAT-S3] 計上の根拠: 料金版・操作ごとの SKU・単価(USD)・1単位の円・換算の係数・出典。"""
+    try:
+        profile = cg.load_profile(db, "explorer")
+    except cg.CostGuardError:
+        return {"status": "unavailable"}
+    snap = profile.provider_price_snapshot or {}
+    factor = Decimal(profile.fx_rate) * Decimal(profile.tax_factor) * Decimal(profile.safety_factor)
+    rows: List[Dict[str, Any]] = []
+    for operation, spec in cg.OPERATIONS.items():
+        op = (snap.get("operations") or {}).get(operation) or {}
+        for unit, usd in (op.get("unit_prices") or {}).items():
+            rows.append({"operation": operation, "label": spec["label"], "sku": op.get("sku"), "unit": unit,
+                         "usd": str(usd), "jpy": cg.money(Decimal(str(usd)) * factor),
+                         "field_mask": op.get("field_mask"), "basis": op.get("basis")})
+    return {"status": "known", "policy_version": profile.version, "checked_at": snap.get("checked_at"),
+            "fx_rate": str(profile.fx_rate), "tax_factor": str(profile.tax_factor),
+            "safety_factor": str(profile.safety_factor), "jpy_per_usd": cg.money(factor),
+            "sources": dict(snap.get("sources") or {}), "rows": rows,
+            "note": "円 = 単価(USD)× 量 × 為替 × 税 × 安全係数。利用枠を越えないための保守的な見込みで、請求額ではない"}
+
+
 # ===================================================================== 概要
 
 @router.get("/overview")
@@ -201,8 +235,15 @@ def ops_overview(admin: User = Depends(require_admin), db: Session = Depends(get
                        "hard_cap_jpy": cg.money(HARD_CAP_JPY)},
         "month": cg.month_key(now),
         "fake_usage": {**fake, "label": "Fake の試験の額(実の請求ではない)"},
+        # [Gate SearchUAT-S3] 旅行・相談の利用枠への計上(アプリの料金版の単価 × 為替・税・安全係数の見込み)。
+        # 提供元の請求額ではない。管理者の鍵の確認(key_verification_usage)は別に数える
         "live_usage": {"providers": live, "estimated_jpy": cg.money(live_est),
-                       "label": "アプリの見込みの原価(実の請求とは別。照合は請求の明細が届いてから)"},
+                       "label": "今月の利用枠の計上(アプリの料金版による見込み)。提供元の請求額ではありません"},
+        "key_verification_usage": _verification_month(db, month_start),
+        "provider_invoice": {"status": "not_reconciled",
+                             "label": "提供元の請求額: 未照合(Google Cloud Billing・OpenAI の明細を取り込んでいません。"
+                                      "月の無料の使用の上限・割引・クレジットはここでは引いていません)"},
+        "price_basis": _price_basis(db),
         # [Gate FR059-D11] 無料の provider へ送った回数(0円。50円の枠には入れない。利用規約・回数の制限の確認用)
         "free_usage": {"providers": {k: {"requests": v["requests"], "events": v["events"]} for k, v in free.items()},
                        "requests": sum(v["requests"] for v in free.values()),

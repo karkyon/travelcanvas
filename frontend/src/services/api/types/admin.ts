@@ -8,12 +8,19 @@ export interface AdminSystemStats {
     verified_users: number;
     new_users_30d: number;
     user_types: { guest: number; registered: number; premium: number; admin: number };
+    /** [Gate SearchUAT-S3] 運用の Fake の試験の利用者(総数に含まれる) */
+    test_accounts?: number;
+    registered_excluding_tests?: number;
+    breakdown_note?: string;
   };
   travel_plans: {
     total_plans: number;
     active_plans: number;
     completed_plans: number;
     draft_plans: number;
+    /** [Gate SearchUAT-S3] 試験の利用者・ゲストの旅行(総数に含まれる) */
+    test_plans?: number;
+    guest_plans?: number;
     average_duration_days: number;
     popular_destinations: { destination: string; count: number }[];
   };

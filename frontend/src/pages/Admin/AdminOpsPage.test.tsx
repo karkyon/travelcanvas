@@ -16,7 +16,13 @@ const overview = {
   as_of: '2026-10-30T09:00:00+00:00', environment: 'development', policy_version: '2026-10-29.1', month: '2026-10',
   thresholds: { user_warning_jpy: '40.0000', ops_alert_jpy: '45.0000', hard_cap_jpy: '50.0000' },
   fake_usage: { events: 12, estimated_jpy: '49.5500', actual_jpy: '0.0000', label: 'x' },
-  live_usage: { providers: {}, estimated_jpy: '0.0000', label: 'y' },
+  live_usage: { providers: {}, estimated_jpy: '8.0500', label: 'y' },
+  key_verification_usage: { checks: 2, estimated_jpy: '9.1144', daily_cap_jpy: '50.0000', label: 'z' },
+  provider_invoice: { status: 'not_reconciled', label: '未照合' },
+  price_basis: { status: 'known', policy_version: '2026-11-02.1', checked_at: '2026-11-02', fx_rate: '180',
+    tax_factor: '1.10', safety_factor: '1.15', jpy_per_usd: '227.7000', sources: {}, note: '請求額ではない',
+    rows: [{ operation: 'places.search', label: '場所の検索', sku: 'places-text-search-pro', unit: 'requests',
+      usd: '0.032', jpy: '7.2864', field_mask: 'places.id,places.displayName', basis: 'Text Search Pro' }] },
   connected_paid_providers: [], suspended_providers: {}, plan_accounts: { total: 1, by_state: { ops_alert: 1 } },
   open_reservations: 0, cloud_billing: { status: 'unavailable', message: 'Cloud Billing の請求額・予算はアプリから取得していません' },
   free_usage: { providers: { overpass: { requests: 3, events: 3 }, nominatim: { requests: 2, events: 1 } }, requests: 5,
@@ -63,7 +69,15 @@ describe('AdminOpsPage (Gate OpsCMS)', () => {
     expect(screen.getByRole('heading', { level: 1, name: '運用の状態を、ひと目で。' })).toBeInTheDocument();
     expect(await screen.findByText('今月の Fake の試験の額')).toBeInTheDocument();
     expect(screen.getByText('¥49.55')).toBeInTheDocument();
-    expect(screen.getByText('今月の実の提供元の見込み')).toBeInTheDocument();
+    // [Gate SearchUAT-S3] 利用枠の計上・管理者の鍵の確認・提供元の請求(未照合)を分ける。¥8.05 と ¥9.11 を混ぜない
+    expect(screen.getByTestId('ops-allowance-usage')).toHaveTextContent('今月の利用枠の計上(見込み)¥8.05');
+    expect(screen.getByTestId('ops-allowance-usage')).toHaveTextContent('提供元の請求額ではありません');
+    expect(screen.getByTestId('ops-verify-usage')).toHaveTextContent('¥9.11');
+    expect(screen.getByTestId('ops-verify-usage')).toHaveTextContent('旅行の枠とは別');
+    expect(screen.getByTestId('ops-provider-invoice')).toHaveTextContent('未照合');
+    expect(screen.getByTestId('ops-price-basis')).toHaveTextContent('places-text-search-pro');
+    expect(screen.getByTestId('ops-price-basis')).toHaveTextContent('227.7000 円');
+    expect(screen.queryByText('今月の実の提供元の見込み')).toBeNull();
     expect(screen.getByText(/Cloud Billing の請求額・予算はアプリから取得していません/)).toBeInTheDocument();
     expect(screen.getByText(/課金を自動で止める上限ではありません/)).toBeInTheDocument();
     expect(screen.getByText('運用に知らせ(45円〜)')).toBeInTheDocument();

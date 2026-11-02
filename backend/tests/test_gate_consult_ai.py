@@ -226,13 +226,13 @@ def test_timeout_and_5xx(admin, db_session, net):
 def test_ai_call_quota_and_cap_are_enforced_per_consult(admin, db_session, net):
     client, user = admin
     _ready(client, db_session, user, net)
-    _tier(db_session, user, "journey")  # AI 3回 / 相談
+    _tier(db_session, user, "journey")  # [Gate F07-4] AI 10回 / 相談(価格の版 2026-11-02.1)
     sid = _session(client)
-    for _ in range(3):
+    for _ in range(10):
         assert _extract(client, sid).status_code == 200
     r = _extract(client, sid)
     assert r.status_code == 429 and r.json()["detail"]["code"] == "feature_quota_exceeded"
-    assert len(net.requests) == 3
+    assert len(net.requests) == 10
     acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="consult").one()
     assert Decimal(acc.settled_jpy) <= Decimal(acc.cap_jpy) == Decimal(50)
 

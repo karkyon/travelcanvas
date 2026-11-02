@@ -541,3 +541,15 @@
 .tc-admin-page { min-width: 0; padding: 24px clamp(16px, 3vw, 42px) 60px; max-width: 1660px; width: 100%; margin: 0 auto; }
 .tc-admin-page > .tc-page { padding: 0; }
 @media (max-width: 760px) { .tc-admin-page { padding: 17px 13px 40px; } }
+/* [Gate HomeHeroVideo] HOME の表紙の背景の動画(山並みの絵と同じ領域。文字・ボタンの位置は変えない) */
+.tc-hero-video { position: absolute; inset: 0; overflow: hidden; background: #dce8df; }
+.tc-hero-video-layer {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+  opacity: 0; transition: opacity var(--tc-hero-fade, 600ms) ease;
+}
+.tc-hero-video-layer.is-active { opacity: 1; }
+.tc-home-hero-art:has(.tc-hero-video) { opacity: 1; }
+[data-theme='dark'] .tc-home-hero-art:has(.tc-hero-video) { opacity: .8; }
+@media (prefers-reduced-motion: reduce) {
+  .tc-hero-video-layer { transition: none; }
+}

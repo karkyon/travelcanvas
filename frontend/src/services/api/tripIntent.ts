@@ -41,6 +41,7 @@ export async function extractIntent(input: ExtractInput): Promise<IntentExtracti
 const geocode: Decoder<Geocode> = object<Geocode>({
   status: oneOf('ok', 'not_found', 'unavailable', 'disabled'), latitude: nullable(num), longitude: nullable(num),
   label: nullable(str), provider: nullable(str), source_url: nullable(str), retrieved_at: nullable(str),
+  suspect: optional(bool), suspect_note: optional(str),
 });
 const note: Decoder<StatusNote> = object<StatusNote>({ status: str, note: str });
 
@@ -55,6 +56,7 @@ const areas: Decoder<AreasResult> = object<AreasResult>({
   origin: object<AreasResult['origin']>({
     query: str, status: oneOf('ok', 'not_found', 'unavailable', 'disabled'), latitude: nullable(num),
     longitude: nullable(num), label: nullable(str), provider: nullable(str), source_url: nullable(str),
+    suspect: optional(bool), suspect_note: optional(str),
     retrieved_at: nullable(str),
   }),
   areas: arrayOf(area), retrieved_at: str,
