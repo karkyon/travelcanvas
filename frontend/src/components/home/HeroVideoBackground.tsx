@@ -93,9 +93,13 @@ const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({ fallback, sce
     const next = list[nextOf(from)]!;
     startedAt.current = Date.now();
     const wait = remaining.current;
+    // [Gate HeroFix] 切り替えた時の後片付けで「残り 0 ms」を覚えてしまい、2本目から連続で切り替わり続けた(UAT 18:16 のちらつき)。
+    // 切り替えが済んだ後片付けでは残りを覚えない(次の場面は 7 秒から)
+    let fired = false;
     const preload = window.setTimeout(() => setLoaded((l) => (l[next.id] ? l : { ...l, [next.id]: true })),
       Math.max(0, wait - HERO_PRELOAD_LEAD_MS));
     const turn = window.setTimeout(() => {
+      fired = true;
       remaining.current = rotateMs;
       setLoaded((l) => (l[next.id] ? l : { ...l, [next.id]: true }));
       setIndex(list.indexOf(next));
@@ -103,7 +107,7 @@ const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({ fallback, sce
     return () => {
       window.clearTimeout(preload);
       window.clearTimeout(turn);
-      remaining.current = Math.max(0, wait - (Date.now() - startedAt.current));
+      if (!fired) remaining.current = Math.max(0, wait - (Date.now() - startedAt.current));
     };
   }, [still, usable.length, running, current, list, nextOf, rotateMs]);
 

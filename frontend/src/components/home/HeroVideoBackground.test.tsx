@@ -64,6 +64,20 @@ describe('HOME の表紙の背景の動画', () => {
     expect(screen.getByTestId('hero-video')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('[HeroFix] 切り替えた後は次の 7 秒を待つ(後片付けで残り 0 にならず、連続で切り替わらない)', () => {
+    render(<HeroVideoBackground fallback={null} scenes={SCENES} />);
+    act(() => { vi.advanceTimersByTime(7000); });
+    expect(active()).toBe('b');
+    for (let i = 0; i < 20; i += 1) act(() => { vi.advanceTimersByTime(100); });
+    expect(active()).toBe('b'); // 以前はここで c → d → a と 0 ms ごとに進んだ
+    act(() => { vi.advanceTimersByTime(4900); });
+    expect(active()).toBe('b');
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(active()).toBe('c');
+    for (let i = 0; i < 20; i += 1) act(() => { vi.advanceTimersByTime(100); });
+    expect(active()).toBe('c');
+  });
+
   it('タブが隠れた間・画面の外の間はタイマーを止め、戻ると残りの時間から続ける', () => {
     render(<HeroVideoBackground fallback={null} scenes={SCENES} />);
     act(() => { vi.advanceTimersByTime(3000); });

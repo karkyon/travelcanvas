@@ -61,7 +61,8 @@ def _ai_answer(text: str) -> Dict[str, Any]:
         "dates": {"status": dates.get("status") if dates.get("status") in ("fixed", "window") else "undecided",
                   "text": dates.get("text"), "evidence": evid("dates")},
         "preferences": list(by.get("preferences", {}).get("value") or []),
-        "areas_mentioned": [a["name"] for a in ex["areas"]],
+        "areas_mentioned": [a["name"] for a in ex["areas"] if a.get("source") == "user_input"]
+        + [r["word"] for r in ex.get("regions", [])],
         "areas_suggested": STUB_SUGGESTIONS,
         "unknowns": ["模擬の提供元の答えです"],
         "other_wishes": ["何もしない時間がほしい"] if "何もしない" in body else [],

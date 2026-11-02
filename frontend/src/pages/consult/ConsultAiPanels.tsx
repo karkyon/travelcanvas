@@ -15,6 +15,7 @@ import {
   type ConsultRouteMode, type ConsultRouteResult, type ConsultUsage,
 } from '@/services/api/consultAi';
 import { retrievedLabel } from './consultModel';
+import type { ExtractedArea, RegionHint } from '@/services/api/types/tripIntent';
 import { operationBlocker, usageLabel } from './consultAiModel';
 
 export const StubBanner: React.FC<{ status: ConsultAiStatus | null }> = ({ status }) => (status?.stub ? (
@@ -75,12 +76,47 @@ export const AiReadPanel: React.FC<{
 export const SuggestedAreasPanel: React.FC<{
   suggestions: Array<{ name: string; reason: string }>; unknowns: string[]; areaNames: string[];
   contradictions?: string[];
+  /** [Gate AreaLogic] 条件(出発地・片道の時間・地域・過ごし方)から内蔵の候補表で選んだ方面 */
+  proposed?: ExtractedArea[]; regions?: RegionHint[]; proposalNote?: string | null;
   onToggle: (name: string, on: boolean) => void;
-}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [] }) => {
+}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [], proposed = [], regions = [], proposalNote = null }) => {
   const id = useId();
-  if (suggestions.length === 0 && unknowns.length === 0 && contradictions.length === 0) return null;
+  if (suggestions.length === 0 && unknowns.length === 0 && contradictions.length === 0 && proposed.length === 0
+    && regions.length === 0 && !proposalNote) return null;
   return (
     <>
+    {(proposed.length > 0 || regions.length > 0 || proposalNote) && (
+      <section aria-labelledby={`${id}-p`} data-testid="consult-proposed-areas"
+        className="mt-4 rounded-2xl border border-cloud-200 bg-surface p-4 text-sm">
+        <h3 id={`${id}-p`} className="font-semibold text-ink-900">条件から選んだ方面(比較に入れます)</h3>
+        {regions.length > 0 && (
+          <p className="text-xs text-ink-700" data-testid="consult-regions">
+            {`範囲の条件: ${regions.map((r) => r.word).join('・')}(地域の名前は行き先ではなく、選ぶ範囲として使います)`}
+          </p>
+        )}
+        <p className="text-xs text-ink-700">
+          出発地からの直線距離と道路の係数で片道の目安を出し、条件の時間の内の方面を内蔵の候補表から選びました。
+          実際の運転時間は道路の提供元が未接続のため未照会です。
+        </p>
+        {proposalNote && <p className="mt-1 text-xs font-semibold text-warning" role="note">{proposalNote}</p>}
+        {proposed.length > 0 && (
+          <ul className="mt-2 space-y-2">
+            {proposed.map((p) => {
+              const on = areaNames.includes(p.name);
+              return (
+                <li key={p.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cloud-200 p-2">
+                  <span className="min-w-0"><b>{p.label ?? p.name}</b><span className="block text-xs text-ink-700">{p.reason}</span></span>
+                  <button type="button" aria-pressed={on} onClick={() => onToggle(p.name, !on)}
+                    className="tc-focus-ring min-h-11 rounded-lg border border-cloud-200 px-3 text-xs" data-testid={`consult-proposed-${p.name}`}>
+                    {on ? '比較から外す' : '比較に足す'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    )}
     {contradictions.length > 0 && (
       <section aria-labelledby={`${id}-c`} data-testid="consult-ai-contradictions"
         className="mt-4 rounded-2xl border border-warning bg-surface p-4 text-sm">

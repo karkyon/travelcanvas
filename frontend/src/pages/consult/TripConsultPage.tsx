@@ -737,9 +737,10 @@ const TripConsultPage: React.FC = () => {
     setBusy('areas');
     setError(null);
     try {
-      // [監査 A06] 確かめていない出発地は使わない(位置の照会をしない)
-      const r = await compareAreas({ origin: review.confirmed.origin ? review.values.origin : '', areas: list,
-        one_way_hours: review.confirmed.one_way ? review.values.one_way_hours : null,
+      // [Gate AreaLogic] 以前(監査 A06)は確かめていない出発地を送らず、距離・片道の判定が全て「未計算」になった(UAT 18:16)。
+      // 出発地・片道の時間は位置関係と目安にだけ使い、未確認なら画面に「未確認の読み取りのまま」と示す(旅程・予約には使わない)
+      const r = await compareAreas({ origin: (review.values.origin ?? '').trim(), areas: list,
+        one_way_hours: review.values.one_way_hours ?? null,
         one_way_strength: review.confirmed.one_way ? review.values.one_way_strength : null });
       setState((s) => ({ ...s, areas: r, selectedArea: s.selectedArea && list.includes(s.selectedArea) ? s.selectedArea : list[0] ?? null }));
     } catch {
@@ -851,7 +852,9 @@ const TripConsultPage: React.FC = () => {
             extraBudgets: (s.review.extraBudgets ?? []).filter((b) => b.id !== bid) } } : s))} />
       )}
       {step === 'review' && state.review && (
-        <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
+        <SuggestedAreasPanel proposed={(state.extraction?.areas ?? []).filter((a) => a.source === 'proposed')}
+          regions={state.extraction?.regions ?? []} proposalNote={state.extraction?.proposal?.note ?? null}
+          suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
           contradictions={state.contradictions ?? []} areaNames={state.areaNames}
           onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)
             : s.areaNames.filter((n) => n !== name) }))} />

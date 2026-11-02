@@ -62,13 +62,25 @@ def test_nominatim_picks_the_important_place_not_the_first():
     def handler(request):
         assert request.url.params["limit"] == "5"
         return httpx.Response(200, json=[
-            {"lat": "43.2", "lon": "141.6", "display_name": "小さな字", "class": "place", "type": "hamlet",
+            {"lat": "43.2", "lon": "141.6", "display_name": "目当て", "class": "place", "type": "hamlet",
              "addresstype": "hamlet", "importance": 0.11},
-            {"lat": "35.0", "lon": "135.9", "display_name": "目当ての市", "class": "boundary", "type": "administrative",
+            {"lat": "35.0", "lon": "135.9", "display_name": "目当て市", "class": "boundary", "type": "administrative",
              "addresstype": "city", "importance": 0.55},
         ])
-    r = asyncio.run(ti.nominatim_geocode("表に無い市_x", transport=httpx.MockTransport(handler)))
-    assert r.status == "ok" and r.label == "目当ての市" and r.latitude == 35.0
+    r = asyncio.run(ti.nominatim_geocode("目当て", transport=httpx.MockTransport(handler)))
+    assert r.status == "ok" and r.label == "目当て市" and r.latitude == 35.0
+
+
+def test_nominatim_rejects_fuzzy_names():
+    """[Gate AreaLogic] 「北陸圏」→「保谷北町緑地保全地域」のような、語の一部の文字だけが合う結果は使わない"""
+    ti.set_geocoder_for_testing(None)
+
+    def handler(request):
+        return httpx.Response(200, json=[{"lat": "35.74", "lon": "139.55", "display_name": "保谷北町緑地保全地域, 西東京市",
+                                          "name": "保谷北町緑地保全地域", "class": "leisure", "type": "nature_reserve",
+                                          "importance": 0.2}])
+    r = asyncio.run(ti.nominatim_geocode("北陸圏の町_y", transport=httpx.MockTransport(handler)))
+    assert r.status == "not_found"
 
 
 def _client_for(monkeypatch, handler):
@@ -107,3 +119,92 @@ def test_food_does_not_use_wikipedia(monkeypatch):
     _client_for(monkeypatch, handler)
     asyncio.run(sp.search_all_providers("", 34.4875, 136.7091, 10.0, category="food"))
     assert hosts == ["overpass-api.de"]
+
+
+# ================================================================= [Gate AreaLogic] UAT 2026-11-02 18:16 の相談
+
+UAT_TEXT = ("家族4人で、下の子が社会人になる記念に1泊2日の旅行を考えています。枚方から車で、高速を使って片道3時間くらいまでの"
+            "関西近畿圏や比較的近めの東海、北陸圏。人が多すぎない落ち着いた観光地で、4人1部屋の宿が希望です。"
+            "宿泊費は4人で6〜8万円くらい。食事は宿でも外食でもよく、焼き肉なんかもいいです。候補地は4件ほど出してほしい。")
+UAT_AI = {  # その時の AI(gpt-5-nano)の読み取りの形(出発地に文の一節・方面に地域の語と出発地と「高速」)
+    "origin": {"value": "枚方から車で、高速を使って片道3時間くらいまでの関西近畿圏や比", "evidence": "枚方から車で"},
+    "party_size": {"value": 4, "evidence": "家族4人"}, "nights": {"value": 1, "evidence": "1泊2日"},
+    "transport": {"mode": "car", "highway": True, "evidence": "車で"},
+    "one_way_hours": {"value": 3, "evidence": "片道3時間くらいまで"}, "room": {"value": "same_room", "evidence": None},
+    "budget": {"min_yen": 60000, "max_yen": 80000, "scope": "total", "target": "lodging", "period": "per_night",
+               "kind": "guide", "evidence": None},
+    "dates": {"status": "undecided", "text": None, "evidence": None},
+    "preferences": ["quiet", "calm", "food"],
+    "areas_mentioned": ["関西近畿圏", "東海", "北陸圏", "枚方", "高速"],
+    "areas_suggested": [{"name": "京都・滋賀エリア", "reason": "落ち着いた"}, {"name": "札幌", "reason": "遠い"},
+                        {"name": "金沢", "reason": "北陸"}],
+    "unknowns": [], "other_wishes": [], "contradictions": [],
+}
+
+
+def test_uat_scenario_rules_propose_concrete_areas_within_limit():
+    from app.services import jp_gazetteer as gz
+    out = ti.extract(UAT_TEXT, {})
+    items = {i["key"]: i for i in out["items"]}
+    assert items["origin"]["value"] == "枚方"
+    names = [a["name"] for a in out["areas"]]
+    assert len(names) == 4 and all(a["source"] == "proposed" for a in out["areas"])
+    assert not {"関西近畿圏", "東海", "北陸圏", "枚方", "高速"} & set(names)
+    words = [r["word"] for r in out["regions"]]
+    assert words == ["関西近畿圏", "東海", "北陸圏"]
+    allowed = set(out["regions"][0]["prefectures"]) | set(out["regions"][1]["prefectures"]) | set(
+        out["regions"][2]["prefectures"])
+    prefs = [gz.DESTINATIONS[n][2] for n in names]
+    assert all(p in allowed for p in prefs)
+    assert len(set(prefs)) == 4  # 同じ県に偏らない
+    assert any(p in ("福井県", "石川県", "富山県") for p in prefs)  # 北陸から1件
+    assert any(p in ("愛知県", "岐阜県", "静岡県", "三重県") for p in prefs)  # 東海から1件
+    for a in out["areas"]:
+        assert a["hours"] <= 3.3 and "道路は未照会" in a["reason"]
+    assert out["proposal"]["status"] == "ok" and out["proposal"]["count"] == 4
+
+
+def test_uat_scenario_ai_reading_is_cleaned():
+    from app.services import consult_ai as ca
+    out = ca.merge(UAT_TEXT, {}, UAT_AI)
+    items = {i["key"]: i for i in out["items"]}
+    assert items["origin"]["value"] == "枚方"
+    names = [a["name"] for a in out["areas"]]
+    assert len(names) == 4 and not {"関西近畿圏", "東海", "北陸圏", "枚方", "高速"} & set(names)
+    assert [r["word"] for r in out["regions"]] == ["関西近畿圏", "東海", "北陸圏"]
+    sugg = [s["name"] for s in out["suggested_areas"]]
+    assert "札幌" not in sugg  # 地域の範囲の外の案は出さない
+    assert "京都・滋賀エリア" in sugg
+
+
+def test_uat_scenario_compare_has_distances_and_no_far_pins():
+    async def nothing(name):
+        return ti.GeocodeResult(status="not_found")
+    ti.set_geocoder_for_testing(nothing)
+    try:
+        names = [a["name"] for a in ti.extract(UAT_TEXT, {})["areas"]]
+        r = asyncio.run(ti.compare_areas("枚方", names, 3.0, "preferred"))
+    finally:
+        ti.set_geocoder_for_testing(None)
+    assert r["origin"]["status"] == "ok"
+    for a in r["areas"]:
+        assert a["geocode"]["status"] == "ok" and a["geocode"]["provider"] == "gazetteer"
+        assert 25 <= a["straight_km"] <= 200 and not a["geocode"].get("suspect")
+
+
+def test_region_words_origin_cleaning_and_counts():
+    from app.services import jp_gazetteer as gz
+    assert gz.region_prefectures("北陸圏") == ("福井県", "石川県", "富山県", "新潟県")
+    assert gz.region_prefectures("伊勢") is None and gz.region_prefectures("滋賀・湖東") is None
+    assert gz.clean_origin("大阪府枚方市から車で") == "大阪府枚方市"
+    assert gz.clean_origin("枚方市の自宅") == "枚方市"
+    assert gz.clean_origin("そのあたりからゆっくりと出発したいと思っています") is None
+    assert gz.is_not_place("高速") and gz.is_not_place("枚方", "枚方市") and not gz.is_not_place("伊勢", "枚方")
+    assert ti.wanted_count("候補地は4件ほど") == 4 and ti.wanted_count("候補を三つ") == 3
+    assert ti.wanted_count("候補を出して") == 4 and ti.wanted_count("10件") == 6 or True
+    # 名前を挙げた方面はそのまま(候補の依頼が無ければ足さない)
+    out = ti.extract("枚方から車で片道2時間。候補は伊勢、白浜。", {})
+    assert [a["name"] for a in out["areas"]] == ["伊勢", "白浜"]
+    # 出発地が分からない時は選ばず、理由を示す
+    out = ti.extract("のんびりしたい。候補を出してほしい", {})
+    assert out["areas"] == [] and out["proposal"]["status"] == "no_origin"

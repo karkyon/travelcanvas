@@ -63,6 +63,9 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
     r.values.one_way_hours && `片道${r.values.one_way_hours}時間(${r.confirmed.one_way ? (r.values.one_way_strength === 'required' ? '絶対条件' : '希望') : '未確認'})`,
   ].filter(Boolean).join(' · ');
 
+  const proposedOf = (name: string) => state.extraction?.areas.find((x) => x.name === name && x.source === 'proposed');
+  const regionWords = (state.extraction?.regions ?? []).map((x) => x.word);
+
   const add = (e: React.FormEvent) => {
     e.preventDefault();
     const name = newArea.trim();
@@ -76,7 +79,9 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-ink-700 break-words" data-testid="areas-conditions">{`適用中の条件: ${conditions || '未指定'}`}</p>
+          <p className="text-xs font-semibold text-ink-700 break-words" data-testid="areas-conditions">{`適用中の条件: ${conditions || '未指定'}`}
+            {regionWords.length > 0 && ` · 範囲: ${regionWords.join('・')}`}
+            {r.values.origin && !r.confirmed.origin && ' · 出発地は未確認の読み取りのまま(位置関係だけに使います)'}</p>
           <h2 className="mt-1 text-lg font-bold text-ink-900">どの方面が今回の旅に合いそう?</h2>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onEdit}>条件を編集</Button>
@@ -152,7 +157,11 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                       <button type="button" aria-pressed={selected} onClick={() => onSelect(a.name)}
                         className="tc-focus-ring min-h-11 text-left">
                         <span className="block text-base font-bold text-ink-900">{selected ? '● ' : '○ '}{a.name}</span>
-                        <span className="block text-[11px] text-ink-700">あなたが挙げた方面 · 選ぶだけでは旅程にしません</span>
+                        <span className="block text-[11px] text-ink-700" data-testid={`area-source-${a.name}`}>
+                          {proposedOf(a.name)
+                            ? `条件から選んだ方面 · ${proposedOf(a.name)?.reason ?? ''} · 選ぶだけでは旅程にしません`
+                            : 'あなたが挙げた方面 · 選ぶだけでは旅程にしません'}
+                        </span>
                       </button>
                       <button type="button" aria-pressed={saved} onClick={() => onToggleSave(a.name)}
                         aria-label={saved ? `${a.name}を比較に残すのをやめる` : `${a.name}を比較に残す`}

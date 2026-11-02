@@ -150,6 +150,34 @@ function renderConsult() {
   );
 }
 
+describe('[Gate AreaLogic] 条件から選んだ方面(UAT 18:16 の相談)', () => {
+  it('地域の語は範囲として示し、選んだ方面を比較に入れる。未確認の出発地も位置関係には使う', async () => {
+    api.extractIntent.mockResolvedValue({ ...EXTRACTION,
+      areas: [{ name: '淡路島', source: 'proposed', reason: '兵庫県 · 直線 約90km · 片道の目安 約1時間半(直線距離からの目安・道路は未照会)', hours: 1.5, km: 90, label: '淡路島(兵庫県)' },
+        { name: 'あわら温泉', source: 'proposed', reason: '福井県 · 直線 約164km · 片道の目安 約3時間(直線距離からの目安・道路は未照会)', hours: 3, km: 164, label: 'あわら温泉(福井県)' }],
+      regions: [{ word: '関西近畿圏', prefectures: ['大阪府'] }, { word: '東海', prefectures: ['愛知県'] }, { word: '北陸圏', prefectures: ['福井県'] }],
+      proposal: { status: 'ok', note: null, limit_hours: 3.3, count: 2 } });
+    api.compareAreas.mockResolvedValue({ origin: { query: '枚方', ...geo(34.8) }, retrieved_at: '2026-10-29T00:00:00+00:00',
+      providers: { geocode: 'nominatim', route: null, lodging: null, crowd: null, destination_suggestions: null },
+      areas: [areaRow('淡路島', 34.35), areaRow('あわら温泉', 36.2)] });
+    renderConsult();
+    fireEvent.click(screen.getByRole('button', { name: '例文を入れる' }));
+    fireEvent.click(screen.getByTestId('consult-extract'));
+    expect(await screen.findByTestId('consult-proposed-areas')).toHaveTextContent('淡路島(兵庫県)');
+    expect(screen.getByTestId('consult-regions')).toHaveTextContent('範囲の条件: 関西近畿圏・東海・北陸圏');
+    expect(screen.getByTestId('consult-proposed-あわら温泉')).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: '片道の時間の扱い' })).getByRole('radio', { name: /希望/ }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: '予算は誰の分か' })).getByRole('radio', { name: /全員の合計/ }));
+    fireEvent.click(screen.getByTestId('review-confirm-nights'));
+    fireEvent.click(screen.getByTestId('consult-compare'));
+    await waitFor(() => expect(api.compareAreas).toHaveBeenCalledWith({ origin: '枚方', areas: ['淡路島', 'あわら温泉'],
+      one_way_hours: 3, one_way_strength: 'preferred' }));
+    expect(await screen.findByTestId('area-source-淡路島')).toHaveTextContent('条件から選んだ方面');
+    expect(screen.getByTestId('areas-conditions')).toHaveTextContent('範囲: 関西近畿圏・東海・北陸圏');
+    expect(screen.getByTestId('areas-conditions')).toHaveTextContent('出発地は未確認の読み取りのまま');
+  });
+});
+
 describe('旅行相談の流れ', () => {
   it('希望 → 確認 → 方面の比較 → 方面の詳細 → 下書き。旅行は最後の操作まで作らない', async () => {
     api.extractIntent.mockResolvedValue(EXTRACTION);

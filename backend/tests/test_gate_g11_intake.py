@@ -129,14 +129,15 @@ def test_extract_fields_override_text_and_answers_close_questions(client, users)
     assert items["budget"]["value"]["scope"] == "per_person" and not items["budget"]["needs_answer"]
     assert items["dates"]["source"] == "user_input" and "日付は未確定" in items["dates"]["display"]
     assert "onsen" in items["preferences"]["value"]
-    assert [a["name"] for a in res.json()["areas"]][:1] == ["四国"]
+    # [Gate AreaLogic] 「四国」は行き先ではなく地域の範囲
+    assert res.json()["regions"][0]["word"] == "四国"
 
 
 def test_extract_areas_variants_and_validation(client, users):
     owner, _ = users
     _as(owner)
     names = [a["name"] for a in ti.extract("候補は伊勢、和歌山、福井、滋賀(湖東/湖西)、岐阜、兵庫、淡路島、四国。", {})["areas"]]
-    assert names == ["伊勢", "和歌山", "福井", "滋賀・湖東", "滋賀・湖西", "岐阜", "兵庫", "淡路島", "四国"]
+    assert names == ["伊勢", "和歌山", "福井", "滋賀・湖東", "滋賀・湖西", "岐阜", "兵庫", "淡路島"]
     assert ti.extract("のんびりしたい", {})["areas"] == []
     assert _items(ti.extract("日帰りで", {}))["nights"]["display"] == "日帰り"
     assert _items(ti.extract("片道2時間半以内", {}))["one_way"]["value"] == 2.5

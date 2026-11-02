@@ -162,7 +162,9 @@ def ai_fields(data: Dict[str, Any], norm_text: str) -> Tuple[Dict[str, Any], Dic
         v = data.get(name)
         return v if isinstance(v, dict) else {}
 
-    origin = _str(part("origin").get("value"), 40)
+    # [Gate AreaLogic] AI が出発地に文の一節(「枚方から車で、高速を使って…」)を入れても、地名だけにする
+    from app.services import jp_gazetteer as gz
+    origin = gz.clean_origin(_str(part("origin").get("value"), 60))
     if origin:
         f["origin"], ev["origin"] = origin, _in_text(norm_text, part("origin").get("evidence"))
     party = _int(part("party_size").get("value"), 1, 30)
@@ -259,24 +261,56 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
             built["strength"] = "undecided"
         items.append(built)
     mentioned = [a for a in (_str(x, 15) for x in (data.get("areas_mentioned") or [])) if a and a in norm]
-    area_names = list(dict.fromkeys([a["name"] for a in base["areas"]] + mentioned))[:ti.MAX_AREAS]
-    areas: List[Dict[str, Any]] = [{"name": a, "source": "user_input"} for a in area_names]
-    suggested: List[Dict[str, Any]] = []
-    for s in data.get("areas_suggested") or []:
-        if not isinstance(s, dict):
-            continue
-        name, reason = _str(s.get("name"), 20), _str(s.get("reason"), 80)
-        if name and name not in area_names and all(x["name"] != name for x in suggested):
-            suggested.append({"name": name, "reason": reason or "", "source": "ai_suggested"})
-        if len(suggested) >= MAX_SUGGESTIONS:
-            break
+    named = [a["name"] for a in base["areas"] if a.get("source") == "user_input"] + \
+        [r["word"] for r in base.get("regions", [])]
+    # [Gate AreaLogic] 書かれた語を「行き先・地域の範囲・行き先ではない語」に分け、条件に合う方面を選ぶ(AI の値を重ねた後の条件で)
+    plan = ti.plan_areas(norm, list(dict.fromkeys(named + mentioned)), items)
+    areas: List[Dict[str, Any]] = plan["areas"]
+    area_names = [a["name"] for a in areas]
+    suggested = _checked_suggestions(data.get("areas_suggested") or [], area_names, plan, items)
     unknowns = [u for u in (_str(x, 60) for x in (data.get("unknowns") or [])) if u][:5]
     notes = list(dict.fromkeys(n for n in (_str(x, 100) for x in (data.get("other_wishes") or [])) if n))[:ti.MAX_NOTES]
     # [Gate AdminUAT U05] 食い違う希望は勝手に片方へ寄せず、確かめてほしいこととして返す
     contradictions = list(dict.fromkeys(c for c in (_str(x, 80) for x in (data.get("contradictions") or [])) if c))[:5]
     nights = next((x["value"] for x in items if x["key"] == "nights" and isinstance(x["value"], int)), None)
-    return {"items": items, "areas": areas, "suggested_areas": suggested, "unknowns": unknowns, "notes": notes,
+    return {"items": items, "areas": areas, "regions": plan["regions"], "proposal": plan["proposal"],
+            "suggested_areas": suggested, "unknowns": unknowns, "notes": notes,
             "contradictions": contradictions, "nights": nights, "extractor": EXTRACTOR, "ai_connected": True}
+
+
+def _checked_suggestions(raw: List[Any], area_names: List[str], plan: Dict[str, Any],
+                         items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """[Gate AreaLogic] AI の方面の案を、地名の表で分かる範囲で確かめる。地域の範囲の外・片道の目安を大きく超える案は出さない
+    (以前は北海道の案もそのまま出した)。表に無い案は「位置は比較の時に照会」のまま残す"""
+    from app.services import jp_gazetteer as gz
+
+    region_prefs = {p for r in plan.get("regions", []) for p in r["prefectures"]}
+    origin = ti._item_value(items, "origin")
+    o = gz.lookup(origin) if isinstance(origin, str) else None
+    hours = ti._item_value(items, "one_way")
+    tr = ti._item_value(items, "transport") or {}
+    out: List[Dict[str, Any]] = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        name, reason = _str(s.get("name"), 20), _str(s.get("reason"), 80)
+        if not name or name in area_names or any(x["name"] == name for x in out) or gz.is_not_place(name):
+            continue
+        pref = gz.destination_pref(name)
+        if region_prefs and pref and pref not in region_prefs:
+            continue
+        hit = gz.lookup(name)
+        if hit is not None and o is not None and isinstance(hours, (int, float)):
+            km = gz._haversine(float(o["latitude"]), float(o["longitude"]),  # type: ignore[arg-type]
+                               float(hit["latitude"]), float(hit["longitude"]))  # type: ignore[arg-type]
+            est = gz.estimate_hours(km, 1.3, tr.get("mode") if isinstance(tr, dict) else None,
+                                    bool(tr.get("highway")) if isinstance(tr, dict) else False)
+            if est > float(hours) * 1.3:
+                continue
+        out.append({"name": name, "reason": reason or "", "source": "ai_suggested"})
+        if len(out) >= MAX_SUGGESTIONS:
+            break
+    return out
 
 
 # ===================================================================== 送る
