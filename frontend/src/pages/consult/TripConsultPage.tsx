@@ -17,12 +17,14 @@ import PlanningClassSummary from '@/components/planning/PlanningClassSummary';
 import { compareAreas, createTripDraft, extractIntent } from '@/services/api/tripIntent';
 import { updateConsents } from '@/services/api';
 import {
-  aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage,
+  aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage, consultTurn,
 } from '@/services/api/consultAi';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import type { IntentExtraction } from '@/services/api/types/tripIntent';
 import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
 import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
+import { TurnPanels } from './TurnPanels';
+import { applyTurn, decideTurnChange, turnStateOf } from './consultTurnModel';
 import AreasStep from './AreasStep';
 import AreaDetailStep from './AreaDetailStep';
 import { keepIdempotencyKey } from './consultAiModel';
@@ -665,6 +667,38 @@ const TripConsultPage: React.FC = () => {
       setBusy(null);
     }
   };
+  /** [Gate F07] 追加・訂正・削除を1ターンとして AI で読む(最新の発言と今の条件だけを送る。全文を送り直さない) */
+  const aiTurn = async (utterance: string) => {
+    const review = state.review;
+    if (!review) return;
+    setBusy('ai');
+    setError(null);
+    try {
+      const sid = await ensureSession();
+      const turnState = turnStateOf(review, state.areaNames);
+      const r = await consultTurn(sid, utterance, turnState, keyFor({ sid, utterance, revision: turnState.revision }));
+      pendingKey.current = null;
+      setConsultUsage(r.usage);
+      setState((s) => {
+        if (!s.review) return s;
+        const out = applyTurn(s.review, s.areaNames, r);
+        const history = [...(s.history ?? []), { review: s.review, areaNames: s.areaNames }].slice(-10);
+        return { ...s, review: out.review, areaNames: out.areaNames, areas: null, history,
+          contradictions: out.contradictions, unknowns: out.questions.length ? out.questions : (s.unknowns ?? []) };
+      });
+    } catch (e) {
+      const code = consultErrorCode(e);
+      if (!keepIdempotencyKey(e)) pendingKey.current = null;
+      if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
+        sessionRef.current = null;
+        setState((s) => ({ ...s, consultSessionId: null }));
+      }
+      setError(`${errorDetailMessage(e, 'AI で読み取れませんでした')}。伝えた内容は確認の画面に反映していません。もう一度送るか、AI を使わずに反映できます`);
+      void refreshAiStatus();
+    } finally {
+      setBusy(null);
+    }
+  };
   const go = useCallback((step: ConsultStep) => {
     setError(null);
     setState((s) => ({ ...s, step }));
@@ -785,6 +819,11 @@ const TripConsultPage: React.FC = () => {
           extras={<FollowUp busy={busy === 'ai' || busy === 'extract'} canUndo={(state.history ?? []).length > 0} onUndo={undo}
             aiReady={Boolean(aiStatus?.operations['ai.generate'].ready && aiStatus.consent.ai_processing)}
             onSend={(text, useAi) => {
+              // [Gate F07] AI の時は1ターンとして読む(最新の発言と今の条件だけを送る)。相談の文章には足さない
+              if (useAi && state.review) {
+                void aiTurn(text);
+                return null;
+              }
               // 追加の文章は相談の文章の後ろへ足す(原文は消さない)。確かめた行は重ねる時に残す
               // [F07-3] 以前は 4000 文字で後ろを切り、最新の訂正を黙って失っていた。上限を越える時は送らず、理由を示す
               const combined = `${state.brief.text.trim()}\n【追加】${text}`;
@@ -798,6 +837,18 @@ const TripConsultPage: React.FC = () => {
               void (useAi ? aiRead(brief) : extract(brief));
               return null;
             }} />} />
+      )}
+      {step === 'review' && state.review && (
+        <TurnPanels review={state.review}
+          onDecide={(cid, accept) => setState((s) => {
+            if (!s.review) return s;
+            const out = decideTurnChange(s.review, s.areaNames, cid, accept);
+            return { ...s, review: out.review, areaNames: out.areaNames, areas: null };
+          })}
+          onBudgetConfirm={(bid, on) => setState((s) => (s.review ? { ...s, review: { ...s.review,
+            extraBudgets: (s.review.extraBudgets ?? []).map((b) => (b.id === bid ? { ...b, confirmed: on } : b)) } } : s))}
+          onBudgetRemove={(bid) => setState((s) => (s.review ? { ...s, review: { ...s.review,
+            extraBudgets: (s.review.extraBudgets ?? []).filter((b) => b.id !== bid) } } : s))} />
       )}
       {step === 'review' && state.review && (
         <SuggestedAreasPanel suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}

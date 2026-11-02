@@ -19,6 +19,7 @@
 運転時間・宿・混み具合・営業時間の値は作らない(経路は Google の結果だけを、出典と時刻つきで示す)。
 旅の個人的な理由は保存しない。監査には件数と方面の数だけを残す(文章・地名は残さない)。
 """
+import json
 import uuid
 from urllib.parse import urlsplit
 from datetime import date as date_cls
@@ -44,6 +45,7 @@ from app.models.models import (
 from app.services import candidates as cs
 from app.services import consents
 from app.services import consult_ai
+from app.services import consult_turn
 from app.services import cost_guard as cg
 from app.services import free_usage
 from app.services import membership_tiers as mt
@@ -159,6 +161,23 @@ class IntentIn(BaseModel):
     preferences: List[str] = Field(default_factory=list, max_length=10)
     # [Gate ConsultAI] 決まった項目に分けられない希望(その他)。利用者が確かめた分だけ下書きへ残す
     notes: List[str] = Field(default_factory=list, max_length=ti.MAX_NOTES)
+    # [Gate F07] 確かめた予算の全て(宿・旅行全体など複数。上の budget_* は以前と同じ主な予算)
+    budgets: List["BudgetItemIn"] = Field(default_factory=list, max_length=6)
+
+
+class BudgetItemIn(BaseModel):
+    """[Gate F07] 予算の1つ。額・全員の合計か1人あたりか・何人分か・対象・期間・上限か目安かを分ける"""
+    model_config = ConfigDict(extra="forbid")
+    min_yen: Optional[int] = Field(None, ge=0, le=10_000_000)
+    max_yen: Optional[int] = Field(None, ge=0, le=10_000_000)
+    unit: Literal["total", "per_person", "undecided"] = "undecided"
+    people: Optional[int] = Field(None, ge=1, le=30)
+    target: Literal["lodging", "transport", "food", "trip_total", "other", "undecided"] = "undecided"
+    period: Literal["per_night", "all_nights", "whole_trip", "undecided"] = "undecided"
+    kind: Literal["cap", "guide", "undecided"] = "undecided"
+
+
+IntentIn.model_rebuild()
 
 
 class AreaIn(BaseModel):
@@ -203,6 +222,11 @@ def create_draft(body: DraftIn, db: Session = Depends(get_db), current_user: Use
     lo, hi = intent["budget_min"], intent["budget_max"]
     if lo is not None and hi is not None and lo > hi:
         raise _bad("invalid_field", "宿泊費の下限が上限より大きくなっています")
+    for b in intent.get("budgets") or []:
+        if b["min_yen"] is None and b["max_yen"] is None:
+            raise _bad("invalid_field", "予算の額を入れてください")
+        if b["min_yen"] is not None and b["max_yen"] is not None and b["min_yen"] > b["max_yen"]:
+            raise _bad("invalid_field", "予算の下限が上限より大きくなっています")
     if (body.area.latitude is None) != (body.area.longitude is None):
         raise _bad("invalid_field", "方面の緯度と経度は両方を指定してください")
     if body.area.retrieved_at is not None and body.area.retrieved_at.tzinfo is None:
@@ -529,6 +553,8 @@ def _send_guard(fn):
                       503, {"reason": error.code})
     except consult_ai.ConsultAIError as error:
         raise _ai_bad(error.code, error.message, error.status)
+    except consult_turn.TurnError as error:
+        raise _ai_bad(error.code, error.message, error.status)
 
 
 def _ai_audit(action: str, user: User, session: TripConsultSession, details: Dict[str, Any]) -> None:
@@ -606,6 +632,34 @@ def consult_ai_extract(body: AiExtractIn, idempotency_key: Optional[str] = Heade
                "suggested_areas": len(result["suggested_areas"]), "result": "ok"})
     return {**result, "usage": usage, "saved": False, "stub": provider_stub.enabled(),
             "notice": "AI の読み取りです(未確認)。確かめた行だけを条件に使います。営業時間・料金・混み具合は AI に作らせていません"}
+
+
+class AiTurnIn(BaseModel):
+    """[Gate F07] 会話の1ターン。最新の発言と、画面が持つ今の条件の状態(値・確認の状態・ID)だけを受け取る"""
+    model_config = ConfigDict(extra="forbid")
+    session_id: uuid.UUID
+    utterance: str = Field(..., max_length=consult_turn.MAX_UTTERANCE_CHARS * 2)
+    state: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/ai/turn")
+def consult_ai_turn(body: AiTurnIn, idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                    db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate F07] 追加・訂正・削除・取消・矛盾を、今の条件への変更案として読む(適用しない・保存しない)。
+    AI へ送るのは最新の発言と今の条件だけ(以前の発言の全文を送り直さない)。"""
+    session = _session(db, current_user, body.session_id)
+    key = _idem(idempotency_key)
+    if not consents.has_consent(current_user, "ai_processing"):
+        raise _ai_bad("consent_required", _CONSENT_MESSAGE, 403)
+    if len(json.dumps(body.state, ensure_ascii=False)) > 20000:
+        raise _ai_bad("invalid_input", "条件の状態が大きすぎます")
+    result, usage = _send_guard(lambda: consult_turn.read_turn(db, session, current_user, body.utterance,
+                                                               body.state, key))
+    _ai_audit("trip_consult.ai_turn", current_user, session,
+              {"changes": len(result["changes"]), "conflicts": len(result["conflicts"]),
+               "dropped": result["dropped"], "result": "ok"})
+    return {**result, "usage": usage, "saved": False, "stub": provider_stub.enabled(),
+            "notice": "AI の読み取りの変更案です(未確認)。確かめた行は、採用するまで変えません"}
 
 
 def _num(payload: Dict[str, Any], name: str, lo: float, hi: float, required: bool = True) -> Optional[float]:

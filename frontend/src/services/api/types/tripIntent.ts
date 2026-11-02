@@ -107,6 +107,9 @@ export interface IntentPayload {
   preferences: string[];
   /** [Gate ConsultAI] 決まった項目に分けられない希望(その他) */
   notes: string[];
+  /** [Gate F07] 確かめた予算の全て(額・全員か1人あたりか・何人分か・対象・期間・上限か目安か) */
+  budgets?: Array<{ min_yen: number | null; max_yen: number | null; unit: 'total' | 'per_person' | 'undecided';
+    people: number | null; target: string; period: string; kind: string }>;
 }
 
 export type BudgetTarget = 'lodging' | 'transport' | 'food' | 'trip_total' | 'other' | 'undecided';

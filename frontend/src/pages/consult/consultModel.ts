@@ -11,6 +11,8 @@ import type {
   IntentItem, IntentPayload, IntentSource, IntentStrength,
 } from '@/services/api/types/tripIntent';
 import type { NearbyResult } from '@/services/api/types/g11discover';
+import type { TurnChange } from '@/services/api/consultAi';
+import { confirmedBudgets, type BudgetItem } from './consultTurnModel';
 
 export type ConsultStep = 'brief' | 'review' | 'areas' | 'detail';
 
@@ -108,6 +110,16 @@ export interface ReviewState {
   proposals?: Partial<Record<ReviewKey, { from: string; to: string; values: Partial<ReviewValues> }>>;
   /** [Gate ConsultAI] その他の希望(決まった項目に分けられない希望。利用者が残した分だけ下書きへ) */
   notes?: string[];
+  /** [Gate F07] 追加の予算(主な予算の行の他。宿・旅行全体など、複数の条件を同時に持つ) */
+  extraBudgets?: BudgetItem[];
+  /** [Gate F07] 主な予算の行が何人分か(書かれていなければ null。人数を変えても計算し直さない) */
+  mainBudgetPeople?: number | null;
+  /** [Gate F07] 確かめた予算・その他の希望・方面への変更案(採用するまで変えない) */
+  turnPending?: TurnChange[];
+  /** [Gate F07] 決めた方面(候補として挙げただけの方面とは別) */
+  decidedArea?: string | null;
+  /** [Gate F07] 会話の状態の版(1ターンごとに 1 進む) */
+  revision?: number;
 }
 
 export interface ConsultState {
@@ -323,6 +335,8 @@ export function intentOf(r: ReviewState): IntentPayload {
     travel_window: ok('dates') && v.travel_window.trim() ? v.travel_window.trim().slice(0, 60) : null,
     preferences: ok('preferences') ? v.preferences.filter((p) => p in PREFERENCE_LABEL) : [],
     notes: (r.notes ?? []).map((n) => n.trim()).filter(Boolean).slice(0, 10),
+    // [Gate F07] 確かめた予算を全て(主な予算の行 + 追加の予算)。上の budget_* は以前と同じ主な予算の行
+    budgets: confirmedBudgets(r),
   };
 }
 

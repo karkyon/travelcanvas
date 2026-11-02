@@ -69,11 +69,43 @@ def _ai_answer(text: str) -> Dict[str, Any]:
     }
 
 
+def _turn_answer(text: str) -> Dict[str, Any]:
+    """[Gate F07] 1ターンの模擬の答え(規則の読み取りの項目を set の操作にする。日帰りと泊まりは食い違い)。"""
+    said = text.split("【最新の発言】", 1)[-1].strip()
+    ops: list = []
+    blank: Dict[str, Any] = {"field": None, "text_value": None, "number_value": None, "bool_value": None,
+                             "target_id": None, "preference": None, "budget": None}
+    conflict = "日帰り" in said and "泊" in said and "取り消" not in said
+    conflicts = [{"about": "nights", "question": "日帰りと1泊が食い違っています。どちらですか"}] if conflict else []
+    if "何もしない" in said:
+        ops.append({**blank, "op": "add_note", "text_value": "何もしない時間がほしい", "evidence": "何もしない"})
+    for it in ti.extract(said, {})["items"]:
+        if it["source"] != "text" or not isinstance(it.get("evidence"), str):
+            continue
+        if conflict and it["key"] == "nights":
+            continue  # 食い違いの項目は決めない
+        if it["key"] in ("party_size", "nights"):
+            ops.append({**blank, "op": "set", "field": it["key"], "number_value": it["value"],
+                        "evidence": it["evidence"]})
+        elif it["key"] == "origin":
+            ops.append({**blank, "op": "set", "field": "origin", "text_value": it["value"], "evidence": it["evidence"]})
+        elif it["key"] == "budget" and isinstance(it["value"], dict):
+            b = it["value"]
+            ops.append({**blank, "op": "add_budget", "evidence": it["evidence"],
+                        "budget": {"min_yen": b.get("min"), "max_yen": b.get("max"), "unit": "undecided",
+                                   "people": None, "target": b.get("target") or "undecided", "period": "undecided",
+                                   "kind": "undecided"}})
+    return {"operations": ops, "conflicts": conflicts, "questions": ["模擬の提供元の答えです"]}
+
+
 def _openai(payload: Dict[str, Any]) -> httpx.Response:
     text = str(payload.get("input") or "")
     if "E2E_TIMEOUT" in text:
         raise httpx.ReadTimeout("stub timeout")
-    if payload.get("text"):
+    fmt = ((payload.get("text") or {}).get("format") or {}) if isinstance(payload.get("text"), dict) else {}
+    if payload.get("text") and fmt.get("name") == "trip_turn":
+        out = "{broken" if "E2E_BROKEN" in text else json.dumps(_turn_answer(text), ensure_ascii=False)
+    elif payload.get("text"):
         out = "{broken" if "E2E_BROKEN" in text else json.dumps(_ai_answer(text), ensure_ascii=False)
     else:
         out = "OK(模擬)"

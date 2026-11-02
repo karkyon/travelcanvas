@@ -26,6 +26,7 @@
 | [gate-doc10rev-trace.md](gate-doc10rev-trace.md) | Gate DOC10-Rev トレース(DOC-10 の版の食い違いの解消・状態の監査表) | 0 | 0 | 0 |
 | [gate-e1-trace.md](gate-e1-trace.md) | Gate E1 予約・チケット・取込・共有・複製の browser E2E トレーサビリティ表 | 2 | 1 | 0 |
 | [gate-e2e-drag-trace.md](gate-e2e-drag-trace.md) | Gate E2E-Drag トレース(#10 gate-g7 のドラッグの並べ替えの不安定) | 0 | 0 | 1 |
+| [gate-f07-turn-trace.md](gate-f07-turn-trace.md) | Gate F07-Turn — 旅行相談の会話の1ターン(追加・訂正・削除・取消・矛盾・複数の予算) | 0 | 1 | 0 |
 | [gate-f45-trace.md](gate-f45-trace.md) | Gate F45 トレース(FR-045 / CA-003 安全な共有ポリシー: 項目単位の共有の規則) | 0 | 0 | 1 |
 | [gate-fr059-d11-trace.md](gate-fr059-d11-trace.md) | Gate FR059-D11 トレース(無料の provider の使用の記録・公開の単価の再確認) | 2 | 0 | 0 |
 | [gate-fr059-tiers-trace.md](gate-fr059-tiers-trace.md) | Gate FR059-Tiers トレース(会員の機能クラス Free / Trip / Journey / Explorer) | 3 | 0 | 0 |
