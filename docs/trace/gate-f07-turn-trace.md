@@ -24,4 +24,4 @@
 | 実 AI(gpt-5-nano)で §4 の 10 ターン(枚方・4人→3人・宿 6〜8万→宿の上限 8万・旅行全体 12万・伊勢/滋賀・市場の削除・日帰りと1泊の矛盾・伊勢に決定・温泉) | NOT_RUN(omega-dev2) |
 | 30 会話以上の評価・critical suite 100%・macro F1 ≥ 0.95・原価の半減の比較(F07-5) | NOT_STARTED(人手の正解の付け方の準備が要る) |
 | 2つのタブの同時の編集の検出(revision の衝突) | NOT_IMPLEMENTED |
-| 下書きの画面での複数の予算の表示 | NOT_IMPLEMENTED(下書きの intent には保存する) |
+| 下書きの画面での複数の予算の表示 | IMPLEMENTED(Gate HomeHeroVideo の PR で `draft-budgets`。閲覧だけで、下書きの画面での編集は未実装) |

@@ -17,6 +17,8 @@ import { commitTripDraft, getTripDraft, updateDraftSlots } from '@/services/api/
 import type { DraftPart, DraftSlot, TripDraft } from '@/services/api/types/tripIntent';
 import { transportMode } from '@/utils/transportModes';
 import TransportIcon from '@/components/common/TransportIcon';
+import { budgetLabel } from './consultTurnModel';
+import type { TurnBudget } from '@/services/api/consultAi';
 import { PART_ORDER, dayCounts, moveSlot, partsOfDay, placeSlot, removeSlot, retrievedLabel, sortSlots } from './consultModel';
 
 const PART_LABEL: Record<DraftPart, string> = { morning: '午前', lunch: '昼食', afternoon: '午後', evening: '夕方・夕食', stay: '宿' };
@@ -251,6 +253,16 @@ const TripDraftPage: React.FC = () => {
       <p aria-live="polite" className="sr-only" data-testid="draft-live">{message}</p>
       {message && <p className="mt-2 text-xs text-ink-700" aria-hidden="true">{message}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg bg-danger-soft p-3 text-sm text-danger">{error}</p>}
+      {/* [Gate F07] 旅行相談で確かめた予算(宿・旅行全体などを別々に。旅行の利用枠とは別) */}
+      {Array.isArray(draft.intent.budgets) && (draft.intent.budgets as TurnBudget[]).length > 0 && (
+        <section className="mt-3 rounded-xl border border-cloud-200 bg-surface p-3 text-sm" data-testid="draft-budgets"
+          aria-label="旅行相談で確かめた予算">
+          <p className="text-xs font-semibold text-ink-900">旅行相談で確かめた予算</p>
+          <ul className="mt-1 list-disc pl-5 text-xs text-ink-700">
+            {(draft.intent.budgets as TurnBudget[]).map((b, i) => <li key={i}>{budgetLabel(b)}</li>)}
+          </ul>
+        </section>
+      )}
       {/* [FR059-B] この旅行の AI・外部検索の利用枠(旅行の予算とは別) */}
       <PlanningUsageMeter planId={planId} className="mt-3" />
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">

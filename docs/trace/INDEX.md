@@ -57,6 +57,7 @@
 | [gate-g9b-trace.md](gate-g9b-trace.md) | Gate G9 後半 トレース(UX-2 旅行の表紙・UX-3 見出しと移動・UX-4 文脈型ダッシュボード) | 2 | 0 | 0 |
 | [gate-geocodejp-trace.md](gate-geocodejp-trace.md) | Gate GeocodeJP・AdminLayout トレース(旅行相談の地名を日本で照会・管理の画面の余白) | 1 | 0 | 0 |
 | [gate-h1-trace.md](gate-h1-trace.md) | Gate H1 トレース(他の PC から画面を開く) | 0 | 0 | 0 |
+| [gate-home-hero-video-trace.md](gate-home-hero-video-trace.md) | Gate HomeHeroVideo — HOME の「最初の旅行を始めましょう」の背景の動画(仕組み。素材は受け取り待ち) | 0 | 0 | 0 |
 | [gate-k1-trace.md](gate-k1-trace.md) | Gate K1 B-008 オフラインデータの鍵 トレーサビリティ表 | 2 | 0 | 0 |
 | [gate-l2-fr016-trace.md](gate-l2-fr016-trace.md) | Gate L2 FR-016 トレーサビリティ表 | 0 | 0 | 2 |
 | [gate-l3-fr017-trace.md](gate-l3-fr017-trace.md) | Gate L3 FR-017 トレーサビリティ表 | 0 | 1 | 3 |

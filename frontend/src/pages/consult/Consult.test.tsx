@@ -284,6 +284,17 @@ function renderDraft() {
 }
 
 describe('未確定の旅程の下書き', () => {
+  it('[F07] 旅行相談で確かめた予算を、宿・旅行全体などに分けて表示する', async () => {
+    api.getTripDraft.mockResolvedValue({ ...DRAFT, intent: { transport: 'car', budgets: [
+      { min_yen: 60000, max_yen: 80000, unit: 'total', people: 4, target: 'lodging', period: 'undecided', kind: 'cap' },
+      { min_yen: null, max_yen: 120000, unit: 'total', people: null, target: 'trip_total', period: 'whole_trip', kind: 'cap' },
+    ] } });
+    renderDraft();
+    const box = await screen.findByTestId('draft-budgets');
+    expect(box).toHaveTextContent('6万円〜8万円 · 宿泊費 · 全員の合計 · 4人分');
+    expect(box).toHaveTextContent('12万円 · 旅行全体 · 全員の合計 · 旅行全体 · 上限');
+  });
+
   it('未確定と示し、移動の区間・未照会を出し、並べ替え → 読み上げ → 元に戻す、日付を決めて旅程にする', async () => {
     api.getTripDraft.mockResolvedValue(DRAFT);
     api.updateDraftSlots.mockImplementation(async (_p: string, slots: TripDraft['slots'], rev: number) => ({ ...DRAFT, slots, revision: rev + 1 }));
