@@ -118,6 +118,8 @@ class AreasIn(BaseModel):
     areas: List[str] = Field(..., min_length=1, max_length=ti.MAX_AREAS)
     one_way_hours: Optional[float] = Field(None, ge=0.5, le=24)
     one_way_strength: Optional[Literal["preferred", "required", "undecided"]] = None
+    # [Gate AreaAI] 方面の名前 → 都道府県(AI の案。同じ名前の別の場所を避ける手がかり)
+    area_prefs: Dict[str, str] = Field(default_factory=dict, max_length=ti.MAX_AREAS)
 
 
 @router.post("/areas")
@@ -126,8 +128,10 @@ async def compare_areas(body: AreasIn, current_user: User = Depends(get_current_
     names = list(dict.fromkeys(a.strip() for a in body.areas if a.strip()))
     if not names or any(len(a) > 40 for a in names):
         raise _bad("invalid_field", "方面の名前を1〜40文字で入力してください")
+    prefs = {k: v for k, v in body.area_prefs.items()
+             if k in names and isinstance(v, str) and 2 <= len(v) <= 4 and v.endswith(("都", "道", "府", "県"))}
     result = await ti.compare_areas(body.origin.strip(), names, body.one_way_hours, body.one_way_strength,
-                                    enabled=_geocoder_enabled())
+                                    enabled=_geocoder_enabled(), prefs=prefs)
     # [Gate FR059-D11] 地名の照会(Nominatim)へ実際に送った回数を残す(地名は残さない)
     calls = int(result.pop("_geocode_calls", 0) or 0)
     if calls:

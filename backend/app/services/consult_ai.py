@@ -24,17 +24,23 @@ from app.services import trip_intent as ti
 logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 3000
-MAX_OUTPUT_TOKENS = 1200
-MAX_SUGGESTIONS = 5
+MAX_OUTPUT_TOKENS = 2000
+MAX_SUGGESTIONS = 6
 EXTRACTOR = "openai_responses"
 
 INSTRUCTIONS = (
     "あなたは日本語の旅行相談の受付です。利用者の文章(と画面で入力した項目)から、旅行の条件を JSON Schema の形で取り出してください。"
     "書かれていないことは null・空の配列にし、推測で埋めないでください。"
     "evidence には、根拠になった利用者の文章の一部を、そのままの文字で 30 文字以内で書いてください(無ければ null)。"
-    "areas_mentioned は利用者が書いた行き先・方面の名前だけです。"
-    "areas_suggested は、条件に合いそうな日本の方面の案を最大 5 つ、名前と理由(60 文字以内)で書いてください。"
-    "営業時間・料金・空室・混雑・所要時間・距離の数値は書かないでください(確かめていないため)。"
+    "areas_mentioned は利用者が書いた具体的な行き先(市町村・観光地)の名前だけです。地方・地域の名前(関西・東海・北陸圏など)、"
+    "出発地、移動の手段(高速・車など)は入れないでください。"
+    "areas_suggested は、利用者の条件(出発地・移動の手段・片道の時間の上限・地域・過ごし方・人数・泊数)に合う具体的な行き先を、"
+    "利用者が求めた件数(書かれていなければ 4 件)出してください。name は 1 つの市町村か観光地の名前だけ(「〜方面」「〜エリア」"
+    "「A・B」は不可。例: 伊勢、淡路島、あわら温泉、南紀白浜)。prefecture は都道府県名。"
+    "drive_minutes_min・drive_minutes_max は、出発地からその行き先までの片道の所要時間の目安(分。指定の移動の手段・高速の有無で、"
+    "休憩と渋滞は含めない)で、片道の時間の上限を超える行き先は出さないでください。"
+    "highlights は見どころ(60 文字以内)、reason は条件に合う理由(60 文字以内)。地域が指定されていれば、なるべく各地域から選んでください。"
+    "営業時間・料金・空室・混雑の数値は書かないでください(確かめていないため)。"
     "人の名前・連絡先・住所の番地などの個人の情報は出力しないでください。"
     "unknowns には、旅行を考えるのにまだ決まっていない大事なこと(例: 日付、予算)を短く書いてください。"
     "budget の target は何の費用か(宿泊費 lodging・交通費 transport・食費 food・旅行全体 trip_total・その他 other)。"
@@ -77,7 +83,10 @@ SCHEMA: Dict[str, Any] = _obj({
                    "text": _nullable("string"), "evidence": _ev()}),
     "preferences": {"type": "array", "items": {"type": "string", "enum": PREF_KEYS}},
     "areas_mentioned": {"type": "array", "items": {"type": "string"}},
-    "areas_suggested": {"type": "array", "items": _obj({"name": {"type": "string"}, "reason": {"type": "string"}})},
+    "areas_suggested": {"type": "array", "items": _obj({
+        "name": {"type": "string"}, "prefecture": {"type": "string"}, "reason": {"type": "string"},
+        "highlights": {"type": "string"}, "drive_minutes_min": _nullable("integer"),
+        "drive_minutes_max": _nullable("integer")})},
     "unknowns": {"type": "array", "items": {"type": "string"}},
     "other_wishes": {"type": "array", "items": {"type": "string"}},
     "contradictions": {"type": "array", "items": {"type": "string"}},
@@ -263,11 +272,36 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
     mentioned = [a for a in (_str(x, 15) for x in (data.get("areas_mentioned") or [])) if a and a in norm]
     named = [a["name"] for a in base["areas"] if a.get("source") == "user_input"] + \
         [r["word"] for r in base.get("regions", [])]
-    # [Gate AreaLogic] 書かれた語を「行き先・地域の範囲・行き先ではない語」に分け、条件に合う方面を選ぶ(AI の値を重ねた後の条件で)
+    # [Gate AreaLogic] 書かれた語を「行き先・地域の範囲・行き先ではない語」に分ける(AI の値を重ねた後の条件で)
     plan = ti.plan_areas(norm, list(dict.fromkeys(named + mentioned)), items)
-    areas: List[Dict[str, Any]] = plan["areas"]
-    area_names = [a["name"] for a in areas]
-    suggested = _checked_suggestions(data.get("areas_suggested") or [], area_names, plan, items)
+    places = [a for a in plan["areas"] if a["source"] == "user_input"]
+    checked = _checked_suggestions(data.get("areas_suggested") or [], [a["name"] for a in places], plan, items)
+    # [Gate AreaAI] 行き先が無い・候補を頼まれた時は、AI が条件から選んだ方面(片道の目安つき・サーバーで確かめた)を比べる。
+    # 足りない分だけ内蔵の候補表で補う。道路の提供元(有料)には送らない
+    asked = bool(ti._ASK_CANDIDATES.search(norm))
+    areas: List[Dict[str, Any]] = list(places)
+    suggested: List[Dict[str, Any]] = []
+    proposal = plan["proposal"]
+    if not places or asked:
+        want = ti.wanted_count(norm)  # 挙げた行き先に加えて、頼まれた件数を出す
+        chosen = [c for c in checked if c.get("minutes_max") is not None][:want]
+        for c in chosen:
+            areas.append({"name": c["name"], "source": "ai_proposed", "reason": c["reason"], "pref": c.get("pref"),
+                          "highlights": c.get("highlights", ""), "minutes_min": c["minutes_min"],
+                          "minutes_max": c["minutes_max"]})
+        if len(chosen) < want:  # AI の案が足りない・確かめられない時は、内蔵の候補表から補う(同じ方面は重ねない)
+            used = {a["name"] for a in areas}
+            for a in plan["areas"]:
+                if a["source"] == "proposed" and a["name"] not in used and len(areas) < len(places) + want:
+                    areas.append(a)
+        suggested = [{"name": c["name"], "reason": c["reason"], "source": "ai_suggested"}
+                     for c in checked if all(c["name"] != a["name"] for a in areas)]
+        proposal = {**proposal, "status": "ai" if chosen else proposal.get("status"),
+                    "count": len(areas) - len(places),
+                    "note": None if chosen else proposal.get("note")}
+    else:
+        suggested = [{"name": c["name"], "reason": c["reason"], "source": "ai_suggested"} for c in checked]
+    plan = {**plan, "proposal": proposal}
     unknowns = [u for u in (_str(x, 60) for x in (data.get("unknowns") or [])) if u][:5]
     notes = list(dict.fromkeys(n for n in (_str(x, 100) for x in (data.get("other_wishes") or [])) if n))[:ti.MAX_NOTES]
     # [Gate AdminUAT U05] 食い違う希望は勝手に片方へ寄せず、確かめてほしいこととして返す
@@ -278,36 +312,63 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
             "contradictions": contradictions, "nights": nights, "extractor": EXTRACTOR, "ai_connected": True}
 
 
-def _checked_suggestions(raw: List[Any], area_names: List[str], plan: Dict[str, Any],
+def _checked_suggestions(raw: List[Any], taken: List[str], plan: Dict[str, Any],
                          items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """[Gate AreaLogic] AI の方面の案を、地名の表で分かる範囲で確かめる。地域の範囲の外・片道の目安を大きく超える案は出さない
-    (以前は北海道の案もそのまま出した)。表に無い案は「位置は比較の時に照会」のまま残す"""
+    """[Gate AreaAI] AI の方面の案を確かめる(送らない・地名の表と計算だけ)。
+
+    - 地方・地域の名前・出発地・移動の語・重複は捨てる。「伊勢方面」「〜エリア」は語尾を外し、「A・B」は A にする
+    - 地域の範囲(関西・東海…)の外は捨てる(都道府県は地名の表、無ければ AI の prefecture)
+    - 片道の目安: 下限が上限の時間の 1.15 倍を超える案は捨てる。位置が地名の表で分かる時は、直線距離と目安が
+      物理的に合わない(時速 110km を超える)目安を捨て、直線距離だけで上限を明らかに超える案も捨てる
+    """
+    import re as _re
+
     from app.services import jp_gazetteer as gz
 
     region_prefs = {p for r in plan.get("regions", []) for p in r["prefectures"]}
     origin = ti._item_value(items, "origin")
-    o = gz.lookup(origin) if isinstance(origin, str) else None
+    origin = origin if isinstance(origin, str) else None
+    o = gz.lookup(origin) if origin else None
     hours = ti._item_value(items, "one_way")
-    tr = ti._item_value(items, "transport") or {}
+    limit_min = float(hours) * 60 if isinstance(hours, (int, float)) else None
     out: List[Dict[str, Any]] = []
     for s in raw:
         if not isinstance(s, dict):
             continue
-        name, reason = _str(s.get("name"), 20), _str(s.get("reason"), 80)
-        if not name or name in area_names or any(x["name"] == name for x in out) or gz.is_not_place(name):
+        name = _str(s.get("name"), 20)
+        if not name:
             continue
-        pref = gz.destination_pref(name)
+        # 「福井市・越前方面」→「福井市」(1 か所にする。比べる・照会する単位)
+        name = _re.split(r"[・/、]", name)[0]
+        name = _re.sub(r"(?:方面|エリア|周辺|あたり)$", "", name).strip()
+        if (not name or name in taken or any(x["name"] == name for x in out) or gz.is_not_place(name, origin)
+                or gz.region_prefectures(name)):
+            continue
+        pref = gz.destination_pref(name) or _str(s.get("prefecture"), 10)
+        if pref and not pref.endswith(("都", "道", "府", "県")):
+            pref = gz._SHORT.get(pref, pref)
         if region_prefs and pref and pref not in region_prefs:
             continue
+        lo = _int(s.get("drive_minutes_min"), 5, 24 * 60)
+        hi = _int(s.get("drive_minutes_max"), 5, 24 * 60)
+        if lo is not None and hi is not None and lo > hi:
+            lo, hi = hi, lo
+        lo = lo if lo is not None else hi
+        hi = hi if hi is not None else lo
         hit = gz.lookup(name)
-        if hit is not None and o is not None and isinstance(hours, (int, float)):
+        if hit is not None and pref and str(hit.get("kind")) == "place" and pref not in str(hit.get("label")):
+            hit = None  # 同じ名前の別の場所(AI の都道府県と合わない)
+        if hit is not None and o is not None:
             km = gz._haversine(float(o["latitude"]), float(o["longitude"]),  # type: ignore[arg-type]
                                float(hit["latitude"]), float(hit["longitude"]))  # type: ignore[arg-type]
-            est = gz.estimate_hours(km, 1.3, tr.get("mode") if isinstance(tr, dict) else None,
-                                    bool(tr.get("highway")) if isinstance(tr, dict) else False)
-            if est > float(hours) * 1.3:
-                continue
-        out.append({"name": name, "reason": reason or "", "source": "ai_suggested"})
+            if limit_min is not None and km / ti.LOWER_BOUND_SPEED_KMH * 60 > limit_min * 1.15:
+                continue  # 直線距離だけで上限を明らかに超える
+            if hi is not None and km / (hi / 60.0) > 110:
+                lo = hi = None  # 目安が距離と合わない(速すぎる)。目安は使わない
+        if limit_min is not None and lo is not None and lo > limit_min * 1.15:
+            continue
+        out.append({"name": name, "pref": pref, "reason": _str(s.get("reason"), 80) or "",
+                    "highlights": _str(s.get("highlights"), 80) or "", "minutes_min": lo, "minutes_max": hi})
         if len(out) >= MAX_SUGGESTIONS:
             break
     return out

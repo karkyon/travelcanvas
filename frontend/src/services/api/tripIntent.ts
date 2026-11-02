@@ -29,8 +29,9 @@ const item: Decoder<IntentItem> = object<IntentItem>({
 
 /** [Gate AreaLogic] 比べる方面・地域の範囲・条件からの選び方(AI の読み取りと共通) */
 export const extractedArea: Decoder<ExtractedArea> = object<ExtractedArea>({
-  name: str, source: oneOf('user_input', 'proposed'), reason: optional(str), hours: optional(num), km: optional(num),
-  label: optional(str),
+  name: str, source: oneOf('user_input', 'proposed', 'ai_proposed'), reason: optional(str), hours: optional(num),
+  km: optional(num), label: optional(str), pref: optional(nullable(str)), highlights: optional(str),
+  minutes_min: optional(nullable(num)), minutes_max: optional(nullable(num)),
 });
 export const regionHint: Decoder<RegionHint> = object<RegionHint>({ word: str, prefectures: arrayOf(str) });
 export const areaProposal: Decoder<AreaProposal> = object<AreaProposal>({
@@ -77,8 +78,9 @@ const areas: Decoder<AreasResult> = object<AreasResult>({
 });
 
 export async function compareAreas(input: { origin: string; areas: string[]; one_way_hours: number | null;
-  one_way_strength: string | null }): Promise<AreasResult> {
+  one_way_strength: string | null; area_prefs?: Record<string, string> }): Promise<AreasResult> {
   const body = { origin: input.origin, areas: input.areas,
+    ...(input.area_prefs && Object.keys(input.area_prefs).length ? { area_prefs: input.area_prefs } : {}),
     ...(input.one_way_hours ? { one_way_hours: input.one_way_hours } : {}),
     ...(input.one_way_strength ? { one_way_strength: input.one_way_strength } : {}) };
   const r = await api.post('/trip-intents/areas', body, SILENT);

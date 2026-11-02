@@ -240,8 +240,13 @@ def clean_origin(value: Optional[str]) -> Optional[str]:
 
 
 def is_not_place(word: str, origin: Optional[str] = None) -> bool:
+    import re
+
     n = _norm(word)
     if not n or n in NOT_PLACES:
+        return True
+    # 数・ひらがなだけの語・「他に」「あと」などは地名ではない(「他にも候補を2つ」→「他に」を方面にしない)
+    if re.search(r"\d", n) or re.fullmatch(r"[ぁ-んー]+", n) or re.match(r"(?:他|ほか|別|あと|残り)", n):
         return True
     if origin:
         o = _norm(origin)

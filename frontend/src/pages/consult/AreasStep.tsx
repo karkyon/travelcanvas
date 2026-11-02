@@ -11,7 +11,7 @@ import React, { Suspense, lazy, useId, useMemo, useState } from 'react';
 import Button from '@/components/common/Button';
 import { coverFor } from '@/styles/tokens';
 import {
-  GEOCODE_LABEL, LIMIT_LABEL, retrievedLabel, straightLabel, type ConsultState,
+  estimateLimit, GEOCODE_LABEL, LIMIT_LABEL, minutesRange, retrievedLabel, straightLabel, type ConsultState,
 } from './consultModel';
 import UiIcon from '@/components/common/UiIcon';
 import { IcCar } from '@/components/common/uiIcons';
@@ -52,18 +52,25 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
     : null;
   // [Gate AreaGeo] 地図に置くのは、位置が確かで条件から大きく外れない方面だけ(遠すぎる照会の結果・片道の上限を
   // 直線だけで越える方面は一覧に理由を出し、地図の範囲を広げない。以前は「滋賀」が北海道に置かれ地図が日本全体に縮んだ)
+  // [Gate AreaAI] AI の片道の目安で条件を超える方面も地図に置かない
   const pins = useMemo(() => rows.map((a, i) => ({ a, order: i + 1 }))
-    .filter(({ a }) => a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null
-      && !offMap(a))
+    .filter(({ a }) => {
+      const ex = state.extraction?.areas.find((x) => x.name === a.name);
+      const over = estimateLimit(ex?.minutes_min, ex?.minutes_max, r.values.one_way_hours, r.values.one_way_strength)
+        .status === 'over';
+      return a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null && !offMap(a)
+        && !over;
+    })
     .map(({ a, order }) => ({ name: a.name, order, latitude: a.geocode.latitude!, longitude: a.geocode.longitude!,
-      selected: a.name === state.selectedArea })), [rows, state.selectedArea]);
+      selected: a.name === state.selectedArea })), [rows, state.selectedArea, state.extraction, r.values.one_way_hours,
+    r.values.one_way_strength]);
   const conditions = [
     r.values.origin && `${r.values.origin}から`, r.values.nights !== null && (r.values.nights === 0 ? '日帰り' : `${r.values.nights}泊${r.values.nights + 1}日`),
     r.values.party_size && `大人${r.values.party_size}人`, r.values.transport === 'car' ? '自家用車' : r.values.transport === 'public' ? '公共交通' : null,
     r.values.one_way_hours && `片道${r.values.one_way_hours}時間(${r.confirmed.one_way ? (r.values.one_way_strength === 'required' ? '絶対条件' : '希望') : '未確認'})`,
   ].filter(Boolean).join(' · ');
 
-  const proposedOf = (name: string) => state.extraction?.areas.find((x) => x.name === name && x.source === 'proposed');
+  const proposedOf = (name: string) => state.extraction?.areas.find((x) => x.name === name && x.source !== 'user_input');
   const regionWords = (state.extraction?.regions ?? []).map((x) => x.word);
 
   const add = (e: React.FormEvent) => {
@@ -158,7 +165,9 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                         className="tc-focus-ring min-h-11 text-left">
                         <span className="block text-base font-bold text-ink-900">{selected ? '● ' : '○ '}{a.name}</span>
                         <span className="block text-[11px] text-ink-700" data-testid={`area-source-${a.name}`}>
-                          {proposedOf(a.name)
+                          {proposedOf(a.name)?.source === 'ai_proposed'
+                            ? `AI が条件から選んだ方面${proposedOf(a.name)?.highlights ? ` · 見どころ: ${proposedOf(a.name)?.highlights}` : ''} · 選ぶだけでは旅程にしません`
+                            : proposedOf(a.name)
                             ? `条件から選んだ方面 · ${proposedOf(a.name)?.reason ?? ''} · 選ぶだけでは旅程にしません`
                             : 'あなたが挙げた方面 · 選ぶだけでは旅程にしません'}
                         </span>
@@ -179,12 +188,28 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                       )}
                       <div><dt className="inline font-semibold text-ink-900">距離: </dt>
                         <dd className="inline">{straightLabel(a.straight_km, r.values.origin)}</dd></div>
-                      <div><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt><dd className="inline">実走行時間・高速料金は未照会</dd></div>
+                      <div data-testid={`area-drive-${a.name}`}><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt>
+                        <dd className="inline">{(() => {
+                          const ex = proposedOf(a.name);
+                          const range = minutesRange(ex?.minutes_min, ex?.minutes_max);
+                          return range
+                            ? `片道 ${range}(AI の目安 · 休憩・渋滞は含まない · 高速料金は未照会)`
+                            : '実走行時間・高速料金は未照会(詳しく見る画面の「経路を調べる」で道路の時間を調べられます)';
+                        })()}</dd></div>
                       <div data-testid={`area-limit-${a.name}`}>
                         <dt className="inline font-semibold text-ink-900">片道の条件: </dt>
-                        <dd className={`inline ${limit === 'exceeds' || limit === 'likely_exceeds' ? 'font-semibold text-warning' : ''}`}>
-                          {`${limit === 'exceeds' || limit === 'likely_exceeds' ? '⚠ ' : ''}${LIMIT_LABEL[limit] ?? limit} · ${a.limit_check.note}`}
-                        </dd>
+                        {(() => {
+                          const ex = proposedOf(a.name);
+                          const est = estimateLimit(ex?.minutes_min, ex?.minutes_max, r.values.one_way_hours, r.values.one_way_strength);
+                          if (est.label && limit !== 'exceeds' && limit !== 'likely_exceeds') {
+                            return <dd className={`inline font-semibold ${est.status === 'within' ? 'text-success' : 'text-warning'}`}>{est.label}</dd>;
+                          }
+                          return (
+                            <dd className={`inline ${limit === 'exceeds' || limit === 'likely_exceeds' ? 'font-semibold text-warning' : ''}`}>
+                              {`${limit === 'exceeds' || limit === 'likely_exceeds' ? '⚠ ' : ''}${LIMIT_LABEL[limit] ?? limit} · ${a.limit_check.note}`}
+                            </dd>
+                          );
+                        })()}
                       </div>
                       <div><dt className="inline font-semibold text-ink-900">⌂ 宿: </dt><dd className="inline">料金・空室は未照会(宿の提供元が未接続)</dd></div>
                       <div><dt className="inline font-semibold text-ink-900">静けさ: </dt><dd className="inline">未確認(混み具合のデータ未接続)</dd></div>

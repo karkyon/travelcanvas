@@ -171,10 +171,44 @@ describe('[Gate AreaLogic] 条件から選んだ方面(UAT 18:16 の相談)', ()
     fireEvent.click(screen.getByTestId('review-confirm-nights'));
     fireEvent.click(screen.getByTestId('consult-compare'));
     await waitFor(() => expect(api.compareAreas).toHaveBeenCalledWith({ origin: '枚方', areas: ['淡路島', 'あわら温泉'],
-      one_way_hours: 3, one_way_strength: 'preferred' }));
+      area_prefs: {}, one_way_hours: 3, one_way_strength: 'preferred' }));
     expect(await screen.findByTestId('area-source-淡路島')).toHaveTextContent('条件から選んだ方面');
     expect(screen.getByTestId('areas-conditions')).toHaveTextContent('範囲: 関西近畿圏・東海・北陸圏');
     expect(screen.getByTestId('areas-conditions')).toHaveTextContent('出発地は未確認の読み取りのまま');
+  });
+});
+
+describe('[Gate AreaAI] AI が条件から選んだ方面(片道の目安つき)', () => {
+  it('確認の画面に見どころと片道の目安、比較の画面に目安での判定を出し、都道府県を手がかりに照会する', async () => {
+    const ai = (name: string, pref: string, lo: number, hi: number, highlights: string) => (
+      { name, source: 'ai_proposed' as const, pref, reason: '条件に合う', highlights, minutes_min: lo, minutes_max: hi });
+    api.extractIntent.mockResolvedValue({ ...EXTRACTION,
+      areas: [ai('伊勢', '三重県', 120, 150, '伊勢神宮・おかげ横丁'), ai('淡路島', '兵庫県', 90, 120, '道の駅'),
+        ai('福井市', '福井県', 150, 180, '永平寺'), ai('南紀白浜', '和歌山県', 165, 195, '白良浜')],
+      regions: [], proposal: { status: 'ai', note: null, limit_hours: 3.3, count: 4 } });
+    api.compareAreas.mockResolvedValue({ origin: { query: '枚方', ...geo(34.8) }, retrieved_at: '2026-10-29T00:00:00+00:00',
+      providers: { geocode: 'nominatim', route: null, lodging: null, crowd: null, destination_suggestions: null },
+      areas: [areaRow('伊勢', 34.4), areaRow('淡路島', 34.35), areaRow('福井市', 36.0), areaRow('南紀白浜', 33.7)] });
+    renderConsult();
+    fireEvent.click(screen.getByRole('button', { name: '例文を入れる' }));
+    fireEvent.click(screen.getByTestId('consult-extract'));
+    const panel = await screen.findByTestId('consult-proposed-areas');
+    expect(panel).toHaveTextContent('AI が条件から選んだ方面');
+    expect(panel).toHaveTextContent('伊勢(三重県)片道 約2時間〜2時間半(AI の目安)');
+    expect(panel).toHaveTextContent('見どころ: 伊勢神宮・おかげ横丁');
+    expect(panel).toHaveTextContent('追加の費用はありません');
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: '片道の時間の扱い' })).getByRole('radio', { name: /希望/ }));
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: '予算は誰の分か' })).getByRole('radio', { name: /全員の合計/ }));
+    fireEvent.click(screen.getByTestId('review-confirm-nights'));
+    fireEvent.click(screen.getByTestId('consult-compare'));
+    await waitFor(() => expect(api.compareAreas).toHaveBeenCalledWith(expect.objectContaining({
+      areas: ['伊勢', '淡路島', '福井市', '南紀白浜'],
+      area_prefs: { 伊勢: '三重県', 淡路島: '兵庫県', 福井市: '福井県', 南紀白浜: '和歌山県' } })));
+    expect(await screen.findByTestId('area-drive-伊勢')).toHaveTextContent('片道 約2時間〜2時間半(AI の目安');
+    expect(screen.getByTestId('area-limit-伊勢')).toHaveTextContent('✓ 片道3時間以内(AI の目安)');
+    expect(screen.getByTestId('area-source-伊勢')).toHaveTextContent('AI が条件から選んだ方面 · 見どころ: 伊勢神宮・おかげ横丁');
+    fireEvent.click(screen.getByRole('button', { name: /他の候補も見る/ }));
+    expect(screen.getByTestId('area-limit-南紀白浜')).toHaveTextContent('△ 片道3時間の前後');
   });
 });
 
@@ -216,7 +250,7 @@ describe('旅行相談の流れ', () => {
     fireEvent.click(screen.getByTestId('review-confirm-nights'));
     fireEvent.click(screen.getByTestId('consult-compare'));
     await waitFor(() => expect(api.compareAreas).toHaveBeenCalledWith({ origin: '枚方', areas: ['伊勢', '福井', '滋賀', '淡路島'],
-      one_way_hours: 3, one_way_strength: 'preferred' }));
+      area_prefs: {}, one_way_hours: 3, one_way_strength: 'preferred' }));
 
     // 3. 方面の比較: 最初の3件と「他の候補も見る」。未照会を値にしない。選ぶだけでは旅程にしない
     expect(await screen.findByTestId('area-row-伊勢')).toBeInTheDocument();

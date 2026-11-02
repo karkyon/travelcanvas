@@ -77,7 +77,7 @@ def test_areas_records_only_real_geocode_calls(auth_client, db_session, monkeypa
 
     client, _user = auth_client
 
-    async def fake_compare(origin, names, hours, strength, enabled=True):
+    async def fake_compare(origin, names, hours, strength, enabled=True, prefs=None):
         return {"origin": {"query": origin, "status": "ok"}, "areas": [
             {"name": n, "geocode": {"status": "ok"}} for n in names], "retrieved_at": "x", "_geocode_calls": 3,
             "providers": {}}

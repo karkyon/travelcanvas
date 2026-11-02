@@ -17,7 +17,8 @@ from app.core.config import settings
 from app.services import provider_http as ph
 from app.services import trip_intent as ti
 
-STUB_SUGGESTIONS = [{"name": "城崎温泉", "reason": "模擬の提供元の案(実の AI ではありません)"}]
+STUB_SUGGESTIONS = [{"name": "城崎温泉", "prefecture": "兵庫県", "reason": "模擬の提供元の案(実の AI ではありません)",
+                     "highlights": "模擬の見どころ", "drive_minutes_min": 140, "drive_minutes_max": 170}]
 
 
 def enabled() -> bool:
