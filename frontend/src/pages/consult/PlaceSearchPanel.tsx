@@ -23,7 +23,7 @@ import {
 import { distanceLabel } from '@/pages/discover/discoverModel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  CONSULT_CATEGORIES, retrievedLabel, searchErrorMessage, type ConsultCategory, type GooglePick, type SearchSource,
+  CONSULT_CATEGORIES, cachedLabel, retrievedLabel, searchErrorMessage, type ConsultCategory, type GooglePick, type SearchSource,
 } from './consultModel';
 import { googleSearchAvailability, keepIdempotencyKey } from './consultAiModel';
 
@@ -66,6 +66,8 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   const [failure, setFailure] = useState<{ source: SearchSource; message: string; replayed?: boolean } | null>(null);
   const [empty, setEmpty] = useState<string | null>(null);
   const [partial, setPartial] = useState(false);
+  // [Gate SearchUAT-S3] 保存した結果(外へ送っていない)・提供元の失敗の時の「前の結果」
+  const [cached, setCached] = useState<{ age: number; stale: boolean } | null>(null);
   const pendingKey = useRef<{ sig: string; key: string } | null>(null);
   const avail = googleSearchAvailability(google.status, google.usage);
   const catLabel = CONSULT_CATEGORIES.find((c) => c.id === category)?.label ?? '';
@@ -75,10 +77,15 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     const r = await searchNearby({ query: query.trim(), category: category as DiscoverCategory, latitude: base.latitude,
       longitude: base.longitude, radius_km: radius });
     const failed = (r.unavailable_providers ?? []).includes('overpass');
+    const message = searchErrorMessage(r.provider_errors?.overpass, r.provider_retry_after?.overpass);
     if (failed && r.candidates.length === 0) {
-      setFailure({ source: 'osm', message: searchErrorMessage(r.provider_errors?.overpass) });
+      setFailure({ source: 'osm', message });
       return; // 前の結果は残す
     }
+    const c = r.cached_providers?.overpass;
+    setCached(c ? { age: c.age_seconds, stale: c.stale } : null);
+    // 提供元は失敗したが、前の結果(古い)を返した: 失敗を示したまま、前の結果を並べる
+    if (failed) setFailure({ source: 'osm', message });
     setPartial((r.partial_providers ?? []).includes('overpass'));
     setOsm({ rows: [...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)),
       label: `${catLabel}${query.trim() ? `「${query.trim()}」` : ''} · ${areaName}の周り ${radius}km` });
@@ -248,6 +255,13 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
         ) : (
           <>
             {empty && <p className="py-3 text-sm text-ink-700" data-testid="consult-results-empty">{empty}</p>}
+            {cached && shown === 'osm' && (
+              <p className={`py-2 text-sm ${cached.stale ? 'text-warning' : 'text-ink-700'}`} data-testid="consult-results-cached">
+                {cached.stale
+                  ? `今は新しい結果を受け取れないため、前の結果(${cachedLabel(cached.age)}に OpenStreetMap から取得)を表示しています。営業・閉店の変化は反映されていない可能性があります。`
+                  : `同じ条件の結果(${cachedLabel(cached.age)}に OpenStreetMap から取得)を使いました。公開の server の混雑を増やさないため、短い時間は送り直しません。`}
+              </p>
+            )}
             {partial && shown === 'osm' && (
               <p className="py-2 text-sm text-warning" data-testid="consult-results-partial">
                 OpenStreetMap の処理が途中で止まったため、一部だけの結果です(他にも場所がある可能性があります)。範囲を小さくするか、もう一度探してください。

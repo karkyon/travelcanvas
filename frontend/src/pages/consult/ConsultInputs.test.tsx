@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { NotesEditor, VoiceInput } from './ConsultInputs';
+import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
 import { speechSupport } from './speech';
 import { initReview, intentOf, mergeReview } from './consultModel';
 import type { IntentExtraction } from '@/services/api/types/tripIntent';
@@ -97,5 +97,21 @@ describe('[Gate AdminUAT U05] 食い違う希望', () => {
     expect(screen.getByTestId('consult-ai-contradictions')).toHaveTextContent('日帰りと泊まりが食い違っています');
     expect(screen.getByRole('heading', { name: /確かめてほしいこと/ })).toBeInTheDocument();
     expect(screen.queryByTestId('consult-ai-suggestions')).toBeNull();
+  });
+});
+
+describe('[F07-3] 追加の相談を黙って切り捨てない', () => {
+  it('反映を断られた時は理由を示し、入力した文章を消さない。反映した時だけ消す', () => {
+    const onSend = vi.fn().mockReturnValueOnce('相談の文章が上限の 3000 文字を越えます').mockReturnValueOnce(null);
+    render(<FollowUp busy={false} aiReady canUndo={false} onSend={onSend} onUndo={vi.fn()} />);
+    const box = screen.getByTestId('consult-followup-text');
+    fireEvent.change(box, { target: { value: 'やっぱり3人に変更' } });
+    fireEvent.click(screen.getByTestId('consult-followup-ai'));
+    expect(onSend).toHaveBeenLastCalledWith('やっぱり3人に変更', true);
+    expect(screen.getByTestId('consult-followup-refused')).toHaveTextContent('上限の 3000 文字');
+    expect(box).toHaveValue('やっぱり3人に変更');
+    fireEvent.click(screen.getByTestId('consult-followup-rules'));
+    expect(box).toHaveValue('');
+    expect(screen.queryByTestId('consult-followup-refused')).toBeNull();
   });
 });

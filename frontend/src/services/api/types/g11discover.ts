@@ -28,6 +28,10 @@ export interface NearbySearch {
   provider_errors?: Record<string, string>;
   /** [Gate SearchUAT F06] 一部だけの結果を返した提供元(処理が途中で止まった。完全な結果ではない) */
   partial_providers?: string[];
+  /** [Gate SearchUAT-S3] 429・406 の後の待機の残り(秒)。この間はアプリから送らない */
+  provider_retry_after?: Record<string, number>;
+  /** [Gate SearchUAT-S3] 保存した結果を使った提供元(外へ送っていない)。stale は提供元の失敗の時の「前の結果」 */
+  cached_providers?: Record<string, { age_seconds: number; stale: boolean }>;
 }
 
 export interface MediaProviderStatus {

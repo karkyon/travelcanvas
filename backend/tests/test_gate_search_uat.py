@@ -147,26 +147,31 @@ def test_draft_keeps_google_place_id_and_url_but_not_name(auth_client, db_sessio
 
 
 def test_search_diag_reports_cause(monkeypatch, capsys):
+    """[Gate SearchUAT-S3] 標準の診断は外へ 1 回(状態の照会)。--probe の結果・比較は明示した時だけ"""
     from app.ops import search_diag as sd
 
-    async def fake_run():
+    async def fake_run(probe=False, compare=False):
         report = {"at": "2026-11-01T00:00:00+00:00", "endpoint": "https://overpass-api.de/api/interpreter",
+                  "mode": "probe" if probe else "default",
                   "dns": {"host": "overpass-api.de", "ok": True, "addresses": ["1.2.3.4"], "ms": 3},
-                  "app_requests": [{"category": c, "ok": True, "count": 12, "ms": 900} for c in sd.CATEGORIES],
-                  "user_agent_comparison": [
-                      {"request": "app_user_agent", "at": "00:00:01", "status": 200, "ms": 900},
-                      {"request": "no_user_agent", "at": "00:00:04", "status": 406, "ms": 200},
-                      {"request": "app_user_agent", "at": "00:00:07", "status": 200, "ms": 900}],
-                  "usage_events": {"days": 7, "by_result": {"unavailable": 5}}}
+                  "cooldown": None,
+                  "server_status": {"url": "https://overpass-api.de/api/status", "status": 200,
+                                    "slots_available_now": 2, "rate_limit": 2, "ms": 40},
+                  "usage_events": {"days": 7, "by_result": {"unavailable": 5}}, "requests_sent": 1}
+        if probe:
+            report["app_requests"] = [{"category": c, "ok": True, "count": 12, "ms": 900, "sent": True}
+                                      for c in sd.CATEGORIES]
+            report["requests_sent"] = 4
         report["conclusion"] = sd.conclusion(report)
         return report
     monkeypatch.setattr(sd, "run", fake_run)
     assert sd.main([]) == 0
     out = capsys.readouterr().out
-    assert "付けない要求だけが HTTP 406" in out and "sightseeing 12件" in out
-    assert "原因" in out and "断定" not in out
-    bad = {"dns": {"ok": True}, "app_requests": [{"category": "food", "ok": False, "code": "rate_limited"}],
-           "user_agent_comparison": [{"request": "no_user_agent", "status": 429}]}
+    assert "外への要求 1 回" in out and "空きの枠 2" in out and "アプリの要求" not in out
+    assert sd.main(["--probe"]) == 0
+    out = capsys.readouterr().out
+    assert "sightseeing 12件" in out and "断定" not in out
+    bad = {"dns": {"ok": True}, "app_requests": [{"category": "food", "ok": False, "code": "rate_limited"}]}
     assert sd.conclusion(bad) == ["アプリの要求が失敗: 回数の制限(429)"]
 
 
@@ -214,18 +219,21 @@ def test_e2e_rate_limit_reset_is_test_only(monkeypatch):
 
 
 def test_user_agent_comparison_sends_the_same_body_and_only_changes_the_header(monkeypatch):
-    """[F05] 比較は同じ送り先・同じ本文で、User-Agent だけを変えて順に送る(アプリ → なし → アプリ)"""
+    """[F05][Gate SearchUAT-S3] 同じ送り先・同じ本文で User-Agent の条件だけを変える(各 1 回)。
+    実際に送った header を記録する: 「付けない」は header そのものが無い(以前は httpx の既定の UA が付いていた)"""
     from app.ops import search_diag as sd
     seen = []
 
     def handler(request):
-        seen.append((request.headers.get("user-agent", ""), request.content))
-        return httpx.Response(406 if "TravelCanvas" not in request.headers.get("user-agent", "") else 200)
+        seen.append((request.headers.get("user-agent"), request.content))
+        return httpx.Response(406 if "TravelCanvas" not in (request.headers.get("user-agent") or "") else 200)
     real = httpx.AsyncClient
     monkeypatch.setattr(sd.httpx, "AsyncClient",
                         lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
     out = asyncio.run(sd.compare_user_agent("https://overpass.example/api/interpreter", pause=0))
-    assert [o["request"] for o in out] == ["app_user_agent", "no_user_agent", "app_user_agent"]
-    assert [o["status"] for o in out] == [200, 406, 200]
+    assert [o["request"] for o in out] == ["app_user_agent", "client_default_user_agent", "no_user_agent_header"]
+    assert [o["status"] for o in out] == [200, 406, 406]
     assert len({body for _ua, body in seen}) == 1  # 本文は同じ
-    assert "TravelCanvas" in seen[0][0] and "TravelCanvas" not in seen[1][0]
+    assert "TravelCanvas" in seen[0][0] and seen[1][0].startswith("python-httpx/") and seen[2][0] is None
+    assert out[1]["wire"]["user_agent"].startswith("python-httpx/")
+    assert out[2]["wire"]["user_agent"] is None and "user-agent" not in out[2]["wire"]["header_names"]

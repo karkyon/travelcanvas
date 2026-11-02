@@ -30,11 +30,28 @@ const stringRecord: Decoder<Record<string, string>> = (v, path) => {
   return out;
 };
 
+/** [Gate SearchUAT-S3] 値が全て整数の辞書(提供元 → 待機の秒数) */
+const intRecord: Decoder<Record<string, number>> = (v, path) => {
+  const r = record(v, path);
+  const out: Record<string, number> = {};
+  for (const [k, x] of Object.entries(r)) out[k] = int(x, `${path}.${k}`);
+  return out;
+};
+
+const cachedOne = object<{ age_seconds: number; stale: boolean }>({ age_seconds: int, stale: bool });
+const cachedRecord: Decoder<Record<string, { age_seconds: number; stale: boolean }>> = (v, path) => {
+  const r = record(v, path);
+  const out: Record<string, { age_seconds: number; stale: boolean }> = {};
+  for (const [k, x] of Object.entries(r)) out[k] = cachedOne(x, `${path}.${k}`);
+  return out;
+};
+
 const nearbySearch: Decoder<NearbySearch> = object<NearbySearch>({
   query: str, category: str, radius_km: num,
   base: nullable(object<{ latitude: number; longitude: number }>({ latitude: num, longitude: num })),
   total: int, candidates: arrayOf(nearby), unavailable_providers: optional(arrayOf(str)),
   provider_errors: optional(stringRecord), partial_providers: optional(arrayOf(str)),
+  provider_retry_after: optional(intRecord), cached_providers: optional(cachedRecord),
 });
 
 export async function searchNearby(input: { query: string; category: DiscoverCategory; latitude: number | null;

@@ -60,6 +60,24 @@ describe('候補を探す(入口は1つ)', () => {
     expect(api.consultPlaces).not.toHaveBeenCalled();
   });
 
+  it('[S3] 429 の後は待つ時間を示す。保存した結果・前の結果(古い)は取得の古さと一緒に示す', async () => {
+    api.searchNearby
+      .mockResolvedValueOnce({ ...failed('rate_limited'), provider_retry_after: { overpass: 120 } })
+      .mockResolvedValueOnce({ ...ok([spot('s1', '皇大神宮')]), cached_providers: { overpass: { age_seconds: 600, stale: false } } })
+      .mockResolvedValueOnce({ ...ok([spot('s2', '前の店')]), unavailable_providers: ['overpass'],
+        provider_errors: { overpass: 'timeout' }, cached_providers: { overpass: { age_seconds: 7300, stale: true } } });
+    setup();
+    fireEvent.click(screen.getByTestId('consult-search'));
+    expect(await screen.findByTestId('consult-search-error')).toHaveTextContent('あと約2分はアプリから送りません');
+    fireEvent.click(screen.getByTestId('consult-search-retry'));
+    expect(await screen.findByTestId('consult-results-cached')).toHaveTextContent('10分前に OpenStreetMap から取得');
+    expect(screen.queryByTestId('consult-search-error')).toBeNull();
+    fireEvent.click(screen.getByTestId('consult-search'));
+    expect(await screen.findByTestId('consult-result-s2')).toBeInTheDocument();
+    expect(screen.getByTestId('consult-results-cached')).toHaveTextContent('前の結果(2時間前');
+    expect(screen.getByTestId('consult-search-error')).toHaveTextContent('時間内に答えませんでした');
+  });
+
   it('該当なしと提供元の失敗を分ける。失敗では前の結果を残し、もう一度探せる。自動で有料へ切り替えない', async () => {
     api.searchNearby.mockResolvedValueOnce(ok([spot('s1', '皇大神宮')])).mockResolvedValueOnce(failed('blocked'))
       .mockResolvedValueOnce(ok([]));

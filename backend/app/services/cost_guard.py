@@ -578,6 +578,11 @@ def _usage_body(res: Resolution, plan_acc: Optional[UsageBudgetAccount], request
     }
     if requested is not None:
         body["requested_max"] = money(requested)
+    # [Gate F07-4] 残りの AI の相談の分として残す額(AI 以外の操作はこの額を残して予約する。使った額ではない)
+    protect, left = ai_protection(res, plan_acc, "places.search")
+    if left:
+        body["ai_calls_left"] = left
+        body["ai_protection_jpy"] = money(protect)
     if res.monthly_cap is not None:
         m_used = Decimal(monthly_acc.settled_jpy) + Decimal(monthly_acc.reserved_jpy) if monthly_acc else Decimal(0)
         body["monthly_cap"] = money(res.monthly_cap)
@@ -602,6 +607,25 @@ def release_expired(db: Session, plan_id: Optional[uuid.UUID] = None, now: Optio
 
 
 # ===================================================================== 予約・確定・解放(§5)
+
+def ai_protection(res: "Resolution", plan_acc: Optional[UsageBudgetAccount], operation: str) -> Tuple[Decimal, int]:
+    """[Gate F07-4] AI の保護の枠: 4つのクラスで AI を含む時、AI 以外の操作(場所・経路・Web 検索など)を予約する前に、
+    まだ使っていない AI の回数 × 1回の最大の額 を 1旅行の上限の中に残す(Google を先に使い切って、決めた回数の
+    AI の相談ができなくなることを防ぐ)。AI の操作自身・旧クラスには掛けない。(額, 残りの回数)。
+
+    回数は送った要求の数(予約の時に数え、送る前に断った・送らなかった予約の解放で戻る)。保護の額は使った額ではない。"""
+    if operation == "ai.generate" or not mt.is_tier(res.profile_key) \
+            or "ai.generate" not in mt.TIER_OPERATIONS.get(res.profile_key, ()):
+        return Decimal(0), 0
+    limit = int(res.quotas.get("ai_calls_per_plan", 0))
+    used = int(((plan_acc.counts or {}) if plan_acc else {}).get("ai_calls_per_plan", 0))
+    left = max(0, limit - used)
+    if left <= 0:
+        return Decimal(0), 0
+    per = cost_of(res.profile, "ai.generate", {"input_tokens": int(res.quotas.get("ai_input_tokens_per_call", 0)),
+                                               "output_tokens": int(res.quotas.get("ai_output_tokens_per_call", 0))})
+    return per * left, left
+
 
 def _check_quotas(res: Resolution, operation: str, units: Dict[str, int], need: Dict[str, int],
                   plan_acc: Optional[UsageBudgetAccount]) -> Optional[CostGuardError]:
@@ -659,6 +683,13 @@ def _denial(db: Session, res: Resolution, plan: Optional[TravelPlan], operation:
         return CostGuardError("plan_cost_limit_reached", 429,
                               "この旅行の旅程相談 API 利用枠に達しました。手動編集と保存済み候補は引き続き利用できます",
                               usage=_usage_body(res, plan_acc, cost, monthly_acc))
+    protect, left = ai_protection(res, plan_acc, operation)
+    if protect > 0 and used + cost + protect > res.plan_cap:
+        return CostGuardError("ai_protection_reserved", 429,
+                              "この操作を使うと、残りの AI の相談(%d回・最大 %s円)の分が 1旅行の利用枠に残りません。"
+                              "AI の相談を先に使うか、保存済みの候補と手での編集で続けてください" % (left, yen_ceil(protect)),
+                              usage=_usage_body(res, plan_acc, cost, monthly_acc),
+                              extra={"ai_calls_left": left, "ai_protection_jpy": money(protect)})
     if res.monthly_cap is not None:
         new_plan = plan_acc is None or plan_acc.counted_month != month
         plans_used = int(monthly_acc.plans_used) if monthly_acc else 0
@@ -1156,6 +1187,11 @@ def tier_matrix(db: Session) -> Dict[str, Any]:
             "monthly_cap_jpy": money(Decimal(profile.monthly_cap_jpy)) if profile.monthly_cap_jpy is not None else None,
             "plans_per_month": profile.plans_per_month, "quotas": dict(profile.feature_quotas or {}),
             "worst_case_plan_jpy": money(worst), "fits_plan_cap": worst <= Decimal(profile.plan_cap_jpy),
+            # [Gate F07-4] 月の枠で、各旅行の回数の上限を全て使った時に入る旅行の数(月の旅行の数の上限を保証しない)
+            "plans_at_full_use": (min(int(profile.plans_per_month or 0),
+                                      int(Decimal(profile.monthly_cap_jpy) // worst))
+                                  if profile.monthly_cap_jpy is not None and worst > 0 and profile.plans_per_month
+                                  else None),
         })
     return {"policy_version": TIER_POLICY_VERSION, "tiers": tiers, "features": mt.FEATURE_MATRIX,
             "legacy": mt.LEGACY_MAPPING,

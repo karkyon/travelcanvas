@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-TIER_POLICY_VERSION = "2026-10-31.1"
+# [Gate SearchUAT-S3 / F07-4] 2026-11-02.1: 単価の是正(場所の検索は Text Search Pro・AI は gpt-5-nano の公式の単価)と、
+# Journey・Explorer の AI 1旅行 10回・Journey の場所の検索 3回(migration e9c1a5d3f7b2)
+TIER_POLICY_VERSION = "2026-11-02.1"
 TIERS: Tuple[str, ...] = ("free", "trip", "journey", "explorer")
 TIER_LABEL = {"free": "Free", "trip": "Trip", "journey": "Journey", "explorer": "Explorer"}
 TIER_SUBTITLE = {"free": "自分でつくる", "trip": "行先を見つける", "journey": "計画を一緒に考える",
@@ -33,7 +35,8 @@ TIER_OPERATIONS: Dict[str, Tuple[str, ...]] = {
     "explorer": _PLACES_ROUTES + ("ai.generate", "ai.web_search"),
 }
 
-# クラスごとの回数の上限(価格の版 2026-10-31.1 の feature_quotas)。根拠と検算は FR-059 §3.3
+# クラスごとの回数の上限(価格の版 2026-11-02.1 の feature_quotas)。根拠と検算は FR-059 §3.3・§3.6
+# AI の回数は「送った要求の数」(提供元へ送った後の失敗・時間切れ・読めない応答も 1回。送る前に断った時は数えない)
 _ZERO = {"ai_calls_per_plan": 0, "ai_input_tokens_per_call": 0, "ai_output_tokens_per_call": 0,
          "web_searches_per_plan": 0, "places_searches_per_plan": 0, "place_details_per_plan": 0, "photos_per_plan": 0,
          "route_elements_per_plan": 0, "dynamic_map_loads_per_plan": 0}
@@ -41,10 +44,10 @@ TIER_QUOTAS: Dict[str, Dict[str, int]] = {
     "free": dict(_ZERO),
     "trip": {**_ZERO, "places_searches_per_plan": 2, "place_details_per_plan": 1, "photos_per_plan": 1,
              "route_elements_per_plan": 4, "dynamic_map_loads_per_plan": 1},
-    "journey": {**_ZERO, "ai_calls_per_plan": 3, "ai_input_tokens_per_call": 10000, "ai_output_tokens_per_call": 2000,
-                "places_searches_per_plan": 2, "place_details_per_plan": 1, "photos_per_plan": 1,
+    "journey": {**_ZERO, "ai_calls_per_plan": 10, "ai_input_tokens_per_call": 10000, "ai_output_tokens_per_call": 2000,
+                "places_searches_per_plan": 3, "place_details_per_plan": 1, "photos_per_plan": 1,
                 "route_elements_per_plan": 4, "dynamic_map_loads_per_plan": 1},
-    "explorer": {"ai_calls_per_plan": 5, "ai_input_tokens_per_call": 10000, "ai_output_tokens_per_call": 2000,
+    "explorer": {"ai_calls_per_plan": 10, "ai_input_tokens_per_call": 10000, "ai_output_tokens_per_call": 2000,
                  "web_searches_per_plan": 2, "places_searches_per_plan": 3, "place_details_per_plan": 2,
                  "photos_per_plan": 2, "route_elements_per_plan": 4, "dynamic_map_loads_per_plan": 1},
 }

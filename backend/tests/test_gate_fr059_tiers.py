@@ -5,8 +5,10 @@
 検証する主な性質(provider は fake。外へつながない):
 - 機能の表: クラスに含まない操作は provider の前で 403 ``tier_feature_not_included``(口座・予約を作らない)。
   Free は AI・有料の検索なし、Trip は AI なし、Journey は Web 検索なし、Explorer は全て
-- 価格の版 2026-10-31.1: 全ての回数の上限を同時に使った額が 1旅行 50円以下(Trip 28.23・Journey 29.60・Explorer 49.55)。
-  月の枠 × 旅行の数 の最大が月の上限以下
+- 価格の版 2026-11-02.1(Places Text Search Pro・gpt-5-nano の公式の単価・Journey/Explorer の AI 10回・Journey の検索 3回):
+  全ての回数の上限を同時に使った額が 1旅行 50円以下(Trip 26.87・Journey 37.12・Explorer 48.00)。
+  月の枠 × 旅行の数 の最大が月の上限を越えるクラス(Journey)は、全てを使った時に入る旅行の数を別に示す(5旅行を保証しない)
+- [F07-4] AI の保護の枠: AI 以外の操作は、まだ使っていない AI の回数の分を 1旅行の上限の中に残して予約する
 - 40円の警告・45円の運用の知らせ・ちょうど 50円の許可・50円を越える見込みの拒否は全てのクラスで同じ
 - 解決の順: Pro の契約 > Explorer > Journey > Trip > Plus > Family > Free。旧クラス(Plus・Trip Pass)は一律に変えない
 - 管理の付与は二者の承認(4つのクラスも申請できる)。開発環境の試験の切り替えは理由・監査・24時間・本番では断る
@@ -90,11 +92,11 @@ def _key():
 # ===================================================================== policy・価格の版
 
 def test_policy_profiles_match_machine_readable_policy(db_session):
-    expected_worst = {"free": Decimal(0), "trip": Decimal("28.2348"), "journey": Decimal("29.6010"),
-                      "explorer": Decimal("49.5480")}
+    expected_worst = {"free": Decimal(0), "trip": Decimal("26.8686"), "journey": Decimal("37.1160"),
+                      "explorer": Decimal("48.0001")}
     for tier in mt.TIERS:
         profile = cg.load_profile(db_session, tier)
-        assert profile.version == mt.TIER_POLICY_VERSION == cg.TIER_POLICY_VERSION
+        assert profile.version == mt.TIER_POLICY_VERSION == cg.TIER_POLICY_VERSION == "2026-11-02.1"
         assert dict(profile.feature_quotas) == mt.TIER_QUOTAS[tier], tier
         plan_cap, monthly_cap, per_month = mt.TIER_CAPS[tier]
         assert Decimal(profile.plan_cap_jpy) == Decimal(plan_cap) == Decimal(50)
@@ -104,22 +106,114 @@ def test_policy_profiles_match_machine_readable_policy(db_session):
         worst = cg.worst_case_plan_cost(profile)
         assert abs(worst - expected_worst[tier]) < Decimal("0.01"), (tier, worst)
         assert worst <= Decimal(50)
-        if monthly_cap is not None:
+        if monthly_cap is not None and tier != "journey":
             assert worst * per_month <= Decimal(monthly_cap), tier  # 月の旅行の数を全て上限まで使っても月の枠に収まる
         # 含まない操作の回数の上限は 0(policy と価格の版が食い違わない)
         for op, spec in cg.OPERATIONS.items():
             limit = int(profile.feature_quotas.get(spec["count"][0], 0))
             assert (limit > 0) == (op in mt.TIER_OPERATIONS[tier]), (tier, op)
+    for tier in ("journey", "explorer"):
+        assert mt.TIER_QUOTAS[tier]["ai_calls_per_plan"] == 10
+    assert mt.TIER_QUOTAS["journey"]["places_searches_per_plan"] == 3
     # 段階: 上のクラスは下のクラスの操作を全て含む
     for lower, upper in zip(mt.TIERS, mt.TIERS[1:]):
         assert set(mt.TIER_OPERATIONS[lower]) <= set(mt.TIER_OPERATIONS[upper])
-    # 価格(単価・為替・税・安全係数)は以前の版と同じ
+    # 為替・税・安全係数は以前の版のまま。単価は公式の表(SKU・field mask・出典を版に持つ)
     legacy = db_session.query(UsagePolicyProfile).filter_by(profile_key="free", version=cg.POLICY_VERSION).one()
     assert legacy.status == "retired"  # 以前の Free(AI 5回)は使わない。行は残す
+    old = db_session.query(UsagePolicyProfile).filter_by(profile_key="journey", version="2026-10-31.1").one()
+    assert old.status == "retired" and old.feature_quotas["ai_calls_per_plan"] == 3  # 以前の版は精算のため残す
     tier_free = cg.load_profile(db_session, "free")
-    assert tier_free.provider_price_snapshot == legacy.provider_price_snapshot
     assert (tier_free.fx_rate, tier_free.tax_factor, tier_free.safety_factor) == \
         (legacy.fx_rate, legacy.tax_factor, legacy.safety_factor)
+    from app.services import provider_calls as pc
+    ops = tier_free.provider_price_snapshot["operations"]
+    assert ops["places.search"]["sku"] == "places-text-search-pro"
+    assert ops["places.search"]["unit_prices"] == {"requests": "0.032"}
+    assert ops["places.search"]["field_mask"] == pc.PLACES_FIELD_MASK
+    assert ops["ai.generate"]["unit_prices"] == {"input_tokens": "0.00000005", "output_tokens": "0.0000004"}
+    assert ops["ai.generate"]["model"] == pc.openai_model()
+    sources = tier_free.provider_price_snapshot["sources"]
+    assert sources["google_maps_pricing"].startswith("https://developers.google.com/")
+
+
+def test_places_field_mask_maps_to_the_right_sku():
+    """[Gate SearchUAT-S3] field mask → SKU。Pro の範囲を越える field(電話・営業時間・評価など)を足したら、高い SKU の
+    単価の版が要る(この試験が失敗する)。field の一覧は Google の Text Search の公式の表(2026-11-02)"""
+    from app.services import provider_calls as pc
+
+    essentials_ids = {"places.id", "places.name", "places.attributions"}
+    pro = {"places.displayName", "places.formattedAddress", "places.location", "places.googleMapsUri",
+           "places.types", "places.primaryType", "places.businessStatus", "places.shortFormattedAddress",
+           "places.viewport", "places.plusCode", "places.addressComponents", "places.utcOffsetMinutes",
+           "places.iconMaskBaseUri", "places.iconBackgroundColor", "places.photos", "places.adrFormatAddress",
+           "places.accessibilityOptions", "places.containingPlaces", "places.pureServiceAreaBusiness",
+           "places.googleMapsLinks", "places.timeZone", "places.postalAddress", "places.primaryTypeDisplayName",
+           "places.subDestinations"}
+
+    def sku(mask: str) -> str:
+        fields = set(mask.split(","))
+        if fields <= essentials_ids:
+            return "places-text-search-essentials-ids-only"
+        if fields <= essentials_ids | pro:
+            return "places-text-search-pro"
+        return "places-text-search-enterprise"
+    assert sku(pc.PLACES_FIELD_MASK) == "places-text-search-pro"
+    assert sku(pc.PLACES_VERIFY_FIELD_MASK) == "places-text-search-essentials-ids-only"
+    assert sku(pc.PLACES_FIELD_MASK + ",places.rating") == "places-text-search-enterprise"
+    assert sku(pc.PLACES_FIELD_MASK + ",places.internationalPhoneNumber") == "places-text-search-enterprise"
+
+
+def test_ai_protection_keeps_room_for_remaining_ai_calls(db_session):
+    """[F07-4] Journey: Google 等を先に使っても、残りの AI の相談の分(10回 × 最大の額)を 50円の中に残す"""
+    member = _member(db_session, "journey")
+    plan = _plan(db_session, member)
+    profile = cg.load_profile(db_session, "journey")
+    per_ai = cg.cost_of(profile, "ai.generate", UNITS["ai.generate"])
+    acc = cg._account(db_session, "plan", plan.id, "plan", cg.resolve(db_session, plan, member), Decimal(50))
+    acc.settled_jpy = Decimal(50) - per_ai * 10 - Decimal("1.5939") + Decimal("0.0001")
+    db_session.flush()
+    est = cg.estimate(db_session, plan, member, "map.load", {"loads": 1})
+    assert est["allowed"] is False and est["reason"] == "ai_protection_reserved"
+    assert est["usage"]["ai_calls_left"] == 10 and Decimal(est["usage"]["ai_protection_jpy"]) == per_ai * 10
+    with pytest.raises(cg.CostGuardError) as e:
+        cg.reserve(db_session, plan, member, "map.load", FAKE, {"loads": 1}, _key())
+    assert e.value.code == "ai_protection_reserved" and e.value.status == 429 and e.value.extra["ai_calls_left"] == 10
+    # AI の相談そのものは保護の枠を使える
+    row = cg.reserve(db_session, plan, member, "ai.generate", FAKE, UNITS["ai.generate"], _key())
+    assert row.status == "reserved"
+    # 実際に使った token が少なければ、確定の後に余った分で地図の表示が入る(保護は残り 9回分)
+    cg.settle(db_session, row.id, {"input_tokens": 500, "output_tokens": 100})
+    assert cg.estimate(db_session, plan, member, "map.load", {"loads": 1})["usage"]["ai_calls_left"] == 9
+    assert cg.reserve(db_session, plan, member, "map.load", FAKE, {"loads": 1}, _key()).status == "reserved"
+
+
+@pytest.mark.parametrize("tier,order", [("journey", "ai_first"), ("journey", "google_first"),
+                                        ("explorer", "ai_first"), ("explorer", "google_first")])
+def test_uat_scenario_ai10_places3_routes4_fits_both_orders(db_session, tier, order):
+    """[F07-4] 受入の場面: AI 10回 + 場所の検索 3回 + 経路 4区間。無料枠・割引に頼らない見込みで 50円以内・通常 45円以内。
+    AI を先に使う順と Google を先に使う順の両方で、全て予約でき、50円を越えない"""
+    member = _member(db_session, tier)
+    plan = _plan(db_session, member)
+    ai = [("ai.generate", UNITS["ai.generate"])] * 10
+    google = [("places.search", {"requests": 1})] * 3 + [("routes.element", {"elements": 4})]
+    for op, units in (ai + google if order == "ai_first" else google + ai):
+        row = cg.reserve(db_session, plan, member, op, FAKE, units, _key())
+        cg.settle(db_session, row.id, units)
+    acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="plan", scope_id=plan.id).one()
+    assert Decimal(acc.settled_jpy) <= Decimal(45) and acc.counts["ai_calls_per_plan"] == 10
+    with pytest.raises(cg.CostGuardError) as e:  # 11回目は回数の上限
+        cg.reserve(db_session, plan, member, "ai.generate", FAKE, UNITS["ai.generate"], _key())
+    assert e.value.code == "feature_quota_exceeded"
+
+
+def test_tier_matrix_shows_plans_at_full_use_without_overpromising(db_session):
+    """[F07-4] 月の枠 150円で 1旅行の最大(Journey 37.12円)を全て使うと 4旅行。「5旅行を必ず保証」と出さない"""
+    body = cg.tier_matrix(db_session)
+    j = next(t for t in body["tiers"] if t["key"] == "journey")
+    assert j["plans_per_month"] == 5 and j["plans_at_full_use"] == 4
+    e = next(t for t in body["tiers"] if t["key"] == "explorer")
+    assert e["plans_at_full_use"] == 5
 
 
 @pytest.mark.parametrize("tier", mt.TIERS)
@@ -168,6 +262,8 @@ def test_thresholds_40_45_50_same_for_every_class(db_session, tier):
     plan = _plan(db_session, member)
     acc = cg._account(db_session, "plan", plan.id, "plan", cg.resolve(db_session, plan, member), Decimal(50))
     acc.settled_jpy = Decimal(40)
+    # [F07-4] AI を含むクラスは、AI を使い切った状態で閾値を確かめる(残りの AI の保護の枠は別の試験)
+    acc.counts = {"ai_calls_per_plan": int(mt.TIER_QUOTAS[tier]["ai_calls_per_plan"])}
     db_session.flush()
     assert cg.plan_summary(db_session, plan, member)["state"] == "warning"  # 40円(80%)で利用者の警告
     assert cg.estimate(db_session, plan, member, "map.load", {"loads": 1})["needs_confirmation"] is True
@@ -185,12 +281,12 @@ def test_explorer_full_use_stays_under_cap_and_alerts_at_45(db_session, caplog):
     plan = _plan(db_session, member)
     ops = [("places.search", {"requests": 1})] * 3 + [("places.details", {"requests": 1})] * 2 + \
         [("places.photo", {"requests": 1})] * 2 + [("routes.element", {"elements": 4}), ("map.load", {"loads": 1})] + \
-        [("ai.generate", UNITS["ai.generate"])] * 5 + [("ai.web_search", {"requests": 1})] * 2
+        [("ai.generate", UNITS["ai.generate"])] * 10 + [("ai.web_search", {"requests": 1})] * 2
     caplog.set_level("WARNING")
     for op, units in ops:
         cg.reserve(db_session, plan, member, op, FAKE, units, _key())
     acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="plan", scope_id=plan.id).one()
-    assert Decimal("49.5") <= Decimal(acc.reserved_jpy) <= Decimal(50)
+    assert Decimal("47.9") <= Decimal(acc.reserved_jpy) <= Decimal(50)  # 2026-11-02.1 の全ての上限 48.00円
     assert any("90%" in r.getMessage() for r in caplog.records)  # 45円(90%)で運用の知らせ
     for op, units in ops:
         with pytest.raises(cg.CostGuardError):
@@ -200,11 +296,11 @@ def test_explorer_full_use_stays_under_cap_and_alerts_at_45(db_session, caplog):
 def test_journey_and_trip_per_plan_quotas(db_session):
     member = _member(db_session, "journey")
     plan = _plan(db_session, member)
-    for _ in range(3):
+    for _ in range(10):
         cg.reserve(db_session, plan, member, "ai.generate", FAKE, UNITS["ai.generate"], _key())
     with pytest.raises(cg.CostGuardError) as e:
         cg.reserve(db_session, plan, member, "ai.generate", FAKE, UNITS["ai.generate"], _key())
-    assert e.value.code == "feature_quota_exceeded" and e.value.extra["limit"] == 3
+    assert e.value.code == "feature_quota_exceeded" and e.value.extra["limit"] == 10
     trip = _member(db_session, "trip")
     tplan = _plan(db_session, trip)
     for _ in range(2):
@@ -306,7 +402,7 @@ def test_concurrent_journey_reservations_never_exceed_quota():
     plan_id, owner_id = plan.id, owner.id
     setup.close()
     results = []
-    barrier = threading.Barrier(6)
+    barrier = threading.Barrier(12)
 
     def worker():
         s = Session(bind=engine)
@@ -320,13 +416,13 @@ def test_concurrent_journey_reservations_never_exceed_quota():
         finally:
             s.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(6)]
+    threads = [threading.Thread(target=worker) for _ in range(12)]
     try:
         for t in threads:
             t.start()
         for t in threads:
             t.join(30)
-        assert results.count("ok") == 3 and results.count("feature_quota_exceeded") == 3
+        assert results.count("ok") == 10 and results.count("feature_quota_exceeded") == 2  # AI 10回(F07-4)
     finally:
         clean = Session(bind=engine)
         clean.query(ProviderUsageEvent).filter_by(plan_id=plan_id).delete()
@@ -468,3 +564,21 @@ def test_override_from_client_is_ignored(auth_client):
     for key in ("class", "profile_key", "plan_cap"):
         r = client.post(f"/api/v1/plans/{plan}/planning-actions/estimate", json={"operation": "map.load", key: "x"})
         assert r.status_code == 422
+
+
+def test_price_migration_constants_match_the_app():
+    """[Gate SearchUAT-S3] migration e9c1a5d3f7b2 はアプリのコードを import しない。値がアプリと一致すること"""
+    import importlib.util
+    from pathlib import Path
+
+    from app.services import provider_calls as pc
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "e9c1a5d3f7b2_fr059_price_2026_11_02.py"
+    spec = importlib.util.spec_from_file_location("mig_e9c1", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.NEW_VERSION == mt.TIER_POLICY_VERSION
+    assert mod.PLACES_FIELD_MASK == pc.PLACES_FIELD_MASK
+    assert mod.QUOTAS == mt.TIER_QUOTAS
+    assert set(mod.PRICE_SNAPSHOT["operations"]) == set(cg.OPERATIONS)
+    factor = Decimal(180) * Decimal("1.10") * Decimal("1.15")
+    assert mod._worst(mt.TIER_QUOTAS["explorer"], factor) <= Decimal(50)

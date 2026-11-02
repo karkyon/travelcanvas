@@ -98,6 +98,7 @@
 | [gate-s7-trace.md](gate-s7-trace.md) | Gate S7 段階的な計算の確認 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-s8-trace.md](gate-s8-trace.md) | Gate S8 侵害が疑われる時の封じ込め トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-s9-trace.md](gate-s9-trace.md) | Gate S9 新しい端末からのログインの通知・ログイン中の端末 トレーサビリティ表 | 1 | 0 | 0 |
+| [gate-search-uat-s3-trace.md](gate-search-uat-s3-trace.md) | Gate SearchUAT-S3 — 無料の検索の復旧・診断の修正・原価の表示と料金版・AI 10回(UAT の開始の準備) | 0 | 1 | 0 |
 | [gate-search-uat-trace.md](gate-search-uat-trace.md) | Gate SearchUAT — 旅行相談の場所の検索の入口の統一と、検索の失敗(OpenStreetMap)の是正 | 0 | 0 | 0 |
 | [gate-secretpolicy-trace.md](gate-secretpolicy-trace.md) | Gate SecretPolicy — 外部 API 鍵の取得元の一本化 | 0 | 0 | 0 |
 | [gate-ux6-icons-trace.md](gate-ux6-icons-trace.md) | Gate UX6-Icons トレース(旅程の中の移動・旅行の基本情報の飾りの絵文字を共通のアイコンへ) | 1 | 0 | 0 |

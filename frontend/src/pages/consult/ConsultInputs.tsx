@@ -152,10 +152,19 @@ export const NotesEditor: React.FC<{ notes: string[]; onChange: (notes: string[]
 // ------------------------------------------------------------------ 追加で伝える(確認の画面)
 
 export const FollowUp: React.FC<{
-  busy: boolean; aiReady: boolean; canUndo: boolean; onSend: (text: string, useAi: boolean) => void; onUndo: () => void;
+  busy: boolean; aiReady: boolean; canUndo: boolean;
+  /** 反映する。断る時は理由(文字数の上限など)を返す(その時は入力を消さない。[F07-3] 黙って切り捨てない) */
+  onSend: (text: string, useAi: boolean) => string | null | void; onUndo: () => void;
 }> = ({ busy, aiReady, canUndo, onSend, onUndo }) => {
   const id = useId();
   const [text, setText] = useState('');
+  const [refused, setRefused] = useState<string | null>(null);
+  const send = (useAi: boolean) => {
+    const why = onSend(text.trim(), useAi);
+    if (why) { setRefused(why); return; }
+    setRefused(null);
+    setText('');
+  };
   return (
     <section aria-labelledby={`${id}-h`} className="mt-4 rounded-2xl border border-cloud-200 bg-surface p-4 text-sm"
       data-testid="consult-followup">
@@ -167,13 +176,14 @@ export const FollowUp: React.FC<{
       <textarea id={`${id}-t`} value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={1000}
         className="tc-focus-ring mt-2 w-full rounded-lg border border-cloud-200 bg-cloud-0 p-2 text-sm" data-testid="consult-followup-text" />
       <VoiceInput onAdd={(t) => setText((x) => (x ? `${x}\n${t}` : t))} />
+      {refused && <p role="alert" className="mt-2 text-xs text-danger" data-testid="consult-followup-refused">{refused}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
         <Button type="button" disabled={busy || !text.trim() || !aiReady} loading={busy}
-          onClick={() => { onSend(text.trim(), true); setText(''); }} data-testid="consult-followup-ai">
+          onClick={() => send(true)} data-testid="consult-followup-ai">
           AI で読み取って反映する
         </Button>
         <Button type="button" variant="outline" disabled={busy || !text.trim()}
-          onClick={() => { onSend(text.trim(), false); setText(''); }} data-testid="consult-followup-rules">
+          onClick={() => send(false)} data-testid="consult-followup-rules">
           AI を使わずに反映する
         </Button>
         <Button type="button" variant="ghost" disabled={!canUndo || busy} onClick={onUndo} data-testid="consult-undo">

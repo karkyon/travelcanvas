@@ -332,6 +332,13 @@ class Settings(BaseSettings):
     TC_UAT_HTTPS_PORT: str = ""
     # [Gate SearchUAT] OpenStreetMap の場所の検索(Overpass)の送り先。空なら公開の overpass-api.de
     OVERPASS_URL: str = ""
+    # [Gate SearchUAT-S3] 1つ目が server の障害・時間切れの時だけ次に送る送り先(https、カンマ区切り)。既定は空。
+    # 規約・送る情報・負荷・データの新しさを確かめて利用者が承認した mirror だけを書く(承認の無い送り先へは送らない)
+    OVERPASS_FALLBACK_URLS: str = ""
+    # [Gate SearchUAT-S3] 同じ条件の成功した結果を使い回す時間(秒。0 で使わない)と、提供元の失敗の時に「前の結果」として
+    # 示してよい古さの上限(秒)。保存のキーは条件の SHA-256 だけ(入力の原文・利用者を含めない)
+    OVERPASS_CACHE_SECONDS: int = 2700
+    OVERPASS_STALE_SECONDS: int = 21600
 
     # アプリケーション設定
     DEBUG: bool = True

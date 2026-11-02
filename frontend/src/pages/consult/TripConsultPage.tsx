@@ -786,9 +786,17 @@ const TripConsultPage: React.FC = () => {
             aiReady={Boolean(aiStatus?.operations['ai.generate'].ready && aiStatus.consent.ai_processing)}
             onSend={(text, useAi) => {
               // 追加の文章は相談の文章の後ろへ足す(原文は消さない)。確かめた行は重ねる時に残す
-              const brief = { ...state.brief, text: `${state.brief.text.trim()}\n【追加】${text}`.slice(0, 4000) };
+              // [F07-3] 以前は 4000 文字で後ろを切り、最新の訂正を黙って失っていた。上限を越える時は送らず、理由を示す
+              const combined = `${state.brief.text.trim()}\n【追加】${text}`;
+              const limit = useAi ? (aiStatus?.max_text_chars ?? 3000) : 4000;
+              if (combined.length > limit) {
+                return `相談の文章が上限の ${limit} 文字を越えます(追加すると ${combined.length} 文字)。`
+                  + '追加の文章は消していません。最初の相談の文章を短くするか、追加を短くしてから反映してください';
+              }
+              const brief = { ...state.brief, text: combined };
               setState((s) => ({ ...s, brief }));
               void (useAi ? aiRead(brief) : extract(brief));
+              return null;
             }} />} />
       )}
       {step === 'review' && state.review && (

@@ -119,8 +119,13 @@ async def get_system_stats(
 
     user_type_counts = {"guest": 0, "registered": 0, "premium": 0, "admin": 0}
     for user_type, count in db.query(User.user_type, func.count(User.id)).group_by(User.user_type).all():
-        key = user_type if user_type in user_type_counts else "registered"
+        # [Gate SearchUAT-S3 OPS-02] super_admin は管理者に数える(以前は登録の利用者に数えていた)
+        key = "admin" if user_type == "super_admin" else user_type if user_type in user_type_counts else "registered"
         user_type_counts[key] += count
+    # [Gate SearchUAT-S3 OPS-01/02] 運用の Fake の試験が作った利用者(ログインできない ops-fake-…@ops.invalid)と、
+    # その旅行は数を分けて示す(総数には含まれる。行は消さない)
+    test_filter = User.email.like("%@ops.invalid")
+    test_accounts = db.query(func.count(User.id)).filter(test_filter).scalar() or 0
 
     # [Gate B-012] 論理削除済みプランは統計に含めない
     live = TravelPlan.deleted_at.is_(None)
@@ -128,6 +133,10 @@ async def get_system_stats(
     active_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "active").scalar() or 0
     completed_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "completed").scalar() or 0
     draft_plans = db.query(func.count(TravelPlan.id)).filter(live, TravelPlan.status == "draft").scalar() or 0
+    test_plans = (db.query(func.count(TravelPlan.id)).join(User, User.id == TravelPlan.user_id)
+                  .filter(live, test_filter).scalar() or 0)
+    guest_plans = (db.query(func.count(TravelPlan.id)).join(User, User.id == TravelPlan.user_id)
+                   .filter(live, User.user_type == "guest").scalar() or 0)
 
     duration_rows = (
         db.query(TravelPlan.start_date, TravelPlan.end_date)
@@ -154,12 +163,20 @@ async def get_system_stats(
             "verified_users": verified_users,
             "new_users_30d": new_users_30d,
             "user_types": user_type_counts,
+            # [Gate SearchUAT-S3] 総数の内訳の意味(総数はゲスト・試験を含む)
+            "test_accounts": test_accounts,
+            "breakdown_note": ("総数はゲスト(一時利用)・運用の Fake の試験の利用者を含みます。"
+                               "登録の利用者 = user_type registered・premium(試験の利用者を除く)"),
+            "registered_excluding_tests": max(0, user_type_counts["registered"] + user_type_counts["premium"]
+                                              - test_accounts),
         },
         "travel_plans": {
             "total_plans": total_plans,
             "active_plans": active_plans,
             "completed_plans": completed_plans,
             "draft_plans": draft_plans,
+            "test_plans": test_plans,
+            "guest_plans": guest_plans,
             "average_duration_days": average_duration_days,
             "popular_destinations": popular_destinations,
         },

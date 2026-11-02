@@ -76,11 +76,14 @@ def _ai(db, plan, caller, i=2000, o=500):
 # ===================================================================== 価格の版
 
 def test_price_profile_fits_cap_and_unknown_price_fails_closed(db_session):
-    for key in ("plus", "family", "trip_pass", "pro", "explorer"):
+    for key in ("plus", "family", "trip_pass", "pro"):
         profile = cg.load_profile(db_session, key)
         worst = cg.worst_case_plan_cost(profile)
         assert worst <= Decimal(profile.plan_cap_jpy) == Decimal(50), key
         assert Decimal("49.5") <= worst <= Decimal("49.6")  # 追補の検算 49.55円(切り上げの誤差の内)
+    # [Gate SearchUAT-S3] Explorer は価格の版 2026-11-02.1(Places Pro・gpt-5-nano の公式の単価・AI 10回): 48.00円
+    worst = cg.worst_case_plan_cost(cg.load_profile(db_session, "explorer"))
+    assert Decimal("47.9") <= worst <= Decimal("48.1") and worst <= Decimal(50)
     assert cg.worst_case_plan_cost(cg.load_profile(db_session, "guest")) == 0
     assert cg.worst_case_plan_cost(cg.load_profile(db_session, "free")) == 0  # 新しい Free は有料の操作を含まない
     assert cg.load_profile(db_session, "free").version == cg.TIER_POLICY_VERSION
@@ -252,7 +255,7 @@ def test_feature_quotas_checked_before_provider(db_session):
     assert e.value.code == "feature_quota_exceeded" and e.value.extra["feature"].endswith("ai_input_tokens_per_call")
     with pytest.raises(cg.CostGuardError):
         _ai(db_session, plan, member, o=2001)
-    for _ in range(5):
+    for _ in range(10):  # [Gate F07-4] Explorer の AI は 1旅行 10回
         _ai(db_session, plan, member)
     with pytest.raises(cg.CostGuardError) as e:
         _ai(db_session, plan, member)
@@ -290,7 +293,7 @@ def test_idempotency_settle_release_and_expiry(db_session):
     cg.settle(db_session, r1.id, {"requests": 1})
     cg.settle(db_session, r1.id, {"requests": 1})  # 二度目は何もしない
     db_session.refresh(acc)
-    assert Decimal(acc.settled_jpy) == Decimal("7.9695") and Decimal(acc.reserved_jpy) == 0
+    assert Decimal(acc.settled_jpy) == Decimal("7.2864") and Decimal(acc.reserved_jpy) == 0  # Text Search Pro
     r3 = cg.reserve(db_session, plan, member, "places.search", FAKE, {"requests": 1}, _key())
     cg.release(db_session, r3.id, "provider_error")
     cg.release(db_session, r3.id, "provider_error")
@@ -340,7 +343,7 @@ def test_run_retry_once_release_on_failure_and_suspend(db_session):
         cg.run(db_session, plan, member, "places.photo", FAKE, {"requests": 1}, _key(), not_safe)
     assert len(unsafe) == 1  # 二重の課金の恐れがある時は再送しない
     acc = db_session.query(UsageBudgetAccount).filter_by(scope_type="plan", scope_id=plan.id).one()
-    assert Decimal(acc.reserved_jpy) == 0 and Decimal(acc.settled_jpy) == Decimal("7.9695")
+    assert Decimal(acc.reserved_jpy) == 0 and Decimal(acc.settled_jpy) == Decimal("7.2864")
 
     def over(units):
         return cg.ProviderResult(units={"requests": 2})  # 予約した1件を越えて報告
@@ -440,11 +443,11 @@ def test_api_entitlements_usage_estimate_and_roles(auth_client, make_user, db_se
     assert not any(c["included"] for c in usage["calls"])
     est = client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
                       json={"operation": "places.search", "units": {"requests": 1}}).json()
-    assert est["max_cost_jpy"] == "7.9695" and est["allowed"] is False and est["reason"] == "tier_feature_not_included"
+    assert est["max_cost_jpy"] == "7.2864" and est["allowed"] is False and est["reason"] == "tier_feature_not_included"
     _grant(db_session, "user", owner.id, "class.trip")
     est = client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
                       json={"operation": "places.search", "units": {"requests": 1}}).json()
-    assert est["max_cost_jpy"] == "7.9695" and est["max_cost_yen_ceil"] == 8 and est["allowed"] is True
+    assert est["max_cost_jpy"] == "7.2864" and est["max_cost_yen_ceil"] == 8 and est["allowed"] is True
     assert client.get(f"/api/v1/plans/{plan}/planning-usage").json()["state"] == "ok"
     assert client.post(f"/api/v1/plans/{plan}/planning-actions/estimate",
                        json={"operation": "places.search", "plan_cap": "9999"}).status_code == 422

@@ -464,7 +464,23 @@ export const SEARCH_ERROR_LABEL: Record<string, string> = {
   unreadable: '検索の提供元(OpenStreetMap)の応答を読めませんでした。もう一度探してください',
 };
 
-export function searchErrorMessage(code: string | null | undefined): string {
+export function searchErrorMessage(code: string | null | undefined, retryAfter?: number | null): string {
+  // [Gate SearchUAT-S3] 回数の制限(429)・受け付けない(406)の後は、アプリが待つ時間(秒)を示す。待つ間は送らない
+  if (retryAfter && retryAfter > 0 && (code === 'rate_limited' || code === 'blocked')) {
+    const wait = retryAfter >= 90 ? `約${Math.ceil(retryAfter / 60)}分` : `${retryAfter}秒`;
+    const head = code === 'rate_limited'
+      ? '検索の提供元(OpenStreetMap)の回数の制限に達しました'
+      : '検索の提供元(OpenStreetMap)が要求を受け付けませんでした(運用者に連絡してください)';
+    return `${head}。混雑を増やさないため、あと${wait}はアプリから送りません。その後にもう一度探してください`
+      + '(該当なしではありません。入力と選んだ候補はそのままです)';
+  }
   return `${SEARCH_ERROR_LABEL[code ?? ''] ?? '検索の提供元(OpenStreetMap)が答えませんでした。もう一度探してください'}`
     + '(該当なしではありません。入力と選んだ候補はそのままです)';
+}
+
+/** [Gate SearchUAT-S3] 保存した結果の古さ(「○分前に取得」)。新しい結果のふりをしない */
+export function cachedLabel(ageSeconds: number): string {
+  if (ageSeconds < 60) return '1分以内';
+  if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}分前`;
+  return `${Math.floor(ageSeconds / 3600)}時間前`;
 }

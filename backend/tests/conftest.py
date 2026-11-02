@@ -90,6 +90,20 @@ def _guard_off_by_default(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _search_guard_isolated(monkeypatch):
+    """[Gate SearchUAT-S3] Overpass の待機・保存(search_guard)は、試験ではプロセス内だけにして試験ごとに消す
+    (試験の間で 429 の待機や保存した結果が残らないように)。保存は既定で使わず、保存の試験が自分で有効にする。"""
+    from app.core.config import settings as _settings
+    from app.services import search_guard as _sg
+
+    _sg.use_backend("memory")
+    _sg.reset()
+    monkeypatch.setattr(_settings, "OVERPASS_CACHE_SECONDS", 0)
+    yield
+    _sg.reset()
+
+
+@pytest.fixture(autouse=True)
 def _isolated_github_summary(monkeypatch, tmp_path):
     """[監査 A09] CI の検査の道具の自己試験が、偽の結果を本物の GitHub の要約(GITHUB_STEP_SUMMARY)へ書かないようにする。"""
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "step-summary.md"))

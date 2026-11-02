@@ -7,6 +7,8 @@
  *
  * - 値は全て backend の実データ。取れない値は「取得していない」「未確認」と書く(作った数を出さない)
  * - Fake の試験の額と、実の提供元の見込みの原価を同じ欄に混ぜない。GCP の予算は通知で、課金を止める上限ではないと書く
+ * - [Gate SearchUAT-S3] 「利用枠の計上(アプリの料金版の見込み)」「管理者の鍵の確認」「提供元の請求額(未照合)」を別の欄に分け、
+ *   計上の根拠(料金版・SKU・単価・換算)を表で示す(以前の「今月の実の提供元の見込み」は請求額に読めた)
  * - 鍵の値は受け取らない・出さない(設定の有無だけ)。止める・戻す・試験は理由が要り、監査に残る
  */
 import React, { useCallback, useEffect, useState } from 'react';
@@ -15,7 +17,7 @@ import PageHead from '@/components/shell/PageHead';
 import {
   disableOpsSecret, importOpsSecretFromEnv, verifyOpsSecret, activateOpsSecret, discardOpsSecret, getOpsCloud, getOpsLedger, getOpsOverview, getOpsProviders, getOpsSecrets, registerOpsSecret,
   runOpsFamilyFake, setOpsProviderSuspended, getOpsTiers, switchOpsTestTier, getOpsUatReadiness,
-  type OpsUatReadiness,
+  type OpsUatReadiness, type OpsPriceBasis,
   type OpsTier, type OpsTiers, type OpsTestTierResult,
   type OpsCloud, type OpsSecrets, type OpsSecretSlot, type OpsFamilyRun, type OpsLedger, type OpsOverview, type OpsProvider, type OpsProviders,
 } from '@/services/api/opsConsole';
@@ -63,6 +65,7 @@ const DENIAL_LABEL: Record<string, string> = {
   monthly_quota_exceeded: '月の額の上限',
   feature_quota_exceeded: '回数の上限', plan_cost_limit_exceeded: '1旅行の額の上限', per_call_limit_exceeded: '1回の量の上限',
   monthly_cost_limit_exceeded: '月の額の上限', monthly_plan_quota_exceeded: '月の旅行の数の上限',
+  ai_protection_reserved: '残りの AI の相談の分を残す',
 };
 
 function useLoad<T>(fn: () => Promise<T>) {
@@ -107,11 +110,25 @@ const OverviewTab: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
           <p className="tc-ops-kpi-value">{yen(data.fake_usage.estimated_jpy)}</p>
           <p className="tc-ops-kpi-sub">{`${data.fake_usage.events}件 · 実の請求ではない`}</p>
         </article>
-        <article className="tc-card tc-ops-kpi">
-          <p className="tc-ops-kpi-head">今月の実の提供元の見込み</p>
+        <article className="tc-card tc-ops-kpi" data-testid="ops-allowance-usage">
+          <p className="tc-ops-kpi-head">今月の利用枠の計上(見込み)</p>
           <p className="tc-ops-kpi-value">{yen(data.live_usage.estimated_jpy)}</p>
-          <p className="tc-ops-kpi-sub">アプリの見込み · 請求との照合は明細が届いてから</p>
+          <p className="tc-ops-kpi-sub">{`旅行・相談の 50円の枠に数えた額 · 料金版 ${data.price_basis?.policy_version ?? data.policy_version} の単価 × 換算の見込み · 提供元の請求額ではありません`}</p>
         </article>
+        {data.key_verification_usage && (
+          <article className="tc-card tc-ops-kpi" data-testid="ops-verify-usage">
+            <p className="tc-ops-kpi-head">今月の管理者の鍵の確認(見込み)</p>
+            <p className="tc-ops-kpi-value">{yen(data.key_verification_usage.estimated_jpy)}</p>
+            <p className="tc-ops-kpi-sub">{`${data.key_verification_usage.checks}回 · 日の枠 ${yen(data.key_verification_usage.daily_cap_jpy)} · 旅行の枠とは別`}</p>
+          </article>
+        )}
+        {data.provider_invoice && (
+          <article className="tc-card tc-ops-kpi" data-testid="ops-provider-invoice">
+            <p className="tc-ops-kpi-head">提供元の請求額</p>
+            <p className="tc-ops-kpi-value">未照合</p>
+            <p className="tc-ops-kpi-sub">明細は Google Cloud Billing・OpenAI の画面で確認 · 無料の使用の上限は未反映</p>
+          </article>
+        )}
         {data.free_usage && (
           <article className="tc-card tc-ops-kpi" data-testid="ops-free-usage">
             <p className="tc-ops-kpi-head">今月の無料の提供元への送信</p>
@@ -153,10 +170,32 @@ const OverviewTab: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
         </article>
       </div>
       <UatReadinessPanel onGo={onGo} />
+      {data.price_basis?.status === 'known' && data.price_basis.rows && <PriceBasisPanel basis={data.price_basis} />}
       <p className="tc-ops-asof">{`取得 ${new Date(data.as_of).toLocaleString('ja-JP')} · 環境 ${data.environment}`}</p>
     </div>
   );
 };
+
+/** [Gate SearchUAT-S3] 利用枠の計上の根拠: 料金版・SKU・単価(USD)・1単位の円・換算の係数・出典 */
+const PriceBasisPanel: React.FC<{ basis: OpsPriceBasis }> = ({ basis }) => (
+  <article className="tc-card tc-ops-panel" data-testid="ops-price-basis" aria-labelledby="ops-price-h">
+    <h2 id="ops-price-h" className="tc-section-title">{`利用枠の計上の根拠(料金版 ${basis.policy_version} · 公式の価格を ${basis.checked_at ?? '—'} に確認)`}</h2>
+    <p className="tc-ops-desc">{`1 USD = 為替 ${basis.fx_rate} × 税 ${basis.tax_factor} × 安全係数 ${basis.safety_factor} = ${basis.jpy_per_usd} 円で計上。${basis.note ?? ''}`}</p>
+    <div className="tc-ops-table-wrap">
+      <table className="tc-ops-table">
+        <thead><tr><th>操作</th><th>SKU</th><th>単位</th><th>単価(USD)</th><th>1単位の計上(円)</th><th>根拠</th></tr></thead>
+        <tbody>
+          {(basis.rows ?? []).map((r) => (
+            <tr key={`${r.operation}-${r.unit}`}>
+              <td>{r.label}</td><td>{r.sku ?? '—'}{r.field_mask && <><br /><small>{`field: ${r.field_mask}`}</small></>}</td>
+              <td>{r.unit}</td><td>{r.usd}</td><td>{r.jpy}</td><td><small>{r.basis ?? '—'}</small></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </article>
+);
 
 /** [Gate AdminUAT] ログイン中のこのアカウントで、旅行相談の実 AI の UAT ができるか。項目ごとに今の値と変える場所 */
 const UatReadinessPanel: React.FC<{ onGo: (t: Tab) => void }> = ({ onGo }) => {
@@ -392,7 +431,10 @@ const TiersTab: React.FC = () => {
                   <td><b>{r.label}</b><br /><small>{r.subtitle}</small></td>
                   <td>{r.operations.length === 0 ? 'なし(手入力・無料の検索だけ)' : `${r.ai ? 'AI あり' : 'AI なし'} · ${r.operations.length} 種類`}</td>
                   <td>{yen(r.plan_cap_jpy)}</td>
-                  <td>{r.monthly_cap_jpy ? `${yen(r.monthly_cap_jpy)} · ${r.plans_per_month ?? '—'}旅行` : '—'}</td>
+                  <td>{r.monthly_cap_jpy ? `${yen(r.monthly_cap_jpy)} · ${r.plans_per_month ?? '—'}旅行` : '—'}
+                    {r.plans_at_full_use != null && r.plans_per_month != null && r.plans_at_full_use < r.plans_per_month && (
+                      <small className="block" data-testid={`ops-tier-full-use-${r.key}`}>{`各旅行の上限まで使うと月の枠で ${r.plans_at_full_use}旅行まで`}</small>
+                    )}</td>
                   <td>{r.profile === 'known'
                     ? <>{yen(r.worst_case_plan_jpy)} <span className={`tc-pill ${r.fits_plan_cap ? 'tc-pill--good' : 'tc-pill--bad'}`}>{r.fits_plan_cap ? '50円以内' : '超える'}</span></>
                     : '価格の版を読めない'}</td>
@@ -502,6 +544,10 @@ const RunsTab: React.FC = () => {
           </button>
         </form>
         <p className="tc-ops-asof">試験用の利用者と旅行を作り、原価の予約→確定を上限まで繰り返します。本番・staging では実行しません。実の提供元の試験(Live)は、契約と鍵が揃ってから1回ずつ行う予定で、この版にはありません。</p>
+        <p className="tc-ops-callout" data-testid="ops-fake-scope">
+          これは外への送信が 0 回の「原価の上限・回数の枠・二重の計上の防止」の試験です。実 AI の旅行相談の受入(UAT)ではなく、画面の家族旅行の条件は計算に使いません。
+          実行のたびに試験用の利用者 1名(ログインできない ops-fake-…@ops.invalid)と旅行 1件が DB に残ります(管理者ダッシュボードでは「運用の試験」として分けて数えます)。繰り返し実行しないでください。
+        </p>
         {error && <p role="alert" className="text-danger text-sm mt-2">{error}</p>}
       </article>
       <article className="tc-card tc-ops-panel" aria-live="polite">
