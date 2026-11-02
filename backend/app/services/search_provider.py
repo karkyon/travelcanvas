@@ -120,6 +120,50 @@ async def search_wikipedia(query: str, client: Optional[httpx.AsyncClient] = Non
             await client.aclose()
 
 
+# [Gate AreaGeo] 観光のカテゴリの2つ目の無料の提供元: Wikipedia の位置つきの記事(geosearch。既に使っている提供元・キー不要)。
+# Overpass(公開の server)が時間切れの時も、観光の候補が空にならないようにする。駅・学校などの観光でない記事は外す
+WIKI_GEO_EXCLUDE = ("駅", "学校", "小学校", "中学校", "高等学校", "大学", "病院", "郵便局", "線", "道路", "国道", "県道",
+                    "インターチェンジ", "ジャンクション", "警察署", "消防署", "市役所", "町役場", "村役場", "団地", "発電所",
+                    "変電所", "トンネル", "バス停", "停留場", "放送局", "工場", "店", "選挙区")
+
+
+async def search_wikipedia_nearby(latitude: float, longitude: float, radius_km: float,
+                                  client: Optional[httpx.AsyncClient] = None) -> List[Dict[str, Any]]:
+    """Wikipedia の位置つきの記事(半径は最大 10km。それより広い範囲は 10km まで)。失敗は例外(呼び手が分類する)。"""
+    url = "https://ja.wikipedia.org/w/api.php"
+    radius_m = int(min(10.0, max(0.1, radius_km)) * 1000)
+    params = {"action": "query", "list": "geosearch", "gscoord": f"{latitude}|{longitude}", "gsradius": str(radius_m),
+              "gslimit": "50", "format": "json"}
+    owns_client = client is None
+    client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
+    try:
+        resp = await client.get(url, params=params, headers=HEADERS)
+        resp.raise_for_status()
+        data = resp.json()
+        items = ((data or {}).get("query") or {}).get("geosearch") if isinstance(data, dict) else None
+        if not isinstance(items, list):
+            raise SearchProviderError("unreadable", resp.status_code, "no geosearch array")
+        retrieved_at = _now()
+        out: List[Dict[str, Any]] = []
+        for it in items:
+            if not isinstance(it, dict) or not it.get("title"):
+                continue
+            title = str(it["title"])
+            if any(title.endswith(w) or w in title for w in WIKI_GEO_EXCLUDE):
+                continue
+            pageid = it.get("pageid")
+            out.append({
+                "provider": "wikipedia", "external_id": f"geo/{pageid}", "name": title, "category": "wikipedia",
+                "latitude": it.get("lat"), "longitude": it.get("lon"), "address": None,
+                "raw_payload": {"pageid": pageid, "dist": it.get("dist")},
+                "source_url": f"https://ja.wikipedia.org/?curid={pageid}", "retrieved_at": retrieved_at,
+            })
+        return out
+    finally:
+        if owns_client:
+            await client.aclose()
+
+
 async def search_nominatim(
     query: str,
     latitude: Optional[float] = None,
@@ -429,12 +473,20 @@ async def search_all_providers(
     失敗(errors)と一緒に「前の結果」(cached.stale)として返す(新しい結果のふりをしない)。"""
     import asyncio
 
+    names: tuple
+    results: List[Any]
     async with httpx.AsyncClient(timeout=OVERPASS_TIMEOUT if category != "all" else REQUEST_TIMEOUT) as client:
         overpass_task = _overpass_guarded(query, latitude, longitude, radius_km, client, category)
-        if category != "all":
+        if category == "sightseeing" and latitude is not None and longitude is not None and not (query or "").strip():
+            # [Gate AreaGeo] 観光は Overpass と Wikipedia の位置つきの記事を並べて探す(片方が時間切れでも候補が残る)
+            names = ("overpass", "wikipedia")
+            results = list(await asyncio.gather(
+                overpass_task, search_wikipedia_nearby(latitude, longitude, radius_km, client=client),
+                return_exceptions=True))
+        elif category != "all":
             # [Gate G11] カテゴリで絞る時は、タグで絞れる OpenStreetMap(近くの場所)だけを使う
-            names: tuple = ("overpass",)
-            results: List[Any] = list(await asyncio.gather(overpass_task, return_exceptions=True))
+            names = ("overpass",)
+            results = list(await asyncio.gather(overpass_task, return_exceptions=True))
         else:
             names = ("wikipedia", "nominatim", "overpass")
             results = list(await asyncio.gather(search_wikipedia(query, client=client),

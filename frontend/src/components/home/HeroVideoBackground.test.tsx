@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import HeroVideoBackground from './HeroVideoBackground';
-import type { HeroScene } from '@/config/heroVideos';
+import { HERO_SCENES_COMMITTED, localScenes, type HeroScene } from '@/config/heroVideos';
 
 const scene = (id: string): HeroScene => ({ id, label: id, poster: `/hero/v1/${id}.jpg`,
   sources: [{ src: `/hero/v1/${id}.webm`, type: 'video/webm' }, { src: `/hero/v1/${id}.mp4`, type: 'video/mp4' }] });
@@ -105,5 +105,18 @@ describe('HOME の表紙の背景の動画', () => {
       act(() => { fireEvent.error(screen.getByTestId(`hero-video-${id}`)); });
     }
     expect(screen.getByTestId('landscape')).toBeInTheDocument();
+  });
+
+  it('[UAT] 手元の素材は /hero/local/ の下を指す正しい行だけを最大4つ使う。リポジトリの素材は空のまま', () => {
+    expect(HERO_SCENES_COMMITTED).toEqual([]);
+    const local = (id: string) => ({ id, label: id, poster: `/hero/local/${id}.jpg`,
+      sources: [{ src: `/hero/local/${id}.mp4`, type: 'video/mp4' }] });
+    const mod = { './heroVideos.local.json': { default: { scenes: [
+      local('a'), { id: 'bad' }, { ...local('x'), poster: 'https://example.com/x.jpg' }, local('b'), local('c'),
+      local('d'), local('e'),
+    ] } } };
+    expect(localScenes(mod).map((x) => x.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(localScenes({})).toEqual([]);
+    expect(localScenes({ './heroVideos.local.json': { default: 'broken' } })).toEqual([]);
   });
 });

@@ -9,7 +9,7 @@ import { request } from 'node:http';
 import { gunzipSync } from 'node:zlib';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { createStaticServer, hostAllowed, resolveInside } from '../../server/static-server.mjs';
+import { createStaticServer, hostAllowed, parseRange, resolveInside } from '../../server/static-server.mjs';
 import { allowedHosts, apiUrlForHost, hostnameOf, securityHeaders } from '@/config/securityHeaders';
 
 let server: Server;
@@ -39,6 +39,8 @@ beforeAll(async () => {
   mkdirSync(join(root, 'assets'));
   writeFileSync(join(root, 'index.html'), '<!doctype html><title>TravelCanvas</title>' + ' '.repeat(600));
   writeFileSync(join(root, 'assets', 'index-abc123.js'), 'console.log("app");' + '/* pad */'.repeat(200));
+  mkdirSync(join(root, 'hero', 'local'), { recursive: true });
+  writeFileSync(join(root, 'hero', 'local', 'a.mp4'), Buffer.from('0123456789'));
   writeFileSync(join(root, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   writeFileSync(join(root, '.env'), 'HIDDEN=1');
   symlinkSync(join(outside, 'secret.txt'), join(root, 'link.txt'));
@@ -132,5 +134,22 @@ describe('本番用の配信 (Gate G3 DEP-03)', () => {
     const head = await get('/', {}, 'HEAD');
     expect(head.status).toBe(200);
     expect(head.body.length).toBe(0);
+  });
+
+  it('[HomeHeroVideo] 動画は video/mp4・範囲の要求に 206 で答える。範囲外は 416。圧縮しない', async () => {
+    const full = await get('/hero/local/a.mp4', { 'Accept-Encoding': 'gzip' });
+    expect(full.status).toBe(200);
+    expect(full.headers['content-type']).toBe('video/mp4');
+    expect(full.headers['accept-ranges']).toBe('bytes');
+    expect(full.headers['content-encoding']).toBeUndefined();
+    const part = await get('/hero/local/a.mp4', { Range: 'bytes=2-5' });
+    expect(part.status).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 2-5/10');
+    expect(part.body.toString()).toBe('2345');
+    expect((await get('/hero/local/a.mp4', { Range: 'bytes=-3' })).body.toString()).toBe('789');
+    expect((await get('/hero/local/a.mp4', { Range: 'bytes=20-' })).status).toBe(416);
+    expect((await get('/hero/local/missing.mp4')).status).toBe(404);
+    expect(parseRange('bytes=0-1,4-5', 10)).toBeNull();
+    expect(parseRange(undefined, 10)).toBeNull();
   });
 });

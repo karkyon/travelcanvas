@@ -20,11 +20,20 @@ function icon(html: string, size = 30) {
   return L.divIcon({ html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
 }
 
+/** [Gate AreaGeo] 出発地と方面が地図いっぱいに入る範囲(近すぎる時は拡大しすぎない)。枠の大きさが変わったら合わせ直す */
 const Fit: React.FC<{ points: [number, number][] }> = ({ points }) => {
   const map = useMap();
   useEffect(() => {
-    if (points.length === 1) map.setView(points[0]!, 9);
-    else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [36, 36] });
+    const fit = () => {
+      map.invalidateSize();
+      if (points.length === 1) map.setView(points[0]!, 9);
+      else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 10 });
+    };
+    fit();
+    const el = map.getContainer();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fit()) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
   }, [map, points]);
   return null;
 };

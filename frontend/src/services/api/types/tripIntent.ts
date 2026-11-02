@@ -60,6 +60,9 @@ export interface Geocode {
   provider: string | null;
   source_url: string | null;
   retrieved_at: string | null;
+  /** [Gate AreaGeo] 照会した位置が出発地から遠すぎる(同じ名前の別の場所の疑い)。地図に置かない */
+  suspect?: boolean;
+  suspect_note?: string;
 }
 
 export interface StatusNote {

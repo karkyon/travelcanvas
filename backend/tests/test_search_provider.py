@@ -161,5 +161,5 @@ async def test_search_all_providers_reports_unavailable_instead_of_zero(monkeypa
     async def boom(*a, **k):
         raise RuntimeError("down")
     monkeypatch.setattr(search_provider, "search_overpass", boom)
-    res = await search_provider.search_all_providers("", 34.48, 136.71, 10, category="sightseeing")
+    res = await search_provider.search_all_providers("", 34.48, 136.71, 10, category="food")
     assert list(res) == [] and res.unavailable == ["overpass"]

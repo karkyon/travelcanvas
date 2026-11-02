@@ -91,7 +91,7 @@ def test_406_is_not_repeated(monkeypatch):
         return httpx.Response(406, text="Not Acceptable")
     _patch_client(monkeypatch, handler)
     for _ in range(3):
-        out = asyncio.run(sp.search_all_providers("", *ISE, 10.0, category="sightseeing"))
+        out = asyncio.run(sp.search_all_providers("", *ISE, 10.0, category="market"))
         assert out.errors == {"overpass": "blocked"}
     assert len(sent) == 1
     assert 0 < sg.cooldown_remaining()["retry_after"] <= sg.BLOCKED_COOLDOWN

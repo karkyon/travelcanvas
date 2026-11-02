@@ -185,8 +185,10 @@ def test_areas_validation_and_disabled(client, users, monkeypatch):
     assert client.post("/api/v1/trip-intents/areas", json={"origin": "x", "areas": ["a"] * 11}).status_code == 422
     from app.core.config import settings
     monkeypatch.setattr(settings, "TRIP_INTENT_GEOCODER", "")
-    body = client.post("/api/v1/trip-intents/areas", json={"origin": "枚方", "areas": ["伊勢"]}).json()
-    assert body["areas"][0]["geocode"]["status"] == "disabled" and body["providers"]["geocode"] is None
+    body = client.post("/api/v1/trip-intents/areas", json={"origin": "枚方", "areas": ["伊勢", "架空の町"]}).json()
+    # [Gate AreaGeo] 内蔵の地名表の地名は外へ送らずに決まる。表に無い地名は照会しない(disabled)
+    assert body["areas"][0]["geocode"]["provider"] == "gazetteer"
+    assert body["areas"][1]["geocode"]["status"] == "disabled" and body["providers"]["geocode"] is None
     assert client.get("/api/v1/trip-intents/status").json()["providers"]["geocode"] is None
 
 

@@ -1,7 +1,7 @@
 # HOME の表紙の背景の動画 — 素材の台帳(Gate HomeHeroVideo)
 
 対象: HOME(ダッシュボード)の旅行が無い時の表紙「最初の旅行を始めましょう」の背景の領域だけ(`EmptyHero`・`.tc-home-hero-art`)。
-見出し・説明・ボタン・他の HOME の部分・他の画面は変えない。素材の設定は `frontend/src/config/heroVideos.ts`(空の間は以前の山並みの絵)。
+見出し・説明・ボタン・他の HOME の部分・他の画面は変えない。素材の設定は `frontend/src/config/heroVideos.ts`(`HERO_SCENES_COMMITTED` が空なら手元の UAT 用、どちらも無ければ以前の山並みの絵)。
 
 ## 1. 受け取りの条件
 
@@ -10,7 +10,23 @@
 - 音声は使わない(音声の track は配信の前に外す)。切り抜き・色の変更は利用者の承認の後だけ
 - 素材を想像で作らない・他の画面の画像を流用しない
 
-## 2. 台帳(受け取った後に書く)
+## 2. 台帳
+
+### 2a. 社内 UAT の見た目の確認だけ(2026-11-02 受け取り・**透かし入りのプレビュー・公開リポジトリに入れない**)
+
+置き場所: omega-dev2 の手元だけ(`frontend/public/hero/local/`・`frontend/src/config/heroVideos.local.json`、.gitignore の対象)。
+入れ方: `bash scripts/ops/install_hero_local.sh hero-local-uat-2026-11-02.tar.gz`。音声の track は元から無い。再 encode せず faststart だけ。
+
+| # | 場面(id) | 元のファイル名 | 権利 | 長さ | 比率 | 解像度 | codec | 容量 | poster |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | airport-checkin | 01-airport-checkin.mp4 | **未購入のプレビュー(透かし)** | 11.7 秒 | 16:9 | 898×506 | H.264/MP4 | 954 KB | 1 秒目の JPEG 45 KB |
+| 2 | castle-walk | 02-castle-walk.mp4 | **未購入のプレビュー(透かし)** | 7.5 秒 | 16:9 | 898×506 | H.264/MP4 | 805 KB | 60 KB |
+| 3 | night-street | 03-night-street.mp4 | **未購入のプレビュー(透かし)** | 16.2 秒 | 16:9 | 898×506 | H.264/MP4 | 1,257 KB | 75 KB |
+| 4 | seaside-dining | 04-seaside-dining.mp4 | **未購入のプレビュー(透かし)** | 9.8 秒 | 16:9 | 898×506 | H.264/MP4 | 555 KB | 60 KB |
+
+合計 3.57 MB(poster 0.24 MB)/ 1 回の表示で読む量の見込み: poster + 今の場面 + 次の場面 ≒ 2.3 MB 以下。
+
+### 2b. 本番(利用権のある版。受け取った後に書く)
 
 | # | 場面(id) | 元のファイル名 | 権利(ライセンス・購入の記録) | 長さ | 比率 | 解像度 | codec | 容量 | 配信の形(AV1/WebM・H.264/MP4) | poster |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,8 +34,6 @@
 | 2 | | | | | | | | | | |
 | 3 | | | | | | | | | | |
 | 4 | | | | | | | | | | |
-
-合計の容量: — / 1 回の表示で読む量の見込み(poster + 今の場面 + 次の場面): —
 
 ## 3. 配信の形(受け取った後に決める)
 

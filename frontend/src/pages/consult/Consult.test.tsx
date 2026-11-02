@@ -201,6 +201,8 @@ describe('旅行相談の流れ', () => {
     expect(screen.getByTestId('areas-provider-note')).toHaveTextContent('道路・宿・混み具合の提供元は未接続');
     expect(screen.queryByText(/点|スコア|相性/)).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'pin 3 滋賀' }));
+    // [Gate AreaGeo] 直線だけで片道の上限を越えそうな方面は地図に置かない(地図の範囲を広げない)。一覧には理由を出す
+    expect(screen.queryByRole('button', { name: 'pin 2 福井' })).toBeNull();
     expect(screen.getByTestId('area-row-滋賀')).toHaveAttribute('data-selected', 'true');
     expect(api.createTripDraft).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('area-open-伊勢'));

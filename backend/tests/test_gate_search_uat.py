@@ -95,7 +95,7 @@ def test_runtime_error_with_some_elements_is_partial_not_complete():
         return out
     from unittest import mock
     with mock.patch.object(sp, "search_overpass", partial):
-        res = asyncio.run(sp.search_all_providers("", 34.4, 136.7, 10.0, category="sightseeing"))
+        res = asyncio.run(sp.search_all_providers("", 34.4, 136.7, 10.0, category="market"))
     assert res.partial == ["overpass"] and res.unavailable == []
 
 

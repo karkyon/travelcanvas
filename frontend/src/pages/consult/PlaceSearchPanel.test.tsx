@@ -60,6 +60,16 @@ describe('候補を探す(入口は1つ)', () => {
     expect(api.consultPlaces).not.toHaveBeenCalled();
   });
 
+  it('[AreaGeo] OpenStreetMap が時間切れでも Wikipedia の座標付き記事が並ぶ。出典は行ごとに Wikipedia と示す', async () => {
+    api.searchNearby.mockResolvedValue({ ...ok([{ ...spot('w1', '伊勢神宮'), provider: 'wikipedia', radius_guaranteed: false }]),
+      unavailable_providers: ['overpass'], provider_errors: { overpass: 'timeout' } });
+    setup();
+    fireEvent.click(screen.getByTestId('consult-search'));
+    const row = await screen.findByTestId('consult-result-w1');
+    expect(row).toHaveTextContent('出典: Wikipedia');
+    expect(row).not.toHaveTextContent('出典: OpenStreetMap');
+  });
+
   it('[S3] 429 の後は待つ時間を示す。保存した結果・前の結果(古い)は取得の古さと一緒に示す', async () => {
     api.searchNearby
       .mockResolvedValueOnce({ ...failed('rate_limited'), provider_retry_after: { overpass: 120 } })

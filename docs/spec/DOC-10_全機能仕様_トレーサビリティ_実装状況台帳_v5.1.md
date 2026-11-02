@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r41** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-02<br>
+> 文書ID: DOC-10 / 版: **v5.1-r42** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-02<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -257,7 +257,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r38 | 2026-11-02 | `6920d88`+監査 F01〜F06 | Gate SearchUAT の監査(6920d88)の是正: PR #45 の PR 側の E2E の flaky(登録の後の時間切れ)は、登録の回数制限(1分5回・接続元ごと)の 429 と手元で再現し、試験の環境だけの回数の記録の初期化と応答の列の記録で直した(本番の制限は変えない。retries=0 で10回合格)。反映の道具は PR 側の必須の検査を待ってから merge する。Google の検索の応答の喪失の後は同じ Idempotency-Key(二度課金しない)・検索範囲を送る。Overpass の応答の構造の検証と一部だけの結果の区別。検索の失敗の原因は未確定(同じ本文で User-Agent だけを変える比較で確かめる)。会話理解・AI 10回・原価の半減(F07)は未実装。`docs/trace/gate-search-uat-trace.md` |
 | r39 | 2026-11-02 | `6632d65`+SearchUAT-S3 | Gate SearchUAT-S3: OpenStreetMap(Overpass)の問い合わせを軽くし(囲む四角・カテゴリの種類と値・server の上限 10 秒/64MB)、429 の Retry-After・406 の 10 分はアプリから送らない待機(Redis で共有)、同じ条件の成功の 45 分の保存(キーは条件の SHA-256)と提供元の失敗の時の「前の結果」、承認した mirror だけへの移り(既定は空)。`search_diag` の occurred_at・送った header の記録・標準は外へ 1 回。概要の ¥ を「利用枠の計上(見込み)」「管理者の鍵の確認」「提供元の請求額(未照合)」に分け、計上の根拠の表。料金版 `2026-11-02.1`(migration `e9c1a5d3f7b2`: Places Text Search Pro $0.032・gpt-5-nano の公式の単価・Journey/Explorer の AI 10回・Journey の検索 3回・AI の保護の枠)。追加の相談の黙った切り捨ての廃止、管理ダッシュボードのゲスト・試験の区分。実環境の検索・実 AI・端末の音声・請求の照合は未実施、F07-1/2(会話の状態・複数の予算)は次の PR。FR-059 は INTEGRATED(部分)のまま。`docs/trace/gate-search-uat-s3-trace.md` |
 | r40 | 2026-11-02 | SearchUAT-S3+F07-Turn | Gate F07-Turn: 旅行相談の追加の相談を1ターンとして読む `POST /trip-intents/ai/turn`(AI へは最新の発言と今の条件の状態(値・確認の状態・ID)だけ。JSON Schema strict の操作: 項目の set・clear、過ごし方・その他の希望・予算(複数)・方面の候補/決定/外す、食い違い・問い)。根拠が最新の発言に無い・知らない ID・範囲の外の操作は捨てる、同じターンの同じ項目の食い違いは決めない、確かめた行への変更は変更案(採用するまで変えない)、人数の変更で予算を計算し直さない。下書きの intent に確かめた予算の全て(`budgets`)。実 AI の 10 ターン・30 会話の評価・原価の半減の比較は未実施。FR-059 は INTEGRATED(部分)のまま。`docs/trace/gate-f07-turn-trace.md` |
-| **r41** | 2026-11-02 | F07-Turn+HomeHeroVideo | **Gate HomeHeroVideo: HOME の「最初の旅行を始めましょう」の背景だけを最大 4 本の動画にする仕組み(7 秒ごと・クロスフェード・音声なし・次の場面だけを先に読む・隠れた間は停止・動きを減らす設定と Save-Data は静止画・読めない場面は飛ばす)。素材は受け取り待ちで設定は空(画面は以前の山並みの絵のまま)。素材の台帳 `docs/ux/home-hero-video-assets.md`。あわせて下書きの画面に旅行相談で確かめた予算(複数)を表示。`docs/trace/gate-home-hero-video-trace.md`** |
+| r41 | 2026-11-02 | F07-Turn+HomeHeroVideo | Gate HomeHeroVideo: HOME の「最初の旅行を始めましょう」の背景だけを最大 4 本の動画にする仕組み(7 秒ごと・クロスフェード・音声なし・次の場面だけを先に読む・隠れた間は停止・動きを減らす設定と Save-Data は静止画・読めない場面は飛ばす)。素材は受け取り待ちで設定は空(画面は以前の山並みの絵のまま)。素材の台帳 `docs/ux/home-hero-video-assets.md`。あわせて下書きの画面に旅行相談で確かめた予算(複数)を表示。`docs/trace/gate-home-hero-video-trace.md` |
+| **r42** | 2026-11-02 | HomeHeroVideo+AreaGeo | **Gate AreaGeo(UAT 15:30 の指摘): 方面の位置を内蔵の地名の表(47 都道府県と代表の地名)→ Nominatim(5 件から場所の種類と重要度で選ぶ)の順に決め、出発地からの直線の距離が上限を大きく越える位置は疑わしいとして地図に置かず理由を出す(③が北海道の是正)。地図の枠を大きくし、上限を越える方面を除いて範囲を合わせる。観光の場所は Overpass と Wikipedia の座標付きの記事を並行して探し、行ごとに出典を示す。HOME の動画は透かし入りのプレビューのため公開リポジトリに入れず、配備先の手元だけに置く仕組み(`scripts/ops/install_hero_local.sh`・.gitignore)と動画の Range の配信。実環境の確認は未実施。`docs/trace/gate-area-geo-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

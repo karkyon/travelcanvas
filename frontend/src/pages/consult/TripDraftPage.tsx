@@ -148,6 +148,7 @@ const TripDraftPage: React.FC = () => {
             <p className="font-semibold text-ink-900 break-words">{c.title}</p>
             <p className="text-xs text-ink-700">
               {[c.category, c.provider === 'overpass' ? `出典: OpenStreetMap ${retrievedLabel(c.retrieved_at)}`
+                : c.provider === 'wikipedia' ? `出典: Wikipedia ${retrievedLabel(c.retrieved_at)}`
                 : c.provider === 'google_places' ? `出典: Google ${retrievedLabel(c.retrieved_at)}` : null]
                 .filter(Boolean).join(' · ')}
             </p>

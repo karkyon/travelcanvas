@@ -50,6 +50,9 @@ export interface PlaceSearchProps {
   autoSearch?: boolean;
 }
 
+/** [Gate AreaGeo] 結果の出典の名前(観光は OpenStreetMap と Wikipedia の座標付き記事の両方から探す) */
+const providerLabel = (p: string): string => (p === 'wikipedia' ? 'Wikipedia' : 'OpenStreetMap');
+
 const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true,
 }) => {
@@ -162,7 +165,8 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     }))
     : (osm?.rows ?? []).map((r) => ({
       key: `o-${r.id}`, source: 'osm' as const, name: r.name, detail: [r.category, distanceLabel(r)].filter(Boolean).join(' · '),
-      sourceLabel: `出典: OpenStreetMap ${retrievedLabel(r.retrieved_at)}`, unverified: '営業時間は未照会',
+      sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
+        ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
       picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
     }));
   const resultLabel = shown === 'google' ? gResults?.label : osm?.label;
