@@ -174,7 +174,68 @@ def test_uat_scenario_ai_reading_is_cleaned():
     assert [r["word"] for r in out["regions"]] == ["関西近畿圏", "東海", "北陸圏"]
     sugg = [s["name"] for s in out["suggested_areas"]]
     assert "札幌" not in sugg  # 地域の範囲の外の案は出さない
-    assert "京都・滋賀エリア" in sugg
+    assert "京都" in sugg  # 「京都・滋賀エリア」は 1 か所(京都)にする
+    # 片道の目安の無い AI の案は比べる方面にせず、内蔵の候補表で補う
+    assert all(a["source"] == "proposed" for a in out["areas"])
+
+
+GPT_LIKE = {**UAT_AI, "origin": {"value": "枚方", "evidence": "枚方から車で"}, "areas_suggested": [
+    {"name": "伊勢", "prefecture": "三重県", "reason": "参拝と食べ歩き", "highlights": "伊勢神宮・おかげ横丁",
+     "drive_minutes_min": 120, "drive_minutes_max": 150},
+    {"name": "淡路島", "prefecture": "兵庫県", "reason": "海の景色", "highlights": "道の駅・花の名所",
+     "drive_minutes_min": 90, "drive_minutes_max": 120},
+    {"name": "福井市・越前方面", "prefecture": "福井県", "reason": "自然と寺院", "highlights": "永平寺・海鮮",
+     "drive_minutes_min": 150, "drive_minutes_max": 180},
+    {"name": "南紀白浜", "prefecture": "和歌山県", "reason": "温泉と海", "highlights": "白良浜・三段壁",
+     "drive_minutes_min": 165, "drive_minutes_max": 180},
+    {"name": "札幌", "prefecture": "北海道", "reason": "", "highlights": "", "drive_minutes_min": 100,
+     "drive_minutes_max": 120},
+    {"name": "金沢", "prefecture": "石川県", "reason": "", "highlights": "", "drive_minutes_min": 20,
+     "drive_minutes_max": 30},
+    {"name": "東海", "prefecture": "愛知県", "reason": "", "highlights": "", "drive_minutes_min": 60,
+     "drive_minutes_max": 90},
+    {"name": "高山", "prefecture": "岐阜県", "reason": "", "highlights": "", "drive_minutes_min": 260,
+     "drive_minutes_max": 300},
+]}
+
+
+def test_ai_proposals_with_estimates_become_the_compared_areas():
+    """[Gate AreaAI] AI に相談すれば、AI が条件から選んだ 4 方面(片道の目安つき)が比べる方面になる(道路の提供元へは送らない)"""
+    from app.services import consult_ai as ca
+    out = ca.merge(UAT_TEXT, {}, GPT_LIKE)
+    rows = {a["name"]: a for a in out["areas"]}
+    assert list(rows) == ["伊勢", "淡路島", "福井市", "南紀白浜"]
+    assert all(a["source"] == "ai_proposed" for a in out["areas"])
+    assert rows["伊勢"]["minutes_min"] == 120 and rows["伊勢"]["minutes_max"] == 150
+    assert rows["伊勢"]["pref"] == "三重県" and rows["伊勢"]["highlights"] == "伊勢神宮・おかげ横丁"
+    assert out["proposal"]["status"] == "ai" and out["proposal"]["count"] == 4
+    sugg = [s["name"] for s in out["suggested_areas"]]
+    assert "札幌" not in sugg and "東海" not in sugg and "高山" not in sugg  # 範囲の外・地域の語・上限を大きく超える
+    assert "金沢" in sugg  # 目安が距離と合わない(30分)→ 目安を使わず、比べる方面にはしない
+
+
+def test_ai_proposals_named_places_are_kept_and_count_is_respected():
+    from app.services import consult_ai as ca
+    out = ca.merge("枚方から車で片道3時間。候補は伊勢。他にも候補を2つ挙げて", {}, {**GPT_LIKE, "areas_mentioned": ["伊勢"]})
+    names = [a["name"] for a in out["areas"]]
+    assert names[0] == "伊勢" and out["areas"][0]["source"] == "user_input"
+    assert names[1:] == ["淡路島", "福井市"]
+
+
+def test_compare_uses_prefecture_hint_for_same_name_places():
+    seen = []
+
+    async def geocode(q):
+        seen.append(q)
+        return ti.GeocodeResult(status="ok", latitude=33.68, longitude=135.35, label="白浜町", provider="nominatim")
+    ti.set_geocoder_for_testing(geocode)
+    try:
+        r = asyncio.run(ti.compare_areas("枚方", ["白浜", "府中"], 3.0, "preferred",
+                                         prefs={"白浜": "和歌山県", "府中": "広島県"}))
+    finally:
+        ti.set_geocoder_for_testing(None)
+    assert r["areas"][0]["geocode"]["provider"] == "gazetteer"  # 表の白浜は和歌山県(手がかりと合う)
+    assert seen == ["府中 広島県"]
 
 
 def test_uat_scenario_compare_has_distances_and_no_far_pins():

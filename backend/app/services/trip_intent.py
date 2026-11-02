@@ -414,7 +414,7 @@ def plan_areas(text: str, named: List[str], items: List[Dict[str, Any]]) -> Dict
         strength = next((x.get("strength") for x in items if x.get("key") == "one_way"), None)
         prefs = _item_value(items, "preferences") or []
         nights = _item_value(items, "nights")
-        count = max(0, wanted_count(text) - (len(places) if asked else 0)) or 2
+        count = wanted_count(text)  # 挙げた行き先に加えて、頼まれた件数を出す
         res = gz.propose(origin or "", float(hours) if isinstance(hours, (int, float)) else None, strength,
                          tr.get("mode") if isinstance(tr, dict) else None,
                          bool(tr.get("highway")) if isinstance(tr, dict) else False,
@@ -549,11 +549,17 @@ def best_match(items: List[Any], query: Optional[str] = None) -> Dict[str, Any]:
     return max(rows, key=score) if rows else {}
 
 
-async def gazetteer_or(geocode: "Geocoder", name: str) -> GeocodeResult:
-    """[Gate AreaGeo] よく使う方面・出発地は内蔵の地名表で決める(送らない)。表に無い地名だけ照会する。"""
+async def gazetteer_or(geocode: "Geocoder", name: str, pref: Optional[str] = None) -> GeocodeResult:
+    """[Gate AreaGeo] よく使う方面・出発地は内蔵の地名表で決める(送らない)。表に無い地名だけ照会する。
+    [Gate AreaAI] 都道府県の手がかり(AI の案の prefecture)がある時は、表の地名がその県でなければ使わず、
+    照会は「地名 都道府県」で行い、結果の住所にその県が無ければ見つからないとする(同じ名前の別の場所を避ける)"""
     from app.services import jp_gazetteer
 
     hit = jp_gazetteer.lookup(name)
+    if hit is not None and pref and hit["kind"] == "place" and pref not in str(hit["label"]):
+        hit = None
+    if hit is None and pref:
+        return await geocode(f"{name} {pref}")
     if hit is not None:
         lat, lng = float(hit["latitude"]), float(hit["longitude"])  # type: ignore[arg-type]
         return GeocodeResult(status="ok", latitude=lat, longitude=lng, label=str(hit["label"]), provider="gazetteer",
@@ -592,7 +598,8 @@ def limit_check(straight_km: Optional[float], one_way_hours: Optional[float],
 
 
 async def compare_areas(origin: str, areas: List[str], one_way_hours: Optional[float],
-                        one_way_strength: Optional[str], enabled: bool = True) -> Dict[str, Any]:
+                        one_way_strength: Optional[str], enabled: bool = True,
+                        prefs: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     geocode: Geocoder = _override or nominatim_geocode
     if not enabled:
         geocode = _disabled
@@ -600,7 +607,7 @@ async def compare_areas(origin: str, areas: List[str], one_way_hours: Optional[f
     o = await gazetteer_or(geocode, origin) if origin else GeocodeResult(status="unavailable")
     out: List[Dict[str, Any]] = []
     for name in areas[:MAX_AREAS]:
-        g = await gazetteer_or(geocode, name)
+        g = await gazetteer_or(geocode, name, (prefs or {}).get(name))
         straight = None
         if o.status == "ok" and g.status == "ok" and None not in (o.latitude, o.longitude, g.latitude, g.longitude):
             straight = round(haversine_km(o.latitude, o.longitude, g.latitude, g.longitude),  # type: ignore[arg-type]

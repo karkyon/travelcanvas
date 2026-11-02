@@ -28,14 +28,21 @@ export interface IntentItem {
   sensitive: boolean;
 }
 
-/** [Gate AreaLogic] 比べる方面。user_input = 利用者が挙げた行き先、proposed = 条件から内蔵の候補表で選んだ方面 */
+/**
+ * [Gate AreaLogic / AreaAI] 比べる方面。user_input = 利用者が挙げた行き先、ai_proposed = AI が条件から選んだ方面
+ * (片道の目安つき・サーバーで範囲と距離を確かめた)、proposed = AI を使わない時に内蔵の候補表で選んだ方面
+ */
 export interface ExtractedArea {
   name: string;
-  source: 'user_input' | 'proposed';
+  source: 'user_input' | 'proposed' | 'ai_proposed';
   reason?: string;
   hours?: number;
   km?: number;
   label?: string;
+  pref?: string | null;
+  highlights?: string;
+  minutes_min?: number | null;
+  minutes_max?: number | null;
 }
 /** [Gate AreaLogic] 地域の語(関西・東海・北陸…)。行き先ではなく範囲の条件 */
 export interface RegionHint { word: string; prefectures: string[] }

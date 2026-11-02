@@ -368,6 +368,34 @@ export const GEOCODE_LABEL: Record<string, string> = {
   disabled: '位置の照会は止めてあります(未照会)',
 };
 
+/** [Gate AreaAI] 片道の目安(分)の表示。「約2時間〜2時間半」 */
+export function minutesRange(lo: number | null | undefined, hi: number | null | undefined): string | null {
+  if (lo == null && hi == null) return null;
+  const f = (m: number) => {
+    const h = Math.floor(m / 60);
+    const r = Math.round(m % 60);
+    return h > 0 ? `${h}時間${r === 30 ? '半' : r ? `${r}分` : ''}` : `${r}分`;
+  };
+  const a = lo ?? hi!;
+  const b = hi ?? lo!;
+  return a === b ? `約${f(a)}` : `約${f(a)}〜${f(b)}`;
+}
+
+/** [Gate AreaAI] AI の片道の目安で片道の条件を判定する(道路の提供元の照会ではない) */
+export function estimateLimit(lo: number | null | undefined, hi: number | null | undefined, hours: number | null,
+  strength: string | null): { status: 'within' | 'borderline' | 'over' | 'unknown'; label: string } {
+  if ((lo == null && hi == null) || !hours) return { status: 'unknown', label: '' };
+  const limit = hours * 60;
+  const a = lo ?? hi!;
+  const b = hi ?? lo!;
+  if (b <= limit) return { status: 'within', label: `✓ 片道${hours}時間以内(AI の目安)` };
+  if (a > limit) {
+    return { status: 'over', label: strength === 'required' ? `✕ 片道${hours}時間の絶対条件を超えます(AI の目安)`
+      : `⚠ 片道${hours}時間の希望を超えそうです(AI の目安)` };
+  }
+  return { status: 'borderline', label: `△ 片道${hours}時間の前後(AI の目安。休憩・渋滞で超えることがあります)` };
+}
+
 export const LIMIT_LABEL: Record<string, string> = {
   exceeds: '条件を超えます', likely_exceeds: '希望を超えそう', unknown: '合うかは未確認', no_limit: '条件なし',
 };
