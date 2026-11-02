@@ -38,8 +38,9 @@ vi.mock('./AreaMap', () => ({
 
 import TripConsultPage from './TripConsultPage';
 import TripDraftPage from './TripDraftPage';
+import AreasStep from './AreasStep';
 import {
-  EMPTY_BRIEF, EXAMPLE_TEXT, extractInputOf, initReview, intentOf, loadState, moveSlot, openQuestions, placeSlot, removeSlot, sortSlots,
+  EMPTY_BRIEF, EXAMPLE_TEXT, extractInputOf, INITIAL_STATE, initReview, intentOf, loadState, moveSlot, openQuestions, placeSlot, removeSlot, sortSlots,
 } from './consultModel';
 import type { IntentExtraction, TripDraft } from '@/services/api/types/tripIntent';
 
@@ -178,6 +179,32 @@ describe('[Gate AreaLogic] 条件から選んだ方面(UAT 18:16 の相談)', ()
   });
 });
 
+describe('[Gate AreaRoutes] 道路で調べた方面の表示', () => {
+  it('道路の所要時間・道のり・出典を出し、片道の条件を道路の時間で判定する。超える方面は地図に置かない', () => {
+    const review = initReview(EXTRACTION);
+    review.values.one_way_hours = 3;
+    review.values.one_way_strength = 'preferred';
+    const state = { ...INITIAL_STATE, step: 'areas' as const, extraction: EXTRACTION, review,
+      areaNames: ['伊勢', '福井'],
+      areas: { origin: { query: '枚方', ...geo(34.8) }, retrieved_at: '2026-10-29T00:00:00+00:00',
+        providers: { geocode: 'nominatim', route: null, lodging: null, crowd: null, destination_suggestions: null },
+        areas: [areaRow('伊勢', 34.4), areaRow('福井', 36.0)] },
+      routes: { 伊勢: { status: 'ok' as const, minutes: 125, km: 141.2, avoidHighways: false, retrievedAt: '2026-11-03T00:00:00Z' },
+        福井: { status: 'ok' as const, minutes: 215, km: 190, avoidHighways: false, retrievedAt: '2026-11-03T00:00:00Z' } },
+    } as unknown as Parameters<typeof AreasStep>[0]['state'];
+    render(<AreasStep state={state} busy={false} error={null} onEdit={vi.fn()} onRetry={vi.fn()} onAddArea={vi.fn()}
+      onRemoveArea={vi.fn()} onSelect={vi.fn()} onToggleSave={vi.fn()} onOpen={vi.fn()} routeSlot={<p>slot</p>} />);
+    expect(screen.getByTestId('area-drive-伊勢')).toHaveTextContent('約2時間5分 · 道のり 約141km(Google Routes · 高速道路を使う');
+    expect(screen.getByTestId('area-limit-伊勢')).toHaveTextContent('✓ 片道3時間以内(道路で確認)');
+    expect(screen.getByTestId('area-limit-福井')).toHaveTextContent('⚠ 片道3時間の希望を約35分超えます');
+    expect(screen.getByText('slot')).toBeInTheDocument();
+    // 地図(試験では置き換えの部品): 道路で条件を超えた福井は置かない
+    return screen.findByRole('button', { name: 'pin 1 伊勢' }).then(() => {
+      expect(screen.queryByRole('button', { name: 'pin 2 福井' })).toBeNull();
+    });
+  });
+});
+
 describe('旅行相談の流れ', () => {
   it('希望 → 確認 → 方面の比較 → 方面の詳細 → 下書き。旅行は最後の操作まで作らない', async () => {
     api.extractIntent.mockResolvedValue(EXTRACTION);
@@ -223,7 +250,7 @@ describe('旅行相談の流れ', () => {
     expect(screen.queryByTestId('area-row-淡路島')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /他の候補も見る\(\+1\)/ }));
     expect(screen.getByTestId('area-row-淡路島')).toHaveTextContent('位置を照会できませんでした(未照会)');
-    expect(screen.getByTestId('area-row-伊勢')).toHaveTextContent('実走行時間・高速料金は未照会');
+    expect(screen.getByTestId('area-row-伊勢')).toHaveTextContent('道路の所要時間は未照会');
     expect(screen.getByTestId('area-row-伊勢')).toHaveTextContent('料金・空室は未照会');
     expect(screen.getByTestId('area-limit-福井')).toHaveTextContent('⚠ 希望を超えそう');
     expect(screen.getByTestId('areas-provider-note')).toHaveTextContent('道路・宿・混み具合の提供元は未接続');

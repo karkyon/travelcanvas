@@ -147,6 +147,36 @@ export interface ConsultState {
   mode?: 'free' | 'fields';
   /** [Gate ConsultAI] 確認の画面の直前の状態(「直前の変更を元に戻す」用。最大10) */
   history?: Array<{ review: ReviewState; areaNames: string[] }>;
+  /** [Gate AreaRoutes] 方面ごとの道路の所要時間(Google Routes。方面の比較をやり直すと消す) */
+  routes?: Record<string, RouteCheck>;
+}
+
+export interface RouteCheck {
+  status: 'ok' | 'not_found' | 'not_sent';
+  minutes: number | null;
+  km: number | null;
+  avoidHighways: boolean;
+  retrievedAt: string;
+  message?: string;
+}
+
+/** [Gate AreaRoutes] 道路の所要時間で片道の条件を判定する(直線距離の目安ではなく実際の道路) */
+export function routeLimit(route: RouteCheck | undefined, hours: number | null, strength: string | null):
+  { status: 'within' | 'exceeds' | 'over_preferred' | 'unknown' | 'no_limit'; label: string } {
+  if (!route || route.status !== 'ok' || route.minutes === null) return { status: 'unknown', label: '' };
+  if (!hours) return { status: 'no_limit', label: '片道の時間の条件はありません' };
+  const limit = hours * 60;
+  if (route.minutes <= limit) return { status: 'within', label: `✓ 片道${hours}時間以内(道路で確認)` };
+  const over = Math.round(route.minutes - limit);
+  return strength === 'required'
+    ? { status: 'exceeds', label: `✕ 片道${hours}時間の絶対条件を約${over}分超えます(道路で確認)` }
+    : { status: 'over_preferred', label: `⚠ 片道${hours}時間の希望を約${over}分超えます(道路で確認)` };
+}
+
+export function durationLabel(minutes: number): string {
+  const m = Math.round(minutes);
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h}時間${m % 60 ? `${m % 60}分` : ''}` : `${m}分`;
 }
 
 export const INITIAL_STATE: ConsultState = {

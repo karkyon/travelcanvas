@@ -503,3 +503,71 @@ def test_places_resend_after_lost_response_sends_once_and_uses_radius(admin, db_
     bad = client.post("/api/v1/trip-intents/ai/places-search", json={**body, "radius_km": 99},
                       headers={"Idempotency-Key": uuid.uuid4().hex})
     assert bad.status_code == 422
+
+
+# ============================================================ [Gate AreaRoutes] 比べる方面の道路の所要時間
+
+_DESTS = [{"name": "淡路島", "latitude": 34.35, "longitude": 134.85},
+          {"name": "伊勢", "latitude": 34.4875, "longitude": 136.7091},
+          {"name": "あわら温泉", "latitude": 36.226, "longitude": 136.195},
+          {"name": "高野山", "latitude": 34.213, "longitude": 135.586}]
+
+
+def _routes(client, sid, dests=None, key=None, **extra):
+    return client.post("/api/v1/trip-intents/ai/routes",
+                       json={"session_id": sid, "origin_latitude": 34.8146, "origin_longitude": 135.6507,
+                             "destinations": _DESTS if dests is None else dests, **extra},
+                       headers={"Idempotency-Key": key or uuid.uuid4().hex})
+
+
+def test_routes_for_compared_areas_use_one_element_each_and_respect_quota(admin, db_session, net):
+    import json as _json
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)  # Journey: 経路 4 区間 / 相談
+    sid = _session(client)
+    key = uuid.uuid4().hex
+    r = _routes(client, sid, key=key, avoid_highways=True)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [x["name"] for x in body["results"]] == ["淡路島", "伊勢", "あわら温泉", "高野山"]
+    assert all(x["status"] == "ok" and x["result"] == {"duration_minutes": 150.0, "distance_km": 180.0}
+               for x in body["results"])
+    sent = [q for q in net.requests if q.url.host == "routes.googleapis.com"]
+    assert len(sent) == 4
+    assert _json.loads(sent[0].content)["routeModifiers"] == {"avoidHighways": True}
+    assert body["saved"] is False and body["attribution"] == "Google"
+    # 同じ Idempotency-Key のやり直しは送らない(二度課金しない。済んだ区間は idempotent_replay)
+    again = _routes(client, sid, key=key, avoid_highways=True)
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "idempotent_replay"
+    assert len([q for q in net.requests if q.url.host == "routes.googleapis.com"]) == 4
+    # 枠(4 区間)を使い切った後は送らずに断る
+    r = _routes(client, sid, dests=_DESTS[:1])
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "feature_quota_exceeded"
+    assert len([q for q in net.requests if q.url.host == "routes.googleapis.com"]) == 4
+
+
+def test_routes_partial_when_quota_runs_out_and_validation(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    assert _routes(client, sid, dests=_DESTS[:3]).status_code == 200
+    r = _routes(client, sid, dests=[{"name": "白浜", "latitude": 33.68, "longitude": 135.35},
+                                    {"name": "城崎温泉", "latitude": 35.63, "longitude": 134.81}])
+    assert r.status_code == 200
+    st = {x["name"]: x["status"] for x in r.json()["results"]}
+    assert st == {"白浜": "ok", "城崎温泉": "not_sent"}
+    assert r.json()["results"][1]["code"] == "feature_quota_exceeded"
+    for bad in ([], _DESTS + [{"name": "x", "latitude": 1, "longitude": 1}], [_DESTS[0], _DESTS[0]],
+                [{"name": "", "latitude": 1, "longitude": 1}], [{"name": "a", "latitude": 99, "longitude": 1}]):
+        assert _routes(client, sid, dests=bad).status_code == 422
+    assert _routes(client, sid, avoid_highways="yes").status_code == 422
+
+
+def test_routes_free_class_sends_nothing(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user, "free")
+    r = _routes(client, _session(client))
+    assert r.status_code in (403, 402, 429) and not [q for q in net.requests if q.url.host == "routes.googleapis.com"]

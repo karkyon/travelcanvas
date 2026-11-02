@@ -21,7 +21,7 @@ import {
 } from '@/services/api/consultAi';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import type { IntentExtraction } from '@/services/api/types/tripIntent';
-import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
+import { AiReadPanel, ConsultLookupPanel, RouteCheckPanel, SuggestedAreasPanel } from './ConsultAiPanels';
 import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
 import { TurnPanels } from './TurnPanels';
 import { applyTurn, decideTurnChange, turnStateOf } from './consultTurnModel';
@@ -742,7 +742,8 @@ const TripConsultPage: React.FC = () => {
       const r = await compareAreas({ origin: (review.values.origin ?? '').trim(), areas: list,
         one_way_hours: review.values.one_way_hours ?? null,
         one_way_strength: review.confirmed.one_way ? review.values.one_way_strength : null });
-      setState((s) => ({ ...s, areas: r, selectedArea: s.selectedArea && list.includes(s.selectedArea) ? s.selectedArea : list[0] ?? null }));
+      setState((s) => ({ ...s, areas: r, routes: {},
+        selectedArea: s.selectedArea && list.includes(s.selectedArea) ? s.selectedArea : list[0] ?? null }));
     } catch {
       setError('方面の位置を照会できませんでした。条件はそのままです。もう一度お試しください');
     } finally {
@@ -869,7 +870,24 @@ const TripConsultPage: React.FC = () => {
           onSelect={(name) => setState((s) => ({ ...s, selectedArea: name }))}
           onToggleSave={(name) => setState((s) => ({ ...s, savedAreas: s.savedAreas.includes(name)
             ? s.savedAreas.filter((n) => n !== name) : [...s.savedAreas, name] }))}
-          onOpen={(name) => { setState((s) => ({ ...s, selectedArea: name })); go('detail'); }} />
+          onOpen={(name) => { setState((s) => ({ ...s, selectedArea: name })); go('detail'); }}
+          routeSlot={state.areas && (() => {
+            const o = state.areas.origin;
+            const origin = o.status === 'ok' && o.latitude !== null && o.longitude !== null
+              ? { latitude: o.latitude, longitude: o.longitude } : null;
+            const done = state.routes ?? {};
+            const todo = state.areas.areas.filter((a) => a.geocode.status === 'ok' && a.geocode.latitude !== null
+              && a.geocode.longitude !== null && !a.geocode.suspect && done[a.name]?.status !== 'ok')
+              .map((a) => ({ name: a.name, latitude: a.geocode.latitude!, longitude: a.geocode.longitude! }));
+            const tr = state.review?.values.transport;
+            return (
+              <RouteCheckPanel status={aiStatus} ensureSession={ensureSession} originLabel={state.review?.values.origin ?? ''}
+                origin={origin} areas={todo} checked={Object.keys(done).length}
+                avoidHighways={tr === 'car' && state.review?.values.highway === false}
+                onDone={(routes) => setState((s) => ({ ...s, routes: { ...(s.routes ?? {}), ...routes } }))}
+                onUsage={setConsultUsage} />
+            );
+          })()} />
       )}
       {step === 'detail' && state.review && (
         <AreaDetailStep state={state} busy={busy === 'draft'} error={error} onBack={() => go('areas')}

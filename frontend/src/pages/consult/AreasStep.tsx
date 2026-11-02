@@ -11,7 +11,7 @@ import React, { Suspense, lazy, useId, useMemo, useState } from 'react';
 import Button from '@/components/common/Button';
 import { coverFor } from '@/styles/tokens';
 import {
-  GEOCODE_LABEL, LIMIT_LABEL, retrievedLabel, straightLabel, type ConsultState,
+  durationLabel, GEOCODE_LABEL, LIMIT_LABEL, retrievedLabel, routeLimit, straightLabel, type ConsultState,
 } from './consultModel';
 import UiIcon from '@/components/common/UiIcon';
 import { IcCar } from '@/components/common/uiIcons';
@@ -35,10 +35,12 @@ interface Props {
   onSelect: (name: string) => void;
   onToggleSave: (name: string) => void;
   onOpen: (name: string) => void;
+  /** [Gate AreaRoutes] 道路の所要時間を調べる操作(Google Routes) */
+  routeSlot?: React.ReactNode;
 }
 
 const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAddArea, onRemoveArea, onSelect, onToggleSave,
-  onOpen }) => {
+  onOpen, routeSlot }) => {
   const id = useId();
   const [all, setAll] = useState(false);
   const [newArea, setNewArea] = useState('');
@@ -52,11 +54,19 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
     : null;
   // [Gate AreaGeo] 地図に置くのは、位置が確かで条件から大きく外れない方面だけ(遠すぎる照会の結果・片道の上限を
   // 直線だけで越える方面は一覧に理由を出し、地図の範囲を広げない。以前は「滋賀」が北海道に置かれ地図が日本全体に縮んだ)
+  // [Gate AreaRoutes] 道路で調べた時は、道路の所要時間で判定する(直線距離の判定より優先)
+  const routes = state.routes ?? {};
+  const roadOf = (name: string) => routeLimit(routes[name], r.values.one_way_hours, r.values.one_way_strength);
   const pins = useMemo(() => rows.map((a, i) => ({ a, order: i + 1 }))
-    .filter(({ a }) => a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null
-      && !offMap(a))
+    .filter(({ a }) => {
+      const road = routeLimit((state.routes ?? {})[a.name], r.values.one_way_hours, r.values.one_way_strength).status;
+      const far = road === 'within' || road === 'no_limit' ? Boolean(a.geocode.suspect)
+        : road === 'exceeds' || road === 'over_preferred' ? true : offMap(a);
+      return a.geocode.status === 'ok' && a.geocode.latitude !== null && a.geocode.longitude !== null && !far;
+    })
     .map(({ a, order }) => ({ name: a.name, order, latitude: a.geocode.latitude!, longitude: a.geocode.longitude!,
-      selected: a.name === state.selectedArea })), [rows, state.selectedArea]);
+      selected: a.name === state.selectedArea })), [rows, state.selectedArea, state.routes, r.values.one_way_hours,
+    r.values.one_way_strength]);
   const conditions = [
     r.values.origin && `${r.values.origin}から`, r.values.nights !== null && (r.values.nights === 0 ? '日帰り' : `${r.values.nights}泊${r.values.nights + 1}日`),
     r.values.party_size && `大人${r.values.party_size}人`, r.values.transport === 'car' ? '自家用車' : r.values.transport === 'public' ? '公共交通' : null,
@@ -101,6 +111,7 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
           <Button type="button" size="sm" variant="ghost" onClick={onEdit}>条件を戻す</Button>
         </div>
       )}
+      {routeSlot}
       {state.areaNames.length === 0 && (
         <div className="rounded-xl border border-dashed border-cloud-200 p-4 text-sm text-ink-700" data-testid="areas-empty">
           <p className="font-semibold text-ink-900">比べる方面がまだありません</p>
@@ -179,12 +190,28 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                       )}
                       <div><dt className="inline font-semibold text-ink-900">距離: </dt>
                         <dd className="inline">{straightLabel(a.straight_km, r.values.origin)}</dd></div>
-                      <div><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt><dd className="inline">実走行時間・高速料金は未照会</dd></div>
+                      <div data-testid={`area-drive-${a.name}`}><dt className="inline font-semibold text-ink-900"><UiIcon icon={IcCar} size={14} className="mr-1 align-[-3px]" />運転: </dt>
+                        <dd className="inline">{(() => {
+                          const rt = routes[a.name];
+                          if (rt?.status === 'ok' && rt.minutes !== null) {
+                            return `約${durationLabel(rt.minutes)}${rt.km !== null ? ` · 道のり 約${Math.round(rt.km)}km` : ''}`
+                              + `(Google Routes · ${rt.avoidHighways ? '一般道' : '高速道路を使う'} · 出発の時刻・渋滞は考えない · ${retrievedLabel(rt.retrievedAt)})`;
+                          }
+                          if (rt?.status === 'not_found') return '道路の経路が見つかりませんでした(島・海を渡る等)';
+                          if (rt?.status === 'not_sent') return `道路は未照会(${rt.message ?? '送れませんでした'})`;
+                          return '道路の所要時間は未照会(上の「道路で片道の時間を調べる」で調べられます) · 高速料金は未照会';
+                        })()}</dd></div>
                       <div data-testid={`area-limit-${a.name}`}>
                         <dt className="inline font-semibold text-ink-900">片道の条件: </dt>
-                        <dd className={`inline ${limit === 'exceeds' || limit === 'likely_exceeds' ? 'font-semibold text-warning' : ''}`}>
-                          {`${limit === 'exceeds' || limit === 'likely_exceeds' ? '⚠ ' : ''}${LIMIT_LABEL[limit] ?? limit} · ${a.limit_check.note}`}
-                        </dd>
+                        {roadOf(a.name).label ? (
+                          <dd className={`inline ${roadOf(a.name).status === 'within' ? 'font-semibold text-success' : 'font-semibold text-warning'}`}>
+                            {roadOf(a.name).label}
+                          </dd>
+                        ) : (
+                          <dd className={`inline ${limit === 'exceeds' || limit === 'likely_exceeds' ? 'font-semibold text-warning' : ''}`}>
+                            {`${limit === 'exceeds' || limit === 'likely_exceeds' ? '⚠ ' : ''}${LIMIT_LABEL[limit] ?? limit} · ${a.limit_check.note}`}
+                          </dd>
+                        )}
                       </div>
                       <div><dt className="inline font-semibold text-ink-900">⌂ 宿: </dt><dd className="inline">料金・空室は未照会(宿の提供元が未接続)</dd></div>
                       <div><dt className="inline font-semibold text-ink-900">静けさ: </dt><dd className="inline">未確認(混み具合のデータ未接続)</dd></div>

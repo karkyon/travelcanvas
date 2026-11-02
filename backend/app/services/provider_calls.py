@@ -173,7 +173,7 @@ def _places_items(body: Any) -> List[Dict[str, Any]]:
 
 
 def _routes_request(key: str, origin: Tuple[float, float], dest: Tuple[float, float],
-                    mode: str) -> ph.ProviderResponse:
+                    mode: str, avoid_highways: bool = False) -> ph.ProviderResponse:
     travel = ROUTE_MODES[mode]
     payload: Dict[str, Any] = {
         "origin": {"location": {"latLng": {"latitude": origin[0], "longitude": origin[1]}}},
@@ -182,6 +182,8 @@ def _routes_request(key: str, origin: Tuple[float, float], dest: Tuple[float, fl
     }
     if travel == "DRIVE":
         payload["routingPreference"] = "TRAFFIC_UNAWARE"
+        if avoid_highways:  # [Gate AreaRoutes] 「高速を使わない」相談は一般道で調べる
+            payload["routeModifiers"] = {"avoidHighways": True}
     return ph.post_json("google.routes.compute",
                         {"X-Goog-Api-Key": key, "X-Goog-FieldMask": ROUTES_FIELD_MASK,
                          "Content-Type": "application/json"}, payload)
@@ -281,11 +283,14 @@ def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: 
 
 def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin: Tuple[float, float],
                   dest: Tuple[float, float], mode: str, idempotency_key: str,
-                  consult_id: Optional[uuid.UUID] = None) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+                  consult_id: Optional[uuid.UUID] = None,
+                  avoid_highways: bool = False) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     def call(units: Dict[str, int]) -> cg.ProviderResult:
-        resp = _send(db, "google_routes", "routes.element", lambda key: _routes_request(key, origin, dest, mode))
+        resp = _send(db, "google_routes", "routes.element",
+                     lambda key: _routes_request(key, origin, dest, mode, avoid_highways))
         return cg.ProviderResult(units={"elements": 1}, payload=_route_summary(resp.body))
 
     return cg.run(db, plan, caller, "routes.element", "google_routes", {"elements": 1}, idempotency_key, call,
                   consult_id=consult_id,
-                  fingerprint=fingerprint("google_routes", str(plan.id if plan else consult_id), origin, dest, mode))
+                  fingerprint=fingerprint("google_routes", str(plan.id if plan else consult_id), origin, dest, mode,
+                                          *(["avoid_highways"] if avoid_highways else [])))

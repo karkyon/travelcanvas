@@ -11,6 +11,7 @@
   POST /trip-intents/ai/extract        : 文章を AI(OpenAI Responses・構造化の出力)で読み取る。「AI · 未確認」として返す
   POST /trip-intents/ai/places-search  : Google で場所を探す(方面の位置の近く)。保存しない
   POST /trip-intents/ai/route          : Google で出発地から方面への経路を調べる。保存しない
+  POST /trip-intents/ai/routes         : [Gate AreaRoutes] 比べる方面(最大4)の道路の所要時間をまとめて調べる。保存しない
 - GET  /plans/{plan_id}/trip-intent               : 下書き(方面・条件・日と時間帯の並び・照会の状態)
 - PUT  /plans/{plan_id}/trip-intent/slots         : 下書きの並びを変える(If-Match: 旅行の revision。前の並びへ戻すのも同じ口)
 - POST /plans/{plan_id}/trip-intent/commit        : 日付を決めて、下書きの並びを旅程(日・予定)にする(1回の変更として元に戻せる)
@@ -540,17 +541,23 @@ def _idem(value: Optional[str]) -> str:
     return key
 
 
+def _guard_http(error: Exception) -> HTTPException:
+    """送る前の判定・鍵・提供元の拒否を、画面へ返す誤りにする"""
+    if isinstance(error, cg.CostGuardError):
+        return HTTPException(status_code=error.status, detail=error.detail())
+    if isinstance(error, ps.SecretUnavailable):
+        message = _SECRET_MESSAGE.get(error.code, "外部の提供元の準備が整っていないため、送りません。手で続けられます")
+        return _ai_bad("provider_not_ready", message, 503, {"reason": error.code})
+    assert isinstance(error, pc.ProviderRejected)
+    return _ai_bad("provider_rejected", "提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます",
+                   503, {"reason": error.code})
+
+
 def _send_guard(fn):
     try:
         return fn()
-    except cg.CostGuardError as error:
-        raise HTTPException(status_code=error.status, detail=error.detail())
-    except ps.SecretUnavailable as error:
-        message = _SECRET_MESSAGE.get(error.code, "外部の提供元の準備が整っていないため、送りません。手で続けられます")
-        raise _ai_bad("provider_not_ready", message, 503, {"reason": error.code})
-    except pc.ProviderRejected as error:
-        raise _ai_bad("provider_rejected", "提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます",
-                      503, {"reason": error.code})
+    except (cg.CostGuardError, ps.SecretUnavailable, pc.ProviderRejected) as error:
+        raise _guard_http(error)
     except consult_ai.ConsultAIError as error:
         raise _ai_bad(error.code, error.message, error.status)
     except consult_turn.TurnError as error:
@@ -700,6 +707,65 @@ def consult_places(payload: Dict[str, Any] = Body(...),
     return {"results": places, "usage": usage, "saved": False, "attribution": "Google",
             "retrieved_at": ti.now().isoformat(), "stub": provider_stub.enabled(),
             "notice": "Google の検索の結果です(営業時間・料金は未確認)。旅行には保存していません"}
+
+
+MAX_ROUTE_DESTINATIONS = 4
+
+
+@router.post("/ai/routes")
+def consult_routes(payload: Dict[str, Any] = Body(...),
+                   idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate AreaRoutes] 比べる方面ごとに、出発地からの道路の所要時間と距離を Google Routes で調べる(利用者の明示の操作)。
+
+    1 方面 = 1 区間(routes.element)。枠・停止・鍵の確認は 1 区間ずつ cost_guard が判定し、途中で枠が尽きたら残りは
+    送らずに理由を返す。全て送れなかった時は 1 区間の時と同じ誤りを返す。地名・結果は保存しない(監査は件数だけ)。"""
+    import hashlib
+
+    body = payload if isinstance(payload, dict) else {}
+    session = _session(db, current_user, body.get("session_id"))
+    mode = body.get("mode") or "driving"
+    if mode not in pc.ROUTE_MODES:
+        raise _ai_bad("invalid_input", "移動の手段は driving・walking・bicycling・transit のどれかです")
+    avoid = body.get("avoid_highways", False)
+    if not isinstance(avoid, bool):
+        raise _ai_bad("invalid_input", "avoid_highways は真偽値です")
+    origin = (_coord(body, "origin_latitude", 90), _coord(body, "origin_longitude", 180))
+    raw = body.get("destinations")
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_ROUTE_DESTINATIONS:
+        raise _ai_bad("invalid_input", f"方面は 1〜{MAX_ROUTE_DESTINATIONS} 件です")
+    dests = []
+    for d in raw:
+        if not isinstance(d, dict) or not isinstance(d.get("name"), str) or not 1 <= len(d["name"].strip()) <= 40:
+            raise _ai_bad("invalid_input", "方面の名前(40文字まで)が要ります")
+        dests.append((d["name"].strip(), (_coord(d, "latitude", 90), _coord(d, "longitude", 180))))
+    if len({n for n, _ in dests}) != len(dests):
+        raise _ai_bad("invalid_input", "同じ方面が2回あります")
+    key = _idem(idempotency_key)
+    base = hashlib.sha256(key.encode("utf-8")).hexdigest()[:48]
+    results: List[Dict[str, Any]] = []
+    usage: Optional[Dict[str, Any]] = None
+    first_error: Optional[Exception] = None
+    for i, (name, dest) in enumerate(dests):
+        try:
+            summary, usage = pc.route_between(db, None, current_user, origin, dest, mode, f"routes:{base}:{i}",
+                                              consult_id=session.id, avoid_highways=avoid)
+            results.append({"name": name, "status": "ok" if summary else "not_found", "result": summary})
+        except (cg.CostGuardError, ps.SecretUnavailable, pc.ProviderRejected) as error:
+            first_error = first_error or error
+            http = _guard_http(error)
+            detail = http.detail if isinstance(http.detail, dict) else {"message": str(http.detail)}
+            results.append({"name": name, "status": "not_sent", "code": detail.get("code"),
+                            "message": detail.get("message") or "送れませんでした"})
+    if first_error is not None and all(r["status"] == "not_sent" for r in results):
+        raise _guard_http(first_error)
+    if usage is None:
+        usage = cg.consult_usage(db, session.id, current_user)
+    _ai_audit("trip_consult.routes", current_user, session,
+              {"sent": sum(1 for r in results if r["status"] != "not_sent"), "mode": mode, "avoid_highways": avoid})
+    return {"results": results, "mode": mode, "avoid_highways": avoid, "usage": usage, "saved": False,
+            "attribution": "Google", "retrieved_at": ti.now().isoformat(), "stub": provider_stub.enabled(),
+            "notice": "Google Routes の道路の所要時間です(出発の時刻・渋滞は考えていません)。旅行には保存していません"}
 
 
 @router.post("/ai/route")

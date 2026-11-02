@@ -11,12 +11,12 @@ import React, { useId, useState } from 'react';
 import Button from '@/components/common/Button';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  consultRoute, newIdempotencyKey, type ConsultAiStatus,
+  consultRoute, consultRoutes, newIdempotencyKey, type ConsultAiStatus,
   type ConsultRouteMode, type ConsultRouteResult, type ConsultUsage,
 } from '@/services/api/consultAi';
-import { retrievedLabel } from './consultModel';
+import { retrievedLabel, type RouteCheck } from './consultModel';
 import type { ExtractedArea, RegionHint } from '@/services/api/types/tripIntent';
-import { operationBlocker, usageLabel } from './consultAiModel';
+import { keepIdempotencyKey, operationBlocker, usageLabel } from './consultAiModel';
 
 export const StubBanner: React.FC<{ status: ConsultAiStatus | null }> = ({ status }) => (status?.stub ? (
   <p role="note" data-testid="consult-stub" className="rounded-lg border border-warning bg-warning-soft p-2 text-xs text-ink-900">
@@ -159,6 +159,73 @@ export const SuggestedAreasPanel: React.FC<{
     </section>
     )}
     </>
+  );
+};
+
+// ------------------------------------------------------------------ [Gate AreaRoutes] 方面の比較: 道路の所要時間
+
+/** 道路で調べる方面の上限(1回の操作。サーバーの MAX_ROUTE_DESTINATIONS と同じ) */
+export const MAX_ROUTE_AREAS = 4;
+
+export const RouteCheckPanel: React.FC<{
+  status: ConsultAiStatus | null; ensureSession: () => Promise<string>; originLabel: string;
+  origin: Point | null; areas: Array<{ name: string; latitude: number; longitude: number }>;
+  avoidHighways: boolean; checked: number;
+  onDone: (routes: Record<string, RouteCheck>) => void; onUsage: (u: ConsultUsage) => void;
+}> = ({ status, ensureSession, originLabel, origin, areas, avoidHighways, checked, onDone, onUsage }) => {
+  const id = useId();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const keyRef = React.useRef<{ sig: string; key: string } | null>(null);
+  const targets = areas.slice(0, MAX_ROUTE_AREAS);
+  const blocker = operationBlocker(status, 'routes.element') ?? (!origin ? '出発地の位置が照会できていません'
+    : targets.length === 0 ? (checked > 0 ? '比べている方面は全て調べました' : '位置を照会できた方面がありません') : null);
+
+  const run = async () => {
+    if (busy || blocker || !origin) return;
+    setBusy(true);
+    setError(null);
+    const sig = JSON.stringify([origin, targets.map((t) => t.name), avoidHighways]);
+    if (keyRef.current?.sig !== sig) keyRef.current = { sig, key: newIdempotencyKey() };
+    try {
+      const r = await consultRoutes(await ensureSession(), origin, targets, avoidHighways, keyRef.current.key);
+      keyRef.current = null;
+      const out: Record<string, RouteCheck> = {};
+      for (const row of r.results) {
+        out[row.name] = { status: row.status, minutes: row.result?.duration_minutes ?? null, km: row.result?.distance_km ?? null,
+          avoidHighways: r.avoid_highways, retrievedAt: r.retrieved_at, message: row.message };
+      }
+      onDone(out);
+      onUsage(r.usage);
+      setNotice(r.notice);
+    } catch (e) {
+      if (!keepIdempotencyKey(e)) keyRef.current = null;
+      setError(`${errorDetailMessage(e, '送れませんでした')}。直線距離の目安のまま比べられます`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby={`${id}-h`} data-testid="consult-route-check"
+      className="rounded-2xl border border-accent bg-accent-soft/40 p-4 text-sm text-ink-900">
+      <h3 id={`${id}-h`} className="font-semibold">道路で片道の時間を調べる(Google Routes・有料・押した時だけ)</h3>
+      <p className="text-xs text-ink-700">
+        {`${originLabel || '出発地'}から各方面まで、${avoidHighways ? '一般道' : '高速道路を使う'}車の経路の所要時間と道のりを調べ、片道の条件を道路の時間で判定します。`}
+        {`1 方面 = 1 区間をこの相談の利用枠から使います(今回 ${targets.length} 区間)。出発の時刻・渋滞は考えません。結果は保存しません。`}
+      </p>
+      <StubBanner status={status} />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button type="button" onClick={() => void run()} loading={busy} disabled={busy || Boolean(blocker)}
+          data-testid="consult-route-check-run">
+          {busy ? '道路で調べています…' : `道路で片道の時間を調べる(${targets.length}方面)`}
+        </Button>
+        {blocker && <span className="text-xs text-ink-700">{`使えません: ${blocker}`}</span>}
+      </div>
+      {error && <p role="alert" className="mt-2 text-sm text-danger" data-testid="consult-route-check-error">{error}</p>}
+      {notice && <p className="mt-2 text-xs text-ink-700" data-testid="consult-route-check-notice">{notice}</p>}
+    </section>
   );
 };
 

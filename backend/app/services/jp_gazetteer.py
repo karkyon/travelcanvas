@@ -341,7 +341,8 @@ def propose(origin: str, one_way_hours: Optional[float], strength: Optional[str]
     for r in picked:
         tags = DESTINATIONS[str(r["name"])][3]
         feats = "・".join(label_of[t] for t in tags if t in label_of)
-        reason = (f"{r['pref']} · 直線 約{r['km']}km · 片道の目安 約{_h(float(r['hours']))}(直線距離からの目安・道路は未照会)"
+        reason = (f"{r['pref']} · 直線 約{r['km']}km · 片道の目安 約{_h(float(r['hours']))}"
+                  "(直線距離からの目安・道路は未照会。比較の画面の「道路で片道の時間を調べる」で確かめられます)"
                   f" · 特徴: {feats}")
         areas.append({"name": r["name"], "label": f"{r['name']}({r['pref']})", "pref": r["pref"], "km": r["km"],
                       "hours": r["hours"], "reason": reason})

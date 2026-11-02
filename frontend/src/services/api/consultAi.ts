@@ -146,6 +146,34 @@ export async function consultRoute(sessionId: string, origin: { latitude: number
   }), 'POST /trip-intents/ai/route');
 }
 
+/** [Gate AreaRoutes] 比べる方面ごとの道路の所要時間(Google Routes。1 方面 = 1 区間) */
+export interface ConsultRoutesRow {
+  name: string; status: 'ok' | 'not_found' | 'not_sent';
+  result?: { duration_minutes: number | null; distance_km: number | null } | null;
+  code?: string | null; message?: string;
+}
+export interface ConsultRoutesResult {
+  results: ConsultRoutesRow[]; mode: string; avoid_highways: boolean; usage: ConsultUsage; attribution: string;
+  retrieved_at: string; notice: string; stub: boolean;
+}
+
+export async function consultRoutes(sessionId: string, origin: { latitude: number; longitude: number },
+  destinations: Array<{ name: string; latitude: number; longitude: number }>, avoidHighways: boolean,
+  key: string): Promise<ConsultRoutesResult> {
+  const r = await api.post('/trip-intents/ai/routes', {
+    session_id: sessionId, origin_latitude: origin.latitude, origin_longitude: origin.longitude, destinations,
+    avoid_highways: avoidHighways, mode: 'driving' }, withKey(key));
+  return decodeResponse(r.data, object<ConsultRoutesResult>({
+    results: arrayOf(object<ConsultRoutesRow>({
+      name: str, status: oneOf('ok', 'not_found', 'not_sent'),
+      result: optional(nullable(object<{ duration_minutes: number | null; distance_km: number | null }>({
+        duration_minutes: nullable(num), distance_km: nullable(num) }))),
+      code: optional(nullable(str)), message: optional(str),
+    })),
+    mode: str, avoid_highways: bool, usage, attribution: str, retrieved_at: str, notice: str, stub: bool,
+  }), 'POST /trip-intents/ai/routes');
+}
+
 // ----------------------------------------------------------------- [Gate F07] 会話の1ターン
 
 export type TurnField = 'origin' | 'party_size' | 'nights' | 'transport' | 'highway' | 'one_way_hours' | 'room' | 'dates';

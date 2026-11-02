@@ -132,7 +132,19 @@ def handler(request: httpx.Request) -> httpx.Response:
              "googleMapsUri": f"https://maps.google.com/?cid={1000 + i}"}
             for i in (1, 2)][:int(payload.get("pageSize") or 2)]})
     if endpoint == "google.routes.compute":
-        return httpx.Response(200, json={"routes": [{"duration": "9000s", "distanceMeters": 180000}]})
+        # 位置から決まる模擬の値(直線 × 1.3・時速 75km)。方面ごとに違う時間になる
+        import math
+        try:
+            o = payload["origin"]["location"]["latLng"]
+            d = payload["destination"]["location"]["latLng"]
+            dlat = math.radians(d["latitude"] - o["latitude"])
+            dlng = math.radians(d["longitude"] - o["longitude"]) * math.cos(math.radians(o["latitude"]))
+            km = 6371.0 * math.hypot(dlat, dlng)
+        except (KeyError, TypeError):
+            km = 138.0
+        meters = int(km * 1300)
+        return httpx.Response(200, json={"routes": [{"duration": f"{int(meters / 1000 / 75 * 3600)}s",
+                                                     "distanceMeters": meters}]})
     return httpx.Response(404, json={"error": {"status": "NOT_FOUND"}})
 
 

@@ -16,6 +16,7 @@
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
 | [gate-area-geo-trace.md](gate-area-geo-trace.md) | Gate AreaGeo — 方面の位置の誤り(③が北海道)・地図の範囲・観光の検索が空(UAT 2026-11-02 15:30 の指摘) | 0 | 0 | 0 |
 | [gate-area-logic-trace.md](gate-area-logic-trace.md) | Gate AreaLogic — 比べる方面の決め方の見直し・HOME 動画のちらつき(UAT 2026-11-02 18:16 の指摘) | 0 | 0 | 0 |
+| [gate-area-routes-trace.md](gate-area-routes-trace.md) | Gate AreaRoutes — 比べる方面の片道の時間を道路(Google Routes)で調べる | 0 | 0 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |
 | [gate-b1-trace.md](gate-b1-trace.md) | Gate B1 トレース(FR-041 組織・B2B / FR-042 API・Webhook の最小形) | 2 | 1 | 3 |
