@@ -226,6 +226,8 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
     if origin_field:
         items.append(_item("origin", "出発地", origin_field, origin_field, "user_input", "required"))
     elif origin_text:
+        from app.services import jp_gazetteer as _gz
+        origin_text = _gz.clean_origin(origin_text) or origin_text
         items.append(_item("origin", "出発地", origin_text, origin_text, "text", "required", _snippet(t, om)))
     else:
         items.append(_item("origin", "出発地", None, "未指定", "unspecified", "undecided",
@@ -355,9 +357,78 @@ def extract(text: str, fields: Dict[str, Any]) -> Dict[str, Any]:
 
     areas_text = _areas(t)
     areas_field = [a.strip() for a in (fields.get("areas") or []) if isinstance(a, str) and a.strip()]
-    areas = list(dict.fromkeys(areas_field + areas_text))[:MAX_AREAS]
-    return {"items": items, "areas": [{"name": a, "source": "user_input"} for a in areas],
-            "nights": nights, "extractor": "text_rules", "ai_connected": False}
+    plan = plan_areas(t, list(dict.fromkeys(areas_field + areas_text)), items)
+    return {"items": items, **plan, "nights": nights, "extractor": "text_rules", "ai_connected": False}
+
+
+# ======================================================================== [Gate AreaLogic] 比べる方面を決める
+
+_ASK_CANDIDATES = re.compile(r"候補(?:地|の方面|先)?(?:を|は|が)?.{0,12}(?:出して|挙げて|教えて|提案|ほしい|欲しい|ください)"
+                             r"|(?:おすすめ|オススメ|お勧め).{0,6}(?:教えて|ありますか|ください)|どこ(?:が|か)(?:いい|良い|おすすめ)")
+_COUNT = re.compile(r"(\d|[一二三四五六])\s*(?:件|か所|カ所|ヶ所|箇所|つ|ヵ所)")
+_KANJI_NUM = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6}
+
+
+def wanted_count(text: str) -> int:
+    m = _COUNT.search(text or "")
+    if not m:
+        return 4
+    v = m.group(1)
+    n = _KANJI_NUM.get(v) or int(v)
+    return max(2, min(6, n))
+
+
+def _item_value(items: List[Dict[str, Any]], key: str) -> Any:
+    return next((x.get("value") for x in items if x.get("key") == key), None)
+
+
+def plan_areas(text: str, named: List[str], items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """利用者の書いた語を「行き先」「地域の範囲(関西・東海…)」「行き先ではない語(出発地・高速…)」に分け、
+    行き先が無い(または候補を出してと頼まれた)時は、条件に合う方面を内蔵の候補表から選ぶ。
+
+    返す: areas([{name, source: user_input|proposed, reason?, hours?, km?, label?}])・regions([{word, prefectures}])・
+    proposal({status, note, limit_hours, count})"""
+    from app.services import jp_gazetteer as gz
+
+    origin = _item_value(items, "origin")
+    origin = origin if isinstance(origin, str) else None
+    places: List[str] = []
+    regions: List[Dict[str, Any]] = []
+    for word in list(dict.fromkeys(named + gz.regions_in_text(text))):
+        if gz.is_not_place(word, origin):
+            continue
+        prefs_of = gz.region_prefectures(word)
+        if prefs_of:
+            if all(r["word"] != word for r in regions):
+                regions.append({"word": word, "prefectures": list(prefs_of)})
+            continue
+        if word not in places:
+            places.append(word)
+    region_prefs = tuple(dict.fromkeys(p for r in regions for p in r["prefectures"]))
+    asked = bool(_ASK_CANDIDATES.search(text or ""))
+    areas: List[Dict[str, Any]] = [{"name": a, "source": "user_input"} for a in places[:MAX_AREAS]]
+    proposal: Dict[str, Any] = {"status": "not_needed", "note": None, "limit_hours": None, "count": 0}
+    if not places or asked:
+        tr = _item_value(items, "transport") or {}
+        hours = _item_value(items, "one_way")
+        strength = next((x.get("strength") for x in items if x.get("key") == "one_way"), None)
+        prefs = _item_value(items, "preferences") or []
+        nights = _item_value(items, "nights")
+        count = max(0, wanted_count(text) - (len(places) if asked else 0)) or 2
+        res = gz.propose(origin or "", float(hours) if isinstance(hours, (int, float)) else None, strength,
+                         tr.get("mode") if isinstance(tr, dict) else None,
+                         bool(tr.get("highway")) if isinstance(tr, dict) else False,
+                         region_prefs, tuple(prefs), nights if isinstance(nights, int) else None, count,
+                         exclude=tuple(places))
+        proposed: List[Dict[str, Any]] = list(res["areas"])  # type: ignore[call-overload]
+        for a in proposed:
+            if len(areas) >= MAX_AREAS:
+                break
+            areas.append({"name": a["name"], "source": "proposed", "reason": a["reason"], "hours": a["hours"],
+                          "km": a["km"], "label": a["label"]})
+        proposal = {"status": res["status"], "note": res["note"], "limit_hours": res["limit_hours"],
+                    "count": len(proposed)}
+    return {"areas": areas, "regions": regions, "proposal": proposal}
 
 
 def _hours_label(hours: float) -> str:
@@ -424,7 +495,11 @@ async def nominatim_geocode(name: str, transport: Optional[httpx.AsyncBaseTransp
     if not isinstance(data, list) or not data:
         result = GeocodeResult(status="not_found", provider="nominatim", retrieved_at=now())
     else:
-        item = best_match(data)
+        item = best_match(data, q)
+        if not item:
+            result = GeocodeResult(status="not_found", provider="nominatim", retrieved_at=now())
+            _cache[q] = (time.monotonic(), result)
+            return result
         try:
             lat, lng = float(item["lat"]), float(item["lon"])
         except (KeyError, TypeError, ValueError):
@@ -449,9 +524,20 @@ _PLACE_KINDS = frozenset({"state", "province", "region", "city", "town", "villag
                           "hot_spring", "resort", "national_park", "protected_area"})
 
 
-def best_match(items: List[Any]) -> Dict[str, Any]:
-    """Nominatim の候補から、行政の区域・市町村・観光地を優先し、重要度の高い1件を選ぶ。"""
+def _name_matches(query: str, item: Dict[str, Any]) -> bool:
+    """[Gate AreaLogic] 照会した語と結果の名前が対応するか。「北陸圏」→「保谷北町緑地保全地域」のような
+    あいまいな一致(語の一部の文字だけが合う)を捨てる"""
+    core = re.sub(r"(?:圏|地方|エリア|方面|周辺|市|町|村|区|県|府|都)$", "", normalize(query).replace(" ", ""))
+    name = normalize(str(item.get("name") or str(item.get("display_name") or "").split(",")[0])).replace(" ", "")
+    return bool(core) and (core in name or (len(name) >= 2 and name in core))
+
+
+def best_match(items: List[Any], query: Optional[str] = None) -> Dict[str, Any]:
+    """Nominatim の候補から、行政の区域・市町村・観光地を優先し、重要度の高い1件を選ぶ。
+    query を渡した時は、名前が照会した語と対応する結果だけ(無ければ空)"""
     rows = [i for i in items if isinstance(i, dict)]
+    if query is not None:
+        rows = [i for i in rows if _name_matches(query, i)]
 
     def score(i: Dict[str, Any]) -> Tuple[int, float]:
         kinds = {str(i.get("addresstype") or ""), str(i.get("type") or ""), str(i.get("class") or "")}

@@ -9,6 +9,7 @@ import {
   arrayOf, bool, decodeResponse, int, nullable, num, object, oneOf, optional, str, type Decoder,
 } from './decode';
 import type { ExtractInput, IntentExtraction, IntentItem, IntentQuestion } from './types/tripIntent';
+import { areaProposal, extractedArea, regionHint } from './tripIntent';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const withKey = (key: string): AxiosRequestConfig => ({ ...SILENT, headers: { 'Idempotency-Key': key } });
@@ -91,7 +92,7 @@ const item: Decoder<IntentItem> = object<IntentItem>({
 
 const extraction: Decoder<AiExtraction> = object<AiExtraction>({
   items: arrayOf(item),
-  areas: arrayOf(object<{ name: string; source: 'user_input' }>({ name: str, source: oneOf('user_input') })),
+  areas: arrayOf(extractedArea), regions: optional(arrayOf(regionHint)), proposal: optional(areaProposal),
   suggested_areas: arrayOf(object<{ name: string; reason: string; source: 'ai_suggested' }>({
     name: str, reason: str, source: oneOf('ai_suggested') })),
   unknowns: arrayOf(str), notes: arrayOf(str), contradictions: optional(arrayOf(str)), nights: nullable(int), extractor: str, ai_connected: bool, model: str, usage,

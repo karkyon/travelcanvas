@@ -28,9 +28,24 @@ export interface IntentItem {
   sensitive: boolean;
 }
 
+/** [Gate AreaLogic] 比べる方面。user_input = 利用者が挙げた行き先、proposed = 条件から内蔵の候補表で選んだ方面 */
+export interface ExtractedArea {
+  name: string;
+  source: 'user_input' | 'proposed';
+  reason?: string;
+  hours?: number;
+  km?: number;
+  label?: string;
+}
+/** [Gate AreaLogic] 地域の語(関西・東海・北陸…)。行き先ではなく範囲の条件 */
+export interface RegionHint { word: string; prefectures: string[] }
+export interface AreaProposal { status: string; note: string | null; limit_hours: number | null; count: number }
+
 export interface IntentExtraction {
   items: IntentItem[];
-  areas: Array<{ name: string; source: 'user_input' }>;
+  areas: ExtractedArea[];
+  regions?: RegionHint[];
+  proposal?: AreaProposal;
   nights: number | null;
   extractor: string;
   ai_connected: boolean;

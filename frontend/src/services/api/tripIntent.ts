@@ -8,8 +8,8 @@ import {
   arrayOf, bool, decodeResponse, int, nullable, num, object, oneOf, optional, record, str, type Decoder,
 } from './decode';
 import type {
-  AreaComparison, AreasResult, DraftInput, ExtractInput, Geocode, IntentExtraction, IntentItem, IntentQuestion,
-  StatusNote, TripDraft,
+  AreaComparison, AreaProposal, AreasResult, DraftInput, ExtractedArea, ExtractInput, Geocode, IntentExtraction,
+  IntentItem, IntentQuestion, RegionHint, StatusNote, TripDraft,
 } from './types/tripIntent';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
@@ -27,9 +27,19 @@ const item: Decoder<IntentItem> = object<IntentItem>({
   needs_answer: bool, note: nullable(str), sensitive: bool,
 });
 
+/** [Gate AreaLogic] 比べる方面・地域の範囲・条件からの選び方(AI の読み取りと共通) */
+export const extractedArea: Decoder<ExtractedArea> = object<ExtractedArea>({
+  name: str, source: oneOf('user_input', 'proposed'), reason: optional(str), hours: optional(num), km: optional(num),
+  label: optional(str),
+});
+export const regionHint: Decoder<RegionHint> = object<RegionHint>({ word: str, prefectures: arrayOf(str) });
+export const areaProposal: Decoder<AreaProposal> = object<AreaProposal>({
+  status: str, note: nullable(str), limit_hours: nullable(num), count: int,
+});
+
 const extraction: Decoder<IntentExtraction> = object<IntentExtraction>({
   items: arrayOf(item),
-  areas: arrayOf(object<{ name: string; source: 'user_input' }>({ name: str, source: oneOf('user_input') })),
+  areas: arrayOf(extractedArea), regions: optional(arrayOf(regionHint)), proposal: optional(areaProposal),
   nights: nullable(int), extractor: str, ai_connected: bool,
 });
 
