@@ -11,6 +11,7 @@
   POST /trip-intents/ai/extract        : 文章を AI(OpenAI Responses・構造化の出力)で読み取る。「AI · 未確認」として返す
   POST /trip-intents/ai/places-search  : Google で場所を探す(方面の位置の近く)。保存しない
   POST /trip-intents/ai/route          : Google で出発地から方面への経路を調べる。保存しない
+  GET  /trip-intents/area-images       : [Gate AreaImages] 方面の代表画像(Wikipedia・無料)。保存しない
 - GET  /plans/{plan_id}/trip-intent               : 下書き(方面・条件・日と時間帯の並び・照会の状態)
 - PUT  /plans/{plan_id}/trip-intent/slots         : 下書きの並びを変える(If-Match: 旅行の revision。前の並びへ戻すのも同じ口)
 - POST /plans/{plan_id}/trip-intent/commit        : 日付を決めて、下書きの並びを旅程(日・予定)にする(1回の変更として元に戻せる)
@@ -28,7 +29,7 @@ from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -120,6 +121,23 @@ class AreasIn(BaseModel):
     one_way_strength: Optional[Literal["preferred", "required", "undecided"]] = None
     # [Gate AreaAI] 方面の名前 → 都道府県(AI の案。同じ名前の別の場所を避ける手がかり)
     area_prefs: Dict[str, str] = Field(default_factory=dict, max_length=ti.MAX_AREAS)
+
+
+@router.get("/area-images")
+async def area_images(names: List[str] = Query(..., min_length=1, max_length=10),
+                      current_user: User = Depends(get_current_user_or_guest), db: Session = Depends(get_db)):
+    """[Gate AreaImages] 比べる方面の代表画像(Wikipedia の記事の代表画像・無料)。出典の記事の URL つき。保存しない"""
+    from app.services import area_images as ai_img
+
+    clean = list(dict.fromkeys(n.strip() for n in names if n and n.strip()))
+    if not clean or any(len(n) > 40 for n in clean):
+        raise _bad("invalid_field", "方面の名前を1〜40文字で指定してください")
+    images, sent = await ai_img.lookup(clean)
+    if sent:
+        free_usage.record(db, current_user, "wikipedia", "area.images",
+                          result_code="ok" if any(images.values()) else "empty")
+        db.commit()
+    return {"images": images, "attribution": "Wikipedia(記事の代表画像・自由なライセンスの画像)"}
 
 
 @router.post("/areas")

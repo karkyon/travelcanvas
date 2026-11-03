@@ -87,7 +87,8 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
         <section aria-labelledby={`${id}-find`} className="rounded-2xl border border-cloud-200 bg-surface">
           <h3 id={`${id}-find`} className="sr-only">場所を探す</h3>
           <PlaceSearchPanel key={state.selectedArea ?? ''} areaName={state.selectedArea ?? ''} base={base}
-            picked={state.picked} pickedGoogle={pickedGoogle} onPick={onPick} onPickGoogle={onPickGoogle} google={google} />
+            picked={state.picked} pickedGoogle={pickedGoogle} onPick={onPick} onPickGoogle={onPickGoogle} google={google}
+            preferences={state.review?.values.preferences ?? []} />
           <form onSubmit={addUrl} aria-label="参考の記事・SNS を足す" className="m-4 rounded-xl border border-dashed border-cloud-200 p-3">
             <label htmlFor={`${id}-url`} className="text-sm font-semibold text-ink-900">見つけた記事・SNS の投稿を参考に足す</label>
             <p className="text-xs text-ink-700">URL の中身は取りに行きません。旅程案の候補箱に出典として入り、場所は確かめてから使います。</p>

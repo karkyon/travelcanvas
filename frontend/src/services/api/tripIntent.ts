@@ -8,7 +8,7 @@ import {
   arrayOf, bool, decodeResponse, int, nullable, num, object, oneOf, optional, record, str, type Decoder,
 } from './decode';
 import type {
-  AreaComparison, AreaProposal, AreasResult, DraftInput, ExtractedArea, ExtractInput, Geocode, IntentExtraction,
+  AreaComparison, AreaImage, AreaProposal, AreasResult, DraftInput, ExtractedArea, ExtractInput, Geocode, IntentExtraction,
   IntentItem, IntentQuestion, RegionHint, StatusNote, TripDraft,
 } from './types/tripIntent';
 
@@ -31,7 +31,9 @@ const item: Decoder<IntentItem> = object<IntentItem>({
 export const extractedArea: Decoder<ExtractedArea> = object<ExtractedArea>({
   name: str, source: oneOf('user_input', 'proposed', 'ai_proposed'), reason: optional(str), hours: optional(num),
   km: optional(num), label: optional(str), pref: optional(nullable(str)), highlights: optional(str),
-  minutes_min: optional(nullable(num)), minutes_max: optional(nullable(num)),
+  minutes_min: optional(nullable(num)), minutes_max: optional(nullable(num)), summary: optional(str),
+  spots: optional(arrayOf(object<{ name: string; kind: string; note: string }>({ name: str, kind: str, note: str }))),
+  caution: optional(str),
 });
 export const regionHint: Decoder<RegionHint> = object<RegionHint>({ word: str, prefectures: arrayOf(str) });
 export const areaProposal: Decoder<AreaProposal> = object<AreaProposal>({
@@ -76,6 +78,22 @@ const areas: Decoder<AreasResult> = object<AreasResult>({
     destination_suggestions: providerName,
   }),
 });
+
+/** [Gate AreaImages] 方面の代表画像(Wikipedia・無料)。取れない方面は null */
+export async function getAreaImages(names: string[]): Promise<Record<string, AreaImage | null>> {
+  const params = new URLSearchParams();
+  for (const n of names.slice(0, 10)) params.append('names', n);
+  const r = await api.get(`/trip-intents/area-images?${params.toString()}`, SILENT);
+  const body = decodeResponse(r.data, object<{ images: Record<string, unknown> }>({ images: record }),
+    'GET /trip-intents/area-images');
+  const out: Record<string, AreaImage | null> = {};
+  for (const [k, v] of Object.entries(body.images)) {
+    const img = v as Partial<AreaImage> | null;
+    out[k] = img && typeof img.url === 'string' && img.url.startsWith('https://upload.wikimedia.org/')
+      && typeof img.page_url === 'string' ? { url: img.url, title: String(img.title ?? k), page_url: img.page_url } : null;
+  }
+  return out;
+}
 
 export async function compareAreas(input: { origin: string; areas: string[]; one_way_hours: number | null;
   one_way_strength: string | null; area_prefs?: Record<string, string> }): Promise<AreasResult> {

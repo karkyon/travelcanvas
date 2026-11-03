@@ -13,6 +13,12 @@ export interface NearbyResult {
   within_radius: boolean | null;
   /** 提供元が半径の内を保証するか(OpenStreetMap の近くの検索だけ true) */
   radius_guaranteed: boolean;
+  /** [Gate PlaceKinds] 場所の種類(神社・寺/城・史跡/博物館/自然/公園/温泉/食事/宿泊…) */
+  kind?: string;
+  /** [Gate PlaceKinds] 代表画像(Wikipedia の記事の自由なライセンスの画像。upload.wikimedia.org)。無ければ null */
+  thumbnail_url?: string | null;
+  /** [Gate PlaceKinds] 短い説明(Wikipedia の記事の説明) */
+  description?: string | null;
 }
 
 export interface NearbySearch {

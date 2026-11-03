@@ -76,6 +76,24 @@ describe('音声で入力', () => {
   });
 });
 
+describe('[Gate InputMode] 音声の声の大きさ', () => {
+  it('録音中は onLevels へ棒を渡し(マイクを測れない時は [] = 飾りの棒)、止めると null', () => {
+    let inst: { onresult: (e: unknown) => void } | null = null;
+    function FakeRec(this: Record<string, unknown>) {
+      this.start = () => undefined; this.stop = () => undefined; this.abort = () => undefined;
+      inst = this as unknown as typeof inst;
+    }
+    const onLevels = vi.fn();
+    render(<VoiceInput onAdd={vi.fn()} support={{ ctor: FakeRec as never, reason: null }} onLevels={onLevels} />);
+    expect(onLevels).toHaveBeenLastCalledWith(null);
+    fireEvent.click(screen.getByTestId('consult-voice-start'));
+    expect(inst).not.toBeNull();
+    expect(onLevels).toHaveBeenLastCalledWith([]);
+    fireEvent.click(screen.getByTestId('consult-voice-stop'));
+    expect(onLevels).toHaveBeenLastCalledWith(null);
+  });
+});
+
 describe('その他の希望', () => {
   it('足す・直す・消す', () => {
     const onChange = vi.fn();

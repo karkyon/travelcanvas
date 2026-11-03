@@ -20,8 +20,58 @@ const ERROR_LABEL: Record<string, string> = {
   network: '音声認識の通信ができませんでした',
 };
 
-export const VoiceInput: React.FC<{ onAdd: (text: string) => void; support?: ReturnType<typeof speechSupport> }> = ({
-  onAdd, support,
+/**
+ * [Gate InputMode] 録音中の声の大きさ(マイクの音を周波数ごとに分けた 16 本の棒・0〜1)。
+ * 音はこの端末の中だけで測り、保存も送信もしない。マイクの音を取れない時は null を返さず [] を渡す(画面は動く棒の飾り)
+ */
+function useVoiceLevels(active: boolean, onLevels?: (levels: number[] | null) => void) {
+  useEffect(() => {
+    if (!onLevels) return undefined;
+    if (!active) { onLevels(null); return undefined; }
+    let stopped = false;
+    let raf = 0;
+    let stream: MediaStream | null = null;
+    let ctx: AudioContext | null = null;
+    onLevels([]);
+    const md = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined;
+    const AC = typeof window !== 'undefined'
+      ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) : undefined;
+    if (md?.getUserMedia && AC) {
+      md.getUserMedia({ audio: true }).then((s) => {
+        if (stopped) { s.getTracks().forEach((t) => t.stop()); return; }
+        stream = s;
+        ctx = new AC();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        ctx.createMediaStreamSource(s).connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        let last = 0;
+        const tick = (t: number) => {
+          if (stopped) return;
+          if (t - last > 66) {
+            last = t;
+            analyser.getByteFrequencyData(data);
+            onLevels(Array.from({ length: 16 }, (_, i) => Math.min(1, (data[i + 1] ?? 0) / 200)));
+          }
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      }).catch(() => { /* 測れない時は飾りの棒のまま(音声認識は続く) */ });
+    }
+    return () => {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      stream?.getTracks().forEach((t) => t.stop());
+      void ctx?.close().catch(() => undefined);
+      onLevels(null);
+    };
+  }, [active, onLevels]);
+}
+
+export const VoiceInput: React.FC<{ onAdd: (text: string) => void; support?: ReturnType<typeof speechSupport>;
+  /** [Gate InputMode] 録音中の声の大きさ(録音していない時は null)。入力の欄の背景の棒に使う */
+  onLevels?: (levels: number[] | null) => void }> = ({
+  onAdd, support, onLevels,
 }) => {
   const id = useId();
   const sup = support ?? speechSupport();
@@ -32,6 +82,7 @@ export const VoiceInput: React.FC<{ onAdd: (text: string) => void; support?: Ret
   const finalText = useRef('');
 
   useEffect(() => () => rec.current?.abort(), []);
+  useVoiceLevels(phase === 'recording', onLevels);
 
   const start = () => {
     if (!sup.ctor) return;

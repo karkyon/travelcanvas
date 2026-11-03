@@ -70,6 +70,31 @@ describe('候補を探す(入口は1つ)', () => {
     expect(row).not.toHaveTextContent('出典: OpenStreetMap');
   });
 
+  it('[PlaceKinds] 種類のバッジ・写真・希望に合う順・種類と希望で絞り込む。探し方を説明する', async () => {
+    const w = (id: string, name: string, kind: string, dist: number, thumb: string | null = null): NearbyResult => ({
+      ...spot(id, name), provider: 'wikipedia', radius_guaranteed: false, kind, distance_m: dist, thumbnail_url: thumb,
+      description: kind === 'museum' ? '三重県鳥羽市にある水族館' : null });
+    api.searchNearby.mockResolvedValue(ok([w('h1', '鳥羽国際ホテル', 'lodging', 100), w('t1', '賀多神社', 'shrine_temple', 400),
+      w('m1', '鳥羽水族館', 'museum', 200, 'https://upload.wikimedia.org/aq.jpg'), w('l1', '遊園地', 'leisure', 50)]));
+    setup({ preferences: ['culture', 'quiet'] });
+    fireEvent.click(screen.getByTestId('consult-search'));
+    const items = await screen.findAllByRole('listitem');
+    const order = items.map((li) => li.getAttribute('data-kind')).filter(Boolean);
+    expect(order).toEqual(['museum', 'shrine_temple', 'lodging', 'leisure']); // 希望に合う種類 → 近い順、静かな希望ではテーマパークは後
+    expect(screen.getByTestId('consult-kind-badge-m1')).toHaveTextContent('博物館・美術館・水族館');
+    expect(screen.getByTestId('consult-match-t1')).toHaveTextContent('希望に合う: 歴史・文化・静か');
+    expect(screen.getByTestId('consult-result-m1').querySelector('img')).toHaveAttribute('src', 'https://upload.wikimedia.org/aq.jpg');
+    expect(screen.getByTestId('consult-result-m1')).toHaveTextContent('三重県鳥羽市にある水族館');
+    expect(screen.getByTestId('consult-results-logic')).toHaveTextContent('市町村そのもの・役所・学校');
+    fireEvent.click(screen.getByTestId('consult-kind-lodging'));
+    expect(screen.queryByTestId('consult-result-t1')).toBeNull();
+    expect(screen.getByTestId('consult-result-h1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('consult-kind-lodging'));
+    fireEvent.click(screen.getByTestId('consult-only-match'));
+    expect(screen.queryByTestId('consult-result-h1')).toBeNull();
+    expect(screen.getByTestId('consult-result-t1')).toBeInTheDocument();
+  });
+
   it('[S3] 429 の後は待つ時間を示す。保存した結果・前の結果(古い)は取得の古さと一緒に示す', async () => {
     api.searchNearby
       .mockResolvedValueOnce({ ...failed('rate_limited'), provider_retry_after: { overpass: 120 } })

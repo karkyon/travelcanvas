@@ -43,7 +43,14 @@ export interface ExtractedArea {
   highlights?: string;
   minutes_min?: number | null;
   minutes_max?: number | null;
+  /** [Gate AreaAI2] AI の選んだ理由の詳しい説明: 特色・代表的な場所(種類・特色)・注意 */
+  summary?: string;
+  spots?: Array<{ name: string; kind: string; note: string }>;
+  caution?: string;
 }
+
+/** [Gate AreaImages] 方面の代表画像(Wikipedia の記事の代表画像) */
+export interface AreaImage { url: string; title: string; page_url: string }
 /** [Gate AreaLogic] 地域の語(関西・東海・北陸…)。行き先ではなく範囲の条件 */
 export interface RegionHint { word: string; prefectures: string[] }
 export interface AreaProposal { status: string; note: string | null; limit_hours: number | null; count: number }

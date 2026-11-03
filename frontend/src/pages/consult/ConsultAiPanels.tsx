@@ -14,8 +14,10 @@ import {
   consultRoute, newIdempotencyKey, type ConsultAiStatus,
   type ConsultRouteMode, type ConsultRouteResult, type ConsultUsage,
 } from '@/services/api/consultAi';
-import { minutesRange, retrievedLabel } from './consultModel';
-import type { ExtractedArea, RegionHint } from '@/services/api/types/tripIntent';
+import { retrievedLabel } from './consultModel';
+import { AreaCover, AreaInsight } from './AreaInsight';
+import { coverFor } from '@/styles/tokens';
+import type { AreaImage, ExtractedArea, RegionHint } from '@/services/api/types/tripIntent';
 import { operationBlocker, usageLabel } from './consultAiModel';
 
 export const StubBanner: React.FC<{ status: ConsultAiStatus | null }> = ({ status }) => (status?.stub ? (
@@ -78,8 +80,10 @@ export const SuggestedAreasPanel: React.FC<{
   contradictions?: string[];
   /** [Gate AreaLogic] 条件(出発地・片道の時間・地域・過ごし方)から内蔵の候補表で選んだ方面 */
   proposed?: ExtractedArea[]; regions?: RegionHint[]; proposalNote?: string | null;
+  images?: Record<string, AreaImage | null>;
   onToggle: (name: string, on: boolean) => void;
-}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [], proposed = [], regions = [], proposalNote = null }) => {
+}> = ({ suggestions, unknowns, areaNames, onToggle, contradictions = [], proposed = [], regions = [], proposalNote = null,
+  images = {} }) => {
   const id = useId();
   if (suggestions.length === 0 && unknowns.length === 0 && contradictions.length === 0 && proposed.length === 0
     && regions.length === 0 && !proposalNote) return null;
@@ -107,14 +111,11 @@ export const SuggestedAreasPanel: React.FC<{
             {proposed.map((p) => {
               const on = areaNames.includes(p.name);
               return (
-                <li key={p.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cloud-200 p-2">
+                <li key={p.name} className="grid grid-cols-[6rem_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-cloud-200 p-2">
+                  <AreaCover name={p.name} image={images[p.name]} fallback={coverFor({ destination: p.name })} className="h-20" />
                   <span className="min-w-0">
-                    <b>{p.label ?? (p.pref ? `${p.name}(${p.pref})` : p.name)}</b>
-                    {p.source === 'ai_proposed' && minutesRange(p.minutes_min, p.minutes_max) && (
-                      <span className="ml-2 text-xs font-semibold text-ink-900">{`片道 ${minutesRange(p.minutes_min, p.minutes_max)}(AI の目安)`}</span>
-                    )}
-                    {p.highlights && <span className="block text-xs text-ink-900">{`見どころ: ${p.highlights}`}</span>}
-                    <span className="block text-xs text-ink-700">{p.reason}</span>
+                    <b className="text-sm">{p.label ?? (p.pref ? `${p.name}(${p.pref})` : p.name)}</b>
+                    {p.source === 'ai_proposed' ? <AreaInsight area={p} /> : <span className="block text-xs text-ink-700">{p.reason}</span>}
                   </span>
                   <button type="button" aria-pressed={on} onClick={() => onToggle(p.name, !on)}
                     className="tc-focus-ring min-h-11 rounded-lg border border-cloud-200 px-3 text-xs" data-testid={`consult-proposed-${p.name}`}>

@@ -25,12 +25,15 @@ logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 3000
 MAX_OUTPUT_TOKENS = 2000
+SPOT_KINDS = ("shrine_temple", "castle_history", "museum", "nature", "park", "onsen", "leisure", "town", "food", "shop")
 MAX_SUGGESTIONS = 6
 EXTRACTOR = "openai_responses"
 
 INSTRUCTIONS = (
     "あなたは日本語の旅行相談の受付です。利用者の文章(と画面で入力した項目)から、旅行の条件を JSON Schema の形で取り出してください。"
-    "書かれていないことは null・空の配列にし、推測で埋めないでください。"
+    "旅行の条件の項目(origin〜other_wishes)は、書かれていないことは null・空の配列にし、推測で埋めないでください。"
+    "ただし areas_suggested は条件の読み取りではなく、旅行の相談員としてのあなたの提案です。日本の地理と観光の知識から、"
+    "下の形で具体的に埋めてください(所要時間の目安・見どころも必ず入れる)。"
     "evidence には、根拠になった利用者の文章の一部を、そのままの文字で 30 文字以内で書いてください(無ければ null)。"
     "areas_mentioned は利用者が書いた具体的な行き先(市町村・観光地)の名前だけです。地方・地域の名前(関西・東海・北陸圏など)、"
     "出発地、移動の手段(高速・車など)は入れないでください。"
@@ -39,7 +42,11 @@ INSTRUCTIONS = (
     "「A・B」は不可。例: 伊勢、淡路島、あわら温泉、南紀白浜)。prefecture は都道府県名。"
     "drive_minutes_min・drive_minutes_max は、出発地からその行き先までの片道の所要時間の目安(分。指定の移動の手段・高速の有無で、"
     "休憩と渋滞は含めない)で、片道の時間の上限を超える行き先は出さないでください。"
-    "highlights は見どころ(60 文字以内)、reason は条件に合う理由(60 文字以内)。地域が指定されていれば、なるべく各地域から選んでください。"
+    "summary はその行き先の特色の一言(50 文字以内)。spots は代表的な観光の場所を 3 つ(name は実在の固有の名前、kind は"
+    " shrine_temple・castle_history・museum・nature・park・onsen・leisure・town・food・shop のどれか、note は特色 25 文字以内)。"
+    "reason は利用者の希望(静かさ・落ち着き・食・温泉・景色・歴史など)に合う理由(50 文字以内)。caution は注意(渋滞しやすい時期・"
+    "一般道の時間・混む時間帯など。30 文字以内。無ければ空)。highlights は見どころを短く(40 文字以内)。"
+    "地域が指定されていれば、なるべく各地域から選んでください。"
     "営業時間・料金・空室・混雑の数値は書かないでください(確かめていないため)。"
     "人の名前・連絡先・住所の番地などの個人の情報は出力しないでください。"
     "unknowns には、旅行を考えるのにまだ決まっていない大事なこと(例: 日付、予算)を短く書いてください。"
@@ -84,7 +91,10 @@ SCHEMA: Dict[str, Any] = _obj({
     "preferences": {"type": "array", "items": {"type": "string", "enum": PREF_KEYS}},
     "areas_mentioned": {"type": "array", "items": {"type": "string"}},
     "areas_suggested": {"type": "array", "items": _obj({
-        "name": {"type": "string"}, "prefecture": {"type": "string"}, "reason": {"type": "string"},
+        "name": {"type": "string"}, "prefecture": {"type": "string"}, "summary": {"type": "string"},
+        "spots": {"type": "array", "items": _obj({
+            "name": {"type": "string"}, "kind": {"type": "string"}, "note": {"type": "string"}})},
+        "reason": {"type": "string"}, "caution": {"type": "string"},
         "highlights": {"type": "string"}, "drive_minutes_min": _nullable("integer"),
         "drive_minutes_max": _nullable("integer")})},
     "unknowns": {"type": "array", "items": {"type": "string"}},
@@ -287,8 +297,9 @@ def merge(text: str, user_fields: Dict[str, Any], data: Dict[str, Any]) -> Dict[
         chosen = [c for c in checked if c.get("minutes_max") is not None][:want]
         for c in chosen:
             areas.append({"name": c["name"], "source": "ai_proposed", "reason": c["reason"], "pref": c.get("pref"),
-                          "highlights": c.get("highlights", ""), "minutes_min": c["minutes_min"],
-                          "minutes_max": c["minutes_max"]})
+                          "highlights": c.get("highlights", ""), "summary": c.get("summary", ""),
+                          "spots": c.get("spots", []), "caution": c.get("caution", ""),
+                          "minutes_min": c["minutes_min"], "minutes_max": c["minutes_max"]})
         if len(chosen) < want:  # AI の案が足りない・確かめられない時は、内蔵の候補表から補う(同じ方面は重ねない)
             used = {a["name"] for a in areas}
             for a in plan["areas"]:
@@ -367,8 +378,14 @@ def _checked_suggestions(raw: List[Any], taken: List[str], plan: Dict[str, Any],
                 lo = hi = None  # 目安が距離と合わない(速すぎる)。目安は使わない
         if limit_min is not None and lo is not None and lo > limit_min * 1.15:
             continue
+        spots = []
+        for sp in (s.get("spots") or [])[:4]:
+            if isinstance(sp, dict) and _str(sp.get("name"), 30):
+                kind = sp.get("kind") if sp.get("kind") in SPOT_KINDS else "other"
+                spots.append({"name": _str(sp.get("name"), 30), "kind": kind, "note": _str(sp.get("note"), 40) or ""})
         out.append({"name": name, "pref": pref, "reason": _str(s.get("reason"), 80) or "",
-                    "highlights": _str(s.get("highlights"), 80) or "", "minutes_min": lo, "minutes_max": hi})
+                    "highlights": _str(s.get("highlights"), 80) or "", "summary": _str(s.get("summary"), 80) or "",
+                    "spots": spots, "caution": _str(s.get("caution"), 60) or "", "minutes_min": lo, "minutes_max": hi})
         if len(out) >= MAX_SUGGESTIONS:
             break
     return out

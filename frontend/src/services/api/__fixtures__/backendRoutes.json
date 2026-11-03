@@ -478,6 +478,7 @@
   "POST /api/v1/trip-intents/ai/route",
   "POST /api/v1/trip-intents/ai/session",
   "POST /api/v1/trip-intents/ai/turn",
+  "GET /api/v1/trip-intents/area-images",
   "POST /api/v1/trip-intents/areas",
   "POST /api/v1/trip-intents/draft",
   "POST /api/v1/trip-intents/extract",

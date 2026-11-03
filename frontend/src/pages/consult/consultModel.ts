@@ -7,7 +7,7 @@
  * - 入力の途中の状態はこのタブの間だけ覚える(sessionStorage。写真・記事を足しに行って戻っても消えない)
  */
 import type {
-  AreasResult, BudgetKind, BudgetPeriod, BudgetTarget, DraftInput, DraftPart, DraftSlot, ExtractInput, IntentExtraction,
+  AreaImage, AreasResult, BudgetKind, BudgetPeriod, BudgetTarget, DraftInput, DraftPart, DraftSlot, ExtractInput, IntentExtraction,
   IntentItem, IntentPayload, IntentSource, IntentStrength,
 } from '@/services/api/types/tripIntent';
 import type { NearbyResult } from '@/services/api/types/g11discover';
@@ -139,6 +139,8 @@ export interface ConsultState {
   consultSessionId?: string | null;
   /** [Gate ConsultAI] AI が挙げた方面の案(未確認。利用者が足すまで比べない) */
   suggestedAreas?: Array<{ name: string; reason: string }>;
+  /** [Gate AreaImages] 方面の代表画像(取れない方面は null。取っていない方面は無い) */
+  areaImages?: Record<string, AreaImage | null>;
   /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
   unknowns?: string[];
   /** [Gate AdminUAT U05] AI が見つけた、希望どうしの食い違い(勝手に決めず、利用者に確かめる) */
