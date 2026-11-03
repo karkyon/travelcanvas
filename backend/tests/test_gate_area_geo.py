@@ -96,15 +96,26 @@ def test_sightseeing_uses_wikipedia_geosearch_when_overpass_times_out(monkeypatc
     def handler(request):
         if request.url.host == "overpass-api.de":
             raise httpx.ReadTimeout("slow", request=request)
-        assert request.url.params["list"] == "geosearch" and request.url.params["gsradius"] == "10000"
-        return httpx.Response(200, json={"query": {"geosearch": [
-            {"pageid": 1, "title": "伊勢神宮", "lat": 34.455, "lon": 136.725, "dist": 3000},
-            {"pageid": 2, "title": "伊勢市駅", "lat": 34.49, "lon": 136.71, "dist": 300},
-            {"pageid": 3, "title": "おかげ横丁", "lat": 34.46, "lon": 136.72, "dist": 2800}]}})
+        assert request.url.params["generator"] == "geosearch" and request.url.params["ggsradius"] == "10000"
+        return httpx.Response(200, json={"batchcomplete": True, "query": {"pages": [
+            {"pageid": 1, "title": "伊勢神宮", "index": 2, "coordinates": [{"lat": 34.455, "lon": 136.725}],
+             "description": "三重県伊勢市にある神社", "thumbnail": {"source": "https://upload.wikimedia.org/a.jpg"}},
+            {"pageid": 2, "title": "伊勢市駅", "index": 1, "coordinates": [{"lat": 34.49, "lon": 136.71}]},
+            {"pageid": 4, "title": "伊勢市", "index": 0, "coordinates": [{"lat": 34.48, "lon": 136.70}],
+             "description": "日本の三重県の市"},
+            {"pageid": 5, "title": "伊勢商工会議所", "index": 4, "coordinates": [{"lat": 34.48, "lon": 136.70}]},
+            {"pageid": 3, "title": "おかげ横丁", "index": 3, "coordinates": [{"lat": 34.46, "lon": 136.72}],
+             "thumbnail": {"source": "https://evil.example/x.jpg"}}]}})
     _client_for(monkeypatch, handler)
     out = asyncio.run(sp.search_all_providers("", 34.4875, 136.7091, 20.0, category="sightseeing"))
-    assert [r["name"] for r in out] == ["伊勢神宮", "おかげ横丁"]  # 駅は観光でないので外す
+    # 駅・市の記事・商工会議所は観光の候補でないので外す。種類と代表画像(upload.wikimedia.org だけ)を付ける
+    assert [r["name"] for r in out] == ["伊勢神宮", "おかげ横丁"]
     assert out[0]["source_url"] == "https://ja.wikipedia.org/?curid=1" and out[0]["provider"] == "wikipedia"
+    assert out[0]["raw_payload"]["_tc"] == {"kind": "shrine_temple",
+                                            "thumbnail_url": "https://upload.wikimedia.org/a.jpg",
+                                            "description": "三重県伊勢市にある神社"}
+    assert out[1]["raw_payload"]["_tc"]["kind"] == "town" and out[1]["raw_payload"]["_tc"]["thumbnail_url"] is None
+    assert out[0]["latitude"] == 34.455
     assert out.errors == {"overpass": "timeout"} and out.unavailable == ["overpass"]
     assert set(out.called) == {"overpass", "wikipedia"}
 
@@ -269,3 +280,64 @@ def test_region_words_origin_cleaning_and_counts():
     # 出発地が分からない時は選ばず、理由を示す
     out = ti.extract("のんびりしたい。候補を出してほしい", {})
     assert out["areas"] == [] and out["proposal"]["status"] == "no_origin"
+
+
+# ================================================================= [Gate PlaceKinds] 場所の種類・方面の代表画像
+
+def test_place_kinds_classify_wikipedia_and_osm():
+    from app.services import place_kinds as pk
+    cases = {"鳥羽城": "castle_history", "鳥羽水族館": "museum", "賀多神社": "shrine_temple",
+             "常安寺 (鳥羽市)": "shrine_temple",
+             "日和山 (鳥羽市)": "nature", "鳥羽中央公園": "park", "鳥羽国際ホテル": "lodging", "鳥羽マルシェ": "shop",
+             "鳥羽1番街": "town", "江戸川乱歩館": "museum"}
+    for title, kind in cases.items():
+        assert pk.classify_wikipedia(title, None) == kind, title
+    for title in ("鳥羽市", "鳥羽町", "加茂村 (三重県)", "鳥羽商工会議所", "鳥羽市立図書館", "鳥羽市水産研究所", "四郷信号場",
+                  "鳥羽マリンターミナル"):
+        assert pk.classify_wikipedia(title, None) is None, title
+    assert pk.classify_wikipedia("ミキモト真珠島", "三重県鳥羽市にある観光施設") == "nature"
+    assert pk.classify_osm({"tourism": "museum"}) == "museum"
+    assert pk.classify_osm({"amenity": "place_of_worship"}) == "shrine_temple"
+    assert pk.classify_osm({"amenity": "cafe"}) == "cafe"
+    assert pk.classify_osm({"historic": "castle"}) == "castle_history"
+    assert pk.classify_osm({}, "伊勢うどん 山口屋") == "food" and pk.classify_osm(None, "") == "other"
+
+
+def test_area_images_use_wikipedia_page_images_with_redirects_and_cache():
+    from app.services import area_images as ai_img
+    ai_img._cache.clear()
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.params["titles"])
+        assert request.url.params["prop"] == "pageimages" and request.url.params["redirects"] == "1"
+        return httpx.Response(200, json={"query": {
+            "redirects": [{"from": "伊勢", "to": "伊勢市"}, {"from": "南紀白浜", "to": "白浜町"}],
+            "pages": [{"pageid": 10, "title": "伊勢市", "thumbnail": {"source": "https://upload.wikimedia.org/ise.jpg"}},
+                      {"pageid": 11, "title": "白浜町", "thumbnail": {"source": "https://upload.wikimedia.org/sh.jpg"}},
+                      {"title": "架空", "missing": True}, {"pageid": 12, "title": "架空市"}]}})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await ai_img.lookup(["伊勢", "南紀白浜", "架空"], client=c)
+    images, sent = asyncio.run(run())
+    assert sent and images["伊勢"] == {
+        "url": "https://upload.wikimedia.org/ise.jpg", "title": "伊勢市", "page_url": "https://ja.wikipedia.org/?curid=10"}
+    assert images["南紀白浜"]["title"] == "白浜町" and images["架空"] is None
+    again, sent2 = asyncio.run(ai_img.lookup(["伊勢"]))
+    assert not sent2 and again["伊勢"]["title"] == "伊勢市" and len(calls) == 1
+
+
+def test_ai_area_details_are_kept_and_cleaned():
+    from app.services import consult_ai as ca
+    data = {**GPT_LIKE, "areas_suggested": [
+        {"name": "伊勢", "prefecture": "三重県", "summary": "参拝と食べ歩き", "reason": "歴史と食",
+         "caution": "連休は渋滞", "highlights": "伊勢神宮", "drive_minutes_min": 120, "drive_minutes_max": 150,
+         "spots": [{"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮・外宮"},
+                   {"name": "おかげ横丁", "kind": "unknown_kind", "note": "食べ歩き"}, {"name": "", "kind": "x", "note": ""}]}]}
+    out = ca.merge(UAT_TEXT, {}, data)
+    ise = next(a for a in out["areas"] if a["name"] == "伊勢")
+    assert ise["summary"] == "参拝と食べ歩き" and ise["caution"] == "連休は渋滞"
+    assert ise["spots"] == [{"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮・外宮"},
+                            {"name": "おかげ横丁", "kind": "other", "note": "食べ歩き"}]
+    assert "必ず入れる" in ca.INSTRUCTIONS and "spots" in ca.SCHEMA["properties"]["areas_suggested"]["items"]["properties"]

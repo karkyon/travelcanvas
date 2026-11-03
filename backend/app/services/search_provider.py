@@ -129,33 +129,52 @@ WIKI_GEO_EXCLUDE = ("駅", "学校", "小学校", "中学校", "高等学校", "
 
 async def search_wikipedia_nearby(latitude: float, longitude: float, radius_km: float,
                                   client: Optional[httpx.AsyncClient] = None) -> List[Dict[str, Any]]:
-    """Wikipedia の位置つきの記事(半径は最大 10km。それより広い範囲は 10km まで)。失敗は例外(呼び手が分類する)。"""
+    """Wikipedia の位置つきの記事(半径は最大 10km。それより広い範囲は 10km まで)。失敗は例外(呼び手が分類する)。
+
+    [Gate PlaceKinds] 1 回の要求(generator=geosearch)で、記事の代表画像(自由なライセンスの画像だけ・pageimages の既定)と
+    短い説明も取り、種類(神社・寺/城・史跡/博物館…)を決める。市町村・役所・学校などの観光の候補でない記事は除く"""
+    from app.services import place_kinds as pk
+
     url = "https://ja.wikipedia.org/w/api.php"
     radius_m = int(min(10.0, max(0.1, radius_km)) * 1000)
-    params = {"action": "query", "list": "geosearch", "gscoord": f"{latitude}|{longitude}", "gsradius": str(radius_m),
-              "gslimit": "50", "format": "json"}
+    params = {"action": "query", "generator": "geosearch", "ggscoord": f"{latitude}|{longitude}",
+              "ggsradius": str(radius_m), "ggslimit": "50", "prop": "coordinates|pageimages|description",
+              "piprop": "thumbnail", "pithumbsize": "320", "pilimit": "50", "colimit": "50", "format": "json",
+              "formatversion": "2"}
     owns_client = client is None
     client = client or httpx.AsyncClient(timeout=REQUEST_TIMEOUT)
     try:
         resp = await client.get(url, params=params, headers=HEADERS)
         resp.raise_for_status()
         data = resp.json()
-        items = ((data or {}).get("query") or {}).get("geosearch") if isinstance(data, dict) else None
+        query = (data or {}).get("query") if isinstance(data, dict) else None
+        if isinstance(data, dict) and query is None and "batchcomplete" in data:
+            return []  # 該当なし(geosearch の generator は 0 件の時 query を返さない)
+        items = (query or {}).get("pages") if isinstance(query, dict) else None
         if not isinstance(items, list):
-            raise SearchProviderError("unreadable", resp.status_code, "no geosearch array")
+            raise SearchProviderError("unreadable", resp.status_code, "no pages array")
         retrieved_at = _now()
         out: List[Dict[str, Any]] = []
-        for it in items:
-            if not isinstance(it, dict) or not it.get("title"):
+        for it in sorted((i for i in items if isinstance(i, dict)), key=lambda i: i.get("index", 0)):
+            title = str(it.get("title") or "")
+            if not title or any(title.endswith(w) or w in title for w in WIKI_GEO_EXCLUDE):
                 continue
-            title = str(it["title"])
-            if any(title.endswith(w) or w in title for w in WIKI_GEO_EXCLUDE):
+            desc = it.get("description") if isinstance(it.get("description"), str) else None
+            kind = pk.classify_wikipedia(title, desc)
+            if kind is None:
                 continue
+            coords = it.get("coordinates") if isinstance(it.get("coordinates"), list) else []
+            lat = coords[0].get("lat") if coords and isinstance(coords[0], dict) else None
+            lon = coords[0].get("lon") if coords and isinstance(coords[0], dict) else None
+            thumb = (it.get("thumbnail") or {}).get("source") if isinstance(it.get("thumbnail"), dict) else None
+            if thumb and not str(thumb).startswith("https://upload.wikimedia.org/"):
+                thumb = None
             pageid = it.get("pageid")
             out.append({
-                "provider": "wikipedia", "external_id": f"geo/{pageid}", "name": title, "category": "wikipedia",
-                "latitude": it.get("lat"), "longitude": it.get("lon"), "address": None,
-                "raw_payload": {"pageid": pageid, "dist": it.get("dist")},
+                "provider": "wikipedia", "external_id": f"geo/{pageid}", "name": title, "category": kind,
+                "latitude": lat, "longitude": lon, "address": None,
+                "raw_payload": {"pageid": pageid, "_tc": {"kind": kind, "thumbnail_url": thumb,
+                                                          "description": (desc or "")[:80] or None}},
                 "source_url": f"https://ja.wikipedia.org/?curid={pageid}", "retrieved_at": retrieved_at,
             })
         return out

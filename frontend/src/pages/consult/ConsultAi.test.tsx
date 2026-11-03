@@ -17,7 +17,7 @@ vi.mock('@/services/api/consultAi', () => ({
 }));
 vi.mock('@/services/api', () => ({ updateConsents: m.updateConsents }));
 vi.mock('@/services/api/tripIntent', () => ({
-  extractIntent: m.extractIntent, compareAreas: vi.fn(), createTripDraft: vi.fn(),
+  extractIntent: m.extractIntent, compareAreas: vi.fn(), createTripDraft: vi.fn(), getAreaImages: vi.fn(() => new Promise(() => {})),
 }));
 vi.mock('@/services/api/g11discover', () => ({ searchNearby: vi.fn() }));
 vi.mock('@/components/planning/PlanningClassSummary', () => ({ default: () => null }));

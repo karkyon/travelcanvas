@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import PlanningClassSummary from '@/components/planning/PlanningClassSummary';
-import { compareAreas, createTripDraft, extractIntent } from '@/services/api/tripIntent';
+import { compareAreas, createTripDraft, extractIntent, getAreaImages } from '@/services/api/tripIntent';
 import { updateConsents } from '@/services/api';
 import {
   aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage, consultTurn,
@@ -35,7 +35,7 @@ import {
   type BriefForm, type ConsultState, type ConsultStep, type ReviewKey, type ReviewState,
 } from './consultModel';
 import UiIcon from '@/components/common/UiIcon';
-import { IcLock } from '@/components/common/uiIcons';
+import { IcLock, IcMic, IcPencil } from '@/components/common/uiIcons';
 
 const field = 'tc-focus-ring w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-ink-900 min-h-11';
 const help = 'mt-1 text-xs text-ink-700';
@@ -75,6 +75,17 @@ const BriefStep: React.FC<{
   const id = useId();
   const optRef = useRef<HTMLDetailsElement>(null);
   const set = <K extends keyof BriefForm>(k: K, v: BriefForm[K]) => onChange({ ...brief, [k]: v });
+  // [Gate InputMode] キーボードで入力中(鉛筆)と音声で入力中(声の大きさの棒)を、入力の欄の背景で分ける
+  const [typing, setTyping] = useState(false);
+  const [voiceLevels, setVoiceLevels] = useState<number[] | null>(null);
+  const typingTimer = useRef<number | null>(null);
+  const onType = () => {
+    setTyping(true);
+    if (typingTimer.current) window.clearTimeout(typingTimer.current);
+    typingTimer.current = window.setTimeout(() => setTyping(false), 1200);
+  };
+  useEffect(() => () => { if (typingTimer.current) window.clearTimeout(typingTimer.current); }, []);
+  const inputMode = voiceLevels !== null ? 'voice' : typing ? 'typing' : 'idle';
   const summary: Array<{ label: string; value: string; state: '入力' | '要確認' | '未入力' }> = [
     { label: '出発地', value: brief.origin || '未入力', state: brief.origin ? '入力' : '未入力' },
     { label: '時期・日数', value: `${brief.travelWindow === 'undecided' ? '日付未定' : brief.windowText || '時期を入力'} · ${
@@ -121,14 +132,30 @@ const BriefStep: React.FC<{
               <button type="button" className="tc-focus-ring text-xs font-medium text-accent underline min-h-11"
                 onClick={() => set('text', EXAMPLE_TEXT)}>例文を入れる</button>
             </div>
-            <textarea id={`${id}-text`} value={brief.text} onChange={(e) => set('text', e.target.value)} rows={6} maxLength={4000}
-              aria-describedby={`${id}-text-help`} className={`${field} leading-relaxed`}
-              placeholder="例: 家族4人で1泊2日。枚方から車で片道3時間くらいまで。人が多すぎない所。伊勢、福井、滋賀などが候補。" />
+            <div className={`tc-input-mode tc-input-mode--${inputMode} mt-1`} data-testid="consult-input-mode" data-mode={inputMode}>
+              <div className={`tc-input-mode__bg ${inputMode === 'voice' ? 'bg-accent-soft' : 'bg-cloud-0'}`} aria-hidden="true">
+                <span className="tc-input-mode__icon"><UiIcon icon={inputMode === 'voice' ? IcMic : IcPencil} size={72} /></span>
+                {voiceLevels !== null && (
+                  <div className={`tc-voice-bars${voiceLevels.length === 0 ? ' tc-voice-bars--idle' : ''}`} data-testid="consult-voice-bars">
+                    {Array.from({ length: 16 }, (_, i) => (
+                      <span key={i} style={voiceLevels.length ? { height: `${Math.round(8 + (voiceLevels[i] ?? 0) * 92)}%` } : undefined} />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <textarea id={`${id}-text`} value={brief.text} onChange={(e) => { set('text', e.target.value); onType(); }} rows={6}
+                maxLength={4000} aria-describedby={`${id}-text-help`} className={`${field} mt-0 leading-relaxed`}
+                placeholder="例: 家族4人で1泊2日。枚方から車で片道3時間くらいまで。人が多すぎない所。伊勢、福井、滋賀などが候補。" />
+            </div>
+            <p className="mt-1 text-xs font-semibold" aria-live="polite" data-testid="consult-input-mode-label">
+              {inputMode === 'voice' && <><UiIcon icon={IcMic} size={14} className="mr-1 align-[-2px]" />音声で入力中(声の大きさを背景の棒で表示)</>}
+              {inputMode === 'typing' && <><UiIcon icon={IcPencil} size={14} className="mr-1 align-[-2px]" />キーボードで入力中</>}
+            </p>
             <p id={`${id}-text-help`} className={help}>
               文字で入力: 箇条書き・思いつきの断片でも大丈夫です。行き先・日程が未定でも始められます。次の画面で、読み取った内容を自分で確かめ・直せます。
             </p>
             <div className="mt-2">
-              <VoiceInput onAdd={(t) => set('text', brief.text ? `${brief.text}\n${t}` : t)} />
+              <VoiceInput onAdd={(t) => set('text', brief.text ? `${brief.text}\n${t}` : t)} onLevels={setVoiceLevels} />
             </div>
           </div>
           <p className="flex items-center gap-2 text-xs font-semibold text-ink-700">候補を探すのに使う基本の情報</p>
@@ -602,6 +629,22 @@ const TripConsultPage: React.FC = () => {
 
   useEffect(() => { saveState(state); }, [state]);
 
+  // [Gate AreaImages] 比べる方面・AI が選んだ方面の代表画像(Wikipedia・無料)。まだ取っていない方面だけを 1 回で取る
+  const imageNames = Array.from(new Set([...state.areaNames,
+    ...(state.extraction?.areas ?? []).map((a) => a.name)])).slice(0, 10);
+  const imageKey = imageNames.filter((n) => !(state.areaImages && n in state.areaImages)).join('\u0001');
+  useEffect(() => {
+    const todo = imageKey ? imageKey.split('\u0001') : [];
+    if (todo.length === 0) return undefined;
+    let alive = true;
+    Promise.resolve().then(() => getAreaImages(todo)).then((images) => {
+      if (alive && images) setState((s) => ({ ...s, areaImages: { ...(s.areaImages ?? {}), ...images } }));
+    }).catch(() => {
+      // 画像が取れなくても相談は続けられる(絵の代わりに色の帯)。次に方面が変わった時にもう一度
+    });
+    return () => { alive = false; };
+  }, [imageKey]);
+
   const refreshAiStatus = useCallback(async () => {
     try {
       const st = await getConsultAiStatus(sessionRef.current);
@@ -857,6 +900,7 @@ const TripConsultPage: React.FC = () => {
       {step === 'review' && state.review && (
         <SuggestedAreasPanel proposed={(state.extraction?.areas ?? []).filter((a) => a.source !== 'user_input')}
           regions={state.extraction?.regions ?? []} proposalNote={state.extraction?.proposal?.note ?? null}
+          images={state.areaImages ?? {}}
           suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
           contradictions={state.contradictions ?? []} areaNames={state.areaNames}
           onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)

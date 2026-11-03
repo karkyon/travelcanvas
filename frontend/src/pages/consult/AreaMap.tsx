@@ -38,6 +38,26 @@ const Fit: React.FC<{ points: [number, number][] }> = ({ points }) => {
   return null;
 };
 
+/** [Gate AreaMapFocus] 一覧で選んだ方面へ地図を寄せる(拡大の度合いは変えない。画面の外にある時だけ動かす) */
+const FocusSelected: React.FC<{ pin: AreaPin | undefined }> = ({ pin }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!pin) return;
+    const at = L.latLng(pin.latitude, pin.longitude);
+    if (!map.getBounds().pad(-0.1).contains(at)) map.panTo(at, { animate: true });
+  }, [map, pin]);
+  return null;
+};
+
+/** 選んだ方面の印(大きく・名前つき・波紋のアニメーション)。動きを減らす設定では波紋を止める(CSS) */
+function selectedIcon(p: AreaPin) {
+  return L.divIcon({
+    className: '', iconSize: [48, 48], iconAnchor: [24, 24],
+    html: `<div class="tc-pin-selected" data-testid="area-pin-selected"><span class="tc-pin-pulse"></span><span class="tc-pin-pulse tc-pin-pulse--late"></span>`
+      + `<div class="tc-pin-core">${p.order}</div></div>`,
+  });
+}
+
 const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: number } | null; pins: AreaPin[];
   onSelect: (name: string) => void }> = ({ origin, pins, onSelect }) => {
   const points = useMemo<[number, number][]>(() => [
@@ -51,6 +71,7 @@ const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: 
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Fit points={points} />
+      <FocusSelected pin={pins.find((p) => p.selected)} />
       {origin && (
         <Marker position={[origin.latitude, origin.longitude]} keyboard={false}
           icon={icon('<div style="width:22px;height:22px;border-radius:9999px;background:#c2410c;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', 22)}>
@@ -59,14 +80,15 @@ const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: 
       )}
       {origin && pins.map((p) => (
         <Polyline key={`l-${p.name}`} positions={[[origin.latitude, origin.longitude], [p.latitude, p.longitude]]}
-          pathOptions={{ color: p.selected ? '#0f6e66' : '#64748b', weight: p.selected ? 3 : 2, dashArray: '6 6', opacity: 0.8 }} />
+          pathOptions={{ color: p.selected ? '#0f6e66' : '#94a3b8', weight: p.selected ? 5 : 2,
+            dashArray: p.selected ? undefined : '6 6', opacity: p.selected ? 0.95 : 0.55 }} />
       ))}
       {pins.map((p) => (
-        <Marker key={p.name} position={[p.latitude, p.longitude]} keyboard={false}
-          eventHandlers={{ click: () => onSelect(p.name) }}
-          icon={icon(`<div style="display:grid;place-items:center;width:30px;height:30px;border-radius:9999px;background:${
-            p.selected ? '#0f6e66' : '#334155'};color:#fff;font-weight:700;font-size:13px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${p.order}</div>`)}>
-          <Tooltip direction="top" offset={[0, -14]}>{`${p.order}. ${p.name}`}</Tooltip>
+        <Marker key={`${p.name}-${p.selected ? 's' : 'n'}`} position={[p.latitude, p.longitude]} keyboard={false}
+          eventHandlers={{ click: () => onSelect(p.name) }} zIndexOffset={p.selected ? 1000 : 0}
+          icon={p.selected ? selectedIcon(p) : icon(`<div style="display:grid;place-items:center;width:28px;height:28px;border-radius:9999px;background:#475569;color:#fff;font-weight:700;font-size:12px;border:2px solid #fff;opacity:.8;box-shadow:0 1px 3px rgba(0,0,0,.35)">${p.order}</div>`, 28)}>
+          <Tooltip direction="top" offset={[0, p.selected ? -26 : -14]} permanent={p.selected}
+            className={p.selected ? 'tc-pin-label' : undefined}>{p.selected ? `選択中: ${p.order}. ${p.name}` : `${p.order}. ${p.name}`}</Tooltip>
         </Marker>
       ))}
     </MapContainer>

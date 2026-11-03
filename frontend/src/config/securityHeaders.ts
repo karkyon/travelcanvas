@@ -86,8 +86,9 @@ export function contentSecurityPolicy(apiUrl: string | undefined): string {
     'script-src': ["'self'", 'https://maps.googleapis.com'],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+    // [Gate AreaImages / PlaceKinds] 方面・場所の代表画像(Wikipedia の記事の画像。配信は upload.wikimedia.org)
     'img-src': ["'self'", 'data:', 'blob:', api, 'https://*.tile.openstreetmap.org',
-      'https://maps.gstatic.com', 'https://maps.googleapis.com'],
+      'https://maps.gstatic.com', 'https://maps.googleapis.com', 'https://upload.wikimedia.org'],
     'media-src': ["'self'", 'blob:', api],
     'connect-src': ["'self'", api, 'https://maps.googleapis.com'],
     'worker-src': ["'self'", 'blob:'],

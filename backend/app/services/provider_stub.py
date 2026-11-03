@@ -18,7 +18,9 @@ from app.services import provider_http as ph
 from app.services import trip_intent as ti
 
 STUB_SUGGESTIONS = [{"name": "城崎温泉", "prefecture": "兵庫県", "reason": "模擬の提供元の案(実の AI ではありません)",
-                     "highlights": "模擬の見どころ", "drive_minutes_min": 140, "drive_minutes_max": 170}]
+                     "highlights": "模擬の見どころ", "summary": "模擬の特色", "caution": "",
+                     "spots": [{"name": "模擬の場所", "kind": "onsen", "note": "模擬"}],
+                     "drive_minutes_min": 140, "drive_minutes_max": 170}]
 
 
 def enabled() -> bool:

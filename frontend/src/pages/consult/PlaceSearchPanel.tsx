@@ -26,6 +26,8 @@ import {
   CONSULT_CATEGORIES, cachedLabel, retrievedLabel, searchErrorMessage, type ConsultCategory, type GooglePick, type SearchSource,
 } from './consultModel';
 import { googleSearchAvailability, keepIdempotencyKey } from './consultAiModel';
+import UiIcon from '@/components/common/UiIcon';
+import { asKind, avoidKind, KIND_META, KIND_ORDER, matchedPrefs, type PlaceKind } from './placeKinds';
 
 const RADII = [2, 5, 10, 20];
 
@@ -35,6 +37,9 @@ type Point = { latitude: number; longitude: number };
 interface Row {
   key: string; source: SearchSource; name: string; detail: string; sourceLabel: string; unverified: string;
   picked: boolean; toggle: () => void;
+  /** [Gate PlaceKinds] 種類・代表画像・説明・希望との一致・距離(並べ替え) */
+  kind: PlaceKind; thumb: string | null; description: string | null; match: string[]; avoid: boolean;
+  distance: number | null; sourceUrl?: string | null;
 }
 
 export interface PlaceSearchProps {
@@ -48,14 +53,20 @@ export interface PlaceSearchProps {
     onUsage: (u: ConsultUsage) => void };
   /** 試験用: 開いた時の自動の検索をしない */
   autoSearch?: boolean;
+  /** [Gate PlaceKinds] 旅行相談の「過ごし方」(合う種類の場所を先に並べ、バッジを出す) */
+  preferences?: string[];
 }
 
 /** [Gate AreaGeo] 結果の出典の名前(観光は OpenStreetMap と Wikipedia の座標付き記事の両方から探す) */
 const providerLabel = (p: string): string => (p === 'wikipedia' ? 'Wikipedia' : 'OpenStreetMap');
 
 const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
-  areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true,
+  areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true, preferences = [],
 }) => {
+  const [kindFilter, setKindFilter] = useState<PlaceKind | 'all'>('all');
+  const [onlyMatch, setOnlyMatch] = useState(false);
+  const [resultsVersion, setResultsVersion] = useState(0);
+  useEffect(() => { setKindFilter('all'); }, [resultsVersion]);
   const id = useId();
   const [category, setCategory] = useState<ConsultCategory>('sightseeing');
   const [radius, setRadius] = useState(10);
@@ -93,6 +104,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     setOsm({ rows: [...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)),
       label: `${catLabel}${query.trim() ? `「${query.trim()}」` : ''} · ${areaName}の周り ${radius}km` });
     setShown('osm');
+    setResultsVersion((v) => v + 1);
     if (r.candidates.length === 0) setEmpty(`OpenStreetMap で探しました: ${areaName}の半径${radius}kmに、このカテゴリの場所は見つかりませんでした(該当なし)。半径・カテゴリ・言葉を変えてください。`);
   };
 
@@ -156,19 +168,30 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base?.latitude, base?.longitude]);
 
-  const rows: Row[] = shown === 'google'
+  const allRows: Row[] = shown === 'google'
     ? (gResults?.rows ?? []).map((g) => ({
       key: `g-${g.place_id}`, source: 'google' as const, name: g.name, detail: g.address ?? '',
       sourceLabel: `出典: Google ${retrievedLabel(g.retrieved_at)}`,
       unverified: '営業時間・料金は未確認 · 下書きには場所の ID と Google マップの URL だけを残します',
       picked: Boolean(pickedGoogle[g.place_id]), toggle: () => onPickGoogle(g, !pickedGoogle[g.place_id]),
+      kind: 'other' as PlaceKind, thumb: null, description: null, match: [], avoid: false, distance: null,
     }))
-    : (osm?.rows ?? []).map((r) => ({
-      key: `o-${r.id}`, source: 'osm' as const, name: r.name, detail: [r.category, distanceLabel(r)].filter(Boolean).join(' · '),
-      sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
-        ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
-      picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
-    }));
+    : (osm?.rows ?? []).map((r) => {
+      const kind = asKind(r.kind);
+      return {
+        key: `o-${r.id}`, source: 'osm' as const, name: r.name, detail: [distanceLabel(r)].filter(Boolean).join(' · '),
+        sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
+          ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
+        picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
+        kind, thumb: r.thumbnail_url ?? null, description: r.description ?? null,
+        match: matchedPrefs(kind, preferences), avoid: avoidKind(kind, preferences), distance: r.distance_m,
+      };
+    })
+      // [Gate PlaceKinds] 希望に合う種類を先に、人混みを避けたい時のテーマパークは後に、同じなら近い順
+      .sort((a, b) => (Number(b.match.length > 0) - Number(a.match.length > 0)) || (Number(a.avoid) - Number(b.avoid))
+        || ((a.distance ?? 1e12) - (b.distance ?? 1e12)));
+  const kindCounts = KIND_ORDER.map((k) => [k, allRows.filter((r) => r.kind === k).length] as const).filter(([, n]) => n > 0);
+  const rows = allRows.filter((r) => (kindFilter === 'all' || r.kind === kindFilter) && (!onlyMatch || r.match.length > 0));
   const resultLabel = shown === 'google' ? gResults?.label : osm?.label;
   const hasResults = shown === 'google' ? gResults !== null : osm !== null;
   const sourceName = source === 'google' ? 'Google(有料・この相談の利用枠)' : 'OpenStreetMap(無料)';
@@ -271,24 +294,84 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
                 OpenStreetMap の処理が途中で止まったため、一部だけの結果です(他にも場所がある可能性があります)。範囲を小さくするか、もう一度探してください。
               </p>
             )}
-            {rows.length > 0 && (
+            {allRows.length > 0 && (
               <>
                 <h4 className="text-sm font-semibold text-ink-900" aria-live="polite">
-                  {`見つかった場所 ${rows.length}件 · ${resultLabel ?? ''}`}
+                  {`見つかった場所 ${rows.length === allRows.length ? rows.length : `${rows.length} / ${allRows.length}`}件 · ${resultLabel ?? ''}`}
                 </h4>
+                {shown === 'osm' && (
+                  <details className="mt-1 text-xs text-ink-700" data-testid="consult-results-logic">
+                    <summary className="tc-focus-ring cursor-pointer font-semibold text-ink-900">この候補の探し方</summary>
+                    <p className="mt-1">
+                      {`${areaName}の中心から半径${radius}kmの場所を、OpenStreetMap(地図の公開データ。観光・食事などの分類)と`}
+                      Wikipedia(位置つきの記事)から探しました。市町村そのもの・役所・学校・研究所・駅などの観光の候補でない記事は外し、
+                      記事の名前と説明・地図の分類から種類(神社・寺/城・史跡/博物館/自然/公園/温泉/食事/宿泊…)を決めています。
+                      {preferences.length > 0 ? ' 並び: あなたの希望(過ごし方)に合う種類を先に、次に近い順。' : ' 並び: 近い順。'}
+                      写真は Wikipedia の記事の代表画像(自由なライセンスの画像)で、無い場所は種類の絵を表示します。営業時間・料金は未照会です。
+                    </p>
+                  </details>
+                )}
+                {kindCounts.length > 1 && (
+                  <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="種類で絞り込む" data-testid="consult-kind-filter">
+                    <button type="button" aria-pressed={kindFilter === 'all'} onClick={() => setKindFilter('all')}
+                      className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs ${kindFilter === 'all' ? 'border-accent bg-accent text-white' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>
+                      {`すべて ${allRows.length}`}
+                    </button>
+                    {kindCounts.map(([k, n]) => (
+                      <button key={k} type="button" aria-pressed={kindFilter === k} onClick={() => setKindFilter(kindFilter === k ? 'all' : k)}
+                        data-testid={`consult-kind-${k}`}
+                        className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs ${kindFilter === k ? 'border-accent ring-2 ring-accent' : 'border-cloud-200'}`}
+                        style={{ background: KIND_META[k].bg, color: KIND_META[k].fg }}>
+                        <UiIcon icon={KIND_META[k].icon} size={14} className="mr-1 align-[-2px]" />{`${KIND_META[k].label} ${n}`}
+                      </button>
+                    ))}
+                    {preferences.length > 0 && (
+                      <label className="ml-1 inline-flex min-h-9 items-center gap-1 text-xs text-ink-900">
+                        <input type="checkbox" checked={onlyMatch} onChange={(e) => setOnlyMatch(e.target.checked)}
+                          data-testid="consult-only-match" />
+                        希望に合う種類だけ
+                      </label>
+                    )}
+                  </div>
+                )}
+                {rows.length === 0 && <p className="py-3 text-sm text-ink-700">この絞り込みに合う場所はありません。絞り込みを外してください。</p>}
                 <ul className="mt-2 grid gap-2 md:grid-cols-2" aria-label="見つかった場所">
-                  {rows.map((r) => (
-                    <li key={r.key} className={`rounded-xl border p-3 text-sm ${r.picked ? 'border-accent bg-accent-soft' : 'border-cloud-200'}`}
-                      data-testid={`consult-result-${r.key.slice(2)}`}>
-                      <p className="font-semibold text-ink-900 break-words">{r.name}</p>
-                      {r.detail && <p className="text-xs text-ink-700 break-words">{r.detail}</p>}
-                      <p className="text-xs text-ink-700">{`${r.sourceLabel} · ${r.unverified}`}</p>
-                      <Button type="button" size="sm" variant={r.picked ? 'primary' : 'outline'} className="mt-2"
-                        aria-pressed={r.picked} onClick={r.toggle} data-testid={`consult-pick-${r.key.slice(2)}`}>
-                        {r.picked ? '✓ 旅程案に入れる' : '旅程案に入れる'}
-                      </Button>
-                    </li>
-                  ))}
+                  {rows.map((r) => {
+                    const meta = KIND_META[r.kind];
+                    return (
+                      <li key={r.key} className={`relative overflow-hidden rounded-xl border text-sm ${r.picked ? 'border-accent ring-2 ring-accent' : 'border-cloud-200'}`}
+                        data-testid={`consult-result-${r.key.slice(2)}`} data-kind={r.kind}
+                        style={{ background: `linear-gradient(90deg, ${meta.bg} 0%, transparent 70%)` }}>
+                        <div className="flex gap-3 p-3">
+                          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg" style={{ background: meta.bg }}
+                            aria-hidden="true">
+                            {r.thumb
+                              ? <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                              : <span className="grid h-full w-full place-items-center" style={{ color: meta.fg }}><UiIcon icon={meta.icon} size={34} /></span>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: meta.bg, color: meta.fg }}
+                                data-testid={`consult-kind-badge-${r.key.slice(2)}`}>
+                                <UiIcon icon={meta.icon} size={12} className="mr-1 align-[-2px]" />{meta.label}</span>
+                              {r.match.length > 0 && (
+                                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success"
+                                  data-testid={`consult-match-${r.key.slice(2)}`}>{`希望に合う: ${r.match.join('・')}`}</span>
+                              )}
+                            </div>
+                            <p className="mt-1 font-semibold text-ink-900 break-words">{r.name}</p>
+                            {r.description && <p className="text-xs text-ink-900 break-words">{r.description}</p>}
+                            {r.detail && <p className="text-xs text-ink-700 break-words">{r.detail}</p>}
+                            <p className="text-[11px] text-ink-700">{`${r.sourceLabel} · ${r.unverified}`}</p>
+                            <Button type="button" size="sm" variant={r.picked ? 'primary' : 'outline'} className="mt-2"
+                              aria-pressed={r.picked} onClick={r.toggle} data-testid={`consult-pick-${r.key.slice(2)}`}>
+                              {r.picked ? '✓ 旅程案に入れる' : '旅程案に入れる'}
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             )}

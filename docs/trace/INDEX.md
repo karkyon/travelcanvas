@@ -15,6 +15,7 @@
 | [gate-admin-uat-trace.md](gate-admin-uat-trace.md) | Gate AdminUAT — 管理画面の鍵の表示の食い違いの解消と、旅行相談の UAT(実 AI・音声)を成立させる準備 | 0 | 0 | 0 |
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
 | [gate-area-ai-trace.md](gate-area-ai-trace.md) | Gate AreaAI — 旅行相談の方面は AI が条件から選ぶ(片道の目安つき・追加の費用なし) | 0 | 0 | 0 |
+| [gate-area-ai2-trace.md](gate-area-ai2-trace.md) | Gate AreaAI2 — 方面の選んだ理由・代表画像・入力の欄・地図の選択・方面の詳細の場所の種類と絞り込み | 0 | 0 | 0 |
 | [gate-area-geo-trace.md](gate-area-geo-trace.md) | Gate AreaGeo — 方面の位置の誤り(③が北海道)・地図の範囲・観光の検索が空(UAT 2026-11-02 15:30 の指摘) | 0 | 0 | 0 |
 | [gate-area-logic-trace.md](gate-area-logic-trace.md) | Gate AreaLogic — 比べる方面の決め方の見直し・HOME 動画のちらつき(UAT 2026-11-02 18:16 の指摘) | 0 | 0 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |

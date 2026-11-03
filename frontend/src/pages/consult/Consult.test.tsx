@@ -9,10 +9,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 const api = vi.hoisted(() => ({
   extractIntent: vi.fn(), compareAreas: vi.fn(), createTripDraft: vi.fn(), getTripDraft: vi.fn(),
   updateDraftSlots: vi.fn(), commitTripDraft: vi.fn(), searchNearby: vi.fn(),
+  getAreaImages: vi.fn().mockResolvedValue({}),
 }));
 vi.mock('@/services/api/tripIntent', () => ({
   extractIntent: api.extractIntent, compareAreas: api.compareAreas, createTripDraft: api.createTripDraft,
   getTripDraft: api.getTripDraft, updateDraftSlots: api.updateDraftSlots, commitTripDraft: api.commitTripDraft,
+  getAreaImages: api.getAreaImages,
 }));
 vi.mock('@/services/api/g11discover', () => ({ searchNearby: api.searchNearby }));
 // [Gate ConsultAI] AI・Google の状態は「鍵の確認がまだ」(この試験は AI を使わない読み取りの経路)
@@ -181,7 +183,11 @@ describe('[Gate AreaLogic] 条件から選んだ方面(UAT 18:16 の相談)', ()
 describe('[Gate AreaAI] AI が条件から選んだ方面(片道の目安つき)', () => {
   it('確認の画面に見どころと片道の目安、比較の画面に目安での判定を出し、都道府県を手がかりに照会する', async () => {
     const ai = (name: string, pref: string, lo: number, hi: number, highlights: string) => (
-      { name, source: 'ai_proposed' as const, pref, reason: '条件に合う', highlights, minutes_min: lo, minutes_max: hi });
+      { name, source: 'ai_proposed' as const, pref, reason: '条件に合う', highlights, minutes_min: lo, minutes_max: hi,
+        ...(name === '伊勢' ? { summary: '参拝と食べ歩きの町', caution: '連休は渋滞しやすい',
+          spots: [{ name: '伊勢神宮', kind: 'shrine_temple', note: '内宮と外宮' }, { name: 'おかげ横丁', kind: 'town', note: '食べ歩き' }] } : {}) });
+    api.getAreaImages.mockResolvedValue({ 伊勢: { url: 'https://upload.wikimedia.org/ise.jpg', title: '伊勢市',
+      page_url: 'https://ja.wikipedia.org/?curid=1' }, 淡路島: null });
     api.extractIntent.mockResolvedValue({ ...EXTRACTION,
       areas: [ai('伊勢', '三重県', 120, 150, '伊勢神宮・おかげ横丁'), ai('淡路島', '兵庫県', 90, 120, '道の駅'),
         ai('福井市', '福井県', 150, 180, '永平寺'), ai('南紀白浜', '和歌山県', 165, 195, '白良浜')],
@@ -194,9 +200,15 @@ describe('[Gate AreaAI] AI が条件から選んだ方面(片道の目安つき)
     fireEvent.click(screen.getByTestId('consult-extract'));
     const panel = await screen.findByTestId('consult-proposed-areas');
     expect(panel).toHaveTextContent('AI が条件から選んだ方面');
-    expect(panel).toHaveTextContent('伊勢(三重県)片道 約2時間〜2時間半(AI の目安)');
-    expect(panel).toHaveTextContent('見どころ: 伊勢神宮・おかげ横丁');
+    expect(panel).toHaveTextContent('伊勢(三重県)片道の目安 約2時間〜2時間半(AI の目安');
+    expect(panel).toHaveTextContent('見どころ 道の駅');
     expect(panel).toHaveTextContent('追加の費用はありません');
+    expect(panel).toHaveTextContent('特色 参拝と食べ歩きの町');
+    expect(panel).toHaveTextContent('伊勢神宮 — 内宮と外宮(神社・寺)');
+    expect(panel).toHaveTextContent('注意 連休は渋滞しやすい');
+    await waitFor(() => expect(screen.getByTestId('area-cover-伊勢').querySelector('img'))
+      .toHaveAttribute('src', 'https://upload.wikimedia.org/ise.jpg'));
+    expect(screen.getByTestId('area-cover-伊勢')).toHaveTextContent('写真: Wikipedia');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: '片道の時間の扱い' })).getByRole('radio', { name: /希望/ }));
     fireEvent.click(within(screen.getByRole('radiogroup', { name: '予算は誰の分か' })).getByRole('radio', { name: /全員の合計/ }));
     fireEvent.click(screen.getByTestId('review-confirm-nights'));
@@ -206,9 +218,22 @@ describe('[Gate AreaAI] AI が条件から選んだ方面(片道の目安つき)
       area_prefs: { 伊勢: '三重県', 淡路島: '兵庫県', 福井市: '福井県', 南紀白浜: '和歌山県' } })));
     expect(await screen.findByTestId('area-drive-伊勢')).toHaveTextContent('片道 約2時間〜2時間半(AI の目安');
     expect(screen.getByTestId('area-limit-伊勢')).toHaveTextContent('✓ 片道3時間以内(AI の目安)');
-    expect(screen.getByTestId('area-source-伊勢')).toHaveTextContent('AI が条件から選んだ方面 · 見どころ: 伊勢神宮・おかげ横丁');
+    expect(screen.getByTestId('area-source-伊勢')).toHaveTextContent('AI が条件から選んだ方面(三重県)');
     fireEvent.click(screen.getByRole('button', { name: /他の候補も見る/ }));
     expect(screen.getByTestId('area-limit-南紀白浜')).toHaveTextContent('△ 片道3時間の前後');
+  });
+});
+
+describe('[Gate InputMode] 入力の欄の背景', () => {
+  it('キーボードで打つと鉛筆の表示(入力中)になり、少し止まると元に戻る', async () => {
+    renderConsult();
+    await act(async () => { await Promise.resolve(); });
+    const box = screen.getByTestId('consult-input-mode');
+    expect(box).toHaveAttribute('data-mode', 'idle');
+    fireEvent.change(screen.getByLabelText('希望・事情'), { target: { value: '家族4人で' } });
+    expect(box).toHaveAttribute('data-mode', 'typing');
+    expect(screen.getByTestId('consult-input-mode-label')).toHaveTextContent('キーボードで入力中');
+    await waitFor(() => expect(box).toHaveAttribute('data-mode', 'idle'), { timeout: 2500 });
   });
 });
 

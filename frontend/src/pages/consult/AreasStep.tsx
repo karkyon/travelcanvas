@@ -14,6 +14,7 @@ import {
   estimateLimit, GEOCODE_LABEL, LIMIT_LABEL, minutesRange, retrievedLabel, straightLabel, type ConsultState,
 } from './consultModel';
 import UiIcon from '@/components/common/UiIcon';
+import { AreaCover, AreaInsight } from './AreaInsight';
 import { IcCar } from '@/components/common/uiIcons';
 
 const AreaMap = lazy(() => import('./AreaMap'));
@@ -153,12 +154,8 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
               const limit = a.limit_check.status;
               return (
                 <li key={a.name} data-testid={`area-row-${a.name}`} data-selected={selected}
-                  className={`grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 p-3 ${selected ? 'bg-accent-soft' : ''}`}>
-                  <div aria-hidden="true" className="relative h-20 overflow-hidden rounded-lg"
-                    style={{ background: `linear-gradient(135deg, ${pal.from}, ${pal.to})` }}>
-                    <span className="absolute left-1 top-1 rounded bg-cloud-0 px-1 text-xs font-bold text-ink-900">{i + 1}</span>
-                    <span className="absolute bottom-1 left-1 right-1 rounded bg-cloud-0 px-1 text-[10px] text-ink-900">イメージ</span>
-                  </div>
+                  className={`grid grid-cols-[6rem_minmax(0,1fr)] gap-3 p-3 ${selected ? 'bg-accent-soft' : ''}`}>
+                  <AreaCover name={a.name} image={state.areaImages?.[a.name]} order={i + 1} fallback={pal} className="h-24" />
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <button type="button" aria-pressed={selected} onClick={() => onSelect(a.name)}
@@ -166,7 +163,9 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                         <span className="block text-base font-bold text-ink-900">{selected ? '● ' : '○ '}{a.name}</span>
                         <span className="block text-[11px] text-ink-700" data-testid={`area-source-${a.name}`}>
                           {proposedOf(a.name)?.source === 'ai_proposed'
-                            ? `AI が条件から選んだ方面${proposedOf(a.name)?.highlights ? ` · 見どころ: ${proposedOf(a.name)?.highlights}` : ''} · 選ぶだけでは旅程にしません`
+                            ? `AI が条件から選んだ方面${proposedOf(a.name)?.pref ? `(${proposedOf(a.name)?.pref})` : ''} · 選ぶだけでは旅程にしません`
+                            : (state.suggestedAreas ?? []).some((x) => x.name === a.name)
+                            ? 'AI の案から足した方面(片道の目安は未確認) · 選ぶだけでは旅程にしません'
                             : proposedOf(a.name)
                             ? `条件から選んだ方面 · ${proposedOf(a.name)?.reason ?? ''} · 選ぶだけでは旅程にしません`
                             : 'あなたが挙げた方面 · 選ぶだけでは旅程にしません'}
@@ -176,6 +175,9 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
                         aria-label={saved ? `${a.name}を比較に残すのをやめる` : `${a.name}を比較に残す`}
                         className="tc-focus-ring min-h-11 min-w-11 rounded-lg text-lg text-ink-700">{saved ? '♥' : '♡'}</button>
                     </div>
+                    {proposedOf(a.name)?.source === 'ai_proposed' && (
+                      <AreaInsight area={proposedOf(a.name)!} compact={!selected} showRange={false} />
+                    )}
                     <dl className="mt-1 grid gap-0.5 text-xs text-ink-700">
                       <div><dt className="inline font-semibold text-ink-900">位置: </dt>
                         <dd className="inline">{a.geocode.status === 'ok'

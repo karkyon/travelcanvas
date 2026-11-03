@@ -58,7 +58,19 @@ def _candidate_to_dict(c: SearchCandidate) -> dict:
             "address": c.address,
         },
         "retrieved_at": c.retrieved_at.isoformat() if c.retrieved_at else None,
+        # [Gate PlaceKinds] 場所の種類・代表画像(Wikipedia の記事の自由なライセンスの画像)・短い説明
+        **_place_extras(c),
     }
+
+
+def _place_extras(c: SearchCandidate) -> dict:
+    from app.services import place_kinds as pk
+
+    raw: dict = c.raw_payload if isinstance(c.raw_payload, dict) else {}
+    tc_raw = raw.get("_tc")
+    tc: dict = tc_raw if isinstance(tc_raw, dict) else {}
+    return {"kind": pk.kind_of(c.provider, c.category, c.name or "", raw),
+            "thumbnail_url": tc.get("thumbnail_url"), "description": tc.get("description")}
 
 
 @router.post("/spots")
