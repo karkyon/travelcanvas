@@ -55,6 +55,7 @@ INSTRUCTIONS = (
     "other_wishes には、上のどの項目にも入らない希望(例: 何もしない時間がほしい、地元の市場)を、文章の言葉に近い形で短く書いてください。"
     "利用者の希望どうしが食い違う時(例: 日帰りと1泊、人数の違う書き方、上限の違う予算)は、片方に決めず、"
     "contradictions に「〜と〜が食い違っています。どちらですか」の形で短く書き、その項目の value は null にしてください。"
+    "出力の文章は全て日本語で書いてください(英語で書かない)。"
 )
 
 
@@ -391,6 +392,110 @@ def _checked_suggestions(raw: List[Any], taken: List[str], plan: Dict[str, Any],
     return out
 
 
+# ===================================================================== [Gate AreaAI3] 方面の提案(2回目の要求)
+#
+# UAT(2026-11-03 20:37)でも、1回目の読み取り(条件の項目+方面の案)では gpt-5-nano が方面の案を返さない・目安を空にすることが
+# 続いた(内蔵の候補表で補われた)。条件の読み取りと提案を1回に詰め込まず、読み取った条件(相談の文章そのものは送らない)だけを
+# 渡して「行き先を N 件提案する」ことだけを頼む。1回目で目安つきの案が揃った時は送らない。1回の最大の原価は約 0.30 円。
+
+PROPOSE_INSTRUCTIONS = (
+    "あなたは日本の国内旅行の相談員です。下の条件に合う具体的な行き先を、指定の件数だけ提案してください。"
+    "行き先(name)は 1 つの市町村か観光地の名前(例: 伊勢、淡路島、南紀白浜、あわら温泉、城崎温泉)。地方の名前・「〜方面」は不可。"
+    "drive_minutes_min・drive_minutes_max は出発地からの片道の所要時間の目安(分。指定の移動の手段で、休憩と渋滞は含めない)で、"
+    "必ず数値で入れてください。片道の上限を超える行き先は出さないでください。地域の指定があれば、なるべく各地域から選んでください。"
+    "summary は特色(50 文字以内)、spots は代表的な観光の場所 3 つ(実在の固有の名前・kind は shrine_temple・castle_history・museum・"
+    "nature・park・onsen・leisure・town・food・shop のどれか・note は特色 25 文字以内)、reason は希望に合う理由(50 文字以内)、"
+    "caution は注意(渋滞しやすい時期など 30 文字以内・無ければ空)、highlights は見どころ(40 文字以内)。"
+    "営業時間・料金・空室・混雑の数値は書かないでください。全て日本語で書いてください。"
+)
+_AREA_ITEM = SCHEMA["properties"]["areas_suggested"]["items"]
+PROPOSE_FORMAT: Dict[str, Any] = {"type": "json_schema", "name": "trip_areas", "strict": True,
+                                  "schema": _obj({"areas": {"type": "array", "items": _AREA_ITEM}})}
+
+
+def conditions_text(result: Dict[str, Any], count: int) -> str:
+    """読み取った条件の要約(提案の要求に渡す。相談の文章・個人的な理由は含めない)"""
+    items = {i["key"]: i for i in result.get("items", [])}
+
+    def disp(key: str) -> Optional[str]:
+        it = items.get(key)
+        if not it or it.get("source") == "unspecified" or it.get("sensitive"):
+            return None
+        return str(it.get("display") or "") or None
+    lines = []
+    for key, label in (("origin", "出発地"), ("transport", "移動の手段"), ("one_way", "片道の時間の上限"),
+                       ("party_size", "人数"), ("nights", "泊数"), ("room", "部屋"), ("preferences", "過ごし方"),
+                       ("dates", "時期")):
+        v = disp(key)
+        if v:
+            lines.append(f"{label}: {v}")
+    regions = [r["word"] for r in result.get("regions", [])]
+    if regions:
+        lines.append("地域: " + "・".join(regions))
+    taken = [a["name"] for a in result.get("areas", []) if a.get("source") == "user_input"]
+    if taken:
+        lines.append("既に挙がっている行き先(重ねない): " + "・".join(taken))
+    notes = [n for n in result.get("notes", []) if n][:5]
+    if notes:
+        lines.append("その他の希望: " + "・".join(notes))
+    lines.append(f"件数: {count}")
+    return "\n".join(lines)
+
+
+def propose_areas(db: Session, session: TripConsultSession, caller: User, prompt: str,
+                  idempotency_key: str) -> Tuple[List[Any], Dict[str, Any]]:
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = pc.send(db, "openai", "ai.generate",
+                       lambda key: pc._openai_request(key, prompt, MAX_OUTPUT_TOKENS, PROPOSE_INSTRUCTIONS,
+                                                      PROPOSE_FORMAT))
+        data = parse_output(resp.body)
+        return cg.ProviderResult(units=pc._openai_usage(resp.body), payload=data, model=pc.openai_model(),
+                                 result_code="ok" if data is not None else "malformed")
+
+    data, usage = cg.run(db, None, caller, "ai.generate", "openai", reserve_units(prompt), idempotency_key, call,
+                         consult_id=session.id,
+                         fingerprint=pc.fingerprint("openai", "consult.propose", str(session.id), prompt))
+    areas = data.get("areas") if isinstance(data, dict) else None
+    return (areas if isinstance(areas, list) else []), usage
+
+
+# ===================================================================== [Gate AreaSpots] 方面の代表的な場所のおすすめ
+
+SPOTS_INSTRUCTIONS = (
+    "あなたは日本の国内旅行の相談員です。指定の行き先(方面)で、旅行者に定番・人気の観光の場所を、利用者の希望に合う順に"
+    "最大 10 件挙げてください。その方面を代表する場所(例: 伊勢なら伊勢神宮・おはらい町・おかげ横丁・夫婦岩)は必ず含めてください。"
+    "name は Wikipedia の記事の名前になっている正式な固有の名前、kind は shrine_temple・castle_history・museum・nature・park・"
+    "onsen・leisure・town・food・shop のどれか、note は特色(25 文字以内)、why は希望に合う理由(30 文字以内)。"
+    "方面の中心から車で 40 分程度までの場所にしてください。営業時間・料金の数値は書かないでください。全て日本語で書いてください。"
+)
+SPOTS_FORMAT: Dict[str, Any] = {"type": "json_schema", "name": "trip_spots", "strict": True, "schema": _obj({
+    "spots": {"type": "array", "items": _obj({"name": {"type": "string"}, "kind": {"type": "string"},
+                                              "note": {"type": "string"}, "why": {"type": "string"}})}})}
+
+
+def recommend_spots(db: Session, session: TripConsultSession, caller: User, prompt: str,
+                    idempotency_key: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = pc.send(db, "openai", "ai.generate",
+                       lambda key: pc._openai_request(key, prompt, MAX_OUTPUT_TOKENS, SPOTS_INSTRUCTIONS, SPOTS_FORMAT))
+        data = parse_output(resp.body)
+        return cg.ProviderResult(units=pc._openai_usage(resp.body), payload=data, model=pc.openai_model(),
+                                 result_code="ok" if data is not None else "malformed")
+
+    data, usage = cg.run(db, None, caller, "ai.generate", "openai", reserve_units(prompt), idempotency_key, call,
+                         consult_id=session.id,
+                         fingerprint=pc.fingerprint("openai", "consult.spots", str(session.id), prompt))
+    if data is None:
+        raise ConsultAIError("ai_output_invalid", 502, "AI の応答を読めませんでした(使った分は枠に数えました)。近くの検索で続けられます")
+    out: List[Dict[str, Any]] = []
+    for sp in (data.get("spots") or [])[:10]:
+        if isinstance(sp, dict) and _str(sp.get("name"), 40):
+            kind = sp.get("kind") if sp.get("kind") in SPOT_KINDS else "other"
+            out.append({"name": _str(sp.get("name"), 40), "kind": kind,
+                        "note": _str(sp.get("note"), 40) or "", "why": _str(sp.get("why"), 50) or ""})
+    return out, usage
+
+
 # ===================================================================== 送る
 
 def extract(db: Session, session: TripConsultSession, caller: User, text: str, user_fields: Dict[str, Any],
@@ -420,5 +525,28 @@ def extract(db: Session, session: TripConsultSession, caller: User, text: str, u
                              "AI の応答を読めませんでした(使った分は枠に数えました)。文章は消えていません。"
                              "AI を使わずに読み取ることもできます")
     result = merge(clean, user_fields, data)
+    raw_n = len(data.get("areas_suggested") or [])
+    norm = ti.normalize(clean)
+    want = ti.wanted_count(norm)
+    asked = bool(ti._ASK_CANDIDATES.search(norm))
+    places = [a for a in result["areas"] if a.get("source") == "user_input"]
+    ai_n = sum(1 for a in result["areas"] if a.get("source") == "ai_proposed")
+    second = False
+    if (not places or asked) and ai_n < want:
+        # [Gate AreaAI3] 1回目で目安つきの案が揃わなかった時だけ、条件だけを渡して提案を頼む(2回目)
+        import hashlib
+        key2 = "propose:" + hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:40]
+        try:
+            proposals, usage = propose_areas(db, session, caller, conditions_text(result, want), key2)
+            second = True
+            if proposals:
+                result = merge(clean, user_fields, {**data, "areas_suggested": proposals})
+        except (cg.CostGuardError, ConsultAIError) as error:
+            logger.info("consult.propose skipped: %s", getattr(error, "code", type(error).__name__))
+        except Exception as error:  # noqa: BLE001 - 提案が失敗しても読み取りの結果は返す(内蔵の候補表のまま)
+            logger.warning("consult.propose failed: %s", type(error).__name__)
+    logger.info("consult.areas raw=%d ai_areas=%d second_call=%s proposal=%s", raw_n,
+                sum(1 for a in result["areas"] if a.get("source") == "ai_proposed"), second,
+                (result.get("proposal") or {}).get("status"))
     result["model"] = pc.openai_model()
     return result, usage

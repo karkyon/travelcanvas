@@ -107,7 +107,12 @@ def _openai(payload: Dict[str, Any]) -> httpx.Response:
     if "E2E_TIMEOUT" in text:
         raise httpx.ReadTimeout("stub timeout")
     fmt = ((payload.get("text") or {}).get("format") or {}) if isinstance(payload.get("text"), dict) else {}
-    if payload.get("text") and fmt.get("name") == "trip_turn":
+    if payload.get("text") and fmt.get("name") == "trip_areas":
+        out = json.dumps({"areas": STUB_SUGGESTIONS}, ensure_ascii=False)
+    elif payload.get("text") and fmt.get("name") == "trip_spots":
+        out = json.dumps({"spots": [{"name": "模擬の神社", "kind": "shrine_temple", "note": "模擬の特色",
+                                     "why": "模擬の理由"}]}, ensure_ascii=False)
+    elif payload.get("text") and fmt.get("name") == "trip_turn":
         out = "{broken" if "E2E_BROKEN" in text else json.dumps(_turn_answer(text), ensure_ascii=False)
     elif payload.get("text"):
         out = "{broken" if "E2E_BROKEN" in text else json.dumps(_ai_answer(text), ensure_ascii=False)

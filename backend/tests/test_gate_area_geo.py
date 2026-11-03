@@ -113,7 +113,7 @@ def test_sightseeing_uses_wikipedia_geosearch_when_overpass_times_out(monkeypatc
     assert out[0]["source_url"] == "https://ja.wikipedia.org/?curid=1" and out[0]["provider"] == "wikipedia"
     assert out[0]["raw_payload"]["_tc"] == {"kind": "shrine_temple",
                                             "thumbnail_url": "https://upload.wikimedia.org/a.jpg",
-                                            "description": "三重県伊勢市にある神社"}
+                                            "description": "三重県伊勢市にある神社", "length": None}
     assert out[1]["raw_payload"]["_tc"]["kind"] == "town" and out[1]["raw_payload"]["_tc"]["thumbnail_url"] is None
     assert out[0]["latitude"] == 34.455
     assert out.errors == {"overpass": "timeout"} and out.unavailable == ["overpass"]
@@ -309,6 +309,9 @@ def test_area_images_use_wikipedia_page_images_with_redirects_and_cache():
     calls = []
 
     def handler(request):
+        if request.url.params.get("generator") == "search":
+            calls.append("search:" + request.url.params["gsrsearch"])
+            return httpx.Response(200, json={"query": {"pages": []}})
         calls.append(request.url.params["titles"])
         assert request.url.params["prop"] == "pageimages" and request.url.params["redirects"] == "1"
         return httpx.Response(200, json={"query": {
@@ -325,7 +328,7 @@ def test_area_images_use_wikipedia_page_images_with_redirects_and_cache():
         "url": "https://upload.wikimedia.org/ise.jpg", "title": "伊勢市", "page_url": "https://ja.wikipedia.org/?curid=10"}
     assert images["南紀白浜"]["title"] == "白浜町" and images["架空"] is None
     again, sent2 = asyncio.run(ai_img.lookup(["伊勢"]))
-    assert not sent2 and again["伊勢"]["title"] == "伊勢市" and len(calls) == 1
+    assert not sent2 and again["伊勢"]["title"] == "伊勢市" and calls[1:] == ["search:架空"] and len(calls) == 2
 
 
 def test_ai_area_details_are_kept_and_cleaned():
@@ -341,3 +344,44 @@ def test_ai_area_details_are_kept_and_cleaned():
     assert ise["spots"] == [{"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮・外宮"},
                             {"name": "おかげ横丁", "kind": "other", "note": "食べ歩き"}]
     assert "必ず入れる" in ca.INSTRUCTIONS and "spots" in ca.SCHEMA["properties"]["areas_suggested"]["items"]["properties"]
+
+
+# ================================================================= [Gate AreaSpots / AreaAI3]
+def test_spot_resolver_uses_titles_then_search_and_drops_far_or_non_tourist():
+    from app.services import spot_resolver as sr
+
+    def handler(request):
+        p = request.url.params
+        if p.get("generator") == "search":
+            assert p["gsrsearch"] == "夫婦岩 三重県"
+            return httpx.Response(200, json={"query": {"pages": [
+                {"pageid": 7, "title": "夫婦岩 (伊勢市)", "coordinates": [{"lat": 34.509, "lon": 136.788}],
+                 "description": "三重県伊勢市にある岩", "length": 9000}]}})
+        assert p["titles"] == "伊勢神宮|夫婦岩|札幌時計台|鳥羽市"
+        return httpx.Response(200, json={"query": {"pages": [
+            {"pageid": 1, "title": "伊勢神宮", "coordinates": [{"lat": 34.455, "lon": 136.725}],
+             "description": "三重県伊勢市にある神社", "length": 150000,
+             "thumbnail": {"source": "https://upload.wikimedia.org/j.jpg"}},
+            {"title": "夫婦岩", "missing": True},
+            {"pageid": 3, "title": "札幌時計台", "coordinates": [{"lat": 43.06, "lon": 141.35}]},
+            {"pageid": 4, "title": "鳥羽市", "coordinates": [{"lat": 34.48, "lon": 136.84}], "description": "日本の三重県の市"}]}})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await sr.resolve([{"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮と外宮", "why": "歴史"},
+                                     {"name": "夫婦岩", "kind": "nature"}, {"name": "札幌時計台"}, {"name": "鳥羽市"}],
+                                    34.4813, 136.8432, "三重県", client=c)
+    out = asyncio.run(run())
+    assert [r["name"] for r in out] == ["伊勢神宮", "夫婦岩 (伊勢市)"]  # 遠い(札幌)・市の記事は除く
+    tc = out[0]["raw_payload"]["_tc"]
+    assert tc["kind"] == "shrine_temple" and tc["ai_note"] == "内宮と外宮" and tc["ai_why"] == "歴史"
+    assert tc["length"] == 150000 and tc["thumbnail_url"] == "https://upload.wikimedia.org/j.jpg"
+
+
+def test_conditions_text_for_second_proposal_call_has_no_raw_text():
+    from app.services import consult_ai as ca
+    out = ca.merge(UAT_TEXT, {}, {**UAT_AI, "areas_suggested": []})
+    text = ca.conditions_text(out, 4)
+    assert "出発地: 枚方" in text and "地域: 関西近畿圏・東海・北陸圏" in text and "件数: 4" in text
+    assert "社会人" not in text and "記念" not in text  # 相談の文章・個人的な理由は送らない
+    assert ca.PROPOSE_FORMAT["name"] == "trip_areas" and "必ず数値" in ca.PROPOSE_INSTRUCTIONS

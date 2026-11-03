@@ -1358,14 +1358,20 @@ const PlannerPage: React.FC = () => {
             <h2 id="planner-empty-title" className="tc-section-title mb-3">まだ旅行がありません。どちらから始めますか?</h2>
             <div className="tc-planner-empty">
               <div className="tc-card">
-                <div className="tc-detail-art w-full"><Landscape /></div>
+                <div className="tc-detail-art w-full">
+                  <img src="/start/quick-plan.webp" alt="" loading="lazy" decoding="async" width={1200} height={526}
+                    style={{ objectPosition: '50% 45%' }} />
+                </div>
                 <p className="tc-eyebrow">QUICK PLAN · 行き先が決まっている</p>
                 <h2>行き先と日付だけで、旅行を作る</h2>
                 <p>時刻・予約・持ち物は、あとから同じ旅行に足せます。決まっていない項目は空のままで保存できます。</p>
                 <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>行き先を入れて作る →</Button>
               </div>
               <div className="tc-card">
-                <div className="tc-detail-art w-full"><Landscape /></div>
+                <div className="tc-detail-art w-full">
+                  <img src="/start/trip-consult.webp" alt="" loading="lazy" decoding="async" width={1200} height={675}
+                    style={{ objectPosition: '50% 40%' }} />
+                </div>
                 <p className="tc-eyebrow">TRIP CONSULT · まだ決まっていない</p>
                 <h2>条件から、行き先を相談する</h2>
                 <p>出発地・時期・人数・したいことから、方面の候補を並べて比べられます。</p>

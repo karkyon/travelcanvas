@@ -70,7 +70,40 @@ def _place_extras(c: SearchCandidate) -> dict:
     tc_raw = raw.get("_tc")
     tc: dict = tc_raw if isinstance(tc_raw, dict) else {}
     return {"kind": pk.kind_of(c.provider, c.category, c.name or "", raw),
-            "thumbnail_url": tc.get("thumbnail_url"), "description": tc.get("description")}
+            "thumbnail_url": tc.get("thumbnail_url"), "description": tc.get("description"),
+            # [Gate AreaSpots] AI のおすすめの特色・理由、記事の大きさ(人気の目安。並べ替えに使う)
+            "ai_note": tc.get("ai_note"), "ai_why": tc.get("ai_why"),
+            "popularity": tc.get("length") if isinstance(tc.get("length"), int) else None}
+
+
+def persist_candidates(db: Session, user: User, raw_results: list, query_label: str,
+                       base: Optional[tuple] = None, radius_km: Optional[float] = None) -> list:
+    """[Gate AreaSpots] 外の提供元の結果を候補(SearchCandidate・SourceRecord)として残し、画面へ返す形にする"""
+    from app.services.route_estimator import haversine_km
+
+    rows = []
+    for r in raw_results:
+        candidate = SearchCandidate(
+            id=uuid.uuid4(), query=query_label[:200], provider=r["provider"], external_id=r.get("external_id"),
+            name=r["name"], category=r.get("category"), latitude=r.get("latitude"), longitude=r.get("longitude"),
+            address=r.get("address"), raw_payload=r.get("raw_payload"), searched_by_user_id=user.id,
+            retrieved_at=r["retrieved_at"])
+        db.add(candidate)
+        db.flush()
+        db.add(SourceRecord(candidate_id=candidate.id, provider=r["provider"], source_url=r.get("source_url"),
+                            retrieved_at=r["retrieved_at"], freshness_state="fresh", raw_response=r.get("raw_payload")))
+        rows.append(candidate)
+    db.commit()
+    out = []
+    for c in rows:
+        db.refresh(c)
+        d = None
+        if base and c.latitude is not None and c.longitude is not None:
+            d = round(haversine_km(base[0], base[1], c.latitude, c.longitude) * 1000)
+        out.append({**_candidate_to_dict(c), "distance_m": d,
+                    "within_radius": (d <= radius_km * 1000) if (d is not None and radius_km) else None,
+                    "radius_guaranteed": False})
+    return out
 
 
 @router.post("/spots")

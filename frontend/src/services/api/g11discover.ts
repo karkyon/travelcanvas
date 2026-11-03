@@ -16,11 +16,12 @@ import type { TravelMemory } from './types/memories';
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const DL = () => import('./decoders');
 
-const nearby: Decoder<NearbyResult> = object<NearbyResult>({
+export const nearby: Decoder<NearbyResult> = object<NearbyResult>({
   id: str, provider: str, name: str, category: nullable(str),
   location: object<NearbyResult['location']>({ latitude: nullable(num), longitude: nullable(num), address: nullable(str) }),
   retrieved_at: nullable(str), distance_m: nullable(int), within_radius: nullable(bool), radius_guaranteed: bool,
   kind: optional(str), thumbnail_url: optional(nullable(str)), description: optional(nullable(str)),
+  ai_note: optional(nullable(str)), ai_why: optional(nullable(str)), popularity: optional(nullable(num)),
 });
 
 /** 値が全て文字列の辞書(提供元 → 失敗の分類) */

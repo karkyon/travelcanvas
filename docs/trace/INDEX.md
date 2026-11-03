@@ -16,6 +16,7 @@
 | [gate-appshell-trace.md](gate-appshell-trace.md) | Gate AppShell トレース(UI/UX モックの殻・ホーム・旅程の3列・クイックの作成・検索の言葉を実際に合わせる・ゲストの設定) | 0 | 1 | 0 |
 | [gate-area-ai-trace.md](gate-area-ai-trace.md) | Gate AreaAI — 旅行相談の方面は AI が条件から選ぶ(片道の目安つき・追加の費用なし) | 0 | 0 | 0 |
 | [gate-area-ai2-trace.md](gate-area-ai2-trace.md) | Gate AreaAI2 — 方面の選んだ理由・代表画像・入力の欄・地図の選択・方面の詳細の場所の種類と絞り込み | 0 | 0 | 0 |
+| [gate-area-ai3-trace.md](gate-area-ai3-trace.md) | Gate AreaAI3 — AI の方面の案を必ず出す・方面の代表的な場所(伊勢神宮など)・方面の写真・日本語の質問・モーダルの余白・始め方の写真・下書きの種類 | 0 | 0 | 0 |
 | [gate-area-geo-trace.md](gate-area-geo-trace.md) | Gate AreaGeo — 方面の位置の誤り(③が北海道)・地図の範囲・観光の検索が空(UAT 2026-11-02 15:30 の指摘) | 0 | 0 | 0 |
 | [gate-area-logic-trace.md](gate-area-logic-trace.md) | Gate AreaLogic — 比べる方面の決め方の見直し・HOME 動画のちらつき(UAT 2026-11-02 18:16 の指摘) | 0 | 0 | 0 |
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |

@@ -157,6 +157,8 @@
 .tc-planner-empty .tc-card { padding: 22px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .tc-planner-empty h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--tc-ink-900); }
 .tc-planner-empty p { margin: 0; color: var(--tc-ink-500); font-size: 13px; }
+/* [Gate StartArt] 始め方の2つのカードは写真(利用者提供)を大きめに見せる */
+.tc-planner-empty .tc-detail-art { height: 220px; }
 
 /* ---- クイックの作成(フォーム+予告のカード) ---- */
 .tc-quick-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); align-items: start; }

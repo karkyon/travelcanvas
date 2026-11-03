@@ -19,6 +19,11 @@ export interface NearbyResult {
   thumbnail_url?: string | null;
   /** [Gate PlaceKinds] 短い説明(Wikipedia の記事の説明) */
   description?: string | null;
+  /** [Gate AreaSpots] AI のおすすめの特色・希望に合う理由(AI が挙げた場所だけ) */
+  ai_note?: string | null;
+  ai_why?: string | null;
+  /** [Gate AreaSpots] 人気の目安(Wikipedia の記事の大きさ)。おすすめ順に使う */
+  popularity?: number | null;
 }
 
 export interface NearbySearch {

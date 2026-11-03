@@ -95,6 +95,35 @@ describe('候補を探す(入口は1つ)', () => {
     expect(screen.getByTestId('consult-result-t1')).toBeInTheDocument();
   });
 
+  it('[AreaSpots] 方面の代表的な場所(伊勢神宮など)を上に出し、特色・理由を示す。並べ方は おすすめ順(人気)/近い順', async () => {
+    const w = (id: string, name: string, dist: number, pop: number | null): NearbyResult => ({
+      ...spot(id, name), provider: 'wikipedia', radius_guaranteed: false, kind: 'shrine_temple', distance_m: dist, popularity: pop });
+    api.searchNearby.mockResolvedValue(ok([w('n1', '小さな社', 300, 1000), w('n2', '有名な寺', 900, 90000)]));
+    const onAsk = vi.fn();
+    const ise = { ...w('a1', '伊勢神宮', 12000, 200000), ai_note: '内宮と外宮', ai_why: '鳥羽から近く代表的' };
+    setup({ recommend: { rows: [ise], busy: false, error: null, blocker: null, asked: true, onAsk } });
+    const rec = screen.getByTestId('consult-recommend');
+    expect(rec).toHaveTextContent('伊勢の代表的な場所(おすすめ)');
+    expect(screen.getByTestId('consult-rec-a1')).toHaveTextContent('伊勢神宮');
+    expect(screen.getByTestId('consult-rec-a1')).toHaveTextContent('特色 内宮と外宮');
+    expect(screen.getByTestId('consult-rec-a1')).toHaveTextContent('おすすめの理由 鳥羽から近く代表的');
+    fireEvent.click(screen.getByTestId('consult-recommend-ask'));
+    expect(onAsk).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('consult-recommend-ask')).toHaveTextContent('AI にもう一度聞く');
+    fireEvent.click(screen.getByTestId('consult-search'));
+    await screen.findByTestId('consult-result-n2');
+    const order = () => Array.from(document.querySelectorAll('[data-testid^="consult-result-n"]')).map((e) => e.getAttribute('data-testid'));
+    expect(order()).toEqual(['consult-result-n2', 'consult-result-n1']); // おすすめ順: 人気(記事の大きさ)が先
+    fireEvent.click(screen.getByTestId('consult-sort-near'));
+    expect(order()).toEqual(['consult-result-n1', 'consult-result-n2']);
+  });
+
+  it('[AreaSpots] AI に頼めない時は理由を示し、ボタンを出さない', () => {
+    setup({ recommend: { rows: [], busy: false, error: null, blocker: 'いまは使えません', asked: false, onAsk: vi.fn() } });
+    expect(screen.getByTestId('consult-recommend')).toHaveTextContent('AI のおすすめ: いまは使えません');
+    expect(screen.queryByTestId('consult-recommend-ask')).toBeNull();
+  });
+
   it('[S3] 429 の後は待つ時間を示す。保存した結果・前の結果(古い)は取得の古さと一緒に示す', async () => {
     api.searchNearby
       .mockResolvedValueOnce({ ...failed('rate_limited'), provider_retry_after: { overpass: 120 } })

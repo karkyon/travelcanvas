@@ -18,6 +18,8 @@ import type { DraftPart, DraftSlot, TripDraft } from '@/services/api/types/tripI
 import { transportMode } from '@/utils/transportModes';
 import TransportIcon from '@/components/common/TransportIcon';
 import { budgetLabel } from './consultTurnModel';
+import UiIcon from '@/components/common/UiIcon';
+import { KIND_META, asKind } from './placeKinds';
 import type { TurnBudget } from '@/services/api/consultAi';
 import { PART_ORDER, dayCounts, moveSlot, partsOfDay, placeSlot, removeSlot, retrievedLabel, sortSlots } from './consultModel';
 
@@ -142,12 +144,24 @@ const TripDraftPage: React.FC = () => {
     if (!c) return null;
     const parts = partsOfDay(s.day, totalDays);
     return (
-      <li key={s.candidate_id} className="rounded-xl border border-cloud-200 bg-cloud-0 p-3" data-testid={`draft-slot-${c.title}`}>
-        <div className="flex flex-wrap items-start justify-between gap-2">
+      <li key={s.candidate_id} className="rounded-2xl border border-cloud-200 bg-cloud-0 p-3 shadow-sm transition hover:border-accent"
+        data-testid={`draft-slot-${c.title}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            {/* [Gate DraftLook] 種類の絵と色(英語の種類名 shrine_temple などを出さない) */}
+            <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+              style={{ background: KIND_META[asKind(c.category)].bg, color: KIND_META[asKind(c.category)].fg }}>
+              <UiIcon icon={KIND_META[asKind(c.category)].icon} size={24} />
+            </span>
           <div className="min-w-0">
             <p className="font-semibold text-ink-900 break-words">{c.title}</p>
-            <p className="text-xs text-ink-700">
-              {[c.category, c.provider === 'overpass' ? `出典: OpenStreetMap ${retrievedLabel(c.retrieved_at)}`
+            {c.category && c.category in KIND_META && (
+              <span className="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: KIND_META[asKind(c.category)].bg, color: KIND_META[asKind(c.category)].fg }}
+                data-testid="draft-slot-kind">{KIND_META[asKind(c.category)].label}</span>
+            )}
+            <p className="mt-1 text-xs text-ink-700">
+              {[c.provider === 'overpass' ? `出典: OpenStreetMap ${retrievedLabel(c.retrieved_at)}`
                 : c.provider === 'wikipedia' ? `出典: Wikipedia ${retrievedLabel(c.retrieved_at)}`
                 : c.provider === 'google_places' ? `出典: Google ${retrievedLabel(c.retrieved_at)}` : null]
                 .filter(Boolean).join(' · ')}
@@ -156,7 +170,8 @@ const TripDraftPage: React.FC = () => {
               // [Gate SearchUAT] Google の利用条件により名前・住所は保存しない。Google マップの URL で確かめる
               <p className="text-xs text-ink-700 break-all" data-testid="draft-google-place">{`Google マップ: ${c.source_url}`}</p>
             )}
-            <p className="text-xs text-warning">時刻 · 営業時間は未照会(日付を決めた後に旅程の画面で照合)</p>
+            <p className="mt-1 text-[11px] text-ink-700">時刻・営業時間は、日付を決めた後に旅程の画面で照合します</p>
+          </div>
           </div>
           {canEdit && (
             <div className="flex flex-wrap items-center gap-1">

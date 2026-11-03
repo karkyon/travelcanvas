@@ -4,6 +4,8 @@
  */
 import type { AxiosRequestConfig } from 'axios';
 import { api } from './index';
+import { nearby } from './g11discover';
+import type { NearbyResult } from './types/g11discover';
 import {
   arrayOf, bool, decodeResponse, int, nullable, num, object, oneOf, optional, record, str, type Decoder,
 } from './decode';
@@ -79,7 +81,17 @@ const areas: Decoder<AreasResult> = object<AreasResult>({
   }),
 });
 
-/** [Gate AreaImages] 方面の代表画像(Wikipedia・無料)。取れない方面は null */
+/** [Gate AreaSpots] 名前で挙がった場所(方面の提案の代表的な場所)を位置・写真つきの候補にする(無料) */
+export async function resolveSpots(input: { area: string; pref?: string | null; latitude: number; longitude: number;
+  spots: Array<{ name: string; kind?: string; note?: string }> }): Promise<NearbyResult[]> {
+  const body = { ...input, pref: input.pref && input.pref.length <= 4 ? input.pref : undefined,
+    spots: input.spots.slice(0, 12).map((s) => ({ name: s.name.slice(0, 40), kind: s.kind, note: s.note?.slice(0, 80) })) };
+  const r = await api.post('/trip-intents/spots/resolve', body, SILENT);
+  return decodeResponse(r.data, object<{ candidates: NearbyResult[] }>({ candidates: arrayOf(nearby) }),
+    'POST /trip-intents/spots/resolve').candidates;
+}
+
+/** [Gate AreaImages] 方面の代表画像(Wikipedia・無料)。見つからない方面は null、取れなかった(通信の失敗)方面は含まない */
 export async function getAreaImages(names: string[]): Promise<Record<string, AreaImage | null>> {
   const params = new URLSearchParams();
   for (const n of names.slice(0, 10)) params.append('names', n);

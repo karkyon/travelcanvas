@@ -157,8 +157,10 @@ test('旅行相談の AI: 断る理由 → AI で読み取る → 方面の案 �
     r = await raw('/trip-intents/ai/extract', { session_id: s1, text: 'E2E_BROKEN 家族旅行' });
     expect(r.status()).toBe(502);
     // [Gate F07-4] Journey は 1相談 AI 10回(送った要求の数: 時間切れ・成功・読めない応答も 1回)。11回目は送る前に断る
-    for (let i = 0; i < 7; i += 1) {
-      r = await raw('/trip-intents/ai/extract', { session_id: s1, text: `家族4人で1泊2日 ${i}` });
+    // [Gate AreaAI3] 行き先を書かない読み取りで方面の案が足りない時は、案だけを頼む 2回目も 1回と数える(上の成功は 2回)。
+    // ここからは行き先を書いた相談(案を頼まない・1回)で残りの 6回を使う
+    for (let i = 0; i < 6; i += 1) {
+      r = await raw('/trip-intents/ai/extract', { session_id: s1, text: `候補は伊勢、鳥羽。家族4人で1泊2日 ${i}` });
       expect(r.status()).toBe(200);
     }
     r = await raw('/trip-intents/ai/extract', { session_id: s1, text: '家族4人で1泊2日' });
