@@ -576,15 +576,14 @@
 /* [Gate InputMode] 旅行相談の入力: キーボード(鉛筆)と音声(声の大きさの棒)を背景で区別する */
 .tc-input-mode { position: relative; border-radius: .75rem; }
 .tc-input-mode textarea { position: relative; z-index: 1; background-color: transparent; }
+/* 背景の色は画面の部品の色(bg-cloud-0 / bg-accent-soft)で付ける。暗い見た目でも文字と背景の対比を保つ */
 .tc-input-mode__bg {
   pointer-events: none; position: absolute; inset: 0; overflow: hidden; border-radius: .75rem; z-index: 0;
-  background: var(--tc-input-bg, #fff);
 }
 .tc-input-mode__icon { position: absolute; right: .75rem; bottom: .25rem; font-size: 4.5rem; line-height: 1; opacity: .09;
   transform: rotate(-12deg); }
 .tc-input-mode--typing .tc-input-mode__icon { opacity: .18; animation: tc-pencil 1.2s ease-in-out infinite alternate; }
 @keyframes tc-pencil { from { transform: rotate(-12deg) translateX(0); } to { transform: rotate(-6deg) translateX(-8px); } }
-.tc-input-mode--voice .tc-input-mode__bg { background: #effaf8; }
 .tc-voice-bars { position: absolute; left: 0; right: 0; bottom: 0; height: 75%; display: flex; align-items: flex-end; gap: 3px;
   padding: 0 .75rem .5rem; opacity: .4; }
 .tc-voice-bars span { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #2dd4bf, #0f6e66);

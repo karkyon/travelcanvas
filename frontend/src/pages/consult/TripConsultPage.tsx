@@ -133,7 +133,7 @@ const BriefStep: React.FC<{
                 onClick={() => set('text', EXAMPLE_TEXT)}>例文を入れる</button>
             </div>
             <div className={`tc-input-mode tc-input-mode--${inputMode} mt-1`} data-testid="consult-input-mode" data-mode={inputMode}>
-              <div className="tc-input-mode__bg" aria-hidden="true">
+              <div className={`tc-input-mode__bg ${inputMode === 'voice' ? 'bg-accent-soft' : 'bg-cloud-0'}`} aria-hidden="true">
                 <span className="tc-input-mode__icon"><UiIcon icon={inputMode === 'voice' ? IcMic : IcPencil} size={72} /></span>
                 {voiceLevels !== null && (
                   <div className={`tc-voice-bars${voiceLevels.length === 0 ? ' tc-voice-bars--idle' : ''}`} data-testid="consult-voice-bars">
