@@ -13,7 +13,7 @@ import { useToast } from './toastContext';
 type ToastApi = ReturnType<typeof useToast>;
 
 describe('ToastProvider (Gate M9-FE-B3)', () => {
-  it('toastを表示してProviderが再描画されても、addToast/removeToast/clearToastsの参照は変わらない', () => {
+  it('toastを表示してProviderが再描画されても、addToast/removeToast/clearToastsの参照は変わらない', async () => {
     const seen: ToastApi[] = [];
     const Probe = () => {
       seen.push(useToast());
@@ -29,7 +29,7 @@ describe('ToastProvider (Gate M9-FE-B3)', () => {
     act(() => {
       seen[0]!.addToast({ type: 'info', message: 'B3-toast', duration: 0 });
     });
-    expect(screen.getByText('B3-toast')).toBeInTheDocument();
+    expect(await screen.findByText('B3-toast')).toBeInTheDocument();
 
     // 子要素を新しいelementとして再描画させ、再度contextを読ませる
     rerender(
@@ -46,7 +46,7 @@ describe('ToastProvider (Gate M9-FE-B3)', () => {
     }
   });
 
-  it('removeToast/clearToastsは従来どおりtoastを消す', () => {
+  it('removeToast/clearToastsは従来どおりtoastを消す', async () => {
     let api: ToastApi | undefined;
     const Probe = () => {
       api = useToast();
@@ -62,8 +62,8 @@ describe('ToastProvider (Gate M9-FE-B3)', () => {
       api!.addToast({ type: 'success', message: 'first', duration: 0 });
       api!.addToast({ type: 'error', message: 'second', duration: 0 });
     });
-    expect(screen.getByText('first')).toBeInTheDocument();
-    expect(screen.getByText('second')).toBeInTheDocument();
+    expect(await screen.findByText('first')).toBeInTheDocument();
+    expect(await screen.findByText('second')).toBeInTheDocument();
 
     act(() => {
       api!.clearToasts();
