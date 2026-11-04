@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r49** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-04<br>
+> 文書ID: DOC-10 / 版: **v5.1-r50** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-05<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -14,10 +14,10 @@
 
 | 項目 | 値 |
 |---|---|
-| 基準commit | `ad041f5`(PR #37 Gate GeocodeJP。2026-10-31 に r31 の版をそろえた時点の main) |
+| 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
 | Alembic head | `b7d2f4a6c8e1`(単一の head。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
-| 基準の試験の実測(`ad041f5`) | backend pytest 1322 合格・2 飛ばし(サンドボックス) / frontend vitest 943 合格(185 ファイル、サンドボックス) / E2E 99 合格・flaky 0(GitHub Actions の main の push run 41070234927 の e2e ジョブ) / mypy の誤り 0 件(基準は空) / 最初に読む JS 429.46 kB(上限 430 kB) |
-| GitHub Actions(`ad041f5`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41070234927)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
+| 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
+| GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
 `backend/tests/test_gate_g1_doc10.py` が、上の基準commit が履歴に実在すること・Alembic head が実際の head と一致すること・
 §3 の表と §2 の集計が `docs/trace/fr-status.json` と一致すること・VERIFIED が `docs/trace/v1-verification-ledger.json`
@@ -83,7 +83,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 |---|---|---|---|---|---|
 | FR-001 | ゲスト旅行開始 | VERIFIED | ✓ | #35・R1・R2 | KPI、回復UX |
 | FR-002 | ゲスト昇格 | VERIFIED | ✓ | G1・A1 | 全所有物の移管のE2E、重複統合 |
-| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | メールの確認、passkey |
+| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | メールの確認、passkey、パスワード再設定(忘れた時)の API・画面 |
 | FR-004 | 旅行CRUD | VERIFIED | ✓ | B-012・G8 | 本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1) |
 | FR-005 | 日・イベント | VERIFIED | ✓ | B-013・G7・G11 | 実機 mobile のタッチでの並べ替え |
 | FR-006 | NOW/NEXT | VERIFIED | ✓ | L1・L1b | 実機mobile、夜行便のE2E |
@@ -112,7 +112,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-029 | 当日モード | VERIFIED | ✓ | L1・P10 | 外部状況の自動取得 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | ✓ | P10 | 外部provider(運行情報・天気・警報・休業) |
 | FR-031 | 安全な再計画 | VERIFIED | ✓ | P10 | 代替移動手段の探索、プッシュ通知 |
-| FR-032 | Offline Pack | VERIFIED | ✓ | #36・K1 | サーバー側のパック、通信しない端末の遠隔消去 |
+| FR-032 | Offline Pack | VERIFIED | ✓ | #36・K1 | サーバー側のパック、通信しない端末の遠隔消去。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働) |
 | FR-033 | Offline同期 | VERIFIED | ✓ | P11・G6 | 本番での確認(RELEASE-1) |
 | FR-034 | しおり生成 | VERIFIED | ✓ | P4 | 冊子の面付 |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | ✓ | P4 | サーバー側の PDF・ダウンロード URL |
@@ -128,7 +128,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-045 | 安全な共有ポリシー | VERIFIED | ✓ | F45・G2 | — |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | ✓ | P4・P16 | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |
 | FR-047 | 旅程複製 | VERIFIED | ✓ | #39・R3-12・E1 | — |
-| FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時) |
+| FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働) |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | ✓ | V2 | 候補の層、地図タイルの上への表示 |
 | FR-050 | 訪問判定・信頼度 | VERIFIED | ✓ | V2 | — |
 | FR-051 | 訪問訂正・除外 | VERIFIED | ✓ | V2・Q1・G6・G8 | 実機の GPS での訂正・除外の確認(PoC) |
@@ -139,7 +139,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-056 | 適応型GPS | INTEGRATED(部分) | ✓ | L5 | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | VERIFIED | ✓ | P17・G7 | 実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1) |
 | FR-058 | Entitlement・料金 | SPECIFIED | ✗ | — | 価格・有料の範囲・決済(購入・返金・請求・Trip Pass の販売)の製品判断待ち(使用量の上限の仕組み BILL-02 は G5。外部 API の原価上限・クラス別 quota は FR-059) |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041) |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -149,10 +149,10 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | J-01 | 登録なしで旅程を作る(FR-001/004/005) | 成立(quickdraft-flow・auth-flows) | — |
 | J-02 | ホテル予約の一元化(FR-008/010/011/012/013) | 部分成立(予約・チケット・文書・取込・オフラインの鍵を E2E で確認) | PDF・メールからの自動抽出、チケットのオフライン表示 |
 | J-03 | 説明可能な最適化(FR-014〜018) | 成立(内部推定の範囲) | 外部経路による実移動時間 |
-| J-04 | グループの合意(FR-020〜024) | 部分成立(投票・懸念・コメント・秘匿プロフィール・開いている人) | 決定の予定への反映、即時の配信 |
+| J-04 | グループの合意(FR-020〜024) | 部分成立(投票・懸念・決定の採用・コメント・秘匿プロフィール・開いている人) | コメントの即時の配信 |
 | J-05 | 当日の障害対応(FR-029〜033) | 成立(外部 provider を除く) | 外部状況の自動取得、プッシュ通知 |
-| J-06 | 安全な出力(FR-034/035/039/045) | 成立(ブラウザ側の出力、項目単位の共有の規則) | サーバー側の PDF |
-| J-07 | 旅の記憶(FR-037/038/052/053/054/057) | 成立 | 公開 URL、地図の上の表示 |
+| J-06 | 安全な出力(FR-034/035/039/045) | 成立(ブラウザ側の出力、項目単位の共有の規則、しおりの Web 公開) | サーバー側の PDF |
+| J-07 | 旅の記憶(FR-037/038/052/053/054/057) | 成立(旅行記の公開 URL を含む) | 地図の上の表示 |
 
 ## 5. 品質・運用の基盤(要点)
 
@@ -265,7 +265,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r46 | 2026-11-03 | `c561ff4`+AreaAI3 | Gate AreaAI3: AI の方面の案が足りない時だけ案だけを頼む 2 回目の呼び出し(条件の要約だけ)。出力は日本語。方面の詳細に代表的な場所(提案の場所を Wikipedia に結び付け・AI のおすすめは方面ごとに 1 回)を出し、近くの検索をおすすめ順(人気)/近い順で並べる。方面の写真の取り直し。モーダルの余白。始め方の写真。下書きの種類を日本語で。実環境は未確認。`docs/trace/gate-area-ai3-trace.md` |
 | r47 | 2026-11-04 | `c561ff4`+AreaAI3+PlanUX | Gate PlanUX: 旅程の画面で移動手段の印を常に並べず、予定と予定の間で印を押して決める(詳細は後から)。予定を押すと選ぶだけ・編集は鉛筆から。編集の画面の見直し。時刻の無い予定に営業時間の照合を出さない。声の波形。始め方の写真の差し替え。`docs/trace/gate-plan-ux-trace.md` |
 | r48 | 2026-11-04 | `ea97839`+HomeV2 | Gate HomeV2: ホーム v2(いま計画中の旅の準備と次にやること・旅行の一覧の状態のタブと見送り・旅の記録と思い出・旅の足あと・行ってみたい場所・道具)。`docs/trace/gate-home-v2-trace.md` |
-| **r49** | 2026-11-04 | `8b25f98`+MockFit | **Gate MockFit: ホームの表紙・左の帯をモックアップ v2 の通りに、旅の記録と思い出の画面、しおりの Web 公開(migration `b7d2f4a6c8e1`)、写真(撮影場所)・声・SNS から探す(スポット検索・旅行相談・近くを発見で共有)。`docs/trace/gate-mock-fit-trace.md`** |
+| r49 | 2026-11-04 | `8b25f98`+MockFit | Gate MockFit: ホームの表紙・左の帯をモックアップ v2 の通りに、旅の記録と思い出の画面、しおりの Web 公開(migration `b7d2f4a6c8e1`)、写真(撮影場所)・声・SNS から探す(スポット検索・旅行相談・近くを発見で共有)。`docs/trace/gate-mock-fit-trace.md` |
+| **r50** | 2026-11-05 | `d8bd1b7` | **設計書の as-built 改訂に合わせて同期: 基準 commit と試験の実測を更新、J-04/06/07 の古い残りを直し、FR-003(パスワード再設定)・FR-032/048(sw.js の未登録)・FR-059(鍵の確認の失効)の不足を明記。FR の状態の遷移なし** |
 
 ## 10. 台帳の更新の規則
 
