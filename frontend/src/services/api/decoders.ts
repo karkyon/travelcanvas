@@ -1067,6 +1067,8 @@ export const bookletExport: Decoder<BookletExport> = object<BookletExport>({
   is_mine: bool,
   can_view: bool,
   can_revoke: bool,
+  is_public: optional(bool),
+  published_at: optional(nullable(str)),
 });
 
 // ----- [Gate P6] データポータビリティ(FR-039)。backend/app/api/v1/data_export.py の保持期間の説明。

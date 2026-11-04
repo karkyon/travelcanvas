@@ -144,6 +144,9 @@ export interface BookletExport {
   is_mine: boolean;
   can_view: boolean;
   can_revoke: boolean;
+  /** [Gate BookletWeb] Web のページとして公開中か・公開した日時 */
+  is_public?: boolean;
+  published_at?: string | null;
 }
 
 export interface BookletExportResult {

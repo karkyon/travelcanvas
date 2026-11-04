@@ -33,6 +33,8 @@ interface Props {
   booklet: Booklet;
   /** 保存済みの版。null はプレビュー(保存されていない) */
   exportInfo: BookletExport | null;
+  /** [Gate BookletWeb] 版の表示の文を変える(Web で公開したページ) */
+  stampLabel?: string;
 }
 
 const Section: React.FC<{ id: string; title: string; style: ThemeStyle; compact: boolean; children: React.ReactNode }> = ({
@@ -44,7 +46,7 @@ const Section: React.FC<{ id: string; title: string; style: ThemeStyle; compact:
   </section>
 );
 
-const BookletView: React.FC<Props> = ({ booklet: b, exportInfo }) => {
+const BookletView: React.FC<Props> = ({ booklet: b, exportInfo, stampLabel }) => {
   const style = THEME_STYLE[b.theme];
   const compact = b.density === 'compact';
   const cur = b.costs?.base_currency ?? 'JPY';
@@ -57,7 +59,7 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo }) => {
 
       <div className={`text-xs border rounded-sm p-2 mb-4 ${style.box}`} data-testid="booklet-stamp">
         <p>
-          {exportInfo ? `第${exportInfo.version_no}版` : 'プレビュー(保存されていません)'}
+          {stampLabel ?? (exportInfo ? `第${exportInfo.version_no}版` : 'プレビュー(保存されていません)')}
           {` ・ 作成 ${formatDateTime(b.generated_at)}`}
           {` ・ 情報の基準 ${formatDateTime(b.data_as_of)}`}
           {` ・ 旅程の版 ${b.input_revision}`}

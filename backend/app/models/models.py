@@ -2392,6 +2392,9 @@ class BookletExport(Base):
     snapshot_ciphertext: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     status: Mapped[str] = mapped_column(String(7), nullable=False, default="active")
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate BookletWeb] Web のページとして公開した時の鍵(SHA-256 の値だけを持つ。鍵そのものは保存しない)・公開した日時
+    public_token_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
     __table_args__ = (

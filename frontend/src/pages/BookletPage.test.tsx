@@ -21,6 +21,9 @@ const m = vi.hoisted(() => ({
   revokeBookletExport: vi.fn(),
 }));
 
+const web = vi.hoisted(() => ({ publishBookletExport: vi.fn(), unpublishBookletExport: vi.fn(), getPublicBooklet: vi.fn() }));
+vi.mock('@/services/api/bookletWeb', () => web);
+
 vi.mock('@/services/api', async () => {
   const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
   return { extractApiErrorDetailMessage: actual.extractApiErrorDetailMessage, ...m };
@@ -28,6 +31,7 @@ vi.mock('@/services/api', async () => {
 
 import BookletPage from './BookletPage';
 import BookletPrintPage from './BookletPrintPage';
+import PublicBookletPage from './PublicBookletPage';
 
 const owner: PlanMember[] = [{ user_id: 'me', name: '自分', role: 'owner', is_me: true }];
 const editor: PlanMember[] = [{ user_id: 'me', name: '自分', role: 'editor', is_me: true }];
@@ -163,5 +167,38 @@ describe('BookletPrintPage (Gate P4)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('この版は失効しています');
     expect(screen.queryByTestId('booklet')).toBeNull();
     expect(screen.queryByRole('button', { name: '印刷 / PDFで保存' })).toBeNull();
+  });
+});
+
+
+describe('[Gate BookletWeb] しおりを Web のページとして公開する', () => {
+  it('機密項目の無い有効な版だけ公開でき、URL を示し、止められる。機密項目を含む版は理由を示す', async () => {
+    web.publishBookletExport.mockResolvedValue({ url: '/b/tok123', published_at: '2026-11-04T12:00:00+00:00' });
+    web.unpublishBookletExport.mockResolvedValue(undefined);
+    const list = fx.booklet_export_list as Array<Record<string, unknown>>;
+    m.getBookletExports.mockResolvedValueOnce(list).mockResolvedValue(list.map((x) => (x.version_no === 1
+      ? { ...x, is_public: true, published_at: '2026-11-04T12:00:00+00:00' } : x)));
+    renderAt('/planner/p1/booklet');
+    const pub = await screen.findByTestId('booklet-publish-1');
+    expect(screen.queryByTestId('booklet-publish-2')).toBeNull();  // 機密項目を含む版
+    expect(screen.getByTestId('booklet-export-2')).toHaveTextContent('機密項目を含む版は Web で公開できません');
+    fireEvent.click(pub);
+    await waitFor(() => expect(web.publishBookletExport).toHaveBeenCalledWith('p1', 'e6e11e0a-a917-43fc-92cc-ea02a6e86e26'));
+    expect(await screen.findByTestId('booklet-web-1')).toHaveTextContent('/b/tok123');
+    fireEvent.click(screen.getByTestId('booklet-unpublish-1'));
+    await waitFor(() => expect(web.unpublishBookletExport).toHaveBeenCalled());
+  });
+
+  it('公開したページはログインなしで表示し、見つからない時は文で伝える', async () => {
+    web.getPublicBooklet.mockResolvedValueOnce({ booklet: (fx.booklet_preview as unknown), version_no: 4, published_at: null,
+      valid_until: null, theme: 'simple', density: 'normal' });
+    const { unmount } = render(<MemoryRouter initialEntries={['/b/tok']}><Routes>
+      <Route path="/b/:token" element={<PublicBookletPage />} /></Routes></MemoryRouter>);
+    expect(await screen.findByTestId('booklet-stamp')).toHaveTextContent('第4版(Web で公開)');
+    unmount();
+    web.getPublicBooklet.mockRejectedValueOnce({ response: { status: 404 } });
+    render(<MemoryRouter initialEntries={['/b/x']}><Routes>
+      <Route path="/b/:token" element={<PublicBookletPage />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('公開が終わっています');
   });
 });

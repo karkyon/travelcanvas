@@ -2,7 +2,7 @@
  * [Gate SpotFind] 写真・SNS から探すための純粋関数(画面から切り離して試験する)。
  *
  * - 写真: JPEG の Exif の GPS(撮った場所の緯度経度)を端末の中で読む。写真そのものはサーバーへ送らない
- * - SNS: 貼り付けた投稿の文から、ハッシュタグ・「」『』の中・📍の後ろ・「〇〇へ/に行った」の地名らしい語を拾う。
+ * - SNS: 貼り付けた投稿の文から、ハッシュタグ・「」『』の中・位置の印(ピン)の後ろ・「〇〇へ/に行った」の地名らしい語を拾う。
  *   URL の中身は取りに行かない(SNS の利用規約・個人の投稿を集めないため)。URL だけの時は文を貼るよう案内する
  */
 
@@ -98,7 +98,7 @@ export function snsKeywords(text: string): { keywords: string[]; urlOnly: boolea
   };
   for (const m of body.matchAll(/[#＃]([^\s#＃、。,.!！?？()（）「」]+)/g)) push(m[1] ?? '');
   for (const m of body.matchAll(/[「『]([^」』]{2,30})[」』]/g)) push(m[1] ?? '');
-  for (const m of body.matchAll(/(?:📍|📌|場所[:：]|at\s)\s*([^\s、。,\n]{2,30})/g)) push(m[1] ?? '');
+  for (const m of body.matchAll(/(?:\u{1F4CD}|\u{1F4CC}|場所[:：]|at\s)\s*([^\s、。,\n]{2,30})/gu)) push(m[1] ?? '');
   for (const m of body.matchAll(/([一-龯ァ-ヶー]{2,15})(?:へ|に)(?:行って|行った|来た|きた|お出かけ|旅行)/g)) push(m[1] ?? '');
   return { keywords: out.slice(0, 8), urlOnly: out.length === 0 && urls.length > 0 && !body.trim() };
 }

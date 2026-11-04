@@ -72,6 +72,7 @@
 | [gate-lp-trace.md](gate-lp-trace.md) | Gate LP トレース(ランディングを景色の主画面・動く画面イメージ・旅の流れ・正直な料金へ作り直す) | 0 | 0 | 0 |
 | [gate-m1-fr014-trace.md](gate-m1-fr014-trace.md) | Gate M1 FR-014 トレーサビリティ表 | 0 | 22 | 0 |
 | [gate-m3-fr015-trace.md](gate-m3-fr015-trace.md) | Gate M3 FR-015 トレーサビリティ表 | 1 | 5 | 1 |
+| [gate-mock-fit-trace.md](gate-mock-fit-trace.md) | Gate MockFit — ホームをモックアップ v2 の通りに・しおりの Web 公開・写真/声/SNS から探す | 0 | 0 | 0 |
 | [gate-o1-trace.md](gate-o1-trace.md) | Gate O1 B-010 トレーサビリティ表 | 2 | 0 | 1 |
 | [gate-o2-trace.md](gate-o2-trace.md) | Gate O2 B-009 トレーサビリティ表 | 1 | 1 | 0 |
 | [gate-opscms-trace.md](gate-opscms-trace.md) | Gate OpsCMS トレース(運用コンソール: 外部 API の接続・原価の台帳・Cloud 環境・Fake の家族旅行の試験) | 5 | 0 | 0 |

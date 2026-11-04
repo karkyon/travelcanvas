@@ -278,3 +278,46 @@ def test_public_share_is_noindex(client, auth_client):
         assert res.headers["x-robots-tag"] == "noindex, nofollow"
         assert res.headers["referrer-policy"] == "no-referrer"
         assert res.headers["cache-control"] == "no-store"
+
+
+def test_web_publish_public_view_and_stop(auth_client, make_user, db_session, audit_calls):
+    """[Gate BookletWeb] しおりの版を Web のページとして公開する。機密項目を含む版は公開できない。止める・失効で見られない"""
+    client, p, owner, editor, _ = _setup(auth_client, make_user, db_session)
+    url = f"/api/v1/plans/{p}/booklet-exports"
+    e = client.post(url, json=_opts(format="web")).json()["export"]
+    assert e["is_public"] is False and e["published_at"] is None
+    pub = client.post(f"{url}/{e['id']}/publish")
+    assert pub.status_code == 200, pub.text
+    web = pub.json()["url"]
+    assert web.startswith("/b/") and audit_calls[-1]["action"] == "booklet_export_published"
+    token = web[3:]
+    view = client.get(f"/api/v1/public/booklets/{token}")
+    assert view.status_code == 200 and view.json()["version_no"] == e["version_no"]
+    assert view.headers["x-robots-tag"] == "noindex, nofollow" and view.headers["cache-control"] == "no-store"
+    assert CONFIRMATION not in view.text
+    assert client.get(url).json()[0]["is_public"] is True
+    assert client.get("/api/v1/public/booklets/wrong-token").status_code == 404
+    # 作り直すと前の URL は使えない
+    web2 = client.post(f"{url}/{e['id']}/publish").json()["url"]
+    assert client.get(f"/api/v1/public/booklets/{token}").status_code == 404
+    assert client.get(f"/api/v1/public/booklets/{web2[3:]}").status_code == 200
+    # 止める
+    assert client.delete(f"{url}/{e['id']}/publish").json() == {"is_public": False}
+    assert client.get(f"/api/v1/public/booklets/{web2[3:]}").status_code == 404
+    # 失効すると公開もできない
+    web3 = client.post(f"{url}/{e['id']}/publish").json()["url"]
+    assert client.delete(f"{url}/{e['id']}").status_code == 200
+    assert client.get(f"/api/v1/public/booklets/{web3[3:]}").status_code == 404
+    assert client.post(f"{url}/{e['id']}/publish").status_code == 409
+    # 機密項目を含む版は公開できない
+    s = client.post(url, json=_opts(includes={"confirmation_numbers": True}, valid_until=_future(10))).json()["export"]
+    r = client.post(f"{url}/{s['id']}/publish")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "sensitive_not_publishable"
+    # 閲覧者は公開できない
+    _act_as(editor)
+    e2 = client.post(url, json=_opts()).json()["export"]
+    from app.core.auth import AuthResult, get_current_user
+    from app.main import app
+    viewer, _pw = make_user()
+    app.dependency_overrides[get_current_user] = lambda: AuthResult(user=viewer, is_authenticated=True, is_guest=False)
+    assert client.post(f"{url}/{e2['id']}/publish").status_code in (403, 404)

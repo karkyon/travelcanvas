@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r48** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-04<br>
+> 文書ID: DOC-10 / 版: **v5.1-r49** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-04<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -15,7 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `ad041f5`(PR #37 Gate GeocodeJP。2026-10-31 に r31 の版をそろえた時点の main) |
-| Alembic head | `e9c1a5d3f7b2`(単一の head。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
+| Alembic head | `b7d2f4a6c8e1`(単一の head。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(`ad041f5`) | backend pytest 1322 合格・2 飛ばし(サンドボックス) / frontend vitest 943 合格(185 ファイル、サンドボックス) / E2E 99 合格・flaky 0(GitHub Actions の main の push run 41070234927 の e2e ジョブ) / mypy の誤り 0 件(基準は空) / 最初に読む JS 429.46 kB(上限 430 kB) |
 | GitHub Actions(`ad041f5`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41070234927)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -264,7 +264,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r45 | 2026-11-03 | `83c3406`+AreaAI2 | Gate AreaAI2: AI の方面の案に特色・代表的な場所(種類つき)・希望に合う理由・注意・片道の目安を必ず入れさせる(条件の読み取りの「推測しない」と分ける)。方面の代表画像(Wikipedia・無料)。相談の入力の欄をキーボード(鉛筆)と音声(声の大きさの棒)で区別。方面の比較の地図で選んだ方面を強調。方面の詳細の場所に種類・代表画像・説明を付け、観光でない記事を除き、希望に合う種類を先に並べ、種類と希望で絞り込む。実環境は未確認。`docs/trace/gate-area-ai2-trace.md` |
 | r46 | 2026-11-03 | `c561ff4`+AreaAI3 | Gate AreaAI3: AI の方面の案が足りない時だけ案だけを頼む 2 回目の呼び出し(条件の要約だけ)。出力は日本語。方面の詳細に代表的な場所(提案の場所を Wikipedia に結び付け・AI のおすすめは方面ごとに 1 回)を出し、近くの検索をおすすめ順(人気)/近い順で並べる。方面の写真の取り直し。モーダルの余白。始め方の写真。下書きの種類を日本語で。実環境は未確認。`docs/trace/gate-area-ai3-trace.md` |
 | r47 | 2026-11-04 | `c561ff4`+AreaAI3+PlanUX | Gate PlanUX: 旅程の画面で移動手段の印を常に並べず、予定と予定の間で印を押して決める(詳細は後から)。予定を押すと選ぶだけ・編集は鉛筆から。編集の画面の見直し。時刻の無い予定に営業時間の照合を出さない。声の波形。始め方の写真の差し替え。`docs/trace/gate-plan-ux-trace.md` |
-| **r48** | 2026-11-04 | `ea97839`+HomeV2 | **Gate HomeV2: ホーム v2(いま計画中の旅の準備と次にやること・旅行の一覧の状態のタブと見送り・旅の記録と思い出・旅の足あと・行ってみたい場所・道具)。`docs/trace/gate-home-v2-trace.md`** |
+| r48 | 2026-11-04 | `ea97839`+HomeV2 | Gate HomeV2: ホーム v2(いま計画中の旅の準備と次にやること・旅行の一覧の状態のタブと見送り・旅の記録と思い出・旅の足あと・行ってみたい場所・道具)。`docs/trace/gate-home-v2-trace.md` |
+| **r49** | 2026-11-04 | `8b25f98`+MockFit | **Gate MockFit: ホームの表紙・左の帯をモックアップ v2 の通りに、旅の記録と思い出の画面、しおりの Web 公開(migration `b7d2f4a6c8e1`)、写真(撮影場所)・声・SNS から探す(スポット検索・旅行相談・近くを発見で共有)。`docs/trace/gate-mock-fit-trace.md`** |
 
 ## 10. 台帳の更新の規則
 

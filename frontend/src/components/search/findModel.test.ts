@@ -11,7 +11,7 @@ describe('[SpotFind] 写真の撮影場所・SNS の言葉', () => {
   });
 
   it('SNS の投稿の文からハッシュタグ・「」・📍・〜へ行った を拾い、よくある言葉と URL は除く', () => {
-    expect(snsKeywords('伊勢神宮に行ってきた!「おかげ横丁」で赤福 #旅行 #鳥羽水族館 📍伊勢市 https://x.com/a/1').keywords)
+    expect(snsKeywords('伊勢神宮に行ってきた!「おかげ横丁」で赤福 #旅行 #鳥羽水族館 \u{1F4CD}伊勢市 https://x.com/a/1').keywords)
       .toEqual(['鳥羽水族館', 'おかげ横丁', '伊勢市', '伊勢神宮']);
     expect(snsKeywords('https://www.instagram.com/p/abc')).toEqual({ keywords: [], urlOnly: true });
   });

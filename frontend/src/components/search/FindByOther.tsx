@@ -91,7 +91,7 @@ const SnsFinder: React.FC<{ onKeyword: Props['onKeyword']; busy?: boolean }> = (
     <div data-testid="find-sns">
       <label htmlFor="find-sns-text" className="text-sm font-semibold text-ink-900">投稿の文を貼る</label>
       <textarea id="find-sns-text" rows={3} value={text} onChange={(e) => { setText(e.target.value); setResult(null); }}
-        placeholder="例: 伊勢神宮にお参り⛩️ #おかげ横丁 #赤福 📍伊勢市"
+        placeholder="例: 伊勢神宮にお参り #おかげ横丁 #赤福 場所: 伊勢市"
         className="tc-focus-ring mt-1 block w-full rounded-xl border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900" />
       <p className="mt-1 text-xs text-ink-700">{FIND_MODE_HELP.sns}</p>
       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary mt-2" disabled={!text.trim() || busy}

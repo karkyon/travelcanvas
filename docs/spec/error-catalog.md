@@ -156,6 +156,7 @@
 | `no_ops_selected` | 422 | no | 採用する変更を選んでください | api/v1/branches.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |
 | `no_trip_period` | 409 | no | 旅行の日程が無いため記録できません。先に日程を登録してください | api/v1/location_tracks.py |
+| `not_active` | 409 | no | 失効・期限切れの版は公開できません | api/v1/booklet.py |
 | `not_adopted` | — | — | この投票はまだ採用していません | api/v1/decisions.py |
 | `not_areas_only` | 409 | no | 訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです | api/v1/location_tracks.py |
 | `not_conflicted` | 409 | no | この操作は競合していません | api/v1/sync.py |
@@ -203,6 +204,7 @@
 | `secret_not_registered` | 409 | no | この画面で登録した有効な鍵はありません | api/v1/admin_ops.py |
 | `self_target` | — | — | 自分自身のアカウントはこの画面から操作できません | api/v1/admin.py |
 | `sensitive_creator_only` | 403 | no | 機密情報を含む版は作成者だけが表示できます | api/v1/booklet.py |
+| `sensitive_not_publishable` | 409 | no | 機密項目を含む版は Web で公開できません。機密項目を外した版を作ってください | api/v1/booklet.py |
 | `sensitive_requires_owner` | — | — | 予約番号・住所・電話・参加者名を含めた出力は旅行の所有者だけが作成できます | api/v1/booklet.py |
 | `share_view_expired` | — | — | 閲覧の時間が過ぎました。もう一度リンクを開いてください | api/v1/public_share.py |
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
