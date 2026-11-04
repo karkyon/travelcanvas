@@ -8,6 +8,8 @@
  *   - 作成した版: 一覧・表示・失効
  * 機密項目を含めると警告を出し、有効期限を必須にする(透かしは作成者名)。
  */
+import { publishBookletExport, unpublishBookletExport } from '@/services/api/bookletWeb';
+import { safeExternalUrl } from '@/utils/safeNavigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ImageExportPanel from './booklet/ImageExportPanel';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -115,6 +117,30 @@ const BookletPage: React.FC = () => {
       setError(errorMessage(e, '版の作成に失敗しました'));
       setIsSaving(false);
     }
+  };
+
+  // [Gate BookletWeb] Web のページとして公開する・止める。URL は公開した時だけ分かる(作り直すと前の URL は使えない)
+  const [webUrl, setWebUrl] = useState<Record<string, string>>({});
+  const publish = async (x: BookletExport) => {
+    if (!planId) return;
+    if (!window.confirm(`第${x.version_no}版を Web のページとして公開しますか?URL を知っている人は誰でも見られます(検索には出しません)。${x.is_public ? '前に作った URL は使えなくなります。' : ''}`)) return;
+    try {
+      const r = await publishBookletExport(planId, x.id);
+      setWebUrl((m) => ({ ...m, [x.id]: `${window.location.origin}${r.url}` }));
+    } catch (e) {
+      setError(errorMessage(e, 'Web のページとして公開できませんでした'));
+    }
+    await loadExports();
+  };
+  const unpublish = async (x: BookletExport) => {
+    if (!planId) return;
+    try {
+      await unpublishBookletExport(planId, x.id);
+      setWebUrl((m) => { const n = { ...m }; delete n[x.id]; return n; });
+    } catch (e) {
+      setError(errorMessage(e, '公開を止められませんでした'));
+    }
+    await loadExports();
   };
 
   const revoke = async (x: BookletExport) => {
@@ -249,8 +275,30 @@ const BookletPage: React.FC = () => {
                         {x.can_view && (
                           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/booklet/${x.id}`)}>表示・印刷</Button>
                         )}
+                        {x.can_revoke && x.state === 'active' && !x.contains_sensitive && (
+                          <Button variant="ghost" size="sm" onClick={() => publish(x)} data-testid={`booklet-publish-${x.version_no}`}>
+                            {x.is_public ? 'Web の URL を作り直す' : 'Web のページとして公開'}
+                          </Button>
+                        )}
+                        {x.can_revoke && x.is_public && (
+                          <Button variant="ghost" size="sm" onClick={() => unpublish(x)} data-testid={`booklet-unpublish-${x.version_no}`}>公開を止める</Button>
+                        )}
                         {x.can_revoke && <Button variant="ghost" size="sm" onClick={() => revoke(x)}>失効</Button>}
                       </div>
+                      {x.is_public && (
+                        <p className="mt-1 text-xs text-gray-800" data-testid={`booklet-web-${x.version_no}`}>
+                          {`Web で公開中(${formatDateTime(x.published_at ?? null)}から)`}
+                          {webUrl[x.id] && (
+                            <>
+                              {' ・ '}<a href={safeExternalUrl(webUrl[x.id]) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline break-all">{webUrl[x.id]}</a>
+                              <button type="button" className="ml-2 underline" onClick={() => void navigator.clipboard?.writeText(webUrl[x.id]!)}>URL をコピー</button>
+                            </>
+                          )}
+                        </p>
+                      )}
+                      {x.contains_sensitive && x.state === 'active' && (
+                        <p className="mt-1 text-xs text-gray-700">機密項目を含む版は Web で公開できません(印刷・PDF だけ)。</p>
+                      )}
                     </li>
                   ))}
                 </ul>

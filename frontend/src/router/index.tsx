@@ -81,6 +81,8 @@ const OrganizationPage = lazyPage(() => import('@/pages/OrganizationPage'));
 const DistributionPage = lazyPage(() => import('@/pages/DistributionPage'));
 const PlacePage = lazyPage(() => import('@/pages/PlacePage'));
 const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
+const MemoriesHomePage = lazyPage(() => import('@/pages/MemoriesHomePage'));
+const PublicBookletPage = lazyPage(() => import('@/pages/PublicBookletPage'));
 const MemoryReplanPage = lazyPage(() => import('@/pages/MemoryReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
@@ -568,6 +570,15 @@ export const router = createBrowserRouter([
         ),
       },
       // 🗺️ [Gate P15] Personal Travel Atlas(FR-052、旅行を横断した訪問地域。本人だけ)。
+      // [Gate HomeV2] 旅の記録と思い出(行った旅・写真・旅の足あと)
+      {
+        path: 'memories',
+        element: (
+          <ProtectedRoute>
+            <MemoriesHomePage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: 'atlas',
         element: (
@@ -679,6 +690,11 @@ export const router = createBrowserRouter([
       },
 
       // 📖 [Gate G6] 公開した旅行記の閲覧(未認証)。ProtectedRoute で包まない
+      // 📘 [Gate BookletWeb] Web で公開したしおり(未認証)。ProtectedRoute で包まない
+      {
+        path: 'b/:token',
+        element: <PublicBookletPage />,
+      },
       {
         path: 'journal/:token',
         element: <PublicJournalPage />,

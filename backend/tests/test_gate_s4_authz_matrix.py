@@ -45,6 +45,7 @@ PUBLIC_ROUTES = {
     ("POST", "/api/v1/public/share/{token}/report"): "[Gate G4] FC-097 濫用の通報(誰でも送れる。接続元ごとの回数制限)",
     ("GET", "/api/v1/public/journal/{token}"): "[Gate G6] MEM-01 公開した旅行記(本人の記録の写しだけ。座標なし・失効できる)",
     ("GET", "/api/v1/public/journal/{token}/photos/{memory_id}"): "[Gate G6] MEM-01 公開した旅行記の写真(本人が選んだ物だけ。撮影情報を除く)",
+    ("GET", "/api/v1/public/booklets/{token}"): "[Gate BookletWeb] Web で公開したしおり(機密項目を含まない版だけ。止める・失効できる)",
     ("POST", "/api/v1/quick-drafts"): "ログイン前の下書き(端末の合言葉で本人を見分ける)",
     ("POST", "/api/v1/quick-drafts/{draft_id}/promote"): "同上",
     ("POST", "/api/v1/auth/logout"): "この端末の cookie を消す(cookie の更新鍵が正しければそのセッションも失効させる)",

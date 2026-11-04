@@ -19,16 +19,20 @@ const AppRail: React.FC = () => {
   const settingsActive = pathname.startsWith('/settings');
   return (
     <nav className="tc-rail" aria-label="主なメニュー" data-testid="app-rail">
-      {items.map(({ key, label, icon: Icon, to, match, needsTrip }) => {
+      {items.map(({ key, label, icon: Icon, to, match, needsTrip, group }, i) => {
         const active = match(pathname);
         const pending = needsTrip && !trip;
+        const firstOfTrip = group === 'trip' && items[i - 1]?.group !== 'trip';
         return (
-          <Link key={key} to={safeInternalPath(to) ?? '/dashboard'} aria-current={active ? 'page' : undefined} className="tc-focus-ring"
+          <React.Fragment key={key}>
+          {firstOfTrip && <span className="tc-rail-sep" aria-hidden="true">この旅行</span>}
+          <Link to={safeInternalPath(to) ?? '/dashboard'} aria-current={active ? 'page' : undefined} className="tc-focus-ring"
             data-testid={`rail-${key}`} title={pending ? `${label}(旅行を選ぶと開きます)` : label}>
             <Icon size={20} aria-hidden="true" />
             <span>{label}</span>
             {pending && <span className="sr-only">(旅行を選ぶと開きます)</span>}
           </Link>
+          </React.Fragment>
         );
       })}
       <Link to="/settings" aria-current={settingsActive ? 'page' : undefined} className="tc-focus-ring tc-rail-bottom"

@@ -22,7 +22,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
 import PageHead from '@/components/shell/PageHead';
 import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
-import { Footprints, HomeProgress, MemoriesSection, NextTasks, Tools, TripShelves, Wishlist } from './dashboard/HomeSections';
+import { Footprints, MemoriesSection, NextTasks, PlanningHero, Tools, TripShelves, Wishlist } from './dashboard/HomeSections';
 
 type LoadState =
   | { kind: 'loading' }
@@ -136,18 +136,16 @@ const DashboardPage: React.FC = () => {
           // [Gate HomeV2] 1. いま計画中: 主役の旅行(表紙・旅の準備・操作)と、次にやること(計画中の旅行ぜんぶ)
           <div className="tc-home-planning">
             <div className="tc-dash-col">
-              <TripHero trip={focusTrip} />
-              {progress && <HomeProgress detail={progress} />}
+              {home ? <PlanningHero trip={focusTrip} detail={progress} /> : <TripHero trip={focusTrip} />}
               {focusIsAuto && data.focus && (data.focus.phase === 'ongoing' || data.focus.phase === 'past'
                 || (data.focus.alerts?.active ?? 0) > 0 || !home) && (
-                <div className="mt-4"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
+                <FocusPanels focus={data.focus} trip={focusTrip} />
               )}
             </div>
             <div className="tc-dash-col">
-              {home && (
+              {home ? (
                 <NextTasks tasks={home.tasks} planning={planningTrips} selected={focusTrip.id} onSelect={setChosenId} />
-              )}
-              <QuickActions trip={focusTrip} />
+              ) : <QuickActions trip={focusTrip} />}
             </div>
           </div>
         )}

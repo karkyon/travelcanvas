@@ -20,8 +20,10 @@ import { setTripState } from '@/services/api/g9';
 import type { DashboardHome, DashboardTrip, HomePlanning, HomeTask, TripShelf } from '@/services/api/types/g9';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import Landscape from '@/components/shell/Landscape';
+import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { TripCard } from './DashboardParts';
-import { tripDateLabel } from './dashboardModel';
+import { PHASE_LABEL, ROLE_LABEL, quickActions, statusLabel, tripDateLabel } from './dashboardModel';
 
 const SHELF_LABEL: Record<TripShelf, string> = {
   planning: '計画中', considering: '検討中', visited: '行った旅', cancelled: '見送り・中止',
@@ -49,6 +51,81 @@ export const HomeProgress: React.FC<{ detail: HomePlanning }> = ({ detail }) => 
           </li>
         ))}
       </ol>
+    </section>
+  );
+};
+
+
+// ------------------------------------------------------------------ いま計画中(主役の旅行の表紙)
+
+/**
+ * モックアップ v2 の表紙: 写真(無ければ絵)の上に、状態・行き先・人数、旅行名、日付と予定の数、出発までの日数(旅行中は何日目)、
+ * 主な操作(旅程を開く / 今日の予定)と「この旅行の操作」(予約・準備・しおり・招待など)、右上に旅の準備の進み具合。
+ */
+export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning | null }> = ({ trip, detail }) => {
+  const cover = useCoverPhoto(trip.id, trip.cover);
+  const primary = trip.phase === 'ongoing'
+    ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' } : { to: `/planner/${trip.id}`, label: '旅程を開く' };
+  const actions = quickActions(trip).filter((a) => a.to !== primary.to);
+  const booklet = { key: 'booklet', label: 'しおり(印刷・Web)', to: `/planner/${trip.id}/booklet` };
+  // 操作は主な操作を含めて 4 つまで(UX-3)。しおり(印刷・Web)は招待の前に置く
+  const others = actions.filter((a) => a.key !== 'share');
+  const withBooklet = trip.phase === 'past' ? actions
+    : [...others.slice(0, 1), booklet, ...others.slice(1), ...actions.filter((a) => a.key === 'share')];
+  const navItems = withBooklet.length > 3 && withBooklet.some((a) => a.key === 'share')
+    ? [...withBooklet.filter((a) => a.key !== 'share').slice(0, 2), ...withBooklet.filter((a) => a.key === 'share')]
+    : withBooklet.slice(0, 3);
+  const pct = detail && detail.total ? Math.round((detail.done / detail.total) * 100) : 0;
+  return (
+    <section className="tc-plan-hero" aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}
+      data-has-photo={cover.photo ? 'true' : undefined}>
+      <div className="tc-plan-hero-bg" aria-hidden="true">
+        {cover.photo ? (
+          <img src={cover.photo.src} alt="" onError={cover.onError} data-testid="trip-cover-photo"
+            style={{ objectPosition: `${cover.photo.focusX * 100}% ${cover.photo.focusY * 100}%` }} />
+        ) : <Landscape />}
+      </div>
+      <div className="tc-plan-hero-in">
+        <div className="tc-plan-hero-chips">
+          <span className="tc-plan-chip tc-plan-chip--live" data-testid="dashboard-phase">{PHASE_LABEL[trip.phase]}</span>
+          {trip.destination && <span className="tc-plan-chip">{trip.destination}</span>}
+          <span className="tc-plan-chip">{`${trip.member_count}人・あなたは${ROLE_LABEL[trip.role]}`}</span>
+        </div>
+        <h2 id="dash-hero-title">{trip.title}</h2>
+        <p className="tc-plan-hero-meta">
+          {[tripDateLabel(trip), detail ? `予定 ${detail.event_count} 件` : null,
+            detail && detail.segments.need ? `移動手段 ${detail.segments.done}/${detail.segments.need} 決定` : null]
+            .filter(Boolean).join(' · ')}
+        </p>
+        <p className="tc-plan-hero-count">
+          {trip.phase === 'upcoming' && trip.days_until_start !== null ? (
+            <><b>{trip.days_until_start}</b><span>日後に出発</span></>
+          ) : trip.phase === 'ongoing' && trip.day_number ? (
+            <><b>{trip.day_number}</b><span>日目(旅行中)</span></>
+          ) : <span>{statusLabel(trip)}</span>}
+        </p>
+        <nav aria-label="この旅行の操作" className="tc-plan-hero-acts">
+          <Link to={safeInternalPath(primary.to) ?? '/dashboard'} className="tc-focus-ring tc-mbtn tc-mbtn--primary">{`${primary.label} →`}</Link>
+          {navItems.map((a) => (
+            <Link key={a.key} to={safeInternalPath(a.to) ?? '/dashboard'} className="tc-focus-ring tc-plan-hero-btn">{a.label}</Link>
+          ))}
+        </nav>
+      </div>
+      {detail && (
+        <div className="tc-plan-hero-prog" data-testid="home-progress">
+          <h3>{`旅の準備 ${detail.done} / ${detail.total}`}</h3>
+          <div className="tc-home-bar" role="progressbar" aria-valuemin={0} aria-valuemax={detail.total} aria-valuenow={detail.done}
+            aria-label="旅の準備の進み具合"><i style={{ width: `${pct}%` }} /></div>
+          <ol className="tc-plan-steps">
+            {detail.steps.map((st) => (
+              <li key={st.key} data-done={st.done ? 'true' : 'false'} data-testid={`home-step-${st.key}`}>
+                <span className="tc-home-step-dot" aria-hidden="true">{st.done ? <Check size={11} /> : '!'}</span>
+                {st.label}<span className="sr-only">{st.done ? '(済み)' : '(まだ)'}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </section>
   );
 };

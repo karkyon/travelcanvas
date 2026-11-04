@@ -9,6 +9,8 @@
 import React, { useId, useMemo, useState } from 'react';
 import Button from '@/components/common/Button';
 import { searchNearby } from '@/services/api/g11discover';
+import FindByOther from '@/components/search/FindByOther';
+import type { FindModeKey } from '@/components/search/findModel';
 import type { DiscoverCategory, NearbyResult } from '@/services/api/types/g11discover';
 import { CATEGORIES, distanceLabel, type BasePoint } from './discoverModel';
 
@@ -33,6 +35,7 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
   const [radius, setRadius] = useState(2);
   const [category, setCategory] = useState<DiscoverCategory>('all');
   const [query, setQuery] = useState('');
+  const [findMode, setFindMode] = useState<FindModeKey | null>(null);
   const [results, setResults] = useState<NearbyResult[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,21 +66,23 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
     );
   };
 
-  const search = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!base) {
+  const search = async (e?: React.FormEvent, over?: { q?: string; at?: { latitude: number; longitude: number } }) => {
+    e?.preventDefault();
+    const at = over?.at ?? base;
+    const q = (over?.q ?? query).trim();
+    if (!at) {
       setError('探す基点を選んでください');
       return;
     }
-    if (category === 'all' && !query.trim()) {
+    if (category === 'all' && !q && !over?.at) {
       setError('「すべて」で探す時は、探す言葉を入力してください');
       return;
     }
     setBusy('search');
     setError(null);
     try {
-      const r = await searchNearby({ query: query.trim(), category, latitude: base.latitude, longitude: base.longitude,
-        radius_km: radius });
+      const r = await searchNearby({ query: q, category: over?.at && category === 'all' ? 'sightseeing' : category,
+        latitude: at.latitude, longitude: at.longitude, radius_km: over?.at ? 2 : radius });
       setResults([...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)));
     } catch {
       setResults([]);
@@ -101,6 +106,23 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
     <section aria-labelledby="nearby-title" className="rounded-xl border border-cloud-200 bg-surface p-4" data-testid="nearby-discover">
       <h2 id="nearby-title" className="font-semibold text-ink-900">近くの「行きたい」を集める</h2>
       <p className="text-xs text-ink-700">基点の周りを、カテゴリと半径で探します。見つけた場所は候補箱へ入れてから、日程へ追加できます。</p>
+      {/* [Gate SpotFind] ほかの探し方(スポット検索と同じ部品) */}
+      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="ほかの探し方">
+        <span className="text-xs text-ink-700">ほかの探し方:</span>
+        {([['image', '写真から'], ['voice', '声で'], ['sns', 'SNS から']] as const).map(([m, label]) => (
+          <button key={m} type="button" aria-pressed={findMode === m} onClick={() => setFindMode(findMode === m ? null : m)}
+            data-testid={`nearby-find-${m}`}
+            className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs font-semibold ${findMode === m
+              ? 'border-accent bg-accent text-on-accent' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>{label}</button>
+        ))}
+      </div>
+      {findMode && (
+        <div className="mt-2 rounded-lg border border-cloud-200 p-3">
+          <FindByOther mode={findMode} busy={busy !== null}
+            onKeyword={(q) => { setQuery(q); void search(undefined, { q }); }}
+            onPhotoPlace={(p) => void search(undefined, { at: { latitude: p.latitude, longitude: p.longitude } })} />
+        </div>
+      )}
       <form className="mt-3 space-y-3" onSubmit={search} aria-label="近くを探す">
         <fieldset>
           <legend className="text-sm text-ink-700">探す基点</legend>

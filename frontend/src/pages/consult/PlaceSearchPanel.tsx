@@ -27,6 +27,8 @@ import {
 } from './consultModel';
 import { googleSearchAvailability, keepIdempotencyKey } from './consultAiModel';
 import UiIcon from '@/components/common/UiIcon';
+import FindByOther from '@/components/search/FindByOther';
+import type { FindModeKey } from '@/components/search/findModel';
 import { asKind, avoidKind, KIND_META, KIND_ORDER, matchedPrefs, type PlaceKind } from './placeKinds';
 
 const RADII = [2, 5, 10, 20];
@@ -74,6 +76,9 @@ export interface PlaceSearchProps {
 /** [Gate AreaGeo] 結果の出典の名前(観光は OpenStreetMap と Wikipedia の座標付き記事の両方から探す) */
 const providerLabel = (p: string): string => (p === 'wikipedia' ? 'Wikipedia' : 'OpenStreetMap');
 
+
+/** [Gate SpotFind] 探す言葉・場所の上書き(声・SNS の言葉、写真の撮影場所) */
+type Over = { q?: string; at?: { latitude: number; longitude: number } };
 const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true, preferences = [], recommend,
 }) => {
@@ -86,6 +91,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   const [category, setCategory] = useState<ConsultCategory>('sightseeing');
   const [radius, setRadius] = useState(10);
   const [query, setQuery] = useState('');
+  const [findMode, setFindMode] = useState<FindModeKey | null>(null);
   const [source, setSource] = useState<SearchSource>('osm');
   const [osm, setOsm] = useState<{ rows: NearbyResult[]; label: string } | null>(null);
   const [gResults, setGResults] = useState<{ rows: GooglePick[]; label: string } | null>(null);
@@ -101,10 +107,12 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   const avail = googleSearchAvailability(google.status, google.usage);
   const catLabel = CONSULT_CATEGORIES.find((c) => c.id === category)?.label ?? '';
 
-  const runOsm = async () => {
-    if (!base) return;
-    const r = await searchNearby({ query: query.trim(), category: category as DiscoverCategory, latitude: base.latitude,
-      longitude: base.longitude, radius_km: radius });
+  const runOsm = async (over?: Over) => {
+    const at = over?.at ?? base;
+    if (!at) return;
+    const q = (over?.q ?? query).trim();
+    const r = await searchNearby({ query: q, category: category as DiscoverCategory, latitude: at.latitude,
+      longitude: at.longitude, radius_km: over?.at ? 2 : radius });
     const failed = (r.unavailable_providers ?? []).includes('overpass');
     const message = searchErrorMessage(r.provider_errors?.overpass, r.provider_retry_after?.overpass);
     if (failed && r.candidates.length === 0) {
@@ -117,7 +125,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     if (failed) setFailure({ source: 'osm', message });
     setPartial((r.partial_providers ?? []).includes('overpass'));
     setOsm({ rows: [...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)),
-      label: `${catLabel}${query.trim() ? `「${query.trim()}」` : ''} · ${areaName}の周り ${radius}km` });
+      label: over?.at ? `${catLabel} · 写真の撮影場所の周り 2km` : `${catLabel}${q ? `「${q}」` : ''} · ${areaName}の周り ${radius}km` });
     setShown('osm');
     setResultsVersion((v) => v + 1);
     if (r.candidates.length === 0) setEmpty(`OpenStreetMap で探しました: ${areaName}の半径${radius}kmに、このカテゴリの場所は見つかりませんでした(該当なし)。半径・カテゴリ・言葉を変えてください。`);
@@ -148,16 +156,16 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     }
   };
 
-  const search = async (which: SearchSource = source) => {
+  const search = async (which: SearchSource = source, over?: Over) => {
     if (busyRef.current) return; // 二重押しで二度送らない
-    if (which === 'osm' && !base) return;
+    if (which === 'osm' && !base && !over?.at) return;
     if (which === 'google' && !avail.ok) return;
     busyRef.current = true;
     setBusy(true);
     setFailure(null);
     setEmpty(null);
     try {
-      if (which === 'osm') await runOsm(); else await runGoogle();
+      if (which === 'osm') await runOsm(over); else await runGoogle();
     } catch (err) {
       if (which === 'google') {
         // ensureSession など、Google の検索の前の失敗(送っていない)
@@ -282,6 +290,23 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
           {!recommend.busy && recRows.length === 0 && !recommend.error && (
             <p className="mt-2 text-xs text-ink-700">まだおすすめの場所はありません。</p>
           )}
+        </div>
+      )}
+      {/* [Gate SpotFind] ほかの探し方(スポット検索と同じ部品): 写真の撮影場所・声・SNS の投稿の文 */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-cloud-200 px-4 py-2" role="group" aria-label="ほかの探し方">
+        <span className="text-xs text-ink-700">ほかの探し方:</span>
+        {([['image', '写真から'], ['voice', '声で'], ['sns', 'SNS から']] as const).map(([m, label]) => (
+          <button key={m} type="button" aria-pressed={findMode === m} onClick={() => setFindMode(findMode === m ? null : m)}
+            data-testid={`consult-find-${m}`}
+            className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs font-semibold ${findMode === m
+              ? 'border-accent bg-accent text-on-accent' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>{label}</button>
+        ))}
+      </div>
+      {findMode && (
+        <div className="border-b border-cloud-200 p-4" data-testid="consult-find-panel">
+          <FindByOther mode={findMode} busy={busy}
+            onKeyword={(q) => { setQuery(q.slice(0, 100)); setSource('osm'); void search('osm', { q: q.slice(0, 100) }); }}
+            onPhotoPlace={(p) => { setSource('osm'); void search('osm', { at: { latitude: p.latitude, longitude: p.longitude } }); }} />
         </div>
       )}
       <form onSubmit={(e) => { e.preventDefault(); void search(); }} aria-label="候補を探す"

@@ -192,7 +192,7 @@
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; overflow: hidden;
   }
   .tc-rail a { height: 54px; gap: 3px; font-size: 11px; border-radius: 11px; }
-  .tc-rail a:nth-child(n + 6) { display: none; }
+  .tc-rail a:nth-child(n + 6), .tc-rail .tc-rail-sep { display: none; }
   .tc-page { padding: 17px 13px 40px; }
   .tc-page-head { align-items: flex-start; margin-bottom: 15px; }
   .tc-page-head h1 { font-size: 22px; }
@@ -706,3 +706,40 @@
 @media (max-width: 1100px) { .tc-home-planning, .tc-home-two { grid-template-columns: 1fr; } }
 .tc-home-mosaic[data-count="0"] { grid-template-rows: 44px; }
 .tc-home-mosaic[data-count="0"] .tc-home-mosaic-empty { grid-row: 1; }
+/* [Gate HomeV2] 左の帯: 開いている旅行の項目の区切り。長い名前は 2 行で */
+.tc-rail-sep { display: block; width: 60px; margin: 6px auto 2px; padding-top: 6px; border-top: 1px solid var(--tc-cloud-200);
+  font-size: 9.5px; font-weight: 700; color: var(--tc-ink-700); text-align: center; }
+@media (min-width: 761px) { .tc-rail a { min-height: 62px; max-height: 62px; height: auto; padding: 3px 2px; gap: 3px; } }
+.tc-rail a span { line-height: 1.12; font-size: 10.5px; text-align: center; white-space: normal; max-width: 64px; word-break: keep-all; overflow-wrap: anywhere; }
+/* [Gate HomeV2] モックアップ v2 の表紙: 写真の上に暗いグラデーション・大きな日数・操作・右上の旅の準備 */
+.tc-plan-hero { position: relative; overflow: hidden; border-radius: 22px; min-height: 320px; color: #fff; background: #1c2f5e;
+  box-shadow: 0 10px 30px rgba(22, 33, 58, .1); }
+.tc-plan-hero-bg { position: absolute; inset: 0; }
+.tc-plan-hero-bg img, .tc-plan-hero-bg svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tc-plan-hero::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(10, 20, 45, .86) 0%, rgba(10, 20, 45, .62) 52%, rgba(10, 20, 45, .2) 100%); }
+.tc-plan-hero-in { position: relative; z-index: 1; padding: 24px 26px; display: flex; flex-direction: column; min-height: 320px; max-width: 62%; }
+.tc-plan-hero-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tc-plan-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 800;
+  background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .32); color: #fff; }
+.tc-plan-chip--live { background: #f3b64b; border-color: #f3b64b; color: #3d2600; }
+.tc-plan-hero h2 { margin: 10px 0 4px; font-size: 28px; line-height: 1.25; font-weight: 800; color: #fff; }
+.tc-plan-hero-meta { margin: 0; font-size: 12.5px; color: rgba(255, 255, 255, .92); }
+.tc-plan-hero-count { margin: 12px 0 0; display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: #fff; }
+.tc-plan-hero-count b { font-size: 46px; line-height: 1; }
+.tc-plan-hero-acts { margin-top: auto; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.tc-plan-hero-btn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 12px; font-size: 13px;
+  font-weight: 800; color: #fff; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .4); }
+.tc-plan-hero-btn:hover { background: rgba(255, 255, 255, .24); }
+.tc-plan-hero-prog { position: absolute; z-index: 1; right: 20px; top: 20px; width: 250px; border-radius: 16px; padding: 12px 14px;
+  background: var(--tc-cloud-0); color: var(--tc-ink-900); box-shadow: 0 8px 24px rgba(10, 20, 45, .25); }
+.tc-plan-hero-prog h3 { margin: 0 0 6px; font-size: 13px; font-weight: 800; }
+.tc-plan-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; font-size: 12px; color: var(--tc-ink-700); }
+.tc-plan-steps li { display: flex; align-items: center; gap: 7px; }
+.tc-plan-steps li[data-done="true"] { color: var(--tc-ink-900); }
+.tc-plan-steps li[data-done="true"] .tc-home-step-dot { background: var(--tc-success-soft); color: var(--tc-success); }
+.tc-home-tasks { height: 100%; }
+@media (max-width: 900px) {
+  .tc-plan-hero-in { max-width: none; }
+  .tc-plan-hero-prog { position: relative; right: auto; top: auto; width: auto; margin: 0 16px 16px; }
+}

@@ -5,14 +5,18 @@
  * 「AI 信頼度」と書き、値段の段階(¥¥)を全ての結果に既定値で付けていた。実際は次のとおりのため、画面の言葉を実際に合わせる:
  *   - 文字の検索: サーバーの /search/spots が公開のデータ(Wikipedia・OpenStreetMap の Nominatim・Overpass)をキーワードで引く。
  *     AI・有料の提供元は使っていない(未接続)。並びは提供元が返した順
- *   - 写真から探す・声で探す: 未実装(押しても何も解析しない)。準備中と示し、送る操作を出さない
+ *   - [Gate SpotFind] 写真から探す: 写真の撮影場所(Exif の GPS)を端末で読み、その周りを探す(写真は送らない)。
+ *     声で探す: 端末の音声認識で文字にして探す。SNS から探す: 投稿の文から場所の言葉を拾う(URL の中身は取りに行かない)
  *   - 評価・値段・所要時間・費用は提供元から来ないため出さない(作った値を見せない)
  */
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Globe, Camera, Mic, Info } from 'lucide-react';
+import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots } from '../services/api';
+import { searchNearby } from '../services/api/g11discover';
+import FindByOther from '@/components/search/FindByOther';
+import type { GpsPoint } from '@/components/search/findModel';
 import UiIcon from '@/components/common/UiIcon';
 import type { LucideIcon } from 'lucide-react';
 import PageHead from '@/components/shell/PageHead';
@@ -44,17 +48,18 @@ const PROVIDER_LABEL: Record<string, string> = {
   overpass: 'OpenStreetMap(Overpass)',
 };
 
-type Mode = 'text' | 'image' | 'voice';
+type Mode = 'text' | 'image' | 'voice' | 'sns';
 type Status =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'done'; results: SearchResult[] }
   | { kind: 'error'; message: string };
 
-const MODES: Array<{ key: Mode; label: string; icon: LucideIcon; ready: boolean }> = [
-  { key: 'text', label: '言葉で探す', icon: Search, ready: true },
-  { key: 'image', label: '写真から探す', icon: Camera, ready: false },
-  { key: 'voice', label: '声で探す', icon: Mic, ready: false },
+const MODES: Array<{ key: Mode; label: string; icon: LucideIcon }> = [
+  { key: 'text', label: '言葉で探す', icon: Search },
+  { key: 'image', label: '写真から探す', icon: Camera },
+  { key: 'voice', label: '声で探す', icon: Mic },
+  { key: 'sns', label: 'SNS から探す', icon: Hash },
 ];
 
 function loadSearchPreferences(): { maxResults: number; area: { latitude: number; longitude: number } | null } {
@@ -92,14 +97,35 @@ const SearchPage: React.FC = () => {
     );
   }, [prefs.area]);
 
-  const run = async (e?: React.FormEvent) => {
+  // [Gate SpotFind] 写真の撮影場所の周り(OpenStreetMap・Wikipedia の近くの場所)
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
+  const runNear = async (p: GpsPoint) => {
+    setStatus({ kind: 'loading' });
+    setPhotoNote(null);
+    try {
+      const r = await searchNearby({ query: '', category: 'sightseeing', latitude: p.latitude, longitude: p.longitude, radius_km: 2 });
+      setPhotoNote(`写真の撮影場所から半径 2km の場所(${r.candidates.length}件)`);
+      setStatus({ kind: 'done', results: r.candidates.map((c) => ({
+        id: c.id, name: c.name, description: c.description ?? '', category: c.kind ?? c.category ?? 'default', provider: c.provider,
+        location: { latitude: c.location.latitude ?? undefined, longitude: c.location.longitude ?? undefined,
+          address: c.location.address ?? undefined },
+      })) });
+    } catch {
+      setStatus({ kind: 'error', message: '写真の場所の周りを探せませんでした。時間をおいてもう一度試してください。' });
+    }
+  };
+
+  const run = async (e?: React.FormEvent, q0?: string) => {
     e?.preventDefault();
-    if (!query.trim()) {
+    const q = (q0 ?? query).trim();
+    if (q0 !== undefined) setQuery(q0);
+    setPhotoNote(null);
+    if (!q) {
       setStatus({ kind: 'error', message: '探す言葉を入れてください' });
       return;
     }
     setStatus({ kind: 'loading' });
-    const response = await searchSpots({ query: query.trim(), location: location ?? undefined, max_results: prefs.maxResults });
+    const response = await searchSpots({ query: q, location: location ?? undefined, max_results: prefs.maxResults });
     if (!response.success) {
       setStatus({ kind: 'error', message: '検索できませんでした。時間をおいてもう一度試してください。' });
       return;
@@ -122,7 +148,6 @@ const SearchPage: React.FC = () => {
     );
   };
 
-  const current = MODES.find((m) => m.key === mode)!;
 
   return (
     <div className="min-h-screen bg-cloud-50">
@@ -142,18 +167,18 @@ const SearchPage: React.FC = () => {
         </p>
 
         <div role="tablist" aria-label="探し方" className="flex flex-wrap gap-2 mb-4">
-          {MODES.map(({ key, label, icon: Icon, ready }) => (
+          {MODES.map(({ key, label, icon: Icon }) => (
             <button key={key} type="button" role="tab" id={`search-tab-${key}`} aria-selected={mode === key}
               aria-controls={`search-panel-${key}`} onClick={() => setMode(key)}
               className={`tc-focus-ring tc-mbtn tc-mbtn--sm ${mode === key ? 'tc-mbtn--primary' : ''}`}>
               <Icon size={14} aria-hidden="true" />{label}
-              {!ready && <span className="tc-pill tc-pill--warn ml-1">準備中</span>}
+              
             </button>
           ))}
         </div>
 
         <section role="tabpanel" id={`search-panel-${mode}`} aria-labelledby={`search-tab-${mode}`} className="tc-card p-5 mb-6">
-          {current.ready ? (
+          {mode === 'text' ? (
             <form onSubmit={run} className="flex flex-col sm:flex-row gap-3" role="search">
               <label htmlFor="search-q" className="sr-only">探す言葉</label>
               <input id="search-q" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
@@ -164,19 +189,15 @@ const SearchPage: React.FC = () => {
               </button>
             </form>
           ) : (
-            <div data-testid={`search-unavailable-${mode}`}>
-              <p className="font-semibold text-ink-900">{`${current.label}は準備中です`}</p>
-              <p className="text-sm text-ink-700 mt-1">
-                {mode === 'image'
-                  ? '写真から場所を見つける仕組み(画像の解析)はまだありません。写真を送っても解析しないため、ここでは受け付けていません。'
-                  : '声から場所を探す仕組み(音声の文字起こし)はまだありません。録音しても解析しないため、ここでは受け付けていません。'}
-              </p>
-              <button type="button" onClick={() => setMode('text')} className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-3">
-                言葉で探す
-              </button>
-            </div>
+            // [Gate SpotFind] 写真・声・SNS から探す(旅行をつくる時の場所の検索と同じ部品)
+            <FindByOther mode={mode} busy={status.kind === 'loading'} onKeyword={(q) => void run(undefined, q)}
+              onPhotoPlace={(p) => void runNear(p)} />
           )}
-          {current.ready && locationNote && <p className="text-xs text-ink-500 mt-2">{locationNote}</p>}
+          {mode !== 'text' && query && status.kind !== 'idle' && !photoNote && (
+            <p className="text-xs text-ink-700 mt-2" data-testid="search-used-words">{`「${query}」で探しました`}</p>
+          )}
+          {photoNote && <p className="text-xs text-ink-700 mt-2">{photoNote}</p>}
+          {mode === 'text' && locationNote && <p className="text-xs text-ink-500 mt-2">{locationNote}</p>}
         </section>
 
         <div aria-live="polite">

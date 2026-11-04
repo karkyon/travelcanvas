@@ -532,6 +532,7 @@ app.include_router(finance.router, prefix="/api/v1")
 app.include_router(discussion.router, prefix="/api/v1")
 # [Gate P4] FR-034しおり生成 / FR-035安全な印刷・公開 / FR-046 PDF出力。/plans/{plan_id}/booklet・booklet-exports配下。
 app.include_router(booklet.router, prefix="/api/v1")
+app.include_router(booklet.public_router, prefix="/api/v1")  # [Gate BookletWeb] 公開したしおり
 # [Gate P5] FR-036カレンダー・地図の書き出し(ICS/GPX/KML/CSV)。/plans/{plan_id}/exports/*配下。
 app.include_router(itinerary_export.router, prefix="/api/v1")
 # [Gate P6] FR-039データポータビリティ。/plans/{plan_id}/data-export、/privacy/data-export・retention。

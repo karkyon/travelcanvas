@@ -18,7 +18,9 @@
 機密項目を含む版は、作成者名の透かしと有効期限が必須(FC-088)。QR・チケットの中身・PIN・名義・個人の持ち物・
 個人予算はどの設定でも含めない。監査には設定(章・含めた項目の種類)だけを記録し、内容は記録しない。
 """
+import hashlib
 import json
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, List, Optional
@@ -36,6 +38,7 @@ from app.models.models import BookletExport, TravelPlan, User
 from app.services import booklet
 from app.services.audit_service import record_audit_event
 from app.services.readiness import member_names
+from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/plans", tags=["booklet"])
 
@@ -183,6 +186,9 @@ def _export_response(e: BookletExport, plan: TravelPlan, user: User, role: str, 
         "is_mine": mine,
         "can_view": state == "active" and (mine or not e.contains_sensitive),
         "can_revoke": state != "revoked" and (mine or role == "owner"),
+        # [Gate BookletWeb] Web のページとして公開中か(URL の鍵は公開した時だけ返す)
+        "is_public": bool(e.public_token_hash) and state == "active",
+        "published_at": _iso(e.published_at) if e.public_token_hash else None,
     }
 
 
@@ -317,8 +323,74 @@ def revoke_export(plan_id: str, export_id: str, request: Request, db: Session = 
         e.status = "revoked"
         e.revoked_at = _now()
         e.snapshot_ciphertext = None
+        e.public_token_hash = None  # [Gate BookletWeb] 失効すると公開の URL も使えなくする
         db.commit()
         db.refresh(e)
         _audit("booklet_export_revoked", request, current_user, e.id, plan.id, {"version_no": e.version_no})
     names = member_names(db, {e.created_by_user_id})
     return {"export": _export_response(e, plan, current_user, role, names, _now())}
+
+
+# ===== [Gate BookletWeb] しおりの版を Web のページとして公開する =====
+# 鍵は推測できない長さで作り、SHA-256 の値だけを保存する(URL は公開した時に 1 度だけ返す。作り直すと前の URL は使えない)。
+# 機密項目を含む版は公開できない。失効・期限切れ・旅行の削除で見られなくなる。閲覧は資格情報なし・noindex・no-store・回数制限。
+
+PUBLIC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
+public_router = APIRouter(prefix="/public/booklets", tags=["public"])
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@router.post("/{plan_id}/booklet-exports/{export_id}/publish", response_model=dict)
+def publish_export(plan_id: str, export_id: str, request: Request, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user_or_guest)):
+    plan, role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor")
+    e = _get_export(db, plan, export_id)
+    if e.created_by_user_id != current_user.id and role != "owner":
+        raise HTTPException(status_code=403, detail="公開できるのは作成者か所有者だけです")
+    if _state(e, _now()) != "active" or e.snapshot_ciphertext is None:
+        raise HTTPException(status_code=409, detail={"code": "not_active", "message": "失効・期限切れの版は公開できません"})
+    if e.contains_sensitive:
+        raise HTTPException(status_code=409, detail={
+            "code": "sensitive_not_publishable", "message": "機密項目を含む版は Web で公開できません。機密項目を外した版を作ってください"})
+    token = secrets.token_urlsafe(24)
+    e.public_token_hash = _token_hash(token)
+    e.published_at = _now()
+    db.commit()
+    _audit("booklet_export_published", request, current_user, e.id, plan.id, {"version_no": e.version_no})
+    return {"url": f"/b/{token}", "published_at": _iso(e.published_at)}
+
+
+@router.delete("/{plan_id}/booklet-exports/{export_id}/publish", response_model=dict)
+def unpublish_export(plan_id: str, export_id: str, request: Request, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    plan, role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor")
+    e = _get_export(db, plan, export_id)
+    if e.created_by_user_id != current_user.id and role != "owner":
+        raise HTTPException(status_code=403, detail="公開を止められるのは作成者か所有者だけです")
+    if e.public_token_hash:
+        e.public_token_hash = None
+        e.published_at = None
+        db.commit()
+        _audit("booklet_export_unpublished", request, current_user, e.id, plan.id, {"version_no": e.version_no})
+    return {"is_public": False}
+
+
+@public_router.get("/{token}")
+def view_public_booklet(token: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"public_booklet:{ip}", 60, 60):
+        raise HTTPException(status_code=429, detail="アクセスが多すぎます。しばらく待ってください", headers=PUBLIC_HEADERS)
+    if not token or len(token) > 100:
+        raise HTTPException(status_code=404, detail="しおりが見つかりません", headers=PUBLIC_HEADERS)
+    e = db.query(BookletExport).filter(BookletExport.public_token_hash == _token_hash(token)).first()
+    plan = db.query(TravelPlan).filter(TravelPlan.id == e.plan_id).first() if e is not None else None
+    if (e is None or plan is None or plan.deleted_at is not None or e.contains_sensitive
+            or _state(e, _now()) != "active" or e.snapshot_ciphertext is None):
+        raise HTTPException(status_code=404, detail="しおりが見つからないか、公開が終わっています", headers=PUBLIC_HEADERS)
+    snapshot = json.loads(decrypt_payload(e.snapshot_ciphertext).decode("utf-8"))
+    response.headers.update(PUBLIC_HEADERS)
+    return {"booklet": snapshot, "version_no": e.version_no, "published_at": _iso(e.published_at),
+            "valid_until": _iso(e.valid_until), "theme": e.theme, "density": e.density}
