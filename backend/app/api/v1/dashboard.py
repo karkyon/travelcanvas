@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -27,7 +28,9 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import accessible_plan_ids_subquery
 from app.models.models import PlanCollaborator, TravelDay, TravelPlan, User
-from app.services import plan_cover
+from app.core.plan_access import require_plan_access
+from app.services import dashboard_home, plan_cover
+from app.services.audit_service import record_audit_event
 
 router = APIRouter(tags=["dashboard"])
 
@@ -245,6 +248,18 @@ async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depe
         if phase in ("ongoing", "upcoming"):
             focus["alerts"] = _alerts_summary(db, pid, current_user)
     counts = {ph: sum(1 for t in trips if t["phase"] == ph) for ph in PHASES}
+    # [Gate HomeV2] 旅行の一覧の状態・計画中の旅行の準備・次にやること・旅の記録と思い出・旅の足あと・行ってみたい場所
+    plans_by_id = {str(p.id): p for p in plans}
+    ready_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+    if focus is not None and focus.get("readiness") is not None:
+        ready_cache[focus["plan_id"]] = focus["readiness"]
+
+    def readiness_of(pid: str) -> Optional[Dict[str, Any]]:
+        if pid not in ready_cache:
+            ready_cache[pid] = _readiness_summary(db, pid, current_user)
+        return ready_cache[pid]
+
+    home = dashboard_home.collect(db, current_user, trips, plans_by_id, readiness_of)
     return {
         "server_time": now.isoformat(),
         "is_guest": getattr(current_user, "user_type", None) == "guest",
@@ -252,5 +267,22 @@ async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depe
         "counts": counts,
         "focus": focus,
         "limit": MAX_TRIPS,
-        "algorithm_version": "dashboard-v1",
+        "algorithm_version": "dashboard-v2",
+        "home": home,
     }
+
+
+class TripStateIn(BaseModel):
+    """[Gate HomeV2] 旅行の一覧での状態。cancelled = 見送り・中止(利用者が決める)。active = 日付で決まる状態へ戻す"""
+    state: str = Field(..., pattern="^(cancelled|active)$")
+
+
+@router.put("/dashboard/trips/{plan_id}/state", response_model=dict)
+def set_trip_state(plan_id: str, body: TripStateIn, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    plan.status = dashboard_home.CANCELLED_STATUS if body.state == "cancelled" else "active"
+    db.commit()
+    record_audit_event(action="plan.state", resource_type="travel_plan", user_id=current_user.id,
+                       resource_id=plan.id, details={"state": body.state})
+    return {"plan_id": str(plan.id), "state": body.state}

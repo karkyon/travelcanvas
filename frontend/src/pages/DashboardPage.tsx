@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, Search, Star, User as UserIcon, Map as MapIcon, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import Surface from '@/components/design/Surface';
 import { useAuthStore } from '@/store/authStore';
 import { getDashboard } from '@/services/api/g9';
@@ -21,7 +21,8 @@ import type { DashboardSummary } from '@/services/api/types/g9';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
 import PageHead from '@/components/shell/PageHead';
-import { EmptyHero, FocusPanels, QuickActions, TripContinue, TripHero, TripList, TripStats } from './dashboard/DashboardParts';
+import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
+import { Footprints, HomeProgress, MemoriesSection, NextTasks, Tools, TripShelves, Wishlist } from './dashboard/HomeSections';
 
 type LoadState =
   | { kind: 'loading' }
@@ -29,13 +30,6 @@ type LoadState =
   | { kind: 'offline' }
   | { kind: 'error'; message: string };
 
-const OTHER_LINKS = [
-  { to: '/spots/search', label: 'スポット検索', icon: Search },
-  { to: '/spots/register', label: 'スポット登録', icon: MapPin },
-  { to: '/spots', label: 'スポット一覧', icon: Star },
-  { to: '/atlas', label: '旅の地図', icon: MapIcon },
-  { to: '/profile', label: 'プロフィール', icon: UserIcon },
-];
 
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
@@ -44,6 +38,7 @@ const DashboardPage: React.FC = () => {
   const { user, isAuthenticated, isGuest } = useAuthStore();
   const { preference, theme, setPreference } = useThemePreference();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  const [chosenId, setChosenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/login');
@@ -70,8 +65,21 @@ const DashboardPage: React.FC = () => {
   if (!isAuthenticated) return null;
 
   const data = state.kind === 'ready' ? state.data : null;
-  const focusTrip = data?.focus ? data.trips.find((t) => t.id === data.focus?.plan_id) ?? null : null;
+  const home = data?.home ?? null;
+  // [Gate HomeV2] 主役の旅行: 選んだ計画中の旅行 → 自動で選ばれた旅行(旅行中 → 出発が近い → 最近終わった)
+  const planningTrips = data ? data.trips.filter((t) => t.shelf === 'planning') : [];
+  const chosen = chosenId ? planningTrips.find((t) => t.id === chosenId) ?? null : null;
+  const autoTrip = data?.focus ? data.trips.find((t) => t.id === data.focus?.plan_id) ?? null : null;
+  const focusTrip = chosen ?? autoTrip;
+  const focusIsAuto = Boolean(focusTrip && data?.focus && focusTrip.id === data.focus.plan_id);
+  const progress = home && focusTrip ? home.planning.find((p) => p.plan_id === focusTrip.id) ?? null : null;
   const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
+  const nextTrip = planningTrips.find((t) => t.days_until_start !== null) ?? null;
+  const title = nextTrip?.days_until_start ? `おかえりなさい。次の旅まで あと ${nextTrip.days_until_start} 日`
+    : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中です。今日の予定を確かめましょう' : '次の旅を、楽しみに変える';
+  const sub = home ? `${name}さん · 計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited}`
+    + ` · 見送り ${home.shelves.cancelled}`
+    : `${name}さん、次にすることをまとめました。日程も予約も旅の準備も、この旅のページから一緒に進められます。`;
 
   return (
     <div data-theme={theme} className="min-h-[calc(100vh-4.5rem)] bg-cloud-50 text-ink-900" data-testid="dashboard">
@@ -79,8 +87,8 @@ const DashboardPage: React.FC = () => {
         {/* [Gate AppShell] モックのホーム: 見出し・旅の表紙・4つの数・旅のつづき/次に決めること/できること */}
         <PageHead
           eyebrow="YOUR JOURNEY · ホーム"
-          title="次の旅を、楽しみに変える"
-          sub={`${name}さん、次にすることをまとめました。日程も予約も旅の準備も、この旅のページから一緒に進められます。`}
+          title={title}
+          sub={sub}
           actions={(
             <nav aria-label="新しい旅を始める" className="tc-page-actions" data-testid="dashboard-start">
               <Link to="/planner?new=1" className="tc-focus-ring tc-mbtn">＋ 旅行をつくる<span className="sr-only">(行き先が決まっている)</span></Link>
@@ -123,40 +131,44 @@ const DashboardPage: React.FC = () => {
         )}
 
         {data && !focusTrip && <EmptyHero isGuest={data.is_guest} />}
-        {data && focusTrip && data.focus && (
+        {data && focusTrip && (
+          // [Gate HomeV2] 1. いま計画中: 主役の旅行(表紙・旅の準備・操作)と、次にやること(計画中の旅行ぜんぶ)
+          <div className="tc-home-planning">
+            <div className="tc-dash-col">
+              <TripHero trip={focusTrip} />
+              {progress && <HomeProgress detail={progress} />}
+              {focusIsAuto && data.focus && (data.focus.phase === 'ongoing' || data.focus.phase === 'past'
+                || (data.focus.alerts?.active ?? 0) > 0 || !home) && (
+                <div className="mt-4"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
+              )}
+            </div>
+            <div className="tc-dash-col">
+              {home && (
+                <NextTasks tasks={home.tasks} planning={planningTrips} selected={focusTrip.id} onSelect={setChosenId} />
+              )}
+              <QuickActions trip={focusTrip} />
+            </div>
+          </div>
+        )}
+        {data && !home && data.trips.length > 0 && <TripList trips={data.trips} />}
+        {data && home && data.trips.length > 0 && (
+          // 2. 旅行の一覧(状態のタブ)
+          <TripShelves trips={data.trips} counts={home.shelves} onChanged={() => void load()} />
+        )}
+        {data && home && (
           <>
-            <TripHero trip={focusTrip} />
-            <TripStats trip={focusTrip} focus={data.focus} />
-            <div className="tc-dash-grid">
-              <div className="tc-dash-col">
-                <TripContinue trip={focusTrip} />
-                <section className="tc-card tc-focus-list" aria-labelledby="dash-next">
-                  <div className="tc-section-row">
-                    <h2 id="dash-next" className="tc-section-title">次に決めること</h2>
-                  </div>
-                  <div className="mt-3"><FocusPanels focus={data.focus} trip={focusTrip} /></div>
-                </section>
-              </div>
-              <div className="tc-dash-col">
-                <QuickActions trip={focusTrip} />
-              </div>
+            {/* 3. 旅の記録と思い出・旅の足あと */}
+            <div className="tc-home-two">
+              <MemoriesSection home={home} />
+              <Footprints home={home} />
+            </div>
+            {/* 4. 行ってみたい場所・道具 */}
+            <div className="tc-home-two">
+              <Wishlist home={home} />
+              <Tools tripId={focusTrip?.id ?? null} />
             </div>
           </>
         )}
-        {data && data.trips.length > 0 && <TripList trips={data.trips} />}
-
-        <section aria-labelledby="dash-other" className="mt-8">
-          <h2 id="dash-other" className="text-lg font-semibold text-ink-900">スポット・地図</h2>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {OTHER_LINKS.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
-                <Link to={to} className="tc-focus-ring tc-mbtn tc-mbtn--sm">
-                  <Icon size={16} aria-hidden="true" />{label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
       </div>
     </div>
   );

@@ -486,6 +486,7 @@
   "POST /api/v1/trip-intents/spots/resolve",
   "PUT /api/v1/admin/usage/override",
   "PUT /api/v1/atlas/settings",
+  "PUT /api/v1/dashboard/trips/{plan_id}/state",
   "PUT /api/v1/auth/me",
   "PUT /api/v1/notifications/settings",
   "PUT /api/v1/notifications/settings/plans/{plan_id}",

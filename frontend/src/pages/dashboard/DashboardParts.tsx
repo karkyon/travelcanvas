@@ -52,7 +52,7 @@ const HeroArt: React.FC<{ photo: ReturnType<typeof useCoverPhoto>['photo']; onEr
 };
 
 /** [Gate G11] 旅行のカード(表紙の写真があれば写真、無い・読めない時はグラデーション) */
-const TripCard: React.FC<{ trip: DashboardTrip }> = ({ trip: t }) => {
+export const TripCard: React.FC<{ trip: DashboardTrip }> = ({ trip: t }) => {
   const coverPhoto = useCoverPhoto(t.id, t.cover);
   return (
     <TripCover size="card" destination={t.destination} tripTitle={t.title} startDate={t.start_date}

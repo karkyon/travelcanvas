@@ -1,18 +1,62 @@
 /** [Gate G9] UX-4 文脈型ダッシュボードの応答の decoder(g9.ts 経由で読む。最初に読む JS に入れない) */
 import type {
-  DashboardAlerts, DashboardEvent, DashboardFocus, DashboardReadiness, DashboardSummary, DashboardToday, DashboardTrip,
-  TripPhase,
+  DashboardAlerts, DashboardEvent, DashboardFocus, DashboardHome, DashboardReadiness, DashboardSummary, DashboardToday,
+  DashboardTrip, HomePlanning, HomeTask, HomeTimelineTrip, TripPhase, TripShelf,
 } from './types/g9';
 import { optionalPlanCover } from './g11cover';
-import { arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, object, oneOf, str, type Decoder } from './decode';
+import {
+  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, object, oneOf, optional, str, type Decoder,
+} from './decode';
 
 const phase = oneOf('ongoing', 'upcoming', 'past', 'undated');
+const shelf = oneOf<TripShelf>('planning', 'considering', 'visited', 'cancelled');
 
 const trip: Decoder<DashboardTrip> = object<DashboardTrip>({
   id: str, title: str, destination: nullable(str), role: oneOf('owner', 'editor', 'viewer'), can_edit: bool,
   start_date: nullable(str), end_date: nullable(str), timezone_id: str, local_today: str, day_count: nonNegativeInt,
   total_days: nullable(nonNegativeInt), phase, days_until_start: nullable(int), day_number: nullable(int),
   days_since_end: nullable(int), member_count: nonNegativeInt, created_at: nullable(str), cover: optionalPlanCover,
+  shelf: optional(shelf), event_count: optional(nonNegativeInt), photo_count: optional(nonNegativeInt),
+  note_count: optional(nonNegativeInt),
+});
+
+// [Gate HomeV2] ホーム v2
+const task: Decoder<HomeTask> = object<HomeTask>({
+  plan_id: str, trip_title: str, kind: str, severity: str, title: str, to: str, action: str,
+});
+const planning: Decoder<HomePlanning> = object<HomePlanning>({
+  plan_id: str, event_count: nonNegativeInt,
+  segments: object<HomePlanning['segments']>({ need: nonNegativeInt, done: nonNegativeInt }),
+  steps: arrayOf(object<HomePlanning['steps'][number]>({ key: str, label: str, done: bool })),
+  done: nonNegativeInt, total: nonNegativeInt, tasks: arrayOf(task),
+});
+const timelineTrip: Decoder<HomeTimelineTrip> = object<HomeTimelineTrip>({
+  plan_id: str, title: str, start_date: nullable(str), end_date: nullable(str), photo_count: nonNegativeInt,
+  note_count: nonNegativeInt, cover: optionalPlanCover,
+});
+const home: Decoder<DashboardHome> = object<DashboardHome>({
+  shelves: object<DashboardHome['shelves']>({
+    planning: nonNegativeInt, considering: nonNegativeInt, visited: nonNegativeInt, cancelled: nonNegativeInt,
+  }),
+  planning: arrayOf(planning),
+  tasks: arrayOf(task),
+  memories: object<DashboardHome['memories']>({
+    recent: nullable(object<NonNullable<DashboardHome['memories']['recent']>>({ plan_id: str, photo_ids: arrayOf(str) })),
+    timeline: arrayOf(timelineTrip),
+  }),
+  footprints: object<DashboardHome['footprints']>({
+    prefectures: arrayOf(str), planned_prefectures: arrayOf(str), all_prefectures: arrayOf(str),
+    trips_visited: nonNegativeInt, days_this_year: nonNegativeInt, photos: nonNegativeInt,
+  }),
+  wishlist: object<DashboardHome['wishlist']>({
+    count: nonNegativeInt,
+    groups: arrayOf(object<DashboardHome['wishlist']['groups'][number]>({
+      category: str, count: nonNegativeInt,
+      spots: arrayOf(object<DashboardHome['wishlist']['groups'][number]['spots'][number]>({
+        spot_id: str, name: str, prefecture: nullable(str),
+      })),
+    })),
+  }),
 });
 
 const event: Decoder<DashboardEvent> = object<DashboardEvent>({
@@ -50,7 +94,7 @@ const counts: Decoder<Record<TripPhase, number>> = object<Record<TripPhase, numb
 
 export const dashboardSummary: Decoder<DashboardSummary> = object<DashboardSummary>({
   server_time: str, is_guest: bool, trips: arrayOf(trip), counts, focus: nullable(focus), limit: nonNegativeInt,
-  algorithm_version: str,
+  algorithm_version: str, home: optional(home),
 });
 
 export function decodeDashboard(raw: unknown): DashboardSummary {
