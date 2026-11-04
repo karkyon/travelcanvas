@@ -92,9 +92,15 @@ test('UX-2・UX-3・UX-4 旅行中を焦点に、全ての幅・暗い見た目�
     const n = await actions.getByRole('link').count();
     expect(n, where).toBeGreaterThan(0);
     expect(n, where).toBeLessThanOrEqual(4);
-    await expect(page.getByRole('list', { name: '旅行中の旅行' }).getByTestId(`trip-card-${ongoing}`)).toBeVisible();
-    await expect(page.getByRole('list', { name: '旅行前の旅行' }).getByTestId(`trip-card-${upcoming}`)).toContainText('京都 紅葉の1泊2日');
-    await expect(page.getByRole('list', { name: '旅行後の旅行' })).toContainText('先月の奈良');
+    // [Gate HomeV2] 旅行の一覧: 計画中(旅行中・旅行前)/ 行った旅 のタブ
+    const shelf = page.getByTestId('home-shelf');
+    const planning = shelf.getByRole('list', { name: '計画中の旅行' });
+    await expect(planning.getByTestId(`trip-card-${ongoing}`)).toBeVisible();
+    await expect(planning.getByTestId(`trip-card-${upcoming}`)).toContainText('京都 紅葉の1泊2日');
+    await shelf.getByRole('tab', { name: /行った旅/ }).click();
+    await expect(shelf.getByRole('list', { name: '行った旅の旅行' })).toContainText('先月の奈良');
+    await shelf.getByRole('tab', { name: /計画中/ }).click();
+    await expect(page.getByTestId('home-memories')).toContainText('先月の奈良');
     await expect(page.getByTestId('dashboard')).not.toContainText('Invalid Date');
     await expectHeaderStable(page, where);
     await expectNoOverflow(page, where);

@@ -9,8 +9,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import fx from '../services/api/__fixtures__/g9Responses.json';
 import { decodeDashboard } from '../services/api/decodersG9';
 
-const { getDashboard } = vi.hoisted(() => ({ getDashboard: vi.fn() }));
-vi.mock('../services/api/g9', () => ({ getDashboard }));
+const { getDashboard, setTripState } = vi.hoisted(() => ({ getDashboard: vi.fn(), setTripState: vi.fn() }));
+vi.mock('../services/api/g9', () => ({ getDashboard, setTripState }));
 
 import DashboardPage from './DashboardPage';
 import { useAuthStore } from '../store/authStore';
@@ -85,6 +85,51 @@ describe('DashboardPage', () => {
     expect(within(actions).getByRole('link', { name: /一緒に行く人を招く/ })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: '旅行前の旅行' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: '旅行後の旅行' })).toBeInTheDocument();
+  });
+
+  it('[HomeV2] いま計画中(旅の準備・次にやること)・旅行の一覧のタブ・旅の記録と思い出・足あと・行ってみたい場所・道具', async () => {
+    const base = fx.dashboard_upcoming as unknown as { trips: Array<Record<string, unknown>> } & Record<string, unknown>;
+    const up = base.trips.find((t) => t.phase === 'upcoming')!;
+    const past = base.trips.find((t) => t.phase === 'past')!;
+    const raw = {
+      ...base,
+      trips: base.trips.map((t) => ({ ...t, shelf: t.phase === 'past' ? 'visited' : 'planning', event_count: 3, photo_count: 0,
+        note_count: 0 })),
+      home: {
+        shelves: { planning: 1, considering: 0, visited: 1, cancelled: 0 },
+        planning: [{ plan_id: up.id, event_count: 3, segments: { need: 2, done: 1 }, done: 3, total: 5, tasks: [], steps: [
+          { key: 'dates', label: '行き先と日付', done: true }, { key: 'places', label: '立ち寄る場所(3 件)', done: true },
+          { key: 'moves', label: '移動手段(あと 1 区間)', done: false }, { key: 'ready', label: '予約・確認', done: true },
+          { key: 'packing', label: '持ち物', done: false }] }],
+        tasks: [{ plan_id: up.id, trip_title: up.title, kind: 'moves', severity: 'normal', title: '移動手段を決める(1 区間)',
+          to: `/planner/${up.id}`, action: '旅程へ' }],
+        memories: { recent: { plan_id: past.id, photo_ids: [] }, timeline: [{ plan_id: past.id, title: past.title,
+          start_date: past.start_date, end_date: past.end_date, photo_count: 0, note_count: 2, cover: null }] },
+        footprints: { prefectures: ['京都府'], planned_prefectures: ['三重県'], all_prefectures: [], trips_visited: 1,
+          days_this_year: 2, photos: 0 },
+        wishlist: { count: 1, groups: [{ category: 'restaurant', count: 1, spots: [{ spot_id: 's1', name: '伊勢うどん', prefecture: '三重県' }] }] },
+      },
+    };
+    getDashboard.mockResolvedValue(decodeDashboard(raw));
+    setTripState.mockResolvedValue(undefined);
+    login();
+    renderDashboard();
+    const progress = await screen.findByTestId('home-progress');
+    expect(progress).toHaveTextContent('旅の準備 3 / 5');
+    expect(screen.getByTestId('home-step-moves')).toHaveAttribute('data-done', 'false');
+    expect(screen.getByTestId('home-tasks')).toHaveTextContent('移動手段を決める(1 区間)');
+    expect(screen.queryByTestId('dashboard-readiness')).toBeNull();  // 準備は「次にやること」にまとめた
+    const shelf = screen.getByTestId('home-shelf');
+    expect(within(shelf).getByRole('tab', { name: /計画中/ })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(within(shelf).getByRole('tab', { name: /行った旅/ }));
+    expect(within(shelf).getByRole('list', { name: '行った旅の旅行' })).toHaveTextContent(past.title as string);
+    fireEvent.click(within(shelf).getByRole('tab', { name: /計画中/ }));
+    fireEvent.click(screen.getByTestId(`home-state-${up.id}`));
+    await waitFor(() => expect(setTripState).toHaveBeenCalledWith(up.id, 'cancelled'));
+    expect(screen.getByTestId('home-memories')).toHaveTextContent(`${past.title as string}`);
+    expect(screen.getByTestId('home-footprints')).toHaveTextContent('1/47');
+    expect(screen.getByTestId('home-wishlist')).toHaveTextContent('伊勢うどん');
+    expect(screen.getByTestId('home-tools')).toHaveTextContent('スポット検索');
   });
 
   it('旅行中: NOW/NEXT(現地の時刻・残り時間)', async () => {

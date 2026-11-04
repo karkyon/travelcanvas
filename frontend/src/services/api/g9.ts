@@ -12,3 +12,8 @@ const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 export async function getDashboard(): Promise<DashboardSummary> {
   return decodeDashboard((await api.get('/dashboard', SILENT)).data);
 }
+
+/** [Gate HomeV2] 旅行の一覧の状態: 見送り・中止にする(cancelled)/ 日付で決まる状態へ戻す(active) */
+export async function setTripState(planId: string, state: 'cancelled' | 'active'): Promise<void> {
+  await api.put(`/dashboard/trips/${planId}/state`, { state });
+}

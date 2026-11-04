@@ -23,6 +23,38 @@ export interface DashboardTrip {
   created_at: string | null;
   /** [Gate G11] 表紙の写真(見える人だけ。無ければ null) */
   cover: PlanCover | null;
+  /** [Gate HomeV2] 旅行の一覧の状態・予定・写真・メモの数 */
+  shelf?: TripShelf;
+  event_count?: number;
+  photo_count?: number;
+  note_count?: number;
+}
+
+/** [Gate HomeV2] 旅行の一覧のタブ: 計画中 / 検討中 / 行った旅 / 見送り・中止 */
+export type TripShelf = 'planning' | 'considering' | 'visited' | 'cancelled';
+
+export interface HomeStep { key: string; label: string; done: boolean }
+export interface HomeTask {
+  plan_id: string; trip_title: string; kind: string; severity: string; title: string; to: string; action: string;
+}
+export interface HomePlanning {
+  plan_id: string; event_count: number; segments: { need: number; done: number }; steps: HomeStep[];
+  done: number; total: number; tasks: HomeTask[];
+}
+export interface HomeTimelineTrip {
+  plan_id: string; title: string; start_date: string | null; end_date: string | null; photo_count: number;
+  note_count: number; cover: PlanCover | null;
+}
+export interface DashboardHome {
+  shelves: Record<TripShelf, number>;
+  planning: HomePlanning[];
+  tasks: HomeTask[];
+  memories: { recent: { plan_id: string; photo_ids: string[] } | null; timeline: HomeTimelineTrip[] };
+  footprints: {
+    prefectures: string[]; planned_prefectures: string[]; all_prefectures: string[]; trips_visited: number;
+    days_this_year: number; photos: number;
+  };
+  wishlist: { count: number; groups: Array<{ category: string; count: number; spots: Array<{ spot_id: string; name: string; prefecture: string | null }> }> };
 }
 
 export interface DashboardEvent {
@@ -77,4 +109,6 @@ export interface DashboardSummary {
   focus: DashboardFocus | null;
   limit: number;
   algorithm_version: string;
+  /** [Gate HomeV2] ホーム v2 の追加の項目 */
+  home?: DashboardHome;
 }

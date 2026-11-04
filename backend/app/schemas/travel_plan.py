@@ -57,7 +57,7 @@ class TravelPlanUpdate(BaseModel):
 
     @validator('status')
     def status_valid(cls, v):
-        allowed = {"draft", "active", "completed", "archived", "shared"}
+        allowed = {"draft", "active", "completed", "archived", "shared", "cancelled"}
         if v is not None and v not in allowed:
             raise ValueError(f'statusは次のいずれかである必要があります: {allowed}')
         return v

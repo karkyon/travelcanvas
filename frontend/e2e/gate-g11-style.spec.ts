@@ -82,9 +82,10 @@ test('見た目の系統 × 明るい・暗い で主な画面に axe の違反�
   test.setTimeout(900_000);
   const { planId } = await seedBaseline(page, 'g11styleaxe');
   const screens = [
-    { name: 'ダッシュボード', path: '/dashboard', h1: '次の旅を、楽しみに変える' },
-    { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' },
-    { name: '設定', path: '/settings?tab=preferences', h1: null },
+    // [Gate HomeV2] 計画中の旅行があると「おかえりなさい。次の旅まで あと N 日」(読み込みの前は「次の旅を、楽しみに変える」)
+    { name: 'ダッシュボード', path: '/dashboard', h1: /次の旅まで あと \d+ 日/ as RegExp | string | null },
+    { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' as RegExp | string | null },
+    { name: '設定', path: '/settings?tab=preferences', h1: null as RegExp | string | null },
   ];
   for (const [style, label] of [['atlas', /^Atlas/], ['editorial', /^Editorial/], ['daylight', /^Daylight/], ['studio', /^Studio/]] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
