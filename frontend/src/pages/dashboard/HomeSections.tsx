@@ -68,7 +68,13 @@ export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning 
     ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' } : { to: `/planner/${trip.id}`, label: '旅程を開く' };
   const actions = quickActions(trip).filter((a) => a.to !== primary.to);
   const booklet = { key: 'booklet', label: 'しおり(印刷・Web)', to: `/planner/${trip.id}/booklet` };
-  const navItems = (actions.length < 4 && trip.phase !== 'past' ? [...actions, booklet] : actions).slice(0, 4);
+  // 操作は主な操作を含めて 4 つまで(UX-3)。しおり(印刷・Web)は招待の前に置く
+  const others = actions.filter((a) => a.key !== 'share');
+  const withBooklet = trip.phase === 'past' ? actions
+    : [...others.slice(0, 1), booklet, ...others.slice(1), ...actions.filter((a) => a.key === 'share')];
+  const navItems = withBooklet.length > 3 && withBooklet.some((a) => a.key === 'share')
+    ? [...withBooklet.filter((a) => a.key !== 'share').slice(0, 2), ...withBooklet.filter((a) => a.key === 'share')]
+    : withBooklet.slice(0, 3);
   const pct = detail && detail.total ? Math.round((detail.done / detail.total) * 100) : 0;
   return (
     <section className="tc-plan-hero" aria-labelledby="dash-hero-title" data-testid="dashboard-hero" data-phase={trip.phase}
@@ -98,16 +104,12 @@ export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning 
             <><b>{trip.day_number}</b><span>日目(旅行中)</span></>
           ) : <span>{statusLabel(trip)}</span>}
         </p>
-        <div className="tc-plan-hero-acts">
+        <nav aria-label="この旅行の操作" className="tc-plan-hero-acts">
           <Link to={safeInternalPath(primary.to) ?? '/dashboard'} className="tc-focus-ring tc-mbtn tc-mbtn--primary">{`${primary.label} →`}</Link>
-          {navItems.length > 0 && (
-            <nav aria-label="この旅行の操作" className="contents">
-              {navItems.map((a) => (
-                <Link key={a.key} to={safeInternalPath(a.to) ?? '/dashboard'} className="tc-focus-ring tc-plan-hero-btn">{a.label}</Link>
-              ))}
-            </nav>
-          )}
-        </div>
+          {navItems.map((a) => (
+            <Link key={a.key} to={safeInternalPath(a.to) ?? '/dashboard'} className="tc-focus-ring tc-plan-hero-btn">{a.label}</Link>
+          ))}
+        </nav>
       </div>
       {detail && (
         <div className="tc-plan-hero-prog" data-testid="home-progress">

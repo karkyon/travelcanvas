@@ -709,7 +709,8 @@
 /* [Gate HomeV2] 左の帯: 開いている旅行の項目の区切り。長い名前は 2 行で */
 .tc-rail-sep { display: block; width: 60px; margin: 6px auto 2px; padding-top: 6px; border-top: 1px solid var(--tc-cloud-200);
   font-size: 9.5px; font-weight: 700; color: var(--tc-ink-700); text-align: center; }
-.tc-rail a span { line-height: 1.2; text-align: center; }
+@media (min-width: 761px) { .tc-rail a { min-height: 62px; max-height: 62px; height: auto; padding: 3px 2px; gap: 3px; } }
+.tc-rail a span { line-height: 1.12; font-size: 10.5px; text-align: center; white-space: normal; max-width: 64px; word-break: keep-all; overflow-wrap: anywhere; }
 /* [Gate HomeV2] モックアップ v2 の表紙: 写真の上に暗いグラデーション・大きな日数・操作・右上の旅の準備 */
 .tc-plan-hero { position: relative; overflow: hidden; border-radius: 22px; min-height: 320px; color: #fff; background: #1c2f5e;
   box-shadow: 0 10px 30px rgba(22, 33, 58, .1); }
