@@ -10,7 +10,7 @@
  * /planner/:planId -> 選択したプランの日程編集画面(PlanHeader + 日タブ + DayView)
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
 import PlanHeader from '@/components/PlanHeader';
@@ -81,6 +81,12 @@ function planDateRange(plan: { days: Array<{ date?: string }>; start_date?: stri
   const fmt = (d: string) => `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日`;
   return last && last !== first ? `${fmt(first)} — ${fmt(last)}` : fmt(first);
 }
+
+// [Gate PlanUX] 予定の種類(編集の画面の選択肢。EventCategory)
+const EDIT_CATEGORIES: Array<[string, string]> = [
+  ['sightseeing', '観光・神社・寺'], ['activity', '体験・アクティビティ'], ['dining', '食事・カフェ'], ['shopping', '買い物'],
+  ['accommodation', '宿'], ['transportation', '交通・移動'], ['other', 'その他'],
+];
 
 const PlannerPage: React.FC = () => {
   const { planId } = useParams<{ planId?: string }>();
@@ -196,8 +202,28 @@ const PlannerPage: React.FC = () => {
     notes: item.notes || item.description || '',
   });
 
+  // [Gate PlanUX] 予定の間の移動手段を保存した: 区間を差し替え、旅程の版(区間の保存で進む)だけを読み直す
+  const handleSegmentSaved = useCallback(async (seg: TravelSegment) => {
+    setSegments((rows) => [...rows.filter((r) => r.id !== seg.id), seg]);
+    const planId = usePlanStore.getState().currentPlan?.id;
+    if (!planId) return;
+    try {
+      const detail = await apiService.getPlanDetail(planId);
+      const rev = detail.success ? detail.data?.revision : undefined;
+      if (rev !== undefined) {
+        usePlanStore.setState((st) => (st.currentPlan ? { currentPlan: { ...st.currentPlan, revision: rev } } : st));
+      }
+    } catch {
+      // 版を読めなくても、次の保存で競合として読み直す
+    }
+  }, []);
+
+  // [Gate PlanUX] 予定の種類(変えた時だけ送る)
+  const [editCategory, setEditCategory] = useState<{ value: string; original: string }>({ value: 'other', original: 'other' });
+
   const openEditItem = (item: ScheduleItemType) => {
     setEditingItem(item);
+    setEditCategory({ value: item.category || 'other', original: item.category || 'other' });
     setEditForm(fieldsOf(item));
     setEditOriginal(fieldsOf(item));
     const end = { time: item.end_time || '', offset: item.end_day_offset ?? 0 };
@@ -221,6 +247,7 @@ const PlannerPage: React.FC = () => {
         description: fields.notes || undefined,
         ...(editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
           ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
+        ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
       });
       if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'conflict') {
@@ -821,10 +848,10 @@ const PlannerPage: React.FC = () => {
                   day={activeDay}
                   planId={currentPlan.id}
                   isActive
-                  onItemClick={(item) => {
-                    setSelectedEventId(item.id);
-                    openEditItem(item);
-                  }}
+                  // [Gate PlanUX] 予定を押すと選ぶだけ(地図・右の欄に出す)。編集は鉛筆から
+                  onItemClick={(item) => setSelectedEventId(item.id)}
+                  revision={currentPlan.revision}
+                  onSegmentSaved={handleSegmentSaved}
                   onItemEdit={openEditItem}
                   onItemDelete={handleDeleteItem}
                   onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
@@ -1156,39 +1183,64 @@ const PlannerPage: React.FC = () => {
                   )}
                 </div>
               )}
-              <Input
-                label="タイトル"
-                value={editForm.title}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                fullWidth
-              />
-              <Input
-                label="開始時刻"
-                type="time"
-                value={editForm.start_time}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                fullWidth
-              />
-              {currentPlan && editingItem && (
-                <EventTimeImpact planId={currentPlan.id} eventId={editingItem.id} startTime={editForm.start_time}
-                  end={editEnd} onEndChange={setEditEnd} />
-              )}
+              {/* [Gate PlanUX] 予定の編集: 名前と種類 → 時間(開始・終了を 1 行) → 場所 → メモ。営業時間は入力の必須ではない */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                <Input
+                  label="タイトル"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                  fullWidth
+                />
+                <label className="text-sm font-medium text-ink-700">
+                  種類
+                  <select value={editCategory.value} onChange={(e) => setEditCategory((c) => ({ ...c, value: e.target.value }))}
+                    className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900"
+                    data-testid="edit-category">
+                    {EDIT_CATEGORIES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <fieldset className="rounded-xl border border-cloud-200 p-3">
+                <legend className="px-1 text-sm font-semibold text-ink-900">時間(任意)</legend>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
+                  <Input
+                    label="開始時刻"
+                    type="time"
+                    value={editForm.start_time}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
+                    fullWidth
+                  />
+                  {currentPlan && editingItem && (
+                    <EventTimeImpact planId={currentPlan.id} eventId={editingItem.id} startTime={editForm.start_time}
+                      end={editEnd} onEndChange={setEditEnd} />
+                  )}
+                </div>
+              </fieldset>
               {/* [Gate G2] FR-045 所有者が見せない設定にした項目は入力を出さない */}
               {!currentPlan?.hidden_fields?.includes('event_address') && (
                 <Input
-                  label="場所"
+                  label="場所・住所"
                   value={editForm.location_name}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
                   fullWidth
                 />
               )}
               {!currentPlan?.hidden_fields?.includes('event_notes') && (
-                <Input
-                  label="メモ"
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  fullWidth
-                />
+                <label className="block text-sm font-medium text-ink-700">
+                  メモ(見どころ・予約の要否・持ち物など)
+                  <textarea rows={3} value={editForm.notes} aria-label="メモ"
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900" />
+                </label>
+              )}
+              {currentPlan && (
+                <p className="text-xs text-ink-700">
+                  予約番号・チケットは
+                  <Link to={`/planner/${currentPlan.id}/reservations`} className="mx-1 font-semibold text-accent underline">予約</Link>
+                  、費用は
+                  <Link to={`/planner/${currentPlan.id}/expenses`} className="mx-1 font-semibold text-accent underline">費用</Link>
+                  に保存します。
+                </p>
               )}
             </div>
           </Modal.Body>

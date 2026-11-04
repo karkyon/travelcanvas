@@ -44,7 +44,7 @@ test('共同編集: 開いている人・編集中・他の人の変更を示し
     await expect(pageB.getByRole('region', { name: '一緒に見ている人' })).toContainText('(所有者)', { timeout: 20_000 });
 
     // Bが編集を始める → Aに「編集中」
-    await eventItem(pageB, '清水寺').click();
+    await eventItem(pageB, '清水寺').getByRole('button', { name: /を編集$/ }).click();
     const dialogB = pageB.getByRole('dialog');
     await expect(dialogB).toBeVisible();
     await expect(barA).toContainText('「清水寺」を編集中', { timeout: 20_000 });
@@ -62,10 +62,10 @@ test('共同編集: 開いている人・編集中・他の人の変更を示し
     await expect(notice).toBeHidden({ timeout: 20_000 });
 
     // 4. 同時に編集: Aが開いたまま、Bが先に開始時刻を変えて保存する
-    await eventItem(page, '清水寺(朝)').click();
+    await eventItem(page, '清水寺(朝)').getByRole('button', { name: /を編集$/ }).click();
     const dialogA = page.getByRole('dialog');
     await expect(dialogA).toBeVisible();
-    await eventItem(pageB, '清水寺(朝)').click();
+    await eventItem(pageB, '清水寺(朝)').getByRole('button', { name: /を編集$/ }).click();
     await expect(dialogA.getByRole('status')).toContainText('もこの予定を編集中です', { timeout: 20_000 });
     await dialogB.getByLabel('開始時刻').fill('09:30');
     await dialogB.getByRole('button', { name: '保存' }).click();

@@ -385,3 +385,13 @@ def test_conditions_text_for_second_proposal_call_has_no_raw_text():
     assert "出発地: 枚方" in text and "地域: 関西近畿圏・東海・北陸圏" in text and "件数: 4" in text
     assert "社会人" not in text and "記念" not in text  # 相談の文章・個人的な理由は送らない
     assert ca.PROPOSE_FORMAT["name"] == "trip_areas" and "必ず数値" in ca.PROPOSE_INSTRUCTIONS
+
+
+def test_draft_event_type_follows_place_kind_then_part():
+    """[Gate PlanUX] 下書きから旅程にする時、予定の種類は場所の種類(食事・宿・買い物など)を時間帯より優先する"""
+    from app.services import trip_intent as ti
+    assert ti.event_type_of("morning", "cafe") == "dining"
+    assert ti.event_type_of("afternoon", "lodging") == "accommodation"
+    assert ti.event_type_of("lunch", "shrine_temple") == "dining"
+    assert ti.event_type_of("morning", "shrine_temple") == "sightseeing"
+    assert ti.event_type_of("stay", None) == "accommodation"

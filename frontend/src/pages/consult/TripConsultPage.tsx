@@ -23,7 +23,7 @@ import {
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import type { IntentExtraction } from '@/services/api/types/tripIntent';
 import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
-import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
+import { FollowUp, NotesEditor, VoiceInput, WAVE_BARS } from './ConsultInputs';
 import { TurnPanels } from './TurnPanels';
 import { applyTurn, decideTurnChange, turnStateOf } from './consultTurnModel';
 import AreasStep from './AreasStep';
@@ -136,20 +136,23 @@ const BriefStep: React.FC<{
             <div className={`tc-input-mode tc-input-mode--${inputMode} mt-1`} data-testid="consult-input-mode" data-mode={inputMode}>
               <div className={`tc-input-mode__bg ${inputMode === 'voice' ? 'bg-accent-soft' : 'bg-cloud-0'}`} aria-hidden="true">
                 <span className="tc-input-mode__icon"><UiIcon icon={inputMode === 'voice' ? IcMic : IcPencil} size={72} /></span>
-                {voiceLevels !== null && (
-                  <div className={`tc-voice-bars${voiceLevels.length === 0 ? ' tc-voice-bars--idle' : ''}`} data-testid="consult-voice-bars">
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <span key={i} style={voiceLevels.length ? { height: `${Math.round(8 + (voiceLevels[i] ?? 0) * 92)}%` } : undefined} />
-                    ))}
-                  </div>
-                )}
               </div>
+              {voiceLevels !== null && (
+                // [Gate VoiceWave] 音声の入力中は、入力の欄の下の帯に声の波形(細い縦線の並び)を動かす
+                <div className={`tc-voice-wave text-ink-900${voiceLevels.length === 0 ? ' tc-voice-wave--idle' : ''}`}
+                  aria-hidden="true" data-testid="consult-voice-bars">
+                  {Array.from({ length: WAVE_BARS }, (_, i) => (
+                    <span key={i} style={voiceLevels.length ? { height: `${Math.max(6, Math.round((voiceLevels[i] ?? 0) * 100))}%` }
+                      : { animationDelay: `${((i * 37) % 23) * -0.06}s` }} />
+                  ))}
+                </div>
+              )}
               <textarea id={`${id}-text`} value={brief.text} onChange={(e) => { set('text', e.target.value); onType(); }} rows={6}
                 maxLength={4000} aria-describedby={`${id}-text-help`} className={`${field} mt-0 leading-relaxed`}
                 placeholder="例: 家族4人で1泊2日。枚方から車で片道3時間くらいまで。人が多すぎない所。伊勢、福井、滋賀などが候補。" />
             </div>
             <p className="mt-1 text-xs font-semibold" aria-live="polite" data-testid="consult-input-mode-label">
-              {inputMode === 'voice' && <><UiIcon icon={IcMic} size={14} className="mr-1 align-[-2px]" />音声で入力中(声の大きさを背景の棒で表示)</>}
+              {inputMode === 'voice' && <><UiIcon icon={IcMic} size={14} className="mr-1 align-[-2px]" />音声で入力中(声の波形を表示)</>}
               {inputMode === 'typing' && <><UiIcon icon={IcPencil} size={14} className="mr-1 align-[-2px]" />キーボードで入力中</>}
             </p>
             <p id={`${id}-text-help`} className={help}>

@@ -55,8 +55,8 @@ export function hoursBadge(h: EventHoursCheck | null | undefined, pending = fals
     }
     default: {
       const why = h.reason === 'stale_source' ? '営業時間の情報が古い・再確認してください'
-        : h.reason === 'no_time' ? '時刻が無いため営業時間を照合できません'
-          : h.reason === 'no_place' ? null
+        // [Gate PlanUX] 時刻を決めていない予定は、営業時間の照合を出さない(時刻・営業時間は必須ではない)
+        : h.reason === 'no_time' || h.reason === 'no_place' ? null
             : '営業時間未確認';
       return why ? { symbol: '?', text: why, tone: 'muted', sourceText: src } : null;
     }

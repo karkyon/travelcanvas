@@ -6,7 +6,7 @@ import { hoursBadge, moveBlockedReason, reorderImpact, segmentRow } from './plan
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
 import TransportIcon from './common/TransportIcon';
-import { LEGEND_MODES, transportMode } from '../utils/transportModes';
+import SegmentPicker from './planner/SegmentPicker';
 import EventPhotoDialog from './planner/EventPhotoDialog';
 import { getEventImageMedia, getEventImages, getMediaProviderStatus } from '../services/api/g11discover';
 import type { EventImage } from '../services/api/types/g11discover';
@@ -52,6 +52,10 @@ interface DayViewProps {
   onHoursChange?: (byId: Record<string, EventHoursCheck>, pending: boolean) => void;
   /** [Gate MockScreens] 値が変わるたびに「予定を追加」を開く(見出しの「＋ 予定を追加」) */
   addSignal?: number;
+  /** [Gate PlanUX] 旅程の版(移動区間の保存の If-Match) */
+  revision?: number;
+  /** [Gate PlanUX] 予定の間で移動手段を選んだ・詳細を直した時(区間の一覧を差し替える) */
+  onSegmentSaved?: (segment: TravelSegment) => void | Promise<void>;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -73,6 +77,8 @@ const DayView: React.FC<DayViewProps> = ({
   selectedEventId = null,
   onHoursChange,
   addSignal = 0,
+  revision,
+  onSegmentSaved,
 }) => {
   const { addNewScheduleItem, deleteScheduleItem, reorderSchedule } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
@@ -428,11 +434,7 @@ const DayView: React.FC<DayViewProps> = ({
             <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
           )}
         </div>
-        <ul className="tc-event-legend" aria-label="移動手段の印">
-          {LEGEND_MODES.map((m) => (
-            <li key={m}><TransportIcon mode={m} size={12} />{transportMode(m).label}</li>
-          ))}
-        </ul>
+        {/* [Gate PlanUX] 移動手段の印は常に並べない。予定と予定の間の「移動手段を選ぶ」で出す */}
       </div>
 
       {photoFor && (
@@ -492,8 +494,34 @@ const DayView: React.FC<DayViewProps> = ({
             const downBlocked = index === view.length - 1 || moveBlockedReason(view, index, 1) !== null;
             return (
             <div key={event.id} role="none">
-              {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる) */}
-              {row && (
+              {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる)
+                  [Gate PlanUX] 2 番目以降の予定の前に、移動手段を選ぶ・変える・詳細を入れる操作を置く */}
+              {index > 0 && (
+                <SegmentPicker planId={planId} revision={revision} fromEventId={view[index - 1]!.id}
+                  fromTitle={view[index - 1]!.title} toEventId={event.id} toTitle={event.title}
+                  segment={row ? (segments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
+                  mismatch={Boolean(row?.mismatch)} canEdit={canEdit && Boolean(onSegmentSaved)}
+                  onSaved={(sg) => onSegmentSaved?.(sg)}>
+                  {row ? (
+                    <div data-testid="segment-row" data-to-event={event.id}
+                      data-mismatch={row.mismatch ? 'true' : 'false'}
+                      className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
+                      <span className="sr-only">移動:</span>
+                      <TransportIcon mode={row.leg.mode} />
+                      <span>{row.leg.text}</span>
+                      {row.leg.isEstimate && <span>(推定)</span>}
+                      {row.leg.status === 'confirmed' && <span>・確定</span>}
+                      {row.fromTitle && <span>{`「${row.fromTitle}」から`}</span>}
+                      {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
+                      {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
+                      {row.mismatch && (
+                        <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
+                      )}
+                    </div>
+                  ) : undefined}
+                </SegmentPicker>
+              )}
+              {index === 0 && row && (
                 <div role="listitem" data-testid="segment-row" data-to-event={event.id}
                   data-mismatch={row.mismatch ? 'true' : 'false'}
                   className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
@@ -501,10 +529,8 @@ const DayView: React.FC<DayViewProps> = ({
                   <TransportIcon mode={row.leg.mode} />
                   <span>{row.leg.text}</span>
                   {row.leg.isEstimate && <span>(推定)</span>}
-                  {row.leg.status === 'confirmed' && <span>・確定</span>}
                   {row.fromTitle && <span>{`「${row.fromTitle}」から`}</span>}
                   {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
-                  {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
                   {row.mismatch && (
                     <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
                   )}

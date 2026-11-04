@@ -68,9 +68,11 @@ interface ScheduleItemProps {
 const CATEGORY_MARKS: Record<string, [LucideIcon, string]> = {
   sightseeing: [IcLandmark, '観光'],
   food: [IcUtensils, '食事'],
+  dining: [IcUtensils, '食事'],
   shopping: [IcShopping, '買い物'],
   accommodation: [IcHotel, '宿泊'],
   transport: [IcTrain, '交通'],
+  transportation: [IcTrain, '交通'],
   activity: [IcTarget, 'アクティビティ'],
   entertainment: [IcDrama, 'エンターテイメント'],
   default: [IcMapPin, '予定'],
@@ -103,7 +105,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   onUpdate,
   onDelete,
   onComment,
-  onEdit: _onEdit,
+  onEdit,
   onShare,
   isDragging = false,
   dragRef,
@@ -115,7 +117,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   locked = false,
   selected = false,
 }) => {
-  void _onEdit;
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -221,8 +222,9 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           )}
             {/* 操作(名前は読み上げにも出す)。[Gate MockScreens] 押しても何も起きない「共有」は、共有の先がある時だけ出す */}
             <div className="tc-event-tools" onClick={(e) => e.stopPropagation()}>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-                className={iconBtn} title="編集" aria-label="編集">
+              {/* [Gate PlanUX] 鉛筆は編集の画面を開く(画面が渡さない時だけ、その場で題・時刻・メモを直す) */}
+              <button type="button" onClick={(e) => { e.stopPropagation(); if (onEdit) onEdit(id); else setIsEditing(true); }}
+                className={iconBtn} title="編集" aria-label={`「${title}」を編集`} data-testid={`schedule-edit-${id}`}>
                 <Edit3 size={14} aria-hidden="true" />
               </button>
               {onPhoto && (

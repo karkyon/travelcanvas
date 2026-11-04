@@ -527,7 +527,7 @@ def commit_draft(plan_id: str, body: CommitIn, db: Session = Depends(get_db),
             c.place_id = place.id
         day = days[s["day"]]
         ev = TravelEvent(plan_id=plan.id, day_id=day.id, place_id=place.id, title=c.title, description=c.note,
-                         event_type=ti.EVENT_TYPE_OF_PART.get(s["part"], "sightseeing"), local_start_time=None,
+                         event_type=ti.event_type_of(s["part"], c.category), local_start_time=None,
                          address=c.address, latitude=c.latitude, longitude=c.longitude,
                          sort_order=counts.get(s["day"], 0))
         counts[s["day"]] = counts.get(s["day"], 0) + 1

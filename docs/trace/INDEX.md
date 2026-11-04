@@ -91,6 +91,7 @@
 | [gate-p7-trace.md](gate-p7-trace.md) | Gate P7 FR-019 トレーサビリティ表 | 0 | 0 | 1 |
 | [gate-p8-trace.md](gate-p8-trace.md) | Gate P8 FR-036 カレンダー取込 トレーサビリティ表 | 1 | 0 | 0 |
 | [gate-p9-trace.md](gate-p9-trace.md) | Gate P9 FR-039 アカウント削除・同意撤回 トレーサビリティ表 | 2 | 0 | 0 |
+| [gate-plan-ux-trace.md](gate-plan-ux-trace.md) | Gate PlanUX — 旅程の画面の移動手段・予定の編集・声の波形・始め方の写真の差し替え | 0 | 0 | 0 |
 | [gate-providerconnect-trace.md](gate-providerconnect-trace.md) | Gate ProviderConnect — 鍵の有効性の確認・候補の有効化・OpenAI / Places / Routes の実接続 | 0 | 0 | 0 |
 | [gate-q1-trace.md](gate-q1-trace.md) | Gate Q1 トレース(写真の撮影情報の除去・V2 の CI の e2e の不安定の修正) | 0 | 0 | 0 |
 | [gate-r2-trace.md](gate-r2-trace.md) | Gate R2 Trace表（QuickDraft） | 0 | 1 | 1 |

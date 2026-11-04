@@ -74,7 +74,7 @@ const SelectedEventCard: React.FC<Props> = ({ planId, dayNumber, event, onEdit, 
             <span data-testid="selected-hours">
               <b>予定との照合</b>
               <small className={hours ? `is-${hours.tone}` : undefined}>
-                {hours ? `${hours.symbol} ${hours.text}` : '営業時間は未登録'}
+                {hours ? `${hours.symbol} ${hours.text}` : event.start_time ? '営業時間は未登録' : '時刻を決めると照合します(任意)'}
               </small>
             </span>
             <span><b>出典・確認</b><small>{hours?.sourceText ?? '—'}</small></span>

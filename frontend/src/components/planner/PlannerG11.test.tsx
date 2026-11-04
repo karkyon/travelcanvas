@@ -220,7 +220,7 @@ describe('1日の画面(DayView)', () => {
     const preview = screen.getByTestId('reorder-preview');
     expect(preview).toHaveTextContent('並べ替えの案(まだ保存していません)');
     expect(within(preview).getByTestId('reorder-preview-moves')).toHaveTextContent('「清水寺」 1番目 → 2番目');
-    expect(screen.getAllByRole('listitem').map((li) => li.getAttribute('aria-label')).filter(Boolean))
+    expect(screen.getAllByRole('listitem', { name: /上下矢印キー/ }).map((li) => li.getAttribute('aria-label')))
       .toEqual(['夕食(上下矢印キーで並べ替え)', '清水寺(上下矢印キーで並べ替え)']);  // 案の並びで見せる
     expect(reorderSchedule).not.toHaveBeenCalled();
     expect(moveItemBy).not.toHaveBeenCalled();

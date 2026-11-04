@@ -102,7 +102,7 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   await expect.poll(async () => titles(await send('get', `/plans/${plan.id}`) as Detail)).toEqual(['酒蔵B', '酒蔵A', '酒蔵C', '酒蔵D']);
 
   // 3. 翌日に終わる予定(保存の前に影響を確かめる)
-  await list.getByRole('listitem', { name: '酒蔵D(上下矢印キーで並べ替え)' }).click();
+  await list.getByRole('listitem', { name: '酒蔵D(上下矢印キーで並べ替え)' }).getByRole('button', { name: /を編集$/ }).click();
   const modal = page.getByRole('dialog', { name: 'スポットを編集' });
   await modal.getByLabel('終了時刻').fill('01:30');
   await modal.getByLabel('終わる日').selectOption('1');
