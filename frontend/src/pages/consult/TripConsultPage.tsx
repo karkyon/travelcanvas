@@ -14,15 +14,16 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import PlanningClassSummary from '@/components/planning/PlanningClassSummary';
-import { compareAreas, createTripDraft, extractIntent, getAreaImages } from '@/services/api/tripIntent';
+import { compareAreas, createTripDraft, extractIntent, getAreaImages, resolveSpots } from '@/services/api/tripIntent';
+import type { NearbyResult } from '@/services/api/types/g11discover';
 import { updateConsents } from '@/services/api';
 import {
-  aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage, consultTurn,
+  aiExtract, consultErrorCode, getConsultAiStatus, newIdempotencyKey, startConsult, type ConsultAiStatus, type ConsultUsage, consultTurn, consultSpots,
 } from '@/services/api/consultAi';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import type { IntentExtraction } from '@/services/api/types/tripIntent';
 import { AiReadPanel, ConsultLookupPanel, SuggestedAreasPanel } from './ConsultAiPanels';
-import { FollowUp, NotesEditor, VoiceInput } from './ConsultInputs';
+import { FollowUp, NotesEditor, VoiceInput, WAVE_BARS } from './ConsultInputs';
 import { TurnPanels } from './TurnPanels';
 import { applyTurn, decideTurnChange, turnStateOf } from './consultTurnModel';
 import AreasStep from './AreasStep';
@@ -135,20 +136,23 @@ const BriefStep: React.FC<{
             <div className={`tc-input-mode tc-input-mode--${inputMode} mt-1`} data-testid="consult-input-mode" data-mode={inputMode}>
               <div className={`tc-input-mode__bg ${inputMode === 'voice' ? 'bg-accent-soft' : 'bg-cloud-0'}`} aria-hidden="true">
                 <span className="tc-input-mode__icon"><UiIcon icon={inputMode === 'voice' ? IcMic : IcPencil} size={72} /></span>
-                {voiceLevels !== null && (
-                  <div className={`tc-voice-bars${voiceLevels.length === 0 ? ' tc-voice-bars--idle' : ''}`} data-testid="consult-voice-bars">
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <span key={i} style={voiceLevels.length ? { height: `${Math.round(8 + (voiceLevels[i] ?? 0) * 92)}%` } : undefined} />
-                    ))}
-                  </div>
-                )}
               </div>
+              {voiceLevels !== null && (
+                // [Gate VoiceWave] 音声の入力中は、入力の欄の下の帯に声の波形(細い縦線の並び)を動かす
+                <div className={`tc-voice-wave text-ink-900${voiceLevels.length === 0 ? ' tc-voice-wave--idle' : ''}`}
+                  aria-hidden="true" data-testid="consult-voice-bars">
+                  {Array.from({ length: WAVE_BARS }, (_, i) => (
+                    <span key={i} style={voiceLevels.length ? { height: `${Math.max(6, Math.round((voiceLevels[i] ?? 0) * 100))}%` }
+                      : { animationDelay: `${((i * 37) % 23) * -0.06}s` }} />
+                  ))}
+                </div>
+              )}
               <textarea id={`${id}-text`} value={brief.text} onChange={(e) => { set('text', e.target.value); onType(); }} rows={6}
                 maxLength={4000} aria-describedby={`${id}-text-help`} className={`${field} mt-0 leading-relaxed`}
                 placeholder="例: 家族4人で1泊2日。枚方から車で片道3時間くらいまで。人が多すぎない所。伊勢、福井、滋賀などが候補。" />
             </div>
             <p className="mt-1 text-xs font-semibold" aria-live="polite" data-testid="consult-input-mode-label">
-              {inputMode === 'voice' && <><UiIcon icon={IcMic} size={14} className="mr-1 align-[-2px]" />音声で入力中(声の大きさを背景の棒で表示)</>}
+              {inputMode === 'voice' && <><UiIcon icon={IcMic} size={14} className="mr-1 align-[-2px]" />音声で入力中(声の波形を表示)</>}
               {inputMode === 'typing' && <><UiIcon icon={IcPencil} size={14} className="mr-1 align-[-2px]" />キーボードで入力中</>}
             </p>
             <p id={`${id}-text-help`} className={help}>
@@ -632,13 +636,13 @@ const TripConsultPage: React.FC = () => {
   // [Gate AreaImages] 比べる方面・AI が選んだ方面の代表画像(Wikipedia・無料)。まだ取っていない方面だけを 1 回で取る
   const imageNames = Array.from(new Set([...state.areaNames,
     ...(state.extraction?.areas ?? []).map((a) => a.name)])).slice(0, 10);
-  const imageKey = imageNames.filter((n) => !(state.areaImages && n in state.areaImages)).join('\u0001');
+  const imageKey = imageNames.filter((n) => !(state.areaPhotos && n in state.areaPhotos)).join('\u0001');
   useEffect(() => {
     const todo = imageKey ? imageKey.split('\u0001') : [];
     if (todo.length === 0) return undefined;
     let alive = true;
     Promise.resolve().then(() => getAreaImages(todo)).then((images) => {
-      if (alive && images) setState((s) => ({ ...s, areaImages: { ...(s.areaImages ?? {}), ...images } }));
+      if (alive && images) setState((s) => ({ ...s, areaPhotos: { ...(s.areaPhotos ?? {}), ...images } }));
     }).catch(() => {
       // 画像が取れなくても相談は続けられる(絵の代わりに色の帯)。次に方面が変わった時にもう一度
     });
@@ -668,6 +672,87 @@ const TripConsultPage: React.FC = () => {
     setState((s) => ({ ...s, consultSessionId: r.session_id }));
     return r.session_id;
   }, []);
+
+  // [Gate AreaSpots] 方面の代表的な場所(例: 鳥羽 → 伊勢神宮)。近くの検索は中心から近い順のため、少し離れた有名な場所が抜ける。
+  // 1) 方面の提案に付いた代表的な場所を Wikipedia で位置づける(無料・方面ごとに1回)
+  // 2) AI が使える時は、方面ごとに1回だけ AI におすすめの場所を聞く(AI 1回。もう一度はボタンから)
+  const [spotsBusy, setSpotsBusy] = useState<string | null>(null);
+  const [spotsError, setSpotsError] = useState<string | null>(null);
+  const spotsDone = useRef<Set<string>>(new Set());
+  const detailArea = state.step === 'detail' ? state.selectedArea : null;
+  const detailGeo = state.areas?.areas.find((a) => a.name === detailArea)?.geocode;
+  const detailLat = detailGeo?.status === 'ok' ? detailGeo.latitude : null;
+  const detailLon = detailGeo?.status === 'ok' ? detailGeo.longitude : null;
+  const detailProposal = state.extraction?.areas.find((a) => a.name === detailArea) ?? null;
+  const aiReady = Boolean(aiStatus?.operations['ai.generate'].ready && aiStatus.consent.ai_processing);
+  const mergeSpots = useCallback((area: string, rows: NearbyResult[], flag: { asked?: boolean; resolved?: boolean }) => {
+    setState((s) => {
+      const cur = s.aiSpots?.[area] ?? { rows: [], asked: false, resolved: false };
+      const ids = new Set(cur.rows.map((r) => r.id));
+      const names = new Set(cur.rows.map((r) => r.name));
+      const add = rows.filter((r) => !ids.has(r.id) && !names.has(r.name));
+      return { ...s, aiSpots: { ...(s.aiSpots ?? {}), [area]: { ...cur, ...flag, rows: [...cur.rows, ...add].slice(0, 16) } } };
+    });
+  }, []);
+  const proposalSpotsKey = (detailProposal?.spots ?? []).map((x) => x.name).join('\u0001');
+  useEffect(() => {
+    if (!detailArea || detailLat === null || detailLat === undefined || detailLon === null || detailLon === undefined) return undefined;
+    const k = `r:${detailArea}`;
+    if (spotsDone.current.has(k) || state.aiSpots?.[detailArea]?.resolved) return undefined;
+    spotsDone.current.add(k);
+    const spots = detailProposal?.spots ?? [];
+    if (spots.length === 0) {
+      mergeSpots(detailArea, [], { resolved: true });
+      return undefined;
+    }
+    const area = detailArea;
+    Promise.resolve().then(() => resolveSpots({ area, pref: detailProposal?.pref ?? null, latitude: detailLat, longitude: detailLon,
+      spots: spots.slice(0, 12) })).then((rows) => mergeSpots(area, rows ?? [], { resolved: true })).catch(() => {
+      // 位置づけられなくても相談は続けられる(次にこの方面を開いた時にもう一度)
+      spotsDone.current.delete(k);
+    });
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailArea, detailLat, detailLon, proposalSpotsKey]);
+
+  const askSpots = useCallback(async (area: string, latitude: number, longitude: number) => {
+    const review = state.review;
+    if (!review) return;
+    setSpotsBusy(area);
+    setSpotsError(null);
+    try {
+      const sid = await ensureSession();
+      const r = await consultSpots(sid, { area, pref: state.extraction?.areas.find((a) => a.name === area)?.pref ?? null,
+        latitude, longitude, preferences: review.values.preferences ?? [], notes: review.notes ?? [],
+        party_size: review.values.party_size, nights: review.values.nights }, newIdempotencyKey());
+      setConsultUsage(r.usage);
+      mergeSpots(area, r.candidates, { asked: true });
+      if (r.candidates.length === 0) setSpotsError('AI のおすすめの場所を、地図上の位置に結び付けられませんでした。近くの検索から選べます');
+    } catch (e) {
+      const code = consultErrorCode(e);
+      if (code === 'consult_closed' || code === 'consult_expired' || code === 'consult_not_found') {
+        sessionRef.current = null;
+        setState((s) => ({ ...s, consultSessionId: null }));
+      }
+      mergeSpots(area, [], { asked: true });
+      setSpotsError(`${errorDetailMessage(e, 'AI のおすすめの場所を取れませんでした')}。近くの検索から選べます`);
+      void refreshAiStatus();
+    } finally {
+      setSpotsBusy(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.review, state.extraction, ensureSession, mergeSpots]);
+  useEffect(() => {
+    if (!detailArea || !aiReady || detailLat === null || detailLat === undefined || detailLon === null || detailLon === undefined) return;
+    const k = `a:${detailArea}`;
+    if (spotsDone.current.has(k) || state.aiSpots?.[detailArea]?.asked) return;
+    spotsDone.current.add(k);
+    void askSpots(detailArea, detailLat, detailLon);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailArea, aiReady, detailLat, detailLon]);
+  const spotsBlocker = !aiStatus ? 'AI の状態を確認しています'
+    : !aiStatus.operations['ai.generate'].ready ? 'いまは使えません'
+      : !aiStatus.consent.ai_processing ? '最初の画面で AI への送信に同意すると使えます' : null;
 
   const setConsent = async (on: boolean) => {
     setConsentBusy(true);
@@ -900,7 +985,7 @@ const TripConsultPage: React.FC = () => {
       {step === 'review' && state.review && (
         <SuggestedAreasPanel proposed={(state.extraction?.areas ?? []).filter((a) => a.source !== 'user_input')}
           regions={state.extraction?.regions ?? []} proposalNote={state.extraction?.proposal?.note ?? null}
-          images={state.areaImages ?? {}}
+          images={state.areaPhotos ?? {}}
           suggestions={state.suggestedAreas ?? []} unknowns={state.unknowns ?? []}
           contradictions={state.contradictions ?? []} areaNames={state.areaNames}
           onToggle={(name, on) => setState((s) => ({ ...s, areaNames: on ? [...s.areaNames.filter((n) => n !== name), name].slice(0, 10)
@@ -932,7 +1017,15 @@ const TripConsultPage: React.FC = () => {
           })}
           onUrls={(urls) => setState((s) => ({ ...s, urls }))}
           onCreate={() => void createDraft()}
-          google={{ status: aiStatus, usage: consultUsage, ensureSession, onUsage: setConsultUsage }} />
+          google={{ status: aiStatus, usage: consultUsage, ensureSession, onUsage: setConsultUsage }}
+          recommend={state.selectedArea ? {
+            rows: state.aiSpots?.[state.selectedArea]?.rows ?? [],
+            busy: spotsBusy === state.selectedArea, error: spotsError, blocker: detailLat === null || detailLat === undefined
+              ? '方面の位置が分からないため使えません' : spotsBlocker,
+            asked: Boolean(state.aiSpots?.[state.selectedArea]?.asked),
+            onAsk: () => { if (state.selectedArea && detailLat !== null && detailLat !== undefined && detailLon !== null
+              && detailLon !== undefined) void askSpots(state.selectedArea, detailLat, detailLon); },
+          } : undefined} />
       )}
       {step === 'detail' && state.review && state.selectedArea && (() => {
         const o = state.areas?.origin;

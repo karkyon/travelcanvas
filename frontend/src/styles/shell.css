@@ -157,6 +157,8 @@
 .tc-planner-empty .tc-card { padding: 22px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .tc-planner-empty h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--tc-ink-900); }
 .tc-planner-empty p { margin: 0; color: var(--tc-ink-500); font-size: 13px; }
+/* [Gate StartArt] 始め方の2つのカードは写真(利用者提供)を大きめに見せる */
+.tc-planner-empty .tc-detail-art { height: 220px; }
 
 /* ---- クイックの作成(フォーム+予告のカード) ---- */
 .tc-quick-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(280px, .7fr); align-items: start; }
@@ -284,6 +286,22 @@
 .tc-segment-row { margin: 0 0 4px 69px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11px;
   color: var(--tc-ink-700); padding: 3px 8px; border-left: 3px solid var(--tc-cloud-200); border-radius: 4px; }
 .tc-segment-row.is-mismatch { border-left-color: var(--tc-warning); background: var(--tc-warning-soft); color: var(--tc-warning); }
+/* [Gate PlanUX] 予定と予定の間の移動: 行・選ぶボタン・移動手段の印(押した時だけ出す)・詳細 */
+.tc-segment-slot { margin: 0 0 6px 69px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tc-segment-slot > .tc-segment-row { margin: 0; }
+.tc-segment-row--empty { border-left-style: dashed; }
+.tc-segment-tools { display: inline-flex; gap: 6px; }
+.tc-segment-btn { min-height: 32px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--tc-cloud-200);
+  background: var(--tc-cloud-0); color: var(--tc-accent); font-size: 12px; font-weight: 700; }
+.tc-segment-btn:hover { border-color: var(--tc-accent); }
+.tc-segment-modes { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-radius: 12px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-surface, var(--tc-cloud-0)); }
+.tc-segment-mode { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-100); color: var(--tc-ink-900); font-size: 12px; font-weight: 600; }
+.tc-segment-mode:hover { border-color: var(--tc-accent); }
+.tc-segment-mode.is-on { border-color: var(--tc-accent); background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+.tc-segment-error { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--tc-danger); }
+@media (max-width: 760px) { .tc-segment-slot { margin-left: 55px; } }
 .tc-add-event { margin-top: 6px; width: 100%; justify-content: center; border-style: dashed; }
 .tc-day-empty { border: 1px dashed var(--tc-cloud-200); border-radius: 14px; }
 .tc-planner-layout > .tc-route-map, .tc-route-map { position: relative; isolation: isolate; border-radius: var(--tc-radius-lg, 18px); overflow: hidden; }
@@ -584,14 +602,14 @@
   transform: rotate(-12deg); }
 .tc-input-mode--typing .tc-input-mode__icon { opacity: .18; animation: tc-pencil 1.2s ease-in-out infinite alternate; }
 @keyframes tc-pencil { from { transform: rotate(-12deg) translateX(0); } to { transform: rotate(-6deg) translateX(-8px); } }
-.tc-voice-bars { position: absolute; left: 0; right: 0; bottom: 0; height: 75%; display: flex; align-items: flex-end; gap: 3px;
-  padding: 0 .75rem .5rem; opacity: .4; }
-.tc-voice-bars span { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, #2dd4bf, #0f6e66);
-  transition: height 90ms linear; }
-.tc-voice-bars--idle span { animation: tc-voice-idle .9s ease-in-out infinite alternate; }
-.tc-voice-bars--idle span:nth-child(3n) { animation-delay: .3s; }
-.tc-voice-bars--idle span:nth-child(3n+1) { animation-delay: .6s; }
-@keyframes tc-voice-idle { from { height: 10%; } to { height: 45%; } }
+/* [Gate VoiceWave] 声の波形: 細い縦線を中央の線から上下へ伸ばす(録音の見本の形)。右から新しい値が入る */
+.tc-input-mode--voice textarea { padding-bottom: 5.25rem; }
+.tc-voice-wave { position: absolute; left: .75rem; right: .75rem; bottom: .5rem; height: 4.25rem; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 2px; }
+.tc-voice-wave span { width: 3px; min-height: 4px; border-radius: 2px; background: currentColor; transition: height 70ms linear; }
+.tc-voice-wave--idle span { animation: tc-voice-wave 1.1s ease-in-out infinite alternate; }
+@keyframes tc-voice-wave { 0% { height: 6%; } 30% { height: 70%; } 60% { height: 25%; } 100% { height: 95%; } }
 @media (prefers-reduced-motion: reduce) {
-  .tc-input-mode--typing .tc-input-mode__icon, .tc-voice-bars--idle span { animation: none; }
+  .tc-input-mode--typing .tc-input-mode__icon { animation: none; }
+  .tc-voice-wave--idle span { animation: none; height: 30%; }
 }

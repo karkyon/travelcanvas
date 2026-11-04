@@ -138,7 +138,7 @@ async def search_wikipedia_nearby(latitude: float, longitude: float, radius_km: 
     url = "https://ja.wikipedia.org/w/api.php"
     radius_m = int(min(10.0, max(0.1, radius_km)) * 1000)
     params = {"action": "query", "generator": "geosearch", "ggscoord": f"{latitude}|{longitude}",
-              "ggsradius": str(radius_m), "ggslimit": "50", "prop": "coordinates|pageimages|description",
+              "ggsradius": str(radius_m), "ggslimit": "50", "prop": "coordinates|pageimages|description|info",
               "piprop": "thumbnail", "pithumbsize": "320", "pilimit": "50", "colimit": "50", "format": "json",
               "formatversion": "2"}
     owns_client = client is None
@@ -174,7 +174,9 @@ async def search_wikipedia_nearby(latitude: float, longitude: float, radius_km: 
                 "provider": "wikipedia", "external_id": f"geo/{pageid}", "name": title, "category": kind,
                 "latitude": lat, "longitude": lon, "address": None,
                 "raw_payload": {"pageid": pageid, "_tc": {"kind": kind, "thumbnail_url": thumb,
-                                                          "description": (desc or "")[:80] or None}},
+                                                          "description": (desc or "")[:80] or None,
+                                                          # 記事の大きさ(人気の目安。有名な場所を先に並べる)
+                                                          "length": it.get("length")}},
                 "source_url": f"https://ja.wikipedia.org/?curid={pageid}", "retrieved_at": retrieved_at,
             })
         return out

@@ -26,8 +26,9 @@ def _variants(name: str) -> List[str]:
     return out
 
 
-async def lookup(names: List[str], client: Optional[httpx.AsyncClient] = None) -> Tuple[Dict[str, Any], bool]:
-    """{名前: {url, page_url, title} or None}, 外へ送ったか"""
+async def lookup(names: List[str], client: Optional[httpx.AsyncClient] = None,
+                 prefs: Optional[Dict[str, str]] = None) -> Tuple[Dict[str, Any], bool]:
+    """{名前: {url, page_url, title} or None}, 外へ送ったか。失敗(通信)の時は結果に入れない(画面はもう一度頼める)"""
     now = time.monotonic()
     result: Dict[str, Any] = {}
     todo: List[str] = []
@@ -48,13 +49,12 @@ async def lookup(names: List[str], client: Optional[httpx.AsyncClient] = None) -
         resp = await client.get(API, params=params, headers=HEADERS)
         resp.raise_for_status()
         data = resp.json()
-    except (httpx.HTTPError, ValueError):
-        for n in todo:
-            result[n] = None  # 失敗は保存しない(次の表示でもう一度)
-        return result, True
-    finally:
+    except (httpx.HTTPError, ValueError) as error:
+        import logging
+        logging.getLogger(__name__).warning("area images failed: %s", type(error).__name__)
         if owns:
             await client.aclose()
+        return result, True  # 失敗は保存しない・返さない(次の表示でもう一度)
     q = data.get("query") if isinstance(data, dict) else None
     q = q if isinstance(q, dict) else {}
     alias: Dict[str, str] = {}
@@ -70,16 +70,41 @@ async def lookup(names: List[str], client: Optional[httpx.AsyncClient] = None) -
             t, seen = alias[t], seen + 1
         return t
 
+    def pick(page: Any) -> Optional[Dict[str, str]]:
+        thumb = page.get("thumbnail") if isinstance(page, dict) else None
+        src = thumb.get("source") if isinstance(thumb, dict) else None
+        if page and not page.get("missing") and src and str(src).startswith("https://upload.wikimedia.org/"):
+            return {"url": str(src), "title": str(page.get("title")),
+                    "page_url": f"https://ja.wikipedia.org/?curid={page.get('pageid')}"}
+        return None
+
+    misses: List[str] = []
     for n in todo:
         found = None
         for v in _variants(n):
-            page = pages.get(final(v))
-            thumb = (page or {}).get("thumbnail") if page else None
-            src = thumb.get("source") if isinstance(thumb, dict) else None
-            if page and not page.get("missing") and src and str(src).startswith("https://upload.wikimedia.org/"):
-                found = {"url": str(src), "title": str(page.get("title")),
-                         "page_url": f"https://ja.wikipedia.org/?curid={page.get('pageid')}"}
+            found = pick(pages.get(final(v)))
+            if found:
                 break
-        _cache[n] = (now, found)
-        result[n] = found
+        if found:
+            _cache[n] = (now, found)
+            result[n] = found
+        else:
+            misses.append(n)
+    # 記事の名前で見つからない・画像の無い記事(曖昧さ回避の記事など)は、記事の検索の 1 件目の代表画像
+    try:
+        for n in misses[:6]:
+            q2 = f"{n} {(prefs or {}).get(n, '')}".strip()
+            r = await client.get(API, params={"action": "query", "generator": "search", "gsrsearch": q2,
+                                              "gsrlimit": "1", "prop": "pageimages", "piprop": "thumbnail",
+                                              "pithumbsize": "480", "format": "json", "formatversion": "2"},
+                                 headers=HEADERS)
+            pages2 = ((r.json() or {}).get("query") or {}).get("pages") if r.status_code == 200 else None
+            found = pick(pages2[0]) if isinstance(pages2, list) and pages2 else None
+            _cache[n] = (now, found)
+            result[n] = found
+    except (httpx.HTTPError, ValueError):
+        pass
+    finally:
+        if owns:
+            await client.aclose()
     return result, True

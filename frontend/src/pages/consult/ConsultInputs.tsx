@@ -21,9 +21,11 @@ const ERROR_LABEL: Record<string, string> = {
 };
 
 /**
- * [Gate InputMode] 録音中の声の大きさ(マイクの音を周波数ごとに分けた 16 本の棒・0〜1)。
+ * [Gate InputMode / VoiceWave] 録音中の声の波形(直近 WAVE_BARS 回の声の大きさ・0〜1。右から新しい値が入り左へ流れる)。
  * 音はこの端末の中だけで測り、保存も送信もしない。マイクの音を取れない時は null を返さず [] を渡す(画面は動く棒の飾り)
  */
+export const WAVE_BARS = 40;
+
 function useVoiceLevels(active: boolean, onLevels?: (levels: number[] | null) => void) {
   useEffect(() => {
     if (!onLevels) return undefined;
@@ -42,16 +44,23 @@ function useVoiceLevels(active: boolean, onLevels?: (levels: number[] | null) =>
         stream = s;
         ctx = new AC();
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 64;
+        analyser.fftSize = 512;
         ctx.createMediaStreamSource(s).connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
+        const data = new Uint8Array(analyser.fftSize);
+        const history: number[] = Array.from({ length: WAVE_BARS }, () => 0);
         let last = 0;
         const tick = (t: number) => {
           if (stopped) return;
-          if (t - last > 66) {
+          if (t - last > 70) {
             last = t;
-            analyser.getByteFrequencyData(data);
-            onLevels(Array.from({ length: 16 }, (_, i) => Math.min(1, (data[i + 1] ?? 0) / 200)));
+            // 声の大きさ(波の振れ幅の二乗平均)。小さな声でも見えるよう平方根で持ち上げる
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 1) { const v = ((data[i] ?? 128) - 128) / 128; sum += v * v; }
+            const level = Math.min(1, Math.sqrt(Math.sqrt(sum / data.length)) * 1.6);
+            history.shift();
+            history.push(level);
+            onLevels([...history]);
           }
           raf = requestAnimationFrame(tick);
         };

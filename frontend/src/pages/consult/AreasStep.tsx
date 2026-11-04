@@ -155,7 +155,7 @@ const AreasStep: React.FC<Props> = ({ state, busy, error, onEdit, onRetry, onAdd
               return (
                 <li key={a.name} data-testid={`area-row-${a.name}`} data-selected={selected}
                   className={`grid grid-cols-[6rem_minmax(0,1fr)] gap-3 p-3 ${selected ? 'bg-accent-soft' : ''}`}>
-                  <AreaCover name={a.name} image={state.areaImages?.[a.name]} order={i + 1} fallback={pal} className="h-24" />
+                  <AreaCover name={a.name} image={state.areaPhotos?.[a.name]} order={i + 1} fallback={pal} className="h-24" />
                   <div className="min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <button type="button" aria-pressed={selected} onClick={() => onSelect(a.name)}

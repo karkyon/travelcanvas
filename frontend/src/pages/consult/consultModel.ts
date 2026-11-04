@@ -140,7 +140,9 @@ export interface ConsultState {
   /** [Gate ConsultAI] AI が挙げた方面の案(未確認。利用者が足すまで比べない) */
   suggestedAreas?: Array<{ name: string; reason: string }>;
   /** [Gate AreaImages] 方面の代表画像(取れない方面は null。取っていない方面は無い) */
-  areaImages?: Record<string, AreaImage | null>;
+  areaPhotos?: Record<string, AreaImage | null>;
+  /** [Gate AreaSpots] 方面ごとの「おすすめの場所」(代表的な場所の名前から・AI のおすすめ)。asked は AI に頼んだか */
+  aiSpots?: Record<string, { rows: NearbyResult[]; asked: boolean; resolved: boolean }>;
   /** [Gate ConsultAI] AI が挙げた、まだ決まっていない大事なこと */
   unknowns?: string[];
   /** [Gate AdminUAT U05] AI が見つけた、希望どうしの食い違い(勝手に決めず、利用者に確かめる) */

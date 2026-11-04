@@ -40,6 +40,19 @@ interface Row {
   /** [Gate PlaceKinds] 種類・代表画像・説明・希望との一致・距離(並べ替え) */
   kind: PlaceKind; thumb: string | null; description: string | null; match: string[]; avoid: boolean;
   distance: number | null; sourceUrl?: string | null;
+  /** [Gate AreaSpots] AI のおすすめの特色・理由、人気の目安(記事の大きさ) */
+  aiNote?: string | null; aiWhy?: string | null; popularity?: number | null;
+}
+
+/** [Gate AreaSpots] 方面の代表的な場所(提案の代表的な場所・AI のおすすめ)。親(旅行相談の画面)が取って渡す */
+export interface Recommend {
+  rows: NearbyResult[];
+  busy: boolean;
+  error: string | null;
+  /** AI に頼めない理由(使える時は null) */
+  blocker: string | null;
+  asked: boolean;
+  onAsk: () => void;
 }
 
 export interface PlaceSearchProps {
@@ -55,14 +68,16 @@ export interface PlaceSearchProps {
   autoSearch?: boolean;
   /** [Gate PlaceKinds] 旅行相談の「過ごし方」(合う種類の場所を先に並べ、バッジを出す) */
   preferences?: string[];
+  recommend?: Recommend;
 }
 
 /** [Gate AreaGeo] 結果の出典の名前(観光は OpenStreetMap と Wikipedia の座標付き記事の両方から探す) */
 const providerLabel = (p: string): string => (p === 'wikipedia' ? 'Wikipedia' : 'OpenStreetMap');
 
 const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
-  areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true, preferences = [],
+  areaName, base, picked, pickedGoogle, onPick, onPickGoogle, google, autoSearch = true, preferences = [], recommend,
 }) => {
+  const [sortMode, setSortMode] = useState<'recommended' | 'near'>('recommended');
   const [kindFilter, setKindFilter] = useState<PlaceKind | 'all'>('all');
   const [onlyMatch, setOnlyMatch] = useState(false);
   const [resultsVersion, setResultsVersion] = useState(0);
@@ -168,6 +183,19 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base?.latitude, base?.longitude]);
 
+  function toRow(r: NearbyResult, prefix: string): Row {
+    const kind = asKind(r.kind);
+    return {
+      key: `${prefix}-${r.id}`, source: 'osm' as const, name: r.name, detail: [distanceLabel(r)].filter(Boolean).join(' · '),
+      sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
+        ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
+      picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
+      kind, thumb: r.thumbnail_url ?? null, description: r.description ?? null,
+      match: matchedPrefs(kind, preferences), avoid: avoidKind(kind, preferences), distance: r.distance_m,
+      aiNote: r.ai_note ?? null, aiWhy: r.ai_why ?? null, popularity: r.popularity ?? null,
+    };
+  }
+
   const allRows: Row[] = shown === 'google'
     ? (gResults?.rows ?? []).map((g) => ({
       key: `g-${g.place_id}`, source: 'google' as const, name: g.name, detail: g.address ?? '',
@@ -176,22 +204,53 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
       picked: Boolean(pickedGoogle[g.place_id]), toggle: () => onPickGoogle(g, !pickedGoogle[g.place_id]),
       kind: 'other' as PlaceKind, thumb: null, description: null, match: [], avoid: false, distance: null,
     }))
-    : (osm?.rows ?? []).map((r) => {
-      const kind = asKind(r.kind);
-      return {
-        key: `o-${r.id}`, source: 'osm' as const, name: r.name, detail: [distanceLabel(r)].filter(Boolean).join(' · '),
-        sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
-          ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
-        picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
-        kind, thumb: r.thumbnail_url ?? null, description: r.description ?? null,
-        match: matchedPrefs(kind, preferences), avoid: avoidKind(kind, preferences), distance: r.distance_m,
-      };
-    })
-      // [Gate PlaceKinds] 希望に合う種類を先に、人混みを避けたい時のテーマパークは後に、同じなら近い順
-      .sort((a, b) => (Number(b.match.length > 0) - Number(a.match.length > 0)) || (Number(a.avoid) - Number(b.avoid))
+    : (osm?.rows ?? []).map((r) => toRow(r, 'o'))
+      // [Gate PlaceKinds / AreaSpots] おすすめ順: 希望に合う種類 → 人混みを避けたい時のテーマパークは後 → 人気(記事の大きさ)→ 近い順
+      .sort((a, b) => (sortMode === 'near' ? 0 : (Number(b.match.length > 0) - Number(a.match.length > 0))
+        || (Number(a.avoid) - Number(b.avoid)) || ((b.popularity ?? 0) - (a.popularity ?? 0)))
         || ((a.distance ?? 1e12) - (b.distance ?? 1e12)));
+  const recRows = (recommend?.rows ?? []).map((r) => toRow(r, 'a'));
   const kindCounts = KIND_ORDER.map((k) => [k, allRows.filter((r) => r.kind === k).length] as const).filter(([, n]) => n > 0);
   const rows = allRows.filter((r) => (kindFilter === 'all' || r.kind === kindFilter) && (!onlyMatch || r.match.length > 0));
+  const card = (r: Row) => {
+    const meta = KIND_META[r.kind];
+    const tid = r.key.startsWith('a-') ? `consult-rec-${r.key.slice(2)}` : `consult-result-${r.key.slice(2)}`;
+    return (
+                      <li key={r.key} className={`relative overflow-hidden rounded-xl border text-sm ${r.picked ? 'border-accent ring-2 ring-accent' : 'border-cloud-200'}`}
+                        data-testid={tid} data-kind={r.kind}
+                        style={{ background: `linear-gradient(90deg, ${meta.bg} 0%, transparent 70%)` }}>
+                        <div className="flex gap-3 p-3">
+                          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg" style={{ background: meta.bg }}
+                            aria-hidden="true">
+                            {r.thumb
+                              ? <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                              : <span className="grid h-full w-full place-items-center" style={{ color: meta.fg }}><UiIcon icon={meta.icon} size={34} /></span>}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: meta.bg, color: meta.fg }}
+                                data-testid={`consult-kind-badge-${r.key.slice(2)}`}>
+                                <UiIcon icon={meta.icon} size={12} className="mr-1 align-[-2px]" />{meta.label}</span>
+                              {r.match.length > 0 && (
+                                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success"
+                                  data-testid={`consult-match-${r.key.slice(2)}`}>{`希望に合う: ${r.match.join('・')}`}</span>
+                              )}
+                            </div>
+                            <p className="mt-1 font-semibold text-ink-900 break-words">{r.name}</p>
+                            {r.description && <p className="text-xs text-ink-900 break-words">{r.description}</p>}
+                            {r.aiNote && <p className="text-xs text-ink-900 break-words"><b>特色</b>{` ${r.aiNote}`}</p>}
+                            {r.aiWhy && <p className="text-xs text-success break-words"><b>おすすめの理由</b>{` ${r.aiWhy}`}</p>}
+                            {r.detail && <p className="text-xs text-ink-700 break-words">{r.detail}</p>}
+                            <p className="text-[11px] text-ink-700">{`${r.sourceLabel} · ${r.unverified}`}</p>
+                            <Button type="button" size="sm" variant={r.picked ? 'primary' : 'outline'} className="mt-2"
+                              aria-pressed={r.picked} onClick={r.toggle} data-testid={`consult-pick-${r.key.slice(2)}`}>
+                              {r.picked ? '✓ 旅程案に入れる' : '旅程案に入れる'}
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+  };
   const resultLabel = shown === 'google' ? gResults?.label : osm?.label;
   const hasResults = shown === 'google' ? gResults !== null : osm !== null;
   const sourceName = source === 'google' ? 'Google(有料・この相談の利用枠)' : 'OpenStreetMap(無料)';
@@ -199,6 +258,32 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   return (
     <section aria-labelledby={`${id}-h`} data-testid="consult-place-search">
       <h3 id={`${id}-h`} className="sr-only">候補を探す</h3>
+      {recommend && (
+        <div className="m-4 rounded-xl border border-accent bg-accent-soft/40 p-3" data-testid="consult-recommend">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-ink-900">{`${areaName}の代表的な場所(おすすめ)`}</p>
+            {!recommend.busy && (recommend.blocker ? (
+              <span className="text-xs text-ink-700">{`AI のおすすめ: ${recommend.blocker}`}</span>
+            ) : (
+              <Button type="button" size="sm" variant="outline" onClick={recommend.onAsk} data-testid="consult-recommend-ask">
+                {recommend.asked ? 'AI にもう一度聞く(AI 1回)' : 'AI におすすめを聞く(AI 1回)'}
+              </Button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-ink-700">
+            方面の提案の代表的な場所と AI のおすすめを、Wikipedia の記事(位置・写真・説明)に結び付けて表示します。
+            近くの検索(下)は中心から近い場所だけのため、少し離れた有名な場所はここに出ます。
+          </p>
+          {recommend.busy && <p role="status" className="mt-2 text-sm text-ink-900">おすすめの場所を探しています…</p>}
+          {recommend.error && <p role="alert" className="mt-2 text-sm text-danger">{recommend.error}</p>}
+          {recRows.length > 0 && (
+            <ul className="mt-2 grid gap-2 md:grid-cols-2" aria-label="おすすめの場所">{recRows.map((r) => card(r))}</ul>
+          )}
+          {!recommend.busy && recRows.length === 0 && !recommend.error && (
+            <p className="mt-2 text-xs text-ink-700">まだおすすめの場所はありません。</p>
+          )}
+        </div>
+      )}
       <form onSubmit={(e) => { e.preventDefault(); void search(); }} aria-label="候補を探す"
         className="space-y-3 border-b border-cloud-200 p-4">
         <div role="group" aria-label="何を探す?" className="flex flex-wrap gap-2">
@@ -314,7 +399,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
                 {kindCounts.length > 1 && (
                   <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="種類で絞り込む" data-testid="consult-kind-filter">
                     <button type="button" aria-pressed={kindFilter === 'all'} onClick={() => setKindFilter('all')}
-                      className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs ${kindFilter === 'all' ? 'border-accent bg-accent text-white' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>
+                      className={`tc-focus-ring min-h-9 rounded-full border px-3 text-xs ${kindFilter === 'all' ? 'border-accent bg-accent text-on-accent' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>
                       {`すべて ${allRows.length}`}
                     </button>
                     {kindCounts.map(([k, n]) => (
@@ -334,44 +419,21 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
                     )}
                   </div>
                 )}
+                {shown === 'osm' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs" role="radiogroup" aria-label="並べ方">
+                    <span className="text-ink-700">並べ方:</span>
+                    {([['recommended', 'おすすめ順(希望・人気)'], ['near', '近い順']] as const).map(([m, label]) => (
+                      <button key={m} type="button" role="radio" aria-checked={sortMode === m} onClick={() => setSortMode(m)}
+                        data-testid={`consult-sort-${m}`}
+                        className={`tc-focus-ring min-h-9 rounded-full border px-3 ${sortMode === m ? 'border-accent bg-accent text-on-accent' : 'border-cloud-200 bg-cloud-0 text-ink-900'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {rows.length === 0 && <p className="py-3 text-sm text-ink-700">この絞り込みに合う場所はありません。絞り込みを外してください。</p>}
                 <ul className="mt-2 grid gap-2 md:grid-cols-2" aria-label="見つかった場所">
-                  {rows.map((r) => {
-                    const meta = KIND_META[r.kind];
-                    return (
-                      <li key={r.key} className={`relative overflow-hidden rounded-xl border text-sm ${r.picked ? 'border-accent ring-2 ring-accent' : 'border-cloud-200'}`}
-                        data-testid={`consult-result-${r.key.slice(2)}`} data-kind={r.kind}
-                        style={{ background: `linear-gradient(90deg, ${meta.bg} 0%, transparent 70%)` }}>
-                        <div className="flex gap-3 p-3">
-                          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg" style={{ background: meta.bg }}
-                            aria-hidden="true">
-                            {r.thumb
-                              ? <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-                              : <span className="grid h-full w-full place-items-center" style={{ color: meta.fg }}><UiIcon icon={meta.icon} size={34} /></span>}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-1">
-                              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: meta.bg, color: meta.fg }}
-                                data-testid={`consult-kind-badge-${r.key.slice(2)}`}>
-                                <UiIcon icon={meta.icon} size={12} className="mr-1 align-[-2px]" />{meta.label}</span>
-                              {r.match.length > 0 && (
-                                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success"
-                                  data-testid={`consult-match-${r.key.slice(2)}`}>{`希望に合う: ${r.match.join('・')}`}</span>
-                              )}
-                            </div>
-                            <p className="mt-1 font-semibold text-ink-900 break-words">{r.name}</p>
-                            {r.description && <p className="text-xs text-ink-900 break-words">{r.description}</p>}
-                            {r.detail && <p className="text-xs text-ink-700 break-words">{r.detail}</p>}
-                            <p className="text-[11px] text-ink-700">{`${r.sourceLabel} · ${r.unverified}`}</p>
-                            <Button type="button" size="sm" variant={r.picked ? 'primary' : 'outline'} className="mt-2"
-                              aria-pressed={r.picked} onClick={r.toggle} data-testid={`consult-pick-${r.key.slice(2)}`}>
-                              {r.picked ? '✓ 旅程案に入れる' : '旅程案に入れる'}
-                            </Button>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {rows.map((r) => card(r))}
                 </ul>
               </>
             )}

@@ -33,6 +33,22 @@ interface ModalFooterProps {
   children: React.ReactNode;
 }
 
+/** 中身が Modal.Header / Body / Footer で組まれているか(組まれていれば各部品が余白を持つ)。form などで包んだ場合も見る */
+function usesSections(node: React.ReactNode, depth = 0): boolean {
+  if (depth > 4) return false;
+  let found = false;
+  React.Children.forEach(node, (child) => {
+    if (found || !React.isValidElement(child)) return;
+    if (child.type === ModalBody || child.type === ModalFooter || child.type === ModalHeader) {
+      found = true;
+      return;
+    }
+    const inner = (child.props as { children?: React.ReactNode }).children;
+    if (inner !== undefined && usesSections(inner, depth + 1)) found = true;
+  });
+  return found;
+}
+
 const Modal: React.FC<ModalProps> & {
   Header: React.FC<ModalHeaderProps>;
   Body: React.FC<ModalBodyProps>;
@@ -164,8 +180,10 @@ const Modal: React.FC<ModalProps> & {
             />
           )}
           
-          {/* Content */}
-          {children}
+          {/* Content: Modal.Body / Footer を使わない中身にも余白を付ける(端に文字やボタンが貼り付かないように) */}
+          {usesSections(children) ? children : (
+            <div className={`p-6 ${size === 'full' ? 'flex-1 overflow-y-auto' : ''}`} data-testid="modal-content">{children}</div>
+          )}
         </div>
       </div>
     </div>

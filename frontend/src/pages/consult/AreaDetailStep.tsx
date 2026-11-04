@@ -15,7 +15,7 @@ import React, { useId, useState } from 'react';
 import Button from '@/components/common/Button';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 import { isHttpUrl, type ConsultState, type GooglePick } from './consultModel';
-import PlaceSearchPanel, { type PlaceSearchProps } from './PlaceSearchPanel';
+import PlaceSearchPanel, { type PlaceSearchProps, type Recommend } from './PlaceSearchPanel';
 
 
 interface Props {
@@ -28,9 +28,10 @@ interface Props {
   onUrls: (urls: string[]) => void;
   onCreate: () => void;
   google: PlaceSearchProps['google'];
+  recommend?: Recommend;
 }
 
-const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, onPickGoogle, onUrls, onCreate, google }) => {
+const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, onPickGoogle, onUrls, onCreate, google, recommend }) => {
   const id = useId();
   const area = state.areas?.areas.find((a) => a.name === state.selectedArea) ?? null;
   const base = area?.geocode.status === 'ok' && area.geocode.latitude !== null && area.geocode.longitude !== null
@@ -88,7 +89,7 @@ const AreaDetailStep: React.FC<Props> = ({ state, busy, error, onBack, onPick, o
           <h3 id={`${id}-find`} className="sr-only">場所を探す</h3>
           <PlaceSearchPanel key={state.selectedArea ?? ''} areaName={state.selectedArea ?? ''} base={base}
             picked={state.picked} pickedGoogle={pickedGoogle} onPick={onPick} onPickGoogle={onPickGoogle} google={google}
-            preferences={state.review?.values.preferences ?? []} />
+            preferences={state.review?.values.preferences ?? []} recommend={recommend} />
           <form onSubmit={addUrl} aria-label="参考の記事・SNS を足す" className="m-4 rounded-xl border border-dashed border-cloud-200 p-3">
             <label htmlFor={`${id}-url`} className="text-sm font-semibold text-ink-900">見つけた記事・SNS の投稿を参考に足す</label>
             <p className="text-xs text-ink-700">URL の中身は取りに行きません。旅程案の候補箱に出典として入り、場所は確かめてから使います。</p>

@@ -58,7 +58,7 @@ test('競合の後に最新を読み直せなかった時は、変わった項�
   const { send, planId, ids } = await setup(page, 'conflict');
   await page.goto(`/planner/${planId}`);
   const item = page.getByRole('listitem', { name: '清水寺(上下矢印キーで並べ替え)' });
-  await item.click();
+  await item.getByRole('button', { name: /を編集$/ }).click();
   const dialog = page.getByRole('dialog', { name: 'スポットを編集' });
   await expect(dialog.getByLabel('タイトル')).toHaveValue('清水寺');
 

@@ -647,6 +647,15 @@ PART_LABEL = {"morning": "午前", "lunch": "昼食", "afternoon": "午後", "ev
 FOOD_CATEGORIES = frozenset({"restaurant", "cafe", "fast_food", "food_court", "ice_cream", "marketplace", "bakery",
                              "deli", "seafood", "butcher", "greengrocer"})
 EVENT_TYPE_OF_PART = {"lunch": "dining", "evening": "dining", "stay": "accommodation"}
+# [Gate PlanUX] 場所の種類(place_kinds)→ 予定の種類。旅程の画面の印を場所に合わせる(時間帯より場所の種類を優先)
+EVENT_TYPE_OF_KIND = {"food": "dining", "cafe": "dining", "shop": "shopping", "lodging": "accommodation",
+                      "leisure": "activity", "onsen": "activity"}
+
+
+def event_type_of(part: str, kind: Optional[str]) -> str:
+    if kind and kind in EVENT_TYPE_OF_KIND:
+        return EVENT_TYPE_OF_KIND[kind]
+    return EVENT_TYPE_OF_PART.get(part, "sightseeing")
 
 
 def day_parts(day: int, total_days: int) -> List[str]:

@@ -12,6 +12,8 @@
   POST /trip-intents/ai/places-search  : Google で場所を探す(方面の位置の近く)。保存しない
   POST /trip-intents/ai/route          : Google で出発地から方面への経路を調べる。保存しない
   GET  /trip-intents/area-images       : [Gate AreaImages] 方面の代表画像(Wikipedia・無料)。保存しない
+  POST /trip-intents/spots/resolve     : [Gate AreaSpots] 名前で挙がった場所を Wikipedia の記事に結び付けて候補にする(無料)
+  POST /trip-intents/ai/spots          : [Gate AreaSpots] 方面の代表的な場所を AI に頼み(1回)、記事に結び付けて候補にする
 - GET  /plans/{plan_id}/trip-intent               : 下書き(方面・条件・日と時間帯の並び・照会の状態)
 - PUT  /plans/{plan_id}/trip-intent/slots         : 下書きの並びを変える(If-Match: 旅行の revision。前の並びへ戻すのも同じ口)
 - POST /plans/{plan_id}/trip-intent/commit        : 日付を決めて、下書きの並びを旅程(日・予定)にする(1回の変更として元に戻せる)
@@ -138,6 +140,36 @@ async def area_images(names: List[str] = Query(..., min_length=1, max_length=10)
                           result_code="ok" if any(images.values()) else "empty")
         db.commit()
     return {"images": images, "attribution": "Wikipedia(記事の代表画像・自由なライセンスの画像)"}
+
+
+class SpotIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(..., min_length=1, max_length=40)
+    kind: Optional[str] = Field(None, max_length=20)
+    note: Optional[str] = Field(None, max_length=80)
+
+
+class SpotsResolveIn(BaseModel):
+    """[Gate AreaSpots] 名前で挙がった観光の場所(方面の提案の代表的な場所)を地図の位置・写真つきの候補にする(無料)"""
+    model_config = ConfigDict(extra="forbid")
+    area: str = Field(..., min_length=1, max_length=40)
+    pref: Optional[str] = Field(None, max_length=4)
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    spots: List[SpotIn] = Field(..., min_length=1, max_length=12)
+
+
+@router.post("/spots/resolve")
+async def resolve_spots(body: SpotsResolveIn, current_user: User = Depends(get_current_user_or_guest),
+                        db: Session = Depends(get_db)):
+    from app.api.v1 import search as search_api
+    from app.services import spot_resolver
+
+    raw = await spot_resolver.resolve([s.model_dump() for s in body.spots], body.latitude, body.longitude, body.pref)
+    free_usage.record(db, current_user, "wikipedia", "spots.resolve", result_code="ok" if raw else "empty")
+    rows = search_api.persist_candidates(db, current_user, raw, f"spots:{body.area}",
+                                         (body.latitude, body.longitude), spot_resolver.MAX_KM)
+    return {"candidates": rows, "attribution": "Wikipedia(記事の位置・代表画像・説明)"}
 
 
 @router.post("/areas")
@@ -495,7 +527,7 @@ def commit_draft(plan_id: str, body: CommitIn, db: Session = Depends(get_db),
             c.place_id = place.id
         day = days[s["day"]]
         ev = TravelEvent(plan_id=plan.id, day_id=day.id, place_id=place.id, title=c.title, description=c.note,
-                         event_type=ti.EVENT_TYPE_OF_PART.get(s["part"], "sightseeing"), local_start_time=None,
+                         event_type=ti.event_type_of(s["part"], c.category), local_start_time=None,
                          address=c.address, latitude=c.latitude, longitude=c.longitude,
                          sort_order=counts.get(s["day"], 0))
         counts[s["day"]] = counts.get(s["day"], 0) + 1
@@ -654,6 +686,52 @@ def consult_ai_extract(body: AiExtractIn, idempotency_key: Optional[str] = Heade
                "suggested_areas": len(result["suggested_areas"]), "result": "ok"})
     return {**result, "usage": usage, "saved": False, "stub": provider_stub.enabled(),
             "notice": "AI の読み取りです(未確認)。確かめた行だけを条件に使います。営業時間・料金・混み具合は AI に作らせていません"}
+
+
+class AiSpotsIn(BaseModel):
+    """[Gate AreaSpots] 方面の代表的な場所のおすすめを AI に頼む(1回)。結果は Wikipedia の記事に結び付けて候補にする"""
+    model_config = ConfigDict(extra="forbid")
+    session_id: uuid.UUID
+    area: str = Field(..., min_length=1, max_length=40)
+    pref: Optional[str] = Field(None, max_length=4)
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    preferences: List[str] = Field(default_factory=list, max_length=10)
+    notes: List[str] = Field(default_factory=list, max_length=5)
+    party_size: Optional[int] = Field(None, ge=1, le=30)
+    nights: Optional[int] = Field(None, ge=0, le=14)
+
+
+@router.post("/ai/spots")
+async def consult_ai_spots(body: AiSpotsIn, idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                           db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    from app.api.v1 import search as search_api
+    from app.services import spot_resolver
+
+    session = _session(db, current_user, body.session_id)
+    key = _idem(idempotency_key)
+    if not consents.has_consent(current_user, "ai_processing"):
+        raise _ai_bad("consent_required", _CONSENT_MESSAGE, 403)
+    prefs = "・".join(ti.PREFERENCES[p] for p in body.preferences if p in ti.PREFERENCES)
+    lines = [f"行き先(方面): {body.area}" + (f"({body.pref})" if body.pref else "")]
+    if prefs:
+        lines.append(f"過ごし方の希望: {prefs}")
+    if body.party_size:
+        lines.append(f"人数: {body.party_size}人")
+    if body.nights is not None:
+        lines.append("日数: " + ("日帰り" if body.nights == 0 else f"{body.nights}泊{body.nights + 1}日"))
+    notes = [n.strip()[:60] for n in body.notes if n and n.strip()]
+    if notes:
+        lines.append("その他の希望: " + "・".join(notes))
+    spots, usage = _send_guard(lambda: consult_ai.recommend_spots(db, session, current_user, "\n".join(lines), key))
+    raw = await spot_resolver.resolve(spots, body.latitude, body.longitude, body.pref)
+    free_usage.record(db, current_user, "wikipedia", "spots.resolve", result_code="ok" if raw else "empty")
+    rows = search_api.persist_candidates(db, current_user, raw, f"ai-spots:{body.area}",
+                                         (body.latitude, body.longitude), spot_resolver.MAX_KM)
+    _ai_audit("trip_consult.ai_spots", current_user, session, {"suggested": len(spots), "resolved": len(rows)})
+    return {"candidates": rows, "suggested": len(spots), "usage": usage, "saved": False,
+            "stub": provider_stub.enabled(),
+            "notice": "AI のおすすめを Wikipedia の記事に結び付けた場所です(営業時間・料金は未照会)"}
 
 
 class AiTurnIn(BaseModel):

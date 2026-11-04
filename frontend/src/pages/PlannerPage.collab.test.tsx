@@ -89,7 +89,7 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
       return 'conflict';
     });
     fireEvent.change(screen.getByLabelText('メモ'), { target: { value: '朝一番に行く' } });
-    fireEvent.change(screen.getByLabelText('場所'), { target: { value: '京都市東山区' } });
+    fireEvent.change(screen.getByLabelText('場所・住所'), { target: { value: '京都市東山区' } });
     fireEvent.click(screen.getByRole('button', { name: '保存' }));
     const conflict = await screen.findByTestId('edit-conflict');
     expect(conflict).toHaveTextContent('保存する前に、ほかの人がこの予定を変更しました。あなたの入力は残っています。');

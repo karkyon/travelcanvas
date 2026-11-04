@@ -200,8 +200,8 @@ test('FR-004 同じ会員の2つの端末で同じ予定を同時に直すと、
     const item = (p: Page) => p.getByRole('listitem', { name: '清水寺(上下矢印キーで並べ替え)' });
     await page.goto(`/planner/${planId}`);
     await page2.goto(`/planner/${planId}`);
-    await item(page).click();
-    await item(page2).click();
+    await item(page).getByRole('button', { name: /を編集$/ }).click();
+    await item(page2).getByRole('button', { name: /を編集$/ }).click();
     const d1 = page.getByRole('dialog', { name: 'スポットを編集' });
     const d2 = page2.getByRole('dialog', { name: 'スポットを編集' });
     await expect(d1.getByLabel('タイトル')).toHaveValue('清水寺');

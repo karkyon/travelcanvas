@@ -503,3 +503,74 @@ def test_places_resend_after_lost_response_sends_once_and_uses_radius(admin, db_
     bad = client.post("/api/v1/trip-intents/ai/places-search", json={**body, "radius_km": 99},
                       headers={"Idempotency-Key": uuid.uuid4().hex})
     assert bad.status_code == 422
+
+
+# ============================================================ [Gate AreaSpots / AreaAI3]
+
+def _fake_resolve(monkeypatch, seen):
+    from app.services import spot_resolver
+    from datetime import datetime, timezone
+
+    async def fake(spots, lat, lng, pref=None, client=None):
+        seen.append([s["name"] for s in spots])
+        return [{"provider": "wikipedia", "external_id": "geo/1", "name": "伊勢神宮", "category": "shrine_temple",
+                 "latitude": 34.455, "longitude": 136.725, "address": None,
+                 "raw_payload": {"pageid": 1, "_tc": {
+                     "kind": "shrine_temple", "thumbnail_url": None, "description": "神社", "ai_note": "内宮",
+                     "ai_why": "歴史", "length": 150000}},
+                 "source_url": "https://ja.wikipedia.org/?curid=1", "retrieved_at": datetime.now(timezone.utc)}]
+    monkeypatch.setattr(spot_resolver, "resolve", fake)
+
+
+def test_spots_resolve_is_free_and_returns_candidates(admin, db_session, net, monkeypatch):
+    client, _ = admin
+    seen = []
+    _fake_resolve(monkeypatch, seen)
+    r = client.post("/api/v1/trip-intents/spots/resolve", json={
+        "area": "伊勢", "pref": "三重県", "latitude": 34.4875, "longitude": 136.7091,
+        "spots": [{"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮と外宮"}]})
+    assert r.status_code == 200, r.text
+    c = r.json()["candidates"][0]
+    assert c["name"] == "伊勢神宮" and c["kind"] == "shrine_temple" and c["ai_note"] == "内宮" and c["popularity"] == 150000
+    assert c["distance_m"] > 3000 and uuid.UUID(c["id"]) and not net.requests and seen == [["伊勢神宮"]]
+    assert client.post("/api/v1/trip-intents/spots/resolve", json={
+        "area": "伊勢", "latitude": 34.4, "longitude": 136.7, "spots": []}).status_code == 422
+
+
+def test_ai_spots_needs_consent_and_uses_one_ai_call(admin, db_session, net, monkeypatch):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    seen = []
+    _fake_resolve(monkeypatch, seen)
+    net.set("api.openai.com", 200, _ai_body({"spots": [
+        {"name": "伊勢神宮", "kind": "shrine_temple", "note": "内宮と外宮", "why": "歴史"},
+        {"name": "おかげ横丁", "kind": "bad_kind", "note": "食べ歩き", "why": "食"}]}))
+    sid = _session(client)
+    r = client.post("/api/v1/trip-intents/ai/spots", json={
+        "session_id": sid, "area": "伊勢", "pref": "三重県", "latitude": 34.4875, "longitude": 136.7091,
+        "preferences": ["culture"], "nights": 1, "party_size": 4}, headers={"Idempotency-Key": uuid.uuid4().hex})
+    assert r.status_code == 200, r.text
+    assert r.json()["suggested"] == 2 and r.json()["candidates"][0]["name"] == "伊勢神宮"
+    assert seen == [["伊勢神宮", "おかげ横丁"]]
+    sent = [q for q in net.requests if q.url.host == "api.openai.com"]
+    assert len(sent) == 1 and "伊勢" in sent[0].content.decode() and "歴史・文化" in sent[0].content.decode()
+    _tier(db_session, user, consent=False)
+    r = client.post("/api/v1/trip-intents/ai/spots", json={
+        "session_id": sid, "area": "伊勢", "latitude": 34.4, "longitude": 136.7}, headers={"Idempotency-Key": "k2"})
+    assert r.status_code == 403
+
+
+def test_extract_asks_second_call_for_proposals_only_when_needed(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    _tier(db_session, user)
+    sid = _session(client)
+    body = {**GOOD, "areas_mentioned": [], "areas_suggested": []}
+    net.set("api.openai.com", 200, _ai_body(body))
+    r = _extract(client, sid, text="枚方から車で片道3時間。関西で候補を4つ挙げて")
+    assert r.status_code == 200, r.text
+    sent = [q for q in net.requests if q.url.host == "api.openai.com"]
+    assert len(sent) == 2  # 1回目に目安つきの案が無い → 条件だけを渡して提案を頼む
+    second = sent[1].content.decode()
+    assert "trip_areas" in second and "地域: 関西" in second and "件数: 4" in second

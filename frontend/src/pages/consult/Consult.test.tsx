@@ -384,6 +384,16 @@ describe('未確定の旅程の下書き', () => {
     expect(box).toHaveTextContent('12万円 · 旅行全体 · 全員の合計 · 旅行全体 · 上限');
   });
 
+  it('[DraftLook] 種類は日本語のバッジと絵で出す(shrine_temple のような英語の種類名を出さない)', async () => {
+    api.getTripDraft.mockResolvedValue({ ...DRAFT, candidates: DRAFT.candidates.map((c) => (c.id === 'a'
+      ? { ...c, category: 'shrine_temple', provider: 'wikipedia' } : c)) });
+    renderDraft();
+    const card = await screen.findByTestId('draft-slot-伊勢神宮');
+    expect(card).toHaveTextContent('神社・寺');
+    expect(card).not.toHaveTextContent('shrine_temple');
+    expect(screen.getByTestId('draft-slot-二見浦')).not.toHaveTextContent('viewpoint');
+  });
+
   it('未確定と示し、移動の区間・未照会を出し、並べ替え → 読み上げ → 元に戻す、日付を決めて旅程にする', async () => {
     api.getTripDraft.mockResolvedValue(DRAFT);
     api.updateDraftSlots.mockImplementation(async (_p: string, slots: TripDraft['slots'], rev: number) => ({ ...DRAFT, slots, revision: rev + 1 }));

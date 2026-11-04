@@ -10,6 +10,8 @@ import {
 } from './decode';
 import type { ExtractInput, IntentExtraction, IntentItem, IntentQuestion } from './types/tripIntent';
 import { areaProposal, extractedArea, regionHint } from './tripIntent';
+import { nearby } from './g11discover';
+import type { NearbyResult } from './types/g11discover';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const withKey = (key: string): AxiosRequestConfig => ({ ...SILENT, headers: { 'Idempotency-Key': key } });
@@ -144,6 +146,20 @@ export async function consultRoute(sessionId: string, origin: { latitude: number
       duration_minutes: nullable(num), distance_km: nullable(num) })),
     mode: str, usage, attribution: str, retrieved_at: str, notice: str, stub: bool,
   }), 'POST /trip-intents/ai/route');
+}
+
+/** [Gate AreaSpots] 方面の代表的な場所のおすすめ(AI 1回)。Wikipedia の記事に結び付けた候補 */
+export async function consultSpots(sessionId: string, input: { area: string; pref?: string | null; latitude: number;
+  longitude: number; preferences: string[]; notes: string[]; party_size?: number | null; nights?: number | null },
+key: string): Promise<{ candidates: NearbyResult[]; suggested: number; usage: ConsultUsage; notice: string; stub: boolean }> {
+  const body = { session_id: sessionId, area: input.area, latitude: input.latitude, longitude: input.longitude,
+    preferences: input.preferences.slice(0, 10), notes: input.notes.slice(0, 5).map((n) => n.slice(0, 60)),
+    ...(input.pref && input.pref.length <= 4 ? { pref: input.pref } : {}),
+    ...(input.party_size ? { party_size: input.party_size } : {}),
+    ...(input.nights !== null && input.nights !== undefined ? { nights: input.nights } : {}) };
+  const r = await api.post('/trip-intents/ai/spots', body, withKey(key));
+  return decodeResponse(r.data, object<{ candidates: NearbyResult[]; suggested: number; usage: ConsultUsage; notice: string;
+    stub: boolean }>({ candidates: arrayOf(nearby), suggested: int, usage, notice: str, stub: bool }), 'POST /trip-intents/ai/spots');
 }
 
 // ----------------------------------------------------------------- [Gate F07] 会話の1ターン
