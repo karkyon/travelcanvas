@@ -1,11 +1,21 @@
-import React, { Suspense, lazy, useState, useCallback, useMemo } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 // [Gate M9-FE-B2] Context・useToast Hook・型はtoastContext.tsへ移設
 // (Fast Refresh: コンポーネントと非コンポーネントのexport混在を解消)。
 import { ToastContext, type Toast, type ToastPosition } from './toastContext';
 
 // [Gate MockFit] 表示部品は知らせが出た時に読む(最初に読む JS の上限 430 kB のため)
-const ToastItem = lazy(() => import('./ToastItem'));
+// 通信できない間(オフライン)に初めて知らせが出ても落ちないよう、起動直後に先読みし、読めなかった時は簡素な表示にする
+const loadToastItem = () => import('./ToastItem');
+const ToastItem = lazy(() => loadToastItem().catch(() => ({
+  default: ({ toast, onClose }: { toast: Toast; onClose: () => void }) => (
+    <div role="status" className="max-w-sm w-full border rounded-lg shadow-lg bg-surface p-4 text-sm">
+      {toast.title ? <strong className="block mb-1">{toast.title}</strong> : null}
+      <span>{toast.message}</span>
+      <button type="button" aria-label="知らせを閉じる" className="ml-3 underline" onClick={onClose}>閉じる</button>
+    </div>
+  ),
+})));
 
 interface ToastProviderProps {
   position?: ToastPosition;
@@ -19,6 +29,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
   children
 }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  useEffect(() => {
+    void loadToastItem().catch(() => undefined);
+  }, []);
 
   // [Gate M9-FE-B3] addToast/removeToast/clearToastsとcontext valueを安定化する。
   // 以前は描画のたびに関数・value objectが作り直されていたため、利用側で
