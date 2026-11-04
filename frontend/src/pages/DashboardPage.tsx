@@ -77,9 +77,10 @@ const DashboardPage: React.FC = () => {
   const nextTrip = planningTrips.find((t) => t.days_until_start !== null) ?? null;
   const title = nextTrip?.days_until_start ? `おかえりなさい。次の旅まで あと ${nextTrip.days_until_start} 日`
     : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中です。今日の予定を確かめましょう' : '次の旅を、楽しみに変える';
-  const sub = home ? `${name}さん · 計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited}`
-    + ` · 見送り ${home.shelves.cancelled}`
-    : `${name}さん、次にすることをまとめました。日程も予約も旅の準備も、この旅のページから一緒に進められます。`;
+  // 挨拶の文は読み込みの前後で変えない(読み込んだ後は旅行の数を後ろに足す)
+  const sub = `${name}さん、次にすることをまとめました。` + (home
+    ? `計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited} · 見送り ${home.shelves.cancelled}`
+    : '日程も予約も旅の準備も、この旅のページから一緒に進められます。');
 
   return (
     <div data-theme={theme} className="min-h-[calc(100vh-4.5rem)] bg-cloud-50 text-ink-900" data-testid="dashboard">
