@@ -5,7 +5,7 @@
  * - 移動概算(route-preview)は表示中の日が変わった時だけ再取得する
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, waitFor, act } from '@testing-library/react';
+import { render, waitFor, act, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
@@ -129,5 +129,21 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
     expect(loadPlans).toHaveBeenCalledTimes(1);
     expect(clearCurrentPlan).toHaveBeenCalledTimes(1);
     expect(loadPlan).not.toHaveBeenCalled();
+  });
+
+  it('[DashPlan] ゲストの始め方: 旅行相談は AI なしで使えると示す(AI・Google は会員)', async () => {
+    setupMocks();
+    useAuthStore.setState({ isAuthenticated: true, isGuest: true });
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/planner']}>
+          <Routes>
+            <Route path="/planner" element={<PlannerPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    expect(await screen.findByTestId('planner-consult-guest')).toHaveTextContent('ゲストでは、AI の方面の提案・おすすめの場所・Google の検索は使えません');
+    expect(screen.getByRole('button', { name: '✦ AI なしで相談をはじめる' })).toBeEnabled();
   });
 });

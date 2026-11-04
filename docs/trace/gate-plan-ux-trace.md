@@ -21,3 +21,11 @@
 | 9 | 下書きから旅程にする時、予定の種類を場所の種類に合わせる(食事・宿・買い物・体験) | IMPLEMENTED | `trip_intent.event_type_of` | `test_draft_event_type_follows_place_kind_then_part` |
 
 **未対応(次の段階)**: 予定に場所の写真(Wikipedia の代表画像)を持たせ、右の欄の「場所画像のイメージ」を置き換える。
+
+## 追補(2026-11-04 12:19 の UAT)
+
+| # | 要件 | 状態 | 実装 | 試験 |
+|---|---|---|---|---|
+| 10 | 「条件から、行き先を相談する」の写真を、旅行の相談窓口(左がコーディネーター)の写真に差し替え(利用者提供) | IMPLEMENTED | `public/start/trip-consult.webp` | 目視の UAT |
+| 11 | ゲストの始め方: 旅行相談は AI なしで使える(条件の整理・方面の比較・下書き)と示し、AI・おすすめの場所・Google は会員と示す。ボタンは使える | IMPLEMENTED | `PlannerPage` | `PlannerPage.test.tsx`(DashPlan) |
+| 12 | ホーム(ダッシュボード)の改善案 v2: 精密モックアップ(PC・スマホ)と類似アプリの研究 | SPECIFIED | `docs/ux/TravelCanvas_ホーム改善案_v2_モックアップ.html` | — |

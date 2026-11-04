@@ -1427,7 +1427,16 @@ const PlannerPage: React.FC = () => {
                 <p className="tc-eyebrow">TRIP CONSULT · まだ決まっていない</p>
                 <h2>条件から、行き先を相談する</h2>
                 <p>出発地・時期・人数・したいことから、方面の候補を並べて比べられます。</p>
-                <Button variant="outline" onClick={() => navigate('/trip-consult')}>✦ 旅行相談をはじめる</Button>
+                {isGuest && (
+                  // [Gate DashPlan] ゲストは無料の範囲だけ(条件の整理・方面の比較・下書き)。AI の提案・Google の検索は会員の有料のクラス
+                  <p className="rounded-lg border border-cloud-200 bg-cloud-100 px-3 py-2 text-xs text-ink-900" data-testid="planner-consult-guest">
+                    ゲストでは、AI の方面の提案・おすすめの場所・Google の検索は使えません。条件の整理・方面の比較・下書きは使えます。
+                    <Link to="/guest/upgrade" className="ml-1 font-semibold text-accent underline">アカウントを作成すると AI も使えます</Link>
+                  </p>
+                )}
+                <Button variant="outline" onClick={() => navigate('/trip-consult')}>
+                  {isGuest ? '✦ AI なしで相談をはじめる' : '✦ 旅行相談をはじめる'}
+                </Button>
               </div>
             </div>
           </section>
