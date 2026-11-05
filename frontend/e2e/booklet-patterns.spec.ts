@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
@@ -42,10 +43,10 @@ test('しおり: 12 パターンすべてで、必須の内容を Web と印刷�
     await expect(view.getByRole('img', { name: /旅行全体の地図/ })).toBeVisible();
     await expect(view.locator('.bk-ov tbody tr')).toHaveCount(2);
     await expect(view.locator('.bk-day')).toHaveCount(2);
-    // Google マップの QR: 全体の経路・この日の経路・場所ごと
-    await expect(view.getByRole('link', { name: /旅行全体の経路/ })).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1/);
-    await expect(view.getByRole('link', { name: /この日の経路/ })).toHaveCount(1);
-    await expect(view.getByRole('img', { name: /清水寺を Google マップで開く/ })).toBeVisible();
+    // 2 地点以上ある日だけ、その日の経路の QR が出る(スポットごとの QR は出さない)
+    await expect(view.getByTestId('booklet-map-qr')).toHaveCount(1);
+    await expect(view.getByTestId('booklet-map-qr')).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1/);
+    await expect(view.getByRole('img', { name: /の経路を Google マップで開く/ })).toBeVisible();
     await settleForAxe(page);
     const axe = await new AxeBuilder({ page }).include('[data-testid="booklet"]').withTags(['wcag2a', 'wcag2aa']).analyze();
     problems.push(...axe.violations.flatMap((v) => v.nodes.map((n) => `${theme}: ${v.id} ${n.target} ${n.any[0]?.message ?? ''}`)));
@@ -70,9 +71,20 @@ test('支出: レシートの写真を読み取り、確かめてから登録す
   await page.goto(`/planner/${planId}/expenses`);
   await page.getByRole('tab', { name: '支出' }).click();
   await page.getByRole('button', { name: 'レシートを読み取る' }).click();
-  await page.getByLabel(/レシートの写真/).setInputFiles('../backend/tests/fixtures/receipt_jp_photo.jpg');
-  await page.getByRole('button', { name: '読み取る', exact: true }).click();
-  await expect(page.getByTestId('receipt-notes')).toContainText('確かめてから', { timeout: 60_000 });
+  // 枠へドロップしても、ファイルを選んでも、入れるとすぐ読み取って小さな画像と項目を並べる
+  await expect(page.getByTestId('image-dropzone')).toContainText('ドラッグ&ドロップ');
+  const bytes = readFileSync('../backend/tests/fixtures/receipt_jp_photo.jpg').toString('base64');
+  const transfer = await page.evaluateHandle((b64) => {
+    const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([data], 'receipt.jpg', { type: 'image/jpeg' }));
+    return dt;
+  }, bytes);
+  await page.getByTestId('image-dropzone').dispatchEvent('drop', { dataTransfer: transfer });
+  await expect(page.getByTestId('image-dropzone-thumb')).toBeVisible();
+  await expect(page.getByTestId('receipt-amount')).toContainText('1260', { timeout: 60_000 });
+  await page.getByRole('button', { name: 'この内容で支出に入れる' }).click();
+  await expect(page.getByTestId('receipt-notes')).toContainText('確かめてから');
   await expect(page.getByLabel(/金額/).first()).toHaveValue('1260');
   await expect(page.getByLabel('内容')).toHaveValue(/ファミリーマート/);
   await page.getByRole('button', { name: /^(保存|登録|追加)/ }).click();
@@ -114,6 +126,8 @@ test('行きたい場所: 追加・編集・削除ができ、旅程の予定へ
   // 旅程: しおりの入口と、予定の追加の入れ方
   await page.goto(`/planner/${planId}`);
   await expect(page.getByTestId('plan-booklet')).toBeVisible({ timeout: 20_000 });
+  // この旅行のメニューは上の帯にある
+  await expect(page.getByRole('navigation', { name: 'この旅行のメニュー' }).getByRole('link', { name: '旅程' })).toHaveAttribute('aria-current', 'page');
   await page.getByRole('button', { name: /予定を追加/ }).first().click();
   const dialog = page.getByRole('dialog');
   for (const name of ['手で入力', '名前で検索', '写真・スクショ', '声', 'SNS・URL', '行きたい場所']) await expect(dialog.getByRole('tab', { name })).toBeVisible();

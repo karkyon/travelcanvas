@@ -6,6 +6,7 @@ import { useCurrentTripStore } from '../store/currentTripStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import CommandPaletteLauncher from './CommandPaletteLauncher';
+import TripNav from './shell/TripNav';
 
 // [Gate AppShell] 利用者のメニュー・スマホのメニューは開いた時に読む(最初に読む JS を増やさない)
 const loadMenus = () => import('./shell/HeaderMenus');
@@ -106,6 +107,8 @@ const Header: React.FC = () => {
   // 画面の移動は左の帯(AppRail、スマホでは下の帯)へ移した。スマホの下の帯に出ない項目は「メニュー」から開く。
   const tripMatch = /^\/planner\/([0-9a-fA-F-]{36})(?:\/|$)/.exec(location.pathname);
   const currentTrip = tripMatch && currentPlan && currentPlan.id === tripMatch[1] ? currentPlan : null;
+  // [Gate TripNav] 旅行の画面(共有を含む)にいる時、その旅行のメニューを上の帯に出す
+  const navTrip = currentTrip?.id ?? (/^\/share\/([0-9a-fA-F-]{36})/.exec(location.pathname)?.[1] ?? tripMatch?.[1] ?? null);
   const tripDates = currentTrip ? tripDateText(currentTrip.start_date, currentTrip.end_date) : '';
   const displayName = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
   return (
@@ -144,6 +147,7 @@ const Header: React.FC = () => {
               <ChevronDown size={16} aria-hidden="true" className="tc-chev" />
             </Link>
           )}
+          {navTrip && <TripNav tripId={navTrip} path={location.pathname} />}
 
           <div className="flex-1 tc-top-spacer" />
 

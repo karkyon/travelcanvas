@@ -4,6 +4,7 @@
  * どの方法も、選ぶと呼び出し元のフォームへ値を入れるだけで、保存は利用者が確かめた後。
  */
 import React, { useEffect, useState } from 'react';
+import ImageDropzone from '@/components/common/ImageDropzone';
 import { searchSpots } from '@/services/api';
 import { searchNearby } from '@/services/api/g11discover';
 import { listWishSpots, readPlaceImage, readPlaceUrl, type UrlRead } from '@/services/api/spotIntake';
@@ -40,11 +41,12 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [words, setWords] = useState<string[]>([]);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [url, setUrl] = useState('');
   const [paste, setPaste] = useState('');
   const [read, setRead] = useState<UrlRead | null>(null);
 
-  const reset = () => { setRows(null); setError(null); setNote(null); setWords([]); setRead(null); };
+  const reset = () => { setPhoto(null); setRows(null); setError(null); setNote(null); setWords([]); setRead(null); };
   const switchTab = (next: PlaceTab) => { reset(); onTab(next); };
 
   const find = async (q0?: string, sourceUrl: string | null = null) => {
@@ -93,7 +95,7 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
 
   const onPhoto = async (file: File | undefined) => {
     if (!file) return;
-    reset();
+    setRows(null); setError(null); setNote(null); setWords([]);
     setBusy(true);
     let gps = null;
     try { gps = readExifGps(await file.arrayBuffer()); } catch { gps = null; }
@@ -169,10 +171,11 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
       )}
       {tab === 'photo' && (
         <div>
-          <label htmlFor="place-photo" className="block text-sm font-medium text-ink-900 mb-1">写真か、SNS・地図のスクリーンショット</label>
-          <input id="place-photo" type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm" onChange={(e) => void onPhoto(e.target.files?.[0])} />
-          <p className="mt-1 text-xs text-ink-700">撮影場所(位置情報)と、画像の中の文字から場所を探します。画像は保存せず、外部へも送りません。</p>
-          {wordButtons(words, null)}
+          <ImageDropzone label="写真か、SNS・地図のスクリーンショット" hint="撮影場所と画像の中の文字から探します。保存せず、外部へ送りません" file={photo} disabled={busy}
+            onFile={(f) => { setPhoto(f); void onPhoto(f); }}>
+            {words.length > 0 ? <p className="text-sm font-medium text-ink-900">読み取った文字</p> : !busy && <p className="text-sm text-ink-700">読み取った文字はありません</p>}
+            {wordButtons(words, null)}
+          </ImageDropzone>
         </div>
       )}
       {tab === 'voice' && <FindByOther mode="voice" busy={busy} onKeyword={(q) => void find(q)} onPhotoPlace={() => undefined} />}

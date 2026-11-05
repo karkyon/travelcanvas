@@ -234,17 +234,19 @@ export async function printWhenReady(root: Document = document): Promise<void> {
 export const MAX_ROUTE_STOPS = 11;
 const at = (p: { latitude: number; longitude: number }) => `${p.latitude},${p.longitude}`;
 
-/** 地点を順に結ぶ経路。多すぎる時は null(途中で切った経路を全体に見せない) */
-export function googleRouteUrl(stops: { latitude: number; longitude: number }[]): string | null {
-  const list = stops.filter((p, i) => i === 0 || at(p) !== at(stops[i - 1]!));
-  if (list.length < 2 || list.length > MAX_ROUTE_STOPS) return null;
+const routeUrl = (list: { latitude: number; longitude: number }[]): string => {
   const middle = list.slice(1, -1).map(at).join('|');
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(at(list[0]!))}&destination=${encodeURIComponent(at(list[list.length - 1]!))}`
     + `${middle ? `&waypoints=${encodeURIComponent(middle)}` : ''}`;
-}
+};
 
-/** 場所の詳細(名前で開くと営業時間・写真などの情報が出る)。エリアを足して同名の別の場所を避ける */
-export const googlePlaceUrl = (label: string, area: string | null | undefined): string =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(area ? `${label} ${area}` : label)}`;
+/** 1 日の順路のリンク。上限を超える日は、つなぎ目の地点を重ねて分ける(途中を落とさない)。地点が 2 つ未満なら無し */
+export function googleDayRoutes(stops: { latitude: number; longitude: number }[]): string[] {
+  const list = stops.filter((p, i) => i === 0 || at(p) !== at(stops[i - 1]!));
+  if (list.length < 2) return [];
+  const out: string[] = [];
+  for (let i = 0; i < list.length - 1; i += MAX_ROUTE_STOPS - 1) out.push(routeUrl(list.slice(i, i + MAX_ROUTE_STOPS)));
+  return out;
+}
 
 export const MY_MAP_URL = /^https:\/\/www\.google\.com\/maps\/d\/[A-Za-z0-9_\-./?=&%#~+]*$/;

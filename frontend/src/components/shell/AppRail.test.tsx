@@ -6,12 +6,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AppRail from './AppRail';
+import TripNav from './TripNav';
 import { useCurrentTripStore } from '../../store/currentTripStore';
 
 const PLAN = '11111111-2222-3333-4444-555555555555';
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><AppRail /></MemoryRouter>);
 const NAMES = ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '発見', '旅行相談', '設定'];
-const IN_TRIP = ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '発見', '旅行相談', '旅程', '今日', '旅行箱', '共有', '比較', '設定'];
 
 describe('AppRail', () => {
   beforeEach(() => useCurrentTripStore.setState({ trip: null }));
@@ -34,25 +34,20 @@ describe('AppRail', () => {
     expect(screen.getByTestId('rail-discover')).toHaveAttribute('href', '/search');
   });
 
-  it('旅行の中: 今の旅行の各画面へ移り、今の画面に印を付ける', () => {
+  it('[TripNav] 旅行の中でも左の帯は共通の項目だけ。旅行の項目は上の帯へ', () => {
     useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都' } });
     at(`/planner/${PLAN}/reservations`);
     const nav = screen.getByRole('navigation', { name: '主なメニュー' });
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(IN_TRIP);
-    expect(nav).toHaveTextContent('この旅行');
-    expect(screen.getByTestId('rail-plan')).toHaveAttribute('href', `/planner/${PLAN}`);
-    expect(screen.getByTestId('rail-today')).toHaveAttribute('href', `/planner/${PLAN}/today`);
-    expect(screen.getByTestId('rail-resources')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('rail-share')).toHaveAttribute('href', `/share/${PLAN}`);
-    expect(screen.getByTestId('rail-optimize')).toHaveAttribute('href', `/planner/${PLAN}/route-options`);
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(NAMES);
     expect(screen.getByTestId('rail-discover')).toHaveAttribute('href', `/planner/${PLAN}/candidates`);
-    expect(screen.getByTestId('rail-today')).toHaveAccessibleName('今日');
   });
 
-  it('旅程の画面では「旅程」に印を付ける', () => {
-    useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都' } });
-    at(`/planner/${PLAN}`);
-    expect(screen.getByTestId('rail-plan')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('rail-home')).not.toHaveAttribute('aria-current');
+  it('[TripNav] この旅行のメニューは今の旅行へ移り、今の画面に印を付ける', () => {
+    render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/reservations`} /></MemoryRouter>);
+    const nav = screen.getByRole('navigation', { name: 'この旅行のメニュー' });
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '今日', '旅行箱', '共有', '比較']);
+    expect(screen.getByTestId('rail-plan')).toHaveAttribute('href', `/planner/${PLAN}`);
+    expect(screen.getByTestId('rail-resources')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('rail-share')).toHaveAttribute('href', `/share/${PLAN}`);
   });
 });
