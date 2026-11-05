@@ -700,7 +700,7 @@ async def reschedule_plan(
         raise HTTPException(status_code=409, detail={
             "code": "days_have_events", "message": "短くすると消える日に予定があります",
             "days": [{"date": d.local_date.isoformat(), "events": [e.title for e in d.events]} for d in with_events]})
-    changes = []
+    changes: List[Any] = []
     if drop:
         event_ids = [e.id for d in drop for e in d.events]
         try:

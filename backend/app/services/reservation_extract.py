@@ -469,7 +469,7 @@ def ocr_image(content: bytes, lang: str = "jpn") -> str:
         gray = ImageOps.autocontrast(ImageOps.exif_transpose(image).convert("L"))
     if max(gray.size) < 1800:  # 小さい字は拡大すると読みやすい
         scale = min(3.0, 1800 / max(gray.size))
-        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.LANCZOS)
+        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.Resampling.LANCZOS)
     png = io.BytesIO()
     gray.save(png, format="PNG")
     try:

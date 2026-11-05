@@ -373,26 +373,27 @@ def apply_extraction(plan_id: str, job_id: str, payload: ApplyExtractionRequest,
                 row.review_status = ExtractionCandidateReviewStatus.REJECTED.value
         for path, raw in payload.fields.items():
             value = (raw or "").strip()
-            row = existing.get(path)
+            current = existing.get(path)
             if not value:
-                if row is not None:
-                    row.review_status = ExtractionCandidateReviewStatus.REJECTED.value
+                if current is not None:
+                    current.review_status = ExtractionCandidateReviewStatus.REJECTED.value
                 continue
             _coerce_reservation_field(path, value)  # 形が合わなければ 422
             cipher = encrypt_payload(value.encode("utf-8"), plan_subject(plan.id))
-            if row is None:
+            if current is None:
                 db.add(ExtractionCandidate(import_job_id=j.id, field_path=path, candidate_value_ciphertext=cipher,
                                            confidence=1.0, evidence_locator="利用者が入力",
                                            review_status=ExtractionCandidateReviewStatus.ACCEPTED.value))
             else:
-                row.candidate_value_ciphertext = cipher
-                row.review_status = ExtractionCandidateReviewStatus.ACCEPTED.value
+                current.candidate_value_ciphertext = cipher
+                current.review_status = ExtractionCandidateReviewStatus.ACCEPTED.value
     except EncryptionNotConfigured:
         db.rollback()
         raise _extract_error("encryption_not_configured", "候補の暗号化が設定されていません(サーバー側の設定)", 503)
     db.commit()
     job = confirm_import_job(plan_id, job_id, request, db, current_user)
-    reservation = db.get(Reservation, uuid.UUID(job.result_reservation_id))
+    reservation = db.get(Reservation, uuid.UUID(job.result_reservation_id or ""))
+    assert reservation is not None  # confirm が作った直後の行
     event_id, itinerary_note = None, None
     if payload.add_to_itinerary:
         event_id, itinerary_note = _add_reservation_event(db, plan, current_user, reservation)
