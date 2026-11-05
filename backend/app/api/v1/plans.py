@@ -23,7 +23,7 @@ JSON blobに日程・イベントを丸ごと保持しており、フロント�
 エンドポイントとの統合、event_linksを使った予約・文書との関連付け。
 """
 import uuid
-from datetime import datetime, date as date_cls, timezone as dt_timezone
+from datetime import datetime, date as date_cls, timedelta, timezone as dt_timezone
 from decimal import Decimal
 import math
 from typing import Any, Dict, Optional, List, cast
@@ -669,6 +669,94 @@ async def update_day(
     return day
 
 
+class RescheduleRequest(BaseModel):
+    start_date: date_cls
+    end_date: date_cls
+    remove_days_with_events: bool = False
+
+
+@router.post("/{plan_id}/reschedule")
+async def reschedule_plan(
+    plan_id: str,
+    body: RescheduleRequest,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """[Gate BookingFix] 旅行の日程を変える。全日程の日付と予定の日時を一緒に動かし、日数の増減もする。
+    予定のある日が減る時は 409 で一覧を返し、確認(remove_days_with_events)の後だけ消す。予約は動かさず件数を返す。"""
+    plan = _get_owned_plan(db, plan_id, current_user)
+    _require_if_match(plan, if_match)
+    if body.end_date < body.start_date:
+        raise HTTPException(status_code=422, detail={"code": "invalid_dates", "message": "最終日は出発日より後にしてください"})
+    length = (body.end_date - body.start_date).days + 1
+    if length > 90:
+        raise HTTPException(status_code=422, detail={"code": "too_long", "message": "日程は 90 日までです"})
+    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.local_date).all()
+    timezone_id = days[0].timezone_id if days else "Asia/Tokyo"
+    drop = days[length:]
+    with_events = [d for d in drop if d.events]
+    if with_events and not body.remove_days_with_events:
+        raise HTTPException(status_code=409, detail={
+            "code": "days_have_events", "message": "短くすると消える日に予定があります",
+            "days": [{"date": d.local_date.isoformat(), "events": [e.title for e in d.events]} for d in with_events]})
+    changes: List[Any] = []
+    if drop:
+        event_ids = [e.id for d in drop for e in d.events]
+        try:
+            detachment = plan_item_deletion.detach_event_references(db, event_ids)
+        except plan_item_deletion.LockedRelationError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail=plan_item_deletion.locked_detail(exc.blocking))
+        for d in drop:
+            before = _day_to_dict(d)
+            before["_events"] = [{"id": str(e.id), **_event_to_dict(e)} for e in d.events]
+            changes.append(("travel_day", d.id, "delete", before, None))
+            db.delete(d)
+        changes += detachment.changes
+        db.flush()
+    keep = days[:length]
+    if keep:
+        delta = body.start_date - keep[0].local_date
+        # 日付の重複の制約に当たらないよう、動かす先の方向の端から順に更新する
+        for d in (reversed(keep) if delta.days > 0 else keep):
+            if delta.days == 0:
+                break
+            before = _day_to_dict(d)
+            d.local_date = d.local_date + delta
+            db.flush()
+            changes.append(("travel_day", d.id, "update", before, _day_to_dict(d)))
+            for e in d.events:
+                if e.start_at is not None or e.end_at is not None:
+                    prior = _event_to_dict(e)
+                    e.start_at = e.start_at + delta if e.start_at is not None else None
+                    e.end_at = e.end_at + delta if e.end_at is not None else None
+                    changes.append(("travel_event", e.id, "update", prior, _event_to_dict(e)))
+    taken = {d.local_date for d in keep}
+    cursor = keep[-1].sort_order if keep else -1
+    for offset in range(length):
+        when = body.start_date + timedelta(days=offset)
+        if when in taken or len(taken) >= length:
+            continue
+        cursor += 1
+        added = TravelDay(plan_id=plan.id, local_date=when, timezone_id=timezone_id, sort_order=cursor)
+        db.add(added)
+        db.flush()
+        taken.add(when)
+        changes.append(("travel_day", added.id, "create", None, _day_to_dict(added)))
+    plan.start_date = datetime(body.start_date.year, body.start_date.month, body.start_date.day, tzinfo=dt_timezone.utc)
+    plan.end_date = datetime(body.end_date.year, body.end_date.month, body.end_date.day, tzinfo=dt_timezone.utc)
+    new_revision = plan.revision
+    if changes:
+        new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    else:
+        db.commit()
+    reservations = db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None),
+                                                Reservation.start_at.isnot(None)).count()
+    return {"revision": new_revision, "start_date": body.start_date.isoformat(), "end_date": body.end_date.isoformat(),
+            "days": length, "reservations_not_moved": reservations}
+
+
 @router.delete("/{plan_id}/days/{day_id}")
 async def delete_day(
     plan_id: str,
@@ -971,12 +1059,29 @@ async def undo_last_change(
             elif item.entity_type == "reservation_links":
                 _detach_reservation_links(db, plan, item)
         db.flush()
+        # [Gate BookingFix] 日付の重複の制約に当たらない順に戻す(ChangeItem の ID は順序を持たない)。
+        # 足した日を消す → 動かす先の端から日付を戻す → 消した日を戻す
+        day_items = [i for i in items if i.entity_type == "travel_day"]
+        moves = [i for i in day_items if i.action == "update"]
+
+        def _day_of(row: Optional[dict]) -> str:
+            return str((row or {}).get("local_date"))
+
+        moves.sort(key=lambda i: _day_of(i.before_json),
+                   reverse=any(_day_of(i.before_json) > _day_of(i.after_json) for i in moves))
+        for item in ([i for i in day_items if i.action == "create"] + moves
+                     + [i for i in day_items if i.action not in ("create", "update")]):
+            _undo_day_item(db, plan, item)
+            db.flush()
         for item in items:
-            if item.entity_type == "travel_day":
-                _undo_day_item(db, plan, item)
-            elif item.entity_type == "travel_event":
+            if item.entity_type == "travel_event":
                 _undo_event_item(db, plan, item)
         db.flush()
+        if any(item.entity_type == "travel_day" for item in items):
+            dates = sorted(d.local_date for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id))
+            if dates and plan.start_date is not None:
+                plan.start_date = datetime(dates[0].year, dates[0].month, dates[0].day, tzinfo=dt_timezone.utc)
+                plan.end_date = datetime(dates[-1].year, dates[-1].month, dates[-1].day, tzinfo=dt_timezone.utc)
         for item in items:
             if item.entity_type == "route_option" and item.action == "delete":
                 _undo_route_option_item(db, plan, item)

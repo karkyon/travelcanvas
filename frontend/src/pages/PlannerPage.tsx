@@ -25,7 +25,9 @@ import {
 } from 'lucide-react';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
+import toast from 'react-hot-toast';
 import Modal from '@/components/common/Modal';
+import PlanBasicsDialog from '@/components/planner/PlanBasicsDialog';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/components/common/toastContext';
 import { spotApiService } from '@/services/spotApi';
@@ -122,6 +124,7 @@ const PlannerPage: React.FC = () => {
   const { isGuest } = useAuthStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBasicsOpen, setIsBasicsOpen] = useState(false);
   const [isQuickPage, setIsQuickPage] = useState(false);
   useEffect(() => {
     if (planId) setIsQuickPage(false);
@@ -678,12 +681,26 @@ const PlannerPage: React.FC = () => {
               営業時間・移動手段・現地時間を予定カードで確認。ドラッグまたは↑↓で順番を入れ替えます。
             </>}
             actions={<>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsBasicsOpen(true)} data-testid="plan-basics-open">基本情報・日程を編集</button>
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← プラン一覧</button>
               {activeDay && planView === 'day' && (
                 <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => setAddSignal((n) => n + 1)}
                   data-testid="planner-add-event">＋ 予定を追加</button>
               )}
             </>}
+          />
+
+          <PlanBasicsDialog
+            planId={currentPlan.id}
+            revision={currentPlan.revision ?? 0}
+            firstDate={currentPlan.days[0]?.date ?? null}
+            lastDate={currentPlan.days[currentPlan.days.length - 1]?.date ?? null}
+            isOpen={isBasicsOpen}
+            onClose={() => setIsBasicsOpen(false)}
+            onSaved={(message) => {
+              void usePlanStore.getState().loadPlan(currentPlan.id);
+              toast.success(message ?? '旅行の基本情報を保存しました');
+            }}
           />
 
           <SyncStatusBar planId={currentPlan.id} />

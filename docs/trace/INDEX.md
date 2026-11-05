@@ -123,7 +123,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 |---|---|---|---|
 | FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
-| FR-011 | 予約取込 | INTEGRATED(部分) | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。omega-dev2 の実画像と実の AI では未確認 |
 | FR-014 | 移動区間 | INTEGRATED | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 外部経路による実移動時間 |

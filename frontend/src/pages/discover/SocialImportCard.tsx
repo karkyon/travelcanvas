@@ -8,6 +8,7 @@
  */
 import React, { useId, useState } from 'react';
 import Button from '@/components/common/Button';
+import { snsKeywords, spotsFromTimeline } from '@/components/search/findModel';
 import { previewSocialUrl } from '@/services/api/g11discover';
 import type { SocialPreview } from '@/services/api/types/g11discover';
 
@@ -41,6 +42,35 @@ interface Props {
 
 const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
   const uid = useId();
+  const [pasted, setPasted] = useState('');
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [bulkDone, setBulkDone] = useState<string | null>(null);
+  const timeline = spotsFromTimeline(pasted);
+  const words = timeline.length ? [] : snsKeywords(pasted).keywords.map((name) => ({ name, note: null }));
+  const found = [...timeline, ...words];
+  const addPasted = async () => {
+    setBusy(true);
+    setError(null);
+    setBulkDone(null);
+    let count = 0;
+    try {
+      for (const spot of found) {
+        if (picked[spot.name] === false) continue;
+        await onSave({
+          title: spot.name, source_url: url.trim(), note: spot.note, address: null, latitude: null, longitude: null,
+          platform: null, retrieved_at: null, social: false,
+        });
+        count += 1;
+      }
+      setBulkDone(`${count} 件を候補箱に入れました。場所は候補箱で確かめてください。`);
+      setPasted('');
+      setPicked({});
+    } catch {
+      setError('候補箱に入れられませんでした');
+    } finally {
+      setBusy(false);
+    }
+  };
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState<SocialPreview | null>(null);
   const [title, setTitle] = useState('');
@@ -58,8 +88,10 @@ const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
     try {
       const p = await previewSocialUrl(planId, url.trim());
       setPreview(p);
-      setTitle(p.place_suggestions[0]?.name ?? p.title ?? '');
-      setPick(p.place_suggestions.length ? 0 : null);
+      // [Gate BookingFix] 確からしさの低い地名(題名からの推定)を、初期の選択にしない
+      const likely = p.place_suggestions.findIndex((s) => s.confidence === 'medium');
+      setTitle(likely >= 0 ? p.place_suggestions[likely]!.name : '');
+      setPick(likely >= 0 ? likely : null);
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: { message?: string } } } })?.response?.data?.detail;
       setPreview(null);
@@ -100,8 +132,26 @@ const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
     <section aria-labelledby={`${uid}-t`} className="rounded-xl border border-cloud-200 bg-surface p-4" data-testid="social-import">
       <h2 id={`${uid}-t`} className="font-semibold text-ink-900">SNS の投稿から取り込む</h2>
       <p className="text-xs text-ink-700">
-        投稿の URL から、題名・作者を公式の方法(oEmbed)で確かめ、場所の候補を出します。内容を確かめてから候補箱へ入れます。画像は取り込みません。
+        動画の中の映像や字幕は読めません。説明欄やコメントの文を貼ると、そこにある場所を一度に取り込めます。URL からは題名と作者だけを確かめます(TikTok は取れないことがあり、Instagram は運用の設定が要ります)。
       </p>
+      <div className="mt-3 rounded-lg border border-cloud-200 p-3" data-testid="social-paste">
+        <label htmlFor={`${uid}-p`} className="block text-sm font-semibold text-ink-900">動画の説明欄・コメント・投稿の文を貼る(複数の場所を一度に)</label>
+        <textarea id={`${uid}-p`} rows={4} value={pasted} onChange={(e) => { setPasted(e.target.value); setBulkDone(null); }}
+          placeholder={'01:20 内宮入口.宇治橋\n01:50 おはらい町'} className="mt-1 w-full rounded-md border border-cloud-200 bg-surface px-3 py-2 text-sm text-ink-900" />
+        {found.length > 0 && (
+          <ul className="mt-2 space-y-1 text-sm" aria-label="見つかった場所">
+            {found.map((spot) => (
+              <li key={spot.name}><label className="flex items-center gap-2">
+                <input type="checkbox" checked={picked[spot.name] !== false} onChange={(e) => setPicked((p) => ({ ...p, [spot.name]: e.target.checked }))} />
+                <span>{spot.name}{spot.note ? ` ・ ${spot.note}` : ''}</span>
+              </label></li>
+            ))}
+          </ul>
+        )}
+        {pasted.trim() && found.length === 0 && <p className="mt-1 text-xs text-ink-700">場所の名前を見つけられませんでした。「01:20 場所の名前」の行やハッシュタグ、「」で囲んだ名前を読みます。</p>}
+        {found.length > 0 && <Button type="button" className="mt-2" onClick={() => void addPasted()} disabled={busy || !canEdit || !found.some((s) => picked[s.name] !== false)} data-testid="social-paste-add">{`選んだ ${found.filter((s) => picked[s.name] !== false).length} 件を候補箱へ`}</Button>}
+        {bulkDone && <p role="status" className="mt-2 text-sm text-success">{bulkDone}</p>}
+      </div>
       <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={check} aria-label="SNS の投稿の URL を確かめる">
         <div className="min-w-0 flex-1">
           <label htmlFor={`${uid}-u`} className="block text-sm text-ink-700">投稿の URL</label>
