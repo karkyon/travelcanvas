@@ -1,4 +1,5 @@
 """ダミーデータの登録(scripts/demo_seed.py)と、完全に元へ戻せることの試験。"""
+
 import argparse
 import sys
 import uuid
@@ -21,10 +22,8 @@ def _snapshot():
     try:
         tables = [r[0] for r in db.execute(text("select tablename from pg_tables where schemaname = 'public'"))]
         return {
-            t: db.execute(
-                text(f"""select count(*), md5(coalesce(string_agg(x, '' order by x), ''))
-                     from (select md5(row(a.*)::text) x from "{t}" a) z""")
-            ).one()
+            t: db.execute(text(f"""select count(*), md5(coalesce(string_agg(x, '' order by x), ''))
+                     from (select md5(row(a.*)::text) x from "{t}" a) z""")).one()
             for t in tables
             if t != "alembic_version"
         }
@@ -36,7 +35,9 @@ def _make_owner():
     db = SessionLocal()
     try:
         email = f"seed_owner_{uuid.uuid4().hex[:10]}@example.com"
-        db.add(User(email=email, username=email.split("@")[0], is_active=True, is_verified=True, user_type="registered"))
+        db.add(
+            User(email=email, username=email.split("@")[0], is_active=True, is_verified=True, user_type="registered")
+        )
         db.commit()
         return email
     finally:
