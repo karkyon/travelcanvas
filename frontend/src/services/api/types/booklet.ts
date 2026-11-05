@@ -124,6 +124,8 @@ export interface Booklet {
     /** [Gate BookletPatterns] 地図のピン。以前の版には無い */
     points?: BookletPoint[];
     coordinates_rounded?: boolean;
+    /** [Gate BookletQR] Google マイマップのリンク */
+    my_map_url?: string | null;
   } | null;
   reservations: BookletReservation[] | null;
   packing: Array<{ name: string; category: string; quantity: number; is_required: boolean; status: string }> | null;

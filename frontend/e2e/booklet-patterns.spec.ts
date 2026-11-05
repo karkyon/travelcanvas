@@ -42,6 +42,10 @@ test('しおり: 12 パターンすべてで、必須の内容を Web と印刷�
     await expect(view.getByRole('img', { name: /旅行全体の地図/ })).toBeVisible();
     await expect(view.locator('.bk-ov tbody tr')).toHaveCount(2);
     await expect(view.locator('.bk-day')).toHaveCount(2);
+    // Google マップの QR: 全体の経路・この日の経路・場所ごと
+    await expect(view.getByRole('link', { name: /旅行全体の経路/ })).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1/);
+    await expect(view.getByRole('link', { name: /この日の経路/ })).toHaveCount(1);
+    await expect(view.getByRole('img', { name: /清水寺を Google マップで開く/ })).toBeVisible();
     await settleForAxe(page);
     const axe = await new AxeBuilder({ page }).include('[data-testid="booklet"]').withTags(['wcag2a', 'wcag2aa']).analyze();
     problems.push(...axe.violations.flatMap((v) => v.nodes.map((n) => `${theme}: ${v.id} ${n.target} ${n.any[0]?.message ?? ''}`)));
@@ -73,4 +77,54 @@ test('支出: レシートの写真を読み取り、確かめてから登録す
   await expect(page.getByLabel('内容')).toHaveValue(/ファミリーマート/);
   await page.getByRole('button', { name: /^(保存|登録|追加)/ }).click();
   await expect(page.getByText(/ファミリーマート/).first()).toBeVisible({ timeout: 15_000 });
+});
+
+test('行きたい場所: 追加・編集・削除ができ、旅程の予定へ位置ごと入り、旅程からしおりを開ける', async ({ page, context }) => {
+  test.setTimeout(120_000);
+  const { planId, apiBase, token } = await startGuestPlanViaApi(page, `行きたい場所確認-${Date.now()}`);
+  const send = client(context.request, apiBase, token);
+  await send(`/plans/${planId}/days`, { local_date: '2027-04-10', timezone_id: 'Asia/Tokyo' });
+  await page.route('**/api/v1/search/spots', (r) => r.fulfill({ json: {
+    query: '伊勢', total: 1, candidates: [{ id: 's1', provider: 'overpass', name: '伊勢神宮', category: 'sightseeing',
+      location: { latitude: 34.455, longitude: 136.725, address: '三重県伊勢市' }, retrieved_at: '2026-10-28T09:00:00+00:00' }],
+  } }));
+
+  // サイドバーの名前と画面の題名が同じ
+  await page.goto('/spots');
+  await expect(page.getByRole('heading', { level: 1, name: '行きたい場所' })).toBeVisible();
+  await page.getByRole('button', { name: '最初の場所を追加' }).click();
+  await page.getByLabel('場所の名前').first().fill('伊勢');
+  await page.getByRole('button', { name: '探す' }).click();
+  await page.getByRole('button', { name: '「伊勢神宮」を入れる' }).click();
+  await expect(page.getByLabel('住所')).toHaveValue('三重県伊勢市');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '伊勢神宮' })).toBeVisible();
+  // 手で追加・編集・削除
+  await page.getByRole('button', { name: '場所を追加' }).click();
+  await page.getByRole('tab', { name: '手で入力' }).click();
+  await page.getByLabel(/場所の名前/).fill('消す場所');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: '「消す場所」を編集' }).click();
+  await page.getByLabel(/場所の名前/).fill('直した場所');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  page.once('dialog', (d) => void d.accept());
+  await page.getByRole('button', { name: '「直した場所」を削除' }).click();
+  await expect(page.getByRole('heading', { name: '直した場所' })).toBeHidden();
+
+  // 旅程: しおりの入口と、予定の追加の入れ方
+  await page.goto(`/planner/${planId}`);
+  await expect(page.getByTestId('plan-booklet')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: /予定を追加/ }).first().click();
+  const dialog = page.getByRole('dialog');
+  for (const name of ['手で入力', '名前で検索', '写真・スクショ', '声', 'SNS・URL', '行きたい場所']) await expect(dialog.getByRole('tab', { name })).toBeVisible();
+  await dialog.getByRole('tab', { name: '行きたい場所' }).click();
+  await dialog.getByRole('button', { name: '「伊勢神宮」を入れる' }).click();
+  await expect(dialog.getByPlaceholder('東京タワー見学')).toHaveValue('伊勢神宮');
+  await dialog.getByRole('button', { name: '追加', exact: true }).click();
+  await expect(page.getByText('伊勢神宮').first()).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('plan-booklet').click();
+  await expect(page).toHaveURL(new RegExp(`/planner/${planId}/booklet`));
+  await expect(page.getByTestId('booklet')).toContainText('伊勢神宮', { timeout: 20_000 });
+  // 位置ごと入ったので、しおりの地図にピンが出る
+  await expect(page.getByRole('img', { name: /旅行全体の地図.*伊勢神宮/ })).toBeVisible();
 });

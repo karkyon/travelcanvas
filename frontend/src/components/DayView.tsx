@@ -18,10 +18,22 @@ import { useToast } from './common/toastContext';
 import Button from './common/Button';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
+import type { PlaceDraft, PlaceTab } from './search/PlaceFinder';
 import Input from './common/Input';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 import UiIcon from '@/components/common/UiIcon';
 import { IcCalendar, IcFootprints, IcMapPin, IcTimer, IcWallet } from '@/components/common/uiIcons';
+
+const PlaceFinder = React.lazy(() => import('./search/PlaceFinder'));
+
+/** [Gate WishPlaces] 場所の種類から予定のカテゴリへ */
+const toEventCategory = (c: string | null): CreateScheduleItemData['category'] => {
+  if (!c) return 'sightseeing';
+  if (/rest|food|dining|cafe|meal/i.test(c)) return 'dining';
+  if (/hotel|lodging|accom/i.test(c)) return 'accommodation';
+  if (/shop|store|market/i.test(c)) return 'shopping';
+  return 'sightseeing';
+};
 
 interface DayViewProps {
   day: DaySchedule;
@@ -245,6 +257,15 @@ const DayView: React.FC<DayViewProps> = ({
   }, [view, propose]);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [placeTab, setPlaceTab] = useState<PlaceTab>('manual');
+  const pickPlace = (d: PlaceDraft) => {
+    setNewItemData((prev) => ({
+      ...prev, title: d.name, location_name: d.name, address: d.address ?? '', category: toEventCategory(d.category),
+      latitude: d.latitude ?? undefined, longitude: d.longitude ?? undefined,
+      description: d.description ?? prev.description, notes: d.sourceUrl ? `出典: ${d.sourceUrl}` : prev.notes,
+    }));
+    setPlaceTab('manual');
+  };
   const [newItemData, setNewItemData] = useState<Partial<CreateScheduleItemData>>({
     title: '',
     description: '',
@@ -317,8 +338,8 @@ const DayView: React.FC<DayViewProps> = ({
         end_time: newItemData.end_time || '',
         duration: newItemData.duration || 60,
         location_name: newItemData.location_name || '',
-        latitude: newItemData.latitude || 0,
-        longitude: newItemData.longitude || 0,
+        latitude: newItemData.latitude,
+        longitude: newItemData.longitude,
         address: newItemData.address || '',
         cost: newItemData.cost || 0,
         currency: 'JPY',
@@ -642,11 +663,14 @@ const DayView: React.FC<DayViewProps> = ({
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="新しいスケジュールを追加"
+        title="予定を追加"
         size="lg"
       >
         <Modal.Body>
-          <div className="space-y-4">
+          <React.Suspense fallback={<p className="text-sm text-ink-700" role="status">読み込み中…</p>}>
+            <PlaceFinder tab={placeTab} onTab={setPlaceTab} onPick={pickPlace} withWish pickLabel="入れる" />
+          </React.Suspense>
+          <div className={`space-y-4 ${placeTab === 'manual' ? '' : 'hidden'}`}>
             <Input
               label="タイトル *"
               value={newItemData.title || ''}

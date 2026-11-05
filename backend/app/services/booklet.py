@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.orm import Session
 
 from app.core.crypto import decrypt_payload
+from app.models.models import PlanExternalMap
 from app.models.models import (
     Budget,
     EventReservation,
@@ -332,7 +333,12 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
                 "latitude": round(lat, 5) if inc["addresses"] and lat is not None else None,
                 "longitude": round(lon, 5) if inc["addresses"] and lon is not None else None,
             })
-        out["map"] = {"places": rows, "points": points, "coordinates_rounded": not inc["addresses"]}
+        # [Gate BookletQR] 本人のマイマップか、メンバーに見せると決めたマイマップのリンク(QR にする)
+        external = db.query(PlanExternalMap).filter(PlanExternalMap.plan_id == plan.id).filter(
+            (PlanExternalMap.user_id == viewer.id) | (PlanExternalMap.visibility == "members")).order_by(
+            (PlanExternalMap.user_id == viewer.id).desc()).first()
+        out["map"] = {"places": rows, "points": points, "coordinates_rounded": not inc["addresses"],
+                      "my_map_url": external.url if external else None}
 
     tickets = 0
     if reservations:

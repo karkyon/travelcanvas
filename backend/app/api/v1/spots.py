@@ -3,7 +3,7 @@ TravelCanvas MVP スポットAPI
 """
 import logging
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -16,7 +16,7 @@ from app.schemas.spots import (
     FavoriteCreate, FavoriteResponse,
     VisitCreate, VisitResponse,
 )
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_user_or_guest
 
 logger = logging.getLogger("travelcanvas")
 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/spots", tags=["spots"])
 @router.post("/", response_model=SpotResponse, status_code=status.HTTP_201_CREATED)
 async def create_spot(
     spot_data: SpotCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """新しいスポットを作成"""
@@ -60,15 +60,17 @@ async def create_spot(
 
 @router.get("/", response_model=List[SpotResponse])
 async def get_spots(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
     category: Optional[str] = None,
-    limit: int = 20
+    limit: int = Query(20, ge=1, le=500),
+    mine: bool = False,
 ):
-    """スポット一覧取得"""
+    """スポット一覧取得。mine=true は本人が保存した場所だけ([Gate WishPlaces] 行きたい場所の一覧)"""
     try:
         query = db.query(Spot).filter(
-            (Spot.created_by == current_user.id) | (Spot.is_public.is_(True))
+            (Spot.created_by == current_user.id) if mine
+            else ((Spot.created_by == current_user.id) | (Spot.is_public.is_(True)))
         )
 
         if category and category != "all":
@@ -132,7 +134,7 @@ async def test_spots_api():
 
 @router.get("/favorites", response_model=List[FavoriteResponse])
 async def get_favorites(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """自分のお気に入りスポット一覧を取得"""
@@ -164,7 +166,7 @@ async def get_favorites(
 async def add_favorite(
     spot_id: uuid.UUID,
     favorite_data: FavoriteCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポットをお気に入りに追加"""
@@ -224,7 +226,7 @@ async def add_favorite(
 @router.delete("/{spot_id}/favorite")
 async def remove_favorite(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポットをお気に入りから削除"""
@@ -263,7 +265,7 @@ async def remove_favorite(
 
 @router.get("/visits", response_model=List[VisitResponse])
 async def get_visits(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """自分の訪問済みスポット一覧を取得"""
@@ -296,7 +298,7 @@ async def get_visits(
 async def add_visit(
     spot_id: uuid.UUID,
     visit_data: VisitCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポットを訪問済みとして記録"""
@@ -362,7 +364,7 @@ async def add_visit(
 @router.delete("/{spot_id}/visit")
 async def remove_visit(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """訪問済み記録を取り消す"""
@@ -396,7 +398,7 @@ async def remove_visit(
 @router.get("/{spot_id}", response_model=SpotResponse)
 async def get_spot(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポット詳細取得"""
@@ -422,7 +424,7 @@ async def get_spot(
 async def update_spot(
     spot_id: uuid.UUID,
     spot_data: SpotUpdate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポット更新"""
@@ -461,7 +463,7 @@ async def update_spot(
 @router.delete("/{spot_id}")
 async def delete_spot(
     spot_id: uuid.UUID,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """スポット削除"""

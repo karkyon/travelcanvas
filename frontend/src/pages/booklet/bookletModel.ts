@@ -227,3 +227,24 @@ export async function printWhenReady(root: Document = document): Promise<void> {
   await Promise.race([Promise.all([loaded, root.fonts?.ready]), new Promise((done) => { setTimeout(done, 5000); })]);
   window.print();
 }
+
+// ===== [Gate BookletQR] Google マップのリンク(公式の Maps URLs。API の費用はかからない) =====
+
+/** Google マップの経路で渡せる地点の上限(出発 + 途中 9 + 到着) */
+export const MAX_ROUTE_STOPS = 11;
+const at = (p: { latitude: number; longitude: number }) => `${p.latitude},${p.longitude}`;
+
+/** 地点を順に結ぶ経路。多すぎる時は null(途中で切った経路を全体に見せない) */
+export function googleRouteUrl(stops: { latitude: number; longitude: number }[]): string | null {
+  const list = stops.filter((p, i) => i === 0 || at(p) !== at(stops[i - 1]!));
+  if (list.length < 2 || list.length > MAX_ROUTE_STOPS) return null;
+  const middle = list.slice(1, -1).map(at).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(at(list[0]!))}&destination=${encodeURIComponent(at(list[list.length - 1]!))}`
+    + `${middle ? `&waypoints=${encodeURIComponent(middle)}` : ''}`;
+}
+
+/** 場所の詳細(名前で開くと営業時間・写真などの情報が出る)。エリアを足して同名の別の場所を避ける */
+export const googlePlaceUrl = (label: string, area: string | null | undefined): string =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(area ? `${label} ${area}` : label)}`;
+
+export const MY_MAP_URL = /^https:\/\/www\.google\.com\/maps\/d\/[A-Za-z0-9_\-./?=&%#~+]*$/;

@@ -14,9 +14,11 @@ import { categoryLabel as expenseCategoryLabel, formatMoney } from '../expenses/
 import { categoryLabel as packingCategoryLabel } from '../preparation/preparationModel';
 import type { ExpenseCategory, PackingCategory } from '@/services/api';
 import BookletCover from './BookletCover';
+import { safeExternalUrl } from '@/utils/safeNavigation';
+import LocalQrCode from '@/components/share/LocalQrCode';
 import BookletMap from './BookletMap';
 import {
-  SECTION_LABEL, WARNING_TEXT, buildOverview, buildTimeline, clock, eventTypeLabel, formatDateTime, modeLabel, reservationStatusLabel,
+  MAX_ROUTE_STOPS, MY_MAP_URL, SECTION_LABEL, WARNING_TEXT, buildOverview, googlePlaceUrl, googleRouteUrl, buildTimeline, clock, eventTypeLabel, formatDateTime, modeLabel, reservationStatusLabel,
   reservationTypeLabel, shortDate, tocSections, unplacedMoves,
 } from './bookletModel';
 import { THEME_WORDS, fontUrl } from './bookletThemes';
@@ -37,6 +39,14 @@ const Section: React.FC<{ id: string; title: string; children: React.ReactNode }
     <h2 id={`booklet-sec-${id}`} className="bk-h2">{title}</h2>
     {children}
   </section>
+);
+
+/** [Gate BookletQR] 紙では QR を読み、画面ではそのまま押せる */
+const MapQr: React.FC<{ url: string; title: string; size?: number; note?: string }> = ({ url, title, size = 112, note }) => (
+  <a className="bk-qr" href={safeExternalUrl(url) ?? undefined} target="_blank" rel="noopener noreferrer" data-testid="booklet-map-qr">
+    <LocalQrCode value={url} size={size} label={`${title}を Google マップで開く QR コード`} />
+    <span className="bk-qr-text"><b>{title}</b>{note && <small>{note}</small>}</span>
+  </a>
 );
 
 /** デザインの字体を使う時だけ読み込む。読めない時は端末の字体で表示・印刷できる */
@@ -73,6 +83,9 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo, stampLabel, shee
     color: i, nos: d.events.map((e) => e.map_no).filter((n): n is number => typeof n === 'number'),
   }));
   const unlocated = (b.map?.places ?? []).filter((p) => !points.some((q) => q.label === p.label));
+  const stopsOf = (d: (typeof days)[number]) => d.events.map((e) => (typeof e.map_no === 'number' ? byNo.get(e.map_no) : undefined)).filter((p): p is BookletPoint => !!p);
+  const wholeRoute = googleRouteUrl(days.flatMap(stopsOf));
+  const myMap = b.map?.my_map_url && MY_MAP_URL.test(b.map.my_map_url) ? b.map.my_map_url : null;
   const leftover = b.schedule ? unplacedMoves(days, b.schedule.transport) : [];
   return (
     <article className={`booklet-root bk bk--${b.theme}${compact ? ' bk--compact' : ''}${sheet ? ' bk--sheet' : ''}`}
@@ -141,10 +154,24 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo, stampLabel, shee
           {points.length > 0 ? (
             <BookletMap points={points} routes={routes} colorOf={colorOf} label={`旅行全体の地図。${points.map((p) => `${p.no} ${p.label}`).join('、')}`} />
           ) : <p>地図に載せられる場所はまだありません(場所の座標がありません)。場所の一覧だけを載せます。</p>}
+          {(wholeRoute || myMap) && (
+            <div className="bk-qrs" aria-label="Google マップで開く">
+              {myMap && <MapQr url={myMap} title="マイマップ" note="Google マイマップで全体を見る" />}
+              {wholeRoute && <MapQr url={wholeRoute} title="旅行全体の経路" note="Google マップで順に結ぶ" />}
+            </div>
+          )}
+          {!wholeRoute && !myMap && days.flatMap(stopsOf).length > MAX_ROUTE_STOPS && (
+            <p className="bk-note">場所が多いため、全体の経路は 1 つの QR にできません。日ごとの QR を使ってください。マイマップのリンクを登録すると、全体の QR を載せられます。</p>
+          )}
           {points.length > 0 && (
             <ol className="bk-legend">
               {points.map((p) => (
-                <li key={p.no}><span className="bk-pin" style={{ background: `var(--bk-d${colorOf(p) % 6})` }}>{p.no}</span>{p.label}{p.date ? <span className="bk-muted"> {shortDate(p.date)}</span> : null}</li>
+                <li key={p.no}>
+                  <a className="bk-qr" href={safeExternalUrl(googlePlaceUrl(p.label, b.cover?.destination)) ?? undefined} target="_blank" rel="noopener noreferrer">
+                    <LocalQrCode value={googlePlaceUrl(p.label, b.cover?.destination)} size={76} label={`${p.label}を Google マップで開く QR コード`} />
+                    <span className="bk-qr-text"><span><span className="bk-pin" style={{ background: `var(--bk-d${colorOf(p) % 6})` }}>{p.no}</span>{p.label}</span>{p.date ? <small>{shortDate(p.date)}</small> : null}</span>
+                  </a>
+                </li>
               ))}
             </ol>
           )}
@@ -180,6 +207,10 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo, stampLabel, shee
                   <BookletMap points={dayPoints} height={250} routes={[{ color: i, nos: d.events.map((e) => e.map_no).filter((n): n is number => typeof n === 'number') }]}
                     colorOf={() => i} label={`${shortDate(d.date)}の地図。${dayPoints.map((p) => `${p.no} ${p.label}`).join('、')}`} />
                 )}
+                {(() => {
+                  const route = googleRouteUrl(stopsOf(d));
+                  return route ? <div className="bk-qrs"><MapQr url={route} title="この日の経路" size={96} note="Google マップで順に結ぶ" /></div> : null;
+                })()}
                 {d.events.length === 0 ? <p>予定はありません。</p> : (
                   <ul className="bk-events">
                     {buildTimeline(d, b.schedule!.transport).map((item, j) => (item.kind === 'move' ? (

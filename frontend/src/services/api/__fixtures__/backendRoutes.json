@@ -484,6 +484,8 @@
   "POST /api/v1/search/spots",
   "POST /api/v1/security/csp-report",
   "POST /api/v1/spots/",
+  "POST /api/v1/spots/read-image",
+  "POST /api/v1/spots/read-url",
   "POST /api/v1/spots/{spot_id}/favorite",
   "POST /api/v1/spots/{spot_id}/visit",
   "POST /api/v1/travel-plans/",

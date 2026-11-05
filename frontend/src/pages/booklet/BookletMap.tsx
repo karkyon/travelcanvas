@@ -60,8 +60,8 @@ const BookletMap: React.FC<Props> = ({ points, routes, colorOf, height = 420, la
       let x = worldX(p.longitude, view.zoom) - view.left;
       let y = worldY(p.latitude, view.zoom) - view.top;
       for (let i = 0; i < 12 && [...out.values()].some((o) => Math.hypot(o.x - x, o.y - y) < 24); i += 1) {
-        x += Math.cos(i * 2.4) * 16;
-        y += Math.sin(i * 2.4) * 16;
+        x += Math.cos(i * 2.4) * 26;
+        y += Math.sin(i * 2.4) * 26;
       }
       out.set(p.no, { x, y });
     }
