@@ -83,6 +83,7 @@ const PlacePage = lazyPage(() => import('@/pages/PlacePage'));
 const AtlasPage = lazyPage(() => import('@/pages/AtlasPage'));
 const MemoriesHomePage = lazyPage(() => import('@/pages/MemoriesHomePage'));
 const PublicBookletPage = lazyPage(() => import('@/pages/PublicBookletPage'));
+const PhotoUploadPage = lazyPage(() => import('@/pages/PhotoUploadPage'));
 const MemoryReplanPage = lazyPage(() => import('@/pages/MemoryReplanPage'));
 const CalendarImportPage = lazyPage(() => import('@/pages/CalendarImportPage'));
 const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
@@ -694,6 +695,10 @@ export const router = createBrowserRouter([
       {
         path: 'b/:token',
         element: <PublicBookletPage />,
+      },
+      {
+        path: 'u/:token',  // [Gate PhotoQR] QR から開く写真の投稿
+        element: <PhotoUploadPage />,
       },
       {
         path: 'journal/:token',

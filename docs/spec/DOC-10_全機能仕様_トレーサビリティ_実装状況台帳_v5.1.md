@@ -15,7 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `ad041f5`(PR #37 Gate GeocodeJP。2026-10-31 に r31 の版をそろえた時点の main) |
-| Alembic head | `b7d2f4a6c8e1`(単一の head。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
+| Alembic head | `c4e8a2f6d1b3`(単一の head。MyMaps・PhotoMap・PhotoQR で写真の位置の根拠の列と QR・マイマップの表(2026-11-05 に利用者が指示)。その前は `b7d2f4a6c8e1`。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(`ad041f5`) | backend pytest 1322 合格・2 飛ばし(サンドボックス) / frontend vitest 943 合格(185 ファイル、サンドボックス) / E2E 99 合格・flaky 0(GitHub Actions の main の push run 41070234927 の e2e ジョブ) / mypy の誤り 0 件(基準は空) / 最初に読む JS 429.46 kB(上限 430 kB) |
 | GitHub Actions(`ad041f5`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41070234927)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -91,7 +91,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ✓ | C2・G4・G11 | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-009 | 情報内検索・コマンドパレット | VERIFIED | ✓ | C3・G4 | 利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1) |
 | FR-010 | 予約管理 | VERIFIED | ✓ | R3・E1 | 外部予約サービスとの同期、取消期限の通知 |
-| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1 | メール・OCRによる自動抽出 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認 |
 | FR-012 | QR・チケット | VERIFIED | ✓ | R3-5・R3-11・E1 | バーコードの描画、オフライン表示 |
 | FR-013 | 文書ウォレット | VERIFIED | ✓ | R3-6・M5〜M10・S4 | 本番の Object Storage・ClamAV の常時運用・KMS |
 | FR-014 | 移動区間 | INTEGRATED | 一部 | M1・M2・B-014・G11 | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
@@ -116,8 +116,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-033 | Offline同期 | VERIFIED | ✓ | P11・G6 | 本番での確認(RELEASE-1) |
 | FR-034 | しおり生成 | VERIFIED | ✓ | P4 | 冊子の面付 |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | ✓ | P4 | サーバー側の PDF・ダウンロード URL |
-| FR-036 | Calendar/Map IO | INTEGRATED(部分) | ✓ | P5・P8 | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
-| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6・G11 | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
+| FR-036 | Calendar/Map IO | INTEGRATED(部分) | ✓ | P5・P8・MyMaps | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込。Google マイマップは KML の案内付き取り込み(自動作成なし、自動更新なし) |
+| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6・G11・PhotoMap・PhotoQR・PhotoPlace | 顔の検査(画像認識の提供元)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装 |
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
 | FR-039 | 輸出・削除 | VERIFIED | ✓ | P6・P9・G7・G8 | 書類の写しの添付による出典の証明 |
 | FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2・G4 | 管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1) |

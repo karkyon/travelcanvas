@@ -34,6 +34,11 @@ export interface TravelMemory {
   updated_at: string | null;
   /** [Gate G11] 外部から取り込んだ写真の出典(作者・ライセンス等)。手で上げた写真は null(古い backend では無い) */
   source?: Record<string, unknown> | null;
+  /** [Gate PhotoMap] 位置の根拠・状態(古い backend では無い) */
+  location_source?: string | null;
+  location_status?: string | null;
+  location_confidence?: number | null;
+  location_visibility?: string | null;
 }
 
 export interface MemoryList {
@@ -67,6 +72,10 @@ export interface MemoryUploadInput {
   place_name?: string | null;
   visibility?: MemoryVisibility;
   include_in_journal?: boolean;
+  /** [Gate PhotoMap] 端末で写真から読んだ位置 */
+  latitude?: number | null;
+  longitude?: number | null;
+  location_source?: string | null;
 }
 
 export type MemoryUpdateInput = Omit<MemoryInput, 'kind'>;

@@ -176,6 +176,7 @@ class Waypoint:
     event_type: str
     latitude: float
     longitude: float
+    time: Optional[str] = None  # [Gate MyMaps] 現地の開始時刻(HH:MM)。未定は None
 
 
 def waypoints(events: Sequence[ExportEvent], precision: str, exclude_accommodation: bool, zones=()):
@@ -195,8 +196,75 @@ def waypoints(events: Sequence[ExportEvent], precision: str, exclude_accommodati
             lodging += 1
             continue
         out.append(Waypoint(e.place_name or e.title, e.local_date, e.event_type,
-                            round(e.latitude, digits), round(e.longitude, digits)))
+                            round(e.latitude, digits), round(e.longitude, digits),
+                            _local_time(e.local_start_time)))
     return out, no_location, lodging
+
+
+def _local_time(value) -> Optional[str]:
+    if value is None:
+        return None
+    return value.strftime("%H:%M") if hasattr(value, "strftime") else str(value)[:5]
+
+
+# [Gate MyMaps] 日ごとの色(KML は aabbggrr)。読み分けやすい 8 色を順に使う
+MYMAPS_COLORS = ("ff666e0f", "ff1a54b4", "ffa84d3f", "ff7a4d8a", "ff2e6f6a", "ff3f4fa8", "ff8a6a1f", "ff4f7a2e")
+# 取り込み 1 回の上限(Google の公式ヘルプ: KML 5MB・2,000 行)
+MYMAPS_MAX_POINTS = 2000
+# スマホのブラウザでも開ける経由地の数(Maps URLs: スマホのブラウザは 3、それ以外は 9)
+MAPS_URL_WAYPOINTS = 3
+
+
+def build_mymaps_kml(plan_title: str, points: Sequence[Waypoint], precision: str) -> str:
+    """[Gate MyMaps] Google マイマップへ取り込む KML。日ごとの Folder・番号・時刻・色・順路の線(地点間の直線)。"""
+    fmt = f"{{:.{PRECISION_DIGITS[precision]}f}}"
+    groups = _by_day(points)
+    parts = ['<?xml version="1.0" encoding="UTF-8"?>', '<kml xmlns="http://www.opengis.net/kml/2.2">', "  <Document>",
+             f"    <name>{escape(plan_title)}</name>",
+             f"    <description>{escape(PRECISION_NOTE[precision])}</description>"]
+    for i in range(len(groups)):
+        color = MYMAPS_COLORS[i % len(MYMAPS_COLORS)]
+        parts.append(f'    <Style id="day{i + 1}"><IconStyle><color>{color}</color></IconStyle>'
+                     f"<LineStyle><color>{color}</color><width>3</width></LineStyle></Style>")
+    for i, (d, pts) in enumerate(groups):
+        parts += ["    <Folder>", f"      <name>{escape(d.isoformat())}</name>"]
+        for n, p in enumerate(pts, start=1):
+            desc = " ".join(x for x in (p.time, _type_label(p.event_type)) if x)
+            parts += ["      <Placemark>", f"        <name>{n}. {escape(p.label)}</name>",
+                      f"        <description>{escape(desc)}</description>",
+                      f"        <styleUrl>#day{i + 1}</styleUrl>",
+                      f"        <Point><coordinates>{fmt.format(p.longitude)},{fmt.format(p.latitude)},0"
+                      "</coordinates></Point>", "      </Placemark>"]
+        if len(pts) >= 2:
+            coords = " ".join(f"{fmt.format(p.longitude)},{fmt.format(p.latitude)},0" for p in pts)
+            parts += ["      <Placemark>", f"        <name>{escape(d.isoformat() + ' の順路')}</name>",
+                      f"        <styleUrl>#day{i + 1}</styleUrl>",
+                      f"        <LineString><tessellate>1</tessellate><coordinates>{coords}</coordinates>"
+                      "</LineString>", "      </Placemark>"]
+        parts.append("    </Folder>")
+    parts += ["  </Document>", "</kml>"]
+    return "\n".join(parts) + "\n"
+
+
+def maps_route_urls(pts: Sequence[Waypoint]) -> List[str]:
+    """[Gate MyMaps] 1 日の順路を Google マップの経路の URL にする。経由地の上限を超える日は、続けて開けるように分ける。"""
+    if len(pts) < 2:
+        return []
+    step = MAPS_URL_WAYPOINTS + 1
+    urls = []
+    for start in range(0, len(pts) - 1, step):
+        chunk = pts[start:start + step + 1]
+        via = chunk[1:-1]
+        url = (f"https://www.google.com/maps/dir/?api=1&origin={chunk[0].latitude},{chunk[0].longitude}"
+               f"&destination={chunk[-1].latitude},{chunk[-1].longitude}")
+        if via:
+            url += "&waypoints=" + "%7C".join(f"{p.latitude},{p.longitude}" for p in via)
+        urls.append(url)
+    return urls
+
+
+def by_day(points: Sequence[Waypoint]):
+    return _by_day(points)
 
 
 def _by_day(points: Sequence[Waypoint]):

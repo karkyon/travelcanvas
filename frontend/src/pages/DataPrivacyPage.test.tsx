@@ -19,6 +19,10 @@ const m = vi.hoisted(() => ({
   // [Gate G10-Q] 削除の後は 401 での /login への強制の移動を止める
   api: { suppressAuthRedirect: vi.fn() },
 }));
+vi.mock('@/services/api/photoFeatures', () => ({
+  getMyMapsPreview: vi.fn().mockResolvedValue({ precision: 'exact', exclude_accommodation: true, count: 0, excluded: 0, days: [], no_location: [], over_limit: false, many_days: false }),
+  getExternalMaps: vi.fn().mockResolvedValue([]), downloadMyMapsKml: vi.fn(), saveExternalMap: vi.fn(), deleteExternalMap: vi.fn(),
+}));
 vi.mock('@/services/api', () => m);
 // [Gate G6] 守る範囲・オフラインの端末のカード
 vi.mock('@/services/api/g6', () => ({

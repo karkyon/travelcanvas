@@ -100,6 +100,7 @@
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_branch_resources` | 422 | no | — | api/v1/branches.py |
 | `invalid_branch_selection` | 422 | no | 比べる分岐案を1〜…つ選んでください | api/v1/branches.py |
+| `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
@@ -114,6 +115,7 @@
 | `invalid_kind` | 422 | no | 記録の種類が不正です | api/v1/memories.py, services/private_profile.py |
 | `invalid_label` | — | — | 名前は1〜…文字で入力してください | services/private_profile.py |
 | `invalid_location_level` | — | — | 場所の出し方は「出さない」か「地名だけ」です | api/v1/memory_publish.py |
+| `invalid_map_url` | 422 | no | https://www.google.com/maps/d/ で始まるマイマップのリンクを貼ってください | api/v1/itinerary_export.py |
 | `invalid_metrics` | — | — | 端末の判定の数値が不正です(座標は送れません) | api/v1/visits.py |
 | `invalid_name` | — | — | 連携の名前を100文字までで入力してください | api/v1/organizations.py, services/organizations.py |
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
@@ -136,6 +138,8 @@
 | `invalid_user` | — | — | user_id が正しくありません | api/v1/admin_ops.py |
 | `invalid_value` | — | — | 時刻は HH:MM で入力してください | services/private_profile.py |
 | `last_owner` | 409 | no | 組織には owner が1人以上必要です | api/v1/organizations.py |
+| `link_inactive` | 410 | no | この QR コードは期限が切れたか、停止されています。新しい QR を発行してもらってください | api/v1/photo_upload.py |
+| `link_not_found` | 404 | no | この QR コードは見つかりません | api/v1/photo_upload.py |
 | `location_off` | 409 | no | この旅行は「位置を記録しない」設定です。記録するには設定を変えてください | api/v1/location_tracks.py |
 | `locked` | 409 | no | — | api/v1/sync.py |
 | `locked_relation` | — | — | 確定ロックされた予約との紐付けがあるため削除できません。予約の紐付けのロックを解除してから削除してください。 | services/plan_item_deletion.py |
@@ -153,6 +157,7 @@
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
 | `no_changes` | 403, 409, 422 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v1/re |
 | `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
+| `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
 | `no_ops_selected` | 422 | no | 採用する変更を選んでください | api/v1/branches.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |
 | `no_trip_period` | 409 | no | 旅行の日程が無いため記録できません。先に日程を登録してください | api/v1/location_tracks.py |
@@ -185,7 +190,7 @@
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
-| `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py, api/v1/privacy.py, service |
+| `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py, api/v1/photo_upload.py, ap |
 | `reauth_failed` | 403 | no | パスワードが正しくありません | api/v1/corrections.py, api/v1/ownership.py, api/v1/privacy.py |
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
@@ -206,6 +211,7 @@
 | `sensitive_creator_only` | 403 | no | 機密情報を含む版は作成者だけが表示できます | api/v1/booklet.py |
 | `sensitive_not_publishable` | 409 | no | 機密項目を含む版は Web で公開できません。機密項目を外した版を作ってください | api/v1/booklet.py |
 | `sensitive_requires_owner` | — | — | 予約番号・住所・電話・参加者名を含めた出力は旅行の所有者だけが作成できます | api/v1/booklet.py |
+| `session_required` | 401 | no | 確認コードをもう一度入れてください | api/v1/photo_upload.py |
 | `share_view_expired` | — | — | 閲覧の時間が過ぎました。もう一度リンクを開いてください | api/v1/public_share.py |
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
 | `stale_version` | 409 | after_reload | 配布が別の操作で改訂されています。読み直してください | api/v1/organizations.py |
@@ -213,6 +219,7 @@
 | `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
 | `test_tier_disabled` | 403 | no | 本番・staging の環境ではクラスの試験の切り替えをしません | api/v1/admin_ops.py |
+| `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |
@@ -224,6 +231,7 @@
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
+| `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |
 | `track_active` | 409 | no | この旅行では記録中(または一時停止中)の軌跡があります。止めてから始めてください | api/v1/location_tracks.py |
 | `track_full` | 409 | no | 1つの軌跡の点は…件までです。新しく記録を始めてください | api/v1/location_tracks.py |

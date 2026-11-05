@@ -96,8 +96,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "R3-7・R3-9・E1",
-   "gaps": "メール・OCRによる自動抽出"
+   "gates": "R3-7・R3-9・E1・BookingImport",
+   "gaps": "メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認"
   },
   "FR-012": {
    "title": "QR・チケット",
@@ -296,16 +296,16 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P5・P8",
-   "gaps": "外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込"
+   "gates": "P5・P8・MyMaps",
+   "gaps": "外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込。Google マイマップは KML の案内付き取り込み(自動作成なし、自動更新なし)"
   },
   "FR-037": {
    "title": "写真・旅行記",
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "P12・Q1・G6・G11",
-   "gaps": "顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元)"
+   "gates": "P12・Q1・G6・G11・PhotoMap・PhotoQR・PhotoPlace",
+   "gaps": "顔の検査(画像認識の提供元)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装"
   },
   "FR-038": {
    "title": "位置軌跡",

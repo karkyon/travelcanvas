@@ -5,6 +5,12 @@
  * 修正は v7)がある。このアプリは利用者の入力を移動先にしていないが、サーバーから受け取った値で移動する箇所
  * (準備状況の「開く」など)は、ここを通して外部 URL・プロトコル相対 URL・バックスラッシュを拒否する。
  */
+/** [Gate PhotoQR] ログインの後に戻る先。写真の投稿ページだけを許す(外の URL へ飛ばさない) */
+export function loginNextPath(search: string = window.location.search): string | null {
+  const next = new URLSearchParams(search).get('next');
+  return next && /^\/u\/[A-Za-z0-9_-]{10,100}$/.test(next) ? next : null;
+}
+
 export function safeInternalPath(target: unknown): string | null {
   if (typeof target !== 'string') return null;
   const value = target.trim();

@@ -35,6 +35,9 @@ export class MemoriesApi extends SyncApi {
     const optional: Array<[string, string | null | undefined]> = [
       ['body', input.body], ['event_id', input.event_id], ['day_id', input.day_id],
       ['occurred_at', input.occurred_at], ['place_name', input.place_name], ['visibility', input.visibility],
+      ['location_source', input.location_source],
+      ['latitude', input.latitude === null || input.latitude === undefined ? null : String(input.latitude)],
+      ['longitude', input.longitude === null || input.longitude === undefined ? null : String(input.longitude)],
     ];
     for (const [key, value] of optional) {
       if (value) form.append(key, value);

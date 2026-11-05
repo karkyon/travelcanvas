@@ -24,6 +24,33 @@ class MetadataUnremovable(ValueError):
     pass
 
 
+class ThumbnailUnavailable(ValueError):
+    pass
+
+
+THUMBNAIL_SIZE = 320
+THUMBNAIL_MAX_PIXELS = 80_000_000
+
+
+def thumbnail(content: bytes) -> bytes:
+    """[Gate PhotoMap] 縮小した JPEG を作る。作り直すので撮影情報は残らない。"""
+    from PIL import Image, ImageOps
+
+    try:
+        with Image.open(io.BytesIO(content)) as im:
+            if im.width * im.height > THUMBNAIL_MAX_PIXELS:
+                raise ThumbnailUnavailable("too_large")
+            small = ImageOps.exif_transpose(im).convert("RGB")
+            small.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE))
+            out = io.BytesIO()
+            small.save(out, format="JPEG", quality=72)
+            return out.getvalue()
+    except ThumbnailUnavailable:
+        raise
+    except Exception as error:  # noqa: BLE001 - 読めない画像は縮小版なしにする
+        raise ThumbnailUnavailable("unreadable") from error
+
+
 def has_metadata_marker(content: bytes) -> bool:
     return any(m in content for m in MARKERS)
 

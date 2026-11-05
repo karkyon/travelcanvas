@@ -2634,12 +2634,28 @@ class Memory(Base):
     include_in_journal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     # [Gate G11] 外部から取り込んだ写真の出典(provider・作者・ライセンス・取得日時。仕様 §5.3)。手で上げた写真は NULL
     source: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    # [Gate PhotoMap] 位置の根拠(exif/track/event/manual)・状態(proposed=推定で確認待ち / confirmed=確定)。
+    # location_visibility は写真の公開範囲とは別で、既定は本人だけ(メンバーに写真を公開しても位置は見せない)
+    location_source: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    location_status: Mapped[Optional[str]] = mapped_column(String(9), nullable=True)
+    location_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    location_visibility: Mapped[str] = mapped_column(String(8), nullable=False, default="private",
+                                                     server_default="private")
+    # [Gate PhotoQR] 再送で二重に保存しないための、端末が付ける ID
+    client_upload_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
+        CheckConstraint("location_source IS NULL OR location_source IN ('exif','track','event','manual')",
+                        name="ck_memories_location_source"),
+        CheckConstraint("location_status IS NULL OR location_status IN ('proposed','confirmed')",
+                        name="ck_memories_location_status"),
+        CheckConstraint("location_visibility IN ('private','members')", name="ck_memories_location_visibility"),
+        Index("uq_memories_client_upload", "plan_id", "author_user_id", "client_upload_id", unique=True,
+              postgresql_where=text("client_upload_id IS NOT NULL")),
         CheckConstraint("kind IN ('note','photo','audio','video')", name="ck_memories_kind"),
         CheckConstraint("visibility IN ('private','members')", name="ck_memories_visibility"),
         CheckConstraint("(kind IN ('photo','audio')) = (storage_key IS NOT NULL)", name="ck_memories_media"),
@@ -2649,6 +2665,57 @@ class Memory(Base):
         CheckConstraint("latitude IS NULL OR latitude BETWEEN -90 AND 90", name="ck_memories_latitude"),
         CheckConstraint("longitude IS NULL OR longitude BETWEEN -180 AND 180", name="ck_memories_longitude"),
         Index("ix_memories_plan_occurred", "plan_id", "occurred_at"),
+    )
+
+
+class PhotoUploadLink(Base):
+    """[Gate PhotoQR] 写真投稿の QR。トークンと確認コードの本体は保存しない(発行の応答で1回だけ返す)。"""
+    __tablename__ = "photo_upload_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_reason: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    upload_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+
+class PhotoUploadSession(Base):
+    """[Gate PhotoQR] 確認コードで開いた端末の、投稿だけの権限(この表のトークンは投稿の API にしか通らない)。"""
+    __tablename__ = "photo_upload_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    link_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("photo_upload_links.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+
+class PlanExternalMap(Base):
+    """[Gate MyMaps] 利用者が作った Google マイマップのリンク(1旅行・1人に1つ)。"""
+    __tablename__ = "plan_external_maps"
+
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    visibility: Mapped[str] = mapped_column(String(8), nullable=False, default="private", server_default="private")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_plan_external_maps_user_id", "user_id"),
+        CheckConstraint("visibility IN ('private','members')", name="ck_plan_external_maps_visibility"),
     )
 
 

@@ -16,18 +16,21 @@ X-Export-Excluded(利用者の選択で除外した件数)を返す。監査に�
 [Gate G2] FR-045 所有者が「予定の住所・位置」を隠した参加者: ICS・CSV に住所を入れない(選んでも無視)、
 GPX・KML は 403。「予約」を隠した参加者: 予約の種類を使わない。
 """
+import re
 from datetime import datetime, timezone as dt_timezone
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
-    EventReservation, Place, Reservation, Spot, TravelDay, TravelEvent, TravelPlan, TravelSegment, User,
+    EventReservation, Place, PlanExternalMap, Reservation, Spot, TravelDay, TravelEvent, TravelPlan, TravelSegment,
+    User,
 )
 from app.services import itinerary_export as ix
 from app.services.audit_service import record_audit_event
@@ -71,7 +74,7 @@ def _collect(db: Session, plan: TravelPlan, hidden=member_policy.EMPTY):
         for er in db.query(EventReservation).filter(EventReservation.event_id.in_([e.id for e in events])).all():
             found = res_by_id.get(er.reservation_id)
             if found is not None and found not in linked.setdefault(er.event_id, []):
-                linked[er.event_id].append(r)
+                linked[er.event_id].append(found)
 
     out: List[ix.ExportEvent] = []
     hide_place = "event_address" in hidden
@@ -159,7 +162,7 @@ def export_ics(plan_id: str, request: Request, include_addresses: bool = Query(F
 
 
 def _geo(fmt: str, plan_id: str, request: Request, precision: str, exclude_accommodation: bool, db: Session,
-         user: User) -> Response:
+         user: User, profile: str = "standard") -> Response:
     plan, _, hidden = member_policy.require_access(db, plan_id, user, "viewer", "event_address")
     _, events, _ = _collect(db, plan, hidden)
     # [Gate G6] LOC-02 旅行の所有者と書き出す本人の守る範囲(自宅・職場など)の中の地点は書き出さない
@@ -167,10 +170,13 @@ def _geo(fmt: str, plan_id: str, request: Request, precision: str, exclude_accom
 
     zones = lp.zones_for(db, {plan.user_id, user.id})
     points, no_location, lodging = ix.waypoints(events, precision, exclude_accommodation, zones)
-    body = ix.build_gpx(plan.title, points, precision, _now()) if fmt == "gpx" else \
-        ix.build_kml(plan.title, points, precision)
+    if profile == "mymaps":
+        body = ix.build_mymaps_kml(plan.title, points, precision)
+    else:
+        body = ix.build_gpx(plan.title, points, precision, _now()) if fmt == "gpx" else \
+            ix.build_kml(plan.title, points, precision)
     _audit(request, user, plan, fmt, {"precision": precision, "exclude_accommodation": exclude_accommodation,
-                                      "count": len(points)})
+                                      "count": len(points), **({"profile": profile} if profile != "standard" else {})})
     return _file(body, fmt, plan, _counts(len(points), skipped=no_location, excluded=lodging))
 
 
@@ -183,9 +189,84 @@ def export_gpx(plan_id: str, request: Request, precision: str = Query("approx", 
 
 @router.get("/{plan_id}/exports/places.kml")
 def export_kml(plan_id: str, request: Request, precision: str = Query("approx", pattern="^(approx|exact)$"),
-               exclude_accommodation: bool = Query(True), db: Session = Depends(get_db),
-               current_user: User = Depends(get_current_user_or_guest)):
-    return _geo("kml", plan_id, request, precision, exclude_accommodation, db, current_user)
+               exclude_accommodation: bool = Query(True),
+               profile: str = Query("standard", pattern="^(standard|mymaps)$"),
+               db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    return _geo("kml", plan_id, request, precision, exclude_accommodation, db, current_user, profile)
+
+
+@router.get("/{plan_id}/exports/mymaps/preview")
+def mymaps_preview(plan_id: str, precision: str = Query("exact", pattern="^(approx|exact)$"),
+                   exclude_accommodation: bool = Query(True), db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate MyMaps] マイマップへ載る地点・位置が無い予定・除外の件数・Google マップの経路の URL。外部へは送らない。"""
+    plan, _, hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "event_address")
+    _, events, _ = _collect(db, plan, hidden)
+    from app.services import location_privacy as lp
+
+    zones = lp.zones_for(db, {plan.user_id, current_user.id})
+    points, _no_location, excluded = ix.waypoints(events, precision, exclude_accommodation, zones)
+    days = [{"date": d.isoformat(), "route_urls": ix.maps_route_urls(pts),
+             "points": [{"label": p.label, "time": p.time, "event_type": p.event_type} for p in pts]}
+            for d, pts in ix.by_day(points)]
+    return {"precision": precision, "exclude_accommodation": exclude_accommodation, "count": len(points),
+            "excluded": excluded, "days": days,
+            "no_location": [{"title": e.title, "date": e.local_date.isoformat()} for e in events
+                            if e.latitude is None or e.longitude is None],
+            "over_limit": len(points) + len(days) > ix.MYMAPS_MAX_POINTS, "many_days": len(days) > 10}
+
+
+_MYMAPS_URL = re.compile(r"^https://www\.google\.com/maps/d/[A-Za-z0-9_\-./?=&%#~+]*$")
+
+
+class ExternalMapInput(BaseModel):
+    url: str = Field(..., max_length=500)
+    visibility: str = Field("private", pattern="^(private|members)$")
+
+
+def _external_map_dict(row: PlanExternalMap, user: User) -> Dict[str, object]:
+    changed = row.updated_at or row.created_at
+    return {"url": row.url, "visibility": row.visibility, "by_me": row.user_id == user.id,
+            "updated_at": changed.isoformat() if changed else None}
+
+
+@router.get("/{plan_id}/external-map")
+def get_external_maps(plan_id: str, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)):
+    plan, _, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    rows = db.query(PlanExternalMap).filter(PlanExternalMap.plan_id == plan.id).filter(
+        (PlanExternalMap.user_id == current_user.id) | (PlanExternalMap.visibility == "members")).all()
+    return {"maps": [_external_map_dict(r, current_user) for r in rows]}
+
+
+@router.put("/{plan_id}/external-map")
+def put_external_map(plan_id: str, body: ExternalMapInput, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    plan, _, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    url = body.url.strip()
+    if not _MYMAPS_URL.match(url):
+        raise HTTPException(status_code=422, detail={
+            "code": "invalid_map_url", "message": "https://www.google.com/maps/d/ で始まるマイマップのリンクを貼ってください"})
+    row = db.query(PlanExternalMap).filter(PlanExternalMap.plan_id == plan.id,
+                                           PlanExternalMap.user_id == current_user.id).first()
+    if row is None:
+        row = PlanExternalMap(plan_id=plan.id, user_id=current_user.id, url=url, visibility=body.visibility)
+        db.add(row)
+    else:
+        row.url, row.visibility = url, body.visibility
+    db.commit()
+    db.refresh(row)
+    return _external_map_dict(row, current_user)
+
+
+@router.delete("/{plan_id}/external-map", status_code=204)
+def delete_external_map(plan_id: str, db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user_or_guest)):
+    plan, _, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer")
+    db.query(PlanExternalMap).filter(PlanExternalMap.plan_id == plan.id,
+                                     PlanExternalMap.user_id == current_user.id).delete()
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/{plan_id}/exports/itinerary.csv")

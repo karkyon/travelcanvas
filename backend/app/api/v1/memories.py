@@ -17,7 +17,8 @@
 import logging
 import uuid
 from datetime import datetime, timezone as dt_timezone
-from typing import Any, Dict, Optional, Sequence
+import re
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict
@@ -30,7 +31,8 @@ from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
 from app.ops import metrics as ops_metrics
-from app.services import malware_scan, usage
+from app.services import location_privacy as lp
+from app.services import malware_scan, photo_location, usage
 from app.services import memories as mem
 from app.services import threat_guard
 from app.services.audit_service import record_audit_event
@@ -76,13 +78,39 @@ def _visible(m: Memory, user: User) -> bool:
     return m.author_user_id == user.id or m.visibility == "members"
 
 
-def _to_dict(m: Memory, user: User, plan: TravelPlan, names: Dict[uuid.UUID, str]) -> Dict[str, Any]:
+def location_for(m: Memory, user: User, zones: Sequence[Any] = ()) -> Optional[Tuple[float, float]]:
+    """[Gate PhotoMap] この人に見せてよい位置。本人以外には、本人が公開を選び、守る範囲の外の位置だけを見せる。"""
+    if m.latitude is None or m.longitude is None:
+        return None
+    if m.author_user_id == user.id:
+        return m.latitude, m.longitude
+    if m.location_visibility != "members" or m.location_status == "proposed" or lp.in_zones(
+            m.latitude, m.longitude, zones):
+        return None
+    return m.latitude, m.longitude
+
+
+def _plan_zones(db: Session, plan: TravelPlan, rows: Sequence[Memory], user: User) -> Sequence[Any]:
+    """本人以外の記録の位置を見せる時の守る範囲(旅行の所有者と、記録を書いた人)。"""
+    authors = {r.author_user_id for r in rows if r.author_user_id != user.id and r.latitude is not None
+               and r.location_visibility == "members"}
+    return lp.zones_for(db, {plan.user_id} | authors) if authors else ()
+
+
+def _to_dict(m: Memory, user: User, plan: TravelPlan, names: Dict[uuid.UUID, str],
+             zones: Sequence[Any] = ()) -> Dict[str, Any]:
     by_me = m.author_user_id == user.id
+    position = location_for(m, user, zones)
     return {
         "id": str(m.id), "plan_id": str(m.plan_id), "kind": m.kind, "body": m.body,
         "event_id": str(m.event_id) if m.event_id else None, "day_id": str(m.day_id) if m.day_id else None,
         "occurred_at": _iso(m.occurred_at), "place_name": m.place_name,
-        "latitude": m.latitude, "longitude": m.longitude, "video_url": m.video_url,
+        "latitude": position[0] if position else None, "longitude": position[1] if position else None,
+        "location_source": m.location_source if position else None,
+        "location_status": m.location_status if position else None,
+        "location_confidence": m.location_confidence if position else None,
+        "location_visibility": m.location_visibility if by_me else None,
+        "video_url": m.video_url,
         "has_media": m.storage_key is not None, "mime_type": m.mime_type, "size": m.size,
         "visibility": m.visibility, "include_in_journal": bool(m.include_in_journal),
         "author_name": names.get(m.author_user_id, "退会したメンバー"),
@@ -213,7 +241,8 @@ def list_memories(plan_id: str, db: Session = Depends(get_db),
             .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members"))
             .order_by(Memory.occurred_at.asc().nullslast(), Memory.created_at.asc(), Memory.id.asc()).all())
     names = _names(db, plan, [r.author_user_id for r in rows])
-    return {"memories": [_to_dict(r, current_user, plan, names) for r in rows],
+    zones = _plan_zones(db, plan, rows, current_user)
+    return {"memories": [_to_dict(r, current_user, plan, names, zones) for r in rows],
             "can_create": role in ("owner", "editor"),
             "max_upload_bytes": settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES}
 
@@ -261,15 +290,41 @@ async def upload_memory(
     longitude: Optional[float] = Form(None),
     visibility: str = Form("private"),
     include_in_journal: bool = Form(True),
+    location_source: Optional[str] = Form(None),
+    client_upload_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    return await handle_upload(request, db, plan, current_user, file, kind, body, event_id, day_id, occurred_at,
+                               place_name, latitude, longitude, visibility, include_in_journal, location_source,
+                               client_upload_id)
+
+
+async def handle_upload(request: Optional[Request], db: Session, plan: TravelPlan, current_user: User,
+                        file: UploadFile, kind: str, body: Optional[str], event_id: Optional[str],
+                        day_id: Optional[str], occurred_at: Optional[datetime], place_name: Optional[str],
+                        latitude: Optional[float], longitude: Optional[float], visibility: str,
+                        include_in_journal: bool, location_source: Optional[str] = None,
+                        client_upload_id: Optional[str] = None) -> Dict[str, Any]:
+    """[Gate PhotoQR] 写真・音声の保存の入口(旅行の画面と QR の投稿ページで共通)。権限は呼ぶ側で確かめる。"""
     if kind not in ("photo", "audio"):
         raise _bad("invalid_kind", "ファイルを付けられるのは写真と音声メモだけです")
+    if client_upload_id is not None and not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", client_upload_id):
+        raise _bad("invalid_field", "再送の ID の形式が不正です")
+    if client_upload_id:
+        # [Gate PhotoQR] 通信が切れて再送しても、同じ写真を二重に保存しない
+        existing = db.query(Memory).filter(Memory.plan_id == plan.id, Memory.author_user_id == current_user.id,
+                                           Memory.client_upload_id == client_upload_id).first()
+        if existing is not None:
+            return _to_dict(existing, current_user, plan, _names(db, plan))
     _count_check(db, plan)
     f = _common_fields(db, plan, kind, body, event_id, day_id, occurred_at, place_name, latitude, longitude,
                        visibility)
+    if kind == "photo":
+        f.update(photo_location.resolve(db, plan, current_user.id, f, location_source))
+    if client_upload_id:
+        f["client_upload_id"] = client_upload_id
     # [Gate S4] F09 上限を超えた時点で読むのを止める。保存の前にウイルス検査をする。
     try:
         content = await read_upload_limited(file, settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES)
@@ -437,6 +492,101 @@ def media_response(m: Memory) -> Response:
         "Content-Disposition": "inline",
         "Content-Security-Policy": "default-src 'none'; sandbox",  # [Gate S4] 直接開かれても画面として動かさない
     })
+
+
+@router.get("/{plan_id}/memories/{memory_id}/thumbnail")
+def get_memory_thumbnail(plan_id: str, memory_id: str, db: Session = Depends(get_db),
+                         current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate PhotoMap] 地図・一覧用の縮小版。保存せず、その都度作る(撮影情報は作り直しで残らない)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    m = _get_visible(db, plan, memory_id, current_user)
+    if m.kind != "photo" or not m.storage_key:
+        raise HTTPException(status_code=404, detail="この記録には写真がありません")
+    try:
+        content = load_decrypted_file(get_storage_backend(), m.storage_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="ファイルが見つかりません")
+    except EncryptionNotConfigured:
+        raise _bad("encryption_not_configured", "ファイルの暗号化が設定されていません(サーバー側の設定)", 503)
+    try:
+        small = image_metadata.thumbnail(content)
+    except image_metadata.ThumbnailUnavailable:
+        raise _bad("thumbnail_unavailable", "この写真の縮小版を作れません", 422)
+    return Response(content=small, media_type="image/jpeg", headers={
+        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+    })
+
+
+@router.get("/{plan_id}/memory-map")
+def memory_map(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate PhotoMap] MEMORY MAP(DOC-14 §4.5)。地図に出す写真と、本人の未配置の写真。"""
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    rows = (db.query(Memory).filter(Memory.plan_id == plan.id, Memory.kind == "photo")
+            .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members"))
+            .order_by(Memory.occurred_at.asc().nullslast(), Memory.created_at.asc(), Memory.id.asc()).all())
+    names = _names(db, plan, [r.author_user_id for r in rows])
+    zones = _plan_zones(db, plan, rows, current_user)
+    placed, unplaced = [], []
+    for r in rows:
+        item = _to_dict(r, current_user, plan, names, zones)
+        if item["latitude"] is not None:
+            placed.append(item)
+        elif r.author_user_id == current_user.id:
+            unplaced.append(item)
+    return {"photos": placed, "unplaced": unplaced, "can_create": role in ("owner", "editor")}
+
+
+class LocationChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    place_name: Optional[str] = None
+    event_id: Optional[str] = None
+    location_visibility: Optional[str] = None
+
+
+@router.post("/{plan_id}/memories/{memory_id}/location")
+def change_location(plan_id: str, memory_id: str, body: LocationChange,
+                    if_match: Optional[str] = Header(None, alias="If-Match"), db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate PhotoPlace] 位置の確定・変更・削除・公開の切り替え。本人だけ(推定は確定するまで本人以外に見えない)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    m = _get_visible(db, plan, memory_id, current_user)
+    if m.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="位置を変えられるのは写真を上げた本人だけです")
+    _require_rev(m, if_match)
+    if body.action == "confirm":
+        if m.latitude is None:
+            raise _bad("no_location", "確定する位置がありません")
+        m.location_status = "confirmed"
+    elif body.action == "set":
+        lat, lng = mem.check_location(body.latitude, body.longitude)
+        if lat is None:
+            raise _bad("no_location", "位置を指定してください")
+        event_id, day_id = _check_target(db, plan, _uuid(body.event_id, "予定ID"), None)
+        m.latitude, m.longitude = lat, lng
+        m.location_source, m.location_status, m.location_confidence = "manual", "confirmed", None
+        if event_id:
+            m.event_id, m.day_id = event_id, day_id
+        if body.place_name is not None:
+            m.place_name = body.place_name.strip()[:mem.MAX_PLACE_NAME] or None
+    elif body.action == "clear":
+        m.latitude = m.longitude = None
+        m.location_source = m.location_status = m.location_confidence = None
+    elif body.action == "visibility":
+        if body.location_visibility not in ("private", "members"):
+            raise _bad("invalid_field", "位置の公開範囲の指定が不正です")
+        m.location_visibility = body.location_visibility
+    else:
+        raise _bad("invalid_field", "操作の指定が不正です")
+    m.revision += 1
+    db.commit()
+    db.refresh(m)
+    _audit("memory.location", current_user, m, {"action": body.action})
+    return _to_dict(m, current_user, plan, _names(db, plan))
 
 
 @router.post("/{plan_id}/memories/journal-draft")

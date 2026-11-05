@@ -31,6 +31,7 @@ import {
 } from '@/services/api';
 import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import BookingExtractCard from './imports/BookingExtractCard';
 
 const STATUS_LABEL: Record<string, string> = {
   uploaded: 'アップロード済み',
@@ -184,6 +185,19 @@ const ImportsPage: React.FC = () => {
     }
   };
 
+  // [Gate BookingImport] 読み取った候補を確かめた後にまとめて採用する
+  const handleAcceptAll = async () => {
+    if (!planId || !selected) return;
+    try {
+      for (const c of selected.candidates.filter((x) => x.review_status === 'pending')) {
+        await acceptExtractionCandidate(planId, selected.id, c.id);
+      }
+      await refreshDetail();
+    } catch (e) {
+      setError(errorDetailMessage(e, '候補の承認に失敗しました'));
+    }
+  };
+
   const handleReject = async (candidateId: string) => {
     if (!planId || !selected) return;
     try {
@@ -244,7 +258,7 @@ const ImportsPage: React.FC = () => {
           </Button>
           <h1 className="text-2xl font-bold text-ink-900">予約取込</h1>
           <p className="text-sm text-ink-700 mt-1">
-            メール・確認書等の内容を手動で登録し、レビューのうえ予約として確定できます。
+            予約メールや画像から項目を読み取るか、手動で登録し、確認のうえ予約として確定できます。
           </p>
         </div>
         <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
@@ -254,6 +268,10 @@ const ImportsPage: React.FC = () => {
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
+      )}
+
+      {planId && (
+        <BookingExtractCard planId={planId} onExtracted={(job) => { setSelected(job); void loadJobs(); }} />
       )}
 
       {isLoading ? (
@@ -295,8 +313,8 @@ const ImportsPage: React.FC = () => {
         <form onSubmit={handleCreate}>
           <Modal.Body>
             <p className="text-sm text-ink-700 mb-4">
-              メールや確認書の内容を、次の画面で1項目ずつ手動登録できます
-              (自動抽出には対応していません)。
+              メールや確認書の内容を、次の画面で1項目ずつ手動登録できます。
+              自動で読み取るには、画面の「予約メール・画像から読み取る」を使ってください。
             </p>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -336,7 +354,12 @@ const ImportsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-ink-700 mb-2">抽出候補</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-ink-700">抽出候補</div>
+                    {selected.status === 'review_required' && selected.candidates.some((x) => x.review_status === 'pending') && (
+                      <Button variant="ghost" size="sm" onClick={() => void handleAcceptAll()}>確認待ちをすべて採用</Button>
+                    )}
+                  </div>
                   <div className="space-y-2 mb-3">
                     {selected.candidates.length === 0 && (
                       <div className="text-sm text-ink-700">候補がまだ登録されていません</div>
@@ -344,9 +367,10 @@ const ImportsPage: React.FC = () => {
                     {selected.candidates.map((c) => (
                       <div key={c.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-sm px-3 py-2">
                         <div className="min-w-0">
-                          <span className="font-medium">{c.field_path}</span>
+                          <span className="font-medium">{FIELD_PATH_OPTIONS.find((o) => o.value === c.field_path)?.label.replace(/[(].*$/, '') ?? c.field_path}</span>
                           <span className="text-ink-700"> = </span>
                           <span className="truncate">{c.value}</span>
+                          {c.evidence_locator && <span className="block text-xs text-ink-700">{`根拠: ${c.evidence_locator}`}</span>}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={

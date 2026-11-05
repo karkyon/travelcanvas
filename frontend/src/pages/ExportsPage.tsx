@@ -16,6 +16,7 @@ import Card from '@/components/common/Card';
 import { downloadItineraryExport, downloadPlanDataExport } from '@/services/api';
 import type { ItineraryExportFormat, ItineraryExportOptions, LocationPrecision } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import MyMapsCard from './exports/MyMapsCard';
 import { FORMAT_LABEL, describeDataExport, describeResult, saveDataExport, saveFile } from './exports/exportModel';
 
 const ExportsPage: React.FC = () => {
@@ -85,6 +86,8 @@ const ExportsPage: React.FC = () => {
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 
       <div className="space-y-4">
+        <MyMapsCard planId={planId} />
+
         <Card padding="md">
           <section aria-labelledby="export-ics">
             <h2 id="export-ics" className="font-semibold text-ink-900 flex items-center gap-2"><Calendar size={18} aria-hidden="true" />カレンダー(ICS)</h2>
