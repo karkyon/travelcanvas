@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { railItems } from './railItems';
 import { safeInternalPath } from '../../utils/safeNavigation';
 
-const TripNav: React.FC<{ tripId: string; path: string }> = ({ tripId, path }) => (
-  <nav className="tc-tripnav" aria-label="この旅行のメニュー" data-testid="trip-nav">
+const TripNav: React.FC<{ tripId: string; path: string; row?: boolean }> = ({ tripId, path, row = false }) => (
+  <nav className={`tc-tripnav${row ? ' tc-tripnav--row' : ''}`} aria-label="この旅行のメニュー" data-testid="trip-nav">
     {railItems(tripId, path).filter((i) => i.group === 'trip').map(({ key, label, icon: Icon, to, match }) => (
       <Link key={key} to={safeInternalPath(to) ?? '/dashboard'} aria-current={match(path) ? 'page' : undefined}
         className="tc-focus-ring" data-testid={`rail-${key}`}>

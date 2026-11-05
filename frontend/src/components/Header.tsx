@@ -6,14 +6,29 @@ import { useCurrentTripStore } from '../store/currentTripStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import CommandPaletteLauncher from './CommandPaletteLauncher';
-import TripNav from './shell/TripNav';
 
 // [Gate AppShell] 利用者のメニュー・スマホのメニューは開いた時に読む(最初に読む JS を増やさない)
+const TripNav = lazy(() => import('./shell/TripNav'));
 const loadMenus = () => import('./shell/HeaderMenus');
 const UserMenu = lazy(() => loadMenus().then((m) => ({ default: m.UserMenu })));
 const MobileMenu = lazy(() => loadMenus().then((m) => ({ default: m.MobileMenu })));
 
+/** [Gate TripNav] 上の帯の 1 段目に収まる幅か。狭い時は 2 段目に出す(1 段目の高さは変えない) */
+const WIDE = '(min-width: 1181px)';
+function useWideTopbar(): boolean {
+  const [wide, setWide] = useState(() => (typeof window.matchMedia === 'function' ? window.matchMedia(WIDE).matches : true));
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia(WIDE);
+    const change = () => setWide(media.matches);
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
+  return wide;
+}
+
 const Header: React.FC = () => {
+  const wide = useWideTopbar();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isGuest } = useAuthStore();
@@ -147,7 +162,7 @@ const Header: React.FC = () => {
               <ChevronDown size={16} aria-hidden="true" className="tc-chev" />
             </Link>
           )}
-          {navTrip && <TripNav tripId={navTrip} path={location.pathname} />}
+          {navTrip && wide && <Suspense fallback={null}><TripNav tripId={navTrip} path={location.pathname} /></Suspense>}
 
           <div className="flex-1 tc-top-spacer" />
 
@@ -207,6 +222,7 @@ const Header: React.FC = () => {
           </button>
         </div>
 
+        {navTrip && !wide && <Suspense fallback={null}><TripNav tripId={navTrip} path={location.pathname} row /></Suspense>}
         {/* スマホのメニュー(全ての項目)。開いた時に読み込む */}
         {isMobileMenuOpen && (
           <Suspense fallback={null}>

@@ -749,9 +749,6 @@
 .tc-tripnav a { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 11px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--tc-ink-700); white-space: nowrap; }
 .tc-tripnav a:hover { background: rgb(128 128 128 / 12%); }
 .tc-tripnav a[aria-current='page'] { background: var(--tc-accent-strong); color: var(--tc-on-accent, #fff); }
-@media (max-width: 1180px) {
-  .tc-topbar-row:has(.tc-tripnav) { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 4px; }
-  .tc-tripnav { order: 10; width: 100%; }
-}
+.tc-tripnav--row { padding: 0 13px 4px; border-top: 1px solid var(--tc-cloud-200); }
 @media print { .tc-tripnav { display: none; } }
 .tc-drop-over { border-color: var(--tc-accent-strong) !important; background: var(--tc-cloud-100); }
