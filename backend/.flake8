@@ -27,6 +27,8 @@
 #   低いため、除外する。alembic/env.py等の実運用コードは対象のまま。
 max-line-length = 120
 extend-ignore = E203,W503
+per-file-ignores =
+    scripts/demo_seed_data.py:E501
 exclude =
     .git,
     __pycache__,
