@@ -51,6 +51,11 @@ const STATUS_COLOR: Record<string, string> = {
   rejected: 'bg-gray-100 text-ink-700',
 };
 
+const TYPE_LABEL: Record<string, string> = {
+  accommodation: '宿泊', flight: '航空', train: '鉄道', bus: 'バス', ferry: '船', rental_car: 'レンタカー',
+  restaurant: '飲食', activity: '体験', admission: '入場', other: 'その他',
+};
+
 const FIELD_PATH_OPTIONS: { value: ImportFieldPath; label: string }[] = [
   { value: 'type', label: '種類(必須。flight/accommodation等)' },
   { value: 'provider_name', label: '事業者名' },
@@ -369,7 +374,7 @@ const ImportsPage: React.FC = () => {
                         <div className="min-w-0">
                           <span className="font-medium">{FIELD_PATH_OPTIONS.find((o) => o.value === c.field_path)?.label.replace(/[(].*$/, '') ?? c.field_path}</span>
                           <span className="text-ink-700"> = </span>
-                          <span className="truncate">{c.value}</span>
+                          <span className="truncate">{c.field_path === 'type' ? (TYPE_LABEL[c.value ?? ''] ?? c.value) : c.value}</span>
                           {c.evidence_locator && <span className="block text-xs text-ink-700">{`根拠: ${c.evidence_locator}`}</span>}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">

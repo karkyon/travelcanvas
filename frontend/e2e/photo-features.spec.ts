@@ -59,7 +59,7 @@ test('マイマップの案内・QR の投稿・写真の地図・予約メー�
   await page.getByTestId('memory-map-toggle').click();
   const panel = page.getByTestId('memory-map');
   await expect(panel).toContainText('確認が必要 1 枚');
-  await panel.getByRole('button', { pressed: false }).first().click();
+  await panel.getByRole('list', { name: '写真の一覧' }).getByRole('button').first().click();
   await panel.getByLabel('予定の場所から選ぶ').selectOption({ index: 1 });
   await expect(panel).toContainText('確認が必要 0 枚');
 });
