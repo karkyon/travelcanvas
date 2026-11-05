@@ -17,6 +17,8 @@ interface ExpenseListProps {
   expenses: Expense[];
   canEdit: boolean;
   onAdd: () => void;
+  /** [Gate Receipt] レシートを読み取って追加する */
+  onScan?: () => void;
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
   onRefund: (e: Expense) => void;
@@ -28,7 +30,7 @@ interface ExpenseListProps {
 }
 
 export const ExpenseListPanel: React.FC<ExpenseListProps> = ({
-  expenses, canEdit, onAdd, onEdit, onDelete, onRefund, onComment, flags, onVoid,
+  expenses, canEdit, onAdd, onScan, onEdit, onDelete, onRefund, onComment, flags, onVoid,
 }) => {
   const titleOf = new Map(expenses.map((e) => [e.id, e.title]));
   return (
@@ -36,7 +38,10 @@ export const ExpenseListPanel: React.FC<ExpenseListProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-700">{expenses.length} 件</p>
         {canEdit && (
-          <Button variant="primary" size="sm" icon={<Plus size={16} />} onClick={onAdd}>支出を追加</Button>
+          <div className="flex flex-wrap gap-2">
+            {onScan && <Button variant="outline" size="sm" onClick={onScan}>レシートを読み取る</Button>}
+            <Button variant="primary" size="sm" icon={<Plus size={16} />} onClick={onAdd}>支出を追加</Button>
+          </div>
         )}
       </div>
       {expenses.length === 0 ? (

@@ -408,6 +408,7 @@
   "POST /api/v1/plans/{plan_id}/imports",
   "POST /api/v1/plans/{plan_id}/imports/extract/file",
   "POST /api/v1/plans/{plan_id}/imports/extract/text",
+  "POST /api/v1/plans/{plan_id}/expenses/extract-receipt",
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/apply",
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/candidates",
   "POST /api/v1/plans/{plan_id}/imports/{job_id}/candidates/{candidate_id}/accept",

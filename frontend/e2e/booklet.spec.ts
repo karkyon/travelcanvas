@@ -75,7 +75,7 @@ test('しおり: 既定は予約番号を伏せ、機密を含む版は透かし
   expect((await previewed).status()).toBe(200);
   await expect(preview).toHaveAttribute('data-theme', 'mono');
   await expect(preview.getByRole('region', { name: '費用' })).toHaveCount(0);
-  await expect(preview.getByRole('region', { name: '日程' })).toContainText('観光');
+  await expect(preview.getByRole('region', { name: '日別の行程表' })).toContainText('観光');
 
   // 3. 機密を含む版の作成
   await page.getByRole('checkbox', { name: /予約番号/ }).click();
@@ -101,7 +101,7 @@ test('しおり: 既定は予約番号を伏せ、機密を含む版は透かし
     window.print = () => { (window as unknown as { __printed: number }).__printed += 1; };
   });
   await page.getByRole('button', { name: '印刷 / PDFで保存' }).click();
-  expect(await page.evaluate(() => (window as unknown as { __printed: number }).__printed)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __printed: number }).__printed)).toBe(1);
   await page.emulateMedia({ media: 'print' });
   await expect(page.getByRole('button', { name: '印刷 / PDFで保存' })).toBeHidden();
   await expect(page.getByTestId('booklet')).toBeVisible();

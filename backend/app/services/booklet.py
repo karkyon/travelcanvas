@@ -10,6 +10,7 @@ Web表示・印刷・PDF保存は、すべてこの1つの構造化データか�
 - 電話: includes.phones のときだけ予約の連絡先電話を入れる
 - 参加者名: includes.participants のときだけメンバーの表示名を入れる(既定は人数だけ)
 - QR・チケットの中身・PIN・名義・個人の持ち物・個人予算は、どの設定でも入れない
+- [Gate BookletPatterns] 地図のピン(map.points): 住所を含めない版は座標を小数 3 桁(約 100m)に丸める
 """
 from dataclasses import dataclass
 from datetime import date, datetime, timezone as dt_timezone
@@ -40,8 +41,10 @@ from app.services import finance
 from app.services.constraint_evaluation import member_user_ids
 from app.services.readiness import member_names
 
-POLICY_VERSION = "booklet-v1"
-THEMES = ("cute", "simple", "family", "school", "business", "accessible", "mono")
+POLICY_VERSION = "booklet-v2"
+# [Gate BookletPatterns] 12 のデザイン + 以前からの 3 つ。デザインは見た目だけを変え、載せる内容は変えない
+THEMES = ("simple", "functional", "business", "family", "friends", "wild", "lovers", "elegant", "calm", "solo",
+          "school", "space", "cute", "accessible", "mono")
 DENSITIES = ("normal", "compact")
 FORMATS = ("web", "print")
 # 表示順(利用者がどの順で選んでも、この順に並べる)
@@ -196,6 +199,29 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
             if linked is not None and linked not in links.setdefault(er.event_id, []):
                 links[er.event_id].append(r)
 
+    # [Gate BookletPatterns] 地図のピンの番号。同じ場所は同じ番号にする(予定と地図を番号で対応させる)
+    pins: Dict[Any, int] = {}
+    points: List[Dict[str, Any]] = []
+    if "map" in sections:
+        digits = 5 if inc["addresses"] else 3
+        by_place: Dict[Any, int] = {}
+        # 番号は日の順・その日の順に振る(1 番が旅の最初の場所になる)
+        day_order = {d.id: i for i, d in enumerate(days)}
+        ordered = sorted(events, key=lambda x: (day_order.get(x.day_id, len(days)), x.sort_order))
+        for e in ordered:
+            name, _address, lat, lon = _event_place(e, places, spots)
+            if lat is None or lon is None:
+                continue
+            label = name or e.title
+            pin_key = (label, round(lat, digits), round(lon, digits))
+            if pin_key not in by_place:
+                by_place[pin_key] = len(points) + 1
+                day = day_by_id.get(e.day_id)
+                points.append({"no": by_place[pin_key], "label": label,
+                               "date": day.local_date.isoformat() if day else None,
+                               "latitude": round(lat, digits), "longitude": round(lon, digits)})
+            pins[e.id] = by_place[pin_key]
+
     members = member_user_ids(db, plan)
     out: Dict[str, Any] = {
         "policy_version": POLICY_VERSION,
@@ -266,6 +292,7 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
                     "place_name": name,
                     "address": address if inc["addresses"] else None,
                     "locked": e.locked,
+                    "map_no": pins.get(e.id),
                     "reservations": [{"type": r.type, "provider_name": r.provider_name, "status": r.status}
                                      for r in links.get(e.id, [])],
                 })
@@ -305,7 +332,7 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
                 "latitude": round(lat, 5) if inc["addresses"] and lat is not None else None,
                 "longitude": round(lon, 5) if inc["addresses"] and lon is not None else None,
             })
-        out["map"] = {"places": rows}
+        out["map"] = {"places": rows, "points": points, "coordinates_rounded": not inc["addresses"]}
 
     tickets = 0
     if reservations:

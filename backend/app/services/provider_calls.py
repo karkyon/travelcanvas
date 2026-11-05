@@ -290,6 +290,26 @@ def ai_extract_reservation(db: Session, plan: TravelPlan, caller: User, instruct
                   fingerprint=fingerprint("openai", "ai.generate", str(plan.id), "reservation", idempotency_key))
 
 
+def ai_extract_receipt(db: Session, plan: TravelPlan, caller: User, instructions: str, schema: Dict[str, Any],
+                       image_jpeg: bytes, idempotency_key: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """[Gate Receipt] レシートの画像から項目を読む。同じ原価の枠(ai.generate)で数える。画像は保存しない。"""
+    max_output = 300
+    data = base64.b64encode(image_jpeg).decode("ascii")
+    content: Any = [{"role": "user", "content": [
+        {"type": "input_text", "text": "この画像は旅行中のレシート・領収書です。項目を抜き出してください。"},
+        {"type": "input_image", "image_url": f"data:image/jpeg;base64,{data}", "detail": "high"}]}]
+
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "openai", "ai.generate",
+                     lambda key: _openai_request(key, content, max_output, instructions, schema))
+        return cg.ProviderResult(units=_openai_usage(resp.body), payload={"text": _openai_text(resp.body)},
+                                 model=openai_model())
+
+    return cg.run(db, plan, caller, "ai.generate", "openai", {"input_tokens": 3000, "output_tokens": max_output},
+                  idempotency_key, call,
+                  fingerprint=fingerprint("openai", "ai.generate", str(plan.id), "receipt", idempotency_key))
+
+
 def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: str, lat: Optional[float],
                   lng: Optional[float], idempotency_key: str,
                   consult_id: Optional[uuid.UUID] = None,

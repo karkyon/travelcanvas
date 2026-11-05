@@ -47,13 +47,10 @@
     [data-theme='dark'] .border-green-200 { border-color: #145638; }
     [data-theme='dark'] .border-green-300 { border-color: #16683e; }
     [data-theme='dark'] .border-indigo-200 { border-color: #2c326f; }
-    [data-theme='dark'] .border-orange-300 { border-color: #7d411b; }
-    [data-theme='dark'] .border-pink-300 { border-color: #772c5a; }
     [data-theme='dark'] .border-purple-200 { border-color: #472b72; }
     [data-theme='dark'] .border-red-200 { border-color: #62252e; }
     [data-theme='dark'] .border-red-300 { border-color: #782a31; }
     [data-theme='dark'] .border-slate-300 { border-color: #33415c; }
-    [data-theme='dark'] .border-slate-500 { border-color: #64748b; }
     [data-theme='dark'] .border-yellow-200 { border-color: #604f17; }
     [data-theme='dark'] .divide-gray-200 > :not(:last-child) { border-color: #24324a; }
     [data-theme='dark'] .from-blue-50 { --tw-gradient-from: #132442; }
@@ -91,7 +88,6 @@
     [data-theme='dark'] .text-amber-700 { color: #fde68a; }
     [data-theme='dark'] .text-amber-800 { color: #fde68a; }
     [data-theme='dark'] .text-amber-900 { color: #fde68a; }
-    [data-theme='dark'] .text-black { color: #f1f5f9; }
     [data-theme='dark'] .text-blue-500 { color: #93c5fd; }
     [data-theme='dark'] .text-blue-600 { color: #93c5fd; }
     [data-theme='dark'] .text-blue-700 { color: #bfdbfe; }
@@ -112,9 +108,7 @@
     [data-theme='dark'] .text-indigo-800 { color: #c7d2fe; }
     [data-theme='dark'] .text-indigo-900 { color: #c7d2fe; }
     [data-theme='dark'] .text-orange-600 { color: #fdba74; }
-    [data-theme='dark'] .text-orange-900 { color: #fed7aa; }
     [data-theme='dark'] .text-pink-600 { color: #f9a8d4; }
-    [data-theme='dark'] .text-pink-900 { color: #fbcfe8; }
     [data-theme='dark'] .text-purple-500 { color: #d8b4fe; }
     [data-theme='dark'] .text-purple-600 { color: #d8b4fe; }
     [data-theme='dark'] .text-purple-800 { color: #e9d5ff; }
@@ -125,7 +119,6 @@
     [data-theme='dark'] .text-red-800 { color: #fecaca; }
     [data-theme='dark'] .text-red-900 { color: #fecaca; }
     [data-theme='dark'] .text-rose-600 { color: #fda4af; }
-    [data-theme='dark'] .text-slate-900 { color: #f1f5f9; }
     [data-theme='dark'] .text-yellow-500 { color: #fde047; }
     [data-theme='dark'] .text-yellow-600 { color: #fde047; }
     [data-theme='dark'] .text-yellow-800 { color: #fef08a; }

@@ -22,6 +22,7 @@
 | [gate-b012-trace.md](gate-b012-trace.md) | Gate B-012 トレーサビリティ表(プラン削除) | 1 | 0 | 1 |
 | [gate-b013-trace.md](gate-b013-trace.md) | Gate B-013 トレーサビリティ表(個別削除: 紐付け解除して削除) | 1 | 0 | 0 |
 | [gate-b1-trace.md](gate-b1-trace.md) | Gate B1 トレース(FR-041 組織・B2B / FR-042 API・Webhook の最小形) | 2 | 1 | 3 |
+| [gate-booklet-patterns-trace.md](gate-booklet-patterns-trace.md) | Gate BookletPatterns・Receipt — しおりの 12 パターンとレシートの読み取り | 0 | 0 | 0 |
 | [gate-c1-trace.md](gate-c1-trace.md) | Gate C1 トレース(FR-020 共同編集・FR-023 秘匿プロフィール) | 0 | 0 | 1 |
 | [gate-c2-trace.md](gate-c2-trace.md) | Gate C2 トレース(FR-007 候補箱・FR-008 場所の一元管理) | 5 | 0 | 0 |
 | [gate-c3-trace.md](gate-c3-trace.md) | Gate C3 トレース(FR-009 情報内検索・コマンドパレット) | 1 | 0 | 0 |

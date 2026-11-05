@@ -7,6 +7,7 @@ import { useParams } from 'react-router-dom';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getPublicBooklet, type PublicBooklet } from '@/services/api/bookletWeb';
 import BookletView from './booklet/BookletView';
+import { printWhenReady } from './booklet/bookletModel';
 
 const PublicBookletPage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -36,9 +37,9 @@ const PublicBookletPage: React.FC = () => {
       {error && <p role="alert" className="mx-auto max-w-xl rounded-xl border border-cloud-200 bg-cloud-0 p-6 text-center text-ink-900">{error}</p>}
       {data && (
         <>
-          <div className="mx-auto mb-3 flex max-w-3xl items-center justify-between gap-2 print:hidden">
+          <div className="no-print mx-auto mb-3 flex max-w-3xl items-center justify-between gap-2 print:hidden">
             <p className="text-xs text-ink-700">TravelCanvas で作ったしおり(Web で公開)</p>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => window.print()}>印刷・PDF</button>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => void printWhenReady()}>印刷・PDF</button>
           </div>
           <BookletView booklet={data.booklet} exportInfo={null} stampLabel={`第${data.version_no}版(Web で公開)`} />
         </>

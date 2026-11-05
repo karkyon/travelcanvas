@@ -224,8 +224,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P2・G5",
-   "gaps": "為替の自動取得(外部の提供元。決まるまで出典つきの手入力の記録)、本番での確認(RELEASE-1)"
+   "gates": "P2・G5・Receipt",
+   "gaps": "為替の自動取得(外部の提供元。決まるまで出典つきの手入力の記録)、本番での確認(RELEASE-1)。レシートの読み取りは実物と実の AI では未確認"
   },
   "FR-028": {
    "title": "立替・精算",
@@ -280,8 +280,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P4",
-   "gaps": "冊子の面付"
+   "gates": "P4・BookletPatterns",
+   "gaps": "冊子の面付。12 パターンは配備先の本物の字体・地図の画像で未確認"
   },
   "FR-035": {
    "title": "安全な印刷・公開",
