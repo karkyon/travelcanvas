@@ -227,3 +227,26 @@ export async function printWhenReady(root: Document = document): Promise<void> {
   await Promise.race([Promise.all([loaded, root.fonts?.ready]), new Promise((done) => { setTimeout(done, 5000); })]);
   window.print();
 }
+
+// ===== [Gate BookletQR] Google マップのリンク(公式の Maps URLs。API の費用はかからない) =====
+
+/** Google マップの経路で渡せる地点の上限(出発 + 途中 9 + 到着) */
+export const MAX_ROUTE_STOPS = 11;
+const at = (p: { latitude: number; longitude: number }) => `${p.latitude},${p.longitude}`;
+
+const routeUrl = (list: { latitude: number; longitude: number }[]): string => {
+  const middle = list.slice(1, -1).map(at).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(at(list[0]!))}&destination=${encodeURIComponent(at(list[list.length - 1]!))}`
+    + `${middle ? `&waypoints=${encodeURIComponent(middle)}` : ''}`;
+};
+
+/** 1 日の順路のリンク。上限を超える日は、つなぎ目の地点を重ねて分ける(途中を落とさない)。地点が 2 つ未満なら無し */
+export function googleDayRoutes(stops: { latitude: number; longitude: number }[]): string[] {
+  const list = stops.filter((p, i) => i === 0 || at(p) !== at(stops[i - 1]!));
+  if (list.length < 2) return [];
+  const out: string[] = [];
+  for (let i = 0; i < list.length - 1; i += MAX_ROUTE_STOPS - 1) out.push(routeUrl(list.slice(i, i + MAX_ROUTE_STOPS)));
+  return out;
+}
+
+export const MY_MAP_URL = /^https:\/\/www\.google\.com\/maps\/d\/[A-Za-z0-9_\-./?=&%#~+]*$/;

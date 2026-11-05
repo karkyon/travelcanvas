@@ -47,7 +47,7 @@ test('画面に出る文字に OS のカラー絵文字が無く、確定の予�
     ['/settings', '設定'],
     ['/search', '検索'],
     ['/search/settings', '検索の設定'],
-    ['/spots', 'スポット一覧'],
+    ['/spots', '行きたい場所'],
     ['/trip-consult', '旅行相談'],
   ] as const) {
     await page.goto(path);

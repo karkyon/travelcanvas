@@ -743,3 +743,12 @@
   .tc-plan-hero-in { max-width: none; }
   .tc-plan-hero-prog { position: relative; right: auto; top: auto; width: auto; margin: 0 16px 16px; }
 }
+
+/* [Gate TripNav] この旅行のメニュー(今の旅行の名前の隣。狭い時は 2 段目) */
+.tc-tripnav { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; }
+.tc-tripnav a { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 11px; border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--tc-ink-700); white-space: nowrap; }
+.tc-tripnav a:hover { background: rgb(128 128 128 / 12%); }
+.tc-tripnav a[aria-current='page'] { background: var(--tc-accent-strong); color: var(--tc-on-accent, #fff); }
+.tc-tripnav--row { padding: 0 13px 4px; border-top: 1px solid var(--tc-cloud-200); }
+@media print { .tc-tripnav { display: none; } }
+.tc-drop-over { border-color: var(--tc-accent-strong) !important; background: var(--tc-cloud-100); }

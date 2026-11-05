@@ -1022,6 +1022,7 @@ export const booklet: Decoder<Booklet> = object<Booklet>({
     })),
     points: optional(arrayOf(object({ no: nonNegativeInt, label: str, date: nullable(str), latitude: num, longitude: num }))),
     coordinates_rounded: optional(bool),
+    my_map_url: optional(nullable(str)),
   })),
   reservations: nullable(arrayOf(object({
     type: str, provider_name: nullable(str), status: str, start: nullable(str), end: nullable(str),

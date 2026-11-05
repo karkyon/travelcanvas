@@ -735,6 +735,10 @@ const PlannerPage: React.FC = () => {
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}>
               <UiIcon icon={Star} />近くを発見・候補
             </button>
+            {/* [Gate WishPlaces] しおりは旅程の主な行き先なので、操作の列から 1 回で開く */}
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/booklet`)} data-testid="plan-booklet">
+              <UiIcon icon={BookOpen} />しおりを作成
+            </button>
             <span className="tc-plan-controls-sep" aria-hidden="true" />
             <Button variant="outline" size="sm" onClick={addDay}>
               ＋ 日を追加

@@ -65,6 +65,11 @@
 .bk-pin { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5em; height: 1.5em; padding: 0 .2em; border-radius: 1em; color: #fff; font-size: .78em; font-weight: 700; margin-right: .4em; flex: none; }
 .bk-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 3px 14px; font-size: .92em; }
 .bk-legend li { display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
+.bk-qrs { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 !important; break-inside: avoid; }
+.bk .bk-qr { display: flex; align-items: center; gap: 8px; text-decoration: none; min-width: 0; break-inside: avoid; }
+.bk-qr img { background: #fff; border: 0; border-radius: 0; flex: none; }
+.bk-qr-text { display: grid; min-width: 0; line-height: 1.35; }
+.bk-qr-text small { font-size: .8em; color: var(--bk-muted); }
 .bk-places { margin-top: 8px !important; font-size: .92em; }
 
 /* 日別の行程表 */

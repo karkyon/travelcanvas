@@ -2,7 +2,7 @@
  * [Gate P4] しおり画面の整形・入力検証(bookletModel)の単体テスト。
  */
 import { THEME_WORDS, fontUrl } from './bookletThemes';
-import { buildOverview, buildTimeline, longDate, shortDate, unplacedMoves, THEME_OPTIONS } from './bookletModel';
+import { MAX_ROUTE_STOPS, googleDayRoutes, buildOverview, buildTimeline, longDate, shortDate, unplacedMoves, THEME_OPTIONS } from './bookletModel';
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_OPTIONS, defaultValidUntil, describeIncludes, eventTypeLabel, isSensitive, orderSections, tocSections,
@@ -70,5 +70,25 @@ describe('[Gate BookletPatterns] 大日程と日別の行程', () => {
       expect(fontUrl(t.value)).toContain('fonts.googleapis.com');
     }
     expect(THEME_OPTIONS).toHaveLength(15);
+  });
+});
+
+describe('[Gate BookletQR] 1 日の経路の Google マップ', () => {
+  const p = (n: number) => ({ latitude: 35 + n / 100, longitude: 135 });
+  it('順に結び、続けて同じ場所は 1 つにする', () => {
+    const [url] = googleDayRoutes([p(1), p(1), p(2), p(3)]);
+    const q = new URL(url!).searchParams;
+    expect(q.get('origin')).toBe('35.01,135');
+    expect(q.get('waypoints')).toBe('35.02,135');
+    expect(q.get('destination')).toBe('35.03,135');
+  });
+  it('1 地点の日は経路を作らない', () => {
+    expect(googleDayRoutes([p(1)])).toEqual([]);
+  });
+  it('上限を超える日は分けて、途中を落とさない', () => {
+    expect(googleDayRoutes(Array.from({ length: MAX_ROUTE_STOPS }, (_, i) => p(i)))).toHaveLength(1);
+    const two = googleDayRoutes(Array.from({ length: MAX_ROUTE_STOPS + 1 }, (_, i) => p(i)));
+    expect(two).toHaveLength(2);
+    expect(new URL(two[1]!).searchParams.get('origin')).toBe(`${p(MAX_ROUTE_STOPS - 1).latitude},135`);
   });
 });

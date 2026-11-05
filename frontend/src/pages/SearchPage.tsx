@@ -15,6 +15,7 @@ import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots } from '../services/api';
 import { searchNearby } from '../services/api/g11discover';
+import { createWishSpot } from '../services/api/spotIntake';
 import FindByOther from '@/components/search/FindByOther';
 import type { GpsPoint } from '@/components/search/findModel';
 import UiIcon from '@/components/common/UiIcon';
@@ -133,6 +134,17 @@ const SearchPage: React.FC = () => {
     setStatus({ kind: 'done', results: (response.data?.spots as SearchResult[] | undefined) ?? [] });
   };
 
+  // [Gate WishPlaces] SC-47 場所を探して保存する
+  const saveWish = async (spot: SearchResult) => {
+    try {
+      await createWishSpot({ name: spot.name, category: 'sightseeing', description: null, address: spot.location?.address || spot.address || null,
+        latitude: spot.location?.latitude ?? null, longitude: spot.location?.longitude ?? null });
+      setPhotoNote(`「${spot.name}」を行きたい場所に保存しました`);
+    } catch {
+      setStatus({ kind: 'error', message: '行きたい場所に保存できませんでした。' });
+    }
+  };
+
   const addSpotToPlan = (spot: SearchResult) => {
     // [Gate #16] 追加と成功の知らせは旅程の画面の受け取り(PlannerPage)で行う
     navigate('/planner', { state: { newSpot: spot } });
@@ -239,6 +251,10 @@ const SearchPage: React.FC = () => {
                       <button type="button" onClick={() => addSpotToPlan(spot)} className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary"
                         aria-label={`「${spot.name}」をプランに追加`}>
                         プランに追加
+                      </button>
+                      <button type="button" onClick={() => void saveWish(spot)} className="tc-focus-ring tc-mbtn tc-mbtn--sm ml-2"
+                        aria-label={`「${spot.name}」を行きたい場所に保存`}>
+                        行きたい場所に保存
                       </button>
                     </div>
                   </li>
