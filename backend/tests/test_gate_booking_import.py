@@ -405,10 +405,24 @@ def test_reschedule_rejects_bad_input_and_stale_revision(auth_client):
                        headers={"If-Match": "999"}).status_code in (409, 412)
 
 
-def test_reschedule_can_be_undone(auth_client):
-    client, _p, base = _trip(auth_client)
-    client.post(f"{base}/reschedule", json={"start_date": "2026-11-29", "end_date": "2026-11-30"},
-                headers=_rev(client, base))
-    undone = client.post(f"{base}/undo", headers=_rev(client, base))
-    assert undone.status_code == 200, undone.text
-    assert _dates(client, base) == [("2026-11-28", ["予定1"]), ("2026-11-29", ["予定2"])]
+def test_reschedule_can_be_undone_in_both_directions(auth_client):
+    # ChangeItem の順序に依らず、重なる日付へ動かしても戻せること(日数を多くして順序の偶然を減らす)
+    dates = ("2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29")
+    client, _p, base = _trip(auth_client, dates)
+    original = _dates(client, base)
+    for start, end in (("2026-11-25", "2026-11-30"), ("2026-11-23", "2026-11-28")):
+        body = {"start_date": start, "end_date": end}
+        moved = client.post(f"{base}/reschedule", json=body, headers=_rev(client, base))
+        assert moved.status_code == 200, moved.text
+        undone = client.post(f"{base}/undo", headers=_rev(client, base))
+        assert undone.status_code == 200, undone.text
+        assert _dates(client, base) == original
+    longer = client.post(f"{base}/reschedule", json={"start_date": "2026-11-25", "end_date": "2026-12-02"},
+                         headers=_rev(client, base))
+    assert longer.status_code == 200
+    assert client.post(f"{base}/undo", headers=_rev(client, base)).status_code == 200
+    assert _dates(client, base) == original
+    shorter = {"start_date": "2026-11-25", "end_date": "2026-11-26", "remove_days_with_events": True}
+    assert client.post(f"{base}/reschedule", json=shorter, headers=_rev(client, base)).status_code == 200
+    assert client.post(f"{base}/undo", headers=_rev(client, base)).status_code == 200
+    assert _dates(client, base) == original

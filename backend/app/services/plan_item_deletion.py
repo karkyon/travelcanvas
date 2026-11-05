@@ -330,6 +330,8 @@ def _reservation_state(db: Session, plan, rid, was_deleted: bool) -> Optional[st
 def check_undo_conflicts(db: Session, plan, items) -> List[dict]:
     """Undoで何かを変更する前に、安全に戻せるかを全件検査する(副作用なし)。"""
     conflicts: List[dict] = []
+    # 同じ変更で動く日は、戻す時に日付が空く(日程の変更の取り消し)
+    moving = [i.entity_id for i in items if i.entity_type == "travel_day" and i.action in ("update", "create")]
     for item in items:
         before = item.before_json or {}
         t, action = item.entity_type, item.action
@@ -338,7 +340,7 @@ def check_undo_conflicts(db: Session, plan, items) -> List[dict]:
             taken = (
                 db.query(TravelDay.id)
                 .filter(TravelDay.plan_id == plan.id, TravelDay.local_date == before["local_date"],
-                        TravelDay.id != item.entity_id)
+                        TravelDay.id != item.entity_id, TravelDay.id.notin_(moving))
                 .first()
             )
             if taken:

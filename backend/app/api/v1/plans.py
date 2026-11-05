@@ -1059,11 +1059,20 @@ async def undo_last_change(
             elif item.entity_type == "reservation_links":
                 _detach_reservation_links(db, plan, item)
         db.flush()
-        # [Gate BookingFix] 日程の変更の取り消しは、動かした時と逆の順に戻す(日付の重複の制約に当たらないように)
-        for item in reversed(items):
-            if item.entity_type == "travel_day":
-                _undo_day_item(db, plan, item)
-                db.flush()
+        # [Gate BookingFix] 日付の重複の制約に当たらない順に戻す(ChangeItem の ID は順序を持たない)。
+        # 足した日を消す → 動かす先の端から日付を戻す → 消した日を戻す
+        day_items = [i for i in items if i.entity_type == "travel_day"]
+        moves = [i for i in day_items if i.action == "update"]
+
+        def _day_of(row: Optional[dict]) -> str:
+            return str((row or {}).get("local_date"))
+
+        moves.sort(key=lambda i: _day_of(i.before_json),
+                   reverse=any(_day_of(i.before_json) > _day_of(i.after_json) for i in moves))
+        for item in ([i for i in day_items if i.action == "create"] + moves
+                     + [i for i in day_items if i.action not in ("create", "update")]):
+            _undo_day_item(db, plan, item)
+            db.flush()
         for item in items:
             if item.entity_type == "travel_event":
                 _undo_event_item(db, plan, item)
