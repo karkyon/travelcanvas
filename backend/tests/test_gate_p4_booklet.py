@@ -326,11 +326,11 @@ def test_web_publish_public_view_and_stop(auth_client, make_user, db_session, au
 def test_地図のピンは住所を含めない版では丸め_番号は旅の順(auth_client):
     client, _ = auth_client
     p = client.post("/api/v1/travel-plans/", json={"title": "ピン"}).json()["id"]
-    d1 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-01", "timezone_id": "Asia/Tokyo"}).json()["id"]
-    d2 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-02", "timezone_id": "Asia/Tokyo"}).json()["id"]
-    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d2, "title": "二日目", "latitude": 35.123456, "longitude": 135.654321})
-    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d1, "title": "一日目", "latitude": 34.987654, "longitude": 135.111111})
+    d1 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-01", "timezone_id": "Asia/Tokyo"}).json()["id"]  # noqa: E501
+    d2 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-02", "timezone_id": "Asia/Tokyo"}).json()["id"]  # noqa: E501
+    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d2, "title": "二日目", "latitude": 35.123456, "longitude": 135.654321})  # noqa: E501
+    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d1, "title": "一日目", "latitude": 34.987654, "longitude": 135.111111})  # noqa: E501
     b = client.post(f"/api/v1/plans/{p}/booklet/preview", json=_opts(theme="space")).json()
     assert b["theme"] == "space" and b["map"]["coordinates_rounded"] is True
-    assert [(x["no"], x["label"], x["latitude"]) for x in b["map"]["points"]] == [(1, "一日目", 34.988), (2, "二日目", 35.123)]
+    assert [(x["no"], x["label"], x["latitude"]) for x in b["map"]["points"]] == [(1, "一日目", 34.988), (2, "二日目", 35.123)]  # noqa: E501
     assert b["schedule"]["days"][0]["events"][0]["map_no"] == 1

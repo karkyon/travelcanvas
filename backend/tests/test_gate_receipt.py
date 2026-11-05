@@ -33,7 +33,7 @@ def test_合計が読めない時は確かでないと示す():
 
 
 @pytest.mark.skipif(not rx.ocr_available(), reason="tesseract が無い")
-@pytest.mark.parametrize("name,amount,currency", [("receipt_jp_photo.jpg", "1260", "JPY"), ("receipt_en_photo.jpg", "10.59", "USD")])
+@pytest.mark.parametrize("name,amount,currency", [("receipt_jp_photo.jpg", "1260", "JPY"), ("receipt_en_photo.jpg", "10.59", "USD")])  # noqa: E501
 def test_傾きとぼけのある画像を読む(name, amount, currency):
     got = _vals(rx.ocr_image((FIXTURES / name).read_bytes(), "jpn+eng"))
     assert got["amount"] == amount and got["currency"] == currency
@@ -41,7 +41,7 @@ def test_傾きとぼけのある画像を読む(name, amount, currency):
 
 def test_AI_の値は形を確かめ_確かな値は変えない():
     found = {"amount": rc.Found("1260", 0.9, "x")}
-    body = '{"fields":[{"field":"amount","value":"9999"},{"field":"title","value":"店"},{"field":"local_date","value":"昨日"},{"field":"category","value":"hack"},{"field":"title","value":"https://evil.example"}]}'
+    body = '{"fields":[{"field":"amount","value":"9999"},{"field":"title","value":"店"},{"field":"local_date","value":"昨日"},{"field":"category","value":"hack"},{"field":"title","value":"https://evil.example"}]}'  # noqa: E501
     assert rc.merge_ai(found, body) == 1
     assert found["amount"].value == "1260" and found["title"].value == "店" and "local_date" not in found
 
@@ -79,7 +79,7 @@ def test_AI_は同意がある時だけで_失敗しても_500_にしない(auth
     monkeypatch.setattr(provider_calls, "ai_extract_receipt", boom)
     monkeypatch.setattr(rx, "ocr_image", lambda *a, **k: "")
     off = client.post(f"{base}/extract-receipt", files=_files())
-    assert off.status_code == 422 and off.json()["detail"]["code"] in ("nothing_extracted", "ocr_unavailable") and not called
+    assert off.status_code == 422 and off.json()["detail"]["code"] in ("nothing_extracted", "ocr_unavailable") and not called  # noqa: E501
     on = client.post(f"{base}/extract-receipt", files=_files(), data={"ai_consent": "true"})
     assert on.status_code == 422 and called and "AI" in on.json()["detail"]["message"]
 
@@ -89,7 +89,7 @@ def test_AI_で足りない項目を補う(auth_client, monkeypatch):
     base = _setup(client)
     monkeypatch.setattr(rx, "ocr_image", lambda *a, **k: "")
     monkeypatch.setattr(provider_calls, "ai_extract_receipt", lambda *a, **k: (
-        {"text": '{"fields":[{"field":"amount","value":"1,500"},{"field":"title","value":"茶店"},{"field":"local_date","value":"2026-11-21"}]}'}, {}))
+        {"text": '{"fields":[{"field":"amount","value":"1,500"},{"field":"title","value":"茶店"},{"field":"local_date","value":"2026-11-21"}]}'}, {}))  # noqa: E501
     body = client.post(f"{base}/extract-receipt", files=_files(), data={"ai_consent": "true"}).json()
     assert body["ai_status"] == "used" and body["fields"]["amount"]["value"] == "1500"
 

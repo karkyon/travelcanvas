@@ -29,29 +29,29 @@ _TOTAL_LABELS: Tuple[Tuple[int, str], ...] = (
 )
 _NOT_TOTAL = re.compile(r"小\s*計|sub\s*-?\s*total|お?預[りか]|現金|お?釣り?|おつり|change|tendered|cash|ポイント|point|"
                         r"対象|内税|消費税|税額|(?<![a-z])tax(?![a-z])|vat|gst|割引|discount|点数|個数|tel|電話|登録番号", re.I)
-_TAX_LINE = re.compile(r"内?\s*消費税|内税|税額|(?<![a-z])(?:sales\s*)?tax(?![a-z])|(?<![a-z])vat(?![a-z])|(?<![a-z])gst(?![a-z])", re.I)
-_AMOUNT = re.compile(r"(?:(NT[$S]|HK\$|S\$|US\$|A\$|C\$|RM|¥|\\|\$|€|£|₩|฿|₫|JPY|USD|EUR|GBP|KRW|TWD|CNY|RMB|THB|SGD|HKD|VND|AUD)\s*)?"
+_TAX_LINE = re.compile(r"内?\s*消費税|内税|税額|(?<![a-z])(?:sales\s*)?tax(?![a-z])|(?<![a-z])vat(?![a-z])|(?<![a-z])gst(?![a-z])", re.I)  # noqa: E501
+_AMOUNT = re.compile(r"(?:(NT[$S]|HK\$|S\$|US\$|A\$|C\$|RM|¥|\\|\$|€|£|₩|฿|₫|JPY|USD|EUR|GBP|KRW|TWD|CNY|RMB|THB|SGD|HKD|VND|AUD)\s*)?"  # noqa: E501
                      r"(?<![\d.,/:\-])(\d{1,3}(?:[,.]\s?\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{1,2})?)(?![\d/:])\s*"
                      r"(円|元|원|JPY|USD|EUR|GBP|KRW|TWD|CNY|THB|SGD|HKD|VND|AUD)?", re.I)
-_SYMBOLS = {"NT$": "TWD", "NTS": "TWD", "HK$": "HKD", "S$": "SGD", "US$": "USD", "A$": "AUD", "C$": "CAD", "RM": "MYR", "¥": "JPY", "\\": "JPY",
-            "$": "USD", "€": "EUR", "£": "GBP", "₩": "KRW", "฿": "THB", "₫": "VND", "円": "JPY", "원": "KRW", "RMB": "CNY",
+_SYMBOLS = {"NT$": "TWD", "NTS": "TWD", "HK$": "HKD", "S$": "SGD", "US$": "USD", "A$": "AUD", "C$": "CAD", "RM": "MYR", "¥": "JPY", "\\": "JPY",  # noqa: E501
+            "$": "USD", "€": "EUR", "£": "GBP", "₩": "KRW", "฿": "THB", "₫": "VND", "円": "JPY", "원": "KRW", "RMB": "CNY",  # noqa: E501
             "元": "CNY"}
 _DATE_PATTERNS = (
     re.compile(r"(20\d{2})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})"),
     re.compile(r"(?:令和|R)\s*(\d{1,2})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})", re.I),
 )
-_MONTHS = {m: i + 1 for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"))}
-_DATE_EN1 = re.compile(r"(\d{1,2})[\s\-/]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s,\-/]*(20\d{2})", re.I)
+_MONTHS = {m: i + 1 for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"))}  # noqa: E501
+_DATE_EN1 = re.compile(r"(\d{1,2})[\s\-/]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s,\-/]*(20\d{2})", re.I)  # noqa: E501
 _DATE_EN2 = re.compile(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})[\s,]+(20\d{2})", re.I)
 _DATE_NUM = re.compile(r"(?<!\d)(\d{1,2})/(\d{1,2})/(20\d{2})(?!\d)")
 _DATE_SHORT = re.compile(r"(?<![\d/])(\d{2})[/.\-](\d{1,2})[/.\-](\d{1,2})(?![\d/])")
 _DATE_MD = re.compile(r"(?<!\d)(\d{1,2})\s*月\s*(\d{1,2})\s*日")
-_NOISE = re.compile(r"領収|レシート|receipt|invoice|tax\s*invoice|ありがとう|いらっしゃい|毎度|thank|welcome|電話|tel|fax|〒|http|www\.|@|登録番号|"
+_NOISE = re.compile(r"領収|レシート|receipt|invoice|tax\s*invoice|ありがとう|いらっしゃい|毎度|thank|welcome|電話|tel|fax|〒|http|www\.|@|登録番号|"  # noqa: E501
                     r"担当|レジ|取引|伝票|no\.|番号|様|御中|但し|\d{2,4}[/年.\-]\d{1,2}", re.I)
 _CATEGORY_WORDS: Tuple[Tuple[str, str], ...] = (
     ("lodging", r"ホテル|旅館|宿泊|hotel|hostel|inn\b|民宿"),
     ("transport", r"タクシー|taxi|\bjr\b|鉄道|新幹線|乗車|バス|高速|駐車|ガソリン|parking|fuel|metro|train|航空|airline|レンタカー"),
-    ("food", r"レストラン|食堂|カフェ|喫茶|居酒屋|ラーメン|寿司|そば|うどん|焼肉|定食|料理|ビール|ランチ|コーヒー|珈琲|restaurant|cafe|café|coffee|bistro|bar\b|grill|kitchen|dining|餐|食"),
+    ("food", r"レストラン|食堂|カフェ|喫茶|居酒屋|ラーメン|寿司|そば|うどん|焼肉|定食|料理|ビール|ランチ|コーヒー|珈琲|restaurant|cafe|café|coffee|bistro|bar\b|grill|kitchen|dining|餐|食"),  # noqa: E501
     ("activity", r"入館|入場|拝観|博物館|美術館|水族館|体験|観覧|ticket|museum|admission|tour\b"),
     ("shopping", r"土産|百貨店|ドラッグ|薬局|コンビニ|スーパー|マート|ストア|ショップ|store|market|mart\b|shop\b|pharmacy|souvenir"),
 )
@@ -190,7 +190,7 @@ def rule_extract(raw: str, year: Optional[int] = None) -> Dict[str, Found]:
     if total is not None:
         out["amount"] = Found(_plain(total), sure, why)
     if unit is None:
-        match = re.search(r"(NT[$S](?=\s*\d)|HK\$|S\$|US\$|€|£|₩|฿|\bJPY\b|\bUSD\b|\bEUR\b|\bGBP\b|\bKRW\b|\bTWD\b|\bCNY\b|\bTHB\b|\bSGD\b|\bHKD\b|\bVND\b|\bAUD\b)", text)
+        match = re.search(r"(NT[$S](?=\s*\d)|HK\$|S\$|US\$|€|£|₩|฿|\bJPY\b|\bUSD\b|\bEUR\b|\bGBP\b|\bKRW\b|\bTWD\b|\bCNY\b|\bTHB\b|\bSGD\b|\bHKD\b|\bVND\b|\bAUD\b)", text)  # noqa: E501
         unit = _SYMBOLS.get(match.group(1)) or match.group(1) if match else None
         if unit is None and re.search(r"[¥\\]\s*\d|\d\s*円", text):
             unit = "JPY"
