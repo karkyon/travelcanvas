@@ -27,11 +27,25 @@ test('マイマップの案内・QR の投稿・写真の地図・予約メー�
 
   // ③ 予約メール
   await page.goto(`/planner/${planId}/imports`);
-  await page.getByLabel('予約確認メールの本文').fill('じゃらん 予約番号: ABC12345\nチェックイン 2026年4月10日 15:00\n大人2名\n合計 ¥24,800');
+  await page.getByLabel('予約確認メールの本文を貼る').fill('●予約番号：ABC12345\n●施設名：都リゾート 奥志摩\n●チェックイン日：2026年4月10日(金)\n●チェックイン可能時間：15:00～18:00\n●チェックアウト日：2026年4月11日(土)\n●チェックアウト時間：～11:00\n●食事：夕朝食付\n●お部屋：ツイン\n●宿泊人数：大人2名');
   await page.getByRole('button', { name: '本文を読み取る' }).click();
-  await expect(page.getByRole('dialog')).toContainText('ABC12345');
-  await page.getByRole('button', { name: '確認待ちをすべて採用' }).click();
-  await expect(page.getByRole('dialog')).toContainText('承認済み');
+  await expect(page.getByLabel('施設・事業者の名前')).toHaveValue('都リゾート 奥志摩');
+  await expect(page.getByLabel('開始(チェックイン・出発)')).toHaveValue('2026-04-10T15:00');
+  await page.getByTestId('booking-review-submit').click();
+  await expect(page).toHaveURL(/reservations/);
+  await expect(page.getByText('都リゾート 奥志摩').first()).toBeVisible();
+  await expect(page.getByTestId('reservation-notes').first()).toContainText('部屋: ツイン');
+
+  // 旅行の基本情報: 日程を変えると予定も動く
+  await page.goto(`/planner/${planId}`);
+  await page.getByTestId('plan-basics-open').click();
+  await page.getByLabel('出発日').fill('2026-05-01');
+  await page.getByLabel('最終日').fill('2026-05-02');
+  await page.getByLabel('人数').fill('4');
+  await page.getByTestId('plan-basics-save').click();
+  await expect(page.getByRole('heading', { name: /2026-05-01/ }).or(page.getByText(/2026-05-01/).first())).toBeVisible();
+  await page.getByTestId('plan-basics-open').click();
+  await page.getByRole('button', { name: 'キャンセル' }).click();
 
   // ② QR(別の端末 = 別のブラウザ文脈で確認コードから送る)
   await page.goto(`/planner/${planId}/memories`);

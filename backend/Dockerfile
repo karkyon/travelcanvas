@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y \
     g++ \
     # Image processing
     libjpeg-dev \
+    # [Gate BookingFix] 予約の画像の文字を読む(サーバーの中の OCR)
+    tesseract-ocr \
+    tesseract-ocr-jpn \
     libpng-dev \
     # Geographic libraries
     libgeos-dev \

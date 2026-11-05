@@ -59,6 +59,7 @@
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
 | `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
+| `days_have_events` | 409 | no | 短くすると消える日に予定があります | api/v1/plans.py |
 | `deleted_on_server` | 409 | after_reload | サーバーで削除された予定のため、自分の変更は使えません | api/v1/sync.py |
 | `delivery_not_found` | 404 | no | 送信の記録が見つかりません | api/v1/organizations.py |
 | `device_only` | 409 | no | この軌跡は「この端末だけ」に保存する設定のため、サーバーへは送れません | api/v1/location_tracks.py |
@@ -102,6 +103,7 @@
 | `invalid_branch_selection` | 422 | no | 比べる分岐案を1〜…つ選んでください | api/v1/branches.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
+| `invalid_dates` | 422 | no | 最終日は出発日より後にしてください | api/v1/plans.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
@@ -220,6 +222,7 @@
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
 | `test_tier_disabled` | 403 | no | 本番・staging の環境ではクラスの試験の切り替えをしません | api/v1/admin_ops.py |
 | `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
+| `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |

@@ -91,7 +91,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ✓ | C2・G4・G11 | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
 | FR-009 | 情報内検索・コマンドパレット | VERIFIED | ✓ | C3・G4 | 利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1) |
 | FR-010 | 予約管理 | VERIFIED | ✓ | R3・E1 | 外部予約サービスとの同期、取消期限の通知 |
-| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport・BookingFix | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。omega-dev2 の実画像と実の AI では未確認 |
 | FR-012 | QR・チケット | VERIFIED | ✓ | R3-5・R3-11・E1 | バーコードの描画、オフライン表示 |
 | FR-013 | 文書ウォレット | VERIFIED | ✓ | R3-6・M5〜M10・S4 | 本番の Object Storage・ClamAV の常時運用・KMS |
 | FR-014 | 移動区間 | INTEGRATED | 一部 | M1・M2・B-014・G11 | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |

@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { exifTimeToIso, readExifInfo } from '@/components/search/findModel';
+import { exifTimeToIso, readExifInfo, spotsFromTimeline } from '@/components/search/findModel';
 import { jpegWithGps } from '@/components/search/findModel.fixture';
 import { loginNextPath } from '@/utils/safeNavigation';
 
@@ -12,12 +12,15 @@ const m = vi.hoisted(() => ({
   getMyMapsPreview: vi.fn(), downloadMyMapsKml: vi.fn(), getExternalMaps: vi.fn(), saveExternalMap: vi.fn(),
   deleteExternalMap: vi.fn(), createUploadLink: vi.fn(), getUploadLinks: vi.fn(), revokeUploadLink: vi.fn(),
   viewUploadLink: vi.fn(), joinUploadLink: vi.fn(), openUploadSession: vi.fn(), uploadWithSession: vi.fn(),
-  uploadAsMember: vi.fn(), extractReservationText: vi.fn(), extractReservationFile: vi.fn(),
+  uploadAsMember: vi.fn(), extractReservationText: vi.fn(), extractReservationFile: vi.fn(), applyExtraction: vi.fn(),
+  getPlanBasics: vi.fn(), savePlanBasics: vi.fn(), reschedulePlan: vi.fn(),
 }));
 vi.mock('@/services/api/photoFeatures', () => m);
 
 import MyMapsCard from './exports/MyMapsCard';
 import BookingExtractCard from './imports/BookingExtractCard';
+import BookingReviewForm from './imports/BookingReviewForm';
+import PlanBasicsDialog from '@/components/planner/PlanBasicsDialog';
 import PhotoQrCard from './memories/PhotoQrCard';
 import PhotoUploadPage from './PhotoUploadPage';
 
@@ -138,28 +141,111 @@ describe('PhotoUploadPage', () => {
 });
 
 describe('BookingExtractCard', () => {
-  it('本文を読み取り、注意を出して親へ渡す', async () => {
-    const job = { id: 'j', candidates: [], ai_status: 'denied', ai_message: 'AI は使えません', warnings: ['日程の外です'] };
+  it('本文を読み取って親へ渡す。AI は選んだ時だけ', async () => {
+    const job = { id: 'j', candidates: [], ai_status: 'off', ai_message: null, warnings: [] };
     m.extractReservationText.mockResolvedValue(job);
     const done = vi.fn();
     render(<BookingExtractCard planId="p1" onExtracted={done} />);
-    fireEvent.change(screen.getByLabelText('予約確認メールの本文'), { target: { value: '予約番号: A1' } });
+    fireEvent.change(screen.getByLabelText('予約確認メールの本文を貼る'), { target: { value: '予約番号: A1' } });
     fireEvent.click(screen.getByRole('button', { name: '本文を読み取る' }));
     await waitFor(() => expect(done).toHaveBeenCalledWith(job));
     expect(m.extractReservationText).toHaveBeenCalledWith('p1', '予約番号: A1', false);
-    expect(screen.getByTestId('booking-extract-note').textContent).toContain('日程の外です');
   });
 
-  it('画像は同意するまで選べない', async () => {
+  it('画像は同意なしでも選べ(サーバーの OCR)、AI を選んだ時だけ送信の同意を付ける。失敗の理由を出す', async () => {
     render(<BookingExtractCard planId="p1" onExtracted={vi.fn()} />);
-    const button = screen.getByRole('button', { name: '画像を選ぶ' }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
-    fireEvent.click(screen.getByTestId('booking-image-consent'));
-    expect(button.disabled).toBe(false);
     const image = new File([new Uint8Array(8)], 's.png', { type: 'image/png' });
-    m.extractReservationFile.mockRejectedValue({ response: { status: 403, data: { detail: { message: 'このクラスには AI が含まれません' } } } });
+    m.extractReservationFile.mockRejectedValue({ response: { status: 422, data: { detail: { message: '読み取れませんでした' } } } });
     fireEvent.change(screen.getByTestId('booking-image'), { target: { files: [image] } });
-    expect((await screen.findByRole('alert')).textContent).toContain('AI');
-    expect(m.extractReservationFile).toHaveBeenCalledWith('p1', image, false, true);
+    expect((await screen.findByRole('alert')).textContent).toContain('読み取れません');
+    expect(m.extractReservationFile).toHaveBeenLastCalledWith('p1', image, false, false);
+    fireEvent.click(screen.getByTestId('booking-use-ai'));
+    fireEvent.change(screen.getByTestId('booking-image'), { target: { files: [image] } });
+    await waitFor(() => expect(m.extractReservationFile).toHaveBeenLastCalledWith('p1', image, true, true));
+  });
+});
+
+const stay = [
+  ['type', 'accommodation'], ['provider_name', '都リゾート'], ['start_at', '2026-11-28T15:00:00+09:00'], ['end_at', '2026-11-29T11:00:00+09:00'],
+  ['detail.room', 'ツイン'], ['detail.meal', '夕朝食付'], ['guest_count', '4'],
+].map(([field_path, value]) => ({ field_path: field_path as string, value, evidence_locator: '見出し', review_status: 'pending' }));
+
+describe('BookingReviewForm', () => {
+  it('読み取った値を項目ごとに出し、直した値で登録する', async () => {
+    m.applyExtraction.mockResolvedValue({ reservation_id: 'r', event_id: 'e', itinerary_note: null });
+    const done = vi.fn();
+    render(<MemoryRouter><BookingReviewForm planId="p1" jobId="j1" candidates={stay} notes={['注意です']} onDone={done} onDiscard={vi.fn()} /></MemoryRouter>);
+    expect((screen.getByLabelText('施設・事業者の名前') as HTMLInputElement).value).toBe('都リゾート');
+    expect((screen.getByLabelText('部屋') as HTMLTextAreaElement).value).toBe('ツイン');
+    expect((screen.getByLabelText('開始(チェックイン・出発)') as HTMLInputElement).value).toBe('2026-11-28T15:00');
+    expect(screen.getByTestId('booking-review-notes').textContent).toContain('注意です');
+    fireEvent.change(screen.getByLabelText('人数'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('食事'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('booking-review-submit'));
+    await waitFor(() => expect(done).toHaveBeenCalled());
+    const [plan, job, fields, add] = m.applyExtraction.mock.calls[0]!;
+    expect([plan, job, add]).toEqual(['p1', 'j1', true]);
+    expect(fields).toMatchObject({ guest_count: '5', 'detail.meal': null, start_at: '2026-11-28T15:00:00+09:00', provider_name: '都リゾート' });
+  });
+
+  it('種類が無いと登録しない', async () => {
+    render(<MemoryRouter><BookingReviewForm planId="p1" jobId="j1" candidates={[]} onDone={vi.fn()} onDiscard={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId('booking-review-submit'));
+    expect((await screen.findByRole('alert')).textContent).toContain('種類');
+    expect(m.applyExtraction).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlanBasicsDialog', () => {
+  const open = (extra = {}) => render(<PlanBasicsDialog planId="p1" revision={7} firstDate="2026-11-28" lastDate="2026-11-29" isOpen onClose={vi.fn()} onSaved={vi.fn()} {...extra} />);
+  beforeEach(() => {
+    m.getPlanBasics.mockResolvedValue({ title: '鳥羽', destination: '鳥羽', description: null, budget: null, start_date: null, end_date: null, preferences: { x: 1 } });
+    m.savePlanBasics.mockResolvedValue(undefined);
+  });
+
+  it('題名・方面・人数を保存する。日程が同じなら日程の変更は呼ばない', async () => {
+    const saved = vi.fn();
+    open({ onSaved: saved });
+    await waitFor(() => expect((screen.getByLabelText('題名') as HTMLInputElement).value).toBe('鳥羽'));
+    fireEvent.change(screen.getByLabelText('題名'), { target: { value: '伊勢志摩' } });
+    fireEvent.change(screen.getByLabelText('人数'), { target: { value: '4' } });
+    fireEvent.click(screen.getByTestId('plan-basics-save'));
+    await waitFor(() => expect(saved).toHaveBeenCalledWith(null));
+    expect(m.reschedulePlan).not.toHaveBeenCalled();
+    expect(m.savePlanBasics.mock.calls[0]![1]).toMatchObject({ title: '伊勢志摩', preferences: { x: 1, party_size: 4 } });
+  });
+
+  it('日程を変えると予定ごと動かし、消える予定があれば一覧を見せて確認してから消す', async () => {
+    m.reschedulePlan.mockRejectedValueOnce({ response: { status: 409, data: { detail: { code: 'days_have_events', days: [{ date: '2026-11-29', events: ['水族館'] }] } } } })
+      .mockResolvedValueOnce({ revision: 8, days: 1, reservations_not_moved: 2 });
+    const saved = vi.fn();
+    open({ onSaved: saved });
+    await waitFor(() => expect((screen.getByLabelText('題名') as HTMLInputElement).value).toBe('鳥羽'));
+    fireEvent.change(screen.getByLabelText('最終日'), { target: { value: '2026-11-28' } });
+    fireEvent.click(screen.getByTestId('plan-basics-save'));
+    expect((await screen.findByTestId('basics-lost')).textContent).toContain('水族館');
+    expect(m.savePlanBasics).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '消して日程を変える' }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(m.reschedulePlan).toHaveBeenLastCalledWith('p1', 7, '2026-11-28', '2026-11-28', true);
+    expect(saved.mock.calls[0]![0]).toContain('予約 2 件');
+  });
+
+  it('最終日が出発日より前なら送らない', async () => {
+    open();
+    await waitFor(() => expect((screen.getByLabelText('題名') as HTMLInputElement).value).toBe('鳥羽'));
+    fireEvent.change(screen.getByLabelText('最終日'), { target: { value: '2026-11-01' } });
+    fireEvent.click(screen.getByTestId('plan-basics-save'));
+    expect((await screen.findByRole('alert')).textContent).toContain('最終日');
+    expect(m.reschedulePlan).not.toHaveBeenCalled();
+  });
+});
+
+describe('spotsFromTimeline', () => {
+  it('YouTube の説明欄の行から場所を拾う', () => {
+    const got = spotsFromTimeline('説明です\n00:00 start.内宮前バス停\n01:20 内宮入口.宇治橋\n01:50 おはらい町\n07:40 五十鈴川カフェ.五十鈴川\n09:35 赤福本店.おかげ横丁入口\n16:55 浦田町バス停\n17:15 アクセスガイド.五十鈴川野遊びどころ\nhttps://example.com');
+    expect(got.map((s) => s.name)).toEqual(['内宮前バス停', '内宮入口', 'おはらい町', '五十鈴川カフェ', '赤福本店', '浦田町バス停', 'アクセスガイド']);
+    expect(got[1]!.note).toBe('宇治橋');
+    expect(spotsFromTimeline('ふつうの文')).toEqual([]);
   });
 });

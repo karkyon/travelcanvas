@@ -118,6 +118,19 @@ export function snsKeywords(text: string): { keywords: string[]; urlOnly: boolea
   return { keywords: out.slice(0, 8), urlOnly: out.length === 0 && urls.length > 0 && !body.trim() };
 }
 
+/** [Gate BookingFix] 説明欄・コメントの「01:20 内宮入口.宇治橋」の行から場所の名前を拾う */
+export function spotsFromTimeline(text: string): { name: string; note: string | null }[] {
+  const out: { name: string; note: string | null }[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.trim().normalize('NFKC').match(/^(?:\d{1,2}:)?\d{1,2}:\d{2}\s*[-–:]?\s*(.+)$/);
+    if (!m) continue;
+    const parts = m[1]!.split(/[.。・/|]/).map((p) => p.trim()).filter((p) => p && !/^(start|end|スタート|ゴール|opening|ending)$/i.test(p));
+    if (parts.length === 0 || parts[0]!.length > 40) continue;
+    if (!out.some((o) => o.name === parts[0])) out.push({ name: parts[0]!, note: parts.slice(1).join(' / ') || null });
+  }
+  return out;
+}
+
 export type FindModeKey = 'image' | 'voice' | 'sns';
 export const FIND_MODE_HELP: Record<FindModeKey, string> = {
   image: '写真の撮影場所(位置情報)から、その周りの場所を探します。写真は端末の中で読み、送りません。',

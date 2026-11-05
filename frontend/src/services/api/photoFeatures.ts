@@ -119,7 +119,26 @@ export async function uploadAsMember(planId: string, file: File, fields: PhotoFi
   })).data as UploadResult;
 }
 
+// ===== 旅行の基本情報
+export interface PlanBasics { title: string; destination: string | null; description: string | null; budget: number | null; start_date: string | null; end_date: string | null; preferences: Record<string, unknown> | null }
+export async function getPlanBasics(planId: string): Promise<PlanBasics> {
+  return (await api.get(`/travel-plans/${planId}`, SILENT)).data as PlanBasics;
+}
+export async function savePlanBasics(planId: string, body: Partial<PlanBasics>): Promise<void> {
+  await api.put(`/travel-plans/${planId}`, body, SILENT);
+}
+export interface RescheduleResult { revision: number; days: number; reservations_not_moved: number }
+export async function reschedulePlan(planId: string, revision: number, startDate: string, endDate: string, removeDaysWithEvents: boolean): Promise<RescheduleResult> {
+  return (await api.post(`/plans/${planId}/reschedule`, { start_date: startDate, end_date: endDate, remove_days_with_events: removeDaysWithEvents }, {
+    ...SILENT, headers: { 'If-Match': String(revision) },
+  })).data as RescheduleResult;
+}
+
 // ===== 予約の読み取り
+export interface ApplyResult { reservation_id: string; event_id: string | null; itinerary_note: string | null }
+export async function applyExtraction(planId: string, jobId: string, fields: Record<string, string | null>, addToItinerary: boolean): Promise<ApplyResult> {
+  return (await api.post(`/plans/${planId}/imports/${jobId}/apply`, { fields, add_to_itinerary: addToItinerary }, SILENT)).data as ApplyResult;
+}
 export interface ExtractedJob extends ImportJobDetail {
   ai_status: 'off' | 'used' | 'denied' | 'not_needed';
   ai_message: string | null;

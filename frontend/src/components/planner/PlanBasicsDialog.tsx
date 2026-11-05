@@ -1,0 +1,132 @@
+/**
+ * [Gate BookingFix] 旅行の基本情報(題名・方面・日程・人数・予算・メモ)の編集。
+ * 日程を変えると全部の日と予定の日時が一緒に動く。短くして予定のある日が消える時は、一覧を見せて確認してから消す。
+ */
+import React, { useEffect, useState } from 'react';
+import Modal from '@/components/common/Modal';
+import Button from '@/components/common/Button';
+import { getPlanBasics, reschedulePlan, savePlanBasics } from '@/services/api/photoFeatures';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
+
+interface Props {
+  planId: string;
+  revision: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSaved: (message: string | null) => void;
+}
+type Lost = { date: string; events: string[] }[];
+
+const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDate, isOpen, onClose, onSaved }) => {
+  const [title, setTitle] = useState('');
+  const [destination, setDestination] = useState('');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [party, setParty] = useState('');
+  const [budget, setBudget] = useState('');
+  const [description, setDescription] = useState('');
+  const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  const [lost, setLost] = useState<Lost | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setError(null);
+    setLost(null);
+    setStart(firstDate ?? '');
+    setEnd(lastDate ?? '');
+    getPlanBasics(planId).then((plan) => {
+      setTitle(plan.title ?? '');
+      setDestination(plan.destination ?? '');
+      setBudget(plan.budget != null ? String(plan.budget) : '');
+      setDescription(plan.description ?? '');
+      const prefs = plan.preferences ?? {};
+      setPreferences(prefs);
+      setParty(prefs.party_size != null ? String(prefs.party_size) : '');
+      if (!firstDate && plan.start_date) setStart(plan.start_date.slice(0, 10));
+      if (!lastDate && plan.end_date) setEnd(plan.end_date.slice(0, 10));
+    }).catch((e) => setError(errorDetailMessage(e, '旅行の情報を読み込めませんでした')));
+  }, [isOpen, planId, firstDate, lastDate]);
+
+  const submit = async (confirmRemove: boolean) => {
+    if (!title.trim()) {
+      setError('題名を入れてください');
+      return;
+    }
+    if ((start && !end) || (!start && end)) {
+      setError('出発日と最終日の両方を入れてください');
+      return;
+    }
+    if (start && end && end < start) {
+      setError('最終日は出発日より後にしてください');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      let message: string | null = null;
+      if (start && end && (start !== firstDate || end !== lastDate)) {
+        const moved = await reschedulePlan(planId, revision, start, end, confirmRemove);
+        if (moved.reservations_not_moved > 0) {
+          message = `日程を変えました。予約 ${moved.reservations_not_moved} 件の日時は変わっていません。予約の画面で確かめてください。`;
+        }
+      }
+      const nextPrefs = { ...preferences };
+      if (party) nextPrefs.party_size = Number(party);
+      else delete nextPrefs.party_size;
+      await savePlanBasics(planId, {
+        title: title.trim(), destination: destination.trim() || null, description: description.trim() || null,
+        budget: budget ? Number(budget) : null, preferences: nextPrefs,
+      });
+      onSaved(message);
+      onClose();
+    } catch (e) {
+      const detail = (e as { response?: { status?: number; data?: { detail?: { code?: string; days?: Lost } } } }).response;
+      if (detail?.status === 409 && detail.data?.detail?.code === 'days_have_events') setLost(detail.data.detail.days ?? []);
+      else setError(errorDetailMessage(e, '保存できませんでした'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const input = 'block w-full mt-1 border border-cloud-200 rounded-md bg-surface px-3 py-2 text-sm text-ink-900';
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="旅行の基本情報" size="lg">
+      <form onSubmit={(e) => { e.preventDefault(); void submit(false); }}>
+        <Modal.Body>
+          <div className="space-y-3" data-testid="plan-basics">
+            {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+            <div><label htmlFor="basics-title" className="text-sm text-ink-800">題名</label><input id="basics-title" className={input} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+            <div><label htmlFor="basics-destination" className="text-sm text-ink-800">方面・行き先</label><input id="basics-destination" className={input} value={destination} onChange={(e) => setDestination(e.target.value)} /></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><label htmlFor="basics-start" className="text-sm text-ink-800">出発日</label><input id="basics-start" type="date" className={input} value={start} onChange={(e) => { setStart(e.target.value); setLost(null); }} /></div>
+              <div><label htmlFor="basics-end" className="text-sm text-ink-800">最終日</label><input id="basics-end" type="date" className={input} value={end} onChange={(e) => { setEnd(e.target.value); setLost(null); }} /></div>
+            </div>
+            <p className="text-xs text-ink-700">日程を変えると、予定も一緒に新しい日付へ動きます。日数が増えると空の日を足します。予約の日時は変わりません。</p>
+            {lost && (
+              <div role="alert" className="rounded-md bg-warning-soft p-3 text-sm text-ink-900" data-testid="basics-lost">
+                <p className="font-semibold">短くすると、次の日の予定が消えます</p>
+                <ul className="mt-1 list-disc pl-5">{lost.map((d) => <li key={d.date}>{`${d.date}: ${d.events.join('、')}`}</li>)}</ul>
+                <Button type="button" variant="outline" size="sm" className="mt-2" loading={busy} onClick={() => void submit(true)}>消して日程を変える</Button>
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><label htmlFor="basics-party" className="text-sm text-ink-800">人数</label><input id="basics-party" type="number" min={1} max={99} className={input} value={party} onChange={(e) => setParty(e.target.value)} /></div>
+              <div><label htmlFor="basics-budget" className="text-sm text-ink-800">予算(円)</label><input id="basics-budget" type="number" min={0} className={input} value={budget} onChange={(e) => setBudget(e.target.value)} /></div>
+            </div>
+            <div><label htmlFor="basics-description" className="text-sm text-ink-800">メモ</label><textarea id="basics-description" rows={3} className={input} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button type="button" variant="ghost" onClick={onClose}>キャンセル</Button>
+          <Button type="submit" variant="primary" loading={busy} data-testid="plan-basics-save">保存</Button>
+        </Modal.Footer>
+      </form>
+    </Modal>
+  );
+};
+
+export default PlanBasicsDialog;

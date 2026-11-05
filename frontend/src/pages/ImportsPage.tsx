@@ -13,6 +13,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Plus, Check, X, FileCheck, FileX } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -32,6 +33,7 @@ import {
 import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookingExtractCard from './imports/BookingExtractCard';
+import BookingReviewForm from './imports/BookingReviewForm';
 
 const STATUS_LABEL: Record<string, string> = {
   uploaded: 'アップロード済み',
@@ -55,6 +57,12 @@ const TYPE_LABEL: Record<string, string> = {
   accommodation: '宿泊', flight: '航空', train: '鉄道', bus: 'バス', ferry: '船', rental_car: 'レンタカー',
   restaurant: '飲食', activity: '体験', admission: '入場', other: 'その他',
 };
+
+const PROVIDER_LABEL: Record<string, string> = {
+  manual: '手入力', rules: 'メールから読み取り', 'rules+openai': 'メールから読み取り(AI で補完)',
+  ocr: '画像から読み取り', 'ocr+openai': '画像から読み取り(AI で補完)', none: '読み取り',
+};
+const isExtracted = (job: ImportJobDetail) => job.status === 'review_required' && job.provider !== 'manual';
 
 const FIELD_PATH_OPTIONS: { value: ImportFieldPath; label: string }[] = [
   { value: 'type', label: '種類(必須。flight/accommodation等)' },
@@ -96,6 +104,7 @@ const ImportsPage: React.FC = () => {
 
   const [selected, setSelected] = useState<ImportJobDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState<string[]>([]);
 
   const [newFieldPath, setNewFieldPath] = useState<ImportFieldPath>('type');
   const [newValue, setNewValue] = useState('');
@@ -276,7 +285,11 @@ const ImportsPage: React.FC = () => {
       )}
 
       {planId && (
-        <BookingExtractCard planId={planId} onExtracted={(job) => { setSelected(job); void loadJobs(); }} />
+        <BookingExtractCard planId={planId} onExtracted={(job) => {
+          setReviewNotes([job.ai_message, ...job.warnings].filter((n): n is string => !!n));
+          setSelected(job);
+          void loadJobs();
+        }} />
       )}
 
       {isLoading ? (
@@ -300,7 +313,7 @@ const ImportsPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="font-medium text-ink-900">取込ジョブ({formatDateTime(j.created_at)})</div>
-                      <div className="text-sm text-ink-700">provider: {j.provider}</div>
+                      <div className="text-sm text-ink-700">{PROVIDER_LABEL[j.provider ?? ''] ?? j.provider}</div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-ink-700'}`}>
                       {STATUS_LABEL[j.status] ?? j.status}
@@ -341,11 +354,29 @@ const ImportsPage: React.FC = () => {
       </Modal>
 
       {/* ジョブ詳細・候補レビュー */}
-      <Modal isOpen={!!selected} onClose={closeDetail} title="取込ジョブ詳細" size="lg">
+      <Modal isOpen={!!selected} onClose={closeDetail} title={selected && isExtracted(selected) ? '読み取った予約の確認' : '取込ジョブ詳細'} size="lg">
         {isDetailLoading && (
           <Modal.Body><div className="flex justify-center py-8"><LoadingSpinner size="md" /></div></Modal.Body>
         )}
-        {selected && !isDetailLoading && (
+        {selected && !isDetailLoading && isExtracted(selected) && (
+          <Modal.Body>
+            <BookingReviewForm
+              key={selected.id}
+              planId={planId as string}
+              jobId={selected.id}
+              candidates={selected.candidates}
+              notes={reviewNotes}
+              onDone={(result) => {
+                closeDetail();
+                void loadJobs();
+                toast.success(result.itinerary_note ? `予約を登録しました。${result.itinerary_note}` : (result.event_id ? '予約を登録し、旅程にも追加しました' : '予約を登録しました'));
+                navigate(`/planner/${planId}/reservations`);
+              }}
+              onDiscard={() => void handleRejectJob()}
+            />
+          </Modal.Body>
+        )}
+        {selected && !isDetailLoading && !isExtracted(selected) && (
           <>
             <Modal.Body>
               <div className="space-y-4">

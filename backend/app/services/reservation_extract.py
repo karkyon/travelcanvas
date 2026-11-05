@@ -16,6 +16,8 @@ import html
 import io
 import json
 import re
+import shutil
+import subprocess
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -34,7 +36,10 @@ CORE_FIELDS = {"type", "provider_name", "start_at"}
 RESERVATION_TYPES = ("accommodation", "flight", "train", "bus", "ferry", "rental_car", "restaurant", "activity",
                      "admission", "other")
 AI_FIELDS = ("type", "provider_name", "guest_count", "start_at", "end_at", "total_amount", "currency",
-             "cancellation_deadline", "confirmation_number", "pin", "holder_name", "contact_phone")
+             "cancellation_deadline", "confirmation_number", "pin", "holder_name", "contact_phone",
+             "detail.booking_site", "detail.plan_name", "detail.room", "detail.meal", "detail.checkin_window",
+             "detail.arrival_time", "detail.checkout_limit", "detail.nights", "detail.address", "detail.flight_number",
+             "detail.train_name", "detail.from_place", "detail.to_place", "detail.seat")
 LABEL = {"type": "種類", "provider_name": "事業者", "confirmation_number": "予約番号", "pin": "PIN",
          "holder_name": "名義", "guest_count": "人数", "start_at": "開始", "end_at": "終了",
          "total_amount": "金額", "currency": "通貨", "cancellation_deadline": "キャンセル期限",
@@ -156,9 +161,62 @@ _PHONE_ANY = re.compile(r"(?<!\d)(?:\+?\d{1,4}[\- ])?\d{2,4}[\- ]\d{2,4}[\- ]\d{
 _EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 _CARD = re.compile(r"(?<!\d)(?:\d[ \-]?){13,19}(?<!\s)(?!\d)")
 _CURRENCY = {"¥": "JPY", "￥": "JPY", "JPY": "JPY", "$": "USD", "USD": "USD", "EUR": "EUR", "€": "EUR"}
-_START_WORDS = r"チェックイン|check[- ]?in|出発|搭乗日|乗車日|ご利用日|来店日|ご来店|予約日時|利用日|貸出|開始|日時|departure"
-_END_WORDS = r"チェックアウト|check[- ]?out|到着|返却|終了|arrival"
-_CANCEL_WORDS = r"キャンセル期限|無料キャンセル|取消期限|cancel(?:lation)?\s*(?:deadline|by)"
+_BULLET = re.compile(r"^[\s●○◎■□◆◇★☆・※▼▽▶►>〇*\-–—=【\[<〈《]+")
+_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "facility": ("施設名", "宿泊施設", "宿泊施設名", "ホテル名", "宿名", "旅館名", "宿泊先", "施設", "ホテル", "宿", "店名",
+                 "店舗名", "レストラン名", "会場", "property", "hotelname", "hotel", "restaurant"),
+    "booking_site": ("予約サイト", "予約元", "申込サイト"),
+    "confirmation": ("予約番号", "予約id", "予約コード", "予約no", "予約no.", "確認番号", "問い合わせ番号", "受付番号",
+                     "bookingnumber", "bookingreference", "bookingid", "bookingcode", "confirmationnumber",
+                     "confirmationcode", "reservationnumber", "reservationcode", "reservationid"),
+    "pin": ("pin", "pinコード", "暗証番号"),
+    "holder": ("予約者", "予約者名", "予約者氏名", "宿泊代表者", "宿泊代表者名", "宿泊代表者氏名", "代表者", "代表者名", "代表者氏名",
+               "名前", "guestname", "bookedby"),
+    "checkin_date": ("チェックイン日", "チェックイン", "宿泊日", "到着日", "checkin", "check-in", "checkindate",
+                     "check-indate"),
+    "checkin_time": ("チェックイン可能時間", "チェックイン時間", "チェックイン時刻", "check-intime", "checkintime"),
+    "arrival_time": ("到着予定時間", "到着予定時刻", "到着予定"),
+    "checkout_date": ("チェックアウト日", "チェックアウト", "出発日(宿泊)", "checkout", "check-out", "checkoutdate",
+                      "check-outdate"),
+    "checkout_time": ("チェックアウト時間", "チェックアウト時刻", "check-outtime", "checkouttime"),
+    "nights": ("宿泊日数", "泊数", "nights"),
+    "plan_name": ("プラン名称", "プラン名", "宿泊プラン", "プラン", "コース", "コース名", "plan"),
+    "meal": ("食事", "食事条件", "食事内容", "meal", "meals"),
+    "room": ("お部屋", "部屋", "部屋タイプ", "部屋名", "客室", "客室タイプ", "ルームタイプ", "room", "roomtype"),
+    "guests": ("宿泊人数", "人数", "利用人数", "乗車人数", "搭乗人数", "guests", "guest", "travelers"),
+    "amount": ("合計", "合計金額", "総額", "支払い金額", "支払金額", "請求金額", "料金合計", "宿泊料金", "料金", "total",
+               "totalamount"),
+    "payment": ("支払い方法", "支払方法", "決済方法", "payment", "paymentmethod"),
+    "phone": ("電話", "電話番号", "tel", "施設電話番号", "phone"),
+    "address": ("住所", "施設住所", "所在地", "address"),
+    "cancel": ("キャンセル期限", "無料キャンセル", "取消期限", "cancellationdeadline", "cancelby"),
+    "start": ("出発日時", "出発", "搭乗日", "搭乗日時", "乗車日", "乗車日時", "来店日時", "来店日", "利用日", "利用日時", "貸出日時",
+              "開始日時", "開始", "乗船日", "入場日", "入場日時", "開催日時", "departure"),
+    "end": ("到着日時", "返却日時", "終了日時", "終了", "降車日時", "arrival"),
+    "restaurant_at": ("予約日時",),
+    "flight_number": ("便名", "フライト", "flight", "flightnumber"),
+    "train_name": ("列車名", "列車", "新幹線", "号車"),
+    "from_place": ("出発地", "出発空港", "乗車駅", "乗車地", "from"),
+    "to_place": ("到着地", "到着空港", "降車駅", "降車地", "to"),
+    "seat": ("座席", "座席番号", "seat"),
+}
+_LABEL_OF = {alias.lower(): key for key, names in _ALIASES.items() for alias in names}
+_LABEL_PATTERNS = [
+    (alias, re.compile(r"^[A-Za-z*・,.'ゃゅょぁぃ\s]{0,4}[ごお]?" + r"\s*".join(map(re.escape, alias))
+                       + r"(?:\s*[:;・>\-=|]\s*|\s+)(.*)$", re.I))
+    for alias in sorted(_LABEL_OF, key=len, reverse=True) if len(alias) >= 2
+]
+_DATE = re.compile(r"(?:(20\d{2})\s*[年/.\-]\s*)?(\d{1,2})\s*[月/.\-]\s*(\d{1,2})\s*日?")
+_TIME = re.compile(r"(?<!\d)(\d{1,2})\s*(?::|時)\s*(\d{2})?")
+_BOOKING_SITES = ("Yahoo!トラベル", "じゃらん", "楽天トラベル", "一休", "Booking.com", "Agoda", "Expedia", "Airbnb",
+                  "るるぶトラベル", "Trip.com", "Hotels.com", "HIS", "食べログ", "ホットペッパー", "KKday", "Klook", "アソビュー")
+_CARRIERS = ("ANA", "JAL", "Peach", "ジェットスター", "スカイマーク", "えきねっと", "スマートEX", "エクスプレス予約",
+             "トヨタレンタカー", "ニッポンレンタカー", "タイムズカー")
+DETAIL_LABELS = {"booking_site": "予約サイト", "plan_name": "プラン", "room": "部屋", "meal": "食事",
+                 "checkin_window": "チェックイン可能時間", "arrival_time": "到着予定", "checkout_limit": "チェックアウト時間",
+                 "nights": "泊数", "payment": "支払い方法", "address": "住所", "flight_number": "便名",
+                 "train_name": "列車", "from_place": "出発地", "to_place": "到着地", "seat": "座席"}
+DETAIL_FIELDS = tuple(f"detail.{k}" for k in DETAIL_LABELS)
 
 
 def _iso_at(match: re.Match, tz: ZoneInfo) -> Optional[str]:
@@ -169,18 +227,6 @@ def _iso_at(match: re.Match, tz: ZoneInfo) -> Optional[str]:
                         tzinfo=tz).isoformat()
     except ValueError:
         return None
-
-
-def _date_after(text: str, words: str, tz: ZoneInfo) -> Optional[Tuple[str, str]]:
-    """見出しの語の行(または次の行)にある日時。(ISO, 根拠の見出し)"""
-    for hit in re.finditer(rf"({words})[^\n\r]{{0,16}}(?:\r?\n[ \t]*)?", text, re.I):
-        window = text[hit.start():hit.end() + 60]
-        found = _DT.search(window)
-        if found and found.start() <= hit.end() - hit.start() + 2:
-            value = _iso_at(found, tz)
-            if value:
-                return value, hit.group(1)
-    return None
 
 
 def _classify(text: str) -> Optional[str]:
@@ -198,44 +244,240 @@ def _sender_name(text: str) -> Optional[str]:
     return match.group(1).strip() if match else None
 
 
-def rule_extract(raw: str, tz_name: str = "Asia/Tokyo") -> Extraction:
-    """費用のかからない読み取り。見出しの語の近くにある値だけを拾う(信頼度は固定の目安)。"""
+def _date_after(text: str, words: str, tz: ZoneInfo) -> Optional[Tuple[str, str]]:
+    """見出しの語の行(または次の行)にある日時。(ISO, 根拠の見出し)"""
+    for hit in re.finditer(rf"({words})[^\n\r]{{0,16}}(?:\r?\n[ \t]*)?", text, re.I):
+        window = text[hit.start():hit.end() + 60]
+        found = _DT.search(window)
+        if found and found.start() <= hit.end() - hit.start() + 2:
+            value = _iso_at(found, tz)
+            if value:
+                return value, hit.group(1)
+    return None
+
+
+def _has_label(line: str) -> bool:
+    if ":" in line:
+        return True
+    return any(pattern.match(line) for _alias, pattern in _LABEL_PATTERNS) or len(line) > 40
+
+
+def _clean_tilde(value: str) -> str:
+    """時刻の範囲の「~」の読み違いを直す(OCR)。"""
+    value = re.sub(r"^[<て~〜]+\s*(?=\d)", "~", value)
+    return re.sub(r"(\d{1,2}:\d{2})\s*[て〜<>]\s*(\d{1,2}:\d{2})", r"\1~\2", value)
+
+
+_INLINE_START = r"チェックイン|check[- ]?in|出発|搭乗日|乗車日|ご利用日|来店日|ご来店|利用日|貸出|departure"
+_INLINE_END = r"チェックアウト|check[- ]?out|到着|返却|arrival"
+_INLINE_CANCEL = r"キャンセル期限|無料キャンセル|取消期限|cancel(?:lation)?\s*(?:deadline|by)"
+
+
+def _read_labels(text: str) -> Dict[str, str]:
+    """「●見出し：値」の行を読む。コロンの無い行(画像の読み取り)は、行頭の見出しで分ける。値が次の行の形にも対応する。"""
+    found: Dict[str, str] = {}
+    lines = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        # 「【施設名】値」の形だけ、閉じ括弧を区切りにする(値の中の【】は残す)
+        if line[:1] in ("【", "[") and re.match(r"^[【\[][^】\]]{1,20}[】\]]", line):
+            line = re.sub(r"[】\]]", ":", line, count=1)
+        line = _BULLET.sub("", line).strip()
+        if line:
+            lines.append(line)
+    for i, line in enumerate(lines):
+        key, value = None, ""
+        if ":" in line:
+            head, rest = line.split(":", 1)
+            norm = re.sub(r"\s", "", head).lower()
+            norm = norm[1:] if norm[:1] in ("ご", "お") and norm[1:] in _LABEL_OF else norm
+            norm = norm.replace("(税込)", "")
+            key, value = _LABEL_OF.get(norm), rest.strip()
+        if key is None:
+            # コロンが無い・読み違えた行(OCR)。行頭の数文字のゴミの後の見出しと、その後ろの区切りで分ける
+            for alias, pattern in _LABEL_PATTERNS:
+                match = pattern.match(line)
+                if match:
+                    key, value = _LABEL_OF[alias], match.group(1).strip()
+                    break
+        if key is None:
+            continue
+        if not value and i + 1 < len(lines):
+            value = lines[i + 1]
+        elif (key in ("facility", "plan_name", "room", "address") and i + 1 < len(lines)
+              and not _has_label(lines[i + 1])):
+            value = f"{value}{lines[i + 1]}"  # 折り返された値(スマホの画面の画像)
+        if value and key not in found:
+            found[key] = _clean_tilde(value.strip())
+    return found
+
+
+def _date_of(value: Optional[str], year: Optional[int]) -> Optional[Tuple[int, int, int]]:
+    match = _DATE.search(value or "")
+    if not match:
+        return None
+    y = int(match.group(1)) if match.group(1) else year
+    if y is None:
+        return None
+    try:
+        datetime(y, int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return None
+    return y, int(match.group(2)), int(match.group(3))
+
+
+def _time_of(value: Optional[str]) -> Optional[Tuple[int, int]]:
+    # 日付の部分を除いてから探す(「2026/11/28」の数字を時刻にしない)
+    match = _TIME.search(_DATE.sub(" ", value or ""))
+    if not match or int(match.group(1)) > 29:
+        return None
+    return int(match.group(1)), int(match.group(2) or 0)
+
+
+def _at(date: Optional[Tuple[int, int, int]], when: Optional[Tuple[int, int]], tz: ZoneInfo) -> Optional[str]:
+    if date is None:
+        return None
+    hour, minute = when or (0, 0)
+    try:
+        return datetime(date[0], date[1], date[2], min(hour, 23), minute, tzinfo=tz).isoformat()
+    except ValueError:
+        return None
+
+
+def _guests(value: str) -> Optional[str]:
+    parts = re.findall(r"(?:大人|子供|子ども|小人|幼児|こども)\s*(\d{1,3})", value)
+    total = sum(int(n) for n in parts) if parts else None
+    if total is None:
+        match = re.search(r"\d{1,3}", value)
+        total = int(match.group()) if match else None
+    return str(total) if total and 1 <= total <= 999 else None
+
+
+def _known(text: str, names: Tuple[str, ...]) -> Optional[str]:
+    lowered = text.lower()
+    return next((n for n in names if n.lower() in lowered), None)
+
+
+def rule_extract(raw: str, tz_name: str = "Asia/Tokyo", year: Optional[int] = None) -> Extraction:
+    """費用のかからない読み取り。見出しと値の組で読み、見出しの無い日時(メールの送信日時など)は拾わない。"""
     text = _normal(raw)
     tz = _zone(tz_name)
+    labels = _read_labels(text)
     out = Extraction()
-    kind = _classify(text)
-    if kind:
-        out.add("type", kind, 0.7, "本文の語から判定")
-    for name in _PROVIDERS:
-        if name.lower() in text.lower():
-            out.add("provider_name", name, 0.7, "本文の事業者名")
-            break
-    if "provider_name" not in out.fields():
-        out.add("provider_name", _sender_name(text), 0.5, "差出人の名前")
-    if (m := _CONFIRM.search(text)):
+    get = labels.get
+
+    kind = None
+    if get("checkin_date") or get("checkout_date") or get("nights") or get("room"):
+        kind = "accommodation"
+    elif get("flight_number"):
+        kind = "flight"
+    elif get("train_name"):
+        kind = "train"
+    out.add("type", kind or _classify(text), 0.9 if kind else 0.6, "見出しから判定" if kind else "本文の語から判定")
+
+    site = get("booking_site") or _known(text, _BOOKING_SITES)
+    carrier = _known(text, _CARRIERS)
+    out.add("provider_name", get("facility"), 0.95, "施設名の見出し")
+    out.add("provider_name", carrier, 0.7, "本文の事業者名")
+    out.add("provider_name", site or _sender_name(text), 0.5, "予約サイト・差出人の名前(施設名の見出しなし)")
+    if site or _sender_name(text):
+        out.add("detail.booking_site", site or _sender_name(text), 0.8, "本文・差出人")
+
+    confirm = _LINE_NUM.search(get("confirmation") or "")
+    if confirm:
+        out.add("confirmation_number", confirm.group(), 0.95, "予約番号の見出し")
+    elif (m := _CONFIRM.search(text)):
         out.add("confirmation_number", m.group(1), 0.9, "予約番号の見出し")
-    if (m := _PIN.search(text)):
-        out.add("pin", m.group(1), 0.9, "PIN の見出し")
-    if (m := _HOLDER.search(text)):
-        out.add("holder_name", re.sub(r"\s*様\s*$", "", m.group(1).strip()), 0.8, "予約者の見出し")
-    if (m := _GUESTS.search(text)):
+    pin = re.search(r"\d{4,8}", get("pin") or "")
+    if pin:
+        out.add("pin", pin.group(), 0.9, "PIN の見出し")
+    if get("holder"):
+        out.add("holder_name", re.sub(r"\s*様\s*$", "", labels["holder"])[:60], 0.85, "予約者の見出し")
+    if get("guests"):
+        out.add("guest_count", _guests(labels["guests"]), 0.9, "人数の見出し")
+    elif (m := _GUESTS.search(text)):
         number = next(g for g in m.groups() if g)
         if 1 <= int(number) <= 999:
-            out.add("guest_count", number, 0.8, "人数の見出し")
-    if (hit := _date_after(text, _START_WORDS, tz)):
-        out.add("start_at", hit[0], 0.85, f"「{hit[1]}」の日時")
-    if (hit := _date_after(text, _END_WORDS, tz)):
-        out.add("end_at", hit[0], 0.85, f"「{hit[1]}」の日時")
-    if (hit := _date_after(text, _CANCEL_WORDS, tz)):
-        out.add("cancellation_deadline", hit[0], 0.8, "キャンセル期限の見出し")
-    if (m := _AMOUNT.search(text)):
-        out.add("total_amount", m.group(2).replace(",", ""), 0.85, "合計金額の見出し")
-        symbol = (m.group(1) or "").upper()
-        currency = _CURRENCY.get(symbol)
-        out.add("currency", currency or ("JPY" if m.group(3) else None), 0.85, "金額の単位")
-    if (m := _PHONE.search(text)):
+            out.add("guest_count", number, 0.7, "本文の人数")
+
+    # 日時: チェックイン日 + 到着予定 → 可能時間の順。見出しの無い「日時」は使わない
+    start_date = _date_of(get("checkin_date"), year) or _date_of(get("start"), year)
+    start_time = (_time_of(get("arrival_time")) or _time_of(get("checkin_time")) or _time_of(get("checkin_date"))
+                  or _time_of(get("start")))
+    if start_date is None and kind is None and get("restaurant_at") and _classify(text) == "restaurant":
+        start_date, start_time = _date_of(labels["restaurant_at"], year), _time_of(labels["restaurant_at"])
+    note = "日付と時刻の見出し" if start_time else "日付の見出し(時刻の記載なし)"
+    out.add("start_at", _at(start_date, start_time, tz), 0.95 if start_time else 0.7, note)
+    end_date = _date_of(get("checkout_date"), year) or _date_of(get("end"), year)
+    end_time = _time_of(get("checkout_time")) or _time_of(get("checkout_date")) or _time_of(get("end"))
+    out.add("end_at", _at(end_date, end_time, tz), 0.95 if end_time else 0.7,
+            "日付と時刻の見出し" if end_time else "日付の見出し(時刻の記載なし)")
+    cancel = _date_of(get("cancel"), year)
+    out.add("cancellation_deadline", _at(cancel, _time_of(get("cancel")), tz), 0.85, "キャンセル期限の見出し")
+
+    # 見出しが行頭に無い書き方(1 行に複数の項目など)
+    for field_name, words in (("start_at", _INLINE_START), ("end_at", _INLINE_END),
+                              ("cancellation_deadline", _INLINE_CANCEL)):
+        if field_name not in out.fields() and (hit := _date_after(text, words, tz)):
+            out.add(field_name, hit[0], 0.75, f"「{hit[1]}」の近くの日時")
+
+    amount_line = None
+    if get("amount"):
+        amount_line = re.search(r"(¥|\\|JPY|\$|USD|EUR|€)?\s*([\d,]+(?:\.\d{1,2})?)\s*(円)?", labels["amount"], re.I)
+    if amount_line:
+        out.add("total_amount", amount_line.group(2).replace(",", ""), 0.9, "合計金額の見出し")
+        symbol = (amount_line.group(1) or "").upper().replace("\\", "¥")
+        out.add("currency", _CURRENCY.get(symbol) or ("JPY" if amount_line.group(3) else None), 0.9, "金額の単位")
+    elif (m := _AMOUNT.search(text)):
+        out.add("total_amount", m.group(2).replace(",", ""), 0.8, "合計金額の見出し")
+        unit = _CURRENCY.get((m.group(1) or "").upper()) or ("JPY" if m.group(3) else None)
+        out.add("currency", unit, 0.8, "金額の単位")
+    phone = re.search(r"\+?\d[\d\-() ]{8,16}\d", get("phone") or "")
+    if phone:
+        out.add("contact_phone", phone.group(), 0.85, "電話の見出し")
+    elif (m := _PHONE.search(text)):
         out.add("contact_phone", m.group(1).strip(), 0.8, "電話の見出し")
+
+    for detail, key in (("plan_name", "plan_name"), ("room", "room"), ("meal", "meal"),
+                        ("checkin_window", "checkin_time"),
+                        ("arrival_time", "arrival_time"), ("checkout_limit", "checkout_time"), ("nights", "nights"),
+                        ("payment", "payment"), ("address", "address"), ("flight_number", "flight_number"),
+                        ("train_name", "train_name"), ("from_place", "from_place"), ("to_place", "to_place"),
+                        ("seat", "seat")):
+        if get(key):
+            out.add(f"detail.{detail}", labels[key][:200], 0.9, f"{DETAIL_LABELS[detail]}の見出し")
     return out
+
+
+def compact_ocr(text: str) -> str:
+    """OCR が日本語の文字の間に入れる空白を取り除く。"""
+    cjk = "぀-ヿ㐀-鿿ｦ-ﾟ"
+    return re.sub(rf"(?<=[{cjk}])[ \t]+(?=[{cjk}])", "", text)
+
+
+def ocr_available() -> bool:
+    return shutil.which("tesseract") is not None
+
+
+def ocr_image(content: bytes, lang: str = "jpn") -> str:
+    """サーバーの中で画像の文字を読む(tesseract)。外部へは送らない。読めない時は空文字。"""
+    if not ocr_available():
+        return ""
+    from PIL import Image, ImageOps
+
+    with Image.open(io.BytesIO(content)) as image:
+        gray = ImageOps.autocontrast(ImageOps.exif_transpose(image).convert("L"))
+    if max(gray.size) < 1800:  # 小さい字は拡大すると読みやすい
+        scale = min(3.0, 1800 / max(gray.size))
+        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.LANCZOS)
+    png = io.BytesIO()
+    gray.save(png, format="PNG")
+    try:
+        done = subprocess.run(["tesseract", "stdin", "stdout", "-l", lang, "--psm", "6"], input=png.getvalue(),
+                              capture_output=True, timeout=60, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return compact_ocr(done.stdout.decode("utf-8", "replace")) if done.returncode == 0 else ""
 
 
 def _zone(name: str) -> ZoneInfo:

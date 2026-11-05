@@ -96,8 +96,8 @@
    "status": "INTEGRATED",
    "partial": true,
    "e2e": "✓",
-   "gates": "R3-7・R3-9・E1・BookingImport",
-   "gaps": "メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認"
+   "gates": "R3-7・R3-9・E1・BookingImport・BookingFix",
+   "gaps": "メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。omega-dev2 の実画像と実の AI では未確認"
   },
   "FR-012": {
    "title": "QR・チケット",

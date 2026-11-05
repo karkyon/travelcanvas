@@ -497,7 +497,8 @@ const ReservationsPage: React.FC = () => {
                   <span className="tc-kit-icon" aria-hidden="true">{typeIcon(r.type)}</span>
                   <span className="min-w-0">
                     <b>{r.provider_name || typeLabel(r.type)}</b>
-                    <small>{typeLabel(r.type)} ・ {formatDateTime(r.start_at)}</small>
+                    <small>{typeLabel(r.type)} ・ {formatDateTime(r.start_at)}{r.end_at ? ` 〜 ${formatDateTime(r.end_at)}` : ''}{r.guest_count ? ` ・ ${r.guest_count}名` : ''}</small>
+                    {r.notes && <small className="whitespace-pre-line" data-testid="reservation-notes">{r.notes}</small>}
                     {r.confirmation_number_masked && <small>{`予約番号 ${r.confirmation_number_masked}`}</small>}
                   </span>
                   <span className="tc-pill">{STATUS_LABEL[r.status] ?? r.status}</span>
