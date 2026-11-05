@@ -107,7 +107,7 @@ def test_preview_default_is_whitelisted_and_masked(auth_client, make_user, db_se
     raw = json.dumps(b, ensure_ascii=False)
     for secret in (CONFIRMATION, PHONE, ADDRESS, "QR-SECRET-PAYLOAD", "常備薬", owner.username):
         assert secret not in raw, secret
-    assert b["policy_version"] == "booklet-v1" and b["contains_sensitive"] is False
+    assert b["policy_version"] == "booklet-v2" and b["contains_sensitive"] is False
     assert b["cover"]["title"] == "しおりテスト旅行" and b["cover"]["member_count"] == 3
     ev = b["schedule"]["days"][0]["events"][0]
     assert ev["title"] == "清水寺" and ev["local_start_time"] == "10:00" and ev["address"] is None
@@ -321,3 +321,16 @@ def test_web_publish_public_view_and_stop(auth_client, make_user, db_session, au
     viewer, _pw = make_user()
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=viewer, is_authenticated=True, is_guest=False)
     assert client.post(f"{url}/{e2['id']}/publish").status_code in (403, 404)
+
+
+def test_地図のピンは住所を含めない版では丸め_番号は旅の順(auth_client):
+    client, _ = auth_client
+    p = client.post("/api/v1/travel-plans/", json={"title": "ピン"}).json()["id"]
+    d1 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-01", "timezone_id": "Asia/Tokyo"}).json()["id"]  # noqa: E501
+    d2 = client.post(f"/api/v1/plans/{p}/days", json={"local_date": "2026-11-02", "timezone_id": "Asia/Tokyo"}).json()["id"]  # noqa: E501
+    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d2, "title": "二日目", "latitude": 35.123456, "longitude": 135.654321})  # noqa: E501
+    client.post(f"/api/v1/plans/{p}/events", json={"day_id": d1, "title": "一日目", "latitude": 34.987654, "longitude": 135.111111})  # noqa: E501
+    b = client.post(f"/api/v1/plans/{p}/booklet/preview", json=_opts(theme="space")).json()
+    assert b["theme"] == "space" and b["map"]["coordinates_rounded"] is True
+    assert [(x["no"], x["label"], x["latitude"]) for x in b["map"]["points"]] == [(1, "一日目", 34.988), (2, "二日目", 35.123)]  # noqa: E501
+    assert b["schedule"]["days"][0]["events"][0]["map_no"] == 1

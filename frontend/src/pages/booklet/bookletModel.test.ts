@@ -1,6 +1,8 @@
 /**
  * [Gate P4] しおり画面の整形・入力検証(bookletModel)の単体テスト。
  */
+import { THEME_WORDS, fontUrl } from './bookletThemes';
+import { buildOverview, buildTimeline, longDate, shortDate, unplacedMoves, THEME_OPTIONS } from './bookletModel';
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_OPTIONS, defaultValidUntil, describeIncludes, eventTypeLabel, isSensitive, orderSections, tocSections,
@@ -37,5 +39,36 @@ describe('bookletModel (Gate P4)', () => {
   it('予定の種類は文字で示す(白黒でも区別できる)。未知の値はそのまま', () => {
     expect(eventTypeLabel('sightseeing')).toBe('観光');
     expect(eventTypeLabel('custom')).toBe('custom');
+  });
+});
+
+describe('[Gate BookletPatterns] 大日程と日別の行程', () => {
+  const ev = (title: string, event_type: string, t: string | null, reservations: { type: string; provider_name: string | null; status: string }[] = []) => ({
+    title, event_type, local_start_time: t, is_all_day: false, end: null, place_name: null, address: null, locked: false, reservations,
+  });
+  const day = (date: string, events: ReturnType<typeof ev>[]) => ({ date, title: null, timezone_id: 'Asia/Tokyo', events });
+  const move = { mode: 'train', from_label: '清水寺', to_label: '祇園', departure: '2027-04-10 12:00', arrival: '2027-04-10 12:20', duration_minutes: 20, transport_number: null, platform: null, status: 'planned', is_estimate: false };
+
+  it('曜日は端末の時刻帯に関係なく書かれた日付で決まる', () => {
+    expect(shortDate('2027-04-10')).toBe('4/10(土)');
+    expect(longDate('2027-04-10')).toBe('2027年4月10日(土)');
+    expect(longDate(null)).toBe('日付未定');
+  });
+  it('大日程は主な予定と、期間が重なる宿泊の予約を 1 行にする', () => {
+    const d = day('2027-04-10', [ev('駅へ', 'transport', '09:00'), ev('清水寺', 'sightseeing', '10:00'), ev('祇園', 'meal', '12:00')]);
+    const rows = buildOverview({ schedule: { days: [d], transport: [] }, reservations: [{ type: 'accommodation', provider_name: '京の宿', status: 'confirmed', start: '2027-04-10 15:00', end: '2027-04-11 10:00', timezone_id: null, guest_count: null, confirmation: null, confirmation_is_full: false, contact_phone: null, cancellation_deadline: null, payment_status: null }] });
+    expect(rows[0]).toMatchObject({ no: 1, highlights: ['清水寺', '祇園'], stay: '京の宿', start: '09:00' });
+  });
+  it('移動は出発する予定の後へ入り、どの日にも入らない移動は別に残る', () => {
+    const d = day('2027-04-10', [ev('清水寺', 'sightseeing', '10:00'), ev('祇園', 'meal', '13:00')]);
+    expect(buildTimeline(d, [move]).map((x) => x.kind)).toEqual(['event', 'move', 'event']);
+    expect(unplacedMoves([d], [move, { ...move, departure: null }])).toHaveLength(1);
+  });
+  it('12 パターンのどれも見出しの言葉と字体を持つ', () => {
+    for (const t of THEME_OPTIONS) {
+      expect(THEME_WORDS[t.value].day(1)).toBeTruthy();
+      expect(fontUrl(t.value)).toContain('fonts.googleapis.com');
+    }
+    expect(THEME_OPTIONS).toHaveLength(15);
   });
 });

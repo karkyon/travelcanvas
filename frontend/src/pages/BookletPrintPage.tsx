@@ -14,6 +14,7 @@ import { extractApiErrorDetailMessage, getBookletExport } from '@/services/api';
 import type { BookletExportResult } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookletView from './booklet/BookletView';
+import { printWhenReady } from './booklet/bookletModel';
 
 // 422(配列)・文字列は extractApiErrorDetailMessage、構造化detail({code, message})は errorDetailMessage で表示する
 function errorMessage(e: unknown, fallback: string): string {
@@ -42,12 +43,12 @@ const BookletPrintPage: React.FC = () => {
   }, [planId, exportId]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/booklet`)}>← しおりの設定へ戻る</Button>
         {result && (
           <div className="flex gap-2">
-            <Button variant="primary" onClick={() => window.print()}>印刷 / PDFで保存</Button>
+            <Button variant="primary" onClick={() => void printWhenReady()}>印刷 / PDFで保存</Button>
           </div>
         )}
       </div>

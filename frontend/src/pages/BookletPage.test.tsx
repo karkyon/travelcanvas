@@ -69,7 +69,7 @@ describe('BookletPage (Gate P4)', () => {
     expect(view).toHaveTextContent('(一部を伏せています)');
     expect(view).toHaveTextContent('チケット・QRコードは含めていません');
     expect(within(view).getByTestId('booklet-stamp')).toHaveTextContent('プレビュー(保存されていません)');
-    expect(within(view).getByRole('link', { name: '日程' })).toHaveAttribute('href', '#booklet-sec-schedule');
+    expect(within(view).getByRole('link', { name: '日別の行程表' })).toHaveAttribute('href', '#booklet-sec-schedule');
     // 費用はカテゴリの超過を文字で示す
     expect(within(view).getByRole('region', { name: '費用' })).toHaveTextContent('【超過】');
   });
@@ -151,7 +151,7 @@ describe('BookletPrintPage (Gate P4)', () => {
     expect(stamp).toHaveTextContent('紛失・置き忘れに注意');
     expect(screen.getByTestId('booklet')).toHaveTextContent('ABC1234567');
     fireEvent.click(screen.getByRole('button', { name: '印刷 / PDFで保存' }));
-    expect(window.print).toHaveBeenCalled();
+    await waitFor(() => expect(window.print).toHaveBeenCalled());
   });
 
   it('旅程が更新された版は注意を出す', async () => {

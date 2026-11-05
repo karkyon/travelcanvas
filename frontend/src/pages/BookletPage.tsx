@@ -24,7 +24,7 @@ import type { Booklet, BookletExport, BookletOptions, BookletSection, PlanMember
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookletView from './booklet/BookletView';
 import {
-  DEFAULT_OPTIONS, EXPORT_STATE_LABEL, INCLUDE_OPTIONS, SECTION_OPTIONS, THEME_OPTIONS, defaultValidUntil,
+  DEFAULT_OPTIONS, EXPORT_STATE_LABEL, INCLUDE_OPTIONS, REQUIRED_SECTIONS, SECTION_OPTIONS, THEME_OPTIONS, defaultValidUntil,
   describeIncludes, formatDateTime, isSensitive, orderSections, validUntilToIso,
 } from './booklet/bookletModel';
 
@@ -33,6 +33,11 @@ function errorMessage(e: unknown, fallback: string): string {
   const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   return extractApiErrorDetailMessage(detail) ?? errorDetailMessage(e, fallback);
 }
+
+/** backend の member_policy.BOOKLET_SECTION_CATEGORY と同じ対応 */
+const HIDDEN_SECTIONS: Record<string, BookletSection[]> = {
+  reservations: ['reservations', 'contacts', 'notes'], costs: ['costs'], event_address: ['map'],
+};
 
 const BookletPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
@@ -46,6 +51,9 @@ const BookletPage: React.FC = () => {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // [Gate BookletPatterns] プレビューの見え方。旅行の所有者が隠した章は必須でも載せない
+  const [sheet, setSheet] = useState(false);
+  const [blocked, setBlocked] = useState<BookletSection[]>([]);
 
   const me = useMemo(() => members.find((m) => m.is_me) ?? null, [members]);
   const isOwner = me?.role === 'owner';
@@ -56,10 +64,24 @@ const BookletPage: React.FC = () => {
     if (!planId) return;
     setIsPreviewing(true);
     try {
-      const b = await previewBooklet(planId, opts);
+      let current = opts;
+      let b: Booklet | null = null;
+      // 所有者が隠した項目の章は作れない(403)。隠された章を外して作り直し、そのことを画面に示す
+      for (let i = 0; i < 4 && !b; i += 1) {
+        try {
+          b = await previewBooklet(planId, current);
+        } catch (e) {
+          const detail = (e as { response?: { data?: { detail?: { code?: string; category?: string } } } })?.response?.data?.detail;
+          const drop = detail?.code === 'member_field_hidden' ? HIDDEN_SECTIONS[detail.category ?? ''] : undefined;
+          if (!drop || i === 3) throw e;
+          current = { ...current, sections: current.sections.filter((s) => !drop.includes(s)) };
+          setBlocked((x) => [...new Set([...x, ...drop])]);
+          setOptions(current);
+        }
+      }
       setPreview(b);
       setError(null);
-      if (!validUntil) setValidUntil(defaultValidUntil(b.cover?.end_date));
+      if (!validUntil) setValidUntil(defaultValidUntil(b?.cover?.end_date));
     } catch (e) {
       setError(errorMessage(e, 'プレビューの作成に失敗しました'));
     } finally {
@@ -178,13 +200,25 @@ const BookletPage: React.FC = () => {
             <Card padding="md">
               <h2 className="font-semibold text-gray-900 mb-3">デザイン</h2>
               <fieldset>
-                <legend className="text-sm font-medium text-gray-800 mb-1">テーマ</legend>
-                <div className="space-y-1 text-sm">
+                <legend className="text-sm font-medium text-gray-800 mb-1">パターン(内容は同じで、見た目が変わります)</legend>
+                <div className="grid grid-cols-2 gap-1.5 text-sm" data-testid="booklet-themes">
                   {THEME_OPTIONS.map((t) => (
-                    <label key={t.value} className="flex items-start gap-2">
+                    <label key={t.value} className={`flex items-start gap-2 border rounded-sm p-1.5 cursor-pointer ${options.theme === t.value ? 'border-gray-900 bg-gray-100' : 'border-gray-300'}`}>
                       <input type="radio" name="booklet-theme" className="mt-1" checked={options.theme === t.value}
-                        onChange={() => setOptions((o) => ({ ...o, theme: t.value }))} />
-                      <span><span className="font-medium">{t.label}</span><span className="block text-xs text-gray-700">{t.help}</span></span>
+                        onChange={() => {
+                          setOptions((o) => ({ ...o, theme: t.value }));
+                          // デザインは見た目だけなので、読み直さずに切り替える
+                          setPreview((p) => (p ? { ...p, theme: t.value } : p));
+                        }} />
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1 font-medium">
+                          <span aria-hidden="true" className="inline-flex shrink-0 border border-gray-400">
+                            <span className="w-2.5 h-3.5" style={{ background: t.swatch[0] }} /><span className="w-2.5 h-3.5" style={{ background: t.swatch[1] }} />
+                          </span>
+                          {t.label}
+                        </span>
+                        <span className="block text-xs text-gray-700">{t.help}</span>
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -213,14 +247,19 @@ const BookletPage: React.FC = () => {
               <fieldset>
                 <legend className="font-semibold text-gray-900 mb-2">載せる章</legend>
                 <div className="grid grid-cols-2 gap-1 text-sm">
-                  {SECTION_OPTIONS.map((s) => (
-                    <label key={s.value} className="flex items-center gap-2">
-                      <input type="checkbox" checked={options.sections.includes(s.value)}
-                        onChange={(e) => toggleSection(s.value, e.target.checked)} />
-                      {s.label}
-                    </label>
-                  ))}
+                  {SECTION_OPTIONS.map((s) => {
+                    const required = REQUIRED_SECTIONS.includes(s.value);
+                    const hidden = blocked.includes(s.value);
+                    return (
+                      <label key={s.value} className="flex items-center gap-2">
+                        <input type="checkbox" checked={options.sections.includes(s.value)} disabled={required || hidden}
+                          onChange={(e) => toggleSection(s.value, e.target.checked)} />
+                        {s.label}{required && !hidden ? '(必須)' : ''}{hidden ? '(所有者が非公開)' : ''}
+                      </label>
+                    );
+                  })}
                 </div>
+                <p className="mt-2 text-xs text-gray-700">タイトル・日程・エリア・地図・大日程・日別の行程表は、どのパターンにも必ず載せます。</p>
               </fieldset>
             </Card>
 
@@ -311,7 +350,11 @@ const BookletPage: React.FC = () => {
 
           <div aria-live="polite">
             <h2 className="sr-only">プレビュー</h2>
-            {preview ? <BookletView booklet={preview} exportInfo={null} /> : (
+            <div className="no-print mb-2 flex gap-1" role="group" aria-label="プレビューの見え方">
+              <Button variant={sheet ? 'ghost' : 'outline'} size="sm" aria-pressed={!sheet} onClick={() => setSheet(false)}>Web の見え方</Button>
+              <Button variant={sheet ? 'outline' : 'ghost'} size="sm" aria-pressed={sheet} onClick={() => setSheet(true)}>印刷の見え方(A4)</Button>
+            </div>
+            {preview ? <div className="overflow-x-auto"><BookletView booklet={preview} exportInfo={null} sheet={sheet} /></div> : (
               <Card padding="lg" className="text-center text-gray-700">プレビューを作成しています…</Card>
             )}
           </div>

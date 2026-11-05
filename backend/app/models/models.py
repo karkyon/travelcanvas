@@ -2401,7 +2401,8 @@ class BookletExport(Base):
         UniqueConstraint("plan_id", "version_no", name="uq_booklet_exports_plan_version"),
         CheckConstraint("format IN ('web','print')", name="ck_booklet_exports_format"),
         CheckConstraint(
-            "theme IN ('cute','simple','family','school','business','accessible','mono')",
+            "theme IN ('cute','simple','family','school','business','accessible','mono','functional','friends','wild',"
+            "'lovers','elegant','calm','solo','space')",
             name="ck_booklet_exports_theme",
         ),
         CheckConstraint("density IN ('normal','compact')", name="ck_booklet_exports_density"),

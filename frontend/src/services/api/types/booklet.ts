@@ -5,7 +5,9 @@
  * しおり投影はホワイトリスト。既定では予約番号は伏字、住所・電話・参加者名は null。
  * QR・チケットの中身・PIN・名義・個人の持ち物・個人予算はどの設定でも含まれない。
  */
-export type BookletTheme = 'cute' | 'simple' | 'family' | 'school' | 'business' | 'accessible' | 'mono';
+export type BookletTheme =
+  | 'simple' | 'functional' | 'business' | 'family' | 'friends' | 'wild' | 'lovers' | 'elegant' | 'calm' | 'solo'
+  | 'school' | 'space' | 'cute' | 'accessible' | 'mono';
 export type BookletDensity = 'normal' | 'compact';
 export type BookletFormat = 'web' | 'print';
 export type BookletSection =
@@ -32,6 +34,14 @@ export interface BookletExportCreateData extends BookletOptions {
   valid_until?: string;
 }
 
+export interface BookletPoint {
+  no: number;
+  label: string;
+  date: string | null;
+  latitude: number;
+  longitude: number;
+}
+
 export interface BookletEvent {
   title: string;
   event_type: string;
@@ -41,6 +51,8 @@ export interface BookletEvent {
   place_name: string | null;
   address: string | null;
   locked: boolean;
+  /** [Gate BookletPatterns] 地図のピンの番号。座標が無い・地図を載せない時は無い */
+  map_no?: number | null;
   reservations: Array<{ type: string; provider_name: string | null; status: string }>;
 }
 
@@ -107,7 +119,12 @@ export interface Booklet {
     day_count: number; member_count: number;
   } | null;
   schedule: { days: BookletDay[]; transport: BookletTransport[] } | null;
-  map: { places: Array<{ label: string; date: string | null; address: string | null; latitude: number | null; longitude: number | null }> } | null;
+  map: {
+    places: Array<{ label: string; date: string | null; address: string | null; latitude: number | null; longitude: number | null }>;
+    /** [Gate BookletPatterns] 地図のピン。以前の版には無い */
+    points?: BookletPoint[];
+    coordinates_rounded?: boolean;
+  } | null;
   reservations: BookletReservation[] | null;
   packing: Array<{ name: string; category: string; quantity: number; is_required: boolean; status: string }> | null;
   contacts: {

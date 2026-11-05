@@ -209,7 +209,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev gcc g++ libjpeg-dev libpng-dev libgeos-dev libproj-dev tesseract-ocr tesseract-ocr-jpn
+          sudo apt-get install -y libpq-dev gcc g++ libjpeg-dev libpng-dev libgeos-dev libproj-dev tesseract-ocr tesseract-ocr-jpn tesseract-ocr-eng
 
       # [Gate S1] 実行時の依存(requirements.txt)と、試験・lint・監査の道具(requirements-dev.txt、版を固定)
       - name: Install Python dependencies

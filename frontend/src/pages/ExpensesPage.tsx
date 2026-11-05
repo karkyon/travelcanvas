@@ -29,6 +29,8 @@ import type { ExpenseFlags, FxRate } from '@/services/api/types/g5';
 import SummaryPanel from './expenses/SummaryPanel';
 import { ExpenseListPanel, SettlementPanel } from './expenses/ExpensePanels';
 import LedgerPanel from './expenses/LedgerPanel';
+import ReceiptScanDialog from './expenses/ReceiptScanDialog';
+import type { ReceiptResult } from '@/services/api/receipt';
 import {
   BUDGET_KIND_LABEL, CATEGORY_OPTIONS, CURRENCY_OPTIONS, SPLIT_OPTIONS, emptyExpenseForm, expenseFormFromExpense,
   expenseFormToPayload, isValidAmount, minorDigits, type ExpenseForm,
@@ -86,6 +88,8 @@ const ExpensesPage: React.FC = () => {
   const [expenseForm, setExpenseForm] = useState<ExpenseForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanNotes, setScanNotes] = useState<string[]>([]);
   // [Gate G5] 取消の状態・為替の記録・領収書の候補・取消の理由の入力
   const [flags, setFlags] = useState<Record<string, ExpenseFlags>>({});
   const [rates, setRates] = useState<FxRate[]>([]);
@@ -209,6 +213,7 @@ const ExpensesPage: React.FC = () => {
   // ----- 支出
   const openExpense = (mode: ExpenseMode) => {
     setFormError(null);
+    setScanNotes([]);
     setExpenseMode(mode);
     const source = mode.mode === 'edit' ? mode.expense : null;
     setExtra({
@@ -226,6 +231,20 @@ const ExpensesPage: React.FC = () => {
     } else {
       setExpenseForm(emptyExpenseForm(members, base));
     }
+  };
+
+  // [Gate Receipt] 読み取った値を支出の追加のフォームへ入れる(登録は利用者が確かめた後)
+  const applyReceipt = (r: ReceiptResult) => {
+    setScanOpen(false);
+    openExpense({ mode: 'create' });
+    const f = r.fields;
+    const category = f.category?.value as ExpenseCategory | undefined;
+    setExpenseForm({
+      ...emptyExpenseForm(members, base),
+      title: f.title?.value ?? '', local_date: f.local_date?.value ?? '', amount: f.amount?.value ?? '',
+      currency: f.currency?.value ?? base, tax_amount: f.tax_amount?.value ?? '', ...(category ? { category } : {}),
+    });
+    setScanNotes(['レシートから読み取りました。内容を確かめてから登録してください。', ...r.warnings, ...(r.ai_message ? [r.ai_message] : [])]);
   };
 
   const submitExpense = async (e: React.FormEvent) => {
@@ -374,7 +393,7 @@ const ExpensesPage: React.FC = () => {
         <div role="tabpanel" id={`fin-panel-${tab}`} aria-labelledby={`fin-tab-${tab}`}>
           {tab === 'summary' && <SummaryPanel summary={summary} budgets={budgets} canEdit={canEdit} onEditBudget={openBudget} />}
           {tab === 'expenses' && (
-            <ExpenseListPanel expenses={expenses} canEdit={canEdit} onAdd={() => openExpense({ mode: 'create' })}
+            <ExpenseListPanel expenses={expenses} canEdit={canEdit} onAdd={() => openExpense({ mode: 'create' })} onScan={() => setScanOpen(true)}
               onEdit={(x) => openExpense({ mode: 'edit', expense: x })} onDelete={removeExpense}
               onRefund={(x) => openExpense({ mode: 'refund', of: x })}
               onComment={(x) => navigate(`/planner/${planId}/discussion?target=expense&id=${x.id}`)}
@@ -429,6 +448,7 @@ const ExpensesPage: React.FC = () => {
         )}
       </Modal>
 
+      {planId && <ReceiptScanDialog planId={planId} isOpen={scanOpen} onClose={() => setScanOpen(false)} onRead={applyReceipt} />}
       <Modal isOpen={expenseMode !== null} onClose={() => setExpenseMode(null)}
         title={expenseMode?.mode === 'edit' ? '支出の編集' : expenseMode?.mode === 'refund' ? '返金の登録' : '支出の追加'} size="lg">
         {expenseForm && expenseMode && (
@@ -436,6 +456,11 @@ const ExpensesPage: React.FC = () => {
             <Modal.Body>
               <div className="space-y-4">
                 {formError && <div className="p-2 rounded-sm bg-red-50 text-red-800 text-sm" role="alert">{formError}</div>}
+                {scanNotes.length > 0 && (
+                  <ul className="p-2 rounded-sm border border-amber-300 bg-amber-50 text-amber-900 text-sm space-y-1" data-testid="receipt-notes">
+                    {scanNotes.map((n) => <li key={n}>{n}</li>)}
+                  </ul>
+                )}
                 <div>
                   <label htmlFor="expense-title" className="block text-sm font-medium text-ink-900 mb-1">内容</label>
                   <input id="expense-title" className={inputClass} maxLength={200} value={expenseForm.title}

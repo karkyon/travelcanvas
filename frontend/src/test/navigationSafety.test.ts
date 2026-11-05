@@ -17,6 +17,7 @@ const SAFE_CALLS = new Set(['safeInternalPath', 'safeExternalUrl', 'safeTelHref'
 /** 固定の配列(画面の上のメニュー)から作った値など、静的に安全と確認した式。`ファイル::式` */
 const ALLOW = new Set([
   'components/Header.tsx::item.path',
+  'pages/booklet/BookletView.tsx::fontUrl(theme)', // 固定の Google Fonts の URL(テーマの一覧から作る)
   'components/layout/Header.tsx::item.href',
   'components/common/Button.tsx::isDisabled ? undefined : href',
   'components/location/RecordingIndicator.tsx::trackPath',

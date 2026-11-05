@@ -171,7 +171,9 @@
 | `not_intent_draft` | 404 | no | この旅行は旅行相談から作った下書きではありません | api/v1/trip_intents.py |
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
+| `nothing_extracted` | 503 | later | レシートの文字を読み取れませんでした。 | api/v1/receipts.py |
 | `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |
+| `ocr_unavailable` | 503 | later | このサーバーでは画像の文字を読めません(OCR が未導入)。手で入力してください | api/v1/receipts.py |
 | `ops_reason_required` | — | — | 理由を200文字までで入力してください | api/v1/admin_ops.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
 | `organization_not_found` | 404 | no | 組織が見つかりません | services/organizations.py |
@@ -233,6 +235,7 @@
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
+| `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |

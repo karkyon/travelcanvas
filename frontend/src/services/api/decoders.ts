@@ -976,7 +976,7 @@ export const planComment: Decoder<PlanComment> = object<PlanComment>({
 // ----- [Gate P4] しおり・印刷・PDF出力(FR-034/035/046)。backend/app/api/v1/booklet.py の応答(booklet-v1)。
 // 機密項目を含むかどうか(contains_sensitive・includes)と版の状態を誤ると、透かしや注意を出さずに
 // 印刷させてしまうため、列挙値と真偽値を厳密に検査する。
-const BOOKLET_THEMES = ['cute', 'simple', 'family', 'school', 'business', 'accessible', 'mono'] as const;
+const BOOKLET_THEMES = ['simple', 'functional', 'business', 'family', 'friends', 'wild', 'lovers', 'elegant', 'calm', 'solo', 'school', 'space', 'cute', 'accessible', 'mono'] as const;
 const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'notes'] as const;
 const bookletIncludes: Decoder<BookletIncludes> = object<BookletIncludes>({
   confirmation_numbers: bool, addresses: bool, phones: bool, participants: bool,
@@ -1006,7 +1006,7 @@ export const booklet: Decoder<Booklet> = object<Booklet>({
       date: str, title: nullable(str), timezone_id: str,
       events: arrayOf(object({
         title: str, event_type: str, local_start_time: nullable(str), is_all_day: bool, end: nullable(str),
-        place_name: nullable(str), address: nullable(str), locked: bool,
+        place_name: nullable(str), address: nullable(str), locked: bool, map_no: optional(nullable(nonNegativeInt)),
         reservations: arrayOf(object({ type: str, provider_name: nullable(str), status: str })),
       })),
     })),
@@ -1020,6 +1020,8 @@ export const booklet: Decoder<Booklet> = object<Booklet>({
     places: arrayOf(object({
       label: str, date: nullable(str), address: nullable(str), latitude: nullable(num), longitude: nullable(num),
     })),
+    points: optional(arrayOf(object({ no: nonNegativeInt, label: str, date: nullable(str), latitude: num, longitude: num }))),
+    coordinates_rounded: optional(bool),
   })),
   reservations: nullable(arrayOf(object({
     type: str, provider_name: nullable(str), status: str, start: nullable(str), end: nullable(str),
