@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r49",
+  "revision": "v5.1-r50",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -33,7 +33,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "A1・S2・S5・S7・S9・S11",
-   "gaps": "メールの確認、passkey"
+   "gaps": "メールの確認、passkey、パスワード再設定(忘れた時)の API・画面"
   },
   "FR-004": {
    "title": "旅行CRUD",
@@ -265,7 +265,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "#36・K1",
-   "gaps": "サーバー側のパック、通信しない端末の遠隔消去"
+   "gaps": "サーバー側のパック、通信しない端末の遠隔消去。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働)"
   },
   "FR-033": {
    "title": "Offline同期",
@@ -393,7 +393,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "#36・P11・K1・G6",
-   "gaps": "本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)"
+   "gaps": "本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働)"
   },
   "FR-049": {
    "title": "Visited Area Layer",
@@ -481,7 +481,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect",
-   "gaps": "OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)"
+   "gaps": "OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する"
   }
  }
 }
