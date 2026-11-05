@@ -123,15 +123,15 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 |---|---|---|---|
 | FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)、祝日の暦の自動の取得(外部の暦。例外の日は手で登録できる) |
-| FR-011 | 予約取込 | INTEGRATED(部分) | メール・OCRによる自動抽出 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | メールの自動受信(転送アドレス・Gmail 連携)、PDF、1 通から複数の予約。実の AI での精度は未確認 |
 | FR-014 | 移動区間 | INTEGRATED | 外部の交通(時刻表・運賃)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 外部経路による実移動時間 |
 | FR-024 | コメント・通知 | INTEGRATED(部分) | メールの送信の提供元(SMTP の設定。運用の判断)、即時の配信(COL-01 の配信の仕組みに載せる) |
 | FR-030 | 外部状況 | INTEGRATED(部分) | 外部provider(運行情報・天気・警報・休業) |
 | FR-035 | 安全な印刷・公開 | INTEGRATED(部分) | サーバー側の PDF・ダウンロード URL |
-| FR-036 | Calendar/Map IO | INTEGRATED(部分) | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込 |
-| FR-037 | 写真・旅行記 | INTEGRATED(部分) | 顔の検査(画像認識の提供元)、MEMORY MAP(地図の提供元) |
+| FR-036 | Calendar/Map IO | INTEGRATED(部分) | 外部カレンダーの常時同期、GPX/KML/CSV の取込、削除の取込。Google マイマップは KML の案内付き取り込み(自動作成なし、自動更新なし) |
+| FR-037 | 写真・旅行記 | INTEGRATED(部分) | 顔の検査(画像認識の提供元)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装 |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | 埋め込み(iframe・JS の部品)、旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ) |
 | FR-046 | 画像・PDFの出力 | INTEGRATED(部分) | サーバー側の生成、NOW/NEXT カードの画像、画像作成の監査 |

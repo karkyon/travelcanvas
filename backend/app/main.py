@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage,
-    privacy_zones, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
+    privacy_zones, photo_upload, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers,
     trip_intents,
     planning_usage,
@@ -531,6 +531,8 @@ app.include_router(finance.router, prefix="/api/v1")
 # [Gate P3] FR-022合意形成(投票・懸念) / FR-024コメント・メンション通知。/plans/{plan_id}/polls・comments配下。
 app.include_router(discussion.router, prefix="/api/v1")
 # [Gate P4] FR-034しおり生成 / FR-035安全な印刷・公開 / FR-046 PDF出力。/plans/{plan_id}/booklet・booklet-exports配下。
+app.include_router(photo_upload.router, prefix="/api/v1")  # [Gate PhotoQR]
+app.include_router(photo_upload.public_router, prefix="/api/v1")
 app.include_router(booklet.router, prefix="/api/v1")
 app.include_router(booklet.public_router, prefix="/api/v1")  # [Gate BookletWeb] 公開したしおり
 # [Gate P5] FR-036カレンダー・地図の書き出し(ICS/GPX/KML/CSV)。/plans/{plan_id}/exports/*配下。

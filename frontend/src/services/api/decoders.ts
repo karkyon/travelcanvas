@@ -1423,6 +1423,10 @@ export const travelMemory: Decoder<TravelMemory> = object<TravelMemory>({
   created_at: nullable(str),
   updated_at: nullable(str),
   source: optional(nullable(record)),
+  location_source: optional(nullable(str)),
+  location_status: optional(nullable(str)),
+  location_confidence: optional(nullable(num)),
+  location_visibility: optional(nullable(str)),
 });
 export const memoryList: Decoder<MemoryList> = object<MemoryList>({
   memories: arrayOf(travelMemory),

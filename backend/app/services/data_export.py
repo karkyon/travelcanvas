@@ -104,7 +104,7 @@ PLAN_TABLES = (
     m.PlanCandidate, m.SupportGrant,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
     m.FxRate, m.BudgetVersion,
-    m.MemoryPublication, m.MemoryTrash,
+    m.MemoryPublication, m.MemoryTrash, m.PhotoUploadLink, m.PlanExternalMap,
     m.PlanMovementSettings,
     m.PlanOwnershipTransfer, m.DataCorrection,
     m.ProviderUsageReservation, m.ProviderUsageEvent,
@@ -114,6 +114,16 @@ PLAN_TABLES = (
 
 def _ids(rows: Iterable) -> List:
     return [r.id for r in rows]
+
+
+def _memory_row(x: m.Memory, me: uuid.UUID) -> Dict[str, Any]:
+    """[Gate PhotoMap] 他の人の写真の位置は、本人が公開を選んだ確定の位置だけ出す。"""
+    out = row(x)
+    if x.author_user_id != me and (x.location_visibility != "members" or x.location_status == "proposed"):
+        out.update(latitude=None, longitude=None, location_source=None, location_status=None,
+                   location_confidence=None)
+    out.pop("client_upload_id", None)
+    return out
 
 
 def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, List[Dict[str, Any]]]:
@@ -224,7 +234,11 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     # 同期の受領記録は送った本人の分だけ(他の人が端末から送った内容は含めない)
     t["sync_operations"] = [row(x) for x in q(m.SyncOperation).filter(m.SyncOperation.user_id == me).all()]
     # 旅の記録は本人の分と、メンバーに公開された分だけ(他の人の「自分だけ」の記録は含めない)。ファイルは含めない
-    t["memories"] = [row(x) for x in q(m.Memory).all() if x.author_user_id == me or x.visibility == "members"]
+    t["memories"] = [_memory_row(x, me) for x in q(m.Memory).all()
+                     if x.author_user_id == me or x.visibility == "members"]
+    t["photo_upload_links"] = [row(x) for x in q(m.PhotoUploadLink).all() if x.created_by_user_id == me]
+    t["plan_external_maps"] = [row(x) for x in q(m.PlanExternalMap).all()
+                               if x.user_id == me or x.visibility == "members"]
     # [Gate P13] 位置の軌跡は本人の分だけ(点は復号して含める)。他の人の軌跡は所有者にも出さない
     t["location_tracks"] = own_location_tracks(db, plan, me)
     # [Gate L5] この旅行の位置の扱い(本人の分だけ)

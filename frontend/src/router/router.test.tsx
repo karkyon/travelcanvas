@@ -28,7 +28,8 @@ const EXPECTED_ROUTE_PATHS = [
   '/planner/:planId/sync', '/planner/:planId/memories', '/planner/:planId/track', '/planner/:planId/journey', '/planner/:planId/visits', '/organizations', '/organizations/:orgId', '/organizations/:orgId/distributions/:distId', '/trip-consult', '/planner/:planId/draft', '/planner/:planId/candidates', '/planner/:planId/places/:placeId', '/planner/:planId/memory-replan', '/search',
   '/search/(index)', '/search/settings', '/search/spots', '/spots', '/spots/(index)', '/spots/search',
   '/spots/register', '/settings', '/settings/data', '/memories', '/atlas', '/profile', '/admin', '/admin/(index)', '/admin/users', '/admin/audit-logs', '/admin/support', '/admin/abuse', '/admin/ops', '/notifications',
-  '/share/:planId', '/s/:token', '/b/:token', '/journal/:token', '/optimization', '/404', '/*',
+  '/share/:planId', '/s/:token', '/b/:token',
+      '/u/:token', '/journal/:token', '/optimization', '/404', '/*',
 ];
 
 function collectPaths(routes: RouteObject[], prefix = ''): string[] {

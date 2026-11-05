@@ -20,21 +20,36 @@ function ascii(view: DataView, off: number, len: number): string {
 
 /** JPEG(ArrayBuffer)の Exif から GPS を読む。無い・壊れている時は null */
 export function readExifGps(buf: ArrayBuffer): GpsPoint | null {
+  return readExifInfo(buf).gps;
+}
+
+/** [Gate PhotoMap] 撮影位置と撮影日時を別々に読む(位置を消しても日時は残るブラウザがある)。読むのは JPEG だけ */
+export function readExifInfo(buf: ArrayBuffer): { gps: GpsPoint | null; takenAt: string | null } {
+  const none = { gps: null, takenAt: null };
   const v = new DataView(buf);
-  if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return null;
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return none;
   let off = 2;
   while (off + 4 <= v.byteLength) {
     const marker = v.getUint16(off);
     const size = v.getUint16(off + 2);
     if (marker === 0xffe1 && ascii(v, off + 4, 4) === 'Exif') return parseTiff(v, off + 10);
-    if ((marker & 0xff00) !== 0xff00 || size < 2) return null;
+    if ((marker & 0xff00) !== 0xff00 || size < 2) return none;
     off += 2 + size;
   }
-  return null;
+  return none;
 }
 
-function parseTiff(v: DataView, base: number): GpsPoint | null {
-  if (base + 8 > v.byteLength) return null;
+/** Exif の "2026:04:10 15:12:00"(端末の時刻)を ISO にする。読めない時は null */
+export function exifTimeToIso(value: string | null): string | null {
+  const m = value?.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const d = new Date(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!);
+  return Number.isNaN(d.getTime()) || +m[1]! < 2000 ? null : d.toISOString();
+}
+
+function parseTiff(v: DataView, base: number): { gps: GpsPoint | null; takenAt: string | null } {
+  const none = { gps: null, takenAt: null };
+  if (base + 8 > v.byteLength) return none;
   const little = v.getUint16(base) === 0x4949;
   const u16 = (o: number) => v.getUint16(base + o, little);
   const u32 = (o: number) => v.getUint32(base + o, little);
@@ -44,12 +59,21 @@ function parseTiff(v: DataView, base: number): GpsPoint | null {
   const n0 = u16(ifd0);
   for (let i = 0; i < n0; i += 1) {
     const e = ifd0 + 2 + i * 12;
-    if (base + e + 12 > v.byteLength) return null;
+    if (base + e + 12 > v.byteLength) return none;
     const tag = u16(e);
     if (tag === 0x8825) gpsOff = u32(e + 8);
     if (tag === 0x8769) exifOff = u32(e + 8);
   }
-  if (!gpsOff) return null;
+  let takenAt: string | null = null;
+  if (exifOff) {
+    const m = u16(exifOff);
+    for (let i = 0; i < m; i += 1) {
+      const e = exifOff + 2 + i * 12;
+      if (base + e + 12 > v.byteLength) break;
+      if (u16(e) === 0x9003) takenAt = ascii(v, base + u32(e + 8), 19) || null;  // DateTimeOriginal
+    }
+  }
+  if (!gpsOff) return { gps: null, takenAt };
   const rational = (o: number) => { const d = u32(o + 4); return d ? u32(o) / d : 0; };
   const triple = (o: number) => rational(o) + rational(o + 8) / 60 + rational(o + 16) / 3600;
   let latRef = 'N';
@@ -66,20 +90,11 @@ function parseTiff(v: DataView, base: number): GpsPoint | null {
     if (tag === 2) lat = triple(u32(e + 8));
     if (tag === 4) lon = triple(u32(e + 8));
   }
-  if (lat === null || lon === null || (lat === 0 && lon === 0)) return null;
+  if (lat === null || lon === null || (lat === 0 && lon === 0)) return { gps: null, takenAt };
   if (latRef === 'S') lat = -lat;
   if (lonRef === 'W') lon = -lon;
-  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-  let takenAt: string | null = null;
-  if (exifOff) {
-    const m = u16(exifOff);
-    for (let i = 0; i < m; i += 1) {
-      const e = exifOff + 2 + i * 12;
-      if (base + e + 12 > v.byteLength) break;
-      if (u16(e) === 0x9003) takenAt = ascii(v, base + u32(e + 8), 19) || null;  // DateTimeOriginal
-    }
-  }
-  return { latitude: Math.round(lat * 1e6) / 1e6, longitude: Math.round(lon * 1e6) / 1e6, takenAt };
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return { gps: null, takenAt };
+  return { gps: { latitude: Math.round(lat * 1e6) / 1e6, longitude: Math.round(lon * 1e6) / 1e6, takenAt }, takenAt };
 }
 
 const URL_RE = /https?:\/\/\S+/g;

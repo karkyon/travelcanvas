@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
@@ -95,7 +96,7 @@ def register_all() -> None:
 
 # ===================================================================== 要求の組み立てと応答の読み取り
 
-def _openai_request(key: str, text: str, max_output_tokens: int, instructions: str = AI_INSTRUCTIONS,
+def _openai_request(key: str, text: Any, max_output_tokens: int, instructions: str = AI_INSTRUCTIONS,
                     text_format: Optional[Dict[str, Any]] = None) -> ph.ProviderResponse:
     payload: Dict[str, Any] = {"model": openai_model(), "instructions": instructions, "input": text,
                                "max_output_tokens": max_output_tokens, "store": False}
@@ -261,6 +262,32 @@ def ai_suggest(db: Session, plan: TravelPlan, caller: User, prompt: str, idempot
     return cg.run(db, plan, caller, "ai.generate", "openai",
                   {"input_tokens": reserve_input, "output_tokens": AI_MAX_OUTPUT_TOKENS}, idempotency_key, call,
                   fingerprint=fingerprint("openai", "ai.generate", str(plan.id), text))
+
+
+def ai_extract_reservation(db: Session, plan: TravelPlan, caller: User, instructions: str, schema: Dict[str, Any],
+                           text: str, image_jpeg: Optional[bytes], idempotency_key: str
+                           ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """[Gate BookingImport] 予約の文章・画像から項目を読む。同じ原価の枠(ai.generate)で数える。文章・画像は保存しない。"""
+    max_output = 600
+    if image_jpeg is None:
+        reserve_input = min(len(text) * 2 + 400, 10000)
+        content: Any = text
+    else:
+        reserve_input = 3000  # 画像 1 枚の入力の見込み。確定は応答の usage で行う
+        data = base64.b64encode(image_jpeg).decode("ascii")
+        content = [{"role": "user", "content": [
+            {"type": "input_text", "text": "この画像は旅行の予約の確認画面です。項目を抜き出してください。"},
+            {"type": "input_image", "image_url": f"data:image/jpeg;base64,{data}", "detail": "high"}]}]
+
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "openai", "ai.generate",
+                     lambda key: _openai_request(key, content, max_output, instructions, schema))
+        return cg.ProviderResult(units=_openai_usage(resp.body), payload={"text": _openai_text(resp.body)},
+                                 model=openai_model())
+
+    return cg.run(db, plan, caller, "ai.generate", "openai",
+                  {"input_tokens": reserve_input, "output_tokens": max_output}, idempotency_key, call,
+                  fingerprint=fingerprint("openai", "ai.generate", str(plan.id), "reservation", idempotency_key))
 
 
 def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: str, lat: Optional[float],

@@ -101,7 +101,8 @@ def _evidence(db: Session, plan: TravelPlan, user: User, events: List[TravelEven
                                       Memory.kind == "photo").all():
         if mm.event_id in out:
             out[mm.event_id]["photo"] = True
-        elif mm.latitude is not None and mm.longitude is not None:
+        # [Gate PhotoPlace] 確認待ちの推定の位置は訪問の根拠にしない
+        elif mm.latitude is not None and mm.longitude is not None and mm.location_status != "proposed":
             for e in events:
                 if e.latitude is None or e.longitude is None:
                     continue

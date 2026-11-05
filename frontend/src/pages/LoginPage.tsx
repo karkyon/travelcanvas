@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import { loginNextPath, safeInternalPath } from '@/utils/safeNavigation';
 
 /**
  * [Gate S11] 多要素認証の2段目(パスワードが正しく、認証アプリの確認コードを待っている時)。
@@ -115,7 +116,7 @@ const LoginPage = () => {
 
       toast.success('ログインしました！');
       console.log('✅ LoginPage: ログイン成功、ダッシュボードへリダイレクト');
-      navigate('/dashboard');
+      navigate(safeInternalPath(loginNextPath()) ?? '/dashboard');
     } catch (error) {
       console.error('❌ LoginPage: ログインエラー:', error);
       const errorMessage = error instanceof Error ? error.message : 'ログインに失敗しました';
@@ -136,7 +137,7 @@ const LoginPage = () => {
             </div>
             
             {pendingMfa ? (
-              <MfaLoginStep onDone={() => { toast.success('ログインしました！'); navigate('/dashboard'); }} />
+              <MfaLoginStep onDone={() => { toast.success('ログインしました！'); navigate(safeInternalPath(loginNextPath()) ?? '/dashboard'); }} />
             ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>

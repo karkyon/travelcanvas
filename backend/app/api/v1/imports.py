@@ -16,17 +16,20 @@ confirmエンドポイントでのみReservationを生成することで維持�
   confirm操作自体はowner/editor限定かつ監査ログ必須とすることで、実際の
   ドメインデータ生成には制御を残す)。
 """
+import uuid
 from datetime import datetime, timezone as dt_timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
-from app.services import member_policy, usage
+from app.services import cost_guard as cg
+from app.services import member_policy, provider_calls, usage
+from app.services import reservation_extract as rx
 from app.models.models import (
     Document,
     ExtractionCandidate,
@@ -36,6 +39,7 @@ from app.models.models import (
     Reservation,
     ReservationStatus,
     ReservationType,
+    TravelDay,
     User,
 )
 from app.services.audit_service import record_audit_event
@@ -196,6 +200,120 @@ def _require_review_required(j: ImportJob) -> None:
 # ==========================================
 # エンドポイント: import_jobs
 # ==========================================
+
+# ==========================================
+# [Gate BookingImport] 予約メール・画像からの読み取り
+# ==========================================
+
+class ExtractTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=rx.MAX_TEXT_CHARS)
+    use_ai: bool = False
+
+
+def _extract_error(code: str, message: str, status_code: int = 422) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+def _plan_dates(db: Session, plan) -> Any:
+    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.local_date).all()
+    dates = [d.local_date for d in days if d.local_date]
+    zone = next((d.timezone_id for d in days if d.timezone_id), "Asia/Tokyo")
+    return (dates[0] if dates else None), (dates[-1] if dates else None), zone
+
+
+def _save_extraction(db: Session, request: Request, plan, user: User, found: rx.Extraction, provider: str,
+                     source: str, ai_status: str, ai_message: Optional[str], first, last) -> Dict[str, Any]:
+    """候補を保存する(確定はしない)。値は暗号化し、元の文章・画像は保存しない。"""
+    values = {c.field: c.value for c in found.candidates}
+    job = ImportJob(plan_id=plan.id, created_by_user_id=user.id, provider=provider,
+                    status=ImportJobStatus.REVIEW_REQUIRED.value, consent_given=True)
+    usage.charge(db, "user", plan.user_id, "imports")
+    db.add(job)
+    db.flush()
+    try:
+        for c in found.candidates:
+            db.add(ExtractionCandidate(
+                import_job_id=job.id, field_path=c.field,
+                candidate_value_ciphertext=encrypt_payload(c.value.encode("utf-8"), plan_subject(plan.id)),
+                confidence=c.confidence, evidence_locator=c.evidence,
+                review_status=ExtractionCandidateReviewStatus.PENDING.value))
+    except EncryptionNotConfigured:
+        db.rollback()
+        raise _extract_error("encryption_not_configured", "候補の暗号化が設定されていません(サーバー側の設定)", 503)
+    db.commit()
+    db.refresh(job)
+    record_audit_event(action="import_job_extracted", resource_type="import_job", user_id=user.id, resource_id=job.id,
+                       ip_address=_client_ip(request), user_agent=_user_agent(request),
+                       details={"plan_id": str(plan.id), "source": source, "provider": provider,
+                                "fields": sorted(values), "ai": ai_status})
+    candidates = db.query(ExtractionCandidate).filter(ExtractionCandidate.import_job_id == job.id).all()
+    return {**_to_job_response(job).model_dump(mode="json"),
+            "candidates": [_to_candidate_response(c).model_dump(mode="json") for c in candidates],
+            "ai_status": ai_status, "ai_message": ai_message, "warnings": rx.out_of_trip(values, first, last)}
+
+
+def _run_text(db: Session, request: Request, plan, user: User, text: str, use_ai: bool, source: str) -> Dict[str, Any]:
+    first, last, zone = _plan_dates(db, plan)
+    found = rx.rule_extract(text, zone)
+    provider, ai_status, ai_message = "rules", "off", None
+    if use_ai:
+        if rx.CORE_FIELDS <= found.fields():
+            ai_status = "not_needed"
+        else:
+            masked = rx.mask_for_ai(text)
+            try:
+                payload, _usage = provider_calls.ai_extract_reservation(
+                    db, plan, user, rx.AI_INSTRUCTIONS, rx.ai_schema(), masked, None, str(uuid.uuid4()))
+                rx.merge_ai(found, payload["text"], zone, source="AI", masked_text=masked)
+                provider, ai_status = "rules+openai", "used"
+            except cg.CostGuardError as error:
+                ai_status, ai_message = "denied", error.message
+            except provider_calls.ProviderRejected:
+                ai_status, ai_message = "denied", "AI の接続に問題があるため、規則の読み取りだけを使いました"
+    if not found.candidates:
+        raise _extract_error("nothing_extracted", ai_message or "予約の項目を読み取れませんでした。手で項目を入れてください")
+    return _save_extraction(db, request, plan, user, found, provider, source, ai_status, ai_message, first, last)
+
+
+@router.post("/{plan_id}/imports/extract/text", status_code=status.HTTP_201_CREATED)
+def extract_from_text(plan_id: str, payload: ExtractTextRequest, request: Request, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)):
+    """貼り付けたメールの本文から候補を作る。AI は use_ai の時だけ(番号・氏名などを伏せて送る)。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    return _run_text(db, request, plan, current_user, payload.text, payload.use_ai, "text")
+
+
+@router.post("/{plan_id}/imports/extract/file", status_code=status.HTTP_201_CREATED)
+async def extract_from_file(plan_id: str, request: Request, file: UploadFile = File(...), use_ai: bool = Form(False),
+                            ai_consent: bool = Form(False), db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user_or_guest)):
+    """.eml または画像(JPEG・PNG・WebP)から候補を作る。画像は AI で読むので、送ることへの同意が必要。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    content = await file.read(rx.MAX_IMAGE_BYTES + 1)
+    name = (file.filename or "").lower()
+    try:
+        if name.endswith((".eml", ".txt")):
+            text = content.decode("utf-8", "replace") if name.endswith(".txt") else rx.parse_eml(content)
+            return _run_text(db, request, plan, current_user, text[:rx.MAX_TEXT_CHARS], use_ai, "eml")
+        if not ai_consent:
+            raise _extract_error("ai_consent_required", "画像を読むには、画像を AI の提供元へ送ることへの同意が必要です")
+        image = rx.prepare_image(content)
+    except rx.ExtractInputError as error:
+        raise _extract_error(error.code, str(error), 413 if error.code == "file_too_large" else 422)
+    first, last, zone = _plan_dates(db, plan)
+    try:
+        payload, _usage = provider_calls.ai_extract_reservation(
+            db, plan, current_user, rx.AI_INSTRUCTIONS, rx.ai_schema(), "", image, str(uuid.uuid4()))
+    except cg.CostGuardError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail())
+    except provider_calls.ProviderRejected:
+        raise _extract_error("provider_unavailable", "AI の提供元に接続できないため、画像を読めませんでした", 503)
+    found = rx.Extraction()
+    rx.merge_ai(found, payload["text"], zone, source="画像", masked_text=None)
+    if not found.candidates:
+        raise _extract_error("nothing_extracted", "画像から予約の項目を読み取れませんでした。手で項目を入れてください")
+    return _save_extraction(db, request, plan, current_user, found, "openai_image", "image", "used", None, first, last)
+
 
 @router.post("/{plan_id}/imports", response_model=ImportJobResponse, status_code=status.HTTP_201_CREATED)
 def create_import_job(

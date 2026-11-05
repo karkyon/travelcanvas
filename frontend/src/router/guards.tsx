@@ -6,6 +6,7 @@
  * ロジックは変更していない。
  */
 
+import { loginNextPath, safeInternalPath } from '@/utils/safeNavigation';
 import React, { Suspense, lazy } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -51,7 +52,8 @@ export const AuthRedirect = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
   
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    // [Gate PhotoQR] 写真の投稿ページから来た時は戻る
+    return <Navigate to={safeInternalPath(loginNextPath()) ?? '/dashboard'} replace />;
   }
   
   return <>{children}</>;

@@ -28,6 +28,12 @@ import {
 import JournalPublishCard from './memories/JournalPublishCard';
 import MemoryTrashCard from './memories/MemoryTrashCard';
 import { restoreMemory } from '@/services/api/g6';
+import PhotoQrCard from './memories/PhotoQrCard';
+import { fieldsFromInfo, readPhotoInfo } from './memories/photoRead';
+import type { PlaceOption } from './memories/MemoryMapPanel';
+
+// [Gate PhotoMap] 地図の部品は重いので、地図を開いた時だけ読む
+const MemoryMapPanel = React.lazy(() => import('./memories/MemoryMapPanel'));
 
 const MemoryMedia: React.FC<{ planId: string; memory: TravelMemory; alt: string }> = ({ planId, memory, alt }) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -99,6 +105,7 @@ const MemoriesPage: React.FC = () => {
   // [Gate G6] MEM-01 削除の取り消し
   const [lastDeleted, setLastDeleted] = useState<string | null>(null);
   const [trashKey, setTrashKey] = useState(0);
+  const [showMap, setShowMap] = useState(false);
 
   const load = useCallback(async () => {
     if (!planId) return;
@@ -122,6 +129,13 @@ const MemoriesPage: React.FC = () => {
     .flatMap((d) => (d.events ?? []).map((e) => ({ id: e.id, label: `${d.local_date} ${e.local_start_time ?? ''} ${e.title}`.replace(/\s+/g, ' ') }))),
   [days]);
   const groups = useMemo(() => groupMemories(data?.memories ?? [], days), [data, days]);
+  // [Gate PhotoMap] 位置のある予定(写真の場所の選択肢)
+  const places = useMemo<PlaceOption[]>(() => [...days]
+    .sort((a, b) => a.local_date.localeCompare(b.local_date))
+    .flatMap((d) => (d.events ?? []).flatMap((e) => (e.latitude != null && e.longitude != null
+      ? [{ id: e.id, label: `${d.local_date} ${e.title}`, name: e.title, latitude: e.latitude, longitude: e.longitude }]
+      : []))),
+  [days]);
 
   const resetForm = () => {
     setBody('');
@@ -164,7 +178,12 @@ const MemoriesPage: React.FC = () => {
     setBusy(true);
     try {
       if (kind === 'photo' || kind === 'audio') {
-        await uploadMemory(planId, { kind, file: file as File, ...common });
+        // [Gate PhotoMap] 撮影位置と日時は端末で読む(サーバーは保存前に撮影情報を消す)。手で入れた日時を優先する
+        const info = kind === 'photo' ? fieldsFromInfo(await readPhotoInfo(file as File)) : {};
+        await uploadMemory(planId, {
+          kind, file: file as File, ...common, occurred_at: common.occurred_at ?? info.occurred_at ?? null,
+          latitude: info.latitude ?? null, longitude: info.longitude ?? null, location_source: info.location_source ?? null,
+        });
       } else {
         await createMemory(planId, { kind, ...common, video_url: kind === 'video' ? videoUrl.trim() : null });
       }
@@ -326,6 +345,20 @@ const MemoriesPage: React.FC = () => {
               </div>
             </div>
           </section>
+
+          {data?.can_create && <div className="mb-4"><PhotoQrCard planId={planId as string} /></div>}
+          <div className="mb-4">
+            <button type="button" className="tc-focus-ring tc-mbtn" aria-expanded={showMap} data-testid="memory-map-toggle" onClick={() => setShowMap((v) => !v)}>
+              {showMap ? '写真の地図を閉じる' : '写真の地図を開く'}
+            </button>
+            {showMap && planId && (
+              <div className="mt-3">
+                <React.Suspense fallback={<p role="status" className="tc-card p-4 text-sm text-ink-700">地図を読み込み中…</p>}>
+                  <MemoryMapPanel planId={planId} places={places} refreshKey={counts.total} />
+                </React.Suspense>
+              </div>
+            )}
+          </div>
 
           <div className="tc-memory-layout">
           <section aria-label="記録の一覧" className="tc-memory-list">

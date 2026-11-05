@@ -11,6 +11,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const m = vi.hoisted(() => ({ downloadItineraryExport: vi.fn() }));
 vi.mock('@/services/api', () => m);
+vi.mock('@/services/api/photoFeatures', () => ({
+  getMyMapsPreview: vi.fn().mockResolvedValue({ precision: 'exact', exclude_accommodation: true, count: 0, excluded: 0, days: [], no_location: [], over_limit: false, many_days: false }),
+  getExternalMaps: vi.fn().mockResolvedValue([]), downloadMyMapsKml: vi.fn(), saveExternalMap: vi.fn(), deleteExternalMap: vi.fn(),
+}));
 
 import ExportsPage from './ExportsPage';
 import { describeResult } from './exports/exportModel';
