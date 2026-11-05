@@ -674,3 +674,16 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 - **期限の切れた予約:** 次の予約の前に自動で解放する(10分。`COST_GUARD_RESERVATION_TTL_SECONDS`)。
 - **鍵:** 有料 provider の鍵は環境・用途ごとに分け、TravelCanvas 専用の project で予算・期限・責任者を決める。CI・開発は fake。
 
+## 画面確認用のダミーデータ(demo_seed)
+
+画面・運用の確認に使う 5 つの旅行(長浜・白浜・金沢・小倉の出張・ダナン)を、指定した利用者の持ち物として登録する。登録は API を通すので、外部の AI・検索は呼ばない。
+
+```bash
+docker compose exec -T backend python scripts/demo_seed.py seed --owner-email <自分のログインメール>
+docker compose exec -T backend python scripts/demo_seed.py status   # 登録の有無・公開 URL
+docker compose exec -T backend python scripts/demo_seed.py reset --yes  # 登録した行とファイルだけを消す
+```
+
+- 同行者役でもログインして確かめる時は seed に `--companion-password <任意>` を付ける(メールは `tc-demo-*@example.com`)。
+- APP_ENV=production では動かない。
+- 既に登録済みなら seed は止まる。やり直しは reset の後に。
