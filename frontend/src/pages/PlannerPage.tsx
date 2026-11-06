@@ -236,6 +236,8 @@ const PlannerPage: React.FC = () => {
   const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null }>(
     { busy: false, result: null, error: null });
   const [photoSignal, setPhotoSignal] = useState(0);
+  // [Gate TripShare] 旅程(左)で読んだ予定の写真を、右の「選択中の予定」にも出す
+  const [eventImageUrls, setEventImageUrls] = useState<Record<string, string>>({});
 
   const lookupPlaceInfo = async () => {
     if (!editingItem) return;
@@ -919,6 +921,7 @@ const PlannerPage: React.FC = () => {
                   onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
                   onDeleteDay={currentPlan.days.length > 1 ? () => handleDeleteDay(currentDayIndex) : undefined}
                   photoSignal={photoSignal}
+                  onImageUrls={setEventImageUrls}
                   segments={segments}
                   zones={zoneOfEvent(currentPlan.days)}
                   titles={titleOfEvent(currentPlan.days)}
@@ -954,6 +957,7 @@ const PlannerPage: React.FC = () => {
                 onEdit={openEditItem}
                 hours={selectedEvent ? hoursBadge(dayHours.byId[selectedEvent.id], dayHours.pending && Boolean(selectedEvent.place_id)) : null}
                 arrival={selectedArrival}
+                imageSrc={selectedEvent ? (eventImageUrls[selectedEvent.id] ?? null) : null}
               />
             </div>
           ) : null}
