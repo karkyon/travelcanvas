@@ -58,6 +58,18 @@ function selectedIcon(p: AreaPin) {
   });
 }
 
+/**
+ * [Gate AreaMapA11y] 吹き出しの文字は Leaflet が吹き出しの枠を作る時に渡す。react-leaflet の子要素で渡すと、枠
+ * (role="tooltip")が一瞬だけ空のまま出て、読み上げの名前が無い吹き出しになっていた(CI の axe aria-tooltip-name が
+ * 時々失敗)。文字は HTML ではなく文字の節点で渡す(方面・地名に記号があっても HTML として解釈しない)。
+ * 文字が変わる時は Marker の key が変わり、作り直す。
+ */
+function textOf(text: string): HTMLElement {
+  const el = document.createElement('span');
+  el.textContent = text;
+  return el;
+}
+
 const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: number } | null; pins: AreaPin[];
   onSelect: (name: string) => void }> = ({ origin, pins, onSelect }) => {
   const points = useMemo<[number, number][]>(() => [
@@ -73,9 +85,9 @@ const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: 
       <Fit points={points} />
       <FocusSelected pin={pins.find((p) => p.selected)} />
       {origin && (
-        <Marker position={[origin.latitude, origin.longitude]} keyboard={false}
+        <Marker key={`o-${origin.label}`} position={[origin.latitude, origin.longitude]} keyboard={false}
           icon={icon('<div style="width:22px;height:22px;border-radius:9999px;background:#c2410c;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', 22)}>
-          <Tooltip permanent direction="top" offset={[0, -10]}>{`出発地: ${origin.label}`}</Tooltip>
+          <Tooltip permanent direction="top" offset={[0, -10]} content={textOf(`出発地: ${origin.label}`)} />
         </Marker>
       )}
       {origin && pins.map((p) => (
@@ -84,11 +96,12 @@ const AreaMap: React.FC<{ origin: { label: string; latitude: number; longitude: 
             dashArray: p.selected ? undefined : '6 6', opacity: p.selected ? 0.95 : 0.55 }} />
       ))}
       {pins.map((p) => (
-        <Marker key={`${p.name}-${p.selected ? 's' : 'n'}`} position={[p.latitude, p.longitude]} keyboard={false}
+        <Marker key={`${p.order}-${p.name}-${p.selected ? 's' : 'n'}`} position={[p.latitude, p.longitude]} keyboard={false}
           eventHandlers={{ click: () => onSelect(p.name) }} zIndexOffset={p.selected ? 1000 : 0}
           icon={p.selected ? selectedIcon(p) : icon(`<div style="display:grid;place-items:center;width:28px;height:28px;border-radius:9999px;background:#475569;color:#fff;font-weight:700;font-size:12px;border:2px solid #fff;opacity:.8;box-shadow:0 1px 3px rgba(0,0,0,.35)">${p.order}</div>`, 28)}>
           <Tooltip direction="top" offset={[0, p.selected ? -26 : -14]} permanent={p.selected}
-            className={p.selected ? 'tc-pin-label' : undefined}>{p.selected ? `選択中: ${p.order}. ${p.name}` : `${p.order}. ${p.name}`}</Tooltip>
+            className={p.selected ? 'tc-pin-label' : undefined}
+            content={textOf(p.selected ? `選択中: ${p.order}. ${p.name}` : `${p.order}. ${p.name}`)} />
         </Marker>
       ))}
     </MapContainer>
