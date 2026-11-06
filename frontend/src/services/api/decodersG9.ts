@@ -5,7 +5,7 @@ import type {
 } from './types/g9';
 import { optionalPlanCover } from './g11cover';
 import {
-  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, object, oneOf, optional, str, type Decoder,
+  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, num, object, oneOf, optional, str, type Decoder,
 } from './decode';
 
 const phase = oneOf('ongoing', 'upcoming', 'past', 'undated');
@@ -47,6 +47,11 @@ const home: Decoder<DashboardHome> = object<DashboardHome>({
   footprints: object<DashboardHome['footprints']>({
     prefectures: arrayOf(str), planned_prefectures: arrayOf(str), all_prefectures: arrayOf(str),
     trips_visited: nonNegativeInt, days_this_year: nonNegativeInt, photos: nonNegativeInt,
+    // [Gate Footprints2] 世界地図の点・海外の旅の数(古い応答には無い)
+    points: optional(arrayOf(object<NonNullable<DashboardHome['footprints']['points']>[number]>({
+      lat: num, lng: num, state: oneOf('visited', 'planned'), label: str,
+    }))),
+    overseas_trips: optional(nonNegativeInt),
   }),
   wishlist: object<DashboardHome['wishlist']>({
     count: nonNegativeInt,

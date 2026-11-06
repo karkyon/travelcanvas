@@ -1,0 +1,91 @@
+/* ===== [Gate TripsWish] 旅行の一覧・行きたい場所の一覧(ホームと同じカードの見た目) ===== */
+.tc-list-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0 0 16px;
+}
+.tc-list-kpis > div {
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 16px; padding: 12px 16px;
+  box-shadow: 0 3px 12px rgba(25, 36, 59, .025);
+}
+.tc-list-kpis dt { font-size: 12px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-list-kpis dd { margin: 2px 0 0; font-size: 26px; font-weight: 800; color: var(--tc-ink-900); line-height: 1.15; }
+.tc-list-kpis dd small { font-size: 12px; font-weight: 600; color: var(--tc-ink-700); }
+
+@media (max-width: 640px) {
+  .tc-list-kpis { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
+  .tc-list-kpis > div { padding: 10px 10px; border-radius: 14px; }
+  .tc-list-kpis dt { font-size: 11px; }
+  .tc-list-kpis dd { font-size: 22px; }
+}
+.tc-list-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.tc-list-tabs button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); color: var(--tc-ink-700);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.tc-list-tabs button span {
+  min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--tc-cloud-100); font-size: 11px; line-height: 18px; text-align: center;
+}
+.tc-list-tabs button[aria-selected='true'], .tc-list-tabs button[aria-pressed='true'] {
+  background: var(--tc-ink-900); border-color: var(--tc-ink-900); color: var(--tc-cloud-0);
+}
+.tc-list-tabs button[aria-selected='true'] span, .tc-list-tabs button[aria-pressed='true'] span { background: rgba(255, 255, 255, .22); }
+.tc-list-empty { padding: 28px; text-align: center; color: var(--tc-ink-700); }
+
+.tc-trip-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.tc-lcard {
+  display: flex; flex-direction: column; overflow: hidden; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200);
+  border-radius: 20px; box-shadow: 0 3px 12px rgba(25, 36, 59, .04); transition: box-shadow .15s ease, transform .15s ease;
+}
+.tc-lcard:hover { box-shadow: 0 10px 26px rgba(25, 36, 59, .1); transform: translateY(-1px); }
+@media (prefers-reduced-motion: reduce) { .tc-lcard { transition: none; } .tc-lcard:hover { transform: none; } }
+.tc-lcard-cover { min-height: 132px !important; display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; border-radius: 0 !important; }
+.tc-trip-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800;
+  background: rgba(255, 255, 255, .92); color: #10202e; box-shadow: 0 1px 3px rgba(16, 32, 46, .18);
+}
+.tc-trip-chip--role { background: rgba(15, 23, 42, .72); color: #fff; }
+.tc-lcard-body { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 16px; flex: 1; }
+.tc-lcard-body h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--tc-ink-900); line-height: 1.35; }
+.tc-lcard-body h3 button { all: unset; cursor: pointer; border-radius: 6px; }
+.tc-lcard-body h3 button:hover { text-decoration: underline; }
+.tc-lcard-body h3 button:focus-visible { outline: 2px solid var(--tc-focus); outline-offset: 2px; }
+.tc-trip-dest, .tc-trip-dates, .tc-trip-note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 13px; color: var(--tc-ink-700); }
+.tc-trip-dest svg, .tc-trip-dates svg, .tc-trip-note svg { flex-shrink: 0; margin-top: 2px; }
+.tc-trip-dest.tc-muted { opacity: .75; }
+.tc-trip-dates { align-items: center; padding: 8px 10px; border-radius: 12px; background: var(--tc-cloud-50); color: var(--tc-ink-900); }
+.tc-trip-dates svg { margin-top: 0; }
+.tc-trip-dates dl { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; flex: 1; min-width: 0; }
+.tc-trip-dates dl div { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.tc-trip-dates dt { font-size: 11px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-trip-dates dd { margin: 0; font-weight: 800; }
+.tc-trip-dates > span { flex: 1; }
+.tc-trip-dates em {
+  flex-shrink: 0; padding: 2px 9px; border-radius: 999px; background: var(--tc-ink-900); color: var(--tc-cloud-0);
+  font-style: normal; font-size: 11px; font-weight: 800; white-space: nowrap;
+}
+.tc-trip-note span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; word-break: break-word; }
+.tc-trip-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.tc-trip-stats li {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--tc-cloud-100);
+  font-size: 12px; font-weight: 600; color: var(--tc-ink-700);
+}
+.tc-trip-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
+.tc-trip-del { margin-left: auto; color: var(--tc-danger); }
+
+/* 行きたい場所 */
+.tc-wish-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 14px; }
+.tc-wish-tools .tc-list-tabs { margin: 0; flex: 1 1 100%; }
+.tc-wish-search {
+  display: flex; align-items: center; gap: 6px; flex: 1 1 240px; min-height: 38px; padding: 0 12px; border-radius: 12px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); color: var(--tc-ink-700);
+}
+.tc-wish-search input { flex: 1; min-width: 0; min-height: 36px; border: 0; background: transparent; color: var(--tc-ink-900); font-size: 14px; }
+.tc-wish-search input:focus-visible { outline: none; }
+.tc-wish-search:focus-within { outline: 2px solid var(--tc-focus); outline-offset: 2px; }
+.tc-wish-sort { min-height: 38px; border-radius: 12px; border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); padding: 0 10px; font-size: 13px; color: var(--tc-ink-900); }
+.tc-wish-art { position: relative; height: 132px; }
+.tc-wish-art > svg { display: block; width: 100%; height: 100%; }
+.tc-wish-art .tc-trip-chip { position: absolute; top: 12px; left: 12px; }
+.tc-wish-art .tc-trip-chip--role { left: auto; right: 12px; }
+.tc-wish-links { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; font-size: 13px; font-weight: 700; }
+.tc-wish-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--tc-accent); text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; }

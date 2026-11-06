@@ -10,6 +10,7 @@
  * - 道具: スポット検索・共有・オフライン・しおり・旅の地図・設定
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { AreaLegend, JapanTileMap, RegionLegend, WorldTileMap } from './FootprintMaps';
 import { Link } from 'react-router-dom';
 import {
   BedDouble, BookOpen, Check, CircleAlert, Compass, Download, Map as MapIcon, MapPin, Route, Search, Settings, Share2,
@@ -325,45 +326,69 @@ export const MemoriesSection: React.FC<{ home: DashboardHome }> = ({ home }) => 
 
 // ------------------------------------------------------------------ 旅の足あと
 
-/** 都道府県のタイル地図(地方ごとの並び。地図の形は略図) */
-const PREF_ROWS: string[][] = [
-  ['北海道'], ['青森県', '岩手県', '秋田県', '宮城県', '山形県', '福島県'],
-  ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'],
-  ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'],
-  ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'],
-  ['鳥取県', '島根県', '岡山県', '広島県', '山口県', '徳島県', '香川県', '愛媛県', '高知県'],
-  ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'],
-];
+type FootView = 'japan' | 'world';
+const VIEW_KEY = 'tc.footprintView';
+function savedView(): FootView | null {
+  try { const v = window.localStorage.getItem(VIEW_KEY); return v === 'japan' || v === 'world' ? v : null; } catch { return null; }
+}
 
+/**
+ * [Gate Footprints2] 旅の足あと。日本(都道府県の升目の地図)と世界(陸の升目の地図に旅の場所の点)を切り替える。
+ * 最初は日本。国内の記録が無く海外の場所だけある時は世界。選んだ方はこの端末に覚える。
+ */
 export const Footprints: React.FC<{ home: DashboardHome }> = ({ home }) => {
   const f = home.footprints;
   const visited = useMemo(() => new Set(f.prefectures), [f.prefectures]);
   const planned = useMemo(() => new Set(f.planned_prefectures), [f.planned_prefectures]);
+  const points = useMemo(() => f.points ?? [], [f.points]);
+  const [view, setView] = useState<FootView>(() => savedView()
+    ?? (f.prefectures.length === 0 && f.planned_prefectures.length === 0 && points.length > 0 ? 'world' : 'japan'));
+  const choose = (v: FootView) => {
+    setView(v);
+    try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* 覚えられなくても切り替えは効く */ }
+  };
+  const visitedPoints = points.filter((p) => p.state === 'visited').length;
   return (
     <section className="tc-card tc-home-foot" aria-labelledby="home-foot" data-testid="home-footprints">
       <div className="tc-section-row">
         <h2 id="home-foot" className="tc-section-title">旅の足あと</h2>
+        <div className="tc-fp-toggle" role="group" aria-label="地図の範囲">
+          <button type="button" className="tc-focus-ring" aria-pressed={view === 'japan'} onClick={() => choose('japan')}
+            data-testid="footprint-view-japan">日本</button>
+          <button type="button" className="tc-focus-ring" aria-pressed={view === 'world'} onClick={() => choose('world')}
+            data-testid="footprint-view-world">世界</button>
+        </div>
         <Link to="/atlas" className="tc-focus-ring tc-mini-link">旅の地図 →</Link>
       </div>
-      <dl className="tc-home-kpis">
-        <div><dt>行った都道府県</dt><dd>{f.prefectures.length}<small>/47</small></dd></div>
-        <div><dt>旅の日数(今年)</dt><dd>{f.days_this_year}</dd></div>
-        <div><dt>残した写真</dt><dd>{f.photos.toLocaleString()}</dd></div>
-      </dl>
-      <div className="tc-home-prefs" role="img"
-        aria-label={`行った都道府県: ${f.prefectures.join('、') || 'まだありません'}。計画中: ${f.planned_prefectures.join('、') || 'なし'}`}>
-        {PREF_ROWS.map((row, i) => (
-          <div key={i} className="tc-home-pref-row">
-            {row.map((p) => (
-              <span key={p} title={p} data-state={visited.has(p) ? 'visited' : planned.has(p) ? 'planned' : 'none'}>
-                {p.replace(/[都府県]$/, '').replace('北海道', '北海道').slice(0, 3)}
-              </span>
-            ))}
-          </div>
-        ))}
+      {view === 'japan' ? (
+        <dl className="tc-home-kpis">
+          <div><dt>行った都道府県</dt><dd>{f.prefectures.length}<small>/47</small></dd></div>
+          <div><dt>旅の日数(今年)</dt><dd>{f.days_this_year}</dd></div>
+          <div><dt>残した写真</dt><dd>{f.photos.toLocaleString()}</dd></div>
+        </dl>
+      ) : (
+        <dl className="tc-home-kpis">
+          <div><dt>行った場所</dt><dd>{visitedPoints}<small> か所</small></dd></div>
+          <div><dt>海外の旅</dt><dd>{f.overseas_trips ?? 0}<small> 回</small></dd></div>
+          <div><dt>旅の日数(今年)</dt><dd>{f.days_this_year}</dd></div>
+        </dl>
+      )}
+      <div className="tc-fp-frame">
+        {view === 'japan' ? <JapanTileMap visited={visited} planned={planned} /> : <WorldTileMap points={points} />}
       </div>
-      <p className="tc-home-legend"><span data-state="visited" />行った<span data-state="planned" />計画中
-        <small>行き先・予定の住所に書かれた都道府県から数えます</small></p>
+      {view === 'japan' ? (
+        <>
+          <p className="tc-home-legend"><span data-state="visited" />行った<span data-state="planned" />計画中
+            <small>行き先・予定の住所に書かれた都道府県から数えます</small></p>
+          <RegionLegend />
+        </>
+      ) : (
+        <>
+          <p className="tc-home-legend"><span data-state="visited-dot" />行った<span data-state="planned-dot" />計画中
+            <small>{points.length ? '予定に登録した位置を点で示します(地図は略図)' : '予定に位置(地図の場所)を入れると、ここに点で出ます'}</small></p>
+          <AreaLegend />
+        </>
+      )}
     </section>
   );
 };

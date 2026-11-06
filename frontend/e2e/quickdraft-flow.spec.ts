@@ -60,12 +60,12 @@ test('匿名ゲスト開始 → QuickDraft作成 → reload → プランが永�
   const navCountAfterLanding = navCount;
 
   // 3. 新しい旅行プラン作成モーダルを開く
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
+  const newPlanButton = page.getByRole('button', { name: /新しい旅行/ });
   try {
     await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
   } catch (e) {
     throw new Error(
-      `"新しいプラン"ボタンが表示されませんでした。/planner到達後のフレーム` +
+      `"新しい旅行"ボタンが表示されませんでした。/planner到達後のフレーム` +
         `遷移回数=${navCount - navCountAfterLanding}回(0であれば単純に描画が` +
         `遅いだけ、1以上なら/loginなどへ自動リダイレクトされている可能性が高い)。` +
         `元エラー: ${e instanceof Error ? e.message : String(e)}`,

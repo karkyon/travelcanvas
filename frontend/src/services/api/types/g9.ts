@@ -53,6 +53,9 @@ export interface DashboardHome {
   footprints: {
     prefectures: string[]; planned_prefectures: string[]; all_prefectures: string[]; trips_visited: number;
     days_this_year: number; photos: number;
+    /** [Gate Footprints2] 行った・計画中の旅の予定の位置(世界地図の点)と、海外の旅の数(古い応答には無い) */
+    points?: Array<{ lat: number; lng: number; state: 'visited' | 'planned'; label: string }>;
+    overseas_trips?: number;
   };
   wishlist: { count: number; groups: Array<{ category: string; count: number; spots: Array<{ spot_id: string; name: string; prefecture: string | null }> }> };
 }

@@ -50,7 +50,7 @@ test.describe('アクセシビリティ (axe-core)', () => {
     await page.getByRole('button', { name: /ゲストとして始める/ }).click();
     await page.waitForURL(/\/planner\/?$/, { timeout: 15_000 });
     await page
-      .getByRole('button', { name: /新しいプラン/ })
+      .getByRole('button', { name: /新しい旅行/ })
       .waitFor({ state: 'visible', timeout: 15_000 });
 
     await settleForAxe(page);
