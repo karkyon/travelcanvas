@@ -12,6 +12,7 @@ import { decodeDashboard } from '../services/api/decodersG9';
 const { getDashboard, setTripState } = vi.hoisted(() => ({ getDashboard: vi.fn(), setTripState: vi.fn() }));
 vi.mock('../services/api/g9', () => ({ getDashboard, setTripState }));
 
+import { useThemeStore } from '@/hooks/useThemePreference';
 import DashboardPage from './DashboardPage';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
@@ -183,13 +184,16 @@ describe('DashboardPage', () => {
     expect(await screen.findByTestId('dashboard-hero')).toBeInTheDocument();
   });
 
-  it('暗い見た目を選べる(この端末に保存)', async () => {
+  it('[Gate HeaderPicker] 見た目の選択はホームの見出しに置かない(上の帯の印へ移した)。選んだ見た目には従う', async () => {
     getDashboard.mockResolvedValue(decodeDashboard(fx.dashboard_empty));
+    try { window.localStorage.setItem('tc.theme', 'dark'); } catch { /* 保存できない環境 */ }
+    useThemeStore.setState({ preference: 'dark' });
     login();
     renderDashboard();
     await screen.findByTestId('dashboard-hero');
-    fireEvent.change(screen.getByLabelText('表示'), { target: { value: 'dark' } });
+    expect(screen.queryByLabelText('表示')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard')).toHaveAttribute('data-theme', 'dark');
-    expect(window.localStorage.getItem('tc.theme')).toBe('dark');
+    act(() => { useThemeStore.setState({ preference: 'system' }); });
+    try { window.localStorage.removeItem('tc.theme'); } catch { /* 保存できない環境 */ }
   });
 });

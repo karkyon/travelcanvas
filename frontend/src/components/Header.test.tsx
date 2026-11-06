@@ -6,10 +6,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const { getUnreadCount } = vi.hoisted(() => ({ getUnreadCount: vi.fn() }));
+const { getUnreadCount, getPlans, getPlan } = vi.hoisted(() => ({ getUnreadCount: vi.fn(), getPlans: vi.fn(), getPlan: vi.fn() }));
 vi.mock('../services/api', async (orig) => ({
   ...(await orig<typeof import('../services/api')>()),
   notificationsAPI: { getUnreadCount },
+  travelAPI: { getPlans, getPlan },
 }));
 vi.mock('./CommandPaletteLauncher', () => ({ default: () => <button type="button">検索(Ctrl+K)</button> }));
 
@@ -20,6 +21,7 @@ import type { User } from '../types';
 import { useThemeStore } from '../hooks/useThemePreference';
 
 const PLAN = '11111111-2222-3333-4444-555555555555';
+const OTHER = '99999999-2222-3333-4444-555555555555';
 
 const renderAt = async (path: string) => {
   const r = render(<MemoryRouter initialEntries={[path]}><Header /></MemoryRouter>);
@@ -30,6 +32,13 @@ const renderAt = async (path: string) => {
 describe('Header (Gate G9 UX-3)', () => {
   beforeEach(() => {
     getUnreadCount.mockReset().mockResolvedValue({ data: { unread_count: 3 } });
+    getPlans.mockReset().mockResolvedValue({
+      success: true, data: [
+        { id: OTHER, title: '金沢と能登', destination: '金沢', start_date: '2027-04-01', end_date: '2027-04-04', days: [] },
+        { id: PLAN, title: '京都 紅葉の1泊2日', destination: '京都', start_date: '2026-11-14', end_date: '2026-11-15', days: [] },
+      ],
+    });
+    getPlan.mockReset().mockResolvedValue({ success: true, data: { id: OTHER, title: '金沢と能登', start_date: '2027-04-01', end_date: '2027-04-04', days: [] } });
     // 会員のトークンも入れておく。authStore は読み込み時に setTimeout(0) で initialize() を予約しており、
     // トークンの無い会員だと「再読込の後」とみなして /auth/refresh を本当に呼んでしまう(実行順で結果が変わる原因)。
     useAuthStore.setState({
@@ -46,20 +55,49 @@ describe('Header (Gate G9 UX-3)', () => {
     expect(within(header).queryByRole('navigation', { name: '主なメニュー' })).not.toBeInTheDocument();
     expect(header.querySelector('.animate-pulse')).toBeNull();
     expect(screen.queryByTestId('header-current-trip')).not.toBeInTheDocument();
-    // 旅行の外では旅行の一覧への入口(押すと一覧へ)
-    expect(screen.getByTestId('header-trip-picker')).toHaveAttribute('href', '/planner');
+    // [Gate HeaderPicker] 旅行の外では「旅行を選ぶ」。押しても画面は移らず、旅行の一覧を出す
+    expect(screen.getByTestId('header-trip-picker').tagName).toBe('BUTTON');
+  });
+
+  it('[Gate HeaderPicker] 「旅行を選ぶ」は一覧を開き(画面を移らない)、選んだ旅行の旅程へ移る', async () => {
+    await renderAt('/dashboard');
+    const picker = screen.getByTestId('header-trip-picker');
+    expect(picker).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(picker);
+    expect(picker).toHaveAttribute('aria-expanded', 'true');
+    const menu = await screen.findByTestId('trip-picker-menu');
+    const items = await within(menu).findAllByRole('button');
+    // 出発の早い順
+    expect(items.map((b) => b.textContent)).toEqual([expect.stringContaining('京都 紅葉の1泊2日'), expect.stringContaining('金沢と能登')]);
+    expect(within(menu).getByRole('link', { name: '旅行の一覧へ' })).toHaveAttribute('href', '/planner');
+    fireEvent.click(within(menu).getByTestId(`trip-picker-item-${OTHER}`));
+    await waitFor(() => expect(screen.queryByTestId('trip-picker-menu')).not.toBeInTheDocument());
   });
 
   it('旅行の中では今開いている旅行を示す', async () => {
     await renderAt(`/planner/${PLAN}/today`);
     expect(screen.getByTestId('header-current-trip')).toHaveTextContent('京都 紅葉の1泊2日');
-    expect(screen.getByTestId('header-current-trip')).toHaveAttribute('href', `/planner/${PLAN}`);
+    // [Gate HeaderPicker] 押すと旅行を切り替える一覧を出す(今の旅行に印)
+    fireEvent.click(screen.getByTestId('header-current-trip'));
+    const menu = await screen.findByTestId('trip-picker-menu');
+    expect(await within(menu).findByTestId(`trip-picker-item-${PLAN}`)).toHaveAttribute('aria-current', 'true');
     expect(screen.queryByTestId('header-trip-picker')).not.toBeInTheDocument();
+    // この旅行のメニューを旅行の名前の右に並べる
+    expect(await screen.findByTestId('trip-nav')).toBeInTheDocument();
   });
 
-  it('別の旅行の画面では示さない', async () => {
-    await renderAt('/planner/99999999-2222-3333-4444-555555555555');
+  it('[Gate HeaderPicker] 旅程を経ずに別の旅行の画面(費用など)を開いても、その旅行を読んで名前を出す', async () => {
+    await renderAt(`/planner/${OTHER}/expenses`);
+    await waitFor(() => expect(screen.getByTestId('header-current-trip')).toHaveTextContent('金沢と能登'));
+    expect(getPlan).toHaveBeenCalledWith(OTHER);
+  });
+
+  it('旅行を読めない時は名前を作らない(「旅行を選ぶ」のまま)', async () => {
+    getPlan.mockRejectedValue(new Error('403'));
+    await renderAt(`/planner/${OTHER}`);
+    await waitFor(() => expect(getPlan).toHaveBeenCalled());
     expect(screen.queryByTestId('header-current-trip')).not.toBeInTheDocument();
+    expect(screen.getByTestId('header-trip-picker')).toBeInTheDocument();
   });
 
   it('通知の未読数を名前で伝え、メニューの開閉を aria-expanded で伝える', async () => {
@@ -81,17 +119,24 @@ describe('Header (Gate G9 UX-3)', () => {
     }
   });
 
-  it('[Gate G10-UX] UX-8 ユーザーのメニューで見た目(明るい・暗い・端末)を選べ、選んだものを aria-pressed で示す', async () => {
+  it('[Gate HeaderPicker] 見た目(端末に合わせる・明るい・暗い)は上の帯の印から選び、選んだものを aria-checked で示す', async () => {
     useThemeStore.setState({ preference: 'system' });
     await renderAt('/dashboard');
-    fireEvent.click(screen.getByRole('button', { name: /^alice/ }));
-    const group = await screen.findByRole('group', { name: '表示' });
-    expect(within(group).getByRole('button', { name: '端末' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(within(group).getByRole('button', { name: '暗い' }));
+    const toggle = await screen.findByTestId('theme-toggle');
+    expect(toggle).toHaveAccessibleName('表示: 端末に合わせる(変える)');
+    fireEvent.click(toggle);
+    const group = screen.getByRole('radiogroup', { name: '表示' });
+    expect(within(group).getByRole('radio', { name: '端末に合わせる' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(within(group).getByRole('radio', { name: '暗い' }));
     expect(useThemeStore.getState().preference).toBe('dark');
     expect(window.localStorage.getItem('tc.theme')).toBe('dark');
-    expect(within(group).getByRole('button', { name: '暗い' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(within(group).getByRole('button', { name: '端末' }));
+    expect(screen.getByTestId('theme-toggle')).toHaveAccessibleName('表示: 暗い(変える)');
+    fireEvent.click(screen.getByTestId('theme-toggle'));
+    fireEvent.click(screen.getByRole('radio', { name: '端末に合わせる' }));
     expect(window.localStorage.getItem('tc.theme')).toBeNull();
+    // ユーザーのメニューには重ねて置かない
+    fireEvent.click(screen.getByRole('button', { name: /^alice/ }));
+    await screen.findByRole('link', { name: '設定' });
+    expect(screen.queryByRole('group', { name: '表示' })).not.toBeInTheDocument();
   });
 });
