@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
@@ -73,6 +73,8 @@ interface DayViewProps {
   onDeleteDay?: () => void;
   /** [Gate PlanSpotEdit] 値が変わったら予定の写真を読み直す(編集の画面で写真を変えた時) */
   photoSignal?: number;
+  /** [Gate TripShare] 予定の写真の表示用 URL(予定 ID → URL)。右の「選択中の予定」でも同じ写真を出す */
+  onImageUrls?: (urls: Record<string, string>) => void;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -98,6 +100,7 @@ const DayView: React.FC<DayViewProps> = ({
   onSegmentSaved,
   onDeleteDay,
   photoSignal = 0,
+  onImageUrls,
 }) => {
   const { addNewScheduleItem, deleteScheduleItem, reorderSpots } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
@@ -137,6 +140,9 @@ const DayView: React.FC<DayViewProps> = ({
   // [Gate G11] 予定のカードの写真(見える写真だけ。一時の URL)
   const [images, setImages] = useState<Record<string, EventImage>>({});
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const imageUrlsCb = useRef(onImageUrls);
+  imageUrlsCb.current = onImageUrls;
+  useEffect(() => { imageUrlsCb.current?.(imageUrls); }, [imageUrls]);
   const [imagesVersion, setImagesVersion] = useState(0);
   const [photoFor, setPhotoFor] = useState<ScheduleItemType | null>(null);
   const [externalEnabled, setExternalEnabled] = useState(false);

@@ -129,10 +129,11 @@ const Header: React.FC = () => {
   // 認証済みユーザー向けのフルヘッダー
   // [Gate AppShell] UI/UX モックの上の帯(72px): 印・今の旅行の切り替え・検索・通知・利用者。
   // 画面の移動は左の帯(AppRail、スマホでは下の帯)へ移した。スマホの下の帯に出ない項目は「メニュー」から開く。
-  const tripMatch = /^\/planner\/([0-9a-fA-F-]{36})(?:\/|$)/.exec(location.pathname);
+  // [Gate TripShare] 旅行の画面は /planner/<id>… と /share/<id>(共有)。以前は共有だけ旅行の中と見なさず「旅行を選ぶ」に戻っていた
+  const tripMatch = /^\/(?:planner|share)\/([0-9a-fA-F-]{36})(?:\/|$)/.exec(location.pathname);
   const currentTrip = tripMatch && currentPlan && currentPlan.id === tripMatch[1] ? currentPlan : null;
   // [Gate TripNav] 旅行の画面(共有を含む)にいる時、その旅行のメニューを上の帯に出す
-  const navTrip = currentTrip?.id ?? (/^\/share\/([0-9a-fA-F-]{36})/.exec(location.pathname)?.[1] ?? tripMatch?.[1] ?? null);
+  const navTrip = currentTrip?.id ?? tripMatch?.[1] ?? null;
   const tripDates = currentTrip ? tripDateText(currentTrip.start_date, currentTrip.end_date) : '';
   const displayName = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
   return (

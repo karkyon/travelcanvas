@@ -19,8 +19,13 @@ vi.mock('@/components/planner/EventRelatedSummary', () => ({ default: () => null
 const { getPlaceInfo } = vi.hoisted(() => ({ getPlaceInfo: vi.fn() }));
 vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo, reorderDay: vi.fn() }));
 vi.mock('@/components/DayView', () => ({
-  default: ({ day, onItemEdit }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void }) => (
-    <div>{day.events.map((e) => <button key={e.id} type="button" onClick={() => onItemEdit(e)}>編集: {e.title}</button>)}</div>
+  default: ({ day, onItemEdit, onImageUrls }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void;
+    onImageUrls?: (u: Record<string, string>) => void }) => (
+    <div>
+      {day.events.map((e) => <button key={e.id} type="button" onClick={() => onItemEdit(e)}>編集: {e.title}</button>)}
+      {/* [Gate TripShare] 旅程(左)が写真を読んだことにする */}
+      <button type="button" onClick={() => onImageUrls?.(Object.fromEntries(day.events.map((e) => [e.id, `blob:photo-${e.id}`])))}>写真を読んだ</button>
+    </div>
   ),
 }));
 
@@ -200,5 +205,16 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     fireEvent.click(screen.getByTestId('place-info-lookup'));
     expect(await screen.findByTestId('place-info-error')).toHaveTextContent('応答しませんでした');
     expect(screen.getByLabelText('場所・住所')).toHaveValue('');
+  });
+
+  it('[Gate TripShare] 旅程(左)に出ている予定の写真を、右の「選択中の予定」にも出す', async () => {
+    setup();
+    await screen.findByRole('button', { name: '編集: 清水寺' });
+    const card = screen.getByTestId('selected-event');
+    expect(card).toHaveTextContent('場所画像のイメージ');
+    fireEvent.click(screen.getByRole('button', { name: '写真を読んだ' }));
+    await waitFor(() => expect(card.querySelector('img')).not.toBeNull());
+    expect(card.querySelector('img')!.getAttribute('src')).toMatch(/^blob:photo-/);
+    expect(card).toHaveTextContent('予定の写真');
   });
 });

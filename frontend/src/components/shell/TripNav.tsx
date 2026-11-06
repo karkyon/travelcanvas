@@ -12,7 +12,8 @@ import { publishCurrentTrip, useCurrentTripStore } from '../../store/currentTrip
 
 const TripNav: React.FC<{ tripId: string; path: string; row?: boolean }> = ({ tripId, path, row = false }) => {
   const knownId = useCurrentTripStore((s) => s.trip?.id ?? null);
-  const inPlanner = path.startsWith(`/planner/${tripId}`);
+  // [Gate TripShare] 共有の画面(/share/<id>)を直接開いた時も旅行を読んで名前を出す
+  const inPlanner = path.startsWith(`/planner/${tripId}`) || path.startsWith(`/share/${tripId}`);
   useEffect(() => {
     if (!inPlanner || knownId === tripId) return undefined;
     let alive = true;

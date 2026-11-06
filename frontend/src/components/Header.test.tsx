@@ -92,6 +92,19 @@ describe('Header (Gate G9 UX-3)', () => {
     expect(getPlan).toHaveBeenCalledWith(OTHER);
   });
 
+  it('[Gate TripShare] 「共有」の画面(/share/<id>)でも今の旅行の名前を出し、「旅行を選ぶ」に戻らない', async () => {
+    await renderAt(`/share/${PLAN}`);
+    expect(screen.getByTestId('header-current-trip')).toHaveTextContent('京都 紅葉の1泊2日');
+    expect(screen.queryByTestId('header-trip-picker')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('rail-share')).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('[Gate TripShare] 共有の画面を直接開いた時も、その旅行を読んで名前を出す', async () => {
+    await renderAt(`/share/${OTHER}`);
+    await waitFor(() => expect(screen.getByTestId('header-current-trip')).toHaveTextContent('金沢と能登'));
+    expect(getPlan).toHaveBeenCalledWith(OTHER);
+  });
+
   it('旅行を読めない時は名前を作らない(「旅行を選ぶ」のまま)', async () => {
     getPlan.mockRejectedValue(new Error('403'));
     await renderAt(`/planner/${OTHER}`);
