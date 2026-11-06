@@ -77,7 +77,11 @@ def test_create_and_get_reservation_masks_confirmation_number(auth_client, db_se
     assert row.confirmation_number_ciphertext is not None
     assert b"ABC1234567" not in row.confirmation_number_ciphertext
     assert row.pin_ciphertext is not None
-    assert b"9999" not in row.pin_ciphertext
+    # PIN は 4 桁と短く、暗号文の鍵の ID(16 進)や本体(base64)に偶然 "9999" が現れることがある(CI で約 1/数百で失敗した)。
+    # 「平文のまま保存していない」ことは、保存した値が平文と違い、暗号の形式で、復号すると元に戻ることで確かめる
+    assert row.pin_ciphertext != b"9999"
+    assert row.pin_ciphertext.startswith(b"tc2:")
+    assert crypto_module.decrypt_payload(row.pin_ciphertext) == b"9999"
 
     get_res = client.get(f"{RES_ENDPOINT.format(plan_id=plan_id)}/{body['id']}")
     assert get_res.status_code == 200
