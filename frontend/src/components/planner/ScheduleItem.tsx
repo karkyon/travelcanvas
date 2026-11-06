@@ -3,6 +3,8 @@ import { safeExternalUrl, safeTelHref } from '@/utils/safeNavigation';
 import { transportText } from '@/utils/transportModes';
 import TransportIcon from '../common/TransportIcon';
 import type { ArrivalLeg, HoursBadge } from './plannerModel';
+import type { EventUrl } from '@/types';
+import { linkText } from './spotLinksModel';
 import { 
   MapPin, Edit3, Trash2, Share2, 
   Star, Phone, ExternalLink, AlertTriangle, MessageSquare,
@@ -42,6 +44,8 @@ interface ScheduleItemProps {
     website?: string;
     phone?: string;
   };
+  /** [Gate SpotLinks] 場所の URL(公式サイト・予約・SNS など) */
+  links?: EventUrl[];
   onUpdate?: (id: string, data: { title: string; startTime: string; endTime: string; notes: string }) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
@@ -102,6 +106,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   isDelayed = false,
   bookingInfo,
   contactInfo,
+  links,
   onUpdate,
   onDelete,
   onComment,
@@ -335,7 +340,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
           )}
 
           {/* Contact & Booking Info */}
-          {(contactInfo || bookingInfo) && (
+          {(contactInfo || bookingInfo || links?.length) && (
             <div className="flex flex-wrap gap-4 mb-3">
               {safeExternalUrl(contactInfo?.website) && (
                 <a
@@ -357,6 +362,12 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   {contactInfo.phone}
                 </a>
               )}
+              {(links ?? []).filter((u) => safeExternalUrl(u.url)).map((u) => (
+                <a key={u.url} href={safeExternalUrl(u.url) ?? undefined} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-accent underline">
+                  <ExternalLink size={14} />{linkText(u)}<span className="sr-only">(新しいタブで開く)</span>
+                </a>
+              ))}
               {safeExternalUrl(bookingInfo?.url) && (
                 <a
                   href={safeExternalUrl(bookingInfo?.url) ?? undefined}

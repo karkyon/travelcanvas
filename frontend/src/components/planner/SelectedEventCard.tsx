@@ -11,6 +11,7 @@ import { Pencil, Luggage, MessageSquare, Lock, MapPinned } from 'lucide-react';
 import Landscape from '@/components/shell/Landscape';
 import TransportIcon from '@/components/common/TransportIcon';
 import { safeExternalUrl } from '@/utils/safeNavigation';
+import SpotLinks from './SpotLinks';
 import type { HoursBadge, ArrivalLeg } from './plannerModel';
 import type { ScheduleItem } from '@/types';
 
@@ -87,6 +88,9 @@ const SelectedEventCard: React.FC<Props> = ({ planId, dayNumber, event, onEdit, 
               </small>
             </span>
             <span><b>場所</b><small>{event.address || event.location_name || '未設定'}</small></span>
+            {(event.phone || event.urls?.length) && (
+              <span><b>連絡先</b><small><SpotLinks phone={event.phone} urls={event.urls} /></small></span>
+            )}
             {event.notes && <span><b>メモ</b><small>{event.notes}</small></span>}
             {event.locked && (
               <span><b>確定</b><small className="inline-flex items-center gap-1"><Lock size={12} aria-hidden="true" />並べ替え・最適化で動かさない</small></span>

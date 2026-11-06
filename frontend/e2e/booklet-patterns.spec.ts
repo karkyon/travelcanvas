@@ -7,7 +7,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
 /** [Gate BookletPatterns] 12 パターンのどれでも、必須の内容が Web と印刷に載る。地図の画像は外部なので、ここでは無地の画像を返す */
 const THEMES: [string, RegExp][] = [
   ['simple', /簡潔/], ['functional', /機能的/], ['business', /仕事/], ['family', /家族/], ['friends', /友人/], ['wild', /ワイルド/],
-  ['lovers', /恋人/], ['elegant', /エレガント/], ['calm', /落ち着いた/], ['solo', /一人旅/], ['school', /学校/], ['space', /宇宙旅行/],
+  ['lovers', /恋人/], ['elegant', /エレガント/], ['calm', /落ち着いた/], ['solo', /一人旅/], ['school', /学校/], ['space', /宇宙旅行/], ['resort', /リゾート/],
 ];
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 

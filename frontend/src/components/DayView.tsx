@@ -657,7 +657,10 @@ const DayView: React.FC<DayViewProps> = ({
                   notes={event.notes}
                   isNext={showTimeProgress && index === nextEventIndex}
                   bookingInfo={event.booking_info as { url?: string; phone?: string } | undefined}
-                  contactInfo={event.contact_info as { website?: string; phone?: string } | undefined}
+                  contactInfo={event.phone
+                    ? { ...(event.contact_info as { website?: string } | undefined), phone: event.phone }
+                    : event.contact_info as { website?: string; phone?: string } | undefined}
+                  links={event.urls}
                   onEdit={() => onItemEdit?.(event)}
                   onDelete={() => handleDeleteItem(event.id)}
                   onComment={onItemComment ? () => onItemComment(event) : undefined}

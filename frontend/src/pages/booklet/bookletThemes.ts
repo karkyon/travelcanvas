@@ -38,6 +38,7 @@ export const THEME_WORDS: Record<BookletTheme, ThemeWords> = {
   solo: { kicker: 'NOTE', overview: '旅の流れ', schedule: '一日ずつ', sections: { packing: '持ち物', notes: 'ひとりの安全メモ' }, day: ENG, fonts: ['Zen+Maru+Gothic:wght@400;500;700', 'Courier+Prime'] },
   school: { kicker: 'しおり', overview: '全行程', schedule: '日別の行程表', sections: { packing: '持ち物', notes: 'きまり・注意', contacts: '緊急連絡' }, day: (n) => `第${n}日`, fonts: ['BIZ+UDPGothic:wght@400;700', 'Yusei+Magic'] },
   space: { kicker: 'FLIGHT PLAN', overview: 'MISSION OVERVIEW / 大日程', schedule: 'FLIGHT PLAN / 日別の行程', sections: { map: 'GROUND TRACK / 地図', reservations: 'BOOKINGS / 予約', packing: 'PAYLOAD / 持ち物', contacts: 'COMMS / 連絡先', costs: 'BUDGET / 費用', notes: 'NOTES / 注意事項' }, day: (n) => `FLIGHT DAY ${n}`, fonts: ['Noto+Sans+JP:wght@400;700', 'Orbitron:wght@500;800', 'Share+Tech+Mono'] },
+  resort: { kicker: 'Resort Holiday', overview: '旅のながれ', schedule: 'デイリープラン', sections: { map: 'アイランドマップ', reservations: '宿とアクティビティの予約', packing: 'ビーチの持ち物', contacts: '困った時の連絡先', notes: 'のんびり過ごすメモ' }, day: (n) => `Day ${n}`, fonts: ['M+PLUS+Rounded+1c:wght@400;700;800', 'Pacifico'] },
   cute: { kicker: '', overview: '大日程', schedule: '日別の行程表', sections: {}, day: nth, fonts: ['Zen+Maru+Gothic:wght@400;700'] },
   accessible: { kicker: '', overview: '大日程', schedule: '日別の行程表', sections: {}, day: nth, fonts: ['BIZ+UDPGothic:wght@400;700'] },
   mono: { kicker: '', overview: '大日程', schedule: '日別の行程表', sections: {}, day: nth, fonts: ['Zen+Kaku+Gothic+New:wght@400;700;900'] },

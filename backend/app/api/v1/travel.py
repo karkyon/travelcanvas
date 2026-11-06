@@ -409,6 +409,8 @@ async def clone_travel_plan(
                     address=event.address,
                     latitude=event.latitude,
                     longitude=event.longitude,
+                    phone=event.phone,
+                    urls=event.urls,
                     locked=False,
                     sort_order=event.sort_order,
                 )

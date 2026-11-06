@@ -542,6 +542,7 @@
   "PUT /api/v1/privacy/private-profile",
   "PUT /api/v1/spots/{spot_id}",
   "PUT /api/v1/travel-plans/{plan_id}",
-  "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}"
+  "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}",
+  "GET /api/v1/plans/{plan_id}/booklet/themes"
  ]
 }

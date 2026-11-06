@@ -22,6 +22,8 @@ import {
 } from '@/services/api';
 import type { Booklet, BookletExport, BookletOptions, BookletSection, PlanMember } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { Lock } from 'lucide-react';
+import { getBookletThemes, TIER_LABEL, type BookletThemeAccess } from '@/services/api/bookletThemes';
 import BookletView from './booklet/BookletView';
 import {
   DEFAULT_OPTIONS, EXPORT_STATE_LABEL, INCLUDE_OPTIONS, REQUIRED_SECTIONS, SECTION_OPTIONS, THEME_OPTIONS, defaultValidUntil,
@@ -54,6 +56,8 @@ const BookletPage: React.FC = () => {
   // [Gate BookletPatterns] プレビューの見え方。旅行の所有者が隠した章は必須でも載せない
   const [sheet, setSheet] = useState(false);
   const [blocked, setBlocked] = useState<BookletSection[]>([]);
+  // [Gate BookletTiers] デザインごとに会員クラスで使えるか(読めない時は全部出し、サーバーの判定に任せる)
+  const [themeAccess, setThemeAccess] = useState<Record<string, BookletThemeAccess> | null>(null);
 
   const me = useMemo(() => members.find((m) => m.is_me) ?? null, [members]);
   const isOwner = me?.role === 'owner';
@@ -106,6 +110,9 @@ const BookletPage: React.FC = () => {
         setMembers(m);
         const role = m.find((x) => x.is_me)?.role;
         if (role === 'owner' || role === 'editor') {
+          getBookletThemes(planId)
+            .then((c) => setThemeAccess(Object.fromEntries(c.themes.map((t) => [t.theme, t]))))
+            .catch(() => setThemeAccess(null));
           await Promise.all([runPreview(DEFAULT_OPTIONS), loadExports()]);
         }
       } catch (e) {
@@ -202,9 +209,14 @@ const BookletPage: React.FC = () => {
               <fieldset>
                 <legend className="text-sm font-medium text-gray-800 mb-1">パターン(内容は同じで、見た目が変わります)</legend>
                 <div className="grid grid-cols-2 gap-1.5 text-sm" data-testid="booklet-themes">
-                  {THEME_OPTIONS.map((t) => (
-                    <label key={t.value} className={`flex items-start gap-2 border rounded-sm p-1.5 cursor-pointer ${options.theme === t.value ? 'border-gray-900 bg-gray-100' : 'border-gray-300'}`}>
-                      <input type="radio" name="booklet-theme" className="mt-1" checked={options.theme === t.value}
+                  {THEME_OPTIONS.map((t) => {
+                    const access = themeAccess?.[t.value];
+                    const locked = access ? !access.available : false;
+                    return (
+                    <label key={t.value} data-theme-locked={locked || undefined}
+                      className={`flex items-start gap-2 border rounded-sm p-1.5 ${locked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${options.theme === t.value ? 'border-gray-900 bg-gray-100' : 'border-gray-300'}`}>
+                      <input type="radio" name="booklet-theme" className="mt-1" checked={options.theme === t.value} disabled={locked}
+                        aria-describedby={locked ? `booklet-theme-lock-${t.value}` : undefined}
                         onChange={() => {
                           setOptions((o) => ({ ...o, theme: t.value }));
                           // デザインは見た目だけなので、読み直さずに切り替える
@@ -216,11 +228,18 @@ const BookletPage: React.FC = () => {
                             <span className="w-2.5 h-3.5" style={{ background: t.swatch[0] }} /><span className="w-2.5 h-3.5" style={{ background: t.swatch[1] }} />
                           </span>
                           {t.label}
+                          {locked && <Lock size={12} aria-hidden="true" className="shrink-0" />}
                         </span>
                         <span className="block text-xs text-gray-700">{t.help}</span>
+                        {locked && access && (
+                          <span id={`booklet-theme-lock-${t.value}`} className="block text-xs font-semibold text-gray-800">
+                            {`${TIER_LABEL[access.min_tier] ?? access.min_tier} クラスから使えます`}
+                          </span>
+                        )}
                       </span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </fieldset>
               <div className="grid grid-cols-2 gap-3 mt-3">

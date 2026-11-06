@@ -20,7 +20,9 @@ import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeIm
 import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
 import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
 import { getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
-import { Globe } from 'lucide-react';
+import { Globe, LocateFixed } from 'lucide-react';
+import EventUrlsField from '@/components/planner/EventUrlsField';
+import { cleanUrls, sameUrls } from '@/components/planner/spotLinksModel';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import Button from '@/components/common/Button';
 import UiIcon from '@/components/common/UiIcon';
@@ -53,7 +55,9 @@ import PageHead from '@/components/shell/PageHead';
 import Landscape from '@/components/shell/Landscape';
 import SelectedEventCard from '@/components/planner/SelectedEventCard';
 import TripList from '@/components/trip/TripList';
-import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
+import type { ScheduleItem as ScheduleItemType, EventCategory, EventUrl } from '@/types';
+// [Gate SpotLinks] 編集の窓の地図(開いた時だけ読む)
+const SpotMiniMap = React.lazy(() => import('@/components/planner/SpotMiniMap'));
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 import PresenceBar from '@/components/planner/PresenceBar';
 import { usePlanPresence } from '@/hooks/usePlanPresence';
@@ -234,17 +238,23 @@ const PlannerPage: React.FC = () => {
   const [editCategory, setEditCategory] = useState<{ value: string; original: string }>({ value: 'other', original: 'other' });
   // [Gate PlanSpotEdit] 電話番号(変えた時だけ送る)・場所の情報の取得(OpenStreetMap)・写真を変えた時の旅程の読み直し
   const [editPhone, setEditPhone] = useState<{ value: string; original: string }>({ value: '', original: '' });
-  const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null }>(
+  const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null; mode?: 'info' | 'geo' }>(
     { busy: false, result: null, error: null });
+  // [Gate SpotLinks] 場所の URL(入力の行。変えた時だけ送る)と、地図の位置(変えた時だけ送る)
+  const [editUrls, setEditUrls] = useState<{ rows: string[]; original: EventUrl[] }>({ rows: [''], original: [] });
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [editCoords, setEditCoords] = useState<{ lat: number | null; lng: number | null; changed: boolean }>(
+    { lat: null, lng: null, changed: false });
   const [photoSignal, setPhotoSignal] = useState(0);
 
   const lookupPlaceInfo = async () => {
     if (!editingItem) return;
     setPlaceInfo({ busy: true, result: null, error: null });
     try {
-      const result = await getPlaceInfo({ name: editForm.title, latitude: editingItem.latitude, longitude: editingItem.longitude });
+      const result = await getPlaceInfo({ name: editForm.title, latitude: editCoords.lat ?? editingItem.latitude,
+        longitude: editCoords.lng ?? editingItem.longitude });
       setPlaceInfo({
-        busy: false, result,
+        busy: false, result, mode: 'info',
         error: result.unavailable ? '場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試すか、手で入れてください'
           : result.candidates.length === 0 ? '場所の情報が見つかりませんでした。名前を確かめるか、手で入れてください' : null,
       });
@@ -253,10 +263,38 @@ const PlannerPage: React.FC = () => {
     }
   };
 
+  // [Gate SpotLinks] 住所(無ければ名前)から地図の位置を探す(押した時だけ。OpenStreetMap)
+  const lookupPosition = async () => {
+    const q = editForm.location_name.trim() || editForm.title.trim();
+    if (!q) return;
+    setPlaceInfo({ busy: true, result: null, error: null, mode: 'geo' });
+    try {
+      const result = await getPlaceInfo({ name: q });
+      const rows = { ...result, candidates: result.candidates.filter((c) => typeof c.latitude === 'number' && typeof c.longitude === 'number') };
+      setPlaceInfo({
+        busy: false, result: rows, mode: 'geo',
+        error: result.unavailable ? '位置の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください'
+          : rows.candidates.length === 0 ? 'この住所の位置が見つかりませんでした。住所を短くする(番地を外す)と見つかることがあります' : null,
+      });
+    } catch {
+      setPlaceInfo({ busy: false, result: null, error: '位置を読めませんでした', mode: 'geo' });
+    }
+  };
+
   const applyPlaceInfo = (c: PlaceInfoResult['candidates'][number]) => {
-    if (c.address) setEditForm((prev) => ({ ...prev, location_name: c.address! }));
-    if (c.phone) setEditPhone((p) => ({ ...p, value: c.phone! }));
-    if (c.category) setEditCategory((x) => ({ ...x, value: c.category! }));
+    const geo = placeInfo.mode === 'geo';
+    if (!geo && c.address) setEditForm((prev) => ({ ...prev, location_name: c.address! }));
+    if (!geo && c.phone) setEditPhone((p) => ({ ...p, value: c.phone! }));
+    if (!geo && c.category) setEditCategory((x) => ({ ...x, value: c.category! }));
+    if (!geo && c.website) {
+      const site = c.website;
+      setEditUrls((u) => (u.rows.some((r) => r.trim() === site) ? u
+        : { ...u, rows: u.rows.some((r) => !r.trim()) ? u.rows.map((r, i) => (i === u.rows.findIndex((x) => !x.trim()) ? site : r))
+          : u.rows.length < 5 ? [...u.rows, site] : u.rows }));
+    }
+    if (typeof c.latitude === 'number' && typeof c.longitude === 'number') {
+      setEditCoords({ lat: c.latitude, lng: c.longitude, changed: true });
+    }
     setPlaceInfo({ busy: false, result: null, error: null });
   };
 
@@ -273,6 +311,10 @@ const PlannerPage: React.FC = () => {
   const openEditItem = (item: ScheduleItemType) => {
     setEditingItem(item);
     setEditPhone({ value: item.phone ?? '', original: item.phone ?? '' });
+    setEditUrls({ rows: item.urls?.length ? item.urls.map((u) => u.url) : [''], original: item.urls ?? [] });
+    setUrlError(null);
+    setEditCoords({ lat: typeof item.latitude === 'number' ? item.latitude : null,
+      lng: typeof item.longitude === 'number' ? item.longitude : null, changed: false });
     setPlaceInfo({ busy: false, result: null, error: null });
     setEditCategory({ value: item.category || 'other', original: item.category || 'other' });
     setEditForm(fieldsOf(item));
@@ -289,6 +331,11 @@ const PlannerPage: React.FC = () => {
   };
 
   const saveFields = async (itemId: string, fields: EditFields, original: EditFields) => {
+    // [Gate SpotLinks] URL の形を保存の前に確かめる(違えば保存しない)
+    const links = cleanUrls(editUrls.rows);
+    if (links.error) { setUrlError(links.error); return; }
+    setUrlError(null);
+    const urlsChanged = !sameUrls(links.urls, editUrls.original);
     setIsSavingItem(true);
     try {
       const result = await updateScheduleItem(itemId, {
@@ -300,8 +347,13 @@ const PlannerPage: React.FC = () => {
           ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
         ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
         ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
+        ...(urlsChanged ? { urls: links.urls } : {}),
+        ...(editCoords.changed && editCoords.lat !== null && editCoords.lng !== null
+          ? { latitude: editCoords.lat, longitude: editCoords.lng } : {}),
       });
       if (result === 'saved') setEditPhone((p) => ({ ...p, original: p.value.trim() }));
+      if (result === 'saved') setEditUrls((u) => ({ ...u, original: links.urls }));
+      if (result === 'saved') setEditCoords((c) => ({ ...c, changed: false }));
       if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'conflict') {
         // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
@@ -1296,7 +1348,7 @@ const PlannerPage: React.FC = () => {
                     </div>
                     {/* [Gate PlanSpotEdit] 課題 #3-⑤ 押した時に 1 回だけ OpenStreetMap で住所・電話番号・種類を調べる(入れる前に確かめる) */}
                     <Button type="button" variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => void lookupPlaceInfo()}
-                      loading={placeInfo.busy} disabled={!editForm.title.trim() && typeof editingItem?.latitude !== 'number'}
+                      loading={placeInfo.busy && placeInfo.mode !== 'geo'} disabled={!editForm.title.trim() && typeof editingItem?.latitude !== 'number'}
                       icon={<Globe size={15} aria-hidden="true" />} data-testid="place-info-lookup"
                       title="名前と位置から、住所・電話番号・種類を OpenStreetMap で調べます(入れる前に確かめられます)">
                       自動取得
@@ -1314,7 +1366,7 @@ const PlannerPage: React.FC = () => {
                               {c.phone && <span className="block text-xs text-ink-700">{`TEL ${c.phone}`}</span>}
                             </span>
                             <Button type="button" size="sm" variant="primary" className="shrink-0" onClick={() => applyPlaceInfo(c)}
-                              data-testid={`place-info-use-${i}`}>入れる</Button>
+                              data-testid={`place-info-use-${i}`}>{placeInfo.mode === 'geo' ? 'この位置にする' : '入れる'}</Button>
                           </li>
                         ))}
                       </ul>
@@ -1332,6 +1384,37 @@ const PlannerPage: React.FC = () => {
                     maxLength={40}
                     fullWidth
                   />
+                  {/* [Gate SpotLinks] 場所の URL(初めは 1 行・＋で 5 件まで) */}
+                  <EventUrlsField rows={editUrls.rows} onChange={(rows) => { setEditUrls((u) => ({ ...u, rows })); setUrlError(null); }}
+                    error={urlError} />
+                  {/* [Gate SpotLinks] 地図(位置がある時は街の縮尺で。印を動かして直せる)。位置が無ければ住所から探す */}
+                  <div className="space-y-2" data-testid="edit-map">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-ink-700">地図の位置</span>
+                      <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void lookupPosition()}
+                        loading={placeInfo.busy && placeInfo.mode === 'geo'}
+                        disabled={!editForm.location_name.trim() && !editForm.title.trim()}
+                        icon={<LocateFixed size={15} aria-hidden="true" />} data-testid="edit-map-lookup"
+                        title="住所(無ければ名前)から地図の位置を OpenStreetMap で探します(選んでから入れます)">
+                        {editCoords.lat !== null ? '住所から位置を探し直す' : '住所から位置を探す'}
+                      </Button>
+                    </div>
+                    {editCoords.lat !== null && editCoords.lng !== null ? (
+                      <>
+                        <React.Suspense fallback={<div className="h-[220px] rounded-xl bg-cloud-100" aria-hidden="true" />}>
+                          <SpotMiniMap latitude={editCoords.lat} longitude={editCoords.lng} label={editForm.title || '予定の場所'}
+                            onMove={(lat, lng) => setEditCoords({ lat, lng, changed: true })} />
+                        </React.Suspense>
+                        <p className="text-xs text-ink-700" data-testid="edit-map-note">
+                          {editCoords.changed ? '位置を変えました(保存すると旅程の地図・移動の計算に使います)' : '印を動かすと位置を直せます'}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="rounded-lg bg-cloud-100 px-3 py-2 text-xs text-ink-700" data-testid="edit-map-empty">
+                        まだ地図の位置がありません。「住所から位置を探す」か「自動取得」で入れると、ここに地図が出ます。
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
               {!currentPlan?.hidden_fields?.includes('event_notes') && (

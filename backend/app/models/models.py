@@ -509,6 +509,8 @@ class TravelEvent(Base):
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     # [Gate PlanSpotEdit] 場所の電話番号(予定ごと。場所の情報の取得・手入力)
     phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    # [Gate SpotLinks] 場所の URL(公式サイト・予約・SNS など。最大 5 件、http/https だけ)。[{"url": str, "label": str|None}]
+    urls: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -2404,7 +2406,7 @@ class BookletExport(Base):
         CheckConstraint("format IN ('web','print')", name="ck_booklet_exports_format"),
         CheckConstraint(
             "theme IN ('cute','simple','family','school','business','accessible','mono','functional','friends','wild',"
-            "'lovers','elegant','calm','solo','space')",
+            "'lovers','elegant','calm','solo','space','resort')",
             name="ck_booklet_exports_theme",
         ),
         CheckConstraint("density IN ('normal','compact')", name="ck_booklet_exports_density"),

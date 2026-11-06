@@ -321,6 +321,32 @@
 .bk--space .bk-tag { color: var(--bk-muted); border-color: var(--bk-line); font-family: var(--bk-mono); }
 .bk--space .bk-map-frame { background-color: #10202c; }
 
+/* ===== 13 リゾート(南の海・砂浜・夕方の空) ===== */
+.bk--resort {
+  --bk-bg: #fffaf0; --bk-fg: #12323b; --bk-muted: #3c5d66; --bk-line: #9ad3d6; --bk-soft: #e5f6f4; --bk-accent: #0b7480; --bk-cover-bg: #7fd3e0; --bk-cover-fg: #0b2e38;
+  --bk-font: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif; --bk-head: var(--bk-font);
+  --bk-d0: #0b7480; --bk-d1: #b8462a; --bk-d2: #1f5f8b; --bk-d3: #7a5a12; --bk-d4: #8a3f6b; --bk-d5: #2f6d3a; --bk-tile: saturate(1.15) hue-rotate(-8deg) brightness(1.03);
+  line-height: 1.8;
+}
+.bk--resort .bk-cover-in { padding-top: 40px; }
+.bk--resort .bk-kicker { font-family: 'Pacifico', cursive; font-size: 30px; letter-spacing: 0; color: #0b5e68; margin-bottom: 6px !important; }
+.bk--resort .bk-title { font-weight: 800; font-size: 54px; color: #0b2e38; text-shadow: 0 2px 0 rgb(255 255 255 / 55%); }
+.bk--resort .bk-title--long { font-size: 38px; }
+.bk--resort .bk-title--xl { font-size: 27px; }
+.bk--resort .bk-cover-meta { background: rgb(255 250 240 / 90%); border-radius: 18px; padding: 14px 18px; color: #12323b; font-weight: 700; }
+.bk--resort .bk-dest { color: #0b7480; }
+.bk--resort .bk-h2 { border: 0; color: var(--bk-accent); font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.bk--resort .bk-h2::after { content: ''; flex: 1; height: 6px; border-radius: 6px; background: linear-gradient(90deg, #13a3b4, #9ad3d6 60%, #fbe6c4); }
+.bk--resort .bk-day-h { background: var(--bk-day); color: #fff; padding: 6px 16px; border-radius: 999px; }
+.bk--resort .bk-day-tz { color: #fff; }
+.bk--resort .bk-events { gap: 8px; }
+.bk--resort .bk-ev { background: #fff; border: 1.5px solid var(--bk-line); border-radius: 16px; padding: 8px 12px; grid-template-columns: 70px minmax(0, 1fr); }
+.bk--resort .bk-ev-time { color: #b8462a; }
+.bk--resort .bk-move { border: 0; padding-left: 14px; }
+.bk--resort .bk-tag { border-radius: 999px; background: var(--bk-soft); border: 0; padding: 0 .6em; }
+.bk--resort .bk-map-frame { border-radius: 18px; border-color: var(--bk-line); }
+.bk--resort .bk-ov th, .bk--resort .bk-ov td { border-bottom-color: var(--bk-line); }
+
 /* ===== 以前からの 3 つ ===== */
 .bk--cute { --bk-bg: #fdf1f5; --bk-fg: #3a2030; --bk-muted: #6b3f55; --bk-line: #e89ab8; --bk-soft: #fde7ef; --bk-accent: #a02a5a; --bk-cover-bg: #f7c6d8; --bk-cover-fg: #3a2030; --bk-font: 'Zen Maru Gothic', sans-serif; --bk-d0: #a02a5a; --bk-d1: #7a4fb0; --bk-d2: #2a7a8a; --bk-d3: #a06020; --bk-d4: #b03a7a; --bk-d5: #3a7a4a; --bk-tile: saturate(.8); }
 .bk--accessible { --bk-fg: #000; --bk-muted: #000; --bk-line: #000; --bk-accent: #000; --bk-font: 'BIZ UDPGothic', sans-serif; --bk-size: 19px; --bk-d0: #000; --bk-d1: #003a8c; --bk-d2: #005a2b; --bk-d3: #7a0000; --bk-d4: #4a0080; --bk-d5: #004a5a; }
@@ -358,6 +384,7 @@
     height: auto !important; min-height: 0 !important; overflow: visible !important; background: transparent !important; box-shadow: none !important; border: 0 !important;
   }
   html[data-booklet-theme='space'], html[data-booklet-theme='space'] body { background: #090d12 !important; }
+  html[data-booklet-theme='resort'], html[data-booklet-theme='resort'] body { background: #fffaf0 !important; }
   html[data-booklet-theme='family'], html[data-booklet-theme='family'] body { background: #fff8e7 !important; }
   html[data-booklet-theme='friends'], html[data-booklet-theme='friends'] body { background: #f5f1e6 !important; }
   html[data-booklet-theme='wild'], html[data-booklet-theme='wild'] body { background: #efe7d0 !important; }

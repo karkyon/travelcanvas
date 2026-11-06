@@ -23,6 +23,9 @@ const m = vi.hoisted(() => ({
 
 const web = vi.hoisted(() => ({ publishBookletExport: vi.fn(), unpublishBookletExport: vi.fn(), getPublicBooklet: vi.fn() }));
 vi.mock('@/services/api/bookletWeb', () => web);
+// [Gate BookletTiers] デザインの会員クラス別の開放(既定は全て開放)
+const tiers = vi.hoisted(() => ({ getBookletThemes: vi.fn() }));
+vi.mock('@/services/api/bookletThemes', () => ({ getBookletThemes: tiers.getBookletThemes, TIER_LABEL: { free: 'Free', trip: 'Trip', journey: 'Journey', explorer: 'Explorer' } }));
 
 vi.mock('@/services/api', async () => {
   const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
@@ -57,6 +60,7 @@ beforeEach(() => {
   m.revokeBookletExport.mockResolvedValue(fx.booklet_export_revoked.export);
   window.confirm = vi.fn(() => true);
   window.print = vi.fn();
+  tiers.getBookletThemes.mockReset().mockRejectedValue(new Error('not loaded'));
 });
 
 describe('BookletPage (Gate P4)', () => {
@@ -132,6 +136,21 @@ describe('BookletPage (Gate P4)', () => {
     expect(within(list).getByTestId(`booklet-export-${versions[2]}`)).toHaveTextContent('旅程が更新済み');
     fireEvent.click(within(sens).getByRole('button', { name: '失効' }));
     await waitFor(() => expect(m.revokeBookletExport).toHaveBeenCalledWith('p1', (fx.booklet_export_list as BookletExport[])[1]!.id));
+  });
+
+  it('[BookletTiers] リゾートのデザインを選べる。クラスで使えないデザインは鍵と「○○ クラスから」を出して選べない', async () => {
+    tiers.getBookletThemes.mockReset().mockResolvedValue({ user_class: 'free', themes: [
+      { theme: 'simple', min_tier: 'free', available: true }, { theme: 'resort', min_tier: 'free', available: true },
+      { theme: 'space', min_tier: 'journey', available: false },
+    ] });
+    renderAt('/planner/p1/booklet');
+    const view = await screen.findByTestId('booklet');
+    const themes = screen.getByTestId('booklet-themes');
+    const space = within(themes).getByRole('radio', { name: /宇宙旅行/ });
+    await waitFor(() => expect(space).toBeDisabled());
+    expect(themes).toHaveTextContent('Journey クラスから使えます');
+    fireEvent.click(within(themes).getByRole('radio', { name: /リゾート/ }));
+    expect(view.className).toContain('bk--resort');
   });
 
   it('閲覧者には作成画面を出さない', async () => {

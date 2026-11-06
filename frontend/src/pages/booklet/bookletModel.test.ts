@@ -64,12 +64,12 @@ describe('[Gate BookletPatterns] 大日程と日別の行程', () => {
     expect(buildTimeline(d, [move]).map((x) => x.kind)).toEqual(['event', 'move', 'event']);
     expect(unplacedMoves([d], [move, { ...move, departure: null }])).toHaveLength(1);
   });
-  it('12 パターンのどれも見出しの言葉と字体を持つ', () => {
+  it('どのパターンも見出しの言葉と字体を持つ', () => {
     for (const t of THEME_OPTIONS) {
       expect(THEME_WORDS[t.value].day(1)).toBeTruthy();
       expect(fontUrl(t.value)).toContain('fonts.googleapis.com');
     }
-    expect(THEME_OPTIONS).toHaveLength(15);
+    expect(THEME_OPTIONS).toHaveLength(16); // [Gate BookletTiers] リゾートを追加
   });
 });
 
