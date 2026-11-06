@@ -39,7 +39,7 @@ test('制約: ハード(共有)とソフト(秘匿・理由付き)を登録し�
   const planId = await startGuestPlan(page);
 
   // 1. プランナーから制約画面へ(画面から到達できること自体も確認する)
-  await page.getByRole('button', { name: /制約/ }).click();
+  await page.getByTestId('planner-actions').getByRole('button', { name: '制約' }).click();  // [Gate HeaderPicker] 上の帯の旅行の切り替えも旅行の名前で読み上げるため、旅程の操作の列に絞る
   await page.waitForURL(new RegExp(`/planner/${planId}/constraints$`), { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: '制約', exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/制約はまだ登録されていません/)).toBeVisible();

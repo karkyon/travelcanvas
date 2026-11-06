@@ -59,7 +59,7 @@ test('実行可能性チェック: 違反・警告・検証不能を分けて表
 
   // 1. 制約画面へ。未検証であることが「問題なし」と区別して出る
   await page.reload();
-  await page.getByRole('button', { name: /制約/ }).click();
+  await page.getByTestId('planner-actions').getByRole('button', { name: '制約' }).click();  // [Gate HeaderPicker] 上の帯の旅行の切り替えも旅行の名前で読み上げるため、旅程の操作の列に絞る
   await page.waitForURL(new RegExp(`/planner/${planId}/constraints$`), { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: '実行可能性チェック' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('note')).toContainText('まだ検証していません');

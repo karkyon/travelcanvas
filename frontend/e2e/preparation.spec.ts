@@ -58,7 +58,7 @@ test('準備: 準備状況の項目をタスクで対応し、持ち物の候補
 
   // 1. 準備画面へ。準備状況に残りが出る(準備完了とは表示されない)
   await page.reload();
-  await page.getByRole('button', { name: /準備/ }).click();
+  await page.getByTestId('planner-actions').getByRole('button', { name: '準備' }).click();  // [Gate HeaderPicker] 上の帯の旅行の切り替えも旅行の名前で読み上げるため、旅程の操作の列に絞る
   await page.waitForURL(new RegExp(`/planner/${planId}/preparation$`), { timeout: 15_000 });
   const summary = page.getByTestId('readiness-summary');
   await expect(summary).toContainText('件の準備が残っています', { timeout: 15_000 });
