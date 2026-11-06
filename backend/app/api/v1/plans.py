@@ -29,7 +29,7 @@ import math
 from typing import Any, Dict, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -47,6 +47,7 @@ from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
 from app.services import plan_item_deletion
 from app.services import event_times as et
+from app.services import event_urls
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -83,6 +84,18 @@ class DayResponse(BaseModel):
         from_attributes = True
 
 
+class EventUrl(BaseModel):
+    """[Gate SpotLinks] 予定の場所の URL 1 件(http/https だけ。表示の名前は任意)"""
+    model_config = ConfigDict(extra="forbid")
+    url: str = Field(..., max_length=event_urls.MAX_URL_LENGTH)
+    label: Optional[str] = Field(None, max_length=event_urls.MAX_LABEL_LENGTH)
+
+    @field_validator("url")
+    @classmethod
+    def _v_url(cls, v: str) -> str:
+        return event_urls.clean_url(v)
+
+
 class EventCreate(BaseModel):
     day_id: str
     title: str
@@ -101,6 +114,8 @@ class EventCreate(BaseModel):
     end_day_offset: Optional[int] = None
     # [Gate PlanSpotEdit] 場所の電話番号(任意)
     phone: Optional[str] = Field(None, max_length=40)
+    # [Gate SpotLinks] 場所の URL(最大 5 件・http/https だけ)
+    urls: Optional[List[EventUrl]] = Field(None, max_length=event_urls.MAX_URLS)
     # [Gate #32] 検索候補(Gate #31 /search)から採用したPlaceのID。
     # 指定された場合、title/address/latitude/longitudeのうち未指定の
     # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
@@ -125,6 +140,8 @@ class EventUpdate(BaseModel):
     end_day_offset: Optional[int] = None
     # [Gate PlanSpotEdit] 場所の電話番号(空で消す)
     phone: Optional[str] = Field(None, max_length=40)
+    # [Gate SpotLinks] 場所の URL(最大 5 件。空の配列・null で消す)
+    urls: Optional[List[EventUrl]] = Field(None, max_length=event_urls.MAX_URLS)
 
 
 class EventMove(BaseModel):
@@ -152,6 +169,7 @@ class EventResponse(BaseModel):
     local_end_time: Optional[str] = None
     end_day_offset: Optional[int] = None
     phone: Optional[str] = None
+    urls: Optional[List[Dict[str, Any]]] = None
 
     @field_validator("id", "day_id", "place_id", mode="before")
     @classmethod
@@ -364,6 +382,7 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "locked": event.locked,
         "sort_order": event.sort_order,
         "phone": event.phone,
+        "urls": event.urls,
     }
 
 
@@ -830,6 +849,7 @@ async def create_event(
     latitude = event_data.latitude
     longitude = event_data.longitude
     phone = (event_data.phone or "").strip() or None
+    urls = event_urls.to_json(event_data.urls)
     place_uuid: Optional[uuid.UUID] = None
     if event_data.place_id:
         try:
@@ -843,6 +863,8 @@ async def create_event(
         title = title or place.name
         address = address if address is not None else place.address
         phone = phone if phone else place.phone
+        if not urls and place.website:
+            urls = event_urls.from_website(place.website)
         latitude = latitude if latitude is not None else place.latitude
         longitude = longitude if longitude is not None else place.longitude
 
@@ -852,7 +874,7 @@ async def create_event(
         title=title, description=event_data.description,
         event_type=event_data.event_type, start_at=event_data.start_at, end_at=event_data.end_at,
         local_start_time=event_data.local_start_time, is_all_day=event_data.is_all_day,
-        address=address, latitude=latitude, longitude=longitude, phone=phone,
+        address=address, latitude=latitude, longitude=longitude, phone=phone, urls=urls,
         sort_order=max_sort,
     )
     # [Gate G7] FR-005 終了時刻(日をまたぐ予定)と前後の確認
@@ -908,6 +930,8 @@ async def update_event(
     old_time = event.local_start_time
     if "phone" in update_data:
         update_data["phone"] = (update_data["phone"] or "").strip() or None
+    if "urls" in update_data:
+        update_data["urls"] = event_urls.to_json(event_data.urls)
     for field, value in update_data.items():
         setattr(event, field, value)
     if "local_start_time" in update_data and not end_given and "end_at" not in update_data:
@@ -1566,7 +1590,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         is_all_day=before.get("is_all_day", False), address=before.get("address"),
         latitude=before.get("latitude"), longitude=before.get("longitude"),
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
-        phone=before.get("phone"),
+        phone=before.get("phone"), urls=before.get("urls"),
     )
 
 

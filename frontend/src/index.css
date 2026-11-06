@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 /* [Gate G9] UX-1 デザインの決まり(--tc-* の変数と面の部品)。今の画面の見た目は変えない */
 @import './styles/tokens.css';
+@import './styles/spot.css'; /* [Gate SpotLinks] 予定の場所の電話・URL のリンク */
 /* [Gate G10-UX] UX-8 暗い見た目を全ての画面へ(Tailwind の色のクラスの置き換え。darkBridge.ts が作る) */
 @import './styles/theme-dark.css';
 @import './styles/shell.css';

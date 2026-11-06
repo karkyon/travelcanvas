@@ -1,0 +1,4 @@
+
+/* [Gate SpotLinks] 予定の場所の電話と URL のリンク(index.css から読む) */
+.tc-spot-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
+.tc-spot-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--tc-accent); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; word-break: break-all; }

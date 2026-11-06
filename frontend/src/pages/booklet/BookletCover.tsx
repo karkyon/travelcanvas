@@ -56,6 +56,33 @@ const Art: React.FC<{ theme: BookletTheme }> = ({ theme }) => {
           <g transform="translate(135 110)" fill="none" stroke="#ffb547"><circle cx="75" cy="75" r="72" strokeWidth="3" /><circle cx="75" cy="75" r="56" /><ellipse cx="75" cy="75" rx="52" ry="17" stroke="#dfe6ea" transform="rotate(-18 75 75)" /><path d="M99 49l14 6-10 10z" fill="#ffb547" /></g>
         </svg>
       );
+    case 'resort':
+      // 空(夕方の色)・太陽・海・砂浜・ヤシの葉。どの島・浜にも合う自作の図形
+      return (
+        <svg {...box}>
+          <defs>
+            <linearGradient id="bk-resort-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#7fd3e0" /><stop offset=".55" stopColor="#bfe9ec" /><stop offset="1" stopColor="#ffe3b8" />
+            </linearGradient>
+          </defs>
+          <rect width="420" height="594" fill="url(#bk-resort-sky)" />
+          <circle cx="300" cy="352" r="58" fill="#ffb56b" />
+          <path d="M0 372H420V470H0Z" fill="#13a3b4" />
+          <path d="M0 386C60 380 110 392 170 386S300 378 420 388" fill="none" stroke="#e8fbfb" strokeWidth="3" opacity=".8" />
+          <path d="M0 412C70 406 140 418 210 412S350 404 420 414" fill="none" stroke="#e8fbfb" strokeWidth="2" opacity=".6" />
+          <path d="M0 470C90 446 170 452 250 462S380 476 420 466V594H0Z" fill="#fbe6c4" />
+          <path d="M0 500C100 486 200 498 300 492S400 486 420 490" fill="none" stroke="#f3d29e" strokeWidth="3" />
+          <g transform="translate(70 230)">
+            <path d="M40 260C46 190 30 120 52 40" fill="none" stroke="#6b4a2b" strokeWidth="9" strokeLinecap="round" />
+            <g fill="#2f8f5b">
+              <path d="M52 40C20 18-8 26-26 44C2 34 26 38 52 40Z" /><path d="M52 40C70 6 104 0 128 12C98 14 74 24 52 40Z" />
+              <path d="M52 40C82 34 114 46 130 70C104 56 78 50 52 40Z" /><path d="M52 40C34 52 18 76 16 102C28 76 40 58 52 40Z" />
+              <path d="M52 40C44 16 50-8 66-22C60 2 58 20 52 40Z" />
+            </g>
+          </g>
+          <g fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round"><path d="M250 120q8-8 16 0q8-8 16 0" /><path d="M300 92q6-6 12 0q6-6 12 0" /></g>
+        </svg>
+      );
     case 'calm':
       return (
         <svg {...box}><circle cx="70" cy="74" r="28" fill="#a33a2c" /><path d="M58 88c0-8 6-8 6-16s-4-6-4-12M72 88c0-8 6-8 6-16s-4-6-4-12" fill="none" stroke="#f7f3e6" strokeWidth="2.5" /></svg>

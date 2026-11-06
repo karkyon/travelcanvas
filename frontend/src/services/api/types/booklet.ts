@@ -7,7 +7,7 @@
  */
 export type BookletTheme =
   | 'simple' | 'functional' | 'business' | 'family' | 'friends' | 'wild' | 'lovers' | 'elegant' | 'calm' | 'solo'
-  | 'school' | 'space' | 'cute' | 'accessible' | 'mono';
+  | 'school' | 'space' | 'cute' | 'accessible' | 'mono' | 'resort';
 export type BookletDensity = 'normal' | 'compact';
 export type BookletFormat = 'web' | 'print';
 export type BookletSection =

@@ -25,6 +25,7 @@ export const THEME_OPTIONS: { value: BookletTheme; label: string; help: string; 
   { value: 'solo', label: '一人旅', help: '方眼の手帳', swatch: ['#1c4e72', '#faf8f1'] },
   { value: 'school', label: '学校・団体', help: 'コピーして配れる行程表', swatch: ['#000000', '#dddddd'] },
   { value: 'space', label: '宇宙旅行', help: '黒と銀の飛行計画書', swatch: ['#090d12', '#ffb547'] },
+  { value: 'resort', label: 'リゾート', help: '南の海と砂浜。休日の旅に', swatch: ['#13a3b4', '#fbe6c4'] },
   { value: 'cute', label: 'かわいい', help: '丸みのある柔らかい配色', swatch: ['#f06292', '#fde7ef'] },
   { value: 'accessible', label: 'アクセシブル', help: '大きな文字・高コントラスト', swatch: ['#000000', '#ffff00'] },
   { value: 'mono', label: '白黒', help: '色なしで印刷しても区別できる', swatch: ['#444444', '#ffffff'] },

@@ -167,6 +167,14 @@ export interface ScheduleItem {
   sort_order?: number;
   /** [Gate PlanSpotEdit] 場所の電話番号 */
   phone?: string;
+  /** [Gate SpotLinks] 場所の URL(公式サイト・予約・SNS など。最大 5 件) */
+  urls?: EventUrl[];
+}
+
+/** [Gate SpotLinks] 予定の場所の URL 1 件 */
+export interface EventUrl {
+  url: string;
+  label?: string | null;
 }
 
 export interface CreateScheduleItemData {
@@ -194,6 +202,8 @@ export interface CreateScheduleItemData {
   contact_info?: Record<string, unknown>;
   /** [Gate PlanSpotEdit] 場所の電話番号 */
   phone?: string;
+  /** [Gate SpotLinks] 場所の URL(最大 5 件) */
+  urls?: EventUrl[];
 }
 
 // 旅行日程(1日分)

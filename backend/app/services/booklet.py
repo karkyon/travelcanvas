@@ -44,8 +44,31 @@ from app.services.readiness import member_names
 
 POLICY_VERSION = "booklet-v2"
 # [Gate BookletPatterns] 12 のデザイン + 以前からの 3 つ。デザインは見た目だけを変え、載せる内容は変えない
+# [Gate BookletTiers] リゾート(南の海・砂浜)を追加
 THEMES = ("simple", "functional", "business", "family", "friends", "wild", "lovers", "elegant", "calm", "solo",
-          "school", "space", "cute", "accessible", "mono")
+          "school", "space", "cute", "accessible", "mono", "resort")
+# [Gate BookletTiers] デザインごとに「使える最も低い会員クラス」(free < trip < journey < explorer)。
+# 今は利用者の判断(2026-11-06「仕組みだけ作って全部開放」)で全部 free。配分を決めたらここを変える(画面とサーバーの両方に効く)。
+# 載っていないデザイン・知らないクラスは free 扱いにしない(下の theme_allowed で断る)
+THEME_MIN_TIER: Dict[str, str] = {t: "free" for t in THEMES}
+# 会員クラスの順。旧クラス(plus・family・pro)は全てを使える上位として扱う。ゲストは free と同じ
+TIER_RANK: Dict[str, int] = {"guest": 0, "free": 0, "trip": 1, "journey": 2, "explorer": 3,
+                             "plus": 3, "family": 3, "pro": 3}
+
+
+def theme_allowed(theme: str, user_class: str) -> bool:
+    need = THEME_MIN_TIER.get(theme)
+    have = TIER_RANK.get(user_class)
+    if need is None or have is None:
+        return False
+    return have >= TIER_RANK[need]
+
+
+def theme_catalog(user_class: str) -> List[Dict[str, Any]]:
+    """画面に出すデザインの一覧(使える最も低いクラスと、この人が使えるか)"""
+    return [{"theme": t, "min_tier": THEME_MIN_TIER[t], "available": theme_allowed(t, user_class)} for t in THEMES]
+
+
 DENSITIES = ("normal", "compact")
 FORMATS = ("web", "print")
 # 表示順(利用者がどの順で選んでも、この順に並べる)

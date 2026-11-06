@@ -976,7 +976,7 @@ export const planComment: Decoder<PlanComment> = object<PlanComment>({
 // ----- [Gate P4] しおり・印刷・PDF出力(FR-034/035/046)。backend/app/api/v1/booklet.py の応答(booklet-v1)。
 // 機密項目を含むかどうか(contains_sensitive・includes)と版の状態を誤ると、透かしや注意を出さずに
 // 印刷させてしまうため、列挙値と真偽値を厳密に検査する。
-const BOOKLET_THEMES = ['simple', 'functional', 'business', 'family', 'friends', 'wild', 'lovers', 'elegant', 'calm', 'solo', 'school', 'space', 'cute', 'accessible', 'mono'] as const;
+const BOOKLET_THEMES = ['simple', 'functional', 'business', 'family', 'friends', 'wild', 'lovers', 'elegant', 'calm', 'solo', 'school', 'space', 'cute', 'accessible', 'mono', 'resort'] as const;
 const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'notes'] as const;
 const bookletIncludes: Decoder<BookletIncludes> = object<BookletIncludes>({
   confirmation_numbers: bool, addresses: bool, phones: bool, participants: bool,

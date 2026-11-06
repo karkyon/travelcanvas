@@ -36,6 +36,8 @@ from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import BookletExport, TravelPlan, User
 from app.services import booklet
+from app.services import cost_guard
+from app.services import membership_tiers as mt
 from app.services.audit_service import record_audit_event
 from app.services.readiness import member_names
 from app.utils.rate_limiter import check_rate_limit
@@ -144,6 +146,16 @@ def _guard_hidden(opts: booklet.Options, hidden) -> None:
         raise member_policy.hidden_error(member_policy.BOOKLET_SECTION_CATEGORY[blocked[0]])
 
 
+def _guard_theme(db: Session, user: User, theme: str) -> None:
+    """[Gate BookletTiers] 会員クラスで使えないデザインは断る(画面で隠すだけにしない)。作成済みの版の表示は断らない"""
+    cls, _source = cost_guard.user_class(db, user)
+    if not booklet.theme_allowed(theme, cls):
+        need = booklet.THEME_MIN_TIER.get(theme, "explorer")
+        raise HTTPException(status_code=403, detail={
+            "code": "tier_feature_not_included", "min_tier": need,
+            "message": f"このデザインは {mt.TIER_LABEL.get(need, need)} クラスから使えます"})
+
+
 def _guard_sensitive(opts: booklet.Options, role: str) -> None:
     if opts.contains_sensitive and role != "owner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
@@ -215,6 +227,7 @@ def preview(plan_id: str, payload: OptionsIn, request: Request, response: Respon
             current_user: User = Depends(get_current_user_or_guest)):
     plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     opts = payload.to_options()
+    _guard_theme(db, current_user, opts.theme)
     _guard_hidden(opts, hidden)
     _guard_sensitive(opts, role)
     response.headers["Cache-Control"] = "no-store"
@@ -222,6 +235,14 @@ def preview(plan_id: str, payload: OptionsIn, request: Request, response: Respon
     if opts.contains_sensitive:
         _audit("booklet_preview_sensitive", request, current_user, None, plan.id, _audit_flags(opts))
     return result
+
+
+@router.get("/{plan_id}/booklet/themes", response_model=dict)
+def list_themes(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate BookletTiers] デザインの一覧と、この人の会員クラスで使えるか(使える最も低いクラス)"""
+    member_policy.require_access(db, plan_id, current_user, "editor")
+    cls, _source = cost_guard.user_class(db, current_user)
+    return {"user_class": cls, "themes": booklet.theme_catalog(cls)}
 
 
 @router.get("/{plan_id}/booklet-exports", response_model=List[dict])
@@ -240,6 +261,7 @@ def create_export(plan_id: str, payload: ExportCreate, request: Request, respons
                   db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     opts = payload.to_options()
+    _guard_theme(db, current_user, opts.theme)
     _guard_hidden(opts, hidden)
     _guard_sensitive(opts, role)
     now = _now()

@@ -24,7 +24,7 @@
  */
 import { create } from 'zustand';
 import { PLAN_MUTATED_EVENT } from '@/utils/commandPalette';
-import { TravelPlan, ScheduleItem, DaySchedule, EventCategory } from '@/types';
+import { TravelPlan, ScheduleItem, DaySchedule, EventCategory, EventUrl } from '@/types';
 import { api as apiService, travelAPI } from '@/services/api';
 import type { SpotResult, NormalizedDay, NormalizedEvent } from '@/services/api';
 import { createQuickDraft, getStoredDeviceToken } from '@/services/quickDraftApi';
@@ -141,9 +141,17 @@ interface PlanState {
 
 // ===== 正規化API <-> フロントエンド型 の変換 =====
 
+function readEventUrls(raw: unknown): EventUrl[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw.flatMap((x) => (x && typeof x === 'object' && typeof (x as { url?: unknown }).url === 'string'
+    ? [{ url: (x as { url: string }).url, label: typeof (x as { label?: unknown }).label === 'string' ? (x as { label: string }).label : null }]
+    : []));
+  return out.length ? out : undefined;
+}
+
 function mapEvent(e: NormalizedEvent): ScheduleItem {
   // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
-  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null };
+  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown };
   return {
     id: e.id,
     title: e.title,
@@ -161,6 +169,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     sort_order: e.sort_order,
     // [Gate PlanSpotEdit] 場所の電話番号(応答にある時だけ。decoder は知らない項目もそのまま通す)
     phone: g7.phone ?? undefined,
+    // [Gate SpotLinks] 場所の URL(形の違う値は捨てる)
+    urls: readEventUrls(g7.urls),
   };
 }
 
@@ -621,6 +631,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       contact_info: item.contact_info,
       end_day_offset: item.end_day_offset,
       phone: item.phone,
+      urls: item.urls,
     };
 
     const updatedDay = { ...day, events: [...day.events, optimisticItem] };
@@ -647,6 +658,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ...(optimisticItem.start_time && optimisticItem.end_time
             ? { local_end_time: optimisticItem.end_time, end_day_offset: optimisticItem.end_day_offset ?? 0 } : {}),
           ...(optimisticItem.phone ? { phone: optimisticItem.phone } : {}),
+          ...(optimisticItem.urls?.length ? { urls: optimisticItem.urls } : {}),
         },
         generateIdempotencyKey()
       );
@@ -754,6 +766,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           longitude: hidePlace ? undefined : item.longitude,
           // [Gate PlanSpotEdit] 電話番号(変えた時だけ。空は消す)
           ...(item.phone === undefined || hidePlace ? {} : { phone: item.phone }),
+          // [Gate SpotLinks] URL(変えた時だけ。空の配列は消す)
+          ...(item.urls === undefined || hidePlace ? {} : { urls: item.urls }),
         },
         plan.revision!
       );

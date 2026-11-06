@@ -226,6 +226,7 @@
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
 | `test_tier_disabled` | 403 | no | 本番・staging の環境ではクラスの試験の切り替えをしません | api/v1/admin_ops.py |
 | `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
+| `tier_feature_not_included` | 403 | no | このデザインは … クラスから使えます | api/v1/booklet.py |
 | `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |

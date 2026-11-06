@@ -46,7 +46,8 @@ PRESETS: Dict[str, List[str]] = {
 
 EVENT_NOTE_FIELDS = ("description",)
 # [Gate PlanSpotEdit] 電話番号も場所を特定できるため、住所・位置と一緒に隠す
-EVENT_ADDRESS_FIELDS = ("address", "latitude", "longitude", "place_id", "phone")
+# [Gate SpotLinks] 場所の URL(公式サイト・予約のページ)も場所を特定できるため一緒に隠す
+EVENT_ADDRESS_FIELDS = ("address", "latitude", "longitude", "place_id", "phone", "urls")
 EMPTY: FrozenSet[str] = frozenset()
 
 
