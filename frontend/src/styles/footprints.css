@@ -1,0 +1,17 @@
+/* ===== [Gate Footprints2] 旅の足あと(日本 / 世界の地図) ===== */
+.tc-fp-toggle { display: inline-flex; margin-left: auto; padding: 3px; border-radius: 999px; background: var(--tc-cloud-100); gap: 2px; }
+.tc-fp-toggle button {
+  min-height: 30px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; font-size: 12px; font-weight: 700;
+  color: var(--tc-ink-700); cursor: pointer;
+}
+.tc-fp-toggle button[aria-pressed='true'] { background: var(--tc-cloud-0); color: var(--tc-ink-900); box-shadow: 0 1px 3px rgba(16, 32, 46, .14); }
+.tc-fp-toggle + .tc-mini-link { margin-left: 10px; }
+.tc-fp-frame { margin-top: 12px; border-radius: 14px; background: var(--tc-cloud-50); border: 1px solid var(--tc-cloud-200); padding: 10px; }
+.tc-fp-map { display: block; width: 100%; height: auto; }
+.tc-fp-japan { max-height: 440px; margin: 0 auto; }
+.tc-fp-world .tc-fp-dot circle { filter: drop-shadow(0 1px 1.5px rgba(16, 32, 46, .35)); }
+.tc-fp-regions { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 0; padding: 0; list-style: none; font-size: 11px; color: var(--tc-ink-700); }
+.tc-fp-regions li { display: inline-flex; align-items: center; gap: 5px; }
+.tc-fp-regions span { width: 10px; height: 10px; border-radius: 3px; }
+.tc-home-legend span[data-state="visited-dot"] { width: 11px; height: 11px; border-radius: 999px; background: var(--tc-accent); border: 2px solid var(--tc-cloud-0); box-shadow: 0 0 0 1px var(--tc-accent); }
+.tc-home-legend span[data-state="planned-dot"] { width: 11px; height: 11px; border-radius: 999px; background: var(--tc-cloud-0); border: 2px solid var(--tc-accent); }
