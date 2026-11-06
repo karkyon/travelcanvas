@@ -9,6 +9,9 @@ import CommandPaletteLauncher from './CommandPaletteLauncher';
 
 // [Gate AppShell] 利用者のメニュー・スマホのメニューは開いた時に読む(最初に読む JS を増やさない)
 const TripNav = lazy(() => import('./shell/TripNav'));
+// [Gate HeaderPicker] 旅行の一覧(押した時に出す)・見た目の切り替え(上の帯の検索の右)。同じ別の塊から読む
+const TripPickerMenu = lazy(() => loadMenus().then((m) => ({ default: m.TripPickerMenu })));
+const ThemeToggle = lazy(() => loadMenus().then((m) => ({ default: m.ThemeToggle })));
 const loadMenus = () => import('./shell/HeaderMenus');
 const UserMenu = lazy(() => loadMenus().then((m) => ({ default: m.UserMenu })));
 const MobileMenu = lazy(() => loadMenus().then((m) => ({ default: m.MobileMenu })));
@@ -35,6 +38,7 @@ const Header: React.FC = () => {
   const currentPlan = useCurrentTripStore((st) => st.trip);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   // [Gate #26] 以前は実データと無関係な固定の未読バッジ(常時点滅)だった。
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -88,14 +92,19 @@ const Header: React.FC = () => {
       if (!target.closest('.mobile-menu-container')) {
         setIsMobileMenuOpen(false);
       }
+      if (!target.closest('.trip-picker-container')) {
+        setIsPickerOpen(false);
+      }
     };
 
-    if (isUserMenuOpen || isMobileMenuOpen) {
+    if (isUserMenuOpen || isMobileMenuOpen || isPickerOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
     return undefined;
-  }, [isUserMenuOpen, isMobileMenuOpen]);
+  }, [isUserMenuOpen, isMobileMenuOpen, isPickerOpen]);
+
+  useEffect(() => { setIsPickerOpen(false); }, [location.pathname]);
 
   // 認証されていないユーザーには最小限のヘッダー(印・ログイン・新規登録)を表示
   if (!isAuthenticated) {
@@ -144,30 +153,38 @@ const Header: React.FC = () => {
             <span className="tc-brand-text" aria-hidden="true">TravelCanvas</span>
           </Link>
 
-          {/* 今開いている旅行(旅行の中にいる時)。それ以外は旅行の一覧へ */}
-          {currentTrip ? (
-            <Link to={`/planner/${currentTrip.id}`} data-testid="header-current-trip" className="tc-focus-ring tc-trip-switch"
-              aria-label={`今の旅行: ${currentTrip.title}${tripDates ? `(${tripDates})` : ''}`}>
+          {/* 今開いている旅行(旅行の中にいる時)。[Gate HeaderPicker] 押すと旅行の一覧を出し、選んだ旅行の旅程へ移る */}
+          <div className="relative trip-picker-container shrink-0 tc-trip-picker">
+            <button type="button" className="tc-focus-ring tc-trip-switch" aria-haspopup="dialog" aria-expanded={isPickerOpen}
+              data-testid={currentTrip ? 'header-current-trip' : 'header-trip-picker'}
+              aria-label={currentTrip ? `今の旅行: ${currentTrip.title}${tripDates ? `(${tripDates})` : ''}。旅行を切り替える` : '旅行を選ぶ'}
+              onClick={(e) => { e.stopPropagation(); setIsPickerOpen((v) => !v); }}>
               <MapPinned size={18} aria-hidden="true" className="shrink-0" />
-              <span className="tc-trip-name">
-                <span>{currentTrip.title}</span>
-                {tripDates && <small>{tripDates}</small>}
-              </span>
+              {currentTrip ? (
+                <span className="tc-trip-name">
+                  <span>{currentTrip.title}</span>
+                  {tripDates && <small>{tripDates}</small>}
+                </span>
+              ) : (
+                <span className="tc-trip-name"><span>旅行を選ぶ</span><small>一覧から選ぶ</small></span>
+              )}
               <ChevronDown size={16} aria-hidden="true" className="tc-chev" />
-            </Link>
-          ) : (
-            <Link to="/planner" className="tc-focus-ring tc-trip-switch" data-testid="header-trip-picker">
-              <MapPinned size={18} aria-hidden="true" className="shrink-0" />
-              <span className="tc-trip-name"><span>旅行を選ぶ</span><small>旅程の一覧へ</small></span>
-              <ChevronDown size={16} aria-hidden="true" className="tc-chev" />
-            </Link>
-          )}
+            </button>
+            {isPickerOpen && (
+              <Suspense fallback={null}>
+                <TripPickerMenu currentId={currentTrip?.id ?? null} onClose={() => setIsPickerOpen(false)} />
+              </Suspense>
+            )}
+          </div>
           {navTrip && wide && <Suspense fallback={null}><TripNav tripId={navTrip} path={location.pathname} /></Suspense>}
 
           <div className="flex-1 tc-top-spacer" />
 
           {/* [Gate C3] 情報内検索・コマンドパレット(Ctrl+K) */}
           <div className="hidden sm:block shrink-0"><CommandPaletteLauncher /></div>
+
+          {/* [Gate HeaderPicker] 見た目(端末に合わせる / 明るい / 暗い)。以前はホームの見出しの大きな選択の欄だった */}
+          <Suspense fallback={<span className="tc-top-icon" aria-hidden="true" />}><ThemeToggle /></Suspense>
 
           {/* 通知 */}
           <Link

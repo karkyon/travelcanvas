@@ -4,12 +4,7 @@ import App from './App.tsx'
 import { ToastProvider } from './components/common/Toast'
 import './index.css'
 
-// 環境変数デバッグ
-console.log('=== 環境変数確認 ===');
-console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-console.log('NODE_ENV:', import.meta.env.NODE_ENV);
-console.log('===================');
+// [Gate HeaderPicker] 起動の度に環境変数(API の送り先)を console へ出す調べ物の残りを外した(最初に読む JS も減る)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

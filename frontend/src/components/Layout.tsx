@@ -1,9 +1,12 @@
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import AppRail from './shell/AppRail';
 import { useAuthStore } from '../store/authStore';
-import RecordingIndicator from './location/RecordingIndicator';
+import { useTrackingStore } from '../store/trackingStore';
+
+// [Gate HeaderPicker] 位置の記録中の帯は、記録中の時だけ読む(最初に読む JS を減らす。状態は trackingStore が最初から持つ)
+const RecordingIndicator = lazy(() => import('./location/RecordingIndicator'));
 
 const PageLoading = () => (
   <div role="status" aria-live="polite" className="flex justify-center items-center py-24">
@@ -17,6 +20,7 @@ const Layout = () => {
   const { pathname } = useLocation();
   // [Gate AppShell] ログインした後の画面は、モックの殻(上の帯+左の帯。スマホは下の帯)で包む
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const recording = useTrackingStore((s) => s.active !== null);
   const isLanding = pathname === '/';
   const withRail = isAuthenticated && !isLanding && !PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const body = (
@@ -32,7 +36,7 @@ const Layout = () => {
     <div className="min-h-screen bg-cloud-50 text-ink-900">
       {!isLanding && <Header />}
       {/* [Gate L5] 位置の記録中であることを全ての画面で示す(CA-014) */}
-      <RecordingIndicator />
+      {recording && <Suspense fallback={null}><RecordingIndicator /></Suspense>}
       {withRail ? (
         <div className="tc-shell">
           <AppRail />

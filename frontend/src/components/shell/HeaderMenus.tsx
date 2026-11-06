@@ -1,25 +1,21 @@
 /**
  * [Gate AppShell] 上の帯のメニュー(利用者のメニュー・スマホのメニュー)。開いた時に読み込む別の塊。
- * 中身は以前の Header と同じ(プロフィール・組織・設定・検索の設定・見た目・ログアウト)。
+ * 中身は以前の Header と同じ(プロフィール・組織・設定・検索の設定・ログアウト)。見た目は上の帯の印([Gate HeaderPicker])。
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Settings, User, Brain, LogOut, Building2, ShieldCheck, Activity } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { useThemePreference, type ThemePreference } from '../../hooks/useThemePreference';
 import { railItems } from './railItems';
 import { safeInternalPath } from '../../utils/safeNavigation';
 
-const THEME_CHOICES: Array<{ value: ThemePreference; label: string }> = [
-  { value: 'light', label: '明るい' },
-  { value: 'dark', label: '暗い' },
-  { value: 'system', label: '端末' },
-];
+// [Gate HeaderPicker] 旅行の一覧・見た目の切り替えも同じ塊で読む(最初に読む JS の入口を増やさない)
+export { default as TripPickerMenu } from './TripPickerMenu';
+export { default as ThemeToggle } from './ThemeToggle';
 
 export const UserMenu: React.FC<{ onClose: () => void; onLogout: () => void }> = ({ onClose, onLogout }) => {
   const { user, isGuest } = useAuthStore();
   const isAdmin = !isGuest && (user?.user_type === 'admin' || user?.user_type === 'super_admin' || user?.is_superuser === true);
-  const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   return (
     <div className="absolute right-0 mt-2 w-60 bg-cloud-0 text-ink-900 rounded-lg shadow-lg border border-cloud-200 py-1 z-10">
       <div className="px-4 py-2 border-b border-cloud-200">
@@ -79,24 +75,7 @@ export const UserMenu: React.FC<{ onClose: () => void; onLogout: () => void }> =
         <Brain size={16} className="inline mr-2" aria-hidden="true" />
         検索の設定
       </Link>
-      {/* [Gate G10-UX] UX-8 見た目の切り替え(この端末。全ての画面に効く) */}
-      <div className="px-4 py-2 border-t border-cloud-200" role="group" aria-label="表示">
-        <p className="text-xs text-ink-700 mb-1" aria-hidden="true">表示</p>
-        <div className="flex gap-1">
-          {THEME_CHOICES.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              aria-pressed={themePreference === c.value}
-              onClick={(e) => { e.stopPropagation(); setThemePreference(c.value); }}
-              className={`tc-focus-ring flex-1 min-h-9 px-2 rounded-md text-xs font-medium border ${themePreference === c.value
-                ? 'bg-accent text-on-accent border-accent' : 'bg-cloud-0 text-ink-900 border-cloud-200 hover:bg-cloud-100'}`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* [Gate HeaderPicker] 見た目の切り替えは上の帯の印(ThemeToggle)へ移した */}
       <hr className="my-1 border-cloud-200" />
       <button
         onClick={() => {
