@@ -13,6 +13,11 @@ vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));
 vi.mock('@/components/planner/PlanMap', () => ({ default: () => null }));
+// [Gate PlanSpotEdit] 編集の画面の写真・予約と費用の要約は、それぞれの試験で確かめる
+vi.mock('@/components/planner/EventPhotoPanel', () => ({ default: () => null }));
+vi.mock('@/components/planner/EventRelatedSummary', () => ({ default: () => null }));
+const { getPlaceInfo } = vi.hoisted(() => ({ getPlaceInfo: vi.fn() }));
+vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo, reorderDay: vi.fn() }));
 vi.mock('@/components/DayView', () => ({
   default: ({ day, onItemEdit }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void }) => (
     <div>{day.events.map((e) => <button key={e.id} type="button" onClick={() => onItemEdit(e)}>編集: {e.title}</button>)}</div>
@@ -154,5 +159,46 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     fireEvent.click(within(screen.getByTestId('edit-conflict')).getByRole('button', { name: '自分の変更を最新の内容に重ねて保存' }));
     await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(2));
     expect(updateScheduleItem.mock.calls[1]![1]).toMatchObject({ start_time: '09:30', description: '朝一番に行く' });
+  });
+
+  it('[PlanSpotEdit] 課題 #3-⑤ 「自動取得」で住所・電話番号・種類の候補を出典つきで示し、「入れる」と欄に入る。保存で電話番号と種類も送る', async () => {
+    const { updateScheduleItem } = setup();
+    getPlaceInfo.mockReset().mockResolvedValue({
+      provider: 'nominatim', attribution: '© OpenStreetMap contributors', license: 'ODbL 1.0',
+      license_url: 'https://www.openstreetmap.org/copyright', cached: false, unavailable: false, error_code: null,
+      candidates: [{ name: '清水寺', address: '〒605-0862 京都府京都市東山区清水1丁目294', phone: '075-551-1234', website: null,
+        category: 'sightseeing', osm_type: 'place_of_worship', latitude: 34.99, longitude: 135.78, source_url: null }],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
+    expect(screen.queryByLabelText('終わる日')).toBeNull(); // [#3-④]「終わる日」の選択は外した
+    expect(screen.getByLabelText('滞在(時間)')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('edit-category'), { target: { value: 'other' } });
+    fireEvent.click(screen.getByTestId('place-info-lookup'));
+    const result = await screen.findByTestId('place-info-result');
+    expect(getPlaceInfo).toHaveBeenCalledWith({ name: '清水寺', latitude: undefined, longitude: undefined });
+    expect(result).toHaveTextContent('TEL 075-551-1234');
+    expect(result).toHaveTextContent('© OpenStreetMap contributors(ODbL 1.0)');
+    expect(screen.getByLabelText('場所・住所')).toHaveValue('');  // 押すまで入れない
+    fireEvent.click(within(result).getByRole('button', { name: '入れる' }));
+    expect(screen.getByLabelText('場所・住所')).toHaveValue('〒605-0862 京都府京都市東山区清水1丁目294');
+    expect(screen.getByLabelText('電話番号')).toHaveValue('075-551-1234');
+    expect(screen.getByTestId('edit-category')).toHaveValue('sightseeing');
+    updateScheduleItem.mockResolvedValueOnce('saved');
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(1));
+    expect(updateScheduleItem.mock.calls[0]![1]).toMatchObject({ address: '〒605-0862 京都府京都市東山区清水1丁目294', phone: '075-551-1234' });
+    expect(updateScheduleItem.mock.calls[0]![1]).not.toHaveProperty('category');  // 元と同じ種類なら送らない
+  });
+
+  it('[PlanSpotEdit] 提供元が応答しない時は 0 件と言わずに伝え、欄は変えない', async () => {
+    setup();
+    getPlaceInfo.mockReset().mockResolvedValue({
+      provider: 'nominatim', attribution: '© OpenStreetMap contributors', license: 'ODbL 1.0', license_url: '',
+      cached: false, unavailable: true, error_code: 'timeout', candidates: [],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
+    fireEvent.click(screen.getByTestId('place-info-lookup'));
+    expect(await screen.findByTestId('place-info-error')).toHaveTextContent('応答しませんでした');
+    expect(screen.getByLabelText('場所・住所')).toHaveValue('');
   });
 });

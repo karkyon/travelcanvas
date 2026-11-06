@@ -145,6 +145,8 @@ export class PlansApi extends SpotsApi {
       day_id: string; title: string; description?: string; event_type?: string;
       local_start_time?: string; address?: string; latitude?: number; longitude?: number;
       place_id?: string;
+      /** [Gate PlanSpotEdit] 終了時刻(開始がある時だけ)・電話番号 */
+      local_end_time?: string; end_day_offset?: number; phone?: string;
     },
     idempotencyKey: string
   ): Promise<NormalizedEvent> {
@@ -160,6 +162,7 @@ export class PlansApi extends SpotsApi {
       title: string; description: string; event_type: string; local_start_time: string;
       local_end_time: string | null; end_day_offset: number;
       address: string; latitude: number; longitude: number; locked: boolean;
+      phone: string;
     }>,
     ifMatch: number
   ): Promise<NormalizedEvent> {

@@ -2,6 +2,7 @@
  * [Gate G11 段階7] 並べ替えの案(保存する前の影響の確認。UIX-M03)。
  * 触る・矢印キー・ドラッグで動かした並びを、まだ保存せずに見せる: 順の変化・前後が合わなくなる移動の区間・営業時間・確定の予定。
  * 「この並びにする」で1回に保存し、「やめる」で何も変えない。保存の後は ReorderImpact(実際の判定の差と元に戻す)が続く。
+ * [Gate PlanSpotEdit] 案の並びは「スポットだけを入れ替える」見え方(時刻・移動手段は位置に残す。plannerModel.keepSlots)。
  */
 import React from 'react';
 import Button from '../common/Button';
@@ -34,7 +35,7 @@ const ReorderPreview: React.FC<Props> = ({ dayId, model, busy, onApply, onCancel
             : `⚠ この並びにすると、前後が合わなくなる移動の区間が${mismatches.length}件あります(${mismatches.map((t) => `「${t}」`).join('')}へ着く区間)。区間は自動では直しません`}
       </p>
       <p data-testid="reorder-preview-hours">
-        開始・終了の時刻は変えないため、営業時間の判定は変わりません(保存の後にもう一度確かめます)。確定の予定は動かしません。
+        スポットだけを入れ替えます。開始・終了の時刻と移動手段は、それぞれの位置に残ります(営業時間は保存の後にもう一度確かめます)。確定の予定は動かしません。
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" className="min-h-11" onClick={onApply} disabled={busy} data-testid="reorder-apply">

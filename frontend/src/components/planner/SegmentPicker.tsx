@@ -8,6 +8,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeftRight, SlidersHorizontal } from 'lucide-react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import TransportIcon from '@/components/common/TransportIcon';
@@ -96,15 +97,26 @@ const SegmentPicker: React.FC<PickerProps> = ({
       )}
       {canEdit && (
         <div className="tc-segment-tools">
-          <button type="button" className="tc-focus-ring tc-segment-btn" aria-expanded={open}
-            onClick={() => setOpen((v) => !v)} data-testid={`segment-choose-${toEventId}`}
-            aria-label={`「${fromTitle}」から「${toTitle}」への移動手段を${segment ? '変える' : '選ぶ'}`}>
-            {segment ? (mismatch ? '移動手段を選び直す' : '変える') : '＋ 移動手段を選ぶ'}
-          </button>
+          {/* [Gate PlanSpotEdit] 区間の操作は印のボタン(丸・色の付いた地)にして、予定の操作(鉛筆・写真・コメント・ごみ箱。
+              線だけの灰色の印)と見分けられるようにする。印の意味は名前(読み上げ)と吹き出し(title)で伝える */}
+          {segment && !mismatch ? (
+            <button type="button" className="tc-focus-ring tc-seg-iconbtn" aria-expanded={open}
+              onClick={() => setOpen((v) => !v)} data-testid={`segment-choose-${toEventId}`} title="移動手段を変える"
+              aria-label={`「${fromTitle}」から「${toTitle}」への移動手段を変える`}>
+              <ArrowLeftRight size={14} aria-hidden="true" />
+            </button>
+          ) : (
+            <button type="button" className="tc-focus-ring tc-segment-btn" aria-expanded={open}
+              onClick={() => setOpen((v) => !v)} data-testid={`segment-choose-${toEventId}`}
+              aria-label={`「${fromTitle}」から「${toTitle}」への移動手段を${segment ? '変える' : '選ぶ'}`}>
+              {segment ? '移動手段を選び直す' : '＋ 移動手段を選ぶ'}
+            </button>
+          )}
           {segment && !mismatch && (
-            <button type="button" className="tc-focus-ring tc-segment-btn" onClick={() => setDetail(true)}
-              data-testid={`segment-detail-${toEventId}`} aria-label={`「${toTitle}」へ着く移動の詳細(時刻・便名・座席など)`}>
-              詳細
+            <button type="button" className="tc-focus-ring tc-seg-iconbtn" onClick={() => setDetail(true)}
+              data-testid={`segment-detail-${toEventId}`} title="移動の詳細(時刻・便名・座席・費用)"
+              aria-label={`「${toTitle}」へ着く移動の詳細(時刻・便名・座席など)`}>
+              <SlidersHorizontal size={14} aria-hidden="true" />
             </button>
           )}
         </div>

@@ -29,7 +29,8 @@ import math
 from typing import Any, Dict, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -98,6 +99,8 @@ class EventCreate(BaseModel):
     # 正本は end_at(app/services/event_times.py)
     local_end_time: Optional[str] = None
     end_day_offset: Optional[int] = None
+    # [Gate PlanSpotEdit] 場所の電話番号(任意)
+    phone: Optional[str] = Field(None, max_length=40)
     # [Gate #32] 検索候補(Gate #31 /search)から採用したPlaceのID。
     # 指定された場合、title/address/latitude/longitudeのうち未指定の
     # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
@@ -120,6 +123,8 @@ class EventUpdate(BaseModel):
     # [Gate G7] FR-005 終了時刻(null で消す)と日数の差
     local_end_time: Optional[str] = None
     end_day_offset: Optional[int] = None
+    # [Gate PlanSpotEdit] 場所の電話番号(空で消す)
+    phone: Optional[str] = Field(None, max_length=40)
 
 
 class EventMove(BaseModel):
@@ -146,6 +151,7 @@ class EventResponse(BaseModel):
     # [Gate G7] FR-005 終了のその日の現地時刻と、開始の日から何日後か(end_at から作る。日をまたぐ予定は 1 以上)
     local_end_time: Optional[str] = None
     end_day_offset: Optional[int] = None
+    phone: Optional[str] = None
 
     @field_validator("id", "day_id", "place_id", mode="before")
     @classmethod
@@ -357,6 +363,7 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "longitude": event.longitude,
         "locked": event.locked,
         "sort_order": event.sort_order,
+        "phone": event.phone,
     }
 
 
@@ -822,6 +829,7 @@ async def create_event(
     address = event_data.address
     latitude = event_data.latitude
     longitude = event_data.longitude
+    phone = (event_data.phone or "").strip() or None
     place_uuid: Optional[uuid.UUID] = None
     if event_data.place_id:
         try:
@@ -834,6 +842,7 @@ async def create_event(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定したPlaceが見つかりません")
         title = title or place.name
         address = address if address is not None else place.address
+        phone = phone if phone else place.phone
         latitude = latitude if latitude is not None else place.latitude
         longitude = longitude if longitude is not None else place.longitude
 
@@ -843,7 +852,7 @@ async def create_event(
         title=title, description=event_data.description,
         event_type=event_data.event_type, start_at=event_data.start_at, end_at=event_data.end_at,
         local_start_time=event_data.local_start_time, is_all_day=event_data.is_all_day,
-        address=address, latitude=latitude, longitude=longitude,
+        address=address, latitude=latitude, longitude=longitude, phone=phone,
         sort_order=max_sort,
     )
     # [Gate G7] FR-005 終了時刻(日をまたぐ予定)と前後の確認
@@ -897,6 +906,8 @@ async def update_event(
     if end_given and "local_end_time" not in event_data.model_fields_set:
         local_end_time = et.end_fields(event.end_at, event.day.local_date, event.day.timezone_id)[0]
     old_time = event.local_start_time
+    if "phone" in update_data:
+        update_data["phone"] = (update_data["phone"] or "").strip() or None
     for field, value in update_data.items():
         setattr(event, field, value)
     if "local_start_time" in update_data and not end_given and "end_at" not in update_data:
@@ -1001,6 +1012,107 @@ async def move_event(
     response = _event_out(event, hidden)
     _store_idempotency(db, current_user, "POST /plans/events/move", idempotency_key, 200, response)
     return response
+
+
+class DayReorder(BaseModel):
+    """[Gate PlanSpotEdit] 1 日の予定の並びを 1 回で変える。
+
+    keep_slots=True(既定)は「スポットだけを入れ替える」: 時刻(開始・終了・終日)と、予定の間の移動区間(移動手段・
+    出発/到着の予定・所要時間・費用など)は並びの位置に残し、場所(予定)だけを入れ替える。False は並びだけを変える
+    (以前の並べ替えと同じ。時刻は予定に付いたまま)。"""
+    order: List[str]
+    keep_slots: bool = True
+
+
+class DayReorderResult(BaseModel):
+    revision: int
+    day: DayWithEvents
+
+
+_SLOT_FIELDS = ("start_at", "end_at", "local_start_time", "is_all_day")
+
+
+@router.post("/{plan_id}/days/{day_id}/reorder", response_model=DayReorderResult)
+async def reorder_day(
+    plan_id: str,
+    day_id: str,
+    body: DayReorder,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """[Gate PlanSpotEdit] 1 日の並べ替え(旅程のドラッグ・↑↓)。1 つの変更(1 回の「元に戻す」で全部戻る)として記録する。
+
+    - order は今のその日の予定の全部(過不足があれば 400)
+    - 確定(locked)の予定の位置は変えられない(409)
+    - keep_slots=True: 位置 i の予定は、元の位置 i の予定の時刻を受け継ぐ。移動区間の端(予定)も同じ位置の予定へ付け替える
+      (前の日・次の日の予定とつながる区間も含む)。区間の移動手段・時刻・費用は変えない
+    """
+    plan, hidden = _plan_hidden(db, plan_id, current_user, "editor")
+    _require_if_match(plan, if_match)
+    day = db.query(TravelDay).filter(TravelDay.id == day_id, TravelDay.plan_id == plan.id).first()
+    if not day:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="指定した日程が見つかりません")
+
+    events = (db.query(TravelEvent).filter(TravelEvent.day_id == day.id)
+              .order_by(TravelEvent.sort_order, TravelEvent.created_at).all())
+    by_id = {str(e.id): e for e in events}
+    if len(body.order) != len(set(body.order)) or set(body.order) != set(by_id):
+        raise HTTPException(status_code=400, detail={
+            "code": "order_mismatch", "message": "並びがこの日の予定と合いません。読み直してからもう一度並べ替えてください"})
+    old_ids = [str(e.id) for e in events]
+    for i, eid in enumerate(body.order):
+        if by_id[eid].locked and old_ids[i] != eid:
+            raise HTTPException(status_code=409, detail={
+                "code": "locked_event", "message": "確定の予定の位置は変えられません"})
+
+    changes: List[tuple] = []
+    if old_ids != body.order:
+        befores = {eid: _event_to_dict(e) for eid, e in by_id.items()}
+        slots = [{f: getattr(by_id[eid], f) for f in _SLOT_FIELDS} for eid in old_ids]
+        for i, eid in enumerate(body.order):
+            ev = by_id[eid]
+            ev.sort_order = i
+            if body.keep_slots:
+                for f, v in slots[i].items():
+                    setattr(ev, f, v)
+        db.flush()
+        for eid in body.order:
+            after = _event_to_dict(by_id[eid])
+            if after != befores[eid]:
+                changes.append(("travel_event", by_id[eid].id, "reorder", befores[eid], after))
+
+        if body.keep_slots:
+            # 区間の端: 元の位置 i の予定 → 新しい位置 i の予定
+            moved = {uuid.UUID(a): uuid.UUID(b) for a, b in zip(old_ids, body.order) if a != b}
+            day_uuids = list(moved.keys())
+            segs = db.query(TravelSegment).filter(
+                TravelSegment.plan_id == plan.id,
+                or_(TravelSegment.from_event_id.in_(day_uuids), TravelSegment.to_event_id.in_(day_uuids)),
+            ).all()
+            for seg in segs:
+                before = _segment_to_dict(seg)
+                if seg.from_event_id in moved:
+                    seg.from_event_id = moved[seg.from_event_id]
+                if seg.to_event_id in moved:
+                    seg.to_event_id = moved[seg.to_event_id]
+                after = _segment_to_dict(seg)
+                if after != before:
+                    changes.append(("travel_segment", seg.id, "update", before, after))
+            db.flush()
+
+    if changes:
+        revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    else:
+        db.commit()
+        revision = plan.revision
+
+    updated = (db.query(TravelEvent).filter(TravelEvent.day_id == day.id).order_by(TravelEvent.sort_order).all())
+    db.refresh(day)
+    return DayReorderResult(revision=revision, day=DayWithEvents(
+        **DayResponse.model_validate(day).model_dump(mode="json"),
+        events=[_event_out(e, hidden, day) for e in updated],
+    ))
 
 
 # ===== Undo =====
@@ -1454,6 +1566,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         is_all_day=before.get("is_all_day", False), address=before.get("address"),
         latitude=before.get("latitude"), longitude=before.get("longitude"),
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
+        phone=before.get("phone"),
     )
 
 

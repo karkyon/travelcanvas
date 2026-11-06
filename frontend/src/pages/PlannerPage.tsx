@@ -17,6 +17,11 @@ import PlanHeader from '@/components/PlanHeader';
 import DayView from '@/components/DayView';
 import OptimizationPanel from '@/components/planner/OptimizationPanel';
 import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeImpact';
+import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
+import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
+import { getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
+import { Globe } from 'lucide-react';
+import { safeExternalUrl } from '@/utils/safeNavigation';
 import Button from '@/components/common/Button';
 import UiIcon from '@/components/common/UiIcon';
 import {
@@ -85,6 +90,9 @@ function planDateRange(plan: { days: Array<{ date?: string }>; start_date?: stri
 }
 
 // [Gate PlanUX] 予定の種類(編集の画面の選択肢。EventCategory)
+// [Gate PlanSpotEdit] 場所の情報の出典(OpenStreetMap の著作権と ODbL の案内)。応答の URL は使わず固定の値にする
+const OSM_COPYRIGHT = 'https://www.openstreetmap.org/copyright';
+
 const EDIT_CATEGORIES: Array<[string, string]> = [
   ['sightseeing', '観光・神社・寺'], ['activity', '体験・アクティビティ'], ['dining', '食事・カフェ'], ['shopping', '買い物'],
   ['accommodation', '宿'], ['transportation', '交通・移動'], ['other', 'その他'],
@@ -223,9 +231,48 @@ const PlannerPage: React.FC = () => {
 
   // [Gate PlanUX] 予定の種類(変えた時だけ送る)
   const [editCategory, setEditCategory] = useState<{ value: string; original: string }>({ value: 'other', original: 'other' });
+  // [Gate PlanSpotEdit] 電話番号(変えた時だけ送る)・場所の情報の取得(OpenStreetMap)・写真を変えた時の旅程の読み直し
+  const [editPhone, setEditPhone] = useState<{ value: string; original: string }>({ value: '', original: '' });
+  const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null }>(
+    { busy: false, result: null, error: null });
+  const [photoSignal, setPhotoSignal] = useState(0);
+
+  const lookupPlaceInfo = async () => {
+    if (!editingItem) return;
+    setPlaceInfo({ busy: true, result: null, error: null });
+    try {
+      const result = await getPlaceInfo({ name: editForm.title, latitude: editingItem.latitude, longitude: editingItem.longitude });
+      setPlaceInfo({
+        busy: false, result,
+        error: result.unavailable ? '場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試すか、手で入れてください'
+          : result.candidates.length === 0 ? '場所の情報が見つかりませんでした。名前を確かめるか、手で入れてください' : null,
+      });
+    } catch {
+      setPlaceInfo({ busy: false, result: null, error: '場所の情報を読めませんでした(手で入れられます)' });
+    }
+  };
+
+  const applyPlaceInfo = (c: PlaceInfoResult['candidates'][number]) => {
+    if (c.address) setEditForm((prev) => ({ ...prev, location_name: c.address! }));
+    if (c.phone) setEditPhone((p) => ({ ...p, value: c.phone! }));
+    if (c.category) setEditCategory((x) => ({ ...x, value: c.category! }));
+    setPlaceInfo({ busy: false, result: null, error: null });
+  };
+
+  // [Gate PlanSpotEdit] 日程の削除(日のカードの上の「この日程を削除」)。どの日か・予定の数を確かめてから消す
+  const handleDeleteDay = (index: number) => {
+    const d = currentPlan?.days[index];
+    if (!d) return;
+    const label = d.date ? `${d.date.slice(5).replace('-', '/')}(${getDayOfWeek(d.date)})` : `${index + 1}日目`;
+    const tail = d.events.length > 0 ? `\nこの日の予定 ${d.events.length} 件も一緒に削除します。` : '';
+    if (!confirm(`${label}の日程を削除しますか？${tail}\n直後なら「元に戻す」で戻せます。`)) return;
+    void removeDay(index);
+  };
 
   const openEditItem = (item: ScheduleItemType) => {
     setEditingItem(item);
+    setEditPhone({ value: item.phone ?? '', original: item.phone ?? '' });
+    setPlaceInfo({ busy: false, result: null, error: null });
     setEditCategory({ value: item.category || 'other', original: item.category || 'other' });
     setEditForm(fieldsOf(item));
     setEditOriginal(fieldsOf(item));
@@ -251,7 +298,9 @@ const PlannerPage: React.FC = () => {
         ...(editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
           ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
         ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
+        ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
       });
+      if (result === 'saved') setEditPhone((p) => ({ ...p, original: p.value.trim() }));
       if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'conflict') {
         // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
@@ -740,18 +789,10 @@ const PlannerPage: React.FC = () => {
               <UiIcon icon={BookOpen} />しおりを作成
             </button>
             <span className="tc-plan-controls-sep" aria-hidden="true" />
-            <Button variant="outline" size="sm" onClick={addDay}>
-              ＋ 日を追加
+            {/* [Gate PlanSpotEdit] 「日を追加」→「日程を追加」。日程の削除は、どの日か分かるよう日のカードの上へ移した */}
+            <Button variant="outline" size="sm" onClick={addDay} data-testid="plan-add-day">
+              ＋ 日程を追加
             </Button>
-            {currentPlan.days.length > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeDay(currentDayIndex)}
-              >
-                この日を削除
-              </Button>
-            )}
             {/* [Gate #31.5C] Gate #29 APIが持つ直近1件のUndoを画面から呼べる
                 ようにする。編集操作は全て正規化APIを経由するようになった
                 ため、ここから正しくUndoできる。 */}
@@ -876,6 +917,8 @@ const PlannerPage: React.FC = () => {
                   onItemEdit={openEditItem}
                   onItemDelete={handleDeleteItem}
                   onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
+                  onDeleteDay={currentPlan.days.length > 1 ? () => handleDeleteDay(currentDayIndex) : undefined}
+                  photoSignal={photoSignal}
                   segments={segments}
                   zones={zoneOfEvent(currentPlan.days)}
                   titles={titleOfEvent(currentPlan.days)}
@@ -1204,6 +1247,13 @@ const PlannerPage: React.FC = () => {
                   )}
                 </div>
               )}
+              {/* [Gate PlanSpotEdit] 写真があれば上に出す(無ければドラッグ&ドロップ・ファイルの選択で入れる) */}
+              {currentPlan && editingItem && (
+                <EventPhotoPanel planId={currentPlan.id} eventId={editingItem.id} eventTitle={editForm.title || editingItem.title}
+                  near={typeof editingItem.latitude === 'number' && typeof editingItem.longitude === 'number'
+                    ? { latitude: editingItem.latitude, longitude: editingItem.longitude } : null}
+                  onChanged={() => setPhotoSignal((n) => n + 1)} />
+              )}
               {/* [Gate PlanUX] 予定の編集: 名前と種類 → 時間(開始・終了を 1 行) → 場所 → メモ。営業時間は入力の必須ではない */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
                 <Input
@@ -1223,28 +1273,65 @@ const PlannerPage: React.FC = () => {
               </div>
               <fieldset className="rounded-xl border border-cloud-200 p-3">
                 <legend className="px-1 text-sm font-semibold text-ink-900">時間(任意)</legend>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
-                  <Input
-                    label="開始時刻"
-                    type="time"
-                    value={editForm.start_time}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))}
-                    fullWidth
-                  />
-                  {currentPlan && editingItem && (
-                    <EventTimeImpact planId={currentPlan.id} eventId={editingItem.id} startTime={editForm.start_time}
-                      end={editEnd} onEndChange={setEditEnd} />
-                  )}
-                </div>
+                {/* [Gate PlanSpotEdit] 開始 〜 終了(既定は「この場所での時間」。印で終了時刻・終わる日付に切り替え) */}
+                {currentPlan && editingItem && (
+                  <EventTimeImpact key={editingItem.id} planId={currentPlan.id} eventId={editingItem.id} startTime={editForm.start_time}
+                    onStartChange={(v) => setEditForm((prev) => ({ ...prev, start_time: v }))}
+                    dayDate={currentPlan.days.find((d) => d.events.some((e) => e.id === editingItem.id))?.date ?? null}
+                    end={editEnd} onEndChange={setEditEnd} />
+                )}
               </fieldset>
               {/* [Gate G2] FR-045 所有者が見せない設定にした項目は入力を出さない */}
               {!currentPlan?.hidden_fields?.includes('event_address') && (
-                <Input
-                  label="場所・住所"
-                  value={editForm.location_name}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
-                  fullWidth
-                />
+                <div className="space-y-2">
+                  <div className="flex items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <Input
+                        label="場所・住所"
+                        value={editForm.location_name}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, location_name: e.target.value }))}
+                        fullWidth
+                      />
+                    </div>
+                    {/* [Gate PlanSpotEdit] 課題 #3-⑤ 押した時に 1 回だけ OpenStreetMap で住所・電話番号・種類を調べる(入れる前に確かめる) */}
+                    <Button type="button" variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => void lookupPlaceInfo()}
+                      loading={placeInfo.busy} disabled={!editForm.title.trim() && typeof editingItem?.latitude !== 'number'}
+                      icon={<Globe size={15} aria-hidden="true" />} data-testid="place-info-lookup"
+                      title="名前と位置から、住所・電話番号・種類を OpenStreetMap で調べます(入れる前に確かめられます)">
+                      自動取得
+                    </Button>
+                  </div>
+                  {placeInfo.error && <p role="status" className="text-xs text-ink-700" data-testid="place-info-error">{placeInfo.error}</p>}
+                  {placeInfo.result && placeInfo.result.candidates.length > 0 && (
+                    <div className="rounded-lg border border-cloud-200 bg-cloud-50 p-2 text-sm" data-testid="place-info-result">
+                      <ul className="space-y-2">
+                        {placeInfo.result.candidates.map((c, i) => (
+                          <li key={`${c.source_url ?? i}`} className="flex items-start justify-between gap-2">
+                            <span className="min-w-0">
+                              <b className="block truncate text-ink-900">{c.name ?? '(名前なし)'}</b>
+                              {c.address && <span className="block text-xs text-ink-700">{c.address}</span>}
+                              {c.phone && <span className="block text-xs text-ink-700">{`TEL ${c.phone}`}</span>}
+                            </span>
+                            <Button type="button" size="sm" variant="primary" className="shrink-0" onClick={() => applyPlaceInfo(c)}
+                              data-testid={`place-info-use-${i}`}>入れる</Button>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-[11px] text-ink-700">
+                        出典: <a href={safeExternalUrl(OSM_COPYRIGHT) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">
+                          {placeInfo.result.attribution}</a>({placeInfo.result.license})。情報が古い・違う場合があります
+                      </p>
+                    </div>
+                  )}
+                  <Input
+                    label="電話番号"
+                    type="tel"
+                    value={editPhone.value}
+                    onChange={(e) => setEditPhone((p) => ({ ...p, value: e.target.value }))}
+                    maxLength={40}
+                    fullWidth
+                  />
+                </div>
               )}
               {!currentPlan?.hidden_fields?.includes('event_notes') && (
                 <label className="block text-sm font-medium text-ink-700">
@@ -1254,6 +1341,8 @@ const PlannerPage: React.FC = () => {
                     className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900" />
                 </label>
               )}
+              {/* [Gate PlanSpotEdit] 課題 #3-⑧ この予定の予約・費用の要約(読むだけ) */}
+              {currentPlan && editingItem && <EventRelatedSummary planId={currentPlan.id} eventId={editingItem.id} />}
               {currentPlan && (
                 <p className="text-xs text-ink-700">
                   予約番号・チケットは

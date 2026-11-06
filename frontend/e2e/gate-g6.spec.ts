@@ -134,7 +134,7 @@ test('OFF-02 通信できない間に足した日程を溜め、通信が戻る�
   const send = apiClient(context.request, apiBase, token);
   await send('post', `/plans/${planId}/days`, { local_date: '2026-11-01', timezone_id: 'Asia/Tokyo' });
   await page.goto(`/planner/${planId}`);
-  const addDay = page.getByRole('button', { name: '＋ 日を追加' });
+  const addDay = page.getByRole('button', { name: '＋ 日程を追加' });
   await expect(addDay).toBeVisible({ timeout: 15_000 });
 
   await context.setOffline(true);

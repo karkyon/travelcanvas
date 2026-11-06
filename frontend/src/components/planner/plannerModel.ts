@@ -347,3 +347,29 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
   scaleEnd = Math.min(24 * 60, Math.ceil(scaleEnd / 60) * 60);
   return { days: out, scaleStart, scaleEnd };
 }
+
+
+/**
+ * [Gate PlanSpotEdit] 「スポットだけを入れ替える」並べ替えの見え方(保存する前の案と、サーバーの reorder の keep_slots と同じ規則)。
+ * 位置 i の予定は、元の位置 i の予定の時刻(開始・終了・終わる日)を受け継ぐ。移動区間の端(予定)も同じ位置の予定へ付け替える
+ * (移動手段・所要時間はそのまま)。saved は今の並び、order は案の並び(同じ予定の集まり)。
+ */
+export function keepSlots<E extends { id: string; start_time?: string; end_time?: string; end_day_offset?: number }>(
+  saved: ReadonlyArray<E>, order: ReadonlyArray<string>, segments: TravelSegment[],
+): { events: E[]; segments: TravelSegment[] } {
+  const byId = new Map(saved.map((e) => [e.id, e] as const));
+  if (order.length !== saved.length || order.some((id) => !byId.has(id))) return { events: [...saved], segments };
+  const events = order.map((id, i) => {
+    const slot = saved[i]!;
+    return { ...byId.get(id)!, start_time: slot.start_time, end_time: slot.end_time, end_day_offset: slot.end_day_offset };
+  });
+  const moved = new Map<string, string>();
+  saved.forEach((e, i) => { if (order[i] !== e.id) moved.set(e.id, order[i]!); });
+  if (moved.size === 0) return { events, segments };
+  const remap = (id: string | null) => (id && moved.has(id) ? moved.get(id)! : id);
+  return {
+    events,
+    segments: segments.map((sg) => (moved.has(sg.from_event_id ?? '') || moved.has(sg.to_event_id ?? '')
+      ? { ...sg, from_event_id: remap(sg.from_event_id), to_event_id: remap(sg.to_event_id) } : sg)),
+  };
+}

@@ -89,23 +89,29 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, box.y + 30, { steps: 5 });
-  const gaps = list.locator('div.border-dashed');
-  await expect(gaps).toHaveCount(5);
-  const gap = (await gaps.nth(2).boundingBox())!;
-  await page.mouse.move(gap.x + gap.width / 2, gap.y + gap.height / 2, { steps: 10 });
+  // [Gate PlanSpotEdit] 予定の行そのものが落とせる場所(以前の細い帯は無い)。酒蔵B の行の下半分 = 酒蔵B の後ろ
+  const target = list.getByRole('listitem', { name: '酒蔵B(上下矢印キーで並べ替え)' });
+  const tb = (await target.boundingBox())!;
+  await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height * 0.8, { steps: 10 });
+  await expect(list.getByTestId('drop-line')).toHaveCount(1);
   await page.mouse.up();
   // [Gate G11 段階7] ドラッグは保存する前の案を作る。サーバーの順は「この並びにする」まで変えない
   await expect(page.getByTestId('reorder-preview')).toContainText('「酒蔵A」 1番目 → 2番目');
   expect(titles(await send('get', `/plans/${plan.id}`) as Detail)).toEqual(['酒蔵A', '酒蔵B', '酒蔵C', '酒蔵D']);
   await page.getByTestId('reorder-apply').click();
-  await expect(page.getByText('スケジュールを並び替えました')).toBeVisible();
+  await expect(page.getByText('スポットを入れ替えました(時刻と移動手段はそのまま)')).toBeVisible();
   await expect.poll(async () => titles(await send('get', `/plans/${plan.id}`) as Detail)).toEqual(['酒蔵B', '酒蔵A', '酒蔵C', '酒蔵D']);
+  // スポットだけを入れ替え、時刻は位置に残る(1 番目は 09:00、2 番目は 10:00)
+  const swapped = (await send('get', `/plans/${plan.id}`) as Detail).days[0]!.events.slice().sort((x, y) => x.sort_order - y.sort_order);
+  expect(swapped.map((e) => [e.title, e.local_start_time])).toEqual([['酒蔵B', '09:00'], ['酒蔵A', '10:00'], ['酒蔵C', '11:00'], ['酒蔵D', '12:00']]);
 
   // 3. 翌日に終わる予定(保存の前に影響を確かめる)
   await list.getByRole('listitem', { name: '酒蔵D(上下矢印キーで並べ替え)' }).getByRole('button', { name: /を編集$/ }).click();
   const modal = page.getByRole('dialog', { name: 'スポットを編集' });
+  // [Gate PlanSpotEdit] 既定は「この場所での時間」。印で終了時刻に切り替え、開始より前の時刻は翌日として扱う
+  await modal.getByTestId('end-mode-toggle').click();
   await modal.getByLabel('終了時刻').fill('01:30');
-  await modal.getByLabel('終わる日').selectOption('1');
+  await expect(modal.getByTestId('end-note')).toContainText('翌日として扱います');
   await modal.getByRole('button', { name: '変更の影響を確かめる' }).click();
   const impact = modal.getByRole('status', { name: '変更の影響' });
   await expect(impact).toContainText('終了は開始の1日後です(日をまたぐ予定)');

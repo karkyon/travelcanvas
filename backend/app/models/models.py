@@ -507,6 +507,8 @@ class TravelEvent(Base):
     address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # [Gate PlanSpotEdit] 場所の電話番号(予定ごと。場所の情報の取得・手入力)
+    phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

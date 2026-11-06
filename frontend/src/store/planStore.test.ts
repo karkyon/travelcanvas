@@ -46,6 +46,10 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+// [Gate PlanSpotEdit] 1 日の並べ替え(スポットだけを入れ替える)の API
+const { reorderDay } = vi.hoisted(() => ({ reorderDay: vi.fn() }));
+vi.mock('@/services/api/planEdit', () => ({ reorderDay }));
+
 vi.mock('@/services/quickDraftApi', () => ({
   createQuickDraft: vi.fn(),
   getStoredDeviceToken: vi.fn(),
@@ -592,5 +596,72 @@ describe('個別削除 (Gate B-013)', () => {
     expect((await toastMock()).error).toHaveBeenCalledWith(expect.stringContaining('何も変更していません'));
     expect(mockedApi.getPlanDetail).toHaveBeenCalledTimes(2);
     expect(consoleError).toHaveBeenCalled();
+  });
+});
+
+
+describe('[Gate PlanSpotEdit] 並べ替え・同じ旅行の読み直し・電話番号', () => {
+  const ev = (id: string, title: string, t: string, sort: number, extra: Record<string, unknown> = {}) => ({
+    id, day_id: DAY_ID, title, event_type: 'sightseeing', local_start_time: t, is_all_day: false, locked: false, sort_order: sort, ...extra,
+  });
+  async function seedTwoDays(revision = 5) {
+    mockedApi.getPlan.mockResolvedValue({ success: true, data: { id: PLAN_ID, title: 'テストプラン', days: [] } });
+    mockedApi.getPlanDetail.mockResolvedValue({ success: true, data: { id: PLAN_ID, title: 'テストプラン', revision, days: [
+      { id: 'day-0', local_date: '2026-11-27', timezone_id: 'Asia/Tokyo', sort_order: 0, events: [] },
+      { id: DAY_ID, local_date: '2026-11-28', timezone_id: 'Asia/Tokyo', sort_order: 1, events: [
+        ev('a', 'ミキモト真珠島', '09:00', 0, { phone: '0599-25-2028' }), ev('b', '賀多神社', '11:00', 1)] },
+    ] } });
+    await usePlanStore.getState().loadPlan(PLAN_ID);
+  }
+
+  it('予定の電話番号を読む', async () => {
+    await seedTwoDays();
+    expect(usePlanStore.getState().currentPlan?.days[1]?.events[0]?.phone).toBe('0599-25-2028');
+  });
+
+  it('同じ旅行を読み直しても見ている日を保つ(予定の追加・元に戻すの後に 1 日目へ戻らない)。別の旅行は 1 日目から', async () => {
+    await seedTwoDays();
+    usePlanStore.getState().setCurrentDay(1);
+    await usePlanStore.getState().loadPlan(PLAN_ID);
+    expect(usePlanStore.getState().currentDayIndex).toBe(1);
+    mockedApi.getPlan.mockResolvedValue({ success: true, data: { id: 'plan-2', title: '別', days: [] } });
+    mockedApi.getPlanDetail.mockResolvedValue({ success: true, data: { id: 'plan-2', title: '別', revision: 1, days: [
+      { id: 'x', local_date: '2026-12-01', timezone_id: 'UTC', sort_order: 0, events: [] },
+      { id: 'y', local_date: '2026-12-02', timezone_id: 'UTC', sort_order: 1, events: [] }] } });
+    await usePlanStore.getState().loadPlan('plan-2');
+    expect(usePlanStore.getState().currentDayIndex).toBe(0);
+  });
+
+  it('reorderDaySlots: 1 回の通信で並べ替え、返った日の予定(時刻は位置に残る)と版に差し替える', async () => {
+    await seedTwoDays(5);
+    reorderDay.mockResolvedValue({ revision: 6, day: { id: DAY_ID, local_date: '2026-11-28', timezone_id: 'Asia/Tokyo', sort_order: 1, events: [
+      ev('b', '賀多神社', '09:00', 0), ev('a', 'ミキモト真珠島', '11:00', 1)] } });
+    await expect(usePlanStore.getState().reorderDaySlots(DAY_ID, ['b', 'a'])).resolves.toBe(true);
+    expect(reorderDay).toHaveBeenCalledWith(PLAN_ID, DAY_ID, ['b', 'a'], 5);
+    const plan = usePlanStore.getState().currentPlan!;
+    expect(plan.revision).toBe(6);
+    expect(plan.days[1]!.events.map((e) => [e.title, e.start_time])).toEqual([['賀多神社', '09:00'], ['ミキモト真珠島', '11:00']]);
+    expect(mockedApi.moveEvent).not.toHaveBeenCalled();
+  });
+
+  it('reorderDaySlots: 確定の予定(409 locked_event)は読み直さずに理由を出し、false を返す', async () => {
+    await seedTwoDays(5);
+    reorderDay.mockRejectedValue({ response: { status: 409, data: { detail: { code: 'locked_event', message: 'x' } } } });
+    mockedApi.getPlanDetail.mockClear();
+    await expect(usePlanStore.getState().reorderDaySlots(DAY_ID, ['b', 'a'])).resolves.toBe(false);
+    expect(mockedApi.getPlanDetail).not.toHaveBeenCalled();
+    expect(usePlanStore.getState().currentPlan!.days[1]!.events.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
+  it('予定の追加で終了時刻(開始がある時だけ)と電話番号を送る', async () => {
+    await seedTwoDays(5);
+    mockedApi.createEvent.mockResolvedValue({});
+    await usePlanStore.getState().addScheduleItem(1, { title: '鳥羽水族館', start_time: '13:00', end_time: '15:00', phone: '0599-25-2555' });
+    expect(mockedApi.createEvent).toHaveBeenCalledWith(PLAN_ID, expect.objectContaining({
+      title: '鳥羽水族館', local_start_time: '13:00', local_end_time: '15:00', end_day_offset: 0, phone: '0599-25-2555',
+    }), expect.any(String));
+    mockedApi.createEvent.mockClear();
+    await usePlanStore.getState().addScheduleItem(1, { title: '開始なし', end_time: '15:00' });
+    expect(mockedApi.createEvent.mock.calls[0]![1]).not.toHaveProperty('local_end_time');
   });
 });

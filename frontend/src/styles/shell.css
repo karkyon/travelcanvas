@@ -306,6 +306,37 @@
 .tc-segment-error { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--tc-danger); }
 @media (max-width: 760px) { .tc-segment-slot { margin-left: 55px; } }
 .tc-add-event { margin-top: 6px; width: 100%; justify-content: center; border-style: dashed; }
+/* ===== [Gate PlanSpotEdit] 旅程のスポットの編集 ===== */
+/* 日のカードの上: 「ルートを見る」と、控えめな赤い「この日程を削除」 */
+.tc-day-head-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+.tc-day-delete {
+  background: none; border: 0; padding: 2px 0; font-size: 11px; font-weight: 600; color: var(--tc-danger, #b42318);
+  opacity: .82; cursor: pointer; white-space: nowrap;
+}
+.tc-day-delete:hover { opacity: 1; text-decoration: underline; }
+/* 区間の操作の印: 丸・色の付いた地(予定の操作の灰色の線の印と見分ける) */
+.tc-seg-iconbtn {
+  width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 999px; flex: none;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong); border: 1px solid color-mix(in srgb, var(--tc-accent) 35%, transparent);
+  cursor: pointer;
+}
+.tc-seg-iconbtn:hover { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+.tc-seg-iconbtn[aria-expanded='true'] { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+/* ドラッグで入れる場所の線 */
+.tc-drop-line { height: 3px; margin: 2px 0 2px 60px; border-radius: 3px; background: var(--tc-accent); box-shadow: 0 0 0 3px var(--tc-accent-soft); }
+.tc-draggable { cursor: grab; }
+.tc-draggable:active { cursor: grabbing; }
+/* 編集の画面: 開始 〜 終了 */
+.tc-time-row { display: grid; grid-template-columns: minmax(0, 8.5rem) auto minmax(0, 1fr); align-items: start; gap: 8px; }
+.tc-time-tilde { padding-top: 34px; color: var(--tc-ink-500); font-weight: 700; }
+.tc-time-toggle {
+  width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid var(--tc-cloud-200);
+  background: var(--tc-cloud-0); color: var(--tc-ink-700); cursor: pointer; flex: none;
+}
+.tc-time-toggle[aria-pressed='true'] { background: var(--tc-accent-soft); color: var(--tc-accent-strong); border-color: var(--tc-accent); }
+.tc-related { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 12px; background: var(--tc-cloud-50); }
+.tc-related li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+@media (max-width: 760px) { .tc-drop-line { margin-left: 46px; } .tc-time-row { grid-template-columns: 1fr; } .tc-time-tilde { display: none; } }
 .tc-day-empty { border: 1px dashed var(--tc-cloud-200); border-radius: 14px; }
 .tc-planner-layout > .tc-route-map, .tc-route-map { position: relative; isolation: isolate; border-radius: var(--tc-radius-lg, 18px); overflow: hidden; }
 @media (min-width: 761px) { .tc-planner-layout > .tc-route-map { position: sticky; } }

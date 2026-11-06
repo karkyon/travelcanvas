@@ -2,8 +2,9 @@
 
 - POST /spots/read-url  : SNS は公式の oEmbed、ほかの Web ページは url_place で 1 ページ読む
 - POST /spots/read-image: 画像の文字(OCR)から場所の名前らしい行を拾う。画像は外へ送らず保存しない
+- POST /spots/place-info: [Gate PlanSpotEdit] 名前・位置から住所・電話番号・種類を OpenStreetMap で読む(押した時の 1 回)
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -15,6 +16,8 @@ from app.core.database import get_db
 from app.models.models import User
 from app.services import candidates as cs
 from app.services import free_usage
+from app.services import place_info as pi
+from app.services.search_provider import SearchProviderError
 from app.services import reservation_extract as rx
 from app.services import url_place as up
 from app.services.media_providers import registry
@@ -75,3 +78,32 @@ async def read_image(file: UploadFile = File(...), current_user: User = Depends(
                             detail={"code": error.code, "message": str(error)})
     text = await run_in_threadpool(rx.ocr_image, content, "jpn+eng")
     return {"words": up.place_lines(text), "ocr_available": rx.ocr_available()}
+
+
+class PlaceInfoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: Optional[str] = Field(None, max_length=200)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+
+@router.post("/place-info")
+async def place_info(body: PlaceInfoIn, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    """[Gate PlanSpotEdit] 予定の場所の住所・電話番号・種類・位置の候補(保存しない)。出典は OpenStreetMap(ODbL)。"""
+    has_point = body.latitude is not None and body.longitude is not None
+    if not (body.name or "").strip() and not has_point:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "名前か位置を入れてください"})
+    _limit(current_user, "place-info")
+    base = {"provider": "nominatim", "attribution": pi.ATTRIBUTION, "license": pi.LICENSE,
+            "license_url": pi.LICENSE_URL}
+    try:
+        rows, cached = await pi.lookup(body.name, body.latitude, body.longitude)
+    except SearchProviderError as err:
+        free_usage.record(db, current_user, "nominatim", "event.place_info", result_code=err.code)
+        db.commit()
+        return {**base, "candidates": [], "cached": False, "unavailable": True, "error_code": err.code}
+    if not cached:
+        free_usage.record(db, current_user, "nominatim", "event.place_info", result_code="ok" if rows else "empty")
+        db.commit()
+    return {**base, "candidates": rows, "cached": cached, "unavailable": False, "error_code": None}
