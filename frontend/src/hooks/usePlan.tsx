@@ -33,6 +33,7 @@ export const usePlan = () => {
     updateScheduleItem,
     deleteScheduleItem,
     reorderScheduleItems,
+    reorderDaySlots,
   } = usePlanStore();
 
   // planStoreの addScheduleItem / reorderScheduleItems は dayIndex(数値)で
@@ -123,6 +124,12 @@ export const usePlan = () => {
     [reorderScheduleItems, resolveDayIndex]
   );
 
+  // [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。成功で true
+  const reorderSpots = useCallback(
+    async (_planId: string, dayId: string, itemOrders: string[]) => reorderDaySlots(dayId, itemOrders),
+    [reorderDaySlots]
+  );
+
   return {
     currentPlan,
     plans,
@@ -136,5 +143,6 @@ export const usePlan = () => {
     updateScheduleItemDetails,
     deleteScheduleItem,
     reorderSchedule,
+    reorderSpots,
   };
 };

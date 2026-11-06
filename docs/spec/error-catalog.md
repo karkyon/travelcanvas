@@ -144,6 +144,7 @@
 | `link_not_found` | 404 | no | この QR コードは見つかりません | api/v1/photo_upload.py |
 | `location_off` | 409 | no | この旅行は「位置を記録しない」設定です。記録するには設定を変えてください | api/v1/location_tracks.py |
 | `locked` | 409 | no | — | api/v1/sync.py |
+| `locked_event` | 409 | no | 確定の予定の位置は変えられません | api/v1/plans.py |
 | `locked_relation` | — | — | 確定ロックされた予約との紐付けがあるため削除できません。予約の紐付けのロックを解除してから削除してください。 | services/plan_item_deletion.py |
 | `logo_not_found` | 404 | no | ロゴはまだありません | api/v1/organizations.py |
 | `malware_found` | 422 | no | ファイルから有害なプログラムが見つかったため、受け付けませんでした | api/v1/memories.py |
@@ -176,6 +177,7 @@
 | `ocr_unavailable` | 503 | later | このサーバーでは画像の文字を読めません(OCR が未導入)。手で入力してください | api/v1/receipts.py |
 | `ops_reason_required` | — | — | 理由を200文字までで入力してください | api/v1/admin_ops.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
+| `order_mismatch` | 400 | no | 並びがこの日の予定と合いません。読み直してからもう一度並べ替えてください | api/v1/plans.py |
 | `organization_not_found` | 404 | no | 組織が見つかりません | services/organizations.py |
 | `outside_trip_period` | 409 | no | 位置の記録は旅行の期間中(前日から最終日まで)だけ始められます | api/v1/location_tracks.py |
 | `owner_can_edit` | 422 | no | 所有者は旅行の画面で直接直せます | api/v1/corrections.py |

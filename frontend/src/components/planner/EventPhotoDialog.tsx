@@ -1,11 +1,13 @@
 /**
  * [Gate G11] 予定のカードの写真(docs/ux/G11_UIUX全範囲_実装仕様.md §2.2・§3.3。画面の正本のモックの「写真を選ぶ」「写真を旅程に差し込む」)。
  * 旅行の写真から選ぶ、または外部の写真を探して取り込む(非公開の記録)。表紙と同じく記録の公開範囲は変えない。
+ * [Gate PlanSpotEdit] この端末の写真もドラッグ&ドロップ・ファイルの選択で取り込める。
  */
 import React, { useEffect, useState } from 'react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
+import EventPhotoDrop from './EventPhotoDrop';
 import { getMemories, getMemoryMedia } from '@/services/api';
 import { clearEventImage, setEventImage } from '@/services/api/g11discover';
 import type { EventImage } from '@/services/api/types/g11discover';
@@ -95,6 +97,14 @@ const EventPhotoDialog: React.FC<Props> = ({
       <Modal isOpen={isOpen && !picker} onClose={onClose} title={`予定の写真(${eventTitle})`} size="lg">
         <div className="space-y-4" data-testid="event-photo-dialog">
           {error && <p role="alert" className="rounded-md bg-danger-soft p-3 text-sm text-danger">{error}</p>}
+          {/* [Gate PlanSpotEdit] 課題 #3-③ この端末の写真をドラッグ&ドロップ・ファイルの選択で入れる */}
+          <section aria-label="写真を取り込む">
+            <h3 className="text-sm font-semibold text-ink-900">写真を取り込む</h3>
+            <div className="mt-2">
+              <EventPhotoDrop planId={planId} eventId={eventId} eventTitle={eventTitle}
+                onUploaded={(image) => { onChanged(image); onClose(); }} compact />
+            </div>
+          </section>
           <section aria-label="この旅行の写真から選ぶ">
             <h3 className="text-sm font-semibold text-ink-900">この旅行の写真から選ぶ</h3>
             {photos === null && <p className="text-sm text-ink-700" role="status">読み込み中…</p>}

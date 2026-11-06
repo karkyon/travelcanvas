@@ -115,6 +115,8 @@ interface PlanState {
    */
   deleteScheduleItem: (itemId: string) => Promise<{ ok: boolean; note: string | null }>;
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
+  /** [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。1 回の「元に戻す」で戻る。成功で true */
+  reorderDaySlots: (dayId: string, itemIds: string[]) => Promise<boolean>;
   moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<void>;
 
   // Undo (Gate #29 APIが持つ直近1件のUndo)
@@ -141,7 +143,7 @@ interface PlanState {
 
 function mapEvent(e: NormalizedEvent): ScheduleItem {
   // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
-  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null };
+  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null };
   return {
     id: e.id,
     title: e.title,
@@ -157,6 +159,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     place_id: e.place_id ?? undefined,
     locked: e.locked,
     sort_order: e.sort_order,
+    // [Gate PlanSpotEdit] 場所の電話番号(応答にある時だけ。decoder は知らない項目もそのまま通す)
+    phone: g7.phone ?? undefined,
   };
 }
 
@@ -241,9 +245,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         hidden_fields: detail?.hidden_fields ?? [],
       };
 
+      // [Gate PlanSpotEdit] 同じ旅行を読み直した時(予定の追加・元に戻すの後など)は、見ている日を保つ(以前は 1 日目へ戻った)
+      const prev = get();
+      const keepDay = prev.currentPlan?.id === merged.id
+        ? Math.min(prev.currentDayIndex, Math.max(0, merged.days.length - 1)) : 0;
       set({
         currentPlan: merged,
-        currentDayIndex: 0,
+        currentDayIndex: keepDay,
         isLoading: false,
         isOfflineData: false,
       });
@@ -611,6 +619,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       notes: item.notes,
       booking_info: item.booking_info,
       contact_info: item.contact_info,
+      end_day_offset: item.end_day_offset,
+      phone: item.phone,
     };
 
     const updatedDay = { ...day, events: [...day.events, optimisticItem] };
@@ -633,6 +643,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           address: optimisticItem.address,
           latitude: optimisticItem.latitude,
           longitude: optimisticItem.longitude,
+          // [Gate PlanSpotEdit] 以前は追加の画面で入れた終了時刻を送らず捨てていた(終了は開始がある時だけ)
+          ...(optimisticItem.start_time && optimisticItem.end_time
+            ? { local_end_time: optimisticItem.end_time, end_day_offset: optimisticItem.end_day_offset ?? 0 } : {}),
+          ...(optimisticItem.phone ? { phone: optimisticItem.phone } : {}),
         },
         generateIdempotencyKey()
       );
@@ -738,6 +752,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           address: hidePlace ? undefined : item.address,
           latitude: hidePlace ? undefined : item.latitude,
           longitude: hidePlace ? undefined : item.longitude,
+          // [Gate PlanSpotEdit] 電話番号(変えた時だけ。空は消す)
+          ...(item.phone === undefined || hidePlace ? {} : { phone: item.phone }),
         },
         plan.revision!
       );
@@ -888,6 +904,45 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       }
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
+    }
+  },
+
+  // [Gate PlanSpotEdit] 1 日の並べ替え(スポットだけを入れ替える)。サーバーが 1 つの変更として行い、その日の予定を返す
+  reorderDaySlots: async (dayId: string, itemIds: string[]) => {
+    const plan = get().currentPlan;
+    if (!plan || plan.revision === undefined) {
+      toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
+      return false;
+    }
+    try {
+      const { reorderDay } = await import('../services/api/planEdit');
+      const result = await reorderDay(plan.id, dayId, itemIds, plan.revision);
+      set((s) => (s.currentPlan && s.currentPlan.id === plan.id ? {
+        currentPlan: {
+          ...s.currentPlan,
+          revision: result.revision,
+          days: s.currentPlan.days.map((d) => (d.id === dayId ? { ...d, events: (result.day.events ?? []).map(mapEvent) } : d)),
+        },
+      } : s));
+      return true;
+    } catch (error) {
+      if (isNetworkError(error)) {
+        toast.error('並べ替えは通信できる時に保存してください(時刻と移動手段を位置に残すため、端末には溜めません)');
+        return false;
+      }
+      const detail = (error as { response?: { data?: { detail?: { code?: unknown } } } } | null)?.response?.data?.detail;
+      const code = conflictCode(error) ?? (typeof detail?.code === 'string' ? detail.code : null);
+      if (code === 'locked_event') {
+        toast.error('確定の予定の位置は変えられません');
+        return false;
+      }
+      if (code === 'order_mismatch') {
+        await get().loadPlan(plan.id);
+        toast.error('予定が変わったため並べ替えられませんでした。最新の内容を読み直しました');
+        return false;
+      }
+      await get()._reconcileOnConflict(error, plan.id);
+      return false;
     }
   },
 

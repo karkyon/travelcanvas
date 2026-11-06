@@ -165,6 +165,8 @@ export interface ScheduleItem {
   locked?: boolean;
   /** [Gate G11] サーバーの並びの番号(並べ替えで変わらない予定を送らないため) */
   sort_order?: number;
+  /** [Gate PlanSpotEdit] 場所の電話番号 */
+  phone?: string;
 }
 
 export interface CreateScheduleItemData {
@@ -190,6 +192,8 @@ export interface CreateScheduleItemData {
   notes?: string;
   booking_info?: Record<string, unknown>;
   contact_info?: Record<string, unknown>;
+  /** [Gate PlanSpotEdit] 場所の電話番号 */
+  phone?: string;
 }
 
 // 旅行日程(1日分)

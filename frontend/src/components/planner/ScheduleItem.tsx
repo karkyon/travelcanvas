@@ -229,13 +229,14 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
               </button>
               {onPhoto && (
                 <button type="button" onClick={(e) => { e.stopPropagation(); onPhoto(id); }}
-                  className={iconBtn} title="写真" aria-label="この予定の写真を選ぶ" data-testid={`schedule-photo-${id}`}>
+                  className={iconBtn} title="写真(選ぶ・ファイルやドラッグ&ドロップで入れる)" aria-label="この予定の写真を選ぶ" data-testid={`schedule-photo-${id}`}>
                   <UiIcon icon={IcImage} size={14} />
                 </button>
               )}
               {onComment && (
                 <button type="button" onClick={(e) => { e.stopPropagation(); onComment(id); }}
-                  className={iconBtn} title="コメント" aria-label="この予定へのコメント">
+                  className={iconBtn} title="メンバーと相談(コメント)。予定のメモとは別に、話し合いを残します"
+                  aria-label="この予定についてメンバーと相談する(コメント)">
                   <MessageSquare size={14} aria-hidden="true" />
                 </button>
               )}

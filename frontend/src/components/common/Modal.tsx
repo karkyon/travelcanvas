@@ -4,6 +4,11 @@ import Button from './Button';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
+// [Gate PlanSpotEdit] 開いているモーダルの重なり(後に開いた物が上)。Esc・スクロールの戻しは一番上・最後の 1 つだけが行う
+// (スポットの編集の上に写真の選択を開いた時、Esc で下の編集まで閉じて入力を失わない)
+const openStack: number[] = [];
+let nextModalId = 1;
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,6 +71,13 @@ const Modal: React.FC<ModalProps> & {
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  // [Gate PlanSpotEdit] 閉じる処理は ref で持つ。以前は下の effect が onClose に依存しており、呼び手が描くたびに
+  // 新しい関数を渡すと(旅程の「スポットを編集」など)、1 文字打つたびに effect が走り直して、フォーカスを開く前の
+  // ボタン → モーダルの枠へ移していた(メモに 1 文字入れるとカーソルが外れ、続けて入力できなかった)
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const idRef = useRef(0);
+  if (idRef.current === 0) idRef.current = nextModalId++;
 
   const sizeClasses = {
     sm: 'max-w-md',
@@ -78,12 +90,14 @@ const Modal: React.FC<ModalProps> & {
   // ESC キーでモーダルを閉じる
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && closable) {
-        onClose();
+      if (event.key === 'Escape' && closable && openStack[openStack.length - 1] === idRef.current) {
+        onCloseRef.current();
       }
     };
 
+    const id = idRef.current;
     if (isOpen) {
+      openStack.push(id);
       document.addEventListener('keydown', handleEscape);
       // フォーカストラップのため、現在のアクティブ要素を保存
       previousActiveElement.current = document.activeElement as HTMLElement;
@@ -99,15 +113,17 @@ const Modal: React.FC<ModalProps> & {
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      // ページスクロールを復元
-      document.body.style.overflow = 'unset';
+      const at = openStack.lastIndexOf(id);
+      if (at >= 0) openStack.splice(at, 1);
+      // ページスクロールを復元(ほかのモーダルが開いている間は戻さない)
+      if (openStack.length === 0) document.body.style.overflow = 'unset';
       
       // 元のアクティブ要素にフォーカスを戻す
       if (previousActiveElement.current) {
         previousActiveElement.current.focus();
       }
     };
-  }, [isOpen, closable, onClose]);
+  }, [isOpen, closable]);
 
   // マスククリックでモーダルを閉じる
   const handleMaskClick = (event: React.MouseEvent) => {

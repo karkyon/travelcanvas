@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
-import { hoursBadge, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
+import { hoursBadge, keepSlots, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
 import TransportIcon from './common/TransportIcon';
@@ -19,6 +19,7 @@ import Button from './common/Button';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
 import type { PlaceDraft, PlaceTab } from './search/PlaceFinder';
+import { getPlaceInfo } from '../services/api/planEdit';
 import Input from './common/Input';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 import UiIcon from '@/components/common/UiIcon';
@@ -68,6 +69,10 @@ interface DayViewProps {
   revision?: number;
   /** [Gate PlanUX] 予定の間で移動手段を選んだ・詳細を直した時(区間の一覧を差し替える) */
   onSegmentSaved?: (segment: TravelSegment) => void | Promise<void>;
+  /** [Gate PlanSpotEdit] この日程を削除(日のカードの上に控えめに出す。日が 1 つの時は渡さない) */
+  onDeleteDay?: () => void;
+  /** [Gate PlanSpotEdit] 値が変わったら予定の写真を読み直す(編集の画面で写真を変えた時) */
+  photoSignal?: number;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -91,8 +96,10 @@ const DayView: React.FC<DayViewProps> = ({
   addSignal = 0,
   revision,
   onSegmentSaved,
+  onDeleteDay,
+  photoSignal = 0,
 }) => {
-  const { addNewScheduleItem, deleteScheduleItem, reorderSchedule } = usePlan();
+  const { addNewScheduleItem, deleteScheduleItem, reorderSpots } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
 
   // [Gate G11] 営業時間の照合。予定の順・時刻・場所が変わったら読み直し、読み直すまでは古い判定を「確認中」にする
@@ -137,7 +144,7 @@ const DayView: React.FC<DayViewProps> = ({
     let active = true;
     getEventImages(planId).then((m) => { if (active) setImages(m); }).catch(() => { if (active) setImages({}); });
     return () => { active = false; };
-  }, [planId, imagesVersion]);
+  }, [planId, imagesVersion, photoSignal]);
   const imageKey = day.events.filter((e) => images[e.id]).map((e) => `${e.id}:${images[e.id]!.memory_id}`).join(',');
   useEffect(() => {
     let active = true;
@@ -184,13 +191,14 @@ const DayView: React.FC<DayViewProps> = ({
     const back = [...impact.order.filter((id) => now.includes(id)), ...now.filter((id) => !impact.order.includes(id))];
     setImpactBusy(true);
     try {
-      await reorderSchedule(planId, day.id, back);
+      // [Gate PlanSpotEdit] 同じ規則(スポットだけを入れ替える)で元の並びへ戻すと、時刻と移動手段も元の位置のまま戻る
+      if (!(await reorderSpots(planId, day.id, back))) return;
       setImpact(null);
       setAnnounce('元の並びに戻しました。営業時間と移動を確かめています');
     } finally {
       setImpactBusy(false);
     }
-  }, [impact, day.events, day.id, planId, reorderSchedule]);
+  }, [impact, day.events, day.id, planId, reorderSpots]);
   const keepReorder = useCallback(() => {
     setImpact(null);
     setAnnounce('この並びのままにしました');
@@ -204,11 +212,10 @@ const DayView: React.FC<DayViewProps> = ({
   const byId = useMemo(() => Object.fromEntries(day.events.map((e) => [e.id, e])), [day.events]);
   const [pending, setPending] = useState<string[] | null>(null);
   const [applying, setApplying] = useState(false);
-  const view = useMemo(() => {
-    if (!pending) return day.events;
-    const list = pending.map((id) => byId[id]).filter((e): e is ScheduleItemType => Boolean(e));
-    return list.length === day.events.length ? list : day.events;
-  }, [pending, byId, day.events]);
+  // [Gate PlanSpotEdit] 案の並びは「スポットだけを入れ替える」見え方(時刻・移動手段は位置に残す。保存の結果と同じ)
+  const slotted = useMemo(() => (pending ? keepSlots(day.events, pending, segments) : null), [pending, day.events, segments]);
+  const view = slotted ? slotted.events : day.events;
+  const viewSegments = slotted ? slotted.segments : segments;
   useEffect(() => {
     if (!pending) return;
     const same = pending.length === savedOrder.length && pending.every((id) => savedOrder.includes(id));
@@ -218,8 +225,8 @@ const DayView: React.FC<DayViewProps> = ({
     }
   }, [pending, savedOrder]);
   useEffect(() => { setPending(null); }, [day.id]);
-  const previewModel = useMemo(() => (pending ? reorderImpact(savedOrder, null, view, null, false, segments) : null),
-    [pending, savedOrder, view, segments]);
+  const previewModel = useMemo(() => (pending ? reorderImpact(savedOrder, null, view, null, false, viewSegments) : null),
+    [pending, savedOrder, view, viewSegments]);
   const propose = useCallback((next: string[], message: string) => {
     setImpact(null);
     setPending(next.join(',') === savedOrder.join(',') ? null : next);
@@ -229,15 +236,20 @@ const DayView: React.FC<DayViewProps> = ({
     if (!pending) return;
     setApplying(true);
     try {
-      setImpact({ order: savedOrder, hours: hoursPending ? null : (hours?.byId ?? {}) });
-      await reorderSchedule(planId, day.id, pending);
+      const baseline = { order: savedOrder, hours: hoursPending ? null : (hours?.byId ?? {}) };
+      const ok = await reorderSpots(planId, day.id, pending);
       setPending(null);
-      addToast({ type: 'success', message: 'スケジュールを並び替えました' });
+      if (!ok) {
+        setAnnounce('並べ替えを保存できませんでした(何も変えていません)');
+        return;
+      }
+      setImpact(baseline);
+      addToast({ type: 'success', message: 'スポットを入れ替えました(時刻と移動手段はそのまま)' });
       setAnnounce('この並びを保存しました。営業時間と移動を確かめています');
     } finally {
       setApplying(false);
     }
-  }, [pending, savedOrder, hoursPending, hours, reorderSchedule, planId, day.id, addToast]);
+  }, [pending, savedOrder, hoursPending, hours, reorderSpots, planId, day.id, addToast]);
   const cancelPending = useCallback(() => {
     setPending(null);
     setAnnounce('並べ替えの案をやめました(保存していません)');
@@ -258,13 +270,35 @@ const DayView: React.FC<DayViewProps> = ({
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [placeTab, setPlaceTab] = useState<PlaceTab>('manual');
+  // [Gate PlanSpotEdit] 場所を選んだ時、足りない住所・電話番号・種類を OpenStreetMap から 1 回だけ読んで空の欄にだけ入れる
+  const [lookup, setLookup] = useState<{ state: 'idle' | 'busy' | 'done' | 'none' | 'error'; note: string }>({ state: 'idle', note: '' });
   const pickPlace = (d: PlaceDraft) => {
     setNewItemData((prev) => ({
       ...prev, title: d.name, location_name: d.name, address: d.address ?? '', category: toEventCategory(d.category),
-      latitude: d.latitude ?? undefined, longitude: d.longitude ?? undefined,
+      latitude: d.latitude ?? undefined, longitude: d.longitude ?? undefined, phone: '',
       description: d.description ?? prev.description, notes: d.sourceUrl ? `出典: ${d.sourceUrl}` : prev.notes,
     }));
     setPlaceTab('manual');
+    if (!d.name.trim() && (d.latitude === null || d.longitude === null)) return;
+    setLookup({ state: 'busy', note: '住所・電話番号を調べています…' });
+    getPlaceInfo({ name: d.name, latitude: d.latitude, longitude: d.longitude }).then((r) => {
+      const c = r.candidates[0];
+      if (r.unavailable) { setLookup({ state: 'error', note: '場所の情報を読めませんでした(手で入れられます)' }); return; }
+      if (!c) { setLookup({ state: 'none', note: '場所の情報が見つかりませんでした' }); return; }
+      setNewItemData((prev) => {
+        if (prev.title !== d.name) return prev; // 別の場所を選び直した後の古い結果は入れない
+        const next = { ...prev };
+        if (!prev.address && c.address) next.address = c.address;
+        if (!prev.phone && c.phone) next.phone = c.phone;
+        if (!d.category && c.category) next.category = c.category;
+        if (prev.latitude === undefined && c.latitude !== null && c.longitude !== null) {
+          next.latitude = c.latitude;
+          next.longitude = c.longitude;
+        }
+        return next;
+      });
+      setLookup({ state: 'done', note: `${r.attribution}(${r.license})の情報を入れました。内容を確かめてください` });
+    }).catch(() => setLookup({ state: 'error', note: '場所の情報を読めませんでした(手で入れられます)' }));
   };
   const [newItemData, setNewItemData] = useState<Partial<CreateScheduleItemData>>({
     title: '',
@@ -347,12 +381,14 @@ const DayView: React.FC<DayViewProps> = ({
         travel_method: newItemData.travel_method || 'walking',
         travel_time: newItemData.travel_time || 0,
         travel_cost: newItemData.travel_cost || 0,
-        notes: newItemData.notes || ''
+        notes: newItemData.notes || '',
+        phone: newItemData.phone?.trim() || undefined,
       };
 
       await addNewScheduleItem(planId, day.id, itemData);
       
       setIsAddModalOpen(false);
+      setLookup({ state: 'idle', note: '' });
       setNewItemData({
         title: '',
         description: '',
@@ -406,8 +442,22 @@ const DayView: React.FC<DayViewProps> = ({
 
   // ドロップゾーンの処理
   // [Gate G11 段階7] ドラッグも案を作るだけ(保存は「この並びにする」)。確定(🔒)の予定の位置が変わる並べ替えは作らない
+  // [Gate PlanSpotEdit] 以前は予定の間の細い帯(高さ 8px・透明)だけが落とせる場所で、予定の上では「禁止」の印になり
+  // 入れ替えられなかった。予定の行そのものを落とせる場所にし、行の上半分なら前・下半分なら後ろに入れる(線で示す)
+  const [dropGap, setDropGap] = useState<number | null>(null);
+  const ownDrag = dragState.isDragging && dragState.sourceContainer === containerId(planId, day.id);
+  useEffect(() => { if (!dragState.isDragging) setDropGap(null); }, [dragState.isDragging]);
+  const overRow = useCallback((e: React.DragEvent<HTMLElement>, index: number) => {
+    if (!ownDrag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const r = e.currentTarget.getBoundingClientRect();
+    const gap = e.clientY < r.top + r.height / 2 ? index : index + 1;
+    setDropGap((g) => (g === gap ? g : gap));
+  }, [ownDrag]);
   const handleItemDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
+    setDropGap(null);
     let itemId: string | null = null;
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json')) as { itemId?: string; sourceContainer?: string };
@@ -436,9 +486,18 @@ const DayView: React.FC<DayViewProps> = ({
             {headerLabel && <p className="tc-label">{headerLabel}</p>}
             <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
           </div>
-          {onOpenRoute && (
-            <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る <span aria-hidden="true">↗</span></button>
-          )}
+          <div className="tc-day-head-actions">
+            {onOpenRoute && (
+              <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る <span aria-hidden="true">↗</span></button>
+            )}
+            {/* [Gate PlanSpotEdit] どの日程を消すかが分かるよう、日のカードの上に控えめな赤い文字で置く */}
+            {onDeleteDay && (
+              <button type="button" className="tc-focus-ring tc-day-delete" onClick={onDeleteDay} data-testid="day-delete"
+                aria-label={`${day.date ? `${day.date} (${getDayOfWeek(day.date)})` : 'この日'}の日程を削除`}>
+                この日程を削除
+              </button>
+            )}
+          </div>
         </div>
         {dayTabs}
         {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
@@ -510,18 +569,21 @@ const DayView: React.FC<DayViewProps> = ({
           </div>
         ) : (
           view.map((event, index) => {
-            const row = segmentRow(view, index, segments, zones, day.timezone_id, titleMap);
+            // [Gate PlanSpotEdit] 区間の行は 2 つの予定の間にあるので「○○から」は出さない(読み上げは区間の枠の名前で伝える)
+            const row = segmentRow(view, index, viewSegments, zones, day.timezone_id, titleMap);
             const upBlocked = index === 0 || moveBlockedReason(view, index, -1) !== null;
             const downBlocked = index === view.length - 1 || moveBlockedReason(view, index, 1) !== null;
             return (
-            <div key={event.id} role="none">
+            <div key={event.id} role="none" onDragOver={(e) => overRow(e, index)}
+              onDrop={(e) => { if (ownDrag) handleItemDrop(e, dropGap ?? index); }}>
+              {ownDrag && dropGap === index && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
               {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる)
                   [Gate PlanUX] 2 番目以降の予定の前に、移動手段を選ぶ・変える・詳細を入れる操作を置く */}
               {index > 0 && (
                 <SegmentPicker planId={planId} revision={revision} fromEventId={view[index - 1]!.id}
                   fromTitle={view[index - 1]!.title} toEventId={event.id} toTitle={event.title}
-                  segment={row ? (segments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
-                  mismatch={Boolean(row?.mismatch)} canEdit={canEdit && Boolean(onSegmentSaved)}
+                  segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
+                  mismatch={Boolean(row?.mismatch)} canEdit={canEdit && Boolean(onSegmentSaved) && !pending}
                   onSaved={(sg) => onSegmentSaved?.(sg)}>
                   {row ? (
                     <div data-testid="segment-row" data-to-event={event.id}
@@ -532,7 +594,6 @@ const DayView: React.FC<DayViewProps> = ({
                       <span>{row.leg.text}</span>
                       {row.leg.isEstimate && <span>(推定)</span>}
                       {row.leg.status === 'confirmed' && <span>・確定</span>}
-                      {row.fromTitle && <span>{`「${row.fromTitle}」から`}</span>}
                       {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
                       {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
                       {row.mismatch && (
@@ -550,28 +611,12 @@ const DayView: React.FC<DayViewProps> = ({
                   <TransportIcon mode={row.leg.mode} />
                   <span>{row.leg.text}</span>
                   {row.leg.isEstimate && <span>(推定)</span>}
-                  {row.fromTitle && <span>{`「${row.fromTitle}」から`}</span>}
                   {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
                   {row.mismatch && (
                     <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
                   )}
                 </div>
               )}
-              {/* ドロップゾーン */}
-              {dragState.isDragging && (
-                <div
-                  className="h-2 rounded-sm bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.currentTarget.classList.add('opacity-100');
-                  }}
-                  onDragLeave={(e) => {
-                    e.currentTarget.classList.remove('opacity-100');
-                  }}
-                  onDrop={(e) => handleItemDrop(e, index)}
-                />
-              )}
-              
               {/* スケジュールアイテム */}
               <div
                 draggable
@@ -588,7 +633,7 @@ const DayView: React.FC<DayViewProps> = ({
                     moveBy(event, e.key === 'ArrowUp' ? -1 : 1);
                   }
                 }}
-                className={`tc-event-row ${isItemDragged(event.id) ? 'opacity-50' : ''}`.trim()}
+                className={`tc-event-row ${isItemDragged(event.id) ? 'opacity-50' : ''} ${event.locked ? '' : 'tc-draggable'}`.trim()}
               >
                 <div className="min-w-0 flex-1">
                 <ScheduleItem
@@ -637,25 +682,13 @@ const DayView: React.FC<DayViewProps> = ({
           })
         )}
         
-        {/* 最後のドロップゾーン */}
-        {dragState.isDragging && day.events.length > 0 && (
-          <div
-            className="h-2 rounded-sm bg-blue-100 border-2 border-dashed border-blue-300 opacity-0 transition-opacity"
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.add('opacity-100');
-            }}
-            onDragLeave={(e) => {
-              e.currentTarget.classList.remove('opacity-100');
-            }}
-            onDrop={(e) => handleItemDrop(e, day.events.length)}
-          />
-        )}
+        {/* 最後の予定の後ろへ落とした時の線 */}
+        {ownDrag && dropGap === view.length && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
       </div>
 
       {day.events.length > 0 && (
         <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-add-event" onClick={() => setIsAddModalOpen(true)}>
-          ＋ 日程に追加する
+          ＋ この日にスポットを追加
         </button>
       )}
 
@@ -756,6 +789,21 @@ const DayView: React.FC<DayViewProps> = ({
               placeholder="東京都港区芝公園4-2-8"
               fullWidth
             />
+
+            <Input
+              label="電話番号"
+              type="tel"
+              value={newItemData.phone || ''}
+              onChange={(e) => setNewItemData(prev => ({ ...prev, phone: e.target.value }))}
+              placeholder="03-3433-5111"
+              maxLength={40}
+              fullWidth
+            />
+            {lookup.state !== 'idle' && (
+              <p role="status" className={`text-xs ${lookup.state === 'error' ? 'text-danger' : 'text-ink-700'}`} data-testid="add-place-lookup">
+                {lookup.note}
+              </p>
+            )}
 
             <Input
               label="費用 (円)"
