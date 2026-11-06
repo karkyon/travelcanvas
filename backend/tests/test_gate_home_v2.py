@@ -101,3 +101,67 @@ def test_cancel_and_restore_state_and_permissions(auth_client, make_user):
     other, _pw = make_user()
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=other, is_authenticated=True, is_guest=False)
     assert client.put(f"/api/v1/dashboard/trips/{up}/state", json={"state": "cancelled"}).status_code in (403, 404)
+
+
+# ================================================================ [Gate Footprints2] 世界地図の点
+
+def _geo_trip(client, title, offsets, spots, destination):
+    p = client.post("/api/v1/travel-plans/", json={"title": title, "destination": destination}).json()["id"]
+    today = datetime.now(TOKYO).date()
+    day_body = {"local_date": (today + timedelta(days=offsets[0])).isoformat(), "timezone_id": "Asia/Tokyo"}
+    day = client.post(f"/api/v1/plans/{p}/days", json=day_body, headers=_ik()).json()
+    for name, lat, lng, addr in spots:
+        ev = {"day_id": day["id"], "title": name, "address": addr, "latitude": lat, "longitude": lng}
+        r = client.post(f"/api/v1/plans/{p}/events", json=ev, headers=_ik())
+        assert r.status_code == 201, r.text
+    return p
+
+
+def test_in_japan_rule():
+    assert dh.in_japan(35.68, 139.76) and dh.in_japan(26.21, 127.68) and dh.in_japan(43.06, 141.35)
+    assert not dh.in_japan(37.56, 126.97)  # ソウル
+    assert not dh.in_japan(16.05, 108.22)  # ダナン
+    assert not dh.in_japan(25.03, 121.56)  # 台北
+
+
+def test_footprint_points_visited_planned_and_overseas(auth_client):
+    client, _owner = auth_client
+    danang = [("ロン橋", 16.0614, 108.2270, None), ("ロン橋の近く", 16.0611, 108.2268, None), ("ホイアン", 15.8801, 108.3380, None)]
+    _geo_trip(client, "ダナン", [-30], danang, "ベトナム")
+    _geo_trip(client, "金沢", [-10], [("兼六園", 36.5621, 136.6626, "石川県金沢市兼六町")], "石川県金沢市")
+    _geo_trip(client, "鳥羽", [10], [("賀多神社", 34.4813, 136.8433, "三重県鳥羽市")], "三重県鳥羽市")
+    fp = client.get(URL).json()["home"]["footprints"]
+    pts = {(p["lat"], p["lng"]): p for p in fp["points"]}
+    # 近い点(小数 2 桁)はまとめる
+    assert (16.06, 108.23) in pts and len([p for p in fp["points"] if p["label"].startswith("ダナン")]) == 2
+    assert pts[(16.06, 108.23)]["state"] == "visited" and pts[(34.48, 136.84)]["state"] == "planned"
+    assert pts[(36.56, 136.66)]["label"] == "金沢・兼六園"
+    assert fp["overseas_trips"] == 1  # 行った旅のうち海外の位置があるのはダナンだけ(計画中は数えない)
+
+
+def test_hidden_locations_are_not_mapped_or_counted(auth_client, make_user, db_session):
+    """位置・住所を見せない設定の旅行は、点にも都道府県の数にも使わない"""
+    from app.core.auth import AuthResult, get_current_user
+    from app.main import app
+    from app.models.models import PlanCollaborator, TravelPlan
+
+    client, owner = auth_client
+    p = _geo_trip(client, "共有の旅", [-5], [("兼六園", 36.5621, 136.6626, "石川県金沢市兼六町")], "旅行")
+    member, _pw = make_user()
+    db_session.add(PlanCollaborator(plan_id=uuid.UUID(p), user_id=member.id, email=member.email, role="viewer",
+                                    status="accepted"))
+    plan = db_session.get(TravelPlan, uuid.UUID(p))
+    plan.member_field_policy = {"roles": {"viewer": ["event_address"]}}
+    db_session.commit()
+    app.dependency_overrides[get_current_user] = lambda: AuthResult(user=member, is_authenticated=True, is_guest=False)
+    try:
+        fp = client.get(URL).json()["home"]["footprints"]
+        assert fp["points"] == [] and fp["prefectures"] == []
+        # 見せる設定に戻すと出る
+        plan.member_field_policy = {"roles": {"viewer": []}}
+        db_session.commit()
+        fp = client.get(URL).json()["home"]["footprints"]
+        assert fp["prefectures"] == ["石川県"] and len(fp["points"]) == 1
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: AuthResult(user=owner, is_authenticated=True,
+                                                                        is_guest=False)

@@ -52,6 +52,7 @@ import DeletedPlansSection from './planner/DeletedPlansSection';
 import PageHead from '@/components/shell/PageHead';
 import Landscape from '@/components/shell/Landscape';
 import SelectedEventCard from '@/components/planner/SelectedEventCard';
+import TripList from '@/components/trip/TripList';
 import type { ScheduleItem as ScheduleItemType, EventCategory } from '@/types';
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 import PresenceBar from '@/components/planner/PresenceBar';
@@ -1478,7 +1479,7 @@ const PlannerPage: React.FC = () => {
           eyebrow="QUICK PLAN · クイック"
           title="まず、行きたい気持ちから"
           sub="目的地と日付だけで保存できます。時刻や予約はあとから追加できます。"
-          actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsQuickPage(false)}>旅程の一覧へ</button>}
+          actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsQuickPage(false)}>旅行の一覧へ</button>}
         />
         <form onSubmit={(e) => { e.preventDefault(); void handleCreatePlan(); }} aria-label="クイックで旅行を作る">
           {quickLayout}
@@ -1496,15 +1497,15 @@ const PlannerPage: React.FC = () => {
       <div className="tc-page">
         {/* [Gate AppShell] モックの page-head */}
         <PageHead
-          eyebrow="TRIPS · 旅程の一覧"
-          title="プランナー"
-          sub="旅行ごとに、日程・地図・予約・準備をひとつにまとめます。"
+          eyebrow="TRIPS · 旅行の一覧"
+          title="旅行"
+          sub="旅行ごとに、日程・地図・予約・準備をひとつにまとめます。カードから旅程を開けます。"
           actions={(
             <>
               {/* [Gate G11] 行き先が未定なら相談から(段階5) */}
               <Button variant="outline" onClick={() => navigate('/trip-consult')}>✦ 条件から旅行先を相談</Button>
               <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-                ＋ 新しいプラン
+                ＋ 新しい旅行
               </Button>
             </>
           )}
@@ -1551,63 +1552,9 @@ const PlannerPage: React.FC = () => {
             </div>
           </section>
         ) : (
-          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-label="プラン一覧">
-            {plans.map((plan) => (
-              // [Gate E1] 各プランを名前付きの一覧項目にし、開く・複製・削除のボタン名にプラン名を含める
-              // (同じ「複製」「削除」が並ぶと読み上げで区別できない。以前はカード全体の <div onClick>
-              // でしか開けず、キーボードから開けなかった)。
-              <li key={plan.id} aria-label={plan.title}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <div className="p-5" onClick={() => navigate(`/planner/${plan.id}`)}>
-                    <h3 className="text-lg font-semibold text-ink-900 mb-1">
-                      <button
-                        type="button"
-                        className="text-left rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
-                        aria-label={`「${plan.title}」を開く`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/planner/${plan.id}`);
-                        }}
-                      >
-                        {plan.title}
-                      </button>
-                    </h3>
-                    {plan.destination && (
-                      <p className="text-sm text-ink-700 mb-2"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />{plan.destination}</p>
-                    )}
-                    <p className="text-xs text-ink-700">
-                      {plan.days?.length ?? 0}日間の日程
-                    </p>
-                  </div>
-                  <div className="px-5 pb-4 flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      loading={cloningPlanId === plan.id}
-                      aria-label={`「${plan.title}」を複製`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleClonePlan(plan.id, plan.title);
-                      }}
-                    >
-                      複製
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`「${plan.title}」を削除`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePlan(plan.id);
-                      }}
-                    >
-                      削除
-                    </Button>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          // [Gate TripsWish] 旅行のカード(表紙・状態・出発日と最終日・泊数・人数・メンバー・予定と写真の数・備考)と状態のタブ
+          <TripList plans={plans} cloningId={cloningPlanId} onOpen={(id) => navigate(`/planner/${id}`)}
+            onClone={(id, title) => handleClonePlan(id, title)} onDelete={(id) => handleDeletePlan(id)} />
         )}
 
         <DeletedPlansSection refreshKey={trashRefreshKey} onRestored={() => loadPlans()} />

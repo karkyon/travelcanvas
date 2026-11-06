@@ -152,7 +152,7 @@ async function registerUser(page: Page, label: string): Promise<{ email: string 
 // /plannerへ直接遷移してから同じ作成ダイアログ操作を行う。
 async function createPlanAsCurrentUser(page: Page, titleSuffix: string): Promise<string> {
   await page.goto('/planner');
-  const newPlanButton = page.getByRole('button', { name: /新しいプラン/ });
+  const newPlanButton = page.getByRole('button', { name: /新しい旅行/ });
   await newPlanButton.waitFor({ state: 'visible', timeout: 15_000 });
   await newPlanButton.click();
 

@@ -27,6 +27,7 @@ MAX_TASKS = 4
 MAX_VISITED = 6
 MAX_PHOTOS = 5
 MAX_WISH = 24
+MAX_POINTS = 400  # [Gate Footprints2] 地図の点の上限(近い点はまとめる)
 
 PREFECTURES = (
     "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県",
@@ -56,6 +57,51 @@ def prefectures_in(texts: Iterable[Optional[str]]) -> List[str]:
             if m not in found:
                 found.append(m)
     return found
+
+
+def in_japan(lat: float, lng: float) -> bool:
+    """[Gate Footprints2] 日本の範囲のおおよその判定(本州・北海道・九州・四国・沖縄。朝鮮半島を除く)。国内か海外かの数え分けだけに使う"""
+    if 24.0 <= lat <= 28.5 and 122.9 <= lng <= 131.5:
+        return True  # 沖縄・南西諸島
+    if not (30.0 <= lat <= 45.8 and 128.5 <= lng <= 146.0):
+        return False
+    return not (lng < 130.5 and lat > 34.0)  # 朝鮮半島・対馬の北を除く
+
+
+def footprint_points(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: Dict[str, Any],
+                     events: Dict[Any, List[TravelEvent]]) -> Dict[str, Any]:
+    """[Gate Footprints2] 行った旅・計画中の旅の予定の位置(世界地図の点)と、海外の旅の数。
+
+    位置を見せない設定(event_address)の旅行は点にしない。近い点(小数 2 桁)はまとめ、最大 MAX_POINTS。"""
+    from app.services import member_policy  # 循環 import を避ける
+
+    seen: Dict[tuple, Dict[str, Any]] = {}
+    overseas = 0
+    for t in trips:
+        state = {"visited": "visited", "planning": "planned"}.get(t.get("shelf") or "")
+        plan = plans_by_id.get(t["id"])
+        if state is None or plan is None:
+            continue
+        if "event_address" in member_policy.hidden_for(db, plan, t.get("role"), user):
+            continue
+        abroad = False
+        for ev in events.get(plan.id, []):
+            if ev.latitude is None or ev.longitude is None:
+                continue
+            lat, lng = float(ev.latitude), float(ev.longitude)
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                continue
+            abroad = abroad or not in_japan(lat, lng)
+            key = (round(lat, 2), round(lng, 2))
+            prev = seen.get(key)
+            if prev is None:
+                if len(seen) < MAX_POINTS:
+                    seen[key] = {"lat": key[0], "lng": key[1], "state": state, "label": f"{t['title']}・{ev.title}"[:80]}
+            elif state == "visited":
+                prev["state"] = "visited"
+        if abroad and state == "visited":
+            overseas += 1
+    return {"points": list(seen.values()), "overseas_trips": overseas}
 
 
 def _events_by_plan(db: Session, plan_ids: List[uuid.UUID]) -> Dict[Any, List[TravelEvent]]:
@@ -208,19 +254,29 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
                 for t in visited[:MAX_VISITED]]
 
     # 旅の足あと: 行った旅の行き先・予定の住所に書かれた都道府県、今年の旅の日数、写真の数
+    # [Gate Footprints2] 住所・位置を見せない設定(event_address)の旅行は、予定の住所を数えない(行き先の名前だけ)
+    from app.services import member_policy  # 循環 import を避ける
+    addr_hidden = {t["id"] for t in trips if t["id"] in plans_by_id
+                   and "event_address" in member_policy.hidden_for(db, plans_by_id[t["id"]], t.get("role"), user)}
+
+    def addresses(t: Dict[str, Any]) -> List[Optional[str]]:
+        if t["id"] in addr_hidden:
+            return []
+        return [ev.address for ev in events.get(plans_by_id[t["id"]].id, [])]
+
     this_year = None
     texts: List[Optional[str]] = []
     days_this_year = 0
     for t in visited:
         plan = plans_by_id[t["id"]]
         texts.append(plan.destination)
-        texts.extend(ev.address for ev in events.get(plan.id, []))
+        texts.extend(addresses(t))
         today = date.fromisoformat(t["local_today"]) if t.get("local_today") else None
         this_year = this_year or (today.year if today else None)
         if t.get("end_date") and this_year and t["end_date"][:4] == str(this_year):
             days_this_year += int(t.get("total_days") or 0)
     planned_prefs = prefectures_in([plans_by_id[t["id"]].destination for t in planning]
-                                   + [ev.address for t in planning for ev in events.get(plans_by_id[t["id"]].id, [])])
+                                   + [a for t in planning for a in addresses(t)])
     footprints = {
         "prefectures": prefectures_in(texts),
         "planned_prefectures": planned_prefs,
@@ -228,6 +284,7 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
         "trips_visited": len(visited),
         "days_this_year": days_this_year,
         "photos": sum(t["photo_count"] for t in visited),
+        **footprint_points(db, user, [t for t in trips if t["shelf"] in ("visited", "planning")], plans_by_id, events),
     }
 
     # 4. 行ってみたい場所(お気に入りのスポット)

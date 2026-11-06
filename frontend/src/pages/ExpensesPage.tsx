@@ -373,7 +373,8 @@ const ExpensesPage: React.FC = () => {
       <div role="tablist" aria-label="予算・費用の表示切替" className="flex gap-2 mb-4 border-b">
         {TABS.map((t) => (
           <button key={t.id} id={`fin-tab-${t.id}`} type="button" role="tab" aria-selected={tab === t.id}
-            aria-controls={`fin-panel-${t.id}`} onClick={() => setTab(t.id)}
+            // 表示中の欄がある時だけ指す(読み込み中・別の欄は画面に無いので、無い要素を指さない。axe aria-valid-attr-value)
+            aria-controls={tab === t.id && !isLoading && summary ? `fin-panel-${t.id}` : undefined} onClick={() => setTab(t.id)}
             className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}>
             {t.label}
           </button>
