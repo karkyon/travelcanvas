@@ -9,7 +9,7 @@
  * 親へ渡す値は今までどおり { time: 終了の時刻, offset: 開始の日から何日後か }。
  */
 import React, { useState } from 'react';
-import { ArrowLeftRight, CalendarDays } from 'lucide-react';
+import { CalendarDays, Clock, Timer } from 'lucide-react';
 import { previewEventImpact } from '@/services/api/g7';
 import type { ImpactPreview } from '@/services/api/types/g7';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
@@ -31,6 +31,8 @@ interface Props {
 }
 
 const field = 'mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900 disabled:opacity-50';
+// 滞在の時間・分の小さな入力(幅を固定し、「時間」「分」の文字を折り返さない)
+const small = 'w-16 shrink-0 rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-2 text-sm text-ink-900 disabled:opacity-50';
 
 const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onEndChange, onStartChange, dayDate }) => {
   const [impact, setImpact] = useState<ImpactPreview | null>(null);
@@ -137,23 +139,23 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
             {mode === 'stay' ? (
               <fieldset className="min-w-0 flex-1" disabled={!hasStart}>
                 <legend className="text-sm font-medium text-ink-700">この場所での時間</legend>
-                <div className="mt-1 flex items-center gap-1 text-sm text-ink-900">
-                  <input type="number" min={0} max={71} inputMode="numeric" aria-label="滞在(時間)" className={`${field} mt-0 w-16`}
+                <div className="mt-1 flex items-center gap-1 whitespace-nowrap text-sm text-ink-900">
+                  <input type="number" min={0} max={71} inputMode="numeric" aria-label="滞在(時間)" className={small}
                     value={stay.h} onChange={(e) => applyStay(e.target.value, stay.m)} />
                   <span>時間</span>
-                  <input type="number" min={0} max={59} step={5} inputMode="numeric" aria-label="滞在(分)" className={`${field} mt-0 w-16`}
+                  <input type="number" min={0} max={59} step={5} inputMode="numeric" aria-label="滞在(分)" className={small}
                     value={stay.m} onChange={(e) => applyStay(stay.h, e.target.value)} />
                   <span>分</span>
                 </div>
               </fieldset>
             ) : (
-              <div className="min-w-0 flex-1">
-                <label className="text-sm font-medium text-ink-700">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                <label className="min-w-[7rem] flex-1 text-sm font-medium text-ink-700">
                   終了時刻
                   <input type="time" className={field} value={end.time} onChange={(e) => setEndTime(e.target.value)} />
                 </label>
                 {withDate && dayDate && (
-                  <label className="mt-2 block text-sm font-medium text-ink-700">
+                  <label className="min-w-[10rem] flex-[1.4] text-sm font-medium text-ink-700">
                     終わる日
                     <input type="date" className={field} value={endDateValue} min={dayDate} max={addDays(dayDate, MAX_OFFSET)}
                       onChange={(e) => setEndDate(e.target.value)} />
@@ -171,7 +173,7 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
             <button type="button" className="tc-focus-ring tc-time-toggle" onClick={switchMode} data-testid="end-mode-toggle"
               title={mode === 'stay' ? '終了時刻(何時まで)で入れる' : '滞在時間(何時間何分)で入れる'}
               aria-label={mode === 'stay' ? '終了時刻(何時まで)で入れる' : '滞在時間(何時間何分)で入れる'}>
-              <ArrowLeftRight size={16} aria-hidden="true" />
+              {mode === 'stay' ? <Clock size={16} aria-hidden="true" /> : <Timer size={16} aria-hidden="true" />}
             </button>
           </div>
         </div>

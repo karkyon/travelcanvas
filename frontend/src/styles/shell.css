@@ -324,8 +324,8 @@
 .tc-draggable { cursor: grab; }
 .tc-draggable:active { cursor: grabbing; }
 /* 編集の画面: 開始 〜 終了 */
-.tc-time-row { display: grid; grid-template-columns: minmax(0, 8.5rem) auto minmax(0, 1fr); align-items: end; gap: 8px; }
-.tc-time-tilde { padding-bottom: 10px; color: var(--tc-ink-500); font-weight: 700; }
+.tc-time-row { display: grid; grid-template-columns: minmax(0, 8.5rem) auto minmax(0, 1fr); align-items: start; gap: 8px; }
+.tc-time-tilde { padding-top: 34px; color: var(--tc-ink-500); font-weight: 700; }
 .tc-time-toggle {
   width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid var(--tc-cloud-200);
   background: var(--tc-cloud-0); color: var(--tc-ink-700); cursor: pointer; flex: none;
