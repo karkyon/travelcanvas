@@ -183,6 +183,9 @@
   .tc-topbar-row { height: 60px; padding: 0 13px; gap: 10px; }
   .tc-brand .tc-brand-text { display: none; }
   .tc-trip-switch { min-width: 0; flex: 1; max-width: none; height: 40px; }
+  .tc-trip-picker { min-width: 0; flex: 1; }
+  .tc-trip-picker .tc-trip-switch { width: 100%; }
+  .tc-trip-menu { width: min(92vw, 360px); }
   .tc-top-spacer { display: none; }
   .tc-shell { display: block; min-height: calc(100vh - 60px); }
   .tc-shell-main { padding-bottom: 80px; }
@@ -783,3 +786,39 @@
 .tc-tripnav--row { padding: 0 13px 4px; border-top: 1px solid var(--tc-cloud-200); }
 @media print { .tc-tripnav { display: none; } }
 .tc-drop-over { border-color: var(--tc-accent-strong) !important; background: var(--tc-cloud-100); }
+
+/* ===== [Gate HeaderPicker] 上の帯の「旅行を選ぶ」の一覧・見た目の切り替え ===== */
+.tc-trip-switch { cursor: pointer; text-align: left; }
+.tc-trip-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 340px; max-height: min(70vh, 520px);
+  display: flex; flex-direction: column; background: var(--tc-cloud-0); color: var(--tc-ink-900);
+  border: 1px solid var(--tc-cloud-200); border-radius: 14px; box-shadow: 0 14px 34px rgba(24, 32, 51, .16); overflow: hidden;
+}
+.tc-trip-menu-note { padding: 14px 16px; font-size: 13px; color: var(--tc-ink-700); }
+.tc-trip-menu-list { overflow-y: auto; padding: 6px; margin: 0; list-style: none; }
+.tc-trip-menu-list button {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; text-align: left;
+  font-size: 13px; font-weight: 700; color: var(--tc-ink-900); background: transparent;
+}
+.tc-trip-menu-list button:hover { background: var(--tc-cloud-100); }
+.tc-trip-menu-list button[aria-current='true'] { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+.tc-trip-menu-name { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
+.tc-trip-menu-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-trip-menu-name small { color: var(--tc-ink-500); font-size: 11px; font-weight: 500; }
+.tc-trip-menu-foot { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--tc-cloud-200); }
+.tc-trip-menu-foot a {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; border-radius: 10px;
+  font-size: 12px; font-weight: 700; color: var(--tc-ink-700); text-decoration: none;
+}
+.tc-trip-menu-foot a:hover { background: var(--tc-cloud-100); color: var(--tc-ink-900); }
+.tc-theme-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 170px; padding: 5px;
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 12px; box-shadow: 0 12px 28px rgba(24, 32, 51, .14);
+}
+.tc-theme-menu button {
+  width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px;
+  color: var(--tc-ink-900); text-align: left; background: transparent;
+}
+.tc-theme-menu button:hover { background: var(--tc-cloud-100); }
+.tc-theme-menu button[aria-checked='true'] { background: var(--tc-accent-soft); color: var(--tc-accent-strong); font-weight: 700; }
+@media print { .tc-trip-menu, .tc-theme-menu { display: none; } }

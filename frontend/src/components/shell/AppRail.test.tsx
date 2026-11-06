@@ -2,9 +2,15 @@
  * [Gate AppShell] 左の帯(UI/UX モックの rail): 10 項目+設定、今の画面の印、旅行の中の項目は今の旅行へ。
  * 旅行を開いていない時は旅程の一覧へ移り、そのことを名前で伝える(押しても何も起きない項目を作らない)。
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+const { getPlan } = vi.hoisted(() => ({ getPlan: vi.fn() }));
+vi.mock('../../services/api', async (orig) => ({
+  ...(await orig<typeof import('../../services/api')>()),
+  travelAPI: { getPlan },
+}));
+
 import AppRail from './AppRail';
 import TripNav from './TripNav';
 import { useCurrentTripStore } from '../../store/currentTripStore';
@@ -43,11 +49,19 @@ describe('AppRail', () => {
   });
 
   it('[TripNav] この旅行のメニューは今の旅行へ移り、今の画面に印を付ける', () => {
+    useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都' } });
     render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/reservations`} /></MemoryRouter>);
     const nav = screen.getByRole('navigation', { name: 'この旅行のメニュー' });
     expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '今日', '旅行箱', '共有', '比較']);
     expect(screen.getByTestId('rail-plan')).toHaveAttribute('href', `/planner/${PLAN}`);
     expect(screen.getByTestId('rail-resources')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('rail-share')).toHaveAttribute('href', `/share/${PLAN}`);
+  });
+
+  it('[HeaderPicker] 旅程を経ずに旅行の中の画面を開いた時は、その旅行を読んで上の帯へ名前を渡す(既に分かっていれば読まない)', async () => {
+    getPlan.mockReset().mockResolvedValue({ success: true, data: { id: PLAN, title: '京都 紅葉', start_date: '2026-11-14', days: [] } });
+    render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/expenses`} /></MemoryRouter>);
+    await waitFor(() => expect(useCurrentTripStore.getState().trip?.title).toBe('京都 紅葉'));
+    expect(getPlan).toHaveBeenCalledTimes(1);
   });
 });

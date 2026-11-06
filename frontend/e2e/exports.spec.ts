@@ -70,7 +70,7 @@ test('書き出し: ICS・GPX・CSVを保存でき、予約番号を含まず、
   });
 
   await page.reload();
-  await page.getByRole('button', { name: /書き出し/ }).click();
+  await page.getByTestId('planner-actions').getByRole('button', { name: '書き出し' }).click();  // [Gate HeaderPicker] 上の帯の旅行の切り替えも旅行の名前で読み上げるため、旅程の操作の列に絞る
   await page.waitForURL(new RegExp(`/planner/${planId}/exports$`), { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: '書き出し', level: 1 })).toBeVisible();
   await axeViolations(page, '書き出し');

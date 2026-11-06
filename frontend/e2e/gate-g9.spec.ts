@@ -107,8 +107,9 @@ test('UX-2・UX-3・UX-4 旅行中を焦点に、全ての幅・暗い見た目�
     if (w === 360 || w === 1440) await expectNoAxeViolations(page, where);
   }
 
-  // 暗い見た目(この端末に保存。読み直しても続く)
-  await page.getByLabel('表示').selectOption('dark');
+  // 暗い見た目(この端末に保存。読み直しても続く)。[Gate HeaderPicker] 上の帯の検索の右の印から選ぶ
+  await page.getByTestId('theme-toggle').click();
+  await page.getByRole('radio', { name: '暗い' }).click();
   await expect(page.getByTestId('dashboard')).toHaveAttribute('data-theme', 'dark');
   await page.reload();
   await expect(page.getByTestId('dashboard')).toHaveAttribute('data-theme', 'dark');
@@ -116,7 +117,8 @@ test('UX-2・UX-3・UX-4 旅行中を焦点に、全ての幅・暗い見た目�
   await expectNoAxeViolations(page, 'ダッシュボード(暗い・1440px)');
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoAxeViolations(page, 'ダッシュボード(暗い・390px)');
-  await page.getByLabel('表示').selectOption('light');
+  await page.getByTestId('theme-toggle').click();
+  await page.getByRole('radio', { name: '明るい' }).click();
 
   // 旅行の画面: 表紙の見出し・今開いている旅行・状態は文字で示す
   await page.setViewportSize({ width: 1024, height: 900 });
@@ -182,8 +184,9 @@ test('UX-4 API の失敗は再試行で直り、オフラインはつながる�
   await page.unroute('**/api/v1/dashboard');
 
   // 旅程の一覧を一度開いて(画面の塊を読み込んでおく)、オフラインでダッシュボードへ戻る
-  // [Gate AppShell] 旅行の外では、上の帯の「旅行を選ぶ」が旅程の一覧へ移る
+  // [Gate HeaderPicker] 旅行の外では、上の帯の「旅行を選ぶ」が旅行の一覧を開く(押しただけでは画面を移らない)。一覧の下から旅行の一覧の画面へ
   await page.getByTestId('header-trip-picker').click();
+  await page.getByTestId('trip-picker-all').click();
   await expect(page).toHaveURL(/\/planner$/);
   // URL は先に変わり、画面の塊を読み込む間はダッシュボードの見出しが残る。プランナーの見出しが出て
   // ダッシュボードが閉じたことを確かめてから切る(閉じる前に切ると、開いたままのダッシュボードへ戻るだけで読み直さない)

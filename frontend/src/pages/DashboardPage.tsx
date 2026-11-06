@@ -5,7 +5,7 @@
  *   旅行が無い → 旅行を始める / 旅行前 → 準備・遅延と休業 / 旅行中 → 今と次・遅延と休業 / 旅行後 → 精算・記録
  * その下に段階ごとの旅行の一覧(表紙つき)と、スポット・地図への入口を置く。
  * 状態: 読み込み中・失敗(問い合わせ番号つき・再試行)・オフライン(つながったら読み直す)・旅行なし・閲覧のみ(操作を出さない)。
- * 見た目: デザインの決まり(tokens・Surface・旅行の表紙)だけを使い、明るい・暗い・端末に合わせるを選べる(この端末だけ)。
+ * 見た目: デザインの決まり(tokens・Surface・旅行の表紙)だけを使う。明るい・暗い・端末に合わせるは上の帯の印で選ぶ([Gate HeaderPicker])。
  *
  * [Gate M9-FE-B3] 表示中に未認証へ変わった場合もログイン画面へ移る(依存を正しく宣言する)。
  * 以前の統計(登録スポット・お気に入り・訪問済みの数)と擬似的な「最近の活動」は、旅行を主役にするため外した
@@ -19,7 +19,7 @@ import { useAuthStore } from '@/store/authStore';
 import { getDashboard } from '@/services/api/g9';
 import type { DashboardSummary } from '@/services/api/types/g9';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
+import { useThemePreference } from '@/hooks/useThemePreference';
 import PageHead from '@/components/shell/PageHead';
 import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
 import { Footprints, MemoriesSection, NextTasks, PlanningHero, Tools, TripShelves, Wishlist } from './dashboard/HomeSections';
@@ -36,7 +36,7 @@ const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine ===
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isGuest } = useAuthStore();
-  const { preference, theme, setPreference } = useThemePreference();
+  const { theme } = useThemePreference();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [chosenId, setChosenId] = useState<string | null>(null);
 
@@ -94,15 +94,6 @@ const DashboardPage: React.FC = () => {
             <nav aria-label="新しい旅を始める" className="tc-page-actions" data-testid="dashboard-start">
               <Link to="/planner?new=1" className="tc-focus-ring tc-mbtn">＋ 旅行をつくる<span className="sr-only">(行き先が決まっている)</span></Link>
               <Link to="/trip-consult" className="tc-focus-ring tc-mbtn tc-mbtn--primary">✦ 条件から旅行先を相談</Link>
-              <label className="text-sm text-ink-700 flex items-center gap-2">
-                表示
-                <select value={preference} onChange={(e) => setPreference(e.target.value as ThemePreference)}
-                  className="tc-focus-ring rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-2 text-ink-900">
-                  <option value="system">端末に合わせる</option>
-                  <option value="light">明るい</option>
-                  <option value="dark">暗い</option>
-                </select>
-              </label>
             </nav>
           )}
         />
