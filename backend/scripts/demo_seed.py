@@ -318,6 +318,7 @@ class TripSeeder:
                     latitude=e["lat"],
                     longitude=e["lng"],
                     description=e["desc"],
+                    dining=e.get("dining"),  # [Gate DemoDining] 食事の情報(サンプル)
                 )
                 if e["time"] and e["end"] and e["end"] < e["time"]:
                     body["end_day_offset"] = 1
@@ -1415,14 +1416,13 @@ def _private_profile(api: Api, owner: Any) -> None:
 def _extras(env: Dict[str, Any], api: Api, db: Any, owner: Any, users: Dict[str, Any], wish: List[Tuple]) -> None:
     """旅行に属さない機能: 行きたい場所・お気に入り・訪問済み・隠すエリア。"""
     a = api.as_(owner)
-    for i, (name, cat, addr, lat, lng, note) in enumerate(wish):
-        spot = a.post(
-            "/spots/",
-            dict(
-                name=name, category=cat, address=addr, latitude=lat, longitude=lng, description=note, price_range="$$"
-            ),
-            soft=True,
+    for i, (name, cat, addr, lat, lng, note, *rest) in enumerate(wish):
+        body: Dict[str, Any] = dict(
+            name=name, category=cat, address=addr, latitude=lat, longitude=lng, description=note, price_range="$$"
         )
+        if rest:
+            body["dining"] = rest[0]  # [Gate DemoDining] 食事の情報(サンプル)
+        spot = a.post("/spots/", body, soft=True)
         if not spot:
             continue
         if i % 2 == 0:

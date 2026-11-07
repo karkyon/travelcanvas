@@ -1,6 +1,8 @@
 """画面・運用の確認に使う 5 つの旅行のダミーデータ(投入は demo_seed.py)。
 
 施設名と座標は実在の場所の目安で、確認していない。予約番号・金額・便の時刻・人物はすべて架空。
+[Gate DemoDining] 食事の情報(ジャンル・名物・予算・予約・駐車場・支払いなど)は画面を確かめるためのサンプルの値で、
+実際の店の情報と違うことがある。実在の店の電話番号・URL は入れない(間違った先へ連絡が行かないように)。
 利用者の記号: O=所有者(コマンドで指定)、M=美咲、K=健太、Y=陽子、S=鈴木、B=部長
 """
 from typing import Any, Dict, List, Optional, Tuple
@@ -20,11 +22,11 @@ COMPANIONS = {
 def E(key: str, time: str, end: Optional[str], etype: str, title: str, lat: Optional[float] = None,
       lng: Optional[float] = None, addr: Optional[str] = None, desc: Optional[str] = None,
       seg: Optional[Tuple] = None, hours: Optional[Tuple] = None, actual: Any = None,
-      locked: bool = False, offset: int = 0) -> Dict[str, Any]:
+      locked: bool = False, offset: int = 0, dining: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """予定1件。seg=(手段, 分, km, 費用, 便名, 乗り場, 乗換数)は1つ前の予定からの移動。
-    hours=(開く, 閉じる, 休みの説明)。actual は実績("visited" または "skipped")。"""
+    hours=(開く, 閉じる, 休みの説明)。actual は実績("visited" または "skipped")。dining は食事の情報(サンプル)。"""
     return dict(key=key, time=time, end=end, type=etype, title=title, lat=lat, lng=lng, addr=addr, desc=desc,
-                seg=seg, hours=hours, actual=actual, locked=locked, offset=offset)
+                seg=seg, hours=hours, actual=actual, locked=locked, offset=offset, dining=dining)
 
 
 def _seg(mode: str, mins: float, km: float, cost: Optional[float] = None, no: Optional[str] = None,
@@ -175,6 +177,12 @@ SHIRAHAMA: Dict[str, Any] = dict(
               seg=_seg("driving", 6, 1.5), actual="visited"),
             E("omiyage", "14:00", "14:40", "shopping", "とれとれ市場でお土産", 33.6868, 135.3762, "和歌山県西牟婁郡白浜町堅田2521",
               "かげろう、梅干し。", seg=_seg("driving", 10, 3.4), actual="visited"),
+            E("gelato", "15:00", "15:40", "dining", "海辺のジェラート店で休憩", 33.6829, 135.3405, "和歌山県西牟婁郡白浜町",
+              "南高梅とみかんのダブル。帰りの運転の前に一息。", seg=_seg("driving", 12, 4.0), actual="visited",
+              dining=dict(genres=["sweets", "cafe"], signature="南高梅ジェラート・みかんソルベ", budget_lunch="u1000",
+                          reservation="not_accepted", parking="yes", parking_note="店の前に数台", payment=["cash", "qr"],
+                          features=["takeout", "kids", "outdoor", "view"], moods=["family", "friends"],
+                          wait_note="夏の休日は 10 分ほど並ぶ")),
             E("ret", "18:30", "18:50", "transportation", "新大阪でレンタカー返却", 34.7335, 135.5002, "大阪市淀川区",
               "満タン返し。21時までに。", seg=_seg("driving", 215, 180, 4320), actual="visited", locked=True),
         ]),
@@ -260,6 +268,12 @@ KANAZAWA: Dict[str, Any] = dict(
               "金箔ソフト。父が疲れたら志摩で座る。", seg=_seg("taxi", 15, 2.1, 1000), hours=("09:00", "18:00", "店舗による"), actual="visited"),
             E("shima", "15:30", "16:00", "activity", "お茶屋 志摩(国重要文化財)", 36.5723, 136.6668, "石川県金沢市東山1-13-21",
               "お抹茶つき。", seg=_seg("walking", 3, 0.2), hours=("09:30", "17:30", "なし"), actual="visited"),
+            E("kinpaku", "16:10", "16:50", "dining", "ひがし茶屋街で金箔ソフトと甘味", 36.5725, 136.6664, "石川県金沢市東山1丁目",
+              "金箔を一枚のせたソフトクリーム。父母は抹茶ぜんざい。", seg=_seg("walking", 3, 0.2), actual="visited",
+              dining=dict(genres=["sweets", "cafe"], signature="金箔ソフトクリーム・抹茶ぜんざい", budget_lunch="u1000",
+                          reservation="not_accepted", parking="nearby", parking_note="東山の有料駐車場へ", payment=["cash", "card", "emoney"],
+                          features=["takeout", "tatami"], moods=["family", "friends"], access="ひがし茶屋街の中ほど",
+                          wait_note="週末の午後は混む。食べ歩きは店の前で")),
             E("dinner1", "18:00", "20:00", "dining", "金沢おでん 赤玉本店", 36.5650, 136.6541, "石川県金沢市片町2-21-2",
               "カニ面は季節外。車麩と梅貝。", seg=_seg("taxi", 15, 2.6, 1300), hours=("12:00", "22:00", "月曜"), actual="visited"),
         ]),
@@ -405,6 +419,12 @@ KOKURA: Dict[str, Any] = dict(
         dict(date="2026-06-19", title="まとめと小倉城・帰阪", notes="午後の新幹線。半休扱いで門司港は別費用。", events=[
             E("wrap", "09:30", "11:00", "other", "検査結果のまとめ打合せ", 33.8700, 130.8900, "デモ製作所 小倉工場", seg=_seg("taxi", 20, 3.5, 1800), actual="visited", locked=True),
             E("kcastle", "11:40", "12:30", "sightseeing", "小倉城", 33.8843, 130.8743, "福岡県北九州市小倉北区城内2-1", "天守の展示をさっと。", seg=_seg("taxi", 15, 3.0, 1500), hours=("09:00", "18:00", "なし"), actual="visited"),
+            E("curry", "12:40", "13:20", "dining", "魚町で北九州名物の焼きカレー", 33.8810, 130.8790, "福岡県北九州市小倉北区魚町",
+              "チーズと卵をのせてオーブンで焼いたカレー。帰りの新幹線の前に。", seg=_seg("walking", 10, 0.8), actual="visited",
+              dining=dict(genres=["curry", "western"], signature="焼きカレー(半熟卵・チーズ)", budget_lunch="1000_2000",
+                          budget_dinner="1000_2000", reservation="possible", parking="nearby", parking_note="魚町のコインパーキング",
+                          seats=30, smoking="no", payment=["cash", "card", "qr"], features=["lunch", "kids"], moods=["solo", "local"],
+                          access="小倉駅から徒歩 10 分", wait_note="平日の 12 時台は満席が多い")),
             E("mojiko", "13:30", "15:00", "sightseeing", "門司港レトロ", 33.9458, 130.9622, "福岡県北九州市門司区港町", "時間が足りれば。結局行けず。", seg=_seg("train", 15, 11, 280, "鹿児島本線", "6番線", 0), hours=("09:00", "17:00", "なし"), actual="skipped"),
             E("home", "16:02", "18:20", "transportation", "のぞみ 小倉 → 新大阪", 33.8862, 130.8827, "小倉駅", "自由席で帰阪。", seg=_seg("train", 45, 11, 280, "鹿児島本線", "1番線", 0), actual="visited", locked=True),
         ]),
@@ -455,6 +475,11 @@ DANANG: Dict[str, Any] = dict(
             E("kix", "07:20", "08:50", "transportation", "関西空港 チェックイン(日本時間 9:20)", 34.4347, 135.2440, "大阪府泉佐野市泉州空港北1", "第1ターミナル。WiFi 受取。この日の時刻はベトナム時間(日本の2時間遅れ)で入れている。", locked=True),
             E("dad", "13:50", "15:00", "transportation", "ダナン国際空港 到着", 16.0439, 108.1993, "Da Nang International Airport", "VJ 829。入国審査は 30 分見込み。SIM を受取。", seg=_seg("flight", 300, 3700, None, "VJ829", "T1-E", 0), locked=True),
             E("hotel", "15:40", "16:10", "accommodation", "Grand Mercure Danang チェックイン", 16.0447, 108.2241, "Lot A1, Zone of the Villas of Green Island, Da Nang", "2泊。", seg=_seg("taxi", 20, 5.5, 180000), locked=True),
+            E("cong", "16:40", "17:30", "dining", "Cộng Cà Phê でココナッツコーヒー", 16.0681, 108.2236, "Bach Dang, Da Nang",
+              "ココナッツミルクのスムージーコーヒー。川沿いの席。", seg=_seg("taxi", 12, 3.0, 60000),
+              dining=dict(genres=["cafe"], signature="ココナッツコーヒー・ベトナム式練乳コーヒー", budget_lunch="u1000",
+                          reservation="not_accepted", payment=["cash", "card"], features=["english_menu", "view", "wifi", "takeout"],
+                          moods=["friends", "solo"], wait_note="夕方は混むが回転は早い")),
             E("dragon", "18:00", "19:00", "sightseeing", "ロン橋(ドラゴンブリッジ)", 16.0611, 108.2274, "Cau Rong, Da Nang", "週末21時は火を噴く。", seg=_seg("taxi", 15, 2.8, 70000)),
             E("dinner", "19:15", "21:00", "dining", "Madame Lân で夕食", 16.0764, 108.2240, "4 Bach Dang, Da Nang", "ミークアン。", seg=_seg("taxi", 10, 2.0, 50000), hours=("06:30", "22:00", "なし")),
         ]),
@@ -548,6 +573,98 @@ DANANG: Dict[str, Any] = dict(
 
 TRIPS: List[Dict[str, Any]] = [NAGAHAMA, SHIRAHAMA, KANAZAWA, KOKURA, DANANG]
 
+# [Gate DemoDining] 食事の予定の情報(サンプルの値)。(旅行, 予定) → 食事の情報。予算は 1 人あたりの円の目安
+DINING: Dict[Tuple[str, str], Dict[str, Any]] = {
+    ("nagahama", "lunch1"): dict(genres=["kyodo", "teishoku"], signature="焼鯖そうめん(焼鯖の煮汁で炊いたそうめん)",
+                                 budget_lunch="1000_2000", reservation="not_accepted", parking="nearby",
+                                 parking_note="黒壁周辺の市営駐車場", payment=["cash"], features=["lunch", "tatami"],
+                                 moods=["local", "family"], access="長浜駅から徒歩 10 分", wait_note="土日の昼は 30 分ほど並ぶ。売り切れで早じまいも"),
+    ("nagahama", "dinner1"): dict(genres=["washoku", "yakiniku"], signature="近江牛の陶板焼きと湖魚の小鉢", budget_dinner="10000_20000",
+                                  reservation="required", parking="yes", private_room=True, smoking="no",
+                                  payment=["cash", "card"], features=["view"], moods=["date"]),
+    ("nagahama", "bf1"): dict(genres=["washoku"], signature="湯豆腐と近江の地野菜", reservation="required", private_room=True),
+    ("nagahama", "lunch2"): dict(genres=["teishoku", "yakitori"], signature="親子丼(とろとろの卵と鶏の旨み)", budget_lunch="u1000",
+                                 reservation="not_accepted", parking="nearby", payment=["cash"], features=["lunch", "counter"],
+                                 moods=["local", "solo"], wait_note="開店前から行列。回転は早い"),
+    ("nagahama", "cafe"): dict(genres=["cafe", "sweets"], signature="ジェラートと自家焙煎のコーヒー", budget_lunch="u1000",
+                               reservation="not_accepted", payment=["cash", "emoney"], features=["takeout", "kids"], moods=["date", "friends"]),
+    ("shirahama", "toretore"): dict(genres=["kaisen", "sushi"], signature="まぐろ丼・まぐろ解体ショーの中トロ", budget_lunch="2000_3000",
+                                    reservation="not_accepted", parking="yes", parking_note="無料の大駐車場", seats=600,
+                                    payment=["cash", "card", "emoney"], features=["kids", "takeout", "lunch", "wheelchair"],
+                                    moods=["family", "friends"], wait_note="解体ショーの時刻は混む"),
+    ("shirahama", "dinner"): dict(genres=["nabe", "washoku", "kaisen"], signature="クエ鍋と熊野牛の陶板焼き", budget_dinner="10000_20000",
+                                  reservation="required", parking="yes", private_room=True, smoking="no",
+                                  payment=["cash", "card"], features=["view", "kids"], moods=["family", "friends"]),
+    ("shirahama", "lunch"): dict(genres=["kaisen", "teishoku", "nabe"], signature="クエの唐揚げ定食・クエ雑炊", budget_lunch="3000_5000",
+                                 budget_dinner="5000_10000", reservation="recommended", parking="yes", payment=["cash", "card"],
+                                 features=["lunch", "tatami", "kids"], moods=["family", "local"]),
+    ("kanazawa", "omicho"): dict(genres=["kaisen", "sushi"], signature="のどぐろ・甘えび・白えびの海鮮丼", budget_lunch="3000_5000",
+                                 reservation="not_accepted", parking="nearby", parking_note="近江町市場の駐車場(買い物で割引)",
+                                 payment=["cash", "card"], features=["lunch", "counter", "english_menu"], moods=["family", "local"],
+                                 access="金沢駅からバスで 5 分", wait_note="11 時台に着くと待ちが短い"),
+    ("kanazawa", "dinner1"): dict(genres=["kyodo", "izakaya"], signature="金沢おでん(車麩・ばい貝・かに面は冬)", budget_dinner="3000_5000",
+                                  reservation="not_accepted", parking="none", payment=["cash", "card"], features=["counter"],
+                                  moods=["local", "friends"], wait_note="開店直後か 20 時以降が入りやすい"),
+    ("kanazawa", "lunch2"): dict(genres=["western", "teishoku"], signature="治部煮定食・昔ながらのオムライス", budget_lunch="1000_2000",
+                                 reservation="not_accepted", parking="nearby", payment=["cash"], features=["lunch", "kids"],
+                                 moods=["family", "local"]),
+    ("kanazawa", "kaiseki"): dict(genres=["washoku", "kyodo"], signature="治部煮・加賀野菜・鯛の唐蒸し", budget_dinner="10000_20000",
+                                  reservation="required", parking="nearby", private_room=True, smoking="no",
+                                  payment=["cash", "card"], features=["tatami"], moods=["family", "business"],
+                                  access="片町の路地の奥。タクシーで店の前まで"),
+    ("kanazawa", "noto_lunch"): dict(genres=["kaisen"], signature="能登の焼き牡蠣・七尾湾の海鮮丼", budget_lunch="2000_3000",
+                                     reservation="not_accepted", parking="yes", parking_note="無料駐車場あり",
+                                     payment=["cash", "card"], features=["kids", "takeout", "view"], moods=["family"]),
+    ("kanazawa", "dinner3"): dict(genres=["washoku", "kaisen"], signature="能登牛と寒ぶりの会席", budget_dinner="10000_20000",
+                                  reservation="required", private_room=True, parking="yes"),
+    ("kanazawa", "rest"): dict(genres=["teishoku", "soba_udon"], signature="地物の定食・ころ柿のソフト", budget_lunch="1000_2000",
+                               reservation="not_accepted", parking="yes", payment=["cash"], features=["kids", "takeout"], moods=["family"]),
+    ("kokura", "lunch1"): dict(genres=["soba_udon"], signature="ごぼう天うどん・かしわおにぎり・ぼた餅", budget_lunch="u1000",
+                               reservation="not_accepted", payment=["cash", "emoney"], features=["kids", "lunch", "counter"],
+                               moods=["solo", "local"], access="小倉駅の構内"),
+    ("kokura", "tanga"): dict(genres=["izakaya", "okonomiyaki"], signature="小倉発祥の焼きうどん・関門だこ", budget_dinner="3000_5000",
+                              reservation="recommended", parking="nearby", private_room=True, payment=["cash", "card"],
+                              features=["tatami"], moods=["business", "local"]),
+    ("kokura", "lunch2"): dict(genres=["teishoku"], signature="日替わり定食", budget_lunch="u1000", reservation="not_accepted",
+                               parking="yes", moods=["business"]),
+    ("kokura", "dinner2"): dict(genres=["kyodo", "izakaya"], signature="いわしのぬか炊き(じんだ煮)・玄海の刺身", budget_dinner="3000_5000",
+                                reservation="recommended", parking="none", payment=["cash", "card"], features=["counter"],
+                                moods=["solo", "local"]),
+    ("danang", "dinner"): dict(genres=["asian"], signature="ミークアン・バインセオ・生春巻き", budget_dinner="1000_2000",
+                               reservation="possible", payment=["cash", "card"], features=["english_menu", "kids"],
+                               moods=["family", "friends"]),
+    ("danang", "hsan"): dict(genres=["kaisen", "asian"], signature="ハマグリのレモングラス蒸し・カニのタマリンド炒め",
+                             budget_dinner="2000_3000", reservation="not_accepted", payment=["cash"],
+                             features=["outdoor", "english_menu"], moods=["friends", "local"], wait_note="生け簀から選んで量り売り"),
+    ("danang", "hlunch"): dict(genres=["asian"], signature="カオラウ・ホワイトローズ", budget_lunch="1000_2000",
+                               reservation="recommended", payment=["cash", "card"], features=["english_menu", "vegetarian"],
+                               moods=["friends", "family"]),
+    ("danang", "hdinner"): dict(genres=["asian"], signature="バインセオとネムルイの食べ放題", budget_dinner="u1000",
+                                reservation="not_accepted", payment=["cash"], features=["kids"], moods=["local", "friends"],
+                                wait_note="路地の奥。地図で場所を確かめる"),
+    ("danang", "lang"): dict(genres=["kaisen", "asian"], signature="ランコー湾の牡蠣と焼きエビ", budget_lunch="1000_2000",
+                             reservation="possible", parking="yes", payment=["cash"], features=["view"], moods=["friends"]),
+    ("danang", "hue_din"): dict(genres=["asian", "kyodo"], signature="フエの宮廷料理のコース", budget_dinner="3000_5000",
+                                reservation="required", payment=["cash", "card"], features=["english_menu"], moods=["friends", "date"]),
+    ("danang", "buncha"): dict(genres=["asian", "ramen"], signature="ブンボーフエ(牛骨とレモングラスの辛い麺)", budget_lunch="u1000",
+                               reservation="not_accepted", payment=["cash"], moods=["local"]),
+    ("danang", "last"): dict(genres=["asian", "kaisen"], signature="ベトナム料理の食べ納め(フォー・揚げ春巻き)",
+                             budget_dinner="1000_2000", reservation="possible", payment=["cash", "card"],
+                             features=["english_menu"], moods=["friends"]),
+}
+
+
+def _attach_dining() -> None:
+    for trip in TRIPS:
+        for day in trip["days"]:
+            for ev in day["events"]:
+                found = DINING.get((trip["key"], ev["key"]))
+                if found and not ev.get("dining"):
+                    ev["dining"] = found
+
+
+_attach_dining()
+
 WISH_PLACES = [
     ("彦根城", "sightseeing", "滋賀県彦根市金亀町1-1", 35.2764, 136.2520, "ひこにゃんに会いたい"),
     ("熊野古道 大門坂", "sightseeing", "和歌山県東牟婁郡那智勝浦町", 33.6702, 135.8900, "次の和歌山で"),
@@ -555,4 +672,28 @@ WISH_PLACES = [
     ("関門海峡ミュージアム", "sightseeing", "福岡県北九州市門司区西海岸1-3-3", 33.9440, 130.9600, "出張ついでに"),
     ("Hanoi Old Quarter", "sightseeing", "Hoan Kiem, Hanoi", 21.0340, 105.8500, "次のベトナムで"),
     ("飛騨高山 古い町並", "sightseeing", "岐阜県高山市上三之町", 36.1420, 137.2590, "夫婦で秋に"),
+    # [Gate DemoDining] 食事の行きたい場所(食事の情報はサンプルの値)
+    ("いづう(鯖姿寿司)", "restaurant", "京都府京都市東山区八坂新地清本町", 35.0040, 135.7743, "祇園で鯖寿司を",
+     dict(genres=["sushi", "kyodo"], signature="鯖姿寿司・いなり寿司", budget_lunch="3000_5000", budget_dinner="3000_5000",
+          reservation="possible", parking="none", payment=["cash", "card"], features=["takeout", "tatami"], moods=["date", "family"])),
+    ("一蘭 本社総本店", "restaurant", "福岡県福岡市博多区中洲5丁目", 33.5928, 130.4054, "博多の夜にとんこつ",
+     dict(genres=["ramen"], signature="天然とんこつラーメン(替え玉)", budget_lunch="u1000", budget_dinner="1000_2000",
+          reservation="not_accepted", parking="nearby", payment=["cash", "card", "emoney"],
+          features=["late_night", "counter", "english_menu"], moods=["solo", "friends"], wait_note="深夜でも並ぶことがある")),
+    ("あつた蓬莱軒 本店", "restaurant", "愛知県名古屋市熱田区神戸町", 35.1265, 136.9092, "熱田神宮のあとにひつまぶし",
+     dict(genres=["unagi", "kyodo"], signature="ひつまぶし(薬味とだしで三通り)", budget_lunch="5000_10000",
+          budget_dinner="5000_10000", reservation="recommended", parking="yes", private_room=True, payment=["cash", "card"],
+          features=["tatami"], moods=["family", "business"], wait_note="昼は 1 時間待ちの日も")),
+    ("六花亭 札幌本店 喫茶室", "restaurant", "北海道札幌市中央区北4条西6丁目", 43.0650, 141.3510, "札幌でホットケーキ",
+     dict(genres=["cafe", "sweets"], signature="ホットケーキ・マルセイバターサンド", budget_lunch="u1000",
+          reservation="not_accepted", parking="nearby", payment=["cash", "card", "emoney"], features=["kids", "takeout"],
+          moods=["family", "friends"], access="札幌駅から徒歩 5 分")),
+    ("首里そば", "restaurant", "沖縄県那覇市首里赤田町", 26.2170, 127.7230, "首里城のあとに沖縄そば",
+     dict(genres=["soba_udon", "kyodo"], signature="首里そば(木灰そばの細麺)・ジューシー", budget_lunch="u1000",
+          reservation="not_accepted", parking="none", payment=["cash"], features=["lunch", "tatami"], moods=["local", "solo"],
+          wait_note="売り切れ次第終わり。昼過ぎは要注意")),
+    ("Pizza 4P's Hoi An", "restaurant", "Hoi An, Quang Nam", 15.8770, 108.3290, "次のホイアンで自家製チーズのピザ",
+     dict(genres=["italian"], signature="ブラータチーズのピザ・自家製チーズの盛り合わせ", budget_dinner="2000_3000",
+          reservation="recommended", payment=["cash", "card"], features=["english_menu", "vegetarian", "kids"],
+          moods=["date", "friends"])),
 ]
