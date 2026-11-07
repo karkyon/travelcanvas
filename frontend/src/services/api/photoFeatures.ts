@@ -139,6 +139,10 @@ export interface ApplyResult { reservation_id: string; event_id: string | null; 
 export async function applyExtraction(planId: string, jobId: string, fields: Record<string, string | null>, addToItinerary: boolean): Promise<ApplyResult> {
   return (await api.post(`/plans/${planId}/imports/${jobId}/apply`, { fields, add_to_itinerary: addToItinerary }, SILENT)).data as ApplyResult;
 }
+/** [Gate BookingImportYahoo] 取込ジョブを一覧から消す(読み取った候補も消える。登録済みの予約は残る) */
+export async function deleteImportJob(planId: string, jobId: string): Promise<void> {
+  await api.delete(`/plans/${planId}/imports/${jobId}`, SILENT);
+}
 export interface ExtractedJob extends ImportJobDetail {
   ai_status: 'off' | 'used' | 'denied' | 'not_needed';
   ai_message: string | null;
