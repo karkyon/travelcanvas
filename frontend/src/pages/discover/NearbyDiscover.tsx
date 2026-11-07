@@ -59,6 +59,11 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
       setGeoError('この端末では現在地を使えません。旅程の場所か座標で探してください');
       return;
     }
+    // [Gate CandidateFilters] ブラウザは https の画面でしか現在地を渡さない(http の LAN の画面では使えない)
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      setGeoError('この画面(http)ではブラウザが現在地を渡しません。https の画面で開くか、旅程の場所・座標で探してください');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (p) => { setCurrent({ id: 'current', label: '現在地', latitude: p.coords.latitude, longitude: p.coords.longitude }); setBaseId('current'); },
       () => setGeoError('現在地を使えませんでした(許可されていません)。旅程の場所か座標で探してください'),
@@ -106,6 +111,17 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
     <section aria-labelledby="nearby-title" className="rounded-xl border border-cloud-200 bg-surface p-4" data-testid="nearby-discover">
       <h2 id="nearby-title" className="font-semibold text-ink-900">近くの「行きたい」を集める</h2>
       <p className="text-xs text-ink-700">基点の周りを、カテゴリと半径で探します。見つけた場所は候補箱へ入れてから、日程へ追加できます。</p>
+      {/* [Gate CandidateFilters] 使い方(何ができるかが分からない、という声から) */}
+      <details className="mt-2 rounded-lg bg-cloud-50 p-2 text-xs text-ink-900" data-testid="nearby-help">
+        <summary className="cursor-pointer font-semibold">使い方(探す基点・現在地とは)</summary>
+        <ol className="mt-1 list-decimal space-y-1 pl-5">
+          <li><b>探す基点</b>は「どこの周りを探すか」の中心です。旅程の予定のうち地図の位置がある場所(例: 2026-11-28 ミキモト真珠島)から選びます。宿の周りで夕食を探す、観光地の近くでカフェを探す、といった使い方です。</li>
+          <li><b>現在地を使う</b>を押すと、ブラウザが許可を求め、許可するといまいる場所が基点になります(旅行の当日に「この近くで」探す時)。https の画面でだけ使えます。</li>
+          <li><b>座標を入れる</b>は、旅程に無い場所(地図で調べた緯度・経度)を基点にする時に使います。</li>
+          <li><b>半径</b>(500m〜5km)と<b>カテゴリ</b>(食べ物・市場・買い物・絶景)を選び、必要なら<b>探す言葉</b>(例: うどん)を入れて「近くを探す」。「すべて」の時は言葉が必要です。</li>
+          <li>見つかった場所は「候補箱へ」で下の候補箱に入ります。候補箱の上の検索・絞り込みで、種類・エリア・タグごとに探せます。</li>
+        </ol>
+      </details>
       {/* [Gate SpotFind] ほかの探し方(スポット検索と同じ部品) */}
       <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="ほかの探し方">
         <span className="text-xs text-ink-700">ほかの探し方:</span>

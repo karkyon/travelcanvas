@@ -34,6 +34,7 @@ beforeEach(() => {
   for (const fn of Object.values(m)) fn.mockReset();
   m.getPlanDetail.mockResolvedValue({ data: { days: [{ id: D1, local_date: '2026-11-01', timezone_id: 'Asia/Tokyo', sort_order: 0 }] } });
   window.confirm = vi.fn(() => true);
+  window.localStorage.clear();
 });
 
 describe('CandidatesPage (Gate C2)', () => {

@@ -123,6 +123,28 @@ def clean_text(value: Optional[str], limit: int, label: str, required: bool = Fa
     return v
 
 
+MAX_TAGS = 10
+MAX_TAG_LENGTH = 20
+
+
+def clean_tags(values: Any) -> Optional[list]:
+    """[Gate CandidateFilters] タグ(最大 10 個・1 つ 20 文字・前の「#」と空白は外す・同じタグは 1 つ)。空なら None"""
+    if values is None:
+        return None
+    if not isinstance(values, list):
+        raise CandidateInputError("invalid_field", "タグの形が違います")
+    out: list = []
+    for raw in values:
+        tag = clean_text(str(raw).lstrip("#＃").strip(), MAX_TAG_LENGTH, "タグ")
+        if tag and "\n" in tag:
+            raise CandidateInputError("invalid_field", "タグに改行は使えません")
+        if tag and tag not in out:
+            out.append(tag)
+    if len(out) > MAX_TAGS:
+        raise CandidateInputError("invalid_field", f"タグは{MAX_TAGS}個までです")
+    return out or None
+
+
 def check_location(lat: Any, lng: Any):
     if lat is None and lng is None:
         return None, None
