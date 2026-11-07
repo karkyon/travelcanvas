@@ -23,8 +23,8 @@ vi.mock('@/components/planner/SpotMiniMap', () => ({
     </div>
   ),
 }));
-const { getPlaceInfo } = vi.hoisted(() => ({ getPlaceInfo: vi.fn() }));
-vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo, reorderDay: vi.fn() }));
+const { getPlaceInfo, geocodeAddress } = vi.hoisted(() => ({ getPlaceInfo: vi.fn(), geocodeAddress: vi.fn() }));
+vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo, geocodeAddress, reorderDay: vi.fn() }));
 vi.mock('@/components/DayView', () => ({
   default: ({ day, onItemEdit }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void }) => (
     <div>{day.events.map((e) => <button key={e.id} type="button" onClick={() => onItemEdit(e)}>編集: {e.title}</button>)}</div>
@@ -95,6 +95,9 @@ describe('PlannerPage スポットの URL と地図 (Gate SpotLinks)', () => {
       candidates: [{ name: '清水寺', address: '京都府京都市東山区清水', phone: null, website: null, category: null,
         osm_type: null, latitude: 34.9949, longitude: 135.785, source_url: null }],
     });
+    geocodeAddress.mockReset().mockResolvedValue({ unavailable: false,
+      sources: [{ provider: 'gsi', label: '国土地理院', credit: '国土地理院 住所検索・逆ジオコーダ', url: 'https://www.gsi.go.jp/' }],
+      candidates: [{ address: '京都府京都市東山区清水', latitude: 34.9949, longitude: 135.785, provider: 'gsi', level: null }] });
     fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
     expect(screen.getAllByLabelText(/^URL \d$/)).toHaveLength(1);
     expect(screen.getByTestId('edit-map-empty')).toBeInTheDocument();  // 位置が無ければ地図の代わりに案内
@@ -112,7 +115,10 @@ describe('PlannerPage スポットの URL と地図 (Gate SpotLinks)', () => {
     // 住所から位置を探して選ぶと、街の縮尺の地図が出る。印を動かすと位置が変わる
     fireEvent.change(screen.getByLabelText('場所・住所'), { target: { value: '京都府京都市東山区清水' } });
     fireEvent.click(screen.getByTestId('edit-map-lookup'));
-    expect(getPlaceInfo).toHaveBeenLastCalledWith({ name: '京都府京都市東山区清水' });
+    // [PlaceLookupJP] 住所がある時は住所の検索(Yahoo!・国土地理院)で探す
+    expect(geocodeAddress).toHaveBeenLastCalledWith('京都府京都市東山区清水', expect.anything());
+    expect(getPlaceInfo).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('place-sources')).toHaveTextContent('国土地理院');
     fireEvent.click(within(await screen.findByTestId('place-info-result')).getByRole('button', { name: 'この位置にする' }));
     expect(await screen.findByTestId('spot-mini-map')).toHaveAttribute('data-at', '34.9949,135.785');
     fireEvent.click(screen.getByRole('button', { name: '印を動かす' }));

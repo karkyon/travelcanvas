@@ -9,7 +9,7 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -211,3 +211,128 @@ def merge_empty(current: Optional[Dict[str, Any]], found: Dict[str, Any]) -> Dic
         if base.get(k) in (None, [], ""):
             base[k] = v
     return base
+
+
+# ------------------------------------------------------------------ 日本の店の情報のサービスの言葉から
+
+# 言葉 → ジャンル(上から順に当てる。「インドカレー」は curry、「和食」は最後の方で washoku)
+_GENRE_WORDS: List[Tuple[Tuple[str, ...], str]] = [
+    (("寿司", "鮨", "すし"), "sushi"), (("海鮮", "魚介", "海の幸", "かに", "カニ", "牡蠣"), "kaisen"),
+    (("ラーメン", "らーめん", "中華そば", "つけ麺"), "ramen"), (("そば", "蕎麦", "うどん"), "soba_udon"),
+    (("焼肉", "ホルモン"), "yakiniku"), (("焼き鳥", "焼鳥", "やきとり"), "yakitori"), (("天ぷら", "天麩羅"), "tempura"),
+    (("とんかつ", "串揚げ", "串カツ", "揚げ物"), "tonkatsu"), (("お好み焼", "たこ焼", "もんじゃ", "粉もの"), "okonomiyaki"),
+    (("郷土料理",), "kyodo"), (("居酒屋",), "izakaya"), (("しゃぶしゃぶ", "すき焼", "もつ鍋", "鍋"), "nabe"),
+    (("うなぎ", "鰻"), "unagi"), (("定食", "食堂"), "teishoku"), (("カレー", "インド"), "curry"),
+    (("中華", "餃子", "飲茶"), "chinese"), (("韓国",), "korean"),
+    (("タイ料理", "ベトナム", "エスニック", "アジア"), "asian"), (("イタリア", "パスタ", "ピザ", "ピッツァ"), "italian"),
+    (("フレンチ", "フランス", "ビストロ"), "french"), (("洋食", "オムライス"), "western"),
+    (("ステーキ", "ハンバーグ"), "steak"), (("ハンバーガー", "バーガー"), "burger"),
+    (("カフェ", "喫茶", "珈琲", "コーヒー"), "cafe"),
+    (("スイーツ", "甘味", "ケーキ", "和菓子", "洋菓子", "パフェ", "アイス", "ジェラート", "クレープ"), "sweets"),
+    (("パン", "ベーカリー"), "bakery"), (("バー", "バル", "ワイン", "日本酒", "ビール"), "bar"),
+    (("ビュッフェ", "バイキング"), "buffet"), (("和食", "日本料理", "懐石", "割烹", "料亭", "会席"), "washoku"),
+]
+
+
+def genres_from_text(*texts: Optional[str]) -> List[str]:
+    """店の種類の言葉(ホットペッパー・Yahoo! のジャンル名など)からジャンルを最大 3 つ。当たらなければ空"""
+    text = " ".join(t for t in texts if t)
+    # 部分の一致の取り違え(ハンバーガーの「バー」・ジャパンの「パン」)を外して見る
+    loose = text.replace("ハンバーガー", "").replace("バーガー", "").replace("ジャパン", "").replace("パンケーキ", "")
+    out: List[str] = []
+    for words, genre in _GENRE_WORDS:
+        src = loose if genre in ("bar", "bakery") else text
+        if genre not in out and any(w in src for w in words):
+            out.append(genre)
+    return out[:MAX_GENRES]
+
+
+def budget_key(text: Optional[str]) -> Optional[str]:
+    """「2001～3000円」「3,000円」「〜1000円」などから予算の区分(上の値で決める)。読めなければ None"""
+    import re as _re
+
+    nums = [int(n.replace(",", "")) for n in _re.findall(r"\d[\d,]*", str(text or ""))]
+    nums = [n for n in nums if 100 <= n <= 1_000_000]
+    if not nums:
+        return None
+    top = max(nums)
+    for limit, key in ((1000, "u1000"), (2000, "1000_2000"), (3000, "2000_3000"), (5000, "3000_5000"),
+                       (10000, "5000_10000"), (20000, "10000_20000")):
+        if top <= limit:
+            return key
+    return "o20000"
+
+
+def from_hotpepper(shop: Dict[str, Any]) -> Dict[str, Any]:
+    """ホットペッパーグルメの店の情報から読める項目だけ(値を作らない)"""
+    def s(key: str) -> str:
+        v = shop.get(key)
+        return str(v).strip() if v is not None else ""
+
+    def name_of(key: str) -> str:
+        v = shop.get(key)
+        return str(v.get("name") or "") if isinstance(v, dict) else ""
+
+    out: Dict[str, Any] = {}
+    genres = genres_from_text(name_of("genre"), name_of("sub_genre"))
+    if genres:
+        out["genres"] = genres
+    raw_budget = shop.get("budget")
+    budget: Dict[str, Any] = raw_budget if isinstance(raw_budget, dict) else {}
+    key = budget_key(str(budget.get("name") or "") + " " + str(budget.get("average") or ""))
+    if key:
+        out["budget_dinner"] = key
+    if s("open"):
+        out["hours"] = s("open")[:300]
+    if s("close"):
+        out["closed"] = s("close")[:100]
+    parking = s("parking")
+    if parking.startswith("あり"):
+        out["parking"] = "yes"
+        note = parking[2:].strip(" ：:").strip()
+        if note:
+            out["parking_note"] = note[:100]
+    elif parking.startswith("なし"):
+        out["parking"] = "none"
+    if s("card").startswith("利用可"):
+        out["payment"] = ["card"]
+    smoke = s("non_smoking")
+    if "全面禁煙" in smoke or "全席禁煙" in smoke:
+        out["smoking"] = "no"
+    elif "一部禁煙" in smoke or "分煙" in smoke:
+        out["smoking"] = "separated"
+    elif "禁煙席なし" in smoke or "喫煙可" in smoke:
+        out["smoking"] = "yes"
+    room = s("private_room")
+    if room.startswith("あり"):
+        out["private_room"] = True
+    elif room.startswith("なし"):
+        out["private_room"] = False
+    try:
+        cap = int(s("capacity"))
+        if 1 <= cap <= 5000:
+            out["seats"] = cap
+    except ValueError:
+        pass
+    feats: List[str] = []
+    if s("lunch").startswith("あり"):
+        feats.append("lunch")
+    if s("midnight").startswith("営業"):
+        feats.append("late_night")
+    if s("free_drink").startswith("あり"):
+        feats.append("all_you_can_drink")
+    if s("wifi").startswith("あり"):
+        feats.append("wifi")
+    if "OK" in s("child") or "歓迎" in s("child"):
+        feats.append("kids")
+    if s("english").startswith("あり"):
+        feats.append("english_menu")
+    if s("pet").startswith("可"):
+        feats.append("pet")
+    if s("barrier_free").startswith("あり"):
+        feats.append("wheelchair")
+    if feats:
+        out["features"] = feats
+    if s("access"):
+        out["access"] = s("access")[:200]
+    return out

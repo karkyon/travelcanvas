@@ -35,6 +35,19 @@ SLOTS: Dict[str, Dict[str, Any]] = {
     "google_maps_server_key": {"label": "Google Maps Platform のサーバー用キー",
                                "providers": ["google_places", "google_routes"], "env": "GOOGLE_PLACES_API_KEY",
                                "hint": "Places API (New)・Routes API だけに制限したサーバー用のキー"},
+    # [Gate PlaceLookupJP] 場所の自動取得の無料の提供元(利用登録だけ。使った分の請求は無い)。無ければその提供元へ送らない
+    "yahoo_client_id": {"label": "Yahoo!デベロッパーネットワークの Client ID", "providers": ["yahoo_local"],
+                        "env": "YAHOO_CLIENT_ID", "free": True,
+                        "hint": "e.developer.yahoo.co.jp でアプリを登録(ID 連携は使わない)。ローカルサーチ・ジオコーダで店・施設の住所・電話・URL を取ります"},
+    "rakuten_app_id": {"label": "楽天ウェブサービスのアプリ ID", "providers": ["rakuten_travel"],
+                       "env": "RAKUTEN_APPLICATION_ID", "free": True,
+                       "hint": "Rakuten Developers でアプリを登録。楽天トラベルで宿の住所・電話・チェックイン/アウトを取ります(アクセスキーも必要)"},
+    "rakuten_access_key": {"label": "楽天ウェブサービスのアクセスキー", "providers": ["rakuten_travel"],
+                           "env": "RAKUTEN_ACCESS_KEY", "free": True,
+                           "hint": "アプリ ID と同じ画面のアクセスキー"},
+    "hotpepper_api_key": {"label": "ホットペッパーグルメ(リクルート Web サービス)の API キー", "providers": ["hotpepper"],
+                          "env": "HOTPEPPER_API_KEY", "free": True,
+                          "hint": "リクルート Web サービスでメールアドレスを登録すると届くキー。飲食店のジャンル・予算・営業時間などを取ります"},
 }
 MIN_LEN, MAX_LEN = 8, 512
 

@@ -19,6 +19,8 @@ import {
   createWishSpot, deleteWishSpot, enrichWishSpot, listWishSpots, updateWishSpot, type WishInput, type WishSpot,
 } from '@/services/api/spotIntake';
 import { getPlaceInfo, getPlacePhoto, type PlaceInfoCandidate, type PlaceInfoResult } from '@/services/api/planEdit';
+import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
+import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import EventUrlsField from '@/components/planner/EventUrlsField';
 import SpotLinks from '@/components/planner/SpotLinks';
 import { cleanUrls } from '@/components/planner/spotLinksModel';
@@ -129,8 +131,9 @@ const SpotListPage: React.FC = () => {
       const result = await getPlaceInfo({ name, latitude: form.latitude, longitude: form.longitude });
       setInfo({
         busy: false, result,
-        error: result.unavailable ? '場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください'
-          : result.candidates.length === 0 ? '見つかりませんでした。名前を短くするか、住所で試してください' : null,
+        error: result.unavailable ? '場所の情報の提供元が応答しませんでした。時間をおいて試してください'
+          : result.candidates.length === 0 ? (result.keyed_providers?.length ? '見つかりませんでした。正式名称にするか、名前を短くして試してください'
+            : '見つかりませんでした。宿・店の情報の提供元(Yahoo!・楽天トラベル・ホットペッパー)の鍵が未登録です(運用コンソールで登録すると見つかりやすくなります)') : null,
       });
     } catch {
       setInfo({ busy: false, result: null, error: '場所の情報を読めませんでした' });
@@ -138,8 +141,7 @@ const SpotListPage: React.FC = () => {
   };
   const applyCandidate = async (c: PlaceInfoCandidate) => {
     const dining = c.dining ? mergeEmptyDining(form.dining, c.dining) : form.dining;
-    const rows = form.urlRows.filter((r) => r.trim());
-    if (c.website && !rows.includes(c.website) && rows.length < 5) rows.push(c.website);
+    const rows = mergeUrlRows(form.urlRows, c);
     setForm((f) => ({
       ...f,
       address: c.address ?? f.address,
@@ -148,7 +150,8 @@ const SpotListPage: React.FC = () => {
       longitude: c.longitude ?? f.longitude,
       category: c.category === 'dining' ? 'restaurant' : c.category === 'accommodation' ? 'accommodation'
         : c.category === 'shopping' ? 'shopping' : f.category,
-      urlRows: rows.length ? rows : [''],
+      urlRows: rows,
+      description: appendNotes(f.description, c.notes),
       dining,
     }));
     setInfo({ busy: false, result: null, error: null });
@@ -166,7 +169,7 @@ const SpotListPage: React.FC = () => {
     try {
       const r = await enrichWishSpot(s.id);
       setSpots((list) => (list ? list.map((x) => (x.id === s.id ? r.spot : x)) : list));
-      if (r.filled.length) setMessage(`「${s.name}」に ${r.filled.map((k) => FILLED_LABEL[k] ?? k).join('・')} を入れました(© OpenStreetMap contributors)`);
+      if (r.filled.length) setMessage(`「${s.name}」に ${r.filled.map((k) => FILLED_LABEL[k] ?? k).join('・')} を入れました(出典: ${(r.sources?.length ? r.sources.map((x) => x.credit) : ['© OpenStreetMap contributors']).join('・')})`);
       else if (!quiet) setMessage(r.matched ? `「${s.name}」は入れられる新しい情報がありませんでした` : `「${s.name}」に当てはまる場所が見つかりませんでした`);
     } catch (err) {
       if (!quiet) setError(errorDetailMessage(err, '自動取得できませんでした'));
@@ -238,7 +241,7 @@ const SpotListPage: React.FC = () => {
                   <input id="wish-phone" type="tel" maxLength={40} className={fieldClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="flex items-end">
                   <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => void lookup()} disabled={info.busy} data-testid="wish-lookup"
-                    title="名前(無ければ住所)で OpenStreetMap を探し、住所・電話・公式サイト・食事の情報・写真を入れます(選んでから入れます)">
+                    title="名前(無ければ住所)で探し、住所・電話・公式サイト・食事の情報・写真を入れます(選んでから入れます)">
                     <Globe size={15} aria-hidden="true" />{info.busy ? '探しています…' : '自動取得'}
                   </button>
                 </div>
@@ -252,6 +255,8 @@ const SpotListPage: React.FC = () => {
                             <span className="min-w-0">
                               <b className="block text-ink-900">{c.name ?? '名前なし'}</b>
                               <span className="block text-xs text-ink-700 break-words">{[c.address, c.phone, c.website, c.dining?.hours].filter(Boolean).join(' · ')}</span>
+                              {c.notes?.map((n) => <span key={n} className="block text-xs text-ink-700 break-words">{n}</span>)}
+                              {c.links?.map((l) => <span key={l.url} className="block text-xs text-ink-700 break-words">{`${l.label ?? 'リンク'}: ${l.url}`}</span>)}
                             </span>
                             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary shrink-0" onClick={() => void applyCandidate(c)}
                               data-testid={`wish-lookup-use-${i}`}>入れる</button>
@@ -259,7 +264,8 @@ const SpotListPage: React.FC = () => {
                         ))}
                       </ul>
                     )}
-                    {info.result && <p className="mt-2 text-xs text-ink-700">{`出典: ${info.result.attribution}(${info.result.license})`}</p>}
+                    {info.result && <PlaceSourcesCredit sources={info.result.sources} className="mt-2 text-xs text-ink-700"
+                      fallback={`出典: ${info.result.attribution}(${info.result.license})`} />}
                   </div>
                 )}
                 <div className="sm:col-span-2">
