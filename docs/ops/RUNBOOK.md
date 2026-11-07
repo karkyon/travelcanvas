@@ -687,3 +687,4 @@ docker compose exec -T backend python scripts/demo_seed.py reset --yes  # 登録
 - 同行者役でもログインして確かめる時は seed に `--companion-password <任意>` を付ける(メールは `tc-demo-*@example.com`)。
 - APP_ENV=production では動かない。
 - 既に登録済みなら seed は止まる。やり直しは reset の後に。
+- 食事の予定(37 件・カフェ 3 件を含む)と食事の行きたい場所(6 件)には、食事の情報(ジャンル・名物・予算・予約・駐車場など)が入る。値はサンプルで、実在の店の情報と違うことがある。実在の店の電話・URL は入れない。
