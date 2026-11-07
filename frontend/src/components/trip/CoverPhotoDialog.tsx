@@ -18,6 +18,7 @@ import type { PlanCover } from '@/services/api/types/g11';
 import type { TravelMemory } from '@/services/api/types/memories';
 import { bumpCover, creditOf } from '@/hooks/useCoverPhoto';
 import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { getMediaProviderStatus } from '@/services/api/g11discover';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -161,7 +162,10 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (file) await takeFile(file);
+  };
+  // [Gate PhotoPaste] ファイルを選んだ時・クリップボードの画像を貼った時
+  const takeFile = async (file: File) => {
     if (maxBytes && file.size > maxBytes) {
       setError(`ファイルが大きすぎます(上限 ${sizeLabel(maxBytes)})`);
       return;
@@ -253,6 +257,7 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
             data-testid="cover-upload-input" aria-label="表紙にする写真のファイル" />
           <Button type="button" variant="outline" size="sm" className="mt-2" disabled={busy}
             onClick={() => fileRef.current?.click()}>写真のファイルを選ぶ</Button>
+          {isOpen && <PasteImageButton onImage={(f) => void takeFile(f)} disabled={busy} testId="cover-paste" />}
         </section>
 
         {externalEnabled && (

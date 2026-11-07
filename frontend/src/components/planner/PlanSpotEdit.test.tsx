@@ -112,6 +112,34 @@ describe('③ 写真のドラッグ&ドロップ・ファイルの選択', () =>
     expect(await screen.findByRole('alert')).toHaveTextContent('JPEG・PNG・WebP');
     expect(m.uploadMemory).not.toHaveBeenCalled();
   });
+  it('[PhotoPaste] Ctrl+V・貼り付けの欄でクリップボードの画像を取り込む。文字だけの時は案内する', async () => {
+    m.uploadMemory.mockReset().mockResolvedValue({ id: 'mem-2' });
+    m.setEventImage.mockReset().mockResolvedValue({ image: { memory_id: 'mem-2', source: null } });
+    const onUploaded = vi.fn();
+    render(<EventPhotoDrop planId="p" eventId="e1" eventTitle="鳥羽城" onUploaded={onUploaded} />);
+    const blob = new File(['png'], 'image.png', { type: 'image/png' });
+    const clip = (file: File | null, types: string[] = []) => ({
+      items: file ? [{ kind: 'file', type: file.type, getAsFile: () => file }] : [], files: file ? [file] : [], types,
+    });
+    // 画面のどこでも(document)Ctrl+V
+    const ev = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown };
+    ev.clipboardData = clip(blob, ['Files']);
+    act(() => { document.body.dispatchEvent(ev); });
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith({ memory_id: 'mem-2', source: null }));
+    const sent = m.uploadMemory.mock.calls[0]![1].file as File;
+    expect(sent.type).toBe('image/png');
+    expect(sent.name).toMatch(/^clipboard-\d{14}\.png$/);
+    expect(ev.defaultPrevented).toBe(true);
+    // 貼り付けの欄(スマホの長押し)。文字(画像の URL)だけなら送らずに案内
+    fireEvent.paste(screen.getByTestId('event-photo-paste-field'), { clipboardData: clip(null, ['text/plain']) });
+    expect(await screen.findByTestId('event-photo-paste-note')).toHaveTextContent('画像をコピー');
+    expect(m.uploadMemory).toHaveBeenCalledTimes(1);
+  });
+  it('[PhotoPaste] 押しボタンは、ブラウザが読ませない時(http)は Ctrl+V を案内する', async () => {
+    render(<EventPhotoDrop planId="p" eventId="e1" eventTitle="x" onUploaded={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('event-photo-paste-button'));
+    expect(await screen.findByTestId('event-photo-paste-note')).toHaveTextContent('Ctrl+V');
+  });
 });
 
 describe('⑧ 予約・費用の要約(読むだけ)', () => {
