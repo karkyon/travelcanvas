@@ -688,3 +688,23 @@ docker compose exec -T backend python scripts/demo_seed.py reset --yes  # 登録
 - APP_ENV=production では動かない。
 - 既に登録済みなら seed は止まる。やり直しは reset の後に。
 - 食事の予定(37 件・カフェ 3 件を含む)と食事の行きたい場所(6 件)には、食事の情報(ジャンル・名物・予算・予約・駐車場など)が入る。値はサンプルで、実在の店の情報と違うことがある。実在の店の電話・URL は入れない。
+
+## 場所の自動取得の提供元(Gate PlaceLookupJP)
+
+スポット・行きたい場所の「自動取得」と「住所から位置を探す」は、次の提供元をまとめて使う(`backend/app/services/place_lookup.py`)。
+
+| 提供元 | 取るもの | 鍵 | 請求 |
+|---|---|---|---|
+| Yahoo!ローカルサーチ・ジオコーダ・リバースジオコーダ | 店・施設の住所(番地まで)・電話・URL・ジャンル、住所 → 位置 | Client ID(`yahoo_client_id`) | 無し(利用登録だけ) |
+| 楽天トラベル キーワード検索 | 宿の住所・電話・位置・チェックイン/アウト・駐車場・アクセス・楽天のページ | アプリ ID とアクセスキー(`rakuten_app_id`・`rakuten_access_key`) | 無し |
+| ホットペッパーグルメ | 飲食店のジャンル・予算・営業時間・定休日・駐車場・カード・禁煙・個室・席数 | API キー(`hotpepper_api_key`) | 無し |
+| OpenStreetMap(Nominatim)・Wikidata・国土地理院 | 場所・公式サイト・住所の町名、住所 → 位置 | 不要 | 無し |
+
+鍵は `.env` ではなく運用コンソール(`/admin/ops` の「鍵」)で登録する(登録した有効な版だけを使う。無ければその提供元へは送らない)。
+登録の手順:
+
+1. Yahoo!: https://e.developer.yahoo.co.jp/register でアプリを登録(「サーバーサイド」・ID 連携は使わない)→ Client ID を登録
+2. 楽天: https://webservice.rakuten.co.jp/ でアプリを登録 → アプリ ID とアクセスキーを登録。アプリの「許可された Web サイト」に画面の URL を入れ、同じ URL を `.env` の `PLACE_LOOKUP_REFERER` に入れる
+3. ホットペッパー: https://webservice.recruit.co.jp/ でメールアドレスを登録 → 届いた API キーを登録
+
+画面には各提供元のクレジット(出典)を出す。写真・口コミ・評価は写さない。外へ送った回数は `provider_usage_events`(額 0 円)に残す。
