@@ -2,7 +2,8 @@
 
 - POST /spots/read-url  : SNS は公式の oEmbed、ほかの Web ページは url_place で 1 ページ読む
 - POST /spots/read-image: 画像の文字(OCR)から場所の名前らしい行を拾う。画像は外へ送らず保存しない
-- POST /spots/place-info: [Gate PlanSpotEdit] 名前・位置から住所・電話番号・種類を OpenStreetMap で読む(押した時の 1 回)
+- POST /spots/place-info: [Gate PlanSpotEdit] 名前・位置から住所・電話番号・種類を読む(押した時の 1 回。place_lookup)
+- POST /spots/geocode: [Gate PlaceLookupJP] 住所から地図の位置の候補
 """
 from typing import Any, Dict, Optional
 
@@ -17,7 +18,6 @@ from app.models.models import User
 from app.services import candidates as cs
 from app.services import free_usage
 from app.services import place_info as pi
-from app.services.search_provider import SearchProviderError
 from app.services import reservation_extract as rx
 from app.services import url_place as up
 from app.services.media_providers import registry
@@ -87,23 +87,55 @@ class PlaceInfoIn(BaseModel):
     longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 
+def _recorder(db: Session, user: User, operation: str):
+    from app.services import place_lookup as pl
+
+    def record(provider: str, code: str) -> None:
+        free_usage.record(db, user, pl.USAGE.get(provider, provider), operation, result_code=code)
+    return record
+
+
 @router.post("/place-info")
 async def place_info(body: PlaceInfoIn, db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
-    """[Gate PlanSpotEdit] 予定の場所の住所・電話番号・種類・位置の候補(保存しない)。出典は OpenStreetMap(ODbL)。"""
+    """[Gate PlanSpotEdit][Gate PlaceLookupJP] 場所の住所・電話・公式サイト・種類・位置の候補(保存しない)。
+    Yahoo!ローカルサーチ・楽天トラベル・ホットペッパー(鍵がある時)と OpenStreetMap・Wikidata・国土地理院から集めてまとめる。
+    出典は sources(各提供元のクレジット)。"""
+    from app.services import place_lookup as pl
+
     has_point = body.latitude is not None and body.longitude is not None
     if not (body.name or "").strip() and not has_point:
         raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "名前か位置を入れてください"})
     _limit(current_user, "place-info")
-    base = {"provider": "nominatim", "attribution": pi.ATTRIBUTION, "license": pi.LICENSE,
-            "license_url": pi.LICENSE_URL}
-    try:
-        rows, cached = await pi.lookup(body.name, body.latitude, body.longitude)
-    except SearchProviderError as err:
-        free_usage.record(db, current_user, "nominatim", "event.place_info", result_code=err.code)
-        db.commit()
-        return {**base, "candidates": [], "cached": False, "unavailable": True, "error_code": err.code}
-    if not cached:
-        free_usage.record(db, current_user, "nominatim", "event.place_info", result_code="ok" if rows else "empty")
-        db.commit()
-    return {**base, "candidates": rows, "cached": cached, "unavailable": False, "error_code": None}
+    result = await pl.lookup(db, body.name, body.latitude, body.longitude,
+                             _recorder(db, current_user, "event.place_info"))
+    db.commit()
+    # 以前の形(OpenStreetMap の出典)も残す(古い画面のため)
+    return {"provider": "multi", "attribution": pi.ATTRIBUTION, "license": pi.LICENSE, "license_url": pi.LICENSE_URL,
+            "candidates": result["candidates"], "sources": result["sources"],
+            "keyed_providers": result["keyed_providers"], "cached": result["cached"],
+            "unavailable": result["unavailable"],
+            "error_code": "server_error" if result["unavailable"] else None}
+
+
+class GeocodeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(..., min_length=1, max_length=200)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+
+@router.post("/geocode")
+async def geocode(body: GeocodeIn, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    """[Gate PlaceLookupJP] 住所(または名前)から地図の位置の候補(保存しない)。
+    Yahoo!ジオコーダ(鍵がある時)→ 国土地理院の住所検索 → OpenStreetMap の順に、見つかるまで引く。"""
+    from app.services import place_lookup as pl
+
+    if not body.query.strip():
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "住所を入れてください"})
+    _limit(current_user, "place-info")
+    result = await pl.geocode(db, body.query, body.latitude, body.longitude,
+                              _recorder(db, current_user, "event.geocode"))
+    db.commit()
+    return result
