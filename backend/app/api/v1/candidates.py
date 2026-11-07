@@ -87,7 +87,7 @@ def _to_dict(c: PlanCandidate, event_ids: set, names: Dict[uuid.UUID, str], dupe
         "source_url": c.source_url, "source_label": cs.url_label(c.source_url), "provider": c.provider,
         "retrieved_at": _iso(c.retrieved_at), "place_id": str(c.place_id) if c.place_id else None,
         "category": c.category, "address": c.address, "latitude": c.latitude, "longitude": c.longitude,
-        "priority": c.priority, "status": status, "status_label": STATUS_LABEL[status],
+        "priority": c.priority, "tags": list(c.tags or []), "status": status, "status_label": STATUS_LABEL[status],
         "scheduled_event_id": str(c.scheduled_event_id) if status == "scheduled" else None,
         "merged_into_id": str(c.merged_into_id) if c.merged_into_id else None,
         "created_by": names.get(c.created_by_user_id, "(退会した利用者)"),
@@ -153,6 +153,7 @@ class CandidateInput(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     priority: int = Field(2, ge=1, le=3)
+    tags: Optional[List[str]] = Field(None, max_length=20)  # [Gate CandidateFilters]
     # [Gate G11] SNS の投稿 URL の確認(social-preview)の後に保存する時。platform は youtube・tiktok・instagram
     source_kind: Optional[str] = Field(None, pattern="^social$")
     platform: Optional[str] = Field(None, pattern="^(youtube|tiktok|instagram)$")
@@ -197,7 +198,8 @@ def create_candidate(plan_id: str, body: CandidateInput, db: Session = Depends(g
     c = PlanCandidate(plan_id=plan.id, created_by_user_id=current_user.id, title=title, note=note, source_kind=kind,
                       source_url=url, category=_guard(lambda: cs.clean_text(body.category, 50, "種類")),
                       address=_guard(lambda: cs.clean_text(body.address, 500, "住所")), latitude=lat, longitude=lng,
-                      priority=body.priority, status="open", provider=provider, retrieved_at=retrieved)
+                      priority=body.priority, status="open", provider=provider, retrieved_at=retrieved,
+                      tags=_guard(lambda: cs.clean_tags(body.tags)))
     db.add(c)
     db.commit()
     _audit("candidate.create", current_user, plan, {"source_kind": kind})
@@ -248,6 +250,7 @@ class CandidatePatch(BaseModel):
     address: Optional[str] = Field(None, max_length=1000)
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    tags: Optional[List[str]] = Field(None, max_length=20)  # [Gate CandidateFilters] 全体を置き換える
 
 
 @router.patch("/{plan_id}/candidates/{candidate_id}")
@@ -270,6 +273,8 @@ def update_candidate(plan_id: str, candidate_id: str, body: CandidatePatch, db: 
         c.latitude, c.longitude = _guard(lambda: cs.check_location(body.latitude, body.longitude))
     if body.priority is not None:
         c.priority = body.priority
+    if "tags" in fields:
+        c.tags = _guard(lambda: cs.clean_tags(body.tags))
     if "status" in fields:
         event_ids = {r[0] for r in db.query(TravelEvent.id).filter(TravelEvent.plan_id == plan.id).all()}
         current = _effective_status(c, event_ids)
@@ -395,6 +400,11 @@ def merge_candidate(plan_id: str, candidate_id: str, body: MergeInput, db: Sessi
         target.provider = target.provider or c.provider
         target.retrieved_at = target.retrieved_at or c.retrieved_at
         changed = True
+    if c.tags:
+        union = list(dict.fromkeys([*(target.tags or []), *c.tags]))[:cs.MAX_TAGS]
+        if union != (target.tags or []):
+            target.tags = union
+            changed = True
     for field in ("address", "category", "latitude", "longitude"):
         if getattr(target, field) is None and getattr(c, field) is not None:
             setattr(target, field, getattr(c, field))

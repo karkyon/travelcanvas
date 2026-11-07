@@ -7,6 +7,8 @@
  * - 旅程に追加(日・時刻)。候補は消えない。予定を消すと候補に戻る。重複はまとめられる(自動では消さない)
  * [Gate SpotInfo] まとめると、まとめた側は消える(メモ・出典・住所はまとめ先へ移る)。カードを押すと詳細が開き、
  * 行きたい場所に保存(住所・電話・食事の情報などを自動で入れる)・旅程に追加へ進める。結果の知らせは画面の上に固定して出す。
+ * [Gate CandidateFilters] 言葉・状態・種類・エリア・タグ・優先度で絞り込み、優先度・新しい順・名前・基点から近い順で並べる。
+ * カード / 一覧(コンパクト)を切り替えられる。絞り込みはこの端末に覚える。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -29,6 +31,20 @@ import CandidateVoting from './candidates/CandidateVoting';
 import CandidateDetailDialog from './candidates/CandidateDetailDialog';
 import { createCandidateFromSearch } from '@/services/api';
 import type { NearbyResult } from '@/services/api/types/g11discover';
+import CandidateToolbar from './candidates/CandidateToolbar';
+import CandidateTags from './candidates/CandidateTags';
+import { EMPTY_FILTER, KIND_LABEL, applyFilter, areaOf, kindOf, type CandidateFilter } from './candidates/candidateFilter';
+
+const FILTER_KEY = 'tc-candidate-filter';
+function loadPrefs(planId: string | undefined): { filter: CandidateFilter; view: 'card' | 'list' } {
+  try {
+    const raw = planId ? window.localStorage.getItem(`${FILTER_KEY}:${planId}`) : null;
+    const v = raw ? JSON.parse(raw) as { filter?: Partial<CandidateFilter>; view?: 'card' | 'list' } : {};
+    return { filter: { ...EMPTY_FILTER, ...(v.filter ?? {}) }, view: v.view === 'list' ? 'list' : 'card' };
+  } catch {
+    return { filter: EMPTY_FILTER, view: 'card' };
+  }
+}
 
 const SOURCE_KIND_LABEL: Record<string, string> = {
   url: 'URL', text: 'メモ', manual: '手入力', search: '検索', social: 'SNS の投稿',
@@ -61,7 +77,14 @@ const CandidatesPage: React.FC = () => {
   const [detail, setDetail] = useState<PlanCandidateItem | null>(null);
   const [form, setForm] = useState({ title: '', source_url: '', note: '', priority: 2 });
   const [scheduling, setScheduling] = useState<Record<string, { day_id: string; time: string }>>({});
-  const [showDismissed, setShowDismissed] = useState(false);
+  const [filter, setFilter] = useState<CandidateFilter>(() => loadPrefs(planId).filter);
+  const [view, setView] = useState<'card' | 'list'>(() => loadPrefs(planId).view);
+  const [sortBaseId, setSortBaseId] = useState<string>('');
+  useEffect(() => {
+    try {
+      if (planId) window.localStorage.setItem(`${FILTER_KEY}:${planId}`, JSON.stringify({ filter, view }));
+    } catch { /* 覚えられなくても絞り込みは使える */ }
+  }, [planId, filter, view]);
 
   const load = useCallback(async () => {
     if (!planId) return;
@@ -132,7 +155,13 @@ const CandidatesPage: React.FC = () => {
       ...(input.social ? { source_kind: 'social' as const, platform: input.platform, retrieved_at: input.retrieved_at } : {}),
     }), input.social ? 'SNS の投稿を候補箱に入れました' : 'URL とメモを出典として候補箱に入れました', '候補箱に入れられませんでした');
   };
-  const items = (data?.items ?? []).filter((c) => showDismissed || c.status !== 'dismissed');
+  const sortBase = bases.find((b) => b.id === sortBaseId) ?? bases[0] ?? null;
+  const allItems = data?.items ?? [];
+  const items = applyFilter(allItems, filter, sortBase);
+  const pickTag = (tag: string) => setFilter((f) => (f.tags.includes(tag) ? f : { ...f, tags: [...f.tags, tag] }));
+  const saveTags = (c: PlanCandidateItem, tags: string[]) => run(() => updateCandidate(planId, c.id, { tags }, c.revision),
+    `「${c.title}」のタグを保存しました`, 'タグを保存できませんでした');
+  const metaOf = (c: PlanCandidateItem) => [KIND_LABEL[kindOf(c)], areaOf(c.address)].filter(Boolean).join(' · ');
   const titleOf = (id: string) => data?.items.find((c) => c.id === id)?.title ?? '';
 
   const schedule = (c: PlanCandidateItem) => {
@@ -172,17 +201,34 @@ const CandidatesPage: React.FC = () => {
           )}
           <section aria-label="候補の一覧" className="mt-6">
             <div className="tc-section-row flex-wrap mb-3">
-              <h2 className="tc-section-title text-base">候補箱({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
-              <label className="text-sm text-ink-900 inline-flex items-center gap-1">
-                <input type="checkbox" checked={showDismissed} onChange={() => setShowDismissed((v) => !v)} />
-                見送った候補も出す({data.counts.dismissed}件)
-              </label>
+              <h2 className="tc-section-title text-base">候補箱({data.counts.open}件・予定に配置済み {data.counts.scheduled}件・見送り {data.counts.dismissed}件)</h2>
             </div>
+            {allItems.length > 0 && (
+              <CandidateToolbar items={allItems} shown={items.length} filter={filter} onChange={setFilter} view={view} onView={setView}
+                bases={bases} baseId={sortBase?.id ?? ''} onBase={setSortBaseId} />
+            )}
             {data.duplicate_pairs > 0 && (
               <p className="text-sm text-amber-900">重複の可能性がある候補が {data.duplicate_pairs}組あります(自動では消しません)。</p>
             )}
-            {items.length === 0 && <p className="tc-card tc-kit-empty">候補はまだありません。近くを探すか、SNS の投稿・URL から入れられます。</p>}
-            <div className="tc-discover-grid">
+            {allItems.length === 0 && <p className="tc-card tc-kit-empty">候補はまだありません。近くを探すか、SNS の投稿・URL から入れられます。</p>}
+            {allItems.length > 0 && items.length === 0 && <p className="tc-card tc-kit-empty" data-testid="candidate-none">条件に合う候補がありません。条件を変えるか「条件をクリア」を押してください。</p>}
+            {view === 'list' && items.length > 0 && (
+              <ul className="tc-card divide-y divide-cloud-200" aria-label="候補の一覧(コンパクト)" data-testid="candidate-list">
+                {items.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                    <button type="button" className="tc-focus-ring min-w-0 flex-1 truncate text-left font-semibold text-ink-900 underline-offset-2 hover:underline"
+                      onClick={() => setDetail(c)} data-testid={`candidate-row-${c.id}`}>{c.title}</button>
+                    <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`}>{c.status_label}</span>
+                    <span className="text-xs text-ink-700">{metaOf(c)}</span>
+                    <span className="text-xs text-ink-700">{`優先度 ${PRIORITY_LABEL[c.priority]}`}</span>
+                    {(c.tags ?? []).map((t) => (
+                      <button key={t} type="button" className="tc-focus-ring rounded-full bg-cloud-100 px-2 text-xs" onClick={() => pickTag(t)}>#{t}</button>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="tc-discover-grid" hidden={view === 'list'}>
             {items.map((c) => {
               const headingId = `cand-${c.id}`;
               const s = scheduling[c.id] ?? { day_id: days[0]?.id ?? '', time: '' };
@@ -200,6 +246,7 @@ const CandidatesPage: React.FC = () => {
                       </h3>
                       <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
                       <span className="text-xs text-ink-700">優先度 {PRIORITY_LABEL[c.priority]}</span>
+                      {metaOf(c) && <span className="text-xs text-ink-700" data-testid="candidate-meta">{metaOf(c)}</span>}
                     </div>
                     <p className="text-sm text-ink-700 mt-1">
                       {c.created_by} が {fmt(c.created_at)} に追加
@@ -211,6 +258,8 @@ const CandidatesPage: React.FC = () => {
                       {c.provider && `・${SOCIAL_PROVIDER_LABEL[c.provider] ?? c.provider}${c.retrieved_at ? `(${fmt(c.retrieved_at)}取得)` : ''}`}
                     </p>
                     {c.note && <p className="text-sm text-ink-900 mt-1 whitespace-pre-wrap">{c.note}</p>}
+                    <CandidateTags title={c.title} tags={c.tags ?? []} canEdit={canEdit} busy={busy} onSave={(tags) => void saveTags(c, tags)}
+                      onPick={pickTag} />
                     {c.merged_from.length > 0 && (
                       <p className="text-sm text-ink-900 mt-1">まとめた候補: {c.merged_from.map((m) => m.title).join('、')}</p>
                     )}

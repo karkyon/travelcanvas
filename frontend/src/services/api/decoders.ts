@@ -1889,7 +1889,7 @@ const planCandidateItem: Decoder<PlanCandidateItem> = object<PlanCandidateItem>(
   id: str, title: str, note: nullable(str), source_kind: oneOf('url', 'text', 'manual', 'search', 'social'),
   source_url: nullable(str), source_label: nullable(str), provider: nullable(str), retrieved_at: nullable(str),
   place_id: nullable(str), category: nullable(str), address: nullable(str), latitude: nullable(num),
-  longitude: nullable(num), priority: int, status: candidateStatus, status_label: str,
+  longitude: nullable(num), priority: int, tags: optional(arrayOf(str)), status: candidateStatus, status_label: str,
   scheduled_event_id: nullable(str), merged_into_id: nullable(str), created_by: str, created_at: nullable(str),
   revision: int,
   duplicates: arrayOf(object({
