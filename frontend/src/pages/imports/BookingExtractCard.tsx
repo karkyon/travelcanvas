@@ -1,5 +1,5 @@
 /**
- * [Gate BookingImport] 予約メール・画像から項目の候補を作る。候補は確認してから予約になる(自動では登録しない)。
+ * [Gate BookingImport] 予約メール・画像・PDF から項目の候補を作る。候補は確認してから予約になる(自動では登録しない)。
  * メールは規則で、画像はサーバーの中の OCR と規則で読む(費用なし・外部へ送らない)。
  * AI は選んだ時だけ。メールは番号・氏名などを伏せて送るが、画像は伏せられないことを選ぶ前に示す。
  */
@@ -15,6 +15,7 @@ const BookingExtractCard: React.FC<{ planId: string; onExtracted: (job: Extracte
   const [error, setError] = useState<string | null>(null);
   const mailFile = useRef<HTMLInputElement>(null);
   const imageFile = useRef<HTMLInputElement>(null);
+  const pdfFile = useRef<HTMLInputElement>(null);
 
   const run = async (work: () => Promise<ExtractedJob>) => {
     setBusy(true);
@@ -37,7 +38,7 @@ const BookingExtractCard: React.FC<{ planId: string; onExtracted: (job: Extracte
 
   return (
     <section className="tc-card p-4 mb-4 space-y-3" aria-labelledby="booking-extract-title" data-testid="booking-extract">
-      <h2 id="booking-extract-title" className="tc-section-title">予約メール・画像から読み取る</h2>
+      <h2 id="booking-extract-title" className="tc-section-title">予約メール・画像・PDF から読み取る</h2>
       <p className="text-sm text-ink-700">読み取った内容を確認画面に出します。直してから登録できます。元のメールや画像は保存しません。</p>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -51,10 +52,14 @@ const BookingExtractCard: React.FC<{ planId: string; onExtracted: (job: Extracte
           </div>
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink-900">写真・スクリーンショットから</p>
-          <p className="mt-1 text-sm text-ink-700">画像の文字をサーバーの中で読みます。外部には送らず、費用もかかりません。JPEG・PNG・WebP、10MB まで。</p>
+          <p className="text-sm font-semibold text-ink-900">写真・スクリーンショット・PDF から</p>
+          <p className="mt-1 text-sm text-ink-700">画像・PDF の文字をサーバーの中で読みます。外部には送らず、費用もかかりません。画像は JPEG・PNG・WebP、どれも 10MB まで。予約の確認の画面を「印刷 → PDF に保存」したものも読めます。</p>
           <input ref={imageFile} type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" aria-label="予約の画像" onChange={(e) => fromFile(e)} data-testid="booking-image" />
-          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary mt-2" disabled={busy} onClick={() => imageFile.current?.click()}>画像を選ぶ</button>
+          <input ref={pdfFile} type="file" className="sr-only" accept="application/pdf,.pdf" aria-label="予約の PDF" onChange={(e) => fromFile(e)} data-testid="booking-pdf" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={busy} onClick={() => imageFile.current?.click()}>画像を選ぶ</button>
+            <button type="button" className="tc-focus-ring tc-mbtn" disabled={busy} onClick={() => pdfFile.current?.click()}>PDF を選ぶ</button>
+          </div>
         </div>
       </div>
       <label className="flex items-start gap-2 text-sm border-t pt-3">

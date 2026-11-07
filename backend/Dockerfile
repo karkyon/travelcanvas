@@ -26,6 +26,8 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-jpn \
     tesseract-ocr-eng \
+    # [Gate BookingImportYahoo] 予約の PDF の文字を読む(pdftotext)・文字の無い PDF を画像にする(pdftoppm)
+    poppler-utils \
     libpng-dev \
     # Geographic libraries
     libgeos-dev \
