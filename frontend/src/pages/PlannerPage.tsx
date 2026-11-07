@@ -19,7 +19,9 @@ import OptimizationPanel from '@/components/planner/OptimizationPanel';
 import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeImpact';
 import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
 import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
-import { getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
+import { geocodeAddress, getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
+import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
+import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { Globe, LocateFixed } from 'lucide-react';
 import EventUrlsField from '@/components/planner/EventUrlsField';
 import DiningFields from '@/components/dining/DiningFields';
@@ -261,26 +263,39 @@ const PlannerPage: React.FC = () => {
         longitude: editCoords.lng ?? editingItem.longitude });
       setPlaceInfo({
         busy: false, result, mode: 'info',
-        error: result.unavailable ? '場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試すか、手で入れてください'
-          : result.candidates.length === 0 ? '場所の情報が見つかりませんでした。名前を確かめるか、手で入れてください' : null,
+        error: result.unavailable ? '場所の情報の提供元が応答しませんでした。時間をおいて試すか、手で入れてください'
+          : result.candidates.length === 0 ? (result.keyed_providers?.length
+            ? '場所の情報が見つかりませんでした。名前を正式名称にするか、短くして試してください'
+            : '場所の情報が見つかりませんでした。宿・店の情報の提供元(Yahoo!・楽天トラベル・ホットペッパー)の鍵が未登録です(運用コンソールで登録すると見つかりやすくなります)') : null,
       });
     } catch {
       setPlaceInfo({ busy: false, result: null, error: '場所の情報を読めませんでした(手で入れられます)' });
     }
   };
 
-  // [Gate SpotLinks] 住所(無ければ名前)から地図の位置を探す(押した時だけ。OpenStreetMap)
+  // [Gate SpotLinks][Gate PlaceLookupJP] 住所(無ければ名前)から地図の位置を探す(押した時だけ)。
+  // 住所は Yahoo!ジオコーダ(鍵がある時)・国土地理院の住所検索で、名前は場所の情報の検索で探す
   const lookupPosition = async () => {
-    const q = editForm.location_name.trim() || editForm.title.trim();
+    const address = editForm.location_name.trim();
+    const q = address || editForm.title.trim();
     if (!q) return;
     setPlaceInfo({ busy: true, result: null, error: null, mode: 'geo' });
     try {
-      const result = await getPlaceInfo({ name: q });
-      const rows = { ...result, candidates: result.candidates.filter((c) => typeof c.latitude === 'number' && typeof c.longitude === 'number') };
+      let rows: PlaceInfoResult;
+      if (address) {
+        const g = await geocodeAddress(address, { latitude: editingItem?.latitude, longitude: editingItem?.longitude });
+        rows = { provider: 'multi', attribution: '', license: '', license_url: '', cached: false, unavailable: g.unavailable,
+          error_code: null, sources: g.sources,
+          candidates: g.candidates.map((c) => ({ name: c.address, address: c.address, phone: null, website: null, category: null,
+            osm_type: null, latitude: c.latitude, longitude: c.longitude, source_url: null })) };
+      } else {
+        const result = await getPlaceInfo({ name: q });
+        rows = { ...result, candidates: result.candidates.filter((c) => typeof c.latitude === 'number' && typeof c.longitude === 'number') };
+      }
       setPlaceInfo({
         busy: false, result: rows, mode: 'geo',
-        error: result.unavailable ? '位置の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください'
-          : rows.candidates.length === 0 ? 'この住所の位置が見つかりませんでした。住所を短くする(番地を外す)と見つかることがあります' : null,
+        error: rows.unavailable ? '位置の提供元が応答しませんでした。時間をおいて試してください'
+          : rows.candidates.length === 0 ? 'この住所の位置が見つかりませんでした。住所の書き方(都道府県から・番地の数字)を確かめてください' : null,
       });
     } catch {
       setPlaceInfo({ busy: false, result: null, error: '位置を読めませんでした', mode: 'geo' });
@@ -293,12 +308,8 @@ const PlannerPage: React.FC = () => {
     if (!geo && c.phone) setEditPhone((p) => ({ ...p, value: c.phone! }));
     if (!geo && c.category) setEditCategory((x) => ({ ...x, value: c.category! }));
     if (!geo && c.dining) setEditDining((d) => ({ ...d, value: mergeEmptyDining(d.value, c.dining) }));
-    if (!geo && c.website) {
-      const site = c.website;
-      setEditUrls((u) => (u.rows.some((r) => r.trim() === site) ? u
-        : { ...u, rows: u.rows.some((r) => !r.trim()) ? u.rows.map((r, i) => (i === u.rows.findIndex((x) => !x.trim()) ? site : r))
-          : u.rows.length < 5 ? [...u.rows, site] : u.rows }));
-    }
+    if (!geo && (c.website || c.links?.length)) setEditUrls((u) => ({ ...u, rows: mergeUrlRows(u.rows, c) }));
+    if (!geo && c.notes?.length) setEditForm((prev) => ({ ...prev, notes: appendNotes(prev.notes, c.notes) }));
     if (typeof c.latitude === 'number' && typeof c.longitude === 'number') {
       setEditCoords({ lat: c.latitude, lng: c.longitude, changed: true });
     }
@@ -1370,7 +1381,7 @@ const PlannerPage: React.FC = () => {
                     <Button type="button" variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => void lookupPlaceInfo()}
                       loading={placeInfo.busy && placeInfo.mode !== 'geo'} disabled={!editForm.title.trim() && typeof editingItem?.latitude !== 'number'}
                       icon={<Globe size={15} aria-hidden="true" />} data-testid="place-info-lookup"
-                      title="名前と位置から、住所・電話番号・種類を OpenStreetMap で調べます(入れる前に確かめられます)">
+                      title="名前と位置から、住所・電話番号・公式サイト・種類を調べます(入れる前に確かめられます)">
                       自動取得
                     </Button>
                   </div>
@@ -1384,16 +1395,20 @@ const PlannerPage: React.FC = () => {
                               <b className="block truncate text-ink-900">{c.name ?? '(名前なし)'}</b>
                               {c.address && <span className="block text-xs text-ink-700">{c.address}</span>}
                               {c.phone && <span className="block text-xs text-ink-700">{`TEL ${c.phone}`}</span>}
+                              {c.website && <span className="block truncate text-xs text-ink-700">{c.website}</span>}
+                              {c.notes?.map((n) => <span key={n} className="block text-xs text-ink-700">{n}</span>)}
+                              {c.links?.map((l) => <span key={l.url} className="block truncate text-xs text-ink-700">{`${l.label ?? 'リンク'}: ${l.url}`}</span>)}
                             </span>
                             <Button type="button" size="sm" variant="primary" className="shrink-0" onClick={() => applyPlaceInfo(c)}
                               data-testid={`place-info-use-${i}`}>{placeInfo.mode === 'geo' ? 'この位置にする' : '入れる'}</Button>
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-2 text-[11px] text-ink-700">
-                        出典: <a href={safeExternalUrl(OSM_COPYRIGHT) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">
-                          {placeInfo.result.attribution}</a>({placeInfo.result.license})。情報が古い・違う場合があります
-                      </p>
+                      {placeInfo.result.sources ? <PlaceSourcesCredit sources={placeInfo.result.sources} className="mt-2 text-[11px] text-ink-700" /> : (
+                        <p className="mt-2 text-[11px] text-ink-700">
+                          出典: <a href={safeExternalUrl(OSM_COPYRIGHT) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">
+                            {placeInfo.result.attribution}</a>({placeInfo.result.license})。情報が古い・違う場合があります
+                        </p>)}
                     </div>
                   )}
                   <Input
@@ -1415,7 +1430,7 @@ const PlannerPage: React.FC = () => {
                         loading={placeInfo.busy && placeInfo.mode === 'geo'}
                         disabled={!editForm.location_name.trim() && !editForm.title.trim()}
                         icon={<LocateFixed size={15} aria-hidden="true" />} data-testid="edit-map-lookup"
-                        title="住所(無ければ名前)から地図の位置を OpenStreetMap で探します(選んでから入れます)">
+                        title="住所(無ければ名前)から地図の位置を探します(選んでから入れます)">
                         {editCoords.lat !== null ? '住所から位置を探し直す' : '住所から位置を探す'}
                       </Button>
                     </div>

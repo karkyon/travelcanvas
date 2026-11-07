@@ -552,16 +552,29 @@ async def enrich_spot(spot_id: uuid.UUID, current_user: User = Depends(get_curre
         raise HTTPException(status_code=404, detail="スポットが見つかりません")
     if spot.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="編集権限がありません")
+    from app.services import free_usage, place_lookup
+
+    def record(provider: str, code: str) -> None:
+        free_usage.record(db, current_user, place_lookup.USAGE.get(provider, provider), "spot.enrich", result_code=code)
+
     try:
-        rows, _cached = await place_info.lookup(spot.name, spot.latitude, spot.longitude)
+        result = await place_lookup.lookup(db, spot.name, spot.latitude, spot.longitude, record)
     except Exception:  # noqa: BLE001 - 提供元が答えない時は変えずに伝える(値を作らない)
+        result = {"unavailable": True, "candidates": [], "sources": []}
+    if result["unavailable"]:
         raise HTTPException(status_code=503, detail={
             "code": "provider_unavailable",
-            "message": "場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください"})
+            "message": "場所の情報の提供元が応答しませんでした。時間をおいて試してください"})
+    rows = result["candidates"]
     hit = _pick(rows, spot.name, spot.latitude, spot.longitude)
     filled: List[str] = []
     if hit:
-        if not spot.address and hit.get("address"):
+        # 住所は、空か「金沢市」までのように細かさが足りない時だけ、より細かい住所に替える
+        mine = spot.address or ""
+        finer = (place_lookup.address_detail(hit.get("address")) > place_lookup.address_detail(mine)
+                 and place_lookup.address_detail(mine) <= 1
+                 and place_lookup.strip_postal(mine) in place_lookup.strip_postal(hit.get("address")))
+        if hit.get("address") and (not mine or finer):
             spot.address = hit["address"]
             filled.append("address")
         if (spot.latitude is None or spot.longitude is None) and hit.get("latitude") is not None:
@@ -570,8 +583,11 @@ async def enrich_spot(spot_id: uuid.UUID, current_user: User = Depends(get_curre
         if not spot.phone and hit.get("phone"):
             spot.phone = hit["phone"]
             filled.append("phone")
-        if not spot.urls and hit.get("website"):
-            urls = event_urls.from_website(hit["website"])
+        if not spot.urls and (hit.get("website") or hit.get("links")):
+            urls = (event_urls.from_website(hit["website"]) or []) if hit.get("website") else []
+            for link in hit.get("links") or []:
+                if len(urls) < event_urls.MAX_URLS and link["url"] not in {u["url"] for u in urls}:
+                    urls.append({"url": link["url"], "label": link.get("label")})
             if urls:
                 spot.urls = urls
                 filled.append("urls")
@@ -598,4 +614,6 @@ async def enrich_spot(spot_id: uuid.UUID, current_user: User = Depends(get_curre
         "matched": bool(hit),
         "source": {"provider": "openstreetmap", "attribution": place_info.ATTRIBUTION, "license": place_info.LICENSE,
                    "license_url": place_info.LICENSE_URL, "source_url": hit.get("source_url") if hit else None},
+        # [Gate PlaceLookupJP] 使った提供元のクレジット
+        "sources": [s for s in result["sources"] if hit and s["provider"] in hit.get("providers", [])],
     }
