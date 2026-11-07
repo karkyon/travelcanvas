@@ -336,7 +336,7 @@ const ImportsPage: React.FC = () => {
                   </div>
                 </button>
                 <button type="button" onClick={() => void handleDeleteJob(j)} data-testid={`import-job-delete-${j.id}`}
-                  aria-label={`取込ジョブ(${formatDateTime(j.created_at)})を削除`} title="一覧から削除"
+                  aria-label={`${formatDateTime(j.created_at)} の取込ジョブを削除`} title="一覧から削除"
                   className="tc-focus-ring m-2 shrink-0 self-center rounded-lg p-2 text-ink-700 hover:bg-cloud-100 hover:text-danger">
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
