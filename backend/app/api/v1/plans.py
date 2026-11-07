@@ -48,6 +48,7 @@ from app.services import today_mode
 from app.services import plan_item_deletion
 from app.services import event_times as et
 from app.services import event_urls
+from app.services import dining as dining_info
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -116,6 +117,8 @@ class EventCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=40)
     # [Gate SpotLinks] 場所の URL(最大 5 件・http/https だけ)
     urls: Optional[List[EventUrl]] = Field(None, max_length=event_urls.MAX_URLS)
+    # [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など)
+    dining: Optional[dining_info.DiningInfo] = None
     # [Gate #32] 検索候補(Gate #31 /search)から採用したPlaceのID。
     # 指定された場合、title/address/latitude/longitudeのうち未指定の
     # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
@@ -142,6 +145,8 @@ class EventUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=40)
     # [Gate SpotLinks] 場所の URL(最大 5 件。空の配列・null で消す)
     urls: Optional[List[EventUrl]] = Field(None, max_length=event_urls.MAX_URLS)
+    # [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など)
+    dining: Optional[dining_info.DiningInfo] = None
 
 
 class EventMove(BaseModel):
@@ -170,6 +175,7 @@ class EventResponse(BaseModel):
     end_day_offset: Optional[int] = None
     phone: Optional[str] = None
     urls: Optional[List[Dict[str, Any]]] = None
+    dining: Optional[Dict[str, Any]] = None
 
     @field_validator("id", "day_id", "place_id", mode="before")
     @classmethod
@@ -383,6 +389,7 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "sort_order": event.sort_order,
         "phone": event.phone,
         "urls": event.urls,
+        "dining": event.dining,
     }
 
 
@@ -875,6 +882,7 @@ async def create_event(
         event_type=event_data.event_type, start_at=event_data.start_at, end_at=event_data.end_at,
         local_start_time=event_data.local_start_time, is_all_day=event_data.is_all_day,
         address=address, latitude=latitude, longitude=longitude, phone=phone, urls=urls,
+        dining=dining_info.to_json(event_data.dining),
         sort_order=max_sort,
     )
     # [Gate G7] FR-005 終了時刻(日をまたぐ予定)と前後の確認
@@ -932,6 +940,8 @@ async def update_event(
         update_data["phone"] = (update_data["phone"] or "").strip() or None
     if "urls" in update_data:
         update_data["urls"] = event_urls.to_json(event_data.urls)
+    if "dining" in update_data:
+        update_data["dining"] = dining_info.to_json(event_data.dining)
     for field, value in update_data.items():
         setattr(event, field, value)
     if "local_start_time" in update_data and not end_given and "end_at" not in update_data:
@@ -1590,7 +1600,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         is_all_day=before.get("is_all_day", False), address=before.get("address"),
         latitude=before.get("latitude"), longitude=before.get("longitude"),
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
-        phone=before.get("phone"), urls=before.get("urls"),
+        phone=before.get("phone"), urls=before.get("urls"), dining=before.get("dining"),
     )
 
 

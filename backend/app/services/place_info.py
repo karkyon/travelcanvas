@@ -16,11 +16,13 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
+from app.services import dining
 from app.services.search_provider import HEADERS, REQUEST_TIMEOUT, SearchProviderError, classify_error
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ MIN_INTERVAL = 1.1
 CACHE_SECONDS = 3600
 CACHE_MAX = 256
 
+_WIKIDATA = re.compile(r"^Q[1-9][0-9]{0,11}$")
 _lock = asyncio.Lock()
 _last = {"at": 0.0}
 _cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
@@ -112,16 +115,24 @@ def _row(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     osm_type, osm_id = item.get("osm_type"), item.get("osm_id")
     website = extra.get("website") or extra.get("contact:website")
+    category = event_category(item.get("category") or item.get("class"), item.get("type"))
+    # [Gate SpotInfo] 食事の場所の情報(ジャンル・営業時間・支払い・予約など)と、写真の手がかり(Commons のファイル・Wikidata)
+    details = dining.from_osm_tags(extra, item.get("type")) if category == "dining" else {}
+    commons = str(extra.get("wikimedia_commons") or "").strip()
+    wikidata = str(extra.get("wikidata") or "").strip()
     return {
         "name": name or None,
         "address": jp_address(item),
         "phone": _phone(extra),
         "website": str(website)[:2000] if website else None,
-        "category": event_category(item.get("category") or item.get("class"), item.get("type")),
+        "category": category,
         "osm_type": item.get("type"),
         "latitude": lat,
         "longitude": lon,
         "source_url": f"https://www.openstreetmap.org/{osm_type}/{osm_id}" if osm_type and osm_id else None,
+        "dining": details or None,
+        "photo_file": commons if commons.startswith("File:") and len(commons) <= 240 else None,
+        "wikidata": wikidata if _WIKIDATA.match(wikidata) else None,
     }
 
 

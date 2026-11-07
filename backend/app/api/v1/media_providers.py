@@ -3,6 +3,7 @@
 
 - GET  /media-providers/status                         : 使える provider(画面は止めてある項目を出さない)
 - GET  /media-providers/images?q=&lat=&lng=             : 外部の画像の候補(作者・ライセンス・出典・取り込めるか)
+- GET  /media-providers/images/for-place?file=&wikidata= : [Gate SpotInfo] 場所に結び付いた写真の候補(ライセンスが許すものだけ)
 - GET  /media-providers/images/thumb?provider=&id=      : 候補の縮小画像(サーバーが provider から取り直して中継する。
                                                           ブラウザから外部へ直接読みに行かない。短い間だけ端末にキャッシュ)
 - POST /plans/{plan_id}/memories/import-external        : 外部の画像を非公開の記録として取り込む({provider, provider_id}。
@@ -122,6 +123,21 @@ async def image_thumb(provider: str = Query(..., max_length=40), id: str = Query
         "Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",
     })
+
+
+@router.get("/media-providers/images/for-place")
+async def image_for_place(file: Optional[str] = Query(None, max_length=260),
+                          wikidata: Optional[str] = Query(None, max_length=20),
+                          current_user: User = Depends(get_current_user_or_guest), db: Session = Depends(get_db)):
+    """[Gate SpotInfo] 場所に結び付いた写真の候補(OpenStreetMap の wikimedia_commons・wikidata のタグから)。
+    ライセンスが許すものだけ。無ければ image は null(値を作らない)"""
+    from app.services import place_photo
+
+    if not file and not wikidata:
+        raise _bad("invalid_field", "ファイルか Wikidata の ID を指定してください")
+    meta = await place_photo.resolve(file, wikidata)
+    _record_free(db, current_user, "wikimedia_commons", "images.for_place", "ok" if meta else "empty")
+    return {"image": meta.to_dict() if meta else None}
 
 
 class ImportExternal(BaseModel):

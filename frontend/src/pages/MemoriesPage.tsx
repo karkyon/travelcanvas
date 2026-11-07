@@ -22,7 +22,7 @@ import type { JournalDraft, MemoryKind, MemoryList, MemoryVisibility, Normalized
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import {
-  AUDIO_EXTENSIONS, KIND_LABEL, PHOTO_EXTENSIONS, VISIBILITY_LABEL, eventLabel, fileProblem, formatSize,
+  AUDIO_EXTENSIONS, KIND_LABEL, PHOTO_EXTENSIONS, VISIBILITY_LABEL, eventLabel, fileProblem, formatSize, joinDistinct,
   groupMemories, journalFileName, videoUrlProblem,
 } from './memories/memoriesModel';
 import JournalPublishCard from './memories/JournalPublishCard';
@@ -295,7 +295,8 @@ const MemoriesPage: React.FC = () => {
     el?.focus({ preventScroll: true });
   };
 
-  const describe = (m: TravelMemory) => [eventLabel(m, days), m.place_name, showTime(m.occurred_at)].filter(Boolean).join('・');
+  // [Gate SpotInfo] 予定の名前と場所の名前が同じ時は 1 回だけ出す(「竹生島・竹生島・…」と重ねない)
+  const describe = (m: TravelMemory) => joinDistinct([eventLabel(m, days), m.place_name, showTime(m.occurred_at)]);
 
   return (
     <div className="tc-page tc-memory">

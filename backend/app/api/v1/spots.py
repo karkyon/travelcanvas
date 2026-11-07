@@ -5,7 +5,7 @@ import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from app.core.config import settings
@@ -17,6 +17,7 @@ from app.schemas.spots import (
     VisitCreate, VisitResponse,
 )
 from app.core.auth import get_current_user_or_guest
+from app.services import dining, event_urls
 
 logger = logging.getLogger("travelcanvas")
 
@@ -40,7 +41,12 @@ async def create_spot(
             longitude=spot_data.longitude,
             price_range=spot_data.price_range,
             image_url=spot_data.image_url,
-            created_by=current_user.id
+            created_by=current_user.id,
+            # [Gate SpotInfo] 電話・URL・写真の出典・食事の情報
+            phone=(spot_data.phone or "").strip() or None,
+            urls=event_urls.to_json(spot_data.urls),
+            photo=spot_data.photo.model_dump() if spot_data.photo else None,
+            dining=dining.to_json(spot_data.dining),
         )
 
         db.add(new_spot)
@@ -443,7 +449,16 @@ async def update_spot(
         )
 
     # 更新処理
-    update_data = spot_data.dict(exclude_unset=True)
+    update_data = spot_data.model_dump(exclude_unset=True)
+    # [Gate SpotInfo] 電話・URL・写真・食事の情報は保存の形へ(null・空で消す)
+    if "phone" in update_data:
+        update_data["phone"] = (update_data["phone"] or "").strip() or None
+    if "urls" in update_data:
+        update_data["urls"] = event_urls.to_json(spot_data.urls)
+    if "photo" in update_data:
+        update_data["photo"] = spot_data.photo.model_dump() if spot_data.photo else None
+    if "dining" in update_data:
+        update_data["dining"] = dining.to_json(spot_data.dining)
     for field, value in update_data.items():
         setattr(spot, field, value)
 
@@ -492,3 +507,95 @@ async def delete_spot(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="スポットの削除に失敗しました。しばらくしてから再試行してください。"
         )
+
+
+# [Gate SpotInfo] 自動取得の種類の対応(予定の種類 → 行きたい場所の種類)
+_WISH_CATEGORY = {"dining": "restaurant", "accommodation": "accommodation", "shopping": "shopping",
+                  "sightseeing": "sightseeing", "activity": "sightseeing"}
+
+
+def _pick(rows: List[Dict[str, Any]], name: str, lat: Optional[float],
+          lng: Optional[float]) -> Optional[Dict[str, Any]]:
+    """候補から同じ場所らしいものを 1 つ選ぶ。位置があれば 500m 以内の一番近いもの。無ければ名前が近いもの。迷えば選ばない"""
+    import math
+
+    def dist(r: Dict[str, Any]) -> float:
+        if lat is None or lng is None or r.get("latitude") is None or r.get("longitude") is None:
+            return math.inf
+        dy = (r["latitude"] - lat) * 111_000
+        dx = (r["longitude"] - lng) * 111_000 * math.cos(math.radians(lat))
+        return math.hypot(dx, dy)
+
+    if lat is not None and lng is not None:
+        near = sorted((r for r in rows if dist(r) <= 500), key=dist)
+        return near[0] if near else None
+    key = name.replace(" ", "").replace("\u3000", "")
+    for r in rows:
+        n = str(r.get("name") or "").replace(" ", "").replace("\u3000", "")
+        if n and (n in key or key in n):
+            return r
+    return None
+
+
+@router.post("/{spot_id}/enrich", response_model=Dict[str, Any])
+async def enrich_spot(spot_id: uuid.UUID, current_user: User = Depends(get_current_user_or_guest),
+                      db: Session = Depends(get_db)):
+    """[Gate SpotInfo] 行きたい場所の情報を OpenStreetMap から自動で埋める(空の項目だけ。利用者が入れた値は変えない)。
+
+    名前(位置があれば近くを優先)で 1 回だけ引き、同じ場所らしい候補(位置があれば 500m 以内、無ければ名前が近いもの)の
+    住所・位置・電話・公式サイト・種類・食事の情報、場所に結び付いた写真(Commons・Wikidata、ライセンスが許すもの)を入れる。
+    当てはまる候補が無ければ何も変えない。"""
+    from app.services import place_info, place_photo
+
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    if not spot:
+        raise HTTPException(status_code=404, detail="スポットが見つかりません")
+    if spot.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="編集権限がありません")
+    try:
+        rows, _cached = await place_info.lookup(spot.name, spot.latitude, spot.longitude)
+    except Exception:  # noqa: BLE001 - 提供元が答えない時は変えずに伝える(値を作らない)
+        raise HTTPException(status_code=503, detail={
+            "code": "provider_unavailable",
+            "message": "場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください"})
+    hit = _pick(rows, spot.name, spot.latitude, spot.longitude)
+    filled: List[str] = []
+    if hit:
+        if not spot.address and hit.get("address"):
+            spot.address = hit["address"]
+            filled.append("address")
+        if (spot.latitude is None or spot.longitude is None) and hit.get("latitude") is not None:
+            spot.latitude, spot.longitude = hit["latitude"], hit["longitude"]
+            filled.append("location")
+        if not spot.phone and hit.get("phone"):
+            spot.phone = hit["phone"]
+            filled.append("phone")
+        if not spot.urls and hit.get("website"):
+            urls = event_urls.from_website(hit["website"])
+            if urls:
+                spot.urls = urls
+                filled.append("urls")
+        wish = _WISH_CATEGORY.get(str(hit.get("category") or ""))
+        if spot.category in (None, "", "other") and wish:
+            spot.category = wish
+            filled.append("category")
+        if hit.get("dining"):
+            merged = dining.merge_empty(spot.dining, hit["dining"])
+            if merged != (spot.dining or {}):
+                spot.dining = dining.to_json(dining.DiningInfo(**merged))
+                filled.append("dining")
+        if not spot.photo and (hit.get("photo_file") or hit.get("wikidata")):
+            meta = await place_photo.resolve(hit.get("photo_file"), hit.get("wikidata"))
+            if meta:
+                spot.photo = {k: getattr(meta, k) for k in (
+                    "provider", "provider_id", "title", "author", "license", "license_url", "source_page_url")}
+                filled.append("photo")
+    db.commit()
+    db.refresh(spot)
+    return {
+        "spot": SpotResponse.model_validate(spot).model_dump(mode="json"),
+        "filled": filled,
+        "matched": bool(hit),
+        "source": {"provider": "openstreetmap", "attribution": place_info.ATTRIBUTION, "license": place_info.LICENSE,
+                   "license_url": place_info.LICENSE_URL, "source_url": hit.get("source_url") if hit else None},
+    }

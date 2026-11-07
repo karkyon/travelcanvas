@@ -5,6 +5,8 @@
  * - URL・テキスト・手入力で候補を足す。URL は追跡用のパラメータを外して出典として残す(サーバーから取りに行かない)
  * - 候補カード: 出典(元の URL・提供元・取得時刻)、登録した人、優先度、状態(候補 / 予定に配置済み / 見送り)、重複の候補(理由つき)
  * - 旅程に追加(日・時刻)。候補は消えない。予定を消すと候補に戻る。重複はまとめられる(自動では消さない)
+ * [Gate SpotInfo] まとめると、まとめた側は消える(メモ・出典・住所はまとめ先へ移る)。カードを押すと詳細が開き、
+ * 行きたい場所に保存(住所・電話・食事の情報などを自動で入れる)・旅程に追加へ進める。結果の知らせは画面の上に固定して出す。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -24,6 +26,7 @@ import NearbyDiscover from './discover/NearbyDiscover';
 import type { BasePoint } from './discover/discoverModel';
 import SocialImportCard, { type SocialCandidateInput } from './discover/SocialImportCard';
 import CandidateVoting from './candidates/CandidateVoting';
+import CandidateDetailDialog from './candidates/CandidateDetailDialog';
 import { createCandidateFromSearch } from '@/services/api';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 
@@ -55,6 +58,7 @@ const CandidatesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [detail, setDetail] = useState<PlanCandidateItem | null>(null);
   const [form, setForm] = useState({ title: '', source_url: '', note: '', priority: 2 });
   const [scheduling, setScheduling] = useState<Record<string, { day_id: string; time: string }>>({});
   const [showDismissed, setShowDismissed] = useState(false);
@@ -150,8 +154,11 @@ const CandidatesPage: React.FC = () => {
         sub="行きたい場所・気になる店を、まだ予定にしないで候補箱に貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。"
         actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
       />
-      {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
-      {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
+      {/* [Gate SpotInfo] 下の方で操作しても見えるよう、知らせは画面の上に固定する */}
+      <div className="tc-sticky-note">
+        {error && <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
+        {message && <div className="p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
+      </div>
 
       {isLoading ? (
         <div className="py-12 flex justify-center"><LoadingSpinner /></div>
@@ -168,7 +175,7 @@ const CandidatesPage: React.FC = () => {
               <h2 className="tc-section-title text-base">候補箱({data.counts.open}件・予定に配置済み {data.counts.scheduled}件)</h2>
               <label className="text-sm text-ink-900 inline-flex items-center gap-1">
                 <input type="checkbox" checked={showDismissed} onChange={() => setShowDismissed((v) => !v)} />
-                見送り・まとめた候補も出す({data.counts.dismissed}件)
+                見送った候補も出す({data.counts.dismissed}件)
               </label>
             </div>
             {data.duplicate_pairs > 0 && (
@@ -181,13 +188,16 @@ const CandidatesPage: React.FC = () => {
               const s = scheduling[c.id] ?? { day_id: days[0]?.id ?? '', time: '' };
               return (
                 <Card key={c.id} className="tc-discover-card">
-                  <div className="tc-discover-art" aria-hidden="true">
+                  <button type="button" className="tc-discover-art tc-focus-ring tc-candidate-open" onClick={() => setDetail(c)}
+                    aria-label={`「${c.title}」の詳細を開く`} data-testid={`candidate-open-${c.id}`}>
                     <Landscape />
-                    <span className="tc-photo-source">{`${SOURCE_KIND_LABEL[c.source_kind] ?? c.source_kind} · 画像のイメージ`}</span>
-                  </div>
+                    <span className="tc-photo-source" aria-hidden="true">{`${SOURCE_KIND_LABEL[c.source_kind] ?? c.source_kind} · 画像のイメージ`}</span>
+                  </button>
                   <article aria-labelledby={headingId} className="p-4">
                     <div className="flex flex-wrap items-baseline gap-2">
-                      <h3 id={headingId} className="font-semibold text-ink-900">{c.title}</h3>
+                      <h3 id={headingId} className="font-semibold text-ink-900">
+                        <button type="button" className="tc-focus-ring tc-candidate-title" onClick={() => setDetail(c)}>{c.title}</button>
+                      </h3>
                       <span className={`text-xs px-2 py-0.5 rounded-sm ${STATUS_BADGE[c.status]}`} data-testid="candidate-status">{c.status_label}</span>
                       <span className="text-xs text-ink-700">優先度 {PRIORITY_LABEL[c.priority]}</span>
                     </div>
@@ -210,8 +220,11 @@ const CandidatesPage: React.FC = () => {
                         <span>「{d.title}」と重複の可能性({d.reasons.map((r) => REASON_LABEL[r] ?? r).join('・')})</span>
                         {canEdit && c.status !== 'scheduled' && (
                           <Button size="sm" variant="outline" disabled={busy} aria-label={`${c.title}を「${d.title}」にまとめる`}
-                            onClick={() => run(() => mergeCandidate(planId, c.id, d.id, c.revision),
-                              `「${c.title}」を「${d.title}」にまとめました`, 'まとめられませんでした')}>
+                            onClick={() => {
+                              if (!window.confirm(`「${c.title}」を「${d.title}」にまとめますか?\n「${c.title}」は候補箱から消え、メモ・出典・住所は「${d.title}」へ移ります。`)) return;
+                              run(() => mergeCandidate(planId, c.id, d.id, c.revision),
+                                `「${c.title}」を「${d.title}」にまとめ、「${c.title}」は候補箱から消しました`, 'まとめられませんでした');
+                            }}>
                             こちらを「{d.title}」にまとめる
                           </Button>
                         )}
@@ -294,6 +307,7 @@ const CandidatesPage: React.FC = () => {
           </div>
         </>
       )}
+      <CandidateDetailDialog candidate={detail} planId={planId} canEdit={canEdit} onClose={() => setDetail(null)} onSchedule={schedule} />
     </div>
   );
 };

@@ -12,6 +12,7 @@ import Landscape from '@/components/shell/Landscape';
 import TransportIcon from '@/components/common/TransportIcon';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import SpotLinks from './SpotLinks';
+import DiningSummary from '@/components/dining/DiningSummary';
 import type { HoursBadge, ArrivalLeg } from './plannerModel';
 import type { ScheduleItem } from '@/types';
 
@@ -96,6 +97,12 @@ const SelectedEventCard: React.FC<Props> = ({ planId, dayNumber, event, onEdit, 
               <span><b>確定</b><small className="inline-flex items-center gap-1"><Lock size={12} aria-hidden="true" />並べ替え・最適化で動かさない</small></span>
             )}
           </div>
+          {event.dining && (
+            <section className="tc-selected-dining" aria-label="食事の情報" data-testid="selected-dining">
+              <h3>食事の情報</h3>
+              <DiningSummary dining={event.dining} />
+            </section>
+          )}
         </>
       ) : (
         <>

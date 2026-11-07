@@ -88,3 +88,14 @@ export function formatSize(bytes: number | null): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
+
+/** [Gate SpotInfo] 空と重なりを除いて「・」でつなぐ(前と同じ・前に含まれる言葉は出さない) */
+export function joinDistinct(parts: Array<string | null | undefined>): string {
+  const out: string[] = [];
+  for (const raw of parts) {
+    const v = (raw ?? '').trim();
+    if (!v || out.some((o) => o === v || o.includes(v))) continue;
+    out.push(v);
+  }
+  return out.join('・');
+}

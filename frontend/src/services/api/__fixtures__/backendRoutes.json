@@ -543,6 +543,8 @@
   "PUT /api/v1/spots/{spot_id}",
   "PUT /api/v1/travel-plans/{plan_id}",
   "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}",
-  "GET /api/v1/plans/{plan_id}/booklet/themes"
+  "GET /api/v1/plans/{plan_id}/booklet/themes",
+  "POST /api/v1/spots/{spot_id}/enrich",
+  "GET /api/v1/media-providers/images/for-place"
  ]
 }

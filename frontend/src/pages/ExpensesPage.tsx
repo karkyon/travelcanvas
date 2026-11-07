@@ -337,7 +337,7 @@ const ExpensesPage: React.FC = () => {
     return (
       <div className="p-8 text-center text-ink-700">
         プランが選択されていません。
-        <div className="mt-4"><Button variant="primary" onClick={() => navigate('/planner')}>プラン一覧へ</Button></div>
+        <div className="mt-4"><Button variant="primary" onClick={() => navigate('/planner')}>旅行の一覧へ</Button></div>
       </div>
     );
   }

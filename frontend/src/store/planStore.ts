@@ -151,7 +151,7 @@ function readEventUrls(raw: unknown): EventUrl[] | undefined {
 
 function mapEvent(e: NormalizedEvent): ScheduleItem {
   // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
-  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown };
+  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown; dining?: unknown };
   return {
     id: e.id,
     title: e.title,
@@ -171,6 +171,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     phone: g7.phone ?? undefined,
     // [Gate SpotLinks] 場所の URL(形の違う値は捨てる)
     urls: readEventUrls(g7.urls),
+    // [Gate SpotInfo] 食事の情報(形が違えば捨てる)
+    dining: g7.dining && typeof g7.dining === 'object' && !Array.isArray(g7.dining) ? (g7.dining as ScheduleItem['dining']) : null,
   };
 }
 
@@ -632,6 +634,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       end_day_offset: item.end_day_offset,
       phone: item.phone,
       urls: item.urls,
+      dining: item.dining,
     };
 
     const updatedDay = { ...day, events: [...day.events, optimisticItem] };
@@ -659,6 +662,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
             ? { local_end_time: optimisticItem.end_time, end_day_offset: optimisticItem.end_day_offset ?? 0 } : {}),
           ...(optimisticItem.phone ? { phone: optimisticItem.phone } : {}),
           ...(optimisticItem.urls?.length ? { urls: optimisticItem.urls } : {}),
+          ...(optimisticItem.dining ? { dining: optimisticItem.dining } : {}),
         },
         generateIdempotencyKey()
       );
@@ -768,6 +772,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ...(item.phone === undefined || hidePlace ? {} : { phone: item.phone }),
           // [Gate SpotLinks] URL(変えた時だけ。空の配列は消す)
           ...(item.urls === undefined || hidePlace ? {} : { urls: item.urls }),
+          // [Gate SpotInfo] 食事の情報(変えた時だけ。null で消す)
+          ...(item.dining === undefined ? {} : { dining: item.dining }),
         },
         plan.revision!
       );

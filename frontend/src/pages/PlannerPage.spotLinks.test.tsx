@@ -134,4 +134,21 @@ describe('PlannerPage スポットの URL と地図 (Gate SpotLinks)', () => {
     expect(updateScheduleItem.mock.calls[0]![1]).not.toHaveProperty('urls');
     expect(updateScheduleItem.mock.calls[0]![1]).not.toHaveProperty('latitude');
   });
+
+  it('[SpotInfo] 種類が「食事」の時は食事の情報を入れられ、変えた時だけ送る', async () => {
+    const { updateScheduleItem } = setup();
+    fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
+    expect(screen.queryByTestId('dining-fields')).toBeNull();
+    fireEvent.change(screen.getByTestId('edit-category'), { target: { value: 'dining' } });
+    const fields = screen.getByTestId('dining-fields');
+    fireEvent.click(within(fields).getByTestId('dining-genre-washoku'));
+    fireEvent.change(within(fields).getByLabelText('予算(昼・1 人)'), { target: { value: '2000_3000' } });
+    fireEvent.change(within(fields).getByLabelText('駐車場'), { target: { value: 'nearby' } });
+    updateScheduleItem.mockResolvedValueOnce('saved');
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(1));
+    expect(updateScheduleItem.mock.calls[0]![1]).toMatchObject({
+      category: 'dining', dining: { genres: ['washoku'], budget_lunch: '2000_3000', parking: 'nearby' },
+    });
+  });
 });

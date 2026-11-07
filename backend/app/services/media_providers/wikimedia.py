@@ -115,6 +115,12 @@ class WikimediaCommonsProvider:
             content = await self._download(client, info.get("thumburl") or info.get("url"), max_bytes)
         return FetchedImage(content=content, mime=meta.mime or "", meta=meta)
 
+    async def describe(self, provider_id: str) -> Optional[ImageCandidate]:
+        """[Gate SpotInfo] 1 枚の作者・ライセンス・出典だけを読む(画像は取らない)。形が違えば None"""
+        async with self._client() as client:
+            page = await self._info(client, provider_id, 480)
+        return _candidate(page)
+
     async def thumbnail(self, provider_id: str, max_bytes: int) -> FetchedImage:
         return await self._get(provider_id, 480, max_bytes, need_license=False)
 

@@ -27,6 +27,9 @@ const renderPage = () => render(
   </MemoryRouter>,
 );
 
+const wish = vi.hoisted(() => ({ createWishSpot: vi.fn(), enrichWishSpot: vi.fn() }));
+vi.mock('@/services/api/spotIntake', () => wish);
+
 beforeEach(() => {
   for (const fn of Object.values(m)) fn.mockReset();
   m.getPlanDetail.mockResolvedValue({ data: { days: [{ id: D1, local_date: '2026-11-01', timezone_id: 'Asia/Tokyo', sort_order: 0 }] } });
@@ -49,7 +52,25 @@ describe('CandidatesPage (Gate C2)', () => {
     const second = cards[1]!;
     fireEvent.click(within(second).getByRole('button', { name: /にまとめる$/ }));
     await waitFor(() => expect(m.mergeCandidate).toHaveBeenCalledWith('p1', C4, C3, 1));
-    expect(await screen.findByRole('status')).toHaveTextContent('にまとめました');
+    expect(await screen.findByRole('status')).toHaveTextContent('は候補箱から消しました');
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('候補箱から消え'));
+  });
+
+  it('[SpotInfo] カードを押すと詳細が開き、行きたい場所に保存すると空の項目を自動で埋める', async () => {
+    m.getCandidates.mockResolvedValue({ ...dupes, can_edit: true });
+    wish.createWishSpot.mockResolvedValue({ id: 'w1' });
+    wish.enrichWishSpot.mockResolvedValue({ spot: { id: 'w1' }, filled: ['phone', 'dining'], matched: true, source: {} });
+    renderPage();
+    const list = await screen.findByRole('region', { name: '候補の一覧' });
+    const first = within(list).getAllByRole('article')[0]!;
+    const title = first.querySelector('h3 button') as HTMLButtonElement;
+    fireEvent.click(title);
+    const dialog = await screen.findByTestId('candidate-detail');
+    fireEvent.click(within(dialog).getByTestId('candidate-save-wish'));
+    await waitFor(() => expect(wish.createWishSpot).toHaveBeenCalledTimes(1));
+    expect(wish.createWishSpot.mock.calls[0]![0]).toMatchObject({ name: 'kiyomizudera.or.jp' });
+    expect(wish.enrichWishSpot).toHaveBeenCalledWith('w1');
+    expect(await within(dialog).findByText(/電話・食事の情報 を自動で入れました/)).toBeInTheDocument();
   });
 
   it('候補を足す(名前か URL が要る)', async () => {

@@ -22,6 +22,8 @@ import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
 import { getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
 import { Globe, LocateFixed } from 'lucide-react';
 import EventUrlsField from '@/components/planner/EventUrlsField';
+import DiningFields from '@/components/dining/DiningFields';
+import { cleanDining, mergeEmptyDining, type DiningInfo } from '@/components/dining/diningModel';
 import { cleanUrls, sameUrls } from '@/components/planner/spotLinksModel';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import Button from '@/components/common/Button';
@@ -243,6 +245,8 @@ const PlannerPage: React.FC = () => {
   // [Gate SpotLinks] 場所の URL(入力の行。変えた時だけ送る)と、地図の位置(変えた時だけ送る)
   const [editUrls, setEditUrls] = useState<{ rows: string[]; original: EventUrl[] }>({ rows: [''], original: [] });
   const [urlError, setUrlError] = useState<string | null>(null);
+  // [Gate SpotInfo] 食事の情報(種類が「食事」の時に入れる。変えた時だけ送る)
+  const [editDining, setEditDining] = useState<{ value: DiningInfo | null; original: string }>({ value: null, original: 'null' });
   const [editCoords, setEditCoords] = useState<{ lat: number | null; lng: number | null; changed: boolean }>(
     { lat: null, lng: null, changed: false });
   const [photoSignal, setPhotoSignal] = useState(0);
@@ -288,6 +292,7 @@ const PlannerPage: React.FC = () => {
     if (!geo && c.address) setEditForm((prev) => ({ ...prev, location_name: c.address! }));
     if (!geo && c.phone) setEditPhone((p) => ({ ...p, value: c.phone! }));
     if (!geo && c.category) setEditCategory((x) => ({ ...x, value: c.category! }));
+    if (!geo && c.dining) setEditDining((d) => ({ ...d, value: mergeEmptyDining(d.value, c.dining) }));
     if (!geo && c.website) {
       const site = c.website;
       setEditUrls((u) => (u.rows.some((r) => r.trim() === site) ? u
@@ -315,6 +320,7 @@ const PlannerPage: React.FC = () => {
     setEditPhone({ value: item.phone ?? '', original: item.phone ?? '' });
     setEditUrls({ rows: item.urls?.length ? item.urls.map((u) => u.url) : [''], original: item.urls ?? [] });
     setUrlError(null);
+    setEditDining({ value: item.dining ?? null, original: JSON.stringify(cleanDining(item.dining)) });
     setEditCoords({ lat: typeof item.latitude === 'number' ? item.latitude : null,
       lng: typeof item.longitude === 'number' ? item.longitude : null, changed: false });
     setPlaceInfo({ busy: false, result: null, error: null });
@@ -338,6 +344,8 @@ const PlannerPage: React.FC = () => {
     if (links.error) { setUrlError(links.error); return; }
     setUrlError(null);
     const urlsChanged = !sameUrls(links.urls, editUrls.original);
+    const dining = cleanDining(editDining.value);
+    const diningChanged = JSON.stringify(dining) !== editDining.original;
     setIsSavingItem(true);
     try {
       const result = await updateScheduleItem(itemId, {
@@ -350,11 +358,13 @@ const PlannerPage: React.FC = () => {
         ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
         ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
         ...(urlsChanged ? { urls: links.urls } : {}),
+        ...(diningChanged ? { dining } : {}),
         ...(editCoords.changed && editCoords.lat !== null && editCoords.lng !== null
           ? { latitude: editCoords.lat, longitude: editCoords.lng } : {}),
       });
       if (result === 'saved') setEditPhone((p) => ({ ...p, original: p.value.trim() }));
       if (result === 'saved') setEditUrls((u) => ({ ...u, original: links.urls }));
+      if (result === 'saved') setEditDining((d) => ({ ...d, original: JSON.stringify(dining) }));
       if (result === 'saved') setEditCoords((c) => ({ ...c, changed: false }));
       if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'conflict') {
@@ -754,7 +764,7 @@ const PlannerPage: React.FC = () => {
           <div className="text-center">
             <p className="text-ink-700 mb-4">プランが見つかりませんでした</p>
             <Button variant="primary" onClick={() => navigate('/planner')}>
-              プラン一覧へ戻る
+              旅行の一覧へ戻る
             </Button>
           </div>
         </div>
@@ -786,7 +796,7 @@ const PlannerPage: React.FC = () => {
             </>}
             actions={<>
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsBasicsOpen(true)} data-testid="plan-basics-open">基本情報・日程を編集</button>
-              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← プラン一覧</button>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← 旅行の一覧</button>
               {activeDay && planView === 'day' && (
                 <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => setAddSignal((n) => n + 1)}
                   data-testid="planner-add-event">＋ 予定を追加</button>
@@ -1328,6 +1338,12 @@ const PlannerPage: React.FC = () => {
                   </select>
                 </label>
               </div>
+              {/* [Gate SpotInfo] 食事の情報(種類が「食事」か、もう入っている時) */}
+              {(editCategory.value === 'dining' || editDining.value) && (
+                <div className="rounded-xl border border-cloud-200 p-3">
+                  <DiningFields value={editDining.value} onChange={(value) => setEditDining((d) => ({ ...d, value }))} />
+                </div>
+              )}
               <fieldset className="rounded-xl border border-cloud-200 p-3">
                 <legend className="px-1 text-sm font-semibold text-ink-900">時間(任意)</legend>
                 {/* [Gate PlanSpotEdit] 開始 〜 終了(既定は「この場所での時間」。印で終了時刻・終わる日付に切り替え) */}
