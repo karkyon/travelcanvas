@@ -662,16 +662,19 @@ def ops_secrets(admin: User = Depends(require_admin), db: Session = Depends(get_
     slots = []
     suspended = cg.suspended_providers()
     for slot, spec in ps.SLOTS.items():
-        used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED]
+        free = bool(spec.get("free"))  # [Gate PlaceLookupJP] 無料の提供元(鍵が無ければ送らないだけ。任意)
+        used_by = [p for p in spec["providers"] if p in ADAPTERS_IMPLEMENTED or free]
         slots.append({"slot": slot, "label": spec["label"], "providers": spec["providers"], "env": spec["env"],
                       "hint": spec["hint"], **ps.state(db, slot), "history": ps.history(db, slot),
                       "verify_supported": slot in pc.SLOT_CHECKS,
                       "in_use": bool(used_by),
                       # [Gate AdminUAT] 使わない鍵は「設定不要」。未設定でも警告にしない
-                      "required": bool(used_by),
+                      "required": bool(used_by) and not free,
+                      "free": free,
                       # 鍵の確認とは別の、利用の制限(提供元を止めている)。会員クラス・枠は利用者ごと(UAT の準備で見る)
                       "suspended_providers": [p for p in spec["providers"] if p in suspended],
-                      "in_use_note": ("使っている提供元: " + "・".join(used_by)) if used_by
+                      "in_use_note": ("任意・無料: 登録すると場所の自動取得で使います(使った分の請求なし。無ければ送りません)"
+                                      if free else ("使っている提供元: " + "・".join(used_by))) if used_by
                       else "現在の構成では使用しません。設定不要(アプリはこの鍵を使わず、外へも送りません)"})
     try:
         verify_budget: Optional[Dict[str, Any]] = pv.budget(db)
