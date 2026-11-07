@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, Check, X, FileCheck, FileX } from 'lucide-react';
+import { Plus, Check, X, FileCheck, FileX, Trash2 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -34,6 +34,7 @@ import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookingExtractCard from './imports/BookingExtractCard';
 import BookingReviewForm from './imports/BookingReviewForm';
+import { deleteImportJob } from '@/services/api/photoFeatures';
 
 const STATUS_LABEL: Record<string, string> = {
   uploaded: 'アップロード済み',
@@ -252,6 +253,20 @@ const ImportsPage: React.FC = () => {
     }
   };
 
+  // [Gate BookingImportYahoo] 一覧から消す(読み取った候補も消える。登録済みの予約は残る)
+  const handleDeleteJob = async (job: ImportJob) => {
+    if (!planId) return;
+    const tail = job.status === 'confirmed' ? '\n登録した予約は消えません。' : '';
+    if (!window.confirm(`取込ジョブ(${formatDateTime(job.created_at)})を一覧から削除しますか？${tail}`)) return;
+    try {
+      await deleteImportJob(planId, job.id);
+      setJobs((list) => list.filter((x) => x.id !== job.id));
+      toast.success('取込ジョブを削除しました');
+    } catch (e) {
+      setError(errorDetailMessage(e, '取込ジョブを削除できませんでした'));
+    }
+  };
+
   if (!planId) {
     return (
       <div className="p-8 text-center text-ink-500">
@@ -303,12 +318,12 @@ const ImportsPage: React.FC = () => {
           {jobs.map((j) => (
             <li key={j.id}>
               {/* [Gate E1] キーボードで開けるようにボタンにする(以前は <div onClick>) */}
-              <Card padding="none" hover>
+              <Card padding="none" hover className="flex items-stretch">
                 <button
                   type="button"
                   onClick={() => openDetail(j)}
                   aria-haspopup="dialog"
-                  className="w-full text-left p-4 rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="min-w-0 flex-1 text-left p-4 rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -319,6 +334,11 @@ const ImportsPage: React.FC = () => {
                       {STATUS_LABEL[j.status] ?? j.status}
                     </span>
                   </div>
+                </button>
+                <button type="button" onClick={() => void handleDeleteJob(j)} data-testid={`import-job-delete-${j.id}`}
+                  aria-label={`取込ジョブ(${formatDateTime(j.created_at)})を削除`} title="一覧から削除"
+                  className="tc-focus-ring m-2 shrink-0 self-center rounded-lg p-2 text-ink-700 hover:bg-cloud-100 hover:text-danger">
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
               </Card>
             </li>

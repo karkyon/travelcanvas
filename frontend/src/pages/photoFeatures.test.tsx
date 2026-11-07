@@ -163,6 +163,17 @@ describe('BookingExtractCard', () => {
     fireEvent.change(screen.getByTestId('booking-image'), { target: { files: [image] } });
     await waitFor(() => expect(m.extractReservationFile).toHaveBeenLastCalledWith('p1', image, true, true));
   });
+
+  it('[BookingImportYahoo] PDF も選べる', async () => {
+    m.extractReservationFile.mockReset().mockResolvedValue({ id: 'j', candidates: [], ai_status: 'off', ai_message: null, warnings: [] });
+    const done = vi.fn();
+    render(<BookingExtractCard planId="p1" onExtracted={done} />);
+    const pdf = new File([new Uint8Array(8)], 'booking.pdf', { type: 'application/pdf' });
+    expect(screen.getByTestId('booking-pdf')).toHaveAttribute('accept', 'application/pdf,.pdf');
+    fireEvent.change(screen.getByTestId('booking-pdf'), { target: { files: [pdf] } });
+    await waitFor(() => expect(done).toHaveBeenCalled());
+    expect(m.extractReservationFile).toHaveBeenLastCalledWith('p1', pdf, false, false);
+  });
 });
 
 const stay = [

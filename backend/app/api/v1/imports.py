@@ -313,15 +313,23 @@ def extract_from_text(plan_id: str, payload: ExtractTextRequest, request: Reques
 async def extract_from_file(plan_id: str, request: Request, file: UploadFile = File(...), use_ai: bool = Form(False),
                             ai_consent: bool = Form(False), db: Session = Depends(get_db),
                             current_user: User = Depends(get_current_user_or_guest)):
-    """.eml または画像から候補を作る。画像はまずサーバーの中で文字を読み(OCR・無料・外部へ送らない)、
-    同意がある時だけ、足りない項目を AI で補う。"""
+    """.eml・PDF または画像から候補を作る。画像はまずサーバーの中で文字を読み(OCR・無料・外部へ送らない)、
+    同意がある時だけ、足りない項目を AI で補う。PDF はサーバーの中で文字を読む(文字の無い PDF は OCR)。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    content = await file.read(rx.MAX_IMAGE_BYTES + 1)
+    content = await file.read(max(rx.MAX_IMAGE_BYTES, rx.MAX_PDF_BYTES) + 1)
     name = (file.filename or "").lower()
     try:
         if name.endswith((".eml", ".txt")):
             text = content.decode("utf-8", "replace") if name.endswith(".txt") else rx.parse_eml(content)
             return _run_text(db, request, plan, current_user, text[:rx.MAX_TEXT_CHARS], use_ai, "eml")
+        if name.endswith(".pdf") or rx.is_pdf(content):
+            # [Gate BookingImportYahoo] PDF(予約の確認の画面を PDF に保存したもの・予約確認書)
+            if not rx.pdf_available():
+                raise _extract_error("pdf_unavailable", "このサーバーでは PDF を読めません(配備をやり直してください)", 503)
+            text = await run_in_threadpool(rx.pdf_text, content)
+            if not text.strip():
+                raise _extract_error("nothing_extracted", "PDF から文字を読み取れませんでした。本文を貼り付けてください")
+            return _run_text(db, request, plan, current_user, text, use_ai, "pdf")
         image = rx.prepare_image(content)
     except rx.ExtractInputError as error:
         raise _extract_error(error.code, str(error), 413 if error.code == "file_too_large" else 422)
@@ -787,6 +795,21 @@ def confirm_import_job(
     )
 
     return _to_job_response(j)
+
+
+@router.delete("/{plan_id}/imports/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_import_job(plan_id: str, job_id: str, request: Request, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)) -> None:
+    """[Gate BookingImportYahoo] 取込ジョブを一覧から消す(読み取った候補も消す)。登録済みの予約は消さない。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    j = _get_job_or_404(db, plan.id, job_id)
+    db.query(ExtractionCandidate).filter(ExtractionCandidate.import_job_id == j.id).delete(synchronize_session=False)
+    status_before = j.status
+    db.delete(j)
+    db.commit()
+    record_audit_event(action="import_job_deleted", resource_type="import_job", user_id=current_user.id,
+                       resource_id=uuid.UUID(job_id), ip_address=_client_ip(request), user_agent=_user_agent(request),
+                       details={"plan_id": str(plan.id), "status": status_before})
 
 
 @router.post("/{plan_id}/imports/{job_id}/reject", response_model=ImportJobResponse)
