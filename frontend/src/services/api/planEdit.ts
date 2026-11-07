@@ -30,10 +30,15 @@ export interface PlaceInfoCandidate {
   osm_type: string | null; latitude: number | null; longitude: number | null; source_url: string | null;
   /** [Gate SpotInfo] 食事の情報(OpenStreetMap のタグから読めた分)と、写真の手がかり */
   dining?: DiningInfo | null; photo_file?: string | null; wikidata?: string | null;
+  /** [Gate PlaceLookupJP] 予約・紹介のページ(楽天トラベル・ホットペッパー)・メモに足す情報(チェックイン/アウト・駐車場など)・使った提供元 */
+  links?: { url: string; label: string | null }[]; notes?: string[]; providers?: string[];
 }
+/** [Gate PlaceLookupJP] 提供元の出典(各提供元の規約のクレジット) */
+export interface PlaceSource { provider: string; label: string; credit: string; url: string }
 export interface PlaceInfoResult {
-  provider: 'nominatim'; attribution: string; license: string; license_url: string;
+  provider: string; attribution: string; license: string; license_url: string;
   candidates: PlaceInfoCandidate[]; cached: boolean; unavailable: boolean; error_code: string | null;
+  sources?: PlaceSource[]; keyed_providers?: string[];
 }
 
 export async function getPlaceInfo(input: { name?: string | null; latitude?: number | null; longitude?: number | null }):
@@ -44,6 +49,15 @@ export async function getPlaceInfo(input: { name?: string | null; latitude?: num
     longitude: typeof input.longitude === 'number' ? input.longitude : null,
   };
   return (await api.post('/spots/place-info', body, SILENT)).data as PlaceInfoResult;
+}
+
+/** [Gate PlaceLookupJP] 住所から地図の位置の候補(Yahoo!ジオコーダ・国土地理院・OpenStreetMap の順に見つかるまで) */
+export interface GeocodeCandidate { address: string | null; latitude: number; longitude: number; provider: string; level: string | null }
+export interface GeocodeResult { candidates: GeocodeCandidate[]; sources: PlaceSource[]; unavailable: boolean }
+export async function geocodeAddress(query: string, near?: { latitude?: number | null; longitude?: number | null }): Promise<GeocodeResult> {
+  const body = { query: query.trim(), latitude: typeof near?.latitude === 'number' ? near.latitude : null,
+    longitude: typeof near?.longitude === 'number' ? near.longitude : null };
+  return (await api.post('/spots/geocode', body, SILENT)).data as GeocodeResult;
 }
 
 /** [Gate SpotInfo] 場所に結び付いた写真(OpenStreetMap の wikimedia_commons・wikidata のタグから)。無ければ null */

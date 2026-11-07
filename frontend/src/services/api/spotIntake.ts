@@ -41,6 +41,8 @@ export async function readPlaceImage(file: File): Promise<{ words: string[]; ocr
 export interface EnrichResult {
   spot: WishSpot; filled: string[]; matched: boolean;
   source: { provider: string; attribution: string; license: string; license_url: string; source_url: string | null };
+  /** [Gate PlaceLookupJP] 使った提供元のクレジット */
+  sources?: { provider: string; label: string; credit: string; url: string }[];
 }
 export const enrichWishSpot = async (id: string): Promise<EnrichResult> =>
   (await api.post(`/spots/${id}/enrich`, {}, SILENT)).data as EnrichResult;
