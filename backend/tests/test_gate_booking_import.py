@@ -426,3 +426,85 @@ def test_reschedule_can_be_undone_in_both_directions(auth_client):
     assert client.post(f"{base}/reschedule", json=shorter, headers=_rev(client, base)).status_code == 200
     assert client.post(f"{base}/undo", headers=_rev(client, base)).status_code == 200
     assert _dates(client, base) == original
+
+
+# [Gate BookingImportYahoo] Yahoo!トラベルの予約の確認の画面を選んで写した文(表の枠はタブ。番号・名前・電話は架空)
+YAHOO_PAGE = (pathlib.Path(__file__).parent / "fixtures" / "yahoo_travel_page.txt").read_text(encoding="utf-8")
+
+
+def test_yahoo_travel_page_copy_reads_every_field():
+    got = {c.field: c.value for c in rx.rule_extract(YAHOO_PAGE).candidates}
+    assert got["provider_name"] == "都リゾート 奥志摩 アクアフォレスト"  # 次の行の電話を名前に付けない
+    assert got["contact_phone"] == "0599-00-0000"
+    assert got["guest_count"] == "2" and got["holder_name"].startswith("山田 花子")
+    assert got["start_at"] == "2026-11-28T15:00:00+09:00" and got["end_at"] == "2026-11-29T11:00:00+09:00"
+    assert got["detail.checkout_limit"] == "~11:00" and got["detail.checkin_window"] == "15:00~18:00"
+    assert got["detail.meal"] == "夕朝食付"  # 1 行に 2 組の見出しと値(料金・サービス料 / 食事)
+    assert got["total_amount"] == "84100" and got["currency"] == "JPY"  # お支払い金額(1 泊 1 人の額ではない)
+    assert got["detail.cancel_policy"].startswith("3日前まで 無料 / 2日前 20%")
+    assert got["cancellation_deadline"] == "2026-11-25T23:59:00+09:00"  # 2日前から料金 → 3日前の 23:59 まで無料
+    assert "決済" not in got.get("cancellation_deadline", "")
+    assert got["detail.booking_site"] == "Yahoo!トラベル"
+
+
+def test_explicit_free_cancel_deadline_wins_and_meal_from_plan_name():
+    text = ("宿泊施設: 海の宿\nチェックイン日: 2026年8月1日\n無料キャンセル期限: 2026年7月29日 18:00\n"
+            "キャンセル規定\n前日 50%\nプラン: 朝食付きプラン\n大人：3名")
+    got = {c.field: c.value for c in rx.rule_extract(text).candidates}
+    assert got["cancellation_deadline"] == "2026-07-29T18:00:00+09:00"
+    assert got["detail.meal"] == "朝食付き" and got["guest_count"] == "3"
+    tz = rx._zone("Asia/Tokyo")
+    assert rx.free_cancel_deadline("前日 50% / 当日 100%", (2026, 8, 1), tz).startswith("2026-07-30T23:59")
+    assert rx.free_cancel_deadline("無料", (2026, 8, 1), tz) is None
+
+
+def _ascii_pdf(lines):
+    """文字の PDF(Helvetica・英数字だけ)を作る(試験用)"""
+    content = "BT /F1 12 Tf 50 750 Td 14 TL " + " ".join(f"({x}) Tj T*" for x in lines) + " ET"
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+            "/Resources << /Font << /F1 5 0 R >> >> >>",
+            f"<< /Length {len(content)} >>\nstream\n{content}\nendstream",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    out, offsets = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{o}\nendobj\n".encode()
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{o:010d} 00000 n \n" for o in offsets).encode()
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return out
+
+
+@pytest.mark.skipif(not rx.pdf_available(), reason="pdftotext なし")
+def test_pdf_file_endpoint_reads_text(auth_client):
+    client, _owner, _p, base = _plan(auth_client)
+    pdf = _ascii_pdf(["ANA Flight NH123", "Booking reference: XY7Q2Z", "Departure: 2026-04-10 08:30",
+                      "Total: JPY 15,200"])
+    assert "XY7Q2Z" in rx.pdf_text(pdf)
+    r = client.post(f"{base}/imports/extract/file", files={"file": ("booking.pdf", pdf, "application/pdf")})
+    assert r.status_code == 201, r.text
+    got = {c["field_path"]: c["value"] for c in r.json()["candidates"]}
+    assert got["confirmation_number"] == "XY7Q2Z" and got["total_amount"] == "15200"
+    bad = client.post(f"{base}/imports/extract/file", files={"file": ("x.pdf", b"not a pdf", "application/pdf")})
+    assert bad.status_code == 422
+
+
+def test_delete_import_job_removes_job_and_candidates_but_keeps_reservation(auth_client, db_session):
+    client, _owner, _p, base = _plan(auth_client)
+    job = client.post(f"{base}/imports/extract/text", json={"text": HOTEL}).json()
+    jid = job["id"]
+    assert client.delete(f"{base}/imports/{jid}").status_code == 204
+    assert all(j["id"] != jid for j in client.get(f"{base}/imports").json())
+    left = db_session.query(ExtractionCandidate).filter(ExtractionCandidate.import_job_id == uuid.UUID(jid))
+    assert left.count() == 0
+    assert client.delete(f"{base}/imports/{jid}").status_code == 404
+    # 登録まで済んだジョブを消しても、予約は残る
+    job2 = client.post(f"{base}/imports/extract/text", json={"text": HOTEL}).json()
+    fields = {c["field_path"]: c["value"] for c in job2["candidates"]}
+    applied = client.post(f"{base}/imports/{job2['id']}/apply", json={"fields": fields})
+    assert applied.status_code == 200, applied.text
+    rid = applied.json()["reservation_id"]
+    assert client.delete(f"{base}/imports/{job2['id']}").status_code == 204
+    assert db_session.get(Reservation, uuid.UUID(rid)) is not None
