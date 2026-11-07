@@ -47,7 +47,7 @@ test('候補箱: URL で足し、重複をまとめ、旅程に追加し、場�
   await expect(cards).toHaveCount(2);
   page.once('dialog', (d) => void d.accept()); // [Gate SpotInfo] まとめる前の確認(まとめた側は消える)
   await cards.nth(1).getByRole('button', { name: /にまとめる$/ }).click();
-  await expect(page.getByRole('status')).toContainText('にまとめました');
+  await expect(page.getByRole('status')).toContainText('は候補箱から消しました');
   await expect(cards).toHaveCount(1);
   // [Gate SpotInfo] まとめた側は消え、メモはまとめ先へ移る
   await expect(cards.first()).toContainText('夕方も良い');
