@@ -45,10 +45,12 @@ test('候補箱: URL で足し、重複をまとめ、旅程に追加し、場�
   await expect(page.getByText('重複の可能性がある候補が 1組あります(自動では消しません)。')).toBeVisible();
   const cards = page.getByRole('region', { name: '候補の一覧' }).getByRole('article');
   await expect(cards).toHaveCount(2);
+  page.once('dialog', (d) => void d.accept()); // [Gate SpotInfo] まとめる前の確認(まとめた側は消える)
   await cards.nth(1).getByRole('button', { name: /にまとめる$/ }).click();
   await expect(page.getByRole('status')).toContainText('にまとめました');
   await expect(cards).toHaveCount(1);
-  await expect(cards.first()).toContainText('まとめた候補: kiyomizudera.or.jp');
+  // [Gate SpotInfo] まとめた側は消え、メモはまとめ先へ移る
+  await expect(cards.first()).toContainText('夕方も良い');
 
   // 3. 旅程に追加
   const card = cards.first();

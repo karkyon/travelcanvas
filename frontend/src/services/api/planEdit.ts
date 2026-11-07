@@ -21,10 +21,15 @@ export async function reorderDay(planId: string, dayId: string, order: string[],
   return decodeResponse(response.data, dayReorderResult, 'POST /plans/{plan_id}/days/{day_id}/reorder');
 }
 
+import type { DiningInfo } from '@/components/dining/diningModel';
+import type { ExternalImage } from './types/g11discover';
+
 export interface PlaceInfoCandidate {
   name: string | null; address: string | null; phone: string | null; website: string | null;
   category: 'sightseeing' | 'activity' | 'dining' | 'shopping' | 'accommodation' | 'transportation' | null;
   osm_type: string | null; latitude: number | null; longitude: number | null; source_url: string | null;
+  /** [Gate SpotInfo] 食事の情報(OpenStreetMap のタグから読めた分)と、写真の手がかり */
+  dining?: DiningInfo | null; photo_file?: string | null; wikidata?: string | null;
 }
 export interface PlaceInfoResult {
   provider: 'nominatim'; attribution: string; license: string; license_url: string;
@@ -39,4 +44,13 @@ export async function getPlaceInfo(input: { name?: string | null; latitude?: num
     longitude: typeof input.longitude === 'number' ? input.longitude : null,
   };
   return (await api.post('/spots/place-info', body, SILENT)).data as PlaceInfoResult;
+}
+
+/** [Gate SpotInfo] 場所に結び付いた写真(OpenStreetMap の wikimedia_commons・wikidata のタグから)。無ければ null */
+export async function getPlacePhoto(input: { photo_file?: string | null; wikidata?: string | null }): Promise<ExternalImage | null> {
+  const params: Record<string, string> = {};
+  if (input.photo_file) params.file = input.photo_file;
+  if (input.wikidata) params.wikidata = input.wikidata;
+  if (!params.file && !params.wikidata) return null;
+  return ((await api.get('/media-providers/images/for-place', { ...SILENT, params })).data as { image: ExternalImage | null }).image;
 }

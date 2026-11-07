@@ -57,3 +57,13 @@ describe('memoriesModel', () => {
     expect(formatSize(null)).toBe('');
   });
 });
+
+describe('joinDistinct', () => {
+  it('同じ言葉・含まれる言葉は 1 回だけ', async () => {
+    const { joinDistinct } = await import('./memoriesModel');
+    expect(joinDistinct(['竹生島(宝厳寺)', '竹生島(宝厳寺)', '2025/05/17 13:55'])).toBe('竹生島(宝厳寺)・2025/05/17 13:55');
+    expect(joinDistinct(['長浜城歴史博物館', '長浜城', null, ''])).toBe('長浜城歴史博物館');
+    expect(joinDistinct(['清水寺', '音羽の滝'])).toBe('清水寺・音羽の滝');
+  });
+});
+

@@ -15,7 +15,8 @@ import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots } from '../services/api';
 import { searchNearby } from '../services/api/g11discover';
-import { createWishSpot } from '../services/api/spotIntake';
+import { createWishSpot, enrichWishSpot } from '../services/api/spotIntake';
+import { FILLED_LABEL, wishCategory } from './spotListModel';
 import FindByOther from '@/components/search/FindByOther';
 import type { GpsPoint } from '@/components/search/findModel';
 import UiIcon from '@/components/common/UiIcon';
@@ -137,9 +138,17 @@ const SearchPage: React.FC = () => {
   // [Gate WishPlaces] SC-47 場所を探して保存する
   const saveWish = async (spot: SearchResult) => {
     try {
-      await createWishSpot({ name: spot.name, category: 'sightseeing', description: null, address: spot.location?.address || spot.address || null,
+      const created = await createWishSpot({ name: spot.name, category: wishCategory(spot.category), description: null,
+        address: spot.location?.address || spot.address || null,
         latitude: spot.location?.latitude ?? null, longitude: spot.location?.longitude ?? null });
       setPhotoNote(`「${spot.name}」を行きたい場所に保存しました`);
+      // [Gate SpotInfo] 住所・電話・公式サイト・食事の情報・写真を、空の項目だけ自動で埋める(失敗しても保存は済んでいる)
+      try {
+        const r = await enrichWishSpot(created.id);
+        if (r.filled.length) {
+          setPhotoNote(`「${spot.name}」を行きたい場所に保存し、${r.filled.map((k) => FILLED_LABEL[k] ?? k).join('・')} を自動で入れました(© OpenStreetMap contributors)`);
+        }
+      } catch { /* 自動取得は任意 */ }
     } catch {
       setStatus({ kind: 'error', message: '行きたい場所に保存できませんでした。' });
     }

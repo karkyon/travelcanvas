@@ -2,3 +2,52 @@
 /* [Gate SpotLinks] 予定の場所の電話と URL のリンク(index.css から読む) */
 .tc-spot-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
 .tc-spot-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--tc-accent); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; word-break: break-all; }
+.tc-spot-links--start { justify-content: flex-start; }
+
+/* [Gate SpotInfo] 食事の情報(入力の印・表示の要約)・行きたい場所の写真 */
+.tc-chip-toggle {
+  min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0);
+  color: var(--tc-ink-700); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.tc-chip-toggle[aria-pressed='true'] { background: var(--tc-ink-900); border-color: var(--tc-ink-900); color: var(--tc-cloud-0); }
+.tc-chip-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.tc-dining-summary { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--tc-ink-700); }
+.tc-dining-genres { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.tc-dining-genres span {
+  padding: 2px 10px; border-radius: 999px; background: #fff1e6; color: #8a3b12; font-size: 12px; font-weight: 800;
+}
+.tc-dining-signature { margin: 0; color: var(--tc-ink-900); }
+.tc-dining-signature b { margin-right: 6px; padding: 1px 7px; border-radius: 6px; background: #b8462a; color: #fff; font-size: 11px; }
+.tc-dining-budget { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; color: var(--tc-ink-900); font-weight: 700; }
+.tc-dining-budget b { margin-right: 4px; padding: 0 6px; border-radius: 6px; background: var(--tc-cloud-100); color: var(--tc-ink-700); font-size: 11px; }
+.tc-dining-facts { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.tc-dining-facts li { display: flex; align-items: flex-start; gap: 6px; }
+.tc-dining-facts svg { flex-shrink: 0; margin-top: 3px; }
+.tc-dining-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.tc-dining-tags span { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--tc-cloud-200); font-size: 11px; font-weight: 600; }
+.tc-dining-wait { margin: 0; font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .tc-dining-genres span { background: #4a2a17; color: #ffd9bf; }
+}
+:root[data-theme='dark'] .tc-dining-genres span { background: #4a2a17; color: #ffd9bf; }
+
+.tc-spot-photo { position: relative; margin: 0; width: 100%; height: 100%; background: var(--tc-cloud-100); }
+.tc-spot-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tc-spot-photo-wait { display: block; width: 100%; height: 100%; }
+.tc-spot-photo figcaption {
+  position: absolute; right: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 1px 6px; border-radius: 6px;
+  background: rgba(15, 23, 42, .66); color: #fff; font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tc-spot-photo figcaption a { color: #fff; text-decoration: underline; }
+.tc-wish-photo-preview { width: 160px; height: 110px; border-radius: 12px; overflow: hidden; }
+.tc-selected-dining { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--tc-cloud-200); }
+.tc-selected-dining h3 { margin: 0 0 6px; font-size: 12px; font-weight: 800; color: var(--tc-ink-900); }
+
+/* [Gate SpotInfo] 候補箱: 知らせを上に固定・カードを押して詳細を開く */
+.tc-sticky-note { position: sticky; top: 76px; z-index: 30; display: grid; gap: 6px; margin-top: 12px; }
+.tc-sticky-note:empty { display: none; }
+.tc-sticky-note > div { box-shadow: 0 6px 18px rgba(16, 32, 46, .12); }
+.tc-candidate-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.tc-candidate-title { all: unset; cursor: pointer; border-radius: 4px; }
+.tc-candidate-title:hover { text-decoration: underline; }
+.tc-candidate-title:focus-visible { outline: 2px solid var(--tc-focus); outline-offset: 2px; }

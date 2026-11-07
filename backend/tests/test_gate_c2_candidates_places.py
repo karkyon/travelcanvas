@@ -122,11 +122,12 @@ def test_candidate_box_flow(auth_client, make_user, db_session, _env):
     assert up.status_code == 200 and _item(up.json(), b_id)["priority"] == 3
     assert client.patch(cu, json={"status": "scheduled"}, headers={"If-Match": "2"}).status_code == 422
 
-    # 統合: b を a へまとめる → b は見送り、a に出典が残る、重複は消える
+    # 統合: b を a へまとめる → [Gate SpotInfo] b は消え、b のメモは a へ移る。重複は消える
     m = client.post(f"{cu}/merge", json={"into_id": a["id"]}, headers={"If-Match": "2"})
     assert m.status_code == 200, m.text
-    assert _item(m.json(), b_id)["status"] == "dismissed" and _item(m.json(), b_id)["merged_into_id"] == a["id"]
-    assert _item(m.json(), a["id"])["merged_from"][0]["id"] == b_id and m.json()["duplicate_pairs"] == 0
+    assert b_id not in {i["id"] for i in m.json()["items"]} and m.json()["duplicate_pairs"] == 0
+    assert "夕方" in _item(m.json(), a["id"])["note"] and "朝が空いている" in _item(m.json(), a["id"])["note"]
+    a = _item(m.json(), a["id"])
 
     # 旅程に追加 → 場所と予定ができ、候補は残る
     s = client.post(f"{url}/{a['id']}/schedule", json={"day_id": day_id, "local_start_time": "09:00"},
@@ -178,10 +179,10 @@ def test_candidate_box_flow(auth_client, make_user, db_session, _env):
     finally:
         _act_as(owner)
 
-    # 削除(まとめられていた候補は戻る)
+    # 削除([Gate SpotInfo] まとめた候補は消えているので、候補箱は空になる)
     assert client.delete(f"{url}/{a['id']}").status_code == 204
     after = client.get(url).json()
-    assert [i["id"] for i in after["items"]] == [b_id] and after["items"][0]["status"] == "open"
+    assert after["items"] == []
 
 
 def test_places_edit_hours_and_provenance(auth_client, make_user, db_session, _env):

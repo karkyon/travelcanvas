@@ -499,7 +499,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               「{plan.title}」を削除しますか？
             </p>
             <p className="text-sm text-ink-500">
-              削除から30日以内なら、プラン一覧の「最近削除したプラン」から復元できます。
+              削除から30日以内なら、旅行の一覧の「最近削除したプラン」から復元できます。
             </p>
           </div>
         </Modal.Body>

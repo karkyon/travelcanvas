@@ -17,12 +17,15 @@ import { safeExternalUrl } from '@/utils/safeNavigation';
 export interface ExternalPhotoPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  planId: string;
+  /** 取り込む旅行(onPick を渡す時は不要) */
+  planId?: string;
   initialQuery?: string;
   near?: { latitude: number; longitude: number } | null;
   eventId?: string | null;
   /** 取り込んだ記録(非公開の写真) */
-  onImported: (memory: TravelMemory) => void;
+  onImported?: (memory: TravelMemory) => void;
+  /** [Gate SpotInfo] 取り込まずに、選んだ写真の出典(作者・ライセンス)だけを返す(行きたい場所の写真) */
+  onPick?: (image: ExternalImage) => void;
   purposeLabel: string;
 }
 
@@ -60,7 +63,7 @@ const Thumb: React.FC<{ image: ExternalImage }> = ({ image }) => {
 };
 
 const ExternalPhotoPicker: React.FC<ExternalPhotoPickerProps> = ({
-  isOpen, onClose, planId, initialQuery = '', near = null, eventId = null, onImported, purposeLabel,
+  isOpen, onClose, planId, initialQuery = '', near = null, eventId = null, onImported, onPick, purposeLabel,
 }) => {
   const qid = useId();
   const [query, setQuery] = useState(initialQuery);
@@ -97,11 +100,13 @@ const ExternalPhotoPicker: React.FC<ExternalPhotoPickerProps> = ({
   };
 
   const choose = async (img: ExternalImage) => {
+    if (onPick) { onPick(img); onClose(); return; }
+    if (!planId) return;
     setBusy(img.provider_id);
     setError(null);
     try {
       const m = await importExternalImage(planId, img.provider, img.provider_id, eventId);
-      onImported(m);
+      onImported?.(m);
       onClose();
     } catch (err) {
       setError(errorMessage(err, '写真を取り込めませんでした'));
@@ -114,8 +119,9 @@ const ExternalPhotoPicker: React.FC<ExternalPhotoPickerProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={`外部の写真を探す(${purposeLabel})`} size="xl">
       <div className="space-y-4" data-testid="external-photo-picker">
         <p className="text-xs text-ink-700">
-          Wikimedia Commons などの、作者・ライセンスが分かる写真だけを出します。使う写真は、この旅行内に非公開(自分だけ)の記録として
-          取り込み、撮影情報を取り除きます。作者・ライセンスは写真と一緒に表示します。
+          {onPick
+            ? 'Wikimedia Commons などの、作者・ライセンスが分かる写真だけを出します。写真はコピーせず、表示の時にサーバーが中継し、作者・ライセンスと一緒に出します。'
+            : 'Wikimedia Commons などの、作者・ライセンスが分かる写真だけを出します。使う写真は、この旅行内に非公開(自分だけ)の記録として取り込み、撮影情報を取り除きます。作者・ライセンスは写真と一緒に表示します。'}
         </p>
         <form className="flex flex-wrap items-end gap-2" onSubmit={search} aria-label="外部の写真を探す">
           <div className="min-w-0 flex-1">

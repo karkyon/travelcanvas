@@ -10,7 +10,7 @@
 - DELETE /candidates/{id}                  : 消す(editor以上)
 - POST   /candidates/{id}/schedule         : 旅程に追加する(日・時刻)。場所(places)を作り(無ければ)、予定を作る。
                                              変更セット source=candidate で「元に戻す」可能。候補は消さない
-- POST   /candidates/{id}/merge            : 重複の候補を別の候補へまとめる(まとめた側は見送りになり、出典は一覧に残る)
+- POST   /candidates/{id}/merge            : 重複の候補を別の候補へまとめる(まとめた側は消す。メモ・出典・住所はまとめ先へ移す)
 
 予定が消えた候補は「候補」に戻る(DOC-14 §3.1「予定から外した場合は削除ではなく既定では候補へ戻す」。読む時に判定する)。
 監査に候補の名前・URL を残さない。
@@ -28,7 +28,8 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    FieldSource, Place, PlanCandidate, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan, User,
+    FieldSource, Place, PlanCandidate, PollOption, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan,
+    User,
 )
 from app.services import candidates as cs
 from app.services.audit_service import record_audit_event
@@ -378,14 +379,29 @@ def merge_candidate(plan_id: str, candidate_id: str, body: MergeInput, db: Sessi
     event_ids = {r[0] for r in db.query(TravelEvent.id).filter(TravelEvent.plan_id == plan.id).all()}
     if _effective_status(c, event_ids) == "scheduled":
         raise _bad("scheduled", "予定に配置済みの候補は、まとめる側にできません", 409)
-    # まとめた側にまとめられていた候補も、まとめ先へ付け替える(連鎖しない)
+    # [Gate SpotInfo] まとめた側は消す(2026-11-07 利用者の指示「マージした場合、不要な方は抹消」)。
+    # 消す前に、まとめ先に無い情報(メモ・出典の URL・住所・位置・種類)をまとめ先へ移す。投票の選択肢はまとめ先を指すようにする
     db.query(PlanCandidate).filter(PlanCandidate.plan_id == plan.id, PlanCandidate.merged_into_id == c.id).update(
         {PlanCandidate.merged_into_id: target.id}, synchronize_session=False)
-    c.status, c.scheduled_event_id, c.merged_into_id = "dismissed", None, target.id
-    if not target.note and c.note:
-        target.note = c.note
+    db.query(PollOption).filter(PollOption.candidate_id == c.id).update(
+        {PollOption.candidate_id: target.id}, synchronize_session=False)
+    changed = False
+    if c.note and c.note not in (target.note or ""):
+        merged_note = f"{target.note}\n\n「{c.title}」のメモ: {c.note}" if target.note else c.note
+        target.note = merged_note[:2000]
+        changed = True
+    if c.source_url and not target.source_url:
+        target.source_url, target.source_kind = c.source_url, c.source_kind
+        target.provider = target.provider or c.provider
+        target.retrieved_at = target.retrieved_at or c.retrieved_at
+        changed = True
+    for field in ("address", "category", "latitude", "longitude"):
+        if getattr(target, field) is None and getattr(c, field) is not None:
+            setattr(target, field, getattr(c, field))
+            changed = True
+    if changed:
         target.revision += 1
-    c.revision += 1
+    db.delete(c)
     db.commit()
     _audit("candidate.merge", current_user, plan, {})
     return _list(db, plan)

@@ -86,7 +86,9 @@ def duplicate_reasons(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
     if d is not None and d <= DUPLICATE_DISTANCE_M:
         reasons.append("nearby")
     aa, ab = normalize_name(a.get("address")), normalize_name(b.get("address"))
-    if aa and aa == ab:
+    # [Gate SpotInfo] 「福岡県北九州市」のような市町村までの住所は同じでも別の場所が多い(門司港レトロと TOTO ミュージアムを
+    # 重複と出していた)。番地(数字)まである住所で、位置が分かれば 1km 以内の時だけ同じ住所とみなす
+    if aa and aa == ab and any(ch.isdigit() for ch in aa) and (d is None or d <= 1000):
         reasons.append("same_address")
     if a.get("source_url") and a.get("source_url") == b.get("source_url"):
         reasons.append("same_url")

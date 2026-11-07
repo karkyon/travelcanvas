@@ -411,6 +411,7 @@ async def clone_travel_plan(
                     longitude=event.longitude,
                     phone=event.phone,
                     urls=event.urls,
+                    dining=event.dining,
                     locked=False,
                     sort_order=event.sort_order,
                 )

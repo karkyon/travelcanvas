@@ -3,6 +3,7 @@
  *
  * [Gate M9-FE-C2a] 旧services/api.ts(約92KB・単一ファイル)を責務別に分割したもの。定義本体は分割前から変更していない。
  */
+import type { DiningInfo } from '@/components/dining/diningModel';
 import type { TravelPlan } from '@/types';
 import { SpotsApi } from './spots';
 import type { ApiResponse, ItemDeleteResult, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
@@ -149,6 +150,8 @@ export class PlansApi extends SpotsApi {
       local_end_time?: string; end_day_offset?: number; phone?: string;
       /** [Gate SpotLinks] 場所の URL(最大 5 件) */
       urls?: { url: string; label?: string | null }[];
+      /** [Gate SpotInfo] 食事の情報 */
+      dining?: DiningInfo | null;
     },
     idempotencyKey: string
   ): Promise<NormalizedEvent> {
@@ -166,6 +169,7 @@ export class PlansApi extends SpotsApi {
       address: string; latitude: number; longitude: number; locked: boolean;
       phone: string;
       urls: { url: string; label?: string | null }[];
+      dining: DiningInfo | null;
     }>,
     ifMatch: number
   ): Promise<NormalizedEvent> {

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { nextEventIndexFor } from './planner/nextEventModel';
 import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
@@ -349,15 +350,12 @@ const DayView: React.FC<DayViewProps> = ({
     };
   }, [day.events]);
 
-  // 現在時刻に基づく次のイベントの特定
-  const nextEventIndex = useMemo(() => {
-    if (!showTimeProgress) return -1;
-    
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    return day.events.findIndex(event => (event.start_time || '') > currentTime);
-  }, [day.events, showTimeProgress]);
+  // 現在時刻に基づく次のイベントの特定。[Gate SpotInfo] その日が「今日」(その日の現地の日付)の時だけ。
+  // 旅行の当日でない日に NEXT を出すと意味が無い(2026-11-07 の指摘)
+  const nextEventIndex = useMemo(
+    () => (showTimeProgress ? nextEventIndexFor(day.events, day.date, day.timezone_id) : -1),
+    [day.events, day.date, day.timezone_id, showTimeProgress],
+  );
 
   // スケジュールアイテム追加
   const handleAddItem = useCallback(async () => {

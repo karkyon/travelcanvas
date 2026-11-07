@@ -377,6 +377,11 @@ class Spot(Base):
 
     # 画像（MVP版：URL文字列）
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # [Gate SpotInfo] 電話・URL(最大 5)・写真の出典(Commons。画像は保存せず中継で出す)・食事の情報(dining.DiningInfo)
+    phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    urls: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    photo: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    dining: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     # ユーザー関連
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -511,6 +516,8 @@ class TravelEvent(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     # [Gate SpotLinks] 場所の URL(公式サイト・予約・SNS など。最大 5 件、http/https だけ)。[{"url": str, "label": str|None}]
     urls: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    # [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など。dining.DiningInfo)
+    dining: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

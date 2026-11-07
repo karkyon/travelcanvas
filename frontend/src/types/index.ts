@@ -3,6 +3,8 @@
  * 既存コンポーネントで使用される型を定義
  */
 
+import type { DiningInfo } from '@/components/dining/diningModel';
+
 // スポット関連の型
 export interface Spot {
   id: string;
@@ -169,6 +171,8 @@ export interface ScheduleItem {
   phone?: string;
   /** [Gate SpotLinks] 場所の URL(公式サイト・予約・SNS など。最大 5 件) */
   urls?: EventUrl[];
+  /** [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など) */
+  dining?: DiningInfo | null;
 }
 
 /** [Gate SpotLinks] 予定の場所の URL 1 件 */
@@ -204,6 +208,8 @@ export interface CreateScheduleItemData {
   phone?: string;
   /** [Gate SpotLinks] 場所の URL(最大 5 件) */
   urls?: EventUrl[];
+  /** [Gate SpotInfo] 食事の情報 */
+  dining?: DiningInfo | null;
 }
 
 // 旅行日程(1日分)
