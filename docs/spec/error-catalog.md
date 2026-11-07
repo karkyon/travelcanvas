@@ -192,7 +192,7 @@
 | `provider_disabled` | 404 | no | この画像の提供元は使えません(止めてあります) | api/v1/media_providers.py |
 | `provider_not_ready` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
 | `provider_rejected` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
-| `provider_unavailable` | 503 | later | 場所の情報の提供元(OpenStreetMap)が応答しませんでした。時間をおいて試してください | api/v1/spots.py |
+| `provider_unavailable` | 503 | later | 場所の情報の提供元が応答しませんでした。時間をおいて試してください | api/v1/spots.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |

@@ -339,6 +339,8 @@ class Settings(BaseSettings):
     # 示してよい古さの上限(秒)。保存のキーは条件の SHA-256 だけ(入力の原文・利用者を含めない)
     OVERPASS_CACHE_SECONDS: int = 2700
     OVERPASS_STALE_SECONDS: int = 21600
+    # [Gate PlaceLookupJP] 楽天ウェブサービスへ送る Referer(アプリの「許可された Web サイト」と同じ URL。空なら付けない)
+    PLACE_LOOKUP_REFERER: str = ""
 
     # アプリケーション設定
     DEBUG: bool = True
