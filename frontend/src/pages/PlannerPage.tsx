@@ -46,7 +46,7 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import AllDaysChart from '@/components/planner/AllDaysChart';
-import { hoursBadge, segmentRow, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+import { hoursBadge, insertIndexByTime, segmentRow, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
@@ -136,6 +136,7 @@ const PlannerPage: React.FC = () => {
     removeOfflinePlan,
     checkOfflineAvailability,
     createQuickPlan,
+    moveItemBetweenDays,
   } = usePlanStore();
 
   const { isGuest } = useAuthStore();
@@ -328,6 +329,8 @@ const PlannerPage: React.FC = () => {
 
   const openEditItem = (item: ScheduleItemType) => {
     setEditingItem(item);
+    const dayIndex = Math.max(0, usePlanStore.getState().currentPlan?.days.findIndex((d) => d.events.some((e) => e.id === item.id)) ?? 0);
+    setEditDay({ value: dayIndex, original: dayIndex });
     setEditPhone({ value: item.phone ?? '', original: item.phone ?? '' });
     setEditUrls({ rows: item.urls?.length ? item.urls.map((u) => u.url) : [''], original: item.urls ?? [] });
     setUrlError(null);
@@ -348,6 +351,24 @@ const PlannerPage: React.FC = () => {
     setEditingItem(null);
     setEditConflict(null);
   };
+
+  // [Gate EventMoveDay] 予定を別の日へ移す(時刻はそのまま・時刻の順の位置へ。「元に戻す」で戻せる)
+  const dayLabel = (index: number) => {
+    const d = currentPlan?.days[index];
+    return d?.date ? `${d.date.slice(5).replace('-', '/')}(${getDayOfWeek(d.date)})` : `${index + 1}日目`;
+  };
+  const moveEventToDay = async (eventId: string, fromIndex: number, toIndex: number): Promise<boolean> => {
+    const plan = usePlanStore.getState().currentPlan;
+    const ev = plan?.days[fromIndex]?.events.find((e) => e.id === eventId);
+    const target = plan?.days[toIndex];
+    if (!ev || !target || fromIndex === toIndex) return false;
+    if (ev.locked) { addToast({ message: `「${ev.title}」は固定の予定なので動かせません`, type: 'error' }); return false; }
+    const ok = await moveItemBetweenDays(eventId, fromIndex, toIndex, insertIndexByTime(target.events, ev.start_time, eventId));
+    if (ok) addToast({ message: `「${ev.title}」を ${dayLabel(toIndex)} へ移しました(「元に戻す」で戻せます)`, type: 'success' });
+    else addToast({ message: `「${ev.title}」を移せませんでした`, type: 'error' });
+    return ok;
+  };
+  const [editDay, setEditDay] = useState<{ value: number; original: number }>({ value: 0, original: 0 });
 
   const saveFields = async (itemId: string, fields: EditFields, original: EditFields) => {
     // [Gate SpotLinks] URL の形を保存の前に確かめる(違えば保存しない)
@@ -388,6 +409,13 @@ const PlannerPage: React.FC = () => {
         // [G11-Conflict] 読み直せなかった: 古い内容と比べて「変わった項目は無い」と言い切らない。入力は残す
         setEditConflict(unreadConflict(original, fields));
         return;
+      }
+      // [Gate EventMoveDay] 日付を変えた時は、ほかの項目を保存した後で別の日へ移す
+      if (result === 'saved' && editDay.value !== editDay.original) {
+        const moved = await moveEventToDay(itemId, editDay.original, editDay.value);
+        if (!moved) return;
+      } else if (result === 'queued' && editDay.value !== editDay.original) {
+        addToast({ message: 'オフラインの間は日付を変えられません。つながってからもう一度変えてください', type: 'error' });
       }
       if (result !== 'failed') closeEditItem();
     } finally {
@@ -962,7 +990,8 @@ const PlannerPage: React.FC = () => {
             </Card>
           ) : planView === 'all' ? (
             <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
-              onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }} />
+              onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }}
+              onMoveEvent={(id, from, to) => { void moveEventToDay(id, from, to); }} />
           ) : activeDay ? (
             <div className={`tc-planner-layout${showMap ? '' : ' tc-planner-layout--nomap'}`} data-testid="planner-layout">
               <section className="tc-card tc-timeline-card" aria-label={`${currentDayIndex + 1}日目の予定`}>
@@ -1354,6 +1383,22 @@ const PlannerPage: React.FC = () => {
                 <div className="rounded-xl border border-cloud-200 p-3">
                   <DiningFields value={editDining.value} onChange={(value) => setEditDining((d) => ({ ...d, value }))} />
                 </div>
+              )}
+              {/* [Gate EventMoveDay] 日付(別の日へ移す。宿・食事・観光など全ての予定) */}
+              {currentPlan && currentPlan.days.length > 1 && (
+                <label className="block text-sm font-medium text-ink-700">
+                  日付
+                  <select value={editDay.value} onChange={(e) => setEditDay((d) => ({ ...d, value: Number(e.target.value) }))}
+                    disabled={!!editingItem?.locked} data-testid="edit-day"
+                    className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900">
+                    {currentPlan.days.map((d, i) => <option key={d.id} value={i}>{`${i + 1}日目 ${dayLabel(i)}`}</option>)}
+                  </select>
+                  <span className="mt-1 block text-xs text-ink-700" data-testid="edit-day-note">
+                    {editingItem?.locked ? '固定の予定なので日付は変えられません'
+                      : editDay.value !== editDay.original ? `保存すると ${dayLabel(editDay.value)} へ移します(時刻はそのまま)`
+                        : '別の日を選ぶと、保存でその日へ移します'}
+                  </span>
+                </label>
               )}
               <fieldset className="rounded-xl border border-cloud-200 p-3">
                 <legend className="px-1 text-sm font-semibold text-ink-900">時間(任意)</legend>

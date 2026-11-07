@@ -117,7 +117,8 @@ interface PlanState {
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
   /** [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。1 回の「元に戻す」で戻る。成功で true */
   reorderDaySlots: (dayId: string, itemIds: string[]) => Promise<boolean>;
-  moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<void>;
+  /** 別の日へ移す(日時も日数の差だけずらす)。成功で true */
+  moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<boolean>;
 
   // Undo (Gate #29 APIが持つ直近1件のUndo)
   undoLastChange: () => Promise<void>;
@@ -969,19 +970,19 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // 日付間でのアイテム移動
   moveItemBetweenDays: async (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => {
     const state = get();
-    if (!state.currentPlan) return;
+    if (!state.currentPlan) return false;
     if (state.currentPlan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
-      return;
+      return false;
     }
 
     const plan = state.currentPlan;
     const fromDay = plan.days[fromDayIndex];
     const toDay = plan.days[toDayIndex];
-    if (!fromDay || !toDay) return;
+    if (!fromDay || !toDay || fromDayIndex === toDayIndex) return false;
 
     const itemToMove = fromDay.events.find((event) => event.id === itemId);
-    if (!itemToMove) return;
+    if (!itemToMove) return false;
 
     const updatedFromDay = { ...fromDay, events: fromDay.events.filter((event) => event.id !== itemId) };
     const updatedToDay = {
@@ -1022,9 +1023,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           },
         };
       });
+      return true;
     } catch (error) {
       set({ currentPlan: plan });
       await get()._reconcileOnConflict(error, plan.id);
+      return false;
     }
   },
 

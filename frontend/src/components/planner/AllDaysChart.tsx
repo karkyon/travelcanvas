@@ -5,9 +5,10 @@
  * - 全ての列で同じ時刻の物差し(その旅行で最も早い開始〜最も遅い終わり)。予定は時刻の位置に帯で置く
  * - 列の見出しに日付・曜日・時刻帯・要約(予定の数・最初と最後・移動の合計・空き時間・固定の数)
  * - 予定・列を押すとその日の日別へ戻る。時刻の無い予定は列の下に並べる
+ * - [Gate EventMoveDay] 予定を別の日の列へドラッグ&ドロップすると、その日へ移す(時刻はそのまま・固定の予定は動かさない)
  * 空き時間・移動の合計は重なりを二重に数えない(plannerModel.unionMinutes)。
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import TransportIcon from '../common/TransportIcon';
 import type { DaySchedule } from '@/types';
 import type { TravelSegment } from '@/services/api/types/segments';
@@ -32,15 +33,46 @@ interface Props {
   segments: TravelSegment[];
   currentDay: number;
   onOpenDay: (index: number) => void;
+  /** [Gate EventMoveDay] 予定を別の日へ移す(ドラッグ&ドロップ)。無ければドラッグできない */
+  onMoveEvent?: (eventId: string, fromIndex: number, toIndex: number) => void;
 }
 
+const DRAG_TYPE = 'application/x-tc-event';
+interface DragState { id: string; from: number }
+
 const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number; current: boolean;
-  onOpen: () => void }> = ({ day, scaleStart, scaleEnd, current, onOpen }) => {
+  onOpen: () => void; locked: Set<string>; drag: DragState | null; setDrag: (d: DragState | null) => void;
+  onDropEvent?: (d: DragState) => void }> = ({ day, scaleStart, scaleEnd, current, onOpen, locked, drag, setDrag, onDropEvent }) => {
   const height = ((scaleEnd - scaleStart) / 60) * PX_PER_HOUR;
   const label = `${day.date}(${weekday(day.date)})`;
+  const [over, setOver] = useState(false);
+  const canDrop = !!onDropEvent && !!drag && drag.from !== day.index;
+  const dragProps = (id: string) => (onDropEvent && !locked.has(id) ? {
+    draggable: true,
+    onDragStart: (ev: React.DragEvent) => {
+      ev.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id, from: day.index }));
+      ev.dataTransfer.effectAllowed = 'move';
+      setDrag({ id, from: day.index });
+    },
+    onDragEnd: () => setDrag(null),
+    title: 'ドラッグして別の日の列に落とすと、その日へ移せます',
+  } : { title: locked.has(id) ? '固定の予定は動かせません' : undefined });
   return (
     <section aria-labelledby={`chart-day-${day.id}`} data-testid={`chart-day-${day.index}`}
-      className={`flex min-w-[15rem] flex-col rounded-xl border bg-surface p-3 ${current ? 'border-accent' : 'border-cloud-200'}`}>
+      onDragOver={(ev) => { if (canDrop) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; setOver(true); } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(ev) => {
+        setOver(false);
+        if (!onDropEvent) return;
+        ev.preventDefault();
+        let d: DragState | null = drag;
+        try { d = JSON.parse(ev.dataTransfer.getData(DRAG_TYPE)) as DragState; } catch { /* 同じ画面の中は drag の値を使う */ }
+        setDrag(null);
+        if (d && d.from !== day.index) onDropEvent(d);
+      }}
+      data-drop={over && canDrop ? 'over' : undefined}
+      className={`flex min-w-[15rem] flex-col rounded-xl border bg-surface p-3 ${over && canDrop ? 'border-accent ring-2 ring-accent/40 bg-cloud-50'
+        : current ? 'border-accent' : 'border-cloud-200'}`}>
       <header className="border-b border-cloud-200 pb-2">
         <p className="text-xs font-semibold text-ink-700">{`DAY ${day.index + 1}`}</p>
         <h3 id={`chart-day-${day.id}`} className="font-semibold text-ink-900">{label}</h3>
@@ -66,8 +98,9 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
             const h = Math.max(30, ((((e.end ?? e.start ?? scaleStart) - (e.start ?? scaleStart)) / 60) * PX_PER_HOUR));
             return (
               <li key={e.id} className="absolute left-0 right-0" style={{ top, height: h }}>
-                <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`}
-                  className="h-full w-full overflow-hidden rounded-md border border-cloud-200 bg-cloud-100 px-2 py-1 text-left text-xs text-ink-900">
+                <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id)}
+                  className={`h-full w-full overflow-hidden rounded-md border border-cloud-200 bg-cloud-100 px-2 py-1 text-left text-xs text-ink-900${
+                    onDropEvent && !locked.has(e.id) ? ' cursor-grab active:cursor-grabbing' : ''}${drag?.id === e.id ? ' opacity-50' : ''}`}>
                   <span className="font-semibold">{hm(e.start ?? 0)}</span>{' '}
                   <span>{e.title}</span>
                   {!e.endKnown && <span className="text-ink-700">(終了未設定)</span>}
@@ -80,7 +113,14 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
       </div>
       {day.untimed.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-ink-700" aria-label={`${label}の時刻の無い予定`}>
-          {day.untimed.map((e) => <li key={e.id}>{`時刻未定 · ${e.title}`}</li>)}
+          {day.untimed.map((e) => (
+            <li key={e.id}>
+              <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id)}
+                className={`w-full rounded-md px-1 text-left hover:bg-cloud-100${onDropEvent && !locked.has(e.id) ? ' cursor-grab' : ''}`}>
+                {`時刻未定 · ${e.title}`}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
       <button type="button" onClick={onOpen} className="mt-3 self-start text-sm font-semibold text-accent underline"
@@ -91,21 +131,24 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
   );
 };
 
-const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay }) => {
-  const model = useMemo(() => buildChart(days, segments, new Set(days.flatMap((d) => d.events.filter((e) => e.locked)
-    .map((e) => e.id)))), [days, segments]);
+const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, onMoveEvent }) => {
+  const locked = useMemo(() => new Set(days.flatMap((d) => d.events.filter((e) => e.locked).map((e) => e.id))), [days]);
+  const model = useMemo(() => buildChart(days, segments, locked), [days, segments, locked]);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const many = days.length > 3;
   return (
     <section aria-labelledby="all-days-title" data-testid="all-days-chart" className="mb-4">
       <h2 id="all-days-title" className="text-base font-semibold text-ink-900">全日程の横断チャート</h2>
-      <p className="text-xs text-ink-700">日ごとの予定の密度と空き時間を、同じ時刻の物差しで見比べられます。予定を押すとその日の編集に戻ります。</p>
+      <p className="text-xs text-ink-700">日ごとの予定の密度と空き時間を、同じ時刻の物差しで見比べられます。予定を押すとその日の編集に戻ります。
+        {onMoveEvent && ' 予定をドラッグして別の日の列に落とすと、その日へ移せます(時刻はそのまま。スマホでは予定の編集の「日付」で変えられます)。'}</p>
       {many && <p className="mt-1 text-xs text-ink-700" data-testid="all-days-scroll-hint">横に流すと他の日も見られます →</p>}
       <div className={`mt-3 gap-3 ${many ? 'flex overflow-x-auto pb-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}
         tabIndex={many ? 0 : undefined} aria-label={many ? '全日程(横に流せます)' : undefined}
         role={many ? 'region' : undefined}>
         {model.days.map((d) => (
           <DayColumn key={d.id} day={d} scaleStart={model.scaleStart} scaleEnd={model.scaleEnd}
-            current={d.index === currentDay} onOpen={() => onOpenDay(d.index)} />
+            current={d.index === currentDay} onOpen={() => onOpenDay(d.index)} locked={locked} drag={drag} setDrag={setDrag}
+            onDropEvent={onMoveEvent ? (x) => onMoveEvent(x.id, x.from, d.index) : undefined} />
         ))}
       </div>
     </section>
