@@ -20,8 +20,11 @@ import Button from './common/Button';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
 import type { PlaceDraft, PlaceTab } from './search/PlaceFinder';
-import { getPlaceInfo } from '../services/api/planEdit';
-import Input from './common/Input';
+import NewEventForm from './planner/NewEventForm';
+import { applyCandidate, lookupPlace, toCategory, type NewEventData } from './planner/newEventLookup';
+import type { PlaceInfoResult } from '../services/api/planEdit';
+import { nearPoint } from '@/components/places/placeHelpers';
+import { usePlanStore } from '@/store/planStore';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 import UiIcon from '@/components/common/UiIcon';
 import { IcCalendar, IcFootprints, IcMapPin, IcTimer, IcWallet } from '@/components/common/uiIcons';
@@ -276,36 +279,82 @@ const DayView: React.FC<DayViewProps> = ({
   }, [view, propose]);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [placeTab, setPlaceTab] = useState<PlaceTab>('manual');
-  // [Gate PlanSpotEdit] 場所を選んだ時、足りない住所・電話番号・種類を OpenStreetMap から 1 回だけ読んで空の欄にだけ入れる
-  const [lookup, setLookup] = useState<{ state: 'idle' | 'busy' | 'done' | 'none' | 'error'; note: string }>({ state: 'idle', note: '' });
+  const [placeTab, setPlaceTabState] = useState<PlaceTab>('manual');
+  // [Gate AddEventForm] 手で入力はスポットを編集と同じ入れ方(自動取得・URL・地図・滞在時間)。名前で検索から来たら自動取得する
+  const [urlRows, setUrlRows] = useState<string[]>(['']);
+  const [stay, setStay] = useState<{ h: string; m: string }>({ h: '', m: '' });
+  const [lookupState, setLookupState] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null }>(
+    { busy: false, result: null, error: null });
+  const lastQuery = useRef('');
+  const near = () => {
+    const days = usePlanStore.getState().currentPlan?.days ?? [];
+    return nearPoint(null, day.events, days.flatMap((d) => d.events));
+  };
+  // 名前で自動取得し、一番上の候補を空の欄へ入れる(ほかの候補は一覧で選び直せる)
+  const autoFill = async (name: string, address?: string | null, at?: { latitude: number; longitude: number } | null) => {
+    if (!name.trim()) return;
+    setLookupState({ busy: true, result: null, error: null });
+    try {
+      const { result, best } = await lookupPlace(name, at ?? near(), address);
+      if (best) {
+        setNewItemData((prev) => (prev.title !== name ? prev : applyCandidate(prev, [], best, false).data));
+        setUrlRows((rows) => applyCandidate({}, rows, best, false).urlRows);
+      }
+      setLookupState({ busy: false, result: result.candidates.length > 1 ? result : null,
+        error: result.unavailable ? '場所の情報を読めませんでした(手で入れられます)'
+          : best ? `自動取得で住所・電話・公式サイト・地図の位置を入れました。違う時は下の候補から選び直すか、手で直してください`
+            : '場所の情報が見つかりませんでした。住所を入れて「自動取得」か「住所から位置を探す」を押してください' });
+    } catch {
+      setLookupState({ busy: false, result: null, error: '場所の情報を読めませんでした(手で入れられます)' });
+    }
+  };
+  const setPlaceTab = (next: PlaceTab) => {
+    setPlaceTabState(next);
+    const q = lastQuery.current.trim();
+    if (next === 'manual' && q && !newItemData.title?.trim()) {
+      setNewItemData((prev) => ({ ...prev, title: q }));
+      void autoFill(q);
+    }
+  };
   const pickPlace = (d: PlaceDraft) => {
     setNewItemData((prev) => ({
-      ...prev, title: d.name, location_name: d.name, address: d.address ?? '', category: toEventCategory(d.category),
+      ...prev, title: d.name, location_name: d.name, address: d.address ?? '', category: d.category ? toEventCategory(d.category) : undefined,
       latitude: d.latitude ?? undefined, longitude: d.longitude ?? undefined, phone: '',
       description: d.description ?? prev.description, notes: d.sourceUrl ? `出典: ${d.sourceUrl}` : prev.notes,
     }));
-    setPlaceTab('manual');
-    if (!d.name.trim() && (d.latitude === null || d.longitude === null)) return;
-    setLookup({ state: 'busy', note: '住所・電話番号を調べています…' });
-    getPlaceInfo({ name: d.name, latitude: d.latitude, longitude: d.longitude }).then((r) => {
-      const c = r.candidates[0];
-      if (r.unavailable) { setLookup({ state: 'error', note: '場所の情報を読めませんでした(手で入れられます)' }); return; }
-      if (!c) { setLookup({ state: 'none', note: '場所の情報が見つかりませんでした' }); return; }
-      setNewItemData((prev) => {
-        if (prev.title !== d.name) return prev; // 別の場所を選び直した後の古い結果は入れない
-        const next = { ...prev };
-        if (!prev.address && c.address) next.address = c.address;
-        if (!prev.phone && c.phone) next.phone = c.phone;
-        if (!d.category && c.category) next.category = c.category;
-        if (prev.latitude === undefined && c.latitude !== null && c.longitude !== null) {
-          next.latitude = c.latitude;
-          next.longitude = c.longitude;
-        }
-        return next;
-      });
-      setLookup({ state: 'done', note: `${r.attribution}(${r.license})の情報を入れました。内容を確かめてください` });
-    }).catch(() => setLookup({ state: 'error', note: '場所の情報を読めませんでした(手で入れられます)' }));
+    setUrlRows(['']);
+    setPlaceTabState('manual');
+    if (!d.name.trim()) return;
+    void autoFill(d.name, d.address, d.latitude !== null && d.longitude !== null ? { latitude: d.latitude, longitude: d.longitude } : null);
+  };
+  // [Gate SpotFromMedia] 動画・投稿・写真の候補を複数まとめて予定に入れる(それぞれ自動取得してから)
+  const [bulk, setBulk] = useState<string | null>(null);
+  const pickMany = async (drafts: PlaceDraft[]) => {
+    let done = 0;
+    for (const d of drafts) {
+      setBulk(`${done + 1} / ${drafts.length} 件目「${d.name}」を調べています…`);
+      let data: NewEventData = {
+        title: d.name, location_name: d.name, category: toCategory(d.category) ?? 'sightseeing', address: d.address ?? '',
+        latitude: d.latitude ?? undefined, longitude: d.longitude ?? undefined,
+        notes: [d.description, d.sourceUrl ? `出典: ${d.sourceUrl}` : null].filter(Boolean).join('\n'),
+      };
+      let rows: string[] = [];
+      try {
+        const { best } = await lookupPlace(d.name, near(), d.address);
+        if (best) ({ data, urlRows: rows } = applyCandidate(data, [], best, false));
+      } catch { /* 名前だけでも入れる */ }
+      try {
+        await addNewScheduleItem(planId, day.id, {
+          ...(data as CreateScheduleItemData), title: d.name, category: data.category ?? 'sightseeing', currency: 'JPY', priority: 3,
+          urls: rows.filter((u) => /^https?:\/\//.test(u)).map((url) => ({ url, label: null })),
+        });
+        done += 1;
+      } catch { /* 次へ */ }
+    }
+    setBulk(null);
+    addToast({ type: done === drafts.length ? 'success' : 'warning',
+      message: `${done} 件を予定に追加しました${done < drafts.length ? `(${drafts.length - done} 件は追加できませんでした)` : ''}。時刻は未定です` });
+    if (done > 0) setIsAddModalOpen(false);
   };
   const [newItemData, setNewItemData] = useState<Partial<CreateScheduleItemData>>({
     title: '',
@@ -387,12 +436,22 @@ const DayView: React.FC<DayViewProps> = ({
         travel_cost: newItemData.travel_cost || 0,
         notes: newItemData.notes || '',
         phone: newItemData.phone?.trim() || undefined,
+        urls: urlRows.map((u) => u.trim()).filter((u) => /^https?:\/\//.test(u)).slice(0, 5).map((url) => ({ url, label: null })),
+        dining: newItemData.dining ?? undefined,
       };
+      const badUrl = urlRows.map((u) => u.trim()).find((u) => u && !/^https?:\/\/[^\s]+$/.test(u));
+      if (badUrl) {
+        addToast({ type: 'warning', message: `URL の形が違います: ${badUrl}` });
+        return;
+      }
 
       await addNewScheduleItem(planId, day.id, itemData);
       
       setIsAddModalOpen(false);
-      setLookup({ state: 'idle', note: '' });
+      setLookupState({ busy: false, result: null, error: null });
+      setUrlRows(['']);
+      setStay({ h: '', m: '' });
+      lastQuery.current = '';
       setNewItemData({
         title: '',
         description: '',
@@ -417,7 +476,7 @@ const DayView: React.FC<DayViewProps> = ({
         message: 'スケジュールの追加に失敗しました'
       });
     }
-  }, [newItemData, addNewScheduleItem, planId, day.id, addToast]);
+  }, [newItemData, urlRows, addNewScheduleItem, planId, day.id, addToast]);
 
   // スケジュールアイテム削除
   const handleDeleteItem = useCallback(async (itemId: string) => {
@@ -708,117 +767,13 @@ const DayView: React.FC<DayViewProps> = ({
       >
         <Modal.Body>
           <React.Suspense fallback={<p className="text-sm text-ink-700" role="status">読み込み中…</p>}>
-            <PlaceFinder tab={placeTab} onTab={setPlaceTab} onPick={pickPlace} withWish pickLabel="入れる" />
+            <PlaceFinder tab={placeTab} onTab={setPlaceTab} onPick={pickPlace} withWish pickLabel="入れる" planId={planId}
+              onPickMany={(d) => void pickMany(d)} onQuery={(q) => { lastQuery.current = q; }} />
           </React.Suspense>
-          <div className={`space-y-4 ${placeTab === 'manual' ? '' : 'hidden'}`}>
-            <Input
-              label="タイトル *"
-              value={newItemData.title || ''}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="東京タワー見学"
-              fullWidth
-            />
-            
-            <Input
-              label="説明"
-              value={newItemData.description || ''}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="展望台からの景色を楽しむ"
-              fullWidth
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">
-                  カテゴリ
-                </label>
-                <select
-                  value={newItemData.category || 'sightseeing'}
-                  onChange={(e) => setNewItemData(prev => ({ ...prev, category: e.target.value as CreateScheduleItemData['category'] }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  <option value="sightseeing">観光・名所</option>
-                  <option value="dining">グルメ・レストラン</option>
-                  <option value="shopping">ショッピング</option>
-                  <option value="activity">エンターテイメント</option>
-                  <option value="accommodation">宿泊施設</option>
-                  <option value="transportation">交通・移動</option>
-                  <option value="other">その他</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">
-                  優先度
-                </label>
-                <select
-                  value={newItemData.priority ?? 3}
-                  onChange={(e) => setNewItemData(prev => ({ ...prev, priority: Number(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  <option value={1}>低</option>
-                  <option value={3}>中</option>
-                  <option value={5}>高</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="開始時間"
-                type="time"
-                value={newItemData.start_time || ''}
-                onChange={(e) => setNewItemData(prev => ({ ...prev, start_time: e.target.value }))}
-                fullWidth
-              />
-              
-              <Input
-                label="終了時間"
-                type="time"
-                value={newItemData.end_time || ''}
-                onChange={(e) => setNewItemData(prev => ({ ...prev, end_time: e.target.value }))}
-                fullWidth
-              />
-            </div>
-
-            <Input
-              label="場所"
-              value={newItemData.location_name || ''}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, location_name: e.target.value }))}
-              placeholder="東京タワー"
-              fullWidth
-            />
-
-            <Input
-              label="住所"
-              value={newItemData.address || ''}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, address: e.target.value }))}
-              placeholder="東京都港区芝公園4-2-8"
-              fullWidth
-            />
-
-            <Input
-              label="電話番号"
-              type="tel"
-              value={newItemData.phone || ''}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, phone: e.target.value }))}
-              placeholder="03-3433-5111"
-              maxLength={40}
-              fullWidth
-            />
-            {lookup.state !== 'idle' && (
-              <p role="status" className={`text-xs ${lookup.state === 'error' ? 'text-danger' : 'text-ink-700'}`} data-testid="add-place-lookup">
-                {lookup.note}
-              </p>
-            )}
-
-            <Input
-              label="費用 (円)"
-              type="number"
-              value={newItemData.cost || 0}
-              onChange={(e) => setNewItemData(prev => ({ ...prev, cost: Number(e.target.value) }))}
-              fullWidth
-            />
+          {bulk && <p className="mt-3 text-sm text-ink-700" role="status" data-testid="add-bulk">{bulk}</p>}
+          <div className={placeTab === 'manual' ? '' : 'hidden'}>
+            <NewEventForm data={newItemData} setData={setNewItemData} urlRows={urlRows} setUrlRows={setUrlRows} stay={stay} setStay={setStay}
+              near={near()} lookupState={lookupState} setLookupState={setLookupState} />
           </div>
         </Modal.Body>
         

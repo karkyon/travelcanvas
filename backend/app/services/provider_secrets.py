@@ -48,6 +48,11 @@ SLOTS: Dict[str, Dict[str, Any]] = {
     "hotpepper_api_key": {"label": "ホットペッパーグルメ(リクルート Web サービス)の API キー", "providers": ["hotpepper"],
                           "env": "HOTPEPPER_API_KEY", "free": True,
                           "hint": "リクルート Web サービスでメールアドレスを登録すると届くキー。飲食店のジャンル・予算・営業時間などを取ります"},
+    # [Gate SpotFromMedia] YouTube の動画の説明欄(目次)を読む(1 日 10,000 単位まで無料)
+    "youtube_api_key": {"label": "YouTube Data API v3 の API キー", "providers": ["youtube_data"],
+                        "env": "YOUTUBE_API_KEY", "free": True,
+                        "hint": ("Google Cloud で「YouTube Data API v3」を有効にした API キー(Google マップのサーバー用キーに"
+                                 "足しても可)。動画の説明欄から場所の候補を出します")},
 }
 MIN_LEN, MAX_LEN = 8, 512
 
