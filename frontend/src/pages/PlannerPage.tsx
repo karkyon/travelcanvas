@@ -20,7 +20,7 @@ import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeIm
 import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
 import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
 import { geocodeAddress, getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
-import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
+import { appendNotes, mergeUrlRows, nearPoint } from '@/components/places/placeHelpers';
 import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { Globe, LocateFixed } from 'lucide-react';
 import EventUrlsField from '@/components/planner/EventUrlsField';
@@ -260,8 +260,12 @@ const PlannerPage: React.FC = () => {
     if (!editingItem) return;
     setPlaceInfo({ busy: true, result: null, error: null });
     try {
-      const result = await getPlaceInfo({ name: editForm.title, latitude: editCoords.lat ?? editingItem.latitude,
-        longitude: editCoords.lng ?? editingItem.longitude });
+      // [Gate PlaceLookupAccuracy] 予定に位置が無ければ、同じ日・旅行の予定の位置の真ん中を「近く」にする。住所も渡す
+      const days = usePlanStore.getState().currentPlan?.days ?? [];
+      const near = nearPoint({ latitude: editCoords.lat ?? editingItem.latitude, longitude: editCoords.lng ?? editingItem.longitude },
+        days.find((d) => d.events.some((e) => e.id === editingItem.id))?.events ?? [], days.flatMap((d) => d.events));
+      const result = await getPlaceInfo({ name: editForm.title, latitude: near?.latitude, longitude: near?.longitude,
+        address: editForm.location_name });
       setPlaceInfo({
         busy: false, result, mode: 'info',
         error: result.unavailable ? '場所の情報の提供元が応答しませんでした。時間をおいて試すか、手で入れてください'

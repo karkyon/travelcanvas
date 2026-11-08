@@ -167,3 +167,38 @@ def test_helpers():
     assert dining.genres_from_text("ハンバーガー") == ["burger"]
     assert dining.genres_from_text("ジャパニーズダイニング 和食") == ["washoku"]
     assert dining.budget_key("～1000円") == "u1000" and dining.budget_key("10001～15000円") == "10000_20000"
+
+
+TOKYO_AQUA = [{"lat": "35.7101", "lon": "139.8107", "name": "アクアフォレスト", "category": "shop", "type": "pet",
+               "osm_type": "node", "osm_id": 9, "display_name": "アクアフォレスト, 押上一丁目, 墨田区, 東京都, 131-0045, 日本",
+               "address": {"country_code": "jp", "state": "東京都", "city": "墨田区", "postcode": "131-0045"}}]
+
+
+def test_far_same_name_is_dropped_and_address_gives_position(auth_client, fake):
+    """[Gate PlaceLookupAccuracy] 伊勢志摩の宿の名前で、東京の同名の店を出さない。住所から位置を出す"""
+    client, _ = auth_client
+    calls, bodies, state = fake
+    state["keys"] = {k: None for k in state["keys"]}
+    bodies["nominatim"] = TOKYO_AQUA
+    r = client.post("/api/v1/spots/place-info", json={
+        "name": "都リゾート 奥志摩 アクアフォレスト", "latitude": 34.482, "longitude": 136.846,
+        "address": "三重県志摩市大王町船越3238-1"}).json()
+    assert len(r["candidates"]) == 1
+    c = r["candidates"][0]
+    assert c["name"] == "都リゾート 奥志摩 アクアフォレスト" and c["address"] == "三重県志摩市大王町船越3238-1"
+    assert (c["latitude"], c["longitude"]) == (34.28, 136.87) and c["providers"] == ["gsi"]
+    assert "東京" not in str(r)
+    # 位置も住所も無い時は、名前の一部で探した遠い候補を出さない
+    pl.reset()
+    pi.reset()
+    r2 = client.post("/api/v1/spots/place-info", json={"name": "都リゾート 奥志摩 アクアフォレスト"}).json()
+    assert r2["candidates"] == []
+
+
+def test_in_area_helpers():
+    rows = [{"address": "東京都墨田区押上1-1", "latitude": 35.71, "longitude": 139.81},
+            {"address": "三重県志摩市大王町", "latitude": 34.28, "longitude": 136.87},
+            {"address": None, "latitude": None, "longitude": None}]
+    assert pl.in_area(rows, None, None, "三重県") == rows[1:]
+    assert pl.in_area(rows, 34.48, 136.84, None) == rows[1:]
+    assert pl.prefecture_of("〒517-0604 三重県志摩市") == "三重県" and pl.prefecture_of("志摩市") is None

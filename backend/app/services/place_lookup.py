@@ -557,10 +557,37 @@ async def _call(name: str, fn: Awaitable[Any], record: Recorder, failures: List[
         return None
 
 
+def prefecture_of(address: Optional[str]) -> Optional[str]:
+    body = strip_postal(address)
+    return next((p for p in _PREFS if body.startswith(p)), None) if body else None
+
+
+# [Gate PlaceLookupAccuracy] 旅行先から遠い同名の場所(例: 伊勢志摩の宿の名前で東京の店)を外す
+NEAR_KM = 80.0
+LOOSE_NEAR_KM = 30.0
+
+
+def in_area(rows: List[Dict[str, Any]], lat: Optional[float], lng: Optional[float], pref: Optional[str],
+            limit_km: float = NEAR_KM) -> List[Dict[str, Any]]:
+    """住所の都道府県が違う候補・近くの位置から limit_km より遠い候補を外す(分からない項目では外さない)"""
+    out = []
+    for r in rows:
+        rp = prefecture_of(r.get("address"))
+        if pref and rp and rp != pref:
+            continue
+        if distance_m(lat, lng, r.get("latitude"), r.get("longitude")) > limit_km * 1000 and lat is not None \
+                and r.get("latitude") is not None:
+            continue
+        out.append(r)
+    return out
+
+
 async def lookup(db: Session, name: Optional[str], lat: Optional[float], lng: Optional[float],
-                 record: Recorder) -> Dict[str, Any]:
-    """名前(と近くの位置)から場所の候補を集める。返す: candidates・sources(出典)・unavailable(全部の提供元が答えない)"""
+                 record: Recorder, address: Optional[str] = None) -> Dict[str, Any]:
+    """名前(と近くの位置・住所)から場所の候補を集める。返す: candidates・sources(出典)・unavailable(全部の提供元が答えない)。
+    [Gate PlaceLookupAccuracy] 住所の都道府県が違う候補・近くの位置から遠い候補は外す。名前で見つからない時は、住所から位置を出す"""
     name = (name or "").strip()[:200]
+    pref = prefecture_of(address)
     k = keys(db)
     failures: List[str] = []
     rows: List[Dict[str, Any]] = []
@@ -584,12 +611,18 @@ async def lookup(db: Session, name: Optional[str], lat: Optional[float], lng: Op
             osm_cached = cached
             if not cached:
                 record("openstreetmap", "ok" if osm else "empty")
+            osm = in_area(osm, lat, lng, pref)
             if not osm and name and not rows:
                 for variant in _variants(name):
-                    osm, cached = await place_info.lookup(variant, lat, lng)
+                    found, cached = await place_info.lookup(variant, lat, lng)
                     if not cached:
-                        record("openstreetmap", "ok" if osm else "empty")
-                    if osm:
+                        record("openstreetmap", "ok" if found else "empty")
+                    # 名前の一部で探した物は、近く(30km 以内)か同じ都道府県の時だけ使う(遠い同名の店を出さない)
+                    found = in_area(found, lat, lng, pref, LOOSE_NEAR_KM)
+                    if lat is None and not pref:
+                        found = []
+                    if found:
+                        osm = found
                         break
         except SearchProviderError as err:
             record("openstreetmap", err.code)
@@ -597,12 +630,23 @@ async def lookup(db: Session, name: Optional[str], lat: Optional[float], lng: Op
             osm, osm_ok = [], False
         for r in osm:
             rows.append(_row("openstreetmap", **{k2: v for k2, v in r.items()}, providers=["openstreetmap"]))
+        rows = in_area(rows, lat, lng, pref)
+        if name and lat is None and not pref:
+            # 位置も住所も無い時、名前の一部だけが同じ候補(「アクアフォレスト」など)は別の場所のことが多いので出さない
+            rows = [r for r in rows if not _partial_only(name, r.get("name"))]
         if name:
             # 名前の当たらない候補(近くの別の店など)は外す。OpenStreetMap だけの時は、別名(英語名など)で当たった物を残す
             close = [r for r in rows if name_score(name, r.get("name")) >= 0.45]
             only_osm = all(r["providers"][0] == "openstreetmap" for r in rows)
             rows = close if close or not only_osm else rows
         merged = rank([merge([g]) for g in group_rows(rows)], name, lat, lng)[:5]
+        # 名前で見つからない時は、入っている住所から位置を出す(名前と住所はそのまま)
+        if not merged and name and strip_postal(address):
+            geo = await _geocode_rows(client, k, strip_postal(address), record, failures)
+            if geo:
+                g = geo[0]
+                merged = [_row(g["provider"], name=name, address=strip_postal(address), latitude=g["latitude"],
+                               longitude=g["longitude"], notes=["名前では見つからなかったので、住所から地図の位置を出しました"])]
         # 足りない所を補う(上の 3 件だけ): Wikidata の公式サイト・住所、住所の細かさ(町名・番地)
         for c in merged[:3]:
             await _complete(client, c, k, record, failures)
@@ -619,6 +663,11 @@ async def lookup(db: Session, name: Optional[str], lat: Optional[float], lng: Op
         "cached": osm_cached and not names and not failures,
         "failed_providers": failures,
     }
+
+
+def _partial_only(query: str, name: Optional[str]) -> bool:
+    a, b = _norm(query), _norm(name)
+    return bool(a and b and b != a and b in a and len(b) / len(a) < 0.7)
 
 
 def _variants(name: str) -> List[str]:
@@ -664,6 +713,18 @@ async def _complete(client: httpx.AsyncClient, c: Dict[str, Any], k: Dict[str, O
 def _postal_of(address: Optional[str]) -> Optional[str]:
     m = re.match(r"^〒?\s*(\d{3}-?\d{4})", unicodedata.normalize("NFKC", str(address or "")).strip())
     return m.group(1) if m else None
+
+
+async def _geocode_rows(client: httpx.AsyncClient, k: Dict[str, Optional[str]], body: str, record: Recorder,
+                        failures: List[str]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    if k[SLOT_YAHOO]:
+        out = await _call("yahoo_local", yahoo_geocode(client, k[SLOT_YAHOO] or "", body), record, failures) or []
+    if not out:
+        out = await _call("gsi", gsi_geocode(client, body), record, failures) or []
+        head = body[:6]
+        out.sort(key=lambda r: 0 if str(r.get("address") or "").startswith(head) else 1)
+    return out
 
 
 async def geocode(db: Session, query: str, lat: Optional[float], lng: Optional[float],

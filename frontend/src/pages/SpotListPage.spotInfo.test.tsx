@@ -78,7 +78,7 @@ describe('行きたい場所の情報', () => {
     fireEvent.click(await screen.findByRole('button', { name: '「焼きカレー屋」を編集' }));
     expect(screen.getAllByLabelText(/^URL \d$/)).toHaveLength(1);
     fireEvent.click(screen.getByTestId('wish-lookup'));
-    expect(place.getPlaceInfo).toHaveBeenCalledWith({ name: '焼きカレー屋', latitude: null, longitude: null });
+    expect(place.getPlaceInfo).toHaveBeenCalledWith(expect.objectContaining({ name: '焼きカレー屋', latitude: null, longitude: null }));
     fireEvent.click(await screen.findByTestId('wish-lookup-use-0'));
     await waitFor(() => expect(screen.getByTestId('wish-photo')).toHaveTextContent('C · CC BY-SA 4.0'));
     expect(screen.getByLabelText('住所')).toHaveValue('福岡県北九州市門司区港町2-2');
