@@ -247,6 +247,9 @@ export interface ChartEvent {
   end: number | null;
   /** 終わりが分からない時は表示のための目安(60分)で、文字では「終了未設定」 */
   endKnown: boolean;
+  /** [Gate TimelineDrag] 種類(帯の色)と、ドラッグで時刻を変える時の長さ(分。終わりが分からなければ null) */
+  category?: string;
+  duration?: number | null;
   modeText: string | null;
   mode: string | null;
 }
@@ -316,6 +319,8 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       const item: ChartEvent = {
         id: e.id, title: e.title, start, end: endKnown ? end : start !== null ? Math.min(24 * 60, start + DEFAULT_STAY) : null,
         endKnown, modeText: seg ? transportText(seg.mode, seg.duration_minutes) : null, mode: seg ? seg.mode : null,
+        category: e.category ?? 'other',
+        duration: start !== null && end !== null && end >= start && !(e.end_day_offset ?? 0) ? end - start : null,
       };
       if (start === null) {
         untimed.push(item);
@@ -381,4 +386,18 @@ export function insertIndexByTime(events: ReadonlyArray<{ id: string; start_time
   if (!startTime) return list.length;
   const at = list.findIndex((e) => !!e.start_time && e.start_time > startTime);
   return at < 0 ? list.length : at;
+}
+
+/** [Gate TimelineDrag] 落とした位置の時刻(15分単位に丸め、0:00〜23:45 に収める) */
+export const SNAP_MINUTES = 15;
+export function snapMinutes(minutes: number, step = SNAP_MINUTES): number {
+  return Math.min(24 * 60 - step, Math.max(0, Math.round(minutes / step) * step));
+}
+export function minutesToHm(v: number): string {
+  return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+}
+/** 開始を start へ変える時の新しい終わり(長さを保つ。日をまたぐなら 23:59 で止める。長さが分からなければ null) */
+export function shiftedEnd(start: number, duration: number | null | undefined): string | null {
+  if (duration === null || duration === undefined) return null;
+  return minutesToHm(Math.min(24 * 60 - 1, start + duration));
 }
