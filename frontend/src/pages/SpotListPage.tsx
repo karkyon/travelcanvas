@@ -128,7 +128,8 @@ const SpotListPage: React.FC = () => {
     if (!name) { setInfo({ busy: false, result: null, error: '先に場所の名前か住所を入れてください' }); return; }
     setInfo({ busy: true, result: null, error: null });
     try {
-      const result = await getPlaceInfo({ name, latitude: form.latitude, longitude: form.longitude });
+      const result = await getPlaceInfo({ name, latitude: form.latitude, longitude: form.longitude,
+        address: form.name.trim() ? form.address : null });
       setInfo({
         busy: false, result,
         error: result.unavailable ? '場所の情報の提供元が応答しませんでした。時間をおいて試してください'

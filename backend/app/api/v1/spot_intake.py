@@ -85,6 +85,8 @@ class PlaceInfoIn(BaseModel):
     name: Optional[str] = Field(None, max_length=200)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
+    # [Gate PlaceLookupAccuracy] 入っている住所(都道府県が違う候補を外す・名前で見つからない時に位置を出す)
+    address: Optional[str] = Field(None, max_length=1000)
 
 
 def _recorder(db: Session, user: User, operation: str):
@@ -108,7 +110,7 @@ async def place_info(body: PlaceInfoIn, db: Session = Depends(get_db),
         raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "名前か位置を入れてください"})
     _limit(current_user, "place-info")
     result = await pl.lookup(db, body.name, body.latitude, body.longitude,
-                             _recorder(db, current_user, "event.place_info"))
+                             _recorder(db, current_user, "event.place_info"), address=body.address)
     db.commit()
     # 以前の形(OpenStreetMap の出典)も残す(古い画面のため)
     return {"provider": "multi", "attribution": pi.ATTRIBUTION, "license": pi.LICENSE, "license_url": pi.LICENSE_URL,

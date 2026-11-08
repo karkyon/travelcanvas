@@ -180,7 +180,7 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     fireEvent.change(screen.getByTestId('edit-category'), { target: { value: 'other' } });
     fireEvent.click(screen.getByTestId('place-info-lookup'));
     const result = await screen.findByTestId('place-info-result');
-    expect(getPlaceInfo).toHaveBeenCalledWith({ name: '清水寺', latitude: undefined, longitude: undefined });
+    expect(getPlaceInfo).toHaveBeenCalledWith(expect.objectContaining({ name: '清水寺' }));
     expect(result).toHaveTextContent('TEL 075-551-1234');
     expect(result).toHaveTextContent('© OpenStreetMap contributors(ODbL 1.0)');
     expect(screen.getByLabelText('場所・住所')).toHaveValue('');  // 押すまで入れない

@@ -41,10 +41,12 @@ export interface PlaceInfoResult {
   sources?: PlaceSource[]; keyed_providers?: string[];
 }
 
-export async function getPlaceInfo(input: { name?: string | null; latitude?: number | null; longitude?: number | null }):
-  Promise<PlaceInfoResult> {
+export async function getPlaceInfo(input: { name?: string | null; latitude?: number | null; longitude?: number | null;
+  address?: string | null }): Promise<PlaceInfoResult> {
   const body = {
     name: input.name?.trim() || null,
+    // [Gate PlaceLookupAccuracy] 入っている住所(都道府県の違う候補を外す・名前で見つからない時に位置を出す)
+    ...(input.address?.trim() ? { address: input.address.trim().slice(0, 1000) } : {}),
     latitude: typeof input.latitude === 'number' ? input.latitude : null,
     longitude: typeof input.longitude === 'number' ? input.longitude : null,
   };

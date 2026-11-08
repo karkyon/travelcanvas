@@ -558,7 +558,7 @@ async def enrich_spot(spot_id: uuid.UUID, current_user: User = Depends(get_curre
         free_usage.record(db, current_user, place_lookup.USAGE.get(provider, provider), "spot.enrich", result_code=code)
 
     try:
-        result = await place_lookup.lookup(db, spot.name, spot.latitude, spot.longitude, record)
+        result = await place_lookup.lookup(db, spot.name, spot.latitude, spot.longitude, record, address=spot.address)
     except Exception:  # noqa: BLE001 - 提供元が答えない時は変えずに伝える(値を作らない)
         result = {"unavailable": True, "candidates": [], "sources": []}
     if result["unavailable"]:

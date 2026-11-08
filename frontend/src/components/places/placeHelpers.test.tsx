@@ -24,3 +24,14 @@ describe('[PlaceLookupJP] 自動取得の候補を入れる', () => {
     expect(screen.queryByText('x')).toBeNull();
   });
 });
+
+describe('[PlaceLookupAccuracy] 近くの位置', () => {
+  it('予定の位置 → 同じ日の真ん中 → 旅行の真ん中', async () => {
+    const { nearPoint } = await import('./placeHelpers');
+    expect(nearPoint({ latitude: 1, longitude: 2 })).toEqual({ latitude: 1, longitude: 2 });
+    expect(nearPoint(null, [{ latitude: 34.4, longitude: 136.8 }, { latitude: null, longitude: null }, { latitude: 34.5, longitude: 136.9 }]))
+      .toEqual({ latitude: 34.5, longitude: 136.9 });
+    expect(nearPoint({ latitude: null }, [], [{ latitude: 35, longitude: 139 }])).toEqual({ latitude: 35, longitude: 139 });
+    expect(nearPoint(undefined, [], [])).toBeNull();
+  });
+});

@@ -16,3 +16,19 @@ export function mergeUrlRows(rows: string[], c: Pick<PlaceInfoCandidate, 'websit
   }
   return out.length ? out : [''];
 }
+
+/** [Gate PlaceLookupAccuracy] 自動取得で「近く」とする位置: 予定の位置 → 同じ日の予定の位置の真ん中 → 旅行全体の真ん中 */
+export function nearPoint(own: { latitude?: number | null; longitude?: number | null } | null | undefined,
+  dayEvents: ReadonlyArray<{ latitude?: number | null; longitude?: number | null }> = [],
+  allEvents: ReadonlyArray<{ latitude?: number | null; longitude?: number | null }> = []): { latitude: number; longitude: number } | null {
+  if (typeof own?.latitude === 'number' && typeof own?.longitude === 'number') return { latitude: own.latitude, longitude: own.longitude };
+  for (const list of [dayEvents, allEvents]) {
+    const pts = list.filter((e): e is { latitude: number; longitude: number } => typeof e.latitude === 'number' && typeof e.longitude === 'number');
+    if (pts.length) {
+      const lat = [...pts.map((p) => p.latitude)].sort((a, b) => a - b)[Math.floor(pts.length / 2)]!;
+      const lng = [...pts.map((p) => p.longitude)].sort((a, b) => a - b)[Math.floor(pts.length / 2)]!;
+      return { latitude: lat, longitude: lng };
+    }
+  }
+  return null;
+}
