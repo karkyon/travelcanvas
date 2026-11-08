@@ -46,7 +46,12 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import AllDaysChart from '@/components/planner/AllDaysChart';
-import { hoursBadge, insertIndexByTime, segmentRow, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+import { hoursBadge, insertIndexByTime, segmentRow, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+
+const toMinutesHm = (v?: string | null): number | null => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(v ?? '');
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
 import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
@@ -361,16 +366,39 @@ const PlannerPage: React.FC = () => {
     const d = currentPlan?.days[index];
     return d?.date ? `${d.date.slice(5).replace('-', '/')}(${getDayOfWeek(d.date)})` : `${index + 1}日目`;
   };
-  const moveEventToDay = async (eventId: string, fromIndex: number, toIndex: number): Promise<boolean> => {
+  // [Gate TimelineDrag] start があれば開始の時刻も変える(長さは保つ)。同じ日の中の時刻の変更は、並びも時刻の順の位置へ直す
+  const moveEventToDay = async (eventId: string, fromIndex: number, toIndex: number, start?: string): Promise<boolean> => {
     const plan = usePlanStore.getState().currentPlan;
     const ev = plan?.days[fromIndex]?.events.find((e) => e.id === eventId);
     const target = plan?.days[toIndex];
-    if (!ev || !target || fromIndex === toIndex) return false;
+    if (!ev || !target || (fromIndex === toIndex && !start)) return false;
     if (ev.locked) { addToast({ message: `「${ev.title}」は固定の予定なので動かせません`, type: 'error' }); return false; }
-    const ok = await moveItemBetweenDays(eventId, fromIndex, toIndex, insertIndexByTime(target.events, ev.start_time, eventId));
-    if (ok) addToast({ message: `「${ev.title}」を ${dayLabel(toIndex)} へ移しました(「元に戻す」で戻せます)`, type: 'success' });
-    else addToast({ message: `「${ev.title}」を移せませんでした`, type: 'error' });
-    return ok;
+    const newStart = start ?? ev.start_time;
+    if (fromIndex !== toIndex) {
+      const ok = await moveItemBetweenDays(eventId, fromIndex, toIndex, insertIndexByTime(target.events, newStart, eventId));
+      if (!ok) { addToast({ message: `「${ev.title}」を移せませんでした`, type: 'error' }); return false; }
+    }
+    if (start && start !== ev.start_time) {
+      const s = toMinutesHm(ev.start_time);
+      const e = toMinutesHm(ev.end_time);
+      const duration = s !== null && e !== null && e >= s && !(ev.end_day_offset ?? 0) ? e - s : null;
+      const end = shiftedEnd(toMinutesHm(start) ?? 0, duration);
+      const saved = await usePlanStore.getState().updateScheduleItem(eventId, { start_time: start, ...(end ? { end_time: end } : {}) });
+      if (saved !== 'saved' && saved !== 'queued') {
+        addToast({ message: `「${ev.title}」の時刻を変えられませんでした`, type: 'error' });
+        return false;
+      }
+      if (fromIndex === toIndex) {
+        const events = usePlanStore.getState().currentPlan?.days[toIndex]?.events ?? [];
+        const others = events.filter((x) => x.id !== eventId);
+        const at = insertIndexByTime(others, start);
+        const order = [...others.slice(0, at).map((x) => x.id), eventId, ...others.slice(at).map((x) => x.id)];
+        if (order.join() !== events.map((x) => x.id).join()) await usePlanStore.getState().reorderScheduleItems(toIndex, order);
+      }
+    }
+    const where = [fromIndex !== toIndex ? dayLabel(toIndex) : null, start ? `${start}〜` : null].filter(Boolean).join(' ');
+    addToast({ message: `「${ev.title}」を ${where} へ移しました(「元に戻す」で戻せます)`, type: 'success' });
+    return true;
   };
   const [editDay, setEditDay] = useState<{ value: number; original: number }>({ value: 0, original: 0 });
 
@@ -995,7 +1023,7 @@ const PlannerPage: React.FC = () => {
           ) : planView === 'all' ? (
             <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
               onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }}
-              onMoveEvent={(id, from, to) => { void moveEventToDay(id, from, to); }} />
+              onMoveEvent={(id, from, to, start) => { void moveEventToDay(id, from, to, start); }} />
           ) : activeDay ? (
             <div className={`tc-planner-layout${showMap ? '' : ' tc-planner-layout--nomap'}`} data-testid="planner-layout">
               <section className="tc-card tc-timeline-card" aria-label={`${currentDayIndex + 1}日目の予定`}>
