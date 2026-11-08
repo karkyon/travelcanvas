@@ -1,11 +1,13 @@
 /**
  * [Gate PlanSpotEdit] 予定の写真を入れる枠(課題 #3-③)。枠へドラッグ&ドロップするか、押してファイルを選ぶ。
  * 選んだらすぐ取り込み、予定の写真にする(取り込んだ写真は「自分だけ」)。
+ * [Gate PhotoPaste] クリップボードの画像(Web で「画像をコピー」したもの)も貼れる(Ctrl+V・押しボタン・長押し)。
  */
 import React, { useRef, useState } from 'react';
 import { ImagePlus } from 'lucide-react';
 import type { EventImage } from '@/services/api/types/g11discover';
 import { PHOTO_TYPES, uploadEventPhoto } from './eventPhoto';
+import PasteImageButton from '@/components/media/PasteImageButton';
 
 interface Props {
   planId: string;
@@ -50,6 +52,7 @@ const EventPhotoDrop: React.FC<Props> = ({ planId, eventId, eventTitle, onUpload
         <input ref={input} type="file" accept={PHOTO_TYPES.join(',')} className="sr-only" aria-label="予定の写真のファイルを選ぶ"
           disabled={busy} data-testid="event-photo-file" onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ''; }} />
       </label>
+      <PasteImageButton onImage={(f) => void take(f)} disabled={busy} testId="event-photo-paste" />
       {error && <p role="alert" className="mt-1 text-sm text-danger">{error}</p>}
     </div>
   );
