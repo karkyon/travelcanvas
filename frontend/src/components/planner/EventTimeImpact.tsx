@@ -30,6 +30,9 @@ interface Props {
   dayDate?: string | null;
 }
 
+
+const HALF_HOURS_ID = 'tc-half-hours';
+const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 const field = 'mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900 disabled:opacity-50';
 // 滞在の時間・分の小さな入力(幅を固定し、「時間」「分」の文字を折り返さない)
 const small = 'w-16 shrink-0 rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-2 text-sm text-ink-900 disabled:opacity-50';
@@ -124,12 +127,15 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
   const endDateValue = dayDate ? addDays(dayDate, end.offset) : '';
   return (
     <div className="space-y-2" data-testid="event-time">
+      {/* [Gate TimelineDrag] 時刻の候補は 30 分ごと(分単位は手で入れる) */}
+      <datalist id={HALF_HOURS_ID}>{HALF_HOURS.map((v) => <option key={v} value={v} />)}</datalist>
       <div className={onStartChange ? 'tc-time-row' : ''}>
         {onStartChange && (
           <>
             <label className="text-sm font-medium text-ink-700">
               開始時刻
-              <input type="time" className={field} value={startTime} onChange={(e) => setStart(e.target.value)} />
+              <input type="time" className={field} value={startTime} onChange={(e) => setStart(e.target.value)} list={HALF_HOURS_ID}
+                data-testid="event-start-time" />
             </label>
             <span className="tc-time-tilde" aria-hidden="true">〜</span>
           </>
@@ -152,7 +158,7 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
               <div className="flex min-w-0 flex-1 flex-wrap gap-2">
                 <label className="min-w-[7rem] flex-1 text-sm font-medium text-ink-700">
                   終了時刻
-                  <input type="time" className={field} value={end.time} onChange={(e) => setEndTime(e.target.value)} />
+                  <input type="time" className={field} value={end.time} onChange={(e) => setEndTime(e.target.value)} list={HALF_HOURS_ID} />
                 </label>
                 {withDate && dayDate && (
                   <label className="min-w-[10rem] flex-[1.4] text-sm font-medium text-ink-700">

@@ -3,7 +3,7 @@
  * 触って使える並べ替えと再確認の知らせ(UIX-M03)。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const { getHoursCheck, moveItemBy, handleKeyboardMove, reorderSchedule, reorderSpots, drag } = vi.hoisted(() => ({
   getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(), reorderSchedule: vi.fn(), reorderSpots: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast
 import DayView from '@/components/DayView';
 import AllDaysChart from './AllDaysChart';
 import {
-  arrivalLeg, arrivalSegment, buildChart, hoursBadge, insertIndexByTime, moveBlockedReason, reorderImpact, segmentRow, titleOfEvent,
+  arrivalLeg, arrivalSegment, buildChart, hoursBadge, insertIndexByTime, moveBlockedReason, shiftedEnd, snapMinutes, reorderImpact, segmentRow, titleOfEvent,
   unionMinutes, zoneOfEvent,
 } from './plannerModel';
 import { LEGEND_MODES } from '@/utils/transportModes';
@@ -193,6 +193,47 @@ describe('全日程のチャート', () => {
     fireEvent.dragStart(e1, { dataTransfer: dt });
     fireEvent.drop(screen.getByTestId('chart-day-0'), { dataTransfer: dt });
     expect(onMove).toHaveBeenCalledTimes(1);  // 同じ日へは移さない
+  });
+
+  it('[TimelineDrag] 物差しの上に落とすと 15 分単位の時刻へ。同じ日でも動かせる。帯は種類の色', () => {
+    const onMove = vi.fn();
+    render(<AllDaysChart days={days()} segments={[]} currentDay={0} onOpenDay={vi.fn()} onMoveEvent={onMove} />);
+    const store: Record<string, string> = {};
+    const dt = { setData: (k: string, v: string) => { store[k] = v; }, getData: (k: string) => store[k] ?? '',
+      effectAllowed: '', dropEffect: '' };
+    const e1 = screen.getByTestId('chart-event-e1');
+    expect(e1.className).toContain('tc-cat--');
+    expect(screen.getByTestId('chart-legend')).toBeInTheDocument();
+    const scale = screen.getByTestId('chart-scale-0');
+    fireEvent.dragStart(e1, { dataTransfer: dt });
+    // 物差しの上端から 44px(1 時間)+ 8px(約 11 分 → 15 分に丸め)
+    const at = (type: 'dragOver' | 'drop', el: HTMLElement, y: number) => {
+      const ev = createEvent[type](el, { dataTransfer: dt });
+      Object.defineProperty(ev, 'clientY', { value: y });
+      fireEvent(el, ev);
+    };
+    at('dragOver', scale, 52);
+    expect(screen.getByTestId('chart-drop-0')).toHaveTextContent('から');
+    at('drop', scale, 52);
+    expect(onMove).toHaveBeenCalledTimes(1);
+    const [id, from, to, start] = onMove.mock.calls[0]!;
+    expect([id, from, to]).toEqual(['e1', 0, 0]);
+    expect(start).toMatch(/^\d{2}:15$/);  // 9:00 の物差しなら 10:15(上端から 1 時間 12 分 → 15 分に丸め)
+    // 別の日の物差しに落とすと日と時刻の両方
+    fireEvent.dragStart(e1, { dataTransfer: dt });
+    at('drop', screen.getByTestId('chart-scale-1'), 0);
+    expect(onMove.mock.calls[1]!.slice(0, 3)).toEqual(['e1', 0, 1]);
+    expect(onMove.mock.calls[1]![3]).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it('[TimelineDrag] 時刻の丸めと長さを保った終わり', () => {
+    expect(snapMinutes(9 * 60 + 7)).toBe(9 * 60);
+    expect(snapMinutes(9 * 60 + 8)).toBe(9 * 60 + 15);
+    expect(snapMinutes(-30)).toBe(0);
+    expect(snapMinutes(24 * 60 + 10)).toBe(23 * 60 + 45);
+    expect(shiftedEnd(10 * 60, 90)).toBe('11:30');
+    expect(shiftedEnd(23 * 60, 120)).toBe('23:59');
+    expect(shiftedEnd(10 * 60, null)).toBeNull();
   });
 
   it('[EventMoveDay] 移す先の位置は時刻の順', () => {
