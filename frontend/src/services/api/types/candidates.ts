@@ -22,6 +22,8 @@ export interface PlanCandidateItem {
   latitude: number | null;
   longitude: number | null;
   priority: number;
+  /** [Gate CandidateFilters] 利用者が付けたタグ(古い応答には無い) */
+  tags?: string[];
   status: CandidateStatus;
   status_label: string;
   scheduled_event_id: string | null;
@@ -54,6 +56,7 @@ export interface CandidateInput {
   latitude?: number | null;
   longitude?: number | null;
   priority?: number;
+  tags?: string[] | null;
   /** [Gate G11] SNS の投稿の確認(social-preview)の後に保存する時 */
   source_kind?: 'social';
   platform?: 'youtube' | 'tiktok' | 'instagram' | null;

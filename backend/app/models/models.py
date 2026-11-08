@@ -2951,6 +2951,8 @@ class PlanCandidate(Base):
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=2, server_default="2")
+    # [Gate CandidateFilters] 利用者が付けるタグ(最大 10 個・1 つ 20 文字)。絞り込みに使う
+    tags: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(9), nullable=False, default="open", server_default="open")
     scheduled_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     merged_into_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
