@@ -52,7 +52,7 @@
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
-| `consent_required` | 403 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py, api/v1/paid_actions.py |
+| `consent_required` | 403, 422 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
 | `consult_pending` | 409 | no | 外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください | api/v1/trip_intents.py |
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
@@ -190,9 +190,10 @@
 | `profile_unreadable` | 409 | no | 保存済みの内容を復号できないため変更できません | api/v1/private_profile.py |
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
 | `provider_disabled` | 404 | no | この画像の提供元は使えません(止めてあります) | api/v1/media_providers.py |
+| `provider_not_configured` | 503 | later | AI の鍵が未設定か確認が切れています(運用コンソールで直せます) | api/v1/spot_media.py |
 | `provider_not_ready` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
-| `provider_rejected` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
-| `provider_unavailable` | 503 | later | 場所の情報の提供元が応答しませんでした。時間をおいて試してください | api/v1/spots.py |
+| `provider_rejected` | 502, 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py, api/v1/spot_media.py |
+| `provider_unavailable` | 502, 503 | later | AI を呼び出せませんでした | api/v1/spot_media.py, api/v1/spots.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
@@ -239,7 +240,7 @@
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
-| `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py, api/v1/spot_intake.py |
+| `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |

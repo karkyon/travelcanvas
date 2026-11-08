@@ -15,6 +15,7 @@ from app.api.v1 import (
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage, receipts,
     spot_intake,
+    spot_media,
     privacy_zones, photo_upload, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers,
     trip_intents,
@@ -576,6 +577,7 @@ app.include_router(decisions.router, prefix="/api/v1")
 app.include_router(finance_ledger.router, prefix="/api/v1")
 app.include_router(receipts.router, prefix="/api/v1")
 app.include_router(spot_intake.router, prefix="/api/v1")
+app.include_router(spot_media.router, prefix="/api/v1")
 # [Gate G5] BILL-02 自分の使用量(/usage)
 app.include_router(usage.router, prefix="/api/v1")
 # [Gate G6] LOC-02 守る範囲(/privacy-zones)・MEM-01 旅行記の公開と記録の削除の取り消し(公開の閲覧 /public/journal)

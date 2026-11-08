@@ -211,11 +211,11 @@ describe('DayView の日のカード', () => {
     render(<DayView day={day()} planId="p1" />);
     fireEvent.click(screen.getByRole('button', { name: '＋ この日にスポットを追加' }));
     fireEvent.click(await screen.findByRole('button', { name: '候補を選ぶ' }));
-    await waitFor(() => expect(screen.getByLabelText('住所')).toHaveValue('〒517-8517 三重県鳥羽市鳥羽3丁目3-6'));
+    await waitFor(() => expect(screen.getByLabelText('場所・住所')).toHaveValue('〒517-8517 三重県鳥羽市鳥羽3丁目3-6'));
     expect(m.getPlaceInfo).toHaveBeenCalledTimes(1);
-    expect(m.getPlaceInfo).toHaveBeenCalledWith({ name: '鳥羽水族館', latitude: 34.48, longitude: 136.84 });
+    expect(m.getPlaceInfo).toHaveBeenCalledWith(expect.objectContaining({ name: '鳥羽水族館', latitude: 34.48, longitude: 136.84 }));
     expect(screen.getByLabelText('電話番号')).toHaveValue('0599-25-2555');
-    expect(screen.getByTestId('add-place-lookup')).toHaveTextContent('© OpenStreetMap contributors(ODbL 1.0)');
+    expect(screen.getByTestId('new-lookup-note')).toHaveTextContent('自動取得で住所・電話');
     fireEvent.click(screen.getByRole('button', { name: '追加' }));
     await waitFor(() => expect(m.addNewScheduleItem).toHaveBeenCalledWith('p1', 'd2', expect.objectContaining({
       title: '鳥羽水族館', address: '〒517-8517 三重県鳥羽市鳥羽3丁目3-6', phone: '0599-25-2555', category: 'activity',

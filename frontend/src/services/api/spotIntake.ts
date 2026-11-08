@@ -21,6 +21,26 @@ export interface UrlRead {
   kind: 'sns' | 'page'; ok: boolean; url: string; name: string | null; title: string | null; author: string | null;
   reason: string | null; description: string | null; address: string | null; latitude: number | null; longitude: number | null;
   suggestions: { word: string; name: string; address: string | null; latitude: number | null; longitude: number | null }[];
+  /** [Gate SpotFromMedia] 説明欄(目次)から拾った場所の名前・説明欄を読めたか(YouTube の鍵がある時) */
+  places?: MediaPlace[]; video_source?: string; description_available?: boolean | null;
+}
+/** [Gate SpotFromMedia] 動画・投稿・写真から拾った場所の候補 */
+export interface MediaPlace {
+  name: string; time?: string | null; context?: string; quoted?: boolean; ai?: boolean;
+  area?: string; reason?: string; confidence?: number; address?: string | null; latitude?: number | null; longitude?: number | null;
+  phone?: string | null; website?: string | null; category?: string | null;
+}
+export const placesFromText = async (text: string, title?: string | null): Promise<MediaPlace[]> =>
+  ((await api.post('/spots/places-from-text', { text: text.slice(0, 20000), title: title ?? null }, SILENT)).data as { places: MediaPlace[] }).places;
+export const aiPlacesFromText = async (planId: string, text: string, title?: string | null): Promise<MediaPlace[]> =>
+  ((await api.post(`/plans/${planId}/spot-ai/places-text`, { text: text.slice(0, 20000), title: title ?? null, consent: true }, SILENT)).data as
+    { places: MediaPlace[] }).places;
+export async function aiPlacesFromImage(planId: string, file: File): Promise<MediaPlace[]> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('consent', 'true');
+  return ((await api.post(`/plans/${planId}/spot-ai/places-image`, form, { ...SILENT, headers: { 'Content-Type': undefined } })).data as
+    { places: MediaPlace[] }).places;
 }
 
 export const listWishSpots = async (category: string): Promise<WishSpot[]> =>

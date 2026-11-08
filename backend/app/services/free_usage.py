@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 FREE_PROVIDERS = frozenset({"nominatim", "overpass", "wikipedia", "wikimedia_commons", "oembed",
                             # [Gate PlaceLookupJP] 無料の利用登録の提供元(鍵あり・請求なし)と、キー不要の国土地理院・Wikidata
-                            "yahoo_local", "rakuten_travel", "hotpepper", "gsi", "wikidata"})
+                            "yahoo_local", "rakuten_travel", "hotpepper", "gsi", "wikidata", "youtube_data"})
 FREE_PRICE_VERSION = "free"
 RESULT_CODES = frozenset({"ok", "empty", "unavailable", "error",
                           # [Gate SearchUAT] 提供元の失敗の分類(search_provider.ERROR_CODES)

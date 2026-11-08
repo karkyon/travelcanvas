@@ -20,6 +20,7 @@ from app.services import free_usage
 from app.services import place_info as pi
 from app.services import reservation_extract as rx
 from app.services import url_place as up
+from app.services import video_places, youtube_data
 from app.services.media_providers import registry
 from app.services.media_providers.social import platform_of
 from app.utils.rate_limiter import check_rate_limit
@@ -54,9 +55,29 @@ async def read_url(body: ReadUrlIn, db: Session = Depends(get_db),
                               result_code="ok" if preview.status == "ok" else "unavailable")
             db.commit()
         data = preview.to_dict()
-        return {"kind": "sns", "ok": preview.status == "ok", "url": url, "name": None, "title": data.get("title"),
-                "author": data.get("author"), "reason": data.get("reason"), "description": None, "address": None,
-                "latitude": None, "longitude": None, "suggestions": data.get("place_suggestions") or []}
+        # [Gate SpotFromMedia] YouTube は鍵があれば説明欄(目次)を読み、場所の名前の候補を出す
+        description, places, video_source = None, [], "oembed"
+        vid = youtube_data.video_id(url) if platform_of(url) == "youtube" else None
+        key = youtube_data.api_key(db) if vid else None
+        if vid and key:
+            video = await run_in_threadpool(youtube_data.fetch, key, vid)
+            free_usage.record(db, current_user, "youtube_data", "social.description",
+                              result_code="ok" if video else "unavailable")
+            db.commit()
+            if video:
+                description = video["description"]
+                data["title"] = data.get("title") or video["title"]
+                data["author"] = data.get("author") or video["channel"]
+                places = video_places.from_text(video["description"] + "\n" + " ".join(f"#{t}" for t in video["tags"]),
+                                                video["title"])
+                video_source = "youtube_data"
+        elif data.get("title"):
+            places = video_places.from_text("", data.get("title"))
+        return {"kind": "sns", "ok": preview.status == "ok" or bool(description), "url": url, "name": None,
+                "title": data.get("title"), "author": data.get("author"), "reason": data.get("reason"),
+                "description": description, "address": None, "latitude": None, "longitude": None,
+                "suggestions": data.get("place_suggestions") or [], "places": places, "video_source": video_source,
+                "description_available": bool(key) if vid else None}
     try:
         page = await run_in_threadpool(up.read_page, url)
     except up.PageUnavailable as error:

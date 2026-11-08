@@ -708,3 +708,10 @@ docker compose exec -T backend python scripts/demo_seed.py reset --yes  # 登録
 3. ホットペッパー: https://webservice.recruit.co.jp/ でメールアドレスを登録 → 届いた API キーを登録
 
 画面には各提供元のクレジット(出典)を出す。写真・口コミ・評価は写さない。外へ送った回数は `provider_usage_events`(額 0 円)に残す。
+
+## 写真・動画・投稿から場所の候補(Gate SpotFromMedia)
+
+- YouTube の説明欄(目次)は YouTube Data API v3 で読む。鍵(`youtube_api_key`)を `/admin/ops` の「API キーの登録」で登録する
+  (Google Cloud の「API とサービス」で YouTube Data API v3 を有効にし、API キーの「API の制限」に足す。1 日 10,000 単位まで無料・1 動画 1 単位)
+- 説明欄・貼った文からの拾い出しは文の規則だけ(`backend/app/services/video_places.py`・外へ送らない)
+- 写真から場所を見分けるのと、文の規則で拾えない場所を補うのは、利用者が同意した時だけ OpenAI へ送る(AI の回数・旅行ごとの原価の枠で数える。写真は撮影情報を消して縮めてから送り、保存しない)

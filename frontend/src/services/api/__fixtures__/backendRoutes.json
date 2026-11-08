@@ -547,6 +547,9 @@
   "GET /api/v1/plans/{plan_id}/booklet/themes",
   "POST /api/v1/spots/{spot_id}/enrich",
   "GET /api/v1/media-providers/images/for-place",
-  "POST /api/v1/spots/geocode"
+  "POST /api/v1/spots/geocode",
+  "POST /api/v1/spots/places-from-text",
+  "POST /api/v1/plans/{plan_id}/spot-ai/places-image",
+  "POST /api/v1/plans/{plan_id}/spot-ai/places-text"
  ]
 }

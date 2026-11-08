@@ -133,7 +133,7 @@ test('行きたい場所: 追加・編集・削除ができ、旅程の予定へ
   for (const name of ['手で入力', '名前で検索', '写真・スクショ', '声', 'SNS・URL', '行きたい場所']) await expect(dialog.getByRole('tab', { name })).toBeVisible();
   await dialog.getByRole('tab', { name: '行きたい場所' }).click();
   await dialog.getByRole('button', { name: '「伊勢神宮」を入れる' }).click();
-  await expect(dialog.getByPlaceholder('東京タワー見学')).toHaveValue('伊勢神宮');
+  await expect(dialog.getByLabel('タイトル *')).toHaveValue('伊勢神宮');
   await dialog.getByRole('button', { name: '追加', exact: true }).click();
   await expect(page.getByText('伊勢神宮').first()).toBeVisible({ timeout: 15_000 });
   await page.getByTestId('plan-booklet').click();

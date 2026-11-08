@@ -195,7 +195,8 @@ def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypa
     slots = {s["slot"]: s for s in client.get("/api/v1/admin/ops/secrets").json()["slots"]}
     assert set(slots) == {"openai_api_key", "google_maps_browser_key", "google_maps_server_key",
                           # [Gate PlaceLookupJP] 場所の自動取得の無料の提供元(任意)
-                          "yahoo_client_id", "rakuten_app_id", "rakuten_access_key", "hotpepper_api_key"}
+                          "yahoo_client_id", "rakuten_app_id", "rakuten_access_key", "hotpepper_api_key",
+                          "youtube_api_key"}
     assert slots["yahoo_client_id"]["free"] is True and slots["yahoo_client_id"]["required"] is False
     assert slots["yahoo_client_id"]["in_use"] is True and "任意・無料" in slots["yahoo_client_id"]["in_use_note"]
     assert slots["google_maps_server_key"]["status"] == "missing"
