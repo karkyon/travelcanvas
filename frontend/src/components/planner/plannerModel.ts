@@ -373,3 +373,12 @@ export function keepSlots<E extends { id: string; start_time?: string; end_time?
       ? { ...sg, from_event_id: remap(sg.from_event_id), to_event_id: remap(sg.to_event_id) } : sg)),
   };
 }
+
+/** [Gate EventMoveDay] 別の日へ移す時の並びの位置。時刻があれば時刻の順の位置、無ければ最後 */
+export function insertIndexByTime(events: ReadonlyArray<{ id: string; start_time?: string | null }>, startTime?: string | null,
+  skipId?: string): number {
+  const list = events.filter((e) => e.id !== skipId);
+  if (!startTime) return list.length;
+  const at = list.findIndex((e) => !!e.start_time && e.start_time > startTime);
+  return at < 0 ? list.length : at;
+}
