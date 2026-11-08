@@ -149,7 +149,11 @@ describe('全日程のチャート', () => {
     expect(unionMinutes([[0, 60], [30, 90], [120, 150]])).toBe(120);
     expect(unionMinutes([])).toBe(0);
     const m = buildChart(days(), [seg({ to_event_id: 'e2', duration_minutes: 18 })], new Set(['e2']));
-    expect([m.scaleStart, m.scaleEnd]).toEqual([8 * 60, 13 * 60]);
+    // 物差しはいつも 6:00〜22:00 を含める(1 件ドラッグした直後に縮まない)
+    expect([m.scaleStart, m.scaleEnd]).toEqual([6 * 60, 22 * 60]);
+    const early = buildChart([{ id: 'x', date: '2026-11-14', timezone_id: 'Asia/Tokyo', events: [
+      { id: 'x1', title: '早朝', category: 'other', start_time: '04:40', end_time: '23:10' }] }], [], new Set());
+    expect([early.scaleStart, early.scaleEnd]).toEqual([4 * 60, 24 * 60]);
     const d1 = m.days[0]!;
     expect([d1.first, d1.last, d1.travelMinutes, d1.lockedCount]).toEqual(['09:30', '12:45', 18, 1]);
     expect(d1.freeMinutes).toBe(195 - 90 - 60 - 18 + 0); // 09:30〜12:45 のうち、予定と移動以外
@@ -461,5 +465,19 @@ describe('移動の区間の行・並べ替えの影響の計算', () => {
     expect(moveBlockedReason(list, 1, -1)).toBe('「B」は確定の予定のため動かせません');
     expect(moveBlockedReason(list, 0, -1)).toBeNull();
     expect(moveBlockedReason([{ title: 'A' }, { title: 'C' }], 0, 1)).toBeNull();
+  });
+});
+
+describe('[Gate TimelineDrag] 重なる予定を横に並べる', () => {
+  it('重なる予定は別の列、重ならない予定は 1 列', async () => {
+    const { overlapLanes } = await import('./plannerModel');
+    const m = overlapLanes([
+      { id: 'a', start: 700, end: 760 }, { id: 'b', start: 735, end: 780 }, { id: 'c', start: 770, end: 800 },
+      { id: 'd', start: 900, end: 930 },
+    ]);
+    expect(m.get('a')).toEqual({ lane: 0, of: 2 });
+    expect(m.get('b')).toEqual({ lane: 1, of: 2 });
+    expect(m.get('c')).toEqual({ lane: 0, of: 2 });
+    expect(m.get('d')).toEqual({ lane: 0, of: 1 });
   });
 });

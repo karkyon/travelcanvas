@@ -67,6 +67,8 @@ const EventTimeImpact: React.FC<Props> = ({ planId, eventId, startTime, end, onE
 
   const setStart = (v: string) => {
     onStartChange?.(v);
+    // [Gate PlanEditClear] 開始を消したら終了も消す(滞在の入力は残し、開始を入れ直すとまた終わりを決める)
+    if (!v) { setNote(null); change({ time: '', offset: 0 }); return; }
     // 滞在時間で入れている時は、開始を変えても長さを保つ
     if (mode === 'stay' && (stay.h || stay.m)) applyStay(stay.h, stay.m, v);
   };

@@ -92,7 +92,7 @@ const SelectedEventCard: React.FC<Props> = ({ planId, dayNumber, event, onEdit, 
             {(event.phone || event.urls?.length) && (
               <span><b>連絡先</b><small><SpotLinks phone={event.phone} urls={event.urls} /></small></span>
             )}
-            {event.notes && <span><b>メモ</b><small>{event.notes}</small></span>}
+            {(event.notes || event.description) && <span><b>メモ</b><small>{event.notes || event.description}</small></span>}
             {event.locked && (
               <span><b>確定</b><small className="inline-flex items-center gap-1"><Lock size={12} aria-hidden="true" />並べ替え・最適化で動かさない</small></span>
             )}

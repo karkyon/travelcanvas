@@ -408,6 +408,25 @@ describe('[Gate G7] FR-005 終了時刻(日をまたぐ予定)', () => {
     expect('end_day_offset' in second).toBe(false);
   });
 
+  it('[Gate PlanEditClear] 開始時刻・住所・メモを空にすると null で送って消す(送らないと消えなかった)', async () => {
+    await seedLoadedPlan(1);
+    seedEvent();
+    mockedApi.updateEvent.mockResolvedValue({
+      id: 'event-1', day_id: DAY_ID, title: '夜行バス', event_type: 'transportation', is_all_day: false, locked: false, sort_order: 0,
+      local_start_time: null, address: null, description: null,
+    });
+    await usePlanStore.getState().updateScheduleItem('event-1', { start_time: '', address: '', description: '' });
+    const sent = mockedApi.updateEvent.mock.calls[0]![2] as Record<string, unknown>;
+    expect(sent.local_start_time).toBeNull();
+    expect(sent.address).toBeNull();
+    expect(sent.description).toBeNull();
+    expect(usePlanStore.getState().currentPlan!.days[0]!.events[0]!.start_time).toBeUndefined();
+    await usePlanStore.getState().updateScheduleItem('event-1', { title: '夜行バス' });
+    const second = mockedApi.updateEvent.mock.calls[1]![2] as Record<string, unknown>;
+    expect(second.local_start_time).toBeUndefined();
+    expect(second.address).toBeUndefined();
+  });
+
   it('通信できない時は終了時刻の変更を溜めず、元に戻して失敗を返す', async () => {
     await seedLoadedPlan(1);
     seedEvent();

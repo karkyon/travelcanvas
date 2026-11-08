@@ -164,9 +164,9 @@ export class PlansApi extends SpotsApi {
   async updateEvent(
     planId: string, eventId: string,
     data: Partial<{
-      title: string; description: string; event_type: string; local_start_time: string;
+      title: string; description: string | null; event_type: string; local_start_time: string | null;
       local_end_time: string | null; end_day_offset: number;
-      address: string; latitude: number; longitude: number; locked: boolean;
+      address: string | null; latitude: number; longitude: number; locked: boolean;
       phone: string;
       urls: { url: string; label?: string | null }[];
       dining: DiningInfo | null;

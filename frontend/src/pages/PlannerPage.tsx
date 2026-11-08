@@ -414,11 +414,15 @@ const PlannerPage: React.FC = () => {
     try {
       const result = await updateScheduleItem(itemId, {
         title: fields.title,
-        start_time: fields.start_time || undefined,
-        address: fields.location_name || undefined,
-        description: fields.notes || undefined,
-        ...(editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
-          ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
+        // [Gate PlanEditClear] 入っている値は送る。空にした項目は空('')で送り、サーバーで消す
+        // (以前は空を「送らない」にしていたため、開始時刻・住所・メモを消しても保存されなかった)
+        ...(fields.start_time || fields.start_time !== original.start_time ? { start_time: fields.start_time } : {}),
+        ...(fields.location_name || fields.location_name !== original.location_name ? { address: fields.location_name } : {}),
+        ...(fields.notes || fields.notes !== original.notes ? { description: fields.notes } : {}),
+        // 開始時刻を消した時は終了も消す(終了だけの予定は作らない)
+        ...(!fields.start_time && (editEnd.time || editEndOriginal.time) ? { end_time: '', end_day_offset: 0 }
+          : editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
+            ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
         ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
         ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
         ...(urlsChanged ? { urls: links.urls } : {}),
