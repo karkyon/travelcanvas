@@ -33,7 +33,7 @@ vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast
 import DayView from '@/components/DayView';
 import AllDaysChart from './AllDaysChart';
 import {
-  arrivalLeg, arrivalSegment, buildChart, hoursBadge, moveBlockedReason, reorderImpact, segmentRow, titleOfEvent,
+  arrivalLeg, arrivalSegment, buildChart, hoursBadge, insertIndexByTime, moveBlockedReason, reorderImpact, segmentRow, titleOfEvent,
   unionMinutes, zoneOfEvent,
 } from './plannerModel';
 import { LEGEND_MODES } from '@/utils/transportModes';
@@ -173,6 +173,34 @@ describe('全日程のチャート', () => {
       events: d.events.map((e) => ({ ...e, id: `${e.id}-${i}` })) }));
     rerender(<AllDaysChart days={many} segments={[]} currentDay={0} onOpenDay={onOpenDay} />);
     expect(screen.getByTestId('all-days-scroll-hint')).toBeInTheDocument();
+  });
+
+  it('[EventMoveDay] 予定を別の日の列へドラッグ&ドロップで移す。固定の予定・同じ日へは動かさない', () => {
+    const onMove = vi.fn();
+    render(<AllDaysChart days={days()} segments={[]} currentDay={0} onOpenDay={vi.fn()} onMoveEvent={onMove} />);
+    const store: Record<string, string> = {};
+    const dt = { setData: (k: string, v: string) => { store[k] = v; }, getData: (k: string) => store[k] ?? '',
+      effectAllowed: '', dropEffect: '' };
+    const e1 = screen.getByTestId('chart-event-e1');
+    expect(e1).toHaveAttribute('draggable', 'true');
+    expect(screen.getByTestId('chart-event-e2')).not.toHaveAttribute('draggable');  // 固定
+    expect(screen.getByTestId('chart-event-e3')).toHaveAttribute('draggable', 'true');  // 時刻の無い予定も
+    fireEvent.dragStart(e1, { dataTransfer: dt });
+    fireEvent.dragOver(screen.getByTestId('chart-day-1'), { dataTransfer: dt });
+    expect(screen.getByTestId('chart-day-1')).toHaveAttribute('data-drop', 'over');
+    fireEvent.drop(screen.getByTestId('chart-day-1'), { dataTransfer: dt });
+    expect(onMove).toHaveBeenCalledWith('e1', 0, 1);
+    fireEvent.dragStart(e1, { dataTransfer: dt });
+    fireEvent.drop(screen.getByTestId('chart-day-0'), { dataTransfer: dt });
+    expect(onMove).toHaveBeenCalledTimes(1);  // 同じ日へは移さない
+  });
+
+  it('[EventMoveDay] 移す先の位置は時刻の順', () => {
+    const evs = [{ id: 'a', start_time: '09:00' }, { id: 'b', start_time: '12:00' }, { id: 'c' }];
+    expect(insertIndexByTime(evs, '10:00')).toBe(1);
+    expect(insertIndexByTime(evs, '13:00')).toBe(3);
+    expect(insertIndexByTime(evs, null)).toBe(3);
+    expect(insertIndexByTime(evs, '08:00', 'a')).toBe(0);
   });
 });
 

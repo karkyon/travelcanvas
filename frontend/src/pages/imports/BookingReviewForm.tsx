@@ -34,7 +34,8 @@ const GROUPS: { title: string; fields: Field[] }[] = [
     { path: 'detail.arrival_time', label: '到着予定', only: STAY },
     { path: 'detail.checkout_limit', label: 'チェックアウト時間', only: STAY },
     { path: 'detail.nights', label: '泊数', only: STAY },
-    { path: 'cancellation_deadline', label: 'キャンセル期限', kind: 'datetime' },
+    { path: 'cancellation_deadline', label: 'キャンセル期限(無料で取り消せる最後の日時)', kind: 'datetime' },
+    { path: 'detail.cancel_policy', label: 'キャンセル規定', kind: 'area' },
   ] },
   { title: '内容', fields: [
     { path: 'detail.plan_name', label: 'プラン', kind: 'area' },
