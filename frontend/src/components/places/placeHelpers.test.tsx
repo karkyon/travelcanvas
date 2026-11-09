@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { appendNotes, mergeUrlRows } from './placeHelpers';
+import { appendNotes, candidateHint, mergeUrlRows } from './placeHelpers';
 import PlaceSourcesCredit from './PlaceSourcesCredit';
 
 describe('[PlaceLookupJP] 自動取得の候補を入れる', () => {
@@ -33,5 +33,20 @@ describe('[PlaceLookupAccuracy] 近くの位置', () => {
       .toEqual({ latitude: 34.5, longitude: 136.9 });
     expect(nearPoint({ latitude: null }, [], [{ latitude: 35, longitude: 139 }])).toEqual({ latitude: 35, longitude: 139 });
     expect(nearPoint(undefined, [], [])).toBeNull();
+  });
+});
+
+describe('[Gate PlaceTripArea] candidateHint', () => {
+  const base = { name: '夫婦岩', address: '三重県伊勢市二見町江', phone: null, website: null, category: null, osm_type: null,
+    latitude: 34.5, longitude: 136.8, source_url: null };
+  it('旅行先からの距離・住所の細かさ・名前の一部一致を 1 行にする', () => {
+    expect(candidateHint({ ...base, distance_km: 6.1, address_level: 2, name_match: 0.79 }, { label: '鳥羽市', prefecture: '三重県' }))
+      .toBe('旅行先(鳥羽市)から 6.1km · 住所は町名まで');
+    expect(candidateHint({ ...base, distance_km: 0.4, address_level: 3, name_match: 0.5 }, null))
+      .toBe('近くの予定から 0.4km · 住所は番地まで · 名前は一部だけ一致');
+  });
+  it('手がかりが無ければ空(古い応答)', () => {
+    expect(candidateHint(base)).toBe('');
+    expect(candidateHint({ ...base, address: null, address_level: 0 })).toBe('');
   });
 });

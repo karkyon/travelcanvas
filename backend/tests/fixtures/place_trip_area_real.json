@@ -1,0 +1,452 @@
+{
+ "_note": "[Gate PlaceTripArea] 2026-11-09 に作業場所から実際に取った Nominatim(OpenStreetMap)の返事。© OpenStreetMap contributors(ODbL 1.0)。国土地理院の逆ジオコーダは同日の実際の返事の形(lv01Nm)を写したもの",
+ "nominatim": [
+  {
+   "q": "伊勢神宮 外宮",
+   "bounded": null,
+   "body": [
+    {
+     "osm_type": "way",
+     "osm_id": 688114973,
+     "lat": "34.4873519",
+     "lon": "136.7036975",
+     "category": "amenity",
+     "type": "place_of_worship",
+     "importance": 0.3905579966299668,
+     "addresstype": "amenity",
+     "name": "伊勢神宮 外宮",
+     "display_name": "伊勢神宮 外宮, 鳥羽松阪線, 宮後一丁目, 本町, 伊勢市, 三重県, 516-0037, 日本",
+     "address": {
+      "amenity": "伊勢神宮 外宮",
+      "road": "鳥羽松阪線",
+      "neighbourhood": "宮後一丁目",
+      "quarter": "本町",
+      "city": "伊勢市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "516-0037",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "fee": "no",
+      "religion": "shinto",
+      "wikidata": "Q11633343",
+      "wikipedia": "ja:豊受大神宮",
+      "opening_hours": "Jan-Apr,Sep Mo-Su 05:00-18:00; May-Aug Mo-Su 05:00-19:00; Oct-Dec Mo-Su 05:00-17:00",
+      "contact:website": "https://www.isejingu.or.jp/about/geku/",
+      "wikimedia_commons": "Category:Geku"
+     }
+    }
+   ]
+  },
+  {
+   "q": "鳥羽駅",
+   "bounded": null,
+   "body": [
+    {
+     "osm_type": "node",
+     "osm_id": 265822795,
+     "lat": "34.4864552",
+     "lon": "136.8427403",
+     "category": "railway",
+     "type": "station",
+     "importance": 0.43467757372735105,
+     "addresstype": "railway",
+     "name": "鳥羽",
+     "display_name": "鳥羽, 国道42号, 鳥羽三丁目, 坂手町, 鳥羽市, 三重県, 517-0011, 日本",
+     "address": {
+      "railway": "鳥羽",
+      "road": "国道42号",
+      "neighbourhood": "鳥羽三丁目",
+      "quarter": "坂手町",
+      "city": "鳥羽市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "517-0011",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "operator": "JR東海",
+      "wikidata": "Q7811445",
+      "wikipedia": "ja:鳥羽駅",
+      "source_ref": "http://nlftp.mlit.go.jp/ksj/jpgis/datalist/KsjTmplt-N02-v1_1.html",
+      "public_transport": "station"
+     }
+    }
+   ]
+  },
+  {
+   "q": "兼六園",
+   "bounded": null,
+   "body": [
+    {
+     "osm_type": "way",
+     "osm_id": 50288147,
+     "lat": "36.5624267",
+     "lon": "136.6623546",
+     "category": "leisure",
+     "type": "park",
+     "importance": 0.43249580853699826,
+     "addresstype": "park",
+     "name": "兼六園",
+     "display_name": "兼六園, 金沢市, 石川県, 920-0936, 日本",
+     "address": {
+      "park": "兼六園",
+      "city": "金沢市",
+      "province": "石川県",
+      "ISO3166-2-lvl4": "JP-17",
+      "postcode": "920-0936",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "fee": "yes",
+      "access": "yes",
+      "smoking": "no",
+      "operator": "石川県",
+      "wikidata": "Q998239",
+      "smokefree": "yes",
+      "wikipedia": "ja:兼六園",
+      "contact:fax": "+81 76 234 5292",
+      "charge:adult": "320 JPY",
+      "contact:phone": "+81 76 234 3800",
+      "contact:website": "http://www.pref.ishikawa.jp/siro-niwa/kenrokuen/index.html"
+     }
+    }
+   ]
+  },
+  {
+   "q": "近江町市場",
+   "bounded": null,
+   "body": [
+    {
+     "osm_type": "node",
+     "osm_id": 10792965205,
+     "lat": "36.5718658",
+     "lon": "136.6557781",
+     "category": "amenity",
+     "type": "marketplace",
+     "importance": 5.000152590214416e-05,
+     "addresstype": "amenity",
+     "name": "近江町市場",
+     "display_name": "近江町市場, 下堤町【百万石通り】, 彦三町二丁目, 下堤町, 金沢市, 石川県, 920-0907, 日本",
+     "address": {
+      "amenity": "近江町市場",
+      "road": "下堤町【百万石通り】",
+      "neighbourhood": "彦三町二丁目",
+      "quarter": "下堤町",
+      "city": "金沢市",
+      "province": "石川県",
+      "ISO3166-2-lvl4": "JP-17",
+      "postcode": "920-0907",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "website": "https://ohmicho-ichiba.com/",
+      "check_date": "2026-10-05"
+     }
+    }
+   ]
+  },
+  {
+   "q": "三重県鳥羽市",
+   "bounded": null,
+   "body": [
+    {
+     "osm_type": "relation",
+     "osm_id": 4538731,
+     "lat": "34.4812985",
+     "lon": "136.8434721",
+     "category": "boundary",
+     "type": "administrative",
+     "importance": 0.4941169814366454,
+     "addresstype": "city",
+     "name": "鳥羽市",
+     "display_name": "鳥羽市, 三重県, 517-0011, 日本",
+     "address": {
+      "city": "鳥羽市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "517-0011",
+      "country": "日本",
+      "country_code": "jp"
+     }
+    }
+   ]
+  },
+  {
+   "q": "夫婦岩",
+   "bounded": "0",
+   "body": [
+    {
+     "osm_type": "relation",
+     "osm_id": 8291970,
+     "lat": "36.2411127",
+     "lon": "136.1305888",
+     "category": "place",
+     "type": "islet",
+     "importance": 0.13338744869153885,
+     "addresstype": "islet",
+     "name": "夫婦岩",
+     "display_name": "夫婦岩, 三国町安島, 坂井市, 福井県, 919-0592, 日本",
+     "address": {
+      "islet": "夫婦岩",
+      "quarter": "三国町安島",
+      "city": "坂井市",
+      "province": "福井県",
+      "ISO3166-2-lvl4": "JP-18",
+      "postcode": "919-0592",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": null
+    },
+    {
+     "osm_type": "node",
+     "osm_id": 599488528,
+     "lat": "33.3530034",
+     "lon": "134.2034608",
+     "category": "natural",
+     "type": "reef",
+     "importance": 0.10671845349813075,
+     "addresstype": "reef",
+     "name": "夫婦岩",
+     "display_name": "夫婦岩, 室戸市, 高知県, 781-7185, 日本",
+     "address": {
+      "reef": "夫婦岩",
+      "city": "室戸市",
+      "province": "高知県",
+      "ISO3166-2-lvl4": "JP-39",
+      "postcode": "781-7185",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": null
+    },
+    {
+     "osm_type": "node",
+     "osm_id": 13535742293,
+     "lat": "35.5681808",
+     "lon": "138.0545725",
+     "category": "place",
+     "type": "locality",
+     "importance": 0.06671859845883879,
+     "addresstype": "locality",
+     "name": "夫婦岩",
+     "display_name": "夫婦岩, 清水, 中尾, 大鹿村, 下伊那郡, 長野県, 399-3502, 日本",
+     "address": {
+      "locality": "夫婦岩",
+      "neighbourhood": "清水",
+      "hamlet": "中尾",
+      "village": "大鹿村",
+      "county": "下伊那郡",
+      "province": "長野県",
+      "ISO3166-2-lvl4": "JP-20",
+      "postcode": "399-3502",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": null
+    }
+   ]
+  },
+  {
+   "q": "ミキモト真珠島",
+   "bounded": "0",
+   "body": [
+    {
+     "osm_type": "way",
+     "osm_id": 131049872,
+     "lat": "34.4833938",
+     "lon": "136.8468875",
+     "category": "place",
+     "type": "islet",
+     "importance": 0.2782362227145218,
+     "addresstype": "islet",
+     "name": "真珠島",
+     "display_name": "真珠島, 坂手町, 鳥羽市, 三重県, 517-0011, 日本",
+     "address": {
+      "islet": "真珠島",
+      "quarter": "坂手町",
+      "city": "鳥羽市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "517-0011",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "fee": "yes",
+      "wikidata": "Q6849883",
+      "wikipedia": "ja:ミキモト真珠島",
+      "charge:adult": "1650 JPY",
+      "charge:child": "820 JPY",
+      "contact:email": "info@pearl-island.jp",
+      "contact:phone": "+81 599-25-2028",
+      "opening_hours": "Mo-Su 09:00-17:00",
+      "contact:website": "https://www.mikimoto-pearl-island.jp",
+      "contact:instagram": "mikimotopearlisland",
+      "contact:tripadvisor": "324880"
+     }
+    }
+   ]
+  },
+  {
+   "q": "道の駅 お茶の京都 みなみやましろ村",
+   "bounded": "0",
+   "body": [
+    {
+     "osm_type": "node",
+     "osm_id": 4596181289,
+     "lat": "34.7651481",
+     "lon": "136.0245076",
+     "category": "highway",
+     "type": "rest_area",
+     "importance": 0.1679799034751623,
+     "addresstype": "highway",
+     "name": "道の駅 お茶の京都 みなみやましろ村",
+     "display_name": "道の駅 お茶の京都 みなみやましろ村, 国道163号, 今山, 南山城村, 相楽郡, 京都府, 619-1422, 日本",
+     "address": {
+      "highway": "道の駅 お茶の京都 みなみやましろ村",
+      "road": "国道163号",
+      "neighbourhood": "今山",
+      "village": "南山城村",
+      "county": "相楽郡",
+      "province": "京都府",
+      "ISO3166-2-lvl4": "JP-26",
+      "postcode": "619-1422",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "wikidata": "Q29897388",
+      "wikipedia": "ja:道の駅お茶の京都みなみやましろ村"
+     }
+    }
+   ]
+  },
+  {
+   "q": "夫婦岩",
+   "bounded": "1",
+   "body": [
+    {
+     "osm_type": "way",
+     "osm_id": 433030237,
+     "lat": "34.3016234",
+     "lon": "136.8511441",
+     "category": "place",
+     "type": "islet",
+     "importance": 0.13338849698634317,
+     "addresstype": "islet",
+     "name": "立石夫婦岩",
+     "display_name": "立石夫婦岩, 阿児町立神, 志摩市, 三重県, 日本",
+     "address": {
+      "islet": "立石夫婦岩",
+      "quarter": "阿児町立神",
+      "city": "志摩市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": null
+    },
+    {
+     "osm_type": "node",
+     "osm_id": 10211095016,
+     "lat": "34.5084331",
+     "lon": "136.7887075",
+     "category": "historic",
+     "type": "memorial",
+     "importance": 5.90470740825058e-05,
+     "addresstype": "historic",
+     "name": "夏至祭の しののめ明り 夫婦岩",
+     "display_name": "夏至祭の しののめ明り 夫婦岩, 禊橋, 二見町江, 伊勢市, 三重県, 516-0037, 日本",
+     "address": {
+      "historic": "夏至祭の しののめ明り 夫婦岩",
+      "road": "禊橋",
+      "quarter": "二見町江",
+      "city": "伊勢市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "516-0037",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "memorial": "stele"
+     }
+    },
+    {
+     "osm_type": "node",
+     "osm_id": 13715366579,
+     "lat": "34.5071424",
+     "lon": "136.7911832",
+     "category": "amenity",
+     "type": "bicycle_rental",
+     "importance": 5.90470740825058e-05,
+     "addresstype": "amenity",
+     "name": "夫婦岩東口バス停前（伊勢シーパラダイス前）",
+     "display_name": "夫婦岩東口バス停前（伊勢シーパラダイス前）, 国道42号, 二見町江, 伊勢市, 三重県, 516-0037, 日本",
+     "address": {
+      "amenity": "夫婦岩東口バス停前（伊勢シーパラダイス前）",
+      "road": "国道42号",
+      "quarter": "二見町江",
+      "city": "伊勢市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "516-0037",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": {
+      "fee": "yes",
+      "network": "HELLO CYCLING",
+      "brand:ja": "ハローサイクリング",
+      "capacity": "5",
+      "network:ja": "ハローサイクリング",
+      "brand:wikidata": "Q91231927",
+      "gbfs:system_id": "hellocycling",
+      "contact:website": "https://www.hellocycling.jp",
+      "gbfs:station_id": "23303",
+      "network:wikidata": "Q91231927",
+      "authentication:app": "yes"
+     }
+    },
+    {
+     "osm_type": "node",
+     "osm_id": 4930293824,
+     "lat": "34.5083528",
+     "lon": "136.7843768",
+     "category": "tourism",
+     "type": "attraction",
+     "importance": 5.90470740825058e-05,
+     "addresstype": "tourism",
+     "name": "夫婦岩表参道",
+     "display_name": "夫婦岩表参道, 国道42号, 二見町茶屋, 伊勢市, 三重県, 516-0037, 日本",
+     "address": {
+      "tourism": "夫婦岩表参道",
+      "road": "国道42号",
+      "quarter": "二見町茶屋",
+      "city": "伊勢市",
+      "province": "三重県",
+      "ISO3166-2-lvl4": "JP-24",
+      "postcode": "516-0037",
+      "country": "日本",
+      "country_code": "jp"
+     },
+     "extratags": null
+    }
+   ]
+  }
+ ],
+ "gsi_reverse": {
+  "34.4873,136.7036": "豊川町",
+  "34.4866,136.8435": "鳥羽一丁目",
+  "34.5083,136.7888": "二見町江",
+  "36.5621,136.6625": "兼六町"
+ }
+}

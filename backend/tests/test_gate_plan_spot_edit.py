@@ -210,7 +210,7 @@ def test_place_info_formats_japanese_address_phone_and_category(auth_client, nom
     body = r.json()
     assert body["attribution"] == "© OpenStreetMap contributors" and body["license"] == "ODbL 1.0"
     c = body["candidates"][0]
-    assert c["address"] == "〒517-8511 三重県鳥羽市鳥羽一丁目1"
+    assert c["address"] == "三重県鳥羽市鳥羽一丁目1"  # [Gate PlaceTripArea] OSM の郵便番号は付けない
     assert c["phone"] == "+81 599-25-2028"
     assert c["category"] == "sightseeing"
     assert c["source_url"] == "https://www.openstreetmap.org/way/123"
@@ -218,9 +218,11 @@ def test_place_info_formats_japanese_address_phone_and_category(auth_client, nom
     assert req.url.path == "/search" and req.url.params["accept-language"] == "ja"
     assert req.headers["user-agent"].startswith("TravelCanvas/")
     assert "viewbox" in req.url.params
-    # 同じ問い合わせは保存した結果を使う(外へ送らない)
+    # 同じ問い合わせは保存した結果を使う(外へ送らない)。[Gate PlaceTripArea] 1 回目は町名を国土地理院でも確かめる
+    sent = len(calls)
+    assert [c.url.host for c in calls] == ["nominatim.openstreetmap.org", "mreversegeocoder.gsi.go.jp"]
     again = client.post("/api/v1/spots/place-info", json={"name": "ミキモト真珠島", "latitude": 34.48, "longitude": 136.84})
-    assert again.json()["cached"] is True and len(calls) == 1
+    assert again.json()["cached"] is True and len(calls) == sent
 
 
 def test_place_info_reverse_by_position_and_provider_failure(auth_client, nominatim):
@@ -229,7 +231,7 @@ def test_place_info_reverse_by_position_and_provider_failure(auth_client, nomina
     state["body"] = {**SEARCH[0], "name": ""}
     r = client.post("/api/v1/spots/place-info", json={"latitude": 34.4836, "longitude": 136.846})
     assert r.status_code == 200 and calls[-1].url.path == "/reverse"
-    assert r.json()["candidates"][0]["address"].startswith("〒517-8511 三重県鳥羽市")
+    assert r.json()["candidates"][0]["address"].startswith("三重県鳥羽市")
     state["status"] = 503
     fail = client.post("/api/v1/spots/place-info", json={"name": "存在しない"}).json()
     assert fail["unavailable"] is True and fail["candidates"] == [] and fail["error_code"] == "server_error"

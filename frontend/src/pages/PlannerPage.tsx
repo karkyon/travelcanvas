@@ -20,7 +20,7 @@ import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeIm
 import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
 import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
 import { geocodeAddress, getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
-import { appendNotes, mergeUrlRows, nearPoint } from '@/components/places/placeHelpers';
+import { appendNotes, candidateHint, mergeUrlRows, nearPoint } from '@/components/places/placeHelpers';
 import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { Globe, LocateFixed } from 'lucide-react';
 import EventUrlsField from '@/components/planner/EventUrlsField';
@@ -270,7 +270,7 @@ const PlannerPage: React.FC = () => {
       const near = nearPoint({ latitude: editCoords.lat ?? editingItem.latitude, longitude: editCoords.lng ?? editingItem.longitude },
         days.find((d) => d.events.some((e) => e.id === editingItem.id))?.events ?? [], days.flatMap((d) => d.events));
       const result = await getPlaceInfo({ name: editForm.title, latitude: near?.latitude, longitude: near?.longitude,
-        address: editForm.location_name });
+        address: editForm.location_name, plan_id: usePlanStore.getState().currentPlan?.id ?? null });
       setPlaceInfo({
         busy: false, result, mode: 'info',
         error: result.unavailable ? '場所の情報の提供元が応答しませんでした。時間をおいて試すか、手で入れてください'
@@ -293,13 +293,14 @@ const PlannerPage: React.FC = () => {
     try {
       let rows: PlaceInfoResult;
       if (address) {
-        const g = await geocodeAddress(address, { latitude: editingItem?.latitude, longitude: editingItem?.longitude });
+        const g = await geocodeAddress(address, { latitude: editingItem?.latitude, longitude: editingItem?.longitude,
+          plan_id: usePlanStore.getState().currentPlan?.id ?? null });
         rows = { provider: 'multi', attribution: '', license: '', license_url: '', cached: false, unavailable: g.unavailable,
           error_code: null, sources: g.sources,
           candidates: g.candidates.map((c) => ({ name: c.address, address: c.address, phone: null, website: null, category: null,
             osm_type: null, latitude: c.latitude, longitude: c.longitude, source_url: null })) };
       } else {
-        const result = await getPlaceInfo({ name: q });
+        const result = await getPlaceInfo({ name: q, plan_id: usePlanStore.getState().currentPlan?.id ?? null });
         rows = { ...result, candidates: result.candidates.filter((c) => typeof c.latitude === 'number' && typeof c.longitude === 'number') };
       }
       setPlaceInfo({
@@ -1475,6 +1476,8 @@ const PlannerPage: React.FC = () => {
                               {c.website && <span className="block truncate text-xs text-ink-700">{c.website}</span>}
                               {c.notes?.map((n) => <span key={n} className="block text-xs text-ink-700">{n}</span>)}
                               {c.links?.map((l) => <span key={l.url} className="block truncate text-xs text-ink-700">{`${l.label ?? 'リンク'}: ${l.url}`}</span>)}
+                              {candidateHint(c, placeInfo.result?.area) && (
+                                <span className="block text-[11px] text-ink-600" data-testid={`place-info-hint-${i}`}>{candidateHint(c, placeInfo.result?.area)}</span>)}
                             </span>
                             <Button type="button" size="sm" variant="primary" className="shrink-0" onClick={() => applyPlaceInfo(c)}
                               data-testid={`place-info-use-${i}`}>{placeInfo.mode === 'geo' ? 'この位置にする' : '入れる'}</Button>

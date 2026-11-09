@@ -5,6 +5,7 @@
 - POST /spots/place-info: [Gate PlanSpotEdit] 名前・位置から住所・電話番号・種類を読む(押した時の 1 回。place_lookup)
 - POST /spots/geocode: [Gate PlaceLookupJP] 住所から地図の位置の候補
 """
+import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
+from app.core.plan_access import require_plan_access
 from app.models.models import User
 from app.services import candidates as cs
 from app.services import free_usage
@@ -108,6 +110,8 @@ class PlaceInfoIn(BaseModel):
     longitude: Optional[float] = Field(None, ge=-180, le=180)
     # [Gate PlaceLookupAccuracy] 入っている住所(都道府県が違う候補を外す・名前で見つからない時に位置を出す)
     address: Optional[str] = Field(None, max_length=1000)
+    # [Gate PlaceTripArea] 旅程の画面から呼ぶ時の旅行。目的地を、位置・住所の無い予定の手がかりにする(見られる旅行だけ)
+    plan_id: Optional[uuid.UUID] = None
 
 
 def _recorder(db: Session, user: User, operation: str):
@@ -116,6 +120,16 @@ def _recorder(db: Session, user: User, operation: str):
     def record(provider: str, code: str) -> None:
         free_usage.record(db, user, pl.USAGE.get(provider, provider), operation, result_code=code)
     return record
+
+
+async def _trip_area(db: Session, user: User, plan_id: Optional[uuid.UUID], operation: str) -> Optional[Dict[str, Any]]:
+    """[Gate PlaceTripArea] 旅行の目的地(無ければ旅行名の先頭の語)の位置と都道府県。見られない旅行は 404/403"""
+    if plan_id is None:
+        return None
+    from app.services import place_lookup as pl
+
+    plan, _role = require_plan_access(db, plan_id, user, min_role="viewer")
+    return await pl.trip_area(plan.destination, plan.title, _recorder(db, user, operation))
 
 
 @router.post("/place-info")
@@ -130,14 +144,17 @@ async def place_info(body: PlaceInfoIn, db: Session = Depends(get_db),
     if not (body.name or "").strip() and not has_point:
         raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "名前か位置を入れてください"})
     _limit(current_user, "place-info")
+    # 住所に都道府県があれば、そちらで絞る(目的地を探しに行かない)
+    area = None if has_point or pl.prefecture_of(body.address) else await _trip_area(
+        db, current_user, body.plan_id, "event.place_info")
     result = await pl.lookup(db, body.name, body.latitude, body.longitude,
-                             _recorder(db, current_user, "event.place_info"), address=body.address)
+                             _recorder(db, current_user, "event.place_info"), address=body.address, area=area)
     db.commit()
     # 以前の形(OpenStreetMap の出典)も残す(古い画面のため)
     return {"provider": "multi", "attribution": pi.ATTRIBUTION, "license": pi.LICENSE, "license_url": pi.LICENSE_URL,
             "candidates": result["candidates"], "sources": result["sources"],
             "keyed_providers": result["keyed_providers"], "cached": result["cached"],
-            "unavailable": result["unavailable"],
+            "unavailable": result["unavailable"], "area": result.get("area"),
             "error_code": "server_error" if result["unavailable"] else None}
 
 
@@ -146,6 +163,7 @@ class GeocodeIn(BaseModel):
     query: str = Field(..., min_length=1, max_length=200)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
+    plan_id: Optional[uuid.UUID] = None
 
 
 @router.post("/geocode")
@@ -158,7 +176,9 @@ async def geocode(body: GeocodeIn, db: Session = Depends(get_db),
     if not body.query.strip():
         raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "住所を入れてください"})
     _limit(current_user, "place-info")
+    has_point = body.latitude is not None and body.longitude is not None
+    area = None if has_point else await _trip_area(db, current_user, body.plan_id, "event.geocode")
     result = await pl.geocode(db, body.query, body.latitude, body.longitude,
-                              _recorder(db, current_user, "event.geocode"))
+                              _recorder(db, current_user, "event.geocode"), area=area)
     db.commit()
     return result
