@@ -80,6 +80,9 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   const list = page.getByRole('list', { name: /の予定$/ });
   const source = list.getByRole('listitem', { name: '酒蔵A(上下矢印キーで並べ替え)' });
   await expect(source).toBeVisible();
+  // [Gate TripHead] 一番上に旅行のカード(表紙・数字)があるので、一覧を画面の中ほどへ出してから測る
+  // (落とし先の 酒蔵B が画面の下にはみ出すと、そこへ動かしたマウスが一覧に届かない)
+  await list.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   // 一覧の上の非同期の表示(利用枠・表紙など)が読み終わって位置が決まってから座標を測る。
   // 読み終わる前に測ると、表示が現れて一覧が下へずれ、落とし先の座標が古くなる(#10 の見立て。サンドボックスで再現・確認。docs/trace/gate-e2e-drag-trace.md)
   await waitLayoutSettled(page, source, pending);
