@@ -109,7 +109,7 @@ def test_without_keys_osm_address_is_completed_by_gsi_and_wikidata(auth_client, 
     bodies["nominatim"] = OSM_KENROKUEN
     body = client.post("/api/v1/spots/place-info", json={"name": "兼六園"}).json()
     c = body["candidates"][0]
-    assert c["address"] == "〒920-0936 石川県金沢市兼六町"
+    assert c["address"] == "石川県金沢市兼六町"  # [Gate PlaceTripArea] OSM の郵便番号は付けない
     assert c["website"] == "https://www.pref.ishikawa.jp/siro-niwa/kenrokuen/"
     assert body["keyed_providers"] == []
     assert not any("yahooapis" in str(x.url) or "rakuten" in str(x.url) for x in calls)  # 鍵が無ければ送らない
@@ -122,7 +122,7 @@ def test_with_yahoo_reverse_address_reaches_house_number(auth_client, fake):
     bodies["map.yahooapis.jp/search"] = {"Feature": []}
     bodies["nominatim"] = OSM_KENROKUEN
     c = client.post("/api/v1/spots/place-info", json={"name": "兼六園"}).json()["candidates"][0]
-    assert c["address"] == "〒920-0936 石川県金沢市兼六町1"
+    assert c["address"] == "石川県金沢市兼六町1"  # [Gate PlaceTripArea] OSM の郵便番号は付けない
 
 
 def test_geocode_uses_gsi_without_key_and_yahoo_first_with_key(auth_client, fake):
@@ -149,7 +149,7 @@ def test_enrich_upgrades_city_only_address(auth_client, fake):
     s = client.post("/api/v1/spots/", json={"name": "兼六園", "address": "〒920-0936 石川県金沢市",
                                             "latitude": 36.5621, "longitude": 136.6627}).json()
     r = client.post(f"/api/v1/spots/{s['id']}/enrich").json()
-    assert "address" in r["filled"] and r["spot"]["address"] == "〒920-0936 石川県金沢市兼六町"
+    assert "address" in r["filled"] and r["spot"]["address"] == "石川県金沢市兼六町"  # [Gate PlaceTripArea] OSM の郵便番号は付けない
     assert r["spot"]["urls"][0]["url"] == "https://www.pref.ishikawa.jp/siro-niwa/kenrokuen/"
     s2 = client.post("/api/v1/spots/", json={"name": "兼六園", "address": "自分の住所", "latitude": 36.5621,
                                              "longitude": 136.6627}).json()

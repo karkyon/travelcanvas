@@ -9,6 +9,8 @@ import Input from '../common/Input';
 import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { geocodeAddress, type PlaceInfoResult } from '@/services/api/planEdit';
 import { applyCandidate, endFrom, lookupPlace, type NewEventData } from './newEventLookup';
+import { candidateHint } from '@/components/places/placeHelpers';
+import { usePlanStore } from '@/store/planStore';
 
 const SpotMiniMap = React.lazy(() => import('./SpotMiniMap'));
 
@@ -52,7 +54,7 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
     if (!q) return;
     setGeo({ busy: true, note: null });
     try {
-      const r = await geocodeAddress(q, near ?? undefined);
+      const r = await geocodeAddress(q, { ...(near ?? {}), plan_id: usePlanStore.getState().currentPlan?.id ?? null });
       const c = r.candidates[0];
       if (c) { set({ latitude: c.latitude, longitude: c.longitude }); setGeo({ busy: false, note: `「${c.address ?? q}」の位置にしました` }); }
       else setGeo({ busy: false, note: 'この住所の位置が見つかりませんでした。住所の書き方を確かめてください' });
@@ -114,6 +116,8 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
                     <p className="font-semibold text-ink-900">{c.name ?? '名前なし'}</p>
                     <p className="text-xs text-ink-700">{[c.address, c.phone && `TEL ${c.phone}`, c.website].filter(Boolean).join(' · ')}</p>
                     {c.notes?.map((n) => <p key={n} className="text-xs text-ink-700">{n}</p>)}
+                    {candidateHint(c, lookupState.result?.area) && (
+                      <p className="text-[11px] text-ink-600" data-testid={`new-lookup-hint-${i}`}>{candidateHint(c, lookupState.result?.area)}</p>)}
                   </div>
                   <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary shrink-0" aria-label={`「${c.name ?? ''}」を入れる`}
                     onClick={() => { const r = applyCandidate(data, urlRows, c); setData(r.data); setUrlRows(r.urlRows); setLookupState({ busy: false, result: null, error: null }); }}>入れる</button>

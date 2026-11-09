@@ -4,6 +4,7 @@
 import { getPlaceInfo, type PlaceInfoCandidate, type PlaceInfoResult } from '@/services/api/planEdit';
 import type { CreateScheduleItemData, EventCategory } from '@/types';
 import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
+import { usePlanStore } from '@/store/planStore';
 
 export type NewEventData = Partial<CreateScheduleItemData>;
 
@@ -22,7 +23,9 @@ export function toCategory(c?: string | null): EventCategory | null {
 /** 名前(と住所・近くの位置)で自動取得し、候補の一覧と、一番上の候補を返す */
 export async function lookupPlace(name: string, near: { latitude: number; longitude: number } | null,
   address?: string | null): Promise<{ result: PlaceInfoResult; best: PlaceInfoCandidate | null }> {
-  const result = await getPlaceInfo({ name, latitude: near?.latitude, longitude: near?.longitude, address });
+  // [Gate PlaceTripArea] 旅程の画面の旅行を渡す(位置・住所が無い時、旅行の目的地の近くを探す)
+  const result = await getPlaceInfo({ name, latitude: near?.latitude, longitude: near?.longitude, address,
+    plan_id: usePlanStore.getState().currentPlan?.id ?? null });
   return { result, best: result.candidates[0] ?? null };
 }
 

@@ -1,5 +1,19 @@
 /** [Gate PlaceLookupJP] 自動取得の候補を入力へ入れる時の小さな関数(画面の試験で API の mock と分けるため別のファイル) */
-import type { PlaceInfoCandidate } from '@/services/api/planEdit';
+import type { PlaceInfoCandidate, PlaceInfoResult } from '@/services/api/planEdit';
+
+const ADDRESS_LEVEL: Record<number, string> = { 1: '住所は市区町村まで', 2: '住所は町名まで', 3: '住所は番地まで' };
+
+/** [Gate PlaceTripArea] 候補を選ぶ手がかり(旅行先・近くの予定からの距離、住所の細かさ、名前が一部だけ合う)を 1 行に */
+export function candidateHint(c: PlaceInfoCandidate, area?: PlaceInfoResult['area']): string {
+  const out: string[] = [];
+  if (typeof c.distance_km === 'number') {
+    out.push(`${area?.label ? `旅行先(${area.label})` : '近くの予定'}から ${c.distance_km}km`);
+  }
+  const level = typeof c.address_level === 'number' ? ADDRESS_LEVEL[c.address_level] : undefined;
+  if (c.address && level) out.push(level);
+  if (typeof c.name_match === 'number' && c.name_match < 0.6) out.push('名前は一部だけ一致');
+  return out.join(' · ');
+}
 
 /** 候補のメモ(チェックイン/アウト・駐車場など)を、まだ書いていない行だけメモへ足す */
 export function appendNotes(current: string, notes?: string[]): string {
