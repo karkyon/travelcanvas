@@ -758,15 +758,16 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         itemId,
         {
           title: item.title,
-          description: hideNotes ? undefined : item.description,
+          // [Gate PlanEditClear] undefined は「変えない」、空('')は「消す」(null で送る)
+          description: hideNotes || item.description === undefined ? undefined : item.description || null,
           event_type: item.category,
-          local_start_time: item.start_time,
+          local_start_time: item.start_time === undefined ? undefined : item.start_time || null,
           // [Gate G7] FR-005 終了時刻を変えた時だけ送る(空は終了を消す)
           ...(item.end_time === undefined ? {} : {
             local_end_time: item.end_time || null,
             ...(item.end_time ? { end_day_offset: item.end_day_offset ?? 0 } : {}),
           }),
-          address: hidePlace ? undefined : item.address,
+          address: hidePlace || item.address === undefined ? undefined : item.address || null,
           latitude: hidePlace ? undefined : item.latitude,
           longitude: hidePlace ? undefined : item.longitude,
           // [Gate PlanSpotEdit] 電話番号(変えた時だけ。空は消す)
@@ -806,9 +807,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         const queued = enqueue(plan.id, {
           action: 'update', entity_id: itemId, base_revision: plan.revision, label: item.title ?? current?.title ?? '予定',
           fields: {
-            title: item.title, description: item.description, event_type: item.category,
+            title: item.title, description: item.description === undefined ? undefined : item.description || null,
+            event_type: item.category,
             local_start_time: item.start_time === undefined ? undefined : item.start_time || null,
-            address: item.address, latitude: item.latitude, longitude: item.longitude,
+            address: item.address === undefined ? undefined : item.address || null, latitude: item.latitude, longitude: item.longitude,
           },
         });
         if (queued) {

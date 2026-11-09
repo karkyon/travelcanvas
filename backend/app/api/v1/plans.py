@@ -244,6 +244,33 @@ def _apply_end_and_check(event: TravelEvent, day: TravelDay, end_given: bool, lo
         raise _time_error(exc)
 
 
+def _apply_local_start(event: TravelEvent, old_time: Optional[str], keep_end: bool) -> None:
+    """[Gate PlanEditClear] 開始の時刻(その日の現地時刻)を変えた・消した時に、開始の日時(start_at)と終了をそろえる。
+
+    - 消した(空・null): 開始の日時も消す。終了も一緒に消す(終了だけの予定は作らない。終了を同時に送った時はそれに従う)
+    - 変えた: 開始の日時(予約の取り込みなどで入っている時)も同じ時刻へ。終了は同じだけずらす(所要時間を保つ)
+    以前は start_at が残り、開始時刻を消しても・変えても元の時刻が残ることがあった。
+    """
+    day = event.day
+    new_time = event.local_start_time
+    if new_time not in (None, "") and not et.parse_local_time(new_time):
+        raise _time_error(et.EventTimeError("invalid_time", "時刻はHH:MMで入力してください"))
+    if not new_time:
+        event.local_start_time = None
+        event.start_at = None
+        if not keep_end:
+            event.end_at = None
+        return
+    if event.start_at is not None and not event.is_all_day:
+        new_start = et.local_dt(day.local_date, new_time, day.timezone_id)
+        if not keep_end and event.end_at is not None:
+            event.end_at = et._aware_req(event.end_at) + (new_start - et._aware_req(event.start_at))
+        event.start_at = new_start
+        return
+    if not keep_end:
+        et.shift_end_with_start(event, day.local_date, day.timezone_id, old_time, new_time)
+
+
 def _plan_hidden(db: Session, plan_id, user: User, min_role: str, *categories: str):
     """(plan, 隠す項目)。categories のどれかが隠されていれば 403。"""
     plan, role = require_plan_access(db, plan_id, user, min_role=min_role)
@@ -942,12 +969,12 @@ async def update_event(
         update_data["urls"] = event_urls.to_json(event_data.urls)
     if "dining" in update_data:
         update_data["dining"] = dining_info.to_json(event_data.dining)
+    if "title" in update_data and not (update_data["title"] or "").strip():
+        update_data.pop("title")  # 名前は消せない(空は変えない扱い)
     for field, value in update_data.items():
         setattr(event, field, value)
-    if "local_start_time" in update_data and not end_given and "end_at" not in update_data:
-        # 開始の時刻だけを変えたら、終了も同じだけずらす(所要時間を保つ)
-        et.shift_end_with_start(event, event.day.local_date, event.day.timezone_id, old_time,
-                                event.local_start_time)
+    if "local_start_time" in update_data and "start_at" not in update_data:
+        _apply_local_start(event, old_time, keep_end=end_given or "end_at" in update_data)
     if end_given or {"start_at", "end_at", "local_start_time", "is_all_day"} & set(update_data):
         _apply_end_and_check(event, event.day, end_given, local_end_time, end_day_offset)
     db.flush()
