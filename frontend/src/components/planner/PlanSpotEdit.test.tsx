@@ -181,7 +181,7 @@ describe('DayView の日のカード', () => {
     { id: 'e1', title: '伊射波神社', category: 'sightseeing' },
   ] });
 
-  it('⑪ 「この日程を削除」は日のカードの上(どの日か読み上げる)。⑬ 追加のボタンは「この日にスポットを追加」', async () => {
+  it('⑪ 「この日程を削除」は日のカードの上(どの日か読み上げる)。⑬ 追加のボタンは日の見出しの右の「＋ 予定を追加」', async () => {
     const onDeleteDay = vi.fn();
     render(<DayView day={day()} planId="p1" onDeleteDay={onDeleteDay} />);
     const del = screen.getByTestId('day-delete');
@@ -189,7 +189,7 @@ describe('DayView の日のカード', () => {
     expect(del).toHaveAccessibleName('2026-11-29 (日)の日程を削除');
     fireEvent.click(del);
     expect(onDeleteDay).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: '＋ この日にスポットを追加' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '＋ 予定を追加' })).toBeInTheDocument();
     expect(screen.queryByText(/日程に追加する/)).toBeNull();
     await waitFor(() => expect(m.getHoursCheck).not.toHaveBeenCalled());
   });
@@ -209,7 +209,7 @@ describe('DayView の日のカード', () => {
     });
     m.addNewScheduleItem.mockResolvedValue(undefined);
     render(<DayView day={day()} planId="p1" />);
-    fireEvent.click(screen.getByRole('button', { name: '＋ この日にスポットを追加' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 予定を追加' }));
     fireEvent.click(await screen.findByRole('button', { name: '候補を選ぶ' }));
     await waitFor(() => expect(screen.getByLabelText('場所・住所')).toHaveValue('〒517-8517 三重県鳥羽市鳥羽3丁目3-6'));
     expect(m.getPlaceInfo).toHaveBeenCalledTimes(1);

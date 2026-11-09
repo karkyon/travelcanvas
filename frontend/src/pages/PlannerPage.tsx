@@ -45,6 +45,7 @@ import { spotApiService } from '@/services/spotApi';
 import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
+import MapTools from '@/components/planner/MapTools';
 import AllDaysChart from '@/components/planner/AllDaysChart';
 import { hoursBadge, insertIndexByTime, segmentRow, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 
@@ -168,10 +169,17 @@ const PlannerPage: React.FC = () => {
   // [G11-Layout] 移動概算の読み込みの状態(地図の下の行の場所を読み込み中から確保する)
   const [routePreviewStatus, setRoutePreviewStatus] = useState<RouteSummaryStatus>('off');
   const [showMap, setShowMap] = useState(true);
+  // [Gate MapTools] 地図を画面いっぱいに広げる(Esc・「元の大きさ」で戻す)
+  const [mapMax, setMapMax] = useState(false);
+  useEffect(() => {
+    if (!mapMax) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMapMax(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mapMax]);
   // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
   const [planView, setPlanView] = useState<'day' | 'all'>('day');
-  // [Gate MockScreens] 見出しの「＋ 予定を追加」→ DayView の追加を開く。営業時間の照合を選んだ予定の欄へ渡す
-  const [addSignal, setAddSignal] = useState(0);
+  // [Gate MockScreens] 営業時間の照合を選んだ予定の欄へ渡す
   const [dayHours, setDayHours] = useState<{ byId: Record<string, EventHoursCheck>; pending: boolean }>({ byId: {}, pending: false });
   const handleHoursChange = useCallback((byId: Record<string, EventHoursCheck>, pending: boolean) => {
     setDayHours({ byId, pending });
@@ -859,10 +867,6 @@ const PlannerPage: React.FC = () => {
             hint="営業時間・移動手段・現地時間を予定カードで確認。ドラッグまたは↑↓で順番を入れ替えます。"
             actions={<>
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← 旅行の一覧</button>
-              {activeDay && planView === 'day' && (
-                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => setAddSignal((n) => n + 1)}
-                  data-testid="planner-add-event">＋ 予定を追加</button>
-              )}
             </>}
           />
 
@@ -1034,7 +1038,6 @@ const PlannerPage: React.FC = () => {
                   onOpenRoute={() => navigate(`/planner/${currentPlan.id}/route-options`)}
                   selectedEventId={selectedEvent?.id ?? null}
                   onHoursChange={handleHoursChange}
-                  addSignal={addSignal}
                   day={activeDay}
                   planId={currentPlan.id}
                   isActive
@@ -1054,7 +1057,11 @@ const PlannerPage: React.FC = () => {
                 />
               </section>
               {showMap && (
-                <div className="tc-map-frame tc-route-map min-w-0" data-testid="planner-map">
+                <div className={`tc-map-frame tc-route-map min-w-0${mapMax ? ' tc-map-frame--max' : ''}`} data-testid="planner-map"
+                  data-max={mapMax ? 'true' : 'false'} role={mapMax ? 'dialog' : undefined} aria-modal={mapMax ? true : undefined}
+                  aria-label={mapMax ? '地図(最大化)' : undefined}>
+                  {/* [Gate MapTools] 右上: 地図を最大化・Google マップで表示(この日の予定の順に経路を検索) */}
+                  <MapTools stops={activeDay.events} maximized={mapMax} onToggleMax={() => setMapMax((v) => !v)} />
                   <div className="tc-map-toolbar" aria-hidden="true">
                     <span className="tc-map-chip">⌖ {activeDay.date ? `${activeDay.date.slice(5).replace('-', '/')} ${getDayOfWeek(activeDay.date)}` : `${currentDayIndex + 1}日目`} · MAP</span>
                   </div>
@@ -1063,8 +1070,9 @@ const PlannerPage: React.FC = () => {
                     <span className="tc-pill">☆ 候補</span>
                   </div>
                   <PlanMap
+                    key={mapMax ? 'max' : 'normal'}
                     day={activeDay}
-                    height={530}
+                    height={mapMax ? 'calc(100vh - 24px)' : 530}
                     candidates={searchResults}
                     routePreview={routePreview}
                     routePreviewStatus={routePreviewStatus}

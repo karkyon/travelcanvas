@@ -822,3 +822,17 @@
 .tc-theme-menu button:hover { background: var(--tc-cloud-100); }
 .tc-theme-menu button[aria-checked='true'] { background: var(--tc-accent-soft); color: var(--tc-accent-strong); font-weight: 700; }
 @media print { .tc-trip-menu, .tc-theme-menu { display: none; } }
+/* ===== [Gate MapTools] 地図の右上の操作(最大化・Google マップ)と最大化 ===== */
+.tc-map-actions { position: absolute; right: 12px; top: 12px; z-index: 600; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: calc(100% - 24px); }
+.tc-map-action { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 10px; border-radius: 10px;
+  border: 1px solid var(--tc-cloud-200); background: color-mix(in srgb, var(--tc-cloud-0) 95%, transparent); color: var(--tc-ink-900);
+  font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(36, 52, 69, .1); text-decoration: none; cursor: pointer; }
+.tc-map-action:hover { border-color: var(--tc-accent); }
+.tc-map-action:disabled { opacity: .55; cursor: not-allowed; }
+.tc-map-toolbar { right: 300px; }
+.tc-map-frame--max { position: fixed !important; inset: 12px; z-index: 1200; background: var(--tc-surface, var(--tc-cloud-0));
+  box-shadow: 0 20px 60px rgba(24, 32, 51, .35); }
+.tc-planner-layout > .tc-map-frame.tc-map-frame--max { position: fixed !important; top: 12px; }
+@media (max-width: 640px) { .tc-map-toolbar { right: 12px; top: 52px; } .tc-map-actions { right: 8px; top: 8px; } }
+/* ===== [Gate DayAdd] 日の見出しの右の「＋ 予定を追加」(編集のボタンと同じ形で少し小さく) ===== */
+.tc-day-add { min-height: 30px; padding: 3px 10px; font-size: 12px; white-space: nowrap; }

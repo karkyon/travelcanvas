@@ -45,7 +45,7 @@ describe('予定を追加', () => {
     m.getPlaceInfo.mockResolvedValue(info('伊勢神宮 内宮', '三重県伊勢市宇治館町1'));
     m.addNewScheduleItem.mockResolvedValue(undefined);
     render(<DayView day={day()} planId="p1" />);
-    fireEvent.click(screen.getByRole('button', { name: '＋ この日にスポットを追加' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 予定を追加' }));
     fireEvent.click(await screen.findByRole('tab', { name: '名前で検索' }));
     fireEvent.change(screen.getByLabelText('場所の名前'), { target: { value: '伊勢神宮' } });
     fireEvent.click(screen.getByRole('tab', { name: '手で入力' }));
@@ -73,7 +73,7 @@ describe('予定を追加', () => {
     m.getPlaceInfo.mockImplementation(async ({ name }: { name: string }) => info(name, `三重県伊勢市 ${name}`));
     m.addNewScheduleItem.mockResolvedValue(undefined);
     render(<DayView day={day()} planId="p1" />);
-    fireEvent.click(screen.getByRole('button', { name: '＋ この日にスポットを追加' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 予定を追加' }));
     fireEvent.click(await screen.findByRole('tab', { name: 'SNS・URL' }));
     fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://www.youtube.com/watch?v=x' } });
     fireEvent.click(screen.getByRole('button', { name: '読む' }));
