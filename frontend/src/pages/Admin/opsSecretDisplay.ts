@@ -61,8 +61,29 @@ function fromParts(status: string, verify: OpsVerifyState | null | undefined, re
   return { code: status, text: o.text, tone: o.tone, detail: null };
 }
 
+/**
+ * [Gate OpsFreeKeys] 無料の提供元(場所の自動取得・動画の読み取り)の鍵。backend は「有効性を確認」を待たず、登録した版を
+ * そのまま使う(provider_secrets.resolve)。「設定不要」「未確認(送らない)」と出すと、実際の動きと食い違う
+ */
+export const FREE_IN_USE_TEXT = '登録済み・自動取得で使用中';
+export const FREE_MISSING_TEXT = '任意・未登録(登録すると自動取得で使います)';
+function freeDisplay(slot: OpsSecretSlot): SecretDisplay | null {
+  if (!slot.free) return null;
+  if (slot.status === 'configured') {
+    return { code: 'free:configured', text: FREE_IN_USE_TEXT, tone: 'tc-pill--good',
+      detail: '無料の提供元です。「有効性を確認」は無く、利用者が自動取得・動画の読み取りを押した時にこの鍵で送ります(使った分の請求なし)' };
+  }
+  if (slot.status === 'missing') {
+    return { code: 'free:missing', text: FREE_MISSING_TEXT, tone: '',
+      detail: '登録しなくてもアプリは動きます(この提供元へは送らず、OpenStreetMap などだけで探します)' };
+  }
+  return null;
+}
+
 /** 秘密情報・権限の1つの鍵 */
 export function secretDisplay(slot: OpsSecretSlot): SecretDisplay {
+  const free = freeDisplay(slot);
+  if (free) return free;
   const required = slot.required ?? true;
   return fromParts(slot.status, slot.verification?.state, required, slot.verification?.expires_at);
 }

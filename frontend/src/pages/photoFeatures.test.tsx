@@ -16,6 +16,8 @@ const m = vi.hoisted(() => ({
   getPlanBasics: vi.fn(), savePlanBasics: vi.fn(), reschedulePlan: vi.fn(),
 }));
 vi.mock('@/services/api/photoFeatures', () => m);
+const cov = vi.hoisted(() => ({ getPlanCover: vi.fn() }));
+vi.mock('@/services/api/g11', async (orig) => ({ ...(await orig<object>()), getPlanCover: cov.getPlanCover }));
 
 import MyMapsCard from './exports/MyMapsCard';
 import BookingExtractCard from './imports/BookingExtractCard';
@@ -212,6 +214,21 @@ describe('PlanBasicsDialog', () => {
   beforeEach(() => {
     m.getPlanBasics.mockResolvedValue({ title: '鳥羽', destination: '鳥羽', description: null, budget: null, start_date: null, end_date: null, preferences: { x: 1 } });
     m.savePlanBasics.mockResolvedValue(undefined);
+    cov.getPlanCover.mockResolvedValue({ cover: null, can_edit: false });
+  });
+
+  it('背景の写真: 変えられる人だけに欄を出し、押すと写真の選択を上に開く', async () => {
+    cov.getPlanCover.mockResolvedValue({ cover: null, can_edit: true });
+    open();
+    const btn = await screen.findByTestId('basics-cover-change');
+    expect(btn).toHaveTextContent('写真を設定');
+    expect(screen.queryByTestId('cover-photo-dialog')).toBeNull();
+  });
+
+  it('背景の写真: 変えられない人には出さない', async () => {
+    open();
+    await waitFor(() => expect(cov.getPlanCover).toHaveBeenCalledWith('p1'));
+    expect(screen.queryByTestId('basics-cover')).toBeNull();
   });
 
   it('題名・方面・人数を保存する。日程が同じなら日程の変更は呼ばない', async () => {

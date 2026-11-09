@@ -4,7 +4,6 @@ import { useToast } from './common/toastContext';
 import Button from './common/Button';
 import UiIcon from './common/UiIcon';
 import { CalendarDays, MapPin, TriangleAlert, Users, Wallet } from 'lucide-react';
-import Input from './common/Input';
 import Card from './common/Card';
 import Modal from './common/Modal';
 import type { TravelPlan } from '../types';
@@ -31,8 +30,16 @@ interface PlanHeaderProps {
   onDuplicate?: () => void;
   onDelete?: () => void;
   className?: string;
-  /** [Gate MockScreens] 旅行の名前の見出しの段(旅程の画面では page-head が h1 のため 2) */
+  /** [Gate MockScreens] 旅行の名前の見出しの段 */
   headingLevel?: 1 | 2;
+  /** [Gate TripHead] 題名の見出しの id(画面の aria-labelledby 用) */
+  titleId?: string;
+  /** [Gate TripHead] 「編集」= 旅行の基本情報のモーダルを開く(題名・行き先・日程・人数・予算・メモ・背景の写真) */
+  onEdit?: () => void;
+  /** [Gate TripHead] 編集・複製・削除の前に並べる画面ごとの操作(← 旅行の一覧 など) */
+  actions?: React.ReactNode;
+  /** [Gate TripHead] 表紙の下に出す短い説明 */
+  hint?: React.ReactNode;
 }
 
 const PlanHeader: React.FC<PlanHeaderProps> = ({
@@ -42,21 +49,16 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
   onDuplicate,
   onDelete,
   headingLevel = 1,
+  titleId,
+  onEdit,
+  actions,
+  hint,
   className = ''
 }) => {
-  const { updatePlanDetails, duplicatePlan, deletePlan } = usePlan();
+  const { duplicatePlan, deletePlan } = usePlan();
   const { addToast } = useToast();
   const online = useOnlineStatus();
   
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedPlan, setEditedPlan] = useState({
-    title: plan.title,
-    description: plan.description || '',
-    destination: plan.destination,
-    budget: plan.budget,
-    group_size: plan.group_size,
-    tags: plan.tags || []
-  });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   // [Gate G11] 表紙の写真(見える人だけ)。変えられるのは編集できる人だけ
   const [cover, setCover] = useState<PlanCover | null>(null);
@@ -104,25 +106,6 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     };
   }, [plan]);
 
-  // プラン更新
-  const handleUpdatePlan = useCallback(async () => {
-    try {
-      await updatePlanDetails(plan.id, editedPlan);
-      setIsEditing(false);
-      
-      addToast({
-        type: 'success',
-        message: 'プラン情報を更新しました'
-      });
-    } catch (error) {
-      console.error('プラン更新エラー:', error);
-      addToast({
-        type: 'error',
-        message: 'プラン更新に失敗しました'
-      });
-    }
-  }, [plan.id, editedPlan, updatePlanDetails, addToast]);
-
   // プラン複製
   const handleDuplicatePlan = useCallback(async () => {
     try {
@@ -155,19 +138,6 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     }
   }, [plan.id, deletePlan, onDelete]);
 
-  // 編集キャンセル
-  const handleCancelEdit = useCallback(() => {
-    setEditedPlan({
-      title: plan.title,
-      description: plan.description || '',
-      destination: plan.destination,
-      budget: plan.budget,
-      group_size: plan.group_size,
-      tags: plan.tags || []
-    });
-    setIsEditing(false);
-  }, [plan]);
-
   // 日付フォーマット
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString || NaN);
@@ -180,34 +150,12 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
     });
   }, []);
 
-  // タグの編集
-  const handleTagInput = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-      const newTag = e.currentTarget.value.trim();
-      if (!editedPlan.tags.includes(newTag)) {
-        setEditedPlan(prev => ({
-          ...prev,
-          tags: [...prev.tags, newTag]
-        }));
-      }
-      e.currentTarget.value = '';
-    }
-  }, [editedPlan.tags]);
-
-  // タグの削除
-  const removeTag = useCallback((tagToRemove: string) => {
-    setEditedPlan(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  }, []);
-
   return (
     <div className={className}>
       <Card variant="elevated" padding="lg">
-        {!isEditing ? (
-          /* 表示モード */
-          <div className="space-y-6">
+        {/* [Gate TripHead] 旅程の画面の一番上の見出し。編集は基本情報のモーダル(onEdit)に一本化した(以前の
+            この場での編集はタグ・人数の欄がサーバーに無く保存されず、上の「基本情報・日程を編集」と二重だった) */}
+        <div className="space-y-6">
             {/* ヘッダー情報 */}
             {/* [Gate G9] UX-0 スマホの幅では題名と操作を縦に並べる(以前は題名が1文字ずつ折り返した) */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -226,7 +174,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                       <span className="rounded-full border border-white px-2 py-0.5" role="status">オフライン(保存済みの内容)</span>
                     )}
                   </div>
-                  {React.createElement(`h${headingLevel}`, { className: 'mt-2 text-2xl font-bold break-words', style: { fontFamily: 'var(--tc-font-display)' } }, plan.title)}
+                  {React.createElement(`h${headingLevel}`, { id: titleId, className: 'mt-2 text-2xl font-bold break-words', style: { fontFamily: 'var(--tc-font-display)' } }, plan.title)}
                   <p className="mt-1 text-sm">
                     {[plan.destination || null, `${formatDate(firstDate(plan))} 〜 ${formatDate(lastDate(plan))}`]
                       .filter(Boolean).join('・')}
@@ -245,6 +193,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                     current={cover} onSaved={setCover} />
                 )}
                 
+                {hint && <p className="text-sm text-ink-700 mb-3">{hint}</p>}
                 {plan.description && (
                   <p className="text-ink-700 mb-3 leading-relaxed">{plan.description}</p>
                 )}
@@ -287,12 +236,15 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 )}
               </div>
 
-              {/* アクションボタン */}
-              <div className="flex gap-2 ml-4">
-                <Button
+              {/* アクションボタン(スマホでは折り返す) */}
+              <div className="flex flex-wrap gap-2 sm:ml-4 sm:justify-end" data-testid="trip-head-actions">
+                {actions}
+                {onEdit && <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setIsEditing(true)}
+                  onClick={onEdit}
+                  data-testid="plan-basics-open"
+                  title="旅行の基本情報・日程・背景の写真を編集"
                   leftIcon={
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -300,7 +252,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                   }
                 >
                   編集
-                </Button>
+                </Button>}
                 
                 <div className="flex gap-1">
                   {onShare && (
@@ -384,105 +336,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               </div>
             </div>
           </div>
-        ) : (
-          /* 編集モード */
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-ink-900">プラン情報を編集</h2>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleCancelEdit}>
-                  キャンセル
-                </Button>
-                <Button variant="primary" onClick={handleUpdatePlan}>
-                  保存
-                </Button>
-              </div>
-            </div>
 
-            <Input
-              label="プランタイトル *"
-              value={editedPlan.title}
-              onChange={(e) => setEditedPlan(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="東京観光2泊3日"
-              fullWidth
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">
-                説明
-              </label>
-              <textarea
-                value={editedPlan.description}
-                onChange={(e) => setEditedPlan(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="プランの詳細説明を入力してください"
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Input
-                label="目的地 *"
-                value={editedPlan.destination}
-                onChange={(e) => setEditedPlan(prev => ({ ...prev, destination: e.target.value }))}
-                placeholder="東京"
-                fullWidth
-              />
-
-              <Input
-                label="予算 (円)"
-                type="number"
-                value={editedPlan.budget}
-                onChange={(e) => setEditedPlan(prev => ({ ...prev, budget: Number(e.target.value) }))}
-                placeholder="50000"
-                fullWidth
-              />
-
-              <Input
-                label="人数"
-                type="number"
-                min="1"
-                value={editedPlan.group_size}
-                onChange={(e) => setEditedPlan(prev => ({ ...prev, group_size: Number(e.target.value) }))}
-                placeholder="2"
-                fullWidth
-              />
-            </div>
-
-            {/* タグ編集 */}
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">
-                タグ
-              </label>
-              <div className="space-y-2">
-                {editedPlan.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {editedPlan.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                      >
-                        #{tag}
-                        <button
-                          onClick={() => removeTag(tag)}
-                          className="ml-1 text-blue-600 hover:text-blue-800"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <input
-                  type="text"
-                  placeholder="タグを入力してEnterキーを押してください"
-                  onKeyDown={handleTagInput}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* 削除確認モーダル */}

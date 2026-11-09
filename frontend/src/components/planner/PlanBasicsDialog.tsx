@@ -1,12 +1,18 @@
 /**
  * [Gate BookingFix] 旅行の基本情報(題名・方面・日程・人数・予算・メモ)の編集。
  * 日程を変えると全部の日と予定の日時が一緒に動く。短くして予定のある日が消える時は、一覧を見せて確認してから消す。
+ * [Gate TripHead] 背景(表紙)の写真もここから変えられる(変えられる人だけ。写真の選択は上に重ねて開き、保存はその場で効く)。
  */
 import React, { useEffect, useState } from 'react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import { getPlanBasics, reschedulePlan, savePlanBasics } from '@/services/api/photoFeatures';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import TripCover from '@/components/trip/TripCover';
+import CoverPhotoDialog from '@/components/trip/CoverPhotoDialog';
+import { getPlanCover } from '@/services/api/g11';
+import type { PlanCover } from '@/services/api/types/g11';
+import { useCoverPhoto, useCoverVersions } from '@/hooks/useCoverPhoto';
 
 interface Props {
   planId: string;
@@ -31,6 +37,22 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
   const [lost, setLost] = useState<Lost | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // [Gate TripHead] 背景の写真(表紙)。読めない・変えられない時は欄ごと出さない
+  const [cover, setCover] = useState<PlanCover | null>(null);
+  const [canEditCover, setCanEditCover] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const coverVersion = useCoverVersions((st) => st.versions[planId] ?? 0);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let active = true;
+    getPlanCover(planId).then((r) => {
+      if (!active) return;
+      setCover(r.cover);
+      setCanEditCover(r.can_edit);
+    }).catch(() => { if (active) { setCover(null); setCanEditCover(false); } });
+    return () => { active = false; };
+  }, [isOpen, planId, coverVersion]);
+  const coverPhoto = useCoverPhoto(isOpen ? planId : null, cover, '');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -117,6 +139,21 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
               <div><label htmlFor="basics-party" className="text-sm text-ink-800">人数</label><input id="basics-party" type="number" min={1} max={99} className={input} value={party} onChange={(e) => setParty(e.target.value)} /></div>
               <div><label htmlFor="basics-budget" className="text-sm text-ink-800">予算(円)</label><input id="basics-budget" type="number" min={0} className={input} value={budget} onChange={(e) => setBudget(e.target.value)} /></div>
             </div>
+            {canEditCover && (
+              <div data-testid="basics-cover">
+                <p className="text-sm text-ink-800">背景の写真</p>
+                <div className="mt-1 flex items-center gap-3">
+                  <TripCover size="card" destination={destination} tripTitle={title} startDate={start || null}
+                    photo={coverPhoto.photo} onPhotoError={coverPhoto.onError} className="w-40 shrink-0 rounded-md" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setCoverOpen(true)} data-testid="basics-cover-change">
+                      {cover ? '写真を変更' : '写真を設定'}
+                    </Button>
+                    <p className="mt-1 text-xs text-ink-700">旅程の上の表紙・一覧のカードに使います。選んだ時点で保存されます。</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div><label htmlFor="basics-description" className="text-sm text-ink-800">メモ</label><textarea id="basics-description" rows={3} className={input} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
           </div>
         </Modal.Body>
@@ -125,6 +162,10 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
           <Button type="submit" variant="primary" loading={busy} data-testid="plan-basics-save">保存</Button>
         </Modal.Footer>
       </form>
+      {canEditCover && (
+        <CoverPhotoDialog isOpen={coverOpen} onClose={() => setCoverOpen(false)} planId={planId}
+          tripTitle={title} destination={destination} startDate={start || null} current={cover} onSaved={setCover} />
+      )}
     </Modal>
   );
 };

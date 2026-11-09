@@ -165,3 +165,29 @@ def test_hidden_locations_are_not_mapped_or_counted(auth_client, make_user, db_s
     finally:
         app.dependency_overrides[get_current_user] = lambda: AuthResult(user=owner, is_authenticated=True,
                                                                         is_guest=False)
+
+
+# ================================================================ [Gate FootHover] 地図のポップアップの旅行
+
+def test_recent_trips_rule():
+    rows = [dh.foot_trip({"id": f"p{i}", "title": f"t{i}", "start_date": f"2026-0{i}-01", "end_date": None}, "visited")
+            for i in range(1, 8)]
+    rows.append(dh.foot_trip({"id": "nodate", "title": "未定", "start_date": None, "end_date": None}, "planned"))
+    rows.append(dh.foot_trip({"id": "p3", "title": "t3", "start_date": "2026-03-01", "end_date": None}, "planned"))
+    out = dh.recent_trips(rows)
+    assert [r["plan_id"] for r in out] == ["p7", "p6", "p5", "p4", "p3"]  # 新しい順・5 件・同じ旅行は 1 件
+    assert out[-1]["state"] == "visited"  # 行ったと計画中が重なれば行った
+
+
+def test_pref_trips_and_point_trips(auth_client):
+    client, _owner = auth_client
+    k1 = _geo_trip(client, "金沢 1 回目", [-40], [("兼六園", 36.5621, 136.6626, "石川県金沢市兼六町")], "石川県金沢市")
+    k2 = _geo_trip(client, "金沢 2 回目", [-10], [("兼六園", 36.5622, 136.6627, "石川県金沢市兼六町")], "石川県金沢市")
+    tb = _geo_trip(client, "鳥羽", [10], [("賀多神社", 34.4813, 136.8433, "三重県鳥羽市")], "三重県鳥羽市")
+    fp = client.get(URL).json()["home"]["footprints"]
+    ishikawa = fp["pref_trips"]["石川県"]
+    assert [t["plan_id"] for t in ishikawa] == [k2, k1] and {t["state"] for t in ishikawa} == {"visited"}
+    assert ishikawa[0]["title"] == "金沢 2 回目" and ishikawa[0]["start_date"]
+    assert [t["plan_id"] for t in fp["pref_trips"]["三重県"]] == [tb] and fp["pref_trips"]["三重県"][0]["state"] == "planned"
+    kenroku = next(p for p in fp["points"] if (p["lat"], p["lng"]) == (36.56, 136.66))
+    assert [t["plan_id"] for t in kenroku["trips"]] == [k2, k1]

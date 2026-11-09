@@ -45,6 +45,8 @@ export interface HomeTimelineTrip {
   plan_id: string; title: string; start_date: string | null; end_date: string | null; photo_count: number;
   note_count: number; cover: PlanCover | null;
 }
+/** [Gate FootHover] 足あとの地図のポップアップに出す旅行(押すとその旅行を開く) */
+export interface FootTrip { plan_id: string; title: string; start_date: string | null; end_date: string | null; state: 'visited' | 'planned' }
 export interface DashboardHome {
   shelves: Record<TripShelf, number>;
   planning: HomePlanning[];
@@ -54,8 +56,10 @@ export interface DashboardHome {
     prefectures: string[]; planned_prefectures: string[]; all_prefectures: string[]; trips_visited: number;
     days_this_year: number; photos: number;
     /** [Gate Footprints2] 行った・計画中の旅の予定の位置(世界地図の点)と、海外の旅の数(古い応答には無い) */
-    points?: Array<{ lat: number; lng: number; state: 'visited' | 'planned'; label: string }>;
+    points?: Array<{ lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[] }>;
     overseas_trips?: number;
+    /** [Gate FootHover] 都道府県ごとの旅行(直近 5 件。古い応答には無い) */
+    pref_trips?: Record<string, FootTrip[]>;
   };
   wishlist: { count: number; groups: Array<{ category: string; count: number; spots: Array<{ spot_id: string; name: string; prefecture: string | null }> }> };
 }

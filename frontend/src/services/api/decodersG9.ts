@@ -1,11 +1,11 @@
 /** [Gate G9] UX-4 文脈型ダッシュボードの応答の decoder(g9.ts 経由で読む。最初に読む JS に入れない) */
 import type {
   DashboardAlerts, DashboardEvent, DashboardFocus, DashboardHome, DashboardReadiness, DashboardSummary, DashboardToday,
-  DashboardTrip, HomePlanning, HomeTask, HomeTimelineTrip, TripPhase, TripShelf,
+  DashboardTrip, FootTrip, HomePlanning, HomeTask, HomeTimelineTrip, TripPhase, TripShelf,
 } from './types/g9';
 import { optionalPlanCover } from './g11cover';
 import {
-  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, num, object, oneOf, optional, str, type Decoder,
+  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, type Decoder,
 } from './decode';
 
 const phase = oneOf('ongoing', 'upcoming', 'past', 'undated');
@@ -34,6 +34,14 @@ const timelineTrip: Decoder<HomeTimelineTrip> = object<HomeTimelineTrip>({
   plan_id: str, title: str, start_date: nullable(str), end_date: nullable(str), photo_count: nonNegativeInt,
   note_count: nonNegativeInt, cover: optionalPlanCover,
 });
+// [Gate FootHover] 足あとの地図のポップアップの旅行
+const footTrip: Decoder<FootTrip> = object<FootTrip>({
+  plan_id: str, title: str, start_date: nullable(str), end_date: nullable(str), state: oneOf('visited', 'planned'),
+});
+const footTripsByPref: Decoder<Record<string, FootTrip[]>> = (v, path) => {
+  const r = record(v, path);
+  return Object.fromEntries(Object.entries(r).map(([k, x]) => [k, arrayOf(footTrip)(x, `${path}.${k}`)]));
+};
 const home: Decoder<DashboardHome> = object<DashboardHome>({
   shelves: object<DashboardHome['shelves']>({
     planning: nonNegativeInt, considering: nonNegativeInt, visited: nonNegativeInt, cancelled: nonNegativeInt,
@@ -49,9 +57,10 @@ const home: Decoder<DashboardHome> = object<DashboardHome>({
     trips_visited: nonNegativeInt, days_this_year: nonNegativeInt, photos: nonNegativeInt,
     // [Gate Footprints2] 世界地図の点・海外の旅の数(古い応答には無い)
     points: optional(arrayOf(object<NonNullable<DashboardHome['footprints']['points']>[number]>({
-      lat: num, lng: num, state: oneOf('visited', 'planned'), label: str,
+      lat: num, lng: num, state: oneOf('visited', 'planned'), label: str, trips: optional(arrayOf(footTrip)),
     }))),
     overseas_trips: optional(nonNegativeInt),
+    pref_trips: optional(footTripsByPref),
   }),
   wishlist: object<DashboardHome['wishlist']>({
     count: nonNegativeInt,
