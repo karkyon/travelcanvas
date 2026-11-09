@@ -1,0 +1,38 @@
+# [Gate GcpVm] GCP の VM(開発の共有環境)だけで重ねる設定。docker-compose.yml の後に読む。
+#
+#   VM の .env に COMPOSE_FILE=docker-compose.yml:docker-compose.gcp.yml を書くと、docker compose(tcops も含む)が
+#   いつもこの 2 つを読む(scripts/ops/gcp_vm.sh env が書く)。omega-dev2 では使わない。
+#
+# 入口は Tailscale だけ(docs/runbooks/gcp-vm-tailscale.md):
+#   端末(tailnet の中)→ https://<TC_SITE_HOST>(Tailscale Serve が HTTPS を終える)→ 127.0.0.1:8080 の gateway(caddy)
+#   → /api/*・/health・/ready は backend、他は画面(frontend)。画面と API は同じ origin(CORS・混在の問題が無い)。
+# - backend・frontend のポートは VM の中(127.0.0.1)だけで開く(tailnet・インターネットから直に届かない)
+# - CORS・CSRF で許すのは https://<TC_SITE_HOST> だけ(.env の TC_SITE_ORIGIN)
+# - ports の !override は Docker Compose 2.24.4 以上(VM には Docker の公式の apt から最新を入れる)
+services:
+  backend:
+    environment:
+      CORS_ORIGINS: ${TC_SITE_ORIGIN:?TC_SITE_ORIGIN must be set in .env (https://<tailscale name>)}
+      API_CORS_ORIGINS: ${TC_SITE_ORIGIN:?TC_SITE_ORIGIN must be set in .env (https://<tailscale name>)}
+    ports: !override
+      - "127.0.0.1:8001:8000"
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:4173:4173"
+
+  # 同じ origin の振り分け(scripts/ops/uat-https/Caddyfile と同じ規則。TLS は Tailscale Serve が終える)
+  gateway:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    environment:
+      TC_SITE_HOST: ${TC_SITE_HOST:?TC_SITE_HOST must be set in .env (<machine>.<tailnet>.ts.net)}
+    volumes:
+      - ./scripts/ops/gcp-vm/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - travelcanvas_net

@@ -1,0 +1,26 @@
+# [Gate GcpVm] GCP の VM の中の振り分け(docker-compose.gcp.yml の gateway)。外へは開かない(127.0.0.1:8080)。
+# 前段は Tailscale Serve(https://<TC_SITE_HOST> → http://127.0.0.1:8080)。TLS は Tailscale が終える。
+# - /api/*・/health・/ready は backend へ、他は画面(frontend)へ。/metrics・/docs は backend へ通さない
+# - Host は必ず TC_SITE_HOST、X-Forwarded-Proto は https にする(前段がどう渡しても、画面の CSP の通信先
+#   (同じ origin の https)と、vite と同じ「受け付ける名前」の判定がずれない。入口は Tailscale の https だけ)
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	encode gzip
+	@backend path /api/* /health /ready
+	handle @backend {
+		reverse_proxy backend:8000 {
+			header_up Host {$TC_SITE_HOST}
+			header_up X-Forwarded-Proto https
+		}
+	}
+	handle {
+		reverse_proxy frontend:4173 {
+			header_up Host {$TC_SITE_HOST}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}
