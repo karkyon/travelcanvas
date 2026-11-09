@@ -120,7 +120,13 @@ export async function uploadAsMember(planId: string, file: File, fields: PhotoFi
 }
 
 // ===== 旅行の基本情報
-export interface PlanBasics { title: string; destination: string | null; description: string | null; budget: number | null; start_date: string | null; end_date: string | null; preferences: Record<string, unknown> | null }
+export interface PlanBasics {
+  title: string; destination: string | null; description: string | null; budget: number | null; start_date: string | null; end_date: string | null;
+  preferences: Record<string, unknown> | null;
+  /** [Gate JourneyEnds] 旅の出発・到着(任意) */
+  journey_enabled?: boolean; journey_start_place?: string | null; journey_start_time?: string | null;
+  journey_end_place?: string | null; journey_end_time?: string | null;
+}
 export async function getPlanBasics(planId: string): Promise<PlanBasics> {
   return (await api.get(`/travel-plans/${planId}`, SILENT)).data as PlanBasics;
 }

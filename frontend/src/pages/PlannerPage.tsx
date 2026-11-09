@@ -46,6 +46,7 @@ import { api as apiService } from '@/services/api';
 import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import MapTools from '@/components/planner/MapTools';
+import { dayAnchors } from '@/components/planner/journeyModel';
 import AllDaysChart from '@/components/planner/AllDaysChart';
 import { hoursBadge, insertIndexByTime, segmentRow, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 
@@ -94,6 +95,9 @@ const getDayOfWeek = (dateStr?: string): string => {
   if (Number.isNaN(d.getTime())) return '';
   return labels[d.getDay()] || '';
 };
+
+/** [Gate JourneyEnds] 日の最初・最後の行を DayView の引数にする */
+const anchorsOf = (a: ReturnType<typeof dayAnchors>) => ({ startAnchor: a.start, endAnchor: a.end });
 
 // [Gate PlanUX] 予定の種類(編集の画面の選択肢。EventCategory)
 // [Gate PlanSpotEdit] 場所の情報の出典(OpenStreetMap の著作権と ODbL の案内)。応答の URL は使わず固定の値にする
@@ -1039,6 +1043,7 @@ const PlannerPage: React.FC = () => {
                   selectedEventId={selectedEvent?.id ?? null}
                   onHoursChange={handleHoursChange}
                   day={activeDay}
+                  {...anchorsOf(dayAnchors(currentPlan, currentDayIndex))}
                   planId={currentPlan.id}
                   isActive
                   // [Gate PlanUX] 予定を押すと選ぶだけ(地図・右の欄に出す)。編集は鉛筆から

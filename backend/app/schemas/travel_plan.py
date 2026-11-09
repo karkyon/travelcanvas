@@ -2,11 +2,14 @@
 TravelCanvas 旅行プラン(TravelPlan)スキーマ
 実DBモデル(app.models.models.TravelPlan)のフィールドに準拠。
 """
+import re
 import uuid
 from datetime import date, datetime
 from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, validator
+
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 class TravelPlanBase(BaseModel):
@@ -48,6 +51,30 @@ class TravelPlanUpdate(BaseModel):
     status: Optional[str] = None
     preferences: Optional[Dict[str, Any]] = None
     itinerary: Optional[Dict[str, Any]] = None
+    # [Gate JourneyEnds] 旅の出発・到着(任意)。空の文字は未設定(None)にする
+    journey_enabled: Optional[bool] = None
+    journey_start_place: Optional[str] = None
+    journey_start_time: Optional[str] = None
+    journey_end_place: Optional[str] = None
+    journey_end_time: Optional[str] = None
+
+    @validator('journey_start_place', 'journey_end_place')
+    def journey_place(cls, v):
+        if v is None:
+            return None
+        v = " ".join(v.split())
+        if len(v) > 120:
+            raise ValueError('場所は120文字以内にしてください')
+        return v or None
+
+    @validator('journey_start_time', 'journey_end_time')
+    def journey_time(cls, v):
+        if v is None or not v.strip():
+            return None
+        v = v.strip()[:5]
+        if not _HHMM.match(v):
+            raise ValueError('時刻は HH:MM(00:00〜23:59)で入れてください')
+        return v
 
     @validator('title')
     def title_not_empty_if_set(cls, v):
@@ -73,6 +100,12 @@ class TravelPlanResponse(TravelPlanBase):
     updated_at: Optional[datetime] = None
     # [Gate G11] 表紙の写真(見える人だけ。app/services/plan_cover.py)。PUT では受け取らない
     cover: Optional[Dict[str, Any]] = None
+    # [Gate JourneyEnds] 旅の出発・到着
+    journey_enabled: bool = False
+    journey_start_place: Optional[str] = None
+    journey_start_time: Optional[str] = None
+    journey_end_place: Optional[str] = None
+    journey_end_time: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -246,6 +246,12 @@ export interface TravelPlan {
   revision?: number;
   /** [Gate G2] FR-045 所有者があなたに見せない設定にした項目(参加者だけ。所有者は空) */
   hidden_fields?: string[];
+  /** [Gate JourneyEnds] 旅程の最初・最後に出発・到着を出すか。場所は短い名前、時刻は "HH:MM"(どれも任意) */
+  journey_enabled?: boolean;
+  journey_start_place?: string | null;
+  journey_start_time?: string | null;
+  journey_end_place?: string | null;
+  journey_end_time?: string | null;
 }
 
 export interface CreatePlanData {

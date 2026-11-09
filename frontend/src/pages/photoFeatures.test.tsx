@@ -259,6 +259,22 @@ describe('PlanBasicsDialog', () => {
     expect(saved.mock.calls[0]![0]).toContain('予約 2 件');
   });
 
+  it('[JourneyEnds] 出発・到着を出すを選ぶと場所・時刻を入れられ、一緒に保存する', async () => {
+    m.getPlanBasics.mockResolvedValue({ title: '鳥羽', destination: '鳥羽', description: null, budget: null, start_date: null, end_date: null,
+      preferences: {}, journey_enabled: false, journey_start_place: null, journey_start_time: null, journey_end_place: null, journey_end_time: null });
+    const saved = vi.fn();
+    open({ onSaved: saved });
+    await waitFor(() => expect((screen.getByLabelText('題名') as HTMLInputElement).value).toBe('鳥羽'));
+    expect(screen.queryByLabelText('出発の場所')).toBeNull();
+    fireEvent.click(screen.getByTestId('basics-journey-on'));
+    fireEvent.change(screen.getByLabelText('出発の場所'), { target: { value: ' 自宅 ' } });
+    fireEvent.change(screen.getByLabelText('出発の時刻'), { target: { value: '07:30' } });
+    fireEvent.click(screen.getByTestId('plan-basics-save'));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(m.savePlanBasics.mock.calls[0]![1]).toMatchObject({ journey_enabled: true, journey_start_place: '自宅', journey_start_time: '07:30',
+      journey_end_place: null, journey_end_time: null });
+  });
+
   it('最終日が出発日より前なら送らない', async () => {
     open();
     await waitFor(() => expect((screen.getByLabelText('題名') as HTMLInputElement).value).toBe('鳥羽'));

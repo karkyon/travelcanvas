@@ -284,6 +284,9 @@ async def update_travel_plan(
 
     update_data = plan_data.dict(exclude_unset=True)
     _reject_itinerary_write(update_data)
+    # [Gate JourneyEnds] 出す・出さないは true / false だけ(null は変えない)
+    if update_data.get("journey_enabled", False) is None:
+        update_data.pop("journey_enabled")
     if "budget" in update_data:
         member_policy.require_visible(member_policy.hidden_for(db, plan, role, current_user), "costs")
 
