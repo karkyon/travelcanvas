@@ -14,7 +14,7 @@ import React, { useMemo, useState } from 'react';
 import TransportIcon from '../common/TransportIcon';
 import type { DaySchedule } from '@/types';
 import type { TravelSegment } from '@/services/api/types/segments';
-import { SNAP_MINUTES, buildChart, minutesToHm, snapMinutes, type ChartDay } from './plannerModel';
+import { SNAP_MINUTES, buildChart, minutesToHm, overlapLanes, snapMinutes, type ChartDay } from './plannerModel';
 import { durationLabel } from '@/utils/transportModes';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
@@ -40,6 +40,9 @@ interface Props {
   onMoveEvent?: (eventId: string, fromIndex: number, toIndex: number, start?: string) => void;
 }
 
+/** 帯の最小の高さ(30px)に当たる分。終わりの無い予定もこの長さで重なりを見る */
+const MIN_BLOCK_MINUTES = Math.ceil((30 / PX_PER_HOUR) * 60);
+
 const DRAG_TYPE = 'application/x-tc-event';
 interface DragState { id: string; from: number; start: number | null; grab: number }
 
@@ -53,6 +56,8 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
   onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, onOpen, locked, drag, setDrag, onDropEvent }) => {
   const height = ((scaleEnd - scaleStart) / 60) * PX_PER_HOUR;
   const label = `${day.date}(${weekday(day.date)})`;
+  const lanes = useMemo(() => overlapLanes(day.events.map((e) => ({ id: e.id, start: e.start ?? scaleStart,
+    end: Math.max((e.end ?? e.start ?? scaleStart), (e.start ?? scaleStart) + MIN_BLOCK_MINUTES) }))), [day.events, scaleStart]);
   const [over, setOver] = useState(false);
   const [preview, setPreview] = useState<number | null>(null);
   const canDrop = !!onDropEvent && !!drag && drag.from !== day.index;
@@ -111,7 +116,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           ].filter(Boolean).join('・')}
         </p>
       </header>
-      <div className="relative mt-2" style={{ height }} aria-hidden="false" data-testid={`chart-scale-${day.index}`}
+      <div className="relative mt-2 mb-3" style={{ height }} aria-hidden="false" data-testid={`chart-scale-${day.index}`}
         onDragOver={(ev) => {
           if (!onDropEvent || !drag) return;
           ev.preventDefault();
@@ -145,8 +150,10 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           {day.events.map((e) => {
             const top = (((e.start ?? scaleStart) - scaleStart) / 60) * PX_PER_HOUR;
             const h = Math.max(30, ((((e.end ?? e.start ?? scaleStart) - (e.start ?? scaleStart)) / 60) * PX_PER_HOUR));
+            const lane = lanes.get(e.id) ?? { lane: 0, of: 1 };
             return (
-              <li key={e.id} className="absolute left-0 right-0" style={{ top, height: h }}>
+              <li key={e.id} className="absolute" data-lane={lane.of > 1 ? `${lane.lane + 1}/${lane.of}` : undefined}
+                style={{ top, height: h, left: `${(lane.lane / lane.of) * 100}%`, width: `calc(${100 / lane.of}% - ${lane.of > 1 ? 2 : 0}px)` }}>
                 <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id, e.start)}
                   data-category={e.category}
                   className={`h-full w-full overflow-hidden rounded-md border border-cloud-200 ${catClass(e.category)} px-2 py-1 text-left text-xs text-ink-900${
@@ -162,7 +169,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
         </ol>
       </div>
       {day.untimed.length > 0 && (
-        <ul className="mt-2 space-y-1 text-xs text-ink-700" aria-label={`${label}の時刻の無い予定`}>
+        <ul className="mt-5 space-y-1 text-xs text-ink-700" aria-label={`${label}の時刻の無い予定`} data-testid={`chart-untimed-${day.index}`}>
           {day.untimed.map((e) => (
             <li key={e.id}>
               <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id, null)}

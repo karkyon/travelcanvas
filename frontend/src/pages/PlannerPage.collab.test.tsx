@@ -4,7 +4,7 @@
  * また、編集画面の「場所」「メモ」が保存の通信に載る(以前は黙って捨てていた)。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ScheduleItem } from '@/types';
 
@@ -193,6 +193,21 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(1));
     expect(updateScheduleItem.mock.calls[0]![1]).toMatchObject({ address: '〒605-0862 京都府京都市東山区清水1丁目294', phone: '075-551-1234' });
     expect(updateScheduleItem.mock.calls[0]![1]).not.toHaveProperty('category');  // 元と同じ種類なら送らない
+  });
+
+  it('[PlanEditClear] 開始時刻・メモを消して保存すると空で送る', async () => {
+    const { updateScheduleItem } = setup();
+    act(() => { usePlanStore.setState({ currentPlan: plan('清水寺', 3, '朝一番に行く') }); });
+    fireEvent.click(await screen.findByRole('button', { name: '編集: 清水寺' }));
+    expect(screen.getByTestId('event-start-time')).toHaveValue('10:00');
+    fireEvent.change(screen.getByTestId('event-start-time'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('メモ'), { target: { value: '' } });
+    updateScheduleItem.mockResolvedValueOnce('saved');
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(updateScheduleItem).toHaveBeenCalledTimes(1));
+    expect(updateScheduleItem.mock.calls[0]![1]).toMatchObject({ start_time: '', description: '' });
+    expect(updateScheduleItem.mock.calls[0]![1]).not.toHaveProperty('address');  // 元も空なら送らない
+    await waitFor(() => expect(screen.queryByTestId('event-start-time')).toBeNull());
   });
 
   it('[PlanSpotEdit] 提供元が応答しない時は 0 件と言わずに伝え、欄は変えない', async () => {

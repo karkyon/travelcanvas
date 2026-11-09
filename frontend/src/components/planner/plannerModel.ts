@@ -302,6 +302,29 @@ export function unionMinutes(ranges: Array<[number, number]>): number {
   return total;
 }
 
+/** [Gate TimelineDrag] 時刻の重なる予定を横に並べる(重なる予定の集まりごとに列を分ける。以前は上に重なって隠れていた) */
+export function overlapLanes(items: { id: string; start: number; end: number }[]): Map<string, { lane: number; of: number }> {
+  const out = new Map<string, { lane: number; of: number }>();
+  const sorted = [...items].sort((a, b) => a.start - b.start || a.end - b.end);
+  let group: { id: string; lane: number }[] = [];
+  let laneEnds: number[] = [];
+  let groupEnd = -Infinity;
+  const flush = () => { for (const g of group) out.set(g.id, { lane: g.lane, of: laneEnds.length }); group = []; laneEnds = []; };
+  for (const it of sorted) {
+    if (it.start >= groupEnd) { flush(); groupEnd = -Infinity; }
+    let lane = laneEnds.findIndex((end) => end <= it.start);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(it.end); } else laneEnds[lane] = it.end;
+    group.push({ id: it.id, lane });
+    groupEnd = Math.max(groupEnd, it.end);
+  }
+  flush();
+  return out;
+}
+
+/** 全日程の物差しにいつも含める時間帯(分) */
+export const CHART_DAY_START = 6 * 60;
+export const CHART_DAY_END = 22 * 60;
+
 export function buildChart(days: DaySchedule[], segments: TravelSegment[], locked: Set<string> = new Set()): ChartModel {
   let scaleStart = 24 * 60;
   let scaleEnd = 0;
@@ -344,10 +367,10 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       lockedCount: d.events.filter((e) => locked.has(e.id)).length,
     };
   });
-  if (scaleEnd <= scaleStart) {
-    scaleStart = 9 * 60;
-    scaleEnd = 18 * 60;
-  }
+  // [Gate TimelineDrag] 物差しはいつも 6:00〜22:00 を含める(予定の時刻だけに合わせると、1 件ドラッグした直後に
+  // 物差しが 1〜2 時間に縮み、ほかの予定を落とす時刻が無くなっていた)。それより早い・遅い予定があれば広げる
+  scaleStart = Math.min(scaleStart, CHART_DAY_START);
+  scaleEnd = Math.max(scaleEnd, CHART_DAY_END);
   scaleStart = Math.floor(scaleStart / 60) * 60;
   scaleEnd = Math.min(24 * 60, Math.ceil(scaleEnd / 60) * 60);
   return { days: out, scaleStart, scaleEnd };
