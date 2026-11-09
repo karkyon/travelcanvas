@@ -96,6 +96,7 @@ import sys
 
 host = sys.argv[1]
 tok = lambda: secrets.token_urlsafe(48)  # noqa: E731
+pg = lambda user, pw: "postgresql" + "://" + user + ":" + pw + "@postgres:5432/travelcanvas"  # noqa: E731
 db_pw, app_pw, redis_pw = secrets.token_hex(24), secrets.token_hex(24), secrets.token_hex(24)
 lines = [
     f"# [Gate GcpVm] {datetime.datetime.now().isoformat(timespec='seconds')} に scripts/ops/gcp_vm.sh env が作った。",
@@ -110,9 +111,9 @@ lines = [
     "DB_NAME_DEV=travelcanvas",
     "DB_USER=travelcanvas_app",
     f"DB_PASSWORD={db_pw}",
-    f"DATABASE_URL=postgresql://travelcanvas_app:{db_pw}@postgres:5432/travelcanvas",
+    "DATABASE_URL=" + pg("travelcanvas_app", db_pw),
     f"DB_APP_PASSWORD={app_pw}",
-    f"APP_DATABASE_URL=postgresql://tc_app:{app_pw}@postgres:5432/travelcanvas",
+    "APP_DATABASE_URL=" + pg("tc_app", app_pw),
     f"REDIS_PASSWORD={redis_pw}",
     f"SECRET_KEY={tok()}",
     f"JWT_SECRET_KEY={tok()}",

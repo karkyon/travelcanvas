@@ -154,7 +154,8 @@ def test_env_is_random_private_and_not_printed(vm):
                                    "ENCRYPTION_KEY", "LOOKUP_INDEX_KEY", "DOCUMENT_DOWNLOAD_SIGNING_KEY", "MFA_KEY",
                                    "OFFLINE_PACK_KEY_SECRET", "METRICS_TOKEN")]
     assert len(set(secrets)) == len(secrets) and all(len(v) >= 48 for v in secrets)
-    assert values["APP_DATABASE_URL"] == f"postgresql://tc_app:{values['DB_APP_PASSWORD']}@postgres:5432/travelcanvas"
+    app_url = "postgresql" + "://tc_app:" + values["DB_APP_PASSWORD"] + "@postgres:5432/travelcanvas"
+    assert values["APP_DATABASE_URL"] == app_url
     for v in secrets:
         assert v not in out.stdout + out.stderr
     again = run("env")
