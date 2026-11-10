@@ -33,7 +33,7 @@ vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast
 import DayView from '@/components/DayView';
 import AllDaysChart from './AllDaysChart';
 import {
-  arrivalLeg, arrivalSegment, buildChart, hoursBadge, insertIndexByTime, moveBlockedReason, shiftedEnd, snapMinutes, reorderImpact, segmentRow, titleOfEvent,
+  arrivalLeg, arrivalSegment, buildChart, estimateDetail, freeGaps, hoursBadge, kmText, insertIndexByTime, moveBlockedReason, shiftedEnd, snapMinutes, reorderImpact, segmentRow, titleOfEvent,
   unionMinutes, zoneOfEvent,
 } from './plannerModel';
 import { LEGEND_MODES } from '@/utils/transportModes';
@@ -290,7 +290,7 @@ describe('1日の画面(DayView)', () => {
     expect(screen.getByTestId('day-timezone')).toHaveTextContent('現地時間 · Asia/Tokyo');
     // 移動はカードの中ではなく、タイムラインの独立した行(着く予定の前)
     // [Gate PlanSpotEdit] 区間の行は 2 つの予定の間にあるので「○○から」は出さない
-    expect(screen.getByTestId('segment-row')).toHaveTextContent('タクシー · 12分(推定)');
+    expect(screen.getByTestId('segment-row')).toHaveTextContent('タクシー · 12分· 1.2km(推定)');
     expect(screen.getByTestId('segment-row')).not.toHaveTextContent('から');
     expect(screen.getByTestId('segment-row')).toHaveAttribute('data-to-event', 'e2');
     expect(screen.getByTestId('segment-row')).toHaveAttribute('data-mismatch', 'false');
@@ -496,5 +496,35 @@ describe('[Gate TimelineDrag] 重なる予定を横に並べる', () => {
     expect(m.get('b')).toEqual({ lane: 1, of: 2 });
     expect(m.get('c')).toEqual({ lane: 0, of: 2 });
     expect(m.get('d')).toEqual({ lane: 0, of: 1 });
+  });
+});
+
+describe('[TravelEstimate] 区間の距離・内訳と全日程の移動の帯・空き時間', () => {
+  it('距離の文字・内訳(車の下道/高速、電車の乗り換え)・計算のもと', () => {
+    expect([kmText(0.42), kmText(3.456), kmText(12.6), kmText(null)]).toEqual(['420m', '3.5km', '13km', null]);
+    const car = estimateDetail({ mode: 'driving', distance_km: 52.3, estimate_basis: '直線 40.0km をもとにした目安', estimate_variants: [
+      { key: 'local', label: '下道', distance_km: 52, duration_minutes: 101, note: '平均 32km/h' },
+      { key: 'highway', label: '高速利用', distance_km: 48, duration_minutes: 52, note: '高速 85km/h' }] });
+    expect(car).toEqual({ distance: '52km', detail: '下道 1時間41分 / 高速利用 52分',
+      basis: '直線 40.0km をもとにした目安。平均 32km/h。高速 85km/h' });
+    const train = estimateDetail({ mode: 'train', distance_km: 30, estimate_basis: null, estimate_variants: [
+      { key: 'recommended', label: '快速・急行・乗り換え 0 回', distance_km: 30, duration_minutes: 52 }] });
+    expect(train.detail).toBe('快速・急行・乗り換え 0 回');
+    expect(estimateDetail({ mode: 'walking', distance_km: 1.2, estimate_basis: null, estimate_variants: [
+      { key: 'walk', label: '徒歩', distance_km: 1.2, duration_minutes: 15 }] }).detail).toBeNull();
+  });
+
+  it('空き時間は 15 分以上のあいだだけ。移動の帯と手段ごとの合計', () => {
+    expect(freeGaps([[540, 600], [610, 660], [720, 780]])).toEqual([[660, 720]]);
+    const m = buildChart(days(), [seg({ to_event_id: 'e2', mode: 'driving', duration_minutes: 20, distance_km: 8.4 })]);
+    const d1 = m.days[0]!;
+    expect(d1.travels).toEqual([{ eventId: 'e2', start: 11 * 60 + 25, end: 11 * 60 + 45, mode: 'driving', minutes: 20, km: 8.4 }]);
+    expect(d1.gaps).toEqual([[11 * 60, 11 * 60 + 25]]);
+    expect(d1.byMode).toEqual([{ mode: '自家用車', label: '自家用車', minutes: 20, km: 8.4 }]);
+    render(<AllDaysChart days={days()} segments={[seg({ to_event_id: 'e2', mode: 'driving', duration_minutes: 20, distance_km: 8.4 })]}
+      currentDay={0} onOpenDay={vi.fn()} />);
+    expect(screen.getByTestId('chart-travel-e2')).toHaveTextContent('20分 · 8.4km');
+    expect(screen.getByTestId('chart-gap-0')).toHaveTextContent('空き 25分');
+    expect(screen.getByTestId('chart-summary-0')).toHaveTextContent('自家用車 20分・8.4km');
   });
 });

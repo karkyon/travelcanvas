@@ -15,7 +15,7 @@ docs/trace/gate-m1-fr014-trace.mdを参照。
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.encoders import jsonable_encoder
@@ -26,7 +26,7 @@ from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
 from app.core.plan_access import require_plan_access
 from app.models.models import TravelSegment, TravelEvent, Place, Reservation, User
-from app.services.route_estimator import estimate_leg
+from app.services import travel_estimate as te
 from app.services.quickdraft_idempotency import (
     claim_or_get_cached,
     finalize_success,
@@ -199,6 +199,9 @@ class SegmentResponse(BaseModel):
     revision: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    # [Gate TravelEstimate] 見積もりの内訳(車の下道・高速、電車の乗り換え など)と計算のもと。手で入れた区間は None
+    estimate_variants: Optional[List[Dict[str, Any]]] = None
+    estimate_basis: Optional[str] = None
 
 
 # ===== 検証ヘルパー =====
@@ -317,12 +320,9 @@ def _apply_haversine_fallback(db: Session, seg_fields: dict) -> dict:
         seg_fields.setdefault("computed_at", datetime.now(dt_timezone.utc))
         return seg_fields
 
-    from_lat, from_lon = _resolve_coordinates(db, seg_fields.get("from_event_id"), seg_fields.get("from_place_id"))
-    to_lat, to_lon = _resolve_coordinates(db, seg_fields.get("to_event_id"), seg_fields.get("to_place_id"))
-
-    estimate = None
-    if from_lat is not None and to_lat is not None:
-        estimate = estimate_leg(from_lat, from_lon, to_lat, to_lon, mode=seg_fields.get("mode", "walking"))
+    estimate = _estimate_between(db, seg_fields.get("from_event_id"), seg_fields.get("from_place_id"),
+                                 seg_fields.get("to_event_id"), seg_fields.get("to_place_id"),
+                                 seg_fields.get("mode", "walking"))
 
     if estimate:
         seg_fields["distance_km"] = estimate["distance_km"]
@@ -335,10 +335,47 @@ def _apply_haversine_fallback(db: Session, seg_fields: dict) -> dict:
         # 座標不足。架空値を作らずnullのままにし、provenanceだけ記録する。
         seg_fields["is_estimate"] = True
         seg_fields["provider"] = "unknown"
-        seg_fields["algorithm_version"] = "haversine-v1"
+        seg_fields["algorithm_version"] = te.ALGORITHM
         seg_fields["computed_at"] = datetime.now(dt_timezone.utc)
 
     return seg_fields
+
+
+def _estimate_between(db: Session, from_event_id, from_place_id, to_event_id, to_place_id, mode: str,
+                      params=None, revision: Optional[int] = None) -> Optional[dict]:
+    """[Gate TravelEstimate] 両端の座標から移動の見積もり v2(条件は管理者の設定)。座標が無ければ None"""
+    from_lat, from_lon = _resolve_coordinates(db, from_event_id, from_place_id)
+    to_lat, to_lon = _resolve_coordinates(db, to_event_id, to_place_id)
+    if params is None or revision is None:
+        params, revision = te.load(db)
+    return te.estimate(from_lat, from_lon, to_lat, to_lon, mode, params, revision)
+
+
+def _refresh_estimate(db: Session, seg: TravelSegment, params=None, revision: Optional[int] = None) -> Optional[dict]:
+    """[Gate TravelEstimate] 手で入れていない区間の見積もりを、今の座標・手段・条件で計算し直す(値が変わった時だけ書く)。
+    座標を後から入れた予定・管理者が条件を変えた時に、古い「未計算」・古い値のままにしない。戻り値は見積もり(内訳つき)"""
+    if seg.provider == "manual":
+        return None
+    est = _estimate_between(db, seg.from_event_id, seg.from_place_id, seg.to_event_id, seg.to_place_id, seg.mode,
+                            params, revision)
+    if est is None:
+        if seg.distance_km is not None or seg.duration_minutes is not None or seg.provider != "unknown":
+            seg.distance_km = None
+            seg.duration_minutes = None
+            seg.is_estimate = True
+            seg.provider = "unknown"
+            seg.algorithm_version = te.ALGORITHM
+            seg.computed_at = datetime.now(dt_timezone.utc)
+        return None
+    if (seg.distance_km != est["distance_km"] or seg.duration_minutes != est["duration_minutes"]
+            or seg.provider != est["provider"] or seg.algorithm_version != est["algorithm_version"]):
+        seg.distance_km = est["distance_km"]
+        seg.duration_minutes = est["duration_minutes"]
+        seg.is_estimate = True
+        seg.provider = est["provider"]
+        seg.algorithm_version = est["algorithm_version"]
+        seg.computed_at = est["computed_at"]
+    return est
 
 
 def _compute_recommended_departure_at(seg: TravelSegment, db: Session) -> Optional[datetime]:
@@ -356,7 +393,9 @@ def _compute_recommended_departure_at(seg: TravelSegment, db: Session) -> Option
     return arrival_basis - timedelta(minutes=total_minutes)
 
 
-def _to_response(seg: TravelSegment, db: Session) -> dict:
+def _to_response(seg: TravelSegment, db: Session, est: Optional[dict] = None) -> dict:
+    if est is None and seg.provider == te.PROVIDER:
+        est = _estimate_between(db, seg.from_event_id, seg.from_place_id, seg.to_event_id, seg.to_place_id, seg.mode)
     body = {
         "id": str(seg.id),
         "plan_id": str(seg.plan_id),
@@ -390,6 +429,8 @@ def _to_response(seg: TravelSegment, db: Session) -> dict:
         "revision": seg.revision,
         "created_at": seg.created_at,
         "updated_at": seg.updated_at,
+        "estimate_variants": est["variants"] if est and seg.provider == te.PROVIDER else None,
+        "estimate_basis": est["basis"] if est and seg.provider == te.PROVIDER else None,
     }
     return jsonable_encoder(SegmentResponse(**body))
 
@@ -409,7 +450,12 @@ def list_segments(
         .order_by(TravelSegment.created_at.asc())
         .all()
     )
-    return [_to_response(s, db) for s in rows]
+    # [Gate TravelEstimate] 見積もりは今の座標・条件で計算し直す(手で入れた区間は変えない。旅行の版は上げない: 派生の値)
+    params, revision = te.load(db)
+    ests = {s.id: _refresh_estimate(db, s, params, revision) for s in rows}
+    if db.dirty:
+        db.commit()
+    return [_to_response(s, db, ests[s.id]) for s in rows]
 
 
 @router.get("/{plan_id}/segments/{segment_id}", response_model=dict)
@@ -617,6 +663,9 @@ def update_segment(
         seg.provider = "manual"
         seg.algorithm_version = "manual-v1"
         seg.computed_at = datetime.now(dt_timezone.utc)
+    elif any(k in data for k in ("mode", "from_event_id", "from_place_id", "to_event_id", "to_place_id")):
+        # [Gate TravelEstimate] 手段・両端を変えたら見積もりも変える(以前は作った時の値のまま「未計算」が残った)
+        _refresh_estimate(db, seg)
 
     seg.revision += 1
     db.flush()

@@ -812,3 +812,62 @@ def ops_discard_candidate(slot: str, request: Request, payload: Dict[str, Any] =
     if row is None:
         raise _bad("candidate_not_found", "捨てる候補はありません", 409)
     return {"slot": slot, **ps.state(db, slot)}
+
+
+# ===================================================================== 移動の見積もりの条件(Gate TravelEstimate)
+
+_TE_SAMPLE_KM = [2.0, 10.0, 50.0, 300.0]
+
+
+def _te_body(db: Session) -> Dict[str, Any]:
+    from app.models.models import TravelEstimateSettings
+    from app.services import travel_estimate as te
+    params, revision = te.load(db)
+    row = db.get(TravelEstimateSettings, 1)
+    return {"schema": te.schema(), "params": params, "revision": revision,
+            "updated_at": _iso(row.updated_at) if row else None,
+            "sample_km": _TE_SAMPLE_KM, "sample": te.preview(params, _TE_SAMPLE_KM),
+            "note": "直線距離をもとにした目安です。実際の道・時刻表・渋滞は見ていません。変えると、次に旅程を開いた時に区間の見積もりが計算し直されます(手で入れた値は変えません)"}
+
+
+@router.get("/travel-estimate")
+def ops_travel_estimate(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """移動の見積もりの条件(手段ごとの速さ・待ち・乗り換えなど)と、直線距離ごとの試算"""
+    return _te_body(db)
+
+
+@router.post("/travel-estimate/preview")
+def ops_travel_estimate_preview(payload: Dict[str, Any] = Body(...), admin: User = Depends(require_admin)):
+    """保存する前の試算(保存しない)"""
+    from app.services import travel_estimate as te
+    params, errors = te.validate(payload.get("params") if isinstance(payload, dict) else None)
+    if errors:
+        raise HTTPException(status_code=422, detail={"code": "travel_estimate_invalid", "message": errors[0],
+                                                     "errors": errors})
+    return {"sample_km": _TE_SAMPLE_KM, "sample": te.preview(params, _TE_SAMPLE_KM)}
+
+
+@router.put("/travel-estimate")
+def ops_travel_estimate_save(request: Request, payload: Dict[str, Any] = Body(...),
+                             admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """条件を保存する(理由は必須・監査に残す)。既定から変えた値だけを持ち、版を 1 つ上げる"""
+    from app.models.models import TravelEstimateSettings
+    from app.services import travel_estimate as te
+    reason = _reason(payload)
+    params, errors = te.validate(payload.get("params"))
+    if errors:
+        raise HTTPException(status_code=422, detail={"code": "travel_estimate_invalid", "message": errors[0],
+                                                     "errors": errors})
+    row = db.get(TravelEstimateSettings, 1)
+    before = dict(row.params or {}) if row else {}
+    if row is None:
+        row = TravelEstimateSettings(id=1, params={}, revision=0)
+        db.add(row)
+    row.params = te.diff_from_defaults(params)
+    row.revision = int(row.revision or 0) + 1
+    row.updated_by_user_id = admin.id
+    row.updated_at = _now()
+    db.commit()
+    _audit(request, admin, "ops_travel_estimate_updated",
+           {"revision": row.revision, "before": before, "after": row.params, "reason": reason[:200]})
+    return _te_body(db)

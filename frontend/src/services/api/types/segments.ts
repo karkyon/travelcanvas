@@ -14,6 +14,15 @@ export type SegmentMode =
 
 export type SegmentStatus = 'planned' | 'confirmed' | 'cancelled';
 
+/** [Gate TravelEstimate] 見積もりの内訳(車の下道・高速、電車の乗り換え など) */
+export interface EstimateVariant {
+  key: string;
+  label: string;
+  distance_km: number;
+  duration_minutes: number;
+  note?: string;
+}
+
 export interface TravelSegment {
   id: string;
   plan_id: string;
@@ -45,6 +54,9 @@ export interface TravelSegment {
   revision: number;
   created_at: string;
   updated_at: string | null;
+  /** [Gate TravelEstimate] 見積もりの内訳と計算のもと(手で入れた区間・古い返事では無い) */
+  estimate_variants?: EstimateVariant[] | null;
+  estimate_basis?: string | null;
 }
 
 export interface SegmentCreateData {

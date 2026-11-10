@@ -14,7 +14,7 @@ import React, { useMemo, useState } from 'react';
 import TransportIcon from '../common/TransportIcon';
 import type { DaySchedule } from '@/types';
 import type { TravelSegment } from '@/services/api/types/segments';
-import { SNAP_MINUTES, buildChart, minutesToHm, overlapLanes, snapMinutes, type ChartDay } from './plannerModel';
+import { SNAP_MINUTES, buildChart, kmText, minutesToHm, overlapLanes, snapMinutes, type ChartDay } from './plannerModel';
 import { durationLabel } from '@/utils/transportModes';
 import JourneyAnchorRow from './JourneyAnchorRow';
 import type { DayAnchor } from './journeyModel';
@@ -123,6 +123,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
             `予定 ${day.events.length + day.untimed.length}件`,
             day.first && day.last ? `${day.first}〜${day.last}` : null,
             `移動 ${durationLabel(day.travelMinutes)}`,
+            ...(day.byMode ?? []).map((m) => `${m.label} ${durationLabel(m.minutes)}${m.km !== null ? `・${kmText(m.km)}` : ''}`),
             day.freeMinutes !== null ? `空き ${durationLabel(day.freeMinutes)}` : null,
             day.lockedCount ? `固定 ${day.lockedCount}件` : null,
           ].filter(Boolean).map((t, i, all) => <span key={t}>{t}{i < all.length - 1 ? <span className="sr-only">・</span> : null}</span>)}
@@ -165,6 +166,19 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
             </div>
           );
         })}
+        {/* [Gate TravelEstimate] 移動の帯(予定の前の時間)と空き時間。帯は予定の下に薄く敷く */}
+        {(day.travels ?? []).map((t) => (
+          <div key={`tr-${t.eventId}`} className="tc-chart-travel" data-testid={`chart-travel-${t.eventId}`}
+            style={{ top: ((t.start - scaleStart) / 60) * PX_PER_HOUR, height: Math.max(12, ((t.end - t.start) / 60) * PX_PER_HOUR) }}>
+            <span><TransportIcon mode={t.mode} size={11} />{` ${durationLabel(t.minutes)}${t.km !== null ? ` · ${kmText(t.km)}` : ''}`}</span>
+          </div>
+        ))}
+        {(day.gaps ?? []).map(([a, b]) => (
+          <div key={`gap-${a}`} className="tc-chart-gap" data-testid={`chart-gap-${day.index}`}
+            style={{ top: ((a - scaleStart) / 60) * PX_PER_HOUR, height: ((b - a) / 60) * PX_PER_HOUR }}>
+            <span>{`空き ${durationLabel(b - a)}`}</span>
+          </div>
+        ))}
         {Array.from({ length: (scaleEnd - scaleStart) / 60 + 1 }, (_, i) => (
           <span key={i} className="absolute left-0 right-0 border-t border-dashed border-cloud-200 text-[10px] text-ink-700"
             style={{ top: i * PX_PER_HOUR }} aria-hidden="true">{hm(scaleStart + i * 60)}</span>
