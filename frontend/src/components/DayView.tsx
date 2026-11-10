@@ -661,8 +661,12 @@ const DayView: React.FC<DayViewProps> = ({
                       <span className="sr-only">移動:</span>
                       <TransportIcon mode={row.leg.mode} />
                       <span>{row.leg.text}</span>
+                      {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
                       {row.leg.isEstimate && <span>(推定)</span>}
                       {row.leg.status === 'confirmed' && <span>・確定</span>}
+                      {row.leg.detail && (
+                        <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+                      )}
                       {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
                       {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
                       {row.mismatch && (
@@ -679,7 +683,11 @@ const DayView: React.FC<DayViewProps> = ({
                   <span className="sr-only">移動:</span>
                   <TransportIcon mode={row.leg.mode} />
                   <span>{row.leg.text}</span>
+                  {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
                   {row.leg.isEstimate && <span>(推定)</span>}
+                  {row.leg.detail && (
+                    <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+                  )}
                   {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
                   {row.mismatch && (
                     <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>

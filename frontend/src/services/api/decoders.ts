@@ -24,6 +24,7 @@ import type { CandidateList, PlaceInfo, PlanCandidateItem, PlanPlaces } from './
 import type { SearchHit, SearchResults } from './types/planSearch';
 import type { PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
 import type { AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, OptimizationProposal, PlaceDetail, PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation, ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket, TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment, ConstraintValue, PlanConstraint, AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry, AuditLogPage, PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem, ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary, DeletedPlanSummary, PlanPurgeResult, CollaboratorRemoveResult, LockedRelationDetail, RouteOptionDeleteResult, UndoConflictDetail, PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem, Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement, PlanComment, Poll, PollOption, PollVote, Booklet, BookletExport, BookletIncludes, RetentionInfo, Branch, BranchAssumptions, BranchDetail, CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState, AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail, OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics, SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse, JournalDraft, JournalMemory, MemoryList, TravelMemory, LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult, AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling, ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview, AtlasCell, AtlasResponse, MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight, OfflinePackKey, OfflinePackKeyRotated } from './types';
+import type { EstimateVariant } from './types/segments';
 import { arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, unitInterval, type Decoder } from './decode';
 import { count } from './decodersCore';
 
@@ -247,6 +248,10 @@ export const travelSegment: Decoder<TravelSegment> = object<TravelSegment>({
   revision: int,
   created_at: str,
   updated_at: nullable(str),
+  estimate_variants: optional(nullable(arrayOf(object<EstimateVariant>({
+    key: str, label: str, distance_km: num, duration_minutes: num, note: optional(str),
+  })))),
+  estimate_basis: optional(nullable(str)),
 });
 
 // ===== [Gate M9-FE-C2b-2] 経路比較(FR-015) =====

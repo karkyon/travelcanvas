@@ -11,6 +11,7 @@
  *   計上の根拠(料金版・SKU・単価・換算)を表で示す(以前の「今月の実の提供元の見込み」は請求額に読めた)
  * - 鍵の値は受け取らない・出さない(設定の有無だけ)。止める・戻す・試験は理由が要り、監査に残る
  */
+import AdminTravelEstimatePanel from './AdminTravelEstimatePanel';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
@@ -24,7 +25,7 @@ import {
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { formatJaDateTime, legacyDisplay, providerSecretDisplay, restrictionNote, secretDisplay } from './opsSecretDisplay';
 
-type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets';
+type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets' | 'travel';
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: '概要' },
   { id: 'providers', label: 'API・契約と接続' },
@@ -33,6 +34,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'cloud', label: 'Cloud 環境' },
   { id: 'runs', label: 'テスト実行(Fake)' },
   { id: 'secrets', label: '秘密情報・権限' },
+  { id: 'travel', label: '移動の見積もり' },
 ];
 
 const yen = (v: string | null | undefined) => (v == null ? '—' : `¥${Number(v).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}`);
@@ -853,6 +855,7 @@ const AdminOpsPage: React.FC = () => {
         {tab === 'cloud' && <CloudTab />}
         {tab === 'runs' && <RunsTab />}
         {tab === 'secrets' && <SecretsTab />}
+        {tab === 'travel' && <AdminTravelEstimatePanel />}
       </section>
     </div>
   );

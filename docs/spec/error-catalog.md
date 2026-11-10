@@ -251,6 +251,7 @@
 | `transfer_invalidated` | 409 | no | 旅行の所有者・参加の状態が変わったため、この申し出は無効になりました | api/v1/ownership.py |
 | `trash_not_found` | 404 | no | 元に戻せる記録が見つかりません(期限は削除から7日です) | api/v1/memory_publish.py |
 | `trash_unreadable` | 409 | no | この記録は読めないため戻せません | api/v1/memory_publish.py |
+| `travel_estimate_invalid` | 422 | no | — | api/v1/admin_ops.py |
 | `trip_pass_already_assigned` | 409 | no | この旅行には既に Trip Pass が割り当てられています | api/v1/planning_usage.py |
 | `two_person_required` | 409 | no | 申請した管理者とは別の管理者が承認してください | api/v1/planning_usage.py |
 | `undo_conflict` | 409 | after_reload | この候補は後で使われた(予定に置いた・まとめた)ため、元に戻せません | api/v1/commands.py, services/plan_item_deletion.py |
