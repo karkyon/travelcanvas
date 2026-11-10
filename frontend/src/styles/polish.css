@@ -1,0 +1,34 @@
+/* ===== [Gate Polish 2026-11-10] 全日程の枠・出発/帰着の移動・写真の重ね・ホームの旅行の切り替え ===== */
+
+/* 全日程: どの日も同じ薄めの枠(選んでいる日を強めない) */
+.tc-chart-col { border-color: color-mix(in srgb, var(--tc-accent) 24%, var(--tc-cloud-200)); }
+
+/* 出発 → 最初の予定 / 最後の予定 → 帰着 の移動の行 */
+.tc-anchor-move { margin: 2px 0 2px 22px; }
+
+/* 写真の重ね(シャドウ)を控えめに。文字のある側だけを暗くし(文字の所は 0.62 以上 = 白い文字 4.5:1)、反対側は写真を見せる */
+.tc-cover[data-has-photo] { text-shadow: 0 1px 2px rgba(15, 23, 42, .55); }
+.tc-cover.tc-cover--scrim-side[data-has-photo]::after {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.72) 0%, rgba(15, 23, 42, 0.62) 42%, rgba(15, 23, 42, 0.22) 72%, rgba(15, 23, 42, 0.04) 100%);
+}
+/* 文字を載せない表紙(札だけ。札は自分の背景を持つ) */
+.tc-cover.tc-cover--scrim-light[data-has-photo]::after {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.28), rgba(15, 23, 42, 0.02) 55%);
+}
+/* ホームの大きな表紙: 文字は左 6 割。右は写真をほぼそのまま見せる */
+.tc-plan-hero::after {
+  background: linear-gradient(90deg, rgba(10, 20, 45, .74) 0%, rgba(10, 20, 45, .64) 42%, rgba(10, 20, 45, .3) 66%, rgba(10, 20, 45, .04) 100%);
+}
+.tc-plan-hero[data-has-photo] .tc-plan-hero-in { text-shadow: 0 1px 3px rgba(10, 20, 45, .55); }
+
+/* ホーム: 主役の旅行の切り替え(大きな表紙のすぐ下) */
+.tc-home-switcher { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--tc-cloud-200); border-radius: 14px; background: var(--tc-cloud-0); }
+.tc-home-switcher-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--tc-ink-900); }
+.tc-home-switcher-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.tc-home-switcher-opts button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); color: var(--tc-ink-800, var(--tc-ink-900)); font-size: 12px; font-weight: 700;
+  cursor: pointer; }
+.tc-home-switcher-opts button:hover { border-color: var(--tc-accent); }
+.tc-home-switcher-opts button[aria-pressed='true'] { background: var(--tc-accent); border-color: var(--tc-accent); color: var(--tc-on-accent); }
+.tc-home-switcher-opts small { font-weight: 600; opacity: .85; }

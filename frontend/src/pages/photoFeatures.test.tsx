@@ -269,10 +269,14 @@ describe('PlanBasicsDialog', () => {
     fireEvent.click(screen.getByTestId('basics-journey-on'));
     fireEvent.change(screen.getByLabelText('出発の場所'), { target: { value: ' 自宅 ' } });
     fireEvent.change(screen.getByLabelText('出発の時刻'), { target: { value: '07:30' } });
+    // [Gate JourneyMove] 出発地からの移動手段と所要時間
+    fireEvent.change(screen.getByLabelText('出発地から最初の予定までの移動手段'), { target: { value: 'driving' } });
+    fireEvent.change(screen.getAllByLabelText('所要時間(分)')[0]!, { target: { value: '40' } });
     fireEvent.click(screen.getByTestId('plan-basics-save'));
     await waitFor(() => expect(saved).toHaveBeenCalled());
     expect(m.savePlanBasics.mock.calls[0]![1]).toMatchObject({ journey_enabled: true, journey_start_place: '自宅', journey_start_time: '07:30',
-      journey_end_place: null, journey_end_time: null });
+      journey_end_place: null, journey_end_time: null, journey_start_mode: 'driving', journey_start_minutes: 40,
+      journey_end_mode: null, journey_end_minutes: null });
   });
 
   it('最終日が出発日より前なら送らない', async () => {

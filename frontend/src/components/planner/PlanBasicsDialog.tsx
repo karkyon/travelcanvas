@@ -8,6 +8,10 @@ import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import { getPlanBasics, reschedulePlan, savePlanBasics } from '@/services/api/photoFeatures';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { LEGEND_MODES, transportMode } from '@/utils/transportModes';
+
+/** [Gate JourneyMove] 出発・帰着の移動手段の選択肢 */
+const JOURNEY_MODES = LEGEND_MODES.filter((m) => m !== 'helicopter');
 import TripCover from '@/components/trip/TripCover';
 import CoverPhotoDialog from '@/components/trip/CoverPhotoDialog';
 import { getPlanCover } from '@/services/api/g11';
@@ -40,6 +44,11 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
   const [startTime, setStartTime] = useState('');
   const [endPlace, setEndPlace] = useState('');
   const [endTime, setEndTime] = useState('');
+  // [Gate JourneyMove] 出発地・帰着地との移動手段と所要時間(分)
+  const [startMode, setStartMode] = useState('');
+  const [startMin, setStartMin] = useState('');
+  const [endMode, setEndMode] = useState('');
+  const [endMin, setEndMin] = useState('');
   const [lost, setLost] = useState<Lost | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +88,10 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
       setStartTime((plan.journey_start_time ?? '').slice(0, 5));
       setEndPlace(plan.journey_end_place ?? '');
       setEndTime((plan.journey_end_time ?? '').slice(0, 5));
+      setStartMode(plan.journey_start_mode ?? '');
+      setStartMin(plan.journey_start_minutes != null ? String(plan.journey_start_minutes) : '');
+      setEndMode(plan.journey_end_mode ?? '');
+      setEndMin(plan.journey_end_minutes != null ? String(plan.journey_end_minutes) : '');
       if (!firstDate && plan.start_date) setStart(plan.start_date.slice(0, 10));
       if (!lastDate && plan.end_date) setEnd(plan.end_date.slice(0, 10));
     }).catch((e) => setError(errorDetailMessage(e, '旅行の情報を読み込めませんでした')));
@@ -115,6 +128,8 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
         budget: budget ? Number(budget) : null, preferences: nextPrefs,
         journey_enabled: journeyOn, journey_start_place: startPlace.trim() || null, journey_start_time: startTime || null,
         journey_end_place: endPlace.trim() || null, journey_end_time: endTime || null,
+        journey_start_mode: startMode || null, journey_start_minutes: startMin ? Number(startMin) : null,
+        journey_end_mode: endMode || null, journey_end_minutes: endMin ? Number(endMin) : null,
       });
       onSaved(message);
       onClose();
@@ -153,20 +168,36 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
               <div><label htmlFor="basics-budget" className="text-sm text-ink-800">予算(円)</label><input id="basics-budget" type="number" min={0} className={input} value={budget} onChange={(e) => setBudget(e.target.value)} /></div>
             </div>
             <fieldset className="rounded-md border border-cloud-200 p-3" data-testid="basics-journey">
-              <legend className="px-1 text-sm text-ink-800">出発と到着(任意)</legend>
+              <legend className="px-1 text-sm text-ink-800">出発と帰着(任意)</legend>
               <label className="flex items-center gap-2 text-sm text-ink-900">
                 <input type="checkbox" checked={journeyOn} onChange={(e) => setJourneyOn(e.target.checked)} data-testid="basics-journey-on" />
-                旅程の最初に「出発」、最後に「到着」を出す
+                旅程の最初に「出発」、最後に「帰着」を出す
               </label>
               {journeyOn && (
                 <div className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
                   <div><label htmlFor="basics-start-place" className="text-sm text-ink-800">出発の場所</label><input id="basics-start-place" className={input} maxLength={120} placeholder="例: 自宅・東京駅" value={startPlace} onChange={(e) => setStartPlace(e.target.value)} /></div>
                   <div><label htmlFor="basics-start-time" className="text-sm text-ink-800">出発の時刻</label><input id="basics-start-time" type="time" className={input} value={startTime} onChange={(e) => setStartTime(e.target.value)} /></div>
-                  <div><label htmlFor="basics-end-place" className="text-sm text-ink-800">到着(旅の終わり)の場所</label><input id="basics-end-place" className={input} maxLength={120} placeholder="例: 自宅" value={endPlace} onChange={(e) => setEndPlace(e.target.value)} /></div>
-                  <div><label htmlFor="basics-end-time" className="text-sm text-ink-800">到着の時刻</label><input id="basics-end-time" type="time" className={input} value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
+                  <div><label htmlFor="basics-start-mode" className="text-sm text-ink-800">出発地から最初の予定までの移動手段</label>
+                    <select id="basics-start-mode" className={input} value={startMode} onChange={(e) => setStartMode(e.target.value)}>
+                      <option value="">未設定</option>
+                      {JOURNEY_MODES.map((m) => <option key={m} value={m}>{transportMode(m).label}</option>)}
+                    </select></div>
+                  <div><label htmlFor="basics-start-min" className="text-sm text-ink-800">所要時間(分)</label>
+                    <input id="basics-start-min" type="number" min={0} max={1440} inputMode="numeric" className={input} value={startMin}
+                      onChange={(e) => setStartMin(e.target.value)} /></div>
+                  <div><label htmlFor="basics-end-place" className="text-sm text-ink-800">帰着(旅の終わり)の場所</label><input id="basics-end-place" className={input} maxLength={120} placeholder="例: 自宅" value={endPlace} onChange={(e) => setEndPlace(e.target.value)} /></div>
+                  <div><label htmlFor="basics-end-time" className="text-sm text-ink-800">帰着の時刻</label><input id="basics-end-time" type="time" className={input} value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
+                  <div><label htmlFor="basics-end-mode" className="text-sm text-ink-800">最後の予定から帰着地までの移動手段</label>
+                    <select id="basics-end-mode" className={input} value={endMode} onChange={(e) => setEndMode(e.target.value)}>
+                      <option value="">未設定</option>
+                      {JOURNEY_MODES.map((m) => <option key={m} value={m}>{transportMode(m).label}</option>)}
+                    </select></div>
+                  <div><label htmlFor="basics-end-min" className="text-sm text-ink-800">所要時間(分)</label>
+                    <input id="basics-end-min" type="number" min={0} max={1440} inputMode="numeric" className={input} value={endMin}
+                      onChange={(e) => setEndMin(e.target.value)} /></div>
                 </div>
               )}
-              <p className="mt-2 text-xs text-ink-700">住所は要りません。2 日目からは前の夜の宿(種類「宿」の予定)から出発として、日の最初と最後に出します。</p>
+              <p className="mt-2 text-xs text-ink-700">住所は要りません(所要時間は自動では計算できないので、分かれば入れてください)。2 日目からは前の夜の宿(種類「宿」の予定)から出発として、日の最初と最後に出します。</p>
             </fieldset>
             {canEditCover && (
               <div data-testid="basics-cover">

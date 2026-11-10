@@ -190,7 +190,7 @@ describe('全日程のチャート', () => {
     expect(col0.getByTestId('day-anchor-start')).toHaveTextContent('出発自宅 · 05:30');
     expect(col0.getByTestId('day-anchor-end')).toHaveTextContent('今夜の宿京の宿');
     expect(screen.getByTestId('chart-anchor-departure-0')).toHaveTextContent('出発 05:30');
-    expect(screen.getByTestId('chart-anchor-arrival-1')).toHaveTextContent('到着 19:10');
+    expect(screen.getByTestId('chart-anchor-arrival-1')).toHaveTextContent('帰着 19:10');
     // 物差しは 5:00 から(6:00 より前に広がる)。1 時間 44px で 05:30 は 22px
     expect(screen.getByTestId('chart-anchor-departure-0')).toHaveStyle({ top: '22px' });
     expect(screen.getByTestId('chart-head-0')).toHaveClass('tc-chart-dayhead');
