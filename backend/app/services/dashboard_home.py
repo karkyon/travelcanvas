@@ -18,6 +18,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import Memory, PackingItem, Spot, TravelDay, TravelEvent, TravelSegment, User, UserSpotFavorite
+from app.services import memory_reel
 
 # 旅行の状態(旅行の一覧のタブ)
 SHELVES = ("planning", "considering", "visited", "cancelled")
@@ -276,7 +277,11 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
                                        segment_to))
 
     # 3. 旅の記録と思い出(行った旅。終わりが新しい順)
+    # [Gate MemoryReel] 思い出リールの順(○年前の今日・この頃 > 同じ季節 > 最近)。札の文(reel_badge)も付ける
     visited = [t for t in trips if t["shelf"] == "visited"]
+    if visited:
+        reel_today = date.fromisoformat(visited[0]["local_today"]) if visited[0].get("local_today") else date.today()
+        visited = memory_reel.order_trips(visited, reel_today)
     recent: Optional[Dict[str, Any]] = None
     if visited:
         top = visited[0]
@@ -286,7 +291,8 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
                   .order_by(Memory.occurred_at.desc().nullslast(), Memory.created_at.desc()).limit(MAX_PHOTOS).all())
         recent = {"plan_id": top["id"], "photo_ids": [str(r[0]) for r in photos]}
     timeline = [{"plan_id": t["id"], "title": t["title"], "start_date": t["start_date"], "end_date": t["end_date"],
-                 "photo_count": t["photo_count"], "note_count": t["note_count"], "cover": t.get("cover")}
+                 "photo_count": t["photo_count"], "note_count": t["note_count"], "cover": t.get("cover"),
+                 "destination": t.get("destination"), "reel_badge": t.get("reel_badge")}
                 for t in visited[:MAX_VISITED]]
 
     # 旅の足あと: 行った旅の行き先・予定の住所に書かれた都道府県、今年の旅の日数、写真の数

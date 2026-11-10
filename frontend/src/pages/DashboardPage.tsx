@@ -150,16 +150,14 @@ const DashboardPage: React.FC = () => {
         )}
         {data && home && (
           <>
-            {/* 3. 旅の記録と思い出・旅の足あと */}
+            {/* 3. 旅の記録と思い出([Gate MemoryReel] 写真が流れる思い出リール。横いっぱい) */}
+            <MemoriesSection home={home} />
+            {/* 4. 旅の足あと・行ってみたい場所 / 道具 */}
             <div className="tc-home-two">
-              <MemoriesSection home={home} />
               <Footprints home={home} />
-            </div>
-            {/* 4. 行ってみたい場所・道具 */}
-            <div className="tc-home-two">
               <Wishlist home={home} />
-              <Tools tripId={focusTrip?.id ?? null} />
             </div>
+            <Tools tripId={focusTrip?.id ?? null} />
           </>
         )}
       </div>

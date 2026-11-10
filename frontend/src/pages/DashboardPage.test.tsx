@@ -11,6 +11,9 @@ import { decodeDashboard } from '../services/api/decodersG9';
 
 const { getDashboard, setTripState } = vi.hoisted(() => ({ getDashboard: vi.fn(), setTripState: vi.fn() }));
 vi.mock('../services/api/g9', () => ({ getDashboard, setTripState }));
+// [Gate MemoryReel] ホームの思い出リールの材料(写真なし・予定の名前で流す)
+const { getMemoryReel } = vi.hoisted(() => ({ getMemoryReel: vi.fn() }));
+vi.mock('../services/api/memoryReel', () => ({ getMemoryReel }));
 
 import { useThemeStore } from '@/hooks/useThemePreference';
 import DashboardPage from './DashboardPage';
@@ -38,6 +41,12 @@ const setOnline = (v: boolean) => Object.defineProperty(window.navigator, 'onLin
 describe('DashboardPage', () => {
   beforeEach(() => {
     getDashboard.mockReset();
+    getMemoryReel.mockReset();
+    getMemoryReel.mockImplementation(async (planId: string) => ({
+      plan_id: planId, title: '思い出', destination: '奈良', start_date: '2026-10-01', end_date: '2026-10-02', day_count: 2,
+      photo_count: 0, note_count: 0, place_count: 0, member_count: 1, quote: null, slides: [],
+      fallback_events: [{ title: '東大寺', local_date: '2026-10-01', local_time: '10:00' }],
+    }));
     setOnline(true);
     try { window.localStorage.removeItem('tc.theme'); } catch { /* 保存できない環境 */ }
   });
@@ -130,6 +139,9 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByTestId(`home-state-${up.id}`));
     await waitFor(() => expect(setTripState).toHaveBeenCalledWith(up.id, 'cancelled'));
     expect(screen.getByTestId('home-memories')).toHaveTextContent(`${past.title as string}`);
+    // [Gate MemoryReel] 行った旅の思い出リール(写真が無い旅は予定の名前を流す)
+    expect(await within(screen.getByTestId('home-memories')).findByTestId('memory-reel')).toHaveTextContent('東大寺');
+    expect(getMemoryReel).toHaveBeenCalledWith(past.id);
     expect(screen.getByTestId('home-footprints')).toHaveTextContent('1/47');
     expect(screen.getByTestId('home-wishlist')).toHaveTextContent('伊勢うどん');
     expect(screen.getByTestId('home-tools')).toHaveTextContent('スポット検索');

@@ -44,6 +44,8 @@ export interface HomePlanning {
 export interface HomeTimelineTrip {
   plan_id: string; title: string; start_date: string | null; end_date: string | null; photo_count: number;
   note_count: number; cover: PlanCover | null;
+  /** [Gate MemoryReel] 行き先(表紙の絵の色)と、思い出リールの札(1年前の今日・2年前の秋・最近の旅 など) */
+  destination?: string | null; reel_badge?: string | null;
 }
 /** [Gate FootHover] 足あとの地図のポップアップに出す旅行(押すとその旅行を開く) */
 export interface FootTrip { plan_id: string; title: string; start_date: string | null; end_date: string | null; state: 'visited' | 'planned' }
