@@ -50,7 +50,8 @@
   "captured_at_head_f07_turn": "gate/f07-turn (+Gate F07-Turn: POST /trip-intents/ai/turn)",
   "captured_at_head_admin_uat": "gate/admin-ops-uat (+Gate AdminUAT: GET /admin/ops/uat-readiness)",
   "captured_at_head_photomap": "d8bd1b7 (+Gate MyMaps・PhotoMap・PhotoQR・BookingImport)",
-  "captured_at_head_travel_estimate": "gate/travel-estimate(+Gate TravelEstimate の /admin/ops/travel-estimate の GET・PUT・preview)"
+  "captured_at_head_travel_estimate": "gate/travel-estimate(+Gate TravelEstimate の /admin/ops/travel-estimate の GET・PUT・preview)",
+  "captured_at_head_memory_reel": "gate/memory-reel (+Gate MemoryReel GET /plans/{plan_id}/memory-reel)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -215,6 +216,7 @@
   "GET /api/v1/plans/{plan_id}/memories/{memory_id}/media",
   "GET /api/v1/plans/{plan_id}/memories/{memory_id}/thumbnail",
   "GET /api/v1/plans/{plan_id}/memory-map",
+  "GET /api/v1/plans/{plan_id}/memory-reel",
   "GET /api/v1/plans/{plan_id}/memory-replan",
   "GET /api/v1/plans/{plan_id}/movement-settings",
   "GET /api/v1/plans/{plan_id}/ownership-transfer",

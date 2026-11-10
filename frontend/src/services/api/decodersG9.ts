@@ -33,6 +33,8 @@ const planning: Decoder<HomePlanning> = object<HomePlanning>({
 const timelineTrip: Decoder<HomeTimelineTrip> = object<HomeTimelineTrip>({
   plan_id: str, title: str, start_date: nullable(str), end_date: nullable(str), photo_count: nonNegativeInt,
   note_count: nonNegativeInt, cover: optionalPlanCover,
+  // [Gate MemoryReel] 行き先(表紙の絵の色)と思い出リールの札
+  destination: optional(nullable(str)), reel_badge: optional(nullable(str)),
 });
 // [Gate FootHover] 足あとの地図のポップアップの旅行
 const footTrip: Decoder<FootTrip> = object<FootTrip>({

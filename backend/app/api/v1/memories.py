@@ -34,6 +34,7 @@ from app.ops import metrics as ops_metrics
 from app.services import location_privacy as lp
 from app.services import malware_scan, photo_location, usage
 from app.services import memories as mem
+from app.services import memory_reel as reel
 from app.services import threat_guard
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import member_user_ids
@@ -535,6 +536,65 @@ def memory_map(plan_id: str, db: Session = Depends(get_db), current_user: User =
         elif r.author_user_id == current_user.id:
             unplaced.append(item)
     return {"photos": placed, "unplaced": unplaced, "can_create": role in ("owner", "editor")}
+
+
+@router.get("/{plan_id}/memory-reel")
+def memory_reel(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate MemoryReel] 旅の思い出リールの材料(写真を撮った順・旅の数・最後のひとこと)。
+
+    写真・位置の見え方は一覧・MEMORY MAP と同じ。旅行記に入れない写真は出さない。写真が無い旅は予定の名前を返す。"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    rows = (db.query(Memory).filter(Memory.plan_id == plan.id)
+            .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members"))
+            .order_by(Memory.occurred_at.asc().nullslast(), Memory.created_at.asc(), Memory.id.asc()).all())
+    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.local_date.asc()).all()
+    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()
+    day_tz = {d.id: d.timezone_id for d in days}
+    first_tz = days[0].timezone_id if days else None
+    ev_by_id = {e.id: e for e in events}
+    zones = _plan_zones(db, plan, rows, current_user)
+
+    photos = [r for r in rows if r.kind == "photo" and r.storage_key is not None]
+    shown = reel.sample_even([r for r in photos if r.include_in_journal])
+    slides = []
+    for r in shown:
+        ev = ev_by_id.get(r.event_id) if r.event_id else None
+        tz = (day_tz.get(r.day_id) if r.day_id else None) or (day_tz.get(ev.day_id) if ev else None) or first_tz
+        position = location_for(r, current_user, zones)
+        slides.append({
+            "memory_id": str(r.id),
+            "title": (ev.title if ev else None) or r.place_name,
+            "place_name": r.place_name,
+            "local_at": reel.local_at(r.occurred_at, tz),
+            "body": reel.clip(r.body, reel.MAX_BODY),
+            "latitude": position[0] if position else None,
+            "longitude": position[1] if position else None,
+        })
+
+    fallback = []
+    if not slides:
+        day_date = {d.id: d.local_date for d in days}
+        day_order = {d.id: i for i, d in enumerate(days)}
+        ordered = sorted(events, key=lambda e: (day_order.get(e.day_id, 99999), e.local_start_time or "99:99",
+                                                e.sort_order))
+        fallback = [{"title": e.title, "local_date": day_date[e.day_id].isoformat() if e.day_id in day_date else None,
+                     "local_time": e.local_start_time} for e in ordered[:reel.MAX_FALLBACK]]
+
+    places = {("e", r.event_id) for r in rows if r.event_id} | {
+        ("p", r.place_name) for r in rows if not r.event_id and r.place_name}
+    quote = next((reel.clip(r.body, reel.MAX_QUOTE) for r in reversed(rows) if reel.clip(r.body, reel.MAX_QUOTE)),
+                 None)
+    return {
+        "plan_id": str(plan.id), "title": plan.title, "destination": plan.destination,
+        "start_date": days[0].local_date.isoformat() if days else (
+            plan.start_date.date().isoformat() if plan.start_date else None),
+        "end_date": days[-1].local_date.isoformat() if days else (
+            plan.end_date.date().isoformat() if plan.end_date else None),
+        "day_count": len(days),
+        "photo_count": len(photos), "note_count": sum(1 for r in rows if r.kind == "note"),
+        "place_count": len(places), "member_count": len(set(member_user_ids(db, plan))),
+        "slides": slides, "fallback_events": fallback, "quote": quote,
+    }
 
 
 class LocationChange(BaseModel):

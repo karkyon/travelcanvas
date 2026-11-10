@@ -159,6 +159,16 @@ const PlannerPage: React.FC = () => {
   }, [wantsNew, searchParams, setSearchParams]);
   const [newPlanTitle, setNewPlanTitle] = useState('');
   const [newPlanDestination, setNewPlanDestination] = useState('');
+  // [Gate MemoryReel] 思い出の「同じ場所でもう一度計画する」(/planner?new=1&destination=…)は、行き先を入れてクイックを開く
+  const presetDestination = !planId ? searchParams.get('destination') : null;
+  useEffect(() => {
+    if (!presetDestination) return;
+    setNewPlanDestination(presetDestination.slice(0, 120));
+    setIsQuickPage(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('destination');
+    setSearchParams(next, { replace: true });
+  }, [presetDestination, searchParams, setSearchParams]);
   // [Gate #38] Quick Plan(CA-001): 開始日・終了日・最初の予定も同じ画面で
   // 入力できるようにする。全て任意項目(未定でも保存できる)。
   const [newPlanStartDate, setNewPlanStartDate] = useState('');
