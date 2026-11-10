@@ -109,3 +109,84 @@
 .tc-list-tabs button[aria-selected='true'][data-shelf]:not([data-shelf='all']) { background: var(--shelf); border-color: var(--shelf); color: var(--tc-cloud-0); }
 .tc-list-filter-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 12px; font-size: 12px; color: var(--tc-ink-700); }
 .tc-list-filter-note button { border: 0; background: none; padding: 0; cursor: pointer; }
+
+/* ===== [Gate ShelfCards] ホームの「旅行の一覧」: どのカードも同じ大きさ(新しい旅行のカードも) ===== */
+.tc-shelf-headrow { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 14px; }
+.tc-shelf-headrow p { margin: 2px 0 0; font-size: 12.5px; color: var(--tc-ink-700); }
+.tc-shelf-toolrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 12px; }
+
+/* 最大 4 列。行の高さは全部同じ(一番高いカードに揃う) */
+.tc-shelf-grid {
+  list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(max(236px, calc((100% - 3 * 14px) / 4)), 1fr));
+  grid-auto-rows: 1fr;
+}
+.tc-shelf-grid > li { display: flex; min-width: 0; }
+
+.tc-shelf-card {
+  position: relative; display: flex; flex-direction: column; width: 100%; min-width: 0; overflow: hidden;
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(25, 36, 59, .04); transition: box-shadow .15s ease, transform .15s ease;
+}
+.tc-shelf-card:hover { box-shadow: 0 10px 24px rgba(25, 36, 59, .1); transform: translateY(-1px); }
+.tc-shelf-card:focus-within { outline: 2px solid var(--tc-focus); outline-offset: 2px; }
+
+/* 表紙: 高さを固定。札は白い地なので、写真の上の重ねは上の方だけ薄く */
+.tc-shelf-cover.tc-cover { height: 112px; min-height: 0 !important; padding: 10px 12px !important; border-radius: 0 !important;
+  display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 6px; flex-shrink: 0; }
+.tc-shelf-cover.tc-cover[data-has-photo]::after { background: linear-gradient(to bottom, rgba(15, 23, 42, .28), rgba(15, 23, 42, 0) 55%); }
+.tc-shelf-chip {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800;
+  background: rgba(20, 28, 44, .78); color: #fff; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.tc-shelf-chip--role { background: rgba(255, 255, 255, .92); color: #10202e; }
+.tc-shelf-card[data-shelf='cancelled'] .tc-shelf-cover { filter: grayscale(.85); opacity: .78; }
+
+.tc-shelf-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 12px 14px 12px; min-width: 0; }
+.tc-shelf-titlerow { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; }
+.tc-shelf-title { flex: 1; min-width: 0; margin: 0; font-size: 14.5px; font-weight: 800; line-height: 1.35; color: var(--tc-ink-900);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-shelf-open { color: inherit; text-decoration: none; outline: none; }
+/* 旅行名のリンクをカード全体に広げる(どこを押しても旅程を開く) */
+.tc-shelf-open::after { content: ''; position: absolute; inset: 0; z-index: 1; border-radius: 16px; }
+.tc-shelf-card:hover .tc-shelf-open { text-decoration: underline; text-underline-offset: 3px; }
+
+.tc-shelf-menu { position: relative; z-index: 2; flex-shrink: 0; }
+.tc-shelf-more { display: inline-grid; place-items: center; width: 32px; height: 28px; border-radius: 8px; color: var(--tc-ink-700); }
+.tc-shelf-more:hover, .tc-shelf-more[aria-expanded='true'] { background: var(--tc-cloud-100); color: var(--tc-ink-900); }
+.tc-shelf-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 168px; margin: 0; padding: 6px; list-style: none;
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 12px; box-shadow: 0 12px 28px rgba(15, 23, 42, .16); }
+.tc-shelf-pop button { width: 100%; min-height: 36px; padding: 6px 10px; border-radius: 8px; text-align: left; font-size: 13px; font-weight: 700;
+  color: var(--tc-ink-900); }
+.tc-shelf-pop button:hover { background: var(--tc-cloud-100); }
+.tc-shelf-pop button:disabled { opacity: .55; }
+
+.tc-shelf-date { margin: 0; font-size: 12px; color: var(--tc-ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-shelf-stats { display: flex; flex-wrap: nowrap; gap: 5px; margin: 0; padding: 0; list-style: none; overflow: hidden; }
+.tc-shelf-stats li { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; background: var(--tc-cloud-100); font-size: 11.5px; font-weight: 600;
+  color: var(--tc-ink-700); white-space: nowrap; }
+
+.tc-shelf-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 10px;
+  border-top: 1px solid var(--tc-cloud-200); }
+.tc-shelf-card .tc-shelf-badge { font-size: 11.5px; padding: 2px 10px; }
+.tc-shelf-cta { font-size: 12px; font-weight: 800; color: var(--tc-accent-strong); white-space: nowrap; }
+.tc-shelf-cta--link { position: relative; z-index: 2; min-height: 28px; display: inline-flex; align-items: center; border-radius: 6px; }
+.tc-shelf-cta--link:hover { text-decoration: underline; }
+
+/* 新しい旅行を作る(旅行のカードと同じ大きさ) */
+.tc-shelf-add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 236px;
+  padding: 18px; text-align: center; border: 1.5px dashed var(--tc-cloud-200); border-radius: 16px; background: var(--tc-cloud-50);
+  color: var(--tc-ink-900); transition: border-color .15s ease, background .15s ease;
+}
+.tc-shelf-add:hover { border-color: var(--tc-accent); background: var(--tc-cloud-0); }
+.tc-shelf-add-ic { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 4px; border-radius: 12px;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+.tc-shelf-add b { font-size: 14px; font-weight: 800; }
+.tc-shelf-add small { font-size: 11.5px; line-height: 1.6; color: var(--tc-ink-700); }
+.tc-shelf-add em { margin-top: 4px; font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--tc-accent-strong); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-shelf-card, .tc-shelf-add { transition: none; }
+  .tc-shelf-card:hover { transform: none; }
+}

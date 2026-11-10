@@ -125,6 +125,8 @@ describe('DashboardPage', () => {
     fireEvent.click(within(shelf).getByRole('tab', { name: /行った旅/ }));
     expect(within(shelf).getByRole('list', { name: '行った旅の旅行' })).toHaveTextContent(past.title as string);
     fireEvent.click(within(shelf).getByRole('tab', { name: /計画中/ }));
+    // [Gate ShelfCards] 見送りは「…」の中
+    fireEvent.click(screen.getByTestId(`home-more-${up.id}`));
     fireEvent.click(screen.getByTestId(`home-state-${up.id}`));
     await waitFor(() => expect(setTripState).toHaveBeenCalledWith(up.id, 'cancelled'));
     expect(screen.getByTestId('home-memories')).toHaveTextContent(`${past.title as string}`);
