@@ -42,6 +42,9 @@ interface PlanHeaderProps {
   hint?: React.ReactNode;
 }
 
+/** [Gate HeadFold] 旅行のカードの詳細を開いたままにするか(端末に覚える) */
+const DETAILS_KEY = 'tc.planHeadDetails';
+
 const PlanHeader: React.FC<PlanHeaderProps> = ({
   plan,
   onShare,
@@ -56,6 +59,13 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
   className = ''
 }) => {
   const { duplicatePlan, deletePlan } = usePlan();
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    try { return window.localStorage.getItem(DETAILS_KEY) === 'open'; } catch { return false; }
+  });
+  const toggleDetails = () => setDetailsOpen((v) => {
+    try { window.localStorage.setItem(DETAILS_KEY, v ? 'closed' : 'open'); } catch { /* 保存できない環境 */ }
+    return !v;
+  });
   const { addToast } = useToast();
   const online = useOnlineStatus();
   
@@ -152,10 +162,10 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
 
   return (
     <div className={className}>
-      <Card variant="elevated" padding="lg">
+      <Card variant="elevated" padding="md">
         {/* [Gate TripHead] 旅程の画面の一番上の見出し。編集は基本情報のモーダル(onEdit)に一本化した(以前の
             この場での編集はタグ・人数の欄がサーバーに無く保存されず、上の「基本情報・日程を編集」と二重だった) */}
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* ヘッダー情報 */}
             {/* [Gate G9] UX-0 スマホの幅では題名と操作を縦に並べる(以前は題名が1文字ずつ折り返した) */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -193,49 +203,22 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                     current={cover} onSaved={setCover} />
                 )}
                 
-                {hint && <p className="text-sm text-ink-700 mb-3">{hint}</p>}
                 {plan.description && (
-                  <p className="text-ink-700 mb-3 leading-relaxed">{plan.description}</p>
+                  <p className="text-ink-700 mb-2 leading-relaxed line-clamp-2">{plan.description}</p>
                 )}
 
-                {/* 基本情報 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-ink-500"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />目的地</span>
-                    <div className="font-medium">{plan.destination || '未設定'}</div>
-                  </div>
-                  <div>
-                    <span className="text-ink-500"><UiIcon icon={CalendarDays} size={14} className="mr-1 align-[-2px]" />期間</span>
-                    <div className="font-medium">{planStats.daysDiff ? `${planStats.daysDiff}日間` : '未設定'}</div>
-                  </div>
-                  <div>
-                    <span className="text-ink-500"><UiIcon icon={Users} size={14} className="mr-1 align-[-2px]" />人数</span>
-                    <div className="font-medium">{plan.group_size ? `${plan.group_size}人` : '未設定'}</div>
-                  </div>
-                  <div>
-                    <span className="text-ink-500"><UiIcon icon={Wallet} size={14} className="mr-1 align-[-2px]" />予算</span>
-                    <div className="font-medium">{plan.budget !== undefined && plan.budget !== null ? `¥${plan.budget.toLocaleString()}` : '未設定'}</div>
-                  </div>
+                {/* [Gate HeadFold] 目的地・期間・人数・予算と数字(総スポット数など)は折りたたむ(既定は閉じる。端末に覚える)。
+                    閉じている時も 1 行の要約は見せ、下の旅程・地図を広く使う */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700" data-testid="plan-head-summary">
+                  <span>{[plan.destination || null, planStats.daysDiff ? `${planStats.daysDiff}日間` : null,
+                    `予定 ${planStats.totalEvents}件`, plan.budget != null ? `予算 ¥${plan.budget.toLocaleString()}` : null]
+                    .filter(Boolean).join(' · ')}</span>
+                  <button type="button" className="tc-focus-ring tc-mini-link" aria-expanded={detailsOpen}
+                    aria-controls="plan-head-details" onClick={toggleDetails} data-testid="plan-head-toggle">
+                    {detailsOpen ? '詳細を閉じる ▲' : '詳細を開く ▼'}
+                  </button>
                 </div>
-
-
-                {/* タグ */}
-                {plan.tags && plan.tags.length > 0 && (
-                  <div className="mt-4">
-                    <div className="flex flex-wrap gap-2">
-                      {plan.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-gray-100 text-ink-700 text-xs rounded-full"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-
               {/* アクションボタン(スマホでは折り返す) */}
               <div className="flex flex-wrap gap-2 sm:ml-4 sm:justify-end" data-testid="trip-head-actions">
                 {actions}
@@ -316,6 +299,45 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               </div>
             </div>
 
+            {detailsOpen && (
+              <div id="plan-head-details" className="space-y-4" data-testid="plan-head-details">
+                {hint && <p className="text-sm text-ink-700">{hint}</p>}
+                {/* 基本情報 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-ink-500"><UiIcon icon={MapPin} size={14} className="mr-1 align-[-2px]" />目的地</span>
+                      <div className="font-medium">{plan.destination || '未設定'}</div>
+                    </div>
+                    <div>
+                      <span className="text-ink-500"><UiIcon icon={CalendarDays} size={14} className="mr-1 align-[-2px]" />期間</span>
+                      <div className="font-medium">{planStats.daysDiff ? `${planStats.daysDiff}日間` : '未設定'}</div>
+                    </div>
+                    <div>
+                      <span className="text-ink-500"><UiIcon icon={Users} size={14} className="mr-1 align-[-2px]" />人数</span>
+                      <div className="font-medium">{plan.group_size ? `${plan.group_size}人` : '未設定'}</div>
+                    </div>
+                    <div>
+                      <span className="text-ink-500"><UiIcon icon={Wallet} size={14} className="mr-1 align-[-2px]" />予算</span>
+                      <div className="font-medium">{plan.budget !== undefined && plan.budget !== null ? `¥${plan.budget.toLocaleString()}` : '未設定'}</div>
+                    </div>
+                  </div>
+
+
+                  {/* タグ */}
+                  {plan.tags && plan.tags.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex flex-wrap gap-2">
+                        {plan.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-gray-100 text-ink-700 text-xs rounded-full"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
             {/* 統計情報 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
               <div className="text-center">
@@ -335,6 +357,8 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
                 <div className="text-sm text-ink-700">1日平均費用</div>
               </div>
             </div>
+              </div>
+            )}
           </div>
 
       </Card>

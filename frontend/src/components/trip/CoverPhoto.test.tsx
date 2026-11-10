@@ -132,7 +132,7 @@ describe('CoverPhotoDialog', () => {
     expect(screen.getByTestId('cover-choice-m1')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('cover-private-note')).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('cover-focus-x'), { target: { value: '35' } });
-    await waitFor(() => expect(screen.getByTestId('cover-preview-hero')).toHaveAttribute('data-has-photo', 'true'));
+    await waitFor(() => expect(screen.getByTestId('cover-preview-header')).toHaveAttribute('data-has-photo', 'true'));
     expect(screen.getByTestId('cover-preview-card')).toHaveAttribute('data-has-photo', 'true');
     expect(screen.getByRole('button', { name: '拡大を増やす' })).toBeInTheDocument();
 
@@ -143,7 +143,23 @@ describe('CoverPhotoDialog', () => {
 
     fireEvent.click(screen.getByTestId('cover-choice-m2'));
     expect(screen.queryByTestId('cover-private-note')).toBeNull();
-    await waitFor(() => expect(screen.getByTestId('cover-preview-hero')).toHaveAttribute('data-has-photo', 'true'));
+    await waitFor(() => expect(screen.getByTestId('cover-preview-header')).toHaveAttribute('data-has-photo', 'true'));
+  });
+
+  it('[CoverPreview] 旅程の見出しのプレビューは画面の実際の表紙と同じ縦横の比で描く(保存後と同じ切り取り)', async () => {
+    getMemories.mockResolvedValue({ memories: [memory('m1')], can_create: true, max_upload_bytes: 1024 });
+    const real = document.createElement('div');
+    real.setAttribute('data-testid', 'trip-header-cover');
+    real.getBoundingClientRect = () => ({ width: 820, height: 100, top: 0, left: 0, right: 820, bottom: 100, x: 0, y: 0, toJSON: () => ({}) });
+    document.body.appendChild(real);
+    try {
+      open();
+      fireEvent.click(await screen.findByTestId('cover-choice-m1'));
+      await waitFor(() => expect(screen.getByTestId('cover-preview-header')).toHaveStyle({ aspectRatio: '8.2' }));
+      expect(screen.getByTestId('cover-preview-card')).toHaveStyle({ aspectRatio: '2.6' });
+    } finally {
+      real.remove();
+    }
   });
 
   it('取り込みは非公開で保存し、上限を超えるファイルは送らない。失敗は理由を出す', async () => {
@@ -168,7 +184,7 @@ describe('CoverPhotoDialog', () => {
       message: '写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません' } } } });
     fireEvent.change(input, { target: { files: [new File([new Uint8Array(10)], 'b.jpg', { type: 'image/jpeg' })] } });
     expect(await screen.findByRole('alert')).toHaveTextContent('撮影情報');
-    await waitFor(() => expect(screen.getByTestId('cover-preview-hero')).toHaveAttribute('data-has-photo', 'true'));
+    await waitFor(() => expect(screen.getByTestId('cover-preview-header')).toHaveAttribute('data-has-photo', 'true'));
   });
 
   it('今の表紙を外せる。通信できない時は案内する', async () => {
