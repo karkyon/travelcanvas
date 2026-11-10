@@ -9,14 +9,13 @@
  * - 行ってみたい場所: お気に入りに保存したスポットを種類別に
  * - 道具: スポット検索・共有・オフライン・しおり・旅の地図・設定
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AreaLegend, JapanTileMap, RegionLegend, WorldTileMap } from './FootprintMaps';
 import { setSoundEnabled, soundEnabled } from './footSound';
 import { Link } from 'react-router-dom';
 import {
   BedDouble, BookOpen, Check, CircleAlert, Compass, Download, Map as MapIcon, MapPin, Route, Search, Settings, Share2, ShoppingBag, Utensils, Volume2, VolumeX, type LucideIcon, ArrowLeftRight,
 } from 'lucide-react';
-import { getMemoryMedia } from '@/services/api';
 import { setTripState } from '@/services/api/g9';
 import type { DashboardHome, DashboardTrip, HomePlanning, HomeTask, TripShelf } from '@/services/api/types/g9';
 import { safeInternalPath } from '@/utils/safeNavigation';
@@ -266,79 +265,8 @@ export const TripShelves: React.FC<{
 
 // ------------------------------------------------------------------ 旅の記録と思い出
 
-function usePhotoUrls(planId: string | null, ids: string[]): Record<string, string> {
-  const [urls, setUrls] = useState<Record<string, string>>({});
-  const key = `${planId ?? ''}|${ids.join(',')}`;
-  useEffect(() => {
-    if (!planId || ids.length === 0) return undefined;
-    let alive = true;
-    const made: string[] = [];
-    Promise.all(ids.map((id) => getMemoryMedia(planId, id).then((b) => [id, URL.createObjectURL(b)] as const).catch(() => null)))
-      .then((rows) => {
-        const ok = rows.filter((r): r is readonly [string, string] => r !== null);
-        ok.forEach(([, u]) => made.push(u));
-        if (alive) setUrls(Object.fromEntries(ok));
-        else ok.forEach(([, u]) => URL.revokeObjectURL(u));
-      });
-    return () => { alive = false; made.forEach((u) => URL.revokeObjectURL(u)); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 写真の組み合わせ(key)が変わった時だけ読み直す
-  }, [key]);
-  return urls;
-}
-
-export const MemoriesSection: React.FC<{ home: DashboardHome }> = ({ home }) => {
-  const { recent, timeline } = home.memories;
-  const top = timeline[0] ?? null;
-  const urls = usePhotoUrls(recent?.plan_id ?? null, recent?.photo_ids ?? []);
-  const photos = (recent?.photo_ids ?? []).map((id) => urls[id]).filter((u): u is string => Boolean(u));
-  const more = top ? Math.max(0, top.photo_count - photos.length) : 0;
-  return (
-    <section className="tc-card tc-home-memories" aria-labelledby="home-memories" data-testid="home-memories">
-      <div className="tc-section-row">
-        <h2 id="home-memories" className="tc-section-title">旅の記録と思い出</h2>
-        <span className="tc-home-mini tc-home-mini--visited">{`行った旅 ${home.shelves.visited}`}</span>
-      </div>
-      {!top ? (
-        <p className="mt-3 text-sm text-ink-700" data-testid="home-memories-empty">
-          行った旅の写真・メモがここに並びます。旅行中は、旅行を開いた画面の「記録」から写真とメモを残せます。
-        </p>
-      ) : (
-        <>
-          <div className="tc-home-mosaic" data-count={photos.length}>
-            {photos.length === 0 ? (
-              <div className="tc-home-mosaic-empty">写真はまだありません</div>
-            ) : photos.map((u, i) => (
-              <div key={u} className="tc-home-mosaic-cell">
-                <img src={u} alt="" />
-                {i === photos.length - 1 && more > 0 && <span className="tc-home-mosaic-more">{`+ ${more}`}</span>}
-              </div>
-            ))}
-          </div>
-          <div className="tc-home-memrow">
-            <span className="min-w-0">
-              <b>{top.title}</b>
-              <small>{`${tripDateLabel({ start_date: top.start_date, end_date: top.end_date, total_days: null })} · 写真 ${top.photo_count} · メモ ${top.note_count}`}</small>
-            </span>
-            <Link to={`/planner/${top.plan_id}/memories`} className="tc-focus-ring tc-mbtn tc-mbtn--sm">旅の記録を見る</Link>
-            <Link to={`/planner/${top.plan_id}/journey`} className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary">旅を振り返る</Link>
-          </div>
-          {timeline.length > 1 && (
-            <ul className="tc-home-timeline" aria-label="行った旅(新しい順)">
-              {timeline.slice(1).map((t) => (
-                <li key={t.plan_id}>
-                  <Link to={`/planner/${t.plan_id}/memories`} className="tc-focus-ring">
-                    <b>{t.title}</b>
-                    <small>{`${(t.end_date ?? t.start_date ?? '').slice(0, 7).replace('-', '/')} · 写真 ${t.photo_count}`}</small>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </section>
-  );
-};
+// [Gate MemoryReel] 写真が数秒ごとに流れる思い出リール(MemoriesReelSection.tsx)
+export { default as MemoriesSection } from './MemoriesReelSection';
 
 // ------------------------------------------------------------------ 旅の足あと
 
