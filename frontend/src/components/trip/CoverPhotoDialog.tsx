@@ -111,6 +111,11 @@ const Range: React.FC<{ label: string; value: number; min: number; max: number; 
   );
 };
 
+/** 見出しの表紙が画面に無い時の縦横の比(パソコンの幅の旅程の見出しの目安) */
+const HEADER_ASPECT_FALLBACK = 7.5;
+/** 旅行の一覧・ホームのカードの縦横の比の目安 */
+const CARD_ASPECT = 2.6;
+
 const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
   isOpen, onClose, planId, tripTitle, destination, startDate, current, onSaved,
 }) => {
@@ -125,6 +130,15 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
   // [Gate G11] 外部の写真(provider が止めてあれば項目ごと出さない)
   const [externalEnabled, setExternalEnabled] = useState(false);
   const [picker, setPicker] = useState(false);
+  // [Gate CoverPreview] 旅程の見出しのプレビューは、画面にある実際の表紙と同じ縦横の比で描く。写真の切り取り
+  // (位置・拡大の %)は縦横の比だけで決まるので、比が同じなら保存後の見え方と一致する。見出しが画面に無い時は横長の目安
+  const [headerAspect, setHeaderAspect] = useState(HEADER_ASPECT_FALLBACK);
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = document.querySelector<HTMLElement>('[data-testid="trip-header-cover"]');
+    const r = el?.getBoundingClientRect();
+    if (r && r.width > 0 && r.height > 0) setHeaderAspect(r.width / r.height);
+  }, [isOpen]);
   useEffect(() => {
     if (!isOpen) return undefined;
     let active = true;
@@ -278,18 +292,23 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
               onChange={(v) => setPos((p) => ({ ...p, focus_y: v }))} />
             <Range label="拡大" value={pos.zoom} min={100} max={300} unit="%" testId="cover-zoom"
               onChange={(v) => setPos((p) => ({ ...p, zoom: v }))} />
-            <div className="grid gap-3 md:grid-cols-3" aria-label="表紙のプレビュー(大・見出し・カード)">
-              {(['hero', 'header', 'card'] as const).map((size) => (
-                <figure key={size} className="m-0">
-                  <TripCover size={size} tripTitle={tripTitle} destination={destination} startDate={startDate}
-                    photo={previewPhoto} data-testid={`cover-preview-${size}`}>
-                    <p className="font-semibold break-words">{tripTitle}</p>
-                  </TripCover>
-                  <figcaption className="mt-1 text-xs text-ink-700">
-                    {size === 'hero' ? 'ダッシュボード' : size === 'header' ? '旅程の見出し' : '旅行のカード'}
-                  </figcaption>
-                </figure>
-              ))}
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_16rem]" aria-label="表紙のプレビュー(旅程の見出し・カード)">
+              <figure className="m-0">
+                <TripCover size="header" tripTitle={tripTitle} destination={destination} startDate={startDate}
+                  photo={previewPhoto} data-testid="cover-preview-header" className="tc-cover--fixed"
+                  style={{ aspectRatio: String(headerAspect) }}>
+                  <p className="font-semibold break-words">{tripTitle}</p>
+                </TripCover>
+                <figcaption className="mt-1 text-xs text-ink-700">旅程の見出し(画面の実際の横長の比で表示)</figcaption>
+              </figure>
+              <figure className="m-0">
+                <TripCover size="card" tripTitle={tripTitle} destination={destination} startDate={startDate}
+                  photo={previewPhoto} data-testid="cover-preview-card" className="tc-cover--fixed"
+                  style={{ aspectRatio: String(CARD_ASPECT) }}>
+                  <p className="font-semibold break-words">{tripTitle}</p>
+                </TripCover>
+                <figcaption className="mt-1 text-xs text-ink-700">旅行の一覧・ホームのカード</figcaption>
+              </figure>
             </div>
             {chosen?.visibility === 'private' && (
               <p className="text-xs text-ink-700" data-testid="cover-private-note">

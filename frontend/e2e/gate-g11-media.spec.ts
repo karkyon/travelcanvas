@@ -50,7 +50,7 @@ test('旅行の表紙の写真: 取り込み・位置・同期・閲覧者には
   await expect(dialog.getByTestId('cover-private-note')).toBeVisible();
   await dialog.getByTestId('cover-zoom').fill('160');
   await dialog.getByRole('button', { name: '横の位置を減らす' }).click();
-  for (const size of ['hero', 'header', 'card']) await hasPhoto(page, `cover-preview-${size}`);
+  for (const size of ['header', 'card']) await hasPhoto(page, `cover-preview-${size}`);
   await expectNoAxeViolations(page, '表紙の写真を選ぶ画面');
   await dialog.getByTestId('cover-save').click();
   await expect(dialog).toBeHidden();

@@ -1021,6 +1021,7 @@ const PlannerPage: React.FC = () => {
             </Card>
           ) : planView === 'all' ? (
             <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
+              anchors={currentPlan.days.map((_, i) => dayAnchors(currentPlan, i))}
               onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }}
               onMoveEvent={(id, from, to, start) => { void moveEventToDay(id, from, to, start); }} />
           ) : activeDay ? (
