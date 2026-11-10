@@ -653,9 +653,12 @@ def test_haversine_fallback_applied_when_coordinates_available(auth_client):
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["is_estimate"] is True
-    assert body["provider"] == "haversine_estimate"
+    # [Gate TravelEstimate] 移動の見積もり v2(直線距離に手段ごとの条件を掛けた目安。内訳と計算のもとを返す)
+    assert body["provider"] == "tc_estimate"
+    assert body["algorithm_version"].startswith("tc-estimate-v2")
     assert body["distance_km"] is not None
     assert body["duration_minutes"] is not None
+    assert body["estimate_variants"] and body["estimate_basis"].startswith("直線")
 
 
 def test_missing_coordinates_leaves_distance_null_not_fabricated(auth_client):
@@ -696,4 +699,5 @@ def test_response_does_not_leak_internal_fields(auth_client):
         "luggage_note", "reservation_id", "route_option_id", "is_estimate", "provider", "algorithm_version",
         "computed_at", "recommended_departure_at", "revision", "created_at", "updated_at",
         "last_departure_at",  # [Gate G7] MOVE-03 最終の便(利用者が入れる値)
+        "estimate_variants", "estimate_basis",  # [Gate TravelEstimate] 見積もりの内訳・計算のもと
     }

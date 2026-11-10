@@ -3569,6 +3569,21 @@ class PlanMovementSettings(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
+class TravelEstimateSettings(Base):
+    """[Gate TravelEstimate] 移動の見積もり(app/services/travel_estimate.py)の条件。全体で 1 行(id=1)。
+
+    params は既定から変えた値だけ(手段 → 項目 → 数)。管理者が理由つきで変え、監査に残す。revision は区間の見積もりの
+    版(algorithm_version の +r{revision})に入り、変えると次に区間を読んだ時に見積もりを計算し直す。"""
+    __tablename__ = "travel_estimate_settings"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    params: Mapped[Any] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    updated_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PlanOwnershipTransfer(Base):
     """[Gate G8] FR-021・FR-039 旅行の所有者の移譲。
 

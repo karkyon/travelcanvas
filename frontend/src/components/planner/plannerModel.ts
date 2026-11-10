@@ -5,7 +5,7 @@
 import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import type { TravelSegment } from '@/services/api/types/segments';
 import type { DaySchedule } from '@/types';
-import { transportMode, transportText } from '@/utils/transportModes';
+import { durationLabel, transportMode, transportText } from '@/utils/transportModes';
 import { dayShift, shiftLabel, zoneCity, zonedParts, type ZonedParts } from '@/utils/zonedTime';
 
 export type Tone = 'good' | 'warn' | 'bad' | 'muted';
@@ -74,6 +74,30 @@ export interface ArrivalLeg {
   crossZone: { from: ZonedParts; to: ZonedParts; shift: string | null; text: string } | null;
   /** 時刻帯が無効で現地の時刻を出せない */
   zoneUnknown: boolean;
+  /** [Gate TravelEstimate] 距離(「12.5km」)・内訳(「下道 25分 / 高速利用 19分」)・計算のもと(説明) */
+  distance?: string | null;
+  detail?: string | null;
+  basis?: string | null;
+}
+
+/** [Gate TravelEstimate] 距離の文字(1km 未満は m) */
+export function kmText(km: number | null | undefined): string | null {
+  if (km === null || km === undefined || !Number.isFinite(km)) return null;
+  if (km < 1) return `${Math.round(km * 1000 / 10) * 10}m`;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)}km`;
+}
+
+/** [Gate TravelEstimate] 区間の見積もりの距離・内訳・計算のもと */
+export function estimateDetail(seg: Pick<TravelSegment, 'distance_km' | 'estimate_variants' | 'estimate_basis' | 'mode'>): {
+  distance: string | null; detail: string | null; basis: string | null } {
+  const vs = seg.estimate_variants ?? [];
+  const modeLabel = transportMode(seg.mode).label;
+  let detail: string | null = null;
+  if (vs.length > 1) detail = vs.map((v) => `${v.label} ${durationLabel(v.duration_minutes)}`).join(' / ');
+  else if (vs.length === 1 && vs[0]!.label !== modeLabel && vs[0]!.label !== '徒歩') detail = vs[0]!.label;
+  const notes = vs.map((v) => v.note).filter((n): n is string => Boolean(n));
+  const basis = [seg.estimate_basis, ...notes].filter(Boolean).join('。') || null;
+  return { distance: kmText(seg.distance_km), detail, basis };
 }
 
 /** その予定へ着く移動区間(取消でないもの。複数あれば最後に作られたもの) */
@@ -128,6 +152,7 @@ export function arrivalLeg(seg: TravelSegment | null, zones: Record<string, stri
     status: seg.status,
     crossZone,
     zoneUnknown,
+    ...estimateDetail(seg),
   };
 }
 
@@ -266,7 +291,16 @@ export interface ChartDay {
   travelMinutes: number;
   freeMinutes: number | null;
   lockedCount: number;
+  /** [Gate TravelEstimate] 移動の帯(到着する予定の前)・空き時間(15 分以上)・手段ごとの合計 */
+  travels?: ChartTravel[];
+  gaps?: Array<[number, number]>;
+  byMode?: Array<{ mode: string; label: string; minutes: number; km: number | null }>;
 }
+
+export interface ChartTravel { eventId: string; start: number; end: number; mode: string; minutes: number; km: number | null }
+
+/** 空き時間として示す最短(分) */
+export const GAP_MIN = 15;
 
 export interface ChartModel {
   days: ChartDay[];
@@ -321,6 +355,18 @@ export function overlapLanes(items: { id: string; start: number; end: number }[]
   return out;
 }
 
+/** [Gate TravelEstimate] 予定と移動のあいだの空き(GAP_MIN 分以上。最初の予定より前・最後の予定より後は数えない) */
+export function freeGaps(intervals: Array<[number, number]>): Array<[number, number]> {
+  const xs = intervals.filter(([a, b]) => b >= a).sort((x, y) => x[0] - y[0]);
+  const out: Array<[number, number]> = [];
+  let end: number | null = null;
+  for (const [a, b] of xs) {
+    if (end !== null && a - end >= GAP_MIN) out.push([end, a]);
+    end = end === null ? b : Math.max(end, b);
+  }
+  return out;
+}
+
 /** 全日程の物差しにいつも含める時間帯(分) */
 export const CHART_DAY_START = 6 * 60;
 export const CHART_DAY_END = 22 * 60;
@@ -333,6 +379,7 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
     const untimed: ChartEvent[] = [];
     const busy: Array<[number, number]> = [];
     const travel: Array<[number, number]> = [];
+    const travels: ChartTravel[] = [];
     for (const e of d.events) {
       const seg = arrivalSegment(e.id, segments);
       const start = toMinutes(e.start_time);
@@ -351,7 +398,11 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       }
       timed.push(item);
       busy.push([start, item.end ?? start]);
-      if (seg?.duration_minutes) travel.push([Math.max(0, start - seg.duration_minutes), start]);
+      if (seg?.duration_minutes) {
+        travel.push([Math.max(0, start - seg.duration_minutes), start]);
+        travels.push({ eventId: e.id, start: Math.max(0, start - seg.duration_minutes), end: start, mode: seg.mode,
+          minutes: seg.duration_minutes, km: seg.distance_km ?? null });
+      }
       scaleStart = Math.min(scaleStart, start);
       scaleEnd = Math.max(scaleEnd, item.end ?? start);
     }
@@ -361,10 +412,19 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
     const travelMinutes = unionMinutes(travel);
     const occupied = unionMinutes([...busy, ...travel]);
     const span = first !== null && lastEnd !== null ? lastEnd - Math.min(first, ...travel.map(([a]) => a)) : null;
+    const gaps = freeGaps([...busy, ...travel]);
+    const modes = new Map<string, { minutes: number; km: number | null }>();
+    for (const t of travels) {
+      const label = transportMode(t.mode).label;
+      const cur = modes.get(label) ?? { minutes: 0, km: 0 };
+      modes.set(label, { minutes: cur.minutes + t.minutes, km: cur.km === null || t.km === null ? null : cur.km + t.km });
+    }
+    const byMode = [...modes.entries()].map(([label, v]) => ({ mode: label, label, minutes: v.minutes, km: v.km }));
     return {
       index, id: d.id, date: d.date ?? '', timezone: d.timezone_id ?? null, events: timed, untimed,
       first: hm(first), last: hm(lastEnd), travelMinutes, freeMinutes: span !== null ? Math.max(0, span - occupied) : null,
       lockedCount: d.events.filter((e) => locked.has(e.id)).length,
+      travels, gaps, byMode,
     };
   });
   // [Gate TimelineDrag] 物差しはいつも 6:00〜22:00 を含める(予定の時刻だけに合わせると、1 件ドラッグした直後に
