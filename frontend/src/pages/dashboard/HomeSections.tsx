@@ -2,7 +2,7 @@
  * [Gate HomeV2] ホーム v2(docs/ux/TravelCanvas_ホーム改善案_v2_モックアップ.html)の段。
  *
  * - 旅の準備: 計画中の旅行の段階(行き先と日付・立ち寄る場所・移動手段・予約と確認・持ち物)
- * - 次にやること: 計画中の旅行ぜんぶから重要な順(主役の旅行を切り替えられる)
+ * - 次にやること: 計画中の旅行ぜんぶから重要な順(主役の旅行の切り替えは大きな表紙の下)
  * - 旅行の一覧: 計画中 / 検討中 / 行った旅 / 見送り・中止 / すべて のタブ。見送り・中止は編集できる人が決める
  * - 旅の記録と思い出: 最近行った旅の写真(見られる写真だけ)・行った旅の時系列
  * - 旅の足あと: 行った都道府県(行き先・住所に書かれた名前だけ)・今年の旅の日数・写真の数
@@ -14,8 +14,7 @@ import { AreaLegend, JapanTileMap, RegionLegend, WorldTileMap } from './Footprin
 import { setSoundEnabled, soundEnabled } from './footSound';
 import { Link } from 'react-router-dom';
 import {
-  BedDouble, BookOpen, Check, CircleAlert, Compass, Download, Map as MapIcon, MapPin, Route, Search, Settings, Share2,
-  ShoppingBag, Utensils, Volume2, VolumeX, type LucideIcon,
+  BedDouble, BookOpen, Check, CircleAlert, Compass, Download, Map as MapIcon, MapPin, Route, Search, Settings, Share2, ShoppingBag, Utensils, Volume2, VolumeX, type LucideIcon, ArrowLeftRight,
 } from 'lucide-react';
 import { getMemoryMedia } from '@/services/api';
 import { setTripState } from '@/services/api/g9';
@@ -132,13 +131,38 @@ export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning 
   );
 };
 
+// ------------------------------------------------------------------ 主役の旅行の切り替え
+
+/**
+ * [Gate HomeSwitch] 大きな表紙のすぐ下で、表紙・旅の準備に出す旅行(計画中)を切り替える。
+ * 押せることが分かるよう、見出し「表示する旅行を切り替え」とアイコン・日付・あと何日を付けたボタンにする。計画中が 1 件なら出さない
+ */
+export const TripSwitcher: React.FC<{ planning: DashboardTrip[]; selected: string; onSelect: (id: string) => void }> = ({
+  planning, selected, onSelect,
+}) => {
+  if (planning.length < 2) return null;
+  return (
+    <div className="tc-home-switcher" role="group" aria-labelledby="home-switch-label" data-testid="home-switcher">
+      <span id="home-switch-label" className="tc-home-switcher-label"><ArrowLeftRight size={14} aria-hidden="true" />表示する旅行を切り替え</span>
+      <div className="tc-home-switcher-opts">
+        {planning.map((t) => (
+          <button key={t.id} type="button" aria-pressed={selected === t.id} onClick={() => onSelect(t.id)}
+            className="tc-focus-ring" data-testid={`home-switch-${t.id}`}>
+            {selected === t.id && <Check size={13} aria-hidden="true" />}
+            <span>{t.title}</span>
+            <small>{statusLabel(t)}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ------------------------------------------------------------------ 次にやること
 
 const TASK_ICON: Record<string, LucideIcon> = { ready: CircleAlert, moves: Route, places: MapPin, packing: BookOpen };
 
-export const NextTasks: React.FC<{
-  tasks: HomeTask[]; planning: DashboardTrip[]; selected: string | null; onSelect: (id: string) => void;
-}> = ({ tasks, planning, selected, onSelect }) => (
+export const NextTasks: React.FC<{ tasks: HomeTask[] }> = ({ tasks }) => (
   <section className="tc-card tc-home-tasks" aria-labelledby="home-tasks" data-testid="home-tasks">
     <h2 id="home-tasks" className="tc-section-title">次にやること</h2>
     <p className="text-xs text-ink-700">計画中の旅行ぜんぶから、重要な順</p>
@@ -162,15 +186,6 @@ export const NextTasks: React.FC<{
           );
         })}
       </ul>
-    )}
-    {planning.length > 1 && (
-      <div className="tc-home-switch" role="group" aria-label="主役の旅行を切り替える">
-        <span className="text-xs text-ink-700">主役の旅行:</span>
-        {planning.map((t) => (
-          <button key={t.id} type="button" aria-pressed={selected === t.id} onClick={() => onSelect(t.id)}
-            className="tc-focus-ring tc-home-chip" data-testid={`home-switch-${t.id}`}>{t.title}</button>
-        ))}
-      </div>
     )}
   </section>
 );

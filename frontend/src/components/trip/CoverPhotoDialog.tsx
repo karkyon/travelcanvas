@@ -295,7 +295,7 @@ const CoverPhotoDialog: React.FC<CoverPhotoDialogProps> = ({
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_16rem]" aria-label="表紙のプレビュー(旅程の見出し・カード)">
               <figure className="m-0">
                 <TripCover size="header" tripTitle={tripTitle} destination={destination} startDate={startDate}
-                  photo={previewPhoto} data-testid="cover-preview-header" className="tc-cover--fixed"
+                  photo={previewPhoto} data-testid="cover-preview-header" className="tc-cover--fixed tc-cover--scrim-side"
                   style={{ aspectRatio: String(headerAspect) }}>
                   <p className="font-semibold break-words">{tripTitle}</p>
                 </TripCover>

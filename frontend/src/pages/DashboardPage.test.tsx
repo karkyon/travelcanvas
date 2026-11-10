@@ -131,6 +131,25 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('home-footprints')).toHaveTextContent('1/47');
     expect(screen.getByTestId('home-wishlist')).toHaveTextContent('伊勢うどん');
     expect(screen.getByTestId('home-tools')).toHaveTextContent('スポット検索');
+    // [Gate HomeTitle] 「おかえりなさい」は使わない
+    expect(screen.getByRole('heading', { level: 1 })).not.toHaveTextContent('おかえりなさい');
+  });
+
+  it('[HomeSwitch] 計画中が 2 件以上なら、大きな表紙のすぐ下で表示する旅行を切り替えられる', async () => {
+    const base = fx.dashboard_upcoming as unknown as { trips: Array<Record<string, unknown>> } & Record<string, unknown>;
+    const up = base.trips.find((t) => t.phase === 'upcoming')!;
+    const other: Record<string, unknown> = { ...up, id: 'p-other', title: '滋賀・1泊2日の旅程案', days_until_start: 46 };
+    getDashboard.mockResolvedValue(decodeDashboard({ ...base,
+      trips: [...base.trips, other].map((t) => ({ ...t, shelf: t.phase === 'past' ? 'visited' : 'planning' })) }));
+    login();
+    renderDashboard();
+    const sw = await screen.findByTestId('home-switcher');
+    expect(sw).toHaveTextContent('表示する旅行を切り替え');
+    expect(screen.getByTestId('dashboard-hero').nextElementSibling).toBe(sw);
+    expect(within(sw).getByTestId(`home-switch-${up.id as string}`)).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(sw).getByTestId('home-switch-p-other'));
+    expect(await screen.findByRole('heading', { level: 2, name: '滋賀・1泊2日の旅程案' })).toBeInTheDocument();
+    expect(within(sw).getByTestId('home-switch-p-other')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('旅行中: NOW/NEXT(現地の時刻・残り時間)', async () => {

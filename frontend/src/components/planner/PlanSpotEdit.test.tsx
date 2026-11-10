@@ -206,6 +206,30 @@ describe('DayView の日のカード', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
   });
 
+  it('[JourneyMove] 出発の下に出発地からの移動、2 日目以降は宿から最初の予定への移動を選べる', async () => {
+    const onEditJourney = vi.fn();
+    const { unmount } = render(<DayView day={day()} planId="p1" onSegmentSaved={vi.fn()} onEditJourney={onEditJourney}
+      startAnchor={{ kind: 'departure', place: '自宅', time: '07:30', continued: false, mode: 'driving', minutes: 40 }} />);
+    expect(screen.getByTestId('journey-move-departure')).toHaveTextContent('自家用車 · 40分');
+    fireEvent.click(screen.getByTestId('journey-move-edit-departure'));
+    expect(onEditJourney).toHaveBeenCalledTimes(1);
+    unmount();
+    render(<DayView day={day()} planId="p1" onSegmentSaved={vi.fn()}
+      startAnchor={{ kind: 'lodging-from', place: '鳥羽の宿', time: null, continued: false, eventId: 'h1' }} />);
+    expect(screen.getByTestId('segment-slot-e1')).toHaveAccessibleName('「伊射波神社」への移動');
+    expect(screen.getByTestId('segment-empty')).toHaveAttribute('data-to-event', 'e1');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  });
+
+  it('[JourneyMove] 帰着の上の移動は、手段が未設定なら「設定する」', async () => {
+    render(<DayView day={day()} planId="p1" onEditJourney={vi.fn()}
+      endAnchor={{ kind: 'arrival', place: '自宅', time: '19:00', continued: false, mode: null, minutes: null }} />);
+    expect(screen.getByTestId('day-anchor-end')).toHaveTextContent('帰着自宅 · 19:00');
+    expect(screen.getByTestId('journey-move-arrival')).toHaveTextContent('最後の予定から帰着地までの移動手段 未設定');
+    expect(screen.getByTestId('journey-move-edit-arrival')).toHaveTextContent('設定する');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  });
+
   it('日が 1 つの時(削除を渡さない)は「この日程を削除」を出さない', async () => {
     render(<DayView day={day()} planId="p1" />);
     expect(screen.queryByTestId('day-delete')).toBeNull();

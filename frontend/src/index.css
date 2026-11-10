@@ -7,6 +7,7 @@
 @import './styles/shell.css';
 @import './styles/footprints.css'; /* [Gate Footprints2] 旅の足あとの地図 */
 @import './styles/lists.css'; /* [Gate TripsWish] 旅行・行きたい場所の一覧 */
+@import './styles/polish.css'; /* [Gate Polish] 全日程の枠・写真の重ね・ホームの切り替え */
 
 @theme {
   --font-inter: Inter, sans-serif;
