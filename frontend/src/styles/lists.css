@@ -89,3 +89,23 @@
 .tc-wish-art .tc-trip-chip--role { left: auto; right: 12px; }
 .tc-wish-links { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; font-size: 13px; font-weight: 700; }
 .tc-wish-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--tc-accent); text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; }
+
+/* ===== [Gate TripShelfLook] 旅行の状態(計画中・検討中・行った旅・見送り・中止)をアイコンと色で一目で(色だけに頼らない) ===== */
+.tc-lcard, .tc-list-tabs button { --shelf: var(--tc-ink-700); --shelf-soft: var(--tc-cloud-100); }
+[data-shelf='planning'] { --shelf: var(--tc-accent-strong); --shelf-soft: var(--tc-accent-soft); }
+[data-shelf='considering'] { --shelf: var(--tc-warning); --shelf-soft: var(--tc-warning-soft); }
+[data-shelf='visited'] { --shelf: #2f5f93; --shelf-soft: #e8f0fa; }
+[data-shelf='cancelled'] { --shelf: var(--tc-ink-700); --shelf-soft: var(--tc-cloud-100); }
+:root[data-theme='dark'] [data-shelf='visited'] { --shelf: #9cc3ef; --shelf-soft: #16263d; }
+.tc-lcard[data-shelf] { border-top: 4px solid var(--shelf); }
+.tc-lcard[data-shelf='cancelled'] .tc-lcard-cover { filter: grayscale(.85); opacity: .78; }
+.tc-lcard[data-shelf='cancelled'] .tc-lcard-body h3 { color: var(--tc-ink-700); }
+.tc-shelf-badge { display: inline-flex; align-self: flex-start; align-items: center; gap: 5px; margin: 0; padding: 2px 10px 2px 8px;
+  border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--shelf); background: var(--shelf-soft);
+  border: 1px solid color-mix(in srgb, var(--shelf) 28%, transparent); }
+.tc-list-tabs button svg { color: var(--shelf); }
+.tc-list-tabs button[data-shelf='all'] svg { color: currentColor; }
+.tc-list-tabs button[aria-selected='true'] svg { color: currentColor; }
+.tc-list-tabs button[aria-selected='true'][data-shelf]:not([data-shelf='all']) { background: var(--shelf); border-color: var(--shelf); color: var(--tc-cloud-0); }
+.tc-list-filter-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -6px 0 12px; font-size: 12px; color: var(--tc-ink-700); }
+.tc-list-filter-note button { border: 0; background: none; padding: 0; cursor: pointer; }

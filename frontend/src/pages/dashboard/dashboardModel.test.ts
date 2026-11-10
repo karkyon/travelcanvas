@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { DashboardTrip } from '@/services/api/types/g9';
 import {
-  eventTime, groupTrips, minutesLabel, quickActions, shortDate, statusLabel, tripDateLabel,
+  eventTime, groupTrips, minutesLabel, quickActions, shortDate, spanTitle, statusLabel, tripDateLabel,
 } from './dashboardModel';
 
 const base: DashboardTrip = {
@@ -30,6 +30,17 @@ describe('日付・状況の表示', () => {
     expect(statusLabel({ ...base, phase: 'past', days_since_end: 0 })).toBe('今日まで');
     expect(statusLabel({ ...base, phase: 'past', days_since_end: 9 })).toBe('9日前に終了');
     expect(statusLabel({ ...base, phase: 'undated' })).toBe('日程を決めましょう');
+    // [Gate RelDays] 31 日までは日、それより長いと半月単位の「約○か月(半)」、1 年以上は「約○年○か月」
+    expect(statusLabel({ ...base, days_until_start: 31 })).toBe('あと31日');
+    expect(statusLabel({ ...base, days_until_start: 46 })).toBe('あと約1か月半');
+    expect(statusLabel({ ...base, days_until_start: 102 })).toBe('あと約3か月半');
+    expect(statusLabel({ ...base, phase: 'past', days_since_end: 144 })).toBe('約4か月半前に終了');
+    expect(statusLabel({ ...base, phase: 'past', days_since_end: 394 })).toBe('約1年1か月前に終了');
+    expect(statusLabel({ ...base, phase: 'past', days_since_end: 541 })).toBe('約1年6か月前に終了');
+    expect(statusLabel({ ...base, phase: 'past', days_since_end: 730 })).toBe('約2年前に終了');
+    expect(statusLabel({ ...base, phase: 'past', days_since_end: 1 })).toBe('昨日終了');
+    expect(spanTitle({ ...base, days_until_start: 102 })).toBe('出発まで 102日');
+    expect(spanTitle({ ...base, days_until_start: 18 })).toBeUndefined();
   });
 
   it('予定の時刻は現地の時刻(local_start_time を優先)と残り時間', () => {

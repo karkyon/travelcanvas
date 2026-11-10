@@ -191,3 +191,17 @@ def test_pref_trips_and_point_trips(auth_client):
     assert [t["plan_id"] for t in fp["pref_trips"]["三重県"]] == [tb] and fp["pref_trips"]["三重県"][0]["state"] == "planned"
     kenroku = next(p for p in fp["points"] if (p["lat"], p["lng"]) == (36.56, 136.66))
     assert [t["plan_id"] for t in kenroku["trips"]] == [k2, k1]
+
+
+def test_overseas_trip_not_listed_on_japan(auth_client):
+    """[Gate FootCountry] 出発の空港が日本にある海外の旅は、日本の県・日本の点のポップアップに出さない(海外の点には出す)"""
+    client, _owner = auth_client
+    stops = [("関西空港", 34.4320, 135.2304, "大阪府泉佐野市泉州空港北"), ("ドラゴン橋", 16.0610, 108.2270, "Da Nang, Vietnam")]
+    vn = _geo_trip(client, "ダナン", [20], stops, "ベトナム ダナン")
+    osaka = _geo_trip(client, "大阪", [30], [("大阪城", 34.6873, 135.5262, "大阪府大阪市中央区")], "大阪府大阪市")
+    fp = client.get(URL).json()["home"]["footprints"]
+    assert [t["plan_id"] for t in fp["pref_trips"]["大阪府"]] == [osaka]
+    kix = next(p for p in fp["points"] if (p["lat"], p["lng"]) == (34.43, 135.23))
+    assert kix["jp"] is True and kix["trips"] == []
+    danang = next(p for p in fp["points"] if (p["lat"], p["lng"]) == (16.06, 108.23))
+    assert danang["jp"] is False and [t["plan_id"] for t in danang["trips"]] == [vn]

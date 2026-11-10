@@ -20,6 +20,7 @@ const plans = [
 ] as unknown as TravelPlan[];
 
 beforeEach(() => {
+  try { window.localStorage.removeItem('tc.tripListTab'); } catch { /* 無い環境 */ }
   g9.getDashboard.mockReset();
   g9.getDashboard.mockResolvedValue(decodeDashboard({ ...base, trips: [{ ...up, shelf: 'planning', event_count: 4, photo_count: 2 }] }));
 });
@@ -47,6 +48,7 @@ describe('TripList', () => {
     expect(card).toHaveTextContent('メンバー 1');
     expect(card).toHaveTextContent('写真 2');
     expect(card).toHaveTextContent('紅葉を見て、湯豆腐を食べる');
+    fireEvent.click(screen.getByTestId('trip-tab-all'));
     const other = screen.getByRole('listitem', { name: '日付のない旅' });
     expect(other).toHaveTextContent('日付は未定');
     expect(other).toHaveTextContent('人数 未入力');
@@ -76,5 +78,22 @@ describe('TripList', () => {
     const card = await screen.findByRole('listitem', { name: up.title });
     expect(card).toHaveTextContent('2026/11/4(水)');
     expect(card).toHaveTextContent('3人');
+  });
+
+  it('[TripShelfLook] 既定は「計画中」。状態をアイコンと色の札で示し、選んだ状態は端末に覚える', async () => {
+    const { unmount } = render(<TripList plans={plans} onOpen={vi.fn()} onClone={vi.fn()} onDelete={vi.fn()} cloningId={null} />);
+    await screen.findByText('予定 4');
+    expect(screen.getByTestId('trip-tab-planning')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('listitem', { name: '日付のない旅' })).toBeNull();
+    expect(screen.getByTestId('trip-filter-note')).toHaveTextContent('「計画中」の 1 件を表示しています(すべて 2 件)');
+    const badge = screen.getByTestId(`trip-shelf-${up.id}`);
+    expect(badge).toHaveTextContent('計画中');
+    expect(badge).toHaveAttribute('data-shelf', 'planning');
+    expect(badge.querySelector('svg')).not.toBeNull();
+    fireEvent.click(screen.getByTestId('trip-tab-all'));
+    unmount();
+    render(<TripList plans={plans} onOpen={vi.fn()} onClone={vi.fn()} onDelete={vi.fn()} cloningId={null} />);
+    await screen.findByText('予定 4');
+    expect(screen.getByTestId('trip-tab-all')).toHaveAttribute('aria-selected', 'true');
   });
 });

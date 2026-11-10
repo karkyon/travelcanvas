@@ -57,7 +57,7 @@ const home: Decoder<DashboardHome> = object<DashboardHome>({
     trips_visited: nonNegativeInt, days_this_year: nonNegativeInt, photos: nonNegativeInt,
     // [Gate Footprints2] 世界地図の点・海外の旅の数(古い応答には無い)
     points: optional(arrayOf(object<NonNullable<DashboardHome['footprints']['points']>[number]>({
-      lat: num, lng: num, state: oneOf('visited', 'planned'), label: str, trips: optional(arrayOf(footTrip)),
+      lat: num, lng: num, state: oneOf('visited', 'planned'), label: str, trips: optional(arrayOf(footTrip)), jp: optional(bool),
     }))),
     overseas_trips: optional(nonNegativeInt),
     pref_trips: optional(footTripsByPref),

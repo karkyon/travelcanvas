@@ -56,13 +56,13 @@ describe('足あとの地図', () => {
     expect(screen.getByTestId('footprint-world')).toBeInTheDocument();
   });
 
-  it('県に触れると 2 段に浮かび、その県の旅行(新しい順・最大 5 件)が出て旅行を開ける', () => {
+  it('[FootLift] 県に触れるとその県だけが浮かび(周りは動かない)、その県の旅行(新しい順・最大 5 件)が出て旅行を開ける', () => {
     const trips = Array.from({ length: 6 }, (_, i) => ({ plan_id: `p${i}`, title: `京都の旅${i}`, start_date: `2026-0${i + 1}-10`, end_date: `2026-0${i + 1}-11`, state: 'visited' }));
     show({ prefectures: ['京都府'], pref_trips: { '京都府': trips } });
     const jp = screen.getByTestId('footprint-japan');
     fireEvent.pointerEnter(jp.querySelector('[data-pref="京都府"]')!);
     expect(jp.querySelector('[data-pref="京都府"]')).toHaveAttribute('data-lift', '2');
-    expect(jp.querySelector('[data-pref="大阪府"]')).toHaveAttribute('data-lift', '1');
+    expect(jp.querySelector('[data-pref="大阪府"]')).toHaveAttribute('data-lift', '0');
     expect(jp.querySelector('[data-pref="北海道"]')).toHaveAttribute('data-lift', '0');
     const rows = screen.getAllByTestId('footprint-popup-trip');
     expect(rows).toHaveLength(5);
@@ -99,5 +99,17 @@ describe('足あとの地図', () => {
     const { x, y } = project(48.86, 2.35);
     const near = tripsNearCell([{ lat: 48.86, lng: 2.35, state: 'visited', label: 'パリ', trips: [a] }], Math.floor(y / 6), Math.floor(x / 6));
     expect(near.map((t) => t.plan_id)).toEqual(['a']);
+  });
+
+  it('[FootCountry] 世界の地図: カーソルに一番近い点の国の旅だけを出す(日本に当てて海外の旅を出さない)', () => {
+    const jpTrip = { plan_id: 'j', title: '伊勢', start_date: '2026-11-28', end_date: null, state: 'planned' as const };
+    const vnTrip = { plan_id: 'v', title: 'ダナン', start_date: '2027-02-20', end_date: null, state: 'planned' as const };
+    // 経度 136.5 は升目の中心(3° = 6px)。海外の点は隣の升目(1 升 = 6px 先。1.5 升の範囲の中)
+    const { x, y } = project(34.69, 136.5);
+    const pts = [
+      { lat: 34.69, lng: 136.5, state: 'planned' as const, label: '三重', trips: [jpTrip], jp: true },
+      { lat: 34.69, lng: 139.5, state: 'planned' as const, label: '外', trips: [vnTrip], jp: false },
+    ];
+    expect(tripsNearCell(pts, Math.floor(y / 6), Math.floor(x / 6)).map((t) => t.plan_id)).toEqual(['j']);
   });
 });
