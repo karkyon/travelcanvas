@@ -836,3 +836,12 @@
 @media (max-width: 640px) { .tc-map-toolbar { right: 12px; top: 52px; } .tc-map-actions { right: 8px; top: 8px; } }
 /* ===== [Gate DayAdd] 日の見出しの右の「＋ 予定を追加」(編集のボタンと同じ形で少し小さく) ===== */
 .tc-day-add { min-height: 30px; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
+/* ===== [Gate JourneyEnds] 日の最初・最後の出発・到着・宿の行 ===== */
+.tc-anchor { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 7px 10px; border-radius: 12px;
+  border: 1px dashed var(--tc-cloud-200); background: var(--tc-cloud-50); font-size: 13px; color: var(--tc-ink-900); }
+.tc-anchor-icon { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 999px;
+  background: var(--tc-surface, var(--tc-cloud-0)); border: 1px solid var(--tc-cloud-200); flex: none; }
+.tc-anchor-text { margin: 0; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.tc-anchor-label { font-weight: 800; margin-right: 8px; }
+.tc-anchor[data-kind='departure'], .tc-anchor[data-kind='arrival'] { border-style: solid; border-color: var(--tc-accent); background: var(--tc-accent-soft); }
+.tc-anchor[data-kind='lodging-missing'] { border-color: var(--tc-warning); background: var(--tc-warning-soft, var(--tc-cloud-50)); }

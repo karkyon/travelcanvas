@@ -218,6 +218,13 @@ class TravelPlan(Base):
     cover_focus_x: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=50, server_default="50")
     cover_focus_y: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=50, server_default="50")
     cover_zoom: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100, server_default="100")
+    # [Gate JourneyEnds] 旅の出発・到着(任意)。journey_enabled=True の旅行だけ、旅程の最初に「出発」・最後に「到着」を出す。
+    # 場所は短い名前(自宅・東京駅 など。住所は要らない)、時刻は最初の日・最後の日の現地時間の "HH:MM"
+    journey_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    journey_start_place: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    journey_start_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    journey_end_place: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    journey_end_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

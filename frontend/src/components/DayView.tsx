@@ -16,6 +16,8 @@ import { getPlanCover } from '../services/api/g11';
 import { usePlan } from '../hooks/usePlan';
 import { useDragDrop, containerId, finalIndexForGap, reorderArray } from '../hooks/useDragDrop';
 import { useToast } from './common/toastContext';
+import JourneyAnchorRow from '@/components/planner/JourneyAnchorRow';
+import type { DayAnchor } from '@/components/planner/journeyModel';
 import Button from './common/Button';
 import Modal from './common/Modal';
 import ScheduleItem from './planner/ScheduleItem';
@@ -42,6 +44,9 @@ const toEventCategory = (c: string | null): CreateScheduleItemData['category'] =
 
 interface DayViewProps {
   day: DaySchedule;
+  /** [Gate JourneyEnds] 日の最初・最後の「出発・到着・宿」の行 */
+  startAnchor?: DayAnchor | null;
+  endAnchor?: DayAnchor | null;
   planId: string;
   isActive?: boolean;
   showTimeProgress?: boolean;
@@ -81,6 +86,8 @@ interface DayViewProps {
 
 const DayView: React.FC<DayViewProps> = ({
   day,
+  startAnchor = null,
+  endAnchor = null,
   planId,
   isActive = false,
   showTimeProgress = true,
@@ -599,6 +606,8 @@ const DayView: React.FC<DayViewProps> = ({
           onUndo={() => { void undoReorder(); }} onKeep={keepReorder} />
       )}
 
+      {startAnchor && <JourneyAnchorRow anchor={startAnchor} position="start" />}
+
       {/* スケジュールリスト
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
           aria-required-parent)。予定がある時だけ一覧の役割を与え、間の包みは役割無しにする。 */}
@@ -748,6 +757,8 @@ const DayView: React.FC<DayViewProps> = ({
         {/* 最後の予定の後ろへ落とした時の線 */}
         {ownDrag && dropGap === view.length && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
       </div>
+
+      {endAnchor && <JourneyAnchorRow anchor={endAnchor} position="end" onAddLodging={() => setIsAddModalOpen(true)} />}
 
       {/* スケジュール追加モーダル */}
       <Modal

@@ -34,6 +34,12 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
   const [budget, setBudget] = useState('');
   const [description, setDescription] = useState('');
   const [preferences, setPreferences] = useState<Record<string, unknown>>({});
+  // [Gate JourneyEnds] 旅の出発・到着(任意)
+  const [journeyOn, setJourneyOn] = useState(false);
+  const [startPlace, setStartPlace] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endPlace, setEndPlace] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [lost, setLost] = useState<Lost | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +74,11 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
       const prefs = plan.preferences ?? {};
       setPreferences(prefs);
       setParty(prefs.party_size != null ? String(prefs.party_size) : '');
+      setJourneyOn(Boolean(plan.journey_enabled));
+      setStartPlace(plan.journey_start_place ?? '');
+      setStartTime((plan.journey_start_time ?? '').slice(0, 5));
+      setEndPlace(plan.journey_end_place ?? '');
+      setEndTime((plan.journey_end_time ?? '').slice(0, 5));
       if (!firstDate && plan.start_date) setStart(plan.start_date.slice(0, 10));
       if (!lastDate && plan.end_date) setEnd(plan.end_date.slice(0, 10));
     }).catch((e) => setError(errorDetailMessage(e, '旅行の情報を読み込めませんでした')));
@@ -102,6 +113,8 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
       await savePlanBasics(planId, {
         title: title.trim(), destination: destination.trim() || null, description: description.trim() || null,
         budget: budget ? Number(budget) : null, preferences: nextPrefs,
+        journey_enabled: journeyOn, journey_start_place: startPlace.trim() || null, journey_start_time: startTime || null,
+        journey_end_place: endPlace.trim() || null, journey_end_time: endTime || null,
       });
       onSaved(message);
       onClose();
@@ -139,6 +152,22 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
               <div><label htmlFor="basics-party" className="text-sm text-ink-800">人数</label><input id="basics-party" type="number" min={1} max={99} className={input} value={party} onChange={(e) => setParty(e.target.value)} /></div>
               <div><label htmlFor="basics-budget" className="text-sm text-ink-800">予算(円)</label><input id="basics-budget" type="number" min={0} className={input} value={budget} onChange={(e) => setBudget(e.target.value)} /></div>
             </div>
+            <fieldset className="rounded-md border border-cloud-200 p-3" data-testid="basics-journey">
+              <legend className="px-1 text-sm text-ink-800">出発と到着(任意)</legend>
+              <label className="flex items-center gap-2 text-sm text-ink-900">
+                <input type="checkbox" checked={journeyOn} onChange={(e) => setJourneyOn(e.target.checked)} data-testid="basics-journey-on" />
+                旅程の最初に「出発」、最後に「到着」を出す
+              </label>
+              {journeyOn && (
+                <div className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                  <div><label htmlFor="basics-start-place" className="text-sm text-ink-800">出発の場所</label><input id="basics-start-place" className={input} maxLength={120} placeholder="例: 自宅・東京駅" value={startPlace} onChange={(e) => setStartPlace(e.target.value)} /></div>
+                  <div><label htmlFor="basics-start-time" className="text-sm text-ink-800">出発の時刻</label><input id="basics-start-time" type="time" className={input} value={startTime} onChange={(e) => setStartTime(e.target.value)} /></div>
+                  <div><label htmlFor="basics-end-place" className="text-sm text-ink-800">到着(旅の終わり)の場所</label><input id="basics-end-place" className={input} maxLength={120} placeholder="例: 自宅" value={endPlace} onChange={(e) => setEndPlace(e.target.value)} /></div>
+                  <div><label htmlFor="basics-end-time" className="text-sm text-ink-800">到着の時刻</label><input id="basics-end-time" type="time" className={input} value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
+                </div>
+              )}
+              <p className="mt-2 text-xs text-ink-700">住所は要りません。2 日目からは前の夜の宿(種類「宿」の予定)から出発として、日の最初と最後に出します。</p>
+            </fieldset>
             {canEditCover && (
               <div data-testid="basics-cover">
                 <p className="text-sm text-ink-800">背景の写真</p>

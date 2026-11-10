@@ -194,6 +194,18 @@ describe('DayView の日のカード', () => {
     await waitFor(() => expect(m.getHoursCheck).not.toHaveBeenCalled());
   });
 
+  it('[JourneyEnds] 日の最初・最後に出発・宿の行を一覧の外に出し、宿が未設定なら「＋ 宿を追加」で追加を開く', async () => {
+    render(<DayView day={day()} planId="p1"
+      startAnchor={{ kind: 'departure', place: '自宅', time: '07:30', continued: false }}
+      endAnchor={{ kind: 'lodging-missing', place: null, time: null, continued: false }} />);
+    expect(screen.getByTestId('day-anchor-start')).toHaveTextContent('出発自宅 · 07:30');
+    expect(screen.getByTestId('day-anchor-end')).toHaveTextContent('今夜の宿未設定');
+    expect(screen.getByRole('list').contains(screen.getByTestId('day-anchor-start'))).toBe(false);
+    fireEvent.click(screen.getByTestId('day-anchor-add-lodging'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  });
+
   it('日が 1 つの時(削除を渡さない)は「この日程を削除」を出さない', async () => {
     render(<DayView day={day()} planId="p1" />);
     expect(screen.queryByTestId('day-delete')).toBeNull();
