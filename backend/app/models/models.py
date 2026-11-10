@@ -225,6 +225,12 @@ class TravelPlan(Base):
     journey_start_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     journey_end_place: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     journey_end_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    # [Gate JourneyMove] 出発地 → 最初の予定、最後の予定 → 帰着地 の移動手段と所要時間(分)。どれも任意。
+    # 出発地・帰着地は住所が無いので見積もれない。所要時間は利用者が入れた値だけを出す
+    journey_start_mode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    journey_start_minutes: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    journey_end_mode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    journey_end_minutes: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
 
     __table_args__ = (
         CheckConstraint(

@@ -126,6 +126,9 @@ export interface PlanBasics {
   /** [Gate JourneyEnds] 旅の出発・到着(任意) */
   journey_enabled?: boolean; journey_start_place?: string | null; journey_start_time?: string | null;
   journey_end_place?: string | null; journey_end_time?: string | null;
+  /** [Gate JourneyMove] 出発地・帰着地との移動手段と所要時間(分) */
+  journey_start_mode?: string | null; journey_start_minutes?: number | null;
+  journey_end_mode?: string | null; journey_end_minutes?: number | null;
 }
 export async function getPlanBasics(planId: string): Promise<PlanBasics> {
   return (await api.get(`/travel-plans/${planId}`, SILENT)).data as PlanBasics;

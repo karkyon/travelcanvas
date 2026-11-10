@@ -172,7 +172,7 @@ const PlanHeader: React.FC<PlanHeaderProps> = ({
               <div className="flex-1 min-w-0">
                 {/* [Gate G9] UX-2・UX-3 旅行の表紙(生成グラデーション)に題名・状態・行き先・期間・通信の状態をまとめる */}
                 <TripCover size="header" destination={plan.destination} tripTitle={plan.title}
-                  startDate={firstDate(plan) || null} className="mb-3" data-testid="trip-header-cover"
+                  startDate={firstDate(plan) || null} className="mb-3 tc-cover--scrim-side" data-testid="trip-header-cover"
                   photo={coverPhoto.photo} onPhotoError={coverPhoto.onError}>
                   <div className="flex flex-wrap items-center gap-2 pr-28 text-xs font-semibold">
                     <span className="rounded-full border border-white px-2 py-0.5">

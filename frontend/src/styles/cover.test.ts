@@ -41,3 +41,14 @@ describe('[G11] 表紙の写真の重ね', () => {
     expect(css).toContain(`rgba(15, 23, 42, ${COVER_PHOTO_SCRIM.bottom}), rgba(15, 23, 42, ${COVER_PHOTO_SCRIM.top})`);
   });
 });
+
+describe('[Polish] 控えめな重ね(文字のある側だけ暗くする)', () => {
+  it('横の重ねでも、文字のある左側は 4.5:1 を保つ濃さ(0.62 以上)', () => {
+    const css = readFileSync(resolve(__dirname, 'polish.css'), 'utf8');
+    const side = /tc-cover--scrim-side\[data-has-photo\]::after \{\s*background: linear-gradient\(90deg, ([^;]+)\);/.exec(css);
+    expect(side).not.toBeNull();
+    const alphas = [...side![1]!.matchAll(/rgba\(15, 23, 42, ([\d.]+)\) (\d+)%/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    for (const [a, at] of alphas) if (at <= 42) expect(a).toBeGreaterThanOrEqual(COVER_PHOTO_SCRIM.top);
+  });
+});
+

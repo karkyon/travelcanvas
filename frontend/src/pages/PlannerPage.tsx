@@ -1045,6 +1045,7 @@ const PlannerPage: React.FC = () => {
                   onHoursChange={handleHoursChange}
                   day={activeDay}
                   {...anchorsOf(dayAnchors(currentPlan, currentDayIndex))}
+                  onEditJourney={() => setIsBasicsOpen(true)}
                   planId={currentPlan.id}
                   isActive
                   // [Gate PlanUX] 予定を押すと選ぶだけ(地図・右の欄に出す)。編集は鉛筆から

@@ -1,8 +1,8 @@
 /**
  * [Gate JourneyEnds] 旅程の日の最初と最後に出す「つなぎ」の行。
  *
- * - 1 日目の最初: 出発(旅行の基本情報で「出発・到着を出す」を選んだ時。場所・時刻は任意)
- * - 最終日の最後: 到着(同上)
+ * - 1 日目の最初: 出発(旅行の基本情報で「出発・帰着を出す」を選んだ時。場所・時刻・移動手段・所要時間は任意)
+ * - 最終日の最後: 帰着(旅の終わり。同上)
  * - 2 日目以降の最初: 前の夜の宿から出発
  * - 最終日以外の最後: 今夜の宿。宿の予定(種類「宿」)が無い日は、前の宿に続けて泊まる想定(連泊)として出す。
  *   それより前にも宿が無ければ「今夜の宿が未設定」
@@ -19,6 +19,11 @@ export interface DayAnchor {
   time: string | null;
   /** 宿の予定が無い日に、前の宿に続けて泊まる想定で出している */
   continued: boolean;
+  /** [Gate JourneyMove] 宿の予定の ID(宿 → その日の最初の予定の移動を登録する時に使う) */
+  eventId?: string | null;
+  /** [Gate JourneyMove] 出発地 → 最初の予定 / 最後の予定 → 帰着地 の移動手段と所要時間(分) */
+  mode?: string | null;
+  minutes?: number | null;
 }
 export interface JourneyEnds {
   journey_enabled?: boolean | null;
@@ -26,20 +31,24 @@ export interface JourneyEnds {
   journey_start_time?: string | null;
   journey_end_place?: string | null;
   journey_end_time?: string | null;
+  journey_start_mode?: string | null;
+  journey_start_minutes?: number | null;
+  journey_end_mode?: string | null;
+  journey_end_minutes?: number | null;
 }
 
-type Lodging = { place: string; continued: boolean } | null;
+type Lodging = { place: string; continued: boolean; eventId: string } | null;
 
 /** 各日の夜の宿(連泊の想定を含む) */
 export function nightlyLodging(days: Pick<DaySchedule, 'events'>[]): Lodging[] {
-  let last: string | null = null;
+  let last: { place: string; eventId: string } | null = null;
   return days.map((d) => {
     const own = [...d.events].reverse().find((e) => e.category === 'accommodation');
     if (own) {
-      last = (own.location_name || own.title || '').trim() || '宿';
-      return { place: last, continued: false };
+      last = { place: (own.location_name || own.title || '').trim() || '宿', eventId: own.id };
+      return { ...last, continued: false };
     }
-    return last ? { place: last, continued: true } : null;
+    return last ? { ...last, continued: true } : null;
   });
 }
 
@@ -55,17 +64,19 @@ export function dayAnchors(plan: JourneyEnds & { days: Pick<DaySchedule, 'events
   let start: DayAnchor | null = null;
   let end: DayAnchor | null = null;
   if (index === 0) {
-    if (on) start = { kind: 'departure', place: clean(plan.journey_start_place), time: hhmm(plan.journey_start_time), continued: false };
+    if (on) start = { kind: 'departure', place: clean(plan.journey_start_place), time: hhmm(plan.journey_start_time), continued: false,
+      mode: plan.journey_start_mode ?? null, minutes: plan.journey_start_minutes ?? null };
   } else {
     const prev = nights[index - 1];
-    if (prev) start = { kind: 'lodging-from', place: prev.place, time: null, continued: prev.continued };
+    if (prev) start = { kind: 'lodging-from', place: prev.place, time: null, continued: prev.continued, eventId: prev.eventId };
   }
   if (index === n - 1) {
-    if (on) end = { kind: 'arrival', place: clean(plan.journey_end_place), time: hhmm(plan.journey_end_time), continued: false };
+    if (on) end = { kind: 'arrival', place: clean(plan.journey_end_place), time: hhmm(plan.journey_end_time), continued: false,
+      mode: plan.journey_end_mode ?? null, minutes: plan.journey_end_minutes ?? null };
   } else {
     const tonight = nights[index];
     end = tonight
-      ? { kind: 'lodging-to', place: tonight.place, time: null, continued: tonight.continued }
+      ? { kind: 'lodging-to', place: tonight.place, time: null, continued: tonight.continued, eventId: tonight.eventId }
       : { kind: 'lodging-missing', place: null, time: null, continued: false };
   }
   return { start, end };
@@ -77,7 +88,7 @@ export function anchorText(a: DayAnchor): { label: string; body: string } {
     case 'departure':
       return { label: '出発', body: [a.place ?? '出発地(未設定)', a.time].filter(Boolean).join(' · ') };
     case 'arrival':
-      return { label: '到着', body: [a.place ?? '到着地(未設定)', a.time].filter(Boolean).join(' · ') };
+      return { label: '帰着', body: [a.place ?? '帰着地(未設定)', a.time].filter(Boolean).join(' · ') };
     case 'lodging-from':
       return { label: '前の夜の宿から', body: `${a.place ?? '宿'}${a.continued ? '(連泊の想定)' : ''}` };
     case 'lodging-to':

@@ -35,3 +35,20 @@ def test_rejects_bad_time_and_long_place(auth_client):
     assert client.put(f"/api/v1/travel-plans/{pid}", json={"journey_start_time": "25:00"}).status_code == 422
     assert client.put(f"/api/v1/travel-plans/{pid}", json={"journey_start_time": "7時"}).status_code == 422
     assert client.put(f"/api/v1/travel-plans/{pid}", json={"journey_start_place": "あ" * 121}).status_code == 422
+
+
+def test_journey_moves_saved_and_validated(auth_client):
+    """[Gate JourneyMove] 出発地・帰着地との移動手段と所要時間(任意)"""
+    client, _ = auth_client
+    pid = _plan(client)
+    r = client.put(f"/api/v1/travel-plans/{pid}", json={
+        "journey_start_mode": "driving", "journey_start_minutes": 40,
+        "journey_end_mode": "train", "journey_end_minutes": 95})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert (body["journey_start_mode"], body["journey_start_minutes"]) == ("driving", 40)
+    assert (body["journey_end_mode"], body["journey_end_minutes"]) == ("train", 95)
+    assert client.put(f"/api/v1/travel-plans/{pid}", json={"journey_start_mode": "rocket"}).status_code == 422
+    assert client.put(f"/api/v1/travel-plans/{pid}", json={"journey_end_minutes": 2000}).status_code == 422
+    r = client.put(f"/api/v1/travel-plans/{pid}", json={"journey_start_mode": "", "journey_start_minutes": None})
+    assert r.json()["journey_start_mode"] is None and r.json()["journey_start_minutes"] is None

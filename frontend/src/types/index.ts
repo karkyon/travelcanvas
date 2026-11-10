@@ -252,6 +252,11 @@ export interface TravelPlan {
   journey_start_time?: string | null;
   journey_end_place?: string | null;
   journey_end_time?: string | null;
+  /** [Gate JourneyMove] 出発地 → 最初の予定、最後の予定 → 帰着地 の移動手段と所要時間(分) */
+  journey_start_mode?: string | null;
+  journey_start_minutes?: number | null;
+  journey_end_mode?: string | null;
+  journey_end_minutes?: number | null;
 }
 
 export interface CreatePlanData {

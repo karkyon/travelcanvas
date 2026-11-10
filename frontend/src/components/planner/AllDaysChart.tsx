@@ -112,8 +112,9 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
         if (d && d.from !== day.index) onDropEvent(d);
       }}
       data-drop={over && canDrop ? 'over' : undefined}
-      className={`flex min-w-[15rem] flex-col rounded-xl border bg-surface p-3 ${over && canDrop ? 'border-accent ring-2 ring-accent/40 bg-cloud-50'
-        : current ? 'border-accent' : 'border-cloud-200'}`}>
+      data-current={current ? 'true' : undefined}
+      // [Gate ChartFrame] 全日程の表では日を選んで操作しないので、選んでいる日を強めない。どの日も同じ薄めの枠で囲む
+      className={`tc-chart-col flex min-w-[15rem] flex-col rounded-xl border bg-surface p-3 ${over && canDrop ? 'border-accent ring-2 ring-accent/40 bg-cloud-50' : ''}`}>
       {/* [Gate ChartHead] 日付の見出しは色の帯で物差しと分ける(日付を大きく、要約は小さな札で) */}
       <header className="tc-chart-dayhead" data-testid={`chart-head-${day.index}`}>
         <p className="tc-chart-dayhead-kicker">{`DAY ${day.index + 1}`}<span>{`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}</span></p>
@@ -162,7 +163,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           return (
             <div key={a.kind} className="tc-chart-anchor-line" data-kind={a.kind} style={{ top: ((at - scaleStart) / 60) * PX_PER_HOUR }}
               data-testid={`chart-anchor-${a.kind}-${day.index}`}>
-              <span>{`${a.kind === 'departure' ? '出発' : '到着'} ${a.time}`}</span>
+              <span>{`${a.kind === 'departure' ? '出発' : '帰着'} ${a.time}`}</span>
             </div>
           );
         })}

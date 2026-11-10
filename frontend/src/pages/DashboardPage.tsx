@@ -22,7 +22,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference } from '@/hooks/useThemePreference';
 import PageHead from '@/components/shell/PageHead';
 import { EmptyHero, FocusPanels, QuickActions, TripHero, TripList } from './dashboard/DashboardParts';
-import { Footprints, MemoriesSection, NextTasks, PlanningHero, Tools, TripShelves, Wishlist } from './dashboard/HomeSections';
+import { Footprints, MemoriesSection, NextTasks, PlanningHero, Tools, TripShelves, TripSwitcher, Wishlist } from './dashboard/HomeSections';
 
 type LoadState =
   | { kind: 'loading' }
@@ -75,10 +75,11 @@ const DashboardPage: React.FC = () => {
   const progress = home && focusTrip ? home.planning.find((p) => p.plan_id === focusTrip.id) ?? null : null;
   const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
   const nextTrip = planningTrips.find((t) => t.days_until_start !== null) ?? null;
-  const title = nextTrip?.days_until_start ? `おかえりなさい。次の旅まで あと ${nextTrip.days_until_start} 日`
+  // [Gate HomeTitle] 「おかえりなさい」は日本のアプリでは不自然なので使わない。旅までの日数をそのまま見出しにする
+  const title = nextTrip?.days_until_start ? `次の旅まで あと ${nextTrip.days_until_start} 日`
     : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中です。今日の予定を確かめましょう' : '次の旅を、楽しみに変える';
   // 挨拶の文は読み込みの前後で変えない(読み込んだ後は旅行の数を後ろに足す)
-  const sub = `${name}さん、次にすることをまとめました。` + (home
+  const sub = `${name}さんの旅の準備と、次にすること。` + (home
     ? `計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited} · 見送り ${home.shelves.cancelled}`
     : '日程も予約も旅の準備も、この旅のページから一緒に進められます。');
 
@@ -128,6 +129,8 @@ const DashboardPage: React.FC = () => {
           <div className="tc-home-planning">
             <div className="tc-dash-col">
               {home ? <PlanningHero trip={focusTrip} detail={progress} /> : <TripHero trip={focusTrip} />}
+              {/* [Gate HomeSwitch] 主役の旅行の切り替えは、大きな表紙のすぐ下に(次にやることの下から移した) */}
+              <TripSwitcher planning={planningTrips} selected={focusTrip.id} onSelect={setChosenId} />
               {focusIsAuto && data.focus && (data.focus.phase === 'ongoing' || data.focus.phase === 'past'
                 || (data.focus.alerts?.active ?? 0) > 0 || !home) && (
                 <FocusPanels focus={data.focus} trip={focusTrip} />
@@ -135,7 +138,7 @@ const DashboardPage: React.FC = () => {
             </div>
             <div className="tc-dash-col">
               {home ? (
-                <NextTasks tasks={home.tasks} planning={planningTrips} selected={focusTrip.id} onSelect={setChosenId} />
+                <NextTasks tasks={home.tasks} />
               ) : <QuickActions trip={focusTrip} />}
             </div>
           </div>

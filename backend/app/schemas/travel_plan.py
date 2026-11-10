@@ -10,6 +10,8 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, validator
 
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_JOURNEY_MODES = {"walking", "driving", "train", "bus", "ferry", "flight", "bicycle", "taxi", "shinkansen",
+                  "express_bus", "helicopter", "transit"}
 
 
 class TravelPlanBase(BaseModel):
@@ -57,6 +59,27 @@ class TravelPlanUpdate(BaseModel):
     journey_start_time: Optional[str] = None
     journey_end_place: Optional[str] = None
     journey_end_time: Optional[str] = None
+    # [Gate JourneyMove] 出発地・帰着地との移動手段と所要時間(分)
+    journey_start_mode: Optional[str] = None
+    journey_start_minutes: Optional[int] = None
+    journey_end_mode: Optional[str] = None
+    journey_end_minutes: Optional[int] = None
+
+    @validator('journey_start_mode', 'journey_end_mode')
+    def journey_mode(cls, v):
+        if v is None or not v.strip():
+            return None
+        if v not in _JOURNEY_MODES:
+            raise ValueError('移動手段が正しくありません')
+        return v
+
+    @validator('journey_start_minutes', 'journey_end_minutes')
+    def journey_minutes(cls, v):
+        if v is None:
+            return None
+        if not 0 <= v <= 1440:
+            raise ValueError('所要時間は 0〜1440 分で入れてください')
+        return v
 
     @validator('journey_start_place', 'journey_end_place')
     def journey_place(cls, v):
@@ -106,6 +129,10 @@ class TravelPlanResponse(TravelPlanBase):
     journey_start_time: Optional[str] = None
     journey_end_place: Optional[str] = None
     journey_end_time: Optional[str] = None
+    journey_start_mode: Optional[str] = None
+    journey_start_minutes: Optional[int] = None
+    journey_end_mode: Optional[str] = None
+    journey_end_minutes: Optional[int] = None
 
     class Config:
         from_attributes = True

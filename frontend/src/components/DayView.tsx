@@ -47,6 +47,8 @@ interface DayViewProps {
   /** [Gate JourneyEnds] 日の最初・最後の「出発・到着・宿」の行 */
   startAnchor?: DayAnchor | null;
   endAnchor?: DayAnchor | null;
+  /** [Gate JourneyMove] 出発・帰着の移動手段を設定する(旅行の基本情報を開く) */
+  onEditJourney?: () => void;
   planId: string;
   isActive?: boolean;
   showTimeProgress?: boolean;
@@ -88,6 +90,7 @@ const DayView: React.FC<DayViewProps> = ({
   day,
   startAnchor = null,
   endAnchor = null,
+  onEditJourney,
   planId,
   isActive = false,
   showTimeProgress = true,
@@ -606,7 +609,7 @@ const DayView: React.FC<DayViewProps> = ({
           onUndo={() => { void undoReorder(); }} onKeep={keepReorder} />
       )}
 
-      {startAnchor && <JourneyAnchorRow anchor={startAnchor} position="start" />}
+      {startAnchor && <JourneyAnchorRow anchor={startAnchor} position="start" onEditMove={onEditJourney} />}
 
       {/* スケジュールリスト
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
@@ -676,7 +679,27 @@ const DayView: React.FC<DayViewProps> = ({
                   ) : undefined}
                 </SegmentPicker>
               )}
-              {index === 0 && row && (
+              {/* [Gate JourneyMove] 2 日目以降の最初の予定の前: 前の夜の宿 → 最初の予定の移動を選べる */}
+              {index === 0 && startAnchor?.kind === 'lodging-from' && startAnchor.eventId && (
+                <SegmentPicker planId={planId} revision={revision} fromEventId={startAnchor.eventId}
+                  fromTitle={startAnchor.place ?? '宿'} toEventId={event.id} toTitle={event.title}
+                  segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
+                  canEdit={canEdit && Boolean(onSegmentSaved) && !pending} onSaved={(sg) => onSegmentSaved?.(sg)}>
+                  {row ? (
+                    <div data-testid="segment-row" data-to-event={event.id} data-mismatch="false" className="tc-segment-row">
+                      <span className="sr-only">宿からの移動:</span>
+                      <TransportIcon mode={row.leg.mode} />
+                      <span>{row.leg.text}</span>
+                      {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
+                      {row.leg.isEstimate && <span>(推定)</span>}
+                      {row.leg.detail && (
+                        <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+                      )}
+                    </div>
+                  ) : undefined}
+                </SegmentPicker>
+              )}
+              {index === 0 && row && !(startAnchor?.kind === 'lodging-from' && startAnchor.eventId) && (
                 <div role="listitem" data-testid="segment-row" data-to-event={event.id}
                   data-mismatch={row.mismatch ? 'true' : 'false'}
                   className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
@@ -766,7 +789,8 @@ const DayView: React.FC<DayViewProps> = ({
         {ownDrag && dropGap === view.length && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
       </div>
 
-      {endAnchor && <JourneyAnchorRow anchor={endAnchor} position="end" onAddLodging={() => setIsAddModalOpen(true)} />}
+      {endAnchor && <JourneyAnchorRow anchor={endAnchor} position="end" onAddLodging={() => setIsAddModalOpen(true)}
+        onEditMove={onEditJourney} />}
 
       {/* スケジュール追加モーダル */}
       <Modal
