@@ -179,6 +179,23 @@ describe('全日程のチャート', () => {
     expect(screen.getByTestId('all-days-scroll-hint')).toBeInTheDocument();
   });
 
+  it('[JourneyEnds][ChartHead] 列に出発・到着・宿を出し、時刻の線を物差しに引く(物差しは出発の時刻まで広げる)', () => {
+    render(<AllDaysChart days={days()} segments={[]} currentDay={0} onOpenDay={vi.fn()} anchors={[
+      { start: { kind: 'departure', place: '自宅', time: '05:30', continued: false },
+        end: { kind: 'lodging-to', place: '京の宿', time: null, continued: false } },
+      { start: { kind: 'lodging-from', place: '京の宿', time: null, continued: false },
+        end: { kind: 'arrival', place: '自宅', time: '19:10', continued: false } },
+    ]} />);
+    const col0 = within(screen.getByTestId('chart-day-0'));
+    expect(col0.getByTestId('day-anchor-start')).toHaveTextContent('出発自宅 · 05:30');
+    expect(col0.getByTestId('day-anchor-end')).toHaveTextContent('今夜の宿京の宿');
+    expect(screen.getByTestId('chart-anchor-departure-0')).toHaveTextContent('出発 05:30');
+    expect(screen.getByTestId('chart-anchor-arrival-1')).toHaveTextContent('到着 19:10');
+    // 物差しは 5:00 から(6:00 より前に広がる)。1 時間 44px で 05:30 は 22px
+    expect(screen.getByTestId('chart-anchor-departure-0')).toHaveStyle({ top: '22px' });
+    expect(screen.getByTestId('chart-head-0')).toHaveClass('tc-chart-dayhead');
+  });
+
   it('[EventMoveDay] 予定を別の日の列へドラッグ&ドロップで移す。固定の予定・同じ日へは動かさない', () => {
     const onMove = vi.fn();
     render(<AllDaysChart days={days()} segments={[]} currentDay={0} onOpenDay={vi.fn()} onMoveEvent={onMove} />);

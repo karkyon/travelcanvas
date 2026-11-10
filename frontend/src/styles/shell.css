@@ -845,3 +845,16 @@
 .tc-anchor-label { font-weight: 800; margin-right: 8px; }
 .tc-anchor[data-kind='departure'], .tc-anchor[data-kind='arrival'] { border-style: solid; border-color: var(--tc-accent); background: var(--tc-accent-soft); }
 .tc-anchor[data-kind='lodging-missing'] { border-color: var(--tc-warning); background: var(--tc-warning-soft, var(--tc-cloud-50)); }
+/* ===== [Gate ChartHead] 全日程の列の日付の見出し(色の帯で物差しと分ける) ===== */
+.tc-chart-dayhead { margin: -12px -12px 0; padding: 10px 12px 9px; border-radius: 12px 12px 0 0;
+  background: var(--tc-accent-soft); border-bottom: 2px solid var(--tc-accent); }
+.tc-chart-dayhead-kicker { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+  font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-chart-dayhead-kicker span { font-weight: 600; letter-spacing: 0; color: var(--tc-ink-700); }
+.tc-chart-dayhead-date { margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--tc-ink-900); }
+.tc-chart-dayhead-chips { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-chart-dayhead-chips > span { padding: 1px 7px; border-radius: 999px; background: var(--tc-surface, var(--tc-cloud-0));
+  border: 1px solid var(--tc-cloud-200); font-size: 11px; color: var(--tc-ink-800, var(--tc-ink-900)); }
+.tc-chart-anchor-line { position: absolute; left: 0; right: 0; border-top: 2px solid var(--tc-accent); z-index: 1; pointer-events: none; }
+.tc-chart-anchor-line > span { position: absolute; right: 2px; top: -9px; padding: 0 5px; border-radius: 6px; font-size: 10px; font-weight: 800;
+  background: var(--tc-accent); color: var(--tc-on-accent, #fff); }

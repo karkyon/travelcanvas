@@ -381,3 +381,6 @@ html[data-style='studio'] .tc-map-frame {
   overflow: hidden;
 }
 /* generated:styles:end */
+
+/* [Gate CoverPreview] プレビューは縦横の比を固定する(中身の高さで比が崩れないよう、文字ははみ出しを隠す) */
+.tc-cover.tc-cover--fixed { min-height: 0; overflow: hidden; }
