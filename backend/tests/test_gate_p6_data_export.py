@@ -13,6 +13,7 @@
 import hashlib
 import io
 import json
+import re
 import uuid
 
 import pytest
@@ -113,8 +114,12 @@ def test_plan_export_contents_and_privacy(auth_client, make_user, db_session, au
     # 本人だけの情報は本人の分だけ
     personal = [x for x in t["packing_items"] if x["scope"] == "personal"]
     assert [x["personal"]["name"] for x in personal] == ["自分の薬"]
+    # 無作為の ID(UUID)・作った日時(マイクロ秒まで)に数字の並び(例 12345)がたまたま入ると、隠した値が漏れたと
+    # 誤って判定していた(CI で時々落ちた)。ID と日時は伏せる対象ではないので、確かめる前に取り除く
+    no_ids = re.sub(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "<id>", raw)
+    scrubbed = re.sub(r"\d{4}-\d{2}-\d{2}T[\d:.]+(?:[+-]\d{2}:\d{2}|Z)?", "<at>", no_ids)
     for other in ("編集者の薬", "99999", "編集者の秘匿上限", "12345", "編集者の事情"):
-        assert other not in raw
+        assert other not in scrubbed
     assert [b["amount"] for b in t["budgets"] if b["kind"] == "member"] == ["30000"]
     assert t["constraints"] == []
     # 匿名の投票は他人の回答を出さない。削除済みコメントは本文なし
