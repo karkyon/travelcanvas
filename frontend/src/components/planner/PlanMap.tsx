@@ -36,8 +36,8 @@ interface PlanMapProps {
   onSelectEvent?: (eventId: string) => void;
   onAddCandidateToItinerary?: (candidateId: string, fallbackTitle: string) => void;
   className?: string;
-  /** [Gate AppShell] 地図の高さ(旅程の3列では 530px) */
-  height?: number;
+  /** [Gate AppShell] 地図の高さ(旅程の3列では 530px)。[Gate MapTools] 最大化の時は CSS の長さ */
+  height?: number | string;
 }
 
 function _divIcon(html: string, size: [number, number] = [28, 28]) {

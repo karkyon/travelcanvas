@@ -67,8 +67,6 @@ interface DayViewProps {
   selectedEventId?: string | null;
   /** [Gate MockScreens] 営業時間の照合の結果(選んだ予定の欄へ渡す) */
   onHoursChange?: (byId: Record<string, EventHoursCheck>, pending: boolean) => void;
-  /** [Gate MockScreens] 値が変わるたびに「予定を追加」を開く(見出しの「＋ 予定を追加」) */
-  addSignal?: number;
   /** [Gate PlanUX] 旅程の版(移動区間の保存の If-Match) */
   revision?: number;
   /** [Gate PlanUX] 予定の間で移動手段を選んだ・詳細を直した時(区間の一覧を差し替える) */
@@ -99,7 +97,6 @@ const DayView: React.FC<DayViewProps> = ({
   onOpenRoute,
   selectedEventId = null,
   onHoursChange,
-  addSignal = 0,
   revision,
   onSegmentSaved,
   onDeleteDay,
@@ -135,11 +132,6 @@ const DayView: React.FC<DayViewProps> = ({
   useEffect(() => {
     if (!hoursPending && announce.endsWith('確かめています')) setAnnounce(announce.replace('確かめています', '確かめました'));
   }, [hoursPending, announce]);
-
-  // [Gate MockScreens] 旅程の見出しの「＋ 予定を追加」から開く
-  useEffect(() => {
-    if (addSignal > 0) setIsAddModalOpen(true);
-  }, [addSignal]);
 
   // [Gate G11] 予定のカードの写真(見える写真だけ。一時の URL)
   const [images, setImages] = useState<Record<string, EventImage>>({});
@@ -550,6 +542,11 @@ const DayView: React.FC<DayViewProps> = ({
             <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
           </div>
           <div className="tc-day-head-actions">
+            {/* [Gate DayAdd] 予定の追加はこの 1 つ(以前は旅程の見出しと日の下に同じ働きの 2 つがあった) */}
+            <Button variant="outline" size="sm" className="tc-day-add" onClick={() => setIsAddModalOpen(true)} data-testid="day-add-event"
+              title={`${day.date ? `${day.date} (${getDayOfWeek(day.date)})` : 'この日'}に予定を追加`}>
+              ＋ 予定を追加
+            </Button>
             {onOpenRoute && (
               <button type="button" className="tc-focus-ring tc-mini-link" onClick={onOpenRoute}>ルートを見る <span aria-hidden="true">↗</span></button>
             )}
@@ -751,12 +748,6 @@ const DayView: React.FC<DayViewProps> = ({
         {/* 最後の予定の後ろへ落とした時の線 */}
         {ownDrag && dropGap === view.length && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
       </div>
-
-      {day.events.length > 0 && (
-        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-add-event" onClick={() => setIsAddModalOpen(true)}>
-          ＋ この日にスポットを追加
-        </button>
-      )}
 
       {/* スケジュール追加モーダル */}
       <Modal
