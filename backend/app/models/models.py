@@ -534,6 +534,12 @@ class TravelEvent(Base):
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # [Gate EventArea] エリア(event_type='area')の中の予定はエリアの ID を持つ(同じ日・入れ子にしない。
+    # 並びはいつもエリアのすぐ後ろに続ける。app/services/event_area.py)
+    parent_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
+                                       name="fk_travel_events_parent_event_id"),
+        nullable=True, index=True)
     # [Gate G11] 予定のカードの写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)
     image_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,

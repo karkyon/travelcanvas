@@ -125,8 +125,10 @@ export const usePlan = () => {
   );
 
   // [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。成功で true
+  // [Gate EventArea] エリアのまとまりを動かす時は keepSlots=false(時刻は予定に付いたまま)
   const reorderSpots = useCallback(
-    async (_planId: string, dayId: string, itemOrders: string[]) => reorderDaySlots(dayId, itemOrders),
+    async (_planId: string, dayId: string, itemOrders: string[], keepSlots = true) =>
+      reorderDaySlots(dayId, itemOrders, keepSlots),
     [reorderDaySlots]
   );
 

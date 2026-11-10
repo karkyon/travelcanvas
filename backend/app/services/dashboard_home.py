@@ -155,6 +155,7 @@ def _events_by_plan(db: Session, plan_ids: List[uuid.UUID]) -> Dict[Any, List[Tr
 
 def segment_progress(events: List[TravelEvent], segment_to: Dict[Any, Any]) -> Dict[str, int]:
     """移動手段: 同じ日の続く 2 つの予定の間(区間)のうち、着く予定の区間が決まっている数"""
+    from app.services import event_area  # [Gate EventArea] エリアの中の移動は数えない
     by_day: Dict[Any, List[TravelEvent]] = defaultdict(list)
     for ev in events:
         by_day[ev.day_id].append(ev)
@@ -162,6 +163,8 @@ def segment_progress(events: List[TravelEvent], segment_to: Dict[Any, Any]) -> D
     done = 0
     for evs in by_day.values():
         for prev, cur in zip(evs, evs[1:]):
+            if event_area.is_inner_pair(prev, cur):
+                continue  # [Gate EventArea] エリアの中の移動は区間として数えない
             need += 1
             if segment_to.get(cur.id) == prev.id:
                 done += 1

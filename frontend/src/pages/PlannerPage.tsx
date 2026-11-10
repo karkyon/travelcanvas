@@ -105,7 +105,7 @@ const OSM_COPYRIGHT = 'https://www.openstreetmap.org/copyright';
 
 const EDIT_CATEGORIES: Array<[string, string]> = [
   ['sightseeing', '観光・神社・寺'], ['activity', '体験・アクティビティ'], ['dining', '食事・カフェ'], ['shopping', '買い物'],
-  ['accommodation', '宿'], ['transportation', '交通・移動'], ['other', 'その他'],
+  ['accommodation', '宿'], ['transportation', '交通・移動'], ['area', 'エリア(中に予定を入れる)'], ['other', 'その他'],
 ];
 
 const PlannerPage: React.FC = () => {
@@ -249,6 +249,8 @@ const PlannerPage: React.FC = () => {
 
   // [Gate PlanUX] 予定の種類(変えた時だけ送る)
   const [editCategory, setEditCategory] = useState<{ value: string; original: string }>({ value: 'other', original: 'other' });
+  // [Gate EventArea] 入れる先のエリア('' は入れない)
+  const [editArea, setEditArea] = useState<{ value: string; original: string }>({ value: '', original: '' });
   // [Gate PlanSpotEdit] 電話番号(変えた時だけ送る)・場所の情報の取得(OpenStreetMap)・写真を変えた時の旅程の読み直し
   const [editPhone, setEditPhone] = useState<{ value: string; original: string }>({ value: '', original: '' });
   const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null; mode?: 'info' | 'geo' }>(
@@ -352,6 +354,7 @@ const PlannerPage: React.FC = () => {
       lng: typeof item.longitude === 'number' ? item.longitude : null, changed: false });
     setPlaceInfo({ busy: false, result: null, error: null });
     setEditCategory({ value: item.category || 'other', original: item.category || 'other' });
+    setEditArea({ value: item.parent_event_id ?? '', original: item.parent_event_id ?? '' });
     setEditForm(fieldsOf(item));
     setEditOriginal(fieldsOf(item));
     const end = { time: item.end_time || '', offset: item.end_day_offset ?? 0 };
@@ -405,6 +408,11 @@ const PlannerPage: React.FC = () => {
     return true;
   };
   const [editDay, setEditDay] = useState<{ value: number; original: number }>({ value: 0, original: 0 });
+  // [Gate EventArea] 編集中の予定と同じ日のエリア(自分は除く)
+  const editAreas = editingItem
+    ? (currentPlan?.days.find((d) => d.events.some((e) => e.id === editingItem.id))?.events ?? [])
+      .filter((e) => e.category === 'area' && e.id !== editingItem.id)
+    : [];
 
   const saveFields = async (itemId: string, fields: EditFields, original: EditFields) => {
     // [Gate SpotLinks] URL の形を保存の前に確かめる(違えば保存しない)
@@ -428,6 +436,9 @@ const PlannerPage: React.FC = () => {
           : editEnd.time !== editEndOriginal.time || (editEnd.time && editEnd.offset !== editEndOriginal.offset)
             ? { end_time: editEnd.time, end_day_offset: editEnd.offset } : {}),
         ...(editCategory.value !== editCategory.original ? { category: editCategory.value as ScheduleItemType['category'] } : {}),
+        // [Gate EventArea] エリアに入れる・外す(エリアにした予定はエリアに入らない)
+        ...(editCategory.value !== 'area' && editArea.value !== editArea.original
+          ? { parent_event_id: editArea.value || null } : {}),
         ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
         ...(urlsChanged ? { urls: links.urls } : {}),
         ...(diningChanged ? { dining } : {}),
@@ -439,6 +450,7 @@ const PlannerPage: React.FC = () => {
       if (result === 'saved') setEditDining((d) => ({ ...d, original: JSON.stringify(dining) }));
       if (result === 'saved') setEditCoords((c) => ({ ...c, changed: false }));
       if (result === 'saved') setEditEndOriginal(editEnd);
+      if (result === 'saved') setEditArea((a) => ({ ...a, original: a.value }));
       if (result === 'conflict') {
         // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
         const latestItem = usePlanStore.getState().currentPlan?.days.flatMap((d) => d.events).find((e) => e.id === itemId);
@@ -1415,6 +1427,18 @@ const PlannerPage: React.FC = () => {
                   </select>
                 </label>
               </div>
+              {/* [Gate EventArea] 同じ日のエリアの中へ入れる・外す(エリアの枠に字下げで並び、中の移動は数えない) */}
+              {editingItem && editCategory.value !== 'area' && editAreas.length > 0 && (
+                <label className="block text-sm font-medium text-ink-700">
+                  エリアの中に入れる
+                  <select value={editArea.value} onChange={(e) => setEditArea((a) => ({ ...a, value: e.target.value }))}
+                    className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900"
+                    data-testid="edit-area">
+                    <option value="">入れない</option>
+                    {editAreas.map((a) => <option key={a.id} value={a.id}>{a.start_time ? `${a.start_time} ${a.title}` : a.title}</option>)}
+                  </select>
+                </label>
+              )}
               {/* [Gate SpotInfo] 食事の情報(種類が「食事」か、もう入っている時) */}
               {(editCategory.value === 'dining' || editDining.value) && (
                 <div className="rounded-xl border border-cloud-200 p-3">

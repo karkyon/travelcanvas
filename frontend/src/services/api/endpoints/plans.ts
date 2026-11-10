@@ -152,6 +152,8 @@ export class PlansApi extends SpotsApi {
       urls?: { url: string; label?: string | null }[];
       /** [Gate SpotInfo] 食事の情報 */
       dining?: DiningInfo | null;
+      /** [Gate EventArea] 入れる先のエリア */
+      parent_event_id?: string;
     },
     idempotencyKey: string
   ): Promise<NormalizedEvent> {
@@ -170,6 +172,8 @@ export class PlansApi extends SpotsApi {
       phone: string;
       urls: { url: string; label?: string | null }[];
       dining: DiningInfo | null;
+      /** [Gate EventArea] 入れる先のエリア(null で外す) */
+      parent_event_id: string | null;
     }>,
     ifMatch: number
   ): Promise<NormalizedEvent> {

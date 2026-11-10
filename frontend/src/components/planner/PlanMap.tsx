@@ -20,10 +20,11 @@
  */
 import React, { useMemo } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
 import type { DaySchedule, ScheduleItem } from '@/types';
+import { areaCircles } from './areaModel';
 import type { SpotResult, RoutePreview } from '@/services/api';
 
 interface PlanMapProps {
@@ -50,8 +51,11 @@ function _divIcon(html: string, size: [number, number] = [28, 28]) {
   });
 }
 
-function scheduledIcon(order: number, isSelected: boolean) {
-  const bg = isSelected ? '#1d4ed8' : '#3b82f6';
+// [Gate EventArea] エリアとその中の予定は同じ色(エリアの範囲の円と合わせる)
+const AREA_COLOR = '#0e7c6b';
+
+function scheduledIcon(order: number, isSelected: boolean, inArea = false) {
+  const bg = inArea ? (isSelected ? '#0a5a4e' : AREA_COLOR) : isSelected ? '#1d4ed8' : '#3b82f6';
   const ring = isSelected ? '0 0 0 3px rgba(29,78,216,0.35)' : 'none';
   return _divIcon(
     `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9999px;background:${bg};color:white;font-size:12px;font-weight:700;box-shadow:${ring}, 0 1px 3px rgba(0,0,0,0.3);border:2px solid white;">${order}</div>`
@@ -123,6 +127,8 @@ const PlanMap: React.FC<PlanMapProps> = ({
     [scheduledWithCoords]
   );
 
+  const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
+
   const hasAnyKnownLocation = allPositions.length > 0;
   const defaultCenter: [number, number] = [35.6812, 139.7671]; // 東京駅(何も無い場合の初期表示のみ)
 
@@ -146,11 +152,18 @@ const PlanMap: React.FC<PlanMapProps> = ({
             <Polyline positions={routeLine} pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.7 }} />
           )}
 
+          {areas.map((a) => (
+            <Circle key={`area-${a.id}`} center={a.center} radius={a.radius}
+              pathOptions={{ color: AREA_COLOR, weight: 2, dashArray: '6 6', fillColor: AREA_COLOR, fillOpacity: 0.08 }}>
+              <Tooltip direction="top">{`エリア: ${a.title}`}</Tooltip>
+            </Circle>
+          ))}
+
           {scheduledWithCoords.map((event, idx) => (
             <Marker
               key={event.id}
               position={[event.latitude, event.longitude]}
-              icon={scheduledIcon(idx + 1, event.id === selectedEventId)}
+              icon={scheduledIcon(idx + 1, event.id === selectedEventId, event.category === 'area' || Boolean(event.parent_event_id))}
               eventHandlers={{ click: () => onSelectEvent?.(event.id) }}
             >
               <Popup>

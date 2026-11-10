@@ -135,7 +135,8 @@ export interface Coordinates {
 
 export type TransportMode = 'walking' | 'bicycle' | 'car' | 'taxi' | 'bus' | 'train' | 'subway' | 'plane' | 'boat' | 'other' | 'tram' | 'ferry' | 'driving' | 'transit';
 
-export type EventCategory = 'accommodation' | 'transportation' | 'activity' | 'dining' | 'shopping' | 'sightseeing' | 'other';
+// [Gate EventArea] area: エリア(おかげ横丁など。中に予定を入れる)
+export type EventCategory = 'accommodation' | 'transportation' | 'activity' | 'dining' | 'shopping' | 'sightseeing' | 'area' | 'other';
 
 // 旅行スケジュールアイテム(1つの予定)
 export interface ScheduleItem {
@@ -173,6 +174,8 @@ export interface ScheduleItem {
   urls?: EventUrl[];
   /** [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など) */
   dining?: DiningInfo | null;
+  /** [Gate EventArea] 入っているエリア(category が area の予定)の ID */
+  parent_event_id?: string | null;
 }
 
 /** [Gate SpotLinks] 予定の場所の URL 1 件 */
@@ -210,6 +213,8 @@ export interface CreateScheduleItemData {
   urls?: EventUrl[];
   /** [Gate SpotInfo] 食事の情報 */
   dining?: DiningInfo | null;
+  /** [Gate EventArea] 入れる先のエリアの予定の ID */
+  parent_event_id?: string | null;
 }
 
 // 旅行日程(1日分)
