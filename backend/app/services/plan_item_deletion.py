@@ -51,6 +51,8 @@ EVENT_REFERENCE_POLICY: Dict[tuple, str] = {
     ("route_options", "from_event_id"): "delete",
     ("route_options", "to_event_id"): "delete",
     ("event_links", "event_id"): "delete",
+    # [Gate EventArea] エリアの中の予定(エリアを消すと外す。plans.delete_event が event_area.detach_members で外して記録する)
+    ("travel_events", "parent_event_id"): "unlink",
 }
 DAY_REFERENCE_POLICY: Dict[tuple, str] = {
     ("travel_events", "day_id"): "delete",  # 予定ごとに EVENT_REFERENCE_POLICY を適用する
