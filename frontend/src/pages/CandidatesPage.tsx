@@ -25,6 +25,7 @@ import type { CandidateList, NormalizedDay, PlanCandidateItem } from '@/services
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import NearbyDiscover from './discover/NearbyDiscover';
+import DiscoverResults from './discover/DiscoverResults';
 import type { BasePoint } from './discover/discoverModel';
 import SocialImportCard, { type SocialCandidateInput } from './discover/SocialImportCard';
 import CandidateVoting from './candidates/CandidateVoting';
@@ -35,12 +36,15 @@ import CandidateToolbar from './candidates/CandidateToolbar';
 import CandidateTags from './candidates/CandidateTags';
 import { EMPTY_FILTER, KIND_LABEL, applyFilter, areaOf, kindOf, type CandidateFilter } from './candidates/candidateFilter';
 
+const DiscoverMap = React.lazy(() => import('./discover/DiscoverMap'));
+
 const FILTER_KEY = 'tc-candidate-filter';
-function loadPrefs(planId: string | undefined): { filter: CandidateFilter; view: 'card' | 'list' } {
+type CandidateView = 'card' | 'list' | 'map';
+function loadPrefs(planId: string | undefined): { filter: CandidateFilter; view: CandidateView } {
   try {
     const raw = planId ? window.localStorage.getItem(`${FILTER_KEY}:${planId}`) : null;
-    const v = raw ? JSON.parse(raw) as { filter?: Partial<CandidateFilter>; view?: 'card' | 'list' } : {};
-    return { filter: { ...EMPTY_FILTER, ...(v.filter ?? {}) }, view: v.view === 'list' ? 'list' : 'card' };
+    const v = raw ? JSON.parse(raw) as { filter?: Partial<CandidateFilter>; view?: CandidateView } : {};
+    return { filter: { ...EMPTY_FILTER, ...(v.filter ?? {}) }, view: v.view === 'list' || v.view === 'map' ? v.view : 'card' };
   } catch {
     return { filter: EMPTY_FILTER, view: 'card' };
   }
@@ -78,7 +82,12 @@ const CandidatesPage: React.FC = () => {
   const [form, setForm] = useState({ title: '', source_url: '', note: '', priority: 2 });
   const [scheduling, setScheduling] = useState<Record<string, { day_id: string; time: string }>>({});
   const [filter, setFilter] = useState<CandidateFilter>(() => loadPrefs(planId).filter);
-  const [view, setView] = useState<'card' | 'list'>(() => loadPrefs(planId).view);
+  const [view, setView] = useState<CandidateView>(() => loadPrefs(planId).view);
+  // [Gate DiscoverUX] 「場所を探す」の検索結果(まだ保存していない)と、保存した結果
+  const [nearby, setNearby] = useState<{ results: NearbyResult[]; base: BasePoint | null } | null>(null);
+  const [savedResults, setSavedResults] = useState<Record<string, boolean>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [sortBaseId, setSortBaseId] = useState<string>('');
   useEffect(() => {
     try {
@@ -148,6 +157,23 @@ const CandidatesPage: React.FC = () => {
   const addFromNearby = async (r: NearbyResult) => {
     await run(() => createCandidateFromSearch(planId, r.id), `「${r.name}」を候補箱に入れました`, '候補箱に入れられませんでした');
   };
+  const saveResult = async (r: NearbyResult) => {
+    setSavingId(r.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await createCandidateFromSearch(planId, r.id);
+      if (res) setData((d) => ({ ...res, can_edit: d?.can_edit ?? res.can_edit }));
+      else await load();
+      setSavedResults((x) => ({ ...x, [r.id]: true }));
+      setLastSaved(r.name);
+    } catch (e) {
+      setError(errorDetailMessage(e, '候補に保存できませんでした'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const addFromSocial = async (input: SocialCandidateInput) => {
     await run(() => createCandidate(planId, {
       title: input.title || null, source_url: input.source_url, note: input.note, address: input.address,
@@ -193,16 +219,57 @@ const CandidatesPage: React.FC = () => {
         <div className="py-12 flex justify-center"><LoadingSpinner /></div>
       ) : data && (
         <>
-          {canEdit && (
-            <div className="tc-discover-tools">
-              <NearbyDiscover bases={bases} canEdit={canEdit} onAddCandidate={addFromNearby} />
-              <SocialImportCard planId={planId} canEdit={canEdit} onSave={addFromSocial} />
+          {/* [Gate DiscoverUX] 画面の中の移動(モックアップ 2026-11-10): 探す / この旅行の候補 / 行きたい場所ライブラリ */}
+          <nav className="tc-disc-tabs" aria-label="発見の画面の中の移動">
+            <button type="button" className="tc-focus-ring" onClick={() => scrollTo('disc-search')}>場所を探す <span>検索</span></button>
+            <button type="button" className="tc-focus-ring" onClick={() => scrollTo('disc-saved')}>
+              この旅行の候補 <span data-testid="disc-tab-count">{data.counts.open}</span></button>
+            <button type="button" className="tc-focus-ring" onClick={() => scrollTo('disc-library')}>行きたい場所ライブラリ <span>共通</span></button>
+          </nav>
+
+          <section id="disc-search" className="tc-disc-search" aria-labelledby="disc-search-title">
+            <div className="tc-disc-head">
+              <div>
+                <h2 id="disc-search-title" className="tc-disc-title"><span className="tc-disc-step" aria-hidden="true">01</span>場所を探す</h2>
+                <p className="tc-disc-copy">ここに表示されるのは検索結果です。まだこの旅行には保存されていません。</p>
+              </div>
+              <span className="tc-disc-area-tag">探す場所 · 一時的な検索結果</span>
             </div>
-          )}
-          <section aria-label="候補の一覧" className="mt-6">
-            <div className="tc-section-row flex-wrap mb-3">
-              <h2 className="tc-section-title text-base">候補箱({data.counts.open}件・予定に配置済み {data.counts.scheduled}件・見送り {data.counts.dismissed}件)</h2>
-            </div>
+            {canEdit ? (
+              <div className="tc-discover-tools">
+                <NearbyDiscover bases={bases} canEdit={canEdit} onAddCandidate={addFromNearby}
+                  onResults={(results, base) => { setNearby({ results, base }); setLastSaved(null); }} />
+                <SocialImportCard planId={planId} canEdit={canEdit} onSave={addFromSocial} />
+              </div>
+            ) : (
+              <p className="text-sm text-ink-700">閲覧だけの参加者は、場所を探して保存できません。</p>
+            )}
+            {nearby && (
+              <DiscoverResults results={nearby.results} base={nearby.base} saved={savedResults} busyId={savingId} canEdit={canEdit}
+                onSave={(r) => void saveResult(r)} lastSaved={lastSaved} onViewCandidates={() => scrollTo('disc-saved')} />
+            )}
+          </section>
+
+          <p className="tc-disc-transition"><span aria-hidden="true">↓</span>「候補に保存」した場所が、ここに追加されます。検索結果とは別の一覧です。</p>
+
+          <section id="disc-saved" className="tc-disc-saved" aria-labelledby="disc-saved-title">
+            <header className="tc-disc-saved-head">
+              <div className="flex items-center gap-3">
+                <span className="tc-disc-step tc-disc-step--light" aria-hidden="true">02</span>
+                <div>
+                  <h2 id="disc-saved-title" className="m-0 text-base font-bold">{`この旅行に保存済みの候補 ${data.counts.open}`}</h2>
+                  <p className="m-0 text-xs">まだ日程は未確定です。行く場所を選んでから日程に配置します。</p>
+                </div>
+              </div>
+              <ul className="tc-disc-totals" aria-label="候補の件数">
+                <li><b>{data.counts.open}</b>候補</li>
+                <li><b>{data.counts.scheduled}</b>日程に配置済み</li>
+                <li><b>{data.counts.dismissed}</b>見送り</li>
+                <li><b>{data.counts.open + data.counts.scheduled + data.counts.dismissed}</b>全件</li>
+              </ul>
+            </header>
+          <div className="tc-disc-saved-body">
+          <section aria-label="候補の一覧">
             {allItems.length > 0 && (
               <CandidateToolbar items={allItems} shown={items.length} filter={filter} onChange={setFilter} view={view} onView={setView}
                 bases={bases} baseId={sortBase?.id ?? ''} onBase={setSortBaseId} />
@@ -228,7 +295,19 @@ const CandidatesPage: React.FC = () => {
                 ))}
               </ul>
             )}
-            <div className="tc-discover-grid" hidden={view === 'list'}>
+            {view === 'map' && (
+              <React.Suspense fallback={<p role="status" className="text-sm text-ink-700">地図を読み込み中…</p>}>
+                <DiscoverMap base={sortBase} label="この旅行の候補の地図" pins={items
+                  .filter((c) => typeof c.latitude === 'number' && typeof c.longitude === 'number')
+                  .map((c) => ({ id: c.id, label: c.title, latitude: c.latitude as number, longitude: c.longitude as number,
+                    kind: c.status === 'scheduled' ? 'scheduled' as const : 'saved' as const }))}
+                  onPick={(id) => { const c = items.find((x) => x.id === id); if (c) setDetail(c); }} />
+                {items.some((c) => c.latitude === null || c.longitude === null) && (
+                  <p className="mt-1 text-xs text-ink-700">{`地図の位置が分からない候補 ${items.filter((c) => c.latitude === null || c.longitude === null).length}件は地図に出ていません(一覧・カードで見られます)。`}</p>
+                )}
+              </React.Suspense>
+            )}
+            <div className="tc-discover-grid" hidden={view !== 'card'}>
             {items.map((c) => {
               const headingId = `cand-${c.id}`;
               const s = scheduling[c.id] ?? { day_id: days[0]?.id ?? '', time: '' };
@@ -320,6 +399,15 @@ const CandidatesPage: React.FC = () => {
               );
             })}
             </div>
+          </section>
+            <aside id="disc-library" className="tc-disc-library" aria-labelledby="disc-library-title">
+              <div>
+                <h3 id="disc-library-title" className="m-0 text-sm font-bold text-ink-900">旅行をまたいで保存した場所は「行きたい場所ライブラリ」へ</h3>
+                <p className="m-0 text-xs text-ink-700">個人用の保存場所です。ここから旅行を選んで、この旅行の候補へ追加できます。</p>
+              </div>
+              <Link to="/spots" className="tc-focus-ring tc-mbtn tc-mbtn--sm">ライブラリを見る →</Link>
+            </aside>
+          </div>
           </section>
 
           <div className="tc-discover-tools mt-6">

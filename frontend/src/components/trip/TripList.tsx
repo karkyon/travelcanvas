@@ -8,19 +8,28 @@
  * 旅行の一覧(GET /travel-plans/)から取る。集約を読めない時は旅行の一覧の値だけで出す(値を作らない)。
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Camera, Copy, MapPin, NotebookPen, Trash2, UserRound, Users } from 'lucide-react';
+import { Ban, CalendarClock, CalendarDays, Camera, CircleCheckBig, Copy, LayoutGrid, Lightbulb, MapPin, NotebookPen, Trash2, UserRound, Users, type LucideIcon } from 'lucide-react';
 import TripCover from '@/components/trip/TripCover';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { getDashboard } from '@/services/api/g9';
 import type { DashboardTrip, TripShelf } from '@/services/api/types/g9';
-import { ROLE_LABEL, statusLabel } from '@/pages/dashboard/dashboardModel';
+import { ROLE_LABEL, spanTitle, statusLabel } from '@/pages/dashboard/dashboardModel';
 import type { TravelPlan } from '@/types';
 import { dateWithDay, partySize, stayLabel, tripSpan } from './tripListModel';
 
 type Tab = 'all' | TripShelf;
-const TABS: Array<[Tab, string]> = [
-  ['all', 'すべて'], ['planning', '計画中'], ['considering', '検討中'], ['visited', '行った旅'], ['cancelled', '見送り・中止'],
+/** [Gate TripShelfLook] 状態ごとの名前・アイコン(色は lists.css の data-shelf。色だけに頼らず、アイコンと文字でも示す) */
+const SHELF: Record<TripShelf, { label: string; icon: LucideIcon }> = {
+  planning: { label: '計画中', icon: CalendarClock },
+  considering: { label: '検討中', icon: Lightbulb },
+  visited: { label: '行った旅', icon: CircleCheckBig },
+  cancelled: { label: '見送り・中止', icon: Ban },
+};
+const TABS: Array<[Tab, string, LucideIcon]> = [
+  ['all', 'すべて', LayoutGrid],
+  ...(Object.entries(SHELF) as Array<[TripShelf, { label: string; icon: LucideIcon }]>).map(([k, v]) => [k, v.label, v.icon] as [Tab, string, LucideIcon]),
 ];
+const TAB_KEY = 'tc.tripListTab';
 export interface TripRow { plan: TravelPlan | undefined; trip: DashboardTrip | undefined; id: string; title: string }
 
 interface Props {
@@ -44,10 +53,18 @@ const TripCard: React.FC<{ row: TripRow } & Omit<Props, 'plans'>> = ({ row, onOp
     <li aria-label={title} className="tc-lcard" data-testid={`trip-list-${id}`} data-shelf={trip?.shelf}>
       <TripCover size="card" destination={destination} tripTitle={title} startDate={start}
         photo={cover.photo} onPhotoError={cover.onError} className="tc-lcard-cover">
-        <span className="tc-trip-chip">{trip ? statusLabel(trip) : (start ? '日付あり' : '日付は未定')}</span>
+        <span className="tc-trip-chip" title={trip ? spanTitle(trip) : undefined}>{trip ? statusLabel(trip) : (start ? '日付あり' : '日付は未定')}</span>
         {shared && <span className="tc-trip-chip tc-trip-chip--role">{`共有・${ROLE_LABEL[trip.role]}`}</span>}
       </TripCover>
       <div className="tc-lcard-body">
+        {trip?.shelf && (() => {
+          const S = SHELF[trip.shelf];
+          return (
+            <p className="tc-shelf-badge" data-shelf={trip.shelf} data-testid={`trip-shelf-${id}`}>
+              <S.icon size={13} aria-hidden="true" />{S.label}
+            </p>
+          );
+        })()}
         <h3>
           <button type="button" className="tc-focus-ring" aria-label={`「${title}」を開く`} onClick={() => onOpen(id)}>{title}</button>
         </h3>
@@ -88,7 +105,17 @@ const TripCard: React.FC<{ row: TripRow } & Omit<Props, 'plans'>> = ({ row, onOp
 
 const TripList: React.FC<Props> = ({ plans, ...actions }) => {
   const [trips, setTrips] = useState<DashboardTrip[] | null>(null);
-  const [tab, setTab] = useState<Tab>('all');
+  // [Gate TripShelfLook] 既定は「計画中」(計画中が無ければ「すべて」)。選んだ状態は端末に覚える
+  const [picked, setPicked] = useState<Tab | null>(() => {
+    try {
+      const v = window.localStorage.getItem(TAB_KEY);
+      return v && (v === 'all' || v in SHELF) ? (v as Tab) : null;
+    } catch { return null; }
+  });
+  const setTab = (v: Tab) => {
+    setPicked(v);
+    try { window.localStorage.setItem(TAB_KEY, v); } catch { /* 覚えられなくても切り替えは使える */ }
+  };
   const ids = plans.map((p) => p.id).join(',');
   useEffect(() => {
     let alive = true;
@@ -109,6 +136,7 @@ const TripList: React.FC<Props> = ({ plans, ...actions }) => {
     return out;
   }, [plans, trips]);
   const count = (t: Tab) => (t === 'all' ? rows.length : rows.filter((r) => r.trip?.shelf === t).length);
+  const tab: Tab = picked ?? (count('planning') > 0 ? 'planning' : 'all');
   const shown = tab === 'all' ? rows : rows.filter((r) => r.trip?.shelf === tab);
   const upcoming = rows.filter((r) => r.trip && (r.trip.phase === 'upcoming' || r.trip.phase === 'ongoing')).length;
   const thisYear = String(new Date().getFullYear());
@@ -126,13 +154,19 @@ const TripList: React.FC<Props> = ({ plans, ...actions }) => {
         <div><dt>今年の旅の日数</dt><dd>{daysThisYear}<small> 日</small></dd></div>
       </dl>
       <div className="tc-list-tabs" role="tablist" aria-label="旅行の状態">
-        {TABS.map(([v, l]) => (
-          <button key={v} type="button" role="tab" aria-selected={tab === v} className="tc-focus-ring"
+        {TABS.map(([v, l, Icon]) => (
+          <button key={v} type="button" role="tab" aria-selected={tab === v} className="tc-focus-ring" data-shelf={v}
             onClick={() => setTab(v)} data-testid={`trip-tab-${v}`}>
-            {l}<span>{count(v)}</span>
+            <Icon size={14} aria-hidden="true" />{l}<span>{count(v)}</span>
           </button>
         ))}
       </div>
+      {tab !== 'all' && rows.length > shown.length && (
+        <p className="tc-list-filter-note" data-testid="trip-filter-note">
+          {`「${SHELF[tab].label}」の ${shown.length} 件を表示しています(すべて ${rows.length} 件)`}
+          <button type="button" className="tc-focus-ring tc-mini-link" onClick={() => setTab('all')}>すべて表示</button>
+        </p>
+      )}
       {shown.length === 0 ? (
         <p className="tc-card tc-list-empty" role="status">この状態の旅行はありません</p>
       ) : (

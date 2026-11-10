@@ -15,7 +15,7 @@ import { Link } from 'react-router-dom';
 import type { FootTrip } from '@/services/api/types/g9';
 import { WORLD_ROWS, WORLD_STEP } from './worldGrid';
 import {
-  AREA_COLOR, AREA_LABEL, C, PREF_TILES, REGION_COLOR, REGION_LABEL, footPeriod, neighborPrefs, onColor, project,
+  AREA_COLOR, AREA_LABEL, C, PREF_TILES, REGION_COLOR, REGION_LABEL, footPeriod, onColor, project,
   recentFootTrips, tripsNearCell, type MapPoint, type Region,
 } from './footprintModel';
 import { tick, unlockSound } from './footSound';
@@ -76,13 +76,9 @@ export const JapanTileMap: React.FC<{
 }> = ({ visited, planned, prefTrips }) => {
   const label = `日本の地図。行った都道府県: ${[...visited].join('、') || 'まだありません'}。計画中: ${[...planned].filter((p) => !visited.has(p)).join('、') || 'なし'}`;
   const { hover, setHover, leave, frame } = useHover<string>();
-  const near = useMemo(() => (hover ? neighborPrefs(hover) : new Set<string>()), [hover]);
   const enter = (name: string) => { if (name !== hover) { tick(true); setHover(name); } };
-  // 浮かせる県は後に描く(上に重ねる): 普通 → 周り → 当てた県
-  const order = useMemo(() => {
-    const rank = (n: string) => (n === hover ? 2 : near.has(n) ? 1 : 0);
-    return [...PREF_TILES].sort((a, b) => rank(a[0]) - rank(b[0]));
-  }, [hover, near]);
+  // 浮かせる県は後に描く(上に重ねる)
+  const order = useMemo(() => [...PREF_TILES].sort((a, b) => Number(a[0] === hover) - Number(b[0] === hover)), [hover]);
   const tile = hover ? PREF_TILES.find((t) => t[0] === hover) : undefined;
   const trips = hover ? recentFootTrips(prefTrips?.[hover] ?? []) : [];
   const pop: PopupAt | null = tile && trips.length
@@ -95,7 +91,8 @@ export const JapanTileMap: React.FC<{
           const state = visited.has(name) ? 'visited' : planned.has(name) ? 'planned' : 'none';
           const color = REGION_COLOR[region];
           const short = name === '北海道' ? '北海道' : name.replace(/[都府県]$/, '');
-          const lift = name === hover ? 2 : near.has(name) ? 1 : 0;
+          // [Gate FootLift] 浮かぶのはカーソルのある県だけ(周りは動かさない)
+          const lift = name === hover ? 2 : 0;
           return (
             <g key={name} data-pref={name} data-state={state} data-region={region} data-lift={lift} className="tc-fp-tile"
               onPointerEnter={() => enter(name)} onClick={() => enter(name)}>

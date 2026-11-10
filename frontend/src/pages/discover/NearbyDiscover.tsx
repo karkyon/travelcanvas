@@ -24,9 +24,11 @@ interface Props {
   canEdit: boolean;
   onAddCandidate: (result: NearbyResult) => Promise<void>;
   onFindPhoto?: (result: NearbyResult) => void;
+  /** [Gate DiscoverUX] 検索結果を画面の帯(DiscoverResults)で出す時。渡すとこの部品の中には結果を出さない */
+  onResults?: (results: NearbyResult[], base: BasePoint | null) => void;
 }
 
-const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFindPhoto }) => {
+const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFindPhoto, onResults }) => {
   const qid = useId();
   const [baseId, setBaseId] = useState<string>(bases[0]?.id ?? 'manual');
   const [manual, setManual] = useState({ lat: '', lng: '' });
@@ -88,9 +90,12 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
     try {
       const r = await searchNearby({ query: q, category: over?.at && category === 'all' ? 'sightseeing' : category,
         latitude: at.latitude, longitude: at.longitude, radius_km: over?.at ? 2 : radius });
-      setResults([...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12)));
+      const sorted = [...r.candidates].sort((a, b) => (a.distance_m ?? 1e12) - (b.distance_m ?? 1e12));
+      setResults(sorted);
+      onResults?.(sorted, 'latitude' in at ? { id: base?.id ?? 'point', label: base?.label ?? '写真の場所', latitude: at.latitude, longitude: at.longitude } : null);
     } catch {
       setResults([]);
+      onResults?.([], null);
       setError('近くの場所を探せませんでした。時間をおいてもう一度お試しください');
     } finally {
       setBusy(null);
@@ -110,7 +115,7 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
   return (
     <section aria-labelledby="nearby-title" className="rounded-xl border border-cloud-200 bg-surface p-4" data-testid="nearby-discover">
       <h2 id="nearby-title" className="font-semibold text-ink-900">近くの「行きたい」を集める</h2>
-      <p className="text-xs text-ink-700">基点の周りを、カテゴリと半径で探します。見つけた場所は候補箱へ入れてから、日程へ追加できます。</p>
+      <p className="text-xs text-ink-700">旅程の場所を基点に、カテゴリと距離で探します。見つけた場所は下の候補箱へ保存できます。</p>
       {/* [Gate CandidateFilters] 使い方(何ができるかが分からない、という声から) */}
       <details className="mt-2 rounded-lg bg-cloud-50 p-2 text-xs text-ink-900" data-testid="nearby-help">
         <summary className="cursor-pointer font-semibold">使い方(探す基点・現在地とは)</summary>
@@ -190,7 +195,7 @@ const NearbyDiscover: React.FC<Props> = ({ bases, canEdit, onAddCandidate, onFin
         <Button type="submit" loading={busy === 'search'} disabled={Boolean(busy)} data-testid="nearby-search">近くを探す</Button>
       </form>
       {error && <p role="alert" className="mt-3 rounded-md bg-danger-soft p-3 text-sm text-danger">{error}</p>}
-      {results && (
+      {results && !onResults && (
         <div className="mt-4">
           <h3 className="text-sm font-semibold text-ink-900" aria-live="polite">{`見つかった場所 ${results.length}件 · 出典つき`}</h3>
           {results.length === 0 && <p className="text-sm text-ink-700">見つかりませんでした。半径・カテゴリ・言葉を変えてください。</p>}
