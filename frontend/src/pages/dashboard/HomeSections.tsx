@@ -24,7 +24,7 @@ import { safeInternalPath } from '@/utils/safeNavigation';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import Landscape from '@/components/shell/Landscape';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
-import { TripCard } from './DashboardParts';
+import { ShelfAddCard, ShelfCard } from './ShelfCard';
 import { PHASE_LABEL, ROLE_LABEL, quickActions, statusLabel, tripDateLabel } from './dashboardModel';
 
 const SHELF_LABEL: Record<TripShelf, string> = {
@@ -199,8 +199,15 @@ export const TripShelves: React.FC<{
   };
   return (
     <section className="tc-card tc-home-shelf" aria-labelledby="home-shelf" data-testid="home-shelf">
-      <div className="tc-home-shelf-head">
-        <h2 id="home-shelf" className="tc-section-title">旅行の一覧</h2>
+      {/* [Gate ShelfCards] 見出し・説明と「新しい旅行」/ 状態のタブと「旅行一覧で管理」/ 同じ大きさのカード(最大 4 列) */}
+      <div className="tc-shelf-headrow">
+        <div>
+          <h2 id="home-shelf" className="tc-section-title">旅行の一覧</h2>
+          <p>計画から旅行後の記録まで、ここからすぐ開けます</p>
+        </div>
+        <Link to="/planner?new=1" className="tc-focus-ring tc-mini-link">＋ 新しい旅行</Link>
+      </div>
+      <div className="tc-shelf-toolrow">
         <div role="tablist" aria-label="旅行の状態" className="tc-home-seg">
           {[...SHELF_ORDER, 'all' as const].map((s) => (
             <button key={s} type="button" role="tab" aria-selected={tab === s} onClick={() => setTab(s)}
@@ -209,37 +216,20 @@ export const TripShelves: React.FC<{
             </button>
           ))}
         </div>
-        <Link to="/planner" className="tc-focus-ring tc-mini-link ml-auto">旅程の一覧で管理 →</Link>
+        <Link to="/planner" className="tc-focus-ring tc-mini-link">旅行一覧で管理 →</Link>
       </div>
       {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
-      <ul className="tc-home-cards" aria-label={`${tab === 'all' ? 'すべて' : SHELF_LABEL[tab]}の旅行`}>
+      <ul className="tc-shelf-grid" aria-label={`${tab === 'all' ? 'すべて' : SHELF_LABEL[tab]}の旅行`}>
         {shown.map((t) => (
-          <li key={t.id} className="tc-home-trip">
-            <Link to={`/planner/${t.id}`} aria-label={`${t.title}(${t.shelf ? SHELF_LABEL[t.shelf] : ''}・${tripDateLabel(t)})を開く`}
-              className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
-              <TripCard trip={t} />
-            </Link>
-            <div className="tc-home-trip-meta">
-              {t.shelf && <span className={`tc-home-mini tc-home-mini--${t.shelf}`}>{SHELF_LABEL[t.shelf]}</span>}
-              <span className="tc-home-mini">{`予定 ${t.event_count ?? 0}`}</span>
-              <span className="tc-home-mini">{`写真 ${t.photo_count ?? 0}`}</span>
-              {t.can_edit && t.shelf !== 'visited' && (
-                <button type="button" className="tc-focus-ring tc-home-mini-btn" disabled={busy === t.id}
-                  onClick={() => void change(t, t.shelf === 'cancelled' ? 'active' : 'cancelled')}
-                  data-testid={`home-state-${t.id}`}>
-                  {t.shelf === 'cancelled' ? 'もう一度計画する' : '見送りにする'}
-                </button>
-              )}
-            </div>
+          <li key={t.id}>
+            <ShelfCard trip={t} busy={busy === t.id} onChangeState={(x, state) => void change(x, state)} />
           </li>
         ))}
-        <li>
-          <Link to="/planner?new=1" className="tc-focus-ring tc-home-add">＋ 新しい旅行<small>行き先を決めて作る</small></Link>
-        </li>
+        <li><ShelfAddCard /></li>
       </ul>
       {shown.length === 0 && (
         <p className="mt-2 text-sm text-ink-700" data-testid="home-shelf-empty">
-          {tab === 'cancelled' ? '見送り・中止にした旅行はありません。旅行のカードの「見送りにする」で移せます。'
+          {tab === 'cancelled' ? '見送り・中止にした旅行はありません。旅行のカードの「…」から「見送りにする」で移せます。'
             : tab === 'visited' ? '行った旅はまだありません。旅行の最後の日を過ぎると、ここに移ります。'
               : tab === 'considering' ? '日付を決めていない旅行(相談中の下書きなど)はありません。'
                 : 'この状態の旅行はありません。'}
