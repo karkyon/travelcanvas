@@ -76,7 +76,7 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
   expect(loginResponse.status()).toBe(200);
   const accessToken = String((await loginResponse.json()).access_token);
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
-  await expect(page.getByText(`${username}さん、次にすることをまとめました。`)).toBeVisible();
+  await expect(page.getByText(`${username}さんの旅の準備と、次にすること。`)).toBeVisible();
 
   // [Gate S5] 会員のアクセストークンは端末(localStorage)に保存しない
   const { persisted, apiToken } = await readAuthState(page);
@@ -91,7 +91,7 @@ test('ログイン: 誤ったパスワードでは画面に留まりエラーを
   const restored = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/refresh') && r.status() !== 428, { timeout: 90_000 });
   await page.reload();
   expect((await restored).status()).toBe(200);
-  await expect(page.getByText(`${username}さん、次にすることをまとめました。`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(`${username}さんの旅の準備と、次にすること。`)).toBeVisible({ timeout: 15_000 });
   expect((await readAuthState(page)).apiToken).toBeNull();
 
   // 4. consoleへ秘匿値を出さない
@@ -132,7 +132,7 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
   const memberToken = String((await upgradeResponse.json()).access_token);
   expect(upgradeResponse.request().headers()['authorization']).toBe(`Bearer ${String(asGuest.persisted.guestToken)}`);
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
-  await expect(page.getByText(`${username}さん、次にすることをまとめました。`)).toBeVisible();
+  await expect(page.getByText(`${username}さんの旅の準備と、次にすること。`)).toBeVisible();
 
   const asMember = await readAuthState(page);
   expect(asMember.persisted).toMatchObject({ isGuest: false, guestToken: null, guestId: null, isAuthenticated: true });
@@ -146,7 +146,7 @@ test('ゲスト昇格: ゲスト開始から正式アカウントへ昇格し、
   await page.locator('#password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
-  await expect(page.getByText(`${username}さん、次にすることをまとめました。`)).toBeVisible();
+  await expect(page.getByText(`${username}さんの旅の準備と、次にすること。`)).toBeVisible();
 
   const logged = consoleLines.join('\n');
   expect(logged).not.toContain(PASSWORD);
