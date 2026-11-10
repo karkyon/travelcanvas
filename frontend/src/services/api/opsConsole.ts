@@ -192,6 +192,8 @@ export interface OpsSecretSlot {
   verification?: OpsSecretVerification | null; candidate?: OpsSecretCandidate | null; verify_supported?: boolean;
   /** [Gate AdminUAT] 今の構成で使う鍵か / 止めている提供元(鍵の確認とは別の制限) */
   required?: boolean; suspended_providers?: string[];
+  /** [Gate OpsFreeKeys] 無料の提供元の鍵(Yahoo!・楽天・ホットペッパー・YouTube)。確認なしで、登録すれば使う */
+  free?: boolean;
 }
 /** [Gate ProviderConnect] 版の有効性の確認(値は含まない)。state は期限・設定の変更も含めた今の判定 */
 export type OpsVerifyState = 'unverified' | 'accepted' | 'rejected' | 'inconclusive' | 'expired' | 'stale';
@@ -244,7 +246,7 @@ const secretSlot: Decoder<OpsSecretSlot> = object<OpsSecretSlot>({
   history: arrayOf(secretHistory), in_use: optional(bool), in_use_note: optional(str),
   env_legacy: optional(object<OpsSecretEnvLegacy>({ present: bool, placeholder: bool, importable: bool })),
   verification: optional(nullable(verification)), candidate: optional(nullable(candidate)), verify_supported: optional(bool),
-  required: optional(bool), suspended_providers: optional(arrayOf(str)),
+  required: optional(bool), suspended_providers: optional(arrayOf(str)), free: optional(bool),
 });
 const secretResult: Decoder<OpsSecretResult> = object<OpsSecretResult>({
   slot: str, status: oneOf('configured', 'missing', 'disabled', 'placeholder', 'invalid', 'decrypt_failed',

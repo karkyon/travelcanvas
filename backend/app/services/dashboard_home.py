@@ -68,6 +68,26 @@ def in_japan(lat: float, lng: float) -> bool:
     return not (lng < 130.5 and lat > 34.0)  # 朝鮮半島・対馬の北を除く
 
 
+MAX_PREF_TRIPS = 5
+
+
+def foot_trip(t: Dict[str, Any], state: str) -> Dict[str, Any]:
+    """[Gate FootHover] 足あとの地図に出す旅行 1 件(題名・期間・状態。押すとその旅行を開く)"""
+    return {"plan_id": t["id"], "title": t["title"], "start_date": t.get("start_date"), "end_date": t.get("end_date"),
+            "state": state}
+
+
+def recent_trips(rows: List[Dict[str, Any]], limit: int = MAX_PREF_TRIPS) -> List[Dict[str, Any]]:
+    """[Gate FootHover] 同じ旅行を 1 件にまとめ、始まりが新しい順に limit 件(日付の無い旅行は後ろ)"""
+    seen: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        prev = seen.get(r["plan_id"])
+        if prev is None or (prev["state"] == "planned" and r["state"] == "visited"):
+            seen[r["plan_id"]] = r
+    return sorted(seen.values(), key=lambda r: (r.get("start_date") is not None, r.get("start_date") or ""),
+                  reverse=True)[:limit]
+
+
 def footprint_points(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: Dict[str, Any],
                      events: Dict[Any, List[TravelEvent]]) -> Dict[str, Any]:
     """[Gate Footprints2] 行った旅・計画中の旅の予定の位置(世界地図の点)と、海外の旅の数。
@@ -96,9 +116,13 @@ def footprint_points(db: Session, user: User, trips: List[Dict[str, Any]], plans
             prev = seen.get(key)
             if prev is None:
                 if len(seen) < MAX_POINTS:
-                    seen[key] = {"lat": key[0], "lng": key[1], "state": state, "label": f"{t['title']}・{ev.title}"[:80]}
-            elif state == "visited":
-                prev["state"] = "visited"
+                    seen[key] = {"lat": key[0], "lng": key[1], "state": state, "label": f"{t['title']}・{ev.title}"[:80],
+                                 "trips": [foot_trip(t, state)]}
+            else:
+                if state == "visited":
+                    prev["state"] = "visited"
+                # [Gate FootHover] 同じ場所に行った別の旅行も、ポップアップに出す(直近 5 件)
+                prev["trips"] = recent_trips(prev["trips"] + [foot_trip(t, state)])
         if abroad and state == "visited":
             overseas += 1
     return {"points": list(seen.values()), "overseas_trips": overseas}
@@ -277,6 +301,11 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
             days_this_year += int(t.get("total_days") or 0)
     planned_prefs = prefectures_in([plans_by_id[t["id"]].destination for t in planning]
                                    + [a for t in planning for a in addresses(t)])
+    # [Gate FootHover] 都道府県ごとの旅行(地図で県にカーソルを当てた時のポップアップ。行った・計画中、直近 5 件)
+    by_pref: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for t, state in [(t, "visited") for t in visited] + [(t, "planned") for t in planning]:
+        for trip_pref in prefectures_in([plans_by_id[t["id"]].destination] + addresses(t)):
+            by_pref[trip_pref].append(foot_trip(t, state))
     footprints = {
         "prefectures": prefectures_in(texts),
         "planned_prefectures": planned_prefs,
@@ -284,6 +313,7 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
         "trips_visited": len(visited),
         "days_this_year": days_this_year,
         "photos": sum(t["photo_count"] for t in visited),
+        "pref_trips": {pref: recent_trips(rows) for pref, rows in by_pref.items()},
         **footprint_points(db, user, [t for t in trips if t["shelf"] in ("visited", "planning")], plans_by_id, events),
     }
 

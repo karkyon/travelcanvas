@@ -763,7 +763,7 @@ const SecretsTab: React.FC = () => {
                     {(s.required ?? true) && s.status === 'configured' && (
                       <p className="tc-ops-desc" data-testid={`ops-secret-restrict-${s.slot}`}>{restrictionNote(s)}</p>
                     )}
-                    {s.in_use_note && (s.required ?? true) && (
+                    {s.in_use_note && ((s.required ?? true) || s.free) && (
                       <p className="tc-ops-desc" data-testid={`ops-secret-use-${s.slot}`}>{s.in_use_note}</p>
                     )}
                     {legacy.prominent && (
@@ -793,7 +793,7 @@ const SecretsTab: React.FC = () => {
             </li>
           ))}
         </ul>
-        <p className="tc-ops-asof">鍵を登録しただけでは送りません。「有効性を確認」が通った鍵だけを、利用者が旅行の中で明示の操作をした時に使います(会員のクラスと 1旅行 50円の枠の中)。</p>
+        <p className="tc-ops-asof">鍵を登録しただけでは送りません。「有効性を確認」が通った鍵だけを、利用者が旅行の中で明示の操作をした時に使います(会員のクラスと 1旅行 50円の枠の中)。無料の提供元(Yahoo!・楽天・ホットペッパー・YouTube)の鍵は確認が無く、登録すると自動取得・動画の読み取りで使います。</p>
       </article>
       <article className="tc-card tc-ops-panel">
         <h2 className="tc-section-title">権限と記録</h2>

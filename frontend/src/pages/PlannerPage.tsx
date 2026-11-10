@@ -94,15 +94,6 @@ const getDayOfWeek = (dateStr?: string): string => {
   return labels[d.getDay()] || '';
 };
 
-/** [Gate MockScreens] 旅行の期間(日程の最初と最後。無ければ開始・終了の日) */
-function planDateRange(plan: { days: Array<{ date?: string }>; start_date?: string; end_date?: string }): string {
-  const first = plan.days[0]?.date || plan.start_date;
-  const last = plan.days[plan.days.length - 1]?.date || plan.end_date;
-  if (!first) return '';
-  const fmt = (d: string) => `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日`;
-  return last && last !== first ? `${fmt(first)} — ${fmt(last)}` : fmt(first);
-}
-
 // [Gate PlanUX] 予定の種類(編集の画面の選択肢。EventCategory)
 // [Gate PlanSpotEdit] 場所の情報の出典(OpenStreetMap の著作権と ODbL の案内)。応答の URL は使わず固定の値にする
 const OSM_COPYRIGHT = 'https://www.openstreetmap.org/copyright';
@@ -861,17 +852,12 @@ const PlannerPage: React.FC = () => {
       <div className="min-h-screen bg-cloud-50">
         <div className="tc-page">
           {/* [Gate MockScreens] モックの旅程の画面: page-head・plan-controls・3列(時間の流れ・地図・選んだ予定) */}
-          <PageHead
-            eyebrow="PLAN · 旅程を組み立てる"
-            titleId="planner-trip-title"
-            title={currentPlan.title}
-            sub={<>
-              {[currentPlan.destination, planDateRange(currentPlan)].filter(Boolean).join(' · ')}
-              {currentPlan.destination || planDateRange(currentPlan) ? ' — ' : ''}
-              営業時間・移動手段・現地時間を予定カードで確認。ドラッグまたは↑↓で順番を入れ替えます。
-            </>}
+          {/* [Gate TripHead] 一番上は旅行のカード(表紙・題名・期間・数字・編集/複製/削除)。以前は上の page-head と
+              下の「旅行の情報」のカードに題名・編集が二重にあった */}
+          <PlanHeader plan={currentPlan} className="mb-4" headingLevel={1} titleId="planner-trip-title"
+            onEdit={() => setIsBasicsOpen(true)} onDelete={() => navigate('/planner')}
+            hint="営業時間・移動手段・現地時間を予定カードで確認。ドラッグまたは↑↓で順番を入れ替えます。"
             actions={<>
-              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsBasicsOpen(true)} data-testid="plan-basics-open">基本情報・日程を編集</button>
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← 旅行の一覧</button>
               {activeDay && planView === 'day' && (
                 <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={() => setAddSignal((n) => n + 1)}
@@ -1106,8 +1092,7 @@ const PlannerPage: React.FC = () => {
           <OptimizationPanel plan={currentPlan} dayIndex={currentDayIndex} className="mt-6" />
 
           <section className="tc-plan-more" aria-labelledby="plan-more-title">
-            <h2 id="plan-more-title" className="tc-section-title">旅行の情報と、この旅行のほかの画面</h2>
-            <PlanHeader plan={currentPlan} className="mb-4" headingLevel={2} onDelete={() => navigate('/planner')} />
+            <h2 id="plan-more-title" className="tc-section-title">この旅行のほかの画面</h2>
           {/* [FR059-B] この旅行の AI・外部検索の利用枠(旅行の予算とは別) */}
           <PlanningUsageMeter planId={currentPlan.id} className="mb-4" />
           {/* [Gate ProviderConnect] AI の案・Google の場所の検索・経路(押した時だけ・この旅行の枠から・保存しない) */}

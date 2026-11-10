@@ -1,4 +1,5 @@
 /** [Gate Footprints2] 旅の足あとの地図のデータと計算(画面の部品 FootprintMaps から分けた) */
+import type { FootTrip } from '@/services/api/types/g9';
 import { WORLD_ROWS, WORLD_STEP, WORLD_TOP } from './worldGrid';
 
 export type Region = 'hokkaido' | 'tohoku' | 'kanto' | 'chubu' | 'kinki' | 'chugoku' | 'shikoku' | 'kyushu';
@@ -53,11 +54,68 @@ export const AREA_LABEL: Record<string, string> = {
 };
 export const C = 6; // 升目(3°)の大きさ
 
-export interface MapPoint { lat: number; lng: number; state: 'visited' | 'planned'; label: string }
+export interface MapPoint { lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[] }
 
 /** 経度・緯度 → 地図の位置(正距円筒。升目と同じ割合) */
 export function project(lat: number, lng: number): { x: number; y: number } {
   const la = Math.max(WORLD_TOP - WORLD_ROWS.length * WORLD_STEP, Math.min(WORLD_TOP, lat));
   return { x: ((lng + 180) / WORLD_STEP) * C, y: ((WORLD_TOP - la) / WORLD_STEP) * C };
+}
+
+
+// ------------------------------------------------------------------ [Gate FootHover] ポップアップ・浮かせる範囲の計算
+
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+function ymd(iso: string | null, withYear: boolean): string | null {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const w = WD[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
+  return `${withYear ? `${y}/` : ''}${mo}/${d}(${w})`;
+}
+/** 旅行の期間(2026/11/28(土)〜11/29(日))。日付が無ければ「日付未定」 */
+export function footPeriod(t: Pick<FootTrip, 'start_date' | 'end_date'>): string {
+  const s = ymd(t.start_date, true);
+  if (!s) return '日付未定';
+  const sameYear = t.end_date?.slice(0, 4) === t.start_date?.slice(0, 4);
+  const e = t.end_date && t.end_date !== t.start_date ? ymd(t.end_date, !sameYear) : null;
+  return e ? `${s}〜${e}` : s;
+}
+
+/** 同じ旅行を 1 件にまとめて、始まりが新しい順に 5 件 */
+export function recentFootTrips(rows: FootTrip[], limit = 5): FootTrip[] {
+  const seen = new Map<string, FootTrip>();
+  for (const r of rows) {
+    const prev = seen.get(r.plan_id);
+    if (!prev || (prev.state === 'planned' && r.state === 'visited')) seen.set(r.plan_id, r);
+  }
+  return [...seen.values()]
+    .sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
+    .slice(0, limit);
+}
+
+/** 当てた県の周り(升目の距離 0.6 以内で触れる県)= 2 段目に浮かせる県 */
+export function neighborPrefs(name: string): Set<string> {
+  const me = PREF_TILES.find((t) => t[0] === name);
+  const out = new Set<string>();
+  if (!me) return out;
+  const [, , x, y, w, h] = me;
+  const g = 0.6;
+  for (const [n, , bx, by, bw, bh] of PREF_TILES) {
+    if (n !== name && bx < x + w + g && x - g < bx + bw && by < y + h + g && y - g < by + bh) out.add(n);
+  }
+  return out;
+}
+
+/** 当てた升目の近く(升目 1.5 個分)の点の旅行 */
+export function tripsNearCell(points: MapPoint[], r: number, c: number): FootTrip[] {
+  const cx = (c + 0.5) * C;
+  const cy = (r + 0.5) * C;
+  const rows: FootTrip[] = [];
+  for (const p of points) {
+    const { x, y } = project(p.lat, p.lng);
+    if (Math.hypot(x - cx, y - cy) <= C * 1.5) rows.push(...(p.trips ?? []));
+  }
+  return recentFootTrips(rows);
 }
 

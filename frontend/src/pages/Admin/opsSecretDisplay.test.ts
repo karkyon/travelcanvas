@@ -1,7 +1,7 @@
 /** [Gate AdminUAT] 鍵の表示の組み合わせ(登録 × 確認 × 旧 .env × 使うか)。食い違い・再登録の案内を出さない。 */
 import { describe, it, expect } from 'vitest';
 import type { OpsSecretSlot, OpsVerifyState } from '@/services/api/opsConsole';
-import { formatJaDateTime, legacyDisplay, secretDisplay } from './opsSecretDisplay';
+import { FREE_IN_USE_TEXT, FREE_MISSING_TEXT, NOT_REQUIRED_TEXT, formatJaDateTime, legacyDisplay, secretDisplay } from './opsSecretDisplay';
 
 const slot = (over: Partial<OpsSecretSlot>): OpsSecretSlot => ({
   slot: 'openai_api_key', label: 'OpenAI', providers: ['openai'], env: 'OPENAI_API_KEY', hint: '', status: 'configured',
@@ -64,4 +64,23 @@ describe('legacyDisplay(旧 .env)', () => {
 it('formatJaDateTime: 読めない値は null', () => {
   expect(formatJaDateTime(null)).toBeNull();
   expect(formatJaDateTime('not-a-date')).toBeNull();
+});
+
+describe('[Gate OpsFreeKeys] 無料の提供元の鍵', () => {
+  const base = { slot: 'yahoo_client_id', label: 'Yahoo!', providers: ['yahoo_local'], env: 'YAHOO_CLIENT_ID', hint: '',
+    source: 'cms' as const, version: 1, last4: 'daQQ', registered_at: null, history: [], required: false, free: true };
+  it('登録済みは「使用中」。設定不要・送らないと言わない', () => {
+    const d = secretDisplay({ ...base, status: 'configured', verification: { state: 'unverified' } } as never);
+    expect(d.text).toBe(FREE_IN_USE_TEXT);
+    expect(`${d.text}${d.detail}`).not.toMatch(/設定不要|送らない|送りません/);
+  });
+  it('未登録は任意', () => {
+    const d = secretDisplay({ ...base, status: 'missing', source: null, version: null, last4: null } as never);
+    expect(d.text).toBe(FREE_MISSING_TEXT);
+    expect(d.text).not.toContain('設定不要');
+  });
+  it('無料でない使わない鍵は今まで通り「設定不要」', () => {
+    const d = secretDisplay({ ...base, free: false, status: 'missing' } as never);
+    expect(d.text).toBe(NOT_REQUIRED_TEXT);
+  });
 });

@@ -11,10 +11,11 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { AreaLegend, JapanTileMap, RegionLegend, WorldTileMap } from './FootprintMaps';
+import { setSoundEnabled, soundEnabled } from './footSound';
 import { Link } from 'react-router-dom';
 import {
   BedDouble, BookOpen, Check, CircleAlert, Compass, Download, Map as MapIcon, MapPin, Route, Search, Settings, Share2,
-  ShoppingBag, Utensils, type LucideIcon,
+  ShoppingBag, Utensils, Volume2, VolumeX, type LucideIcon,
 } from 'lucide-react';
 import { getMemoryMedia } from '@/services/api';
 import { setTripState } from '@/services/api/g9';
@@ -348,6 +349,9 @@ export const Footprints: React.FC<{ home: DashboardHome }> = ({ home }) => {
     try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* 覚えられなくても切り替えは効く */ }
   };
   const visitedPoints = points.filter((p) => p.state === 'visited').length;
+  // [Gate FootHover] カーソルを動かした時の音(この端末に覚える)
+  const [sound, setSound] = useState(soundEnabled);
+  const toggleSound = () => { setSoundEnabled(!sound); setSound(!sound); };
   return (
     <section className="tc-card tc-home-foot" aria-labelledby="home-foot" data-testid="home-footprints">
       <div className="tc-section-row">
@@ -358,6 +362,11 @@ export const Footprints: React.FC<{ home: DashboardHome }> = ({ home }) => {
           <button type="button" className="tc-focus-ring" aria-pressed={view === 'world'} onClick={() => choose('world')}
             data-testid="footprint-view-world">世界</button>
         </div>
+        <button type="button" className="tc-focus-ring tc-fp-sound" aria-pressed={sound} onClick={toggleSound}
+          aria-label={sound ? '地図の音を消す' : '地図の音を鳴らす'} title={sound ? '地図の音: 鳴らす' : '地図の音: 消している'}
+          data-testid="footprint-sound">
+          {sound ? <Volume2 size={15} aria-hidden="true" /> : <VolumeX size={15} aria-hidden="true" />}
+        </button>
         <Link to="/atlas" className="tc-focus-ring tc-mini-link">旅の地図 →</Link>
       </div>
       {view === 'japan' ? (
@@ -374,18 +383,18 @@ export const Footprints: React.FC<{ home: DashboardHome }> = ({ home }) => {
         </dl>
       )}
       <div className="tc-fp-frame">
-        {view === 'japan' ? <JapanTileMap visited={visited} planned={planned} /> : <WorldTileMap points={points} />}
+        {view === 'japan' ? <JapanTileMap visited={visited} planned={planned} prefTrips={f.pref_trips} /> : <WorldTileMap points={points} />}
       </div>
       {view === 'japan' ? (
         <>
           <p className="tc-home-legend"><span data-state="visited" />行った<span data-state="planned" />計画中
-            <small>行き先・予定の住所に書かれた都道府県から数えます</small></p>
+            <small>行き先・予定の住所に書かれた都道府県から数えます。県にカーソルを当てると、その県の旅行(直近 5 件)が出ます</small></p>
           <RegionLegend />
         </>
       ) : (
         <>
           <p className="tc-home-legend"><span data-state="visited-dot" />行った<span data-state="planned-dot" />計画中
-            <small>{points.length ? '予定に登録した位置を点で示します(地図は略図)' : '予定に位置(地図の場所)を入れると、ここに点で出ます'}</small></p>
+            <small>{points.length ? '予定に登録した位置を点で示します(地図は略図)。点の辺りにカーソルを当てると、その旅行が出ます' : '予定に位置(地図の場所)を入れると、ここに点で出ます'}</small></p>
           <AreaLegend />
         </>
       )}
