@@ -3,7 +3,7 @@
  * 触って使える並べ替えと再確認の知らせ(UIX-M03)。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const { getHoursCheck, moveItemBy, handleKeyboardMove, reorderSchedule, reorderSpots, drag } = vi.hoisted(() => ({
   getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(), reorderSchedule: vi.fn(), reorderSpots: vi.fn(),
@@ -351,7 +351,7 @@ describe('1日の画面(DayView)', () => {
     expect(rows[0]).toHaveTextContent('09:30');
     expect(rows[1]).toHaveTextContent('18:00');
     fireEvent.click(within(preview).getByTestId('reorder-apply'));
-    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1']));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1'], true));
     expect(reorderSpots).toHaveBeenCalledTimes(1);
     expect(reorderSchedule).not.toHaveBeenCalled();
     // サーバーが入れ替えた: 夕食が 09:30、清水寺が 18:00。区間の端も付け替わった
@@ -420,7 +420,7 @@ describe('1日の画面(DayView)', () => {
     expect(screen.queryByTestId('reorder-preview')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '「清水寺」を下へ移す' }));
     fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
-    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1', 'e3']));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['e2', 'e1', 'e3'], true));
     const t = three();
     rerender(<DayView day={{ ...t, events: [t.events[1]!, t.events[0]!, t.events[2]!] }} planId="p1" />);
     const panel = await screen.findByTestId('reorder-impact');
@@ -526,5 +526,64 @@ describe('[TravelEstimate] 区間の距離・内訳と全日程の移動の帯�
     expect(screen.getByTestId('chart-travel-e2')).toHaveTextContent('20分 · 8.4km');
     expect(screen.getByTestId('chart-gap-0')).toHaveTextContent('空き 25分');
     expect(screen.getByTestId('chart-summary-0')).toHaveTextContent('自家用車 20分・8.4km');
+  });
+});
+
+// [Gate EventArea] エリアの中の予定(おかげ横丁の中の赤福・ダンデライオン)
+describe('エリアの枠(DayView・全日程)', () => {
+  const areaDay = (): DaySchedule => ({ id: 'd1', date: '2026-11-28', timezone_id: 'Asia/Tokyo', events: [
+    { id: 'ise', title: '伊勢神宮', category: 'sightseeing', start_time: '10:00', end_time: '12:00' },
+    { id: 'area', title: 'おかげ横丁', category: 'area', start_time: '13:45', end_time: '15:45' },
+    { id: 'aka', title: '赤福', category: 'dining', start_time: '13:50', end_time: '14:20', parent_event_id: 'area' },
+    { id: 'dan', title: 'ダンデライオン', category: 'dining', start_time: '14:30', end_time: '15:30', parent_event_id: 'area' },
+    { id: 'toba', title: '鳥羽水族館', category: 'sightseeing', start_time: '16:30', end_time: '18:00' },
+  ] });
+  beforeEach(() => {
+    getHoursCheck.mockReset();
+    getHoursCheck.mockResolvedValue({ day_id: 'd1', local_date: '2026-11-28', timezone_id: 'Asia/Tokyo', near_minutes: 30, stale_days: 90, events: [] });
+    reorderSpots.mockReset();
+    reorderSpots.mockResolvedValue(true);
+  });
+
+  it('エリアを枠にし、見出しに滞在・中の予定・空き。中の移動は手段を選ばず数えない', async () => {
+    render(<DayView day={areaDay()} planId="p1" segments={[]} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByTestId('area-summary-area')).toHaveTextContent('エリアエリア内の滞在 2時間・中の予定 2件・空き 30分');
+    const inner = screen.getAllByTestId('segment-inner');
+    expect(inner.map((r) => r.getAttribute('data-to-event'))).toEqual(['aka', 'dan']);
+    expect(inner[0]).toHaveTextContent('エリアの中 · 歩いて回る(移動として数えない)');
+    // 枠: エリア → 中の予定(最後に閉じる)
+    const roles = Array.from(document.querySelectorAll('[data-area-role]')).map((n) => `${n.getAttribute('data-area-role')}${n.classList.contains('is-area-last') ? '.last' : ''}`);
+    expect(roles).toEqual(['none', 'area', 'member', 'member.last', 'none']);
+    // エリアと中の予定はドラッグしない(↑↓ で動かす)
+    expect(screen.getByRole('listitem', { name: '赤福(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'false');
+    expect(screen.getByRole('listitem', { name: '伊勢神宮(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'true');
+  });
+
+  it('↑↓: 中の予定はエリアの中だけ。エリアはまとまりごと(時刻は予定に付いたまま)動かして 1 回に保存', async () => {
+    render(<DayView day={areaDay()} planId="p1" segments={[]} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByTestId('move-up-aka')).toBeDisabled();  // エリアより前へは出ない
+    expect(screen.getByTestId('move-down-dan')).toBeDisabled();  // エリアの後ろへは出ない
+    expect(screen.getByTestId('move-up-dan')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('move-up-area'));
+    const rows = screen.getAllByRole('listitem', { name: /上下矢印キー/ });
+    expect(rows.map((r) => r.getAttribute('aria-label')!.split(/[((]/)[0])).toEqual(
+      ['おかげ横丁', '赤福', 'ダンデライオン', '伊勢神宮', '鳥羽水族館']);
+    expect(rows[3]).toHaveTextContent('10:00');  // 時刻は予定に付いたまま
+    fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['area', 'aka', 'dan', 'ise', 'toba'], false));
+  });
+
+  it('全日程: エリアは帯、中の予定には移動の帯を出さない', () => {
+    const segs = [seg({ from_event_id: 'area', to_event_id: 'aka', mode: 'walking', duration_minutes: 5 })];
+    const model = buildChart([areaDay()], segs);
+    const d = model.days[0]!;
+    expect(d.areas?.map((a) => a.id)).toEqual(['area']);
+    expect(d.events.map((e) => e.id)).toEqual(['ise', 'aka', 'dan', 'toba']);
+    expect(d.events.filter((e) => e.inArea).map((e) => e.id)).toEqual(['aka', 'dan']);
+    expect(d.travels ?? []).toEqual([]);
+    render(<AllDaysChart days={[areaDay()]} segments={segs} currentDay={0} onOpenDay={() => {}} />);
+    expect(screen.getByTestId('chart-area-area')).toHaveTextContent('エリア 13:45 おかげ横丁');
   });
 });

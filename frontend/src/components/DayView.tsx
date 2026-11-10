@@ -4,6 +4,7 @@ import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
 import { hoursBadge, keepSlots, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
+import { areaMove, areaRoles, areaSummary, isInnerPair } from './planner/areaModel';
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
 import TransportIcon from './common/TransportIcon';
@@ -223,10 +224,27 @@ const DayView: React.FC<DayViewProps> = ({
   const savedOrder = useMemo(() => day.events.map((e) => e.id), [day.events]);
   const byId = useMemo(() => Object.fromEntries(day.events.map((e) => [e.id, e])), [day.events]);
   const [pending, setPending] = useState<string[] | null>(null);
+  // [Gate EventArea] エリアのまとまりを動かす案は、時刻を予定に付けたまま(位置の時刻を受け継がない)
+  const [pendingKeep, setPendingKeep] = useState(true);
   const [applying, setApplying] = useState(false);
   // [Gate PlanSpotEdit] 案の並びは「スポットだけを入れ替える」見え方(時刻・移動手段は位置に残す。保存の結果と同じ)
-  const slotted = useMemo(() => (pending ? keepSlots(day.events, pending, segments) : null), [pending, day.events, segments]);
+  const slotted = useMemo(() => {
+    if (!pending) return null;
+    if (pendingKeep) return keepSlots(day.events, pending, segments);
+    const byIdNow = new Map(day.events.map((e) => [e.id, e]));
+    return { events: pending.map((id) => byIdNow.get(id)!).filter(Boolean), segments };
+  }, [pending, pendingKeep, day.events, segments]);
   const view = slotted ? slotted.events : day.events;
+  // [Gate EventArea] エリアの枠(エリアと、すぐ後ろに続く中の予定)と見出しの数
+  const roles = useMemo(() => areaRoles(view), [view]);
+  const areaSums = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const a of view) {
+      if (roles.get(a.id)?.role !== 'area') continue;
+      out.set(a.id, areaSummary(a, view.filter((e) => roles.get(e.id)?.role === 'member' && roles.get(e.id)?.areaId === a.id)).text);
+    }
+    return out;
+  }, [view, roles]);
   const viewSegments = slotted ? slotted.segments : segments;
   useEffect(() => {
     if (!pending) return;
@@ -239,8 +257,9 @@ const DayView: React.FC<DayViewProps> = ({
   useEffect(() => { setPending(null); }, [day.id]);
   const previewModel = useMemo(() => (pending ? reorderImpact(savedOrder, null, view, null, false, viewSegments) : null),
     [pending, savedOrder, view, viewSegments]);
-  const propose = useCallback((next: string[], message: string) => {
+  const propose = useCallback((next: string[], message: string, keep = true) => {
     setImpact(null);
+    setPendingKeep(keep);
     setPending(next.join(',') === savedOrder.join(',') ? null : next);
     setAnnounce(message);
   }, [savedOrder]);
@@ -249,25 +268,29 @@ const DayView: React.FC<DayViewProps> = ({
     setApplying(true);
     try {
       const baseline = { order: savedOrder, hours: hoursPending ? null : (hours?.byId ?? {}) };
-      const ok = await reorderSpots(planId, day.id, pending);
+      const ok = await reorderSpots(planId, day.id, pending, pendingKeep);
       setPending(null);
       if (!ok) {
         setAnnounce('並べ替えを保存できませんでした(何も変えていません)');
         return;
       }
       setImpact(baseline);
-      addToast({ type: 'success', message: 'スポットを入れ替えました(時刻と移動手段はそのまま)' });
+      addToast({ type: 'success', message: pendingKeep ? 'スポットを入れ替えました(時刻と移動手段はそのまま)' : '並びを変えました(時刻は予定に付いたまま)' });
       setAnnounce('この並びを保存しました。営業時間と移動を確かめています');
     } finally {
       setApplying(false);
     }
-  }, [pending, savedOrder, hoursPending, hours, reorderSpots, planId, day.id, addToast]);
+  }, [pending, pendingKeep, savedOrder, hoursPending, hours, reorderSpots, planId, day.id, addToast]);
   const cancelPending = useCallback(() => {
     setPending(null);
     setAnnounce('並べ替えの案をやめました(保存していません)');
   }, []);
   const moveBy = useCallback((event: ScheduleItemType, delta: -1 | 1) => {
     const index = view.findIndex((e) => e.id === event.id);
+    // [Gate EventArea] 中の予定はエリアの中でだけ。エリア・エリアを越える時は、まとまりごと(時刻は予定に付いたまま)
+    const am = areaMove(view, index, delta);
+    if (am.kind === 'blocked') { setAnnounce(am.reason); return; }
+    if (am.kind === 'move') { propose(am.order, am.text, false); return; }
     const blocked = moveBlockedReason(view, index, delta);
     if (blocked) {
       setAnnounce(blocked);
@@ -440,6 +463,8 @@ const DayView: React.FC<DayViewProps> = ({
         phone: newItemData.phone?.trim() || undefined,
         urls: urlRows.map((u) => u.trim()).filter((u) => /^https?:\/\//.test(u)).slice(0, 5).map((url) => ({ url, label: null })),
         dining: newItemData.dining ?? undefined,
+        // [Gate EventArea] エリアの中へ(エリア自身は入れない)
+        parent_event_id: newItemData.category !== 'area' && newItemData.parent_event_id ? newItemData.parent_event_id : undefined,
       };
       const badUrl = urlRows.map((u) => u.trim()).find((u) => u && !/^https?:\/\/[^\s]+$/.test(u));
       if (badUrl) {
@@ -532,6 +557,12 @@ const DayView: React.FC<DayViewProps> = ({
     }
     handleDragEnd();
     if (!itemId || !byId[itemId]) return;
+    // [Gate EventArea] エリアの枠の中へは落とさない(入れる時は編集の「エリア」で)。エリアと中の予定は ↑↓ で動かす
+    const rolesNow = areaRoles(view);
+    if (rolesNow.get(itemId)?.role !== 'none' || (view[targetIndex] && rolesNow.get(view[targetIndex]!.id)?.role === 'member')) {
+      setAnnounce('エリアの中へは、予定の編集の「エリア」で入れてください(エリアのまとまりは ↑↓ で動かせます)');
+      return;
+    }
     const order = view.map((x) => x.id);
     const next = reorderArray(order, itemId, finalIndexForGap(order, itemId, targetIndex));
     if (view.some((x, i) => x.locked && next[i] !== x.id)) {
@@ -643,15 +674,31 @@ const DayView: React.FC<DayViewProps> = ({
           view.map((event, index) => {
             // [Gate PlanSpotEdit] 区間の行は 2 つの予定の間にあるので「○○から」は出さない(読み上げは区間の枠の名前で伝える)
             const row = segmentRow(view, index, viewSegments, zones, day.timezone_id, titleMap);
-            const upBlocked = index === 0 || moveBlockedReason(view, index, -1) !== null;
-            const downBlocked = index === view.length - 1 || moveBlockedReason(view, index, 1) !== null;
+            // [Gate EventArea] 並べ替えのボタン: エリアのまとまり・中の予定の決まりも見る
+            const blockedBy = (delta: -1 | 1) => {
+              const am = areaMove(view, index, delta);
+              return am.kind === 'blocked' || (am.kind === 'default' && moveBlockedReason(view, index, delta) !== null);
+            };
+            const upBlocked = index === 0 || blockedBy(-1);
+            const downBlocked = index === view.length - 1 || blockedBy(1);
+            const role = roles.get(event.id);
+            const inner = index > 0 && isInnerPair(view[index - 1], event);
             return (
             <div key={event.id} role="none" onDragOver={(e) => overRow(e, index)}
+              className={role?.role === 'member' ? `tc-area-member${role.last ? ' is-area-last' : ''}` : undefined}
+              data-area-role={role?.role}
               onDrop={(e) => { if (ownDrag) handleItemDrop(e, dropGap ?? index); }}>
               {ownDrag && dropGap === index && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
               {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる)
                   [Gate PlanUX] 2 番目以降の予定の前に、移動手段を選ぶ・変える・詳細を入れる操作を置く */}
-              {index > 0 && (
+              {/* [Gate EventArea] エリアの中の移動は歩いて回る(移動の区間として数えない・手段を選ばない) */}
+              {inner && (
+                <div role="listitem" className="tc-segment-row tc-segment-row--inner" data-testid="segment-inner"
+                  data-to-event={event.id}>
+                  <span className="sr-only">移動:</span>エリアの中 · 歩いて回る(移動として数えない)
+                </div>
+              )}
+              {index > 0 && !inner && (
                 <SegmentPicker planId={planId} revision={revision} fromEventId={view[index - 1]!.id}
                   fromTitle={view[index - 1]!.title} toEventId={event.id} toTitle={event.title}
                   segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
@@ -717,9 +764,16 @@ const DayView: React.FC<DayViewProps> = ({
                   )}
                 </div>
               )}
+              {/* [Gate EventArea] エリアの枠の始まり(エリアへ着く移動の行は枠の外)。見出しに滞在・中の予定・空き */}
+              <div className={role?.role === 'area' ? `tc-area-area${role.last ? ' is-area-last' : ''}` : 'contents'}>
+              {role?.role === 'area' && (
+                <p className="tc-area-sum" data-testid={`area-summary-${event.id}`}>
+                  <span className="tc-area-tag">エリア</span>{areaSums.get(event.id)}
+                </p>
+              )}
               {/* スケジュールアイテム */}
               <div
-                draggable
+                draggable={!role || role.role === 'none'}
                 tabIndex={0}
                 role="listitem"
                 aria-label={`${event.title}(上下矢印キーで並べ替え)`}
@@ -780,6 +834,7 @@ const DayView: React.FC<DayViewProps> = ({
                     onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
                 </div>
               </div>
+              </div>
             </div>
             );
           })
@@ -807,7 +862,8 @@ const DayView: React.FC<DayViewProps> = ({
           {bulk && <p className="mt-3 text-sm text-ink-700" role="status" data-testid="add-bulk">{bulk}</p>}
           <div className={placeTab === 'manual' ? '' : 'hidden'}>
             <NewEventForm data={newItemData} setData={setNewItemData} urlRows={urlRows} setUrlRows={setUrlRows} stay={stay} setStay={setStay}
-              near={near()} lookupState={lookupState} setLookupState={setLookupState} />
+              near={near()} lookupState={lookupState} setLookupState={setLookupState}
+              areas={day.events.filter((e) => e.category === 'area').map((e) => ({ id: e.id, title: e.title }))} />
           </div>
         </Modal.Body>
         

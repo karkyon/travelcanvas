@@ -47,6 +47,7 @@ from app.services.route_estimator import estimate_leg, haversine_km
 from app.services import today_mode
 from app.services import plan_item_deletion
 from app.services import event_times as et
+from app.services import event_area
 from app.services import event_urls
 from app.services import dining as dining_info
 
@@ -124,6 +125,8 @@ class EventCreate(BaseModel):
     # フィールドをPlaceの値で補完する(「候補に追加」と「旅程に追加」を
     # 分離しつつ、旅程に追加した際は出典を引き継ぐため)。
     place_id: Optional[str] = None
+    # [Gate EventArea] 入れる先のエリア(同じ日の event_type='area' の予定)
+    parent_event_id: Optional[str] = None
 
 
 class EventUpdate(BaseModel):
@@ -147,6 +150,8 @@ class EventUpdate(BaseModel):
     urls: Optional[List[EventUrl]] = Field(None, max_length=event_urls.MAX_URLS)
     # [Gate SpotInfo] 食事の情報(ジャンル・予算・予約・駐車場など)
     dining: Optional[dining_info.DiningInfo] = None
+    # [Gate EventArea] 入れる先のエリア(null・空で外す)
+    parent_event_id: Optional[str] = None
 
 
 class EventMove(BaseModel):
@@ -176,8 +181,10 @@ class EventResponse(BaseModel):
     phone: Optional[str] = None
     urls: Optional[List[Dict[str, Any]]] = None
     dining: Optional[Dict[str, Any]] = None
+    # [Gate EventArea] この予定が入っているエリアの予定の ID
+    parent_event_id: Optional[str] = None
 
-    @field_validator("id", "day_id", "place_id", mode="before")
+    @field_validator("id", "day_id", "place_id", "parent_event_id", mode="before")
     @classmethod
     def _stringify_ids(cls, v):
         return str(v) if v is not None else v
@@ -417,7 +424,26 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "phone": event.phone,
         "urls": event.urls,
         "dining": event.dining,
+        "parent_event_id": str(event.parent_event_id) if event.parent_event_id else None,
     }
+
+
+def _area_error(e: "event_area.AreaError") -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": e.code, "message": str(e)})
+
+
+def _area_changes(primary_id, extra) -> List[tuple]:
+    """[Gate EventArea] 並び直し・外したエリアの記録(主の予定は別に記録するので除く。同じ予定は最初の写しを使う)"""
+    seen: set = {primary_id}
+    out: List[tuple] = []
+    for ev, before in extra:
+        if ev.id in seen:
+            continue
+        seen.add(ev.id)
+        after = _event_to_dict(ev)
+        if after != before:
+            out.append(("travel_event", ev.id, "reorder", before, after))
+    return out
 
 
 def _segment_to_dict(seg: TravelSegment) -> dict:
@@ -902,6 +928,14 @@ async def create_event(
         latitude = latitude if latitude is not None else place.latitude
         longitude = longitude if longitude is not None else place.longitude
 
+    # [Gate EventArea] 入れる先のエリア(同じ日のエリアだけ)
+    try:
+        parent_uuid = event_area.parse_parent(event_data.parent_event_id)
+        event_area.check_parent(db, plan_id=plan.id, day_id=day.id, event_type=event_data.event_type, event_id=None,
+                                parent_id=parent_uuid)
+    except event_area.AreaError as e:
+        raise _area_error(e)
+
     max_sort = db.query(TravelEvent).filter(TravelEvent.day_id == day.id).count()
     new_event = TravelEvent(
         plan_id=plan.id, day_id=day.id, place_id=place_uuid,
@@ -910,7 +944,7 @@ async def create_event(
         local_start_time=event_data.local_start_time, is_all_day=event_data.is_all_day,
         address=address, latitude=latitude, longitude=longitude, phone=phone, urls=urls,
         dining=dining_info.to_json(event_data.dining),
-        sort_order=max_sort,
+        sort_order=max_sort, parent_event_id=parent_uuid,
     )
     # [Gate G7] FR-005 終了時刻(日をまたぐ予定)と前後の確認
     _apply_end_and_check(new_event, day, event_data.local_end_time is not None, event_data.local_end_time,
@@ -918,10 +952,19 @@ async def create_event(
     db.add(new_event)
     db.flush()
 
-    _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_event", new_event.id, "create",
-        before_json=None, after_json=_event_to_dict(new_event),
-    )
+    # [Gate EventArea] エリアの中に入れた時は、エリアの中の最後へ並べる
+    extra = event_area.normalize_day(db, day.id, _event_to_dict) if parent_uuid else []
+    if extra:
+        db.flush()
+        _record_batch_change_and_bump_revision(
+            db, plan, current_user, "manual",
+            [("travel_event", new_event.id, "create", None, _event_to_dict(new_event))]
+            + _area_changes(new_event.id, extra))
+    else:
+        _record_change_and_bump_revision(
+            db, plan, current_user, "manual", "travel_event", new_event.id, "create",
+            before_json=None, after_json=_event_to_dict(new_event),
+        )
     db.refresh(new_event)
 
     response = _event_out(new_event, hidden)
@@ -956,6 +999,9 @@ async def update_event(
         )
 
     before = _event_to_dict(event)
+    # [Gate EventArea] エリアの指定(列はそのまま当てず、決まりを確かめてから)
+    parent_given = "parent_event_id" in update_data
+    parent_raw = update_data.pop("parent_event_id", None)
     # [Gate G7] FR-005 終了時刻の入力(列ではない)を取り出してから項目を当てる
     end_given = "local_end_time" in update_data or "end_day_offset" in update_data
     local_end_time = update_data.pop("local_end_time", None)
@@ -977,12 +1023,35 @@ async def update_event(
         _apply_local_start(event, old_time, keep_end=end_given or "end_at" in update_data)
     if end_given or {"start_at", "end_at", "local_start_time", "is_all_day"} & set(update_data):
         _apply_end_and_check(event, event.day, end_given, local_end_time, end_day_offset)
+    # [Gate EventArea] エリアに入れる・外す。エリアの種類をやめたら中の予定を外す。エリアになった予定はエリアから出す
+    extra: List[tuple] = []
+    if parent_given:
+        try:
+            pid = event_area.parse_parent(parent_raw)
+            event_area.check_parent(db, plan_id=plan.id, day_id=event.day_id, event_type=event.event_type,
+                                    event_id=event.id, parent_id=pid)
+        except event_area.AreaError as e:
+            raise _area_error(e)
+        event.parent_event_id = pid
+    elif event.event_type == event_area.AREA and event.parent_event_id is not None:
+        event.parent_event_id = None
+    if before["event_type"] == event_area.AREA and event.event_type != event_area.AREA:
+        extra += event_area.detach_members(db, event.id, _event_to_dict)
     db.flush()
+    if parent_given or "event_type" in update_data:
+        extra += event_area.normalize_day(db, event.day_id, _event_to_dict)
+        db.flush()
 
-    _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_event", event.id, "update",
-        before_json=before, after_json=_event_to_dict(event),
-    )
+    others = _area_changes(event.id, extra)
+    if others:
+        _record_batch_change_and_bump_revision(
+            db, plan, current_user, "manual",
+            [("travel_event", event.id, "update", before, _event_to_dict(event))] + others)
+    else:
+        _record_change_and_bump_revision(
+            db, plan, current_user, "manual", "travel_event", event.id, "update",
+            before_json=before, after_json=_event_to_dict(event),
+        )
     db.refresh(event)
     return _event_out(event, hidden)
 
@@ -1015,10 +1084,13 @@ async def delete_event(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=plan_item_deletion.locked_detail(exc.blocking))
 
+    # [Gate EventArea] エリアを消す時は中の予定を外す(元に戻すとまた入る)
+    members = event_area.detach_members(db, event_uuid, _event_to_dict) if event.event_type == event_area.AREA else []
     db.delete(event)
     db.flush()
 
     changes = [("travel_event", event_uuid, "delete", before, None)] + detachment.changes
+    changes += [("travel_event", m.id, "update", b, _event_to_dict(m)) for m, b in members]
     new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
     return {"message": "イベントを削除しました", "revision": new_revision, "detached": detachment.impact()}
 
@@ -1057,17 +1129,33 @@ async def move_event(
         target_day = None
 
     before = _event_to_dict(event)
+    old_day_id = event.day_id
+    extra: List[tuple] = []
     if target_day:
         # [Gate G7] FR-005 開始・終了の日時も日数の差だけずらす(以前は日程だけ変わり、日時が元の日に残った)
         et.shift_dates(event, event.day.local_date, target_day.local_date)
+        if target_day.id != old_day_id:
+            # [Gate EventArea] 別の日へ移すとエリアから出る。エリアを移すと中の予定は元の日に残り、エリアから外れる
+            event.parent_event_id = None
+            if event.event_type == event_area.AREA:
+                extra += event_area.detach_members(db, event.id, _event_to_dict)
         event.day_id = target_day.id
     event.sort_order = move_data.sort_order
     db.flush()
+    for d in {old_day_id, event.day_id}:
+        extra += event_area.normalize_day(db, d, _event_to_dict)
+    db.flush()
 
-    _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_event", event.id, "reorder",
-        before_json=before, after_json=_event_to_dict(event),
-    )
+    others = _area_changes(event.id, extra)
+    if others:
+        _record_batch_change_and_bump_revision(
+            db, plan, current_user, "manual",
+            [("travel_event", event.id, "reorder", before, _event_to_dict(event))] + others)
+    else:
+        _record_change_and_bump_revision(
+            db, plan, current_user, "manual", "travel_event", event.id, "reorder",
+            before_json=before, after_json=_event_to_dict(event),
+        )
     db.refresh(event)
 
     response = _event_out(event, hidden)
@@ -1128,8 +1216,8 @@ async def reorder_day(
                 "code": "locked_event", "message": "確定の予定の位置は変えられません"})
 
     changes: List[tuple] = []
+    befores = {eid: _event_to_dict(e) for eid, e in by_id.items()}
     if old_ids != body.order:
-        befores = {eid: _event_to_dict(e) for eid, e in by_id.items()}
         slots = [{f: getattr(by_id[eid], f) for f in _SLOT_FIELDS} for eid in old_ids]
         for i, eid in enumerate(body.order):
             ev = by_id[eid]
@@ -1161,6 +1249,17 @@ async def reorder_day(
                 if after != before:
                     changes.append(("travel_segment", seg.id, "update", before, after))
             db.flush()
+
+    # [Gate EventArea] エリアの中の予定はエリアのすぐ後ろ(画面もこの並びで送るが、決まりに合わせて直す)
+    area_fix = event_area.normalize_day(db, day.id, _event_to_dict)
+    if area_fix:
+        db.flush()
+        fixed = {e.id for e, _b in area_fix}
+        changes = [c for c in changes if not (c[0] == "travel_event" and c[1] in fixed)]
+        for e, _b in area_fix:
+            after = _event_to_dict(e)
+            if after != befores[str(e.id)]:
+                changes.append(("travel_event", e.id, "reorder", befores[str(e.id)], after))
 
     if changes:
         revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
@@ -1628,6 +1727,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         latitude=before.get("latitude"), longitude=before.get("longitude"),
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
         phone=before.get("phone"), urls=before.get("urls"), dining=before.get("dining"),
+        parent_event_id=before.get("parent_event_id"),
     )
 
 

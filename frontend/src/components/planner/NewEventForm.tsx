@@ -16,7 +16,7 @@ const SpotMiniMap = React.lazy(() => import('./SpotMiniMap'));
 
 const NEW_EVENT_CATEGORIES: Array<[string, string]> = [
   ['sightseeing', '観光・神社・寺'], ['activity', '体験・アクティビティ'], ['dining', '食事・カフェ'], ['shopping', '買い物'],
-  ['accommodation', '宿'], ['transportation', '交通・移動'], ['other', 'その他'],
+  ['accommodation', '宿'], ['transportation', '交通・移動'], ['area', 'エリア(中に予定を入れる)'], ['other', 'その他'],
 ];
 const HALF = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 const field = 'mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900';
@@ -32,9 +32,11 @@ interface Props {
   /** 親が自動取得した時の結果(名前で検索から来た時など) */
   lookupState: { busy: boolean; result: PlaceInfoResult | null; error: string | null };
   setLookupState: (s: { busy: boolean; result: PlaceInfoResult | null; error: string | null }) => void;
+  /** [Gate EventArea] この日のエリア(中へ入れる先の候補) */
+  areas?: { id: string; title: string }[];
 }
 
-const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, stay, setStay, near, lookupState, setLookupState }) => {
+const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, stay, setStay, near, lookupState, setLookupState, areas = [] }) => {
   const [geo, setGeo] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
   const set = (p: NewEventData) => setData((d) => ({ ...d, ...p }));
   const runLookup = async () => {
@@ -74,6 +76,21 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
           </select>
         </label>
       </div>
+      {/* [Gate EventArea] エリアは大きな枠(おかげ横丁など)。中の予定は枠の中に字下げで並び、中の移動は数えない */}
+      {data.category === 'area' && (
+        <p className="text-xs text-ink-700" data-testid="new-area-hint">
+          エリアは、おかげ横丁のような歩いて回る範囲です。開始・終了を滞在の時間にし、中の店などはこのエリアに入れて追加してください。
+        </p>
+      )}
+      {data.category !== 'area' && areas.length > 0 && (
+        <label className="block text-sm font-medium text-ink-700">エリアの中に入れる(任意)
+          <select value={data.parent_event_id ?? ''} onChange={(e) => set({ parent_event_id: e.target.value || null })} className={field}
+            data-testid="new-event-area">
+            <option value="">入れない</option>
+            {areas.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        </label>
+      )}
       <fieldset className="rounded-xl border border-cloud-200 p-3">
         <legend className="px-1 text-sm font-semibold text-ink-900">時間(任意)</legend>
         <div className="flex flex-wrap items-end gap-3">

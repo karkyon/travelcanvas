@@ -277,6 +277,8 @@ export interface ChartEvent {
   duration?: number | null;
   modeText: string | null;
   mode: string | null;
+  /** [Gate EventArea] エリアの中の予定(帯の上に少し字下げして重ねる) */
+  inArea?: boolean;
 }
 
 export interface ChartDay {
@@ -295,6 +297,8 @@ export interface ChartDay {
   travels?: ChartTravel[];
   gaps?: Array<[number, number]>;
   byMode?: Array<{ mode: string; label: string; minutes: number; km: number | null }>;
+  /** [Gate EventArea] エリア(時刻のある物)。薄い色の大きな帯にし、中の予定をその上に重ねる */
+  areas?: ChartEvent[];
 }
 
 export interface ChartTravel { eventId: string; start: number; end: number; mode: string; minutes: number; km: number | null }
@@ -380,8 +384,10 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
     const busy: Array<[number, number]> = [];
     const travel: Array<[number, number]> = [];
     const travels: ChartTravel[] = [];
+    const areas: ChartEvent[] = [];
     for (const e of d.events) {
-      const seg = arrivalSegment(e.id, segments);
+      // [Gate EventArea] エリアの中の予定は歩いて回る(移動の帯を出さない・数えない)
+      const seg = e.parent_event_id ? null : arrivalSegment(e.id, segments);
       const start = toMinutes(e.start_time);
       let end = toMinutes(e.end_time);
       if (start !== null && end !== null && (e.end_day_offset ?? 0) > 0) end = 24 * 60;
@@ -392,12 +398,25 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
         category: e.category ?? 'other',
         duration: start !== null && end !== null && end >= start && !(e.end_day_offset ?? 0) ? end - start : null,
       };
+      if (e.parent_event_id) item.inArea = true;
       if (start === null) {
         untimed.push(item);
         continue;
       }
-      timed.push(item);
       busy.push([start, item.end ?? start]);
+      if (e.category === 'area') {
+        // [Gate EventArea] エリアは帯(予定の列には並べない。滞在の時間は空き時間に含めない)
+        areas.push(item);
+        if (seg?.duration_minutes) {
+          travel.push([Math.max(0, start - seg.duration_minutes), start]);
+          travels.push({ eventId: e.id, start: Math.max(0, start - seg.duration_minutes), end: start, mode: seg.mode,
+            minutes: seg.duration_minutes, km: seg.distance_km ?? null });
+        }
+        scaleStart = Math.min(scaleStart, start);
+        scaleEnd = Math.max(scaleEnd, item.end ?? start);
+        continue;
+      }
+      timed.push(item);
       if (seg?.duration_minutes) {
         travel.push([Math.max(0, start - seg.duration_minutes), start]);
         travels.push({ eventId: e.id, start: Math.max(0, start - seg.duration_minutes), end: start, mode: seg.mode,
@@ -407,8 +426,9 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       scaleEnd = Math.max(scaleEnd, item.end ?? start);
     }
     timed.sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
-    const first = timed[0]?.start ?? null;
-    const lastEnd = timed.length ? Math.max(...timed.map((t) => t.end ?? t.start ?? 0)) : null;
+    const spans = [...timed, ...areas];
+    const first = spans.length ? Math.min(...spans.map((t) => t.start ?? 0)) : null;
+    const lastEnd = spans.length ? Math.max(...spans.map((t) => t.end ?? t.start ?? 0)) : null;
     const travelMinutes = unionMinutes(travel);
     const occupied = unionMinutes([...busy, ...travel]);
     const span = first !== null && lastEnd !== null ? lastEnd - Math.min(first, ...travel.map(([a]) => a)) : null;
@@ -424,7 +444,7 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
       index, id: d.id, date: d.date ?? '', timezone: d.timezone_id ?? null, events: timed, untimed,
       first: hm(first), last: hm(lastEnd), travelMinutes, freeMinutes: span !== null ? Math.max(0, span - occupied) : null,
       lockedCount: d.events.filter((e) => locked.has(e.id)).length,
-      travels, gaps, byMode,
+      travels, gaps, byMode, areas,
     };
   });
   // [Gate TimelineDrag] 物差しはいつも 6:00〜22:00 を含める(予定の時刻だけに合わせると、1 件ドラッグした直後に

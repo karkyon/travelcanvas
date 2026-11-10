@@ -184,13 +184,22 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           <span key={i} className="absolute left-0 right-0 border-t border-dashed border-cloud-200 text-[10px] text-ink-700"
             style={{ top: i * PX_PER_HOUR }} aria-hidden="true">{hm(scaleStart + i * 60)}</span>
         ))}
+        {/* [Gate EventArea] エリアは薄い色の大きな帯(中の予定はその上に重ねる) */}
+        {(day.areas ?? []).map((a) => (
+          <div key={`area-${a.id}`} className="tc-chart-area" data-testid={`chart-area-${a.id}`}
+            style={{ top: (((a.start ?? scaleStart) - scaleStart) / 60) * PX_PER_HOUR,
+              height: Math.max(30, ((((a.end ?? a.start ?? scaleStart) - (a.start ?? scaleStart)) / 60) * PX_PER_HOUR)) }}>
+            <span title={`エリア ${hm(a.start ?? 0)}〜${hm(a.end ?? a.start ?? 0)} ${a.title}`}>{a.title}</span>
+            <span className="sr-only">{`エリア ${hm(a.start ?? 0)} ${a.title}`}</span>
+          </div>
+        ))}
         <ol className="absolute inset-0 left-10" aria-label={`${label}の予定(時刻順)`}>
           {day.events.map((e) => {
             const top = (((e.start ?? scaleStart) - scaleStart) / 60) * PX_PER_HOUR;
             const h = Math.max(30, ((((e.end ?? e.start ?? scaleStart) - (e.start ?? scaleStart)) / 60) * PX_PER_HOUR));
             const lane = lanes.get(e.id) ?? { lane: 0, of: 1 };
             return (
-              <li key={e.id} className="absolute" data-lane={lane.of > 1 ? `${lane.lane + 1}/${lane.of}` : undefined}
+              <li key={e.id} className={`absolute${e.inArea ? ' tc-chart-in-area' : ''}`} data-lane={lane.of > 1 ? `${lane.lane + 1}/${lane.of}` : undefined}
                 style={{ top, height: h, left: `${(lane.lane / lane.of) * 100}%`, width: `calc(${100 / lane.of}% - ${lane.of > 1 ? 2 : 0}px)` }}>
                 <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id, e.start)}
                   data-category={e.category}

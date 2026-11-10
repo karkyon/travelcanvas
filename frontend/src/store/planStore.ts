@@ -116,7 +116,7 @@ interface PlanState {
   deleteScheduleItem: (itemId: string) => Promise<{ ok: boolean; note: string | null }>;
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
   /** [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。1 回の「元に戻す」で戻る。成功で true */
-  reorderDaySlots: (dayId: string, itemIds: string[]) => Promise<boolean>;
+  reorderDaySlots: (dayId: string, itemIds: string[], keepSlots?: boolean) => Promise<boolean>;
   /** 別の日へ移す(日時も日数の差だけずらす)。成功で true */
   moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<boolean>;
 
@@ -152,7 +152,8 @@ function readEventUrls(raw: unknown): EventUrl[] | undefined {
 
 function mapEvent(e: NormalizedEvent): ScheduleItem {
   // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
-  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown; dining?: unknown };
+  const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown; dining?: unknown;
+    parent_event_id?: string | null };
   return {
     id: e.id,
     title: e.title,
@@ -174,6 +175,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     urls: readEventUrls(g7.urls),
     // [Gate SpotInfo] 食事の情報(形が違えば捨てる)
     dining: g7.dining && typeof g7.dining === 'object' && !Array.isArray(g7.dining) ? (g7.dining as ScheduleItem['dining']) : null,
+    // [Gate EventArea] 入っているエリア
+    parent_event_id: g7.parent_event_id ?? null,
   };
 }
 
@@ -636,6 +639,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       phone: item.phone,
       urls: item.urls,
       dining: item.dining,
+      parent_event_id: item.parent_event_id ?? null,
     };
 
     const updatedDay = { ...day, events: [...day.events, optimisticItem] };
@@ -664,6 +668,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ...(optimisticItem.phone ? { phone: optimisticItem.phone } : {}),
           ...(optimisticItem.urls?.length ? { urls: optimisticItem.urls } : {}),
           ...(optimisticItem.dining ? { dining: optimisticItem.dining } : {}),
+          // [Gate EventArea] エリアの中へ入れる(サーバーがエリアの中の最後へ並べる)
+          ...(optimisticItem.parent_event_id ? { parent_event_id: optimisticItem.parent_event_id } : {}),
         },
         generateIdempotencyKey()
       );
@@ -776,9 +782,18 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ...(item.urls === undefined || hidePlace ? {} : { urls: item.urls }),
           // [Gate SpotInfo] 食事の情報(変えた時だけ。null で消す)
           ...(item.dining === undefined ? {} : { dining: item.dining }),
+          // [Gate EventArea] エリアに入れる・外す(変えた時だけ。null で外す)
+          ...(item.parent_event_id === undefined ? {} : { parent_event_id: item.parent_event_id }),
         },
         plan.revision!
       );
+      // [Gate EventArea] エリアに入れた・外した・エリアの種類を変えた時は、サーバーが並びを直すので読み直す
+      const before = plan.days.flatMap((d) => d.events).find((e) => e.id === itemId);
+      if (item.parent_event_id !== undefined || (item.category !== undefined
+        && (item.category === 'area') !== (before?.category === 'area'))) {
+        await get().loadPlan(plan.id);
+        return 'saved';
+      }
 
       set((s) => {
         if (!s.currentPlan) return s;
@@ -931,7 +946,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   // [Gate PlanSpotEdit] 1 日の並べ替え(スポットだけを入れ替える)。サーバーが 1 つの変更として行い、その日の予定を返す
-  reorderDaySlots: async (dayId: string, itemIds: string[]) => {
+  reorderDaySlots: async (dayId: string, itemIds: string[], keepSlots = true) => {
     const plan = get().currentPlan;
     if (!plan || plan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
@@ -939,7 +954,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     }
     try {
       const { reorderDay } = await import('../services/api/planEdit');
-      const result = await reorderDay(plan.id, dayId, itemIds, plan.revision);
+      const result = await reorderDay(plan.id, dayId, itemIds, plan.revision, keepSlots);
       set((s) => (s.currentPlan && s.currentPlan.id === plan.id ? {
         currentPlan: {
           ...s.currentPlan,

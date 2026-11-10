@@ -292,6 +292,25 @@
 /* [Gate PlanUX] 予定と予定の間の移動: 行・選ぶボタン・移動手段の印(押した時だけ出す)・詳細 */
 .tc-segment-slot { margin: 0 0 6px 69px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .tc-segment-slot > .tc-segment-row { margin: 0; }
+/* [Gate EventArea] エリアの枠(おかげ横丁の中の赤福・ダンデライオン): エリアを見出し、中の予定は字下げで続く。中の移動は数えない */
+.tc-area-area, .tc-area-member { position: relative; background: color-mix(in srgb, #0e7c6b 6%, var(--tc-cloud-0));
+  border-left: 3px solid #0e7c6b; border-right: 1px solid color-mix(in srgb, #0e7c6b 28%, transparent); padding: 0 6px 0 4px; }
+.tc-area-area { border-top: 1px solid color-mix(in srgb, #0e7c6b 28%, transparent); border-radius: 14px 14px 0 0; padding-top: 8px; margin-top: 6px; }
+.tc-area-area.is-area-last, .tc-area-member.is-area-last { border-bottom: 1px solid color-mix(in srgb, #0e7c6b 28%, transparent);
+  border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; padding-bottom: 6px; margin-bottom: 8px; }
+.tc-area-member > .tc-event-row { margin-left: 18px; }
+.tc-area-member > .tc-segment-row { margin-left: 87px; }
+.tc-area-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 6px 6px; font-size: 12px; font-weight: 700; color: #0b5d52; }
+.tc-area-tag { display: inline-flex; padding: 1px 8px; border-radius: 999px; background: #0e7c6b; color: #fff; font-size: 11px; font-weight: 800; }
+.tc-segment-row--inner { color: #0b5d52; font-style: normal; }
+:root[data-theme='dark'] .tc-area-sum, :root[data-theme='dark'] .tc-segment-row--inner { color: #7fd8c6; }
+@media (max-width: 640px) { .tc-area-member > .tc-event-row { margin-left: 10px; } .tc-area-member > .tc-segment-row { margin-left: 65px; } }
+.tc-chart-area { position: absolute; left: 40px; right: 0; z-index: 0; pointer-events: none; border-radius: 10px;
+  background: color-mix(in srgb, #0e7c6b 9%, transparent); border: 1px dashed color-mix(in srgb, #0e7c6b 55%, transparent); }
+.tc-chart-area > span:not(.sr-only) { position: absolute; left: 0; top: 0; bottom: 0; width: 17px; overflow: hidden; writing-mode: vertical-rl;
+  padding: 5px 0; border-radius: 9px 0 0 9px; background: #0e7c6b; color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-align: center; }
+.tc-chart-in-area { padding-left: 20px; }
 .tc-segment-row--empty { border-left-style: dashed; }
 .tc-segment-tools { display: inline-flex; gap: 6px; }
 .tc-segment-btn { min-height: 32px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--tc-cloud-200);

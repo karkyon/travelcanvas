@@ -656,7 +656,7 @@ describe('[Gate PlanSpotEdit] 並べ替え・同じ旅行の読み直し・電�
     reorderDay.mockResolvedValue({ revision: 6, day: { id: DAY_ID, local_date: '2026-11-28', timezone_id: 'Asia/Tokyo', sort_order: 1, events: [
       ev('b', '賀多神社', '09:00', 0), ev('a', 'ミキモト真珠島', '11:00', 1)] } });
     await expect(usePlanStore.getState().reorderDaySlots(DAY_ID, ['b', 'a'])).resolves.toBe(true);
-    expect(reorderDay).toHaveBeenCalledWith(PLAN_ID, DAY_ID, ['b', 'a'], 5);
+    expect(reorderDay).toHaveBeenCalledWith(PLAN_ID, DAY_ID, ['b', 'a'], 5, true);
     const plan = usePlanStore.getState().currentPlan!;
     expect(plan.revision).toBe(6);
     expect(plan.days[1]!.events.map((e) => [e.title, e.start_time])).toEqual([['賀多神社', '09:00'], ['ミキモト真珠島', '11:00']]);
