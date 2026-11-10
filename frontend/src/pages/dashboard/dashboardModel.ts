@@ -33,15 +33,44 @@ export function tripDateLabel(t: Pick<DashboardTrip, 'start_date' | 'end_date' |
   return e ? `${s}〜${e}${days}` : `${s}${days}`;
 }
 
-/** 段階ごとの短い状況(あと何日・何日目・何日前) */
+/**
+ * [Gate RelDays] 日数を読みやすい長さに。31 日までは日のまま、それより長いと「か月」(半月の単位で丸めて「約」)、
+ * 1 年以上は「年とか月」(月で丸めて「約」)。多くのアプリの相対時刻(30 日前後で月・11 か月前後で年に切り替える)に合わせ、
+ * 端数は半月まで出す。正確な日数は title で見られる(spanTitle)。
+ */
+export function daySpan(days: number): string {
+  if (days <= 31) return `${days}日`;
+  const months = days / 30.44;
+  if (days < 365) {
+    const half = Math.round(months * 2) / 2;
+    const whole = Math.floor(half);
+    return `約${whole}か月${half > whole ? '半' : ''}`;
+  }
+  let years = Math.floor(days / 365.25);
+  let rest = Math.round((days - years * 365.25) / 30.44);
+  if (rest >= 12) { years += 1; rest -= 12; }
+  return `約${years}年${rest ? `${rest}か月` : ''}`;
+}
+
+/** 状況の札の title(正確な日数。31 日を超える時だけ) */
+export function spanTitle(t: DashboardTrip): string | undefined {
+  const n = t.phase === 'upcoming' ? t.days_until_start : t.phase === 'past' ? t.days_since_end : null;
+  if (n === null || n === undefined || n <= 31) return undefined;
+  return t.phase === 'upcoming' ? `出発まで ${n}日` : `終了から ${n}日`;
+}
+
+/** 段階ごとの短い状況(あと何日・何日目・何日前。長い時は「約○か月」「約○年○か月」) */
 export function statusLabel(t: DashboardTrip): string {
   switch (t.phase) {
     case 'upcoming':
-      return t.days_until_start === 1 ? '明日から' : `あと${t.days_until_start ?? '?'}日`;
+      if (t.days_until_start === 0) return '今日から';
+      return t.days_until_start === 1 ? '明日から' : t.days_until_start == null ? 'あと?日' : `あと${daySpan(t.days_until_start)}`;
     case 'ongoing':
       return t.total_days ? `${t.day_number ?? 1}日目 / ${t.total_days}日` : `${t.day_number ?? 1}日目`;
     case 'past':
-      return t.days_since_end === 0 ? '今日まで' : `${t.days_since_end ?? '?'}日前に終了`;
+      if (t.days_since_end === 0) return '今日まで';
+      if (t.days_since_end === 1) return '昨日終了';
+      return t.days_since_end == null ? '?日前に終了' : `${daySpan(t.days_since_end)}前に終了`;
     default:
       return '日程を決めましょう';
   }

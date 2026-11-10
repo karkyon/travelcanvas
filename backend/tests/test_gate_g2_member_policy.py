@@ -8,6 +8,7 @@
 - 所有者には何も隠さない。規則の無い旅行は本Gate以前と同じ(何も隠さない)
 """
 import json
+import re
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -28,6 +29,7 @@ NOTE = "集合は裏口G2メモ"
 ADDR = "京都市東山区G2番地"
 CONF = "G2CF-1234-8765"
 DOCNAME = "保険証券G2.pdf"
+UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
 @pytest.fixture(autouse=True)
@@ -158,6 +160,9 @@ def test_viewer_sees_nothing_hidden_on_any_route(auth_client, make_user, db_sess
                 body = json.dumps({k: v for k, v in data.items() if k != "query"}, ensure_ascii=False)
         except ValueError:
             pass
+        # 無作為に作る ID(UUID)に数字の並び(例 8765)がたまたま入ると、隠した値が漏れたと誤って判定していた
+        # (CI で時々落ちた)。ID は伏せる対象ではないので、確かめる前に取り除く
+        body = UUID_RE.sub("<id>", body)
         for x in secrets:
             assert x not in body, (res.request.url, x)
 

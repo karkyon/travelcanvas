@@ -56,7 +56,7 @@ export interface DashboardHome {
     prefectures: string[]; planned_prefectures: string[]; all_prefectures: string[]; trips_visited: number;
     days_this_year: number; photos: number;
     /** [Gate Footprints2] 行った・計画中の旅の予定の位置(世界地図の点)と、海外の旅の数(古い応答には無い) */
-    points?: Array<{ lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[] }>;
+    points?: Array<{ lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[]; jp?: boolean }>;
     overseas_trips?: number;
     /** [Gate FootHover] 都道府県ごとの旅行(直近 5 件。古い応答には無い) */
     pref_trips?: Record<string, FootTrip[]>;

@@ -54,7 +54,7 @@ export const AREA_LABEL: Record<string, string> = {
 };
 export const C = 6; // 升目(3°)の大きさ
 
-export interface MapPoint { lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[] }
+export interface MapPoint { lat: number; lng: number; state: 'visited' | 'planned'; label: string; trips?: FootTrip[]; jp?: boolean }
 
 /** 経度・緯度 → 地図の位置(正距円筒。升目と同じ割合) */
 export function project(lat: number, lng: number): { x: number; y: number } {
@@ -111,11 +111,14 @@ export function neighborPrefs(name: string): Set<string> {
 export function tripsNearCell(points: MapPoint[], r: number, c: number): FootTrip[] {
   const cx = (c + 0.5) * C;
   const cy = (r + 0.5) * C;
-  const rows: FootTrip[] = [];
-  for (const p of points) {
+  const near = points.map((p) => {
     const { x, y } = project(p.lat, p.lng);
-    if (Math.hypot(x - cx, y - cy) <= C * 1.5) rows.push(...(p.trips ?? []));
-  }
+    return { p, d: Math.hypot(x - cx, y - cy) };
+  }).filter((n) => n.d <= C * 1.5).sort((a, b) => a.d - b.d);
+  // [Gate FootCountry] カーソルに一番近い点の国(日本か海外か)の旅だけ。日本に当てて海外の旅を出さない
+  const jp = near[0]?.p.jp;
+  const rows: FootTrip[] = [];
+  for (const { p } of near) if (jp === undefined || p.jp === undefined || p.jp === jp) rows.push(...(p.trips ?? []));
   return recentFootTrips(rows);
 }
 
