@@ -166,3 +166,11 @@ describe('予定の写真', () => {
     await waitFor(() => expect(onChanged).toHaveBeenLastCalledWith(null));
   });
 });
+
+describe('[DiscoverUX] 直線距離の目安', () => {
+  it('2 点の直線距離と言い方', async () => {
+    const { straightKm, kmLabel } = await import('./discoverModel');
+    expect(straightKm({ latitude: 35, longitude: 135 }, { latitude: 35.1, longitude: 135 })).toBeCloseTo(11.12, 1);
+    expect([kmLabel(0.43), kmLabel(2.345), kmLabel(18.6)]).toEqual(['約430m', '約2.3km', '約19km']);
+  });
+});

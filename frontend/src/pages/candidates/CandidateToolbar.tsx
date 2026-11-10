@@ -3,7 +3,7 @@
  * 言葉(名前・メモ・住所・タグ)・状態・種類・エリア(市区町村)・タグ・優先度で絞り、優先度・新しい順・名前・基点からの距離で並べる。
  */
 import React from 'react';
-import { LayoutGrid, List, Search, X } from 'lucide-react';
+import { LayoutGrid, List, Search, X, Map as MapIcon } from 'lucide-react';
 import type { PlanCandidateItem } from '@/services/api';
 import type { BasePoint } from '../discover/discoverModel';
 import {
@@ -20,8 +20,8 @@ interface Props {
   shown: number;
   filter: CandidateFilter;
   onChange: (f: CandidateFilter) => void;
-  view: 'card' | 'list';
-  onView: (v: 'card' | 'list') => void;
+  view: 'card' | 'list' | 'map';
+  onView: (v: 'card' | 'list' | 'map') => void;
   bases: BasePoint[];
   baseId: string;
   onBase: (id: string) => void;
@@ -68,8 +68,12 @@ const CandidateToolbar: React.FC<Props> = ({ items, shown, filter, onChange, vie
             className={`tc-focus-ring min-h-10 rounded-l-xl px-3 ${view === 'card' ? 'bg-ink-900 text-cloud-0' : ''}`} data-testid="candidate-view-card">
             <LayoutGrid size={15} aria-label="カード" /></button>
           <button type="button" aria-pressed={view === 'list'} onClick={() => onView('list')} title="一覧で表示(コンパクト)"
-            className={`tc-focus-ring min-h-10 rounded-r-xl px-3 ${view === 'list' ? 'bg-ink-900 text-cloud-0' : ''}`} data-testid="candidate-view-list">
+            className={`tc-focus-ring min-h-10 px-3 ${view === 'list' ? 'bg-ink-900 text-cloud-0' : ''}`} data-testid="candidate-view-list">
             <List size={15} aria-label="一覧" /></button>
+          {/* [Gate DiscoverUX] 地図で位置関係と基点からの直線距離を見る */}
+          <button type="button" aria-pressed={view === 'map'} onClick={() => onView('map')} title="地図で表示(位置関係・直線距離)"
+            className={`tc-focus-ring min-h-10 rounded-r-xl px-3 ${view === 'map' ? 'bg-ink-900 text-cloud-0' : ''}`} data-testid="candidate-view-map">
+            <MapIcon size={15} aria-label="地図" /></button>
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="状態">

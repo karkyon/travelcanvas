@@ -9,11 +9,28 @@ import type { CandidateList } from '@/services/api';
 
 const m = vi.hoisted(() => ({
   getCandidates: vi.fn(), createCandidate: vi.fn(), updateCandidate: vi.fn(), deleteCandidate: vi.fn(),
-  scheduleCandidate: vi.fn(), mergeCandidate: vi.fn(), getPlanDetail: vi.fn(),
+  scheduleCandidate: vi.fn(), mergeCandidate: vi.fn(), getPlanDetail: vi.fn(), createCandidateFromSearch: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ ...m, default: { getPlanDetail: m.getPlanDetail } }));
 
 vi.mock('./candidates/CandidateVoting', () => ({ default: () => null }));
+// [Gate DiscoverUX] 近くを探す部品は、押すと検索結果を画面へ渡すだけの代わりにする。地図は印の数だけを出す
+const NEAR = vi.hoisted(() => [
+  { id: 'n1', provider: 'overpass', name: '二見興玉神社・夫婦岩', category: '絶景', distance_m: 1800, within_radius: true,
+    radius_guaranteed: true, retrieved_at: '2026-11-10T02:24:00+00:00',
+    location: { latitude: 34.509, longitude: 136.785, address: '三重県伊勢市二見町江' } },
+  { id: 'n2', provider: 'overpass', name: '伊勢シーパラダイス', category: '水族館', distance_m: 2100, within_radius: true,
+    radius_guaranteed: true, retrieved_at: '2026-11-10T02:24:00+00:00',
+    location: { latitude: 34.511, longitude: 136.79, address: '三重県伊勢市二見町江' } },
+]);
+vi.mock('./discover/NearbyDiscover', () => ({
+  default: ({ onResults }: { onResults?: (r: unknown[], b: unknown) => void }) => (
+    <button type="button" onClick={() => onResults?.(NEAR, { id: 'b', label: '旅程の場所', latitude: 34.5, longitude: 136.78 })}>近くを探す(代わり)</button>
+  ),
+}));
+vi.mock('./discover/DiscoverMap', () => ({
+  default: ({ pins, label }: { pins: unknown[]; label: string }) => <div data-testid="discover-map">{`${label} ${pins.length}件`}</div>,
+}));
 import CandidatesPage from './CandidatesPage';
 
 const dupes = fx.candidates_duplicates as unknown as CandidateList;
@@ -107,5 +124,35 @@ describe('CandidatesPage (Gate C2)', () => {
     await screen.findByRole('region', { name: '候補の一覧' });
     expect(screen.queryByRole('form', { name: '候補を追加' })).toBeNull();
     expect(screen.queryByRole('button', { name: /旅程に追加/ })).toBeNull();
+  });
+
+  it('[DiscoverUX] 探す(未保存の検索結果)と保存済みの候補を分け、保存すると札と件数が変わり、候補一覧へ移れる', async () => {
+    m.getCandidates.mockResolvedValue({ ...dupes, can_edit: true });
+    m.createCandidateFromSearch.mockResolvedValue({ ...dupes, can_edit: true, counts: { ...dupes.counts, open: dupes.counts.open + 1 } });
+    renderPage();
+    const search = await screen.findByRole('region', { name: '場所を探す' });
+    expect(search).toHaveTextContent('まだこの旅行には保存されていません');
+    expect(screen.getByRole('region', { name: new RegExp(`この旅行に保存済みの候補 ${dupes.counts.open}`) })).toBeInTheDocument();
+    fireEvent.click(within(search).getByText('近くを探す(代わり)'));
+    const results = await screen.findByTestId('discover-results');
+    expect(results).toHaveTextContent('検索結果 2件未保存の検索結果');
+    expect(within(results).getByTestId('nearby-state-n1')).toHaveTextContent('未保存');
+    fireEvent.click(within(results).getByTestId('nearby-add-n1'));
+    await waitFor(() => expect(m.createCandidateFromSearch).toHaveBeenCalledWith('p1', 'n1'));
+    expect(await within(results).findByTestId('discover-saved-notice')).toHaveTextContent('「二見興玉神社・夫婦岩」をこの旅行の候補に保存しました');
+    expect(within(results).getByTestId('nearby-state-n1')).toHaveTextContent('候補に保存済み');
+    expect(within(results).getByTestId('nearby-add-n1')).toHaveTextContent('✓ 保存済み');
+    expect(screen.getByTestId('disc-tab-count')).toHaveTextContent(String(dupes.counts.open + 1));
+    // 地図に切り替えると、基点と位置の分かる結果を出す
+    fireEvent.click(within(results).getByTestId('discover-results-map'));
+    expect(await within(results).findByTestId('discover-map')).toHaveTextContent('検索結果の地図 2件');
+    expect(screen.getByRole('link', { name: 'ライブラリを見る →' })).toHaveAttribute('href', '/spots');
+  });
+
+  it('[DiscoverUX] 保存済みの候補も地図で見られる(位置の分からない候補は数を示す)', async () => {
+    m.getCandidates.mockResolvedValue({ ...dupes, can_edit: true });
+    renderPage();
+    fireEvent.click(await screen.findByTestId('candidate-view-map'));
+    expect(await screen.findByTestId('discover-map')).toHaveTextContent('この旅行の候補の地図');
   });
 });
