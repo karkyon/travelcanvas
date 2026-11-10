@@ -57,12 +57,15 @@ test('発見: 近くを探す・SNS の投稿・外部の写真の表紙・予�
   await expect(page.getByTestId('nearby-base')).toContainText('清水寺');
   await nearby.getByTestId('nearby-category-food').click();
   await nearby.getByTestId('nearby-search').click();
-  const rows = nearby.getByTestId(/nearby-result-/);
+  // [Gate DiscoverUX] 検索結果は「場所を探す」の下の帯(未保存の検索結果)に出す。出典は帯の見出しにまとめる
+  const band = page.getByTestId('discover-results');
+  const rows = band.getByTestId(/nearby-result-/);
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('近くの甘味処');
   await expect(rows.nth(0)).toContainText('半径内 · 122m');
+  await expect(rows.nth(0)).toContainText('未保存');
   await expect(rows.nth(1)).toContainText('周辺優先 · 1.1km');
-  await expect(rows.nth(1)).toContainText('出典: OpenStreetMap(地名)');
+  await expect(band).toContainText('OpenStreetMap');
 
   // 2. SNS の投稿
   await page.route(`**/api/v1/plans/${plan.id}/candidates/social-preview`, (route) => route.fulfill({ json: {
