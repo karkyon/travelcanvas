@@ -1,3 +1,4 @@
+import type { AreaExtra } from '@/components/planner/areaModel';
 import { useCallback } from 'react';
 import { usePlanStore } from '../store/planStore';
 import type { CreateScheduleItemData, ScheduleItem, TravelPlan } from '../types';
@@ -127,8 +128,8 @@ export const usePlan = () => {
   // [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。成功で true
   // [Gate EventArea] エリアのまとまりを動かす時は keepSlots=false(時刻は予定に付いたまま)
   const reorderSpots = useCallback(
-    async (_planId: string, dayId: string, itemOrders: string[], keepSlots = true) =>
-      reorderDaySlots(dayId, itemOrders, keepSlots),
+    async (_planId: string, dayId: string, itemOrders: string[], keepSlots = true, extra?: AreaExtra) =>
+      (extra ? reorderDaySlots(dayId, itemOrders, keepSlots, extra) : reorderDaySlots(dayId, itemOrders, keepSlots)),
     [reorderDaySlots]
   );
 

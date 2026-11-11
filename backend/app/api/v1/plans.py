@@ -1171,6 +1171,18 @@ class DayReorder(BaseModel):
     (以前の並べ替えと同じ。時刻は予定に付いたまま)。"""
     order: List[str]
     keep_slots: bool = True
+    # [Gate AreaDrag] エリアの出し入れ(予定 ID → エリアの ID。null は外す)と、時刻の付け直し(予定 ID → 開始・終了 HH:MM)。
+    # ドラッグでエリアへ入れた・出した・エリアの中で並べ替えた時に、並びと一緒に 1 つの変更(1 回の「元に戻す」)で送る
+    parents: Optional[Dict[str, Optional[str]]] = None
+    times: Optional[Dict[str, "DayReorderTime"]] = None
+
+
+class DayReorderTime(BaseModel):
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+DayReorder.model_rebuild()
 
 
 class DayReorderResult(BaseModel):
@@ -1249,6 +1261,49 @@ async def reorder_day(
                 if after != before:
                     changes.append(("travel_segment", seg.id, "update", before, after))
             db.flush()
+
+    # [Gate AreaDrag] エリアの出し入れと時刻の付け直し(確定の予定は変えない)
+    for eid, pid_raw in (body.parents or {}).items():
+        tev = by_id.get(eid)
+        if tev is None:
+            raise HTTPException(status_code=400, detail={
+                "code": "order_mismatch", "message": "並びがこの日の予定と合いません。読み直してからもう一度並べ替えてください"})
+        try:
+            pid = event_area.parse_parent(pid_raw)
+            event_area.check_parent(db, plan_id=plan.id, day_id=day.id, event_type=tev.event_type, event_id=tev.id,
+                                    parent_id=pid)
+        except event_area.AreaError as area_err:
+            raise _area_error(area_err)
+        if tev.parent_event_id != pid:
+            if tev.locked:
+                raise HTTPException(status_code=409, detail={"code": "locked_event", "message": "確定の予定は動かせません"})
+            tev.parent_event_id = pid
+    for eid, t in (body.times or {}).items():
+        tev = by_id.get(eid)
+        if tev is None:
+            raise HTTPException(status_code=400, detail={
+                "code": "order_mismatch", "message": "並びがこの日の予定と合いません。読み直してからもう一度並べ替えてください"})
+        bad_end = t.end is not None and not et.parse_local_time(t.end)
+        if t.start is None or not et.parse_local_time(t.start) or bad_end:
+            raise _time_error(et.EventTimeError("invalid_time", "時刻はHH:MMで入力してください"))
+        cur_end = et.end_fields(tev.end_at, day.local_date, day.timezone_id)[0] if tev.end_at is not None else None
+        if tev.local_start_time == t.start and (t.end is None or cur_end == t.end):
+            continue
+        if tev.locked:
+            raise HTTPException(status_code=409, detail={"code": "locked_event", "message": "確定の予定の時刻は変えられません"})
+        old_time = tev.local_start_time
+        tev.local_start_time = t.start
+        _apply_local_start(tev, old_time, keep_end=t.end is not None)
+        if t.end is not None:
+            _apply_end_and_check(tev, day, True, t.end, None)
+    if body.parents or body.times:
+        db.flush()
+        for eid, tev2 in by_id.items():
+            after = _event_to_dict(tev2)
+            if after != befores[eid] and not any(c[0] == "travel_event" and c[1] == tev2.id for c in changes):
+                changes.append(("travel_event", tev2.id, "reorder", befores[eid], after))
+        changes = [c if c[0] != "travel_event" else (c[0], c[1], c[2], c[3], _event_to_dict(by_id[str(c[1])]))
+                   for c in changes]
 
     # [Gate EventArea] エリアの中の予定はエリアのすぐ後ろ(画面もこの並びで送るが、決まりに合わせて直す)
     area_fix = event_area.normalize_day(db, day.id, _event_to_dict)

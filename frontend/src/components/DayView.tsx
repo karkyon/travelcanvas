@@ -4,7 +4,7 @@ import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
 import type { TravelSegment } from '../services/api/types/segments';
 import { hoursBadge, keepSlots, moveBlockedReason, reorderImpact, segmentRow } from './planner/plannerModel';
-import { areaMove, areaRoles, areaSummary, isInnerPair } from './planner/areaModel';
+import { applyExtra, areaDrop, areaMove, areaRoles, areaSummary, blockOf, isInnerPair, type AreaExtra } from './planner/areaModel';
 import ReorderImpact from './planner/ReorderImpact';
 import ReorderPreview from './planner/ReorderPreview';
 import TransportIcon from './common/TransportIcon';
@@ -55,6 +55,7 @@ interface DayViewProps {
   showTimeProgress?: boolean;
   onItemClick?: (item: ScheduleItemType) => void;
   onItemEdit?: (item: ScheduleItemType) => void;
+  /** 消した後の知らせ(DayView が確かめて消す。呼び出し側は消さない) */
   onItemDelete?: (itemId: string) => void;
   /** [Gate G4] COL-03 予定へのコメントを開く */
   onItemComment?: (item: ScheduleItemType) => void;
@@ -226,14 +227,16 @@ const DayView: React.FC<DayViewProps> = ({
   const [pending, setPending] = useState<string[] | null>(null);
   // [Gate EventArea] エリアのまとまりを動かす案は、時刻を予定に付けたまま(位置の時刻を受け継がない)
   const [pendingKeep, setPendingKeep] = useState(true);
+  // [Gate AreaDrag] エリアの出し入れ・時刻の付け直し(並びと一緒に保存する)
+  const [pendingExtra, setPendingExtra] = useState<AreaExtra | null>(null);
   const [applying, setApplying] = useState(false);
   // [Gate PlanSpotEdit] 案の並びは「スポットだけを入れ替える」見え方(時刻・移動手段は位置に残す。保存の結果と同じ)
   const slotted = useMemo(() => {
     if (!pending) return null;
     if (pendingKeep) return keepSlots(day.events, pending, segments);
     const byIdNow = new Map(day.events.map((e) => [e.id, e]));
-    return { events: pending.map((id) => byIdNow.get(id)!).filter(Boolean), segments };
-  }, [pending, pendingKeep, day.events, segments]);
+    return { events: applyExtra(pending.map((id) => byIdNow.get(id)!).filter(Boolean), pendingExtra), segments };
+  }, [pending, pendingKeep, pendingExtra, day.events, segments]);
   const view = slotted ? slotted.events : day.events;
   // [Gate EventArea] エリアの枠(エリアと、すぐ後ろに続く中の予定)と見出しの数
   const roles = useMemo(() => areaRoles(view), [view]);
@@ -257,10 +260,12 @@ const DayView: React.FC<DayViewProps> = ({
   useEffect(() => { setPending(null); }, [day.id]);
   const previewModel = useMemo(() => (pending ? reorderImpact(savedOrder, null, view, null, false, viewSegments) : null),
     [pending, savedOrder, view, viewSegments]);
-  const propose = useCallback((next: string[], message: string, keep = true) => {
+  const propose = useCallback((next: string[], message: string, keep = true, extra: AreaExtra | null = null) => {
     setImpact(null);
     setPendingKeep(keep);
-    setPending(next.join(',') === savedOrder.join(',') ? null : next);
+    const hasExtra = Boolean(extra && (extra.parents || (extra.times && Object.keys(extra.times).length)));
+    setPendingExtra(hasExtra ? extra : null);
+    setPending(next.join(',') === savedOrder.join(',') && !hasExtra ? null : next);
     setAnnounce(message);
   }, [savedOrder]);
   const applyPending = useCallback(async () => {
@@ -268,21 +273,26 @@ const DayView: React.FC<DayViewProps> = ({
     setApplying(true);
     try {
       const baseline = { order: savedOrder, hours: hoursPending ? null : (hours?.byId ?? {}) };
-      const ok = await reorderSpots(planId, day.id, pending, pendingKeep);
+      const extra = pendingExtra;
+      const ok = extra ? await reorderSpots(planId, day.id, pending, pendingKeep, extra)
+        : await reorderSpots(planId, day.id, pending, pendingKeep);
       setPending(null);
+      setPendingExtra(null);
       if (!ok) {
         setAnnounce('並べ替えを保存できませんでした(何も変えていません)');
         return;
       }
       setImpact(baseline);
-      addToast({ type: 'success', message: pendingKeep ? 'スポットを入れ替えました(時刻と移動手段はそのまま)' : '並びを変えました(時刻は予定に付いたまま)' });
+      addToast({ type: 'success', message: extra ? 'エリアの中の予定と時刻を保存しました'
+        : pendingKeep ? 'スポットを入れ替えました(時刻と移動手段はそのまま)' : '並びを変えました(時刻は予定に付いたまま)' });
       setAnnounce('この並びを保存しました。営業時間と移動を確かめています');
     } finally {
       setApplying(false);
     }
-  }, [pending, pendingKeep, savedOrder, hoursPending, hours, reorderSpots, planId, day.id, addToast]);
+  }, [pending, pendingKeep, pendingExtra, savedOrder, hoursPending, hours, reorderSpots, planId, day.id, addToast]);
   const cancelPending = useCallback(() => {
     setPending(null);
+    setPendingExtra(null);
     setAnnounce('並べ替えの案をやめました(保存していません)');
   }, []);
   const moveBy = useCallback((event: ScheduleItemType, delta: -1 | 1) => {
@@ -532,22 +542,40 @@ const DayView: React.FC<DayViewProps> = ({
 
   // ドロップゾーンの処理
   // [Gate G11 段階7] ドラッグも案を作るだけ(保存は「この並びにする」)。確定(🔒)の予定の位置が変わる並べ替えは作らない
-  // [Gate PlanSpotEdit] 以前は予定の間の細い帯(高さ 8px・透明)だけが落とせる場所で、予定の上では「禁止」の印になり
-  // 入れ替えられなかった。予定の行そのものを落とせる場所にし、行の上半分なら前・下半分なら後ろに入れる(線で示す)
-  const [dropGap, setDropGap] = useState<number | null>(null);
+  // [Gate PlanSpotEdit] 予定の行そのものを落とせる場所にし、行の上半分なら前・下半分なら後ろに入れる(線で示す)
+  // [Gate AreaDrag] 落とした所がエリアの中か外かも見る(エリアの中へ入れる・外へ出す・中で並べ替える)。
+  // エリアの見出しの下半分・中の予定の行・「ここに落とすとエリアに入ります」はエリアの中。エリアの見出しの上半分は前(外)
+  const [dropAt, setDropAt] = useState<{ gap: number; parent: string | null } | null>(null);
   const ownDrag = dragState.isDragging && dragState.sourceContainer === containerId(planId, day.id);
-  useEffect(() => { if (!dragState.isDragging) setDropGap(null); }, [dragState.isDragging]);
-  const overRow = useCallback((e: React.DragEvent<HTMLElement>, index: number) => {
+  const draggedId = ownDrag ? dragState.draggedItems?.[0]?.id ?? null : null;
+  const draggingArea = Boolean(draggedId && roles.get(draggedId)?.role === 'area');
+  useEffect(() => { if (!dragState.isDragging) setDropAt(null); }, [dragState.isDragging]);
+  const setDrop = useCallback((gap: number, parent: string | null) => {
+    setDropAt((d) => (d && d.gap === gap && d.parent === parent ? d : { gap, parent }));
+  }, []);
+  const overRow = useCallback((e: React.DragEvent<HTMLElement>, index: number, mode: 'none' | 'member' | 'areaHead', areaId?: string) => {
     if (!ownDrag) return;
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     const r = e.currentTarget.getBoundingClientRect();
-    const gap = e.clientY < r.top + r.height / 2 ? index : index + 1;
-    setDropGap((g) => (g === gap ? g : gap));
-  }, [ownDrag]);
-  const handleItemDrop = useCallback((e: React.DragEvent, targetIndex: number) => {
+    const lower = !(e.clientY < r.top + r.height / 2);
+    if (mode === 'member' && !draggingArea) { setDrop(lower ? index + 1 : index, areaId ?? null); return; }
+    if (mode === 'areaHead' && !draggingArea) { setDrop(lower ? index + 1 : index, lower ? view[index]!.id : null); return; }
+    if (mode === 'areaHead' || mode === 'member') {
+      // エリアを動かす時は、エリアの枠の前か後ろ(外)
+      const ai = mode === 'member' ? view.findIndex((x) => x.id === areaId) : index;
+      const [, be] = blockOf(view, ai, roles);
+      setDrop(lower ? be + 1 : ai, null);
+      return;
+    }
+    setDrop(lower ? index + 1 : index, null);
+  }, [ownDrag, draggingArea, setDrop, view, roles]);
+  const handleItemDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setDropGap(null);
+    e.stopPropagation();
+    const at = dropAt;
+    setDropAt(null);
     let itemId: string | null = null;
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json')) as { itemId?: string; sourceContainer?: string };
@@ -556,22 +584,213 @@ const DayView: React.FC<DayViewProps> = ({
       itemId = null;
     }
     handleDragEnd();
-    if (!itemId || !byId[itemId]) return;
-    // [Gate EventArea] エリアの枠の中へは落とさない(入れる時は編集の「エリア」で)。エリアと中の予定は ↑↓ で動かす
-    const rolesNow = areaRoles(view);
-    if (rolesNow.get(itemId)?.role !== 'none' || (view[targetIndex] && rolesNow.get(view[targetIndex]!.id)?.role === 'member')) {
-      setAnnounce('エリアの中へは、予定の編集の「エリア」で入れてください(エリアのまとまりは ↑↓ で動かせます)');
+    if (!itemId || !byId[itemId] || !at) return;
+    // [Gate AreaDrag] エリアが関わる時は、並び・エリアの指定・時刻(はみ出したらエリアを延ばす)を 1 つの案に
+    const ad = areaDrop(view, itemId, at.gap, at.parent);
+    if (ad.kind === 'blocked') {
+      if (ad.reason !== '同じ位置です') addToast({ type: 'warning', message: ad.reason });
+      setAnnounce(ad.reason);
       return;
     }
+    if (ad.kind === 'move') { propose(ad.order, ad.text, false, ad.extra); return; }
     const order = view.map((x) => x.id);
-    const next = reorderArray(order, itemId, finalIndexForGap(order, itemId, targetIndex));
+    const next = reorderArray(order, itemId, finalIndexForGap(order, itemId, at.gap));
     if (view.some((x, i) => x.locked && next[i] !== x.id)) {
       setAnnounce('確定の予定の位置が変わるため、この並べ替えはできません');
       addToast({ type: 'error', message: '確定の予定の位置は変えられません' });
       return;
     }
     propose(next, `「${byId[itemId]!.title}」を${next.indexOf(itemId) + 1}番目へ動かす案にしました。まだ保存していません`);
-  }, [planId, day.id, view, byId, handleDragEnd, propose, addToast]);
+  }, [planId, day.id, view, byId, handleDragEnd, propose, addToast, dropAt]);
+
+  // [Gate AreaDrag] 旅程の並び → まとまり(普通の予定 1 つ・エリアと中の予定)
+  const blocks = useMemo(() => {
+    const out: Array<{ kind: 'single'; index: number } | { kind: 'area'; index: number; members: number[] }> = [];
+    view.forEach((e, i) => {
+      const r = roles.get(e.id);
+      if (r?.role === 'area') { out.push({ kind: 'area', index: i, members: [] }); return; }
+      const last = out[out.length - 1];
+      if (r?.role === 'member' && last?.kind === 'area' && view[last.index]!.id === r.areaId) { last.members.push(i); return; }
+      out.push({ kind: 'single', index: i });
+    });
+    return out;
+  }, [view, roles]);
+  // エリアの詳細(写真・住所・リンク)は見出しの「エリアの詳細を開く」で出す
+  const [openAreas, setOpenAreas] = useState<Set<string>>(() => new Set());
+  const toggleArea = useCallback((id: string) => {
+    setOpenAreas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
+  const dropLine = (gap: number, parent: string | null) => (ownDrag && dropAt && dropAt.gap === gap && dropAt.parent === parent
+    ? <div className={`tc-day-drop-line${parent ? ' is-in-area' : ''}`} aria-hidden="true" data-testid="drop-line" /> : null);
+
+  // [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行)。[Gate EventArea] エリアの中は歩いて回る(数えない)
+  const segmentFor = (index: number): React.ReactNode => {
+    const event = view[index]!;
+    const row = segmentRow(view, index, viewSegments, zones, day.timezone_id, titleMap);
+    const inner = index > 0 && isInnerPair(view[index - 1], event);
+    if (inner) {
+      return (
+        <div role="listitem" className="tc-segment-row tc-segment-row--inner" data-testid="segment-inner" data-to-event={event.id}>
+          <span className="sr-only">移動:</span>エリアの中 · 歩いて回る(移動として数えない)
+        </div>
+      );
+    }
+    if (index > 0) {
+      return (
+        <SegmentPicker planId={planId} revision={revision} fromEventId={view[index - 1]!.id}
+          fromTitle={view[index - 1]!.title} toEventId={event.id} toTitle={event.title}
+          segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
+          mismatch={Boolean(row?.mismatch)} canEdit={canEdit && Boolean(onSegmentSaved) && !pending}
+          onSaved={(sg) => onSegmentSaved?.(sg)}>
+          {row ? (
+            <div data-testid="segment-row" data-to-event={event.id}
+              data-mismatch={row.mismatch ? 'true' : 'false'}
+              className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
+              <span className="sr-only">移動:</span>
+              <TransportIcon mode={row.leg.mode} />
+              <span>{row.leg.text}</span>
+              {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
+              {row.leg.isEstimate && <span>(推定)</span>}
+              {row.leg.status === 'confirmed' && <span>・確定</span>}
+              {row.leg.detail && (
+                <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+              )}
+              {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
+              {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
+              {row.mismatch && (
+                <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
+              )}
+            </div>
+          ) : undefined}
+        </SegmentPicker>
+      );
+    }
+    // [Gate JourneyMove] 2 日目以降の最初の予定の前: 前の夜の宿 → 最初の予定の移動を選べる
+    if (startAnchor?.kind === 'lodging-from' && startAnchor.eventId) {
+      return (
+        <SegmentPicker planId={planId} revision={revision} fromEventId={startAnchor.eventId}
+          fromTitle={startAnchor.place ?? '宿'} toEventId={event.id} toTitle={event.title}
+          segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
+          canEdit={canEdit && Boolean(onSegmentSaved) && !pending} onSaved={(sg) => onSegmentSaved?.(sg)}>
+          {row ? (
+            <div data-testid="segment-row" data-to-event={event.id} data-mismatch="false" className="tc-segment-row">
+              <span className="sr-only">宿からの移動:</span>
+              <TransportIcon mode={row.leg.mode} />
+              <span>{row.leg.text}</span>
+              {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
+              {row.leg.isEstimate && <span>(推定)</span>}
+              {row.leg.detail && (
+                <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+              )}
+            </div>
+          ) : undefined}
+        </SegmentPicker>
+      );
+    }
+    if (!row) return null;
+    return (
+      <div role="listitem" data-testid="segment-row" data-to-event={event.id}
+        data-mismatch={row.mismatch ? 'true' : 'false'}
+        className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
+        <span className="sr-only">移動:</span>
+        <TransportIcon mode={row.leg.mode} />
+        <span>{row.leg.text}</span>
+        {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
+        {row.leg.isEstimate && <span>(推定)</span>}
+        {row.leg.detail && (
+          <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
+        )}
+        {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
+        {row.mismatch && (
+          <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
+        )}
+      </div>
+    );
+  };
+
+  // 予定の行(エリアは見出しにし、詳細は開いた時だけ)
+  const itemRow = (index: number, opts?: { head?: React.ReactNode; onOver?: (e: React.DragEvent<HTMLElement>) => void }): React.ReactNode => {
+    const event = view[index]!;
+    const row = segmentRow(view, index, viewSegments, zones, day.timezone_id, titleMap);
+    // [Gate EventArea] 並べ替えのボタン: エリアのまとまり・中の予定の決まりも見る
+    const blockedBy = (delta: -1 | 1) => {
+      const am = areaMove(view, index, delta);
+      return am.kind === 'blocked' || (am.kind === 'default' && moveBlockedReason(view, index, delta) !== null);
+    };
+    const upBlocked = index === 0 || blockedBy(-1);
+    const downBlocked = index === view.length - 1 || blockedBy(1);
+    const isAreaHead = Boolean(opts?.head);
+    const showItem = !isAreaHead || openAreas.has(event.id);
+    return (
+      <div
+        draggable={!event.locked}
+        tabIndex={0}
+        role="listitem"
+        aria-label={`${isAreaHead ? `エリア ${event.title}` : event.title}(上下矢印キーで並べ替え)`}
+        onDragStart={(e) => handleDragStart(e, event, containerId(planId, day.id))}
+        onDragEnd={handleDragEnd}
+        onDragOver={opts?.onOver}
+        onDrop={opts?.onOver ? (e) => { if (ownDrag) handleItemDrop(e); } : undefined}
+        onClick={() => onItemClick?.(event)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            moveBy(event, e.key === 'ArrowUp' ? -1 : 1);
+          }
+        }}
+        className={`tc-event-row${isAreaHead ? ' tc-area-head' : ''} ${isItemDragged(event.id) ? 'opacity-50' : ''} ${event.locked ? '' : 'tc-draggable'}`.trim()}
+      >
+        <div className="min-w-0 flex-1">
+        {opts?.head}
+        {showItem && (
+        <ScheduleItem
+          id={event.id}
+          title={event.title}
+          description={event.description}
+          startTime={event.start_time || ''}
+          endTime={event.end_time || ''}
+          endDayOffset={event.end_day_offset}
+          duration={event.duration || 0}
+          locationName={event.location_name || ''}
+          address={event.address || ''}
+          cost={event.cost}
+          currency={event.currency}
+          category={event.category}
+          locked={Boolean(event.locked)}
+          priority={priorityToLabel(event.priority)}
+          travelMethod={row ? undefined : event.travel_method}
+          travelTime={event.travel_time}
+          travelCost={event.travel_cost}
+          notes={event.notes}
+          isNext={showTimeProgress && index === nextEventIndex}
+          bookingInfo={event.booking_info as { url?: string; phone?: string } | undefined}
+          contactInfo={event.phone
+            ? { ...(event.contact_info as { website?: string } | undefined), phone: event.phone }
+            : event.contact_info as { website?: string; phone?: string } | undefined}
+          links={event.urls}
+          onEdit={() => onItemEdit?.(event)}
+          onDelete={() => handleDeleteItem(event.id)}
+          onComment={onItemComment ? () => onItemComment(event) : undefined}
+          hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
+          image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
+          onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
+          selected={selectedEventId === event.id}
+        />
+        )}
+        </div>
+        {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え)。[Gate MockScreens] モックの event-actions(右) */}
+        <div className="tc-event-actions">
+          <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
+            data-testid={`move-up-${event.id}`} className="tc-focus-ring"
+            onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
+          <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
+            data-testid={`move-down-${event.id}`} className="tc-focus-ring"
+            onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`tc-dayview ${className}`.trim()}>
@@ -671,177 +890,88 @@ const DayView: React.FC<DayViewProps> = ({
             </div>
           </div>
         ) : (
-          view.map((event, index) => {
-            // [Gate PlanSpotEdit] 区間の行は 2 つの予定の間にあるので「○○から」は出さない(読み上げは区間の枠の名前で伝える)
-            const row = segmentRow(view, index, viewSegments, zones, day.timezone_id, titleMap);
-            // [Gate EventArea] 並べ替えのボタン: エリアのまとまり・中の予定の決まりも見る
-            const blockedBy = (delta: -1 | 1) => {
-              const am = areaMove(view, index, delta);
-              return am.kind === 'blocked' || (am.kind === 'default' && moveBlockedReason(view, index, delta) !== null);
-            };
-            const upBlocked = index === 0 || blockedBy(-1);
-            const downBlocked = index === view.length - 1 || blockedBy(1);
-            const role = roles.get(event.id);
-            const inner = index > 0 && isInnerPair(view[index - 1], event);
+          blocks.map((block) => {
+            if (block.kind === 'single') {
+              const index = block.index;
+              const event = view[index]!;
+              return (
+                <div key={event.id} role="none" onDragOver={(e) => overRow(e, index, 'none')} data-area-role="none"
+                  onDrop={(e) => { if (ownDrag) handleItemDrop(e); }}>
+                  {dropLine(index, null)}
+                  {segmentFor(index)}
+                  {itemRow(index)}
+                </div>
+              );
+            }
+            const index = block.index;
+            const area = view[index]!;
+            const open = openAreas.has(area.id);
+            const lastGap = (block.members.length ? block.members[block.members.length - 1]! : index) + 1;
             return (
-            <div key={event.id} role="none" onDragOver={(e) => overRow(e, index)}
-              className={role?.role === 'member' ? `tc-area-member${role.last ? ' is-area-last' : ''}` : undefined}
-              data-area-role={role?.role}
-              onDrop={(e) => { if (ownDrag) handleItemDrop(e, dropGap ?? index); }}>
-              {ownDrag && dropGap === index && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
-              {/* [Gate G11] この予定へ着く移動の区間(タイムラインの独立した行。並べ替えで前後が合わなくなったら知らせる)
-                  [Gate PlanUX] 2 番目以降の予定の前に、移動手段を選ぶ・変える・詳細を入れる操作を置く */}
-              {/* [Gate EventArea] エリアの中の移動は歩いて回る(移動の区間として数えない・手段を選ばない) */}
-              {inner && (
-                <div role="listitem" className="tc-segment-row tc-segment-row--inner" data-testid="segment-inner"
-                  data-to-event={event.id}>
-                  <span className="sr-only">移動:</span>エリアの中 · 歩いて回る(移動として数えない)
+              <div key={area.id} role="none" data-area-role="area-block">
+                <div role="none" onDragOver={(e) => overRow(e, index, 'none')} onDrop={(e) => { if (ownDrag) handleItemDrop(e); }}>
+                  {dropLine(index, null)}
+                  {segmentFor(index)}
                 </div>
-              )}
-              {index > 0 && !inner && (
-                <SegmentPicker planId={planId} revision={revision} fromEventId={view[index - 1]!.id}
-                  fromTitle={view[index - 1]!.title} toEventId={event.id} toTitle={event.title}
-                  segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
-                  mismatch={Boolean(row?.mismatch)} canEdit={canEdit && Boolean(onSegmentSaved) && !pending}
-                  onSaved={(sg) => onSegmentSaved?.(sg)}>
-                  {row ? (
-                    <div data-testid="segment-row" data-to-event={event.id}
-                      data-mismatch={row.mismatch ? 'true' : 'false'}
-                      className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
-                      <span className="sr-only">移動:</span>
-                      <TransportIcon mode={row.leg.mode} />
-                      <span>{row.leg.text}</span>
-                      {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
-                      {row.leg.isEstimate && <span>(推定)</span>}
-                      {row.leg.status === 'confirmed' && <span>・確定</span>}
-                      {row.leg.detail && (
-                        <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
-                      )}
-                      {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
-                      {row.leg.zoneUnknown && <span>・時刻帯未確認</span>}
-                      {row.mismatch && (
-                        <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
-                      )}
-                    </div>
-                  ) : undefined}
-                </SegmentPicker>
-              )}
-              {/* [Gate JourneyMove] 2 日目以降の最初の予定の前: 前の夜の宿 → 最初の予定の移動を選べる */}
-              {index === 0 && startAnchor?.kind === 'lodging-from' && startAnchor.eventId && (
-                <SegmentPicker planId={planId} revision={revision} fromEventId={startAnchor.eventId}
-                  fromTitle={startAnchor.place ?? '宿'} toEventId={event.id} toTitle={event.title}
-                  segment={row ? (viewSegments.find((sg) => sg.to_event_id === event.id) ?? null) : null}
-                  canEdit={canEdit && Boolean(onSegmentSaved) && !pending} onSaved={(sg) => onSegmentSaved?.(sg)}>
-                  {row ? (
-                    <div data-testid="segment-row" data-to-event={event.id} data-mismatch="false" className="tc-segment-row">
-                      <span className="sr-only">宿からの移動:</span>
-                      <TransportIcon mode={row.leg.mode} />
-                      <span>{row.leg.text}</span>
-                      {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
-                      {row.leg.isEstimate && <span>(推定)</span>}
-                      {row.leg.detail && (
-                        <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
-                      )}
-                    </div>
-                  ) : undefined}
-                </SegmentPicker>
-              )}
-              {index === 0 && row && !(startAnchor?.kind === 'lodging-from' && startAnchor.eventId) && (
-                <div role="listitem" data-testid="segment-row" data-to-event={event.id}
-                  data-mismatch={row.mismatch ? 'true' : 'false'}
-                  className={`tc-segment-row ${row.mismatch ? 'is-mismatch' : ''}`}>
-                  <span className="sr-only">移動:</span>
-                  <TransportIcon mode={row.leg.mode} />
-                  <span>{row.leg.text}</span>
-                  {row.leg.distance && <span data-testid="segment-distance">· {row.leg.distance}</span>}
-                  {row.leg.isEstimate && <span>(推定)</span>}
-                  {row.leg.detail && (
-                    <span className="tc-seg-detail" data-testid="segment-detail" title={row.leg.basis ?? undefined}>{row.leg.detail}</span>
-                  )}
-                  {row.leg.crossZone && <span data-testid="schedule-cross-zone">{row.leg.crossZone.text}</span>}
-                  {row.mismatch && (
-                    <span data-testid="segment-mismatch">⚠ 前の予定と合っていません(区間は自動では直しません)</span>
-                  )}
-                </div>
-              )}
-              {/* [Gate EventArea] エリアの枠の始まり(エリアへ着く移動の行は枠の外)。見出しに滞在・中の予定・空き */}
-              <div className={role?.role === 'area' ? `tc-area-area${role.last ? ' is-area-last' : ''}` : 'contents'}>
-              {role?.role === 'area' && (
-                <p className="tc-area-sum" data-testid={`area-summary-${event.id}`}>
-                  <span className="tc-area-tag">エリア</span>{areaSums.get(event.id)}
-                </p>
-              )}
-              {/* スケジュールアイテム */}
-              <div
-                draggable={!role || role.role === 'none'}
-                tabIndex={0}
-                role="listitem"
-                aria-label={`${event.title}(上下矢印キーで並べ替え)`}
-                onDragStart={(e) => handleDragStart(e, event, containerId(planId, day.id))}
-                onDragEnd={handleDragEnd}
-                onClick={() => onItemClick?.(event)}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    moveBy(event, e.key === 'ArrowUp' ? -1 : 1);
-                  }
-                }}
-                className={`tc-event-row ${isItemDragged(event.id) ? 'opacity-50' : ''} ${event.locked ? '' : 'tc-draggable'}`.trim()}
-              >
-                <div className="min-w-0 flex-1">
-                <ScheduleItem
-                  id={event.id}
-                  title={event.title}
-                  description={event.description}
-                  startTime={event.start_time || ''}
-                  endTime={event.end_time || ''}
-                  endDayOffset={event.end_day_offset}
-                  duration={event.duration || 0}
-                  locationName={event.location_name || ''}
-                  address={event.address || ''}
-                  cost={event.cost}
-                  currency={event.currency}
-                  category={event.category}
-                  locked={Boolean(event.locked)}
-                  priority={priorityToLabel(event.priority)}
-                  travelMethod={row ? undefined : event.travel_method}
-                  travelTime={event.travel_time}
-                  travelCost={event.travel_cost}
-                  notes={event.notes}
-                  isNext={showTimeProgress && index === nextEventIndex}
-                  bookingInfo={event.booking_info as { url?: string; phone?: string } | undefined}
-                  contactInfo={event.phone
-                    ? { ...(event.contact_info as { website?: string } | undefined), phone: event.phone }
-                    : event.contact_info as { website?: string; phone?: string } | undefined}
-                  links={event.urls}
-                  onEdit={() => onItemEdit?.(event)}
-                  onDelete={() => handleDeleteItem(event.id)}
-                  onComment={onItemComment ? () => onItemComment(event) : undefined}
-                  hours={hoursBadge(hours?.byId[event.id], hoursPending && Boolean(event.place_id))}
-                  image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
-                  onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
-                  selected={selectedEventId === event.id}
-                />
-                </div>
-                {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え)。[Gate MockScreens] モックの event-actions(右) */}
-                <div className="tc-event-actions">
-                  <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
-                    data-testid={`move-up-${event.id}`} className="tc-focus-ring"
-                    onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
-                  <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
-                    data-testid={`move-down-${event.id}`} className="tc-focus-ring"
-                    onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
+                {/* [Gate AreaDrag] エリアの枠: 見出し(エリアの名前・時刻・滞在・中の予定・空き・詳細を開く)と、中の予定 */}
+                <div className="tc-area-block" data-testid={`area-block-${area.id}`}
+                  data-drop={ownDrag && dropAt?.parent === area.id ? 'in' : undefined}>
+                  {itemRow(index, {
+                    head: (
+                      <div className="tc-area-head-main">
+                        <p className="tc-area-head-title">
+                          <span className="tc-area-tag">エリア</span>
+                          <strong>{area.title}</strong>
+                          <span className="tc-area-head-time">{area.start_time ? `${area.start_time.slice(0, 5)}〜${area.end_time ? area.end_time.slice(0, 5) : ''}` : '時刻未設定'}</span>
+                        </p>
+                        <p className="tc-area-sum" data-testid={`area-summary-${area.id}`}>{areaSums.get(area.id)}</p>
+                        <button type="button" className="tc-focus-ring tc-mini-link tc-area-toggle" aria-expanded={open}
+                          data-testid={`area-toggle-${area.id}`}
+                          onClick={(e) => { e.stopPropagation(); toggleArea(area.id); }}>
+                          {open ? 'エリアの詳細を閉じる' : 'エリアの詳細を開く'}
+                        </button>
+                      </div>
+                    ),
+                    onOver: (e) => overRow(e, index, 'areaHead'),
+                  })}
+                  <div className="tc-area-inner" role="none">
+                    <p className="tc-area-inner-label" aria-hidden="true">エリアの中の予定</p>
+                    {block.members.map((mi) => {
+                      const m = view[mi]!;
+                      return (
+                        <div key={m.id} role="none" className="tc-area-member" data-area-role="member"
+                          onDragOver={(e) => overRow(e, mi, 'member', area.id)}
+                          onDrop={(e) => { if (ownDrag) handleItemDrop(e); }}>
+                          {dropLine(mi, area.id)}
+                          {segmentFor(mi)}
+                          {itemRow(mi)}
+                        </div>
+                      );
+                    })}
+                    {dropLine(lastGap, area.id)}
+                    {(block.members.length === 0 || ownDrag) && (
+                      <div role="none" className={`tc-area-dropzone${ownDrag ? ' is-active' : ''}`} data-testid={`area-dropzone-${area.id}`}
+                        onDragOver={(e) => { if (!ownDrag || draggingArea) return; e.preventDefault(); e.stopPropagation(); setDrop(lastGap, area.id); }}
+                        onDrop={(e) => { if (ownDrag) { e.stopPropagation(); handleItemDrop(e); } }}>
+                        {ownDrag ? 'ここに落とすとエリアに入ります' : '中の予定はまだありません(予定をここへドラッグすると入ります)'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              </div>
-            </div>
             );
           })
         )}
-        
-        {/* 最後の予定の後ろへ落とした時の線 */}
-        {ownDrag && dropGap === view.length && <div className="tc-drop-line" aria-hidden="true" data-testid="drop-line" />}
+
+        {/* 最後の予定の後ろへ落とす所(エリアの外) */}
+        {ownDrag && (
+          <div role="none" className="tc-day-drop-tail" data-testid="drop-tail"
+            onDragOver={(e) => { e.preventDefault(); setDrop(view.length, null); }}
+            onDrop={(e) => handleItemDrop(e)}>
+            {dropLine(view.length, null)}
+            <span>ここに落とすと最後へ</span>
+          </div>
+        )}
       </div>
 
       {endAnchor && <JourneyAnchorRow anchor={endAnchor} position="end" onAddLodging={() => setIsAddModalOpen(true)}
