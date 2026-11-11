@@ -231,6 +231,27 @@ describe('PlanBasicsDialog', () => {
     expect(screen.queryByTestId('basics-cover')).toBeNull();
   });
 
+  it('[BasicsRace] 読み込みが終わるまで入力・保存させず、後から届いた旅程の日付で入力を上書きしない', async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    m.getPlanBasics.mockReturnValue(new Promise((r) => { resolve = r; }));
+    m.reschedulePlan.mockResolvedValue({ revision: 8, days: 2, reservations_not_moved: 0 });
+    const saved = vi.fn();
+    const view = render(<PlanBasicsDialog planId="p1" revision={7} firstDate={null} lastDate={null} isOpen onClose={vi.fn()} onSaved={saved} />);
+    expect(screen.getByLabelText('出発日')).toBeDisabled();
+    expect(screen.getByTestId('plan-basics-save')).toBeDisabled();
+    resolve({ title: '金沢', destination: null, description: null, budget: null, start_date: '2026-04-10', end_date: '2026-04-10', preferences: {} });
+    await waitFor(() => expect(screen.getByLabelText('出発日')).not.toBeDisabled());
+    expect(screen.getByLabelText('出発日')).toHaveValue('2026-04-10');
+    fireEvent.change(screen.getByLabelText('出発日'), { target: { value: '2026-05-01' } });
+    fireEvent.change(screen.getByLabelText('最終日'), { target: { value: '2026-05-02' } });
+    // 旅程が後から読み込まれても(firstDate が届いても)入力は残る
+    view.rerender(<PlanBasicsDialog planId="p1" revision={7} firstDate="2026-04-10" lastDate="2026-04-10" isOpen onClose={vi.fn()} onSaved={saved} />);
+    expect(screen.getByLabelText('出発日')).toHaveValue('2026-05-01');
+    fireEvent.click(screen.getByTestId('plan-basics-save'));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(m.reschedulePlan).toHaveBeenCalledWith('p1', 7, '2026-05-01', '2026-05-02', false);
+  });
+
   it('題名・方面・人数を保存する。日程が同じなら日程の変更は呼ばない', async () => {
     const saved = vi.fn();
     open({ onSaved: saved });
