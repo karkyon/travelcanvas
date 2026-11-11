@@ -164,6 +164,7 @@
   "GET /api/v1/plans/documents/download",
   "GET /api/v1/plans/{plan_id}",
   "GET /api/v1/plans/{plan_id}/alerts",
+  "GET /api/v1/plans/{plan_id}/booking-status",
   "GET /api/v1/plans/{plan_id}/booklet-exports",
   "GET /api/v1/plans/{plan_id}/booklet-exports/{export_id}",
   "GET /api/v1/plans/{plan_id}/booklet/themes",

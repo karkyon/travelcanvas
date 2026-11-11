@@ -28,6 +28,11 @@ vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast
 import DayView from '@/components/DayView';
 import PlaceFinder from '@/components/search/PlaceFinder';
 import type { DaySchedule } from '@/types';
+// [Gate BookingBadge] 予約の札の読み込み(旅程の予定ごと)は空にする
+vi.mock('@/services/api/bookingStatus', () => ({
+  getBookingStatus: vi.fn().mockResolvedValue({ party_size: null, events: {} }), linkReservationToEvent: vi.fn(),
+}));
+
 
 const day = (): DaySchedule => ({ id: 'd1', date: '2026-11-28', timezone_id: 'Asia/Tokyo', events: [
   { id: 'e1', title: '鳥羽城', category: 'sightseeing', latitude: 34.48, longitude: 136.84 } as DaySchedule['events'][number],
