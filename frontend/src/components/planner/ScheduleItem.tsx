@@ -67,6 +67,8 @@ interface ScheduleItemProps {
   locked?: boolean;
   /** [Gate MockScreens] 選んでいる予定(地図と選んだ予定の欄と同じ予定) */
   selected?: boolean;
+  /** [Gate BookingBadge] 予約の札(予約済み・要確認・まだ) */
+  badge?: React.ReactNode;
 }
 
 const CATEGORY_MARKS: Record<string, [LucideIcon, string]> = {
@@ -121,6 +123,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   onPhoto,
   locked = false,
   selected = false,
+  badge,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -279,6 +282,8 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
             {travelCost ? <span>• {formatCurrency(travelCost)}</span> : null}
           </div>
         ) : null}
+
+        {badge}
 
         {/* [Gate G11] 営業時間の照合(記号と文字。色だけで伝えない) */}
         {hours && (

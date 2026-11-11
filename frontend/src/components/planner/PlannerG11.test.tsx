@@ -43,6 +43,11 @@ import { dayShift, zonedParts } from '@/utils/zonedTime';
 import type { TravelSegment } from '@/services/api/types/segments';
 import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import type { DaySchedule } from '@/types';
+// [Gate BookingBadge] 予約の札の読み込み(旅程の予定ごと)は空にする
+vi.mock('@/services/api/bookingStatus', () => ({
+  getBookingStatus: vi.fn().mockResolvedValue({ party_size: null, events: {} }), linkReservationToEvent: vi.fn(),
+}));
+
 
 const seg = (over: Partial<TravelSegment>): TravelSegment => ({
   id: 's1', plan_id: 'p', from_event_id: 'e1', from_place_id: null, to_event_id: 'e2', to_place_id: null, mode: 'walking',

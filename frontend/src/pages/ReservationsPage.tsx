@@ -11,8 +11,8 @@
  * 出し分け(viewerには編集ボタンを出さない等)のみを行う不変条件の
  * 二重チェックとして扱う(信頼境界はbackend)。
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
   Ticket as TicketIcon, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
@@ -257,6 +257,27 @@ const ReservationsPage: React.FC = () => {
     loadTickets(reservation);
   };
 
+  // [Gate BookingBadge] 旅程の予約の札から: ?open=予約 で詳細を開く、?new=1&event=予定 で予定につないだ予約を登録する
+  const [search] = useSearchParams();
+  const openId = search.get('open');
+  const linkEventId = search.get('new') === '1' ? search.get('event') : null;
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openId || handled.current === `open:${openId}`) return;
+    const r = reservations.find((x) => x.id === openId);
+    if (!r) return;
+    handled.current = `open:${openId}`;
+    openDetail(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 読み込んだ予約の一覧から 1 回だけ開く
+  }, [openId, reservations]);
+  useEffect(() => {
+    if (!linkEventId || handled.current === `new:${linkEventId}`) return;
+    handled.current = `new:${linkEventId}`;
+    const t = search.get('type');
+    setCreateForm({ ...EMPTY_FORM, type: t && /^[a-z_]+$/.test(t) ? t : EMPTY_FORM.type, provider_name: search.get('name') ?? '' });
+    setIsCreateOpen(true);
+  }, [linkEventId, search]);
+
   const closeDetail = () => {
     setSelected(null);
     setRevealed(null);
@@ -274,7 +295,7 @@ const ReservationsPage: React.FC = () => {
     setIsSaving(true);
     setError(null);
     try {
-      await createReservation(planId, formToPayload(createForm));
+      await createReservation(planId, { ...formToPayload(createForm), ...(linkEventId ? { event_id: linkEventId } : {}) });
       setIsCreateOpen(false);
       setCreateForm(EMPTY_FORM);
       await loadReservations();
