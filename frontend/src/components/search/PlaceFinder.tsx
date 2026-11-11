@@ -13,8 +13,10 @@ import ImageDropzone from '@/components/common/ImageDropzone';
 import { searchSpots } from '@/services/api';
 import { searchNearby } from '@/services/api/g11discover';
 import {
-  aiPlacesFromImage, aiPlacesFromText, listWishSpots, placesFromText, readPlaceUrl, type MediaPlace, type UrlRead,
+  aiPlacesFromImage, aiPlacesFromText, findPlaces, listWishSpots, placesFromText, readPlaceUrl, type FindScope, type MediaPlace,
+  type UrlRead, type WishSpot,
 } from '@/services/api/spotIntake';
+import SpotPhotoView from '@/components/media/SpotPhotoView';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import PasteImageButton from '@/components/media/PasteImageButton';
 import FindByOther from './FindByOther';
@@ -46,7 +48,28 @@ const LABELS: [PlaceTab, string][] = [
 ];
 const inputClass = 'tc-focus-ring w-full min-h-11 rounded-xl border border-cloud-200 bg-cloud-0 px-3 text-ink-900';
 
-interface Row extends PlaceDraft { key: string; source: string; detail?: string | null }
+interface Row extends PlaceDraft {
+  key: string; source: string; detail?: string | null;
+  /** [Gate PlaceFinderArea] ジャンルの札・この旅行の範囲からの距離・範囲の外・行きたい場所の写真 */
+  genre?: string | null; distanceKm?: number | null; outside?: boolean; photo?: WishSpot['photo'] | null;
+}
+
+/** [Gate PlaceFinderArea] 名前で検索のジャンル(backend の place_finder.GENRES と同じ) */
+const GENRES: [string, string][] = [
+  ['all', 'すべて'], ['cafe', 'カフェ'], ['meal', '食事・ランチ'], ['japanese', '和食・郷土料理'], ['ramen', 'ラーメン・麺'],
+  ['sweets', 'スイーツ・甘味'], ['izakaya', '居酒屋・夜ごはん'], ['sightseeing', '観光名所'], ['shrine', '神社・寺'],
+  ['view', '景色・展望'], ['onsen', '温泉'], ['activity', '体験・遊び'], ['souvenir', '買い物・土産'], ['michinoeki', '道の駅'],
+  ['hotel', '宿'],
+];
+const SCOPES: [FindScope, string][] = [['area', 'この旅行の範囲'], ['route', '経路の近く'], ['all', '全国']];
+const CATEGORY_LABEL: Record<string, string> = {
+  sightseeing: '観光', dining: '食事', shopping: '買い物', accommodation: '宿', activity: '体験', transportation: '交通', other: 'その他',
+};
+/** AI が見分けた種類 → 同じ種類の場所を探すジャンル */
+const KIND_GENRE: Record<string, string> = { dining: 'meal', sightseeing: 'sightseeing', shopping: 'souvenir', accommodation: 'hotel', activity: 'activity' };
+const CONSENT_KEY = 'tc-ai-photo-consent';
+const readConsent = (): boolean => { try { return localStorage.getItem(CONSENT_KEY) === '1'; } catch { return false; } };
+const writeConsent = (v: boolean) => { try { if (v) localStorage.setItem(CONSENT_KEY, '1'); else localStorage.removeItem(CONSENT_KEY); } catch { /* 覚えられなくても動く */ } };
 
 const mediaRow = (p: MediaPlace, i: number, sourceUrl: string | null, title: string | null): Row => ({
   key: `m${i}-${p.name}`, name: p.name, address: p.address ?? (p.area || null), latitude: p.latitude ?? null,
@@ -62,7 +85,13 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
   const [query, setQueryState] = useState('');
   const setQuery = (q: string) => { setQueryState(q); onQuery?.(q); };
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [aiOk, setAiOk] = useState(false);
+  const [aiOk, setAiOkState] = useState(readConsent);
+  const setAiOk = (v: boolean) => { setAiOkState(v); writeConsent(v); };
+  const [genre, setGenre] = useState('all');
+  const [scope, setScope] = useState<FindScope>('area');
+  const [region, setRegion] = useState<string | null>(null);
+  const [credits, setCredits] = useState<string[]>([]);
+  const [photoKind, setPhotoKind] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +101,44 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
   const [paste, setPaste] = useState('');
   const [read, setRead] = useState<UrlRead | null>(null);
 
-  const reset = () => { setPhoto(null); setRows(null); setError(null); setNote(null); setRead(null); setChecked(new Set()); };
+  const reset = () => {
+    setPhoto(null); setRows(null); setError(null); setNote(null); setRead(null); setChecked(new Set()); setRegion(null); setCredits([]);
+    setPhotoKind(null);
+  };
   const switchTab = (next: PlaceTab) => { reset(); onTab(next); };
+
+  // [Gate PlaceFinderArea] 旅行の予定の追加: 言葉とジャンルで、この旅行の範囲・経路の近く・全国から探す
+  const findInTrip = async (q: string, g: string, sc: FindScope) => {
+    if (!planId) return;
+    setBusy(true); setError(null); setNote(null); setRows(null);
+    try {
+      const r = await findPlaces(planId, q, g, sc);
+      setRegion(r.region.label);
+      setCredits(r.sources.map((s) => s.credit));
+      setRows(r.candidates.map((c, i) => ({
+        key: `f${i}-${c.name}`, name: c.name, address: c.address, latitude: c.latitude, longitude: c.longitude, category: c.category,
+        description: null, sourceUrl: null, source: '', genre: c.genre_label, distanceKm: c.distance_km,
+      })));
+      if (r.candidates.length === 0) {
+        setNote(r.keyed_providers.length === 0
+          ? `${r.region.label}では見つかりませんでした。店・施設の検索(Yahoo!・ホットペッパー)の鍵が未登録のため、OpenStreetMap だけで探しています(運用コンソールで登録できます)`
+          : `${r.region.label}では見つかりませんでした。言葉・ジャンルを変えるか、範囲を広げてください`);
+      }
+    } catch (e) {
+      setError(errorDetailMessage(e, '検索できませんでした。時間をおいて試すか、手で入力してください'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const find = async (q0?: string, sourceUrl: string | null = null) => {
     const q = (q0 ?? query).trim();
+    if (planId && !sourceUrl) {
+      if (!q && genre === 'all') return;
+      setQuery(q);
+      await findInTrip(q, genre, scope);
+      return;
+    }
     if (!q) return;
     setQuery(q);
     setBusy(true);
@@ -128,18 +190,26 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
     try { gps = readExifGps(await file.arrayBuffer()); } catch { gps = null; }
     if (gps) await findNear(gps.latitude, gps.longitude);
     setBusy(false);
-    if (!gps) {
-      setNote(planId ? 'この写真に撮影場所(GPS)はありません。「AI で写真の場所を探す」で、写っている場所・店の候補を出せます'
-        : 'この写真に撮影場所(GPS)はありません。写真から場所を見分けるのは、旅行の予定の追加で使えます');
+    // [Gate PlaceFinderArea] Web などから取った写真には撮影場所が無いのが普通。写真に写っている物から場所を見分ける(同意済みならすぐ)
+    if (!gps && planId && aiOk) await photoAi(file);
+    else if (!gps) {
+      setNote(planId ? '写っている建物・景色・看板から場所の候補を出します。下で AI へ送ることに同意して「写真から場所を探す」を押してください'
+        : '写真から場所を見分けるのは、旅行の予定の追加で使えます');
     }
   };
-  const photoAi = async () => {
-    if (!photo || !planId || !aiOk) return;
+  const photoAi = async (file?: File) => {
+    const f = file ?? photo;
+    if (!f || !planId || !aiOk) return;
     setBusy(true); setError(null); setNote(null);
     try {
-      const list = await aiPlacesFromImage(planId, photo);
-      setRows((prev) => [...(prev ?? []).filter((r) => r.key === 'gps'), ...list.map((p, i) => mediaRow(p, i, null, null))]);
-      if (!list.length) setNote('AI でも写真の場所を見分けられませんでした。名前で検索するか、手で入力してください');
+      const list = await aiPlacesFromImage(planId, f);
+      setRows((prev) => [...(prev ?? []).filter((r) => r.key === 'gps'), ...list.map((p, i) => ({
+        ...mediaRow(p, i, null, null), distanceKm: p.distance_km ?? null, outside: p.in_trip === false,
+        genre: p.category ? CATEGORY_LABEL[p.category] ?? null : null,
+      }))]);
+      setPhotoKind(list.find((p) => p.category && KIND_GENRE[p.category])?.category ?? null);
+      if (!list.length) setNote('写真から場所を見分けられませんでした。下の「この旅行の範囲で探す」か、名前で検索してください');
+      else if (list.every((p) => p.in_trip === false)) setNote('見分けた場所は、どれもこの旅行の範囲の外です(範囲の外の印を付けています)');
     } catch (e) {
       setError(errorDetailMessage(e, 'AI で写真の場所を探せませんでした'));
     } finally {
@@ -201,7 +271,10 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
     let live = true;
     setBusy(true);
     listWishSpots('all').then((list) => {
-      if (live) setRows(list.map((s) => ({ key: s.id, name: s.name, address: s.address, latitude: s.latitude, longitude: s.longitude, category: s.category, description: s.description, sourceUrl: null, source: '行きたい場所' })));
+      if (live) setRows(list.map((s) => ({ key: s.id, name: s.name, address: s.address, latitude: s.latitude, longitude: s.longitude, category: s.category, description: s.description, sourceUrl: null, source: '',
+        // [Gate PlaceFinderArea] 写真とジャンルの札(食事は料理のジャンル)
+        genre: [CATEGORY_LABEL[s.category] ?? null, ...(s.dining?.genres ?? []).slice(0, 2)].filter(Boolean).join('・') || null,
+        photo: s.photo ?? null })));
     }).catch(() => { if (live) setError('行きたい場所を読み込めませんでした'); }).finally(() => { if (live) setBusy(false); });
     return () => { live = false; };
   }, [tab]);
@@ -224,23 +297,53 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
         ))}
       </div>
       {tab === 'search' && (
-        <div className="flex gap-2" role="search">
-          <label htmlFor="place-q" className="sr-only">場所の名前</label>
-          <input id="place-q" type="search" value={query} placeholder="例: 伊勢神宮、金沢 市場" className={inputClass}
-            onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void find(); } }} />
-          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary shrink-0" disabled={busy || !query.trim()} onClick={() => void find()}>探す</button>
+        <div className="space-y-2">
+          <div className="flex gap-2" role="search">
+            <label htmlFor="place-q" className="sr-only">場所の名前</label>
+            <input id="place-q" type="search" value={query} placeholder={planId ? '例: 赤福、菰野 (ジャンルだけでも探せます)' : '例: 伊勢神宮、金沢 市場'} className={inputClass}
+              onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void find(); } }} />
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary shrink-0" data-testid="finder-search"
+              disabled={busy || (!query.trim() && (!planId || genre === 'all'))} onClick={() => void find()}>探す</button>
+          </div>
+          {planId && (
+            <>
+              <div>
+                <label htmlFor="place-genre" className="text-xs font-semibold text-ink-700">ジャンル</label>
+                <select id="place-genre" className={`${inputClass} mt-1 min-h-10`} value={genre} data-testid="finder-genre"
+                  onChange={(e) => setGenre(e.target.value)}>
+                  {GENRES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </div>
+              <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-800">
+                <legend className="text-xs font-semibold text-ink-700 mb-1">探す範囲</legend>
+                {SCOPES.map(([k, label]) => (
+                  <label key={k} className="inline-flex items-center gap-1">
+                    <input type="radio" name="place-scope" value={k} checked={scope === k} onChange={() => setScope(k)}
+                      data-testid={`finder-scope-${k}`} />{label}
+                  </label>
+                ))}
+              </fieldset>
+            </>
+          )}
         </div>
       )}
       {tab === 'photo' && (
         <div>
-          <ImageDropzone label="写真か、SNS・地図のスクリーンショット" hint="撮影場所(GPS)と、写っている場所・店から候補を出します" file={photo} disabled={busy}
+          <ImageDropzone label="写真か、SNS・地図のスクリーンショット" hint="写っている建物・景色・看板から場所の候補を出します(撮影場所が入った写真ならその近くも)" file={photo} disabled={busy}
             onFile={(f) => { setPhoto(f); void onPhoto(f); }} />
           <PasteImageButton onImage={(f) => { setPhoto(f); void onPhoto(f); }} disabled={busy} global={tab === 'photo'} testId="finder-paste" />
           {photo && planId && (
             <div className="mt-2 rounded-xl border border-cloud-200 p-3">
               {aiConsent}
-              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary mt-2" disabled={busy || !aiOk} onClick={() => void photoAi()}
-                data-testid="finder-photo-ai">AI で写真の場所を探す</button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={busy || !aiOk} onClick={() => void photoAi()}
+                  data-testid="finder-photo-ai">写真から場所を探す(AI)</button>
+                {/* [Gate PlaceFinderArea] 見分けた種類(無ければ観光)で、この旅行の範囲から似た場所を探す(AI を使わない) */}
+                <button type="button" className="tc-focus-ring tc-mbtn" disabled={busy} data-testid="finder-photo-similar"
+                  onClick={() => void findInTrip('', KIND_GENRE[photoKind ?? ''] ?? 'sightseeing', 'area')}>
+                  {`この旅行の範囲で${photoKind && KIND_GENRE[photoKind] ? `同じ種類(${CATEGORY_LABEL[photoKind]})の` : '観光の'}場所を探す`}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -287,6 +390,7 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
         {busy && <p className="mt-3 text-sm text-ink-700" role="status">読み取っています…</p>}
         {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
         {note && <p className="mt-3 text-sm text-warning" role="status">{note}</p>}
+        {region && rows && <p className="mt-2 text-xs text-ink-700" data-testid="finder-region">{`探した範囲: ${region}`}</p>}
         {tab !== 'manual' && rows && rows.length === 0 && !busy && (
           <p className="mt-3 text-sm text-ink-700">{tab === 'wish' ? '行きたい場所はまだありません。' : tab === 'url' ? '場所の候補は見つかりませんでした。' : '見つかりませんでした。言葉を変えるか、手で入力してください。'}</p>
         )}
@@ -303,13 +407,24 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
         {tab !== 'manual' && rows && rows.length > 0 && (
           <ul className="mt-3 divide-y divide-cloud-200 max-h-72 overflow-y-auto rounded-xl border border-cloud-200">
             {rows.map((r) => (
-              <li key={r.key} className="flex items-center gap-2 p-2.5">
+              <li key={r.key} className="flex items-center gap-2 p-2.5" data-testid={`finder-row-${r.name}`}>
                 {many && (
                   <input type="checkbox" checked={checked.has(r.key)} onChange={() => toggle(r.key)} aria-label={`「${r.name}」を選ぶ`}
                     data-testid={`finder-check-${r.name}`} />
                 )}
+                {tab === 'wish' && (
+                  <div className="tc-finder-thumb" aria-hidden={r.photo ? undefined : true}>
+                    {r.photo ? <SpotPhotoView photo={r.photo} alt={r.name} fallback={<span className="tc-finder-thumb-none">写真なし</span>} />
+                      : <span className="tc-finder-thumb-none">写真なし</span>}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1 text-sm">
-                  <p className="font-semibold text-ink-900 break-words">{r.name}</p>
+                  <p className="font-semibold text-ink-900 break-words">
+                    {r.name}
+                    {r.genre && <span className="tc-finder-genre" data-testid="finder-genre-badge">{r.genre}</span>}
+                    {r.outside && <span className="tc-finder-outside">旅行の範囲の外</span>}
+                    {r.distanceKm != null && <span className="tc-finder-dist">{scope === 'route' && tab === 'search' ? `経路から ${r.distanceKm}km` : `${r.distanceKm}km`}</span>}
+                  </p>
                   <p className="text-xs text-ink-700 break-words">{r.address ?? '住所は追加の時に自動取得'}{r.source ? ` ・ ${r.source}` : ''}</p>
                   {r.detail && r.detail !== r.name && <p className="text-[11px] text-ink-700 break-words line-clamp-2">{r.detail}</p>}
                 </div>
@@ -317,6 +432,9 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
               </li>
             ))}
           </ul>
+        )}
+        {credits.length > 0 && rows && rows.length > 0 && (
+          <p className="mt-1 text-[11px] text-ink-500" data-testid="finder-credits">{credits.join(' / ')}</p>
         )}
       </div>
     </div>
