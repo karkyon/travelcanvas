@@ -5,7 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-const { getHoursCheck, moveItemBy, handleKeyboardMove, reorderSchedule, reorderSpots, drag } = vi.hoisted(() => ({
+const { getHoursCheck, moveItemBy, handleKeyboardMove, reorderSchedule, reorderSpots, drag, deleteScheduleItem } = vi.hoisted(() => ({
+  deleteScheduleItem: vi.fn(),
   getHoursCheck: vi.fn(), moveItemBy: vi.fn(), handleKeyboardMove: vi.fn(), reorderSchedule: vi.fn(), reorderSpots: vi.fn(),
   drag: { isDragging: false, sourceContainer: null as string | null },
 }));
@@ -26,7 +27,7 @@ vi.mock('@/hooks/useDragDrop', () => ({
   }),
 }));
 vi.mock('@/hooks/usePlan', () => ({
-  usePlan: () => ({ addNewScheduleItem: vi.fn(), deleteScheduleItem: vi.fn(), reorderSchedule, reorderSpots }),
+  usePlan: () => ({ addNewScheduleItem: vi.fn(), deleteScheduleItem, reorderSchedule, reorderSpots }),
 }));
 vi.mock('@/components/common/toastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
 
@@ -187,12 +188,13 @@ describe('全日程のチャート', () => {
         end: { kind: 'arrival', place: '自宅', time: '19:10', continued: false } },
     ]} />);
     const col0 = within(screen.getByTestId('chart-day-0'));
-    expect(col0.getByTestId('day-anchor-start')).toHaveTextContent('出発自宅 · 05:30');
+    // [AreaDrag] 出発・帰着の箱は時刻の線にくっつける(物差しの上の箱。列の上・下には出さない)
+    expect(within(screen.getByTestId('chart-anchor-departure-0')).getByTestId('day-anchor-start')).toHaveTextContent('出発 自宅 · 05:30');
     expect(col0.getByTestId('day-anchor-end')).toHaveTextContent('今夜の宿京の宿');
     expect(screen.getByTestId('chart-anchor-departure-0')).toHaveTextContent('出発 05:30');
-    expect(screen.getByTestId('chart-anchor-arrival-1')).toHaveTextContent('帰着 19:10');
-    // 物差しは 5:00 から(6:00 より前に広がる)。1 時間 44px で 05:30 は 22px
-    expect(screen.getByTestId('chart-anchor-departure-0')).toHaveStyle({ top: '22px' });
+    expect(within(screen.getByTestId('chart-anchor-arrival-1')).getByTestId('day-anchor-end')).toHaveTextContent('帰着 自宅 · 19:10');
+    // 物差しは出発の箱の分(1 時間)だけ前の 4:00 から。1 時間 44px で 05:30 は 66px
+    expect(screen.getByTestId('chart-anchor-departure-0')).toHaveStyle({ top: '66px' });
     expect(screen.getByTestId('chart-head-0')).toHaveClass('tc-chart-dayhead');
   });
 
@@ -548,16 +550,23 @@ describe('エリアの枠(DayView・全日程)', () => {
   it('エリアを枠にし、見出しに滞在・中の予定・空き。中の移動は手段を選ばず数えない', async () => {
     render(<DayView day={areaDay()} planId="p1" segments={[]} />);
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    expect(screen.getByTestId('area-summary-area')).toHaveTextContent('エリアエリア内の滞在 2時間・中の予定 2件・空き 30分');
+    expect(screen.getByTestId('area-summary-area')).toHaveTextContent('エリア内の滞在 2時間・中の予定 2件・空き 30分');
     const inner = screen.getAllByTestId('segment-inner');
     expect(inner.map((r) => r.getAttribute('data-to-event'))).toEqual(['aka', 'dan']);
     expect(inner[0]).toHaveTextContent('エリアの中 · 歩いて回る(移動として数えない)');
-    // 枠: エリア → 中の予定(最後に閉じる)
-    const roles = Array.from(document.querySelectorAll('[data-area-role]')).map((n) => `${n.getAttribute('data-area-role')}${n.classList.contains('is-area-last') ? '.last' : ''}`);
-    expect(roles).toEqual(['none', 'area', 'member', 'member.last', 'none']);
-    // エリアと中の予定はドラッグしない(↑↓ で動かす)
-    expect(screen.getByRole('listitem', { name: '赤福(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'false');
-    expect(screen.getByRole('listitem', { name: '伊勢神宮(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'true');
+    // [AreaDrag] 枠: エリアの見出し(名前・時刻)の下に中の予定。ほかの予定は枠の外
+    const block = screen.getByTestId('area-block-area');
+    expect(block).toHaveTextContent('エリアおかげ横丁13:45〜15:45');
+    expect(within(block).getAllByRole('listitem', { name: /上下矢印キー/ }).map((r) => r.getAttribute('aria-label')!.split(/[((]/)[0]))
+      .toEqual(['エリア おかげ横丁', '赤福', 'ダンデライオン']);
+    // エリアの詳細(写真・住所)は「エリアの詳細を開く」で出す
+    expect(within(block).queryByText('おかげ横丁', { selector: '.tc-event-title' })).toBeNull();
+    fireEvent.click(screen.getByTestId('area-toggle-area'));
+    expect(screen.getByTestId('area-toggle-area')).toHaveAttribute('aria-expanded', 'true');
+    expect(within(block).getAllByText('おかげ横丁').length).toBeGreaterThan(1);
+    // エリアも中の予定もドラッグで動かせる
+    expect(screen.getByRole('listitem', { name: '赤福(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'true');
+    expect(screen.getByRole('listitem', { name: 'エリア おかげ横丁(上下矢印キーで並べ替え)' })).toHaveAttribute('draggable', 'true');
   });
 
   it('↑↓: 中の予定はエリアの中だけ。エリアはまとまりごと(時刻は予定に付いたまま)動かして 1 回に保存', async () => {
@@ -569,10 +578,60 @@ describe('エリアの枠(DayView・全日程)', () => {
     fireEvent.click(screen.getByTestId('move-up-area'));
     const rows = screen.getAllByRole('listitem', { name: /上下矢印キー/ });
     expect(rows.map((r) => r.getAttribute('aria-label')!.split(/[((]/)[0])).toEqual(
-      ['おかげ横丁', '赤福', 'ダンデライオン', '伊勢神宮', '鳥羽水族館']);
+      ['エリア おかげ横丁', '赤福', 'ダンデライオン', '伊勢神宮', '鳥羽水族館']);
     expect(rows[3]).toHaveTextContent('10:00');  // 時刻は予定に付いたまま
     fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
     await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['area', 'aka', 'dan', 'ise', 'toba'], false));
+  });
+
+  /** 行の下半分へ落とす(jsdom のドラッグの出来事は clientY を持たないので、いつも下半分として扱われる) */
+  const dropOn = (el: HTMLElement, item: string) => {
+    el.getBoundingClientRect = () => ({ top: 100, height: 40, bottom: 140, left: 0, right: 300, width: 300, x: 0, y: 100, toJSON: () => ({}) });
+    fireEvent.dragOver(el, { dataTransfer: { dropEffect: 'none' } });
+    fireEvent.drop(el, { dataTransfer: { getData: () => JSON.stringify({ itemId: item, sourceContainer: 'p1:d1' }) } });
+  };
+
+  it('[AreaDrag] 外の予定をエリアの中へドラッグ: エリアに入れ、時刻を中の予定の後ろへ。はみ出したらエリアの終わりを延ばす', async () => {
+    drag.isDragging = true;
+    drag.sourceContainer = 'p1:d1';
+    render(<DayView day={areaDay()} planId="p1" segments={[]} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // 鳥羽水族館(1時間30分)を、ダンデライオンの下半分(エリアの中の最後)へ
+    dropOn(screen.getByRole('listitem', { name: 'ダンデライオン(上下矢印キーで並べ替え)' }).parentElement!, 'toba');
+    const preview = screen.getByTestId('reorder-preview');
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「鳥羽水族館」をエリア「おかげ横丁」へ入れる案にしました(エリアの時刻を 13:45〜17:00 に)');
+    expect(screen.getByTestId('area-summary-area')).toHaveTextContent('中の予定 3件');
+    fireEvent.click(within(preview).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['ise', 'area', 'aka', 'dan', 'toba'], false, {
+      parents: { toba: 'area' },
+      times: { toba: { start: '15:30', end: '17:00' }, area: { start: '13:45', end: '17:00' } },
+    }));
+    drag.isDragging = false;
+  });
+
+  it('[AreaDrag] 中の予定をエリアの外へ・エリアの中で並べ替える(エリアの時間帯の中で時刻を配り直す)', async () => {
+    drag.isDragging = true;
+    drag.sourceContainer = 'p1:d1';
+    render(<DayView day={areaDay()} planId="p1" segments={[]} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // ダンデライオンをエリアの見出しの下半分へ(エリアの中の先頭へ。時刻は 13:50〜14:50・14:50〜15:20)
+    dropOn(screen.getByRole('listitem', { name: 'エリア おかげ横丁(上下矢印キーで並べ替え)' }), 'dan');
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「ダンデライオン」をエリア「おかげ横丁」の中で動かす案にしました');
+    fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['ise', 'area', 'dan', 'aka', 'toba'], false, {
+      times: { dan: { start: '13:50', end: '14:50' }, aka: { start: '14:50', end: '15:20' } },
+    }));
+    // 赤福を最後(エリアの外)へ: エリアから出し、前の予定(鳥羽水族館)の終わりから
+    reorderSpots.mockClear();
+    fireEvent.dragOver(screen.getByTestId('drop-tail'), { dataTransfer: { dropEffect: 'none' } });
+    fireEvent.drop(screen.getByTestId('drop-tail'), { dataTransfer: { getData: () => JSON.stringify({ itemId: 'aka', sourceContainer: 'p1:d1' }) } });
+    expect(screen.getByTestId('reorder-status')).toHaveTextContent('「赤福」をエリア「おかげ横丁」から出す案にしました');
+    fireEvent.click(within(screen.getByTestId('reorder-preview')).getByTestId('reorder-apply'));
+    await waitFor(() => expect(reorderSpots).toHaveBeenCalledWith('p1', 'd1', ['ise', 'area', 'dan', 'toba', 'aka'], false, {
+      parents: { aka: null },
+      times: { aka: { start: '18:00', end: '18:30' } },
+    }));
+    drag.isDragging = false;
   });
 
   it('全日程: エリアは帯、中の予定には移動の帯を出さない', () => {
@@ -584,6 +643,31 @@ describe('エリアの枠(DayView・全日程)', () => {
     expect(d.events.filter((e) => e.inArea).map((e) => e.id)).toEqual(['aka', 'dan']);
     expect(d.travels ?? []).toEqual([]);
     render(<AllDaysChart days={[areaDay()]} segments={segs} currentDay={0} onOpenDay={() => {}} />);
-    expect(screen.getByTestId('chart-area-area')).toHaveTextContent('エリア 13:45 おかげ横丁');
+    // [AreaDrag] エリアは枠: 見出しに「エリア 名前 時刻」、中の予定は枠の中
+    const box = screen.getByTestId('chart-area-area');
+    expect(box).toHaveTextContent('エリアおかげ横丁13:45〜15:45');
+    expect(within(box).getByTestId('chart-event-aka')).toHaveTextContent('13:50 赤福');
+    expect(within(box).getByTestId('chart-event-dan')).toBeInTheDocument();
+    expect(within(box).queryByTestId('chart-event-ise')).toBeNull();
+  });
+});
+
+// [Gate DeleteOnce] 予定の削除は 1 回だけ送る(以前は旅程の画面がもう一度消して 404「リソースが見つかりません」になった)
+describe('予定の削除', () => {
+  it('確かめて 1 回だけ消し、消した後に onItemDelete で知らせる', async () => {
+    getHoursCheck.mockResolvedValue({ day_id: 'd1', local_date: '2026-11-29', timezone_id: 'Asia/Tokyo', near_minutes: 30, stale_days: 90, events: [] });
+    deleteScheduleItem.mockReset();
+    deleteScheduleItem.mockResolvedValue({ ok: true, note: null });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const onItemDelete = vi.fn();
+    render(<DayView day={{ id: 'd1', date: '2026-11-29', timezone_id: 'Asia/Tokyo', events: [
+      { id: 'yoko', title: '横山展望台', category: 'sightseeing' }, { id: 'toba', title: '鳥羽マルシェ', category: 'shopping' }] }}
+      planId="p1" onItemDelete={onItemDelete} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    fireEvent.click(within(screen.getByRole('listitem', { name: '鳥羽マルシェ(上下矢印キーで並べ替え)' })).getByRole('button', { name: '削除' }));
+    await waitFor(() => expect(onItemDelete).toHaveBeenCalledWith('toba'));
+    expect(deleteScheduleItem).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
   });
 });

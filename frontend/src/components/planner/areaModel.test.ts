@@ -1,7 +1,7 @@
 /** [Gate EventArea] エリアの中の予定の表示と並べ替えの計算 */
 import { describe, expect, it } from 'vitest';
 import type { ScheduleItem } from '@/types';
-import { areaCircles, areaMove, areaRoles, areaSummary, blockOf, isInnerPair } from './areaModel';
+import { applyExtra, areaCircles, areaDrop, areaMove, areaRoles, areaSummary, blockOf, isInnerPair } from './areaModel';
 
 const ev = (id: string, extra: Partial<ScheduleItem> = {}): ScheduleItem =>
   ({ id, title: id, category: 'sightseeing', ...extra }) as ScheduleItem;
@@ -82,5 +82,52 @@ describe('areaModel', () => {
     expect(c!.radius).toBeGreaterThanOrEqual(120);
     expect(c!.radius).toBeLessThan(400);
     expect(areaCircles([ev('A', { category: 'area', latitude: 34.46, longitude: 136.72 })])[0]!.radius).toBe(120);
+  });
+});
+
+describe('[AreaDrag] ドラッグでエリアへ入れる・出す', () => {
+  const day = () => [
+    ev('伊勢神宮', { start_time: '10:00', end_time: '12:00' }),
+    ev('おかげ横丁', { category: 'area', start_time: '13:45', end_time: '15:45' }),
+    ev('赤福', { parent_event_id: 'おかげ横丁', start_time: '14:45', end_time: '15:15' }),
+    ev('ダンデライオン', { start_time: '16:15', end_time: '16:45' }),
+  ];
+
+  it('外 → 外はエリアと関係ない(今までの入れ替え)', () => {
+    expect(areaDrop(day(), '伊勢神宮', 4, null)).toEqual({ kind: 'plain' });
+  });
+
+  it('外の予定をエリアの中へ: 中の予定の後ろへ時刻を付け、はみ出したらエリアの終わりを延ばす', () => {
+    const r = areaDrop(day(), 'ダンデライオン', 3, 'おかげ横丁');
+    expect(r.kind).toBe('move');
+    if (r.kind !== 'move') return;
+    expect(r.order).toEqual(['伊勢神宮', 'おかげ横丁', '赤福', 'ダンデライオン']);
+    expect(r.extra).toEqual({ parents: { ダンデライオン: 'おかげ横丁' },
+      times: { ダンデライオン: { start: '15:15', end: '15:45' } } });
+  });
+
+  it('エリアの先頭へ入れると中の予定を後ろへずらす。エリアのまとまりは外の位置へ(中には入れない)', () => {
+    const list = [...day()];
+    list[2] = { ...list[2]!, start_time: '13:45', end_time: '15:30' };
+    const r = areaDrop(list, '伊勢神宮', 2, 'おかげ横丁');
+    if (r.kind !== 'move') throw new Error(r.kind);
+    expect(r.extra.times).toEqual({ 伊勢神宮: { start: '13:45', end: '15:45' }, 赤福: { start: '15:45', end: '17:30' },
+      おかげ横丁: { start: '13:45', end: '17:30' } });
+    const m = areaDrop(day(), 'おかげ横丁', 0, null);
+    expect(m.kind === 'move' && m.order).toEqual(['おかげ横丁', '赤福', '伊勢神宮', 'ダンデライオン']);
+    expect(areaDrop(day(), 'おかげ横丁', 2, 'おかげ横丁').kind).toBe('blocked');
+  });
+
+  it('確定の予定は動かさない・日をまたぐ時刻にはしない', () => {
+    const locked = day().map((e) => (e.id === 'ダンデライオン' ? { ...e, locked: true } : e));
+    expect(areaDrop(locked, 'ダンデライオン', 3, 'おかげ横丁').kind).toBe('blocked');
+    const late = day().map((e) => (e.id === 'ダンデライオン' ? { ...e, start_time: '22:00', end_time: '23:50' } : e));
+    late[2] = { ...late[2]!, start_time: '22:30', end_time: '23:30' };
+    expect(areaDrop(late, 'ダンデライオン', 3, 'おかげ横丁')).toMatchObject({ kind: 'blocked' });
+  });
+
+  it('案の見え方: エリアの指定と時刻を当てる', () => {
+    const v = applyExtra(day(), { parents: { ダンデライオン: 'おかげ横丁' }, times: { ダンデライオン: { start: '15:15', end: '15:45' } } });
+    expect(v[3]).toMatchObject({ parent_event_id: 'おかげ横丁', start_time: '15:15', end_time: '15:45' });
   });
 });

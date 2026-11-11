@@ -17,7 +17,8 @@ import type { TravelSegment } from '@/services/api/types/segments';
 import { SNAP_MINUTES, buildChart, kmText, minutesToHm, overlapLanes, snapMinutes, type ChartDay } from './plannerModel';
 import { durationLabel } from '@/utils/transportModes';
 import JourneyAnchorRow from './JourneyAnchorRow';
-import type { DayAnchor } from './journeyModel';
+import { anchorText, type DayAnchor } from './journeyModel';
+import { transportText } from '@/utils/transportModes';
 
 /** [Gate JourneyEnds] 列の最初・最後の「出発・到着・宿」 */
 export interface ChartAnchors { start: DayAnchor | null; end: DayAnchor | null }
@@ -68,8 +69,21 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
   onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, anchors, onOpen, locked, drag, setDrag, onDropEvent }) => {
   const height = ((scaleEnd - scaleStart) / 60) * PX_PER_HOUR;
   const label = `${day.date}(${weekday(day.date)})`;
-  const lanes = useMemo(() => overlapLanes(day.events.map((e) => ({ id: e.id, start: e.start ?? scaleStart,
-    end: Math.max((e.end ?? e.start ?? scaleStart), (e.start ?? scaleStart) + MIN_BLOCK_MINUTES) }))), [day.events, scaleStart]);
+  // [Gate AreaDrag] エリアは 1 つの枠(中の予定を含む長さ)として横に並べ、中の予定は枠の中に置く
+  const areaBoxes = useMemo(() => (day.areas ?? []).map((a) => {
+    const members = day.events.filter((e) => e.areaId === a.id);
+    const spans = [a, ...members].map((e) => [e.start ?? scaleStart,
+      Math.max(e.end ?? e.start ?? scaleStart, (e.start ?? scaleStart) + MIN_BLOCK_MINUTES)] as const);
+    return { area: a, members, start: Math.min(...spans.map(([s]) => s)), end: Math.max(...spans.map(([, e]) => e)) + 18 / PX_PER_HOUR * 60 };
+  }), [day.areas, day.events, scaleStart]);
+  const inBox = useMemo(() => new Set(areaBoxes.flatMap((b) => b.members.map((m) => m.id))), [areaBoxes]);
+  const outside = useMemo(() => day.events.filter((e) => !inBox.has(e.id)), [day.events, inBox]);
+  const lanes = useMemo(() => overlapLanes([
+    ...outside.map((e) => ({ id: e.id, start: e.start ?? scaleStart,
+      end: Math.max((e.end ?? e.start ?? scaleStart), (e.start ?? scaleStart) + MIN_BLOCK_MINUTES) })),
+    ...areaBoxes.map((b) => ({ id: b.area.id, start: b.start, end: b.end })),
+  ]), [outside, areaBoxes, scaleStart]);
+  const timedAnchor = (a: DayAnchor | null | undefined) => Boolean(a && (a.kind === 'departure' || a.kind === 'arrival') && toMin(a.time) !== null);
   const [over, setOver] = useState(false);
   const [preview, setPreview] = useState<number | null>(null);
   const canDrop = !!onDropEvent && !!drag && drag.from !== day.index;
@@ -130,7 +144,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           ].filter(Boolean).map((t, i, all) => <span key={t}>{t}{i < all.length - 1 ? <span className="sr-only">・</span> : null}</span>)}
         </p>
       </header>
-      {anchors?.start && <div className="mt-2"><JourneyAnchorRow anchor={anchors.start} position="start" /></div>}
+      {anchors?.start && !timedAnchor(anchors.start) && <div className="mt-2"><JourneyAnchorRow anchor={anchors.start} position="start" /></div>}
       <div className="relative mt-2 mb-3" style={{ height }} aria-hidden="false" data-testid={`chart-scale-${day.index}`}
         onDragOver={(ev) => {
           if (!onDropEvent || !drag) return;
@@ -160,10 +174,17 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
         {[anchors?.start, anchors?.end].map((a) => {
           const at = a && (a.kind === 'departure' || a.kind === 'arrival') ? toMin(a.time) : null;
           if (!a || at === null) return null;
+          // [Gate AreaDrag] 出発・帰着の箱は時刻の線にくっつける(出発は線の上・帰着は線の下)。移動手段は箱の中に小さく
+          const { label, body } = anchorText(a);
+          const move = a.mode ? transportText(a.mode, a.minutes ?? null) : null;
           return (
             <div key={a.kind} className="tc-chart-anchor-line" data-kind={a.kind} style={{ top: ((at - scaleStart) / 60) * PX_PER_HOUR }}
               data-testid={`chart-anchor-${a.kind}-${day.index}`}>
-              <span>{`${a.kind === 'departure' ? '出発' : '帰着'} ${a.time}`}</span>
+              <span className="sr-only">{`${a.kind === 'departure' ? '出発' : '帰着'} ${a.time}`}</span>
+              <div className={`tc-chart-anchor-box is-${a.kind}`} data-testid={`day-anchor-${a.kind === 'departure' ? 'start' : 'end'}`}>
+                <strong>{label}</strong> {body}
+                {move && <small><TransportIcon mode={a.mode ?? undefined} size={11} /> {move}</small>}
+              </div>
             </div>
           );
         })}
@@ -184,22 +205,45 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           <span key={i} className="absolute left-0 right-0 border-t border-dashed border-cloud-200 text-[10px] text-ink-700"
             style={{ top: i * PX_PER_HOUR }} aria-hidden="true">{hm(scaleStart + i * 60)}</span>
         ))}
-        {/* [Gate EventArea] エリアは薄い色の大きな帯(中の予定はその上に重ねる) */}
-        {(day.areas ?? []).map((a) => (
-          <div key={`area-${a.id}`} className="tc-chart-area" data-testid={`chart-area-${a.id}`}
-            style={{ top: (((a.start ?? scaleStart) - scaleStart) / 60) * PX_PER_HOUR,
-              height: Math.max(30, ((((a.end ?? a.start ?? scaleStart) - (a.start ?? scaleStart)) / 60) * PX_PER_HOUR)) }}>
-            <span title={`エリア ${hm(a.start ?? 0)}〜${hm(a.end ?? a.start ?? 0)} ${a.title}`}>{a.title}</span>
-            <span className="sr-only">{`エリア ${hm(a.start ?? 0)} ${a.title}`}</span>
-          </div>
-        ))}
         <ol className="absolute inset-0 left-10" aria-label={`${label}の予定(時刻順)`}>
-          {day.events.map((e) => {
+          {/* [Gate AreaDrag] エリアは枠: 上に「エリア 名前 時刻」、中の予定は枠の中に時刻の位置で並べる(ほかの予定と重なれば横に並ぶ) */}
+          {areaBoxes.map((b) => {
+            const lane = lanes.get(b.area.id) ?? { lane: 0, of: 1 };
+            const top = ((b.start - scaleStart) / 60) * PX_PER_HOUR;
+            const height = ((b.end - b.start) / 60) * PX_PER_HOUR;
+            const range = `${hm(b.area.start ?? 0)}〜${b.area.endKnown ? hm(b.area.end ?? 0) : ''}`;
+            return (
+              <li key={b.area.id} className="absolute tc-chart-areabox" data-testid={`chart-area-${b.area.id}`}
+                style={{ top, height, left: `${(lane.lane / lane.of) * 100}%`, width: `calc(${100 / lane.of}% - ${lane.of > 1 ? 2 : 0}px)` }}>
+                <button type="button" onClick={onOpen} className="tc-chart-areahead" data-testid={`chart-event-${b.area.id}`}
+                  {...dragProps(b.area.id, b.area.start)} title={`エリア ${b.area.title} ${range}`}>
+                  <span className="tc-area-tag">エリア</span><span className="tc-chart-areaname">{b.area.title}</span><span>{range}</span>
+                </button>
+                <ol aria-label={`エリア ${b.area.title} の中の予定`}>
+                  {b.members.map((m) => {
+                    const rel = (((m.start ?? b.start) - b.start) / 60) * PX_PER_HOUR;
+                    const mh = Math.max(26, ((((m.end ?? m.start ?? b.start) - (m.start ?? b.start)) / 60) * PX_PER_HOUR));
+                    return (
+                      <li key={m.id} className="absolute left-1.5 right-1" style={{ top: Math.max(20, rel), height: mh }}>
+                        <button type="button" onClick={onOpen} data-testid={`chart-event-${m.id}`} {...dragProps(m.id, m.start)}
+                          data-category={m.category}
+                          className={`h-full w-full overflow-hidden rounded-md border border-cloud-200 ${catClass(m.category)} px-2 py-0.5 text-left text-xs text-ink-900${
+                            drag?.id === m.id ? ' opacity-50' : ''}`}>
+                          <span className="font-semibold">{hm(m.start ?? 0)}</span> <span>{m.title}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </li>
+            );
+          })}
+          {outside.map((e) => {
             const top = (((e.start ?? scaleStart) - scaleStart) / 60) * PX_PER_HOUR;
             const h = Math.max(30, ((((e.end ?? e.start ?? scaleStart) - (e.start ?? scaleStart)) / 60) * PX_PER_HOUR));
             const lane = lanes.get(e.id) ?? { lane: 0, of: 1 };
             return (
-              <li key={e.id} className={`absolute${e.inArea ? ' tc-chart-in-area' : ''}`} data-lane={lane.of > 1 ? `${lane.lane + 1}/${lane.of}` : undefined}
+              <li key={e.id} className="absolute" data-lane={lane.of > 1 ? `${lane.lane + 1}/${lane.of}` : undefined}
                 style={{ top, height: h, left: `${(lane.lane / lane.of) * 100}%`, width: `calc(${100 / lane.of}% - ${lane.of > 1 ? 2 : 0}px)` }}>
                 <button type="button" onClick={onOpen} data-testid={`chart-event-${e.id}`} {...dragProps(e.id, e.start)}
                   data-category={e.category}
@@ -215,7 +259,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           })}
         </ol>
       </div>
-      {anchors?.end && <JourneyAnchorRow anchor={anchors.end} position="end" />}
+      {anchors?.end && !timedAnchor(anchors.end) && <JourneyAnchorRow anchor={anchors.end} position="end" />}
       {day.untimed.length > 0 && (
         <ul className="mt-5 space-y-1 text-xs text-ink-700" aria-label={`${label}の時刻の無い予定`} data-testid={`chart-untimed-${day.index}`}>
           {day.untimed.map((e) => (
@@ -248,8 +292,10 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
       for (const x of [a.start, a.end]) {
         const t = x && (x.kind === 'departure' || x.kind === 'arrival') ? toMin(x.time) : null;
         if (t === null) continue;
-        lo = Math.min(lo, Math.floor(t / 60) * 60);
-        hi = Math.max(hi, Math.ceil((t + 1) / 60) * 60);
+        // 出発の箱は線の上・帰着の箱は線の下に置くので、1 時間の余白をとる
+        if (x!.kind === 'departure') lo = Math.min(lo, Math.floor((t - 60) / 60) * 60);
+        else hi = Math.min(24 * 60, Math.max(hi, Math.ceil((t + 60) / 60) * 60));
+        lo = Math.max(0, Math.min(lo, Math.floor(t / 60) * 60));
       }
     }
     return { lo, hi };

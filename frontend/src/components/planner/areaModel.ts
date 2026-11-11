@@ -120,7 +120,7 @@ export function areaMove(events: ReadonlyArray<Ev>, index: number, delta: -1 | 1
       return { kind: 'default' };
     }
     const area = events.find((e) => e.id === role.areaId);
-    return { kind: 'blocked', reason: `「${ev.title}」はエリア「${area?.title ?? ''}」の中の予定です。外へ出す時は、編集の「エリア」で外してください` };
+    return { kind: 'blocked', reason: `「${ev.title}」はエリア「${area?.title ?? ''}」の中の予定です。外へ出す時は、ドラッグでエリアの外へ落としてください` };
   }
   const [s, e] = blockOf(events, index, roles);
   const ns = delta < 0 ? (s > 0 ? blockOf(events, s - 1, roles)[0] : -1) : e + 1;
@@ -165,5 +165,180 @@ export function areaCircles(events: ReadonlyArray<ScheduleItem>): { id: string; 
     if (!center) return [];
     const far = inner.reduce((m, p) => Math.max(m, meters(center, p)), 0);
     return [{ id: a.id, title: a.title, center, radius: Math.min(1500, Math.max(120, far + 60)) }];
+  });
+}
+
+// ===== [Gate AreaDrag] ドラッグでエリアへ入れる・出す・エリアの中で並べ替える =====
+
+type DropEv = Ev & Pick<ScheduleItem, 'duration'>;
+
+/** 並べ替えと一緒に送る、エリアの出し入れと時刻の付け直し */
+export interface AreaExtra {
+  parents?: Record<string, string | null>;
+  times?: Record<string, { start: string; end?: string | null }>;
+}
+
+export type AreaDrop =
+  | { kind: 'plain' }
+  | { kind: 'blocked'; reason: string }
+  | { kind: 'move'; order: string[]; extra: AreaExtra; text: string };
+
+const hmOf = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+/** 予定の長さ(分)。終了が無ければ所要時間、それも無ければ 30 分 */
+export function stayMinutes(e: DropEv): number {
+  const s = span(e);
+  if (s !== null && s > 0) return s;
+  return e.duration && e.duration > 0 ? e.duration : 30;
+}
+
+/**
+ * エリア A の中の予定に、新しい順で時刻を付け直す。
+ * - 元から中にあった予定の開始の時刻(早い順)を、新しい順の位置に配る(エリアの時間帯の中で並べ替える)
+ * - 新しく入れた予定は、前の予定の終わり(先頭ならエリアの開始)から。長さはそれぞれの予定のまま
+ * - 前の予定と重なれば後ろへずらす。はみ出したら、エリアの終わりを延ばす・開始を早める(縮めはしない)
+ * 戻り値: 予定 ID → [開始, 終了](分)。時刻を付けられない予定(時刻の無い予定)は含めない
+ */
+export function packArea(area: DropEv, members: ReadonlyArray<DropEv>, entering: ReadonlySet<string>,
+): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>();
+  const aStart = minutesOf(area.start_time);
+  const slots = members.filter((m) => !entering.has(m.id)).map((m) => minutesOf(m.start_time))
+    .filter((v): v is number => v !== null).sort((a, b) => a - b);
+  let cursor: number | null = aStart;
+  for (const m of members) {
+    const own = minutesOf(m.start_time);
+    const isNew = entering.has(m.id);
+    if (!isNew && own === null) continue;  // 時刻の無い予定はそのまま
+    const preferred = isNew ? cursor ?? own : slots.shift() ?? cursor ?? own;
+    if (preferred === null) continue;
+    const start = cursor !== null ? Math.max(preferred, cursor) : preferred;
+    const end = start + stayMinutes(m);
+    out.set(m.id, [start, end]);
+    cursor = end;
+  }
+  const spans = [...out.values()];
+  if (spans.length) {
+    const lo = Math.min(...spans.map(([s]) => s));
+    const hi = Math.max(...spans.map(([, e]) => e));
+    const aEnd = aStart !== null ? aStart + (span(area) ?? 0) : null;
+    const ns = aStart === null ? lo : Math.min(aStart, lo);
+    const ne = aEnd === null || aEnd <= ns ? hi : Math.max(aEnd, hi);
+    out.set(area.id, [ns, ne]);
+  }
+  return out;
+}
+
+/**
+ * ドラッグの結果。gap は元の並びで「i 番目の予定の前」(末尾は件数)、parent は落とした所のエリア(外なら null)。
+ * - エリアが関わらない(外 → 外)なら 'plain'(今までのスポットの入れ替え)
+ * - エリア自身はまとまりごと外の位置へ(時刻は予定に付いたまま)
+ * - 外 → エリア・エリア → 外・エリアの中の並べ替え: 並び・エリアの指定・時刻(エリアの延長を含む)を 1 回で送る
+ */
+export function areaDrop(events: ReadonlyArray<DropEv>, dragId: string, gap: number, parent: string | null): AreaDrop {
+  const roles = areaRoles(events);
+  const idx = events.findIndex((e) => e.id === dragId);
+  const dragged = events[idx];
+  if (!dragged) return { kind: 'blocked', reason: '動かす予定が見つかりません' };
+  if (dragged.locked) return { kind: 'blocked', reason: `確定の予定「${dragged.title}」は動かせません` };
+  const ids = events.map((e) => e.id);
+  const role = roles.get(dragId)!;
+
+  // エリアのまとまりを動かす(落とす先はエリアの外。ほかのエリアの中なら、そのエリアの前へ)
+  if (role.role === 'area') {
+    const [s, e] = blockOf(events, idx, roles);
+    let at = gap;
+    if (at > s && at <= e + 1) return { kind: 'blocked', reason: '同じ位置です' };
+    const inside = events[at] && roles.get(events[at]!.id)?.role === 'member' ? roles.get(events[at]!.id)!.areaId : null;
+    if (inside) at = events.findIndex((x) => x.id === inside);
+    const block = ids.slice(s, e + 1);
+    const rest = ids.filter((x) => !block.includes(x));
+    const pos = at > e ? at - block.length : at;
+    const order = [...rest.slice(0, pos), ...block, ...rest.slice(pos)];
+    const locked = events.find((x, i) => x.locked && order[i] !== x.id);
+    if (locked) return { kind: 'blocked', reason: `確定の予定「${locked.title}」の位置が変わるため動かせません` };
+    return { kind: 'move', order, extra: {}, text: `エリア「${dragged.title}」と中の予定を${order.indexOf(dragged.id) + 1}番目へ動かす案にしました(時刻は予定に付いたまま)。まだ保存していません` };
+  }
+
+  const from = role.role === 'member' ? role.areaId : null;
+  if (!from && !parent) return { kind: 'plain' };
+  const area = parent ? events.find((x) => x.id === parent && isArea(x)) : undefined;
+  if (parent && !area) return { kind: 'blocked', reason: '入れる先のエリアが見つかりません' };
+
+  // 並び: 自分を抜いて、落とした所へ。エリアの中へは、エリアのまとまりの中に収める。外へは、まとまりの外に出す
+  const rest = ids.filter((x) => x !== dragId);
+  let pos = gap > idx ? gap - 1 : gap;
+  const restEv = rest.map((x) => events.find((y) => y.id === x)!);
+  const restRoles = areaRoles(restEv);
+  if (area) {
+    const ai = rest.indexOf(area.id);
+    const [, be] = blockOf(restEv, ai, restRoles);
+    pos = Math.min(Math.max(pos, ai + 1), be + 1);
+  } else if (pos < rest.length && restRoles.get(rest[pos]!)?.role === 'member') {
+    const ai = rest.indexOf(restRoles.get(rest[pos]!)!.areaId!);
+    pos = blockOf(restEv, ai, restRoles)[1] + 1;  // エリアの中へは入れない(まとまりの後ろへ)
+  }
+  const order = [...rest.slice(0, pos), dragId, ...rest.slice(pos)];
+  if (order.join(',') === ids.join(',') && from === parent) return { kind: 'blocked', reason: '同じ位置です' };
+  const lockedMoved = events.find((x, i) => x.locked && order[i] !== x.id);
+  if (lockedMoved) return { kind: 'blocked', reason: `確定の予定「${lockedMoved.title}」の位置が変わるため動かせません` };
+
+  // 時刻
+  const byId = new Map(events.map((e) => [e.id, e]));
+  const next = new Map<string, [number, number]>();
+  const repack = (areaId: string, enteringIds: string[]) => {
+    const a = byId.get(areaId)!;
+    const members = order.filter((x) => x !== areaId && (x === dragId ? parent === areaId : byId.get(x)!.parent_event_id === areaId))
+      .map((x) => byId.get(x)!);
+    for (const [k, v] of packArea(a, members, new Set(enteringIds))) next.set(k, v);
+  };
+  if (parent) repack(parent, from === parent ? [] : [dragId]);
+  if (from && from !== parent) {
+    repack(from, []);
+    // エリアから出した予定: 前の予定の終わりから(長さはそのまま)
+    const own = minutesOf(dragged.start_time);
+    const prevId = order[order.indexOf(dragId) - 1];
+    let prev = prevId ? byId.get(prevId) : undefined;
+    // 前がエリアの中の予定なら、エリアの終わりから(エリアの方が長い時)
+    if (prev?.parent_event_id && prev.id !== dragId) prev = byId.get(prev.parent_event_id) ?? prev;
+    const endOf = (e: DropEv): number | null => {
+      const n = next.get(e.id);
+      if (n) return n[1];
+      const ps = minutesOf(e.start_time);
+      return ps !== null ? ps + stayMinutes(e) : null;
+    };
+    const start = (prev ? endOf(prev) : null) ?? own;
+    if (start !== null) next.set(dragId, [start, start + stayMinutes(dragged)]);
+  }
+  const times: Record<string, { start: string; end?: string | null }> = {};
+  for (const [id, [s, e]] of next) {
+    const ev = byId.get(id)!;
+    if (e > 24 * 60 - 1) return { kind: 'blocked', reason: `「${ev.title}」の時刻が日をまたぐため、この位置には入れられません(時刻を直してから動かしてください)` };
+    const st = hmOf(s);
+    const en = hmOf(e);
+    if (minutesOf(ev.start_time) === s && minutesOf(ev.end_time) === e) continue;
+    if (ev.locked) return { kind: 'blocked', reason: `確定の予定「${ev.title}」の時刻が変わるため動かせません` };
+    times[id] = { start: st, end: en };
+  }
+  const extra: AreaExtra = { times };
+  if (from !== parent) extra.parents = { [dragId]: parent };
+  const areaTime = (id: string) => (times[id] ? `(エリアの時刻を ${times[id]!.start}〜${times[id]!.end} に)` : '');
+  const text = parent && from === parent
+    ? `「${dragged.title}」をエリア「${area!.title}」の中で動かす案にしました${areaTime(parent)}。まだ保存していません`
+    : parent
+      ? `「${dragged.title}」をエリア「${area!.title}」へ入れる案にしました${areaTime(parent)}。まだ保存していません`
+      : `「${dragged.title}」をエリア「${byId.get(from!)?.title ?? ''}」から出す案にしました。まだ保存していません`;
+  return { kind: 'move', order, extra, text };
+}
+
+/** 案の見え方: 並び・エリアの指定・時刻を当てた予定の一覧 */
+export function applyExtra<T extends Ev>(events: ReadonlyArray<T>, extra: AreaExtra | null | undefined): T[] {
+  if (!extra || (!extra.parents && !extra.times)) return [...events];
+  return events.map((e) => {
+    let out = e;
+    if (extra.parents && e.id in extra.parents) out = { ...out, parent_event_id: extra.parents[e.id] ?? undefined };
+    const t = extra.times?.[e.id];
+    if (t) out = { ...out, start_time: t.start, end_time: t.end ?? out.end_time, end_day_offset: 0 };
+    return out;
   });
 }

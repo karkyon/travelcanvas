@@ -116,7 +116,7 @@ interface PlanState {
   deleteScheduleItem: (itemId: string) => Promise<{ ok: boolean; note: string | null }>;
   reorderScheduleItems: (dayIndex: number, itemIds: string[]) => Promise<void>;
   /** [Gate PlanSpotEdit] スポットだけを入れ替える(時刻・移動手段は位置に残す)。1 回の「元に戻す」で戻る。成功で true */
-  reorderDaySlots: (dayId: string, itemIds: string[], keepSlots?: boolean) => Promise<boolean>;
+  reorderDaySlots: (dayId: string, itemIds: string[], keepSlots?: boolean, extra?: import('@/components/planner/areaModel').AreaExtra) => Promise<boolean>;
   /** 別の日へ移す(日時も日数の差だけずらす)。成功で true */
   moveItemBetweenDays: (itemId: string, fromDayIndex: number, toDayIndex: number, newIndex: number) => Promise<boolean>;
 
@@ -946,7 +946,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   // [Gate PlanSpotEdit] 1 日の並べ替え(スポットだけを入れ替える)。サーバーが 1 つの変更として行い、その日の予定を返す
-  reorderDaySlots: async (dayId: string, itemIds: string[], keepSlots = true) => {
+  reorderDaySlots: async (dayId: string, itemIds: string[], keepSlots = true, extra) => {
     const plan = get().currentPlan;
     if (!plan || plan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
@@ -954,7 +954,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     }
     try {
       const { reorderDay } = await import('../services/api/planEdit');
-      const result = await reorderDay(plan.id, dayId, itemIds, plan.revision, keepSlots);
+      const result = extra ? await reorderDay(plan.id, dayId, itemIds, plan.revision, keepSlots, extra)
+        : await reorderDay(plan.id, dayId, itemIds, plan.revision, keepSlots);
       set((s) => (s.currentPlan && s.currentPlan.id === plan.id ? {
         currentPlan: {
           ...s.currentPlan,
@@ -977,6 +978,12 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       if (code === 'order_mismatch') {
         await get().loadPlan(plan.id);
         toast.error('予定が変わったため並べ替えられませんでした。最新の内容を読み直しました');
+        return false;
+      }
+      // [Gate AreaDrag] エリアの決まり・時刻の誤り(400/422)は理由を出す
+      const message = (detail as { message?: unknown } | undefined)?.message;
+      if (code && typeof message === 'string') {
+        toast.error(message);
         return false;
       }
       await get()._reconcileOnConflict(error, plan.id);

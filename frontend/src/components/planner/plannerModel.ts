@@ -277,8 +277,10 @@ export interface ChartEvent {
   duration?: number | null;
   modeText: string | null;
   mode: string | null;
-  /** [Gate EventArea] エリアの中の予定(帯の上に少し字下げして重ねる) */
+  /** [Gate EventArea] エリアの中の予定(エリアの枠の中に並べる) */
   inArea?: boolean;
+  /** [Gate AreaDrag] 入っているエリアの ID */
+  areaId?: string;
 }
 
 export interface ChartDay {
@@ -398,7 +400,7 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
         category: e.category ?? 'other',
         duration: start !== null && end !== null && end >= start && !(e.end_day_offset ?? 0) ? end - start : null,
       };
-      if (e.parent_event_id) item.inArea = true;
+      if (e.parent_event_id) { item.inArea = true; item.areaId = e.parent_event_id; }
       if (start === null) {
         untimed.push(item);
         continue;

@@ -130,7 +130,6 @@ const PlannerPage: React.FC = () => {
     removeDay,
     clearCurrentPlan,
     updateScheduleItem,
-    deleteScheduleItem,
     searchResults,
     addScheduleItemFromCandidate,
     saveCurrentPlanOffline,
@@ -524,9 +523,10 @@ const PlannerPage: React.FC = () => {
     setEditConflict(null);
   };
 
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('このスポットを日程から削除しますか？')) return;
-    await deleteScheduleItem(itemId);
+  // [Gate DeleteOnce] DayView は確かめて消した「後」に知らせる(onItemDelete)。以前はここでもう一度確かめて消していたため、
+  // 2 回目の削除が「リソースが見つかりません」(404)になり、消えたのに失敗の知らせが出ていた。ここでは選択を外すだけ
+  const handleDeleteItem = (itemId: string) => {
+    setSelectedEventId((cur) => (cur === itemId ? null : cur));
   };
 
   // [Gate #16] SearchPage.tsxの「プランに追加」ボタンはlocation.state.newSpotで

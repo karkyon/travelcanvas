@@ -15,8 +15,12 @@ export interface DayReorderResult { revision: number; day: NormalizedDay }
 const dayReorderResult = object<DayReorderResult>({ revision: int, day: normalizedDay });
 
 export async function reorderDay(planId: string, dayId: string, order: string[], ifMatch: number,
-  keepSlots = true): Promise<DayReorderResult> {
-  const response = await api.post(`/plans/${planId}/days/${dayId}/reorder`, { order, keep_slots: keepSlots },
+  keepSlots = true, extra?: { parents?: Record<string, string | null>; times?: Record<string, { start: string; end?: string | null }> },
+): Promise<DayReorderResult> {
+  // [Gate AreaDrag] エリアの出し入れ・時刻の付け直しは並びと一緒に送る(1 回の「元に戻す」で全部戻る)
+  const body = { order, keep_slots: keepSlots, ...(extra?.parents ? { parents: extra.parents } : {}),
+    ...(extra?.times && Object.keys(extra.times).length ? { times: extra.times } : {}) };
+  const response = await api.post(`/plans/${planId}/days/${dayId}/reorder`, body,
     { ...SILENT, headers: { 'If-Match': String(ifMatch) } });
   return decodeResponse(response.data, dayReorderResult, 'POST /plans/{plan_id}/days/{day_id}/reorder');
 }

@@ -170,3 +170,42 @@ def test_reorder_keeps_members_after_area(auth_client):
                     json={"order": [area["id"], m["id"], a["id"], b["id"]], "keep_slots": False},
                     headers={"If-Match": str(_rev(client, p))})
     assert [e["title"] for e in r.json()["day"]["events"]] == ["おかげ横丁", "赤福", "伊勢神宮", "鳥羽水族館"]
+
+
+def test_reorder_moves_in_and_out_of_area_with_times_in_one_change(auth_client):
+    """[Gate AreaDrag] ドラッグでエリアへ入れる・出す・時刻の付け直し(エリアの延長)を 1 つの変更で。元に戻すと全部戻る"""
+    client, _owner = auth_client
+    p, base, d1, _d2 = _plan(client)
+    a = _ev(client, base, d1, "伊勢神宮", local_start_time="12:30", local_end_time="13:30")
+    area = _ev(client, base, d1, "おかげ横丁", "area", local_start_time="13:45", local_end_time="15:45")
+    m = _ev(client, base, d1, "赤福", parent_event_id=area["id"], local_start_time="14:00", local_end_time="14:30")
+    b = _ev(client, base, d1, "ダンデライオン", local_start_time="16:15", local_end_time="16:45")
+    rev = _rev(client, p)
+    body = {
+        "order": [a["id"], area["id"], m["id"], b["id"]], "keep_slots": False,
+        "parents": {b["id"]: area["id"]},
+        "times": {b["id"]: {"start": "14:30", "end": "15:00"}, area["id"]: {"start": "13:45", "end": "16:00"}},
+    }
+    r = client.post(f"{base}/days/{d1['id']}/reorder", json=body, headers={"If-Match": str(rev)})
+    assert r.status_code == 200, r.text
+    evs = {e["title"]: e for e in r.json()["day"]["events"]}
+    assert [e["title"] for e in r.json()["day"]["events"]] == ["伊勢神宮", "おかげ横丁", "赤福", "ダンデライオン"]
+    assert evs["ダンデライオン"]["parent_event_id"] == area["id"]
+    assert evs["ダンデライオン"]["local_start_time"] == "14:30" and evs["ダンデライオン"]["local_end_time"] == "15:00"
+    assert evs["おかげ横丁"]["local_end_time"] == "16:00"
+    assert r.json()["revision"] == rev + 1
+    # エリアから外へ出す
+    r = client.post(f"{base}/days/{d1['id']}/reorder", json={
+        "order": [a["id"], area["id"], b["id"], m["id"]], "keep_slots": False, "parents": {m["id"]: None},
+        "times": {m["id"]: {"start": "16:00", "end": "16:30"}}}, headers={"If-Match": str(rev + 1)})
+    assert r.status_code == 200, r.text
+    assert _order(client, p, d1["id"])[-1] == ("赤福", None)
+    # 元に戻すと、外へ出す前へ戻る
+    assert client.post(f"/api/v1/plans/{p}/undo", headers={"If-Match": str(rev + 2)}).status_code == 200
+    assert _order(client, p, d1["id"]) == [("伊勢神宮", None), ("おかげ横丁", None), ("赤福", area["id"]),
+                                           ("ダンデライオン", area["id"])]
+    # 決まりに合わない入れ方(エリアでない予定へ)は 400
+    r = client.post(f"{base}/days/{d1['id']}/reorder", json={
+        "order": [e["id"] for e in client.get(f"/api/v1/plans/{p}").json()["days"][0]["events"]],
+        "keep_slots": False, "parents": {a["id"]: b["id"]}}, headers={"If-Match": str(_rev(client, p))})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "parent_not_area"
