@@ -236,7 +236,7 @@ describe('PlanBasicsDialog', () => {
     m.getPlanBasics.mockReturnValue(new Promise((r) => { resolve = r; }));
     m.reschedulePlan.mockResolvedValue({ revision: 8, days: 2, reservations_not_moved: 0 });
     const saved = vi.fn();
-    const view = render(<PlanBasicsDialog planId="p1" revision={7} isOpen onClose={vi.fn()} onSaved={saved} />);
+    const view = render(<PlanBasicsDialog planId="p1" revision={7} firstDate={null} lastDate={null} isOpen onClose={vi.fn()} onSaved={saved} />);
     expect(screen.getByLabelText('出発日')).toBeDisabled();
     expect(screen.getByTestId('plan-basics-save')).toBeDisabled();
     resolve({ title: '金沢', destination: null, description: null, budget: null, start_date: '2026-04-10', end_date: '2026-04-10', preferences: {} });
