@@ -28,6 +28,8 @@ import { applyCandidate, lookupPlace, toCategory, type NewEventData } from './pl
 import type { PlaceInfoResult } from '../services/api/planEdit';
 import { nearPoint } from '@/components/places/placeHelpers';
 import { usePlanStore } from '@/store/planStore';
+import BookingBadge from './planner/BookingBadge';
+import { getBookingStatus, linkReservationToEvent, type EventBooking } from '@/services/api/bookingStatus';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 import UiIcon from '@/components/common/UiIcon';
 import { IcCalendar, IcFootprints, IcMapPin, IcTimer, IcWallet } from '@/components/common/uiIcons';
@@ -188,6 +190,24 @@ const DayView: React.FC<DayViewProps> = ({
       .catch(() => undefined);
     return () => { active = false; };
   }, [canEdit]);
+
+  // [Gate BookingBadge] 予定ごとの予約の状態(予約済み・食い違い・合いそうな予約・まだ)。予定が変わったら読み直す
+  const bookingKey = day.events.map((e) => `${e.id}|${e.category}|${e.start_time ?? ''}|${e.title}`).join(',');
+  const [bookings, setBookings] = useState<Record<string, EventBooking>>({});
+  const [bookingVersion, setBookingVersion] = useState(0);
+  useEffect(() => {
+    let active = true;
+    getBookingStatus(planId).then((r) => { if (active) setBookings(r.events ?? {}); }).catch(() => { if (active) setBookings({}); });
+    return () => { active = false; };
+  }, [planId, bookingKey, bookingVersion]);
+  const linkBooking = useCallback(async (reservationId: string, eventId: string) => {
+    try {
+      await linkReservationToEvent(planId, reservationId, eventId);
+      setBookingVersion((v) => v + 1);
+    } catch {
+      setAnnounce('予約を予定につなげませんでした');
+    }
+  }, [planId]);
 
   // [Gate G11] 並べ替えの影響(UIX-M03): 動かす前の並びと営業時間の判定を覚え、差・合わなくなった区間・元に戻すを出す。
   // 続けて動かした時は最初の並びを覚えたまま(元に戻すと、まとめて最初の並びへ戻る)
@@ -776,6 +796,10 @@ const DayView: React.FC<DayViewProps> = ({
           image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
           onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
           selected={selectedEventId === event.id}
+          badge={bookings[event.id] ? (
+            <BookingBadge planId={planId} eventId={event.id} title={event.title} category={event.category} booking={bookings[event.id]!} canEdit={canEdit}
+              onLink={(rid) => linkBooking(rid, event.id)} />
+          ) : null}
         />
         )}
         </div>

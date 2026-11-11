@@ -28,6 +28,11 @@ import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
 import type { TravelPlan } from '@/types';
+// [Gate BookingBadge] 予約の札の読み込み(旅程の予定ごと)は空にする
+vi.mock('@/services/api/bookingStatus', () => ({
+  getBookingStatus: vi.fn().mockResolvedValue({ party_size: null, events: {} }), linkReservationToEvent: vi.fn(),
+}));
+
 
 const plan = (): TravelPlan => ({
   id: 'plan-1', title: 'trip', revision: 3,

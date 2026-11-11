@@ -1460,3 +1460,16 @@ def reveal_ticket(
     )
 
     return TicketRevealResponse(id=str(t.id), payload=payload_value, barcode_format=t.barcode_format)
+
+
+@router.get("/{plan_id}/booking-status")
+def get_booking_status(
+    plan_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate BookingBadge] 旅程の予定ごとの予約の状態(予約済み・食い違い・この予約では?・まだ)。秘密の値は返さない"""
+    from app.services.booking_status import booking_status
+
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
+    return booking_status(db, plan)

@@ -22,6 +22,11 @@ import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
 import type { TravelPlan } from '@/types';
+// [Gate BookingBadge] 予約の札の読み込み(旅程の予定ごと)は空にする
+vi.mock('@/services/api/bookingStatus', () => ({
+  getBookingStatus: vi.fn().mockResolvedValue({ party_size: null, events: {} }), linkReservationToEvent: vi.fn(),
+}));
+
 
 // [Gate G3] DEP-04 待つ間の画面の更新を act の中で行う
 const sleep = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
