@@ -17,19 +17,24 @@ vi.mock('@/components/PlanHeader', () => ({ default: () => null }));
 vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));
-vi.mock('@/components/planner/PlanMap', () => ({ default: () => null }));
+// [Gate TimelineRedesign] 地図のピンを押したことにする
+vi.mock('@/components/planner/PlanMap', () => ({
+  default: ({ day, onSelectEvent }: { day: { events: ScheduleItem[] }; onSelectEvent?: (id: string) => void }) => (
+    <button type="button" onClick={() => onSelectEvent?.(day.events[0]!.id)}>ピンを押した</button>
+  ),
+}));
 // [Gate PlanSpotEdit] 編集の画面の写真・予約と費用の要約は、それぞれの試験で確かめる
 vi.mock('@/components/planner/EventPhotoPanel', () => ({ default: () => null }));
 vi.mock('@/components/planner/EventRelatedSummary', () => ({ default: () => null }));
 const { getPlaceInfo } = vi.hoisted(() => ({ getPlaceInfo: vi.fn() }));
 vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo, reorderDay: vi.fn() }));
 vi.mock('@/components/DayView', () => ({
-  default: ({ day, onItemEdit, onImageUrls }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void;
-    onImageUrls?: (u: Record<string, string>) => void }) => (
+  default: ({ day, onItemEdit, selectedEventId, focus }: { day: { events: ScheduleItem[] }; onItemEdit: (i: ScheduleItem) => void;
+    selectedEventId?: string | null; focus?: { id: string; n: number } | null }) => (
     <div>
       {day.events.map((e) => <button key={e.id} type="button" onClick={() => onItemEdit(e)}>編集: {e.title}</button>)}
-      {/* [Gate TripShare] 旅程(左)が写真を読んだことにする */}
-      <button type="button" onClick={() => onImageUrls?.(Object.fromEntries(day.events.map((e) => [e.id, `blob:photo-${e.id}`])))}>写真を読んだ</button>
+      {/* [Gate TimelineRedesign] 地図で選んだ予定と、旅程のカードへ送る合図 */}
+      <p data-testid="dv-focus">{`${selectedEventId ?? '-'}|${focus?.id ?? '-'}|${focus?.n ?? 0}`}</p>
     </div>
   ),
 }));
@@ -232,14 +237,16 @@ describe('PlannerPage 共同編集 (Gate C1 FR-020)', () => {
     expect(screen.getByLabelText('場所・住所')).toHaveValue('');
   });
 
-  it('[Gate TripShare] 旅程(左)に出ている予定の写真を、右の「選択中の予定」にも出す', async () => {
+  it('[Gate TimelineRedesign] 右の「選択中の予定」の欄は無く、地図のピンを押すと旅程のカードへ送る(押すたびに合図が増える)', async () => {
     setup();
     await screen.findByRole('button', { name: '編集: 清水寺' });
-    const card = screen.getByTestId('selected-event');
-    expect(card).toHaveTextContent('場所画像のイメージ');
-    fireEvent.click(screen.getByRole('button', { name: '写真を読んだ' }));
-    await waitFor(() => expect(card.querySelector('img')).not.toBeNull());
-    expect(card.querySelector('img')!.getAttribute('src')).toMatch(/^blob:photo-/);
-    expect(card).toHaveTextContent('予定の写真');
+    expect(screen.queryByTestId('selected-event')).toBeNull();
+    expect(screen.getByTestId('dv-focus')).toHaveTextContent('-|-|0');
+    fireEvent.click(screen.getByRole('button', { name: 'ピンを押した' }));
+    const id = screen.getByTestId('dv-focus').textContent!.split('|')[0]!;
+    expect(id).not.toBe('-');
+    expect(screen.getByTestId('dv-focus')).toHaveTextContent(`${id}|${id}|1`);
+    fireEvent.click(screen.getByRole('button', { name: 'ピンを押した' }));
+    expect(screen.getByTestId('dv-focus')).toHaveTextContent(`${id}|${id}|2`);
   });
 });

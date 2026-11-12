@@ -50,13 +50,12 @@ import { dayAnchors } from '@/components/planner/journeyModel';
 import AllDaysChart from '@/components/planner/AllDaysChart';
 import VariantPanel from '@/components/planner/variants/VariantPanel';
 import { usePlanVariants } from '@/components/planner/variants/usePlanVariants';
-import { hoursBadge, insertIndexByTime, segmentRow, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
+import { insertIndexByTime, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 
 const toMinutesHm = (v?: string | null): number | null => {
   const m = /^(\d{1,2}):(\d{2})/.exec(v ?? '');
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 };
-import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import { getSegments } from '@/services/api';
 import type { TravelSegment } from '@/services/api/types/segments';
 import SyncStatusBar from '@/components/planner/SyncStatusBar';
@@ -66,7 +65,6 @@ import type { RouteSummaryStatus } from '@/components/planner/RouteSummaryLine';
 import DeletedPlansSection from './planner/DeletedPlansSection';
 import PageHead from '@/components/shell/PageHead';
 import Landscape from '@/components/shell/Landscape';
-import SelectedEventCard from '@/components/planner/SelectedEventCard';
 import TripList from '@/components/trip/TripList';
 import type { ScheduleItem as ScheduleItemType, EventCategory, EventUrl } from '@/types';
 // [Gate SpotLinks] 編集の窓の地図(開いた時だけ読む)
@@ -194,10 +192,11 @@ const PlannerPage: React.FC = () => {
   }, [mapMax]);
   // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
   const [planView, setPlanView] = useState<'day' | 'all'>('day');
-  // [Gate MockScreens] 営業時間の照合を選んだ予定の欄へ渡す
-  const [dayHours, setDayHours] = useState<{ byId: Record<string, EventHoursCheck>; pending: boolean }>({ byId: {}, pending: false });
-  const handleHoursChange = useCallback((byId: Record<string, EventHoursCheck>, pending: boolean) => {
-    setDayHours({ byId, pending });
+  // [Gate TimelineRedesign] 地図のピンから選んだ予定(旅程のカードまで送って詳細を開く。n は選ぶたびに増やす)
+  const [mapFocus, setMapFocus] = useState<{ id: string; n: number } | null>(null);
+  const pickFromMap = useCallback((id: string) => {
+    setSelectedEventId(id);
+    setMapFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   }, []);
   const [segments, setSegments] = useState<TravelSegment[]>([]);
   // [Gate PlanB] 日ごとの案: この日の案・開いている控えの案
@@ -276,8 +275,6 @@ const PlannerPage: React.FC = () => {
   const [editCoords, setEditCoords] = useState<{ lat: number | null; lng: number | null; changed: boolean }>(
     { lat: null, lng: null, changed: false });
   const [photoSignal, setPhotoSignal] = useState(0);
-  // [Gate TripShare] 旅程(左)で読んだ予定の写真を、右の「選択中の予定」にも出す
-  const [eventImageUrls, setEventImageUrls] = useState<Record<string, string>>({});
 
   const lookupPlaceInfo = async () => {
     if (!editingItem) return;
@@ -880,15 +877,8 @@ const PlannerPage: React.FC = () => {
     const baseDay = currentPlan.days[currentDayIndex];
     const activeDay = variantState.open?.day ?? baseDay;
     const shownSegments = variantState.open ? variantState.open.segments : segments;
-    // [Gate MockScreens] 選んだ予定(未選択なら最初の予定。モックと同じく右の欄は空にしない)
-    const selectedEvent = activeDay
-      ? activeDay.events.find((e) => e.id === selectedEventId) ?? activeDay.events[0] ?? null : null;
-    const selectedIndex = activeDay && selectedEvent ? activeDay.events.findIndex((e) => e.id === selectedEvent.id) : -1;
-    const selectedArrival = activeDay && selectedIndex >= 0
-      ? segmentRow(activeDay.events, selectedIndex, shownSegments, zoneOfEvent(currentPlan.days), activeDay.timezone_id,
-        titleOfEvent(currentPlan.days))?.leg ?? null
-      : null;
-
+    // [Gate TimelineRedesign] 選んだ予定(旅程のカードと地図のピンを強調する。選んでいなければ強調しない)
+    const selectedEvent = activeDay ? activeDay.events.find((e) => e.id === selectedEventId) ?? null : null;
     return (
       <div className="min-h-screen bg-cloud-50">
         <div className="tc-page">
@@ -1084,7 +1074,7 @@ const PlannerPage: React.FC = () => {
                   )}
                   onOpenRoute={() => navigate(`/planner/${currentPlan.id}/route-options`)}
                   selectedEventId={selectedEvent?.id ?? null}
-                  onHoursChange={handleHoursChange}
+                  focus={mapFocus}
                   day={activeDay}
                   {...anchorsOf(dayAnchors(currentPlan, currentDayIndex))}
                   onEditJourney={() => setIsBasicsOpen(true)}
@@ -1099,7 +1089,6 @@ const PlannerPage: React.FC = () => {
                   onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
                   onDeleteDay={currentPlan.days.length > 1 && !variantState.open ? () => handleDeleteDay(currentDayIndex) : undefined}
                   photoSignal={photoSignal}
-                  onImageUrls={setEventImageUrls}
                   segments={shownSegments}
                   variantDayId={variantState.open ? activeDay.id : null}
                   zones={zoneOfEvent(currentPlan.days)}
@@ -1122,27 +1111,18 @@ const PlannerPage: React.FC = () => {
                   <PlanMap
                     key={mapMax ? 'max' : 'normal'}
                     day={activeDay}
-                    height={mapMax ? 'calc(100vh - 24px)' : 530}
+                    height={mapMax ? 'calc(100vh - 24px)' : '100%'}
                     candidates={searchResults}
                     routePreview={routePreview}
                     routePreviewStatus={routePreviewStatus}
                     selectedEventId={selectedEvent?.id ?? null}
-                    onSelectEvent={setSelectedEventId}
+                    onSelectEvent={pickFromMap}
                     onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
                       addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
                     }
                   />
                 </div>
               )}
-              <SelectedEventCard
-                planId={currentPlan.id}
-                dayNumber={currentDayIndex + 1}
-                event={selectedEvent}
-                onEdit={openEditItem}
-                hours={selectedEvent ? hoursBadge(dayHours.byId[selectedEvent.id], dayHours.pending && Boolean(selectedEvent.place_id)) : null}
-                arrival={selectedArrival}
-                imageSrc={selectedEvent ? (eventImageUrls[selectedEvent.id] ?? null) : null}
-              />
             </div>
           ) : null}
 

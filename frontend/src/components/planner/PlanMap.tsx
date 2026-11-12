@@ -20,6 +20,7 @@
  */
 import React, { useMemo } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
+import { hasCoords } from './mapNumberModel';
 import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
@@ -95,13 +96,12 @@ const PlanMap: React.FC<PlanMapProps> = ({
 }) => {
   const scheduledWithCoords = useMemo(
     () => (day?.events ?? []).filter(
-      (e): e is ScheduleItem & { latitude: number; longitude: number } =>
-        e.latitude !== undefined && e.longitude !== undefined
+      (e): e is ScheduleItem & { latitude: number; longitude: number } => hasCoords(e)
     ),
     [day]
   );
   const scheduledUnknown = useMemo(
-    () => (day?.events ?? []).filter((e) => e.latitude === undefined || e.longitude === undefined),
+    () => (day?.events ?? []).filter((e) => !hasCoords(e)),
     [day]
   );
 
@@ -132,9 +132,11 @@ const PlanMap: React.FC<PlanMapProps> = ({
   const hasAnyKnownLocation = allPositions.length > 0;
   const defaultCenter: [number, number] = [35.6812, 139.7671]; // 東京駅(何も無い場合の初期表示のみ)
 
+  // [Gate TimelineRedesign] height="100%": 旅程の欄と同じ高さに広げ、移動の概算と位置不明の予定は地図の下に重ねる
+  const fill = height === '100%';
   return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height }}>
+    <div className={fill ? `tc-planmap-fill ${className}` : `space-y-2 ${className}`}>
+      <div className={fill ? 'tc-planmap-box' : 'rounded-xl overflow-hidden border border-gray-200'} style={fill ? undefined : { height }}>
         <MapContainer
           center={hasAnyKnownLocation ? allPositions[0] : defaultCenter}
           zoom={13}
@@ -200,6 +202,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
         </MapContainer>
       </div>
 
+      <div className={fill ? 'tc-planmap-foot' : undefined}>
       <RouteSummaryLine status={routePreviewStatus ?? (routePreview ? 'ready' : 'off')} preview={routePreview ?? null} />
 
       {(scheduledUnknown.length > 0 || candidatesUnknown.length > 0) && (
@@ -212,6 +215,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };
