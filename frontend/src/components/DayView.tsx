@@ -839,6 +839,7 @@ const DayView: React.FC<DayViewProps> = ({
             <BookingBadge part="status" planId={planId} eventId={event.id} title={event.title} category={event.category}
               booking={bookings[event.id]!} canEdit={canEdit} onLink={(rid) => linkBooking(rid, event.id)} />
           ) : null}
+          reservationId={bookings[event.id]?.reservations[0]?.id ?? null}
           bookingAction={bookings[event.id] ? (
             <BookingBadge part="action" planId={planId} eventId={event.id} title={event.title} category={event.category}
               booking={bookings[event.id]!} canEdit={canEdit} onLink={(rid) => linkBooking(rid, event.id)} />

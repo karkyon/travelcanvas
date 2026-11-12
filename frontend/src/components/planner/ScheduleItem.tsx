@@ -92,6 +92,8 @@ interface ScheduleItemProps {
   focusSignal?: number;
   /** [Gate TimelineRedesign] 詳細の「予約」の行き先に使う */
   planId?: string;
+  /** [Gate BookingJump] この予定の予約(あればその予約を開く。無ければ予約の一覧) */
+  reservationId?: string | null;
   latitude?: number;
   longitude?: number;
   /** 食事の予定の情報(ジャンル・価格帯など) */
@@ -167,6 +169,7 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   reorder,
   focusSignal = 0,
   planId,
+  reservationId = null,
   latitude,
   longitude,
   dining,
@@ -376,7 +379,10 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                 </span>
               )}
               {planId && (
-                <Link to={`/planner/${planId}/reservations`} className="tc-focus-ring tc-mbtn tc-mbtn--sm">
+                <Link to={reservationId ? `/planner/${planId}/reservations?open=${encodeURIComponent(reservationId)}`
+                  : `/planner/${planId}/reservations`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"
+                  data-testid={`schedule-reservation-${id}`}
+                  title={reservationId ? 'この予定の予約を開く' : '予約の一覧を開く'}>
                   <Luggage size={14} aria-hidden="true" />予約
                 </Link>
               )}

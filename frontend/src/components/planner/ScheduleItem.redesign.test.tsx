@@ -99,4 +99,14 @@ describe('ScheduleItem(作り直し)', () => {
     expect(screen.getByTestId('b-status').closest('.tc-event-line')).not.toBeNull();
     expect(screen.getByRole('button', { name: '予約の操作' }).closest('.tc-event-topline')).not.toBeNull();
   });
+
+  it('[Gate BookingJump] 詳細の「予約」は、この予定の予約があればその予約を開く(無ければ予約の一覧)', () => {
+    const { unmount } = wrap(<ScheduleItem {...base} planId="p1" reservationId="r-9" />);
+    fireEvent.click(screen.getByTestId('schedule-more-e1'));
+    expect(screen.getByTestId('schedule-reservation-e1')).toHaveAttribute('href', '/planner/p1/reservations?open=r-9');
+    unmount();
+    wrap(<ScheduleItem {...base} planId="p1" />);
+    fireEvent.click(screen.getByTestId('schedule-more-e1'));
+    expect(screen.getByTestId('schedule-reservation-e1')).toHaveAttribute('href', '/planner/p1/reservations');
+  });
 });
