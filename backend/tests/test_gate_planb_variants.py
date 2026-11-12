@@ -310,3 +310,56 @@ def test_save_replan_candidate_as_day_variant(auth_client):
     assert [[e["local_start_time"] for e in d["events"]] for d in after["days"]] == \
         [[e["local_start_time"] for e in d["events"]] for d in before["days"]]
     assert client.post(f"{base}/replans/{rp['id']}/save-variant", json={"candidate": "C"}).status_code == 422
+
+
+# ---------------------------------------------------------------- P7: 旅の記録(どの案で回ったか・切り替えた点)
+
+def test_journey_visits_and_reel_follow_the_travelled_variant(auth_client):
+    client, _owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    vb = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "blank", "name": "雨の日",
+                                               "reason": "rain"}).json()["variants"][0]
+    ids = {}
+    for title, at in (("海の博物館", "09:00"), ("鳥羽水族館", "11:30"), ("海鮮ランチ", "13:00")):
+        ids[title] = client.post(f"{base}/events", json={
+            "day_id": vb["day_id"], "title": title, "event_type": "sightseeing", "local_start_time": at,
+            "latitude": 34.48, "longitude": 136.84}, headers=_ik()).json()["id"]
+    # 切り替える前: 旅の記録は今の案(プランA)のまま
+    j = client.get(f"{base}/journey").json()
+    day2 = j["days"][1]
+    assert day2["variant"] == {"label": "A", "name": "プランA"} and day2["switch"] is None
+    assert [e["title"] for e in day2["events"]] == ["二見興玉神社", "横山展望台"]
+    # 10:00 に鳥羽のあたりで、二見興玉神社を済ませて B の水族館から合流
+    rev = _rev(client, p)
+    sw = client.post(f"{base}/variants/{vb['day_id']}/switch", json={
+        "reason": "rain", "phase": "during", "join_event_id": ids["鳥羽水族館"], "done_event_ids": [a1["id"]],
+        "place_label": "鳥羽のあたり"}, headers={"If-Match": str(rev)})
+    assert sw.status_code == 200, sw.text
+    j = client.get(f"{base}/journey").json()
+    day2 = j["days"][1]
+    assert day2["variant"] == {"label": "B", "name": "雨の日"}
+    assert day2["switch"]["from_label"] == "A" and day2["switch"]["to_label"] == "B"
+    assert day2["switch"]["place_label"] == "鳥羽のあたり" and day2["switch"]["reason_label"] == "雨"
+    rows = [(e["title"], e["from_variant"], e["skipped_by_switch"]) for e in day2["events"]]
+    assert rows == [("二見興玉神社", True, False), ("鳥羽水族館", False, False), ("海鮮ランチ", False, False),
+                    ("海の博物館", False, True)]
+    # 達成指標の予定の数: 1 日目 2 件 + 2 日目(済んだ 1 + 合流から 2)= 5(とばした予定・控えの案の予定は数えない)
+    assert j["metrics"]["planned_events"] == 5
+    # 実績を、元の案の済んだ予定にも付けられる
+    put = client.put(f"{base}/journey/events/{a1['id']}", json={"status": "visited"})
+    assert put.status_code == 200, put.text
+    # 訪問の判定の対象(位置のある、実際に回った予定)
+    vis = client.get(f"{base}/visits").json()
+    located = {(i["title"], i["date"]) for i in vis["items"]}
+    assert ("二見興玉神社", "2026-11-29") in located and ("鳥羽水族館", "2026-11-29") in located
+    assert not any(t in ("横山展望台", "海の博物館") for t, _ in located)
+    # 思い出リール(写真が無い時): 実際に回った順
+    reel = client.get(f"{base}/memory-reel").json()
+    assert [x["title"] for x in reel["fallback_events"]][2:] == ["二見興玉神社", "鳥羽水族館", "海鮮ランチ"]
+    # 元に戻すと、記録も今の案(プランA)に戻る
+    rev = _rev(client, p)
+    assert client.post(f"{base}/undo", headers={"If-Match": str(rev)}).status_code == 200
+    day2 = client.get(f"{base}/journey").json()["days"][1]
+    assert day2["switch"] is None and [e["title"] for e in day2["events"]] == ["二見興玉神社", "横山展望台"]
+    sws = client.get(f"{base}/variant-switches").json()["switches"]
+    assert sws[0]["undone"] is True

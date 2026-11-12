@@ -20,7 +20,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
 from app.models.models import (
-    EventActual, LocationAreaCell, LocationPointBatch, LocationTrack, Memory, PlanCollaborator, TravelDay, TravelEvent,
+    EventActual, LocationAreaCell, LocationPointBatch, LocationTrack, Memory, PlanCollaborator,
     TravelPlan, User,
 )
 from app.api.v1 import visits as visits_api
@@ -60,8 +60,14 @@ def _plans(db: Session, user: User) -> List[TravelPlan]:
 def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> List[Dict[str, Any]]:
     obs: List[Dict[str, Any]] = []
     title = plan.title or "(名前なし)"
-    days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
-    events = {e.id: e for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()}
+    # [Gate PlanB-P7] 実際に回った予定(切り替えでとばした予定・控えの案の予定は足あとに出さない)
+    from app.services import day_variants as dv
+
+    tr = dv.travelled(db, plan.id)
+    days = {d.id: d for d in tr["days"]}
+    events = {e.id: e for d in tr["days"] for e in tr["events"].get(d.id, [])}
+    for e in events.values():
+        days.setdefault(e.day_id, tr["day_of"][e.id])
     actuals = {a.event_id: a for a in db.query(EventActual).filter(EventActual.plan_id == plan.id).all()}
     # [Gate V2] FR-051 地点単位の除外: 本人が地図から隠した予定・「行っていない」と直した予定は Atlas に出さない。
     # 隠した予定の場所の半径の中の軌跡の点・記録も出さない

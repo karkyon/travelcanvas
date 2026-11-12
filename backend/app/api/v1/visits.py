@@ -27,7 +27,7 @@ from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
-    EventActual, EventReservation, LocationPointBatch, LocationTrack, Memory, TravelDay, TravelEvent, TravelPlan, User,
+    EventActual, EventReservation, LocationPointBatch, LocationTrack, Memory, TravelEvent, TravelPlan, User,
     VisitAssessment,
 )
 from app.services import location_tracks as lt
@@ -77,11 +77,20 @@ def _own_points(db: Session, plan: TravelPlan, user: User) -> List[Dict[str, Any
 
 
 def _located_events(db: Session, plan: TravelPlan):
-    days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
-    events = [e for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all() if e.day_id in days]
+    # [Gate PlanB-P7] 実際に回った予定(途中で切り替えた日は、元の案の済んだ予定と今の案の合流点から先)。
+    # 切り替えでとばした予定・控えの案の予定は判定しない
+    from app.services import day_variants as dv
+
+    tr = dv.travelled(db, plan.id)
+    days = {d.id: d for d in tr["days"]}
+    events = [e for d in tr["days"] for e in tr["events"].get(d.id, [])]
+    day_of = {e.id: d for d in tr["days"] for e in tr["events"].get(d.id, [])}
+    # 元の案の済んだ予定は、その日付の今の案の日として扱う(日の id から引けるように)
+    for e in events:
+        days.setdefault(e.day_id, day_of[e.id])
 
     def key(e: TravelEvent):
-        d = days[e.day_id]
+        d = day_of[e.id]
         return (d.local_date, d.sort_order or 0, e.local_start_time or "99:99", e.sort_order or 0, str(e.id))
 
     events.sort(key=key)

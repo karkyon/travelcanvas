@@ -328,7 +328,7 @@ def list_switches(plan_id: str, db: Session = Depends(get_db),
         "switched_at": r.switched_at.isoformat() if r.switched_at else None,
         "reason": r.reason, "reason_label": dv.REASON_LABEL.get(r.reason or "", None), "note": r.note, "phase": r.phase,
         "place_label": r.place_label, "join_event_id": str(r.join_event_id) if r.join_event_id else None,
-        "done_event_ids": r.done_event_ids or [], "undone": r.undone_at is not None,
+        "done_event_ids": r.done_event_ids or [], "undone": dv.switch_undone(db, r),
         "switched_by_me": r.switched_by_user_id == current_user.id,
     } for r in rows]}
 

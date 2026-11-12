@@ -547,11 +547,18 @@ def memory_reel(plan_id: str, db: Session = Depends(get_db), current_user: User 
     rows = (db.query(Memory).filter(Memory.plan_id == plan.id)
             .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members"))
             .order_by(Memory.occurred_at.asc().nullslast(), Memory.created_at.asc(), Memory.id.asc()).all())
-    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.local_date.asc()).all()
-    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()
-    day_tz = {d.id: d.timezone_id for d in days}
+    # [Gate PlanB-P7] 実際に回った予定(途中で切り替えた日の元の案の済んだ予定を含む)。写真の予定の名前は控えの案の予定も引く
+    from app.services import day_variants as dv
+
+    tr = dv.travelled(db, plan.id)
+    days = tr["days"]
+    events = [e for d in days for e in tr["events"].get(d.id, [])]
+    with dv.all_variants(db):
+        all_days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()
+        all_events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()
+    day_tz = {d.id: d.timezone_id for d in all_days}
     first_tz = days[0].timezone_id if days else None
-    ev_by_id = {e.id: e for e in events}
+    ev_by_id = {e.id: e for e in all_events}
     zones = _plan_zones(db, plan, rows, current_user)
 
     photos = [r for r in rows if r.kind == "photo" and r.storage_key is not None]
@@ -573,12 +580,9 @@ def memory_reel(plan_id: str, db: Session = Depends(get_db), current_user: User 
 
     fallback = []
     if not slides:
-        day_date = {d.id: d.local_date for d in days}
-        day_order = {d.id: i for i, d in enumerate(days)}
-        ordered = sorted(events, key=lambda e: (day_order.get(e.day_id, 99999), e.local_start_time or "99:99",
-                                                e.sort_order))
-        fallback = [{"title": e.title, "local_date": day_date[e.day_id].isoformat() if e.day_id in day_date else None,
-                     "local_time": e.local_start_time} for e in ordered[:reel.MAX_FALLBACK]]
+        # 実際に回った順(日の順・日の中は回った順)
+        fallback = [{"title": e.title, "local_date": tr["day_of"][e.id].local_date.isoformat(),
+                     "local_time": e.local_start_time} for e in events[:reel.MAX_FALLBACK]]
 
     places = {("e", r.event_id) for r in rows if r.event_id} | {
         ("p", r.place_name) for r in rows if not r.event_id and r.place_name}
@@ -653,8 +657,12 @@ def change_location(plan_id: str, memory_id: str, body: LocationChange,
 def journal_draft(plan_id: str, body: JournalOptions, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()
-    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()
+    # [Gate PlanB-P7] 旅行記は実際に回った予定で作る(途中で切り替えた日の元の案の済んだ予定を、その日に入れる)
+    from app.services import day_variants as dv
+
+    tr = dv.travelled(db, plan.id)
+    days = tr["days"]
+    travelled = [(e, d) for d in days for e in tr["events"].get(d.id, [])]
     rows = (db.query(Memory).filter(Memory.plan_id == plan.id)
             .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members")).all())
     names = _names(db, plan)
@@ -662,8 +670,8 @@ def journal_draft(plan_id: str, body: JournalOptions, db: Session = Depends(get_
     draft = mem.build_journal_draft(
         plan.title or "旅行記",
         [{"id": d.id, "local_date": d.local_date, "title": d.title} for d in days],
-        [{"id": e.id, "day_id": e.day_id, "title": e.title, "local_start_time": e.local_start_time,
-          "sort_order": e.sort_order} for e in events],
+        [{"id": e.id, "day_id": d.id, "title": e.title, "local_start_time": e.local_start_time,
+          "sort_order": e.sort_order} for e, d in travelled],
         [{"id": r.id, "kind": r.kind, "body": r.body, "event_id": r.event_id, "day_id": r.day_id,
           "occurred_at": r.occurred_at, "place_name": r.place_name, "latitude": r.latitude,
           "longitude": r.longitude, "video_url": r.video_url, "by_me": r.author_user_id == current_user.id,

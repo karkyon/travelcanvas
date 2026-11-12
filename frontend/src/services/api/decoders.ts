@@ -1614,7 +1614,15 @@ export const journeyReview: Decoder<JourneyReview> = object<JourneyReview>({
         actual_start_at: str, actual_end_at: str, basis: oneOf('track', 'memory'), points: nonNegativeInt,
       })),
       start_diff_minutes: nullable(int),
+      from_variant: optional(bool),
+      skipped_by_switch: optional(bool),
     })),
+    variant: optional(object({ label: str, name: str })),
+    switch: optional(nullable(object({
+      from_label: nullable(str), from_name: nullable(str), to_label: nullable(str), to_name: nullable(str),
+      phase: oneOf('planning', 'during', 'after'), reason: nullable(str), reason_label: nullable(str),
+      place_label: nullable(str), switched_at: nullable(str),
+    }))),
   })),
   metrics: object({
     planned_events: nonNegativeInt,

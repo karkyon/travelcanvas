@@ -35,7 +35,9 @@ _scope: contextvars.ContextVar[bool] = contextvars.ContextVar("tc_all_variants",
 # 案そのものを編集する API(すべての案を見る)。予定・日・区間を ID で指す・元に戻す・案の API
 _ALL_PATHS = re.compile(
     r"^/api/v1/plans/[^/]+/("
-    r"events(/[^/]+(/.*)?)?$|days/[^/]+(/.*)?$|segments(/[^/]+)?$|undo$|redo$|variants(/.*)?$|day-variants(/.*)?$)")
+    r"events(/[^/]+(/.*)?)?$|days/[^/]+(/.*)?$|segments(/[^/]+)?$|undo$|redo$|variants(/.*)?$|day-variants(/.*)?$"
+    # [P7] 旅の記録の実績・思い出(写真・メモ)は、途中で切り替えた日の元の案の済んだ予定にも付ける
+    r"|journey/events/[^/]+(/.*)?$|memories(/.*)?$)")
 
 
 def path_needs_all(method: str, path: str, query: str = "") -> bool:
@@ -512,3 +514,86 @@ def check_continuity(db: Session, day: TravelDay, party: Optional[int] = None) -
     worst = max((order[i["level"]] for i in items), default=0)
     return {"status": {3: "bad", 2: "warn"}.get(worst, "ok"), "items": items,
             "counts": {k: sum(1 for i in items if i["level"] == k) for k in ("ok", "info", "warn", "bad")}}
+
+
+# ---- [P7] 実際に回った予定(旅の記録・思い出・訪問の判定) ----------------------------------------
+
+def _live_switches(db: Session, plan_id: Any) -> List[Any]:
+    """元に戻していない切り替えの記録(古い順)"""
+    from app.models.models import ChangeSet, DayVariantSwitch
+
+    rows = (db.query(DayVariantSwitch).filter(DayVariantSwitch.plan_id == plan_id)
+            .order_by(DayVariantSwitch.switched_at.asc(), DayVariantSwitch.id.asc()).all())
+    cs_ids = [r.change_set_id for r in rows if r.change_set_id is not None]
+    undone = set()
+    if cs_ids:
+        q = db.query(ChangeSet.id).filter(ChangeSet.id.in_(cs_ids), ChangeSet.undone_at.isnot(None))
+        undone = {row[0] for row in q.all()}
+    return [r for r in rows if r.undone_at is None and r.change_set_id not in undone]
+
+
+def switch_undone(db: Session, rec: Any) -> bool:
+    if rec.undone_at is not None:
+        return True
+    if rec.change_set_id is None:
+        return False
+    from app.models.models import ChangeSet
+
+    cs = db.query(ChangeSet).filter(ChangeSet.id == rec.change_set_id).first()
+    return cs is not None and cs.undone_at is not None
+
+
+def _order_key(e: TravelEvent):
+    return (e.local_start_time or "99:99", e.sort_order or 0, str(e.id))
+
+
+def travelled(db: Session, plan_id: Any) -> Dict[str, Any]:
+    """日ごとに、実際に回った(回る)予定の並び。
+    - 今の案の予定。旅行中に途中で切り替えた日は、元の案の済んだ予定 → 切り替え → 今の案の合流点から先
+    - 合流点より前の今の案の予定は「切り替えでとばした」(回った予定に入れない)
+    戻り値: {"days": [今の案の日], "events": {day_id: [予定]}, "skipped": {day_id: [予定]},
+             "trail": {day_id: 切り替えの記録の dict(日の中の最後の切り替え)}, "day_of": {event_id: 今の案の日}}"""
+    with all_variants(db):
+        days = (db.query(TravelDay).filter(TravelDay.plan_id == plan_id, TravelDay.variant_status == "active")
+                .order_by(TravelDay.local_date, TravelDay.sort_order).all())
+        all_days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan_id).all()}
+        evs = db.query(TravelEvent).filter(TravelEvent.plan_id == plan_id).all()
+        switches = _live_switches(db, plan_id)
+    by_day: Dict[Any, List[TravelEvent]] = {}
+    for e in evs:
+        by_day.setdefault(e.day_id, []).append(e)
+    ev_by_id = {e.id: e for e in evs}
+    out_events: Dict[Any, List[TravelEvent]] = {}
+    skipped: Dict[Any, List[TravelEvent]] = {}
+    trail: Dict[Any, Dict[str, Any]] = {}
+    day_of: Dict[Any, TravelDay] = {}
+    for d in days:
+        mine = sorted(by_day.get(d.id, []), key=_order_key)
+        recs = [r for r in switches if r.local_date == d.local_date and r.to_day_id == d.id]
+        rec = recs[-1] if recs else None
+        if rec is not None:
+            src = all_days.get(rec.from_day_id) if rec.from_day_id else None
+            trail[d.id] = {
+                "from_label": rec.from_label, "from_name": rec.from_name, "to_label": rec.to_label,
+                "to_name": rec.to_name, "phase": rec.phase, "reason": rec.reason,
+                "reason_label": REASON_LABEL.get(rec.reason or "", None), "place_label": rec.place_label,
+                "switched_at": rec.switched_at.isoformat() if rec.switched_at else None,
+                "from_day_id": str(src.id) if src else None,
+                "join_event_id": str(rec.join_event_id) if rec.join_event_id else None,
+            }
+        done: List[TravelEvent] = []
+        if rec is not None and rec.phase == "during" and rec.join_event_id is not None:
+            done_ids = {str(x) for x in (rec.done_event_ids or [])}
+            done = sorted((ev_by_id[i] for i in ev_by_id if str(i) in done_ids), key=_order_key)
+            ids = [e.id for e in mine]
+            if rec.join_event_id in ids:
+                k = ids.index(rec.join_event_id)
+                skipped[d.id] = [e for e in mine[:k] if e.parent_event_id is None]
+                mine = [e for e in mine[k:]]
+                # とばした予定の中のエリアの子は、合流点より前ならとばす
+                skip_ids = {e.id for e in skipped[d.id]}
+                mine = [e for e in mine if e.parent_event_id not in skip_ids]
+        out_events[d.id] = done + mine
+        for e in out_events[d.id] + skipped.get(d.id, []):
+            day_of[e.id] = d
+    return {"days": days, "events": out_events, "skipped": skipped, "trail": trail, "day_of": day_of}

@@ -1247,3 +1247,8 @@
 .tc-today-switch-sub { margin: 0; font-size: 12px; color: var(--tc-ink-700); }
 .tc-today-switch-sub.is-warn { color: var(--tc-warning); }
 .tc-today-switch-done { margin: 0; font-size: 12.5px; color: var(--tc-success); font-weight: 700; }
+.tc-journey-variant { margin: 4px 0 0; display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px 10px; border-radius: 999px;
+  background: var(--tc-info-soft); color: #1e3a8a; font-size: 12.5px; font-weight: 700; }
+.tc-journey-variant.is-plain { background: var(--tc-cloud-100); color: var(--tc-ink-700); font-weight: 600; }
+.tc-journey-cut { margin: 0 0 8px; padding: 4px 10px; border-left: 3px dashed var(--tc-info); color: var(--tc-info); font-size: 12.5px;
+  font-weight: 800; }
