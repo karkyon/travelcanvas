@@ -71,7 +71,7 @@ const HERO_EYEBROW: Record<DashboardTrip['phase'], string> = {
 export const TripHero: React.FC<{ trip: DashboardTrip }> = ({ trip }) => {
   const coverPhoto = useCoverPhoto(trip.id, trip.cover);  // [Gate G11] 表紙の写真(無い・読めない時は山並みの絵)
   const primary = trip.phase === 'ongoing'
-    ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' }
+    ? { to: `/planner/${trip.id}/today`, label: '旅の当日を開く' }
     : { to: `/planner/${trip.id}`, label: '旅程を開く' };
   const second = trip.phase === 'past'
     ? { to: `/planner/${trip.id}/memories`, label: '旅の記録を見る' }

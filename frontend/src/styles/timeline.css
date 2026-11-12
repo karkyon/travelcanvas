@@ -386,3 +386,15 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-anchor-row.is-compact .tc-anchor-icon { margin-top: 1px; color: #17734d; }
 .tc-anchor-row.is-compact .tc-anchor-text { font-size: 13px; font-weight: 600; line-height: 1.4; }
 .tc-anchor-row.is-compact .tc-anchor-label { display: block; margin: 0 0 1px; font-size: 11px; font-weight: 800; color: #17734d; }
+
+/* ===== [Gate TripDayNav] 旅の当日: メニューの「旅行中」の印・当日まであと何日 ===== */
+.tc-tripnav-live { position: relative; }
+.tc-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #dc2626; box-shadow: 0 0 0 0 rgba(220, 38, 38, .55);
+  animation: tc-live-pulse 1.8s ease-out infinite; }
+@keyframes tc-live-pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .55); } 80%, 100% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); } }
+@media (prefers-reduced-motion: reduce) { .tc-live-dot { animation: none; } }
+.tc-today-empty.is-before { background: linear-gradient(135deg, var(--tc-accent-soft), var(--tc-surface, #fff) 70%); color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-today-countdown { display: flex; align-items: baseline; gap: 4px; margin: 4px 0; color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-today-countdown b { font-size: 56px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.tc-today-countdown span { font-size: 18px; font-weight: 800; }
+.tc-today-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }

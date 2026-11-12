@@ -21,7 +21,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ListChecks, RefreshCw, WifiOff, CalendarDays } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ListChecks, RefreshCw, WifiOff, CalendarDays, PartyPopper, Luggage, Camera } from 'lucide-react';
 import Button from '@/components/common/Button';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Surface from '@/components/design/Surface';
@@ -36,6 +36,7 @@ import {
 import { DayList, EventCard } from './today/TodayParts';
 import TodaySwitchPanel from './today/TodaySwitchPanel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { localToday, tripDayHeading } from './today/tripDayModel';
 
 // [Gate L1] DOC-04 §16に準拠し、当日画面は一定間隔で自動更新する
 // (旅行者がアプリを開いたままにする想定のため、明示的なreloadを要求しない)。
@@ -190,13 +191,16 @@ const TodayPage: React.FC = () => {
   const nowLocal = data ? formatTimeInZone(new Date(nowMs).toISOString(), timeZone) : null;
   const syncedAt = snapshot ? formatTimeInZone(new Date(snapshot.fetchedAt).toISOString(), timeZone) : null;
   const allToday = data?.events ?? [];
+  // [Gate TripDayNav] 見出しは「今日」ではなく、待ちに待った旅の当日らしく(何日目か・当日まであと何日か)
+  const heading = tripDayHeading({ todayDate: data?.today_date ?? null, start: trip.startDate, end: trip.endDate,
+    deviceToday: localToday(new Date(nowMs)) });
 
   return (
     <div className="tc-page tc-today" data-testid="today">
       {/* [Gate MockScreens] モックの今日: page-head(つながりの状態・最終同期)・live-hero・NOW/NEXT・今日の旅程・旅の操作 */}
       <PageHead
-        eyebrow="LIVE · 当日"
-        title="今日"
+        eyebrow={heading.eyebrow}
+        title={heading.title}
         sub={data ? (
           <>
             {data.today_date && <span>{data.today_date}</span>}
@@ -251,10 +255,34 @@ const TodayPage: React.FC = () => {
       ) : !data || !view ? null : !view.isCurrentDay ? (
         <Notice>保存済みの当日情報は{data.today_date}のものです。通信できる場所で更新してください。</Notice>
       ) : !data.today_date && !view.nowEvent ? (
-        <div className="tc-card tc-today-empty">
-          <CalendarDays size={28} aria-hidden="true" />
-          <p className="font-semibold text-ink-900">今日の日程は登録されていません。</p>
-          <p className="text-sm text-ink-500">旅行の日付の当日になると、今いる予定と次の予定がここに出ます。</p>
+        <div className={`tc-card tc-today-empty is-${heading.phase}`} data-testid="today-empty" data-phase={heading.phase}>
+          {heading.phase === 'after' ? <Camera size={28} aria-hidden="true" />
+            : heading.phase === 'before' ? <PartyPopper size={28} aria-hidden="true" /> : <CalendarDays size={28} aria-hidden="true" />}
+          {heading.phase === 'before' ? (
+            <>
+              {heading.daysLeft !== null && (
+                <p className="tc-today-countdown" data-testid="today-days-left"><b>{heading.daysLeft}</b><span>日</span></p>
+              )}
+              <p className="font-semibold text-ink-900">この日のために準備してきた旅、もうすぐです！</p>
+              <p className="text-sm text-ink-500">当日になると、今いる予定・次の予定・出発までの時間がここに出ます。</p>
+              <div className="tc-today-empty-actions">
+                <Button variant="primary" icon={<CalendarDays size={16} />} onClick={() => navigate(`/planner/${planId}`)}>旅程を見直す</Button>
+                <Button variant="outline" icon={<Luggage size={16} />} onClick={() => navigate(`/planner/${planId}/preparation`)}>持ち物・準備</Button>
+              </div>
+            </>
+          ) : heading.phase === 'after' ? (
+            <>
+              <p className="font-semibold text-ink-900">楽しい旅でしたか？ 写真や記録を思い出にまとめましょう。</p>
+              <div className="tc-today-empty-actions">
+                <Button variant="primary" icon={<Camera size={16} />} onClick={() => navigate(`/planner/${planId}/memories`)}>旅の記録と思い出</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-ink-900">今日の日程は登録されていません。</p>
+              <p className="text-sm text-ink-500">旅行の日付の当日になると、今いる予定と次の予定がここに出ます。</p>
+            </>
+          )}
         </div>
       ) : (
         <>

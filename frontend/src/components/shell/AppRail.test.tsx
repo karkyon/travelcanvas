@@ -52,10 +52,28 @@ describe('AppRail', () => {
     useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都' } });
     render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/reservations`} /></MemoryRouter>);
     const nav = screen.getByRole('navigation', { name: 'この旅行のメニュー' });
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '今日', '旅行箱', '共有', '比較']);
+    // [Gate TripDayNav] 旅の当日の項目は、旅行の当日だけ出す(期間の外の旅行では出さない)
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '旅行箱', '共有', '比較']);
     expect(screen.getByTestId('rail-plan')).toHaveAttribute('href', `/planner/${PLAN}`);
     expect(screen.getByTestId('rail-resources')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('rail-share')).toHaveAttribute('href', `/share/${PLAN}`);
+  });
+
+  it('[TripDayNav] 旅行の期間の中だけ「旅の当日」を出す(その画面を開いている時も出す)', () => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    const d = new Date();
+    const today = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都', start_date: today, end_date: today } });
+    const { unmount } = render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}`} /></MemoryRouter>);
+    expect(screen.getByTestId('rail-today')).toHaveTextContent('旅の当日');
+    expect(screen.getByLabelText('旅行中')).toBeInTheDocument();
+    unmount();
+    useCurrentTripStore.setState({ trip: { id: PLAN, title: '京都', start_date: '2099-01-01', end_date: '2099-01-02' } });
+    const r2 = render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}`} /></MemoryRouter>);
+    expect(screen.queryByTestId('rail-today')).toBeNull();
+    r2.unmount();
+    render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/today`} /></MemoryRouter>);
+    expect(screen.getByTestId('rail-today')).toHaveAttribute('aria-current', 'page');
   });
 
   it('[HeaderPicker] 旅程を経ずに旅行の中の画面を開いた時は、その旅行を読んで上の帯へ名前を渡す(既に分かっていれば読まない)', async () => {

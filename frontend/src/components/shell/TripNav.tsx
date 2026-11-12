@@ -5,13 +5,15 @@
  */
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { railItems } from './railItems';
+import { railItems, tripIsLive } from './railItems';
 import { safeInternalPath } from '../../utils/safeNavigation';
 import { travelAPI } from '../../services/api';
 import { publishCurrentTrip, useCurrentTripStore } from '../../store/currentTripStore';
 
 const TripNav: React.FC<{ tripId: string; path: string; row?: boolean }> = ({ tripId, path, row = false }) => {
   const knownId = useCurrentTripStore((s) => s.trip?.id ?? null);
+  const current = useCurrentTripStore((s) => s.trip);
+  const live = current?.id === tripId && tripIsLive(current);
   // [Gate TripShare] 共有の画面(/share/<id>)を直接開いた時も旅行を読んで名前を出す
   const inPlanner = path.startsWith(`/planner/${tripId}`) || path.startsWith(`/share/${tripId}`);
   useEffect(() => {
@@ -24,11 +26,12 @@ const TripNav: React.FC<{ tripId: string; path: string; row?: boolean }> = ({ tr
   }, [tripId, knownId, inPlanner]);
   return (
     <nav className={`tc-tripnav${row ? ' tc-tripnav--row' : ''}`} aria-label="この旅行のメニュー" data-testid="trip-nav">
-      {railItems(tripId, path).filter((i) => i.group === 'trip').map(({ key, label, icon: Icon, to, match }) => (
+      {railItems(tripId, path, { live }).filter((i) => i.group === 'trip').map(({ key, label, icon: Icon, to, match }) => (
         <Link key={key} to={safeInternalPath(to) ?? '/dashboard'} aria-current={match(path) ? 'page' : undefined}
-          className="tc-focus-ring" data-testid={`rail-${key}`}>
+          className={`tc-focus-ring${key === 'today' ? ' tc-tripnav-live' : ''}`} data-testid={`rail-${key}`}>
           <Icon size={16} aria-hidden="true" />
           <span>{label}</span>
+          {key === 'today' && live && <span className="tc-live-dot" aria-label="旅行中" />}
         </Link>
       ))}
     </nav>

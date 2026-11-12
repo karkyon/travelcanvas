@@ -6,7 +6,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Settings, User, Brain, LogOut, Building2, ShieldCheck, Activity } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { railItems } from './railItems';
+import { railItems, tripIsLive } from './railItems';
+import { useCurrentTripStore } from '../../store/currentTripStore';
 import { safeInternalPath } from '../../utils/safeNavigation';
 
 // [Gate HeaderPicker] 旅行の一覧・見た目の切り替えも同じ塊で読む(最初に読む JS の入口を増やさない)
@@ -91,10 +92,13 @@ export const UserMenu: React.FC<{ onClose: () => void; onLogout: () => void }> =
   );
 };
 
-export const MobileMenu: React.FC<{ pathname: string; tripId: string | null; onClose: () => void }> = ({ pathname, tripId, onClose }) => (
+export const MobileMenu: React.FC<{ pathname: string; tripId: string | null; onClose: () => void }> = ({ pathname, tripId, onClose }) => {
+  const current = useCurrentTripStore((s) => s.trip);
+  const live = Boolean(tripId) && current?.id === tripId && tripIsLive(current);
+  return (
   <nav className="md:hidden border-t border-cloud-200 mobile-menu-container" aria-label="主なメニュー(スマホ)">
     <ul className="py-2 grid grid-cols-2 gap-1 px-2">
-      {railItems(tripId, pathname).map(({ key, label, icon: Icon, to, match }) => (
+      {railItems(tripId, pathname, { live }).map(({ key, label, icon: Icon, to, match }) => (
         <li key={key}>
           <Link
             to={safeInternalPath(to) ?? '/dashboard'}
@@ -115,4 +119,5 @@ export const MobileMenu: React.FC<{ pathname: string; tripId: string | null; onC
       </li>
     </ul>
   </nav>
-);
+  );
+};

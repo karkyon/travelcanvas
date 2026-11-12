@@ -205,3 +205,18 @@ def test_overseas_trip_not_listed_on_japan(auth_client):
     assert kix["jp"] is True and kix["trips"] == []
     danang = next(p for p in fp["points"] if (p["lat"], p["lng"]) == (16.06, 108.23))
     assert danang["jp"] is False and [t["plan_id"] for t in danang["trips"]] == [vn]
+
+
+def test_overseas_trip_does_not_mark_prefecture(auth_client):
+    """[Gate FootCountry2] 計画中・行った海外の旅の出発の空港(大阪府泉佐野市)で、大阪府を「計画中」「行った」にしない"""
+    client, _owner = auth_client
+    stops = [("関西空港 チェックイン", 34.4320, 135.2304, "大阪府泉佐野市泉州空港北"),
+             ("ドラゴン橋", 16.0610, 108.2270, "Da Nang, Vietnam")]
+    _geo_trip(client, "ダナン(計画中)", [20], stops, "ベトナム ダナン")
+    _geo_trip(client, "ダナン(行った)", [-30], stops, "ベトナム ダナン")
+    _geo_trip(client, "伊勢", [10], [("内宮", 34.4551, 136.7258, "三重県伊勢市宇治館町1")], "三重県 伊勢")
+    fp = client.get(URL).json()["home"]["footprints"]
+    assert "大阪府" not in fp["planned_prefectures"]
+    assert "大阪府" not in fp["prefectures"]
+    assert "三重県" in fp["planned_prefectures"]
+    assert "大阪府" not in fp["pref_trips"]
