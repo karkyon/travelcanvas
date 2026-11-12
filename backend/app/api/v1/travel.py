@@ -341,18 +341,24 @@ async def clone_travel_plan(
     """
     original_plan, _role = require_plan_access(db, plan_id, current_user, min_role="owner")
 
-    original_days = (
-        db.query(TravelDay)
-        .options(joinedload(TravelDay.events))
-        .filter(TravelDay.plan_id == original_plan.id)
-        .order_by(TravelDay.sort_order)
-        .all()
-    )
+    # [Gate PlanB] 複製は日ごとの案(控え・しまった案)もすべて写す(切り替えの記録は写さない)
+    from app.services.day_variants import all_variants
+
+    with all_variants(db):
+        original_days = (
+            db.query(TravelDay)
+            .options(joinedload(TravelDay.events))
+            .filter(TravelDay.plan_id == original_plan.id)
+            .order_by(TravelDay.sort_order, TravelDay.local_date, TravelDay.variant_label)
+            .all()
+        )
+    # 基準日は今の案の最初の日
+    active_days = [d for d in original_days if d.variant_status == "active"] or original_days
 
     date_delta: Optional[timedelta] = None
     if clone_data.start_date is not None:
-        if original_days:
-            base_date = original_days[0].local_date
+        if active_days:
+            base_date = active_days[0].local_date
         elif original_plan.start_date is not None:
             base_date = original_plan.start_date.date()
         else:
@@ -392,6 +398,12 @@ async def clone_travel_plan(
                 title=day.title,
                 notes=day.notes,
                 sort_order=day.sort_order,
+                variant_status=day.variant_status,
+                variant_label=day.variant_label,
+                variant_name=day.variant_name,
+                variant_reason=day.variant_reason,
+                variant_conditions=day.variant_conditions,
+                variant_group_id=day.variant_group_id,
             )
             db.add(new_day)
             db.flush()  # new_day.idを確定させる

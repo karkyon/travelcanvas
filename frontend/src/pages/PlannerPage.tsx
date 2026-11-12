@@ -1050,6 +1050,8 @@ const PlannerPage: React.FC = () => {
             </Card>
           ) : planView === 'all' ? (
             <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
+              variantsByDate={Object.fromEntries(variantState.datesWithStandby.map((x) => [x.date,
+                x.variants.filter((v) => v.status === 'standby').map((v) => `${v.label} ${v.name}`)]))}
               anchors={currentPlan.days.map((_, i) => dayAnchors(currentPlan, i))}
               onOpenDay={(i) => { setCurrentDay(i); setPlanView('day'); }}
               onMoveEvent={(id, from, to, start) => { void moveEventToDay(id, from, to, start); }} />

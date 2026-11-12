@@ -28,7 +28,7 @@ export interface ShareLink {
 /** [Gate F45] FR-045 共有リンクで選べる項目(backend app/services/share_policy.py FIELDS) */
 export type ShareFieldKey =
   | 'plan_description' | 'day_titles' | 'event_times'
-  | 'event_address' | 'event_notes' | 'reservation_summary';
+  | 'event_address' | 'event_notes' | 'reservation_summary' | 'day_variants';
 export type ShareFieldClassification = 'internal' | 'confidential';
 export type SharePreset = 'minimal' | 'standard' | 'all';
 
@@ -128,4 +128,14 @@ export interface PublicSharedPlan {
   // [Gate F45] このリンクで見せている項目
   fields?: ShareFieldKey[];
   reservations?: PublicSharedReservation[];
+  /** [Gate PlanB] 控えの案(所有者が「控えの案」を選んだ時だけ) */
+  variants?: PublicSharedVariant[];
+}
+
+export interface PublicSharedVariant {
+  date: string;
+  label: string;
+  name: string;
+  reason_label: string | null;
+  events: PublicSharedEvent[];
 }

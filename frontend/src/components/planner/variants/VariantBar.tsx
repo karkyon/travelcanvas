@@ -75,6 +75,16 @@ const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, 
             <strong>{`控えの案「${showing.label} ${showing.name}」を見ています`}</strong>
             {active && <span>{`今の案は ${active.label} ${active.name}`}</span>}
           </p>
+          {(showing.conditions?.scaffold?.length ?? 0) > 0 && (
+            <details className="tc-variant-scaffold" data-testid="variant-scaffold-notes">
+              <summary>{`たたき台で変えた所・印 ${showing.conditions!.scaffold!.length}件`}</summary>
+              <ul>
+                {showing.conditions!.scaffold!.map((n, i) => (
+                  <li key={`${n.kind}-${n.event_id ?? i}`}><strong>{n.title}</strong>{` ${n.text}`}</li>
+                ))}
+              </ul>
+            </details>
+          )}
           {conditionText(showing).length > 0 && (
             <p className="tc-variant-chips">{conditionText(showing).map((t) => <span key={t} className="tc-variant-chip">{t}</span>)}</p>
           )}

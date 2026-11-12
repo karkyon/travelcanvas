@@ -242,6 +242,93 @@ def copy_day_into(db: Session, src: TravelDay, dst: TravelDay) -> Dict[str, Any]
     return {"events": len(new_events), "segments": n_seg, "idmap": {str(k): str(v) for k, v in idmap.items()}}
 
 
+# ---- たたき台(R3: 理由に合わせて組み替える) -----------------------------------
+
+OUTDOOR_TYPES = {"sightseeing", "activity"}
+# 画面の「移動の既定」→ 区間の手段
+TRANSPORT_TO_MODE = {"car": "driving", "train": "train", "bus": "bus", "walk": "walking", "taxi": "taxi"}
+# 手段を変えてよい区間(飛行機・船・手で入れた区間は変えない)
+_SWITCHABLE_MODES = {"driving", "walking", "train", "bus", "taxi", "bicycle", "mixed"}
+SCAFFOLD_REASONS = ("rain", "delay", "fatigue", "transport")
+
+
+def _hm_shift(v: str, minutes: int) -> Optional[str]:
+    m = re.match(r"^(\d{1,2}):(\d{2})", v or "")
+    if not m:
+        return None
+    t = int(m.group(1)) * 60 + int(m.group(2)) + minutes
+    return None if t > 23 * 60 + 59 else f"{t // 60:02d}:{t % 60:02d}"
+
+
+def apply_scaffold(db: Session, day: TravelDay, reason: Optional[str], cond: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """写した案 day を理由に合わせて組み替える。変えた所・印を付けた所の一覧を返す(案の条件に残して帯に出す)。
+    確定(locked)の予定は動かさない。予定は消さない(外す候補の印だけ)"""
+    from datetime import timedelta
+
+    notes: List[Dict[str, Any]] = []
+    with all_variants(db):
+        evs = _events(db, day)
+        top = [e for e in evs if e.parent_event_id is None]
+        if reason == "rain":
+            for e in top:
+                if e.event_type in OUTDOOR_TYPES and not e.locked:
+                    notes.append({"kind": "rain", "event_id": str(e.id), "title": e.title,
+                                  "text": "屋外の予定です。雨の時は屋内の代わりを検討してください"})
+        elif reason == "delay":
+            minutes = int(cond.get("delay_minutes") or 60)
+            after = cond.get("delay_after") or "00:00"
+            for e in evs:
+                if not e.local_start_time or e.is_all_day or e.local_start_time[:5] < after:
+                    continue
+                if e.locked:
+                    notes.append({"kind": "delay", "event_id": str(e.id), "title": e.title,
+                                  "text": "確定の予定なので動かしていません。遅れの影響を確かめてください"})
+                    continue
+                new = _hm_shift(e.local_start_time, minutes)
+                if new is None:
+                    notes.append({"kind": "delay", "event_id": str(e.id), "title": e.title,
+                                  "text": f"{minutes}分ずらすと日付を越えるため動かしていません(要調整)"})
+                    continue
+                notes.append({"kind": "delay", "event_id": str(e.id), "title": e.title,
+                              "text": f"{e.local_start_time[:5]} → {new}({minutes}分ずらしました)"})
+                e.local_start_time = new
+                if e.start_at is not None:
+                    e.start_at = e.start_at + timedelta(minutes=minutes)
+                if e.end_at is not None:
+                    e.end_at = e.end_at + timedelta(minutes=minutes)
+        elif reason == "fatigue":
+            limit = int(cond.get("max_events") or 4)
+            countable = [e for e in top if e.event_type not in ("accommodation", "transportation")]
+            excess = len(countable) - limit
+            for e in reversed(countable):
+                if excess <= 0:
+                    break
+                if e.locked:
+                    continue
+                notes.append({"kind": "fatigue", "event_id": str(e.id), "title": e.title,
+                              "text": f"1日{limit}件までにするなら外す候補です"})
+                excess -= 1
+        mode = TRANSPORT_TO_MODE.get(cond.get("transport_mode") or "")
+        if mode is not None and reason in ("rain", "transport"):
+            from app.api.v1 import segments as S
+
+            ids = [e.id for e in evs]
+            segs = (db.query(TravelSegment).filter(TravelSegment.to_event_id.in_(ids or [uuid.uuid4()])).all())
+            changed = 0
+            params, est_rev = S.te.load(db)
+            for sg in segs:
+                if sg.mode == mode or sg.mode not in _SWITCHABLE_MODES or sg.provider == "manual":
+                    continue
+                sg.mode = mode
+                S._refresh_estimate(db, sg, params, est_rev)
+                changed += 1
+            if changed:
+                notes.append({"kind": "transport", "event_id": None, "title": "移動の手段",
+                              "text": f"区間 {changed} 件の手段を変えて、移動の見積もりを計算し直しました"})
+        db.flush()
+    return notes
+
+
 # ---- 切り替え ---------------------------------------------------------------
 
 def activate(db: Session, day: TravelDay) -> Optional[TravelDay]:

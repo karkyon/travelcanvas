@@ -22,7 +22,7 @@
 import type { VisitAssessment, VisitCorrectionResult, VisitItem, VisitsOverview } from './types/visits';
 import type { CandidateList, PlaceInfo, PlanCandidateItem, PlanPlaces } from './types/candidates';
 import type { SearchHit, SearchResults } from './types/planSearch';
-import type { PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
+import type { PublicSharedReservation, PublicSharedVariant, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
 import type { AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, OptimizationProposal, PlaceDetail, PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation, ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket, TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment, ConstraintValue, PlanConstraint, AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry, AuditLogPage, PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem, ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary, DeletedPlanSummary, PlanPurgeResult, CollaboratorRemoveResult, LockedRelationDetail, RouteOptionDeleteResult, UndoConflictDetail, PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem, Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement, PlanComment, Poll, PollOption, PollVote, Booklet, BookletExport, BookletIncludes, RetentionInfo, Branch, BranchAssumptions, BranchDetail, CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState, AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail, OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics, SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse, JournalDraft, JournalMemory, MemoryList, TravelMemory, LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult, AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling, ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview, AtlasCell, AtlasResponse, MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight, OfflinePackKey, OfflinePackKeyRotated } from './types';
 import type { EstimateVariant } from './types/segments';
 import { arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, unitInterval, type Decoder } from './decode';
@@ -446,7 +446,7 @@ export const placeDetail: Decoder<PlaceDetail> = object<PlaceDetail>({
 
 // [Gate F45] FR-045 共有リンクで選べる項目
 const shareFieldKey = oneOf<ShareFieldKey>(
-  'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary',
+  'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary', 'day_variants',
 );
 
 export const shareLink: Decoder<ShareLink> = object<ShareLink>({
@@ -514,6 +514,9 @@ export const publicSharedPlan: Decoder<PublicSharedPlan> = object<PublicSharedPl
   can_edit: bool,
   fields: optional(arrayOf(shareFieldKey)),
   reservations: optional(arrayOf(publicSharedReservation)),
+  variants: optional(arrayOf(object<PublicSharedVariant>({
+    date: str, label: str, name: str, reason_label: nullable(str), events: arrayOf(publicSharedEvent),
+  }))),
 });
 
 // [Gate F45] 所有者の共有前プレビュー
@@ -982,7 +985,7 @@ export const planComment: Decoder<PlanComment> = object<PlanComment>({
 // 機密項目を含むかどうか(contains_sensitive・includes)と版の状態を誤ると、透かしや注意を出さずに
 // 印刷させてしまうため、列挙値と真偽値を厳密に検査する。
 const BOOKLET_THEMES = ['simple', 'functional', 'business', 'family', 'friends', 'wild', 'lovers', 'elegant', 'calm', 'solo', 'school', 'space', 'cute', 'accessible', 'mono', 'resort'] as const;
-const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'notes'] as const;
+const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'variants', 'notes'] as const;
 const bookletIncludes: Decoder<BookletIncludes> = object<BookletIncludes>({
   confirmation_numbers: bool, addresses: bool, phones: bool, participants: bool,
 });
@@ -1051,6 +1054,10 @@ export const booklet: Decoder<Booklet> = object<Booklet>({
     by_category: arrayOf(object({ category: str, budget: nullable(moneyString), actual: moneyString, over: bool })),
     unconverted_expenses: nonNegativeInt,
   })),
+  variants: optional(nullable(arrayOf(object({
+    date: str, label: str, name: str, reason_label: nullable(str),
+    events: arrayOf(object({ title: str, event_type: str, local_start_time: nullable(str), is_all_day: bool })),
+  })))),
   notes: nullable(arrayOf(str)),
 });
 

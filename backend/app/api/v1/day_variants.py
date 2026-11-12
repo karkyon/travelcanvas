@@ -36,6 +36,10 @@ class Conditions(BaseModel):
     transport_mode: Optional[str] = Field(None, max_length=20)
     prefer_indoor: bool = False
     note: Optional[str] = Field(None, max_length=200)
+    # たたき台の条件(遅れ: 何分・何時から、疲れ: 1 日の予定の上限)
+    delay_minutes: Optional[int] = Field(None, ge=15, le=720)
+    delay_after: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    max_events: Optional[int] = Field(None, ge=1, le=10)
 
 
 class VariantCreate(BaseModel):
@@ -47,6 +51,8 @@ class VariantCreate(BaseModel):
     reason: Optional[str] = None
     conditions: Optional[Conditions] = None
     also_dates: List[date_cls] = Field(default_factory=list, max_length=30)
+    # 理由に合わせて組み替えたたたき台にする(雨・遅れ・疲れ・移動手段。写す時だけ)
+    scaffold: bool = False
 
 
 class VariantPatch(BaseModel):
@@ -138,6 +144,15 @@ def _make_one(db: Session, plan, user, d0: date_cls, body: VariantCreate, group_
     db.flush()
     if src is not None:
         dv.copy_day_into(db, src, nd)
+        if body.scaffold and nd.variant_reason in dv.SCAFFOLD_REASONS:
+            cond = dict(nd.variant_conditions or {})
+            if nd.variant_reason == "rain":
+                # 雨: 屋内を優先・移動の既定は(指定が無ければ)電車・徒歩
+                cond["prefer_indoor"] = True
+                cond["transport_mode"] = cond.get("transport_mode") or "train"
+            cond["scaffold"] = dv.apply_scaffold(db, nd, nd.variant_reason, cond)
+            nd.variant_conditions = cond
+            db.flush()
     return nd
 
 
@@ -197,7 +212,8 @@ def patch_variant(plan_id: str, day_id: uuid.UUID, body: VariantPatch,
         if body.reason is not None:
             d.variant_reason = _reason(body.reason)
         if body.conditions is not None:
-            d.variant_conditions = body.conditions.model_dump()
+            # 送られた条件だけを変える(たたき台の印・遅れの条件などは残す)
+            d.variant_conditions = {**(d.variant_conditions or {}), **body.conditions.model_dump(exclude_unset=True)}
         if body.status is not None:
             if d.variant_status == "active":
                 raise HTTPException(status_code=409, detail={"code": "active_variant",

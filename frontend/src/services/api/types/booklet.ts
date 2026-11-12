@@ -11,7 +11,7 @@ export type BookletTheme =
 export type BookletDensity = 'normal' | 'compact';
 export type BookletFormat = 'web' | 'print';
 export type BookletSection =
-  | 'cover' | 'toc' | 'schedule' | 'map' | 'reservations' | 'packing' | 'contacts' | 'costs' | 'notes';
+  | 'cover' | 'toc' | 'schedule' | 'map' | 'reservations' | 'packing' | 'contacts' | 'costs' | 'variants' | 'notes';
 export type BookletWarning = 'stale_revision' | 'contains_sensitive' | 'qr_not_included' | 'unconverted_expenses';
 
 export interface BookletIncludes {
@@ -139,7 +139,14 @@ export interface Booklet {
     base_currency: string; budget_total: string | null; actual_total: string; over: boolean;
     by_category: BookletCostRow[]; unconverted_expenses: number;
   } | null;
+  /** [Gate PlanB] 付録: 控えの案(古い版には無い) */
+  variants?: BookletVariant[] | null;
   notes: string[] | null;
+}
+
+export interface BookletVariant {
+  date: string; label: string; name: string; reason_label: string | null;
+  events: Array<{ title: string; event_type: string; local_start_time: string | null; is_all_day: boolean }>;
 }
 
 export interface BookletExport {

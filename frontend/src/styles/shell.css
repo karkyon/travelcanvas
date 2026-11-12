@@ -1224,3 +1224,8 @@
 .tc-variant-cmp-list li { display: flex; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--tc-cloud-50); }
 .tc-variant-cmp-list li.is-only { background: var(--tc-info-soft); }
 .tc-variant-cmp-time { font-weight: 800; width: 42px; flex: none; }
+.tc-variant-scaffold { font-size: 12px; color: var(--tc-ink-700); background: var(--tc-cloud-0); border-radius: 9px; padding: 6px 10px; }
+.tc-variant-scaffold summary { cursor: pointer; font-weight: 700; color: #1e3a8a; }
+.tc-variant-scaffold ul { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+.tc-chart-variant { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border-radius: 999px; background: var(--tc-info-soft);
+  color: var(--tc-info); border: 1px solid #c7d7fb; font-weight: 700; }

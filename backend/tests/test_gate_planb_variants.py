@@ -119,3 +119,85 @@ def test_viewer_cannot_create_and_share_view_shows_active_only(auth_client, make
     assert seg.status_code == 200
     detail = client.get(f"/api/v1/plans/{p}").json()
     assert [len(d["events"]) for d in detail["days"]] == [2, 2]
+
+
+# ---------------------------------------------------------------- P5: たたき台・複製・共有・しおり
+
+def test_scaffold_rain_delay_fatigue(auth_client):
+    client, _owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    # 区間(車)を足す: 雨のたたき台で電車に変わる
+    seg = client.post(f"{base}/segments", json={"from_event_id": a1["id"], "to_event_id": a2["id"], "mode": "driving"},
+                      headers=_ik())
+    assert seg.status_code == 201, seg.text
+    rain = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "copy_active", "name": "雨の日",
+                                                 "reason": "rain", "scaffold": True}).json()["variants"][0]
+    c = rain["conditions"]
+    assert c["prefer_indoor"] is True and c["transport_mode"] == "train"
+    kinds = [(n["kind"], n["title"]) for n in c["scaffold"]]
+    assert ("rain", "二見興玉神社") in kinds and ("rain", "横山展望台") in kinds and kinds[-1][0] == "transport"
+    v = client.get(f"{base}/variants/{rain['day_id']}").json()
+    assert [s["mode"] for s in v["segments"]] == ["train"]
+    assert [s["mode"] for s in client.get(f"{base}/segments").json()] == ["driving"]  # 今の案の区間は変わらない
+    # 名前だけ変えても、たたき台の印と条件は残る
+    rev = _rev(client, p)
+    pt = client.patch(f"{base}/variants/{rain['day_id']}", json={"name": "雨の日2", "conditions": {"party_size": 3}},
+                      headers={"If-Match": str(rev)})
+    assert pt.status_code == 200, pt.text
+    pc = pt.json()["variant"]["conditions"]
+    assert pc["party_size"] == 3 and pc["transport_mode"] == "train" and len(pc["scaffold"]) == 3
+
+    delay = client.post(f"{base}/variants", json={
+        "local_date": "2026-11-29", "source": "copy_active", "reason": "delay", "scaffold": True,
+        "conditions": {"delay_minutes": 90, "delay_after": "09:00"}}).json()["variants"][0]
+    v = client.get(f"{base}/variants/{delay['day_id']}").json()
+    times = {e["title"]: e["local_start_time"][:5] for e in v["day"]["events"]}
+    assert times == {"二見興玉神社": "08:00", "横山展望台": "10:45"}
+    assert any("09:15 → 10:45" in n["text"] for n in delay["conditions"]["scaffold"])
+
+    fat = client.post(f"{base}/variants", json={
+        "local_date": "2026-11-29", "source": "copy_active", "reason": "fatigue", "scaffold": True,
+        "conditions": {"max_events": 1}}).json()["variants"][0]
+    assert [(n["kind"], n["title"]) for n in fat["conditions"]["scaffold"]] == [("fatigue", "横山展望台")]
+    assert fat["events"] == 2  # 予定は消さない(外す候補の印だけ)
+    # 白紙・たたき台の無い理由では何もしない
+    other = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "blank", "reason": "rain",
+                                                  "scaffold": True}).json()["variants"][0]
+    assert "scaffold" not in other["conditions"]
+
+
+def test_clone_share_and_booklet_include_variants(auth_client):
+    client, _owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    r = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "copy_active", "name": "雨の日",
+                                              "reason": "rain"})
+    vb = r.json()["variants"][0]
+    rev = _rev(client, p)
+    client.put(f"{base}/events/{client.get(f'{base}/variants/{vb['day_id']}').json()['day']['events'][1]['id']}",
+               json={"title": "鳥羽水族館"}, headers={"If-Match": str(rev)})
+    # 複製: すべての案を写す
+    cl = client.post(f"/api/v1/travel-plans/{p}/clone", json={"title": "写し"})
+    assert cl.status_code == 201, cl.text
+    np_ = cl.json()["id"]
+    lst = client.get(f"/api/v1/plans/{np_}/variants").json()["dates"]["2026-11-29"]
+    assert [(x["label"], x["status"], x["name"]) for x in lst] == [("A", "active", "プランA"), ("B", "standby", "雨の日")]
+    assert [len(d["events"]) for d in client.get(f"/api/v1/plans/{np_}").json()["days"]] == [2, 2]
+    # 共有: 既定では控えの案を見せない。day_variants を選ぶと見せる
+    pv = client.post(f"/api/v1/travel-plans/{p}/share-preview", json={"preset": "all"}).json()
+    assert "day_variants" not in pv["fields"] and "variants" not in pv["view"]
+    pv = client.post(f"/api/v1/travel-plans/{p}/share-preview",
+                     json={"fields": ["event_times", "day_variants"]}).json()
+    assert pv["view"]["variants"] == [{"date": "2026-11-29", "label": "B", "name": "雨の日", "reason_label": "雨",
+                                       "events": [{"title": "二見興玉神社", "event_type": "sightseeing",
+                                                   "local_start_time": "08:00", "is_all_day": False},
+                                                  {"title": "鳥羽水族館", "event_type": "sightseeing",
+                                                   "local_start_time": "09:15", "is_all_day": False}]}]
+    assert [len(d["events"]) for d in pv["view"]["days"]] == [2, 2]
+    # しおり: 付録「控えの案」を選んだ時だけ
+    b = client.post(f"/api/v1/plans/{p}/booklet/preview", json={"theme": "simple", "sections": ["cover", "schedule"]})
+    assert b.status_code == 200 and b.json()["variants"] is None
+    b = client.post(f"/api/v1/plans/{p}/booklet/preview",
+                    json={"theme": "simple", "sections": ["cover", "schedule", "variants"]}).json()
+    assert [(v["label"], v["name"], [e["title"] for e in v["events"]]) for v in b["variants"]] == [
+        ("B", "雨の日", ["二見興玉神社", "鳥羽水族館"])]
+    assert sum(len(d["events"]) for d in b["schedule"]["days"]) == 4

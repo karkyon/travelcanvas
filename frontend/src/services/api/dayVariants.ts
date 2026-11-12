@@ -8,10 +8,15 @@ const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const ifMatch = (rev: number): AxiosRequestConfig => ({ ...SILENT, headers: { 'If-Match': String(rev) } });
 
 export type VariantReason = 'rain' | 'party' | 'transport' | 'delay' | 'fatigue' | 'budget' | 'closure' | 'other';
+/** たたき台で変えた所・印を付けた所(案を作った時に理由に合わせて組み替えた結果) */
+export interface ScaffoldNote { kind: 'rain' | 'delay' | 'fatigue' | 'transport'; event_id: string | null; title: string; text: string }
 export interface VariantConditions {
   party_size?: number | null; absent_member_ids?: string[]; transport_mode?: string | null; prefer_indoor?: boolean;
-  note?: string | null;
+  note?: string | null; delay_minutes?: number | null; delay_after?: string | null; max_events?: number | null;
+  scaffold?: ScaffoldNote[];
 }
+/** たたき台を作れる理由 */
+export const SCAFFOLD_REASONS: VariantReason[] = ['rain', 'delay', 'fatigue', 'transport'];
 export interface VariantSummary {
   day_id: string; local_date: string; label: string; name: string; status: 'active' | 'standby' | 'archived';
   reason: VariantReason | null; reason_label: string | null; conditions: VariantConditions; group_id: string | null;
@@ -48,7 +53,7 @@ export async function getVariant(planId: string, dayId: string): Promise<Variant
 }
 export async function createVariant(planId: string, body: {
   local_date: string; source: 'copy_active' | 'copy_day' | 'blank'; source_day_id?: string | null; name?: string;
-  reason?: VariantReason | null; conditions?: VariantConditions; also_dates?: string[];
+  reason?: VariantReason | null; conditions?: VariantConditions; also_dates?: string[]; scaffold?: boolean;
 }): Promise<{ revision: number; variants: VariantSummary[] }> {
   return (await api.post(`/plans/${planId}/variants`, body, SILENT)).data as { revision: number; variants: VariantSummary[] };
 }
