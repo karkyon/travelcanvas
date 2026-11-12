@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Camera, ExternalLink, ImagePlus, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
+import { CalendarDays, Camera, Download, ExternalLink, ImagePlus, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
 import PageHead from '@/components/shell/PageHead';
 import PlaceArt from '@/components/shell/PlaceArt';
 import PlaceFinder, { type PlaceDraft, type PlaceTab } from '@/components/search/PlaceFinder';
@@ -30,6 +30,7 @@ import { cleanDining, mergeEmptyDining, type DiningInfo } from '@/components/din
 import SpotPhotoView, { type SpotPhoto } from '@/components/media/SpotPhotoView';
 import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
 import PasteImageButton from '@/components/media/PasteImageButton';
+import GoogleSavedImportDialog from './spots/GoogleSavedImportDialog';
 import type { ExternalImage } from '@/services/api/types/g11discover';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
@@ -74,6 +75,8 @@ const SpotListPage: React.FC = () => {
     { busy: false, result: null, error: null });
   const [urlError, setUrlError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
+  // [Gate GoogleSavedImport] Google マップの保存リストから取り込む窓
+  const [googleOpen, setGoogleOpen] = useState(false);
   // [Gate SpotOwnPhoto] 保存の時に入れる自分の写真(ファイル・クリップボードから)
   const [pending, setPending] = useState<File | null>(null);
   const [enriching, setEnriching] = useState<string | null>(null);
@@ -235,7 +238,16 @@ const SpotListPage: React.FC = () => {
     <div className="min-h-screen bg-cloud-50">
       <div className="tc-page">
         <PageHead eyebrow="WISHLIST · 行きたい場所" title="行きたい場所" sub="気になる場所をためておき、旅行の予定に入れられます。"
-          actions={!adding ? <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={open}><Plus size={16} aria-hidden="true" />場所を追加</button> : undefined} />
+          actions={!adding ? (
+            <>
+              <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => setGoogleOpen(true)} data-testid="wish-google-import">
+                <Download size={16} aria-hidden="true" />Google マップから取り込む
+              </button>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={open}><Plus size={16} aria-hidden="true" />場所を追加</button>
+            </>
+          ) : undefined} />
+        <GoogleSavedImportDialog isOpen={googleOpen} onClose={() => setGoogleOpen(false)} spots={spots ?? []}
+          onDone={(m) => { setError(null); setMessage(m); void load(); }} />
         {error && <p role="alert" className="tc-card px-4 py-3 mb-4 text-sm text-danger">{error}</p>}
         {message && <p role="status" className="tc-card px-4 py-3 mb-4 text-sm text-ink-900">{message}</p>}
 
