@@ -329,6 +329,8 @@ const TodayPage: React.FC = () => {
       )}
 
       {/* モックの「旅の操作をひとつに」。親指の届く所(スマホでは画面の下に固定。広い画面では本文の下) */}
+      {/* [Gate TripDayNav] 当日の操作(遅延・休業の対応)は旅の当日だけ(前・後は出さない) */}
+      {heading.phase !== 'before' && heading.phase !== 'after' && (
       <nav aria-label="当日の操作" className="tc-today-actions"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         <p className="tc-section-title hidden sm:block">旅の操作をひとつに</p>
@@ -347,6 +349,7 @@ const TodayPage: React.FC = () => {
           </Button>
         </div>
       </nav>
+      )}
     </div>
   );
 };

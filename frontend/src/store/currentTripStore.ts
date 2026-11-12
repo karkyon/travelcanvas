@@ -9,12 +9,25 @@ export interface CurrentTrip { id: string; title: string; start_date?: string | 
 
 export const useCurrentTripStore = create<{ trip: CurrentTrip | null }>(() => ({ trip: null }));
 
-export function publishCurrentTrip(
-  plan: { id?: string | null; title?: string | null; start_date?: string | null; end_date?: string | null } | null | undefined,
-): void {
+type PlanLike = {
+  id?: string | null; title?: string | null; start_date?: string | null; end_date?: string | null;
+  days?: ReadonlyArray<{ date?: string | null }> | null;
+};
+
+/** [Gate TripDayNav] 旅行の期間。旅行に出発・最後の日が無ければ、日程の最初・最後の日付から */
+export function tripRange(plan: PlanLike | null | undefined): { start: string | null; end: string | null } {
+  const dates = (plan?.days ?? []).map((d) => (d?.date ?? '').slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return {
+    start: plan?.start_date?.slice(0, 10) || dates[0] || null,
+    end: plan?.end_date?.slice(0, 10) || dates[dates.length - 1] || null,
+  };
+}
+
+export function publishCurrentTrip(plan: PlanLike | null | undefined): void {
   // [Gate AppShell] 上の帯の旅行の切り替えに日付も出す
+  const range = tripRange(plan);
   const next = plan?.id
-    ? { id: String(plan.id), title: plan.title || '', start_date: plan.start_date ?? null, end_date: plan.end_date ?? null }
+    ? { id: String(plan.id), title: plan.title || '', start_date: range.start, end_date: range.end }
     : null;
   const prev = useCurrentTripStore.getState().trip;
   if (prev?.id === next?.id && prev?.title === next?.title && (prev?.start_date ?? null) === (next?.start_date ?? null)
