@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.v1 import plans as plans_api
-from app.api.v1.branches import _apply_time
+from app.services.plan_edits import apply_time as _apply_time
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.services import member_policy

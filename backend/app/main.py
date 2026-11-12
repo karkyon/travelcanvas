@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.api.v1 import (
     spots, travel, ai, admin, share, notifications, plans, public_share, search,
     quickdrafts, reservations, documents, imports, segments, route_options, constraints,
-    validation, preparation, finance, discussion, booklet, itinerary_export, data_export, branches,
+    validation, preparation, finance, discussion, booklet, itinerary_export, data_export,
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage, receipts,
@@ -556,8 +556,7 @@ app.include_router(itinerary_export.router, prefix="/api/v1")
 # [Gate P6] FR-039データポータビリティ。/plans/{plan_id}/data-export、/privacy/data-export・retention。
 app.include_router(data_export.plans_router, prefix="/api/v1")
 app.include_router(data_export.privacy_router, prefix="/api/v1")
-# [Gate P7] FR-019 What-if・旅程ブランチ。/plans/{plan_id}/branches配下。
-app.include_router(branches.router, prefix="/api/v1")
+# [Gate PlanB-P8] FR-019 もしもの案(/plans/{plan_id}/branches)は日ごとの案(プランB、/plans/{plan_id}/variants)に置き換えた
 # [Gate P8] FR-036カレンダー(ICS)の取込(差分確認後に適用)。/plans/{plan_id}/calendar-import配下。
 app.include_router(calendar_import.router, prefix="/api/v1")
 # 🗑️ [Gate P9] アカウント削除・同意の撤回(FR-039)

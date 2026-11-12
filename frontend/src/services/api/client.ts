@@ -12,8 +12,7 @@
 // [Gate P4] しおり・印刷・PDF出力(FR-034/035/046)を追加: ... → Discussion → Booklet → CompleteTravelAPI
 // [Gate P5] カレンダー・地図の書き出し(FR-036)を追加: ... → Booklet → ItineraryExport → CompleteTravelAPI
 // [Gate P6] データポータビリティ(FR-039)を追加: ... → ItineraryExport → DataExport → CompleteTravelAPI
-// [Gate P7] What-if・旅程ブランチ(FR-019)を追加: ... → DataExport → Branches → CompleteTravelAPI
-// [Gate P8] カレンダー(ICS)の取込(FR-036)を追加: ... → Branches → CalendarImport → CompleteTravelAPI
+// [Gate P8] カレンダー(ICS)の取込(FR-036)を追加: ... → DataExport → CalendarImport → CompleteTravelAPI([Gate PlanB-P8] もしもの案はやめた)
 // [Gate P9] アカウントの削除・同意の撤回(FR-039)を追加: ... → CalendarImport → Privacy → CompleteTravelAPI
 // [Gate P10] 外部状況(アラート、FR-030)・安全な再計画(FR-031)を追加: ... → Privacy → Replans → CompleteTravelAPI
 // [Gate L4] 説明可能な最適化(FR-018)を追加: ... → Replans → Optimization → CompleteTravelAPI

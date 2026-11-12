@@ -4,13 +4,13 @@
  * [Gate P8] backend/app/api/v1/calendar_import.py。/plans/{planId}/calendar-import/*。
  * プレビューはファイルをmultipartで送る(DBは変えない)。適用は本案のrevision(If-Match)。
  */
-import { BranchesApi } from './branches';
+import { DataExportApi } from './dataExport';
 import type { CalendarImportApplyItem, CalendarImportPreview, CalendarImportResult } from '../types';
 import { decodeResponse } from '../decode';
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
-export class CalendarImportApi extends BranchesApi {
+export class CalendarImportApi extends DataExportApi {
   async previewCalendarImport(planId: string, file: Blob, createMissingDays = false): Promise<CalendarImportPreview> {
     const form = new FormData();
     form.append('file', file, 'calendar.ics');

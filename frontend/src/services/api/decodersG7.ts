@@ -3,8 +3,8 @@
  * の応答の decoder(使う画面が g7.ts 経由で読む。最初に読む JS に入れない)。
  */
 import type {
-  BranchComparison, CompareBranch, CompareColumn, DayMetric, DeletionScheduleResult, G7Candidate, G7Candidates,
-  G7Insight, G7MemoryReplan, G7Proposal, ImpactIssue, ImpactPreview, Money, MovementEffective, MovementSettings,
+  DayMetric, DeletionScheduleResult, G7Candidate, G7Candidates,
+  G7Insight, G7MemoryReplan, G7Proposal, ImpactIssue, ImpactPreview, MovementEffective, MovementSettings,
   MovementSettingsValue, Objective, ObjectiveTerm, PartialPreview, RunMovement,
 } from './types/g7';
 import {
@@ -107,27 +107,6 @@ const partialPreview: Decoder<PartialPreview> = object<PartialPreview>({
 const applyResult = object({ plan_revision: int, changed: nonNegativeInt, change_set_id: nullable(str),
   algorithm_version: str });
 
-// ===== FR-019
-const money: Decoder<Money> = object<Money>({ currency: str, amount: str });
-const columnShape = {
-  counts, constraints_violated: nonNegativeInt, constraints_satisfied: nonNegativeInt,
-  travel: object({ minutes: nonNegativeInt, km: num, legs: nonNegativeInt, unknown_legs: nonNegativeInt, is_estimate: bool }),
-  max_fatigue_percent: nullable(nonNegativeInt), heavy_days: nonNegativeInt,
-  costs: nullable(object({ total: arrayOf(money), removed: arrayOf(money) })),
-};
-const compareBranch: Decoder<CompareBranch> = object<CompareBranch>({
-  ...columnShape, id: str, title: str, scenario_type: str, state: str,
-  summary: object({ added: nonNegativeInt, removed: nonNegativeInt, updated: nonNegativeInt, time_changed: nonNegativeInt }),
-  conflicts: nonNegativeInt, new_issues: arrayOf(impactIssue), resolved_issues: arrayOf(impactIssue),
-  affected_reservations: nullable(arrayOf(object({ id: str, label: str, status: str }))),
-  budget_target: nullable(arrayOf(object({ currency: str, target: str, branch: str, met: bool }))),
-});
-const comparison: Decoder<BranchComparison> = object<BranchComparison>({
-  plan_id: str, plan_revision: int, algorithm_version: str, validation_algorithm_version: str, movement_applied: bool,
-  plan: object<CompareColumn & { title: string }>({ ...columnShape, title: str }), branches: arrayOf(compareBranch),
-  costs_hidden: bool, reservations_hidden: bool, can_adopt: bool,
-});
-
 // ===== MEM-03
 const insight: Decoder<G7Insight> = object<G7Insight>({
   kind: oneOf('stay_longer', 'stay_shorter', 'late_arrival', 'often_skipped', 'slow_transport'),
@@ -164,7 +143,6 @@ export interface G7Types {
   candidates: G7Candidates;
   partial: PartialPreview;
   apply: { plan_revision: number; changed: number; change_set_id: string | null; algorithm_version: string };
-  comparison: BranchComparison;
   memoryReplan: G7MemoryReplan;
   schedule: DeletionScheduleResult;
 }
@@ -176,7 +154,6 @@ const G7: { [K in keyof G7Types]: [Decoder<G7Types[K]>, string] } = {
   candidates: [candidates, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates'],
   partial: [partialPreview, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates/partial-preview'],
   apply: [applyResult, 'POST /plans/{plan_id}/days/{day_id}/optimization-candidates/apply'],
-  comparison: [comparison, 'GET /plans/{plan_id}/branches-comparison'],
   memoryReplan: [memoryReplan, 'GET /plans/{plan_id}/memory-replan'],
   schedule: [scheduleResult, 'POST /privacy/account-deletion/schedule'],
 };

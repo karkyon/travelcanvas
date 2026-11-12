@@ -2543,7 +2543,7 @@ class ItineraryBranch(Base):
     # [Gate G8] FR-019 案の中で予約・移動区間そのものを変える分岐(branch-v2)。NULL は予定だけの案(G7 まで)。
     # {"base": {"segments": [...], "reservations": [...]}, "segments": [変更], "reservations": [変更]}。
     # base は変更を初めて保存した時の本案の区間・予約(三方向の取り込みの基準)。予約は外部へ取消・変更を送らない
-    # (取消は「手続きの準備」を作るだけ。app/services/branch_resources.py)
+    # (取消は「手続きの準備」を作るだけ。[Gate PlanB-P8] 機能はやめた。表は移行の確かめのため 1 版残す)
     resources: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())

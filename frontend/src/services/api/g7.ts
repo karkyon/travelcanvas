@@ -10,7 +10,7 @@ import type { AxiosRequestConfig } from 'axios';
 import { api } from './index';
 import { decodeG7 } from './decodersG7';
 import type {
-  BranchComparison, DeletionExtras, DeletionScheduleResult, G7Candidates, G7MemoryReplan, ImpactInput, ImpactPreview,
+  DeletionExtras, DeletionScheduleResult, G7Candidates, G7MemoryReplan, ImpactInput, ImpactPreview,
   MovementSettings, MovementSettingsValue, PartialPreview, RunMovement, Weights,
 } from './types/g7';
 import type { OptimizationTravelMode } from './types';
@@ -70,12 +70,6 @@ export async function applyCandidateG7(
     ...(weights ? { weights } : {}), ...(eventIds ? { event_ids: eventIds } : {}),
   }, { ...SILENT, headers: { 'If-Match': String(planRevision) } });
   return decodeG7('apply', r.data);
-}
-
-// ===== FR-019
-export async function compareBranches(planId: string, branchIds: string[]): Promise<BranchComparison> {
-  const r = await api.get(`/plans/${planId}/branches-comparison`, { ...SILENT, params: { ids: branchIds.join(',') } });
-  return decodeG7('comparison', r.data);
 }
 
 // ===== MEM-03

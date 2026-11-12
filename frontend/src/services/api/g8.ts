@@ -8,43 +8,13 @@
  */
 import type { AxiosRequestConfig } from 'axios';
 import { api } from './index';
-import { decodeG8, type BranchG8Extras } from './decodersG8';
+import { decodeG8 } from './decodersG8';
 import type {
-  AdoptionPreview, AdoptResultG8, CorrectionRequest, CorrectionSource, CorrectionsOverview, KeepRole, OpsJobs,
-  OwnershipInfo, OwnershipTransfer, ResourcesInput, SelfCorrection,
+  CorrectionRequest, CorrectionSource, CorrectionsOverview, KeepRole, OpsJobs,
+  OwnershipInfo, OwnershipTransfer, SelfCorrection,
 } from './types/g8';
-import type { BranchContentInput } from './types';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
-const ifMatch = (revision: number): AxiosRequestConfig => ({ ...SILENT, headers: { 'If-Match': String(revision) } });
-
-// ===== FR-019
-/** 分岐案の詳細(GET /branches/{id} などの応答)から、区間・予約の変更を読む(以前の応答は空) */
-export function branchExtras(detail: unknown): BranchG8Extras {
-  return decodeG8('branchExtras', detail);
-}
-
-/** 予定と区間・予約の変更を一緒に保存する。応答は分岐案の詳細(BranchDetail と同じ形) */
-export async function saveBranchWithResources(
-  planId: string, branchId: string, events: BranchContentInput[], resources: ResourcesInput, revision: number,
-): Promise<unknown> {
-  const r = await api.put(`/plans/${planId}/branches/${branchId}/content`, { events, resources }, ifMatch(revision));
-  return r.data;
-}
-
-export async function getAdoptionPreview(planId: string, branchId: string, only?: string[] | null): Promise<AdoptionPreview> {
-  const r = await api.get(`/plans/${planId}/branches/${branchId}/adoption-preview`,
-    { ...SILENT, params: only ? { only: only.join(',') } : undefined });
-  return decodeG8('preview', r.data);
-}
-
-export async function adoptBranchG8(
-  planId: string, branchId: string, revision: number, only?: string[] | null,
-): Promise<AdoptResultG8 & { raw: unknown }> {
-  const r = await api.post(`/plans/${planId}/branches/${branchId}/adopt`, only ? { only } : undefined, ifMatch(revision));
-  const data = r.data as { branch?: unknown };
-  return { ...decodeG8('adopt', r.data), raw: data?.branch };
-}
 
 // ===== FR-021
 export async function getOwnership(planId: string): Promise<OwnershipInfo> {

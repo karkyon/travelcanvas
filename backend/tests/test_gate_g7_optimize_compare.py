@@ -4,18 +4,16 @@
 - 重みの検査(範囲・知らない条件・全部0)は 422
 - 部分の採用: 選んだ予定だけを動かした結果の確認(DBは変えない)→ 適用は選んだ予定だけ・1つの変更セットで元に戻る。
   案で変わらない予定を選ぶと 422、候補の計算後に入力が変わると 409
-- 比較: 本案と分岐案(最大3つ)の検証の件数・新たに出る/解消する問題・移動・疲れ・費用・外す予定に紐付く予約と費用・予算の目標
-- 費用・予約を見せない設定のメンバーには、比較でも費用・予約を出さない。部外者は 403/404
+[Gate PlanB-P8] FR-019 の本案と分岐案の比較の試験は、もしもの案をやめたため消した(日ごとの案の比較は test_gate_planb_variants)
 """
 import uuid
 
 import pytest
 
-from app.api.v1 import branches as branches_api
 from app.api.v1 import optimization as optimization_api
 from app.core.auth import AuthResult, get_current_user
 from app.main import app
-from app.models.models import ChangeSet, PlanCollaborator, TravelPlan
+from app.models.models import ChangeSet
 from app.services import optimizer as opt
 
 
@@ -23,7 +21,6 @@ from app.services import optimizer as opt
 def audit_calls(monkeypatch):
     calls = []
     monkeypatch.setattr(optimization_api, "record_audit_event", lambda **kw: calls.append(kw))
-    monkeypatch.setattr(branches_api, "record_audit_event", lambda **kw: calls.append(kw))
     return calls
 
 
@@ -172,99 +169,3 @@ def test_partial_preview_and_apply_only_selected(auth_client, db_session, audit_
     stale = client.post(f"{url}/partial-preview", json={"candidate_id": cand["id"], "event_ids": [pick],
                                                         "input_fingerprint": body["input_fingerprint"]})
     assert stale.status_code == 409
-
-
-# ================================================================ 比較
-
-def _branch_setup(client):
-    p = client.post("/api/v1/travel-plans/", json={"title": "G7 比較"}).json()["id"]
-    base = f"/api/v1/plans/{p}"
-    d1 = client.post(f"{base}/days", json={"local_date": "2026-11-21", "timezone_id": "Asia/Tokyo"},
-                     headers=_ik()).json()
-
-    def ev(title, t, lon, **kw):
-        r = client.post(f"{base}/events", json={"day_id": d1["id"], "title": title, "local_start_time": t,
-                                                "latitude": LAT, "longitude": lon, "event_type": "sightseeing", **kw},
-                        headers=_ik())
-        assert r.status_code == 201, r.text
-        return r.json()
-
-    a = ev("美冨久酒造", "10:00", 135.70)
-    b = ev("藤居本家", "13:00", 135.80)
-    c = ev("岡村本家", "15:00", 135.81)
-    res = client.post(f"{base}/reservations", json={"type": "activity", "provider_name": "酒蔵見学", "event_id": c["id"],
-                                                    "total_amount": 3000, "currency": "JPY"})
-    assert res.status_code == 201, res.text
-    seg_body = {"from_event_id": b["id"], "to_event_id": c["id"], "mode": "driving", "duration_minutes": 15,
-                "cost": 500, "currency": "JPY"}
-    seg = client.post(f"{base}/segments", json=seg_body, headers=_ik())
-    assert seg.status_code == 201, seg.text
-    return p, base, d1, {"a": a, "b": b, "c": c}
-
-
-def test_branch_comparison_columns_diff_costs_and_budget(auth_client):
-    client, _owner = auth_client
-    p, base, d1, ev = _branch_setup(client)
-    b = client.post(f"{base}/branches", json={"title": "予算を削る", "scenario_type": "budget",
-                                              "assumptions": {"budget_cut_percent": 50}}).json()
-    content = b["content"]
-    for i in content:
-        if i["title"] == "岡村本家":
-            i["removed"] = True
-        if i["title"] == "藤居本家":
-            i["local_start_time"] = "10:00"  # 美冨久と同じ時刻にする(新たな問題)
-    saved = client.put(f"{base}/branches/{b['id']}/content", json={"events": content},
-                       headers={"If-Match": str(b["revision"])})
-    assert saved.status_code == 200, saved.text
-    r = client.get(f"{base}/branches/{b['id']}/comparison")
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["algorithm_version"] == "branch-compare-v1" and body["plan"]["title"] == "本案"
-    assert body["plan"]["costs"]["total"] == [{"currency": "JPY", "amount": "3500.00"}]
-    col = body["branches"][0]
-    assert col["summary"]["removed"] == 1 and col["summary"]["updated"] == 1
-    assert "SAME_START_TIME" in [i["code"] for i in col["new_issues"]]
-    assert col["costs"]["removed"] == [{"currency": "JPY", "amount": "3500.00"}]
-    assert col["costs"]["total"] == []
-    assert col["affected_reservations"] == [{"id": col["affected_reservations"][0]["id"], "label": "酒蔵見学",
-                                             "status": "confirmed"}]
-    assert col["budget_target"] == [{"currency": "JPY", "target": "1750.00", "branch": "0.00", "met": True}]
-    assert col["travel"]["legs"] == 1 and body["plan"]["travel"]["legs"] == 2
-    assert body["plan"]["travel"]["minutes"] > 0 and col["travel"]["is_estimate"] is True
-    assert isinstance(col["max_fatigue_percent"], int)
-    # 複数の比較
-    b2 = client.post(f"{base}/branches", json={"title": "そのまま", "scenario_type": "rain"}).json()
-    many = client.get(f"{base}/branches-comparison", params={"ids": f"{b['id']},{b2['id']}"})
-    assert many.status_code == 200 and len(many.json()["branches"]) == 2
-    assert many.json()["branches"][1]["new_issues"] == []
-    assert client.get(f"{base}/branches-comparison", params={"ids": ",".join([b["id"]] * 2)}).status_code == 422
-    four = ",".join(str(uuid.uuid4()) for _ in range(4))
-    assert client.get(f"{base}/branches-comparison", params={"ids": four}).status_code == 422
-    assert client.get(f"{base}/branches-comparison", params={"ids": str(uuid.uuid4())}).status_code == 404
-
-
-def test_comparison_hides_costs_and_reservations_by_member_policy(auth_client, make_user, db_session):
-    client, owner = auth_client
-    p, base, d1, ev = _branch_setup(client)
-    b = client.post(f"{base}/branches", json={"title": "案", "scenario_type": "custom"}).json()
-    member, _ = make_user()
-    stranger, _ = make_user()
-    db_session.add(PlanCollaborator(plan_id=uuid.UUID(p), user_id=member.id, email=member.email, role="viewer",
-                                    status="accepted"))
-    plan = db_session.query(TravelPlan).filter(TravelPlan.id == uuid.UUID(p)).one()
-    plan.member_field_policy = {"roles": {"viewer": ["costs", "reservations"]}}
-    db_session.commit()
-    try:
-        _act_as(member)
-        r = client.get(f"{base}/branches/{b['id']}/comparison")
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["costs_hidden"] is True and body["reservations_hidden"] is True
-        assert body["plan"]["costs"] is None and body["branches"][0]["affected_reservations"] is None
-        # 費用 3500 が値として残っていない(文字列の検索は、乱数の ID・時刻に含まれると誤って落ちる)
-        leaked = {str(v) for v in _json_values(body)} & {"3500", "3500.0", "3500.00"}
-        assert "酒蔵見学" not in r.text and not leaked and body["can_adopt"] is False
-        _act_as(stranger)
-        assert client.get(f"{base}/branches/{b['id']}/comparison").status_code in (403, 404)
-    finally:
-        _act_as(owner)

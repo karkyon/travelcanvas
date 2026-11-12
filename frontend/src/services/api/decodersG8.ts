@@ -1,106 +1,15 @@
 /**
- * [Gate G8] 分岐の区間・予約の変更と選んで採用・所有者の移譲・出典つきの訂正・定期の処理の記録 の応答の decoder
+ * [Gate G8] 所有者の移譲・出典つきの訂正・定期の処理の記録 の応答の decoder
  * (使う画面が g8.ts 経由で読む。最初に読む JS に入れない)。
  */
 import type {
-  AdoptionPreview, AdoptResultG8, BaseReservation, BaseSegment, BranchResources, CorrectionRequest,
-  CorrectionsOverview, OpsJob, OpsJobs, OwnershipInfo, OwnershipTransfer, PreviewConflict, PreviewItem, ReservationOp,
-  ResourceSummary, SegmentOp, SelfCorrection,
+  CorrectionRequest, CorrectionsOverview, OpsJob, OpsJobs, OwnershipInfo, OwnershipTransfer, SelfCorrection,
 } from './types/g8';
 import {
-  arrayOf, bool, decodeResponse, int, nonNegativeInt, nullable, num, object, oneOf, optional, record, str,
+  arrayOf, bool, decodeResponse, nonNegativeInt, nullable, object, oneOf, optional, str,
   type Decoder,
 } from './decode';
 
-const mode = oneOf('walking', 'driving', 'train', 'bus', 'ferry', 'flight', 'bicycle', 'taxi', 'mixed',
-  'shinkansen', 'helicopter', 'express_bus');  // [Gate G11]
-const segStatus = oneOf('planned', 'confirmed', 'cancelled');
-
-const baseSegment: Decoder<BaseSegment> = object<BaseSegment>({
-  id: str, from_event_id: nullable(str), to_event_id: nullable(str), from_place_id: nullable(str),
-  to_place_id: nullable(str), mode, status: segStatus, planned_departure_at: nullable(str),
-  planned_arrival_at: nullable(str), last_departure_at: nullable(str), duration_minutes: nullable(num),
-  distance_km: nullable(num), cost: nullable(str), currency: nullable(str), transport_number: nullable(str),
-  platform: nullable(str), preparation_minutes: nonNegativeInt, buffer_before_minutes: nonNegativeInt,
-  reservation_id: nullable(str),
-});
-
-const baseReservation: Decoder<BaseReservation> = object<BaseReservation>({
-  id: str, label: str, type: str, status: str, event_id: nullable(str), event_ids: arrayOf(str), locked: bool,
-  total_amount: nullable(num), currency: nullable(str), cancellation_deadline: nullable(str),
-});
-
-/** 変更の一覧は backend が検証済みの形(op ごとの必須の項目だけを確かめる) */
-const segmentOp: Decoder<SegmentOp> = (raw, path) => {
-  const v = record(raw, path);
-  const op = oneOf('update', 'remove', 'add')(v.op, `${path}.op`);
-  if (op === 'add') {
-    str(v.key, `${path}.key`);
-    record(v.fields, `${path}.fields`);
-  } else {
-    str(v.segment_id, `${path}.segment_id`);
-    if (op === 'update') record(v.fields, `${path}.fields`);
-  }
-  return v as unknown as SegmentOp;
-};
-
-const reservationOp: Decoder<ReservationOp> = (raw, path) => {
-  const v = record(raw, path);
-  oneOf('relink', 'cancel')(v.op, `${path}.op`);
-  str(v.reservation_id, `${path}.reservation_id`);
-  return v as unknown as ReservationOp;
-};
-
-const resources: Decoder<BranchResources> = object<BranchResources>({
-  algorithm_version: str, base_segments: arrayOf(baseSegment), base_reservations: arrayOf(baseReservation),
-  segments: arrayOf(segmentOp), reservations: arrayOf(reservationOp), reservations_hidden: bool, costs_hidden: bool,
-});
-
-const resourceSummary: Decoder<ResourceSummary> = object<ResourceSummary>({
-  segments_added: nonNegativeInt, segments_removed: nonNegativeInt, segments_updated: nonNegativeInt,
-  reservations_relinked: nonNegativeInt, reservations_cancel_planned: nonNegativeInt,
-});
-
-/** 分岐案の詳細(BranchDetail)に G8 で足した項目。以前の応答(項目なし)は空として読む */
-export interface BranchG8Extras {
-  resources: BranchResources;
-  resource_summary: ResourceSummary;
-}
-
-const emptyResources: BranchResources = {
-  algorithm_version: 'branch-v1', base_segments: [], base_reservations: [], segments: [], reservations: [],
-  reservations_hidden: false, costs_hidden: false,
-};
-const emptySummary: ResourceSummary = {
-  segments_added: 0, segments_removed: 0, segments_updated: 0, reservations_relinked: 0,
-  reservations_cancel_planned: 0,
-};
-
-const branchExtras: Decoder<BranchG8Extras> = object<BranchG8Extras>({
-  resources: (v, path) => (v === undefined ? emptyResources : resources(v, path)),
-  resource_summary: (v, path) => (v === undefined ? emptySummary : resourceSummary(v, path)),
-});
-
-const kind = oneOf('event', 'segment', 'reservation');
-const previewItem: Decoder<PreviewItem> = object<PreviewItem>({
-  op_id: str, kind, op: str, label: str, selected: bool, requires: arrayOf(str),
-});
-const previewConflict: Decoder<PreviewConflict> = object<PreviewConflict>({
-  kind, op_id: str, op: optional(str), reason: str, fields: optional(arrayOf(str)), label: optional(str),
-  title: optional(str),
-});
-const preview: Decoder<AdoptionPreview> = object<AdoptionPreview>({
-  branch_id: str, algorithm_version: str, items: arrayOf(previewItem), conflicts: arrayOf(previewConflict),
-  missing_dependencies: arrayOf(object({ op_id: str, requires: arrayOf(str) })),
-  tasks: arrayOf(object({ title: str, due_at: nullable(str) })), reservations_hidden: bool, can_adopt: bool,
-  partial: bool,
-});
-const adoptResult: Decoder<AdoptResultG8> = object<AdoptResultG8>({
-  plan_revision: int, left_out: (v, path) => (v === undefined ? [] : arrayOf(str)(v, path)),
-  tasks_created: (v, path) => (v === undefined ? 0 : nonNegativeInt(v, path)),
-});
-
-// ===== FR-021
 const transferStatus = oneOf('pending', 'accepted', 'declined', 'cancelled', 'expired');
 const transfer: Decoder<OwnershipTransfer> = object<OwnershipTransfer>({
   id: str, plan_id: str, status: transferStatus, from_name: str, to_name: str,
@@ -145,9 +54,6 @@ const opsJob: Decoder<OpsJob> = object<OpsJob>({
 const opsJobs: Decoder<OpsJobs> = object<OpsJobs>({ jobs: arrayOf(opsJob), attention: arrayOf(str) });
 
 export interface G8Types {
-  branchExtras: BranchG8Extras;
-  preview: AdoptionPreview;
-  adopt: AdoptResultG8;
   ownershipInfo: OwnershipInfo;
   transfer: OwnershipTransfer;
   transfers: OwnershipTransfer[];
@@ -159,9 +65,6 @@ export interface G8Types {
 }
 
 const G8: { [K in keyof G8Types]: [Decoder<G8Types[K]>, string] } = {
-  branchExtras: [branchExtras, 'GET /plans/{plan_id}/branches/{branch_id}'],
-  preview: [preview, 'GET /plans/{plan_id}/branches/{branch_id}/adoption-preview'],
-  adopt: [adoptResult, 'POST /plans/{plan_id}/branches/{branch_id}/adopt'],
   ownershipInfo: [ownershipInfo, 'GET /plans/{plan_id}/ownership-transfer'],
   transfer: [transfer, 'POST /plans/{plan_id}/ownership-transfer'],
   transfers: [arrayOf(transfer), 'GET /ownership-transfers/incoming'],

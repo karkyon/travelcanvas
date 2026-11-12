@@ -46,6 +46,7 @@ const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, 
         <span className="tc-variant-label">この日の案</span>
         {list.length > 1 && <span className="tc-variant-note">今の案は旅程・しおり・共有に出ます</span>}
       </div>
+      <div className="tc-variant-tabs">
       <div className="tc-variant-tabs" role="tablist" aria-label="この日の案">
         {list.map((v) => {
           const isActive = v.status === 'active';
@@ -62,6 +63,7 @@ const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, 
             </button>
           );
         })}
+      </div>
         {canEdit && (
           <button type="button" className="tc-focus-ring tc-vtab tc-vtab-add" onClick={onCreate} data-testid="variant-create">
             <Svg d={ICON.plus} />案を作る

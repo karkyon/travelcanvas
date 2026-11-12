@@ -7,8 +7,7 @@ import { TEXT_PAIRS } from '../src/styles/tokens';
 
 /**
  * [Gate G8・G9] 外部の判断の要らない残りを、実際のブラウザで確かめる。
- *   1. FR-019 案の中で移動区間を外す・足す、予約を取り消す予定にする。採用の前に変更ごとに確かめ、選んだ変更だけを採用すると
- *      準備の一覧に「予約の取消の手続き」が入る。本案の「元に戻す」で区間・予約の紐付け・準備まで戻る
+ *   1. (FR-019 もしもの案の区間・予約の変更は [Gate PlanB-P8] でやめた。日ごとの案は test_gate_planb_variants と画面の試験)
  *   2. FR-021・FR-039 所有者の移譲(申し出 → 相手がパスワードで受け入れ)、旅行の中の情報の訂正の申し出と対応、
  *      出典つきの本人の情報の訂正と取り消し
  *   3. FR-004 同じ会員の2つの端末で同じ予定を同時に直すと、あとの保存は黙って上書きせず違いを示し、重ねて保存できる
@@ -17,84 +16,12 @@ import { TEXT_PAIRS } from '../src/styles/tokens';
 
 const PASSWORD = 'Gate-G8-TestPass-1';
 
-type Detail = { revision: number; days: Array<{ events: Array<{ id: string; title: string }> }> };
 
 async function member(page: Page, label: string): Promise<{ send: Send; email: string; username: string }> {
   const a = await registerAccount(page, { prefix: 'g8', label, password: PASSWORD });
   return { send: apiClient(page.request, a.apiBase, a.token), email: a.email, username: a.username };
 }
 
-const titles = (d: Detail) => d.days.flatMap((x) => x.events.map((e) => e.title)).sort();
-
-test('FR-019 案の中の区間・予約の変更、選んだ変更だけの採用、元に戻す', async ({ page }) => {
-  test.setTimeout(180_000);
-  const { send } = await member(page, 'br');
-  const plan = await send('post', '/travel-plans/', { title: `滋賀G8-${Date.now()}` }) as { id: string };
-  const base = `/plans/${plan.id}`;
-  const day = await send('post', `${base}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
-  const ev: Record<string, string> = {};
-  for (const [title, time, lon] of [['美冨久酒造', '10:00', 135.70], ['藤居本家', '13:00', 135.80], ['岡村本家', '15:00', 135.81]] as const) {
-    ev[title] = (await send('post', `${base}/events`, {
-      day_id: day.id, title, event_type: 'sightseeing', local_start_time: time, latitude: 35.0, longitude: lon }) as { id: string }).id;
-  }
-  const reservation = await send('post', `${base}/reservations`, {
-    type: 'activity', provider_name: '酒蔵見学', event_id: ev['岡村本家'], total_amount: 3000, currency: 'JPY',
-    cancellation_deadline: '2026-11-19T15:00:00+09:00' }) as { id: string };
-  const segment = await send('post', `${base}/segments`, {
-    from_event_id: ev['藤居本家'], to_event_id: ev['岡村本家'], mode: 'driving', duration_minutes: 15, cost: 500, currency: 'JPY' }) as { id: string };
-  const branch = await send('post', `${base}/branches`, { title: '車をやめる', scenario_type: 'custom', assumptions: {} }) as { id: string };
-  const before = await send('get', base) as Detail;
-
-  await page.goto(`/planner/${plan.id}/branches/${branch.id}`);
-  const panel = page.getByRole('region', { name: '移動区間・予約' });
-  await expect(panel.getByTestId(`branch-segment-${segment.id}`)).toContainText('藤居本家 → 岡村本家(自家用車・15分)');
-  // 岡村本家を外すと、付いた区間・予約の扱いを促す
-  await page.locator('li', { has: page.locator('input[value="岡村本家"]') }).getByRole('button', { name: '外す' }).click();
-  await expect(panel.getByTestId('branch-resources-pending')).toContainText('区間1件・予約1件の扱いを決めてください');
-  await panel.getByRole('button', { name: '藤居本家 → 岡村本家(自家用車・15分)を外す' }).click();
-  const res = panel.getByTestId(`branch-reservation-${reservation.id}`);
-  await res.getByLabel('取り消す予定にする').check();
-  await expect(res).toContainText('採用しても予約先では取り消されません');
-  await expect(panel.getByTestId('branch-resources-pending')).toHaveCount(0);
-  // 区間を足す(美冨久酒造 → 藤居本家、バス)
-  const add = panel.getByRole('group', { name: '区間を足す' });
-  await add.getByLabel('出発の予定').selectOption({ label: '美冨久酒造' });
-  await add.getByLabel('到着の予定').selectOption({ label: '藤居本家' });
-  await add.getByLabel('移動手段').selectOption('bus');
-  await add.getByLabel('所要時間(分・空なら概算)').fill('20');
-  await add.getByRole('button', { name: 'この区間を足す' }).click();
-  await expect(panel).toContainText('追加: 美冨久酒造 → 藤居本家(路線バス・20分)');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByText('分岐案を保存しました')).toBeVisible();
-  await expectNoAxeViolations(page, '案の詳細(移動区間・予約)');
-  expect(titles(await send('get', base) as Detail)).toEqual(titles(before)); // 保存しても本案は変わらない
-
-  // 採用の前の確かめ: 足した区間だけ選ばずに採用する
-  await page.getByRole('button', { name: '本案に採用' }).click();
-  const dialog = page.getByTestId('adoption-dialog');
-  await expect(dialog).toContainText('予約の取消の手続き: 酒蔵見学');
-  await dialog.getByRole('checkbox', { name: /移動区間・追加: 美冨久酒造 → 藤居本家/ }).uncheck();
-  await expect(dialog).toContainText('選ばなかった変更は本案へ当てません');
-  await expectNoAxeViolations(page, '本案に採用する前に確かめる');
-  await dialog.getByRole('button', { name: '選んだ3件を採用' }).click();
-  await expect(page.getByRole('status').filter({ hasText: '選ばなかった1件は当てていません' }))
-    .toContainText('「予約の取消の手続き」を1件');
-  const after = await send('get', base) as Detail;
-  expect(titles(after)).toEqual(['美冨久酒造', '藤居本家']);
-  expect(await send('get', `${base}/segments`)).toHaveLength(0);
-  const tasks = await send('get', `${base}/preparation-tasks`) as Array<{ title: string }> | { items: Array<{ title: string }> };
-  const taskTitles = (Array.isArray(tasks) ? tasks : tasks.items).map((t) => t.title);
-  expect(taskTitles).toContain('予約の取消の手続き: 酒蔵見学');
-
-  // 本案の「元に戻す」: 予定・区間・予約の紐付け・作った準備が戻る
-  await send('post', `${base}/undo`, undefined, { 'If-Match': String(after.revision) });
-  expect(titles(await send('get', base) as Detail)).toEqual(titles(before));
-  expect((await send('get', `${base}/segments`) as Array<{ id: string }>).map((s) => s.id)).toEqual([segment.id]);
-  const links = await send('get', `${base}/reservations/${reservation.id}/events`) as Array<{ event_id: string }> | { items: Array<{ event_id: string }> };
-  expect((Array.isArray(links) ? links : links.items).map((l) => l.event_id)).toEqual([ev['岡村本家']]);
-  const tasksAfter = await send('get', `${base}/preparation-tasks`) as Array<{ title: string }> | { items: Array<{ title: string }> };
-  expect((Array.isArray(tasksAfter) ? tasksAfter : tasksAfter.items).map((t) => t.title)).not.toContain('予約の取消の手続き: 酒蔵見学');
-});
 
 test('FR-021・FR-039 所有者の移譲、訂正の申し出と対応、出典つきの本人の情報の訂正', async ({ page, browser }) => {
   test.setTimeout(240_000);

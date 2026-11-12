@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.v1 import branches as branches_api
+from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
@@ -177,9 +177,9 @@ def _reservation_event_ids(db: Session, event_ids: List[uuid.UUID]) -> set:
 
 def _snapshot(db: Session, plan: TravelPlan) -> Dict[str, Any]:
     """本案の予定に、守る予定(確定・予約付き)と外せない予定(紐付きあり)の印を付けたもの。"""
-    base = branches_api._snapshot(db, plan)
+    base = plan_edits.snapshot(db, plan)
     ids = [uuid.UUID(e["source_event_id"]) for e in base["events"]]
-    related = branches_api._related_event_ids(db, ids)
+    related = plan_edits.related_event_ids(db, ids)
     reserved = _reservation_event_ids(db, ids)
     for e in base["events"]:
         has_reservation = e["source_event_id"] in reserved
@@ -491,7 +491,7 @@ def apply_replan(plan_id: str, replan_id: str, payload: ApplyRequest, request: R
     day_ids = {str(d.id) for d in db.query(TravelDay.id).filter(TravelDay.plan_id == plan.id).all()}
     removal_ids = [uuid.UUID(o["event_id"]) for o in ops if o["op"] == "remove"]
     conflicts = br.find_conflicts(ops, r.base_snapshot, current, day_ids,
-                                  branches_api._related_event_ids(db, removal_ids))
+                                  plan_edits.related_event_ids(db, removal_ids))
     reserved_now = _reservation_event_ids(db, [uuid.UUID(o["event_id"]) for o in ops if o.get("event_id")])
     conflicts += [{"op": o["op"], "event_id": o["event_id"], "title": o["title"], "reason": "has_reservation"}
                   for o in ops if o.get("event_id") in reserved_now]
@@ -501,7 +501,7 @@ def apply_replan(plan_id: str, replan_id: str, payload: ApplyRequest, request: R
             "message": "旅程と食い違う変更があるため適用できません。もう一度再計画案を作ってください",
             "conflicts": conflicts,
         })
-    changes = branches_api.apply_ops(db, plan, ops)
+    changes = plan_edits.apply_ops(db, plan, ops)
     new_revision = plans_api._record_batch_change_and_bump_revision(db, plan, current_user, "replan", changes)
     cs = db.query(ChangeSet).filter(ChangeSet.plan_id == plan.id,
                                     ChangeSet.resulting_revision == new_revision).first()

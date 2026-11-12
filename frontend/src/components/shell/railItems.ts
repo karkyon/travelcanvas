@@ -51,7 +51,7 @@ export function railItems(tripId: string | null, path: string): RailItem[] {
   const inside: RailItem[] = [
     {
       key: 'plan', label: '旅程', icon: CalendarDays, to: trip(''), group: 'trip',
-      match: inTrip(['', '/draft', '/segments', '/constraints', '/branches']),
+      match: inTrip(['', '/draft', '/segments', '/constraints']),
     },
     { key: 'today', label: '今日', icon: Sun, to: trip('/today'), match: inTrip(['/today', '/alerts', '/track']), group: 'trip' },
     {

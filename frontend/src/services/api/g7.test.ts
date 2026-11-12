@@ -9,7 +9,7 @@ vi.mock('./index', () => ({ api }));
 
 import { decodeG7 } from './decodersG7';
 import {
-  applyCandidateG7, cancelAccountDeletion, compareBranches, deletionExtras, getCandidatesG7, getMemoryReplanG7,
+  applyCandidateG7, cancelAccountDeletion, deletionExtras, getCandidatesG7, getMemoryReplanG7,
   getMovementSettings, previewEventImpact, previewPartial, runMovement, saveMovementSettings, scheduleAccountDeletion,
 } from './g7';
 
@@ -51,10 +51,7 @@ describe('decodersG7 (実 backend の応答)', () => {
     expect(decodeG7('apply', fx.optimization_apply_partial).changed).toBeGreaterThan(0);
   });
 
-  it('比較・思い出からの提案(v2)・猶予つきの削除を受理する', () => {
-    const cmp = decodeG7('comparison', fx.branch_comparison);
-    expect(cmp.branches).toHaveLength(2);
-    expect(cmp.branches[0]!.budget_target?.[0]!.met).toBe(true);
+  it('思い出からの提案(v2)・猶予つきの削除を受理する', () => {
     const mr = decodeG7('memoryReplan', fx.memory_replan_v2);
     expect(mr.proposals.find((p) => p.kind === 'slow_transport')?.target).toBe('segment');
     expect(mr.insights.find((i) => i.kind === 'slow_transport')?.basis).toBe('same_party');
@@ -103,10 +100,6 @@ describe('g7 API', () => {
     expect(api.post).toHaveBeenLastCalledWith('/plans/p1/days/d1/optimization-candidates/apply',
       { candidate_id: 'c1', input_fingerprint: 'fp', travel_mode: 'walking', event_ids: ['e1'] },
       expect.objectContaining({ headers: { 'If-Match': '7' } }));
-    api.get.mockResolvedValueOnce({ data: fx.branch_comparison });
-    await compareBranches('p1', ['b1', 'b2']);
-    expect(api.get).toHaveBeenLastCalledWith('/plans/p1/branches-comparison',
-      expect.objectContaining({ params: { ids: 'b1,b2' } }));
     api.get.mockResolvedValueOnce({ data: fx.memory_replan_v2 });
     await getMemoryReplanG7('p1');
     expect(api.get).toHaveBeenLastCalledWith('/plans/p1/memory-replan', expect.anything());

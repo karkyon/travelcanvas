@@ -31,7 +31,7 @@ import { safeExternalUrl } from '@/utils/safeNavigation';
 import Button from '@/components/common/Button';
 import UiIcon from '@/components/common/UiIcon';
 import {
-  BookOpen, Camera, Compass, Download, Earth, FileText, Footprints, GitBranch, Inbox, Lightbulb, ListChecks, Luggage, Map as MapIcon,
+  BookOpen, Camera, Compass, Download, Earth, FileText, Footprints, Inbox, Lightbulb, ListChecks, Luggage, Map as MapIcon,
   MapPin, Pencil, Route, Scale, Share2, Star, Sun, TriangleAlert, Undo2, Upload, Vote, Wallet, WifiOff,
 } from 'lucide-react';
 import Card from '@/components/common/Card';
@@ -1227,14 +1227,6 @@ const PlannerPage: React.FC = () => {
                   icon={<UiIcon icon={Route} />}
                 >
                   経路の比較
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/planner/${currentPlan.id}/branches`)}
-                  icon={<UiIcon icon={GitBranch} />}
-                >
-                  もしもの案
                 </Button>
                 <Button
                   variant="outline"

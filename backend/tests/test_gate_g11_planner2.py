@@ -22,9 +22,8 @@ def _ik():
 
 def test_express_bus_vocabulary_and_estimate():
     from app.api.v1.segments import MODES
-    from app.services.branch_resources import MODES as BRANCH_MODES
 
-    assert "express_bus" in MODES and "express_bus" in BRANCH_MODES and "bus" in MODES
+    assert "express_bus" in MODES and "bus" in MODES
     express = estimate_leg(35.0, 135.7, 35.6, 139.7, "express_bus")
     local = estimate_leg(35.0, 135.7, 35.6, 139.7, "bus")
     assert express and express["mode"] == "express_bus" and express["is_estimate"] is True

@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import BranchesMoved from './BranchesMoved';
 import Layout from '@/components/Layout';
 import { ProtectedRoute, AdminRoute, AuthRedirect } from './guards';
 import RouteErrorBoundary from './RouteErrorBoundary';
@@ -57,8 +58,6 @@ const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
 const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
 const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
-const BranchesPage = lazyPage(() => import('@/pages/BranchesPage'));
-const BranchDetailPage = lazyPage(() => import('@/pages/BranchDetailPage'));
 // [Gate G8] FR-039 訂正の申し出・UX-1 デザインの部品の一覧
 const CorrectionRequestsPage = lazyPage(() => import('@/pages/CorrectionRequestsPage'));
 const DesignCatalogPage = lazyPage(() => import('@/pages/DesignCatalogPage'));
@@ -307,23 +306,9 @@ export const router = createBrowserRouter([
         ),
       },
 
-      // 🔀 [Gate P7] もしもの案(What-if・旅程ブランチ、FR-019)。
-      {
-        path: 'planner/:planId/branches',
-        element: (
-          <ProtectedRoute>
-            <BranchesPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'planner/:planId/branches/:branchId',
-        element: (
-          <ProtectedRoute>
-            <BranchDetailPage />
-          </ProtectedRoute>
-        ),
-      },
+      // 🔀 [Gate PlanB-P8] もしもの案(FR-019)はやめて、旅程の日ごとの案(プランB)に置き換えた。前の URL は旅程へ
+      { path: 'planner/:planId/branches', element: <BranchesMoved /> },
+      { path: 'planner/:planId/branches/:branchId', element: <BranchesMoved /> },
 
       // ✏️ [Gate G8] FR-039 旅行の中の情報の訂正の申し出(参加者が出し、所有者が対応を記録する)。
       {

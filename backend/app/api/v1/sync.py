@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from app.api.v1 import branches as branches_api
+from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
@@ -154,7 +154,7 @@ def _apply_fields(db: Session, plan: TravelPlan, ev: TravelEvent, fields: Dict[s
         new_time = fields.get("local_start_time", ev.local_start_time)
         ev.local_start_time = new_time
         day = db.query(TravelDay).filter(TravelDay.id == ev.day_id).first()
-        branches_api._apply_time(ev, day, new_time, old_time, old_date)
+        plan_edits.apply_time(ev, day, new_time, old_time, old_date)
 
 
 def _store(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn, status: str,
@@ -305,7 +305,7 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         return _row_result(row, replay=False)
     if ev.locked:
         return reject("locked", entity_id=target_id)
-    if str(ev.id) in branches_api._related_event_ids(db, [ev.id]):
+    if str(ev.id) in plan_edits.related_event_ids(db, [ev.id]):
         return reject("has_relations", entity_id=target_id)
     at_base = sy.comparable(_value_at_base(db, plan, ev, op.base_revision))
     current = sy.comparable(plans_api._event_to_dict(ev))
@@ -622,7 +622,7 @@ def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, r
         if ev is not None:
             if ev.locked:
                 raise HTTPException(status_code=409, detail={"code": "locked", "message": CODE_MESSAGES["locked"]})
-            if str(ev.id) in branches_api._related_event_ids(db, [ev.id]):
+            if str(ev.id) in plan_edits.related_event_ids(db, [ev.id]):
                 raise HTTPException(status_code=409, detail={"code": "has_relations",
                                                              "message": CODE_MESSAGES["has_relations"]})
             rev = _delete_event(db, plan, current_user, ev)

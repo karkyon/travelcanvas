@@ -156,12 +156,12 @@
    "gaps": "外部経路による実移動時間"
   },
   "FR-019": {
-   "title": "What-if",
+   "title": "日ごとの案(プランB。旧 What-if)",
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P7・G7・G8",
-   "gaps": "案どうしの統合(rebase)"
+   "gates": "P7・G7・G8 → PlanB P1〜P8",
+   "gaps": "オフラインでの切り替え・天気の予報の自動取得・押した時だけの AI の検証"
   },
   "FR-020": {
    "title": "共同編集",
