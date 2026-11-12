@@ -37,7 +37,7 @@ describe('BookingBadge', () => {
     await waitFor(() => expect(onLink).toHaveBeenCalledWith('r9'));
   });
 
-  it('未予約: 普段はカレンダー＋だけ。押すと「予約情報を取り込む」「予約を手動登録する」が出る', () => {
+  it('未予約: 普段はカレンダー＋だけ。押すと「予約を取り込む」「予約を登録する」の小さなメニューが出る', () => {
     wrap(<BookingBadge planId="p1" eventId="e1" title="赤福 本店" category="dining" canEdit
       booking={{ state: 'none', issues: [], reservations: [], suggestions: [] }} />);
     expect(screen.getByTestId('booking-e1')).toHaveTextContent('未予約');
@@ -46,8 +46,8 @@ describe('BookingBadge', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('booking-import-e1')).toHaveTextContent('予約情報を取り込む');
-    expect(screen.getByTestId('booking-new-e1')).toHaveTextContent('予約を手動登録する');
+    expect(screen.getByTestId('booking-import-e1')).toHaveTextContent('予約を取り込む');
+    expect(screen.getByTestId('booking-new-e1')).toHaveTextContent('予約を登録する');
     expect(screen.getByTestId('booking-import-e1')).toHaveAttribute('href', '/planner/p1/imports');
     expect(screen.getByTestId('booking-new-e1')).toHaveAttribute('href',
       `/planner/p1/reservations?new=1&event=e1&type=restaurant&name=${encodeURIComponent('赤福 本店')}`);

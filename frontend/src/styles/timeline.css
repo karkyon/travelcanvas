@@ -125,7 +125,6 @@
 .tc-event-tools { opacity: .8; }
 .tc-event-book { flex: none; }
 /* 予約の操作を開いている間は、ほかの操作のアイコンを隠して 2 つの操作に場所を譲る */
-.tc-event-topline:has(.tc-bk-slide) .tc-event-tools { display: none; }
 
 .tc-event-body { display: grid; grid-template-columns: 150px minmax(0, 1fr) 30px; gap: 10px; padding: 9px 8px 9px 10px; align-items: start; }
 .tc-event-body.is-nophoto { grid-template-columns: minmax(0, 1fr) 30px; }
@@ -213,7 +212,37 @@
 }
 .tc-bk-act:hover { background: var(--tc-accent-soft); }
 .tc-bk-act.is-primary { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
-@media (prefers-reduced-motion: reduce) { .tc-bk-slide { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tc-bk-slide, .tc-bk-menu { animation: none; } }
+/* [Gate BookingMenu] 未予約: 丸い「＋」を押すと、下に小さなメニュー(予約を取り込む・予約を登録する) */
+.tc-bk--menu { position: relative; }
+.tc-bk-plus {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 1px; height: 32px; padding: 0 8px 0 9px;
+  border-radius: 999px; border: 1.5px solid color-mix(in srgb, var(--tc-accent) 45%, transparent);
+  background: var(--tc-surface, #fff); color: var(--tc-accent-strong, var(--tc-accent)); cursor: pointer;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc-accent) 10%, transparent);
+}
+.tc-bk-plus:hover { background: var(--tc-accent-soft); }
+.tc-bk-plus[aria-expanded='true'] { background: var(--tc-accent-soft); border-color: var(--tc-accent); }
+.tc-bk-plus.is-suggest::after {
+  content: ''; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: #c2410c;
+  border: 2px solid var(--tc-cloud-0);
+}
+.tc-bk-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; display: grid; min-width: 172px; padding: 4px;
+  border: 1px solid var(--tc-cloud-200); border-radius: 12px; background: var(--tc-surface, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .16); animation: tcBkMenu .16s ease-out;
+}
+@keyframes tcBkMenu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.tc-bk-menu .tc-bk-act {
+  justify-content: flex-start; gap: 9px; width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tc-ink-900); font-size: 13px; font-weight: 700;
+}
+.tc-bk-menu .tc-bk-act + .tc-bk-act { border-top: 1px solid var(--tc-cloud-100, var(--tc-cloud-200)); border-radius: 0 0 8px 8px; }
+.tc-bk-menu .tc-bk-act svg { color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-bk-menu .tc-bk-act:hover { background: var(--tc-accent-soft); }
+.tc-bk-menu .tc-bk-act.is-primary { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+.tc-bk-menu .tc-bk-act.is-primary svg { color: currentColor; }
+@media (max-width: 760px) { .tc-bk-plus { height: 44px; padding: 0 12px; } .tc-bk-menu .tc-bk-act { height: 44px; } }
 @media (max-width: 760px) { .tc-bk-btn { width: 44px; height: 44px; } .tc-bk-act { height: 40px; } }
 
 /* ---- 移動: 横の細い破線と、真ん中の小さなラベル ---- */

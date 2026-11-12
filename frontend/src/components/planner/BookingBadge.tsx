@@ -8,9 +8,9 @@
  *   - 予約あり・未接続: 印付きのカレンダー＋。押すと「この予定につなぐ」「予約を見る」が出る
  *   予約の手配まではしない
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarCheck, CalendarPlus, Download, Link2, PenLine, X, CalendarSearch } from 'lucide-react';
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, Link2, Plus, CalendarSearch } from 'lucide-react';
 import type { BookingReservation, EventBooking } from '@/services/api/bookingStatus';
 
 interface Props {
@@ -71,6 +71,16 @@ const BookingStatus: React.FC<Props> = ({ eventId, booking }) => {
 const BookingAction: React.FC<Props> = ({ planId, eventId, title, category, booking, canEdit, onLink }) => {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+  // [Gate BookingMenu] 開いた小さなメニューは、外を押す・Esc で閉じる
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
   if (booking.state === 'booked' || booking.state === 'issue') {
     const r = booking.reservations[0]!;
     return (
@@ -85,40 +95,41 @@ const BookingAction: React.FC<Props> = ({ planId, eventId, title, category, book
   }
   const suggest = booking.state === 'suggest' ? booking.suggestions[0]! : null;
   return (
-    <span className="tc-bk" onClick={stop}>
+    <span className="tc-bk tc-bk--menu" onClick={stop} ref={box}>
+      <button type="button" className={`tc-focus-ring tc-bk-plus${suggest ? ' is-suggest' : ''}`} aria-expanded={open}
+        aria-haspopup="true" data-testid={`booking-toggle-${eventId}`} title="予約"
+        aria-label={open ? '予約の操作を閉じる' : `予約の操作(${suggest ? '予約あり・まだつないでいません' : '未予約'})`}
+        onClick={() => setOpen((v) => !v)}>
+        <Plus size={16} strokeWidth={2.6} aria-hidden="true" />
+        {open ? <ChevronUp size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
+      </button>
       {open && (
-        <span className="tc-bk-slide" data-testid={`booking-actions-${eventId}`}>
+        <span className="tc-bk-menu" data-testid={`booking-actions-${eventId}`}>
           {suggest ? (
             <>
               {canEdit && onLink && (
                 <button type="button" className="tc-focus-ring tc-bk-act is-primary" disabled={busy} data-testid={`booking-link-${eventId}`}
                   onClick={async () => { setBusy(true); try { await onLink(suggest.id); setOpen(false); } finally { setBusy(false); } }}>
-                  <Link2 size={14} aria-hidden="true" />この予定につなぐ
+                  <Link2 size={16} aria-hidden="true" />この予定につなぐ
                 </button>
               )}
               <Link to={`/planner/${planId}/reservations?open=${encodeURIComponent(suggest.id)}`} className="tc-focus-ring tc-bk-act">
-                <CalendarSearch size={14} aria-hidden="true" />予約を見る
+                <CalendarSearch size={16} aria-hidden="true" />予約を見る
               </Link>
             </>
           ) : (
             <>
               <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-bk-act" data-testid={`booking-import-${eventId}`}>
-                <Download size={14} aria-hidden="true" />予約情報を取り込む
+                <CalendarDays size={16} aria-hidden="true" />予約を取り込む
               </Link>
               <Link to={`/planner/${planId}/reservations?new=1&event=${encodeURIComponent(eventId)}&type=${RES_TYPE[category ?? ''] ?? 'other'}&name=${encodeURIComponent(title ?? '')}`}
                 className="tc-focus-ring tc-bk-act" data-testid={`booking-new-${eventId}`}>
-                <PenLine size={14} aria-hidden="true" />予約を手動登録する
+                <Plus size={16} aria-hidden="true" />予約を登録する
               </Link>
             </>
           )}
         </span>
       )}
-      <button type="button" className={`tc-focus-ring tc-bk-btn${suggest ? ' is-suggest' : ''}`} aria-expanded={open}
-        data-testid={`booking-toggle-${eventId}`} title="予約"
-        aria-label={open ? '予約の操作を閉じる' : `予約の操作(${suggest ? '予約あり・まだつないでいません' : '未予約'})`}
-        onClick={() => setOpen((v) => !v)}>
-        {open ? <X size={18} aria-hidden="true" /> : <CalendarPlus size={18} aria-hidden="true" />}
-      </button>
     </span>
   );
 };
