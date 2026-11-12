@@ -64,6 +64,8 @@ interface DayViewProps {
   className?: string;
   /** [Gate G11] 旅行の移動区間(予定へ着く移動の名前・時差) */
   segments?: TravelSegment[];
+  /** [Gate PlanB] 控えの案を開いている時、その日の ID(予約の札をその案の予定で判定する) */
+  variantDayId?: string | null;
   /** [Gate G11] 予定 → その日の時刻帯(時差をまたぐ区間の出発地) */
   zones?: Record<string, string | undefined>;
   /** [Gate G11] 予定 → 題名(区間の行の出発の予定。別の日の予定を含む) */
@@ -104,6 +106,7 @@ const DayView: React.FC<DayViewProps> = ({
   onItemComment,
   className = '',
   segments = [],
+  variantDayId = null,
   zones = {},
   titles,
   headerLabel,
@@ -197,9 +200,9 @@ const DayView: React.FC<DayViewProps> = ({
   const [bookingVersion, setBookingVersion] = useState(0);
   useEffect(() => {
     let active = true;
-    getBookingStatus(planId).then((r) => { if (active) setBookings(r.events ?? {}); }).catch(() => { if (active) setBookings({}); });
+    getBookingStatus(planId, variantDayId).then((r) => { if (active) setBookings(r.events ?? {}); }).catch(() => { if (active) setBookings({}); });
     return () => { active = false; };
-  }, [planId, bookingKey, bookingVersion]);
+  }, [planId, bookingKey, bookingVersion, variantDayId]);
   const linkBooking = useCallback(async (reservationId: string, eventId: string) => {
     try {
       await linkReservationToEvent(planId, reservationId, eventId);

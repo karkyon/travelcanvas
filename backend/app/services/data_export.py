@@ -101,7 +101,7 @@ PLAN_TABLES = (
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
     m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
-    m.PlanCandidate, m.SupportGrant,
+    m.PlanCandidate, m.SupportGrant, m.DayVariantSwitch,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
     m.FxRate, m.BudgetVersion,
     m.MemoryPublication, m.MemoryTrash, m.PhotoUploadLink, m.PlanExternalMap,
@@ -229,6 +229,8 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["plan_versions"] = [row(x) for x in q(m.PlanVersion).all()]
     # [Gate P12] P7〜P12で追加した旅行の表(以前の書き出しに漏れていたP7・P10・P11の表を含む)
     t["itinerary_branches"] = [row(x) for x in q(m.ItineraryBranch).all()]
+    # [Gate PlanB] 日ごとの案の切り替えの記録(控えの案の日・予定は all_variants で travel_days・travel_events に入る)
+    t["day_variant_switches"] = [row(x) for x in q(m.DayVariantSwitch).all()]
     t["plan_alerts"] = [row(x) for x in q(m.PlanAlert).all()]
     t["replans"] = [row(x) for x in q(m.Replan).all()]
     # 同期の受領記録は送った本人の分だけ(他の人が端末から送った内容は含めない)
@@ -333,7 +335,9 @@ def document_manifest(db: Session, plan: m.TravelPlan) -> List[Dict[str, Any]]:
 
 
 def plan_export(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Any]:
-    tables = plan_tables(db, plan, me)
+    from app.services.day_variants import all_variants  # [Gate PlanB] 書き出しには控え・しまった案も入れる
+    with all_variants(db):
+        tables = plan_tables(db, plan, me)
     return {
         "plan": row(plan),
         "tables": tables,

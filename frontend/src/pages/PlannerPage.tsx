@@ -48,6 +48,8 @@ import PlanMap from '@/components/planner/PlanMap';
 import MapTools from '@/components/planner/MapTools';
 import { dayAnchors } from '@/components/planner/journeyModel';
 import AllDaysChart from '@/components/planner/AllDaysChart';
+import VariantPanel from '@/components/planner/variants/VariantPanel';
+import { usePlanVariants } from '@/components/planner/variants/usePlanVariants';
 import { hoursBadge, insertIndexByTime, segmentRow, shiftedEnd, titleOfEvent, zoneOfEvent } from '@/components/planner/plannerModel';
 
 const toMinutesHm = (v?: string | null): number | null => {
@@ -198,6 +200,8 @@ const PlannerPage: React.FC = () => {
     setDayHours({ byId, pending });
   }, []);
   const [segments, setSegments] = useState<TravelSegment[]>([]);
+  // [Gate PlanB] 日ごとの案: この日の案・開いている控えの案
+  const variantState = usePlanVariants(currentPlan?.id, currentPlan?.revision, currentPlan?.days[currentDayIndex]?.date);
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
@@ -872,13 +876,16 @@ const PlannerPage: React.FC = () => {
       );
     }
 
-    const activeDay = currentPlan.days[currentDayIndex];
+    // [Gate PlanB] 控えの案を開いている時は、その案の日(予定・区間)を旅程・地図・右の欄に出す
+    const baseDay = currentPlan.days[currentDayIndex];
+    const activeDay = variantState.open?.day ?? baseDay;
+    const shownSegments = variantState.open ? variantState.open.segments : segments;
     // [Gate MockScreens] 選んだ予定(未選択なら最初の予定。モックと同じく右の欄は空にしない)
     const selectedEvent = activeDay
       ? activeDay.events.find((e) => e.id === selectedEventId) ?? activeDay.events[0] ?? null : null;
     const selectedIndex = activeDay && selectedEvent ? activeDay.events.findIndex((e) => e.id === selectedEvent.id) : -1;
     const selectedArrival = activeDay && selectedIndex >= 0
-      ? segmentRow(activeDay.events, selectedIndex, segments, zoneOfEvent(currentPlan.days), activeDay.timezone_id,
+      ? segmentRow(activeDay.events, selectedIndex, shownSegments, zoneOfEvent(currentPlan.days), activeDay.timezone_id,
         titleOfEvent(currentPlan.days))?.leg ?? null
       : null;
 
@@ -1052,6 +1059,7 @@ const PlannerPage: React.FC = () => {
                 <DayView
                   headerLabel={`${(currentPlan.destination || 'TRIP').toUpperCase()} · DAY ${currentDayIndex + 1} · LOCAL TIME`}
                   dayTabs={(
+                    <>
                     <div className="tc-day-tabs" role="group" aria-label="日を選ぶ">
                       {currentPlan.days.map((d, i) => (
                         <button key={d.id} type="button" className="tc-focus-ring tc-day-tab" aria-pressed={i === currentDayIndex}
@@ -1061,6 +1069,16 @@ const PlannerPage: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                      {baseDay?.date && (
+                        <VariantPanel planId={currentPlan.id} revision={currentPlan.revision ?? 0} date={baseDay.date}
+                          dateLabel={`${baseDay.date.slice(5).replace('-', '/')}(${getDayOfWeek(baseDay.date)})`}
+                          canEdit={variantState.canEdit} variants={variantState.variants} openId={variantState.openId}
+                          checkSum={variantState.checkSum} onOpen={variantState.setOpenId}
+                          otherDays={currentPlan.days.filter((d) => d.id !== baseDay.id && d.date).map((d) => ({
+                            id: d.id, date: d.date as string, label: `${(d.date as string).slice(5).replace('-', '/')}(${getDayOfWeek(d.date as string)})` }))}
+                          onChanged={async () => { await usePlanStore.getState().loadPlan(currentPlan.id); variantState.reload(); }} />
+                      )}
+                    </>
                   )}
                   onOpenRoute={() => navigate(`/planner/${currentPlan.id}/route-options`)}
                   selectedEventId={selectedEvent?.id ?? null}
@@ -1077,10 +1095,11 @@ const PlannerPage: React.FC = () => {
                   onItemEdit={openEditItem}
                   onItemDelete={handleDeleteItem}
                   onItemComment={(item) => navigate(`/planner/${currentPlan.id}/discussion?target=event&id=${item.id}`)}
-                  onDeleteDay={currentPlan.days.length > 1 ? () => handleDeleteDay(currentDayIndex) : undefined}
+                  onDeleteDay={currentPlan.days.length > 1 && !variantState.open ? () => handleDeleteDay(currentDayIndex) : undefined}
                   photoSignal={photoSignal}
                   onImageUrls={setEventImageUrls}
-                  segments={segments}
+                  segments={shownSegments}
+                  variantDayId={variantState.open ? activeDay.id : null}
                   zones={zoneOfEvent(currentPlan.days)}
                   titles={titleOfEvent(currentPlan.days)}
                 />

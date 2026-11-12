@@ -7,6 +7,11 @@ import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-li
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ScheduleItem } from '@/types';
 
+vi.mock('@/components/planner/variants/usePlanVariants', () => ({
+  usePlanVariants: () => ({ canEdit: false, variants: [], openId: null, setOpenId: () => {}, open: null, checkSum: null,
+    reload: () => {}, datesWithStandby: [] }),
+}));
+vi.mock('@/components/planner/variants/VariantPanel', () => ({ default: () => null }));
 vi.mock('@/components/PlanHeader', () => ({ default: () => null }));
 vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));

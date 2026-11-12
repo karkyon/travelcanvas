@@ -21,9 +21,11 @@
 | code | HTTP | 再試行 | 利用者向けの文(例) | 場所 |
 |---|---|---|---|---|
 | `acknowledgement_required` | 422 | no | 公開の前に確認の項目を全て確かめてください | api/v1/memory_publish.py |
+| `active_variant` | 409 | no | 今の案はしまえません。先に別の案に切り替えてください | api/v1/day_variants.py |
 | `admin_account` | 403 | no | 管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください | api/v1/privacy.py |
 | `admin_target` | — | — | ほかの管理者はこの画面から操作できません(運用の手順で権限を外してから) | api/v1/admin.py |
 | `alert_target_changed` | 409 | after_reload | — | api/v1/replans.py |
+| `already_active` | 409 | no | もう今の案です | api/v1/day_variants.py |
 | `already_adopted` | — | — | この投票はもう採用しています | api/v1/decisions.py |
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
@@ -57,7 +59,7 @@
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
-| `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
+| `day_not_found` | 404, 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/day_variants.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
 | `days_have_events` | 409 | no | 短くすると消える日に予定があります | api/v1/plans.py |
 | `deleted_on_server` | 409 | after_reload | サーバーで削除された予定のため、自分の変更は使えません | api/v1/sync.py |
@@ -123,7 +125,7 @@
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
-| `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py |
+| `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
 | `invalid_scope` | — | — | スコープは | api/v1/organizations.py |
@@ -222,6 +224,7 @@
 | `session_required` | 401 | no | 確認コードをもう一度入れてください | api/v1/photo_upload.py |
 | `share_view_expired` | — | — | 閲覧の時間が過ぎました。もう一度リンクを開いてください | api/v1/public_share.py |
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
+| `source_required` | 422 | no | 写す日を選んでください | api/v1/day_variants.py |
 | `stale_version` | 409 | after_reload | 配布が別の操作で改訂されています。読み直してください | api/v1/organizations.py |
 | `storage_failed` | 503 | later | ファイルの保存に失敗しました。しばらくしてから再試行してください | api/v1/memories.py |
 | `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
@@ -243,6 +246,7 @@
 | `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
+| `too_many_variants` | 409 | no | … の案は … つまでです | api/v1/day_variants.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |
 | `track_active` | 409 | no | この旅行では記録中(または一時停止中)の軌跡があります。止めてから始めてください | api/v1/location_tracks.py |
 | `track_full` | 409 | no | 1つの軌跡の点は…件までです。新しく記録を始めてください | api/v1/location_tracks.py |
@@ -269,6 +273,7 @@
 | `user_not_found` | 404 | no | 利用者が見つかりません | api/v1/admin_ops.py, api/v1/organizations.py |
 | `username_taken` | 409 | no | この表示名は既に使われています | api/v1/corrections.py |
 | `valid_until_required` | 422 | no | 機密情報を含む版には有効期限が必要です | api/v1/booklet.py |
+| `variant_not_found` | 404 | no | 案が見つかりません | api/v1/day_variants.py |
 | `void_reason_required` | 422 | no | 取り消す理由を200文字までで入力してください | api/v1/finance_ledger.py |
 | `webhook_not_found` | 404 | no | Webhook が見つかりません | api/v1/organizations.py |
 | `webhook_revoked` | 409 | no | 止めた Webhook の鍵は作り直せません | api/v1/organizations.py |
