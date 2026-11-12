@@ -1,6 +1,7 @@
 /**
  * [Gate TimelineRedesign] 旅程のタイムラインの予定のカード。
- * - 上の段: 地図のピンと同じ番号 · 種類の印 · 題 · 確定/NEXT/遅れ · 操作(編集・リンク・相談・共有・削除) · 予約のカレンダー＋
+ * - 上の段: 地図のピンと同じ番号 · 種類の印 · 題 · 確定/NEXT/遅れ · 操作(編集・リンク・共有・削除) · 予約のカレンダー＋
+ *   (相談は「詳細を見る」の中だけ)
  * - 中の段: 横長の写真(押すと写真を選ぶ) · 予約の札と一言 · 営業時間の照合 · 場所・滞在・費用 · 電話 · 並べ替え(↑↓)
  * - 「詳細を見る」: 以前の右の「選んだ予定」の欄の中身(時刻・照合・出典・移動・場所・連絡先・メモ・確定・食事の情報)
  *   地図のピンを押した時は、このカードまで送って詳細を開く(focusSignal)。
@@ -306,13 +307,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                 <ExternalLink size={14} aria-hidden="true" />
               </a>
             )}
-            {onComment && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); onComment(id); }}
-                className={iconBtn} title="メンバーと相談(コメント)。予定のメモとは別に、話し合いを残します"
-                aria-label="この予定についてメンバーと相談する(コメント)">
-                <MessageSquare size={14} aria-hidden="true" />
-              </button>
-            )}
             {onShare && (
               <button type="button" onClick={(e) => { e.stopPropagation(); onShare(id); }}
                 className={iconBtn} title="共有" aria-label="共有">
@@ -387,7 +381,8 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
                 </Link>
               )}
               {onComment && (
-                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => onComment(id)}>
+                <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => onComment(id)}
+                  title="メンバーと相談(コメント)。予定のメモとは別に、話し合いを残します" aria-label="この予定についてメンバーと相談する(コメント)">
                   <MessageSquare size={14} aria-hidden="true" />相談
                 </button>
               )}

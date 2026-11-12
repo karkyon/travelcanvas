@@ -42,17 +42,22 @@ const MoveLine: React.FC<{ anchor: DayAnchor; onEdit?: () => void }> = ({ anchor
 };
 
 const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onEditMove }) => {
-  const { label, body } = anchorText(anchor);
+  // [Gate TimelineRedesign] 出発・帰着の時刻は、予定の着く時刻と同じく左の時刻の列に大きく出す(本文には場所だけ)
+  const { label, body } = anchorText({ ...anchor, time: null });
   const move = anchor.kind === 'departure' || anchor.kind === 'arrival';
   return (
     <>
     {move && anchor.kind === 'arrival' && <MoveLine anchor={anchor} onEdit={onEditMove} />}
-    <div className="tc-anchor" data-kind={anchor.kind} data-position={position} data-testid={`day-anchor-${position}`}>
-      <span className="tc-anchor-icon" aria-hidden="true"><UiIcon icon={ICON[anchor.kind]} size={15} /></span>
-      <p className="tc-anchor-text"><span className="tc-anchor-label">{label}</span>{body}</p>
-      {anchor.kind === 'lodging-missing' && onAddLodging && (
-        <button type="button" className="tc-focus-ring tc-mini-link" onClick={onAddLodging} data-testid="day-anchor-add-lodging">＋ 宿を追加</button>
-      )}
+    <div className="tc-anchor-row" data-kind={anchor.kind} data-position={position} data-testid={`day-anchor-${position}`}>
+      <div className="tc-anchor-time">{anchor.time ?? ''}</div>
+      <div className="tc-anchor-dot" aria-hidden="true" />
+      <div className="tc-anchor" data-kind={anchor.kind}>
+        <span className="tc-anchor-icon" aria-hidden="true"><UiIcon icon={ICON[anchor.kind]} size={15} /></span>
+        <p className="tc-anchor-text"><span className="tc-anchor-label">{label}</span>{body}</p>
+        {anchor.kind === 'lodging-missing' && onAddLodging && (
+          <button type="button" className="tc-focus-ring tc-mini-link" onClick={onAddLodging} data-testid="day-anchor-add-lodging">＋ 宿を追加</button>
+        )}
+      </div>
     </div>
     {move && anchor.kind === 'departure' && <MoveLine anchor={anchor} onEdit={onEditMove} />}
     </>

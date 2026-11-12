@@ -20,7 +20,7 @@
  */
 import React, { useMemo } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
-import { hasCoords } from './mapNumberModel';
+import { hasCoords, mapNumbers } from './mapNumberModel';
 import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
@@ -40,6 +40,8 @@ interface PlanMapProps {
   className?: string;
   /** [Gate AppShell] 地図の高さ(旅程の3列では 530px)。[Gate MapTools] 最大化の時は CSS の長さ */
   height?: number | string;
+  /** [Gate TimelineRedesign] 最初の予定の印の横に出す出発の札(例: 「出発: 自宅から 08:00」) */
+  startLabel?: string | null;
 }
 
 function _divIcon(html: string, size: [number, number] = [28, 28]) {
@@ -55,17 +57,26 @@ function _divIcon(html: string, size: [number, number] = [28, 28]) {
 // [Gate EventArea] エリアとその中の予定は同じ色(エリアの範囲の円と合わせる)
 const AREA_COLOR = '#0e7c6b';
 
+/**
+ * [Gate TimelineRedesign] 予定の印: 旅程のカードと同じ番号のしずく形。選んだ予定は赤(カードの番号と同じ色)で大きく、
+ * エリアとその中の予定はエリアの緑。
+ */
+export const PIN_SELECTED = '#dc2626';
+const PIN_PLANNED = '#0f6e66';
 function scheduledIcon(order: number, isSelected: boolean, inArea = false) {
-  const bg = inArea ? (isSelected ? '#0a5a4e' : AREA_COLOR) : isSelected ? '#1d4ed8' : '#3b82f6';
-  const ring = isSelected ? '0 0 0 3px rgba(29,78,216,0.35)' : 'none';
+  const bg = isSelected ? PIN_SELECTED : inArea ? AREA_COLOR : PIN_PLANNED;
+  const size = isSelected ? 38 : 30;
+  const ring = isSelected ? 'box-shadow:0 0 0 6px rgba(220,38,38,.25),0 2px 6px rgba(0,0,0,.35);' : 'box-shadow:0 2px 5px rgba(0,0,0,.3);';
   return _divIcon(
-    `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9999px;background:${bg};color:white;font-size:12px;font-weight:700;box-shadow:${ring}, 0 1px 3px rgba(0,0,0,0.3);border:2px solid white;">${order}</div>`
+    `<div class="tc-pin${isSelected ? ' is-sel' : ''}" style="width:${size}px;height:${size}px;background:${bg};${ring}">`
+      + `<span style="font-size:${isSelected ? 15 : 13}px">${order}</span></div>`,
+    [size, Math.round(size * 1.21)],
   );
 }
 
 function candidateIcon() {
   return _divIcon(
-    `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:9999px;background:white;color:#f59e0b;font-size:15px;border:2px solid #f59e0b;box-shadow:0 1px 3px rgba(0,0,0,0.3);">★</div>`
+    `<div class="tc-pin is-cand" style="width:28px;height:28px"><span>☆</span></div>`, [28, 34],
   );
 }
 
@@ -93,6 +104,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
   onAddCandidateToItinerary,
   className = '',
   height = 420,
+  startLabel = null,
 }) => {
   const scheduledWithCoords = useMemo(
     () => (day?.events ?? []).filter(
@@ -128,6 +140,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
   );
 
   const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
+  const nums = useMemo(() => mapNumbers(day?.events ?? []), [day]);
 
   const hasAnyKnownLocation = allPositions.length > 0;
   const defaultCenter: [number, number] = [35.6812, 139.7671]; // 東京駅(何も無い場合の初期表示のみ)
@@ -151,31 +164,42 @@ const PlanMap: React.FC<PlanMapProps> = ({
           {hasAnyKnownLocation && <FitBounds positions={allPositions} />}
 
           {routeLine.length > 1 && (
-            <Polyline positions={routeLine} pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.7 }} />
+            <Polyline positions={routeLine} pathOptions={{ color: PIN_PLANNED, weight: 3, opacity: 0.85, dashArray: '6 8' }} />
           )}
 
           {areas.map((a) => (
             <Circle key={`area-${a.id}`} center={a.center} radius={a.radius}
               pathOptions={{ color: AREA_COLOR, weight: 2, dashArray: '6 6', fillColor: AREA_COLOR, fillOpacity: 0.08 }}>
-              <Tooltip direction="top">{`エリア: ${a.title}`}</Tooltip>
+              <Tooltip direction="top" permanent className="tc-area-tip">{`${nums[a.id] !== undefined ? `${nums[a.id]} ` : ''}${a.title}`}</Tooltip>
             </Circle>
           ))}
 
-          {scheduledWithCoords.map((event, idx) => (
-            <Marker
-              key={event.id}
-              position={[event.latitude, event.longitude]}
-              icon={scheduledIcon(idx + 1, event.id === selectedEventId, event.category === 'area' || Boolean(event.parent_event_id))}
-              eventHandlers={{ click: () => onSelectEvent?.(event.id) }}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <p className="font-semibold">{idx + 1}. {event.title}</p>
-                  {event.start_time && <p className="text-ink-500">{event.start_time}</p>}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {scheduledWithCoords.map((event, idx) => {
+            const n = nums[event.id] ?? idx + 1;
+            const sel = event.id === selectedEventId;
+            return (
+              <Marker
+                key={event.id}
+                position={[event.latitude, event.longitude]}
+                icon={scheduledIcon(n, sel, event.category === 'area' || Boolean(event.parent_event_id))}
+                zIndexOffset={sel ? 1000 : 0}
+                title={`${n}. ${event.title}`}
+                eventHandlers={{ click: () => onSelectEvent?.(event.id) }}
+              >
+                {sel ? (
+                  <Tooltip key="sel" permanent direction="bottom" offset={[0, 4]} className="tc-pin-tip is-sel">
+                    {`${n} ${event.title}${event.start_time ? ` ${event.start_time.slice(0, 5)}` : ''}`}
+                  </Tooltip>
+                ) : idx === 0 && startLabel ? (
+                  <Tooltip key="start" permanent direction="left" offset={[-16, -20]} className="tc-pin-tip is-start">{startLabel}</Tooltip>
+                ) : (
+                  <Tooltip key="hover" direction="top" offset={[0, -34]} className="tc-pin-tip">
+                    {`${n} ${event.title}${event.start_time ? ` ${event.start_time.slice(0, 5)}` : ''}`}
+                  </Tooltip>
+                )}
+              </Marker>
+            );
+          })}
 
           {candidatesWithCoords.map((candidate) => (
             <Marker

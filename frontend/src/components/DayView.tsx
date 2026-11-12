@@ -93,6 +93,8 @@ interface DayViewProps {
   onImageUrls?: (urls: Record<string, string>) => void;
   /** [Gate TimelineRedesign] 地図のピンから選ばれた予定(このカードまで送って詳細を開く。n は選ばれるたびに増える) */
   focus?: { id: string; n: number } | null;
+  /** [Gate TimelineRedesign] 予定ごとの予約の状態(地図の上の旅程チェックへ渡す) */
+  onBookingsChange?: (bookings: Record<string, EventBooking>) => void;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -123,6 +125,7 @@ const DayView: React.FC<DayViewProps> = ({
   photoSignal = 0,
   onImageUrls,
   focus = null,
+  onBookingsChange,
 }) => {
   const { addNewScheduleItem, deleteScheduleItem, reorderSpots } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
@@ -207,6 +210,9 @@ const DayView: React.FC<DayViewProps> = ({
     getBookingStatus(planId, variantDayId).then((r) => { if (active) setBookings(r.events ?? {}); }).catch(() => { if (active) setBookings({}); });
     return () => { active = false; };
   }, [planId, bookingKey, bookingVersion, variantDayId]);
+  const bookingsCb = useRef(onBookingsChange);
+  bookingsCb.current = onBookingsChange;
+  useEffect(() => { bookingsCb.current?.(bookings); }, [bookings]);
   const linkBooking = useCallback(async (reservationId: string, eventId: string) => {
     try {
       await linkReservationToEvent(planId, reservationId, eventId);
@@ -850,11 +856,31 @@ const DayView: React.FC<DayViewProps> = ({
   return (
     <div className={`tc-dayview ${className}`.trim()}>
       {/* [Gate MockScreens] モックの timeline-card の見出し: 小見出し・日の題・ルートを見る・日のタブ・現地時間・集計・移動手段の凡例 */}
+      {/* [Gate TimelineRedesign] 日の見出しは旅程の欄の上に固定し、下の予定(tc-day-body)だけがスクロールする。
+          日付と「この日の案」(プランB)は色の付いた 1 つの帯にまとめる */}
       <div className="tc-day-head" data-active={isActive ? 'true' : 'false'}>
-        <div className="tc-section-row">
-          <div className="min-w-0">
+        <div className="tc-day-band" data-testid="day-band">
+        {/* 1 段目: 日付(と小見出し)・現地時間と件数・予定の追加などの操作 */}
+        <div className="tc-day-row1">
+          <div className="tc-day-titles min-w-0">
             {headerLabel && <p className="tc-label">{headerLabel}</p>}
             <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
+          </div>
+          <div className="tc-day-metarow">
+            {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
+            <p className="tc-day-meta" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
+            <div className="tc-day-stats">
+              <span><UiIcon icon={IcMapPin} size={13} className="mr-1 align-[-2px]" />{timeStats.eventCount}件</span>
+              {timeStats.totalDuration > 0 && (
+                <span><UiIcon icon={IcTimer} size={13} className="mr-1 align-[-2px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
+              )}
+              {timeStats.totalCost > 0 && (
+                <span><UiIcon icon={IcWallet} size={13} className="mr-1 align-[-2px]" />¥{timeStats.totalCost.toLocaleString()}</span>
+              )}
+              {timeStats.totalTravelTime > 0 && (
+                <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
+              )}
+            </div>
           </div>
           <div className="tc-day-head-actions">
             {/* [Gate DayAdd] 予定の追加はこの 1 つ(以前は旅程の見出しと日の下に同じ働きの 2 つがあった) */}
@@ -874,23 +900,13 @@ const DayView: React.FC<DayViewProps> = ({
             )}
           </div>
         </div>
-        {dayTabs}
-        {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
-        <p className="tc-day-meta" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
-        <div className="tc-day-stats">
-          <span><UiIcon icon={IcMapPin} size={13} className="mr-1 align-[-2px]" />{timeStats.eventCount}件</span>
-          {timeStats.totalDuration > 0 && (
-            <span><UiIcon icon={IcTimer} size={13} className="mr-1 align-[-2px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
-          )}
-          {timeStats.totalCost > 0 && (
-            <span><UiIcon icon={IcWallet} size={13} className="mr-1 align-[-2px]" />¥{timeStats.totalCost.toLocaleString()}</span>
-          )}
-          {timeStats.totalTravelTime > 0 && (
-            <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
-          )}
+        {/* 2 段目: 日のタブと「この日の案」(プランB)を 1 行に */}
+        {dayTabs && <div className="tc-day-row2">{dayTabs}</div>}
         </div>
         {/* [Gate PlanUX] 移動手段の印は常に並べない。予定と予定の間の「移動手段を選ぶ」で出す */}
       </div>
+
+      <div className="tc-day-body" data-testid="day-body">
 
       {photoFor && (
         <EventPhotoDialog isOpen onClose={() => setPhotoFor(null)} planId={planId} eventId={photoFor.id}
@@ -1090,6 +1106,7 @@ const DayView: React.FC<DayViewProps> = ({
           </Button>
         </Modal.Footer>
       </Modal>
+      </div>
     </div>
   );
 };

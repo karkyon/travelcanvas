@@ -451,6 +451,27 @@ describe('1日の画面(DayView)', () => {
   });
 });
 
+describe('[Gate TimelineRedesign] 日の見出し(固定)と予定(スクロール)', () => {
+  it('日付・現地時間・日のタブ・この日の案(dayTabs)は色の帯の中、予定の一覧は見出しの下の day-body の中', async () => {
+    getHoursCheck.mockResolvedValue({ events: [] });
+    const d: DaySchedule = { id: 'd1', date: '2026-11-28', timezone_id: 'Asia/Tokyo', events: [
+      { id: 'e1', title: '伊勢神宮 外宮', category: 'sightseeing', start_time: '11:45', end_time: '13:45', order_index: 0 },
+    ] } as unknown as DaySchedule;
+    render(<DayView day={d} planId="p1" headerLabel="伊勢・鳥羽 · DAY 1 · LOCAL TIME"
+      dayTabs={<div data-testid="variant-bar-stub">この日の案</div>} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const band = screen.getByTestId('day-band');
+    expect(band).toHaveTextContent('伊勢・鳥羽 · DAY 1 · LOCAL TIME');
+    expect(band).toHaveTextContent('2026-11-28');
+    expect(within(band).getByTestId('variant-bar-stub')).toBeInTheDocument();
+    expect(within(band).getByTestId('day-add-event')).toBeInTheDocument();
+    expect(band).toContainElement(screen.getByTestId('day-timezone'));
+    const body = screen.getByTestId('day-body');
+    expect(within(body).getByRole('list', { name: /の予定$/ })).toBeInTheDocument();
+    expect(body).not.toContainElement(band);
+  });
+});
+
 describe('移動の区間の行・並べ替えの影響の計算', () => {
   const evs = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }];
 
