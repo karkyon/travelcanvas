@@ -496,6 +496,7 @@
   "POST /api/v1/search/spots",
   "POST /api/v1/security/csp-report",
   "POST /api/v1/spots/",
+  "POST /api/v1/spots/find-places",
   "POST /api/v1/spots/geocode",
   "POST /api/v1/spots/place-info",
   "POST /api/v1/spots/places-from-text",

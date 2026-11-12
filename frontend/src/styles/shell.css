@@ -1140,3 +1140,17 @@
 .tc-booking.is-suggest { border-style: dashed; border-color: var(--tc-accent); }
 .tc-booking.is-suggest .tc-booking-tag { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
 .tc-booking-issues { flex-basis: 100%; margin: 2px 0 0; padding-left: 18px; list-style: disc; color: var(--tc-warning); font-weight: 700; }
+/* [Gate PlaceFinderArea] 予定の追加の候補: 行きたい場所の写真・ジャンルの札・距離・範囲の外 */
+.tc-finder-thumb { flex: none; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; background: var(--tc-cloud-100);
+  display: grid; place-items: center; }
+.tc-finder-thumb .tc-spot-photo { width: 64px; height: 64px; margin: 0; position: relative; }
+.tc-finder-thumb .tc-spot-photo img { width: 64px; height: 64px; object-fit: cover; }
+.tc-finder-thumb .tc-spot-photo figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 2px; font-size: 8px; line-height: 1.3;
+  background: rgba(0, 0, 0, .45); color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tc-finder-thumb .tc-spot-photo figcaption a { color: #fff; }
+.tc-finder-thumb-none { font-size: 10px; color: var(--tc-ink-500); }
+.tc-finder-genre { display: inline-flex; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong); vertical-align: 1px; }
+.tc-finder-dist { margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--tc-ink-700); }
+.tc-finder-outside { display: inline-flex; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: var(--tc-warning-soft, var(--tc-cloud-100)); color: var(--tc-warning); }

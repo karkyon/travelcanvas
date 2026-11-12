@@ -7,18 +7,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const m = vi.hoisted(() => ({
   getPlaceInfo: vi.fn(), addNewScheduleItem: vi.fn(), readPlaceUrl: vi.fn(), placesFromText: vi.fn(),
-  aiPlacesFromImage: vi.fn(), aiPlacesFromText: vi.fn(), listWishSpots: vi.fn(),
+  aiPlacesFromImage: vi.fn(), aiPlacesFromText: vi.fn(), listWishSpots: vi.fn(), findPlaces: vi.fn(), getExternalThumb: vi.fn(),
 }));
 vi.mock('@/services/api/planEdit', () => ({ getPlaceInfo: m.getPlaceInfo, geocodeAddress: vi.fn(), reorderDay: vi.fn() }));
 vi.mock('@/services/api/g11planner', () => ({ getHoursCheck: vi.fn().mockResolvedValue({ events: [] }) }));
 vi.mock('@/services/api/g11discover', () => ({
   getEventImages: vi.fn().mockResolvedValue({}), getEventImageMedia: vi.fn(), getMediaProviderStatus: vi.fn().mockResolvedValue({ image_providers: [] }),
-  searchNearby: vi.fn().mockResolvedValue({ candidates: [] }),
+  searchNearby: vi.fn().mockResolvedValue({ candidates: [] }), getExternalThumb: m.getExternalThumb,
 }));
 vi.mock('@/services/api/g11', () => ({ getPlanCover: vi.fn().mockResolvedValue({ cover: null, can_edit: false }) }));
 vi.mock('@/services/api/spotIntake', () => ({
   readPlaceUrl: m.readPlaceUrl, placesFromText: m.placesFromText, aiPlacesFromImage: m.aiPlacesFromImage,
-  aiPlacesFromText: m.aiPlacesFromText, listWishSpots: m.listWishSpots,
+  aiPlacesFromText: m.aiPlacesFromText, listWishSpots: m.listWishSpots, findPlaces: m.findPlaces,
 }));
 vi.mock('@/hooks/usePlan', () => ({
   usePlan: () => ({ addNewScheduleItem: m.addNewScheduleItem, deleteScheduleItem: vi.fn(), reorderSpots: vi.fn() }),
@@ -43,7 +43,7 @@ const info = (name: string, address: string) => ({
     latitude: 34.455, longitude: 136.725, source_url: null, links: [], notes: [] }],
 });
 
-beforeEach(() => { for (const f of Object.values(m)) f.mockReset(); m.listWishSpots.mockResolvedValue([]); });
+beforeEach(() => { for (const f of Object.values(m)) f.mockReset(); m.listWishSpots.mockResolvedValue([]); localStorage.removeItem('tc-ai-photo-consent'); });
 
 describe('予定を追加', () => {
   it('名前で検索に入れた名前で、手で入力へ移ると自動取得して主な情報を入れる', async () => {
@@ -114,5 +114,62 @@ describe('PlaceFinder の写真・文', () => {
     fireEvent.click(screen.getByTestId('finder-paste-find'));
     expect(await screen.findByText('猿田彦神社')).toBeInTheDocument();
     expect(screen.getByText(/動画 6:31/)).toBeInTheDocument();
+  });
+
+  it('[PlaceFinderArea] 名前で検索: 言葉とジャンル・範囲で探し、ジャンルの札・距離・探した範囲・出典を出す', async () => {
+    m.findPlaces.mockResolvedValue({ query: '菰野 カフェ', genre: 'cafe', genre_label: 'カフェ', scope: 'area',
+      region: { label: 'この旅行の範囲(予定の真ん中から 8km 以内)', radius_km: 8 },
+      candidates: [{ name: '湯の山カフェ', address: '三重県三重郡菰野町菰野8500', latitude: 35.01, longitude: 136.46, category: 'dining',
+        genre_label: 'カフェ', distance_km: 2.1, providers: ['yahoo_local'] }],
+      sources: [{ provider: 'yahoo_local', label: 'Yahoo!ローカルサーチ', credit: 'Webサービス by Yahoo! JAPAN', url: 'https://developer.yahoo.co.jp/sitemap/' }],
+      keyed_providers: ['yahoo_local'], failed_providers: [] });
+    const onPick = vi.fn();
+    render(<PlaceFinder tab="search" onTab={vi.fn()} onPick={onPick} planId="p1" />);
+    fireEvent.change(screen.getByLabelText('場所の名前'), { target: { value: '菰野' } });
+    fireEvent.change(screen.getByTestId('finder-genre'), { target: { value: 'cafe' } });
+    fireEvent.click(screen.getByTestId('finder-scope-route'));
+    fireEvent.click(screen.getByTestId('finder-search'));
+    await waitFor(() => expect(m.findPlaces).toHaveBeenCalledWith('p1', '菰野', 'cafe', 'route'));
+    const row = await screen.findByTestId('finder-row-湯の山カフェ');
+    expect(row).toHaveTextContent('湯の山カフェカフェ経路から 2.1km');
+    expect(screen.getByTestId('finder-region')).toHaveTextContent('探した範囲: この旅行の範囲(予定の真ん中から 8km 以内)');
+    expect(screen.getByTestId('finder-credits')).toHaveTextContent('Webサービス by Yahoo! JAPAN');
+    // ジャンルだけでも探せる
+    fireEvent.change(screen.getByLabelText('場所の名前'), { target: { value: '' } });
+    expect(screen.getByTestId('finder-search')).not.toBeDisabled();
+  });
+
+  it('[PlaceFinderArea] 写真: 撮影場所が無ければ(同意済みなら)すぐ写真から見分け、旅行の範囲の外に印。範囲で同じ種類も探せる', async () => {
+    localStorage.setItem('tc-ai-photo-consent', '1');
+    m.aiPlacesFromImage.mockResolvedValue([
+      { name: '伊勢神宮内宮', reason: '宇治橋', confidence: 0.9, category: 'sightseeing', distance_km: 3.2, in_trip: true },
+      { name: '明治神宮', reason: '鳥居', confidence: 0.4, category: 'sightseeing', distance_km: 300, in_trip: false },
+    ]);
+    m.findPlaces.mockResolvedValue({ query: '', genre: 'sightseeing', genre_label: '観光名所', scope: 'area',
+      region: { label: 'この旅行の範囲', radius_km: 8 }, candidates: [], sources: [], keyed_providers: ['yahoo_local'], failed_providers: [] });
+    render(<PlaceFinder tab="photo" onTab={vi.fn()} onPick={vi.fn()} planId="p1" />);
+    const file = new File([new Uint8Array([1, 2, 3])], 'p.jpg', { type: 'image/jpeg' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await waitFor(() => expect(m.aiPlacesFromImage).toHaveBeenCalledWith('p1', file));
+    expect(await screen.findByTestId('finder-row-明治神宮')).toHaveTextContent('旅行の範囲の外');
+    expect(screen.getByTestId('finder-row-伊勢神宮内宮')).not.toHaveTextContent('旅行の範囲の外');
+    expect(screen.queryByText(/GPS/)).toBeNull();
+    fireEvent.click(screen.getByTestId('finder-photo-similar'));
+    await waitFor(() => expect(m.findPlaces).toHaveBeenCalledWith('p1', '', 'sightseeing', 'area'));
+  });
+
+  it('[PlaceFinderArea] 行きたい場所: 写真とジャンルの札(食事は料理のジャンル)', async () => {
+    m.listWishSpots.mockResolvedValue([
+      { id: 's1', name: '赤福 本店', description: null, category: 'dining', address: null, latitude: null, longitude: null,
+        price_range: null, image_url: null, created_at: '', dining: { genres: ['和菓子'] } },
+      { id: 's2', name: '夫婦岩', description: null, category: 'sightseeing', address: null, latitude: null, longitude: null,
+        price_range: null, image_url: null, created_at: '', photo: { provider: 'commons', provider_id: 'File:x.jpg', author: 'A', license: 'CC BY' } },
+    ]);
+    m.getExternalThumb.mockResolvedValue(new Blob(['x']));
+    render(<PlaceFinder tab="wish" onTab={vi.fn()} onPick={vi.fn()} withWish planId="p1" />);
+    expect(await screen.findByTestId('finder-row-赤福 本店')).toHaveTextContent('赤福 本店食事・和菓子');
+    expect(screen.getByTestId('finder-row-赤福 本店')).toHaveTextContent('写真なし');
+    expect(screen.getByTestId('finder-row-夫婦岩')).toHaveTextContent('夫婦岩観光');
+    await waitFor(() => expect(m.getExternalThumb).toHaveBeenCalledWith('commons', 'File:x.jpg'));
   });
 });

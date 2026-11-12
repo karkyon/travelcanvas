@@ -108,7 +108,10 @@ async def places_from_image(plan_id: str, file: UploadFile = File(...), consent:
     except rx.ExtractInputError as error:
         raise HTTPException(status_code=413 if error.code == "file_too_large" else 422,
                             detail={"code": error.code, "message": str(error)})
-    hint = str(getattr(plan, "destination", "") or "")
+    # [Gate PlaceFinderArea] 旅行先の手がかり: 目的地と予定の名前(写真の場所をこの旅行の範囲の中から見分けやすくする)
+    titles = [t for (t,) in db.query(TravelEvent.title).filter(TravelEvent.plan_id == plan.id).limit(12).all() if t]
+    hint = " / ".join(x for x in (str(getattr(plan, "destination", "") or ""),
+                                  f"予定: {'、'.join(titles)}" if titles else "") if x)
     try:
         payload, _usage = provider_calls.ai_places_from_image(db, plan, current_user, jpeg, hint, str(uuid.uuid4()))
     except Exception as error:  # noqa: BLE001 - 理由を返す(画像は保存していない)
@@ -119,8 +122,17 @@ async def places_from_image(plan_id: str, file: UploadFile = File(...), consent:
         raise _ai_error(error)
     items = _ai_items(payload.get("text") or "")[:MAX_AI_PLACES]
     places = await _enrich(db, current_user, plan.id, items)
+    # [Gate PlaceFinderArea] この旅行の範囲の中の候補を先に(範囲の外は印を付けて後ろへ)
+    from app.services import place_finder as pf
+
+    region = pf.region_of(pf.plan_points(db, plan), "area")
+    for pl_ in places:
+        d = pf.distance_in(region, pl_.get("latitude"), pl_.get("longitude"))
+        pl_["distance_km"] = round(d, 1) if d is not None else None
+        pl_["in_trip"] = None if d is None or region is None else d <= region["radius_km"] + 2
+    places.sort(key=lambda x: (x.get("in_trip") is False, -(x.get("confidence") or 0)))
     db.commit()
-    return {"places": places, "ai": "used"}
+    return {"places": places, "ai": "used", "region": region["label"] if region else None}
 
 
 async def _enrich(db: Session, user: User, plan_id: Any, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

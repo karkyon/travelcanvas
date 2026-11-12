@@ -182,3 +182,29 @@ async def geocode(body: GeocodeIn, db: Session = Depends(get_db),
                               _recorder(db, current_user, "event.geocode"), area=area)
     db.commit()
     return result
+
+
+class FindPlacesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    plan_id: uuid.UUID
+    query: str = Field("", max_length=120)
+    genre: str = Field("all", max_length=20)
+    scope: str = Field("area", max_length=10)
+
+
+@router.post("/find-places")
+async def find_places(body: FindPlacesIn, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    """[Gate PlaceFinderArea] 予定の追加の「名前で検索」: 言葉とジャンルで、この旅行の範囲・経路の近く・全国から場所を探す(保存しない)"""
+    from app.services import place_finder as pf
+
+    if body.genre not in pf.GENRES or body.scope not in pf.SCOPES:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "ジャンルか範囲の指定が正しくありません"})
+    if not body.query.strip() and body.genre == "all":
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "言葉を入れるか、ジャンルを選んでください"})
+    plan, _role = require_plan_access(db, body.plan_id, current_user, min_role="viewer")
+    _limit(current_user, "find-places")
+    record = _recorder(db, current_user, "event.find_places")
+    result = await pf.find(db, plan, body.query, body.genre, body.scope, record)
+    db.commit()
+    return result

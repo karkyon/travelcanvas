@@ -29,7 +29,25 @@ export interface MediaPlace {
   name: string; time?: string | null; context?: string; quoted?: boolean; ai?: boolean;
   area?: string; reason?: string; confidence?: number; address?: string | null; latitude?: number | null; longitude?: number | null;
   phone?: string | null; website?: string | null; category?: string | null;
+  /** [Gate PlaceFinderArea] この旅行の範囲の真ん中からの距離(km)・範囲の中か */
+  distance_km?: number | null; in_trip?: boolean | null;
 }
+
+/** [Gate PlaceFinderArea] 言葉とジャンルで、この旅行の範囲・経路の近く・全国から探す */
+export type FindScope = 'area' | 'route' | 'all';
+export interface FoundPlace {
+  name: string; address: string | null; latitude: number | null; longitude: number | null; category: string | null;
+  genre_label: string | null; distance_km: number | null; providers: string[]; off_genre?: boolean;
+}
+export interface FindPlacesResult {
+  query: string; genre: string; genre_label: string; scope: FindScope;
+  region: { label: string; radius_km: number | null };
+  candidates: FoundPlace[];
+  sources: { provider: string; label: string; credit: string; url: string }[];
+  keyed_providers: string[]; failed_providers: string[];
+}
+export const findPlaces = async (planId: string, query: string, genre: string, scope: FindScope): Promise<FindPlacesResult> =>
+  (await api.post('/spots/find-places', { plan_id: planId, query: query.slice(0, 120), genre, scope }, SILENT)).data as FindPlacesResult;
 export const placesFromText = async (text: string, title?: string | null): Promise<MediaPlace[]> =>
   ((await api.post('/spots/places-from-text', { text: text.slice(0, 20000), title: title ?? null }, SILENT)).data as { places: MediaPlace[] }).places;
 export const aiPlacesFromText = async (planId: string, text: string, title?: string | null): Promise<MediaPlace[]> =>
