@@ -3,7 +3,7 @@
  * 日程を変えると全部の日と予定の日時が一緒に動く。短くして予定のある日が消える時は、一覧を見せて確認してから消す。
  * [Gate TripHead] 背景(表紙)の写真もここから変えられる(変えられる人だけ。写真の選択は上に重ねて開き、保存はその場で効く)。
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import { getPlanBasics, reschedulePlan, savePlanBasics } from '@/services/api/photoFeatures';
@@ -50,6 +50,11 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
   const [endMode, setEndMode] = useState('');
   const [endMin, setEndMin] = useState('');
   const [lost, setLost] = useState<Lost | null>(null);
+  // [Gate BasicsRace] 開いた時の読み込みが終わるまで入力させない。以前は読み込みの前に入れた日付・人数が、後から届いた
+  // 旅行の情報や旅程の日付で上書きされ、日程が変わらないことがあった(e2e の photo-features がまれに落ちた原因)
+  const [loaded, setLoaded] = useState(false);
+  const dates = useRef({ firstDate, lastDate });
+  dates.current = { firstDate, lastDate };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // [Gate TripHead] 背景の写真(表紙)。読めない・変えられない時は欄ごと出さない
@@ -70,12 +75,14 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
   const coverPhoto = useCoverPhoto(isOpen ? planId : null, cover, '');
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return undefined;
+    let active = true;
+    setLoaded(false);
     setError(null);
     setLost(null);
-    setStart(firstDate ?? '');
-    setEnd(lastDate ?? '');
     getPlanBasics(planId).then((plan) => {
+      if (!active) return;
+      const { firstDate: first, lastDate: last } = dates.current;
       setTitle(plan.title ?? '');
       setDestination(plan.destination ?? '');
       setBudget(plan.budget != null ? String(plan.budget) : '');
@@ -92,10 +99,20 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
       setStartMin(plan.journey_start_minutes != null ? String(plan.journey_start_minutes) : '');
       setEndMode(plan.journey_end_mode ?? '');
       setEndMin(plan.journey_end_minutes != null ? String(plan.journey_end_minutes) : '');
-      if (!firstDate && plan.start_date) setStart(plan.start_date.slice(0, 10));
-      if (!lastDate && plan.end_date) setEnd(plan.end_date.slice(0, 10));
-    }).catch((e) => setError(errorDetailMessage(e, '旅行の情報を読み込めませんでした')));
-  }, [isOpen, planId, firstDate, lastDate]);
+      // 日付は旅程の最初・最後の日(無ければ旅行の情報の日付)
+      setStart(first ?? (plan.start_date ? plan.start_date.slice(0, 10) : ''));
+      setEnd(last ?? (plan.end_date ? plan.end_date.slice(0, 10) : ''));
+      setLoaded(true);
+    }).catch((e) => {
+      if (!active) return;
+      const { firstDate: first, lastDate: last } = dates.current;
+      setStart(first ?? '');
+      setEnd(last ?? '');
+      setError(errorDetailMessage(e, '旅行の情報を読み込めませんでした'));
+      setLoaded(true);
+    });
+    return () => { active = false; };
+  }, [isOpen, planId]);
 
   const submit = async (confirmRemove: boolean) => {
     if (!title.trim()) {
@@ -147,6 +164,7 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
     <Modal isOpen={isOpen} onClose={onClose} title="旅行の基本情報" size="lg">
       <form onSubmit={(e) => { e.preventDefault(); void submit(false); }}>
         <Modal.Body>
+          <fieldset disabled={!loaded} aria-busy={!loaded} className="contents">
           <div className="space-y-3" data-testid="plan-basics">
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div><label htmlFor="basics-title" className="text-sm text-ink-800">題名</label><input id="basics-title" className={input} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
@@ -216,10 +234,11 @@ const PlanBasicsDialog: React.FC<Props> = ({ planId, revision, firstDate, lastDa
             )}
             <div><label htmlFor="basics-description" className="text-sm text-ink-800">メモ</label><textarea id="basics-description" rows={3} className={input} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
           </div>
+          </fieldset>
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="ghost" onClick={onClose}>キャンセル</Button>
-          <Button type="submit" variant="primary" loading={busy} data-testid="plan-basics-save">保存</Button>
+          <Button type="submit" variant="primary" loading={busy} disabled={!loaded} data-testid="plan-basics-save">保存</Button>
         </Modal.Footer>
       </form>
       {canEditCover && (

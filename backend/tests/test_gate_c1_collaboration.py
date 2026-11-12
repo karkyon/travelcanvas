@@ -14,6 +14,7 @@ FR-023
 - 適用をやめる・アカウントの削除で消える。書き出しには本人の分だけ
 """
 import json
+import re
 import time
 import uuid
 
@@ -289,7 +290,9 @@ def test_profile_applied_to_trip_is_private_and_drives_feasibility(auth_client, 
     run = client.post(f"{base}/validation-runs")
     assert run.status_code == 201, run.text
     text = json.dumps(run.json(), ensure_ascii=False)
-    assert PRIVATE_MESSAGE in text and "朝はゆっくり" not in text and "11:00" not in text
+    # 時刻の値(started_at など "...T11:00:15")が 11 時台に当たると "11:00" を含むため、日時を除いてから確かめる
+    values = re.sub(r"\d{4}-\d{2}-\d{2}T[\d:.]+(\+\d{2}:\d{2}|Z)?", "", text)
+    assert PRIVATE_MESSAGE in text and "朝はゆっくり" not in text and "11:00" not in values
     _act_as(editor)
     own_run = json.dumps(client.post(f"{base}/validation-runs").json(), ensure_ascii=False)
     assert "朝はゆっくりしたい" in own_run
