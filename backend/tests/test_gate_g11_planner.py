@@ -145,9 +145,9 @@ def test_api_permissions_and_payload(auth_client, make_user, db_session):
 
 def test_transport_vocabulary():
     from app.api.v1.segments import MODES
-    from app.services.branch_resources import MODES as BRANCH_MODES
 
-    assert {"shinkansen", "helicopter"} <= MODES and {"shinkansen", "helicopter"} <= set(BRANCH_MODES)
+    # [Gate PlanB-P8] もしもの案の区間(branch_resources)はやめた。区間の手段は segments.MODES だけ
+    assert {"shinkansen", "helicopter"} <= MODES
     assert estimate_leg(35.0, 135.7, 35.6, 139.7, "helicopter") is None
     leg = estimate_leg(35.0, 135.7, 35.6, 139.7, "shinkansen")
     assert leg and leg["mode"] == "shinkansen" and leg["is_estimate"] is True

@@ -104,9 +104,11 @@ class CarryOverInput(BaseModel):
 @router.get("/{plan_id}/journey")
 def get_journey(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(
-        TravelDay.local_date, TravelDay.sort_order).all()
-    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).all()
+    # [Gate PlanB-P7] 実際に回った予定: 途中で切り替えた日は、元の案の済んだ予定 → 切り替え → 今の案の合流点から
+    from app.services import day_variants as dv
+
+    tr = dv.travelled(db, plan.id)
+    days = tr["days"]
     actuals = {a.event_id: a for a in db.query(EventActual).filter(EventActual.plan_id == plan.id).all()}
     # 記録は閲覧者に見えるもの(本人の記録とメンバーに公開された記録)だけを数える
     mems = (db.query(Memory.event_id, Memory.kind, Memory.occurred_at)
@@ -121,12 +123,14 @@ def get_journey(plan_id: str, db: Session = Depends(get_db), current_user: User 
     planned_ids: List[str] = []
     actual_map: Dict[str, Dict[str, Any]] = {}
     for d in days:
-        evs = sorted((e for e in events if e.day_id == d.id),
-                     key=lambda e: (e.local_start_time or "99:99", e.sort_order, str(e.id)))
+        skipped_ids = {e.id for e in tr["skipped"].get(d.id, [])}
+        evs = list(tr["events"].get(d.id, [])) + list(tr["skipped"].get(d.id, []))
         rows = []
         for e in evs:
             key = str(e.id)
-            planned_ids.append(key)
+            by_switch = e.id in skipped_ids
+            if not by_switch:
+                planned_ids.append(key)
             a = actuals.get(e.id)
             if a:
                 actual_map[key] = {"status": a.status, "actual_start_at": a.actual_start_at,
@@ -146,9 +150,13 @@ def get_journey(plan_id: str, db: Session = Depends(get_db), current_user: User 
                 "actual": _actual_dict(a), "memory_count": len(ms),
                 "photo_count": sum(1 for m in ms if m[0] == "photo"), "suggestion": suggestion,
                 "start_diff_minutes": jr.start_diff_minutes(planned, a.actual_start_at if a else None),
+                # [Gate PlanB-P7] 元の案で済んだ予定(途中の切り替えの前)・切り替えでとばした予定
+                "from_variant": e.day_id != d.id, "skipped_by_switch": by_switch,
             })
         out_days.append({"day_id": str(d.id), "date": d.local_date.isoformat(), "title": d.title,
-                         "timezone_id": d.timezone_id, "events": rows})
+                         "timezone_id": d.timezone_id, "events": rows,
+                         "variant": {"label": d.variant_label, "name": dv.label_name(d)},
+                         "switch": tr["trail"].get(d.id)})
 
     photo_ids = [str(eid) for eid, ms in mem_by_event.items() if any(k == "photo" for k, _ in ms)]
     distance = lt.distance_m([{"t": p["t"].isoformat(), "lat": p["lat"], "lng": p["lng"]} for p in points]) \

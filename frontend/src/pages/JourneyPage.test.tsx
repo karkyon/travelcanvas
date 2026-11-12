@@ -116,4 +116,25 @@ describe('JourneyPage (Gate P14)', () => {
     expect(screen.queryByRole('button', { name: '行った' })).toBeNull();
     expect(screen.queryByRole('button', { name: '提案を使う' })).toBeNull();
   });
+
+  it('[PlanB-P7] 途中で切り替えた日: 案の切り替えの点(時刻・地名・理由)、済んだ予定 → ✂ → 新しい案、とばした予定', async () => {
+    const base = recorded.days[0]!;
+    const ev = (id: string, title: string, time: string, extra: object = {}) => ({
+      ...base.events[0]!, event_id: id, title, planned_time: time, actual: null, suggestion: null, start_diff_minutes: null,
+      memory_count: 0, photo_count: 0, ...extra });
+    m.getJourney.mockResolvedValue({ ...recorded, days: [{
+      ...base, date: '2026-11-29', timezone_id: 'Asia/Tokyo', variant: { label: 'B', name: '雨の日' },
+      switch: { from_label: 'A', from_name: 'プランA', to_label: 'B', to_name: '雨の日', phase: 'during', reason: 'rain',
+        reason_label: '雨', place_label: '鳥羽のあたり', switched_at: '2026-11-29T01:10:00+00:00' },
+      events: [ev('a1', '二見興玉神社', '08:00', { from_variant: true }), ev('b2', '鳥羽水族館', '11:30'),
+        ev('b1', '海の博物館', '09:00', { skipped_by_switch: true })],
+    }] });
+    renderPage();
+    expect((await screen.findByTestId('journey-switch-2026-11-29')).textContent)
+      .toBe('A プランA → 10:10 鳥羽のあたりで B 雨の日 に切り替え(雨)');
+    const titles = screen.getAllByText(/二見興玉神社|鳥羽水族館|ここで B 雨の日 に切り替え/).map((x) => x.textContent);
+    expect(titles).toEqual(['08:00 二見興玉神社', '✂ ここで B 雨の日 に切り替え', '11:30 鳥羽水族館']);
+    expect(screen.getByTestId('journey-skipped-2026-11-29').textContent).toBe('切り替えでとばした予定: 海の博物館');
+    expect(screen.queryByText(/09:00 海の博物館/)).toBeNull();
+  });
 });

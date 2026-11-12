@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
-from app.api.v1 import branches as branches_api
+from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
@@ -69,14 +69,14 @@ class OperationIn(BaseModel):
     @classmethod
     def _v_type(cls, v):
         if v not in sy.ENTITY_ACTIONS:
-            raise ValueError("entity_typeはevent/day/order/reservationです")
+            raise ValueError("entity_typeはevent/day/order/reservation/variantです")
         return v
 
     @field_validator("action")
     @classmethod
     def _v_action(cls, v):
-        if v not in ("create", "update", "delete", "reorder"):
-            raise ValueError("actionはcreate/update/delete/reorderです")
+        if v not in ("create", "update", "delete", "reorder", "switch"):
+            raise ValueError("actionはcreate/update/delete/reorder/switchです")
         return v
 
     @model_validator(mode="after")
@@ -154,7 +154,7 @@ def _apply_fields(db: Session, plan: TravelPlan, ev: TravelEvent, fields: Dict[s
         new_time = fields.get("local_start_time", ev.local_start_time)
         ev.local_start_time = new_time
         day = db.query(TravelDay).filter(TravelDay.id == ev.day_id).first()
-        branches_api._apply_time(ev, day, new_time, old_time, old_date)
+        plan_edits.apply_time(ev, day, new_time, old_time, old_date)
 
 
 def _store(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn, status: str,
@@ -216,6 +216,8 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
 
     if op.entity_type == "reservation":
         return reject("online_required")
+    if op.entity_type == "variant":
+        return _process_variant(db, plan, user, device_id, op, reject)
     if op.entity_type == "day":
         return _process_day(db, plan, user, device_id, op, reject)
     if op.entity_type == "order":
@@ -305,7 +307,7 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         return _row_result(row, replay=False)
     if ev.locked:
         return reject("locked", entity_id=target_id)
-    if str(ev.id) in branches_api._related_event_ids(db, [ev.id]):
+    if str(ev.id) in plan_edits.related_event_ids(db, [ev.id]):
         return reject("has_relations", entity_id=target_id)
     at_base = sy.comparable(_value_at_base(db, plan, ev, op.base_revision))
     current = sy.comparable(plans_api._event_to_dict(ev))
@@ -320,6 +322,52 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
     rev = _delete_event(db, plan, user, ev)
     row = _store(db, plan, user, device_id, op, "applied", entity_id=target_id, resulting_revision=rev)
     return _row_result(row, replay=False)
+
+
+def _process_variant(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn,
+                     reject) -> Dict[str, Any]:
+    """[Gate PlanB-Offline] オフラインの日の案の切り替え。端末が見ていた今の案(from_day_id)が、その後にサーバーで
+    別の案へ切り替わっていたら、黙って上書きせず競合にする(利用者が「自分の切り替えを使う」で決める)"""
+    from pydantic import ValidationError
+
+    from app.api.v1 import day_variants as dva
+    from app.services import day_variants as dv
+
+    raw = {k: v for k, v in dict(op.fields or {}).items() if k in sy.VARIANT_FIELDS}
+    if not op.entity_id or not sy.is_uuid(op.entity_id):
+        return reject("unknown_entity", fields=raw)
+    if op.base_revision is None:
+        return reject("base_revision_required", fields=raw)
+    with dv.all_variants(db):
+        target = _day(db, plan, uuid.UUID(op.entity_id))
+        if target is None:
+            return reject("unknown_entity", fields=raw)
+        active = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id, TravelDay.local_date == target.local_date,
+                                             TravelDay.variant_status == "active").first())
+        if target.variant_status == "active":
+            row = _store(db, plan, user, device_id, op, "applied", "no_change", entity_id=target.id, fields=raw)
+            return _row_result(row, replay=False)
+        seen = raw.get("from_day_id")
+        if seen and active is not None and str(active.id) != str(seen):
+            conflict = {"fields": ["variant"], "mine": {"to": f"{target.variant_label} {dv.label_name(target)}"},
+                        "server": {"active": f"{active.variant_label} {dv.label_name(active)}"},
+                        "server_deleted": False,
+                        "title": f"{target.local_date.month}/{target.local_date.day} の案の切り替え"}
+            row = _store(db, plan, user, device_id, op, "conflicted", "changed_on_server", entity_id=target.id,
+                         conflict=conflict, fields=raw)
+            return {**_row_result(row, replay=False), "message": CODE_MESSAGES["changed_on_server"]}
+        try:
+            body = dva.SwitchIn(**{k: v for k, v in raw.items() if k != "from_day_id"})
+            out = dva.perform_switch(db, plan, user, target, body, source="sync")
+        except (ValidationError, HTTPException):
+            db.rollback()
+            return reject("invalid_field", "切り替えの内容が正しくありません", fields=raw, entity_id=target.id)
+        if out is None:
+            row = _store(db, plan, user, device_id, op, "applied", "no_change", entity_id=target.id, fields=raw)
+            return _row_result(row, replay=False)
+        row = _store(db, plan, user, device_id, op, "applied", entity_id=target.id,
+                     resulting_revision=out["revision"], fields=raw)
+        return _row_result(row, replay=False)
 
 
 def _day(db: Session, plan: TravelPlan, day_id) -> Optional[TravelDay]:
@@ -546,6 +594,15 @@ def list_conflicts(plan_id: str, db: Session = Depends(get_db),
     out = []
     r: Any
     for r in rows:
+        if r.entity_type == "variant":
+            out.append({
+                "operation_id": str(r.operation_id), "action": r.action, "entity_type": r.entity_type,
+                "code": r.code, "message": CODE_MESSAGES.get(r.code),
+                "entity_id": str(r.entity_id) if r.entity_id else None, "title": (r.conflict or {}).get("title"),
+                "conflict": r.conflict, "current": (r.conflict or {}).get("server"), "server_deleted": False,
+                "created_at": _iso(r.created_at),
+            })
+            continue
         if r.entity_type in ("day", "order"):
             day = _day(db, plan, r.entity_id) if r.entity_id else None
             out.append({
@@ -593,6 +650,24 @@ def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, r
         return {"operation_id": operation_id, "status": r.status, "plan_revision": plan.revision}
 
     plans_api._require_if_match(plan, if_match)
+    if r.entity_type == "variant":
+        from app.api.v1 import day_variants as dva
+        from app.services import day_variants as dv
+
+        with dv.all_variants(db):
+            target = _day(db, plan, r.entity_id) if r.entity_id else None
+            if target is None:
+                raise HTTPException(status_code=409, detail={"code": "unknown_entity",
+                                                             "message": CODE_MESSAGES["unknown_entity"]})
+            fields = {k: v for k, v in (r.fields or {}).items() if k != "from_day_id"}
+            out = dva.perform_switch(db, plan, current_user, target, dva.SwitchIn(**fields), source="sync")
+        r = cast(Any, db.query(SyncOperation).filter(SyncOperation.id == r.id).first())
+        r.status = "resolved_mine"
+        r.resolved_at = _now()
+        r.resulting_revision = out["revision"] if out else plan.revision
+        db.commit()
+        _audit("sync_conflict_resolved", request, current_user, plan, {"resolution": "use_mine"})
+        return {"operation_id": operation_id, "status": "resolved_mine", "plan_revision": r.resulting_revision}
     if r.entity_type in ("day", "order"):
         rev = _resolve_day_or_order(db, plan, current_user, r)
         r = cast(Any, db.query(SyncOperation).filter(SyncOperation.id == r.id).first())
@@ -622,7 +697,7 @@ def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, r
         if ev is not None:
             if ev.locked:
                 raise HTTPException(status_code=409, detail={"code": "locked", "message": CODE_MESSAGES["locked"]})
-            if str(ev.id) in branches_api._related_event_ids(db, [ev.id]):
+            if str(ev.id) in plan_edits.related_event_ids(db, [ev.id]):
                 raise HTTPException(status_code=409, detail={"code": "has_relations",
                                                              "message": CODE_MESSAGES["has_relations"]})
             rev = _delete_event(db, plan, current_user, ev)

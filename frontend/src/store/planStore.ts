@@ -180,7 +180,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
   };
 }
 
-function mapDay(d: NormalizedDay): DaySchedule {
+/** [Gate PlanB] 控えの案の日(案の API の応答)も同じ形にする */
+export function mapDay(d: NormalizedDay): DaySchedule {
   return {
     id: d.id,
     date: d.local_date,

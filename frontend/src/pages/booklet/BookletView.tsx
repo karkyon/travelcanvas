@@ -348,6 +348,19 @@ const BookletView: React.FC<Props> = ({ booklet: b, exportInfo, stampLabel, shee
         </Section>
       )}
 
+      {b.variants && b.variants.length > 0 && (
+        <Section id="variants" title={title('variants')}>
+          {b.variants.map((v) => (
+            <div key={`${v.date}-${v.label}`} className="bk-variant">
+              <h3>{`${v.date} 控えの案 ${v.label} ${v.name}`}{v.reason_label ? `(${v.reason_label}の時はこちら)` : ''}</h3>
+              <ul>
+                {v.events.map((e, i) => <li key={i}>{e.local_start_time ? `${e.local_start_time} ` : ''}{e.title}</li>)}
+              </ul>
+            </div>
+          ))}
+        </Section>
+      )}
+
       {b.notes && (
         <Section id="notes" title={title('notes')}>
           <ul>{b.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>

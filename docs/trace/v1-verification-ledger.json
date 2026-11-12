@@ -16,7 +16,8 @@
   "updated_g5": "Gate G5(r17): FR-027(予算・費用。為替の記録・予算の版・確定の予約額の換算・取消・端数の規則・締め。E2E expenses.spec.ts・gate-g5.spec.ts)を追加。FR-028 は領収書の選択・精算の冪等を足した。FR-041(ロゴ・ドメイン・席)は料金(FR-058)が残るため(部分)のまま",
   "updated_g6": "Gate G6(r18): FR-048(Offline Travel Pack。端末ごとの鍵・期限・1台だけの失効・失効した端末の消去・日程と並びのオフラインの編集。E2E offline-pack.spec.ts・gate-g6.spec.ts)を追加。FR-033 は日程・並びの競合と依存の順・予約はオンラインだけの証拠を足した。FR-037(顔の検査・MEMORY MAP)は外部の提供元が残るため(部分)のまま。FR-051 は(部分)を外したが VERIFIED の証拠は V3 で整える",
   "updated_g7": "Gate G7(r19): FR-005(日をまたぐ予定・変更の影響の確認・実際のブラウザのドラッグの並べ替え。E2E gate-g7.spec.ts・item-deletion.spec.ts)と FR-057(同じ同行者の傾向・移動手段の傾向と区間の余裕の提案。E2E memory-replan.spec.ts・gate-g7.spec.ts)を追加。FR-017 は既定の滞在・休憩・最終の便の証拠を足した。FR-018(外部の経路)・FR-019(案の中の予約・区間の分岐)・FR-039(所有者の移譲・出典つきの訂正)は(部分)のまま",
-  "updated_g8": "Gate G8(r20): FR-004(定期の処理の実行の記録・2つの端末の同時の編集。E2E plan-deletion.spec.ts・gate-g8.spec.ts)・FR-019(案の中の移動区間・予約の変更・選んだ変更だけの採用。E2E branches.spec.ts・gate-g7.spec.ts・gate-g8.spec.ts)・FR-039(所有者の移譲・出典つきの訂正。E2E data-export.spec.ts・account-deletion.spec.ts・gate-g8.spec.ts)・FR-051(訪問の訂正・除外。V3 の証拠の整理。E2E visits.spec.ts)を追加。FR-021 は所有者の移譲の証拠を足した"
+  "updated_g8": "Gate G8(r20): FR-004(定期の処理の実行の記録・2つの端末の同時の編集。E2E plan-deletion.spec.ts・gate-g8.spec.ts)・FR-019(案の中の移動区間・予約の変更・選んだ変更だけの採用。E2E branches.spec.ts・gate-g7.spec.ts・gate-g8.spec.ts)・FR-039(所有者の移譲・出典つきの訂正。E2E data-export.spec.ts・account-deletion.spec.ts・gate-g8.spec.ts)・FR-051(訪問の訂正・除外。V3 の証拠の整理。E2E visits.spec.ts)を追加。FR-021 は所有者の移譲の証拠を足した",
+  "updated_planb": "Gate PlanB(P1〜P8): FR-019 を日ごとの案(プランB)に置き換えた。もしもの案(branches)の画面・API・試験・E2E(branches.spec.ts・gate-g7/g8 の分岐の部分)を消し、証拠を test_gate_planb_variants.py・E2E plan-b.spec.ts へ"
  },
  "cross_cutting": {
   "authz": [
@@ -697,24 +698,23 @@
    "status": "VERIFIED"
   },
   "FR-019": {
-   "title": "What-if",
+   "title": "日ごとの案(プランB。旧 What-if)",
    "e2e": [
-    "frontend/e2e/branches.spec.ts",
-    "frontend/e2e/gate-g7.spec.ts",
-    "frontend/e2e/gate-g8.spec.ts"
+    "frontend/e2e/plan-b.spec.ts"
    ],
    "authz": [
-    "backend/tests/test_gate_p7_branches.py::test_discard_delete_and_permissions"
+    "backend/tests/test_gate_planb_variants.py::test_viewer_cannot_create_and_share_view_shows_active_only"
    ],
    "conflict": [
-    "backend/tests/test_gate_p7_branches.py::test_conflicts_block_adoption",
-    "backend/tests/test_gate_g8_branch_resources.py::test_partial_adoption_and_three_way_conflicts",
-    "backend/tests/test_gate_g8_branch_resources.py::test_reservation_changed_in_plan_blocks_and_undo_refuses_after_relink"
+    "backend/tests/test_gate_planb_variants.py::test_create_copy_hidden_edit_switch_undo",
+    "backend/tests/test_gate_planb_variants.py::test_blank_group_limit_and_lodging_check",
+    "backend/tests/test_gate_planb_next.py::test_offline_switch_via_sync_applies_conflicts_and_resolves"
    ],
-   "conflict_note": "分岐の後に本案でも変わった予定・区間・予約は採用を止める(三方向の取り込み)。採用の後に紐付けを変えた時の元に戻すは 409",
+   "conflict_note": "切り替えは今の案の印を付け替えるだけ(上書きしない)。旅行の版(If-Match)で同時の変更を止め、元に戻すで戻る。1 日の案は 5 つまで",
    "security": [
-    "backend/tests/test_gate_g8_branch_resources.py::test_member_policy_hides_reservation_and_cost_changes",
-    "backend/tests/test_gate_g8_branch_resources.py::test_cancel_planned_creates_task_and_never_cancels"
+    "backend/tests/test_gate_planb_variants.py::test_clone_share_and_booklet_include_variants",
+    "backend/tests/test_gate_planb_variants.py::test_today_switch_options_join_point_and_partial_switch",
+    "backend/tests/test_gate_planb_next.py::test_ai_check_free_class_sends_nothing"
    ],
    "status": "VERIFIED"
   },

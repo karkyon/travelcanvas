@@ -347,7 +347,7 @@ def test_purge_export_and_account_deletion(auth_client, make_user, db_session, s
     rows = exp["tables"]["memories"]
     assert sorted(r.get("body") or "" for r in rows) == ["", "メンバーの公開メモ"]
     assert all("storage_key" not in r for r in rows)
-    for t in ("itinerary_branches", "plan_alerts", "replans", "sync_operations"):
+    for t in ("plan_alerts", "replans", "sync_operations"):
         assert t in exp["tables"]
 
     # メンバーのアカウント削除: 参加している旅行に残した記録とファイルを消す

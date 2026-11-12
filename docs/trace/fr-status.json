@@ -156,12 +156,12 @@
    "gaps": "外部経路による実移動時間"
   },
   "FR-019": {
-   "title": "What-if",
+   "title": "日ごとの案(プランB。旧 What-if)",
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P7・G7・G8",
-   "gaps": "案どうしの統合(rebase)"
+   "gates": "P7・G7・G8 → PlanB P1〜P8・Next",
+   "gaps": "天気の予報は Open-Meteo の日ごとの値だけ(時間ごとの雨・気象警報は対象外)。AI の確かめは会員のクラスの枠の中だけ"
   },
   "FR-020": {
    "title": "共同編集",

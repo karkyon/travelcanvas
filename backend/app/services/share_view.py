@@ -95,16 +95,25 @@ def clone_plan(db: Session, plan: Any, share: Any, user: Any, title: Optional[st
                      status="draft")
     db.add(new)
     db.flush()
-    days: List[TravelDay] = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id)
-                             .order_by(TravelDay.local_date.asc(), TravelDay.sort_order.asc()).all())
-    events = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id).order_by(TravelEvent.sort_order).all() \
-        if days else []
+    # [Gate PlanB] 控えの案を見せる共有では、控えの案も写す(しまった案は写さない)
+    from app.services import day_variants as dv
+
+    with_variants = "day_variants" in fields
+    with dv.all_variants(db):
+        q = db.query(TravelDay).filter(TravelDay.plan_id == plan.id)
+        q = q.filter(TravelDay.variant_status.in_(("active", "standby") if with_variants else ("active",)))
+        order = (TravelDay.local_date.asc(), TravelDay.variant_label.asc(), TravelDay.sort_order.asc())
+        days: List[TravelDay] = q.order_by(*order).all()
+        events = (db.query(TravelEvent).filter(TravelEvent.day_id.in_([d.id for d in days]))
+                  .order_by(TravelEvent.sort_order).all() if days else [])
     by_day: Dict[Any, List[TravelEvent]] = {}
     for e in events:
         by_day.setdefault(e.day_id, []).append(e)
     for i, d in enumerate(days):
         nd = TravelDay(plan_id=new.id, local_date=d.local_date, timezone_id=d.timezone_id,
-                       title=d.title if "day_titles" in fields else None, sort_order=i)
+                       title=d.title if "day_titles" in fields else None, sort_order=i,
+                       variant_status=d.variant_status, variant_label=d.variant_label, variant_name=d.variant_name,
+                       variant_reason=d.variant_reason)
         db.add(nd)
         db.flush()
         for j, e in enumerate(by_day.get(d.id, [])):

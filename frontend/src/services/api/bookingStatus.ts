@@ -21,8 +21,10 @@ export interface EventBooking {
 }
 export interface BookingStatus { party_size: number | null; events: Record<string, EventBooking> }
 
-export async function getBookingStatus(planId: string): Promise<BookingStatus> {
-  return (await api.get(`/plans/${planId}/booking-status`, SILENT)).data as BookingStatus;
+export async function getBookingStatus(planId: string, dayId?: string | null): Promise<BookingStatus> {
+  // [Gate PlanB] 控えの案を開いている時は、その案の日を指定する(その案の予定も判定する)
+  const config = dayId ? { ...SILENT, params: { day_id: dayId } } : SILENT;
+  return (await api.get(`/plans/${planId}/booking-status`, config)).data as BookingStatus;
 }
 
 /** 予約を予定につなぐ(event_reservations の primary) */

@@ -20,7 +20,10 @@ SYNC_FIELDS = ("day_id", "title", "description", "event_type", "local_start_time
                "latitude", "longitude")
 DAY_FIELDS = ("local_date", "timezone_id", "title", "notes")
 ENTITY_ACTIONS = {"event": ("create", "update", "delete"), "day": ("create", "update", "delete"),
-                  "order": ("reorder",), "reservation": ("create", "update", "delete")}
+                  "order": ("reorder",), "reservation": ("create", "update", "delete"),
+                  # [Gate PlanB-Offline] 日の案の切り替え(entity_id = 切り替え先の案の日)
+                  "variant": ("switch",)}
+VARIANT_FIELDS = ("from_day_id", "reason", "note", "phase", "join_event_id", "done_event_ids", "place_label", "group")
 MAX_ORDER = 300
 MAX_OPERATIONS = 100
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")

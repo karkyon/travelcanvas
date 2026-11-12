@@ -27,8 +27,14 @@ FIELDS: Dict[str, Dict[str, str]] = {
                     "description": "予定の説明・メモ欄。予約番号や電話番号を書いていないか確認してください"},
     "reservation_summary": {"classification": "confidential", "label": "予約の概要",
                             "description": "予約の種類・施設名・日時・状態(予約番号・PIN・予約者名・連絡先・金額は含めない)"},
+    # [Gate PlanB] 日ごとの控えの案(雨の日の案など)。既定では見せない(標準・すべてにも含めない。1 つずつ選ぶ)
+    "day_variants": {"classification": "internal", "label": "控えの案(雨の日など)",
+                     "description": "日ごとの控えの案の名前と予定。見る人は今の案の下に「雨の日はこちら」として見られます"},
 }
-FIELD_ORDER = ["plan_description", "day_titles", "event_times", "event_address", "event_notes", "reservation_summary"]
+FIELD_ORDER = ["plan_description", "day_titles", "event_times", "event_address", "event_notes", "reservation_summary",
+               "day_variants"]
+# 標準・すべての一括操作に含めない項目(1 つずつ選ぶ)
+OPT_IN_FIELDS = {"day_variants"}
 
 RESTRICTED: List[Dict[str, str]] = [
     {"key": "confirmation_numbers", "label": "予約番号・PIN"},
@@ -41,7 +47,7 @@ RESTRICTED: List[Dict[str, str]] = [
 RESTRICTED_KEYS = {r["key"] for r in RESTRICTED}
 ALWAYS_SHOWN = ["旅行名", "目的地", "期間", "予定名", "予定の種類"]
 
-INTERNAL_FIELDS = [k for k in FIELD_ORDER if FIELDS[k]["classification"] == "internal"]
+INTERNAL_FIELDS = [k for k in FIELD_ORDER if FIELDS[k]["classification"] == "internal" and k not in OPT_IN_FIELDS]
 CONFIDENTIAL_FIELDS = [k for k in FIELD_ORDER if FIELDS[k]["classification"] == "confidential"]
 PRESETS: Dict[str, List[str]] = {
     "minimal": [],

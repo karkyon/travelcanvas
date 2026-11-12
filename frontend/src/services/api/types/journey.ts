@@ -35,6 +35,17 @@ export interface JourneyEvent {
   photo_count: number;
   suggestion: ActualSuggestion | null;
   start_diff_minutes: number | null;
+  /** [Gate PlanB-P7] 途中で切り替えた日の、元の案で済んだ予定 */
+  from_variant?: boolean;
+  /** [Gate PlanB-P7] 切り替えで合流点より前にあったため、とばした予定(達成指標に数えない) */
+  skipped_by_switch?: boolean;
+}
+
+/** [Gate PlanB-P7] その日の切り替え(最後の 1 回) */
+export interface JourneySwitch {
+  from_label: string | null; from_name: string | null; to_label: string | null; to_name: string | null;
+  phase: 'planning' | 'during' | 'after'; reason: string | null; reason_label: string | null; place_label: string | null;
+  switched_at: string | null;
 }
 
 export interface JourneyMetrics {
@@ -56,7 +67,11 @@ export interface JourneyMetrics {
 export interface JourneyReview {
   plan_id: string;
   title: string;
-  days: Array<{ day_id: string; date: string; title: string | null; timezone_id: string; events: JourneyEvent[] }>;
+  days: Array<{
+    day_id: string; date: string; title: string | null; timezone_id: string; events: JourneyEvent[];
+    /** [Gate PlanB-P7] 回った案(今の案)と、切り替えの点 */
+    variant?: { label: string; name: string }; switch?: JourneySwitch | null;
+  }>;
   metrics: JourneyMetrics;
   can_edit: boolean;
 }

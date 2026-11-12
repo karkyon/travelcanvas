@@ -43,6 +43,7 @@ export const SECTION_OPTIONS: { value: BookletSection; label: string }[] = [
   { value: 'packing', label: '持ち物' },
   { value: 'contacts', label: '連絡先' },
   { value: 'costs', label: '費用' },
+  { value: 'variants', label: '控えの案(雨の日など・付録)' },
   { value: 'notes', label: '注意事項' },
 ];
 export const SECTION_LABEL = Object.fromEntries(SECTION_OPTIONS.map((o) => [o.value, o.label])) as Record<BookletSection, string>;

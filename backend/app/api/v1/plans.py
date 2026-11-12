@@ -402,6 +402,9 @@ def _day_to_dict(day: TravelDay) -> dict:
         "title": day.title,
         "notes": day.notes,
         "sort_order": day.sort_order,
+        # [Gate PlanB] 案の状態(元に戻すで戻す)
+        "variant_status": day.variant_status, "variant_label": day.variant_label, "variant_name": day.variant_name,
+        "variant_reason": day.variant_reason, "variant_conditions": day.variant_conditions,
     }
 
 
@@ -1529,10 +1532,21 @@ def _undo_day_item(db: Session, plan: TravelPlan, item: ChangeItem):
     elif item.action == "update" and item.before_json:
         day = db.query(TravelDay).filter(TravelDay.id == item.entity_id).first()
         if day:
-            for k, v in item.before_json.items():
+            before = dict(item.before_json)
+            # [Gate PlanB] 切り替えを戻す: 今の案(1 日付に 1 つ)の索引に当たらないよう、今の案を先に控えへ下ろす
+            vs = before.pop("variant_status", None)
+            for k, v in before.items():
                 if k == "local_date" and v:
                     v = date_cls.fromisoformat(v)
                 setattr(day, k, v)
+            if vs is not None and vs != day.variant_status:
+                if vs == "active":
+                    from app.services import day_variants as dv
+
+                    dv.activate(db, day)
+                else:
+                    day.variant_status = vs
+                    db.flush()
     elif item.action == "delete" and item.before_json:
         before = dict(item.before_json)
         events = before.pop("_events", [])
@@ -1541,6 +1555,9 @@ def _undo_day_item(db: Session, plan: TravelPlan, item: ChangeItem):
             local_date=date_cls.fromisoformat(before["local_date"]) if before.get("local_date") else None,
             timezone_id=before.get("timezone_id", "UTC"), title=before.get("title"),
             notes=before.get("notes"), sort_order=before.get("sort_order", 0),
+            variant_status=before.get("variant_status") or "active", variant_label=before.get("variant_label") or "A",
+            variant_name=before.get("variant_name"), variant_reason=before.get("variant_reason"),
+            variant_conditions=before.get("variant_conditions"),
         )
         db.add(restored)
         db.flush()

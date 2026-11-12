@@ -7,7 +7,7 @@ import { expectNoAxeViolations } from './support/axe';
  *   1. MOVE-03 既定の滞在・休憩・疲れ: 「制約」の画面で既定を見て変え、検証で休憩の無い連続と日ごとの疲れの目安が出る
  *   2. FR-005 予定のドラッグで並べ替え(実際のブラウザのドラッグ)・終了時刻を翌日にする(保存の前に影響を確かめる)
  *   3. MOVE-04 条件(目的の重み)を変えて計算し、選んだ予定だけを確かめてから適用する
- *   4. FR-019 案を選んで本案と比べる(移動・検証・費用)。案で予定を外して保存すると、比較に外した分が出る
+ *   4. (FR-019 本案と案の比較は [Gate PlanB-P8] でやめた。日ごとの案は plan-b.spec.ts)
  *   5. MEM-03 過去の旅の移動の遅れから、区間の前の余裕を足す提案を適用する
  *   6. FR-039 14日後の削除を申し込み、読み込み直しても残り、取り消せる
  */
@@ -131,7 +131,7 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   expect(d.end_day_offset).toBe(1);
 });
 
-test('MOVE-04・FR-019 条件を変えた計算・選んだ予定だけの適用、案と本案の比較', async ({ page }) => {
+test('MOVE-04 条件を変えた計算・選んだ予定だけの適用', async ({ page }) => {
   test.setTimeout(180_000);
   const { send } = await member(page, 'opt');
   const plan = await send('post', '/travel-plans/', { title: `京都G7-${Date.now()}` }) as { id: string };
@@ -176,26 +176,6 @@ test('MOVE-04・FR-019 条件を変えた計算・選んだ予定だけの適用
     expect(after.days[0]!.events.find((x) => x.id === e.id)!.local_start_time).toBe(e.local_start_time);
   }
 
-  // 4. 案を作って本案と比べる
-  const branch = await send('post', `${base}/branches`, { title: '雨の日G7', scenario_type: 'custom', assumptions: {} }) as { id: string };
-  await page.goto(`/planner/${plan.id}/branches`);
-  await page.getByRole('checkbox', { name: '「雨の日G7」を比べる' }).check();
-  await page.getByRole('button', { name: '選んだ案(1/3)を本案と比べる' }).click();
-  const table = page.getByRole('table', { name: '本案と案の比較' });
-  await expect(table.getByRole('columnheader', { name: '雨の日G7' })).toBeVisible();
-  await expect(table.getByRole('row', { name: /移動\(概算\)/ })).toContainText('km');
-  await expect(page.getByRole('group', { name: '雨の日G7の違い' })).toContainText('検証の結果は本案と変わりません。');
-  await expectNoAxeViolations(page, '案の一覧(本案との比較)');
-
-  await page.goto(`/planner/${plan.id}/branches/${branch.id}`);
-  const item = page.locator('[data-testid^="branch-item-"]').filter({ has: page.locator('input[value="地点D"]') });
-  await item.getByRole('button', { name: '外す' }).click();
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByRole('list', { name: '変更の一覧' })).toContainText('外す: 地点D');
-  await page.getByRole('button', { name: '移動・検証・費用で比べる' }).click();
-  const cmp = page.getByRole('table', { name: '本案と案の比較' });
-  await expect(cmp.getByRole('row', { name: /^変更/ })).toContainText('外す1');
-  await expectNoAxeViolations(page, '案の詳細(本案との比較)');
 });
 
 test('MEM-03・FR-039 移動の遅れの傾向から余裕を足す、14日後の削除の申し込みと取り消し', async ({ page }) => {

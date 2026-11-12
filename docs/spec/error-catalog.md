@@ -21,9 +21,11 @@
 | code | HTTP | 再試行 | 利用者向けの文(例) | 場所 |
 |---|---|---|---|---|
 | `acknowledgement_required` | 422 | no | 公開の前に確認の項目を全て確かめてください | api/v1/memory_publish.py |
+| `active_variant` | 409 | no | 今の案はしまえません。先に別の案に切り替えてください | api/v1/day_variants.py |
 | `admin_account` | 403 | no | 管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください | api/v1/privacy.py |
 | `admin_target` | — | — | ほかの管理者はこの画面から操作できません(運用の手順で権限を外してから) | api/v1/admin.py |
 | `alert_target_changed` | 409 | after_reload | — | api/v1/replans.py |
+| `already_active` | 409 | no | もう今の案です | api/v1/day_variants.py |
 | `already_adopted` | — | — | この投票はもう採用しています | api/v1/decisions.py |
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
@@ -38,13 +40,11 @@
 | `api_client_revoked` | 409 | no | 止めた連携の秘密は作り直せません | api/v1/organizations.py |
 | `areas_only` | 409 | no | この軌跡は「訪問地域だけ同期」の設定のため、座標はサーバーへ送れません | api/v1/location_tracks.py |
 | `blocked_host` | — | — | 内部のアドレス・localhost へは送れません | api/v1/organizations.py |
-| `branch_conflict` | 409 | after_reload | 本案と食い違う変更があるため採用できません。分岐案を直してから採用してください | api/v1/branches.py |
-| `branch_dependency_missing` | 422 | no | 選んだ変更が頼る変更(足した予定など)も選んでください | api/v1/branches.py |
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
 | `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py |
-| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/replans.py |
+| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py |
 | `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `changed_since` | 409 | no | 訂正の後に値が変わっているため取り消せません(新しく訂正してください) | api/v1/corrections.py |
 | `client_policy_ignored` | — | — | 上限・クラス・提供元は指定できません(サーバーが決めます) | api/v1/planning_usage.py |
@@ -52,12 +52,12 @@
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
-| `consent_required` | 403, 422 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
+| `consent_required` | 403, 422 | no | AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます | api/v1/day_variants.py, api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
 | `consult_pending` | 409 | no | 外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください | api/v1/trip_intents.py |
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
-| `day_not_found` | 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
+| `day_not_found` | 404, 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/day_variants.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
 | `days_have_events` | 409 | no | 短くすると消える日に予定があります | api/v1/plans.py |
 | `deleted_on_server` | 409 | after_reload | サーバーで削除された予定のため、自分の変更は使えません | api/v1/sync.py |
@@ -80,7 +80,7 @@
 | `entitlement_subject_not_found` | 404 | no | 対象の利用者が見つかりません | api/v1/planning_usage.py |
 | `event_locked` | — | — | 予定「%s」はロックされているため外せません | api/v1/decisions.py |
 | `event_missing` | — | — | 決定した予定が旅程から消えています | api/v1/decisions.py |
-| `event_not_found` | 404 | no | 指定した予定が見つかりません | api/v1/memories.py, api/v1/paid_actions.py |
+| `event_not_found` | 404 | no | 入れ替える予定がありません | api/v1/day_variants.py, api/v1/memories.py, api/v1/paid_actions.py |
 | `event_without_location` | 404 | no | 場所(座標)の無い予定の経路は調べられません(送っていません) | api/v1/paid_actions.py |
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
@@ -93,14 +93,13 @@
 | `forbidden` | 403 | no | この場所を使う全ての旅行の編集の権限が無いため、直せません | api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
+| `guest_not_allowed` | 403 | no | ゲストでは AI の確かめは使えません。会員登録の後に使えます | api/v1/day_variants.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
-| `has_relations` | 409 | no | — | api/v1/sync.py |
+| `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
 | `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
-| `invalid_branch_resources` | 422 | no | — | api/v1/branches.py |
-| `invalid_branch_selection` | 422 | no | 比べる分岐案を1〜…つ選んでください | api/v1/branches.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
 | `invalid_dates` | 422 | no | 最終日は出発日より後にしてください | api/v1/plans.py |
@@ -123,7 +122,7 @@
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
-| `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py |
+| `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
 | `invalid_scope` | — | — | スコープは | api/v1/organizations.py |
@@ -132,6 +131,7 @@
 | `invalid_slots` | — | — | …日目 | api/v1/trip_intents.py |
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
 | `invalid_tier` | 403 | no | tier は free・trip・journey・explorer のどれかです | api/v1/admin_ops.py |
+| `invalid_time` | 422 | no | 時刻は HH:MM で指定してください | api/v1/day_variants.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
 | `invalid_url` | — | — | https:// で始まる URL を入力してください(ユーザー名・パスワードは含めない) | api/v1/organizations.py |
@@ -143,7 +143,7 @@
 | `link_inactive` | 410 | no | この QR コードは期限が切れたか、停止されています。新しい QR を発行してもらってください | api/v1/photo_upload.py |
 | `link_not_found` | 404 | no | この QR コードは見つかりません | api/v1/photo_upload.py |
 | `location_off` | 409 | no | この旅行は「位置を記録しない」設定です。記録するには設定を変えてください | api/v1/location_tracks.py |
-| `locked` | 409 | no | — | api/v1/sync.py |
+| `locked` | 409 | no | 確定の予定は入れ替えられません | api/v1/day_variants.py, api/v1/sync.py |
 | `locked_event` | 409 | no | 確定の予定の位置は変えられません | api/v1/plans.py |
 | `locked_relation` | — | — | 確定ロックされた予約との紐付けがあるため削除できません。予約の紐付けのロックを解除してから削除してください。 | services/plan_item_deletion.py |
 | `logo_not_found` | 404 | no | ロゴはまだありません | api/v1/organizations.py |
@@ -158,10 +158,9 @@
 | `mode_mismatch` | 409 | after_reload | この旅行の位置の設定と違う保存先です。先に設定を変えてください | api/v1/location_tracks.py |
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
-| `no_changes` | 403, 409, 422 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v1/re |
+| `no_changes` | 403, 409, 422 | no | この案では旅程は変わりません | api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v |
 | `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
 | `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
-| `no_ops_selected` | 422 | no | 採用する変更を選んでください | api/v1/branches.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |
 | `no_trip_period` | 409 | no | 旅行の日程が無いため記録できません。先に日程を登録してください | api/v1/location_tracks.py |
 | `not_active` | 409 | no | 失効・期限切れの版は公開できません | api/v1/booklet.py |
@@ -203,6 +202,7 @@
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
 | `replan_conflict` | 409 | after_reload | 旅程と食い違う変更があるため適用できません。もう一度再計画案を作ってください | api/v1/replans.py |
+| `replan_not_found` | 404 | no | 再計画が見つかりません | api/v1/day_variants.py |
 | `replan_stale` | 409 | after_reload | 提案を作った後に旅程か過去の記録が変わりました。提案を読み込み直してください | api/v1/memory_replan.py, api/v1/replans.py |
 | `revision_conflict` | 409 | after_reload | 候補が他の人の変更で更新されています(現在のrevision: …) | api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.py, api/v1/visits. |
 | `revision_mismatch` | 409 | after_reload | ほかの画面で変更されました。読み込み直してください | services/private_profile.py |
@@ -222,6 +222,7 @@
 | `session_required` | 401 | no | 確認コードをもう一度入れてください | api/v1/photo_upload.py |
 | `share_view_expired` | — | — | 閲覧の時間が過ぎました。もう一度リンクを開いてください | api/v1/public_share.py |
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
+| `source_required` | 422 | no | 写す日を選んでください | api/v1/day_variants.py |
 | `stale_version` | 409 | after_reload | 配布が別の操作で改訂されています。読み直してください | api/v1/organizations.py |
 | `storage_failed` | 503 | later | ファイルの保存に失敗しました。しばらくしてから再試行してください | api/v1/memories.py |
 | `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
@@ -243,6 +244,7 @@
 | `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
+| `too_many_variants` | 409 | no | … の案は … つまでです | api/v1/day_variants.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |
 | `track_active` | 409 | no | この旅行では記録中(または一時停止中)の軌跡があります。止めてから始めてください | api/v1/location_tracks.py |
 | `track_full` | 409 | no | 1つの軌跡の点は…件までです。新しく記録を始めてください | api/v1/location_tracks.py |
@@ -256,7 +258,7 @@
 | `two_person_required` | 409 | no | 申請した管理者とは別の管理者が承認してください | api/v1/planning_usage.py |
 | `undo_conflict` | 409 | after_reload | この候補は後で使われた(予定に置いた・まとめた)ため、元に戻せません | api/v1/commands.py, services/plan_item_deletion.py |
 | `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py |
-| `unknown_branch_ops` | 422 | no | この案に無い変更が選ばれています | api/v1/branches.py |
+| `unknown_entity` | 409 | no | — | api/v1/sync.py |
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unknown_planning_operation` | — | — | 知らない操作です | api/v1/planning_usage.py |
@@ -269,6 +271,7 @@
 | `user_not_found` | 404 | no | 利用者が見つかりません | api/v1/admin_ops.py, api/v1/organizations.py |
 | `username_taken` | 409 | no | この表示名は既に使われています | api/v1/corrections.py |
 | `valid_until_required` | 422 | no | 機密情報を含む版には有効期限が必要です | api/v1/booklet.py |
+| `variant_not_found` | 404 | no | 案が見つかりません | api/v1/day_variants.py |
 | `void_reason_required` | 422 | no | 取り消す理由を200文字までで入力してください | api/v1/finance_ledger.py |
 | `webhook_not_found` | 404 | no | Webhook が見つかりません | api/v1/organizations.py |
 | `webhook_revoked` | 409 | no | 止めた Webhook の鍵は作り直せません | api/v1/organizations.py |

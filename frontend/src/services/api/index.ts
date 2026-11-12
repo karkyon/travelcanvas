@@ -11,7 +11,6 @@ import type { TravelPlan, User } from '@/types';
 import type { CommentCreateData, CommentTargetType, PollCreateData, PollUpdateData, VoteInput } from './types';
 import type { BookletExportCreateData, BookletOptions } from './types';
 import type { ItineraryExportFormat, ItineraryExportOptions } from './types';
-import type { BranchContentInput, BranchCreateData, BranchUpdateData } from './types';
 import type { CalendarImportApplyItem, ConsentPurpose } from './types';
 import type { AlertCreateData, AlertUpdateData } from './types';
 import type { OptimizationTravelMode } from './types';
@@ -345,15 +344,6 @@ export const downloadPlanDataExport = (planId: string) => api.downloadPlanDataEx
 export const downloadAccountDataExport = () => api.downloadAccountDataExport();
 
 // ===== [Gate P7] What-if・旅程ブランチ(FR-019) =====
-export const getBranches = (planId: string) => api.getBranches(planId);
-export const createBranch = (planId: string, data: BranchCreateData) => api.createBranch(planId, data);
-export const getBranch = (planId: string, branchId: string) => api.getBranch(planId, branchId);
-export const updateBranchContent = (planId: string, branchId: string, events: BranchContentInput[], revision: number) =>
-  api.updateBranchContent(planId, branchId, events, revision);
-export const updateBranch = (planId: string, branchId: string, data: BranchUpdateData, revision: number) =>
-  api.updateBranch(planId, branchId, data, revision);
-export const adoptBranch = (planId: string, branchId: string, revision: number) => api.adoptBranch(planId, branchId, revision);
-export const deleteBranch = (planId: string, branchId: string, revision: number) => api.deleteBranch(planId, branchId, revision);
 
 // ===== [Gate P8] カレンダー(ICS)の取込(FR-036) =====
 export const previewCalendarImport = (planId: string, file: Blob, createMissingDays?: boolean) =>

@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.v1 import branches as branches_api
+from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
@@ -350,7 +350,7 @@ def apply_optimization_candidate(plan_id: str, day_id: str, payload: ApplyReques
         if new_time != ev.local_start_time:
             old_time = ev.local_start_time
             ev.local_start_time = new_time
-            branches_api._apply_time(ev, day, new_time, old_time)
+            plan_edits.apply_time(ev, day, new_time, old_time)
         db.flush()
         changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
     if not changes:

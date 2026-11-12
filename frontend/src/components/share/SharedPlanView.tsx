@@ -26,6 +26,7 @@ const dayHeading = (date: string | null, title: string | null, idx: number): str
 const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
   const days = plan.days || [];
   const reservations = plan.reservations;
+  const variantsOf = (date: string | null) => (plan.variants ?? []).filter((v) => v.date === date);
   return (
     <div>
       <Heading level={titleLevel} className={titleLevel === 1 ? 'text-3xl font-bold text-ink-900 mb-3' : 'text-xl font-bold text-ink-900 mb-2'}>
@@ -71,6 +72,21 @@ const SharedPlanView: React.FC<Props> = ({ plan, titleLevel = 1 }) => {
               ) : (
                 <p className="text-sm text-ink-700">予定はまだ登録されていません</p>
               )}
+              {variantsOf(day.date).map((v) => (
+                <details key={v.label} className="mt-3 rounded-lg border border-dashed border-blue-200 bg-blue-50 px-3 py-2"
+                  data-testid={`shared-variant-${day.date}-${v.label}`}>
+                  <summary className="cursor-pointer text-sm font-semibold text-ink-900">
+                    {`控えの案 ${v.label} ${v.name}`}{v.reason_label ? `(${v.reason_label}の時)` : ''}
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {v.events.map((ev, i) => (
+                      <li key={i} className="text-sm text-ink-900 border-l-2 border-blue-200 pl-3">
+                        {ev.local_start_time && <span className="text-ink-700 mr-2">{ev.local_start_time}</span>}{ev.title}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))}
             </section>
           ))}
         </div>

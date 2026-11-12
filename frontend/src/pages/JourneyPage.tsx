@@ -169,16 +169,37 @@ const JourneyPage: React.FC = () => {
           {data.days.map((d) => (
             <section key={d.day_id} aria-label={d.date} className="mt-6">
               <h2 className="font-semibold text-ink-900">{`${d.date}${d.title ? ` ${d.title}` : ''}`}</h2>
+              {/* [Gate PlanB-P7] どの案で回ったか・どこで何の理由で切り替えたか */}
+              {d.switch ? (
+                <p className="tc-journey-variant" data-testid={`journey-switch-${d.date}`}>
+                  {`${d.switch.from_label ?? ''} ${d.switch.from_name ?? ''} → `}
+                  {d.switch.phase === 'during'
+                    ? `${localTime(d.switch.switched_at, d.timezone_id)}${d.switch.place_label ? ` ${d.switch.place_label}で` : ' に'} `
+                    : '旅行の前に '}
+                  {`${d.switch.to_label ?? ''} ${d.switch.to_name ?? ''} に切り替え`}
+                  {d.switch.reason_label ? `(${d.switch.reason_label})` : ''}
+                </p>
+              ) : d.variant && d.variant.label !== 'A' ? (
+                <p className="tc-journey-variant" data-testid={`journey-variant-${d.date}`}>{`${d.variant.label} ${d.variant.name} で回りました`}</p>
+              ) : d.variant ? (
+                <p className="tc-journey-variant is-plain">{`${d.variant.label} ${d.variant.name} のとおり`}</p>
+              ) : null}
               <ul className="mt-2 space-y-2">
-                {d.events.map((e) => {
+                {d.events.filter((e) => !e.skipped_by_switch).map((e, i, list) => {
                   const t = times[e.event_id] ?? {
                     start: localTime(e.actual?.actual_start_at ?? null, d.timezone_id),
                     end: localTime(e.actual?.actual_end_at ?? null, d.timezone_id),
                   };
                   const c = carry[e.event_id];
                   const status = e.actual?.status;
+                  const cut = d.switch?.phase === 'during' && i > 0 && list[i - 1]!.from_variant && !e.from_variant;
                   return (
                     <li key={e.event_id}>
+                      {cut && (
+                        <p className="tc-journey-cut" data-testid="journey-cut">
+                          {`✂ ここで ${d.switch!.to_label ?? ''} ${d.switch!.to_name ?? ''} に切り替え`}
+                        </p>
+                      )}
                       <Card padding="md" className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-ink-900">{`${e.planned_time ? `${e.planned_time} ` : ''}${e.title}`}</span>
@@ -288,6 +309,11 @@ const JourneyPage: React.FC = () => {
                 })}
                 {d.events.length === 0 && <li className="text-sm text-ink-700">予定はありません。</li>}
               </ul>
+              {d.events.some((e) => e.skipped_by_switch) && (
+                <p className="mt-2 text-sm text-ink-700" data-testid={`journey-skipped-${d.date}`}>
+                  {`切り替えでとばした予定: ${d.events.filter((e) => e.skipped_by_switch).map((e) => e.title).join('・')}`}
+                </p>
+              )}
             </section>
           ))}
         </>

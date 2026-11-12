@@ -34,6 +34,7 @@ import {
   computeTodayFlow, computeTodayView, formatCountdown, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
 import { DayList, EventCard } from './today/TodayParts';
+import TodaySwitchPanel from './today/TodaySwitchPanel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 
 // [Gate L1] DOC-04 §16に準拠し、当日画面は一定間隔で自動更新する
@@ -291,6 +292,11 @@ const TodayPage: React.FC = () => {
                 nextId={view.nextEvent?.id ?? null} doneIds={new Set(flow?.doneIds ?? [])} />
             )}
           </div>
+          {/* [Gate PlanB-P6] 控えの案がある日だけ出る(通信できない時は出さない) */}
+          {planId && (
+            <TodaySwitchPanel planId={planId} date={data.today_date} events={allToday} offline={isStale}
+              onSwitched={() => { void load(); }} />
+          )}
         </>
       )}
 

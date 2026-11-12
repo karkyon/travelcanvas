@@ -72,7 +72,8 @@ def theme_catalog(user_class: str) -> List[Dict[str, Any]]:
 DENSITIES = ("normal", "compact")
 FORMATS = ("web", "print")
 # 表示順(利用者がどの順で選んでも、この順に並べる)
-SECTIONS = ("cover", "toc", "schedule", "map", "reservations", "packing", "contacts", "costs", "notes")
+# [Gate PlanB] variants: 付録「控えの案」(雨の日はこちら など)。選んだ時だけ
+SECTIONS = ("cover", "toc", "schedule", "map", "reservations", "packing", "contacts", "costs", "variants", "notes")
 INCLUDE_KEYS = ("confirmation_numbers", "addresses", "phones", "participants")
 ACTIVE_RESERVATION = {"candidate", "confirmed", "modified", "used"}
 
@@ -262,7 +263,7 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
         "is_stale": input_revision is not None and input_revision != plan.revision,
         "data_as_of": (_aware(plan.updated_at) or _aware(plan.created_at) or now).isoformat(),
         "cover": None, "schedule": None, "map": None, "reservations": None, "packing": None,
-        "contacts": None, "costs": None, "notes": None,
+        "contacts": None, "costs": None, "variants": None, "notes": None,
     }
     if out["is_stale"]:
         warnings.append("stale_revision")
@@ -398,6 +399,9 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
         if out["costs"]["unconverted_expenses"]:
             warnings.append("unconverted_expenses")
 
+    if "variants" in sections:
+        out["variants"] = _variants(db, plan)
+
     if "notes" in sections:
         for r in reservations:
             dl = _aware(r.cancellation_deadline)
@@ -417,6 +421,25 @@ def build(db: Session, plan: TravelPlan, viewer, opts: Options, input_revision: 
 
     out["warnings"] = warnings
     return out
+
+
+def _variants(db: Session, plan: TravelPlan) -> List[Dict[str, Any]]:
+    """[Gate PlanB] 付録: 日ごとの控えの案(しまった案は載せない)。予定の名前・種類・時刻だけ(住所・予約は載せない)"""
+    from app.services import day_variants as dv
+
+    with dv.all_variants(db):
+        days = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id, TravelDay.variant_status == "standby")
+                .order_by(TravelDay.local_date.asc(), TravelDay.variant_label.asc()).all())
+        evs = (db.query(TravelEvent).filter(TravelEvent.day_id.in_([d.id for d in days]))
+               .order_by(TravelEvent.sort_order.asc()).all()) if days else []
+    by_day: Dict[Any, List[TravelEvent]] = {}
+    for e in evs:
+        by_day.setdefault(e.day_id, []).append(e)
+    return [{"date": d.local_date.isoformat(), "label": d.variant_label, "name": dv.label_name(d),
+             "reason_label": dv.REASON_LABEL.get(d.variant_reason or "", None),
+             "events": [{"title": e.title, "event_type": e.event_type,
+                         "local_start_time": (e.local_start_time or "")[:5] or None, "is_all_day": bool(e.is_all_day)}
+                        for e in by_day.get(d.id, [])]} for d in days]
 
 
 def _costs(db: Session, plan: TravelPlan) -> Dict[str, Any]:

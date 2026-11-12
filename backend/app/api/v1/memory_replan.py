@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.v1 import branches as branches_api
+from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
@@ -153,7 +153,7 @@ def apply_memory_replan(plan_id: str, body: ApplyInput, db: Session = Depends(ge
         old_time = ev.local_start_time
         ev.local_start_time = c["to"]
         # [Gate G7] FR-005 終了(日をまたぐ予定を含む)も同じだけずらす
-        branches_api._apply_time(ev, ev.day, c["to"], old_time)
+        plan_edits.apply_time(ev, ev.day, c["to"], old_time)
         changes.append(("travel_event", ev.id, "update", before, plans_api._event_to_dict(ev)))
     if not changes:
         raise HTTPException(status_code=409, detail={"code": "no_changes", "message": "変える予定がありません"})

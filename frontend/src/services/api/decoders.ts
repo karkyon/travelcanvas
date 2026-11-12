@@ -22,8 +22,8 @@
 import type { VisitAssessment, VisitCorrectionResult, VisitItem, VisitsOverview } from './types/visits';
 import type { CandidateList, PlaceInfo, PlanCandidateItem, PlanPlaces } from './types/candidates';
 import type { SearchHit, SearchResults } from './types/planSearch';
-import type { PublicSharedReservation, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
-import type { AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, OptimizationProposal, PlaceDetail, PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation, ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket, TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment, ConstraintValue, PlanConstraint, AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry, AuditLogPage, PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem, ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary, DeletedPlanSummary, PlanPurgeResult, CollaboratorRemoveResult, LockedRelationDetail, RouteOptionDeleteResult, UndoConflictDetail, PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem, Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement, PlanComment, Poll, PollOption, PollVote, Booklet, BookletExport, BookletIncludes, RetentionInfo, Branch, BranchAssumptions, BranchDetail, CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState, AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail, OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics, SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse, JournalDraft, JournalMemory, MemoryList, TravelMemory, LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult, AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling, ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview, AtlasCell, AtlasResponse, MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight, OfflinePackKey, OfflinePackKeyRotated } from './types';
+import type { PublicSharedReservation, PublicSharedVariant, ShareFieldInfo, ShareFieldKey, SharePolicyCatalog, SharePreview, ShareWithheld } from './types/share';
+import type { AdoptRouteOptionResponse, Collaborator, InsertionPreview, LegPreview, OptimizationProposal, PlaceDetail, PublicSharedDay, PublicSharedEvent, PublicSharedPlan, RoutePreview, ShareLink, DocumentLink, ExtractionCandidate, ImportJob, ImportJobDetail, Reservation, ReservationEventLink, ReservationParticipant, ReservationRevealResult, RouteLeg, RouteOption, Ticket, TicketRevealResult, TodayEvent, TodayResponse, TravelDocument, TravelSegment, ConstraintValue, PlanConstraint, AdminManageResult, AdminPagination, AdminSystemStats, AdminUserDetail, AdminUserRow, AdminUsersPage, AuditLogEntry, AuditLogPage, PlanPrivateProfile, PresenceChange, PresenceState, PresenceViewer, PrivateProfile, PrivateProfileItem, ConstraintCheckResult, ValidationCounts, ValidationIssue, ValidationRunDetail, ValidationRunSummary, DeletedPlanSummary, PlanPurgeResult, CollaboratorRemoveResult, LockedRelationDetail, RouteOptionDeleteResult, UndoConflictDetail, PackingItem, PackingSuggestions, PlanMember, PreparationTask, Readiness, ReadinessItem, Budget, BudgetDiff, Expense, ExpenseShare, FinanceSettings, FinanceSummary, Settlement, PlanComment, Poll, PollOption, PollVote, Booklet, BookletExport, BookletIncludes, RetentionInfo, CalendarImportPreview, CalendarImportResult, AccountDeletionPreview, AccountDeletionResult, ConsentState, AlertList, PlanAlert, Replan, ReplanApplyResult, ReplanErrorDetail, OptimizationApplyResult, OptimizationCandidates, OptimizationIssue, OptimizationMetrics, SyncConflictDetail, SyncConflictList, SyncResolveResult, SyncResponse, JournalDraft, JournalMemory, MemoryList, TravelMemory, LocationTrack, LocationTrackDetail, LocationTrackList, TrackPointsDeleteResult, TrackPointsUploadResult, AreaCell, AreaCellsUploadResult, LocationSettings, TrackSampling, ActualPutResult, CarryOverResult, EventActualRecord, JourneyReview, AtlasCell, AtlasResponse, MemoryReplanApplyResult, MemoryReplanResult, ReplanInsight, OfflinePackKey, OfflinePackKeyRotated } from './types';
 import type { EstimateVariant } from './types/segments';
 import { arrayOf, bool, exactNumber, int, matching, nonNegativeInt, nullable, num, object, oneOf, optional, record, str, unitInterval, type Decoder } from './decode';
 import { count } from './decodersCore';
@@ -446,7 +446,7 @@ export const placeDetail: Decoder<PlaceDetail> = object<PlaceDetail>({
 
 // [Gate F45] FR-045 共有リンクで選べる項目
 const shareFieldKey = oneOf<ShareFieldKey>(
-  'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary',
+  'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary', 'day_variants',
 );
 
 export const shareLink: Decoder<ShareLink> = object<ShareLink>({
@@ -514,6 +514,9 @@ export const publicSharedPlan: Decoder<PublicSharedPlan> = object<PublicSharedPl
   can_edit: bool,
   fields: optional(arrayOf(shareFieldKey)),
   reservations: optional(arrayOf(publicSharedReservation)),
+  variants: optional(arrayOf(object<PublicSharedVariant>({
+    date: str, label: str, name: str, reason_label: nullable(str), events: arrayOf(publicSharedEvent),
+  }))),
 });
 
 // [Gate F45] 所有者の共有前プレビュー
@@ -982,7 +985,7 @@ export const planComment: Decoder<PlanComment> = object<PlanComment>({
 // 機密項目を含むかどうか(contains_sensitive・includes)と版の状態を誤ると、透かしや注意を出さずに
 // 印刷させてしまうため、列挙値と真偽値を厳密に検査する。
 const BOOKLET_THEMES = ['simple', 'functional', 'business', 'family', 'friends', 'wild', 'lovers', 'elegant', 'calm', 'solo', 'school', 'space', 'cute', 'accessible', 'mono', 'resort'] as const;
-const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'notes'] as const;
+const BOOKLET_SECTIONS = ['cover', 'toc', 'schedule', 'map', 'reservations', 'packing', 'contacts', 'costs', 'variants', 'notes'] as const;
 const bookletIncludes: Decoder<BookletIncludes> = object<BookletIncludes>({
   confirmation_numbers: bool, addresses: bool, phones: bool, participants: bool,
 });
@@ -1051,6 +1054,10 @@ export const booklet: Decoder<Booklet> = object<Booklet>({
     by_category: arrayOf(object({ category: str, budget: nullable(moneyString), actual: moneyString, over: bool })),
     unconverted_expenses: nonNegativeInt,
   })),
+  variants: optional(nullable(arrayOf(object({
+    date: str, label: str, name: str, reason_label: nullable(str),
+    events: arrayOf(object({ title: str, event_type: str, local_start_time: nullable(str), is_all_day: bool })),
+  })))),
   notes: nullable(arrayOf(str)),
 });
 
@@ -1090,56 +1097,6 @@ export const retentionInfo: Decoder<RetentionInfo> = object<RetentionInfo>({
     period: str,
     note: str,
   })),
-});
-
-// ----- [Gate P7] What-if・旅程ブランチ(FR-019)。backend/app/api/v1/branches.py の応答(branch-v1)。
-// 採用できない理由(conflicts)と状態を誤ると、本案を壊す採用ボタンを出してしまうため、列挙値を厳密に検査する。
-const BRANCH_SCENARIOS = ['rain', 'delay', 'absence', 'budget', 'fatigue', 'custom'] as const;
-const branchShape = {
-  id: str,
-  plan_id: str,
-  algorithm_version: str,
-  title: str,
-  scenario_type: oneOf(...BRANCH_SCENARIOS),
-  // 想定の値は作成時にbackendが検証済み。画面は既知の項目だけを読む
-  assumptions: record as Decoder<BranchAssumptions>,
-  base_revision: int,
-  plan_revision: int,
-  plan_changed_since_base: bool,
-  status: oneOf('draft', 'adopted', 'discarded'),
-  state: oneOf('draft', 'adopted', 'discarded', 'adopted_undone'),
-  created_by_name: str,
-  adopted_at: nullable(str),
-  adopted_by_name: nullable(str),
-  summary: object({ added: nonNegativeInt, removed: nonNegativeInt, updated: nonNegativeInt, time_changed: nonNegativeInt }),
-  can_edit: bool,
-  revision: int,
-  created_at: nullable(str),
-  updated_at: nullable(str),
-};
-export const branch: Decoder<Branch> = object<Branch>(branchShape);
-
-export const branchDetail: Decoder<BranchDetail> = object<BranchDetail>({
-  ...branchShape,
-  days: arrayOf(object({ id: str, local_date: str, timezone_id: str, title: nullable(str) })),
-  content: arrayOf(object({
-    key: str, source_event_id: nullable(str), day_id: str, title: str, event_type: str,
-    local_start_time: nullable(str), is_all_day: bool, sort_order: int, locked: bool, removed: bool, note: nullable(str),
-  })),
-  ops: arrayOf(object({
-    op: oneOf('add', 'remove', 'update'), event_id: optional(str), key: optional(str), title: optional(str),
-    fields: optional(record), before: optional(record),
-  })),
-  // [Gate G8] FR-019 区間・予約の変更の競合(kind: segment / reservation、op: relink / cancel、理由を足した)
-  conflicts: arrayOf(object({
-    op: oneOf('add', 'remove', 'update', 'relink', 'cancel'), event_id: optional(str), key: optional(str),
-    title: optional(str),
-    reason: oneOf('changed_in_plan', 'deleted_in_plan', 'locked', 'has_relations', 'day_missing', 'event_missing',
-      'already_cancelled', 'hidden'),
-    fields: optional(arrayOf(str)), kind: optional(oneOf('event', 'segment', 'reservation')), op_id: optional(str),
-    label: optional(str),
-  })),
-  day_counts: arrayOf(object({ day_id: str, local_date: str, plan: nonNegativeInt, branch: nonNegativeInt })),
 });
 
 // ----- [Gate P8] カレンダー(ICS)の取込(FR-036)。backend/app/api/v1/calendar_import.py の応答。
@@ -1389,7 +1346,7 @@ export const syncConflictList: Decoder<SyncConflictList> = object<SyncConflictLi
   conflicts: arrayOf(object({
     operation_id: str,
     action: oneOf('create', 'update', 'delete', 'reorder'),
-    entity_type: optional(oneOf('event', 'day', 'order', 'reservation')),
+    entity_type: optional(oneOf('event', 'day', 'order', 'reservation', 'variant')),
     code: nullable(str),
     message: nullable(str),
     entity_id: nullable(str),
@@ -1607,7 +1564,15 @@ export const journeyReview: Decoder<JourneyReview> = object<JourneyReview>({
         actual_start_at: str, actual_end_at: str, basis: oneOf('track', 'memory'), points: nonNegativeInt,
       })),
       start_diff_minutes: nullable(int),
+      from_variant: optional(bool),
+      skipped_by_switch: optional(bool),
     })),
+    variant: optional(object({ label: str, name: str })),
+    switch: optional(nullable(object({
+      from_label: nullable(str), from_name: nullable(str), to_label: nullable(str), to_name: nullable(str),
+      phase: oneOf('planning', 'during', 'after'), reason: nullable(str), reason_label: nullable(str),
+      place_label: nullable(str), switched_at: nullable(str),
+    }))),
   })),
   metrics: object({
     planned_events: nonNegativeInt,

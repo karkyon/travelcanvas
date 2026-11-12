@@ -1,0 +1,139 @@
+/**
+ * [Gate PlanB] 日ごとの案(プランB)の API。旅程の画面(後から読む)だけが import する。
+ */
+import type { AxiosRequestConfig } from 'axios';
+import { api } from './index';
+
+const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
+const ifMatch = (rev: number): AxiosRequestConfig => ({ ...SILENT, headers: { 'If-Match': String(rev) } });
+
+export type VariantReason = 'rain' | 'party' | 'transport' | 'delay' | 'fatigue' | 'budget' | 'closure' | 'other';
+/** たたき台で変えた所・印を付けた所(案を作った時に理由に合わせて組み替えた結果) */
+export interface ScaffoldNote {
+  kind: 'rain' | 'delay' | 'fatigue' | 'transport' | 'candidates' | 'replan'; event_id: string | null; title: string; text: string;
+  /** 雨の時: 屋外(outdoor)・一部屋外(partly) */
+  fit?: 'outdoor' | 'partly';
+}
+export interface VariantConditions {
+  party_size?: number | null; absent_member_ids?: string[]; transport_mode?: string | null; prefer_indoor?: boolean;
+  note?: string | null; delay_minutes?: number | null; delay_after?: string | null; max_events?: number | null;
+  scaffold?: ScaffoldNote[];
+}
+/** たたき台を作れる理由 */
+export const SCAFFOLD_REASONS: VariantReason[] = ['rain', 'delay', 'fatigue', 'transport'];
+export interface VariantSummary {
+  day_id: string; local_date: string; label: string; name: string; status: 'active' | 'standby' | 'archived';
+  reason: VariantReason | null; reason_label: string | null; conditions: VariantConditions; group_id: string | null;
+  copied_from_day_id: string | null; events: number; first_time: string | null; last_time: string | null; titles: string[];
+}
+export interface VariantList { revision: number; dates: Record<string, VariantSummary[]>; max_per_date: number }
+export interface VariantDay {
+  revision: number; variant: VariantSummary;
+  day: { id: string; local_date: string; timezone_id: string; title: string | null; events: Record<string, unknown>[] };
+  segments: Record<string, unknown>[];
+}
+export interface CheckItem {
+  kind: 'prev' | 'next' | 'time' | 'drop' | 'booking' | 'unbooked' | 'weather'; level: 'ok' | 'info' | 'warn' | 'bad';
+  title: string; text: string; reservation_id?: string;
+}
+export interface VariantCheck { variant: VariantSummary; status: 'ok' | 'warn' | 'bad'; items: CheckItem[];
+  counts: Record<'ok' | 'info' | 'warn' | 'bad', number> }
+export interface SwitchRecord {
+  id: string; local_date: string; from_label: string | null; to_label: string | null; from_name: string | null;
+  to_name: string | null; switched_at: string | null; reason: VariantReason | null; reason_label: string | null;
+  note: string | null; phase: 'planning' | 'during' | 'after'; place_label: string | null; undone: boolean;
+}
+
+export const REASONS: [VariantReason, string][] = [
+  ['rain', '雨'], ['party', '人数'], ['transport', '移動手段'], ['delay', '遅れ'], ['fatigue', '疲れ'], ['budget', '予算'],
+  ['closure', '休業'], ['other', 'その他'],
+];
+
+export async function listVariants(planId: string): Promise<VariantList> {
+  return (await api.get(`/plans/${planId}/variants`, SILENT)).data as VariantList;
+}
+export async function getVariant(planId: string, dayId: string): Promise<VariantDay> {
+  return (await api.get(`/plans/${planId}/variants/${dayId}`, SILENT)).data as VariantDay;
+}
+export async function createVariant(planId: string, body: {
+  local_date: string; source: 'copy_active' | 'copy_day' | 'blank'; source_day_id?: string | null; name?: string;
+  reason?: VariantReason | null; conditions?: VariantConditions; also_dates?: string[]; scaffold?: boolean;
+}): Promise<{ revision: number; variants: VariantSummary[] }> {
+  return (await api.post(`/plans/${planId}/variants`, body, SILENT)).data as { revision: number; variants: VariantSummary[] };
+}
+export async function patchVariant(planId: string, dayId: string, rev: number, body: {
+  name?: string; reason?: VariantReason | null; conditions?: VariantConditions; status?: 'standby' | 'archived';
+}): Promise<{ revision: number }> {
+  return (await api.patch(`/plans/${planId}/variants/${dayId}`, body, ifMatch(rev))).data as { revision: number };
+}
+export async function deleteVariant(planId: string, dayId: string, rev: number): Promise<{ revision: number }> {
+  return (await api.delete(`/plans/${planId}/variants/${dayId}`, ifMatch(rev))).data as { revision: number };
+}
+export async function checkVariant(planId: string, dayId: string): Promise<VariantCheck> {
+  return (await api.get(`/plans/${planId}/variants/${dayId}/check`, SILENT)).data as VariantCheck;
+}
+export async function switchVariant(planId: string, dayId: string, rev: number, body: {
+  reason?: VariantReason | null; note?: string; phase?: 'planning' | 'during' | 'after'; group?: boolean;
+  join_event_id?: string | null; done_event_ids?: string[]; place_label?: string | null;
+}): Promise<{ revision: number }> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/switch`, body, ifMatch(rev))).data as { revision: number };
+}
+/** [P6] 旅行中の切り替え先(合流点・移動・とばす予定・済んだ予定・つながり) */
+export interface SwitchJoin {
+  event_id: string; title: string; start: string; mode: string; travel_minutes: number | null; arrive: string;
+  margin_minutes: number; travel_known: boolean;
+}
+export interface SwitchOption {
+  variant: VariantSummary; join: SwitchJoin | null; skipped: string[]; done: string[]; done_ids: string[];
+  outdoor_after_join: string[]; recommended: boolean;
+  check: { status: 'ok' | 'warn' | 'bad'; counts: Record<'ok' | 'info' | 'warn' | 'bad', number>; items: CheckItem[] };
+}
+export interface SwitchOptions {
+  revision?: number; date: string | null; now: string | null; place_label?: string | null; here_known?: boolean;
+  active?: VariantSummary; alerts: { id: string; kind: string; label: string; note: string | null }[];
+  options: SwitchOption[]; message?: string;
+  /** [PlanB-Weather] この日の予報 */
+  forecast?: Forecast | null;
+}
+/** [PlanB-Weather] 日ごとの天気の予報(Open-Meteo) */
+export interface Forecast {
+  date: string; day_id: string; label: string; weather_code: number | null; precipitation_probability: number | null;
+  precipitation_mm: number | null; temp_max: number | null; temp_min: number | null; rainy: boolean; source: string;
+  has_rain_variant: boolean;
+  /** 時間ごとの雨の時間帯(「11時〜15時」) */
+  rain_hours?: string[];
+  /** 雨の時間に始まる屋外・一部屋外の予定(今の案) */
+  affected_events?: { event_id: string; title: string; time: string; probability: number | null; fit: 'outdoor' | 'partly' }[];
+}
+export async function getWeather(planId: string, date?: string | null): Promise<{ enabled: boolean; forecasts: Forecast[]; notice: string }> {
+  return (await api.get(`/plans/${planId}/weather`, { ...SILENT, params: date ? { date } : undefined })).data as {
+    enabled: boolean; forecasts: Forecast[]; notice: string };
+}
+const newKey = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID() : `k-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+/** [PlanB-AI] 押した時だけの AI の確かめ(会員のクラス・旅行の枠・AI の同意) */
+export async function aiCheckVariant(planId: string, dayId: string): Promise<{ result: { text: string }; notice: string }> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/ai-check`, null,
+    { ...SILENT, headers: { 'Idempotency-Key': newKey() } })).data as { result: { text: string }; notice: string };
+}
+/** [PlanB-Indoor] 雨の日の屋内の候補(この日の予定の範囲) */
+export interface IndoorCandidate {
+  name: string; address?: string | null; latitude?: number | null; longitude?: number | null; category?: string | null;
+  genre_label?: string | null; distance_km?: number | null; kind: string; fit: 'indoor' | 'partly' | 'unknown';
+}
+export async function indoorCandidates(planId: string, dayId: string, nearEventId?: string | null): Promise<{
+  candidates: IndoorCandidate[]; region: { label: string; radius_km: number | null } | null; near_event: string | null;
+  failed_providers: string[]; message?: string;
+}> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/indoor-candidates`, { near_event_id: nearEventId ?? null },
+    SILENT)).data as never;
+}
+export async function replaceInVariant(planId: string, dayId: string, rev: number, body: {
+  replace_event_id?: string | null; name: string; address?: string | null; latitude?: number | null; longitude?: number | null;
+  event_type?: string;
+}): Promise<{ revision: number }> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/replace`, body, ifMatch(rev))).data as { revision: number };
+}
+export async function listSwitches(planId: string): Promise<SwitchRecord[]> {
+  return ((await api.get(`/plans/${planId}/variant-switches`, SILENT)).data as { switches: SwitchRecord[] }).switches;
+}

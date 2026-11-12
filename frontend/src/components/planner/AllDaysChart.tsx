@@ -46,6 +46,8 @@ interface Props {
   onMoveEvent?: (eventId: string, fromIndex: number, toIndex: number, start?: string) => void;
   /** [Gate JourneyEnds] 日ごとの最初・最後の行(出発・到着・宿)。時刻のある出発・到着は物差しにも線で示す */
   anchors?: ChartAnchors[];
+  /** [Gate PlanB] 日付ごとの控えの案(「B 雨の日」など)。ある日は見出しに「B あり」の札 */
+  variantsByDate?: Record<string, string[]>;
 }
 
 /** 帯の最小の高さ(30px)に当たる分。終わりの無い予定もこの長さで重なりを見る */
@@ -65,8 +67,8 @@ const toMin = (t: string | null | undefined): number | null => {
 };
 
 const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number; current: boolean; anchors?: ChartAnchors;
-  onOpen: () => void; locked: Set<string>; drag: DragState | null; setDrag: (d: DragState | null) => void;
-  onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, anchors, onOpen, locked, drag, setDrag, onDropEvent }) => {
+  variants?: string[]; onOpen: () => void; locked: Set<string>; drag: DragState | null; setDrag: (d: DragState | null) => void;
+  onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, anchors, variants, onOpen, locked, drag, setDrag, onDropEvent }) => {
   const height = ((scaleEnd - scaleStart) / 60) * PX_PER_HOUR;
   const label = `${day.date}(${weekday(day.date)})`;
   // [Gate AreaDrag] エリアは 1 つの枠(中の予定を含む長さ)として横に並べ、中の予定は枠の中に置く
@@ -142,6 +144,11 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
             day.freeMinutes !== null ? `空き ${durationLabel(day.freeMinutes)}` : null,
             day.lockedCount ? `固定 ${day.lockedCount}件` : null,
           ].filter(Boolean).map((t, i, all) => <span key={t}>{t}{i < all.length - 1 ? <span className="sr-only">・</span> : null}</span>)}
+          {variants && variants.length > 0 && (
+            <span className="tc-chart-variant" title={`控えの案: ${variants.join('・')}`} data-testid={`chart-variants-${day.index}`}>
+              {`${variants.map((v) => v.split(' ')[0]).join('・')} あり`}
+            </span>
+          )}
         </p>
       </header>
       {anchors?.start && !timedAnchor(anchors.start) && <div className="mt-2"><JourneyAnchorRow anchor={anchors.start} position="start" /></div>}
@@ -281,7 +288,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
   );
 };
 
-const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, onMoveEvent, anchors }) => {
+const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, onMoveEvent, anchors, variantsByDate }) => {
   const locked = useMemo(() => new Set(days.flatMap((d) => d.events.filter((e) => e.locked).map((e) => e.id))), [days]);
   const model = useMemo(() => buildChart(days, segments, locked), [days, segments, locked]);
   // [Gate JourneyEnds] 出発・到着の時刻が物差しの外なら、物差しを 1 時間単位で広げる
@@ -321,6 +328,7 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
         role={many ? 'region' : undefined}>
         {model.days.map((d) => (
           <DayColumn key={d.id} day={d} scaleStart={scale.lo} scaleEnd={scale.hi} anchors={anchors?.[d.index]}
+            variants={variantsByDate?.[d.date]}
             current={d.index === currentDay} onOpen={() => onOpenDay(d.index)} locked={locked} drag={drag} setDrag={setDrag}
             onDropEvent={onMoveEvent ? (x, start) => (start === undefined ? onMoveEvent(x.id, x.from, d.index)
               : onMoveEvent(x.id, x.from, d.index, minutesToHm(start))) : undefined} />

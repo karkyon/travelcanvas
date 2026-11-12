@@ -484,6 +484,16 @@ class TravelDay(Base):
     title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # [Gate PlanB] 日ごとの案(プランB)。同じ日付に日の行を複数持ち、1 つだけが今の案(active)。
+    # 控え(standby)・しまった案(archived)の日と予定は、ふだんの問い合わせから自動で外す(app/services/day_variants.py)
+    variant_status: Mapped[str] = mapped_column(String(8), nullable=False, default="active", server_default="active")
+    variant_label: Mapped[str] = mapped_column(String(1), nullable=False, default="A", server_default="A")
+    variant_name: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    variant_reason: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    variant_conditions: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    variant_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    copied_from_day_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_days.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
@@ -494,7 +504,16 @@ class TravelDay(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("plan_id", "local_date", name="uq_travel_days_plan_date"),
+        Index("uq_travel_days_plan_date_active", "plan_id", "local_date", unique=True,
+              postgresql_where=text("variant_status = 'active'")),
+        Index("uq_travel_days_plan_date_label", "plan_id", "local_date", "variant_label", unique=True),
+        Index("ix_travel_days_copied_from_day_id", "copied_from_day_id"),
+        CheckConstraint("variant_status IN ('active','standby','archived')", name="ck_travel_days_variant_status"),
+        CheckConstraint("variant_label IN ('A','B','C','D','E')", name="ck_travel_days_variant_label"),
+        CheckConstraint(
+            "variant_reason IS NULL OR variant_reason IN "
+            "('rain','party','transport','delay','fatigue','budget','closure','other')",
+            name="ck_travel_days_variant_reason"),
     )
 
 
@@ -533,6 +552,8 @@ class TravelEvent(Base):
     dining: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 最適化対象から除外
+    # [Gate PlanB] 控えの案(日の行が active でない)の予定。日の状態から自動で合わせる(app/services/day_variants.py)
+    variant_standby: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # [Gate EventArea] エリア(event_type='area')の中の予定はエリアの ID を持つ(同じ日・入れ子にしない。
     # 並びはいつもエリアのすぐ後ろに続ける。app/services/event_area.py)
@@ -549,6 +570,10 @@ class TravelEvent(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
     day = relationship("TravelDay", back_populates="events")
+
+    __table_args__ = (
+        Index("ix_travel_events_variant_standby", "plan_id", "variant_standby"),
+    )
 
 
 class EventLink(Base):
@@ -964,6 +989,8 @@ class TravelSegment(Base):
     to_place_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     # walking | driving | train | bus | ferry | flight | bicycle | taxi | mixed
+    # [Gate PlanB] 控えの案の予定どうしの区間(予定の variant_standby から自動で合わせる)
+    variant_standby: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     mode: Mapped[str] = mapped_column(String, nullable=False)
     # planned | confirmed | cancelled
     status: Mapped[str] = mapped_column(String, nullable=False, default="planned", server_default="planned")
@@ -2449,52 +2476,44 @@ class BookletExport(Base):
     )
 
 
-class ItineraryBranch(Base):
-    """[Gate P7] What-if・旅程ブランチ(FR-019、DOC-05 §7.6 itinerary_branches)。
-
-    本案(正本の予定)を壊さずに、雨天・遅延・欠席・予算・体力などの想定で予定を組み替えた案を保存する。
-    base_snapshot は作成時点の本案の予定、content は分岐案の予定。採用時は
-    「分岐案での変更(base_snapshot→content の差分)」を現在の本案へ1つの変更セットとして適用する(Undo可能)。
+class DayVariantSwitch(Base):
+    """[Gate PlanB] 日ごとの案の切り替えの記録(旅行前・旅行中・旅行後)。旅の記録とデータの書き出しに使う。
+    場所は座標を持たず、おおまかな地名(place_label)だけ。日の行・予定には外部キーを張らない(消しても記録は残す)。
     """
-    __tablename__ = "itinerary_branches"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    __tablename__ = "day_variant_switches"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     plan_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    scenario_type: Mapped[str] = mapped_column(String(10), nullable=False, default="custom")
-    assumptions: Mapped[Any] = mapped_column(JSON, nullable=False)
-    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    base_snapshot: Mapped[Any] = mapped_column(JSON, nullable=False)
-    content: Mapped[Any] = mapped_column(JSON, nullable=False)
-    status: Mapped[str] = mapped_column(String(9), nullable=False, default="draft")
-    adopted_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    from_day_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    to_day_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    from_label: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    to_label: Mapped[Optional[str]] = mapped_column(String(1), nullable=True)
+    from_name: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    to_name: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    switched_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    switched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    phase: Mapped[str] = mapped_column(String(8), nullable=False, default="planning", server_default="planning")
+    join_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    done_event_ids: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    place_label: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
-    adopted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    adopted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-
-    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
-    # [Gate G8] FR-019 案の中で予約・移動区間そのものを変える分岐(branch-v2)。NULL は予定だけの案(G7 まで)。
-    # {"base": {"segments": [...], "reservations": [...]}, "segments": [変更], "reservations": [変更]}。
-    # base は変更を初めて保存した時の本案の区間・予約(三方向の取り込みの基準)。予約は外部へ取消・変更を送らない
-    # (取消は「手続きの準備」を作るだけ。app/services/branch_resources.py)
-    resources: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    group_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    undone_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "scenario_type IN ('rain','delay','absence','budget','fatigue','custom')",
-            name="ck_itinerary_branches_scenario",
-        ),
-        CheckConstraint("status IN ('draft','adopted','discarded')", name="ck_itinerary_branches_status"),
-        CheckConstraint("(status = 'adopted') = (adopted_at IS NOT NULL)", name="ck_itinerary_branches_adopted_at"),
-        CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="ck_itinerary_branches_title"),
-        Index("ix_itinerary_branches_plan_deleted", "plan_id", "deleted_at"),
+        CheckConstraint("phase IN ('planning','during','after')", name="ck_day_variant_switches_phase"),
+        Index("ix_day_variant_switches_plan", "plan_id", "switched_at"),
+        Index("ix_day_variant_switches_user", "switched_by_user_id"),
+        Index("ix_day_variant_switches_change_set", "change_set_id"),
     )
+
+
+# [Gate PlanB-Next] class ItineraryBranch(もしもの案)は表と一緒に消した(日ごとの案 TravelDay の variant_* に置き換え)
 
 
 class PlanAlert(Base):
@@ -2617,9 +2636,10 @@ class SyncOperation(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "operation_id", name="uq_sync_operations_user_operation"),
-        CheckConstraint("entity_type IN ('event', 'day', 'order', 'reservation')",
+        CheckConstraint("entity_type IN ('event', 'day', 'order', 'reservation', 'variant')",
                         name="ck_sync_operations_entity_type"),
-        CheckConstraint("action IN ('create', 'update', 'delete', 'reorder')", name="ck_sync_operations_action"),
+        CheckConstraint("action IN ('create', 'update', 'delete', 'reorder', 'switch')",
+                        name="ck_sync_operations_action"),
         CheckConstraint(
             "status IN ('applied','conflicted','rejected','resolved_mine','resolved_server')",
             name="ck_sync_operations_status",
@@ -3951,3 +3971,7 @@ class ProviderSecretVerification(Base):
         CheckConstraint("status IN ('reserved', 'finished')", name="ck_provider_secret_verifications_status"),
         Index("ix_provider_secret_verifications_slot_created", "slot", "created_at"),
     )
+
+
+# [Gate PlanB] 日ごとの案: 控えの案をふだんの問い合わせから外すしくみ(Session の出来事)を登録する
+from app.services import day_variants as _day_variants  # noqa: E402,F401

@@ -185,7 +185,28 @@ def build_public_view(db: Session, plan: TravelPlan, fields: List[str], permissi
     }
     if "reservation_summary" in fields:
         view["reservations"] = _public_reservations(db, plan.id)
+    if "day_variants" in fields:
+        view["variants"] = _public_variants(db, plan.id, fields)
     return view
+
+
+def _public_variants(db: Session, plan_id, fields: List[str]) -> List[Dict[str, Any]]:
+    """[Gate PlanB] 控えの案(しまった案は出さない)。名前・理由と、予定の公開投影だけ"""
+    from app.services import day_variants as dv
+
+    with dv.all_variants(db):
+        days = (db.query(TravelDay).filter(TravelDay.plan_id == plan_id, TravelDay.variant_status == "standby")
+                .order_by(TravelDay.local_date.asc(), TravelDay.variant_label.asc()).all())
+        if not days:
+            return []
+        events = (db.query(TravelEvent).filter(TravelEvent.day_id.in_([d.id for d in days]))
+                  .order_by(TravelEvent.sort_order.asc()).all())
+    by_day: Dict[Any, List[TravelEvent]] = {}
+    for e in events:
+        by_day.setdefault(e.day_id, []).append(e)
+    return [{"date": d.local_date.isoformat(), "label": d.variant_label, "name": dv.label_name(d),
+             "reason_label": dv.REASON_LABEL.get(d.variant_reason or "", None),
+             "events": [_public_event(e, fields) for e in by_day.get(d.id, [])]} for d in days]
 
 
 def _client_ip(request: Request) -> str:

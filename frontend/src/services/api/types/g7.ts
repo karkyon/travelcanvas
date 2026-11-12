@@ -163,32 +163,6 @@ export interface CompareColumn {
   costs: { total: Money[]; removed: Money[] } | null;
 }
 
-export interface CompareBranch extends CompareColumn {
-  id: string;
-  title: string;
-  scenario_type: string;
-  state: string;
-  summary: { added: number; removed: number; updated: number; time_changed: number };
-  conflicts: number;
-  new_issues: ImpactIssue[];
-  resolved_issues: ImpactIssue[];
-  affected_reservations: Array<{ id: string; label: string; status: string }> | null;
-  budget_target: Array<{ currency: string; target: string; branch: string; met: boolean }> | null;
-}
-
-export interface BranchComparison {
-  plan_id: string;
-  plan_revision: number;
-  algorithm_version: string;
-  validation_algorithm_version: string;
-  movement_applied: boolean;
-  plan: CompareColumn & { title: string };
-  branches: CompareBranch[];
-  costs_hidden: boolean;
-  reservations_hidden: boolean;
-  can_adopt: boolean;
-}
-
 // ===== MEM-03
 export interface PartyInfo { with_children: boolean; with_seniors: boolean; size: number; group: 'solo' | 'group' }
 

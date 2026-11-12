@@ -45,6 +45,8 @@ function isQueued(v: unknown): v is QueuedOperation {
   if (!o || typeof o.operation_id !== 'string') return false;
   // [Gate G6] 日程(day)・並び(order)も溜める
   if (o.entity_type === 'order') return o.action === 'reorder';
+  // [Gate PlanB-Offline] 日の案の切り替え
+  if (o.entity_type === 'variant') return o.action === 'switch';
   return (o.entity_type === 'event' || o.entity_type === 'day')
     && (o.action === 'create' || o.action === 'update' || o.action === 'delete');
 }
