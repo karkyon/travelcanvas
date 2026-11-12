@@ -38,6 +38,7 @@ import api, {
   createTicket,
   deleteTicket,
   revealTicket,
+  updateSegment,
 } from '@/services/api';
 import type {
   Reservation, ReservationCreateData, ReservationParticipant,
@@ -261,6 +262,8 @@ const ReservationsPage: React.FC = () => {
   const [search] = useSearchParams();
   const openId = search.get('open');
   const linkEventId = search.get('new') === '1' ? search.get('event') : null;
+  // [Gate SegmentBooking] ?new=1&segment=区間: 移動(区間)につないだ予約を登録する
+  const linkSegmentId = search.get('new') === '1' ? search.get('segment') : null;
   const handled = useRef<string | null>(null);
   useEffect(() => {
     if (!openId || handled.current === `open:${openId}`) return;
@@ -271,12 +274,13 @@ const ReservationsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 読み込んだ予約の一覧から 1 回だけ開く
   }, [openId, reservations]);
   useEffect(() => {
-    if (!linkEventId || handled.current === `new:${linkEventId}`) return;
-    handled.current = `new:${linkEventId}`;
+    const target = linkEventId ?? linkSegmentId;
+    if (!target || handled.current === `new:${target}`) return;
+    handled.current = `new:${target}`;
     const t = search.get('type');
     setCreateForm({ ...EMPTY_FORM, type: t && /^[a-z_]+$/.test(t) ? t : EMPTY_FORM.type, provider_name: search.get('name') ?? '' });
     setIsCreateOpen(true);
-  }, [linkEventId, search]);
+  }, [linkEventId, linkSegmentId, search]);
 
   const closeDetail = () => {
     setSelected(null);
@@ -295,7 +299,16 @@ const ReservationsPage: React.FC = () => {
     setIsSaving(true);
     setError(null);
     try {
-      await createReservation(planId, { ...formToPayload(createForm), ...(linkEventId ? { event_id: linkEventId } : {}) });
+      const created = await createReservation(planId, { ...formToPayload(createForm), ...(linkEventId ? { event_id: linkEventId } : {}) });
+      if (linkSegmentId) {
+        // [Gate SegmentBooking] 作った予約を、その移動(区間)につなぐ(旅程の版を読んでから)
+        try {
+          const detail = await api.getPlanDetail(planId);
+          await updateSegment(planId, linkSegmentId, { reservation_id: created.id }, detail.data.revision);
+        } catch (err) {
+          setError(errorDetailMessage(err, '予約は作りましたが、移動につなげませんでした。旅程の移動の「＋」からつないでください'));
+        }
+      }
       setIsCreateOpen(false);
       setCreateForm(EMPTY_FORM);
       await loadReservations();

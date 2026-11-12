@@ -16,6 +16,7 @@ import { LEGEND_MODES, transportMode } from '@/utils/transportModes';
 import { createSegment, updateSegment } from '@/services/api';
 import type { SegmentMode, SegmentUpdateData, TravelSegment } from '@/services/api/types/segments';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import SegmentBooking from './SegmentBooking';
 
 export interface SegmentSaveContext {
   planId: string;
@@ -119,6 +120,18 @@ const SegmentPicker: React.FC<PickerProps> = ({
               <SlidersHorizontal size={14} aria-hidden="true" />
             </button>
           )}
+          {/* [Gate SegmentBooking] 移動の予約(飛行機・鉄道・バス・船・タクシーなど) */}
+          {segment && !mismatch && (
+            <SegmentBooking planId={planId} revision={revision} segment={segment} fromTitle={fromTitle} toTitle={toTitle}
+              canEdit={canEdit} onSaved={onSaved} />
+          )}
+        </div>
+      )}
+      {/* 見るだけの人にも、予約済みの移動はその予約を開けるようにする */}
+      {!canEdit && segment?.reservation_id && (
+        <div className="tc-segment-tools">
+          <SegmentBooking planId={planId} revision={revision} segment={segment} fromTitle={fromTitle} toTitle={toTitle}
+            canEdit={false} onSaved={onSaved} />
         </div>
       )}
       {open && (

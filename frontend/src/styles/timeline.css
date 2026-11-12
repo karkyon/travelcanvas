@@ -427,3 +427,10 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-today-countdown b { font-size: 56px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
 .tc-today-countdown span { font-size: 18px; font-weight: 800; }
 .tc-today-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+
+/* ===== [Gate SegmentBooking] 移動の予約(移動の行の右の小さな「＋⌄」・予約済みはカレンダー✓) ===== */
+.tc-segment-tools .tc-bk--menu { display: inline-flex; }
+.tc-bk-plus--sm { height: 28px; padding: 0 6px 0 7px; box-shadow: none; }
+.tc-bk-menu--left { right: auto; left: 0; }
+.tc-bk-menu .tc-bk-act .truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-seg-iconbtn.tc-seg-booked { color: #17734d; }
