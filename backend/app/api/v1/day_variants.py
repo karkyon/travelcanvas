@@ -583,6 +583,18 @@ def plan_weather(plan_id: str, date: Optional[date_cls] = None, db: Session = De
             if date is None or d.local_date == date:
                 f = _forecast_for(db, d, prev)
                 if f is not None:
+                    # [PlanB-Weather] 雨の時間に始まる屋外・一部屋外の予定(BBQ・展望台など)
+                    from app.services import weather_fit as wf
+
+                    affected = []
+                    for e in dv._events(db, d):
+                        hit = wfc.rain_at(f, e.local_start_time)
+                        fit = wf.fit(e.title, e.event_type, e.description)["fit"]
+                        if hit and fit in ("outdoor", "partly") and e.parent_event_id is None:
+                            affected.append({"event_id": str(e.id), "title": e.title,
+                                             "time": (e.local_start_time or "")[:5],
+                                             "probability": hit["probability"], "fit": fit})
+                    f = {**f, "affected_events": affected}
                     has_rain_variant = (db.query(TravelDay).filter(
                         TravelDay.plan_id == plan.id, TravelDay.local_date == d.local_date,
                         TravelDay.variant_status == "standby", TravelDay.variant_reason == "rain").first() is not None)

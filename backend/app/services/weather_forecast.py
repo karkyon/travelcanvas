@@ -66,6 +66,7 @@ def _fetch(lat: float, lng: float, day: date, tz: str) -> Optional[Dict[str, Any
     params: Dict[str, Any] = {
         "latitude": lat, "longitude": lng, "timezone": tz or "Asia/Tokyo",
         "daily": "weather_code,precipitation_probability_max,precipitation_sum,temperature_2m_max,temperature_2m_min",
+        "hourly": "precipitation_probability,precipitation",
         "start_date": day.isoformat(), "end_date": day.isoformat(),
     }
     with httpx.Client(timeout=TIMEOUT, transport=_transport, headers={"User-Agent": USER_AGENT}) as client:
@@ -85,12 +86,29 @@ def _fetch(lat: float, lng: float, day: date, tz: str) -> Optional[Dict[str, Any
     prob_i = int(prob) if isinstance(prob, (int, float)) else None
     mm_f = float(mm) if isinstance(mm, (int, float)) else None
     tmax, tmin = first("temperature_2m_max"), first("temperature_2m_min")
+    # 時間ごと(0〜23 時)の降水確率・降水量。雨の時間帯と、その時間の屋外の予定を出すのに使う
+    hourly = body.get("hourly") or {}
+    hours: List[Dict[str, Any]] = []
+    times = hourly.get("time") or []
+    probs = hourly.get("precipitation_probability") or []
+    mms = hourly.get("precipitation") or []
+    for i, t in enumerate(times[:24]):
+        try:
+            h = int(str(t)[11:13])
+        except ValueError:
+            continue
+        pr = probs[i] if i < len(probs) and isinstance(probs[i], (int, float)) else None
+        mm_h = mms[i] if i < len(mms) and isinstance(mms[i], (int, float)) else None
+        hours.append({"hour": h, "probability": int(pr) if pr is not None else None,
+                      "mm": float(mm_h) if mm_h is not None else None,
+                      "rainy": bool((pr is not None and pr >= RAIN_PROBABILITY) or (mm_h is not None and mm_h >= 1.0))})
     return {
         "date": day.isoformat(), "weather_code": code_i, "label": CODE_LABEL.get(code_i or -1, "不明"),
         "precipitation_probability": prob_i, "precipitation_mm": mm_f,
         "temp_max": float(tmax) if isinstance(tmax, (int, float)) else None,
         "temp_min": float(tmin) if isinstance(tmin, (int, float)) else None,
-        "rainy": judge(prob_i, mm_f, code_i), "source": "Open-Meteo",
+        "rainy": judge(prob_i, mm_f, code_i), "source": "Open-Meteo", "hours": hours,
+        "rain_hours": rain_ranges(hours),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -120,6 +138,31 @@ def forecast(lat: Optional[float], lng: Optional[float], day: date, tz: str, tod
             # 失敗は 5 分だけ覚える(提供元へ送り続けない・長く「予報なし」にしない)
             _cache[key] = (now if result is not None else now - max(ttl - 300, 0), result)
     return result
+
+
+def rain_ranges(hours: List[Dict[str, Any]]) -> List[str]:
+    """雨の時間帯を「13時〜16時」の形にまとめる"""
+    out: List[str] = []
+    run: List[int] = []
+    for h in sorted(x["hour"] for x in hours if x.get("rainy")):
+        if run and h != run[-1] + 1:
+            out.append(f"{run[0]}時〜{run[-1] + 1}時")
+            run = []
+        run.append(h)
+    if run:
+        out.append(f"{run[0]}時〜{run[-1] + 1}時")
+    return out
+
+
+def rain_at(f: Optional[Dict[str, Any]], hhmm: Optional[str]) -> Optional[Dict[str, Any]]:
+    """その時刻(HH:MM)の時間の予報(雨なら)。時間ごとの値が無ければ None"""
+    if not f or not hhmm or len(hhmm) < 2:
+        return None
+    try:
+        h = int(hhmm[:2])
+    except ValueError:
+        return None
+    return next((x for x in f.get("hours") or [] if x["hour"] == h and x.get("rainy")), None)
 
 
 def center(points: List[Tuple[float, float]]) -> Optional[Tuple[float, float]]:

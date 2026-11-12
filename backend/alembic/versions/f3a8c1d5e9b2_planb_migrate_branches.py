@@ -37,18 +37,17 @@ def _j(v: Any) -> Any:
     return json.loads(v)
 
 
-def _copy_event(conn, cols: List[str], src_id, new_id, day_id, fields: Dict[str, Any]) -> None:
-    keep = [c for c in cols if c not in ("id", "day_id", "variant_standby", "parent_event_id", "created_at", "updated_at")]
-    sets = {c: sa.column(c) for c in keep}
-    row = conn.execute(sa.select(*[sets[c] for c in keep]).select_from(sa.table("travel_events"))
-                       .where(sa.column("id") == uuid.UUID(str(src_id)))).mappings().first()
+def _copy_event(conn, events: sa.Table, src_id, new_id, day_id, fields: Dict[str, Any]) -> None:
+    """予定を写す。列の型は DB から読んだ表(events)を使う(JSONB の urls・dining などを正しく渡す)"""
+    keep = [c for c in events.c if c.name not in ("id", "day_id", "variant_standby", "parent_event_id", "created_at",
+                                                    "updated_at")]
+    row = conn.execute(sa.select(*keep).where(events.c.id == uuid.UUID(str(src_id)))).mappings().first()
     if row is None:
         return
     vals = dict(row)
     vals.update(fields)
     vals.update({"id": new_id, "day_id": day_id, "variant_standby": True})
-    t = sa.table("travel_events", *[sa.column(k) for k in vals])
-    conn.execute(sa.insert(t).values(**vals))
+    conn.execute(sa.insert(events).values(**vals))
 
 
 def upgrade() -> None:
@@ -57,9 +56,10 @@ def upgrade() -> None:
 
 def run(conn) -> Dict[str, int]:
     """移行の本体(試験からも呼ぶ)。作った案の数を返す"""
-    insp = sa.inspect(conn)
-    ev_cols = [c["name"] for c in insp.get_columns("travel_events")]
-    seg_cols = [c["name"] for c in insp.get_columns("travel_segments")]
+    # 列の型(JSONB・UUID・時刻)を DB から読む。型の無い表で写すと、JSONB の値(辞書・配列)を渡せない
+    md = sa.MetaData()
+    events = sa.Table("travel_events", md, autoload_with=conn)
+    segments = sa.Table("travel_segments", md, autoload_with=conn)
     branches = conn.execute(sa.text(
         "SELECT id, plan_id, title, scenario_type, base_snapshot, content FROM itinerary_branches "
         "WHERE status = 'draft' AND deleted_at IS NULL ORDER BY created_at")).mappings().all()
@@ -129,24 +129,22 @@ def run(conn) -> Dict[str, int]:
                 new_id = uuid.uuid4()
                 src = item.get("source_event_id")
                 if src is not None:
-                    _copy_event(conn, ev_cols, src, new_id, nd, fields)
+                    _copy_event(conn, events, src, new_id, nd, fields)
                     idmap[src] = new_id
                 else:
-                    t = sa.table("travel_events", *[sa.column(k) for k in
-                                                    ("id", "plan_id", "day_id", "variant_standby", "locked", *FIELDS)])
-                    conn.execute(sa.insert(t).values(id=new_id, plan_id=b["plan_id"], day_id=nd, variant_standby=True,
-                                                     locked=False, **fields))
+                    conn.execute(sa.insert(events).values(id=new_id, plan_id=b["plan_id"], day_id=nd,
+                                                          variant_standby=True, locked=False, **fields))
             # 案に無い今の予定(案を作った後に本案へ足した予定)も写す
             for (eid,) in conn.execute(sa.text("SELECT id FROM travel_events WHERE day_id = :d"), {"d": d["id"]}).all():
                 if str(eid) not in idmap and str(eid) not in base_ev:
                     new_id = uuid.uuid4()
-                    _copy_event(conn, ev_cols, eid, new_id, nd, {})
+                    _copy_event(conn, events, eid, new_id, nd, {})
                     idmap[str(eid)] = new_id
             # 移動区間: 両端が写した予定の区間
             if idmap:
-                keep = [c for c in seg_cols if c not in ("id", "created_at", "updated_at", "variant_standby")]
-                rows = conn.execute(sa.select(*[sa.column(c) for c in keep]).select_from(sa.table("travel_segments"))
-                                    .where(sa.column("to_event_id").in_([uuid.UUID(k) for k in idmap]))).mappings().all()
+                keep = [c for c in segments.c if c.name not in ("id", "created_at", "updated_at", "variant_standby")]
+                rows = conn.execute(sa.select(*keep).where(
+                    segments.c.to_event_id.in_([uuid.UUID(k) for k in idmap]))).mappings().all()
                 for r in rows:
                     vals = dict(r)
                     frm = str(vals["from_event_id"]) if vals.get("from_event_id") else None
@@ -156,8 +154,7 @@ def run(conn) -> Dict[str, int]:
                     if frm is not None:
                         vals["from_event_id"] = idmap[frm]
                     vals.update({"id": uuid.uuid4(), "variant_standby": True})
-                    t = sa.table("travel_segments", *[sa.column(k) for k in vals])
-                    conn.execute(sa.insert(t).values(**vals))
+                    conn.execute(sa.insert(segments).values(**vals))
             made += 1
     log.info("[PlanB-P8] もしもの案の下書き %d 件から控えの案を %d 件作りました(案が 5 つの日で作れなかった %d 件)",
              len(branches), made, skipped_full)

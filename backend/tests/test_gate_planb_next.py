@@ -56,9 +56,12 @@ def meteo():
         sent.append(request)
         assert request.url.host == "api.open-meteo.com"
         day = request.url.params["start_date"]
-        return httpx.Response(200, json={"daily": {"time": [day], "weather_code": [63],
-                                                   "precipitation_probability_max": [80], "precipitation_sum": [12.5],
-                                                   "temperature_2m_max": [16.2], "temperature_2m_min": [9.1]}})
+        probs = [10] * 11 + [70, 80, 85, 60] + [20] * 9  # 11 時〜15 時が雨
+        return httpx.Response(200, json={
+            "daily": {"time": [day], "weather_code": [63], "precipitation_probability_max": [80],
+                      "precipitation_sum": [12.5], "temperature_2m_max": [16.2], "temperature_2m_min": [9.1]},
+            "hourly": {"time": [f"{day}T{h:02d}:00" for h in range(24)], "precipitation_probability": probs,
+                       "precipitation": [0.0] * 24}})
     wfc.set_transport(httpx.MockTransport(handler))
     yield sent
     wfc.set_transport(None)
@@ -72,6 +75,9 @@ def test_weather_forecast_rounds_coordinates_caches_and_suggests_rain_variant(au
     f = r.json()["forecasts"][0]
     assert (f["date"], f["label"], f["precipitation_probability"], f["rainy"], f["has_rain_variant"]) == (
         d0.isoformat(), "雨", 80, True, False)
+    # 時間ごと: 雨の時間帯と、その時間に始まる屋外の予定(BBQ 12:00)。屋内の水族館(15:00)・晴れの時間の神社は出さない
+    assert f["rain_hours"] == ["11時〜15時"]
+    assert [(x["title"], x["time"], x["probability"]) for x in f["affected_events"]] == [("河原でバーベキュー", "12:00", 80)]
     # 送ったのは丸めた座標と日付だけ(予定の名前は送らない)
     q = meteo[0].url.params
     assert (q["latitude"], q["longitude"]) == ("34.4", "136.8") and "伊勢" not in str(meteo[0].url)
@@ -227,3 +233,41 @@ def test_branches_table_is_gone(db_session):
 
     assert not hasattr(m, "ItineraryBranch")
     assert "itinerary_branches" not in inspect(db_session.get_bind()).get_table_names()
+
+
+def test_branch_migration_copies_jsonb_event_columns(auth_client, db_session):
+    """[PlanB-P8 の直し] 移行で予定を写す時、JSONB の列(urls・dining)を正しく渡す(以前は型の無い表で写し、
+    omega-dev2 の移行が「can't adapt type 'dict'」で止まった)"""
+    import importlib.util
+    import pathlib
+
+    import sqlalchemy as sa
+
+    from app.models.models import TravelDay, TravelEvent
+
+    client, _ = auth_client
+    p, base, d, evs, d0 = _setup(client)
+    src = db_session.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(evs["河原でバーベキュー"]["id"])).one()
+    src.urls = ["https://bbq.example/menu"]
+    src.dining = {"budget": "3000", "notes": "雨天中止"}
+    db_session.commit()
+    versions = pathlib.Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    path = versions / "f3a8c1d5e9b2_planb_migrate_branches.py"
+    spec = importlib.util.spec_from_file_location("planb_migrate_branches", path)
+    mig = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mig)
+    conn = db_session.connection()
+    events = sa.Table("travel_events", sa.MetaData(), autoload_with=conn)
+    nd = TravelDay(plan_id=uuid.UUID(p), local_date=d0, timezone_id="Asia/Tokyo", variant_status="standby",
+                   variant_label="B")
+    db_session.add(nd)
+    db_session.flush()
+    new_id = uuid.uuid4()
+    mig._copy_event(conn, events, src.id, new_id, nd.id, {"local_start_time": "12:30"})
+    db_session.commit()
+    from app.services import day_variants as dv
+
+    with dv.all_variants(db_session):
+        got = db_session.query(TravelEvent).filter(TravelEvent.id == new_id).one()
+    assert got.urls == ["https://bbq.example/menu"] and got.dining == {"budget": "3000", "notes": "雨天中止"}
+    assert got.local_start_time == "12:30" and got.variant_standby is True and got.day_id == nd.id

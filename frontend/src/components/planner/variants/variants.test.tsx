@@ -138,6 +138,10 @@ describe('[Next] 予報・屋内の候補・AI の確かめ', () => {
     const x = h();
     const { rerender } = render(<VariantBar variants={[A]} openId={null} canEdit forecast={rain} {...x} />);
     expect(screen.getByTestId('variant-forecast').textContent).toBe('予報 雨 · 降水 80% · 16℃');
+    rerender(<VariantBar variants={[A]} openId={null} canEdit {...x} forecast={{ ...rain, rain_hours: ['11時〜15時'],
+      affected_events: [{ event_id: 'e', title: '河原でバーベキュー', time: '12:00', probability: 80, fit: 'outdoor' }] }} />);
+    expect(screen.getByTestId('variant-forecast').textContent).toBe('予報 雨 · 降水 80% · 16℃ · 雨 11時〜15時');
+    expect(screen.getByTestId('variant-affected').textContent).toBe('雨の時間に屋外: 河原でバーベキュー 12:00');
     fireEvent.click(screen.getByTestId('variant-create-rain'));
     expect(x.onCreateRain).toHaveBeenCalled();
     rerender(<VariantBar variants={[A, B]} openId="b" canEdit forecast={{ ...rain, has_rain_variant: true }} {...x} />);

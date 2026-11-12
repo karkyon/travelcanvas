@@ -156,6 +156,7 @@ const TodaySwitchPanel: React.FC<Props> = ({ planId, date, events, onSwitched, o
         <p className={`tc-today-switch-sub${data.forecast.rainy ? ' is-warn' : ''}`} data-testid="today-switch-forecast">
           {`予報(${data.forecast.source}): ${data.forecast.label}`}
           {data.forecast.precipitation_probability !== null ? ` · 降水確率 ${data.forecast.precipitation_probability}%` : ''}
+          {data.forecast.rain_hours && data.forecast.rain_hours.length > 0 ? ` · 雨 ${data.forecast.rain_hours.join('・')}` : ''}
           {data.forecast.rainy ? ' · 雨の案への切り替えを考えてください' : ''}
         </p>
       )}

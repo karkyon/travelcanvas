@@ -59,6 +59,12 @@ const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, 
             {`予報 ${forecast.label}`}
             {forecast.precipitation_probability !== null ? ` · 降水 ${forecast.precipitation_probability}%` : ''}
             {forecast.temp_max !== null ? ` · ${Math.round(forecast.temp_max)}℃` : ''}
+            {forecast.rain_hours && forecast.rain_hours.length > 0 ? ` · 雨 ${forecast.rain_hours.join('・')}` : ''}
+          </span>
+        )}
+        {(forecast?.affected_events?.length ?? 0) > 0 && (
+          <span className="tc-variant-note is-warn" data-testid="variant-affected">
+            {`雨の時間に屋外: ${forecast!.affected_events!.map((e) => `${e.title} ${e.time}`).join('・')}`}
           </span>
         )}
         {forecast?.rainy && !forecast.has_rain_variant && canEdit && onCreateRain && (

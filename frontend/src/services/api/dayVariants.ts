@@ -100,6 +100,10 @@ export interface Forecast {
   date: string; day_id: string; label: string; weather_code: number | null; precipitation_probability: number | null;
   precipitation_mm: number | null; temp_max: number | null; temp_min: number | null; rainy: boolean; source: string;
   has_rain_variant: boolean;
+  /** 時間ごとの雨の時間帯(「11時〜15時」) */
+  rain_hours?: string[];
+  /** 雨の時間に始まる屋外・一部屋外の予定(今の案) */
+  affected_events?: { event_id: string; title: string; time: string; probability: number | null; fit: 'outdoor' | 'partly' }[];
 }
 export async function getWeather(planId: string, date?: string | null): Promise<{ enabled: boolean; forecasts: Forecast[]; notice: string }> {
   return (await api.get(`/plans/${planId}/weather`, { ...SILENT, params: date ? { date } : undefined })).data as {
