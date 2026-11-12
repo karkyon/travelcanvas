@@ -28,6 +28,15 @@ describe('[Gate RoadRoute] 地図の線の区間', () => {
     ]);
   });
 
+  it('エリアの中でも遠い場所(エリアに入れ間違えた場所)は歩きと決めつけない', () => {
+    const legs = buildMapLegs([
+      ev('area', 34.4622, 136.7232, { category: 'area' }),
+      ev('geku', 34.4874, 136.7036, { parent_event_id: 'area' }),
+    ]);
+    expect(legs[0]!.source).toBe('guess');
+    expect(legs[0]!.mode).toBe('driving');
+  });
+
   it('近い2点は歩きと推測する', () => {
     const legs = buildMapLegs([ev('a', 34.4551, 136.7258), ev('b', 34.4600, 136.7258)]);
     expect(straightKm(legs[0]!.from, legs[0]!.to)).toBeLessThan(1.2);

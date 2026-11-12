@@ -54,7 +54,7 @@ const MODE_LABEL: Record<string, string> = {
   walking: '徒歩', driving: '車', taxi: 'タクシー', bus: 'バス', express_bus: '高速バス', bicycle: '自転車',
   train: '電車', shinkansen: '新幹線', flight: '飛行機', ferry: '船', helicopter: 'ヘリ', mixed: '複合',
 };
-const ROUTE_STRAIGHT = '#64748b';
+const ROUTE_STRAIGHT = '#334155';
 
 /** [Gate RoadRoute] 区間の線の説明(手段・道の目安の時間と距離。推測した手段は「手段は推測」) */
 function legTip(leg: MapLeg, g: RouteGeometry['legs'][number] | undefined): string {
@@ -117,6 +117,19 @@ const FitBounds: React.FC<{ positions: [number, number][] }> = ({ positions }) =
     }
     map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
   }, [map, positions]);
+  return null;
+};
+
+// [Gate MapFloatTimeline] 選んだ予定の印が地図の外なら、そこへ動かす(見えていれば動かさない)
+const PanToSelected: React.FC<{ position: [number, number] | null }> = ({ position }) => {
+  const map = useMap();
+  const lat = position?.[0];
+  const lng = position?.[1];
+  React.useEffect(() => {
+    if (lat === undefined || lng === undefined) return;
+    const target = L.latLng(lat, lng);
+    if (!map.getBounds().pad(-0.1).contains(target)) map.panTo(target, { animate: true });
+  }, [map, lat, lng]);
   return null;
 };
 
@@ -187,6 +200,10 @@ const PlanMap: React.FC<PlanMapProps> = ({
     }, 250);
     return () => { alive = false; window.clearTimeout(timer); };
   }, [planId, legs, sig]);
+  const selectedPos = useMemo((): [number, number] | null => {
+    const e = scheduledWithCoords.find((x) => x.id === selectedEventId);
+    return e && typeof e.latitude === 'number' && typeof e.longitude === 'number' ? [e.latitude, e.longitude] : null;
+  }, [scheduledWithCoords, selectedEventId]);
   const geoLegs = geo && geo.sig === sig && geo.data.legs.length === legs.length ? geo.data.legs : null;
 
   const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
@@ -212,6 +229,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {hasAnyKnownLocation && <FitBounds positions={allPositions} />}
+          <PanToSelected position={selectedPos} />
 
           {geoLegs ? legs.map((leg, i) => {
             const g = geoLegs[i];
@@ -219,7 +237,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
             const positions = road ? g!.coordinates.map((c): [number, number] => [c[0]!, c[1]!]) : [leg.from, leg.to];
             const pathOptions = road
               ? { color: PIN_PLANNED, weight: leg.source === 'guess' ? 3 : 4, opacity: leg.source === 'guess' ? 0.6 : 0.9 }
-              : { color: ROUTE_STRAIGHT, weight: 3, opacity: 0.85, dashArray: '1 8', lineCap: 'round' as const };
+              : { color: ROUTE_STRAIGHT, weight: 4, opacity: 0.95, dashArray: '2 9', lineCap: 'round' as const };
             return (
               <Polyline key={`leg-${leg.key}-${i}`} positions={positions} pathOptions={pathOptions}>
                 <Tooltip sticky className="tc-pin-tip">{legTip(leg, g)}</Tooltip>

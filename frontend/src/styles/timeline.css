@@ -296,7 +296,7 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-mapov-legend i.is-cand { background: #fff; border: 2px solid #c2410c; }
 /* [Gate RoadRoute] 道に沿った経路(実線)・直線の目安(点線) */
 .tc-mapov-legend i.is-road { width: 18px; height: 4px; border-radius: 2px; background: var(--tc-accent); }
-.tc-mapov-legend i.is-straight { width: 18px; height: 0; border-radius: 0; background: transparent; border-top: 3px dotted #64748b; }
+.tc-mapov-legend i.is-straight { width: 18px; height: 0; border-radius: 0; background: transparent; border-top: 3px dotted #334155; }
 /* 地図を最大化・Google マップで表示(MapTools)は日付の欄の右に */
 .tc-map-frame .tc-map-actions { left: 12px; right: auto; top: 50px; justify-content: flex-start; max-width: calc(100% - 310px); }
 .tc-mapov-check { right: 12px; top: 10px; width: 270px; padding: 10px 12px; }
@@ -331,3 +331,58 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
   .tc-mapov-next { display: none; }
   .tc-map-frame .tc-map-actions { left: auto; right: 8px; top: 52px; }
 }
+
+/* ===== [Gate MapFloatTimeline] 地図の最大化の時の小さな旅程(左に重ねる) ===== */
+.tc-mtl { left: 12px; top: 100px; bottom: 44px; width: 300px; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.tc-mtl-head { display: flex; align-items: center; gap: 6px; padding: 9px 8px 9px 12px; border-bottom: 1px solid var(--tc-cloud-200);
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong, var(--tc-accent)); font-size: 13px; }
+.tc-mtl-head b { color: var(--tc-ink-900); }
+.tc-mtl-date { font-size: 12px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-mtl-list { list-style: none; margin: 0; padding: 6px 6px 10px; overflow-y: auto; flex: 1; scrollbar-width: thin; }
+.tc-mtl-btn { width: 100%; display: grid; grid-template-columns: 42px 24px minmax(0, 1fr); align-items: center; gap: 6px;
+  padding: 5px 6px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; color: var(--tc-ink-900); }
+.tc-mtl-btn:hover { background: var(--tc-cloud-50); }
+.tc-mtl-btn.is-selected { background: #fef2f2; border-color: #fecaca; }
+.tc-mtl-time { font-size: 12px; font-weight: 800; text-align: right; color: var(--tc-ink-900); font-variant-numeric: tabular-nums; }
+.tc-mtl-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #0f6e66; color: #fff;
+  font-size: 11px; font-weight: 800; }
+.tc-mtl-num.is-none { background: var(--tc-cloud-200); color: var(--tc-ink-700); }
+.tc-mtl-btn.is-selected .tc-mtl-num { background: #dc2626; }
+.tc-mtl-title { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-mtl-item.is-inner .tc-mtl-btn { padding-left: 18px; }
+.tc-mtl-item.is-inner .tc-mtl-title { font-weight: 600; }
+.tc-mtl-item.is-area .tc-mtl-title::before { content: 'エリア'; margin-right: 6px; padding: 0 5px; border-radius: 5px; font-size: 10px;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-mtl-move { display: flex; align-items: center; gap: 5px; margin: 1px 0 1px 54px; padding-left: 8px; border-left: 2px dashed var(--tc-cloud-200);
+  font-size: 11px; color: var(--tc-ink-700); }
+.tc-mtl-move.is-inner { margin-left: 66px; }
+.tc-mtl-anchor { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px; align-items: center; margin: 2px 0; padding: 6px;
+  border-radius: 9px; background: var(--tc-cloud-50); font-size: 12px; }
+.tc-mtl-anchortext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-mtl-anchortext b { margin-right: 6px; color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-mtl-pill { left: 12px; top: 100px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; cursor: pointer; }
+.tc-mtl-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: var(--tc-accent); color: var(--tc-on-accent, #fff); font-size: 11px; }
+/* 最大化の時は、拡大・縮小のボタンを旅程の右へ。選んだ予定の1行も旅程の右から */
+.tc-map-frame--max .leaflet-top.leaflet-left { left: 316px; }
+.tc-map-frame--max .tc-mapov-sel { left: 324px; max-width: calc(100% - 620px); }
+@media (max-width: 900px) {
+  .tc-mtl { width: 230px; }
+  .tc-map-frame--max .leaflet-top.leaflet-left { left: 246px; }
+  .tc-map-frame--max .tc-mapov-sel { left: 254px; max-width: calc(100% - 270px); }
+}
+
+/* ===== [Gate ChartAlign] 全日程の表: 上の段(見出し・前夜の宿)を同じ高さに。宿は列の幅いっぱい ===== */
+.tc-chart-top { display: flex; flex-direction: column; }
+.tc-chart-top .tc-chart-dayhead { box-sizing: border-box; }
+.tc-chart-topanchor:not(:empty) { padding-top: 8px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact { margin: 0; }
+.tc-anchor-row.is-compact { display: block; margin: 6px 0 0; }
+.tc-anchor-row.is-compact .tc-anchor { align-items: flex-start; gap: 8px; padding: 8px 10px; border-style: solid; border-radius: 10px;
+  background: var(--tc-surface, var(--tc-cloud-0)); }
+.tc-anchor-row.is-compact[data-kind^='lodging'] .tc-anchor { border-color: color-mix(in srgb, #17734d 35%, var(--tc-cloud-200));
+  background: color-mix(in srgb, #17734d 6%, var(--tc-surface, #fff)); }
+.tc-anchor-row.is-compact .tc-anchor-icon { margin-top: 1px; color: #17734d; }
+.tc-anchor-row.is-compact .tc-anchor-text { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.tc-anchor-row.is-compact .tc-anchor-label { display: block; margin: 0 0 1px; font-size: 11px; font-weight: 800; color: #17734d; }

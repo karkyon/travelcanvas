@@ -10,7 +10,7 @@
  *   見出しなど物差しの外に落とすと、日だけを変える。帯は種類ごとの色で見分ける(凡例つき)
  * 空き時間・移動の合計は重なりを二重に数えない(plannerModel.unionMinutes)。
  */
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import TransportIcon from '../common/TransportIcon';
 import type { DaySchedule } from '@/types';
 import type { TravelSegment } from '@/services/api/types/segments';
@@ -131,8 +131,10 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
       data-current={current ? 'true' : undefined}
       // [Gate ChartFrame] 全日程の表では日を選んで操作しないので、選んでいる日を強めない。どの日も同じ薄めの枠で囲む
       className={`tc-chart-col flex min-w-[15rem] flex-col rounded-xl border bg-surface p-3 ${over && canDrop ? 'border-accent ring-2 ring-accent/40 bg-cloud-50' : ''}`}>
-      {/* [Gate ChartHead] 日付の見出しは色の帯で物差しと分ける(日付を大きく、要約は小さな札で) */}
-      <header className="tc-chart-dayhead" data-testid={`chart-head-${day.index}`}>
+      {/* [Gate ChartHead] 日付の見出しは色の帯で物差しと分ける(日付を大きく、要約は小さな札で)
+          [Gate ChartAlign] 見出しと前夜の宿は「上の段」にまとめ、全部の日で同じ高さにそろえる(物差しの時刻の位置もそろう) */}
+      <div className="tc-chart-top" data-testid={`chart-top-${day.index}`}>
+      <header className="tc-chart-dayhead" data-chart-head="" data-testid={`chart-head-${day.index}`}>
         <p className="tc-chart-dayhead-kicker">{`DAY ${day.index + 1}`}<span>{`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}</span></p>
         <h3 id={`chart-day-${day.id}`} className="tc-chart-dayhead-date">{label}</h3>
         <p className="tc-chart-dayhead-chips" data-testid={`chart-summary-${day.index}`}>
@@ -151,7 +153,10 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           )}
         </p>
       </header>
-      {anchors?.start && !timedAnchor(anchors.start) && <div className="mt-2"><JourneyAnchorRow anchor={anchors.start} position="start" /></div>}
+      <div className="tc-chart-topanchor" data-chart-slot="">
+        {anchors?.start && !timedAnchor(anchors.start) && <JourneyAnchorRow anchor={anchors.start} position="start" compact />}
+      </div>
+      </div>
       <div className="relative mt-2 mb-3" style={{ height }} aria-hidden="false" data-testid={`chart-scale-${day.index}`}
         onDragOver={(ev) => {
           if (!onDropEvent || !drag) return;
@@ -266,7 +271,7 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           })}
         </ol>
       </div>
-      {anchors?.end && !timedAnchor(anchors.end) && <JourneyAnchorRow anchor={anchors.end} position="end" />}
+      {anchors?.end && !timedAnchor(anchors.end) && <JourneyAnchorRow anchor={anchors.end} position="end" compact />}
       {day.untimed.length > 0 && (
         <ul className="mt-5 space-y-1 text-xs text-ink-700" aria-label={`${label}の時刻の無い予定`} data-testid={`chart-untimed-${day.index}`}>
           {day.untimed.map((e) => (
@@ -309,6 +314,26 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
   }, [model.scaleStart, model.scaleEnd, anchors]);
   const [drag, setDrag] = useState<DragState | null>(null);
   const many = days.length > 3;
+  // [Gate ChartAlign] 各日の上の段(見出し・前夜の宿)を一番高い日に合わせる。列の幅が変わったら合わせ直す
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+    // 見出しの帯と前夜の宿の枠を、それぞれ一番高い日に合わせる(帯の高さも物差しの位置もそろう)
+    const apply = () => {
+      for (const sel of ['[data-chart-head]', '[data-chart-slot]']) {
+        const els = Array.from(row.querySelectorAll<HTMLElement>(sel));
+        els.forEach((t) => { t.style.minHeight = ''; });
+        const max = Math.max(0, ...els.map((t) => t.getBoundingClientRect().height));
+        if (max > 0) els.forEach((t) => { t.style.minHeight = `${Math.ceil(max)}px`; });
+      }
+    };
+    apply();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, [model, anchors, variantsByDate]);
   const cats = Object.keys(CATEGORY_NAME).filter((c) => model.days.some((d) => [...d.events, ...d.untimed].some((e) => (e.category ?? 'other') === c)));
   return (
     <section aria-labelledby="all-days-title" data-testid="all-days-chart" className="mb-4">
@@ -323,7 +348,7 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
         </ul>
       )}
       {many && <p className="mt-1 text-xs text-ink-700" data-testid="all-days-scroll-hint">横に流すと他の日も見られます →</p>}
-      <div className={`mt-3 gap-3 ${many ? 'flex overflow-x-auto pb-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}
+      <div ref={rowRef} className={`mt-3 gap-3 ${many ? 'flex overflow-x-auto pb-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}
         tabIndex={many ? 0 : undefined} aria-label={many ? '全日程(横に流せます)' : undefined}
         role={many ? 'region' : undefined}>
         {model.days.map((d) => (

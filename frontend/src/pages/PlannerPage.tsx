@@ -47,6 +47,7 @@ import type { RoutePreview } from '@/services/api';
 import PlanMap from '@/components/planner/PlanMap';
 import MapTools from '@/components/planner/MapTools';
 import MapOverlays from '@/components/planner/MapOverlays';
+import MapTimelineFloat from '@/components/planner/MapTimelineFloat';
 import { dayCheck } from '@/components/planner/mapCheckModel';
 import { mapNumbers } from '@/components/planner/mapNumberModel';
 import { localToday, nextEventIndexFor } from '@/components/planner/nextEventModel';
@@ -923,7 +924,8 @@ const PlannerPage: React.FC = () => {
       minutes: Math.max(0, (toMinutesHm(nextEv.start_time) ?? 0) - (toMinutesHm(nowLocal.time) ?? 0)),
       routeHref: dirHref(nextEv),
     } : null;
-    const startA = dayAnchors(currentPlan, currentDayIndex).start;
+    const dayEnds = dayAnchors(currentPlan, currentDayIndex);
+    const startA = dayEnds.start;
     const startLabel = startA && startA.kind === 'departure'
       ? `出発: ${startA.place ?? '出発地'}から${startA.time ? ` ${startA.time}` : ''}` : null;
     return (
@@ -1163,6 +1165,19 @@ const PlannerPage: React.FC = () => {
                     autoDetect={isAutoDetectEnabled}
                     onToggleAutoDetect={() => { setAutoDetectError(null); setIsAutoDetectEnabled((v) => !v); }}
                   />
+                  {/* [Gate MapFloatTimeline] 地図を最大化した時だけ、左に小さな旅程を重ねる(押すと選んで地図をそこへ) */}
+                  {mapMax && activeDay && (
+                    <MapTimelineFloat
+                      dateLabel={activeDay.date ? `${activeDay.date.slice(5).replace('-', '/')} ${getDayOfWeek(activeDay.date)}` : `${currentDayIndex + 1}日目`}
+                      events={activeDay.events}
+                      numbers={pinNums}
+                      segments={shownSegments}
+                      selectedId={selectedEvent?.id ?? null}
+                      onPick={(id) => setSelectedEventId(id)}
+                      start={dayEnds.start}
+                      end={dayEnds.end}
+                    />
+                  )}
                   <PlanMap
                     key={mapMax ? 'max' : 'normal'}
                     day={activeDay}

@@ -19,6 +19,13 @@ from . import (
 API = "https://commons.wikimedia.org/w/api.php"
 IMAGE_HOSTS = frozenset({"upload.wikimedia.org"})
 IMAGE_MIMES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
+# [Gate PhotoThumbSteps] Wikimedia は 2026 年から決まった幅(thumbnail steps)以外の縮小画像を制限する(429
+# 「Use thumbnail steps」)。縮小画像は決まった幅だけを頼む(https://www.mediawiki.org/wiki/Common_thumbnail_sizes)
+THUMB_STEPS = (20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840)
+THUMB_WIDTH = 500
+FETCH_WIDTH = 1280
+_STEP_IN_URL = re.compile(r"/(\d+)px-")
+
 _FILE_ID = re.compile(r"^File:[^\x00-\x1f|#<>\[\]{}]{1,240}$")
 
 
@@ -51,6 +58,19 @@ def _candidate(page: Dict[str, Any]) -> Optional[ImageCandidate]:
     )
 
 
+def _step_urls(thumb: Optional[str], original: Optional[str], width: int) -> List[str]:
+    """縮小画像の URL を決まった幅に直す(幅 → 1段小さい幅の順。縮小画像が無ければ元の画像)。
+    API が決まった幅以外の URL を返しても、そのまま頼まない"""
+    if not thumb:
+        return [original] if original else []
+    m = _STEP_IN_URL.search(thumb)
+    if not m:
+        return [thumb]
+    smaller = [w for w in THUMB_STEPS if w <= width]
+    want = smaller[-2:][::-1] if smaller else [THUMB_STEPS[0]]
+    return [thumb[:m.start()] + f"/{w}px-" + thumb[m.end():] for w in want]
+
+
 class WikimediaCommonsProvider:
     name = "wikimedia_commons"
 
@@ -66,7 +86,7 @@ class WikimediaCommonsProvider:
         limit = max(1, min(limit, 30))
         params: Dict[str, Any] = {
             "action": "query", "format": "json", "prop": "imageinfo", "iiprop": "url|mime|size|extmetadata",
-            "iiurlwidth": "640",
+            "iiurlwidth": str(THUMB_WIDTH),
         }
         if lat is not None and lng is not None:
             params.update({"generator": "geosearch", "ggscoord": f"{lat}|{lng}", "ggsradius": "3000",
@@ -112,17 +132,28 @@ class WikimediaCommonsProvider:
             if need_license and not meta.importable:
                 raise ProviderUnavailable("license_not_allowed")
             info = (page.get("imageinfo") or [{}])[0]
-            content = await self._download(client, info.get("thumburl") or info.get("url"), max_bytes)
+            content = None
+            last: Optional[ProviderUnavailable] = None
+            for url in _step_urls(info.get("thumburl"), info.get("url"), width):
+                try:
+                    content = await self._download(client, url, max_bytes)
+                    break
+                except ProviderUnavailable as e:  # 決まった幅でも断られた時は、1段小さい幅を試す
+                    last = e
+                    if e.code not in ("bad_status", "rate_limited"):
+                        raise
+            if content is None:
+                raise last or ProviderUnavailable("bad_status")
         return FetchedImage(content=content, mime=meta.mime or "", meta=meta)
 
     async def describe(self, provider_id: str) -> Optional[ImageCandidate]:
         """[Gate SpotInfo] 1 枚の作者・ライセンス・出典だけを読む(画像は取らない)。形が違えば None"""
         async with self._client() as client:
-            page = await self._info(client, provider_id, 480)
+            page = await self._info(client, provider_id, THUMB_WIDTH)
         return _candidate(page)
 
     async def thumbnail(self, provider_id: str, max_bytes: int) -> FetchedImage:
-        return await self._get(provider_id, 480, max_bytes, need_license=False)
+        return await self._get(provider_id, THUMB_WIDTH, max_bytes, need_license=False)
 
     async def fetch(self, provider_id: str, max_bytes: int) -> FetchedImage:
-        return await self._get(provider_id, 1600, max_bytes, need_license=True)
+        return await self._get(provider_id, FETCH_WIDTH, max_bytes, need_license=True)

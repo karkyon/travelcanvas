@@ -16,6 +16,8 @@ interface Props {
   onAddLodging?: () => void;
   /** [Gate JourneyMove] 出発・帰着の移動を設定する(旅行の基本情報を開く)。無ければ設定のボタンを出さない */
   onEditMove?: () => void;
+  /** [Gate ChartAlign] 全日程の表の狭い列: 時刻の列と点を出さず、列の幅いっぱいに出す */
+  compact?: boolean;
 }
 
 const ICON = { departure: House, arrival: Flag, 'lodging-from': BedDouble, 'lodging-to': BedDouble, 'lodging-missing': TriangleAlert } as const;
@@ -41,16 +43,17 @@ const MoveLine: React.FC<{ anchor: DayAnchor; onEdit?: () => void }> = ({ anchor
   );
 };
 
-const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onEditMove }) => {
+const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onEditMove, compact = false }) => {
   // [Gate TimelineRedesign] 出発・帰着の時刻は、予定の着く時刻と同じく左の時刻の列に大きく出す(本文には場所だけ)
   const { label, body } = anchorText({ ...anchor, time: null });
   const move = anchor.kind === 'departure' || anchor.kind === 'arrival';
   return (
     <>
     {move && anchor.kind === 'arrival' && <MoveLine anchor={anchor} onEdit={onEditMove} />}
-    <div className="tc-anchor-row" data-kind={anchor.kind} data-position={position} data-testid={`day-anchor-${position}`}>
-      <div className="tc-anchor-time">{anchor.time ?? ''}</div>
-      <div className="tc-anchor-dot" aria-hidden="true" />
+    <div className={`tc-anchor-row${compact ? ' is-compact' : ''}`} data-kind={anchor.kind} data-position={position}
+      data-testid={`day-anchor-${position}`}>
+      {!compact && <div className="tc-anchor-time">{anchor.time ?? ''}</div>}
+      {!compact && <div className="tc-anchor-dot" aria-hidden="true" />}
       <div className="tc-anchor" data-kind={anchor.kind}>
         <span className="tc-anchor-icon" aria-hidden="true"><UiIcon icon={ICON[anchor.kind]} size={15} /></span>
         <p className="tc-anchor-text"><span className="tc-anchor-label">{label}</span>{body}</p>

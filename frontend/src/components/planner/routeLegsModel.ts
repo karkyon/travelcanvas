@@ -3,7 +3,7 @@
  *
  * 手段の決め方(画面にある値だけから。推測した時は guess と分かるようにする):
  * 1. 移動区間(segments)が入っていればその手段(取り消しの区間は使わない) … source 'segment'
- * 2. 同じエリアの中(エリアとその中の予定・中の予定どうし)は歩き … source 'area'
+ * 2. 同じエリアの中(エリアとその中の予定・中の予定どうし)で 1.5km 以内は歩き … source 'area'
  * 3. どちらでもない時は、直線で 1.2km 以内なら歩き・それより遠ければ車 … source 'guess'
  */
 import { hasCoords } from './mapNumberModel';
@@ -36,6 +36,8 @@ export interface MapLeg {
 }
 
 export const WALK_GUESS_KM = 1.2;
+/** エリアの中でも、これより離れた2点は歩きと決めつけない(エリアに入れた場所が実は遠い時。距離で推測する) */
+export const AREA_WALK_KM = 1.5;
 
 export function straightKm(a: [number, number], b: [number, number]): number {
   const R = 6371;
@@ -67,7 +69,7 @@ export function buildMapLegs(events: ReadonlyArray<LegEvent>, segments: Readonly
     if (seg) {
       mode = seg.mode;
       source = 'segment';
-    } else if (areaA !== null && areaA === areaOf(b)) {
+    } else if (areaA !== null && areaA === areaOf(b) && straightKm(from, to) <= AREA_WALK_KM) {
       mode = 'walking';
       source = 'area';
     } else {
