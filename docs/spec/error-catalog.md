@@ -52,7 +52,7 @@
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
-| `consent_required` | 403, 422 | no | 位置情報の利用に同意していないため記録できません。「データとプライバシー」で同意を変更できます | api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
+| `consent_required` | 403, 422 | no | AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます | api/v1/day_variants.py, api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
 | `consult_pending` | 409 | no | 外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください | api/v1/trip_intents.py |
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
@@ -80,7 +80,7 @@
 | `entitlement_subject_not_found` | 404 | no | 対象の利用者が見つかりません | api/v1/planning_usage.py |
 | `event_locked` | — | — | 予定「%s」はロックされているため外せません | api/v1/decisions.py |
 | `event_missing` | — | — | 決定した予定が旅程から消えています | api/v1/decisions.py |
-| `event_not_found` | 404 | no | 指定した予定が見つかりません | api/v1/memories.py, api/v1/paid_actions.py |
+| `event_not_found` | 404 | no | 入れ替える予定がありません | api/v1/day_variants.py, api/v1/memories.py, api/v1/paid_actions.py |
 | `event_without_location` | 404 | no | 場所(座標)の無い予定の経路は調べられません(送っていません) | api/v1/paid_actions.py |
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
@@ -93,8 +93,9 @@
 | `forbidden` | 403 | no | この場所を使う全ての旅行の編集の権限が無いため、直せません | api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
+| `guest_not_allowed` | 403 | no | ゲストでは AI の確かめは使えません。会員登録の後に使えます | api/v1/day_variants.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
-| `has_relations` | 409 | no | — | api/v1/sync.py |
+| `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
 | `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
@@ -142,7 +143,7 @@
 | `link_inactive` | 410 | no | この QR コードは期限が切れたか、停止されています。新しい QR を発行してもらってください | api/v1/photo_upload.py |
 | `link_not_found` | 404 | no | この QR コードは見つかりません | api/v1/photo_upload.py |
 | `location_off` | 409 | no | この旅行は「位置を記録しない」設定です。記録するには設定を変えてください | api/v1/location_tracks.py |
-| `locked` | 409 | no | — | api/v1/sync.py |
+| `locked` | 409 | no | 確定の予定は入れ替えられません | api/v1/day_variants.py, api/v1/sync.py |
 | `locked_event` | 409 | no | 確定の予定の位置は変えられません | api/v1/plans.py |
 | `locked_relation` | — | — | 確定ロックされた予約との紐付けがあるため削除できません。予約の紐付けのロックを解除してから削除してください。 | services/plan_item_deletion.py |
 | `logo_not_found` | 404 | no | ロゴはまだありません | api/v1/organizations.py |
@@ -257,6 +258,7 @@
 | `two_person_required` | 409 | no | 申請した管理者とは別の管理者が承認してください | api/v1/planning_usage.py |
 | `undo_conflict` | 409 | after_reload | この候補は後で使われた(予定に置いた・まとめた)ため、元に戻せません | api/v1/commands.py, services/plan_item_deletion.py |
 | `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py |
+| `unknown_entity` | 409 | no | — | api/v1/sync.py |
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unknown_planning_operation` | — | — | 知らない操作です | api/v1/planning_usage.py |

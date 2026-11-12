@@ -92,6 +92,43 @@ export interface SwitchOptions {
   revision?: number; date: string | null; now: string | null; place_label?: string | null; here_known?: boolean;
   active?: VariantSummary; alerts: { id: string; kind: string; label: string; note: string | null }[];
   options: SwitchOption[]; message?: string;
+  /** [PlanB-Weather] この日の予報 */
+  forecast?: Forecast | null;
+}
+/** [PlanB-Weather] 日ごとの天気の予報(Open-Meteo) */
+export interface Forecast {
+  date: string; day_id: string; label: string; weather_code: number | null; precipitation_probability: number | null;
+  precipitation_mm: number | null; temp_max: number | null; temp_min: number | null; rainy: boolean; source: string;
+  has_rain_variant: boolean;
+}
+export async function getWeather(planId: string, date?: string | null): Promise<{ enabled: boolean; forecasts: Forecast[]; notice: string }> {
+  return (await api.get(`/plans/${planId}/weather`, { ...SILENT, params: date ? { date } : undefined })).data as {
+    enabled: boolean; forecasts: Forecast[]; notice: string };
+}
+const newKey = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID() : `k-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+/** [PlanB-AI] 押した時だけの AI の確かめ(会員のクラス・旅行の枠・AI の同意) */
+export async function aiCheckVariant(planId: string, dayId: string): Promise<{ result: { text: string }; notice: string }> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/ai-check`, null,
+    { ...SILENT, headers: { 'Idempotency-Key': newKey() } })).data as { result: { text: string }; notice: string };
+}
+/** [PlanB-Indoor] 雨の日の屋内の候補(この日の予定の範囲) */
+export interface IndoorCandidate {
+  name: string; address?: string | null; latitude?: number | null; longitude?: number | null; category?: string | null;
+  genre_label?: string | null; distance_km?: number | null; kind: string; fit: 'indoor' | 'partly' | 'unknown';
+}
+export async function indoorCandidates(planId: string, dayId: string, nearEventId?: string | null): Promise<{
+  candidates: IndoorCandidate[]; region: { label: string; radius_km: number | null } | null; near_event: string | null;
+  failed_providers: string[]; message?: string;
+}> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/indoor-candidates`, { near_event_id: nearEventId ?? null },
+    SILENT)).data as never;
+}
+export async function replaceInVariant(planId: string, dayId: string, rev: number, body: {
+  replace_event_id?: string | null; name: string; address?: string | null; latitude?: number | null; longitude?: number | null;
+  event_type?: string;
+}): Promise<{ revision: number }> {
+  return (await api.post(`/plans/${planId}/variants/${dayId}/replace`, body, ifMatch(rev))).data as { revision: number };
 }
 export async function listSwitches(planId: string): Promise<SwitchRecord[]> {
   return ((await api.get(`/plans/${planId}/variant-switches`, SILENT)).data as { switches: SwitchRecord[] }).switches;

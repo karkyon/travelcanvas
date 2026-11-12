@@ -3,7 +3,7 @@
  * 控えの案ごとに間に合う合流点・そこまでの移動・とばす予定・済んだ予定・この後の屋外の予定・つながりを出し、
  * 途中から切り替える(済んだ予定は元の案に残り、記録に合流点と地名が残る)。位置(緯度経度)は送らない。
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GitBranch, CloudRain, CheckCircle2, AlertTriangle } from 'lucide-react';
 import Button from '@/components/common/Button';
 import type { AxiosRequestConfig } from 'axios';
@@ -25,39 +25,105 @@ async function switchVariant(planId: string, dayId: string, rev: number, body: {
     { ...SILENT, headers: { 'If-Match': String(rev) } })).data as { revision: number };
 }
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { enqueue, isNetworkError, loadQueue } from '@/utils/syncQueue';
+import { loadSnapshot, saveSnapshot } from '@/utils/offlineVault';
+import { currentOfflineSession } from '@/utils/offlineSession';
 
 interface Props {
   planId: string;
   date: string | null;
   events: TodayEvent[];
   onSwitched: () => void;
+  /** 通信できない(保存済みの当日情報を見ている)。保存した切り替え先を出し、切り替えは端末に溜めて後で送る */
+  offline?: boolean;
 }
+
+/** [Gate PlanB-Offline] 切り替え先を端末に保存する名前(暗号化して IndexedDB。ログアウト後は開けない) */
+const snapName = (planId: string) => `variant-switch:${planId}`;
 
 const MODE_LABEL: Record<string, string> = { driving: '車', train: '電車', bus: 'バス', walking: '徒歩', taxi: 'タクシー' };
 
-const TodaySwitchPanel: React.FC<Props> = ({ planId, date, events, onSwitched }) => {
+const TodaySwitchPanel: React.FC<Props> = ({ planId, date, events, onSwitched, offline = false }) => {
   const [data, setData] = useState<SwitchOptions | null>(null);
   const [from, setFrom] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
+  const [queued, setQueued] = useState(() => loadQueue(planId).some((o) => o.entity_type === 'variant'));
+
+  const fromSaved = useCallback(async () => {
+    const snap = await loadSnapshot<SwitchOptions>(currentOfflineSession(), snapName(planId)).catch(() => null);
+    if (snap && snap.data && snap.data.date === date) {
+      setData(snap.data);
+      setSaved(snap.savedAt);
+    } else {
+      setData(null);
+    }
+  }, [planId, date]);
 
   const load = useCallback(async () => {
-    try {
-      setData(await getSwitchOptions(planId, { date, from_event_id: from || null }));
-      setError(null);
-    } catch {
-      setData(null);  // 控えの案の欄は出さない(当日の画面の本体は続ける)
+    if (offline) {
+      await fromSaved();
+      return;
     }
-  }, [planId, date, from]);
+    try {
+      const r = await getSwitchOptions(planId, { date, from_event_id: from || null });
+      setData(r);
+      setSaved(null);
+      setError(null);
+      if (!from) void saveSnapshot(currentOfflineSession(), snapName(planId), r).catch(() => false);
+    } catch (e) {
+      // 通信できない時は保存した切り替え先を出す。それ以外は欄を出さない(当日の画面の本体は続ける)
+      if (isNetworkError(e)) await fromSaved();
+      else setData(null);
+    }
+  }, [planId, date, from, offline, fromSaved]);
   useEffect(() => { void load(); }, [load]);
+  const switchedRef = useRef(onSwitched);
+  switchedRef.current = onSwitched;
+  // [Gate PlanB-Offline] 通信が戻ったら、端末に溜めた切り替えを送る(旅程の画面と同じ同期。同じ操作は二重にしない)
+  useEffect(() => {
+    const flush = () => {
+      if (!loadQueue(planId).some((o) => o.entity_type === 'variant')) return;
+      void import('@/store/planStore').then(async ({ usePlanStore }) => {
+        await usePlanStore.getState().syncPending(planId);
+        const still = loadQueue(planId).some((o) => o.entity_type === 'variant');
+        setQueued(still);
+        if (!still) { setDone(null); switchedRef.current(); void load(); }
+      });
+    };
+    if (!offline) flush();
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [planId, offline, load]);
 
   if (!data || data.options.length === 0) return done ? <p role="status" className="tc-today-switch-done">{done}</p> : null;
   const place = from ? `${events.find((e) => e.id === from)?.title ?? ''}のあたり` : null;
 
+  const queue = (o: SwitchOption, label: string) => {
+    const ok = enqueue(planId, {
+      entity_type: 'variant', action: 'switch', entity_id: o.variant.day_id, base_revision: data.revision ?? 0,
+      label: `${label} に切り替え`,
+      fields: { from_day_id: data.active?.day_id, reason: o.variant.reason, phase: 'during', join_event_id: o.join?.event_id ?? null,
+        done_event_ids: o.done_ids, place_label: place },
+    });
+    if (ok) {
+      setQueued(true);
+      setDone(`通信できないため、${label} への切り替えを端末に保存しました。通信が戻ったら送ります(その間に別の人が切り替えていたら、確かめてから決められます)`);
+    } else {
+      setError('端末に保存できませんでした(ストレージが使えません)');
+    }
+  };
+
   const go = async (o: SwitchOption) => {
     if (!o.join) return;
     const label = `${o.variant.label} ${o.variant.name}`;
+    if (offline || saved !== null) {
+      if (!window.confirm(`通信できないため、${label} への切り替えを端末に保存し、通信が戻ったら送ります。よろしいですか?`)) return;
+      queue(o, label);
+      return;
+    }
     if (!window.confirm(`ここから「${label}」に切り替えます。${o.join.start} の「${o.join.title}」で合流します。済んだ予定はそのまま記録に残ります。`)) return;
     setBusy(o.variant.day_id);
     setError(null);
@@ -70,7 +136,8 @@ const TodaySwitchPanel: React.FC<Props> = ({ planId, date, events, onSwitched })
       onSwitched();
       await load();
     } catch (err) {
-      setError(errorDetailMessage(err, '切り替えられませんでした'));
+      if (isNetworkError(err)) queue(o, label);
+      else setError(errorDetailMessage(err, '切り替えられませんでした'));
     } finally {
       setBusy(null);
     }
@@ -79,6 +146,19 @@ const TodaySwitchPanel: React.FC<Props> = ({ planId, date, events, onSwitched })
   return (
     <section className="tc-card tc-today-switch" aria-labelledby="today-switch-title" data-testid="today-switch">
       <h2 id="today-switch-title" className="tc-today-switch-title"><GitBranch size={16} aria-hidden="true" />プランB に切り替える</h2>
+      {saved !== null && (
+        <p className="tc-today-switch-sub is-warn" role="status" data-testid="today-switch-offline">
+          {`通信できないため、${new Date(saved).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} に保存した切り替え先を出しています(移動の時間はその時の値)`}
+        </p>
+      )}
+      {queued && !done && <p className="tc-today-switch-sub" data-testid="today-switch-queued">端末に保存した切り替えがあります。通信が戻ったら送ります</p>}
+      {data.forecast && (
+        <p className={`tc-today-switch-sub${data.forecast.rainy ? ' is-warn' : ''}`} data-testid="today-switch-forecast">
+          {`予報(${data.forecast.source}): ${data.forecast.label}`}
+          {data.forecast.precipitation_probability !== null ? ` · 降水確率 ${data.forecast.precipitation_probability}%` : ''}
+          {data.forecast.rainy ? ' · 雨の案への切り替えを考えてください' : ''}
+        </p>
+      )}
       {data.alerts.length > 0 && (
         <p className="tc-today-switch-alert" role="status" data-testid="today-switch-alert">
           {data.alerts.some((a) => a.kind === 'weather') ? <CloudRain size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}

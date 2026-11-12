@@ -4,6 +4,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { SwitchOptions } from '@/services/api/dayVariants';
 
 const m = vi.hoisted(() => ({ getSwitchOptions: vi.fn(), switchVariant: vi.fn() }));
+const vault = vi.hoisted(() => ({ store: new Map<string, unknown>() }));
+vi.mock('@/utils/offlineVault', () => ({
+  saveSnapshot: async (_s: unknown, name: string, data: unknown) => { vault.store.set(name, data); return true; },
+  loadSnapshot: async (_s: unknown, name: string) => (vault.store.has(name) ? { data: vault.store.get(name), savedAt: Date.UTC(2026, 10, 29, 1, 0) } : null),
+}));
+vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => null }));
 vi.mock('@/services/api', () => ({ api: {
   get: (url: string, cfg: { params: unknown }) => m.getSwitchOptions(url.split('/')[2], cfg.params).then((data: unknown) => ({ data })),
   post: (url: string, body: unknown, cfg: { headers: Record<string, string> }) =>
@@ -28,7 +34,7 @@ const events = [{ id: 'e1', title: '二見興玉神社', event_type: 'sightseein
   address: null, latitude: null, longitude: null, has_ticket: false, reservation_id: null }];
 
 describe('TodaySwitchPanel', () => {
-  beforeEach(() => { m.getSwitchOptions.mockReset(); m.switchVariant.mockReset(); });
+  beforeEach(() => { m.getSwitchOptions.mockReset(); m.switchVariant.mockReset(); localStorage.clear(); vault.store.clear(); });
 
   it('控えの案が無い日は何も出さない', async () => {
     m.getSwitchOptions.mockResolvedValue({ date: '2026-11-29', now: '10:00', alerts: [], options: [] });
@@ -56,5 +62,30 @@ describe('TodaySwitchPanel', () => {
     await waitFor(() => expect(onSwitched).toHaveBeenCalled());
     expect(m.switchVariant).toHaveBeenCalledWith('p', 'b', 7, { reason: 'rain', phase: 'during', join_event_id: 'j',
       done_event_ids: ['e1'], place_label: '二見興玉神社のあたり' });
+  });
+
+  it('[Offline] 通信できない時は保存した切り替え先を出し、切り替えを端末に溜める', async () => {
+    m.getSwitchOptions.mockResolvedValueOnce({ ...opts(), active: { ...v, day_id: 'a', label: 'A', status: 'active' } });
+    const { unmount } = render(<TodaySwitchPanel planId="p" date="2026-11-29" events={events as never} onSwitched={vi.fn()} />);
+    await screen.findByTestId('today-switch-B');
+    unmount();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TodaySwitchPanel planId="p" date="2026-11-29" events={events as never} onSwitched={vi.fn()} offline />);
+    expect(await screen.findByTestId('today-switch-offline')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('today-switch-go-B'));
+    await screen.findByText(/端末に保存しました/);
+    expect(m.switchVariant).not.toHaveBeenCalled();
+    const q = JSON.parse(localStorage.getItem('tc_sync_queue_p')!);
+    expect(q[0]).toMatchObject({ entity_type: 'variant', action: 'switch', entity_id: 'b', base_revision: 7,
+      fields: { from_day_id: 'a', reason: 'rain', phase: 'during', join_event_id: 'j', done_event_ids: ['e1'] } });
+  });
+
+  it('予報が雨の時は予報を出す', async () => {
+    m.getSwitchOptions.mockResolvedValue({ ...opts(), forecast: { date: '2026-11-29', day_id: 'a', label: '雨', weather_code: 63,
+      precipitation_probability: 80, precipitation_mm: 12, temp_max: null, temp_min: null, rainy: true, source: 'Open-Meteo',
+      has_rain_variant: true } });
+    render(<TodaySwitchPanel planId="p" date="2026-11-29" events={events as never} onSwitched={vi.fn()} />);
+    expect((await screen.findByTestId('today-switch-forecast')).textContent).toBe(
+      '予報(Open-Meteo): 雨 · 降水確率 80% · 雨の案への切り替えを考えてください');
   });
 });

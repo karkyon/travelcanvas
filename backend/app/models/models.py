@@ -2513,52 +2513,7 @@ class DayVariantSwitch(Base):
     )
 
 
-class ItineraryBranch(Base):
-    """[Gate P7] What-if・旅程ブランチ(FR-019、DOC-05 §7.6 itinerary_branches)。
-
-    本案(正本の予定)を壊さずに、雨天・遅延・欠席・予算・体力などの想定で予定を組み替えた案を保存する。
-    base_snapshot は作成時点の本案の予定、content は分岐案の予定。採用時は
-    「分岐案での変更(base_snapshot→content の差分)」を現在の本案へ1つの変更セットとして適用する(Undo可能)。
-    """
-    __tablename__ = "itinerary_branches"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
-    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    scenario_type: Mapped[str] = mapped_column(String(10), nullable=False, default="custom")
-    assumptions: Mapped[Any] = mapped_column(JSON, nullable=False)
-    base_revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    base_snapshot: Mapped[Any] = mapped_column(JSON, nullable=False)
-    content: Mapped[Any] = mapped_column(JSON, nullable=False)
-    status: Mapped[str] = mapped_column(String(9), nullable=False, default="draft")
-    adopted_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
-    adopted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    adopted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-
-    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
-    # [Gate G8] FR-019 案の中で予約・移動区間そのものを変える分岐(branch-v2)。NULL は予定だけの案(G7 まで)。
-    # {"base": {"segments": [...], "reservations": [...]}, "segments": [変更], "reservations": [変更]}。
-    # base は変更を初めて保存した時の本案の区間・予約(三方向の取り込みの基準)。予約は外部へ取消・変更を送らない
-    # (取消は「手続きの準備」を作るだけ。[Gate PlanB-P8] 機能はやめた。表は移行の確かめのため 1 版残す)
-    resources: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        CheckConstraint(
-            "scenario_type IN ('rain','delay','absence','budget','fatigue','custom')",
-            name="ck_itinerary_branches_scenario",
-        ),
-        CheckConstraint("status IN ('draft','adopted','discarded')", name="ck_itinerary_branches_status"),
-        CheckConstraint("(status = 'adopted') = (adopted_at IS NOT NULL)", name="ck_itinerary_branches_adopted_at"),
-        CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="ck_itinerary_branches_title"),
-        Index("ix_itinerary_branches_plan_deleted", "plan_id", "deleted_at"),
-    )
+# [Gate PlanB-Next] class ItineraryBranch(もしもの案)は表と一緒に消した(日ごとの案 TravelDay の variant_* に置き換え)
 
 
 class PlanAlert(Base):
@@ -2681,9 +2636,10 @@ class SyncOperation(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "operation_id", name="uq_sync_operations_user_operation"),
-        CheckConstraint("entity_type IN ('event', 'day', 'order', 'reservation')",
+        CheckConstraint("entity_type IN ('event', 'day', 'order', 'reservation', 'variant')",
                         name="ck_sync_operations_entity_type"),
-        CheckConstraint("action IN ('create', 'update', 'delete', 'reorder')", name="ck_sync_operations_action"),
+        CheckConstraint("action IN ('create', 'update', 'delete', 'reorder', 'switch')",
+                        name="ck_sync_operations_action"),
         CheckConstraint(
             "status IN ('applied','conflicted','rejected','resolved_mine','resolved_server')",
             name="ck_sync_operations_status",

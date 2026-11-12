@@ -1252,3 +1252,7 @@
 .tc-journey-variant.is-plain { background: var(--tc-cloud-100); color: var(--tc-ink-700); font-weight: 600; }
 .tc-journey-cut { margin: 0 0 8px; padding: 4px 10px; border-left: 3px dashed var(--tc-info); color: var(--tc-info); font-size: 12.5px;
   font-weight: 800; }
+.tc-variant-forecast { display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px; background: var(--tc-cloud-100);
+  color: var(--tc-ink-700); font-size: 11px; font-weight: 700; }
+.tc-variant-forecast.is-rain { background: var(--tc-info-soft); color: #1e3a8a; }
+.tc-variant-ai { white-space: pre-wrap; font-size: 13px; line-height: 1.7; background: var(--tc-cloud-50); border-radius: 10px; padding: 10px 12px; }

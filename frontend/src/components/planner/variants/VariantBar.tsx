@@ -3,7 +3,7 @@
  * (この案に切り替える・今の案と比べる・前後のつながり)。案の名前の変更・しまう・消すもここから。
  */
 import React, { useState } from 'react';
-import type { VariantSummary } from '@/services/api/dayVariants';
+import type { Forecast, VariantSummary } from '@/services/api/dayVariants';
 import { conditionText, sortVariants } from './variantModel';
 
 interface Props {
@@ -19,6 +19,14 @@ interface Props {
   onRename: (v: VariantSummary) => void;
   onArchive: (v: VariantSummary) => void;
   onDelete: (v: VariantSummary) => void;
+  /** [PlanB-Weather] この日の予報(無ければ出さない) */
+  forecast?: Forecast | null;
+  /** 予報が雨で雨の案が無い時に「雨の日の案を作る」 */
+  onCreateRain?: () => void;
+  /** [PlanB-Indoor] 屋内の候補を探す(雨・屋内を優先の案) */
+  onIndoor?: () => void;
+  /** [PlanB-AI] AI で確かめる(押した時だけ) */
+  onAiCheck?: () => void;
 }
 
 const Svg: React.FC<{ d: string; size?: number }> = ({ d, size = 13 }) => (
@@ -33,18 +41,31 @@ const ICON = {
 };
 
 const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, onOpen, onCreate, onSwitch, onCompare, onCheck,
-  onRename, onArchive, onDelete }) => {
+  onRename, onArchive, onDelete, forecast, onCreateRain, onIndoor, onAiCheck }) => {
   const [menu, setMenu] = useState(false);
   const list = sortVariants(variants);
   const active = list.find((v) => v.status === 'active');
   const open = list.find((v) => v.day_id === openId) ?? null;
-  if (list.length <= 1 && !canEdit) return null;
+  if (list.length <= 1 && !canEdit && !forecast) return null;
   const showing = open && open.status !== 'active' ? open : null;
   return (
     <div className="tc-variant" data-testid="variant-bar">
       <div className="tc-variant-head">
         <span className="tc-variant-label">この日の案</span>
         {list.length > 1 && <span className="tc-variant-note">今の案は旅程・しおり・共有に出ます</span>}
+        {forecast && (
+          <span className={`tc-variant-forecast${forecast.rainy ? ' is-rain' : ''}`} data-testid="variant-forecast"
+            title={`予報(${forecast.source})`}>
+            {`予報 ${forecast.label}`}
+            {forecast.precipitation_probability !== null ? ` · 降水 ${forecast.precipitation_probability}%` : ''}
+            {forecast.temp_max !== null ? ` · ${Math.round(forecast.temp_max)}℃` : ''}
+          </span>
+        )}
+        {forecast?.rainy && !forecast.has_rain_variant && canEdit && onCreateRain && (
+          <button type="button" className="tc-focus-ring tc-mini-link" onClick={onCreateRain} data-testid="variant-create-rain">
+            雨の予報です。雨の日の案を作る
+          </button>
+        )}
       </div>
       <div className="tc-variant-tabs">
       <div className="tc-variant-tabs" role="tablist" aria-label="この日の案">
@@ -109,6 +130,12 @@ const VariantBar: React.FC<Props> = ({ variants, openId, canEdit, checkSummary, 
                 </span>
               )}
             </button>
+            {canEdit && onIndoor && (showing.reason === 'rain' || showing.conditions?.prefer_indoor) && (
+              <button type="button" className="tc-focus-ring tc-mbtn" onClick={onIndoor} data-testid="variant-indoor">屋内の候補を探す</button>
+            )}
+            {canEdit && onAiCheck && (
+              <button type="button" className="tc-focus-ring tc-mbtn" onClick={onAiCheck} data-testid="variant-ai">AI で確かめる</button>
+            )}
             {canEdit && (
               <span className="tc-variant-more">
                 <button type="button" className="tc-focus-ring tc-mini-link" aria-expanded={menu} onClick={() => setMenu((m) => !m)}

@@ -293,7 +293,10 @@ const TodayPage: React.FC = () => {
             )}
           </div>
           {/* [Gate PlanB-P6] 控えの案がある日だけ出る(通信できない時は出さない) */}
-          {planId && !isStale && <TodaySwitchPanel planId={planId} date={data.today_date} events={allToday} onSwitched={load} />}
+          {planId && (
+            <TodaySwitchPanel planId={planId} date={data.today_date} events={allToday} offline={isStale}
+              onSwitched={() => { void load(); }} />
+          )}
         </>
       )}
 

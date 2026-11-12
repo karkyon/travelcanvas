@@ -189,10 +189,11 @@ def _dedupe(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 async def find(db: Session, plan: TravelPlan, query: str, genre: str, scope: str,
-               record: pl.Recorder) -> Dict[str, Any]:
+               record: pl.Recorder, points: Optional[List[Tuple[float, float]]] = None) -> Dict[str, Any]:
+    """points を渡すと、旅行全体ではなくその点(例: 1 日の案の予定)の範囲で探す([Gate PlanB-Indoor])"""
     label, word, cat = GENRES[genre]
     text = " ".join(x for x in (query.strip(), word) if x)[:120]
-    points = plan_points(db, plan)
+    points = points if points else plan_points(db, plan)
     area = None
     if not points and scope != "all":
         area = await pl.trip_area(plan.destination, plan.title, record)

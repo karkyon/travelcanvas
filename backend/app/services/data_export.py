@@ -99,7 +99,7 @@ PLAN_TABLES = (
     m.PlanFinanceSettings, m.Budget, m.Expense, m.ExpenseShare, m.Settlement,
     m.Poll, m.PollOption, m.Vote, m.Comment,
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
-    m.ItineraryBranch, m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
+    m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
     m.PlanCandidate, m.SupportGrant, m.DayVariantSwitch,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
@@ -228,7 +228,6 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
         m.ChangeItem.change_set_id.in_(_ids(change_sets))).all()] if change_sets else []
     t["plan_versions"] = [row(x) for x in q(m.PlanVersion).all()]
     # [Gate P12] P7〜P12で追加した旅行の表(以前の書き出しに漏れていたP7・P10・P11の表を含む)
-    t["itinerary_branches"] = [row(x) for x in q(m.ItineraryBranch).all()]
     # [Gate PlanB] 日ごとの案の切り替えの記録(控えの案の日・予定は all_variants で travel_days・travel_events に入る)
     t["day_variant_switches"] = [row(x) for x in q(m.DayVariantSwitch).all()]
     t["plan_alerts"] = [row(x) for x in q(m.PlanAlert).all()]

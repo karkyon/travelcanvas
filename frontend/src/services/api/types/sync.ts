@@ -5,9 +5,9 @@
  * 端末に溜めた予定の操作(作成・変更・削除)を operation_id 付きで送り、操作ごとの結果を受け取る。
  * 同じ operation_id の再送は already_applied(二重に適用しない)。競合は利用者が解決するまでサーバーに残る。
  */
-export type SyncAction = 'create' | 'update' | 'delete' | 'reorder';
+export type SyncAction = 'create' | 'update' | 'delete' | 'reorder' | 'switch';
 /** [Gate G6] OFF-02 予定・日程・日程の中の予定の並び(予約はオフラインでは変えない) */
-export type SyncEntityType = 'event' | 'day' | 'order';
+export type SyncEntityType = 'event' | 'day' | 'order' | 'variant';
 export type SyncResultStatus = 'applied' | 'already_applied' | 'conflicted' | 'rejected';
 
 export interface SyncEventFields {
@@ -25,6 +25,13 @@ export interface SyncEventFields {
   timezone_id?: string;
   notes?: string | null;
   order?: string[];
+  /** [Gate PlanB-Offline] 日の案の切り替え(variant・switch)。端末が見ていた今の案と、切り替えの記録 */
+  from_day_id?: string;
+  reason?: string | null;
+  phase?: 'planning' | 'during' | 'after';
+  join_event_id?: string | null;
+  done_event_ids?: string[];
+  place_label?: string | null;
 }
 
 export interface SyncOperationInput {

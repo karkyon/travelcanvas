@@ -707,12 +707,14 @@
    ],
    "conflict": [
     "backend/tests/test_gate_planb_variants.py::test_create_copy_hidden_edit_switch_undo",
-    "backend/tests/test_gate_planb_variants.py::test_blank_group_limit_and_lodging_check"
+    "backend/tests/test_gate_planb_variants.py::test_blank_group_limit_and_lodging_check",
+    "backend/tests/test_gate_planb_next.py::test_offline_switch_via_sync_applies_conflicts_and_resolves"
    ],
    "conflict_note": "切り替えは今の案の印を付け替えるだけ(上書きしない)。旅行の版(If-Match)で同時の変更を止め、元に戻すで戻る。1 日の案は 5 つまで",
    "security": [
     "backend/tests/test_gate_planb_variants.py::test_clone_share_and_booklet_include_variants",
-    "backend/tests/test_gate_planb_variants.py::test_today_switch_options_join_point_and_partial_switch"
+    "backend/tests/test_gate_planb_variants.py::test_today_switch_options_join_point_and_partial_switch",
+    "backend/tests/test_gate_planb_next.py::test_ai_check_free_class_sends_nothing"
    ],
    "status": "VERIFIED"
   },

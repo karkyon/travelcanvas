@@ -2,13 +2,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const m = vi.hoisted(() => ({ createVariant: vi.fn(), patchVariant: vi.fn() }));
+const m = vi.hoisted(() => ({ createVariant: vi.fn(), patchVariant: vi.fn(), indoorCandidates: vi.fn(), replaceInVariant: vi.fn(),
+  aiCheckVariant: vi.fn() }));
 vi.mock('@/services/api/dayVariants', async (orig) => ({
   ...(await orig<typeof import('@/services/api/dayVariants')>()), createVariant: m.createVariant, patchVariant: m.patchVariant,
+  indoorCandidates: m.indoorCandidates, replaceInVariant: m.replaceInVariant, aiCheckVariant: m.aiCheckVariant,
 }));
 import type { VariantSummary } from '@/services/api/dayVariants';
 import VariantBar from './VariantBar';
 import CreateVariantDialog from './CreateVariantDialog';
+import IndoorDialog from './IndoorDialog';
+import AiCheckDialog from './AiCheckDialog';
 import AllDaysChart from '../AllDaysChart';
 import SharedPlanView from '@/components/share/SharedPlanView';
 import { booklet as bookletDecoder } from '@/services/api/decoders';
@@ -121,5 +125,52 @@ describe('[P5] たたき台・全日程・共有・しおり', () => {
     const b = bookletDecoder({ ...base, variants: [{ date: '2026-11-29', label: 'B', name: '雨の日', reason_label: '雨',
       events: [{ title: '水族館', event_type: 'activity', local_start_time: '10:00', is_all_day: false }] }] }, '$');
     expect(b.variants?.[0]?.name).toBe('雨の日');
+  });
+});
+
+describe('[Next] 予報・屋内の候補・AI の確かめ', () => {
+  const h = () => ({ onOpen: vi.fn(), onCreate: vi.fn(), onSwitch: vi.fn(), onCompare: vi.fn(), onCheck: vi.fn(),
+    onRename: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(), onCreateRain: vi.fn(), onIndoor: vi.fn(), onAiCheck: vi.fn() });
+  const rain = { date: '2026-11-29', day_id: 'a', label: '雨', weather_code: 63, precipitation_probability: 80, precipitation_mm: 12,
+    temp_max: 16.2, temp_min: 9, rainy: true, source: 'Open-Meteo', has_rain_variant: false };
+
+  it('雨の予報で雨の案が無い時は「雨の日の案を作る」。雨の控えの案を開くと屋内の候補・AI のボタン', () => {
+    const x = h();
+    const { rerender } = render(<VariantBar variants={[A]} openId={null} canEdit forecast={rain} {...x} />);
+    expect(screen.getByTestId('variant-forecast').textContent).toBe('予報 雨 · 降水 80% · 16℃');
+    fireEvent.click(screen.getByTestId('variant-create-rain'));
+    expect(x.onCreateRain).toHaveBeenCalled();
+    rerender(<VariantBar variants={[A, B]} openId="b" canEdit forecast={{ ...rain, has_rain_variant: true }} {...x} />);
+    expect(screen.queryByTestId('variant-create-rain')).toBeNull();
+    fireEvent.click(screen.getByTestId('variant-indoor'));
+    fireEvent.click(screen.getByTestId('variant-ai'));
+    expect(x.onIndoor).toHaveBeenCalled();
+    expect(x.onAiCheck).toHaveBeenCalled();
+  });
+
+  it('屋内の候補: 屋外の予定を選んで探し、入れ替える', async () => {
+    m.indoorCandidates.mockResolvedValue({ candidates: [{ name: '伊勢美術館', kind: 'sightseeing', fit: 'indoor', distance_km: 2,
+      genre_label: '観光', latitude: 34.4, longitude: 136.7 }], region: { label: 'この日の範囲', radius_km: 5 }, near_event: 'BBQ',
+    failed_providers: [] });
+    m.replaceInVariant.mockResolvedValue({ revision: 9 });
+    const onDone = vi.fn();
+    const v = { ...B, conditions: { scaffold: [{ kind: 'rain' as const, event_id: 'e9', title: '河原でバーベキュー', text: '', fit: 'outdoor' as const }] } };
+    render(<IndoorDialog planId="p" isOpen variant={v} revision={8} onClose={vi.fn()} onDone={onDone} />);
+    await waitFor(() => expect(m.indoorCandidates).toHaveBeenLastCalledWith('p', 'b', 'e9'));
+    fireEvent.click(await screen.findByTestId('indoor-put-伊勢美術館'));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(m.replaceInVariant).toHaveBeenCalledWith('p', 'b', 8, { replace_event_id: 'e9', name: '伊勢美術館', address: null,
+      latitude: 34.4, longitude: 136.7, event_type: 'sightseeing' });
+  });
+
+  it('AI の確かめ: 結果を出し、断られた時は理由を出す', async () => {
+    m.aiCheckVariant.mockResolvedValueOnce({ result: { text: '大きな問題はありません' }, notice: '要確認' });
+    const { unmount } = render(<AiCheckDialog planId="p" isOpen variant={B} onClose={vi.fn()} />);
+    expect((await screen.findByTestId('ai-check-text')).textContent).toBe('大きな問題はありません');
+    unmount();
+    m.aiCheckVariant.mockRejectedValueOnce({ isAxiosError: true, response: { status: 403, data: { detail: {
+      code: 'consent_required', message: 'AI の利用に同意していないため、AI へ送りません' } } } });
+    render(<AiCheckDialog planId="p" isOpen variant={B} onClose={vi.fn()} />);
+    expect((await screen.findByRole('alert')).textContent).toContain('同意していない');
   });
 });

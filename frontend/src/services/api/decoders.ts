@@ -1346,7 +1346,7 @@ export const syncConflictList: Decoder<SyncConflictList> = object<SyncConflictLi
   conflicts: arrayOf(object({
     operation_id: str,
     action: oneOf('create', 'update', 'delete', 'reorder'),
-    entity_type: optional(oneOf('event', 'day', 'order', 'reservation')),
+    entity_type: optional(oneOf('event', 'day', 'order', 'reservation', 'variant')),
     code: nullable(str),
     message: nullable(str),
     entity_id: nullable(str),

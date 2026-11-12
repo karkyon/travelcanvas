@@ -160,8 +160,8 @@
    "status": "VERIFIED",
    "partial": false,
    "e2e": "✓",
-   "gates": "P7・G7・G8 → PlanB P1〜P8",
-   "gaps": "オフラインでの切り替え・天気の予報の自動取得・押した時だけの AI の検証"
+   "gates": "P7・G7・G8 → PlanB P1〜P8・Next",
+   "gaps": "天気の予報は Open-Meteo の日ごとの値だけ(時間ごとの雨・気象警報は対象外)。AI の確かめは会員のクラスの枠の中だけ"
   },
   "FR-020": {
    "title": "共同編集",

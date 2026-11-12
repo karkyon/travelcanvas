@@ -21,6 +21,8 @@ interface Props {
   editing?: VariantSummary | null;
   onClose: () => void;
   onDone: (dayId: string | null) => void;
+  /** [PlanB-Weather] 開いた時の理由(雨の予報から作る時など) */
+  presetReason?: VariantReason | null;
 }
 
 const SCAFFOLD_TEXT = {
@@ -30,7 +32,8 @@ const SCAFFOLD_TEXT = {
   transport: '区間の移動手段を「移動の既定」に変えて、所要時間を計算し直す',
 };
 
-const CreateVariantDialog: React.FC<Props> = ({ planId, isOpen, date, dateLabel, otherDays, revision, editing, onClose, onDone }) => {
+const CreateVariantDialog: React.FC<Props> = ({ planId, isOpen, date, dateLabel, otherDays, revision, editing, onClose, onDone,
+  presetReason }) => {
   const [source, setSource] = useState<'copy_active' | 'copy_day' | 'blank'>('copy_active');
   const [sourceDay, setSourceDay] = useState('');
   const [name, setName] = useState('');
@@ -53,8 +56,8 @@ const CreateVariantDialog: React.FC<Props> = ({ planId, isOpen, date, dateLabel,
     setSource('copy_active');
     setSourceDay(otherDays[0]?.id ?? '');
     setAlso(new Set());
-    setName(editing?.name ?? '');
-    setReason(editing?.reason ?? null);
+    setName(editing?.name ?? (presetReason === 'rain' ? '雨の日' : ''));
+    setReason(editing?.reason ?? presetReason ?? null);
     setParty(editing?.conditions?.party_size ? String(editing.conditions.party_size) : '');
     setTransport(editing?.conditions?.transport_mode ?? '');
     setIndoor(Boolean(editing?.conditions?.prefer_indoor));
