@@ -67,6 +67,15 @@ export const createWishSpot = async (input: WishInput): Promise<WishSpot> => (aw
 export const updateWishSpot = async (id: string, input: WishInput): Promise<WishSpot> =>
   (await api.put(`/spots/${id}`, input, SILENT)).data as WishSpot;
 export const deleteWishSpot = async (id: string): Promise<void> => { await api.delete(`/spots/${id}`, SILENT); };
+/** [Gate SpotOwnPhoto] 自分の写真(ファイル・クリップボードから)を入れる。前の自分の写真は消える */
+export const uploadSpotPhoto = async (id: string, file: File): Promise<WishSpot> => {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  return (await api.post(`/spots/${id}/photo`, form, { ...SILENT, headers: { 'Content-Type': undefined } })).data as WishSpot;
+};
+/** [Gate SpotOwnPhoto] 自分の写真の本文 */
+export const getSpotPhotoMedia = async (id: string): Promise<Blob> =>
+  (await api.get(`/spots/${id}/photo/media`, { ...SILENT, responseType: 'blob' })).data as Blob;
 
 export const readPlaceUrl = async (url: string): Promise<UrlRead> => (await api.post('/spots/read-url', { url }, SILENT)).data as UrlRead;
 export async function readPlaceImage(file: File): Promise<{ words: string[]; ocr_available: boolean }> {

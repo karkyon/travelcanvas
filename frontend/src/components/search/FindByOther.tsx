@@ -7,6 +7,7 @@
  * - SNS から探す: 投稿の文(ハッシュタグ・「」・📍など)を貼ると探す言葉を拾う。URL の中身は取りに行かない
  */
 import React, { useEffect, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { ImagePlus } from 'lucide-react';
 import { VoiceInput } from '@/pages/consult/ConsultInputs';
 import { FIND_MODE_HELP, readExifGps, snsKeywords, type GpsPoint } from './findModel';
@@ -69,6 +70,8 @@ const PhotoFinder: React.FC<{ onPhotoPlace: Props['onPhotoPlace']; busy?: boolea
         <input type="file" accept="image/jpeg,image/*" className="sr-only" aria-label="探す写真を選ぶ" disabled={busy}
           onChange={(e) => void onFile(e.target.files?.[0])} data-testid="find-photo-input" />
       </label>
+      {/* [Gate PhotoPasteAll] 写真を入れる所は、どこでもクリップボードから貼れる */}
+      <div className="sm:col-span-2 -mt-1"><PasteImageButton onImage={(f) => void onFile(f)} disabled={busy} testId="find-photo-paste" /></div>
       <div className="text-sm text-ink-900" aria-live="polite">
         <p className="text-ink-700">{FIND_MODE_HELP.image}</p>
         {point && (

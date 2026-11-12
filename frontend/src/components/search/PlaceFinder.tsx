@@ -18,7 +18,6 @@ import {
 } from '@/services/api/spotIntake';
 import SpotPhotoView from '@/components/media/SpotPhotoView';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import PasteImageButton from '@/components/media/PasteImageButton';
 import FindByOther from './FindByOther';
 import { readExifGps } from './findModel';
 
@@ -330,8 +329,7 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
       {tab === 'photo' && (
         <div>
           <ImageDropzone label="写真か、SNS・地図のスクリーンショット" hint="写っている建物・景色・看板から場所の候補を出します(撮影場所が入った写真ならその近くも)" file={photo} disabled={busy}
-            onFile={(f) => { setPhoto(f); void onPhoto(f); }} />
-          <PasteImageButton onImage={(f) => { setPhoto(f); void onPhoto(f); }} disabled={busy} global={tab === 'photo'} testId="finder-paste" />
+            onFile={(f) => { setPhoto(f); void onPhoto(f); }} pasteGlobal={tab === 'photo'} pasteTestId="finder-paste" />
           {photo && planId && (
             <div className="mt-2 rounded-xl border border-cloud-200 p-3">
               {aiConsent}

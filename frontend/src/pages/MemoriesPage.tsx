@@ -8,6 +8,7 @@
  *   下書きはコピー・Markdownファイルとして保存できる(公開ページへの掲載はまだ無い)
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -464,6 +465,13 @@ const MemoriesPage: React.FC = () => {
                       onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                     />
                   </label>
+                )}
+                {/* [Gate PhotoPasteAll] 写真はクリップボードからも貼れる */}
+                {kind === 'photo' && (
+                  <>
+                    <PasteImageButton onImage={(f) => setFile(f)} testId="memory-paste" />
+                    {file && <p className="text-xs text-ink-700" data-testid="memory-file-name">{`入れる写真: ${file.name}`}</p>}
+                  </>
                 )}
                 {kind === 'video' && (
                   <label className="block text-sm text-ink-900">

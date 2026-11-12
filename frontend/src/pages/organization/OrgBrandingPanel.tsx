@@ -7,6 +7,7 @@
  * - ドメイン: 登録すると DNS の TXT に置く値を表示する。置いた後に「確認する」。確認済みは1つの組織だけ
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import {
   addOrgDomain, deleteOrgLogo, getOrgDomains, getOrgSeats, getOrgUsage, putSeatLimit, revokeOrgDomain, uploadOrgLogo,
   verifyOrgDomain,
@@ -103,6 +104,8 @@ const OrgBrandingPanel: React.FC<Props> = ({ orgId, isOwner, hasLogo, logoVersio
               <label htmlFor="org-logo-file" className="block text-sm font-medium text-ink-900 mb-1">画像(PNG・JPEG・WebP、1MBまで)</label>
               <input id="org-logo-file" type="file" accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+              <PasteImageButton onImage={(f) => setFile(f)} disabled={busy} testId="org-logo-paste" />
+              {file && <p className="text-xs text-ink-700">{`入れる画像: ${file.name}`}</p>}
             </div>
             <button type="submit" disabled={busy || !file} className={`${btn} bg-blue-700 text-white`}>ロゴを保存</button>
             {hasLogo && (

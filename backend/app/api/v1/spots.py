@@ -3,7 +3,7 @@ TravelCanvas MVP スポットAPI
 """
 import logging
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status, Query
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -24,6 +24,40 @@ logger = logging.getLogger("travelcanvas")
 router = APIRouter(prefix="/spots", tags=["spots"])
 
 
+# ===== [Gate SpotOwnPhoto] 行きたい場所の自分の写真(ファイル・クリップボードから) =====
+# 保存は「spots/<利用者のID>/<乱数>.<拡張子>」に、利用者のデータ鍵で暗号化(退会で鍵を破棄すると読めなくなる)。
+# 記録の写真と同じ検査(形式・先頭の中身・ウイルス・撮影情報の除去)。応答には保存の場所を出さない。
+
+def _own_key(photo: Any) -> Optional[str]:
+    if isinstance(photo, dict) and photo.get("provider") == "own" and isinstance(photo.get("storage_key"), str):
+        return photo["storage_key"]
+    return None
+
+
+def _drop_own_file(photo: Any) -> None:
+    key = _own_key(photo)
+    if not key:
+        return
+    from app.services.storage_backend import get_storage_backend
+    try:
+        get_storage_backend().delete(key)
+    except (OSError, ValueError):
+        logger.warning("spot photo delete failed")
+
+
+def _photo_input(spot: Optional[Spot], photo: Any) -> Any:
+    """入力の写真 → 保存の形。自分の写真(own)は、今の写真をそのまま残す時だけ受け付ける"""
+    if photo is None:
+        return None
+    if photo.provider == "own":
+        current = spot.photo if spot is not None else None
+        if not (isinstance(current, dict) and current.get("provider") == "own"
+                and current.get("provider_id") == photo.provider_id):
+            raise HTTPException(status_code=422, detail="自分の写真は「ファイルから」「貼り付け」で入れてください")
+        return current
+    return photo.model_dump()
+
+
 @router.post("/", response_model=SpotResponse, status_code=status.HTTP_201_CREATED)
 async def create_spot(
     spot_data: SpotCreate,
@@ -31,6 +65,7 @@ async def create_spot(
     db: Session = Depends(get_db)
 ):
     """新しいスポットを作成"""
+    photo = _photo_input(None, spot_data.photo)  # [Gate SpotOwnPhoto] 自分の写真は作った後に POST /photo で入れる
     try:
         new_spot = Spot(
             name=spot_data.name,
@@ -45,7 +80,7 @@ async def create_spot(
             # [Gate SpotInfo] 電話・URL・写真の出典・食事の情報
             phone=(spot_data.phone or "").strip() or None,
             urls=event_urls.to_json(spot_data.urls),
-            photo=spot_data.photo.model_dump() if spot_data.photo else None,
+            photo=photo,
             dining=dining.to_json(spot_data.dining),
         )
 
@@ -455,8 +490,9 @@ async def update_spot(
         update_data["phone"] = (update_data["phone"] or "").strip() or None
     if "urls" in update_data:
         update_data["urls"] = event_urls.to_json(spot_data.urls)
+    old_photo = spot.photo
     if "photo" in update_data:
-        update_data["photo"] = spot_data.photo.model_dump() if spot_data.photo else None
+        update_data["photo"] = _photo_input(spot, spot_data.photo)
     if "dining" in update_data:
         update_data["dining"] = dining.to_json(spot_data.dining)
     for field, value in update_data.items():
@@ -465,6 +501,8 @@ async def update_spot(
     try:
         db.commit()
         db.refresh(spot)
+        if _own_key(old_photo) and _own_key(old_photo) != _own_key(spot.photo):
+            _drop_own_file(old_photo)  # [Gate SpotOwnPhoto] 外した・替えた自分の写真のファイルを消す
         return spot
     except Exception:
         db.rollback()
@@ -497,8 +535,10 @@ async def delete_spot(
         )
 
     try:
+        photo = spot.photo
         db.delete(spot)
         db.commit()
+        _drop_own_file(photo)  # [Gate SpotOwnPhoto]
         return {"message": "スポットを削除しました"}
     except Exception:
         db.rollback()
@@ -507,6 +547,101 @@ async def delete_spot(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="スポットの削除に失敗しました。しばらくしてから再試行してください。"
         )
+
+
+@router.post("/{spot_id}/photo", response_model=SpotResponse)
+async def upload_spot_photo(
+    spot_id: uuid.UUID,
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """[Gate SpotOwnPhoto] 行きたい場所に自分の写真を入れる(ファイル・クリップボードから)。前の自分の写真は消す"""
+    from app.core.crypto import EncryptionNotConfigured, encrypt_payload, user_subject
+    from app.services import image_metadata, malware_scan, usage
+    from app.services import memories as mem
+    from app.services.storage_backend import FileTooLargeError, get_storage_backend, read_upload_limited
+
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    if not spot:
+        raise HTTPException(status_code=404, detail="スポットが見つかりません")
+    if spot.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="編集権限がありません")
+    limit = settings.DOCUMENT_MAX_UPLOAD_SIZE_BYTES
+    try:
+        content = await read_upload_limited(file, limit)
+    except FileTooLargeError:
+        raise HTTPException(status_code=413, detail=f"ファイルが大きすぎます(上限 {limit // (1024 * 1024)}MB)")
+    try:
+        ext, mime_type = mem.validate_media("photo", file.filename or "", content, limit)
+    except mem.MemoryInputError as e:
+        raise HTTPException(status_code=413 if e.code == "file_too_large" else 422, detail=str(e))
+    try:
+        scan = malware_scan.scan_upload(content)
+    except malware_scan.MalwareScanUnavailable:
+        raise HTTPException(status_code=503, detail="ファイルの安全確認ができないため、今は受け付けられません")
+    if scan.infected:
+        raise HTTPException(status_code=422, detail="ファイルから有害なプログラムが見つかったため、受け付けませんでした")
+    if settings.DOCUMENT_REQUIRE_CLEAN_SCAN and scan.status != malware_scan.CLEAN:
+        raise HTTPException(status_code=503, detail="ファイルの安全確認ができないため、今は受け付けられません")
+    try:
+        content, _stripped = image_metadata.strip(ext, content)
+    except image_metadata.MetadataUnremovable:
+        raise HTTPException(status_code=422, detail="写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません")
+    usage.charge(db, "user", current_user.id, "upload_bytes", len(content))
+    token = uuid.uuid4().hex
+    key = f"spots/{current_user.id}/{token}{ext}"
+    backend = get_storage_backend()
+    try:
+        backend.save(key, encrypt_payload(content, user_subject(current_user.id)))
+    except EncryptionNotConfigured:
+        raise HTTPException(status_code=503, detail="ファイルの暗号化が設定されていません(サーバー側の設定)")
+    except OSError:
+        logger.exception("spot photo storage write failed")
+        raise HTTPException(status_code=503, detail="ファイルの保存に失敗しました。しばらくしてから再試行してください")
+    old = spot.photo
+    spot.photo = {"provider": "own", "provider_id": token, "title": None, "author": None, "license": None,
+                  "license_url": None, "source_page_url": None, "storage_key": key, "mime_type": mime_type,
+                  "size": len(content)}
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        backend.delete(key)
+        raise
+    db.refresh(spot)
+    _drop_own_file(old)
+    return spot
+
+
+@router.get("/{spot_id}/photo/media")
+async def get_spot_photo_media(
+    spot_id: uuid.UUID,
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+) -> Response:
+    """[Gate SpotOwnPhoto] 自分の写真の本文(見られる人だけ。直接開かれても画面として動かさない)"""
+    from app.core.crypto import EncryptionNotConfigured
+    from app.services.storage_backend import get_storage_backend, load_decrypted_file
+
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    if not spot or (not spot.is_public and spot.created_by != current_user.id):
+        raise HTTPException(status_code=404, detail="写真が見つかりません")
+    key = _own_key(spot.photo)
+    if not key:
+        raise HTTPException(status_code=404, detail="写真が見つかりません")
+    try:
+        content = load_decrypted_file(get_storage_backend(), key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="写真が見つかりません")
+    except EncryptionNotConfigured:
+        raise HTTPException(status_code=503, detail="ファイルの暗号化が設定されていません(サーバー側の設定)")
+    mime = (spot.photo or {}).get("mime_type") or "application/octet-stream"
+    return Response(content=content, media_type=str(mime), headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+    })
 
 
 # [Gate SpotInfo] 自動取得の種類の対応(予定の種類 → 行きたい場所の種類)

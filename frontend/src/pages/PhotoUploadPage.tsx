@@ -5,6 +5,7 @@
  * 撮影位置と日時は端末で読んで送る。1 枚ずつ送り、失敗した写真だけ送り直せる。
  */
 import React, { useEffect, useRef, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { Link, useParams } from 'react-router-dom';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useAuthStore } from '@/store/authStore';
@@ -92,6 +93,12 @@ const PhotoUploadPage: React.FC = () => {
     e.target.value = '';
     void sendAll(added);
   };
+  // [Gate PhotoPasteAll] クリップボードの画像も同じく送る
+  const pasted = (file: File) => {
+    const added = [{ file, id: newUploadId(), state: 'wait' as const }];
+    setItems((prev) => [...prev.filter((i) => i.state !== 'done'), ...added]);
+    void sendAll(added);
+  };
 
   const done = items.filter((i) => i.state === 'done');
   const failed = items.filter((i) => i.state === 'failed');
@@ -129,6 +136,7 @@ const PhotoUploadPage: React.FC = () => {
                 <div className="tc-card p-4 space-y-2">
                   <input ref={input} type="file" multiple accept={PHOTO_ACCEPT} className="sr-only" id="upload-files" onChange={choose} data-testid="upload-files" />
                   <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary w-full" disabled={sending} onClick={() => input.current?.click()}>写真を選んで送る</button>
+                  <PasteImageButton onImage={pasted} disabled={sending} testId="upload-paste" />
                   <label className="block text-sm">公開範囲
                     <select className="block w-full mt-1 border rounded-sm px-2 py-1" value={visibility} onChange={(e) => setVisibility(e.target.value)}>
                       <option value="private">自分だけ</option>
