@@ -463,6 +463,7 @@
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/reveal",
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/tickets",
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}/reveal",
+  "POST /api/v1/plans/{plan_id}/route-geometry",
   "POST /api/v1/plans/{plan_id}/route-options",
   "POST /api/v1/plans/{plan_id}/route-options/{option_id}/adopt",
   "POST /api/v1/plans/{plan_id}/route-options/{option_id}/legs",

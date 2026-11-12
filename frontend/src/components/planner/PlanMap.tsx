@@ -18,9 +18,11 @@
  * timeline側で選択されたeventIdをselectedEventIdとして受け取りハイライト
  * する。
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
 import { hasCoords, mapNumbers } from './mapNumberModel';
+import { buildMapLegs, legsSignature, type LegSegment, type MapLeg } from './routeLegsModel';
+import { getRouteGeometry, type RouteGeometry } from '@/services/api/routeGeometry';
 import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
@@ -42,6 +44,30 @@ interface PlanMapProps {
   height?: number | string;
   /** [Gate TimelineRedesign] 最初の予定の印の横に出す出発の札(例: 「出発: 自宅から 08:00」) */
   startLabel?: string | null;
+  /** [Gate RoadRoute] 道に沿った経路を聞く旅行(無ければ直線のまま) */
+  planId?: string | null;
+  /** [Gate RoadRoute] 移動区間(区間の手段で道の種類を決める。控えの案を開いている時はその案の区間) */
+  segments?: ReadonlyArray<LegSegment>;
+}
+
+const MODE_LABEL: Record<string, string> = {
+  walking: '徒歩', driving: '車', taxi: 'タクシー', bus: 'バス', express_bus: '高速バス', bicycle: '自転車',
+  train: '電車', shinkansen: '新幹線', flight: '飛行機', ferry: '船', helicopter: 'ヘリ', mixed: '複合',
+};
+const ROUTE_STRAIGHT = '#64748b';
+
+/** [Gate RoadRoute] 区間の線の説明(手段・道の目安の時間と距離。推測した手段は「手段は推測」) */
+function legTip(leg: MapLeg, g: RouteGeometry['legs'][number] | undefined): string {
+  const mode = MODE_LABEL[leg.mode] ?? leg.mode;
+  const guess = leg.source === 'guess' ? '(手段は推測)' : '';
+  if (g && g.kind === 'road') {
+    const parts = [
+      typeof g.duration_minutes === 'number' ? `約${Math.max(1, Math.round(g.duration_minutes))}分` : null,
+      typeof g.distance_km === 'number' ? `${g.distance_km.toFixed(1)}km` : null,
+    ].filter(Boolean).join('・');
+    return `${mode}${guess} 道に沿った経路${parts ? ` ${parts}` : ''}`;
+  }
+  return `${mode}${guess} 直線(道の経路なし・目安)`;
 }
 
 function _divIcon(html: string, size: [number, number] = [28, 28]) {
@@ -105,6 +131,8 @@ const PlanMap: React.FC<PlanMapProps> = ({
   className = '',
   height = 420,
   startLabel = null,
+  planId = null,
+  segments,
 }) => {
   const scheduledWithCoords = useMemo(
     () => (day?.events ?? []).filter(
@@ -139,6 +167,28 @@ const PlanMap: React.FC<PlanMapProps> = ({
     [scheduledWithCoords]
   );
 
+  // [Gate RoadRoute] 道に沿った経路(OSRM)。聞けない・無い区間は直線の点線(架空の道を作らない)
+  const legs = useMemo(() => buildMapLegs(scheduledWithCoords, segments ?? []), [scheduledWithCoords, segments]);
+  const sig = useMemo(() => legsSignature(legs), [legs]);
+  const [geo, setGeo] = useState<{ sig: string; data: RouteGeometry } | null>(null);
+  const asked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!planId || legs.length === 0) return undefined;
+    const want = `${planId}#${sig}`;
+    if (asked.current === want) return undefined;
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      asked.current = want;
+      getRouteGeometry(planId, legs.map((l) => ({
+        from_lat: l.from[0], from_lng: l.from[1], to_lat: l.to[0], to_lng: l.to[1], mode: l.mode,
+      })))
+        .then((data) => { if (alive) setGeo({ sig, data }); })
+        .catch(() => { if (alive) { asked.current = null; setGeo(null); } });
+    }, 250);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [planId, legs, sig]);
+  const geoLegs = geo && geo.sig === sig && geo.data.legs.length === legs.length ? geo.data.legs : null;
+
   const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
   const nums = useMemo(() => mapNumbers(day?.events ?? []), [day]);
 
@@ -163,7 +213,19 @@ const PlanMap: React.FC<PlanMapProps> = ({
           />
           {hasAnyKnownLocation && <FitBounds positions={allPositions} />}
 
-          {routeLine.length > 1 && (
+          {geoLegs ? legs.map((leg, i) => {
+            const g = geoLegs[i];
+            const road = g?.kind === 'road' && g.coordinates.length > 1;
+            const positions = road ? g!.coordinates.map((c): [number, number] => [c[0]!, c[1]!]) : [leg.from, leg.to];
+            const pathOptions = road
+              ? { color: PIN_PLANNED, weight: leg.source === 'guess' ? 3 : 4, opacity: leg.source === 'guess' ? 0.6 : 0.9 }
+              : { color: ROUTE_STRAIGHT, weight: 3, opacity: 0.85, dashArray: '1 8', lineCap: 'round' as const };
+            return (
+              <Polyline key={`leg-${leg.key}-${i}`} positions={positions} pathOptions={pathOptions}>
+                <Tooltip sticky className="tc-pin-tip">{legTip(leg, g)}</Tooltip>
+              </Polyline>
+            );
+          }) : routeLine.length > 1 && (
             <Polyline positions={routeLine} pathOptions={{ color: PIN_PLANNED, weight: 3, opacity: 0.85, dashArray: '6 8' }} />
           )}
 

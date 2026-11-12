@@ -341,6 +341,13 @@ class Settings(BaseSettings):
     OVERPASS_STALE_SECONDS: int = 21600
     # [Gate PlanB-Weather] 天気の予報(Open-Meteo。鍵は要らない)。false で取りに行かない(画面は「予報なし」)。
     # 送るのは予定の場所の真ん中の座標を 0.1 度(約 10km)に丸めた値と日付だけ。結果は WEATHER_CACHE_SECONDS の間使い回す
+    # [Gate RoadRoute] 地図の「道に沿った経路」(OSRM。自分の server。docker compose --profile osrm の osrm-car・osrm-foot)。
+    # 空なら道を引かない(地図は直線の点線のまま)。scripts/ops/osrm_prepare.sh が .env に書く
+    # (例: OSRM_CAR_URL=http://osrm-car:5000)。送り先は設定だけで決まる(利用者の入力では変えられない)
+    OSRM_CAR_URL: str = ""
+    OSRM_FOOT_URL: str = ""
+    OSRM_CACHE_SECONDS: int = 86400
+    OSRM_TIMEOUT_SECONDS: float = 4.0
     WEATHER_FORECAST_ENABLED: bool = True
     WEATHER_CACHE_SECONDS: int = 3600
     # [Gate PlaceLookupJP] 楽天ウェブサービスへ送る Referer(アプリの「許可された Web サイト」と同じ URL。空なら付けない)

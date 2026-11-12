@@ -1173,6 +1173,8 @@ const PlannerPage: React.FC = () => {
                     selectedEventId={selectedEvent?.id ?? null}
                     onSelectEvent={pickFromMap}
                     startLabel={startLabel}
+                    planId={currentPlan.id}
+                    segments={shownSegments}
                     onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
                       addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
                     }

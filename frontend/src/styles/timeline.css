@@ -294,6 +294,9 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-mapov-legend { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--tc-ink-700); }
 .tc-mapov-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--tc-accent); }
 .tc-mapov-legend i.is-cand { background: #fff; border: 2px solid #c2410c; }
+/* [Gate RoadRoute] 道に沿った経路(実線)・直線の目安(点線) */
+.tc-mapov-legend i.is-road { width: 18px; height: 4px; border-radius: 2px; background: var(--tc-accent); }
+.tc-mapov-legend i.is-straight { width: 18px; height: 0; border-radius: 0; background: transparent; border-top: 3px dotted #64748b; }
 /* 地図を最大化・Google マップで表示(MapTools)は日付の欄の右に */
 .tc-map-frame .tc-map-actions { left: 12px; right: auto; top: 50px; justify-content: flex-start; max-width: calc(100% - 310px); }
 .tc-mapov-check { right: 12px; top: 10px; width: 270px; padding: 10px 12px; }

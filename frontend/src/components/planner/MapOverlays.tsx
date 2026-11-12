@@ -1,6 +1,6 @@
 /**
  * [Gate TimelineRedesign] 地図の上に重ねる欄(2026-11-12 のモック「画面全体の見直し」の地図)。
- * - 左上: 日付 · 地図 と凡例(予定・候補)
+ * - 左上: 日付 · 地図 と凡例(予定・候補・道の経路・直線の目安)
  * - 右上: この日の旅程チェック(たためる)。値は画面にある照合・予約・区間から作る(mapCheckModel)
  * - 左下: 選んだ予定の 1 行(番号・名前・時刻・「旅程のカードへ」・ここまでの経路)。以前の右の欄の代わり
  * - 右下: 次の予定(旅行の当日だけ)
@@ -49,6 +49,8 @@ const MapOverlays: React.FC<Props> = ({ dateLabel, check, budget, cost, selected
         <span className="tc-mapov-date">{dateLabel} · 地図</span>
         <span className="tc-mapov-legend"><i className="is-plan" aria-hidden="true" />予定</span>
         <span className="tc-mapov-legend"><i className="is-cand" aria-hidden="true" />候補</span>
+        <span className="tc-mapov-legend"><i className="is-road" aria-hidden="true" />道の経路</span>
+        <span className="tc-mapov-legend"><i className="is-straight" aria-hidden="true" />直線(目安)</span>
       </div>
 
       {check && (

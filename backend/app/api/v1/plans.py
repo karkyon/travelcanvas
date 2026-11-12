@@ -1894,6 +1894,74 @@ async def get_route_preview(
     )
 
 
+# ===== [Gate RoadRoute] 地図の「道に沿った経路」(OSRM) =====
+# 地図に出ている順(控えの案を開いている時はその案)の2点ずつを画面から受け取り、道に沿った線を返す。
+# 線の形を返すだけで DB へは書かない。電車・飛行機・船などは直線(kind="straight")。OSRM が無い・届かない
+# 区間も直線(画面は点線で「目安」と分かるように描く。架空の道を作らない)。
+# 送り先は設定の OSRM_CAR_URL・OSRM_FOOT_URL だけ。位置を隠された人には返さない(route-preview と同じ)。
+
+class RouteGeometryLegIn(BaseModel):
+    from_lat: float = Field(ge=-90, le=90)
+    from_lng: float = Field(ge=-180, le=180)
+    to_lat: float = Field(ge=-90, le=90)
+    to_lng: float = Field(ge=-180, le=180)
+    mode: str = Field(default="walking", max_length=20)
+
+
+class RouteGeometryRequest(BaseModel):
+    legs: List[RouteGeometryLegIn] = Field(default_factory=list, max_length=60)
+
+
+class RouteGeometryLeg(BaseModel):
+    index: int
+    mode: str
+    kind: str  # "road"(道に沿った線)/ "straight"(直線。道を引かない手段・OSRM が無い・見つからない)
+    profile: Optional[str] = None  # "car" / "foot"(road の時)
+    coordinates: List[List[float]]  # [[lat, lng], ...]
+    distance_km: Optional[float] = None
+    duration_minutes: Optional[float] = None
+
+
+class RouteGeometryResponse(BaseModel):
+    legs: List[RouteGeometryLeg]
+    provider: str  # "osrm" / "none"(設定なし)
+    available: bool
+
+
+@router.post("/{plan_id}/route-geometry", response_model=RouteGeometryResponse)
+async def get_route_geometry(
+    plan_id: str,
+    body: RouteGeometryRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """地図に引く道の線(閲覧のみ、viewer可。DBへは書かない)。"""
+    from app.services import osrm_router
+
+    _plan_hidden(db, plan_id, current_user, "viewer", "event_address")
+    asks = []
+    for leg in body.legs:
+        profile = osrm_router.profile_for(leg.mode)
+        asks.append((profile, (leg.from_lat, leg.from_lng), (leg.to_lat, leg.to_lng)))
+    road_idx = [i for i, a in enumerate(asks) if a[0] is not None]
+    road_asks = [(asks[i][0] or "car", asks[i][1], asks[i][2]) for i in road_idx]
+    found = await osrm_router.route_many(road_asks) if road_asks else []
+    by_idx = dict(zip(road_idx, found))
+    legs: List[RouteGeometryLeg] = []
+    for i, (leg, (profile, a, b)) in enumerate(zip(body.legs, asks)):
+        hit = by_idx.get(i)
+        if hit:
+            legs.append(RouteGeometryLeg(index=i, mode=leg.mode, kind="road", profile=profile,
+                                         coordinates=hit["coordinates"], distance_km=hit.get("distance_km"),
+                                         duration_minutes=hit.get("duration_minutes")))
+        else:
+            legs.append(RouteGeometryLeg(index=i, mode=leg.mode, kind="straight", profile=None,
+                                         coordinates=[[a[0], a[1]], [b[0], b[1]]]))
+    available = osrm_router.enabled()
+    return RouteGeometryResponse(legs=legs, provider=osrm_router.PROVIDER_NAME if available else "none",
+                                 available=available)
+
+
 class InsertionPreviewRequest(BaseModel):
     place_id: Optional[str] = None
     # place_idが無い場合、直接座標を指定して仮のスポットとして試算できる
