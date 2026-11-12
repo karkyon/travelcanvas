@@ -260,6 +260,16 @@ def _hm_shift(v: str, minutes: int) -> Optional[str]:
     return None if t > 23 * 60 + 59 else f"{t // 60:02d}:{t % 60:02d}"
 
 
+def rain_candidates(db: Session, day: TravelDay, limit: int = 5) -> List[str]:
+    """候補箱(まだ予定にしていない)の中で、雨の日に向く(屋内の)候補の名前"""
+    from app.models.models import PlanCandidate
+    from app.services import weather_fit as wf
+
+    rows = (db.query(PlanCandidate).filter(PlanCandidate.plan_id == day.plan_id, PlanCandidate.status == "open")
+            .order_by(PlanCandidate.priority.asc(), PlanCandidate.created_at.asc()).limit(200).all())
+    return [c.title for c in rows if wf.indoor_like(c.title, c.category, c.tags)][:limit]
+
+
 def apply_scaffold(db: Session, day: TravelDay, reason: Optional[str], cond: Dict[str, Any]) -> List[Dict[str, Any]]:
     """写した案 day を理由に合わせて組み替える。変えた所・印を付けた所の一覧を返す(案の条件に残して帯に出す)。
     確定(locked)の予定は動かさない。予定は消さない(外す候補の印だけ)"""
@@ -270,10 +280,18 @@ def apply_scaffold(db: Session, day: TravelDay, reason: Optional[str], cond: Dic
         evs = _events(db, day)
         top = [e for e in evs if e.parent_event_id is None]
         if reason == "rain":
+            # 当たり前の感覚: 種類ではなく名前・説明で見分ける(屋外の BBQ・海水浴・展望台など。水族館・美術館は屋内)
+            from app.services import weather_fit as wf
+
             for e in top:
-                if e.event_type in OUTDOOR_TYPES and not e.locked:
-                    notes.append({"kind": "rain", "event_id": str(e.id), "title": e.title,
-                                  "text": "屋外の予定です。雨の時は屋内の代わりを検討してください"})
+                f = wf.fit(e.title, e.event_type, e.description)
+                if f["fit"] in ("outdoor", "partly"):
+                    notes.append({"kind": "rain", "event_id": str(e.id), "title": e.title, "fit": f["fit"],
+                                  "text": wf.rain_note(e.title, f)})
+            picks = rain_candidates(db, day)
+            if picks:
+                notes.append({"kind": "candidates", "event_id": None, "title": "候補箱の屋内の候補",
+                              "text": "・".join(picks)})
         elif reason == "delay":
             minutes = int(cond.get("delay_minutes") or 60)
             after = cond.get("delay_after") or "00:00"
@@ -478,6 +496,18 @@ def check_continuity(db: Session, day: TravelDay, party: Optional[int] = None) -
         if not rs and e.event_type in bs.BOOKABLE:
             items.append({"kind": "unbooked", "level": "info", "title": f"未予約: {e.title}",
                           "text": "切り替えた後に「予約を取り込む」で登録できます。"})
+    # 5. 天気: 雨の案(屋内を優先)なのに屋外の予定が残っていないか(当たり前の感覚の検証)
+    cond = day.variant_conditions or {}
+    if day.variant_reason == "rain" or cond.get("prefer_indoor"):
+        from app.services import weather_fit as wf
+
+        for e in mine:
+            if e.parent_event_id is not None:
+                continue
+            f = wf.fit(e.title, e.event_type, e.description)
+            if f["fit"] == "outdoor":
+                items.append({"kind": "weather", "level": "warn", "title": f"雨の案に屋外の予定: {e.title}",
+                              "text": wf.rain_note(e.title, f)})
     order = {"bad": 3, "warn": 2, "info": 1, "ok": 0}
     worst = max((order[i["level"]] for i in items), default=0)
     return {"status": {3: "bad", 2: "warn"}.get(worst, "ok"), "items": items,

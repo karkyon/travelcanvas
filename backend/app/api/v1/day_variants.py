@@ -11,10 +11,12 @@
 - POST   /variants/{day_id}/switch    : 今の案にする {reason?, note?, phase?, join_event_id?, done_event_ids?, place_label?,
                                         group: true で案の組をまとめて}  If-Match。元に戻す(/undo)で戻せる
 - GET    /variant-switches            : 切り替えの記録(旅の記録・書き出し)
+- GET    /today/switch-options        : 旅行中: 今いる所・時刻から、控えの案ごとの合流点・移動・とばす予定・つながり
+- POST   /replans/{replan_id}/save-variant : 再計画の案 A/B を、この日の控えの案として保存する(上書きしない)
 """
 import uuid
 from datetime import date as date_cls
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -299,6 +301,16 @@ def switch_variant(plan_id: str, day_id: uuid.UUID, body: SwitchIn,
         cs = (db.query(ChangeSet).filter(ChangeSet.plan_id == plan.id, ChangeSet.resulting_revision == rev).first())
         for r in records:
             r.change_set_id = cs.id if cs else None
+        # 共同の編集者へ知らせる(本文に予定名は入れない。日付と案の記号・名前だけ)
+        from app.models.models import Notification
+        from app.services.constraint_evaluation import member_user_ids
+
+        msg = "・".join(f"{r.local_date.month}/{r.local_date.day} {r.to_label} {r.to_name}" for r in records)
+        for uid in member_user_ids(db, plan):
+            if uid == current_user.id:
+                continue
+            db.add(Notification(id=uuid.uuid4(), user_id=uid, type="variant_switched", title="日の案が切り替わりました",
+                                message=f"{msg} に切り替わりました。旅程を確認してください", related_plan_id=plan.id))
         db.commit()
         return {"revision": rev, "switched": [_summary(db, t) for t in targets],
                 "records": [str(r.id) for r in records]}
@@ -322,3 +334,200 @@ def list_switches(plan_id: str, db: Session = Depends(get_db),
 
 
 _ = (TravelEvent, status)
+
+
+# ---- [P6] 旅行中: 今いる所と時刻から、間に合う合流点つきの切り替え先 ----------------------------
+
+def _hm(v: Optional[str]) -> Optional[int]:
+    from app.services.weather_fit import minutes_of
+
+    return minutes_of(v)
+
+
+def _fmt(m: int) -> str:
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+@router.get("/{plan_id}/today/switch-options")
+def switch_options(plan_id: str, date: Optional[date_cls] = None, at: Optional[str] = None,
+                   lat: Optional[float] = None, lng: Optional[float] = None, from_event_id: Optional[uuid.UUID] = None,
+                   place_label: Optional[str] = None, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    """今日(date)の控えの案ごとに: 合流点(今から間に合う最初の予定)・そこまでの移動・とばす予定・済んだ予定・
+    前後のつながり・屋外の予定の数。位置は送らずに予定(from_event_id)を選ぶ形も。位置は記録しない"""
+    from datetime import datetime as dt_cls
+    from zoneinfo import ZoneInfo
+
+    from app.models.models import PlanAlert
+    from app.services import travel_estimate as te
+    from app.services import weather_fit as wf
+
+    plan = P._get_owned_plan(db, plan_id, current_user, "viewer")
+    with dv.all_variants(db):
+        days = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id, TravelDay.variant_status == "active")
+                .order_by(TravelDay.local_date).all())
+        if not days:
+            return {"date": None, "now": None, "options": [], "alerts": []}
+        tz = ZoneInfo(days[0].timezone_id or "Asia/Tokyo")
+        now_local = dt_cls.now(tz)
+        the_date = date or now_local.date()
+        active = next((d for d in days if d.local_date == the_date), None)
+        if active is None:
+            return {"date": the_date.isoformat(), "now": None, "options": [], "alerts": [],
+                    "message": "この日は旅程にありません"}
+        import re as _re
+
+        ok_at = at is None or _re.match(r"^([01]\d|2[0-3]):[0-5]\d$", at)
+        now_min = (_hm(at) if at else now_local.hour * 60 + now_local.minute) if ok_at else None
+        if now_min is None:
+            raise HTTPException(status_code=422, detail={"code": "invalid_time", "message": "時刻は HH:MM で指定してください"})
+        cur_events = dv._events(db, active)
+        done = [e for e in cur_events if (_hm(e.local_start_time) or 24 * 60) <= now_min]
+        # 今いる所: 位置 → 選んだ予定 → 済んだ最後の予定の場所
+        here: Optional[tuple] = None
+        if lat is not None and lng is not None:
+            here = (lat, lng)
+        elif from_event_id is not None:
+            ev = db.query(TravelEvent).filter(TravelEvent.id == from_event_id, TravelEvent.plan_id == plan.id).first()
+            if ev is not None and ev.latitude is not None and ev.longitude is not None:
+                here = (ev.latitude, ev.longitude)
+        else:
+            last = next((e for e in reversed(done) if e.latitude is not None and e.longitude is not None), None)
+            if last is not None:
+                here = (last.latitude, last.longitude)
+        params, rev = te.load(db)
+        alerts = (db.query(PlanAlert).filter(PlanAlert.plan_id == plan.id, PlanAlert.status == "active").all())
+        day_alerts = [a for a in alerts if a.day_id is None or a.day_id == active.id
+                      or (a.event_id is not None and a.event_id in {e.id for e in cur_events})]
+        rainy = any(a.kind == "weather" for a in day_alerts)
+        options: List[Dict[str, Any]] = []
+        variants = (db.query(TravelDay).filter(TravelDay.plan_id == plan.id, TravelDay.local_date == the_date,
+                                               TravelDay.variant_status == "standby")
+                    .order_by(TravelDay.variant_label).all())
+        for v in variants:
+            evs = [e for e in dv._events(db, v) if e.parent_event_id is None]
+            mode = dv.TRANSPORT_TO_MODE.get((v.variant_conditions or {}).get("transport_mode") or "", "driving")
+            join = None
+            join_idx = len(evs)
+            skipped: List[str] = []
+            for i, e in enumerate(evs):
+                start = _hm(e.local_start_time)
+                if start is None:
+                    continue
+                travel: Optional[float] = None
+                if here is not None:
+                    est = te.estimate(here[0], here[1], e.latitude, e.longitude, mode, params, rev)
+                    travel = est["duration_minutes"] if est else None
+                need = int(round(travel)) if travel is not None else 30  # 分からない時は 30 分を見込む
+                if start >= now_min + need:
+                    join = {"event_id": str(e.id), "title": e.title, "start": _fmt(start), "mode": mode,
+                            "travel_minutes": int(round(travel)) if travel is not None else None,
+                            "arrive": _fmt(min(now_min + need, 23 * 60 + 59)), "margin_minutes": start - now_min - need,
+                            "travel_known": travel is not None}
+                    join_idx = i
+                    break
+                skipped.append(e.title)
+            after = evs[join_idx:]
+            outdoor = [e.title for e in after if wf.fit(e.title, e.event_type, e.description)["fit"] == "outdoor"]
+            check = dv.check_continuity(db, v, (v.variant_conditions or {}).get("party_size"))
+            next_items = [i for i in check["items"] if i["kind"] in ("next", "weather")]
+            options.append({
+                "variant": _summary(db, v), "join": join, "skipped": skipped if join else [],
+                "done": [e.title for e in done], "done_ids": [str(e.id) for e in done], "outdoor_after_join": outdoor,
+                "check": {"status": check["status"], "counts": check["counts"], "items": next_items[:4]},
+                "recommended": False,
+            })
+        # 雨の知らせがある時は、屋外の予定が少なく間に合う案を勧める
+        if rainy:
+            usable = [o for o in options if o["join"]]
+            if usable:
+                best = min(usable, key=lambda o: (len(cast(List[str], o["outdoor_after_join"])),
+                                                  cast(Dict[str, Any], o["variant"])["reason"] != "rain"))
+                best["recommended"] = True
+        from app.services.replan import KIND_LABELS
+
+        return {
+            "revision": plan.revision, "date": the_date.isoformat(), "now": _fmt(now_min), "place_label": place_label,
+            "active": _summary(db, active), "here_known": here is not None,
+            "alerts": [{"id": str(a.id), "kind": a.kind, "label": KIND_LABELS.get(a.kind, a.kind), "note": a.note}
+                       for a in day_alerts],
+            "options": options,
+        }
+
+
+# ---- [P6] 再計画の案を「この日の案」として保存する(上書きしないで控えの案にする) -------------------
+
+class SaveReplanIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    candidate: str = Field(..., pattern="^[AB]$")
+    name: Optional[str] = Field(None, max_length=40)
+
+
+ALERT_TO_REASON = {"weather": "rain", "delay": "delay", "cancellation": "delay", "closure": "closure"}
+
+
+@router.post("/{plan_id}/replans/{replan_id}/save-variant", status_code=201)
+def save_replan_as_variant(plan_id: str, replan_id: uuid.UUID, body: SaveReplanIn, db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    from app.models.models import PlanAlert, Replan
+    from app.services import branches as br
+
+    plan = P._get_owned_plan(db, plan_id, current_user)
+    r = db.query(Replan).filter(Replan.id == replan_id, Replan.plan_id == plan.id).first()
+    if r is None:
+        raise HTTPException(status_code=404, detail={"code": "replan_not_found", "message": "再計画が見つかりません"})
+    cand = next((c for c in r.candidates if c["id"] == body.candidate), None)
+    if cand is None or not cand.get("available"):
+        raise HTTPException(status_code=409, detail={"code": "candidate_unavailable", "message": "この案は使えません"})
+    ops = br.compute_ops(r.base_snapshot, cand["content"])
+    base_ev = {e["source_event_id"]: e for e in r.base_snapshot["events"]}
+    by_day: Dict[str, List[Dict[str, Any]]] = {}
+    for o in ops:
+        if o.get("event_id") in base_ev:
+            by_day.setdefault(base_ev[o["event_id"]]["day_id"], []).append(o)
+    if not by_day:
+        raise HTTPException(status_code=409, detail={"code": "no_changes", "message": "この案では旅程は変わりません"})
+    alert = db.query(PlanAlert).filter(PlanAlert.id == r.alert_id).first()
+    reason = ALERT_TO_REASON.get(alert.kind if alert else "", "other")
+    made: List[TravelDay] = []
+    with dv.all_variants(db):
+        for day_id, day_ops in by_day.items():
+            src = db.query(TravelDay).filter(TravelDay.id == uuid.UUID(day_id), TravelDay.plan_id == plan.id).first()
+            if src is None:
+                continue
+            same = dv.days_of_date(db, plan.id, src.local_date)
+            label = dv.next_label(same)
+            if label is None or len([d for d in same if d.variant_status != "archived"]) >= dv.MAX_VARIANTS:
+                msg = f"{src.local_date} の案は {dv.MAX_VARIANTS} つまでです"
+                raise HTTPException(status_code=409, detail={"code": "too_many_variants", "message": msg})
+            nd = TravelDay(plan_id=plan.id, local_date=src.local_date, timezone_id=src.timezone_id, title=src.title,
+                           sort_order=src.sort_order, variant_status="standby", variant_label=label,
+                           variant_name=(body.name or "").strip() or f"再計画 {cand.get('label') or body.candidate}",
+                           variant_reason=reason, copied_from_day_id=src.id)
+            db.add(nd)
+            db.flush()
+            idmap = dv.copy_day_into(db, src, nd)["idmap"]
+            notes: List[Dict[str, Any]] = []
+            for o in day_ops:
+                new_id = idmap.get(o["event_id"])
+                ev = db.query(TravelEvent).filter(TravelEvent.id == uuid.UUID(new_id)).first() if new_id else None
+                if ev is None:
+                    continue
+                fields = o.get("fields") or {}
+                if o["op"] == "remove" or ("day_id" in fields and fields["day_id"] != day_id):
+                    notes.append({"kind": "replan", "event_id": None, "title": ev.title,
+                                  "text": "外しました" if o["op"] == "remove" else "翌日へ移す案のため、この日の案から外しました"})
+                    db.delete(ev)
+                    continue
+                if "local_start_time" in fields:
+                    notes.append({"kind": "replan", "event_id": str(ev.id), "title": ev.title,
+                                  "text": f"{(ev.local_start_time or '')[:5]} → {fields['local_start_time']}"})
+                    ev.local_start_time = fields["local_start_time"]
+            nd.variant_conditions = {"scaffold": notes, "note": f"再計画({cand.get('label') or ''})から保存"}
+            db.flush()
+            made.append(nd)
+        if not made:
+            raise HTTPException(status_code=409, detail={"code": "no_changes", "message": "この案では旅程は変わりません"})
+        changes = [("travel_day", d.id, "create", None, P._day_to_dict(d)) for d in made]
+        rev = P._record_batch_change_and_bump_revision(db, plan, current_user, "variant", changes)
+        return {"revision": rev, "variants": [_summary(db, d) for d in made]}

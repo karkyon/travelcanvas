@@ -1229,3 +1229,21 @@
 .tc-variant-scaffold ul { margin: 6px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
 .tc-chart-variant { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border-radius: 999px; background: var(--tc-info-soft);
   color: var(--tc-info); border: 1px solid #c7d7fb; font-weight: 700; }
+.tc-today-switch { margin-top: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.tc-today-switch-title { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; margin: 0; color: var(--tc-ink-900); }
+.tc-today-switch-alert { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 10px; border-radius: 10px;
+  background: var(--tc-info-soft); color: #1e3a8a; font-size: 12.5px; font-weight: 700; }
+.tc-today-switch-from { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--tc-ink-700); }
+.tc-today-switch-from select { border: 1px solid var(--tc-cloud-200); border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }
+.tc-today-switch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tc-today-switch-opt { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column;
+  gap: 4px; align-items: flex-start; }
+.tc-today-switch-opt.is-rec { border-color: var(--tc-accent); box-shadow: 0 0 0 3px var(--tc-accent-soft); }
+.tc-today-switch-name { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13.5px; }
+.tc-today-switch-rec { padding: 1px 8px; border-radius: 999px; background: var(--tc-accent); color: var(--tc-on-accent); font-size: 10.5px; font-weight: 800; }
+.tc-today-switch-join { margin: 0; font-size: 12.5px; color: var(--tc-ink-900); display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.tc-today-switch-join .is-ok { display: inline-flex; align-items: center; gap: 3px; color: var(--tc-success); font-weight: 700; }
+.tc-today-switch-join.is-none { color: var(--tc-ink-500); }
+.tc-today-switch-sub { margin: 0; font-size: 12px; color: var(--tc-ink-700); }
+.tc-today-switch-sub.is-warn { color: var(--tc-warning); }
+.tc-today-switch-done { margin: 0; font-size: 12.5px; color: var(--tc-success); font-weight: 700; }

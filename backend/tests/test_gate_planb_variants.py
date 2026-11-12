@@ -201,3 +201,112 @@ def test_clone_share_and_booklet_include_variants(auth_client):
     assert [(v["label"], v["name"], [e["title"] for e in v["events"]]) for v in b["variants"]] == [
         ("B", "雨の日", ["二見興玉神社", "鳥羽水族館"])]
     assert sum(len(d["events"]) for d in b["schedule"]["days"]) == 4
+
+
+# ---------------------------------------------------------------- P6: 天気の当たり前の感覚・今日の切り替え・再計画から保存
+
+def test_weather_fit_common_sense():
+    from app.services import weather_fit as wf
+
+    assert wf.fit("河原でバーベキュー", "dining")["fit"] == "outdoor"  # 食事でも屋外
+    assert "焼肉" in wf.fit("河原でバーベキュー", "dining")["alternative"]
+    assert wf.fit("鳥羽水族館", "sightseeing")["fit"] == "indoor"  # 観光でも屋内
+    assert wf.fit("水族館の前のビーチで海水浴", "activity")["fit"] == "outdoor"  # はっきり屋外の行いが強い
+    assert wf.fit("美術館", "sightseeing")["fit"] == "indoor"
+    assert wf.fit("伊勢神宮 内宮", "sightseeing")["fit"] == "partly"
+    assert wf.fit("横山展望台", "sightseeing")["fit"] == "outdoor"
+    assert wf.fit("都リゾート", "accommodation")["fit"] == "indoor"
+    assert wf.fit("屋形船の夕食", "dining")["fit"] == "indoor"
+    assert wf.indoor_like("海の博物館", "sightseeing") and not wf.indoor_like("海水浴場", "activity")
+
+
+def test_rain_scaffold_flags_bbq_and_suggests_indoor_candidates(auth_client):
+    client, _owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    client.post(f"{base}/events", json={"day_id": d2["id"], "title": "河原でバーベキュー", "event_type": "dining",
+                                        "local_start_time": "12:00"}, headers=_ik())
+    client.post(f"{base}/events", json={"day_id": d2["id"], "title": "鳥羽水族館", "event_type": "sightseeing",
+                                        "local_start_time": "14:00"}, headers=_ik())
+    for t in ("海の博物館", "海水浴場", "ミキモト真珠島"):
+        assert client.post(f"/api/v1/plans/{p}/candidates", json={"title": t}).status_code == 201
+    v = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "copy_active", "reason": "rain",
+                                              "scaffold": True}).json()["variants"][0]
+    notes = {n["title"]: n for n in v["conditions"]["scaffold"]}
+    assert "焼肉" in notes["河原でバーベキュー"]["text"] and notes["河原でバーベキュー"]["fit"] == "outdoor"
+    assert notes["横山展望台"]["fit"] == "outdoor" and notes["二見興玉神社"]["fit"] == "partly"
+    assert "鳥羽水族館" not in notes  # 屋内はそのまま
+    assert notes["候補箱の屋内の候補"]["text"] == "海の博物館"
+    # 検証: 雨の案に屋外の予定が残っている
+    chk = client.get(f"{base}/variants/{v['day_id']}/check").json()
+    weather = [i["title"] for i in chk["items"] if i["kind"] == "weather"]
+    assert weather == ["雨の案に屋外の予定: 横山展望台", "雨の案に屋外の予定: 河原でバーベキュー"]
+
+
+def test_today_switch_options_join_point_and_partial_switch(auth_client, make_user, db_session):
+    from app.models.models import Notification, PlanCollaborator
+
+    client, owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    # 共同の編集者(切り替えの知らせ)
+    other, _pw = make_user()
+    db_session.add(PlanCollaborator(plan_id=uuid.UUID(p), user_id=other.id, role="editor", status="accepted",
+                                    email=other.email))
+    db_session.commit()
+    vb = client.post(f"{base}/variants", json={"local_date": "2026-11-29", "source": "blank", "name": "雨の日",
+                                               "reason": "rain"}).json()["variants"][0]
+    for title, t, at, lat, lng in (("海の博物館", "sightseeing", "09:00", 34.48, 136.84),
+                                   ("鳥羽水族館", "sightseeing", "11:30", 34.48, 136.84),
+                                   ("海辺でバーベキュー", "dining", "13:00", 34.48, 136.84)):
+        r = client.post(f"{base}/events", json={"day_id": vb["day_id"], "title": title, "event_type": t,
+                                                "local_start_time": at, "latitude": lat, "longitude": lng},
+                        headers=_ik())
+        assert r.status_code == 201, r.text
+    # 天気の知らせ(雨)
+    rain = {"kind": "weather", "day_id": d2["id"], "note": "午後から雨"}
+    assert client.post(f"{base}/alerts", json=rain).status_code == 201
+    r = client.get(f"{base}/today/switch-options", params={"date": "2026-11-29", "at": "10:00"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["now"] == "10:00" and body["here_known"] is True and body["alerts"][0]["kind"] == "weather"
+    o = body["options"][0]
+    # 済んだ: 二見興玉神社(08:00)・横山展望台(09:15)。今は展望台のあたり → 09:00 の博物館はとばし、11:30 の水族館で合流
+    assert o["done"] == ["二見興玉神社", "横山展望台"]
+    assert o["join"]["title"] == "鳥羽水族館" and o["join"]["travel_known"] is True and o["join"]["margin_minutes"] > 0
+    assert o["skipped"] == ["海の博物館"] and o["outdoor_after_join"] == ["海辺でバーベキュー"]
+    assert o["recommended"] is True
+    # 途中の切り替え(合流点・済んだ予定・地名を記録)
+    rev = _rev(client, p)
+    done_ids = [a1["id"], a2["id"]]
+    sw = client.post(f"{base}/variants/{vb['day_id']}/switch", json={
+        "reason": "rain", "phase": "during", "join_event_id": o["join"]["event_id"], "done_event_ids": done_ids,
+        "place_label": "鳥羽のあたり"}, headers={"If-Match": str(rev)})
+    assert sw.status_code == 200, sw.text
+    rec = client.get(f"{base}/variant-switches").json()
+    rec = rec["switches"][0] if isinstance(rec, dict) else rec[0]
+    assert rec["phase"] == "during" and rec["place_label"] == "鳥羽のあたり"
+    msgs = db_session.query(Notification).filter(Notification.user_id == other.id,
+                                                 Notification.type == "variant_switched").all()
+    assert len(msgs) == 1 and "11/29 B 雨の日" in msgs[0].message and "水族館" not in msgs[0].message
+    # 範囲外の日・時刻の誤り
+    assert client.get(f"{base}/today/switch-options", params={"date": "2026-12-31"}).json()["options"] == []
+    assert client.get(f"{base}/today/switch-options", params={"date": "2026-11-29", "at": "25:99"}).status_code == 422
+
+
+def test_save_replan_candidate_as_day_variant(auth_client):
+    client, _owner = auth_client
+    p, base, d1, d2, a1, a2 = _setup(client)
+    a = client.post(f"{base}/alerts", json={"kind": "delay", "event_id": a1["id"], "delay_minutes": 60}).json()
+    rp = client.post(f"{base}/alerts/{a['id']}/replans").json()
+    before = client.get(f"/api/v1/plans/{p}").json()
+    r = client.post(f"{base}/replans/{rp['id']}/save-variant", json={"candidate": "A"})
+    assert r.status_code == 201, r.text
+    v = r.json()["variants"][0]
+    assert v["status"] == "standby" and v["reason"] == "delay" and v["local_date"] == "2026-11-29"
+    day = client.get(f"{base}/variants/{v['day_id']}").json()["day"]
+    times = {e["title"]: e["local_start_time"][:5] for e in day["events"]}
+    assert times["二見興玉神社"] == "09:00"
+    # 本体は変わらない(上書きしない)
+    after = client.get(f"/api/v1/plans/{p}").json()
+    assert [[e["local_start_time"] for e in d["events"]] for d in after["days"]] == \
+        [[e["local_start_time"] for e in d["events"]] for d in before["days"]]
+    assert client.post(f"{base}/replans/{rp['id']}/save-variant", json={"candidate": "C"}).status_code == 422

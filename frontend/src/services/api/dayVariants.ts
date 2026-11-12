@@ -9,7 +9,11 @@ const ifMatch = (rev: number): AxiosRequestConfig => ({ ...SILENT, headers: { 'I
 
 export type VariantReason = 'rain' | 'party' | 'transport' | 'delay' | 'fatigue' | 'budget' | 'closure' | 'other';
 /** たたき台で変えた所・印を付けた所(案を作った時に理由に合わせて組み替えた結果) */
-export interface ScaffoldNote { kind: 'rain' | 'delay' | 'fatigue' | 'transport'; event_id: string | null; title: string; text: string }
+export interface ScaffoldNote {
+  kind: 'rain' | 'delay' | 'fatigue' | 'transport' | 'candidates' | 'replan'; event_id: string | null; title: string; text: string;
+  /** 雨の時: 屋外(outdoor)・一部屋外(partly) */
+  fit?: 'outdoor' | 'partly';
+}
 export interface VariantConditions {
   party_size?: number | null; absent_member_ids?: string[]; transport_mode?: string | null; prefer_indoor?: boolean;
   note?: string | null; delay_minutes?: number | null; delay_after?: string | null; max_events?: number | null;
@@ -29,7 +33,7 @@ export interface VariantDay {
   segments: Record<string, unknown>[];
 }
 export interface CheckItem {
-  kind: 'prev' | 'next' | 'time' | 'drop' | 'booking' | 'unbooked'; level: 'ok' | 'info' | 'warn' | 'bad';
+  kind: 'prev' | 'next' | 'time' | 'drop' | 'booking' | 'unbooked' | 'weather'; level: 'ok' | 'info' | 'warn' | 'bad';
   title: string; text: string; reservation_id?: string;
 }
 export interface VariantCheck { variant: VariantSummary; status: 'ok' | 'warn' | 'bad'; items: CheckItem[];
@@ -73,6 +77,21 @@ export async function switchVariant(planId: string, dayId: string, rev: number, 
   join_event_id?: string | null; done_event_ids?: string[]; place_label?: string | null;
 }): Promise<{ revision: number }> {
   return (await api.post(`/plans/${planId}/variants/${dayId}/switch`, body, ifMatch(rev))).data as { revision: number };
+}
+/** [P6] 旅行中の切り替え先(合流点・移動・とばす予定・済んだ予定・つながり) */
+export interface SwitchJoin {
+  event_id: string; title: string; start: string; mode: string; travel_minutes: number | null; arrive: string;
+  margin_minutes: number; travel_known: boolean;
+}
+export interface SwitchOption {
+  variant: VariantSummary; join: SwitchJoin | null; skipped: string[]; done: string[]; done_ids: string[];
+  outdoor_after_join: string[]; recommended: boolean;
+  check: { status: 'ok' | 'warn' | 'bad'; counts: Record<'ok' | 'info' | 'warn' | 'bad', number>; items: CheckItem[] };
+}
+export interface SwitchOptions {
+  revision?: number; date: string | null; now: string | null; place_label?: string | null; here_known?: boolean;
+  active?: VariantSummary; alerts: { id: string; kind: string; label: string; note: string | null }[];
+  options: SwitchOption[]; message?: string;
 }
 export async function listSwitches(planId: string): Promise<SwitchRecord[]> {
   return ((await api.get(`/plans/${planId}/variant-switches`, SILENT)).data as { switches: SwitchRecord[] }).switches;

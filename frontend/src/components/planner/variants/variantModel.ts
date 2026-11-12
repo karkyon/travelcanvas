@@ -36,6 +36,7 @@ export function groupChecks(items: ReadonlyArray<CheckItem>): { title: string; i
   return [
     { title: '前後のつながり', items: g(['prev', 'next']) },
     { title: '時刻', items: g(['time']) },
+    { title: '天気', items: g(['weather']) },
     { title: '予約', items: g(['drop', 'booking', 'unbooked']) },
   ].filter((x) => x.items.length > 0);
 }

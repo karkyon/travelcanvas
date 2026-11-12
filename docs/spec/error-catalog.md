@@ -46,7 +46,7 @@
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
 | `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py |
-| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/replans.py |
+| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py |
 | `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `changed_since` | 409 | no | 訂正の後に値が変わっているため取り消せません(新しく訂正してください) | api/v1/corrections.py |
 | `client_policy_ignored` | — | — | 上限・クラス・提供元は指定できません(サーバーが決めます) | api/v1/planning_usage.py |
@@ -134,6 +134,7 @@
 | `invalid_slots` | — | — | …日目 | api/v1/trip_intents.py |
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
 | `invalid_tier` | 403 | no | tier は free・trip・journey・explorer のどれかです | api/v1/admin_ops.py |
+| `invalid_time` | 422 | no | 時刻は HH:MM で指定してください | api/v1/day_variants.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
 | `invalid_url` | — | — | https:// で始まる URL を入力してください(ユーザー名・パスワードは含めない) | api/v1/organizations.py |
@@ -160,7 +161,7 @@
 | `mode_mismatch` | 409 | after_reload | この旅行の位置の設定と違う保存先です。先に設定を変えてください | api/v1/location_tracks.py |
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
-| `no_changes` | 403, 409, 422 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v1/re |
+| `no_changes` | 403, 409, 422 | no | 本案からの変更がありません | api/v1/branches.py, api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/ |
 | `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
 | `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
 | `no_ops_selected` | 422 | no | 採用する変更を選んでください | api/v1/branches.py |
@@ -205,6 +206,7 @@
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
 | `replan_conflict` | 409 | after_reload | 旅程と食い違う変更があるため適用できません。もう一度再計画案を作ってください | api/v1/replans.py |
+| `replan_not_found` | 404 | no | 再計画が見つかりません | api/v1/day_variants.py |
 | `replan_stale` | 409 | after_reload | 提案を作った後に旅程か過去の記録が変わりました。提案を読み込み直してください | api/v1/memory_replan.py, api/v1/replans.py |
 | `revision_conflict` | 409 | after_reload | 候補が他の人の変更で更新されています(現在のrevision: …) | api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.py, api/v1/visits. |
 | `revision_mismatch` | 409 | after_reload | ほかの画面で変更されました。読み込み直してください | services/private_profile.py |

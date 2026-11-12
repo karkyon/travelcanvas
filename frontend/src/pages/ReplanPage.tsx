@@ -12,7 +12,14 @@ import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { applyReplan, createReplan, getAlerts, getReplan, rejectReplan } from '@/services/api';
+import { api, applyReplan, createReplan, getAlerts, getReplan, rejectReplan } from '@/services/api';
+import type { VariantSummary } from '@/services/api/dayVariants';
+
+/** [Gate PlanB-P6] 再計画の案を、この日の控えの案として保存する(旅程は上書きしない) */
+async function saveReplanAsVariant(planId: string, replanId: string, candidate: string): Promise<{ variants: VariantSummary[] }> {
+  return (await api.post(`/plans/${planId}/replans/${replanId}/save-variant`, { candidate },
+    { skipGlobalErrorHandler: true })).data as { variants: VariantSummary[] };
+}
 import type { PlanAlert, Replan, ReplanCandidate } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
@@ -26,7 +33,9 @@ const CandidateCard: React.FC<{
   applying: boolean;
   applied: boolean;
   onApply: (c: ReplanCandidate) => void;
-}> = ({ c, canApply, applying, applied, onApply }) => (
+  /** [Gate PlanB-P6] この日の案として保存(上書きしない) */
+  onSave?: (c: ReplanCandidate) => void;
+}> = ({ c, canApply, applying, applied, onApply, onSave }) => (
   <Card padding="md" className={`space-y-3 ${applied ? 'ring-2 ring-green-600' : ''}`}>
     <section aria-label={`案${c.id}`}>
       <h2 className="text-lg font-bold text-ink-900">
@@ -82,6 +91,11 @@ const CandidateCard: React.FC<{
               {`案${c.id}で旅程を変更する`}
             </Button>
           )}
+          {canApply && onSave && (
+            <Button variant="outline" onClick={() => onSave(c)} data-testid={`replan-save-variant-${c.id}`}>
+              {`案${c.id}をこの日の控えの案として保存(旅程は変えない)`}
+            </Button>
+          )}
         </>
       )}
     </section>
@@ -97,6 +111,7 @@ const ReplanPage: React.FC = () => {
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; items: string[]; stale: boolean } | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!planId || !replanId) return;
@@ -133,6 +148,18 @@ const ReplanPage: React.FC = () => {
       await load();
     } finally {
       setApplying(null);
+    }
+  };
+
+  const saveVariant = async (c: ReplanCandidate) => {
+    if (!planId || !replan) return;
+    setError(null);
+    try {
+      const r = await saveReplanAsVariant(planId, replan.id, c.id);
+      const names = r.variants.map((v) => `${v.local_date} ${v.label} ${v.name}`).join('・');
+      setSaved(`案${c.id}を控えの案(${names})として保存しました。旅程の日の案のタブ、または今日の画面から切り替えられます`);
+    } catch (err) {
+      setError({ ...replanErrorInfo(err), stale: false });
     }
   };
 
@@ -186,6 +213,7 @@ const ReplanPage: React.FC = () => {
         </div>
       )}
       {done && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{done}</div>}
+      {saved && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status" data-testid="replan-saved">{saved}</div>}
 
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
@@ -207,7 +235,7 @@ const ReplanPage: React.FC = () => {
           <div className="grid md:grid-cols-2 gap-4 mt-4">
             {replan.candidates.map((c) => (
               <CandidateCard key={c.id} c={c} canApply={canApply} applying={applying === c.id}
-                applied={replan.applied_candidate === c.id} onApply={apply} />
+                applied={replan.applied_candidate === c.id} onApply={apply} onSave={saveVariant} />
             ))}
           </div>
           {replan.status === 'proposed' && replan.can_apply && !done && (

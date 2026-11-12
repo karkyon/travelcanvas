@@ -23,6 +23,7 @@ vi.mock('@/services/api', () => ({
 // [Gate K1] 当日画面の保存は利用者ごとの鍵で暗号化する(offlineVault)
 const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
+vi.mock('./today/TodaySwitchPanel', () => ({ default: () => null }));
 
 import TodayPage from './TodayPage';
 import { saveTodayCache } from './today/todayModel';
