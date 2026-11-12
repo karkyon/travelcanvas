@@ -434,3 +434,24 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-bk-menu--left { right: auto; left: 0; }
 .tc-bk-menu .tc-bk-act .truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-seg-iconbtn.tc-seg-booked { color: #17734d; }
+
+/* ===== [Gate ChartHeadSlim] 全日程の表: 見出しを低く・見出しを固定して予定だけ上下に流す ===== */
+.tc-chart-scroll { max-height: calc(100vh - 150px); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.tc-chart-scroll > .tc-chart-col { overflow: visible; }
+.tc-chart-top { position: sticky; top: 0; z-index: 6; margin: -12px -12px 0; padding: 0 12px 6px;
+  background: var(--tc-surface, var(--tc-cloud-0)); border-radius: 12px 12px 0 0;
+  box-shadow: 0 6px 10px -8px rgba(15, 23, 42, .25); }
+.tc-chart-top .tc-chart-dayhead { margin: 0 -12px; padding: 7px 12px 6px; }
+.tc-chart-dayhead-kicker { font-size: 10.5px; }
+.tc-chart-dayhead-kicker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-chart-dayhead-date { margin-top: 0; font-size: 16px; line-height: 1.25; }
+.tc-chart-dayhead-sum { margin-top: 3px; display: grid; gap: 2px; }
+.tc-chart-dayhead-line { margin: 0; font-size: 11px; line-height: 1.45; color: var(--tc-ink-800, var(--tc-ink-900)); }
+.tc-chart-dayhead-line .tc-chart-sep { color: var(--tc-ink-500, var(--tc-ink-700)); }
+.tc-chart-dayhead-line .tc-chart-variant { margin-left: 6px; }
+.tc-chart-dayhead-modes { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: var(--tc-ink-700); }
+.tc-chart-dayhead-modes > span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.tc-chart-topanchor:not(:empty) { padding-top: 6px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact .tc-anchor { padding: 5px 8px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact .tc-anchor-text { font-size: 12px; }
+.tc-chart-dayhead-line > span { white-space: nowrap; }

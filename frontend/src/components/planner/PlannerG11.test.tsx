@@ -548,7 +548,7 @@ describe('[TravelEstimate] 区間の距離・内訳と全日程の移動の帯�
     const d1 = m.days[0]!;
     expect(d1.travels).toEqual([{ eventId: 'e2', start: 11 * 60 + 25, end: 11 * 60 + 45, mode: 'driving', minutes: 20, km: 8.4 }]);
     expect(d1.gaps).toEqual([[11 * 60, 11 * 60 + 25]]);
-    expect(d1.byMode).toEqual([{ mode: '自家用車', label: '自家用車', minutes: 20, km: 8.4 }]);
+    expect(d1.byMode).toEqual([{ mode: 'driving', label: '自家用車', minutes: 20, km: 8.4 }]);
     render(<AllDaysChart days={days()} segments={[seg({ to_event_id: 'e2', mode: 'driving', duration_minutes: 20, distance_km: 8.4 })]}
       currentDay={0} onOpenDay={vi.fn()} />);
     expect(screen.getByTestId('chart-travel-e2')).toHaveTextContent('20分 · 8.4km');

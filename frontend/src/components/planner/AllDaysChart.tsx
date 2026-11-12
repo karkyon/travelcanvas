@@ -135,23 +135,44 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
           [Gate ChartAlign] 見出しと前夜の宿は「上の段」にまとめ、全部の日で同じ高さにそろえる(物差しの時刻の位置もそろう) */}
       <div className="tc-chart-top" data-testid={`chart-top-${day.index}`}>
       <header className="tc-chart-dayhead" data-chart-head="" data-testid={`chart-head-${day.index}`}>
-        <p className="tc-chart-dayhead-kicker">{`DAY ${day.index + 1}`}<span>{`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}</span></p>
-        <h3 id={`chart-day-${day.id}`} className="tc-chart-dayhead-date">{label}</h3>
-        <p className="tc-chart-dayhead-chips" data-testid={`chart-summary-${day.index}`}>
-          {[
-            `予定 ${day.events.length + day.untimed.length}件`,
-            day.first && day.last ? `${day.first}〜${day.last}` : null,
-            `移動 ${durationLabel(day.travelMinutes)}`,
-            ...(day.byMode ?? []).map((m) => `${m.label} ${durationLabel(m.minutes)}${m.km !== null ? `・${kmText(m.km)}` : ''}`),
-            day.freeMinutes !== null ? `空き ${durationLabel(day.freeMinutes)}` : null,
-            day.lockedCount ? `固定 ${day.lockedCount}件` : null,
-          ].filter(Boolean).map((t, i, all) => <span key={t}>{t}{i < all.length - 1 ? <span className="sr-only">・</span> : null}</span>)}
-          {variants && variants.length > 0 && (
-            <span className="tc-chart-variant" title={`控えの案: ${variants.join('・')}`} data-testid={`chart-variants-${day.index}`}>
-              {`${variants.map((v) => v.split(' ')[0]).join('・')} あり`}
-            </span>
-          )}
+        {/* [Gate ChartHeadSlim] 見出しを低く: DAY と時刻帯は 1 行、日付の横に予定の数、要約は小さな文字の 1〜2 行、
+            移動の手段は印と時間だけ(手段の名前・距離は読み上げと吹き出しで) */}
+        <p className="tc-chart-dayhead-kicker" title={`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}>
+          {`DAY ${day.index + 1}`}<span>{(day.timezone ?? '時刻帯未確認').split('/').pop()!.replace(/_/g, ' ')}</span>
         </p>
+        <h3 id={`chart-day-${day.id}`} className="tc-chart-dayhead-date">{label}</h3>
+        <div className="tc-chart-dayhead-sum" data-testid={`chart-summary-${day.index}`}>
+          <p className="tc-chart-dayhead-line">
+            {[
+              `予定 ${day.events.length + day.untimed.length}件`,
+              day.first && day.last ? `${day.first}〜${day.last}` : null,
+              `移動 ${durationLabel(day.travelMinutes)}`,
+              day.freeMinutes !== null ? `空き ${durationLabel(day.freeMinutes)}` : null,
+              day.lockedCount ? `固定 ${day.lockedCount}件` : null,
+            ].filter(Boolean).map((t, i, all) => (
+              <span key={t}>{t}{i < all.length - 1 ? <span aria-hidden="false" className="tc-chart-sep">・</span> : null}</span>
+            ))}
+            {variants && variants.length > 0 && (
+              <span className="tc-chart-variant" title={`控えの案: ${variants.join('・')}`} data-testid={`chart-variants-${day.index}`}>
+                {`${variants.map((v) => v.split(' ')[0]).join('・')} あり`}
+              </span>
+            )}
+          </p>
+          {(day.byMode ?? []).length > 0 && (
+            <p className="tc-chart-dayhead-modes">
+              {(day.byMode ?? []).map((m) => {
+                const full = `${m.label} ${durationLabel(m.minutes)}${m.km !== null ? `・${kmText(m.km)}` : ''}`;
+                return (
+                  <span key={m.label} title={full}>
+                    <TransportIcon mode={m.mode} size={12} />
+                    <span className="sr-only">{`${m.label} `}</span>{durationLabel(m.minutes)}
+                    {m.km !== null && <span className="sr-only">{`・${kmText(m.km)}`}</span>}
+                  </span>
+                );
+              })}
+            </p>
+          )}
+        </div>
       </header>
       <div className="tc-chart-topanchor" data-chart-slot="">
         {anchors?.start && !timedAnchor(anchors.start) && <JourneyAnchorRow anchor={anchors.start} position="start" compact />}
@@ -348,7 +369,7 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
         </ul>
       )}
       {many && <p className="mt-1 text-xs text-ink-700" data-testid="all-days-scroll-hint">横に流すと他の日も見られます →</p>}
-      <div ref={rowRef} className={`mt-3 gap-3 ${many ? 'flex overflow-x-auto pb-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}
+      <div ref={rowRef} className={`tc-chart-scroll mt-3 gap-3 ${many ? 'flex overflow-x-auto pb-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3'}`}
         tabIndex={many ? 0 : undefined} aria-label={many ? '全日程(横に流せます)' : undefined}
         role={many ? 'region' : undefined}>
         {model.days.map((d) => (

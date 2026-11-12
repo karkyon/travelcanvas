@@ -435,13 +435,13 @@ export function buildChart(days: DaySchedule[], segments: TravelSegment[], locke
     const occupied = unionMinutes([...busy, ...travel]);
     const span = first !== null && lastEnd !== null ? lastEnd - Math.min(first, ...travel.map(([a]) => a)) : null;
     const gaps = freeGaps([...busy, ...travel]);
-    const modes = new Map<string, { minutes: number; km: number | null }>();
+    const modes = new Map<string, { mode: string; minutes: number; km: number | null }>();
     for (const t of travels) {
       const label = transportMode(t.mode).label;
-      const cur = modes.get(label) ?? { minutes: 0, km: 0 };
-      modes.set(label, { minutes: cur.minutes + t.minutes, km: cur.km === null || t.km === null ? null : cur.km + t.km });
+      const cur = modes.get(label) ?? { mode: transportMode(t.mode).mode ?? String(t.mode ?? ''), minutes: 0, km: 0 };
+      modes.set(label, { mode: cur.mode, minutes: cur.minutes + t.minutes, km: cur.km === null || t.km === null ? null : cur.km + t.km });
     }
-    const byMode = [...modes.entries()].map(([label, v]) => ({ mode: label, label, minutes: v.minutes, km: v.km }));
+    const byMode = [...modes.entries()].map(([label, v]) => ({ mode: v.mode, label, minutes: v.minutes, km: v.km }));
     return {
       index, id: d.id, date: d.date ?? '', timezone: d.timezone_id ?? null, events: timed, untimed,
       first: hm(first), last: hm(lastEnd), travelMinutes, freeMinutes: span !== null ? Math.max(0, span - occupied) : null,
