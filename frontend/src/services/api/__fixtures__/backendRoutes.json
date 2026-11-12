@@ -53,7 +53,8 @@
   "captured_at_head_travel_estimate": "gate/travel-estimate(+Gate TravelEstimate の /admin/ops/travel-estimate の GET・PUT・preview)",
   "captured_at_head_memory_reel": "gate/memory-reel (+Gate MemoryReel GET /plans/{plan_id}/memory-reel)",
   "captured_at_head_planb": "dev/plan-b (+Gate PlanB /plans/{plan_id}/variants*・variant-switches)",
-  "captured_at_head_planb_p8": "dev/plan-b (-Gate P7/G7/G8 /plans/{plan_id}/branches*・branches-comparison: もしもの案をやめた)"
+  "captured_at_head_planb_p8": "dev/plan-b (-Gate P7/G7/G8 /plans/{plan_id}/branches*・branches-comparison: もしもの案をやめた)",
+  "captured_at_head_tday": "Gate PlanB-P8 (+Gate TDay today/guide・today/detours・today/eta)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -94,6 +95,7 @@
   "DELETE /api/v1/plans/{plan_id}/route-options/{option_id}/legs/{leg_id}",
   "DELETE /api/v1/plans/{plan_id}/segments/{segment_id}",
   "DELETE /api/v1/plans/{plan_id}/settlements/{settlement_id}",
+  "DELETE /api/v1/plans/{plan_id}/today/eta",
   "DELETE /api/v1/plans/{plan_id}/upload-links/{link_id}",
   "DELETE /api/v1/plans/{plan_id}/variants/{day_id}",
   "DELETE /api/v1/privacy-zones/{zone_id}",
@@ -244,6 +246,8 @@
   "GET /api/v1/plans/{plan_id}/settlements",
   "GET /api/v1/plans/{plan_id}/sync/conflicts",
   "GET /api/v1/plans/{plan_id}/today",
+  "GET /api/v1/plans/{plan_id}/today/eta",
+  "GET /api/v1/plans/{plan_id}/today/guide",
   "GET /api/v1/plans/{plan_id}/today/switch-options",
   "GET /api/v1/plans/{plan_id}/trip-intent",
   "GET /api/v1/plans/{plan_id}/upload-links",
@@ -472,6 +476,7 @@
   "POST /api/v1/plans/{plan_id}/spot-ai/places-text",
   "POST /api/v1/plans/{plan_id}/sync",
   "POST /api/v1/plans/{plan_id}/sync/conflicts/{operation_id}/resolve",
+  "POST /api/v1/plans/{plan_id}/today/detours",
   "POST /api/v1/plans/{plan_id}/trip-intent/commit",
   "POST /api/v1/plans/{plan_id}/undo",
   "POST /api/v1/plans/{plan_id}/upload-links",
@@ -558,6 +563,7 @@
   "PUT /api/v1/plans/{plan_id}/movement-settings",
   "PUT /api/v1/plans/{plan_id}/polls/{poll_id}/votes",
   "PUT /api/v1/plans/{plan_id}/private-profile",
+  "PUT /api/v1/plans/{plan_id}/today/eta",
   "PUT /api/v1/plans/{plan_id}/trip-intent/slots",
   "PUT /api/v1/privacy/consents",
   "PUT /api/v1/privacy/private-profile",

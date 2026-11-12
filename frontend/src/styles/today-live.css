@@ -1,0 +1,207 @@
+/* [Gate TDay] 旅の当日「旅帖ライブ」(docs/ux/TDay_旅の当日_旅帖ライブ.md)。色・面はデザインの決まり(tokens)を使う。
+   状態は色だけで伝えない(必ず文字を付ける)。暗い見た目でも同じ部品で読める。動きは「動きを減らす」設定で止める。 */
+
+.tc-live-band { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
+  margin: 0 0 14px; padding: 10px 16px; border-radius: var(--tc-radius-lg); background: #0f2a3a; color: #ffffff; font-size: 13px;
+  box-shadow: var(--tc-shadow-2); }
+.tc-live-band__live { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; color: #9fe3d3; }
+.tc-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff8a65; animation: tc-live-pulse 1.6s infinite; }
+.tc-live-band__go { border-radius: var(--tc-radius-md); padding: 2px 10px; font-weight: 800; background: #b23c22; color: #ffffff; }
+.tc-live-band__go[data-stage='relaxed'] { background: #0b544e; }
+.tc-live-band__go[data-stage='late'] { background: #7a2e0e; }
+.tc-live-band__muted { color: #c9dde6; }
+.tc-live-band__end { margin-left: auto; color: #c9dde6; }
+.tc-live-band b { color: #ffffff; }
+
+@keyframes tc-live-pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 138, 101, .55); } 100% { box-shadow: 0 0 0 10px rgba(255, 138, 101, 0); } }
+@keyframes tc-seal-press { 0% { transform: scale(1.6) rotate(-14deg); opacity: 0; } 60% { transform: scale(.94) rotate(-6deg); opacity: 1; } 100% { transform: scale(1) rotate(var(--tilt, -6deg)); } }
+
+/* 旅の糸(今日の道のり) */
+.tc-thread { position: relative; margin-top: 16px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.tc-thread ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; min-width: max-content; position: relative; }
+.tc-thread ol::before { content: ''; position: absolute; left: 22px; right: 22px; top: 21px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .25); }
+.tc-thread li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; text-align: center; font-size: 11px; }
+.tc-thread li b { font-size: 12px; font-variant-numeric: tabular-nums; }
+.tc-thread li span.tc-thread__title { color: rgba(255, 255, 255, .86); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-thread__node { position: relative; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .55); background: #14465a; color: #ffffff; font-weight: 800; font-size: 13px; }
+.tc-thread__node[data-state='done'] { background: #fff3e8; border-color: #b23c22; color: #b23c22; font-family: var(--tc-font-display); font-size: 15px; }
+.tc-thread__node[data-state='now'] { background: #ffcf8a; border: 3px solid #ffffff; color: #0f2a3a; font-size: 10px; animation: tc-live-pulse 1.6s infinite; }
+.tc-thread__node[data-state='next'] { border: 3px dashed #ffcf8a; color: #ffcf8a; font-size: 10px; }
+.tc-thread__node[data-state='rain'] { border-color: #8fb8ff; }
+.tc-thread__rain { color: #b9d3ff; font-weight: 700; }
+
+/* 出発の合図(NEXT の中) */
+.tc-go { margin-top: 12px; padding: 12px; border-radius: var(--tc-radius-lg); background: var(--tc-danger-soft); border: 1px solid rgba(178, 60, 34, .25); }
+.tc-go[data-stage='relaxed'] { background: var(--tc-accent-soft); border-color: rgba(15, 110, 102, .25); }
+.tc-go[data-stage='late'] { background: var(--tc-warning-soft); border-color: rgba(146, 64, 14, .3); }
+.tc-go__row { display: flex; gap: 14px; align-items: center; }
+.tc-go__ring { flex: none; }
+.tc-go__ring circle.bg { stroke: var(--tc-cloud-200); }
+.tc-go__ring circle.fg { stroke: #b23c22; transition: stroke-dasharray var(--tc-motion-base) var(--tc-motion-easing); }
+.tc-go[data-stage='relaxed'] .tc-go__ring circle.fg { stroke: var(--tc-accent); }
+.tc-go[data-stage='late'] .tc-go__ring circle.fg { stroke: var(--tc-warning); }
+.tc-go__ring text { fill: var(--tc-ink-900); }
+.tc-go__ring text.sub { fill: var(--tc-ink-500); }
+.tc-go__head { margin: 0; font: 800 18px/1.4 var(--tc-font-display); color: var(--tc-ink-900); }
+.tc-go__sub { margin: 2px 0 0; font-size: 13px; color: var(--tc-ink-700); }
+.tc-go__note { margin: 2px 0 0; font-size: 12px; color: var(--tc-ink-500); }
+.tc-go__stages { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tc-go__stages li { text-align: center; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: var(--tc-radius-md); background: var(--tc-cloud-100); color: var(--tc-ink-500); }
+.tc-go__stages li[aria-current='step'] { background: #b23c22; color: #ffffff; }
+.tc-go[data-stage='relaxed'] .tc-go__stages li[aria-current='step'] { background: var(--tc-accent); }
+.tc-go[data-stage='late'] .tc-go__stages li[aria-current='step'] { background: var(--tc-warning); }
+.tc-go__advice { margin: 8px 0 0; font-size: 13px; color: var(--tc-ink-700); }
+
+/* 共通のカード */
+.tc-live-card { background: var(--tc-surface-solid); border: 1px solid var(--tc-cloud-200); border-radius: var(--tc-radius-xl); box-shadow: var(--tc-shadow-1); padding: 16px; }
+.tc-live-card--sand { background: var(--tc-sand-50); border-color: var(--tc-sand-300); }
+.tc-live-card--info { background: var(--tc-info-soft); border-color: rgba(29, 78, 216, .25); }
+.tc-live-card--warm { background: var(--tc-warning-soft); border-color: rgba(146, 64, 14, .25); }
+.tc-live-label { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .12em; color: var(--tc-accent); }
+.tc-live-label--coral { color: #a5281a; }
+.tc-live-label--gold { color: var(--tc-warning); }
+.tc-live-label--info { color: var(--tc-info); }
+.tc-lv-title { margin: 4px 0 0; font: 800 19px/1.4 var(--tc-font-display); color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-live-muted { color: var(--tc-ink-500); font-size: 12px; }
+.tc-live-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tc-live-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tc-live-chip { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--tc-radius-pill); padding: 2px 10px; font-size: 12px; font-weight: 700;
+  background: var(--tc-cloud-100); color: var(--tc-ink-700); }
+.tc-live-chip--good { background: var(--tc-success-soft); color: var(--tc-success); }
+.tc-live-chip--warn { background: var(--tc-warning-soft); color: var(--tc-warning); }
+.tc-live-chip--bad { background: var(--tc-danger-soft); color: var(--tc-danger); }
+.tc-live-chip--info { background: var(--tc-info-soft); color: var(--tc-info); }
+.tc-live-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tc-live-stack { display: grid; gap: 16px; min-width: 0; }
+.tc-live-stack > * { min-width: 0; }
+
+/* 次の場所のチラ見せ */
+.tc-teaser { overflow: hidden; padding: 0; }
+.tc-teaser__img { position: relative; height: 168px; background: var(--tc-mist-200); }
+.tc-teaser__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tc-teaser__art { width: 100%; height: 100%; display: block; }
+.tc-teaser__credit { position: absolute; left: 10px; bottom: 8px; border-radius: 6px; padding: 2px 8px; font-size: 11px; background: rgba(15, 23, 42, .72); color: #ffffff; text-decoration: none; }
+.tc-teaser__body { padding: 14px 16px 16px; }
+
+/* 空模様の時刻の線 */
+.tc-sky__bars { display: grid; gap: 3px; align-items: end; height: 64px; margin-top: 12px; }
+.tc-sky__bar { border-radius: 4px 4px 0 0; background: var(--tc-info-soft); min-height: 3px; }
+.tc-sky__bar[data-rain='true'] { background: var(--tc-info); }
+.tc-sky__bar[data-mid='true'] { background: #8fb3ea; }
+.tc-sky__bar[data-now='true'] { outline: 2px solid var(--tc-ink-900); outline-offset: 1px; }
+.tc-sky__hours { display: grid; gap: 3px; margin-top: 4px; font-size: 10px; color: var(--tc-ink-500); text-align: center; }
+.tc-sky__events { position: relative; height: 26px; margin-top: 8px; border-radius: var(--tc-radius-md); background: var(--tc-cloud-50); }
+.tc-sky__event { position: absolute; top: 4px; bottom: 4px; min-width: 6px; border-radius: 6px; background: var(--tc-cloud-200); }
+.tc-sky__event[data-state='done'] { background: #f2c7b9; }
+.tc-sky__event[data-state='now'] { background: var(--tc-accent); }
+.tc-sky__event[data-rain='true'] { box-shadow: inset 0 0 0 2px var(--tc-info); }
+.tc-sky__notice { display: flex; gap: 10px; align-items: center; margin-top: 12px; padding: 12px; border-radius: var(--tc-radius-lg); background: var(--tc-info-soft); color: var(--tc-info); font-size: 13px; }
+.tc-sky__notice p { margin: 0; flex: 1; }
+
+/* 当日の地図 */
+.tc-tmap { overflow: hidden; padding: 0; }
+.tc-tmap__head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--tc-cloud-200); }
+.tc-tmap__head h2 { margin: 0; font-size: 14px; color: var(--tc-ink-900); }
+.tc-tmap__canvas { height: 300px; }
+.tc-tmap.is-full { position: fixed; inset: 0; z-index: 70; border-radius: 0; display: flex; flex-direction: column; }
+.tc-tmap.is-full .tc-tmap__canvas { flex: 1; height: auto; }
+.tc-tmap__legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 14px; font-size: 11px; color: var(--tc-ink-700); }
+.tc-tmap__pin { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font: 800 11px/1 var(--tc-font-body);
+  border: 3px solid var(--tc-accent); background: #ffffff; color: var(--tc-accent); box-shadow: 0 2px 6px rgba(15, 23, 42, .25); }
+.tc-tmap__pin[data-state='done'] { border-color: #b23c22; color: #b23c22; background: #fff3e8; font-family: var(--tc-font-display); }
+.tc-tmap__pin[data-state='now'] { border-color: #ffffff; background: #ffcf8a; color: #0f2a3a; font-size: 8px; width: 34px; height: 34px; animation: tc-live-pulse 1.6s infinite; }
+.tc-tmap__pin[data-state='next'] { background: var(--tc-accent); color: #ffffff; border-color: #ffffff; }
+.tc-tmap__pin[data-state='rain'] { border-color: var(--tc-info); color: var(--tc-info); }
+.tc-tmap__pin[data-state='detour'] { border-color: #a8741f; color: #8a5a12; background: #fbf1dc; }
+
+/* 寄り道チャンス */
+.tc-detour__list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.tc-detour__item { display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--tc-cloud-200); border-radius: var(--tc-radius-lg); background: var(--tc-surface-solid); }
+.tc-detour__item > div { flex: 1; min-width: 0; }
+.tc-detour__item b { color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-detour__impact { margin-top: 10px; padding: 12px; border-radius: var(--tc-radius-lg); background: var(--tc-sand-50); border: 1px dashed var(--tc-sand-300); font-size: 13px; color: var(--tc-ink-700); }
+.tc-detour__impact ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* 旅帖(印) */
+.tc-seal { display: inline-grid; place-items: center; flex: none; border-radius: 50%; border: 3px double #b23c22; color: #b23c22;
+  font-family: var(--tc-font-display); font-weight: 800; transform: rotate(var(--tilt, -5deg)); background: rgba(178, 60, 34, .04); }
+.tc-seal--empty { border: 2px dashed var(--tc-sand-300); color: var(--tc-ink-500); background: transparent; transform: none; font-weight: 700; }
+.tc-seal--ready { border: 2px dashed #b9a274; color: #8a6a2c; transform: none; }
+.tc-seal--press { animation: tc-seal-press .7s ease-out both; }
+.tc-tabicho__strip { list-style: none; margin: 12px 0 0; padding: 0; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.tc-tabicho__strip li { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--tc-ink-500); min-width: 60px; }
+.tc-tabicho__strip button { border: 0; background: transparent; padding: 0; cursor: pointer; border-radius: 50%; }
+.tc-tabicho__page { display: grid; gap: 0; }
+.tc-tabicho__entry { display: flex; gap: 12px; padding: 14px 0; border-top: 1px dashed var(--tc-sand-300); }
+.tc-tabicho__entry b { color: var(--tc-ink-900); }
+.tc-stamp-hero { display: grid; justify-items: center; gap: 8px; padding: 8px 0 4px; text-align: center; }
+.tc-stamp-hero .tc-seal { width: 150px; height: 150px; font-size: 44px; border-width: 6px; }
+
+/* 同行者 */
+.tc-crew { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.tc-crew li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--tc-ink-700); }
+.tc-crew__face { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--tc-info-soft); color: var(--tc-info); font-weight: 800; flex: none; }
+.tc-crew__face[data-self='true'] { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+
+/* 朝・旅の前・夜・旅の終わり */
+.tc-live-dawn { border-radius: var(--tc-radius-xl); padding: 20px; background: linear-gradient(160deg, #f6dcc0, #fbf3e6 70%); color: #2b1c0e; border: 1px solid var(--tc-sand-300); }
+.tc-live-dawn h2 { margin: 6px 0 0; font: 800 24px/1.4 var(--tc-font-display); }
+.tc-live-dawn .tc-live-label { color: #7a3c12; }
+.tc-live-night { border-radius: var(--tc-radius-xl); padding: 20px; background: #0e1d2e; color: #ffffff; }
+.tc-live-night h2 { margin: 6px 0 0; font: 800 22px/1.45 var(--tc-font-display); }
+.tc-live-night .tc-live-label { color: #ffcf8a; }
+.tc-live-night__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 14px; }
+.tc-live-night__stats div { padding: 12px; border-radius: var(--tc-radius-lg); background: #1a2f45; }
+.tc-live-night__stats b { display: block; font: 800 22px var(--tc-font-display); }
+.tc-live-night__stats span, .tc-live-night__muted { font-size: 12px; color: #b8c7d8; }
+.tc-live-night a, .tc-live-night .tc-mbtn { color: #0e1d2e; }
+.tc-live-count { font: 800 44px/1.1 var(--tc-font-display); margin: 4px 0 0; }
+
+/* 画面の中の知らせ */
+.tc-live-notices { display: grid; gap: 8px; margin: 0 0 14px; }
+.tc-live-notice { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--tc-radius-xl); color: #ffffff; box-shadow: var(--tc-shadow-2); }
+.tc-live-notice[data-kind='go'] { background: #a5281a; }
+.tc-live-notice[data-kind='arrive'] { background: #6b4226; }
+.tc-live-notice[data-kind='rain'] { background: #1d4ed8; }
+.tc-live-notice[data-kind='delay'] { background: #7a3a0a; }
+.tc-live-notice p { margin: 0; flex: 1; font-size: 13px; }
+.tc-live-notice p b { display: block; font-size: 14px; }
+.tc-live-notice button { flex: none; }
+.tc-live-notice__act { min-height: 40px; border-radius: var(--tc-radius-lg); border: 0; padding: 0 12px; font-weight: 800; background: #ffffff; color: #0f172a; cursor: pointer; }
+.tc-live-notice__close { width: 40px; height: 40px; border-radius: var(--tc-radius-lg); border: 0; background: rgba(255, 255, 255, .18); color: #ffffff; cursor: pointer; display: grid; place-items: center; }
+
+/* 移動モード(全画面) */
+.tc-transit { position: fixed; inset: 0; z-index: 80; background: #0f2a3a; color: #ffffff; overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 18px; }
+.tc-transit__big { margin: 4px 0 0; font: 800 60px/1.05 var(--tc-font-display); }
+.tc-transit__bar { height: 10px; border-radius: 10px; background: #244a5c; overflow: hidden; }
+.tc-transit__bar div { height: 100%; background: #ffcf8a; }
+.tc-transit__box { padding: 16px; border-radius: var(--tc-radius-xl); background: #163647; }
+.tc-transit__muted { color: #c9dde6; font-size: 13px; }
+.tc-transit .tc-mbtn { background: #163647; color: #ffffff; border-color: #2c4a5a; }
+.tc-transit .tc-mbtn--gold { background: #ffcf8a; color: #0e1d2e; border-color: #ffcf8a; }
+
+/* お助け・設定のリスト */
+.tc-help { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tc-help button, .tc-help a { width: 100%; display: flex; gap: 12px; align-items: center; padding: 10px 8px; min-height: 52px; border: 0; border-radius: var(--tc-radius-lg);
+  background: transparent; color: var(--tc-ink-900); text-align: left; text-decoration: none; cursor: pointer; font: inherit; }
+.tc-help button:hover, .tc-help a:hover { background: var(--tc-cloud-100); }
+.tc-help__icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--tc-radius-lg); background: var(--tc-cloud-100); color: var(--tc-ink-700); flex: none; }
+.tc-help small { display: block; color: var(--tc-ink-500); font-size: 12px; }
+.tc-live-switch { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--tc-cloud-200); }
+.tc-live-switch input { width: 22px; height: 22px; accent-color: var(--tc-accent); flex: none; }
+.tc-live-switch small { display: block; color: var(--tc-ink-500); font-size: 12px; }
+
+.tc-today-live-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 16px; align-items: start; margin-top: 16px; }
+@media (max-width: 960px) { .tc-today-live-grid { grid-template-columns: minmax(0, 1fr); } }
+/* スマホの「当日の操作」: 4つの操作を2列に(画面の下に固定。本文の下に余白) */
+@media (max-width: 640px) {
+  .tc-today-actions > div { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .tc-today-actions > div > * { width: 100%; min-width: 0; font-size: 13px !important; padding-inline: 8px !important; min-height: 44px; }
+  .tc-today { padding-bottom: 180px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-live-dot, .tc-thread__node[data-state='now'], .tc-tmap__pin[data-state='now'], .tc-seal--press { animation: none; }
+}

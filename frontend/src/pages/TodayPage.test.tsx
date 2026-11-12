@@ -24,6 +24,8 @@ vi.mock('@/services/api', () => ({
 const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
 vi.mock('./today/TodaySwitchPanel', () => ({ default: () => null }));
+// [Gate TDay] 当日の地図(Leaflet・後から読む)はこの試験の対象外
+vi.mock('./today/live/TodayMap', () => ({ default: () => null }));
 
 import TodayPage from './TodayPage';
 import { saveTodayCache } from './today/todayModel';

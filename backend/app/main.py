@@ -520,6 +520,9 @@ app.include_router(segments.router, prefix="/api/v1")
 # [Gate PlanB] 日ごとの案(プランB)
 from app.api.v1 import day_variants as day_variants_api  # noqa: E402
 app.include_router(day_variants_api.router, prefix="/api/v1")
+# [Gate TDay] 旅の当日「旅帖ライブ」(出発の合図・すきま時間・旅帖の印・寄り道・到着予定の共有)
+from app.api.v1 import today_live as today_live_api  # noqa: E402
+app.include_router(today_live_api.router, prefix="/api/v1")
 # [Gate M3] FR-015複数経路比較。/plans/{plan_id}/route-options配下。
 app.include_router(route_options.router, prefix="/api/v1")
 # [Gate R2-2] POST /quick-drafts (DOC-06正式契約)。anonymous device tokenで
