@@ -16,7 +16,8 @@ from typing import Callable, Optional
 from app.core.config import settings
 from app.core.security_headers import apply_security_headers
 
-UPLOAD_PATH_SUFFIXES = ("/documents/upload", "/memories/upload", "/calendar-import/preview")
+UPLOAD_PATH_SUFFIXES = ("/documents/upload", "/memories/upload", "/calendar-import/preview",
+                        "/inbound-mail")  # [Gate Remaining-3] 予約メールの転送(PDF の添付を含む)
 _BODY_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 

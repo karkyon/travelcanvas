@@ -10,6 +10,9 @@ import { Camera, Mic, Layers, LocateFixed, Navigation, Info, Ticket as TicketIco
 import { getMemoryThumbnail } from '@/services/api/photoFeatures';
 import { addMedia, addNote, pressStamp, removeStamp, type EtaShare } from '@/services/api/travelDay';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { queueMemo } from '@/utils/memoQueue';
+import { currentOfflineSession } from '@/utils/offlineSession';
+import { isNetworkError } from '@/utils/syncQueue';
 import { formatTimeInZone } from '../todayModel';
 import {
   TYPE_LABEL, arriveDiffLabel, dateLabel, durationLabel, hoursLabel, kanjiNum, modeWord, reiwaDate, sealGlyph, speak,
@@ -165,19 +168,52 @@ export const MemoScreen: React.FC<{ ctx: TodayCtx; eventId: string | null }> = (
   const visited = ctx.visitedIds.has(e.id);
   const canPress = !visited && (e.id === ctx.nowEv?.id || ctx.doneIds.has(e.id));
   const vis = members ? 'members' as const : 'private' as const;
+  // 送れた物は端末に置き直さない(通信が途中で切れた時に二重にしない)
+  const sent = { photos: 0, audio: false };
+  const queueAll = async (): Promise<string> => {
+    const session = currentOfflineSession();
+    const base = { eventId: e.id, dayId: ctx.guide?.day_id ?? null, visibility: vis, placeName: e.title, includeInJournal: journal };
+    let count = 0;
+    const parts: { kind: 'photo' | 'audio' | 'note'; file?: File; body: string | null }[] = [
+      ...photos.slice(sent.photos).map((f) => ({ kind: 'photo' as const, file: f, body: null })),
+      ...(audio && !sent.audio ? [{ kind: 'audio' as const, file: audio, body: null }] : []),
+      ...(note.trim() ? [{ kind: 'note' as const, body: note.trim() }] : []),
+    ];
+    for (const p of parts) {
+      const r = await queueMemo(session, ctx.planId, { ...base, kind: p.kind, body: p.body, file: p.file ?? null });
+      if (!r.ok) {
+        return r.reason === 'too_large' ? '大きすぎる写真・声は通信が戻ってから残してください(1件15MBまで)'
+          : r.reason === 'full' ? '端末に置ける数を超えました。通信が戻ってから残してください'
+            : '端末に置けませんでした(一度通信してログインし直すと置けます)';
+      }
+      count = r.count;
+    }
+    ctx.onMemoQueued(count);
+    setPhotos([]);
+    setAudio(null);
+    setNote('');
+    return `通信できないため端末に置きました。つながった時に送ります(${count}件 待ち)`;
+  };
   const save = async () => {
     if (!note.trim() && photos.length === 0 && !audio && !canPress) return;
     setBusy(true);
     setMsg(null);
+    if (ctx.stale && (note.trim() || photos.length > 0 || audio)) {
+      setMsg(await queueAll());
+      setBusy(false);
+      return;
+    }
     try {
       const dayId = ctx.guide?.day_id ?? null;
       for (const file of photos) {
         await addMedia(ctx.planId, { kind: 'photo', file, event_id: e.id, day_id: dayId, body: null, visibility: vis,
           place_name: e.title, include_in_journal: journal });
+        sent.photos += 1;
       }
       if (audio) {
         await addMedia(ctx.planId, { kind: 'audio', file: audio, event_id: e.id, day_id: dayId, body: null, visibility: vis,
           place_name: e.title, include_in_journal: journal });
+        sent.audio = true;
       }
       if (note.trim()) {
         await addNote(ctx.planId, { event_id: e.id, day_id: dayId, body: note.trim(), visibility: vis, place_name: e.title,
@@ -191,7 +227,7 @@ export const MemoScreen: React.FC<{ ctx: TodayCtx; eventId: string | null }> = (
       setMsg('旅帖に綴じました');
       window.setTimeout(ctx.close, 600);
     } catch (err) {
-      setMsg(errorDetailMessage(err, '記録を残せませんでした'));
+      setMsg(isNetworkError(err) ? await queueAll() : errorDetailMessage(err, '記録を残せませんでした'));
     } finally {
       setBusy(false);
     }

@@ -7,7 +7,7 @@ import type { GuideEvent } from '@/services/api/travelDay';
 const m = vi.hoisted(() => ({
   support: 'ok' as string,
   cfg: {
-    available: true, public_key: 'BPK', kinds: { depart: true, rain: true, morning: true, crew: true }, devices: [],
+    available: true, public_key: 'BPK', kinds: { depart: true, rain: true, morning: true, crew: true, notice: true }, devices: [],
     notice: 'お知らせ',
   },
   getPushConfig: vi.fn(), putPushKinds: vi.fn(), sendTestPush: vi.fn(), enablePush: vi.fn(), disablePush: vi.fn(),

@@ -1,6 +1,8 @@
 """[Gate G5] FIN-01 為替の記録・予算の版 / FIN-02 支出の取消・精算の締め(すべて /plans/{plan_id} 配下)。
 
 - GET/POST /fx-rates                 : 為替の記録(1 currency = rate base_currency。出典・基準日・取得時刻)。閲覧 viewer、記録 editor
+- POST /fx-rates/fetch               : [Gate Remaining-2] 為替を自動で取って記録する(ECB の参考値。取れない時は 503 で手入力へ)
+- GET  /fx-rates/supported           : 自動で取れる通貨
 - GET/POST /budget-versions          : 予算の版(initial 当初・revised 更新・committed 確定(予約)・actual 実績)。
                                        作った時点の写しで、後から変わらない。当初は1つだけ。閲覧 viewer、作成 editor
 - POST /expenses/{id}/void           : 支出の取消(理由は必須。消さずに集計・精算から外す)。editor・If-Match
@@ -22,6 +24,8 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.models.models import Budget, BudgetVersion, Expense, FxRate, PlanFinanceSettings, TravelPlan, User
 from app.services import finance
+from app.services import fx_provider
+from app.services.ext_http import Unavailable
 
 require_plan_access = fin.require_plan_access
 router = APIRouter(prefix="/plans", tags=["finance"])
@@ -107,6 +111,60 @@ def create_rate(plan_id: str, payload: FxRateCreate, request: Request, db: Sessi
     db.commit()
     db.refresh(r)
     fin._audit("fx_rate_created", "plan", request, current_user, r.id, plan.id, {"currency": r.currency})
+    return _rate_response(r)
+
+
+class FxFetch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    currency: str
+    rate_date: Optional[date] = None
+
+    @field_validator("currency")
+    @classmethod
+    def _v_cur(cls, v):
+        return fin._currency(v)
+
+
+@router.get("/{plan_id}/fx-rates/supported", response_model=dict)
+def supported_rates(plan_id: str, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user_or_guest)):
+    plan, _ = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    base = fin._base_currency(db, plan)
+    return {"enabled": fx_provider.enabled(), "base_currency": base,
+            "base_supported": fx_provider.supported(base), "currencies": sorted(fx_provider.SUPPORTED - {base}),
+            "source": fx_provider.SOURCE_LABEL}
+
+
+@router.post("/{plan_id}/fx-rates/fetch", status_code=201, response_model=dict)
+def fetch_rate(plan_id: str, payload: FxFetch, request: Request, db: Session = Depends(get_db),
+               current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate Remaining-2] FR-027 為替を自動で取って記録する。取れない時は記録しない(画面は出典つきの手入力)"""
+    plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
+    base = fin._base_currency(db, plan)
+    if payload.currency == base:
+        raise HTTPException(status_code=422, detail="基準通貨の為替は記録できません")
+    if not (fx_provider.supported(payload.currency) and fx_provider.supported(base)):
+        raise HTTPException(status_code=422, detail={
+            "code": "fx_unsupported", "message": "この通貨は自動で取れません。出典を書いて手で入れてください"})
+    if payload.rate_date and payload.rate_date > fin._now().date():
+        raise HTTPException(status_code=422, detail="未来の日の為替は取れません")
+    if db.query(FxRate).filter(FxRate.plan_id == plan.id).count() >= MAX_RATES:
+        raise HTTPException(status_code=409, detail={"code": "too_many_fx_rates",
+                                                     "message": f"為替の記録は{MAX_RATES}件までです"})
+    try:
+        got = fx_provider.fetch(payload.currency, base, payload.rate_date)
+    except Unavailable as e:
+        raise HTTPException(status_code=503, detail={
+            "code": "fx_unavailable", "reason": e.code,
+            "message": "為替を自動で取れませんでした。出典を書いて手で入れてください"})
+    r: Any = FxRate(id=uuid.uuid4(), plan_id=plan.id, currency=payload.currency, base_currency=base,
+                    rate=got["rate"], rate_date=got["rate_date"], source=got["source"], retrieved_at=fin._now(),
+                    created_by_user_id=current_user.id, created_at=fin._now())
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    fin._audit("fx_rate_created", "plan", request, current_user, r.id, plan.id,
+               {"currency": r.currency, "auto": True})
     return _rate_response(r)
 
 

@@ -16,6 +16,7 @@ const KIND_ROWS: { kind: PushKind; label: string; sub: string }[] = [
   { kind: 'rain', label: '雨の兆し', sub: '屋外の予定の2時間前から、雨の予報の時' },
   { kind: 'morning', label: '今日の旅程', sub: '最初の出発の1時間前(6時より後)' },
   { kind: 'crew', label: '同行者の遅れ', sub: '同行者の到着予定が10分以上遅い時(位置は届きません)' },
+  { kind: 'notice', label: '自分あての知らせ', sub: 'メンション・返信・予約の取消期限・転送した予約メールの読み取り(題名だけ)' },
 ];
 
 const SUPPORT_TEXT: Record<string, string> = {

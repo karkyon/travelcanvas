@@ -55,7 +55,7 @@ export type NotificationLevel = 'all' | 'mentions' | 'none';
 
 export interface NotificationPrefs {
   level: NotificationLevel;
-  email_digest: 'off' | 'daily';
+  email_digest: EmailDigest;
   email_available: boolean;
   has_email: boolean;
   plans: Array<{ plan_id: string; plan_title: string | null; level: NotificationLevel }>;
@@ -124,3 +124,6 @@ export interface AbuseReportList {
   counts: Record<'open' | 'dismissed' | 'actioned', number>;
   reports: AbuseReportItem[];
 }
+
+/** [Gate Remaining-3] FR-024 メールの送り方(instant: 自分あて・急ぎの通知をすぐ) */
+export type EmailDigest = 'off' | 'daily' | 'instant';

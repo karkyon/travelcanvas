@@ -27,7 +27,9 @@ describe('通知の設定 (Gate G4)', () => {
     render(<NotificationSettingsPanel />);
     fireEvent.click(await screen.findByLabelText(/自分あてだけ/));
     await waitFor(() => expect(m.putNotificationSettings).toHaveBeenCalledWith({ level: 'mentions' }));
-    expect(screen.getByLabelText('毎日まとめて送る')).toBeDisabled();
+    expect(screen.getByLabelText(/1日1回、読んでいない通知の件数/)).toBeDisabled();
+    // [Gate Remaining-3] すぐ送る(自分あて・急ぎ)もメールが使えない環境では選べない
+    expect(screen.getByLabelText(/自分あて・急ぎの通知をすぐ送る/)).toBeDisabled();
     expect(screen.getByText('この環境ではメールを送れません(管理者の設定が必要です)。')).toBeInTheDocument();
     expect(screen.getByLabelText('読んでいない通知のまとめ')).toHaveTextContent('京都: 3 件');
     fireEvent.click(screen.getByRole('button', { name: '京都の設定を外す' }));

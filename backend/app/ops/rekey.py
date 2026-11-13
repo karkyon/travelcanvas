@@ -271,6 +271,8 @@ SUBJECT_SQL: Dict[str, Tuple[str, str]] = {
     "extraction_candidates": ("plan", "(SELECT j.plan_id FROM import_jobs j WHERE j.id = t.import_job_id)"),
     "location_point_batches": ("user", "(SELECT lt.user_id FROM location_tracks lt WHERE lt.id = t.track_id)"),
     "user_private_profiles": ("user", "t.user_id"),
+    # [Gate Remaining-3] FR-011 予約メールの転送用のアドレス(宛先の文字)
+    "inbound_mail_addresses": ("plan", "t.plan_id"),
 }
 # データ鍵の対象にしない列(鍵そのもの・組織の Webhook の秘密・短命の下書き)
 NOT_SUBJECT_TABLES = {"data_keys", "org_webhooks", "quick_drafts", "user_mfa"}

@@ -196,7 +196,13 @@ def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypa
     assert set(slots) == {"openai_api_key", "google_maps_browser_key", "google_maps_server_key",
                           # [Gate PlaceLookupJP] 場所の自動取得の無料の提供元(任意)
                           "yahoo_client_id", "rakuten_app_id", "rakuten_access_key", "hotpepper_api_key",
-                          "youtube_api_key"}
+                          "youtube_api_key",
+                          # [Gate Remaining-2] 接続口(鍵が有る時だけ使う。無ければ手入力)
+                          "odpt_consumer_key", "ekispert_api_key",
+                          # [Gate Remaining-4] 決済(テストモード)
+                          "stripe_secret_key", "stripe_webhook_secret"}
+    assert slots["ekispert_api_key"]["required"] is False and slots["ekispert_api_key"]["in_use"] is True
+    assert "任意・有料" in slots["ekispert_api_key"]["in_use_note"]
     assert slots["yahoo_client_id"]["free"] is True and slots["yahoo_client_id"]["required"] is False
     assert slots["yahoo_client_id"]["in_use"] is True and "任意・無料" in slots["yahoo_client_id"]["in_use_note"]
     assert slots["google_maps_server_key"]["status"] == "missing"

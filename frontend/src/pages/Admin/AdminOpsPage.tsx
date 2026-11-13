@@ -12,6 +12,7 @@
  * - 鍵の値は受け取らない・出さない(設定の有無だけ)。止める・戻す・試験は理由が要り、監査に残る
  */
 import AdminTravelEstimatePanel from './AdminTravelEstimatePanel';
+import AdminBillingPanel from './AdminBillingPanel';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHead from '@/components/shell/PageHead';
@@ -25,7 +26,7 @@ import {
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { formatJaDateTime, legacyDisplay, providerSecretDisplay, restrictionNote, secretDisplay } from './opsSecretDisplay';
 
-type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets' | 'travel';
+type Tab = 'overview' | 'providers' | 'ledger' | 'tiers' | 'cloud' | 'runs' | 'secrets' | 'travel' | 'billing';
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: '概要' },
   { id: 'providers', label: 'API・契約と接続' },
@@ -35,6 +36,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'runs', label: 'テスト実行(Fake)' },
   { id: 'secrets', label: '秘密情報・権限' },
   { id: 'travel', label: '移動の見積もり' },
+  { id: 'billing', label: '料金・決済' },  // [Gate Remaining-4] FR-058
 ];
 
 const yen = (v: string | null | undefined) => (v == null ? '—' : `¥${Number(v).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}`);
@@ -856,6 +858,7 @@ const AdminOpsPage: React.FC = () => {
         {tab === 'runs' && <RunsTab />}
         {tab === 'secrets' && <SecretsTab />}
         {tab === 'travel' && <AdminTravelEstimatePanel />}
+        {tab === 'billing' && <AdminBillingPanel />}
       </section>
     </div>
   );

@@ -3,6 +3,8 @@
 
 エンドポイント(すべて /plans/{plan_id} 配下):
 - GET   /alerts                       : アラートの一覧と、登録済み経路の遅延・運休の検出(viewer以上)
+- GET   /alerts/external              : [Gate Remaining-2] 外の情報(気象庁の警報・注意報、鍵がある時は鉄道の運行情報)。
+                                        今日・明日の予定の場所について取る。登録はしない(画面で確かめて「状況として登録」)
 - POST  /alerts                       : アラートを登録する(editor以上)。情報源・取得時刻・確度を必ず持つ
 - PATCH /alerts/{id}                  : 確度・メモの変更、解決・取り下げ(If-Match: アラートのrevision)
 - POST  /alerts/{id}/replans          : アラートを起点に再計画案A/Bを作る(editor以上)。本案は変えない
@@ -366,6 +368,93 @@ def list_alerts(plan_id: str, db: Session = Depends(get_db),
         "alerts": active + others,
         "detected": _detected(db, plan, events, days, active_event_ids, now),
     }
+
+
+EXTERNAL_DAYS = 2          # 今日と明日(警報・注意報は今の発表だけ)
+EXTERNAL_PLACES_PER_DAY = 5
+
+
+def _day_today(day: TravelDay) -> Any:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    try:
+        return datetime.now(ZoneInfo(day.timezone_id or "UTC")).date()
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now(dt_timezone.utc).date()
+
+
+@router.get("/{plan_id}/alerts/external", response_model=dict)
+def external_status(plan_id: str, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate Remaining-2] FR-030 外部状況の自動取得。気象庁の警報・注意報(無料)と、鍵がある時だけ ODPT の運行情報。
+    取れない提供元は unavailable に名前を返す(画面は手で登録する欄のまま)。送るのは地域の番号・丸めた座標だけ"""
+    from app.services import jma_warnings, odpt_train, reverse_geocode
+    from app.services.ext_http import Unavailable
+
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    events, days = _plan_maps(db, plan)
+    target_days = []
+    for d in sorted(days.values(), key=lambda x: x.local_date):
+        today = _day_today(d)
+        if today <= d.local_date < today + timedelta(days=EXTERNAL_DAYS):
+            target_days.append(d)
+    unavailable: List[str] = []
+    weather: List[Dict[str, Any]] = []
+    jma_ok = jma_warnings.enabled()
+    if not jma_ok:
+        unavailable.append("jma")
+    for d in target_days if jma_ok else []:
+        pts: List[tuple] = []
+        for e in sorted((e for e in events.values() if str(e.day_id) == str(d.id)),
+                        key=lambda e: e.local_start_time or ""):
+            if e.latitude is None or e.longitude is None:
+                continue
+            p = (round(float(e.latitude), 2), round(float(e.longitude), 2))
+            if p not in pts:
+                pts.append(p)
+        seen_munis: set = set()
+        for lat, lng in pts[:EXTERNAL_PLACES_PER_DAY]:
+            if not reverse_geocode.in_japan_box(lat, lng):
+                continue
+            place = reverse_geocode.reverse(lat, lng)
+            code = (place or {}).get("muni_code")
+            if not code or code in seen_munis:
+                continue
+            seen_munis.add(code)
+            try:
+                w = jma_warnings.for_municipality(code)
+            except Unavailable:
+                if "jma" not in unavailable:
+                    unavailable.append("jma")
+                continue
+            weather.append({"day_id": str(d.id), "local_date": d.local_date.isoformat(), **w})
+    transit: List[Dict[str, Any]] = []
+    odpt_ready = odpt_train.configured(db)
+    if odpt_ready and target_days:
+        day_ids = {str(d.id) for d in target_days}
+        day_events = [e for e in events.values() if str(e.day_id) in day_ids]
+        legs = (db.query(RouteLeg.line, TravelSegment.to_event_id)
+                .join(TravelSegment, TravelSegment.route_option_id == RouteLeg.route_option_id)
+                .filter(TravelSegment.plan_id == plan.id).all())
+        lines_by_event: Dict[str, List[str]] = {}
+        for line, to_event in legs:
+            if line and to_event is not None:
+                lines_by_event.setdefault(str(to_event), []).append(str(line))
+        texts = [e.title or "" for e in day_events] + [x for e in day_events for x in lines_by_event.get(str(e.id), [])]
+        try:
+            for item in odpt_train.disruptions(db, texts):
+                related = [str(e.id) for e in day_events
+                           if item["railway"] in (e.title or "")
+                           or any(item["railway"] in ln for ln in lines_by_event.get(str(e.id), []))]
+                transit.append({**item, "event_ids": related})
+        except Unavailable:
+            unavailable.append("odpt")
+    return {"plan_id": str(plan.id), "server_time": _iso(_now()), "can_edit": role in ("owner", "editor"),
+            "days": [{"day_id": str(d.id), "local_date": d.local_date.isoformat()} for d in target_days],
+            "weather": weather, "transit": transit,
+            "providers": {"jma": {"enabled": jma_ok, "source": jma_warnings.SOURCE_LABEL},
+                          "odpt": {"configured": odpt_ready, "source": odpt_train.SOURCE_LABEL}},
+            "unavailable": unavailable}
 
 
 @router.post("/{plan_id}/alerts", status_code=201, response_model=dict)

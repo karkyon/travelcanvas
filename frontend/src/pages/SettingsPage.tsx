@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge, CreditCard
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
@@ -819,6 +819,15 @@ const SettingsPage: React.FC = () => {
                 >
                   <Download size={16} />
                   <span className="font-medium">データとプライバシー</span>
+                </button>
+
+                {/* [Gate Remaining-4] FR-058 料金・お支払い(Stripe のテストモード) */}
+                <button
+                  onClick={() => navigate('/settings/billing')}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-ink-700 hover:bg-gray-50 transition-colors"
+                >
+                  <CreditCard size={16} />
+                  <span className="font-medium">料金・お支払い</span>
                 </button>
 
                 <div className="border-t border-gray-200 pt-4 mt-4">

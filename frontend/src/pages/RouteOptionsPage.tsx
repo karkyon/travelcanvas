@@ -31,6 +31,9 @@ import UiIcon from '@/components/common/UiIcon';
 import PageHead from '@/components/shell/PageHead';
 import { useTripContext } from '@/hooks/useTripContext';
 import { IcRoute } from '@/components/common/uiIcons';
+import TimetableLookup from './route/TimetableLookup';
+import type { TimetableCandidate } from '@/services/api/remaining2';
+import type { RouteLegCreateData } from '@/services/api/types/routeOptions';
 
 function generateIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -111,6 +114,8 @@ const RouteOptionsPage: React.FC = () => {
   const [form, setForm] = useState<OptionFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // [Gate Remaining-2] 時刻表から入れた区間(保存の時に経路候補の区間として送る)
+  const [pickedLegs, setPickedLegs] = useState<RouteLegCreateData[]>([]);
 
   const allEvents: NormalizedEvent[] = days.flatMap((d) => d.events ?? []);
 
@@ -141,6 +146,7 @@ const RouteOptionsPage: React.FC = () => {
 
   const openCreateForm = () => {
     setForm(EMPTY_FORM);
+    setPickedLegs([]);
     setFormError(null);
     setIsFormOpen(true);
   };
@@ -158,7 +164,9 @@ const RouteOptionsPage: React.FC = () => {
     setIsSaving(true);
     setFormError(null);
     try {
-      await createRouteOption(planId, formToPayload(form), generateIdempotencyKey());
+      const payload = formToPayload(form);
+      if (pickedLegs.length > 0) payload.legs = pickedLegs;
+      await createRouteOption(planId, payload, generateIdempotencyKey());
       setIsFormOpen(false);
       await loadAll();
     } catch (e) {
@@ -168,6 +176,26 @@ const RouteOptionsPage: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  const pickTimetable = (c: TimetableCandidate) => {
+    setForm((f) => ({
+      ...f,
+      total_duration_minutes: c.total_duration_minutes !== null ? String(c.total_duration_minutes) : f.total_duration_minutes,
+      total_cost: c.total_cost !== null ? String(c.total_cost) : f.total_cost,
+      currency: c.currency ?? f.currency,
+      walking_minutes: c.walking_minutes !== null ? String(c.walking_minutes) : f.walking_minutes,
+      transfer_count: c.transfer_count !== null ? String(c.transfer_count) : f.transfer_count,
+    }));
+    setPickedLegs(c.legs.map((l) => ({
+      mode: l.mode as RouteLegCreateData['mode'],
+      ...(l.line ? { line: l.line } : {}), ...(l.from_label ? { from_label: l.from_label } : {}),
+      ...(l.to_label ? { to_label: l.to_label } : {}), ...(l.departure_at ? { departure_at: l.departure_at } : {}),
+      ...(l.arrival_at ? { arrival_at: l.arrival_at } : {}),
+      ...(l.duration_minutes !== null ? { duration_minutes: l.duration_minutes } : {}),
+    })));
+  };
+
+  const dayOfEvent = (eventId: string) => days.find((d) => (d.events ?? []).some((e) => e.id === eventId))?.local_date ?? '';
 
   const handleDelete = async (option: RouteOption) => {
     if (!planId || planRevision === null) return;
@@ -345,6 +373,17 @@ const RouteOptionsPage: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            {planId && form.from_event_id && form.to_event_id && (
+              <TimetableLookup key={`${form.from_event_id}-${form.to_event_id}`} planId={planId}
+                origin={eventLabel(allEvents, form.from_event_id)} destination={eventLabel(allEvents, form.to_event_id)}
+                date={dayOfEvent(form.from_event_id)} onPick={pickTimetable} />
+            )}
+            {pickedLegs.length > 0 && (
+              <p className="text-xs text-ink-700" role="status">
+                {`時刻表の区間を入れました: ${pickedLegs.map((l) => l.line || l.mode).join(' → ')}(保存で経路候補の区間になります)`}
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Input

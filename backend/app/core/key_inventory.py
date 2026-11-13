@@ -115,6 +115,14 @@ KEYS: List[Dict[str, object]] = [
         "required_in_production": False,
     },
     {
+        "name": "INBOUND_MAIL_SECRET",
+        "purpose": "[Gate Remaining-3] 予約メールの転送(受信サービス → POST /api/v1/inbound-mail)の合言葉",
+        "kind": "token",
+        "rotation": "受信サービスの転送の設定と同時に替える",
+        "impact": "替えるまで転送されたメールを受け付けない(403。受信サービスが再送する)",
+        "required_in_production": False,
+    },
+    {
         "name": "METRICS_TOKEN",
         "purpose": "監視の計測値(/metrics)を見る合言葉",
         "kind": "token",

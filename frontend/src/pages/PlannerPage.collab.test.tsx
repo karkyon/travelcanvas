@@ -8,6 +8,8 @@ import { render, screen, fireEvent, waitFor, within, cleanup, act } from '@testi
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ScheduleItem } from '@/types';
 
+// [Gate Remaining-2] 祝日は取りに行かない(外の通信を差し替える)
+vi.mock('@/hooks/usePlanHolidays', () => ({ usePlanHolidays: () => ({}) }));
 vi.mock('@/components/planner/variants/usePlanVariants', () => ({
   usePlanVariants: () => ({ canEdit: false, variants: [], openId: null, setOpenId: () => {}, open: null, checkSum: null,
     reload: () => {}, datesWithStandby: [] }),

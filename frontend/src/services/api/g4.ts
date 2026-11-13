@@ -14,7 +14,7 @@ import type { PlaceEntrance, PlaceInfo, SpecialHoursItem, DayHours } from './typ
 import type { CommandList, CommandPreview, CommandResult, CommandUndoResult } from './types/planSearch';
 import type {
   AbuseReason, AbuseReportList, AdoptInput, AdoptionPreview, AdoptResult, NotificationDigest, NotificationLevel,
-  NotificationPrefs, ShareCloneResult, ShareInfo, GuestShareView,
+  EmailDigest, NotificationPrefs, ShareCloneResult, ShareInfo, GuestShareView,
 } from './types/g4';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
@@ -74,7 +74,7 @@ export async function getNotificationSettings(): Promise<NotificationPrefs> {
   return decodeG4('notificationSettings', (await api.get('/notifications/settings', SILENT)).data);
 }
 
-export async function putNotificationSettings(input: { level?: NotificationLevel; email_digest?: 'off' | 'daily' }): Promise<NotificationPrefs> {
+export async function putNotificationSettings(input: { level?: NotificationLevel; email_digest?: EmailDigest }): Promise<NotificationPrefs> {
   return decodeG4('notificationSettings', (await api.put('/notifications/settings', input, SILENT)).data);
 }
 

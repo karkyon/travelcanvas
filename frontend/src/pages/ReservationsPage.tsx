@@ -19,6 +19,7 @@ import {
   Users, X, CalendarDays, Lock, Unlock, Link2, QrCode,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
+import TicketCode from '@/components/share/TicketCode';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -906,7 +907,14 @@ const ReservationsPage: React.FC = () => {
                           </div>
                           {revealedTickets[t.id] !== undefined && (
                             <div className="mt-1 text-xs font-mono break-all text-ink-700">
-                              {revealedTickets[t.id] || '(データなし)'}
+                              {revealedTickets[t.id] ? (
+                                // [Gate Remaining-1] FR-012 端末の中で QR・バーコードを描く(係の人に見せられる)
+                                <div className="bg-white p-2 rounded-sm inline-block max-w-full" data-testid="ticket-code">
+                                  <TicketCode value={revealedTickets[t.id]!} format={t.barcode_format} size={180}
+                                    label={`チケット「${t.ticket_type}」のコード`} />
+                                  <p className="mt-1">{revealedTickets[t.id]}</p>
+                                </div>
+                              ) : '(データなし)'}
                             </div>
                           )}
                         </div>

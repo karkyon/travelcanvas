@@ -302,6 +302,41 @@ def _get_leg_or_404(db: Session, option_id, leg_id: str) -> RouteLeg:
 
 # ===== エンドポイント =====
 
+class TimetableSearchRequest(BaseModel):
+    origin: str = Field(..., min_length=1, max_length=60)
+    destination: str = Field(..., min_length=1, max_length=60)
+    date: str = Field(..., min_length=10, max_length=10)
+    time: Optional[str] = Field(None, pattern=r"^\d{2}:\d{2}$")
+    arrive_by: bool = False
+
+
+@router.post("/{plan_id}/route-options/timetable-search", response_model=dict)
+def timetable_search(plan_id: str, payload: TimetableSearchRequest, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate Remaining-2] FR-014・FR-015・FR-017 時刻表・運賃の候補(駅すぱあと。鍵がある時だけ)。保存はしない
+    (利用者が選んで手入力の経路候補として作る)。鍵が無い・取れない時は configured=false / available=false"""
+    from datetime import date as date_cls
+
+    from app.services import timetable_provider as tt
+    from app.services.ext_http import Unavailable
+
+    require_plan_access(db, plan_id, current_user, min_role="editor")
+    try:
+        day = date_cls.fromisoformat(payload.date)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="日付は YYYY-MM-DD で入れてください")
+    if not tt.configured(db):
+        return {"configured": False, "available": False, "candidates": [], "source": tt.SOURCE_LABEL,
+                "message": "時刻表の提供元が未設定です。区間・時刻・運賃を手で入れてください"}
+    try:
+        found = tt.search(db, payload.origin, payload.destination, day, payload.time, payload.arrive_by)
+    except Unavailable:
+        return {"configured": True, "available": False, "candidates": [], "source": tt.SOURCE_LABEL,
+                "message": "時刻表を取れませんでした。区間・時刻・運賃を手で入れてください"}
+    return {"configured": True, "available": True, "candidates": found, "source": tt.SOURCE_LABEL,
+            "message": None if found else "経路が見つかりませんでした。駅名を確かめるか、手で入れてください"}
+
+
 @router.get("/{plan_id}/route-options", response_model=list)
 def list_route_options(
     plan_id: str,

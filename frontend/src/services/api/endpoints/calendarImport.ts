@@ -13,7 +13,8 @@ const DL = () => import('../decoders');
 export class CalendarImportApi extends DataExportApi {
   async previewCalendarImport(planId: string, file: Blob, createMissingDays = false): Promise<CalendarImportPreview> {
     const form = new FormData();
-    form.append('file', file, 'calendar.ics');
+    // [Gate Remaining-1] 形式(ICS・GPX・KML・CSV)を見分けられるよう、元のファイル名で送る
+    form.append('file', file, (file as File).name || 'calendar.ics');
     form.append('create_missing_days', createMissingDays ? 'true' : 'false');
     // 文書のアップロード(documents.ts)と同じく、Content-Typeはaxiosにboundary付きで付けさせる
     const response = await this.client.post(

@@ -3420,7 +3420,8 @@ class NotificationPreference(Base):
 
     __table_args__ = (
         CheckConstraint("level IN ('all', 'mentions', 'none')", name="ck_notification_preferences_level"),
-        CheckConstraint("email_digest IN ('off', 'daily')", name="ck_notification_preferences_digest"),
+        # [Gate Remaining-3] instant: 自分あて・急ぎの通知をすぐメールで送る(FR-024)
+        CheckConstraint("email_digest IN ('off', 'daily', 'instant')", name="ck_notification_preferences_digest"),
         Index("uq_notification_preferences_user_plan", "user_id", "plan_id", unique=True,
               postgresql_where=text("plan_id IS NOT NULL")),
         Index("uq_notification_preferences_user_global", "user_id", unique=True,
@@ -3450,6 +3451,33 @@ class EmailOutbox(Base):
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'sent', 'failed', 'dead')", name="ck_email_outbox_status"),
         Index("ix_email_outbox_due", "next_attempt_at", postgresql_where=text("status IN ('pending', 'failed')")),
+    )
+
+
+class InboundMailAddress(Base):
+    """[Gate Remaining-3] FR-011 予約メールの転送用のアドレス(旅行・人ごと。<token>@INBOUND_MAIL_DOMAIN)。
+
+    届いたメールは、この人の操作として予約の読み取り(候補)にする(確定は人が画面で行う)。宛先の文字(token)は
+    ENCRYPTION_KEY で暗号化して持ち(画面に出すため)、届いたメールとの照合は sha256 だけで行う。作り直すと前の
+    アドレスは使えなくなる(revoked_at)。メールの本文は保存しない(読み取った候補は暗号化して import の表へ)。"""
+    __tablename__ = "inbound_mail_addresses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    received_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_inbound_mail_addresses_token_hash"),
+        Index("ix_inbound_mail_addresses_plan_user", "plan_id", "user_id"),
+        Index("ix_inbound_mail_addresses_user", "user_id"),
     )
 
 
@@ -3975,3 +4003,134 @@ class ProviderSecretVerification(Base):
 
 # [Gate PlanB] 日ごとの案: 控えの案をふだんの問い合わせから外すしくみ(Session の出来事)を登録する
 from app.services import day_variants as _day_variants  # noqa: E402,F401
+
+
+# ===================================================================== [Gate Remaining-4] FR-058 料金・決済(Stripe のテストモード)
+# 正本の決定: 2026-11-13 利用者「Stripe のテストモードで仕組みだけ作る(価格・有料の範囲は仮で、管理画面で変えられる)」
+
+class BillingProduct(Base):
+    """売る物(会員のクラスの購読・Trip Pass)。価格は仮で管理者が変える(revision)。"""
+    __tablename__ = "billing_products"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    tier_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    price_jpy: Mapped[int] = mapped_column(Integer, nullable=False)
+    interval: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    updated_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_billing_products_code"),
+        CheckConstraint("kind IN ('subscription', 'trip_pass')", name="ck_billing_products_kind"),
+        CheckConstraint("tier_key IN ('trip', 'journey', 'explorer', 'trip_pass')", name="ck_billing_products_tier"),
+        CheckConstraint("price_jpy BETWEEN 50 AND 1000000", name="ck_billing_products_price"),
+        CheckConstraint("(kind = 'subscription') = (interval IS NOT NULL) AND "
+                        "(interval IS NULL OR interval IN ('month', 'year'))", name="ck_billing_products_interval"),
+        CheckConstraint("(kind = 'trip_pass') = (tier_key = 'trip_pass')", name="ck_billing_products_kind_tier"),
+        Index("ix_billing_products_updated_by", "updated_by"),
+    )
+
+
+class BillingCustomer(Base):
+    """利用者 ↔ Stripe の顧客(カード・住所はこのアプリに持たない)。"""
+    __tablename__ = "billing_customers"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    stripe_customer_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (UniqueConstraint("stripe_customer_id", name="uq_billing_customers_stripe"),)
+
+
+class BillingSubscription(Base):
+    """購読(会員のクラス)。使える間(active・trialing・past_due)は Entitlement を active にする。"""
+    __tablename__ = "billing_subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("billing_products.id", ondelete="RESTRICT"), nullable=False)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="incomplete", server_default="incomplete")
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
+                                                       server_default=text("false"))
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    price_jpy: Mapped[int] = mapped_column(Integer, nullable=False)
+    entitlement_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entitlements.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("stripe_subscription_id", name="uq_billing_subscriptions_stripe"),
+        CheckConstraint("status IN ('incomplete', 'incomplete_expired', 'trialing', 'active', 'past_due', "
+                        "'canceled', 'unpaid', 'paused')", name="ck_billing_subscriptions_status"),
+        Index("ix_billing_subscriptions_user", "user_id"),
+        Index("ix_billing_subscriptions_product", "product_id"),
+        Index("ix_billing_subscriptions_entitlement", "entitlement_id"),
+    )
+
+
+class BillingPayment(Base):
+    """支払い(Checkout・購読の請求書)と返金。Trip Pass は旅行(plan_id)に付く。"""
+    __tablename__ = "billing_payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("billing_products.id", ondelete="SET NULL"), nullable=True)
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL"), nullable=True)
+    subscription_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("billing_subscriptions.id", ondelete="SET NULL"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    amount_jpy: Mapped[int] = mapped_column(Integer, nullable=False)
+    refunded_jpy: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    stripe_checkout_session_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stripe_invoice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    receipt_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    entitlement_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entitlements.id", ondelete="SET NULL"), nullable=True)
+    refund_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("stripe_checkout_session_id", name="uq_billing_payments_session"),
+        UniqueConstraint("stripe_invoice_id", name="uq_billing_payments_invoice"),
+        CheckConstraint("kind IN ('subscription', 'trip_pass', 'invoice')", name="ck_billing_payments_kind"),
+        CheckConstraint("status IN ('pending', 'paid', 'failed', 'expired', 'refunded', 'partially_refunded')",
+                        name="ck_billing_payments_status"),
+        CheckConstraint("amount_jpy >= 0 AND refunded_jpy >= 0 AND refunded_jpy <= amount_jpy",
+                        name="ck_billing_payments_amounts"),
+        Index("ix_billing_payments_user_id", "user_id"),
+        Index("ix_billing_payments_product_id", "product_id"),
+        Index("ix_billing_payments_plan_id", "plan_id"),
+        Index("ix_billing_payments_subscription_id", "subscription_id"),
+        Index("ix_billing_payments_entitlement_id", "entitlement_id"),
+        Index("ix_billing_payments_stripe_payment_intent_id", "stripe_payment_intent_id"),
+    )
+
+
+class BillingEvent(Base):
+    """Stripe の Webhook のイベントの ID(同じイベントを 2 回処理しない)。"""
+    __tablename__ = "billing_events"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    type: Mapped[str] = mapped_column(String(80), nullable=False)
+    result: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

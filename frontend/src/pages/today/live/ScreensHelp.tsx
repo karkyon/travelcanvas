@@ -12,6 +12,7 @@ import {
   AlertTriangle, CloudRain, QrCode, Phone, Wallet, Languages, Home, Users, ChevronRight, Check,
 } from 'lucide-react';
 import LocalQrCode from '@/components/share/LocalQrCode';
+import TicketCode from '@/components/share/TicketCode';
 import {
   applyReplan, createAlert, createPackingItem, createReplan, getAlerts, getPackingItems, getReplan, getReservation,
   getTickets, revealTicket, updatePackingItem,
@@ -519,7 +520,7 @@ export const TicketScreen: React.FC<{ ctx: TodayCtx; eventId: string | null }> =
                 <p className="tl-small tl-mute">{`${hm(tab.start, ctx.timeZone)} ・ ${res?.provider_name ?? ev?.title ?? ''}`}</p>
                 <b className="tl-title tl-title--lg">{[tab.type, tab.guests ? `${tab.guests}名` : null].filter(Boolean).join(' ')}</b>
                 <div className="tl-ticket__qr">
-                  {qr ? <LocalQrCode value={qr.payload} size={200} label={`${tab.label}のQRコード`} />
+                  {qr ? <TicketCode value={qr.payload} format={qr.format} size={200} label={`${tab.label}のチケットのコード`} />
                     : state === 'loading' ? <span className="tl-small" role="status">表示しています…</span>
                       : state === 'error' ? <span className="tl-small">{ctx.stale ? '通信できないため表示できません' : 'チケットを表示できませんでした'}</span>
                         : <span className="tl-small">この予約に QR のチケットは登録されていません</span>}

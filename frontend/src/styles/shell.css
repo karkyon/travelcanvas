@@ -228,6 +228,8 @@
 .tc-seg { display: inline-flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--tc-cloud-100); }
 .tc-day-tab { white-space: nowrap; min-height: 32px; padding: 6px 11px; background: var(--tc-cloud-100); border: 0;
   color: var(--tc-ink-500); border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+/* [Gate Remaining-2] FR-008 祝日の印(文字の色だけで伝えず「祝」の字と名前(読み上げ・title)を添える) */
+.tc-day-holiday { color: #b42318; font-weight: 600; }
 .tc-day-tab[aria-pressed="true"] { background: var(--tc-accent); color: var(--tc-on-accent); }
 .tc-day-meta { font-size: 11px; color: var(--tc-ink-500); margin: 0 0 6px; }
 .tc-day-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--tc-ink-700); margin-bottom: 8px; }

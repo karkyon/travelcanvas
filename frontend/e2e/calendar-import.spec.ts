@@ -62,11 +62,11 @@ test('カレンダー取込: 書き出したICSを編集して取り込むと、
   const ics = readFileSync(path, 'utf-8');
   expect(ics).toContain('DTSTART:20261101T010000Z');
 
-  await page.getByRole('button', { name: 'カレンダー(ICS)から予定を取り込む' }).click();
+  await page.getByRole('button', { name: 'カレンダー(ICS)・地図(GPX・KML)・表(CSV)から取り込む' }).click();
   await page.waitForURL(new RegExp(`/planner/${planId}/calendar-import$`), { timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: 'カレンダーから取り込む', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'カレンダー・地図・表から取り込む', level: 1 })).toBeVisible();
   await axeViolations(page, 'カレンダー取込');
-  const input = page.getByLabel(/ICSファイル/);
+  const input = page.getByLabel(/ファイル\(ICS/);
 
   // 1. そのまま取り込むと変更なし
   await input.setInputFiles({ name: 'same.ics', mimeType: 'text/calendar', buffer: Buffer.from(ics) });
@@ -93,4 +93,22 @@ test('カレンダー取込: 書き出したICSを編集して取り込むと、
   expect(eventsOf(after)).toEqual(['11:30 清水寺', '15:00 伏見稲荷']);
   await send('post', `/plans/${planId}/undo`, undefined, { 'If-Match': String(after.revision) });
   expect(eventsOf((await send('get', `/plans/${planId}`)) as PlanDetail)).toEqual(eventsOf(before));
+
+  // 4. [Gate Remaining-1] 地図(KML。Google マイマップの書き出し)を取り込む: 日付のある地点は予定、無い地点は候補箱へ
+  const kml = ['<?xml version="1.0" encoding="UTF-8"?>', '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>',
+    '<Placemark><name>伏見稲荷</name><TimeStamp><when>2026-11-01T15:00:00</when></TimeStamp>',
+    '<Point><coordinates>135.7727,34.9671,0</coordinates></Point></Placemark>',
+    '<Placemark><name>嵐山</name><Point><coordinates>135.6719,35.0094,0</coordinates></Point></Placemark>',
+    '<Placemark><name>歩いた道</name><LineString><coordinates>135,35 136,36</coordinates></LineString></Placemark>',
+    '</Document></kml>'].join('');
+  await page.reload();
+  await page.getByLabel(/ファイル\(ICS/).setInputFiles({ name: 'mymap.kml', mimeType: 'application/vnd.google-earth.kml+xml', buffer: Buffer.from(kml) });
+  await expect(page.getByTestId('import-summary')).toContainText('2件中、追加1件・変更0件・候補箱へ1件・取り込まない0件');
+  await expect(page.getByTestId('import-shapes')).toContainText('線(経路・軌跡) 1件');
+  await axeViolations(page, '地図の取込(確認)');
+  await page.getByRole('button', { name: '選んだ予定を取り込む' }).click();
+  await expect(page.getByTestId('import-result')).toContainText('候補箱へ1件');
+  expect(eventsOf((await send('get', `/plans/${planId}`)) as PlanDetail)).toEqual(['10:00 清水寺', '15:00 伏見稲荷']);
+  const cands = (await send('get', `/plans/${planId}/candidates`)) as { items: { title: string; latitude: number | null }[] };
+  expect(cands.items.find((c) => c.title === '嵐山')?.latitude).toBeCloseTo(35.0094);
 });

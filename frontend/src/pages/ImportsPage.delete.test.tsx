@@ -9,6 +9,12 @@ const api = vi.hoisted(() => ({
 const pf = vi.hoisted(() => ({ deleteImportJob: vi.fn(), extractReservationText: vi.fn(), extractReservationFile: vi.fn(), applyExtraction: vi.fn() }));
 vi.mock('@/services/api', () => api);
 vi.mock('@/services/api/photoFeatures', () => pf);
+// [Gate Remaining-3] 転送アドレスは「設定なし」で返す
+vi.mock('@/services/api/remaining2', () => ({
+  getInboundMail: vi.fn().mockResolvedValue({ configured: false, address: null, received_count: 0, last_received_at: null,
+    created_at: null, daily_limit: 30 }),
+  createInboundMail: vi.fn(), revokeInboundMail: vi.fn(),
+}));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import ImportsPage from './ImportsPage';

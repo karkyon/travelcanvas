@@ -40,7 +40,7 @@ function renderPage() {
 
 const pickFile = () => {
   const f = new File(['BEGIN:VCALENDAR'], 'a.ics', { type: 'text/calendar' });
-  fireEvent.change(screen.getByLabelText(/ICSファイル/), { target: { files: [f] } });
+  fireEvent.change(screen.getByLabelText(/ファイル\(ICS/), { target: { files: [f] } });
   return f;
 };
 
@@ -65,9 +65,10 @@ describe('CalendarImportPage (Gate P8)', () => {
     fireEvent.click(boxes[0]!); // 追加を外す
     fireEvent.click(screen.getByRole('button', { name: '選んだ予定を取り込む' }));
     await waitFor(() => expect(m.applyCalendarImport).toHaveBeenCalledWith('p1', [
-      { action: 'update', event_id: 'e1', title: '清水寺', local_date: '2026-11-01', local_start_time: '11:30', is_all_day: false, address: null },
+      { action: 'update', event_id: 'e1', title: '清水寺', local_date: '2026-11-01', local_start_time: '11:30', is_all_day: false, address: null,
+        latitude: null, longitude: null, note: null },
     ], false, 7));
-    expect(await screen.findByTestId('import-result')).toHaveTextContent('取り込みました(追加0件・変更1件)。プラン画面の「元に戻す」で取り消せます。');
+    expect(await screen.findByTestId('import-result')).toHaveTextContent('取り込みました(追加0件・変更1件)。プラン画面の「元に戻す」で取り消せます');
     expect(screen.queryByTestId('import-summary')).toBeNull();
   });
 

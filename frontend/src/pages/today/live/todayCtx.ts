@@ -58,6 +58,9 @@ export interface TodayCtx {
   setDetourPins: (c: DetourCandidate[]) => void;
   trail: TrailPoint[];
   pendingCount: number;
+  /** [Gate Remaining-1] 送信待ちの写真・ひとこと */
+  memoPending: number;
+  onMemoQueued: (count: number) => void;
   open: (screen: TodayScreen, eventId?: string | null) => void;
   close: () => void;
   refresh: () => void;

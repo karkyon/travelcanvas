@@ -130,7 +130,7 @@ async def mark_all_notifications_read(
 class SettingsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     level: Optional[str] = Field(None, pattern="^(all|mentions|none)$")
-    email_digest: Optional[str] = Field(None, pattern="^(off|daily)$")
+    email_digest: Optional[str] = Field(None, pattern="^(off|daily|instant)$")
 
 
 class PlanSettingsIn(BaseModel):
@@ -146,7 +146,7 @@ async def get_settings(current_user: User = Depends(get_current_active_user), db
 @router.put("/settings")
 async def put_settings(body: SettingsIn, current_user: User = Depends(get_current_active_user),
                        db: Session = Depends(get_db)):
-    if body.email_digest == "daily":
+    if body.email_digest in ("daily", "instant"):
         if not notify.email_available():
             raise HTTPException(status_code=409, detail={"code": "email_unavailable",
                                                          "message": "この環境ではメールを送れません(管理者の設定が必要です)"})
