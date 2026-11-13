@@ -219,19 +219,23 @@ export function speak(text: string): void {
 }
 
 export interface LiveSettings {
-  notices: { go: boolean; arrive: boolean; rain: boolean; delay: boolean };
+  notices: { go: boolean; arrive: boolean; rain: boolean; delay: boolean; detour: boolean };
+  /** [Gate TDay-Mock] 位置(既定は OFF)。この端末の中だけで使い、送らない */
+  location: { arrive: boolean; trail: boolean };
   voice: boolean;
   shareEta: boolean;
 }
 export const SETTINGS_KEY = 'tc.today.live';
 export const DEFAULT_SETTINGS: LiveSettings = {
-  notices: { go: true, arrive: true, rain: true, delay: true }, voice: false, shareEta: false,
+  notices: { go: true, arrive: true, rain: true, delay: true, detour: false }, location: { arrive: false, trail: false },
+  voice: false, shareEta: false,
 };
 export function readSettings(): LiveSettings {
   try {
     const raw = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null') as Partial<LiveSettings> | null;
     if (!raw || typeof raw !== 'object') return DEFAULT_SETTINGS;
-    return { notices: { ...DEFAULT_SETTINGS.notices, ...(raw.notices ?? {}) }, voice: raw.voice === true,
+    return { notices: { ...DEFAULT_SETTINGS.notices, ...(raw.notices ?? {}) },
+      location: { ...DEFAULT_SETTINGS.location, ...(raw.location ?? {}) }, voice: raw.voice === true,
       shareEta: raw.shareEta === true };
   } catch {
     return DEFAULT_SETTINGS;
@@ -262,7 +266,7 @@ export function writeDismissed(keys: Set<string>): void {
   }
 }
 
-export interface LiveNotice { key: string; kind: 'go' | 'arrive' | 'rain' | 'delay'; title: string; sub: string; action: string; onAction: () => void }
+export interface LiveNotice { key: string; kind: 'go' | 'arrive' | 'rain' | 'delay' | 'detour'; title: string; sub: string; action: string; onAction: () => void }
 
 // ---- [Gate TDay-Transit] 乗換の時刻(無料で正確: 外の地図の乗換で調べて、分かった時刻を区間に入れる) ----------
 
@@ -305,4 +309,184 @@ export function travelLabel(view: Pick<GoNowView, 'travelMinutes' | 'source'>): 
   if (view.source === 'manual') return `${base}(乗換で調べた時刻)`;
   if (view.source === 'segment') return `${base}(登録した移動)`;
   return base;
+}
+
+// ---- [Gate TDay-Mock] モックアップの画面の言葉・計算 -------------------------------------------------------------
+
+const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
+/** "2026-11-13" → "11/13（金）" */
+export function dateLabel(date: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? '');
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return `${Number(m[2])}/${Number(m[3])}（${WEEK[d.getUTCDay()]}）`;
+}
+const KANJI = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+export function kanjiNum(n: number): string {
+  if (n <= 10) return n === 10 ? '十' : KANJI[n]!;
+  if (n < 20) return `十${KANJI[n - 10]}`;
+  if (n < 100) return `${KANJI[Math.floor(n / 10)]}十${n % 10 ? KANJI[n % 10] : ''}`;
+  return String(n);
+}
+/** 印に入れる和暦の日付 "令和八年 十一月十三日"(2019-05-01 から令和) */
+export function reiwaDate(date: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? '');
+  if (!m) return '';
+  const y = Number(m[1]) - 2018;
+  return `令和${y === 1 ? '元' : kanjiNum(y)}年 ${kanjiNum(Number(m[2]))}月${kanjiNum(Number(m[3]))}日`;
+}
+/** 雨の時間帯の見出し "14〜16時、雨の可能性 70%"。雨が無ければ null */
+export function rainTitle(hours: SkyHour[], fromHour = 0): string | null {
+  const w = rainWindow(hours, fromHour);
+  return w ? `${w.start}〜${w.end}時、雨の可能性 ${w.max}%` : null;
+}
+/** 今日の空模様の一行 "晴れ 18° → 14〜16時 雨 70%"(気温・空の言葉は予報の値。無い所は省く) */
+export function weatherLine(label: string | null, temp: number | null, hours: SkyHour[], fromHour = 0): string | null {
+  const head = [label, temp != null ? `${Math.round(temp)}°` : null].filter(Boolean).join(' ');
+  const w = rainWindow(hours, fromHour);
+  const rain = w ? `${w.start}〜${w.end}時 雨 ${w.max}%` : null;
+  const out = [head || null, rain].filter(Boolean).join(' → ');
+  return out || null;
+}
+/** 2点の距離(km、球面) */
+export function distanceKm(a: { latitude: number | null; longitude: number | null },
+  b: { latitude: number | null; longitude: number | null }): number | null {
+  if (a.latitude == null || a.longitude == null || b.latitude == null || b.longitude == null) return null;
+  const r = 6371;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+/** 印を押した場所を順に結んだ道のり(km、直線の和。概算) */
+export function walkedKm(events: TodayEvent[], visited: Set<string>): number {
+  const pts = events.filter((e) => visited.has(e.id) && e.latitude != null && e.longitude != null);
+  let km = 0;
+  for (let i = 1; i < pts.length; i += 1) km += distanceKm(pts[i - 1]!, pts[i]!) ?? 0;
+  return Math.round(km * 10) / 10;
+}
+/** 滞在の予定との差 "予定より 2分長く滞在" */
+export function stayDiffLabel(plannedStart: string | null, plannedEnd: string | null, actualStart: string | null,
+  actualEnd: string | null): string | null {
+  if (!plannedStart || !plannedEnd || !actualStart || !actualEnd) return null;
+  const p = (Date.parse(plannedEnd) - Date.parse(plannedStart)) / 60_000;
+  const a = (Date.parse(actualEnd) - Date.parse(actualStart)) / 60_000;
+  if (Number.isNaN(p) || Number.isNaN(a)) return null;
+  const d = Math.round(a - p);
+  if (d === 0) return '予定どおりの滞在';
+  return d > 0 ? `予定より ${d}分長く滞在` : `予定より ${-d}分短く滞在`;
+}
+/** 着いた時刻と予定の差 "予定より1分遅れ" */
+export function arriveDiffLabel(plannedStart: string | null, actual: string | null): string | null {
+  if (!plannedStart || !actual) return null;
+  const d = Math.round((Date.parse(actual) - Date.parse(plannedStart)) / 60_000);
+  if (Number.isNaN(d)) return null;
+  if (d === 0) return '予定どおり';
+  return d > 0 ? `予定より${d}分遅れ` : `予定より${-d}分早く`;
+}
+/** 1日だけ閉じる表示(朝・夜の画面を「今日の画面へ」で閉じた) */
+export function readDayFlag(key: string): boolean {
+  try {
+    return window.localStorage.getItem(`tc.today.flag.${key}`) === '1';
+  } catch {
+    return false;
+  }
+}
+export function writeDayFlag(key: string): void {
+  try {
+    window.localStorage.setItem(`tc.today.flag.${key}`, '1');
+  } catch {
+    // 何もしない
+  }
+}
+/** 今日の足跡(位置の設定を ON にした時だけ、この端末に置く。送らない) */
+export type TrailPoint = [number, number, number];
+const TRAIL_KEY = 'tc.today.trail.';
+export function readTrail(planId: string, date: string | null): TrailPoint[] {
+  if (!date) return [];
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(`${TRAIL_KEY}${planId}.${date}`) ?? '[]') as unknown;
+    return Array.isArray(raw) ? (raw.filter((p) => Array.isArray(p) && p.length === 3) as TrailPoint[]) : [];
+  } catch {
+    return [];
+  }
+}
+export function addTrailPoint(planId: string, date: string | null, p: TrailPoint): TrailPoint[] {
+  if (!date) return [];
+  const cur = readTrail(planId, date);
+  const last = cur[cur.length - 1];
+  // 30m より近い点・30秒より短い間隔は足さない(電池と保存の量)
+  if (last && distanceKm({ latitude: last[0], longitude: last[1] }, { latitude: p[0], longitude: p[1] })! < 0.03
+    && p[2] - last[2] < 30_000) return cur;
+  const next = [...cur, p].slice(-2000);
+  try {
+    window.localStorage.setItem(`${TRAIL_KEY}${planId}.${date}`, JSON.stringify(next));
+  } catch {
+    // 保存できなくても続ける
+  }
+  return next;
+}
+export function clearTrail(planId: string, date: string | null): void {
+  try {
+    window.localStorage.removeItem(`${TRAIL_KEY}${planId}.${date ?? ''}`);
+  } catch {
+    // 何もしない
+  }
+}
+/** 同行者に送る文 */
+export function shareText(lines: string[]): string {
+  return lines.filter(Boolean).join('\n');
+}
+
+/** 出発の合図の画面の言葉(段階ごと)。leave/arrive は現地の "HH:MM" */
+export function goScreenText(v: GoNowView, leave: string, arrive: string | null, expected: string | null = null): {
+  ringTop: string; big: string; head: string; advice: string; primary: string;
+} {
+  switch (v.stage) {
+    case 'relaxed':
+      return { ringTop: '出発まで', big: `${v.minutesToLeave}分`, head: `${leave} に出れば大丈夫`,
+        advice: 'まだ時間があります。今の場所をもう少し楽しんで。出る10分前にもう一度お知らせします。', primary: 'このまま楽しむ' };
+    case 'soon':
+      return { ringTop: '出発まで', big: `${v.minutesToLeave}分`, head: 'そろそろ準備を',
+        advice: `印を押す・写真を撮るなら今のうちに。${leave} に出ると ${arrive ?? '予定どおり'} に着きます。`, primary: '案内を開く' };
+    case 'now':
+      return { ringTop: '今', big: '出発', head: `今出れば ${arrive ?? '予定どおり'} 着`,
+        advice: '案内を開くと、着くまでの残り時間だけを大きく表示する「移動モード」に切り替わります。', primary: '移動モードで出発' };
+    default:
+      return { ringTop: '予定より', big: `+${-v.minutesToLeave}分`, head: `${expected ?? arrive ?? ''} 着の見込み`.trim(),
+        advice: '予約の時刻を過ぎそうです。お店に連絡するか、後の予定を組み直せます（再計画）。', primary: '後の予定を組み直す' };
+  }
+}
+/** 予定の種類の言葉(印の集まりの見出し) */
+export const TYPE_LABEL: Record<string, string> = {
+  sightseeing: '見どころ', dining: '食事の場所', accommodation: '宿', transport: '移動', activity: '体験の場所',
+  shopping: '買い物の場所', other: '場所',
+};
+/** 移動の手段の言葉 */
+export const MODE_WORD: Record<string, string> = {
+  walking: '徒歩', walk: '徒歩', train: '電車', rail: '鉄道', bus: 'バス', driving: '車', car: '車', taxi: 'タクシー',
+  bicycle: '自転車', ferry: '船', flight: '飛行機', transit: '電車・バス',
+};
+export function modeWord(mode: string | null | undefined): string {
+  return (mode && MODE_WORD[mode]) || '移動';
+}
+/** 場所のメモを「着いたら」の手順に分ける(改行・。で区切る。最大6) */
+export function noteLines(...texts: (string | null | undefined)[]): string[] {
+  const out: string[] = [];
+  for (const t of texts) {
+    if (!t) continue;
+    for (const line of t.split(/\n|。/)) {
+      const v = line.replace(/^\s*(?:[-・*•]|\d+[.)．、])\s*/, '').trim();
+      if (v && !out.includes(v)) out.push(v);
+    }
+  }
+  return out.slice(0, 6);
+}
+/** 分の長さ "1時間30分" */
+export function durationLabel(minutes: number | null): string | null {
+  if (minutes == null || minutes <= 0) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}時間${m ? `${m}分` : ''}` : `${m}分`;
 }

@@ -16,6 +16,8 @@ const CACHE = 'tc.today.guide.';
 export interface SkyState {
   hours: SkyHour[]; affected: { event_id: string; title: string; time: string }[]; hasRainVariant: boolean;
   label: string | null; tempMax: number | null; tempMin: number | null; source: string;
+  /** 予報を取った時刻(端末時刻 ms) */
+  fetchedAt: number;
 }
 
 function readCache(planId: string): TodayGuide | null {
@@ -60,7 +62,7 @@ export function useTodayLive(planId: string | undefined, date: string | null, of
         hours: Array.isArray(f.hours) ? f.hours.map((h) => ({ hour: h.hour, probability: h.probability ?? null, rainy: !!h.rainy })) : [],
         affected: (f.affected_events ?? []).map((a) => ({ event_id: a.event_id, title: a.title, time: a.time })),
         hasRainVariant: !!f.has_rain_variant, label: f.label ?? null, tempMax: f.temp_max ?? null, tempMin: f.temp_min ?? null,
-        source: f.source || 'Open-Meteo',
+        source: f.source || 'Open-Meteo', fetchedAt: Date.now(),
       } : null);
     } catch {
       // 天気は無くてもよい

@@ -127,7 +127,7 @@
 .tc-seal { display: inline-grid; place-items: center; flex: none; border-radius: 50%; border: 3px double #b23c22; color: #b23c22;
   font-family: var(--tc-font-display); font-weight: 800; transform: rotate(var(--tilt, -5deg)); background: rgba(178, 60, 34, .04); }
 .tc-seal--empty { border: 2px dashed var(--tc-sand-300); color: var(--tc-ink-500); background: transparent; transform: none; font-weight: 700; }
-.tc-seal--ready { border: 2px dashed #b9a274; color: #8a6a2c; transform: none; }
+.tc-seal--ready { border: 2px dashed #b9a274; color: #6f5320; transform: none; }
 .tc-seal--press { animation: tc-seal-press .7s ease-out both; }
 .tc-tabicho__strip { list-style: none; margin: 12px 0 0; padding: 0; display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
 .tc-tabicho__strip li { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--tc-ink-500); min-width: 60px; }

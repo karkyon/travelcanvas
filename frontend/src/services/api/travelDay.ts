@@ -41,15 +41,41 @@ export interface GuideEvent {
   segment_id: string | null;
   segment_revision: number | null;
   segment_departure_at: string | null;
+  /** [Gate TDay-Mock] 入口・目印(場所のメモ)・場所のメモ・自分のメモ(予定の説明)・この予定の写真(最大6)・最新のひとこと */
+  entrance_note?: string | null;
+  place_note?: string | null;
+  memo?: string | null;
+  photo_ids?: string[];
+  note_text?: string | null;
+  audio_count?: number;
 }
 export interface GuideStamp {
   status: 'visited' | 'skipped' | null; revision: number | null; actual_start_at: string | null;
+  actual_end_at?: string | null;
   memory_count: number; photo_count: number;
 }
+export interface GuideBookingRes {
+  id: string; type: string; type_label: string; status: string; provider_name: string | null; guest_count: number | null;
+  start: string | null; end: string | null;
+}
+export interface GuideBooking { state: 'booked' | 'issue'; issues: string[]; reservations: GuideBookingRes[] }
+export interface GuideLodging {
+  event_id: string; title: string; start_at: string | null; address: string | null; phone: string | null;
+  latitude: number | null; longitude: number | null; check_in: string | null; booking: 'booked' | 'issue' | null;
+  guest_count: number | null; nights: number | null; notes: string | null; memo: string | null; entrance_note: string | null;
+}
+export interface GuideDayPhoto { id: string; event_id: string; at: string | null }
+export interface GuideTrip {
+  days: number; stamps: { event_id: string; title: string; event_type: string }[]; stamp_count: number;
+  photos: number; notes: number; missed: { event_id: string; title: string }[];
+}
+export interface GuidePrevDay { date: string; title: string | null; visited: number; photos: number }
 export interface GuideGap { after_event_id: string; before_event_id: string; start_at: string; end_at: string; minutes: number }
 export interface GuideUpcoming {
   date: string; days_until: number; day_title: string | null; is_trip_start: boolean;
   first_event_title: string | null; first_event_time: string | null;
+  /** [Gate TDay-Mock] その日の時刻のある予定の数 */
+  event_count?: number;
 }
 export interface GuideNextDay {
   date: string; day_title: string | null; event_count: number; first_event_title: string | null;
@@ -73,6 +99,12 @@ export interface TodayGuide {
   gaps: GuideGap[];
   stamps: Record<string, GuideStamp>;
   metrics: { visited: number; total: number; photos: number; notes: number };
+  /** [Gate TDay-Mock] 予約(予約済み・要確認)・今日の宿・今日の写真・旅全体(最終日)・前の日 */
+  bookings?: Record<string, GuideBooking>;
+  lodging?: GuideLodging | null;
+  day_photos?: GuideDayPhoto[];
+  trip?: GuideTrip | null;
+  prev_day?: GuidePrevDay | null;
 }
 
 const hours: Decoder<GuideHours> = object<GuideHours>({
@@ -86,10 +118,33 @@ const guideEvent: Decoder<GuideEvent> = object<GuideEvent>({
   distance_km: nullable(num), travel_source: nullable(oneOf('segment', 'manual', 'estimate')), leave_by: nullable(str),
   fit: str, hours: nullable(hours), start_at: nullable(str), from_event_id: nullable(str), segment_id: nullable(str),
   segment_revision: nullable(int), segment_departure_at: nullable(str),
+  entrance_note: optional(nullable(str)) as Decoder<string | null | undefined>,
+  place_note: optional(nullable(str)) as Decoder<string | null | undefined>,
+  memo: optional(nullable(str)) as Decoder<string | null | undefined>,
+  photo_ids: optional(arrayOf(str)) as Decoder<string[] | undefined>,
+  note_text: optional(nullable(str)) as Decoder<string | null | undefined>,
+  audio_count: optional(int) as Decoder<number | undefined>,
 });
 const stamp: Decoder<GuideStamp> = object<GuideStamp>({
   status: nullable(oneOf('visited', 'skipped')), revision: nullable(int), actual_start_at: nullable(str),
+  actual_end_at: optional(nullable(str)) as Decoder<string | null | undefined>,
   memory_count: int, photo_count: int,
+});
+const bookingRes: Decoder<GuideBookingRes> = object<GuideBookingRes>({
+  id: str, type: str, type_label: str, status: str, provider_name: nullable(str), guest_count: nullable(int),
+  start: nullable(str), end: nullable(str),
+});
+const booking: Decoder<GuideBooking> = object<GuideBooking>({
+  state: oneOf('booked', 'issue'), issues: arrayOf(str), reservations: arrayOf(bookingRes),
+});
+const lodging: Decoder<GuideLodging> = object<GuideLodging>({
+  event_id: str, title: str, start_at: nullable(str), address: nullable(str), phone: nullable(str),
+  latitude: nullable(num), longitude: nullable(num), check_in: nullable(str), booking: nullable(oneOf('booked', 'issue')),
+  guest_count: nullable(int), nights: nullable(int), notes: nullable(str), memo: nullable(str), entrance_note: nullable(str),
+});
+const trip: Decoder<GuideTrip> = object<GuideTrip>({
+  days: int, stamps: arrayOf(object({ event_id: str, title: str, event_type: str })), stamp_count: int, photos: int,
+  notes: int, missed: arrayOf(object({ event_id: str, title: str })),
 });
 const mapOf = <T>(d: Decoder<T>): Decoder<Record<string, T>> => (v, path) => {
   const raw = record(v, path);
@@ -101,6 +156,7 @@ export const todayGuide: Decoder<TodayGuide> = object<TodayGuide>({
   upcoming: nullable(object<GuideUpcoming>({
     date: str, days_until: int, day_title: nullable(str), is_trip_start: bool,
     first_event_title: nullable(str), first_event_time: nullable(str),
+    event_count: optional(int) as Decoder<number | undefined>,
   })),
   next_day: nullable(object<GuideNextDay>({
     date: str, day_title: nullable(str), event_count: int, first_event_title: nullable(str), first_event_time: nullable(str),
@@ -110,6 +166,11 @@ export const todayGuide: Decoder<TodayGuide> = object<TodayGuide>({
   gaps: arrayOf(object<GuideGap>({ after_event_id: str, before_event_id: str, start_at: str, end_at: str, minutes: int })),
   stamps: mapOf(stamp),
   metrics: object({ visited: int, total: int, photos: int, notes: int }),
+  bookings: optional((v, path) => mapOf(booking)(v, path)) as Decoder<Record<string, GuideBooking> | undefined>,
+  lodging: optional(nullable(lodging)) as Decoder<GuideLodging | null | undefined>,
+  day_photos: optional(arrayOf(object<GuideDayPhoto>({ id: str, event_id: str, at: nullable(str) }))) as Decoder<GuideDayPhoto[] | undefined>,
+  trip: optional(nullable(trip)) as Decoder<GuideTrip | null | undefined>,
+  prev_day: optional(nullable(object<GuidePrevDay>({ date: str, title: nullable(str), visited: int, photos: int }))) as Decoder<GuidePrevDay | null | undefined>,
 });
 
 export async function getTodayGuide(planId: string): Promise<TodayGuide> {
@@ -183,14 +244,25 @@ export async function removeStamp(planId: string, eventId: string) {
 }
 /** この場所のひとこと(メモ) */
 export async function addNote(planId: string, input: { event_id: string; day_id: string | null; body: string;
-  visibility: 'private' | 'members'; place_name: string | null }) {
+  visibility: 'private' | 'members'; place_name: string | null; include_in_journal?: boolean }) {
   return api.createMemory(planId, { kind: 'note', body: input.body, event_id: input.event_id, day_id: input.day_id,
-    visibility: input.visibility, place_name: input.place_name, occurred_at: new Date().toISOString() });
+    visibility: input.visibility, place_name: input.place_name, occurred_at: new Date().toISOString(),
+    ...(input.include_in_journal != null ? { include_in_journal: input.include_in_journal } : {}) });
 }
 /** 写真・声の記録 */
 export async function addMedia(planId: string, input: { kind: 'photo' | 'audio'; file: File; event_id: string;
-  day_id: string | null; body: string | null; visibility: 'private' | 'members'; place_name: string | null }) {
+  day_id: string | null; body: string | null; visibility: 'private' | 'members'; place_name: string | null;
+  include_in_journal?: boolean }) {
   return api.uploadMemory(planId, { ...input, occurred_at: new Date().toISOString() });
+}
+/** [Gate TDay-Mock] 行けなかった場所を「次の旅の候補」(候補箱・行きたい場所リスト)に残す */
+export async function keepForNextTrip(planId: string, input: { title: string; address: string | null;
+  latitude: number | null; longitude: number | null }) {
+  return api.post(`/plans/${planId}/candidates`, {
+    title: input.title, note: '旅の当日に行けなかった場所', priority: 2,
+    ...(input.address ? { address: input.address } : {}),
+    ...(input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : {}),
+  }, SILENT);
 }
 /** 寄り道を旅程に足す(POST /plans/{id}/events)。時刻は旅行先の現地時間の "HH:MM" */
 export async function addDetourEvent(planId: string, input: { day_id: string; title: string; local_start_time: string;
