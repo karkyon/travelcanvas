@@ -50,7 +50,7 @@ export const JourneyThread: React.FC<{
   events: TodayEvent[]; timeZone: string | null; nowId: string | null; nextId: string | null; doneIds: Set<string>;
   stamps: Record<string, GuideStamp>; rainIds: Set<string>;
 }> = ({ events, timeZone, nowId, nextId, doneIds, stamps, rainIds }) => (
-  <nav className="tc-thread" aria-label="旅の糸(今日の道のり)">
+  <nav className="tc-thread tc-focus-ring" aria-label="旅の糸(今日の道のり)" tabIndex={0}>
     <ol>
       {events.map((e, i) => {
         const visited = stamps[e.id]?.status === 'visited';

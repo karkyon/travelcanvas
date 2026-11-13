@@ -214,3 +214,19 @@
 .tc-transit-time label { display: grid; gap: 4px; font-size: 13px; color: var(--tc-ink-700); }
 .tc-transit-time input, .tc-transit-time select { min-height: 40px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; font-size: 15px; background: var(--tc-cloud-0); color: inherit; }
 .tc-go__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* 暗い見た目(設定で選んだ時)。sand 系の色は暗い見た目で切り替わらないため、ここで塗り直す */
+[data-theme='dark'] .tc-live-card--sand { background: #1d1a14; border-color: #4a3f2c; }
+[data-theme='dark'] .tc-detour__impact { background: #1d1a14; border-color: #4a3f2c; }
+[data-theme='dark'] .tc-tabicho__entry { border-top-color: #4a3f2c; }
+[data-theme='dark'] .tc-seal { border-color: #ff9b7a; color: #ff9b7a; background: rgba(255, 155, 122, .06); }
+[data-theme='dark'] .tc-seal--empty { border-color: #6b5c40; color: var(--tc-ink-500); background: transparent; }
+[data-theme='dark'] .tc-seal--ready { border-color: #c9b07a; color: #e2c98e; }
+[data-theme='dark'] .tc-go { border-color: rgba(252, 165, 165, .3); }
+[data-theme='dark'] .tc-go__ring circle.fg { stroke: #ff9b7a; }
+[data-theme='dark'] .tc-go__stages li[aria-current='step'] { background: #ff9b7a; color: #0b1220; }
+[data-theme='dark'] .tc-go[data-stage='relaxed'] .tc-go__stages li[aria-current='step'],
+[data-theme='dark'] .tc-go[data-stage='late'] .tc-go__stages li[aria-current='step'] { color: #0b1220; }
+[data-theme='dark'] .tc-live-dawn { background: linear-gradient(160deg, #3a2614, #1d1710 70%); color: #fbe9d4; border-color: #4a3f2c; }
+[data-theme='dark'] .tc-live-dawn .tc-live-label { color: #ffcf8a; }
+[data-theme='dark'] .tc-sky__event[data-state='done'] { background: #7a4636; }
