@@ -39,6 +39,8 @@
 | `api_client_not_found` | 404 | no | 連携が見つかりません | api/v1/organizations.py |
 | `api_client_revoked` | 409 | no | 止めた連携の秘密は作り直せません | api/v1/organizations.py |
 | `areas_only` | 409 | no | この軌跡は「訪問地域だけ同期」の設定のため、座標はサーバーへ送れません | api/v1/location_tracks.py |
+| `bad_signature` | 400 | no | 署名が違います | api/v1/billing.py |
+| `billing_unavailable` | 409 | no | — | api/v1/billing.py |
 | `blocked_host` | — | — | 内部のアドレス・localhost へは送れません | api/v1/organizations.py |
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
@@ -68,6 +70,7 @@
 | `domain_not_found` | 404 | no | ドメインが見つかりません | api/v1/organizations.py |
 | `domain_revoked` | 409 | no | 取り消したドメインは確認できません。もう一度登録してください | api/v1/organizations.py |
 | `domain_taken` | 409 | no | このドメインは別の組織で確認済みです | api/v1/organizations.py |
+| `duplicate_code` | 409 | no | 同じ記号の商品があります | api/v1/billing.py |
 | `duplicate_event` | — | — | 同じ予定が2回含まれています | api/v1/visits.py |
 | `duplicate_item` | — | — | 同じ項目が2回あります | services/private_profile.py |
 | `email_taken` | 409 | no | このメールアドレスは既に使われています | api/v1/corrections.py |
@@ -109,7 +112,7 @@
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tra |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/billing.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py,  |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |
@@ -189,6 +192,7 @@
 | `poll_adopted` | 409 | no | 予定に採用した投票は変えられません(先に採用を元に戻してください) | api/v1/discussion.py |
 | `poll_not_decided` | — | — | まだ決定していません(先に選択肢を決定してください) | api/v1/decisions.py |
 | `privacy_zone_not_found` | 404 | no | 守る範囲が見つかりません | api/v1/privacy_zones.py |
+| `product_not_found` | 404 | no | その商品はありません | api/v1/billing.py |
 | `profile_empty` | 409 | no | 非公開の条件がまだありません。設定 → 非公開の条件 で登録してください | api/v1/private_profile.py |
 | `profile_unreadable` | 409 | no | 保存済みの内容を復号できないため変更できません | api/v1/private_profile.py |
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
@@ -228,8 +232,10 @@
 | `share_view_expired` | — | — | 閲覧の時間が過ぎました。もう一度リンクを開いてください | api/v1/public_share.py |
 | `source_plan_gone` | 409 | no | 元の旅行が削除されているため改訂できません | api/v1/organizations.py |
 | `source_required` | 422 | no | 写す日を選んでください | api/v1/day_variants.py |
+| `stale` | 409 | no | 他の管理者が変えました。読み直してください | api/v1/billing.py |
 | `stale_version` | 409 | after_reload | 配布が別の操作で改訂されています。読み直してください | api/v1/organizations.py |
 | `storage_failed` | 503 | later | ファイルの保存に失敗しました。しばらくしてから再試行してください | api/v1/memories.py |
+| `stripe_error` | 422 | no | — | api/v1/billing.py |
 | `sync_operation_missing` | 404 | no | 同期の記録が見つかりません | api/v1/sync.py |
 | `target_merged` | — | — | まとめ先の候補は、すでに別の候補へまとめられています | api/v1/candidates.py |
 | `test_tier_disabled` | 403 | no | 本番・staging の環境ではクラスの試験の切り替えをしません | api/v1/admin_ops.py |

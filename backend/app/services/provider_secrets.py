@@ -63,6 +63,15 @@ SLOTS: Dict[str, Dict[str, Any]] = {
                          "env": "EKISPERT_API_KEY", "connector": True,
                          "note": "任意・有料: 登録すると区間の時刻表・運賃の候補を出します(無ければ送らず、区間は手で入れます)",
                          "hint": "駅すぱあと Web サービスの契約のキー(有料)。区間の時刻表・乗り換え・運賃の候補を出します"},
+    # [Gate Remaining-4] FR-058 決済(Stripe のテストモードだけ。sk_live_ は送らずに断る)
+    "stripe_secret_key": {"label": "Stripe のシークレットキー(テストモード)", "providers": ["stripe"],
+                          "env": "STRIPE_SECRET_KEY", "connector": True,
+                          "note": "任意・テストモード: 登録すると料金・お支払いの画面で購入・取り消し・返金を試せます(実際には請求されません)",
+                          "hint": "Stripe のダッシュボードの「テストモード」の sk_test_… のキー。本番の sk_live_ は使いません"},
+    "stripe_webhook_secret": {"label": "Stripe の Webhook の署名の鍵", "providers": ["stripe"],
+                              "env": "STRIPE_WEBHOOK_SECRET", "connector": True,
+                              "note": "任意: 登録すると支払い・購読の変化を Stripe から受け取ります(無くても画面に戻った時に確かめます)",
+                              "hint": "Webhook の送り先 https://<ホスト>/api/v1/billing/stripe/webhook の whsec_… の鍵"},
 }
 MIN_LEN, MAX_LEN = 8, 512
 

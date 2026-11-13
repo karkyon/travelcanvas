@@ -12,7 +12,8 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *   4. 旅程の日のタブに祝日の印(日本は計算。通信しない)
  *   5. [Gate Remaining-3] 予約の取り込みの「転送アドレス」(受信の設定が無い環境は案内)・通知の「すぐ送る」(メールが
  *      使えない環境は選べない)
- *   6. 画面に axe(WCAG 2.1 AA)違反が無い
+ *   6. [Gate Remaining-4] 料金・お支払い(CI は決済の鍵なし → 案内・買えない)。ゲストは買えない
+ *   7. 画面に axe(WCAG 2.1 AA)違反が無い
  */
 
 async function axeViolations(page: Page, label: string): Promise<void> {
@@ -96,4 +97,17 @@ test('外の情報: 警報を状況として登録・時刻表の案内・為替
   await page.goto(`/planner/${planId}/imports`);
   await expect(page.getByTestId('inbound-mail')).toContainText('管理者の設定が必要です');
   await axeViolations(page, '予約の取り込みの画面');
+
+  // 6. 料金・お支払い(決済の鍵なし → 案内して買えない。ゲストは API でも買えない)
+  await page.goto('/settings/billing');
+  await expect(page.getByRole('heading', { name: '料金・お支払い' })).toBeVisible();
+  await expect(page.getByText(/決済を使えません/)).toBeVisible();
+  await expect(page.getByRole('button', { name: '購読する' }).first()).toBeDisabled();
+  await axeViolations(page, '料金・お支払いの画面');
+  const products = await (await context.request.get(`${apiBase}/billing/products`, {
+    headers: { Authorization: `Bearer ${token}` } })).json();
+  expect(products.configured).toBe(false);
+  const buy = await context.request.post(`${apiBase}/billing/checkout`, {
+    headers: { Authorization: `Bearer ${token}` }, data: { product_id: products.products[0].id } });
+  expect([403, 409]).toContain(buy.status());
 });

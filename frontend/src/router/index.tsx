@@ -58,6 +58,8 @@ const BookletPage = lazyPage(() => import('@/pages/BookletPage'));
 const BookletPrintPage = lazyPage(() => import('@/pages/BookletPrintPage'));
 const ExportsPage = lazyPage(() => import('@/pages/ExportsPage'));
 const DataPrivacyPage = lazyPage(() => import('@/pages/DataPrivacyPage'));
+// [Gate Remaining-4] FR-058 料金・お支払い(Stripe のテストモード)
+const BillingPage = lazyPage(() => import('@/pages/BillingPage'));
 // [Gate G8] FR-039 訂正の申し出・UX-1 デザインの部品の一覧
 const CorrectionRequestsPage = lazyPage(() => import('@/pages/CorrectionRequestsPage'));
 const DesignCatalogPage = lazyPage(() => import('@/pages/DesignCatalogPage'));
@@ -552,6 +554,15 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DataPrivacyPage />
+          </ProtectedRoute>
+        ),
+      },
+      // 💳 [Gate Remaining-4] FR-058 料金・お支払い(会員のクラスの購読・Trip Pass。Stripe のテストモード)
+      {
+        path: 'settings/billing',
+        element: (
+          <ProtectedRoute>
+            <BillingPage />
           </ProtectedRoute>
         ),
       },

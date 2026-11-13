@@ -110,6 +110,7 @@ PLAN_TABLES = (
     m.ProviderUsageReservation, m.ProviderUsageEvent,
     m.TripConsultSession,
     m.InboundMailAddress,
+    m.BillingPayment,
 )
 
 
@@ -290,6 +291,8 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     # [Gate Remaining-3] 予約メールの転送アドレス(本人の分だけ。宛先の文字は含めない)
     t["inbound_mail_addresses"] = [row(x) for x in q(m.InboundMailAddress).filter(
         m.InboundMailAddress.user_id == me).all()]
+    # [Gate Remaining-4] この旅行の Trip Pass の支払い(本人の分だけ。カードの情報は元から持たない)
+    t["billing_payments"] = [row(x) for x in q(m.BillingPayment).filter(m.BillingPayment.user_id == me).all()]
     return t
 
 
