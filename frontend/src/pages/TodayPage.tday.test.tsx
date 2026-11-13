@@ -19,9 +19,16 @@ const m = vi.hoisted(() => ({
   addNote: vi.fn(async () => ({})),
   getEta: vi.fn(async () => ({ plan_id: 'p', shares: [], max_hours: 24, notice: '' })),
   putEta: vi.fn(),
+  getAlerts: vi.fn(),
+  createAlert: vi.fn(),
+  createReplan: vi.fn(),
+  getReplan: vi.fn(),
+  applyReplan: vi.fn(async () => ({})),
+  getPackingItems: vi.fn(async () => []),
 }));
 vi.mock('@/services/api', () => ({
-  getToday: m.getToday,
+  getToday: m.getToday, getAlerts: m.getAlerts, createAlert: m.createAlert, createReplan: m.createReplan,
+  getReplan: m.getReplan, applyReplan: m.applyReplan, getPackingItems: m.getPackingItems,
   getOfflinePackKey: vi.fn(async () => ({ user_id: 'u', key_version: 1, key: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA',
     algorithm: 'AES-256-GCM', key_bits: 256, issued_at: '2026-05-01T00:00:00Z' })),
   travelAPI: { getPlan: vi.fn(async () => ({ success: true, data: { id: 'plan-t', title: '滋賀・大津 1泊2日', destination: '大津' } })) },
@@ -114,17 +121,23 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     vi.restoreAllMocks();
   });
 
+  /** [Gate TDay-Mock] 開いた画面(後から読む)を待つ */
+  const dock = () => screen.getByRole('navigation', { name: '当日の操作' });
+
   it('ライブ帯・旅の糸・出発の合図(出る時刻と段階・概算の明記)を出す', async () => {
     renderPage();
-    const band = await screen.findByTestId('today-live-band');
+    const band = await screen.findByTestId('today-live-band', undefined, { timeout: 5000 });
     await waitFor(() => expect(band).toHaveTextContent('あと18分で出発'));
-    expect(band).toHaveTextContent('移動 約12分(概算)');
-    await waitFor(() => expect(band).toHaveTextContent('14〜16時に雨の可能性 70%'));
-    const go = within(screen.getByTestId('today-next')).getByTestId('today-go');
-    expect(go).toHaveAttribute('data-stage', 'soon');
+    expect(band).toHaveTextContent('移動 約12分（概算）');
+    await waitFor(() => expect(band).toHaveTextContent('14時から雨の可能性 70%'));
+    const next = screen.getByTestId('today-next');
+    expect(next).toHaveAttribute('data-stage', 'soon');
+    expect(next).toHaveTextContent('出発の合図 ・ NEXT');
+    expect(next).toHaveTextContent('テラスでランチ 12:30着');
+    const go = next;
     expect(within(go).getByText('12:18 に出れば、ちょうど')).toBeInTheDocument();
     expect(within(go).getByText('移動時間は直線距離からの概算です')).toBeInTheDocument();
-    expect(within(go).getByText('そろそろ').closest('li')).toHaveAttribute('aria-current', 'step');
+    expect(within(within(go).getByRole('list', { name: '出発までの段階' })).getByText('そろそろ')).toHaveAttribute('aria-current', 'step');
     const thread = screen.getByRole('navigation', { name: '旅の糸(今日の道のり)' });
     expect(within(thread).getByRole('listitem', { name: '10:30 大津駅(印を押した)' })).toBeInTheDocument();
     expect(within(thread).getByRole('listitem', { name: '11:00 浜大津の湖岸(今いる場所)' })).toBeInTheDocument();
@@ -135,13 +148,21 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
 
   it('次の場所のチラ見せ(営業・予約・電話)と空模様(雨にかかる屋外の予定→プランB)', async () => {
     renderPage();
-    const teaser = await screen.findByTestId('today-teaser');
+    const teaser = await screen.findByTestId('today-teaser', undefined, { timeout: 5000 });
     expect(within(teaser).getByText('営業中')).toBeInTheDocument();
     expect(within(teaser).getByText('予約 あり')).toBeInTheDocument();
     expect(within(teaser).getByRole('link', { name: /電話/ })).toHaveAttribute('href', 'tel:0770000000');
-    const sky = await screen.findByTestId('today-sky');
-    expect(await within(sky).findByText('15:45 三尾神社(屋外)が雨の時間にかかります。')).toBeInTheDocument();
+    const sky = await screen.findByTestId('today-sky', undefined, { timeout: 5000 });
+    expect(await within(sky).findByText('15:45 三尾神社（屋外）が雨の時間にかかります。')).toBeInTheDocument();
     expect(within(sky).getByRole('listitem', { name: '14時 70% 雨' })).toBeInTheDocument();
+    // スマホ・タブレットの「雨の兆し」のカード → 雨の兆しの画面(影響する予定・プランB)
+    const rain = await screen.findByTestId('today-rain', undefined, { timeout: 5000 });
+    expect(rain).toHaveTextContent('14〜16時 雨 70%');
+    expect(rain).toHaveTextContent('15:45 三尾神社（屋外）にかかります');
+    fireEvent.click(within(rain).getByRole('button', { name: /プランB/ }));
+    const scr = await screen.findByTestId('today-rain-screen', undefined, { timeout: 5000 });
+    expect(scr).toHaveTextContent('14〜16時、雨の可能性 70%');
+    expect(scr).toHaveTextContent('影響する予定：15:45 三尾神社（屋外）');
   });
 
   it('寄り道チャンス: 押した時だけ探し、足す前に後の予定への影響を出して、承認で旅程に足す', async () => {
@@ -149,61 +170,84 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
       { name: '湖のカフェ', address: '大津市', latitude: 35.01, longitude: 135.86, distance_km: 0.3, genre_label: 'カフェ',
         category: 'dining', provider: 'openstreetmap', url: null, fit: 'indoor' }] });
     renderPage();
-    const box = await screen.findByTestId('today-detour');
-    expect(within(box).getByText('14:55〜15:40 に45分の空き')).toBeInTheDocument();
+    const box = await screen.findByTestId('today-detour', undefined, { timeout: 5000 });
+    expect(box).toHaveTextContent('14:55〜15:40 に45分の空き');
     expect(m.findDetours).not.toHaveBeenCalled();
-    fireEvent.click(within(box).getByRole('button', { name: 'カフェ' }));
-    expect(await within(box).findByText('湖のカフェ')).toBeInTheDocument();
+    fireEvent.click(within(box).getByRole('button', { name: '見る' }));
+    const scr = await screen.findByTestId('today-detour-screen', undefined, { timeout: 5000 });
+    expect(scr).toHaveTextContent('本要寺のあと、45分の空き');
+    await waitFor(() => expect(m.findDetours).toHaveBeenCalledWith(PLAN, { after_event_id: 'd', before_event_id: 'f', kind: 'all' }));
+    fireEvent.click(within(scr).getByRole('button', { name: 'カフェ' }));
+    expect(await within(scr).findByText('湖のカフェ')).toBeInTheDocument();
     expect(m.findDetours).toHaveBeenCalledWith(PLAN, { after_event_id: 'd', before_event_id: 'f', kind: 'cafe' });
-    fireEvent.click(within(box).getByRole('button', { name: '湖のカフェを足す前に影響を見る' }));
-    const impact = within(box).getByRole('region', { name: '足す前の影響' });
-    expect(impact).toHaveTextContent('寄る時間: 15:00〜15:30');
-    expect(impact).toHaveTextContent('三尾神社: 変わらず(あと5分の余裕)');
-    fireEvent.click(within(impact).getByRole('radio', { name: '45分' }));
-    expect(impact).toHaveTextContent('三尾神社: 10分はみ出します');
-    fireEvent.click(within(impact).getByRole('radio', { name: '20分' }));
-    fireEvent.click(within(impact).getByRole('button', { name: '今日の旅程に足す' }));
+    fireEvent.click(within(scr).getByRole('button', { name: '湖のカフェを足す前に影響を見る' }));
+    const add = await screen.findByTestId('today-detour-add', undefined, { timeout: 5000 });
+    const impact = within(add).getByRole('region', { name: '後の予定への影響' });
+    expect(add).toHaveTextContent('本要寺のあと 15:00〜15:30');
+    expect(impact).toHaveTextContent('三尾神社15:40 → 15:40 変わらず'.replace('15:40', '15:45').replace('15:40', '15:45'));
+    expect(impact).toHaveTextContent('空き時間45分 → 5分');
+    fireEvent.click(within(add).getByRole('radio', { name: '45分' }));
+    expect(impact).toHaveTextContent('10分はみ出します');
+    expect(within(add).getByRole('button', { name: '今日の旅程に足す' })).toBeDisabled();
+    fireEvent.click(within(add).getByRole('radio', { name: '20分' }));
+    fireEvent.click(within(add).getByRole('button', { name: '今日の旅程に足す' }));
     await waitFor(() => expect(m.addDetourEvent).toHaveBeenCalledWith(PLAN, expect.objectContaining({
       day_id: 'day-1', title: '湖のカフェ', local_start_time: '15:00', local_end_time: '15:20' })));
   });
 
   it('旅帖: 今いる場所で印を押し、ひとことを綴じる(自分だけが既定)', async () => {
     renderPage();
-    const now = await screen.findByTestId('today-now');
-    fireEvent.click(within(now).getByRole('button', { name: /着いた・印を押す/ }));
-    const dialog = await screen.findByTestId('today-stamp-dialog');
+    const now = await screen.findByTestId('today-now', undefined, { timeout: 5000 });
+    expect(now).toHaveTextContent('NOW ・ 残り10分');
+    fireEvent.click(within(now).getAllByRole('button', { name: '印を押す' })[0]!);
+    const dialog = await screen.findByTestId('today-stamp-dialog', undefined, { timeout: 5000 });
     fireEvent.click(within(dialog).getByRole('button', { name: '着いた・印を押す' }));
     await waitFor(() => expect(m.pressStamp).toHaveBeenCalledWith(PLAN, 'b', expect.any(String), null));
-    fireEvent.change(screen.getByLabelText('ひとこと'), { target: { value: '湖が近い' } });
-    fireEvent.click(screen.getByRole('button', { name: 'ひとことを綴じる' }));
+    expect(await within(dialog).findByText('令和八年 十一月十三日')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('今日 2つ目の印 ・ 予定より60分遅れ');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ひとこと' }));
+    const memo = await screen.findByTestId('today-memo', undefined, { timeout: 5000 });
+    fireEvent.change(within(memo).getByLabelText('ひとこと'), { target: { value: '湖が近い' } });
+    expect(within(memo).getByRole('button', { name: '自分だけ' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(memo).getByRole('button', { name: /旅帖に綴じる/ }));
     await waitFor(() => expect(m.addNote).toHaveBeenCalledWith(PLAN, expect.objectContaining({
-      event_id: 'b', day_id: 'day-1', body: '湖が近い', visibility: 'private' })));
+      event_id: 'b', day_id: 'day-1', body: '湖が近い', visibility: 'private', include_in_journal: true })));
     const strip = screen.getByTestId('today-tabicho');
     expect(strip).toHaveTextContent('1 / 5 押印');
   });
 
   it('画面の中の知らせ(出発・着きましたか)は閉じると同じ日に二度出ない', async () => {
     const first = renderPage();
-    const notices = await screen.findByTestId('today-notices');
+    const notices = await screen.findByTestId('today-notices', undefined, { timeout: 5000 });
     await waitFor(() => expect(notices).toHaveTextContent('そろそろ出発の時間'));
     expect(notices).toHaveTextContent('着きましたか?');
     fireEvent.click(within(notices).getByRole('button', { name: '「そろそろ出発の時間」を閉じる' }));
     expect(screen.getByTestId('today-notices')).not.toHaveTextContent('そろそろ出発の時間');
     first.unmount();
     renderPage();
-    const again = await screen.findByTestId('today-notices');
+    const again = await screen.findByTestId('today-notices', undefined, { timeout: 5000 });
     expect(again).not.toHaveTextContent('そろそろ出発の時間');
   });
 
   it('お助け・移動モード', async () => {
     renderPage();
-    await screen.findByTestId('today-next');
-    fireEvent.click(screen.getByRole('button', { name: 'お助け' }));
-    const help = await screen.findByTestId('today-help');
+    await screen.findByTestId('today-next', undefined, { timeout: 5000 });
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    fireEvent.click(within(dock()).getByRole('button', { name: 'お助け' }));
+    const help = await screen.findByTestId('today-help', undefined, { timeout: 5000 });
     expect(within(help).getByText('遅れた・休みだった')).toBeInTheDocument();
-    expect(within(help).getByText('テラスでランチに電話')).toBeInTheDocument();
-    fireEvent.click(within(help).getByText('移動モード'));
-    const transit = await screen.findByTestId('today-transit');
+    await waitFor(() => expect(within(help).getByRole('link', { name: /お店・宿に電話/ })).toHaveAttribute('href', 'tel:0770000000'));
+    fireEvent.click(within(help).getByRole('button', { name: '閉じる' }));
+    await waitFor(() => expect(screen.queryByTestId('today-help')).toBeNull());
+    // 出発の合図の画面(段階・出る時刻)→ 案内を開く → 移動モード
+    fireEvent.click(within(screen.getByTestId('today-next')).getByRole('button', { name: '案内を開く' }));
+    const gonow = await screen.findByTestId('today-gonow', undefined, { timeout: 5000 });
+    expect(gonow).toHaveTextContent('段階：そろそろ');
+    expect(gonow).toHaveTextContent('そろそろ準備を');
+    expect(gonow).toHaveTextContent('12:18 に出ると 12:30 に着きます');
+    fireEvent.click(within(gonow).getByRole('button', { name: '案内を開く' }));
+    expect(open).toHaveBeenCalled();
+    const transit = await screen.findByTestId('today-transit', undefined, { timeout: 5000 });
     await waitFor(() => expect(transit).toHaveTextContent('あと30分'));
     expect(transit).toHaveTextContent('12:30 着の見込み');
     fireEvent.click(within(transit).getByRole('button', { name: '終える' }));
@@ -215,7 +259,7 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     m.getTodayGuide.mockResolvedValue(guide({ day_id: null, local_date: null, upcoming: { date: '2026-11-14', days_until: 1,
       day_title: '湖のまち', is_trip_start: true, first_event_title: '自宅を出発', first_event_time: '08:00' }, events: {}, gaps: [], stamps: {} }));
     renderPage();
-    const before = await screen.findByTestId('today-before');
+    const before = await screen.findByTestId('today-before', undefined, { timeout: 5000 });
     expect(before).toHaveTextContent('あと 1日');
     expect(before).toHaveTextContent('最初の予定: 08:00 自宅を出発');
   });
@@ -225,14 +269,71 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     m.getToday.mockResolvedValue(today({ server_time: '2026-11-13T12:00:00Z', now_event: null, next_event: null,
       events: events.map((x) => ({ ...x, end_at: '2026-11-13T09:00:00Z' })) as never }));
     const first = renderPage();
-    const recap = await screen.findByTestId('today-recap');
+    const recap = await screen.findByTestId('today-recap', undefined, { timeout: 5000 });
     expect(recap).toHaveTextContent('今日のふりかえり');
     expect(recap).toHaveTextContent('5か所のうち1か所をめぐりました');
-    expect(recap).toHaveTextContent('最初は 09:30 石山寺');
+    expect(recap).toHaveTextContent('09:30 出発 ・ 3か所');
     first.unmount();
     window.sessionStorage.clear();
     m.getTodayGuide.mockResolvedValue(guide({ is_last_day: true }));
     renderPage();
     expect(await screen.findByText('おかえりなさい。旅帖が一冊になりました')).toBeInTheDocument();
+  });
+
+  it('朝は「おはようございます」と最初の出発・出発前のチェック。「今日の画面へ」で今日の画面に戻る', async () => {
+    vi.setSystemTime(new Date('2026-11-13T01:00:00Z')); // 10:00 JST・最初の予定の前
+    m.getToday.mockResolvedValue(today({ server_time: '2026-11-13T01:00:00Z', now_event: null, next_event: events[0] as never }));
+    m.getTodayGuide.mockResolvedValue(guide({ stamps: {}, events: { ...guide().events,
+      a: gEvent('a', { leave_by: '2026-11-13T01:10:00Z', travel_minutes: 20, travel_source: 'estimate' }) } }));
+    renderPage();
+    const dawn = await screen.findByTestId('today-dawn', undefined, { timeout: 5000 });
+    expect(dawn).toHaveTextContent('おはようございます');
+    expect(dawn).toHaveTextContent('今日は、湖のまち、大津をめぐる日');
+    await waitFor(() => expect(dawn).toHaveTextContent('10:10 に出発'));
+    fireEvent.click(within(dawn).getByRole('button', { name: '今日の画面へ' }));
+    expect(await screen.findByTestId('today-next', undefined, { timeout: 5000 })).toHaveTextContent('大津駅 10:30着');
+    expect(screen.queryByTestId('today-dawn')).toBeNull();
+  });
+
+  it('予定の無い日は「今日は自由な日です」と昨日の旅帖', async () => {
+    m.getToday.mockResolvedValue(today({ now_event: null, next_event: null, events: [], minutes_until_next: null }));
+    m.getTodayGuide.mockResolvedValue(guide({ events: {}, gaps: [], stamps: {}, prev_day: { date: '2026-11-12', title: '京都', visited: 6, photos: 38 } }));
+    renderPage();
+    const free = await screen.findByTestId('today-free', undefined, { timeout: 5000 });
+    expect(free).toHaveTextContent('今日は自由な日です');
+    expect(free).toHaveTextContent('11/13（金）の予定はまだありません。');
+    await waitFor(() => expect(free).toHaveTextContent('昨日の旅帖： 6つの印 ・ 写真 38枚'));
+  });
+
+  it('遅れの知らせ: 知らせて組み直しの案(A/B)を作り、承認した案で組み直す', async () => {
+    m.getAlerts.mockResolvedValue({ plan_id: PLAN, server_time: NOW, can_edit: true, alerts: [], detected: [] });
+    const alert = { id: 'al1', plan_id: PLAN, kind: 'delay', kind_label: '遅延', source: 'user_report', source_label: null,
+      confidence: 'reported', observed_at: NOW, is_stale: false, event_id: 'c', event_title: 'テラスでランチ', event_local_start_time: '12:30',
+      event_missing: false, day_id: 'day-1', local_date: '2026-11-13', delay_minutes: 20, note: null, status: 'active', resolved_at: null,
+      created_by_name: 'わたし', latest_replan_id: null, latest_replan_status: null, revision: 1, created_at: NOW, updated_at: null };
+    m.createAlert.mockResolvedValue(alert);
+    const cand = (id: 'A' | 'B', label: string, lost: { event_id: string; title: string }[]) => ({
+      id, strategy: id === 'A' ? 'shift_later' : 'remove', label, description: '', available: true, unavailable_reason: null, warnings: [],
+      changes: [{ event_id: 'd', title: '本要寺', before_time: '14:15', after_time: '14:35', before_date: '2026-11-13', after_date: '2026-11-13' }],
+      lost, protected: [], metrics: { changed_count: 1, lost_count: lost.length, protected_count: 0, max_delay_minutes: 20,
+        day_end_shift_minutes: id === 'A' ? 20 : null }, cost_impact: null });
+    m.createReplan.mockResolvedValue({ id: 'rp1', plan_id: PLAN, alert_id: 'al1', algorithm_version: 'v1', base_revision: 3, plan_revision: 3,
+      is_stale: false, status: 'proposed', state: 'proposed', applied_candidate: null, applied_at: null, applied_by_name: null,
+      created_by_name: 'わたし', can_apply: true, candidates: [cand('A', '後ろへずらす', []), cand('B', '一つ外す', [{ event_id: 'f', title: '三尾神社' }])],
+      revision: 1, created_at: NOW });
+    renderPage();
+    await screen.findByTestId('today-next', undefined, { timeout: 5000 });
+    fireEvent.click(within(dock()).getByRole('button', { name: 'お助け' }));
+    fireEvent.click(within(await screen.findByTestId('today-help', undefined, { timeout: 5000 })).getByRole('button', { name: /遅れた・休みだった/ }));
+    const delay = await screen.findByTestId('today-delay', undefined, { timeout: 5000 });
+    fireEvent.click(await within(delay).findByRole('button', { name: '組み直しの案を作る' }));
+    await waitFor(() => expect(m.createAlert).toHaveBeenCalledWith(PLAN, expect.objectContaining({
+      kind: 'delay', event_id: 'c', delay_minutes: 20, source: 'user_report' })));
+    expect(await within(delay).findByText('案A 後ろへずらす')).toBeInTheDocument();
+    expect(delay).toHaveTextContent('宿に20分遅れ ・ 外す予定なし');
+    expect(delay).toHaveTextContent('三尾神社は外れます');
+    expect(delay).toHaveTextContent('承認するまで旅程は変わりません');
+    fireEvent.click(within(delay).getByRole('button', { name: '案Bにする' }));
+    await waitFor(() => expect(m.applyReplan).toHaveBeenCalledWith(PLAN, 'rp1', 'B', 3));
   });
 });

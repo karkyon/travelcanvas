@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.models.models import EventActual, Memory, Place, TravelDay, TravelEvent, TravelSegment, User
 from app.services import eta_share, feasibility, hours_check, today_guide, today_mode
 from app.services import movement as mv
+from app.services import weather_fit as wf
 
 router = APIRouter(prefix="/plans", tags=["today-live"])
 
@@ -73,6 +74,96 @@ def _estimated_ends(db: Session, plan, event_ids: List[uuid.UUID]) -> Dict[uuid.
     return out
 
 
+def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _visible_memories(db: Session, plan, user):
+    return (db.query(Memory).filter(Memory.plan_id == plan.id)
+            .filter((Memory.author_user_id == user.id) | (Memory.visibility == "members")))
+
+
+def _day_summary(db: Session, plan, day: TravelDay, user) -> Dict[str, Any]:
+    """[Gate TDay-Mock] 前の日の旅帖(予定が無い日に出す): 印の数・写真の数"""
+    ev_ids = [e.id for e in db.query(TravelEvent.id).filter(TravelEvent.day_id == day.id).all()]
+    visited = db.query(EventActual).filter(EventActual.plan_id == plan.id, EventActual.event_id.in_(ev_ids),
+                                           EventActual.status == "visited").count() if ev_ids else 0
+    photos = _visible_memories(db, plan, user).filter(Memory.event_id.in_(ev_ids), Memory.kind == "photo").count() \
+        if ev_ids else 0
+    return {"date": day.local_date.isoformat(), "title": day.title, "visited": visited, "photos": photos}
+
+
+def _trip_summary(db: Session, plan, user) -> Dict[str, Any]:
+    """[Gate TDay-Mock] 旅の最終日: 旅全体の旅帖(印・写真・ひとこと・日数)"""
+    days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()
+    order = {d.id: (d.local_date, d) for d in days}
+    visited = {a.event_id for a in db.query(EventActual).filter(
+        EventActual.plan_id == plan.id, EventActual.status == "visited").all()}
+    evs = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id, TravelEvent.parent_event_id.is_(None)).all()
+
+    def key(e):
+        d = order.get(e.day_id)
+        return (d[0] if d else datetime.max.date(), e.sort_order or 0)
+    stamps = [{"event_id": str(e.id), "title": e.title, "event_type": e.event_type}
+              for e in sorted(evs, key=key) if e.id in visited]
+    missed = [{"event_id": str(e.id), "title": e.title} for e in sorted(evs, key=key)
+              if e.id not in visited and e.event_type not in ("transport", "accommodation")]
+    mem = _visible_memories(db, plan, user)
+    return {"days": len({d.local_date for d in days}), "stamps": stamps[:40], "stamp_count": len(stamps),
+            "photos": mem.filter(Memory.kind == "photo").count(),
+            "notes": mem.filter(Memory.kind.in_(("note", "audio"))).count(), "missed": missed[:5]}
+
+
+def _bookings(db: Session, plan, ids: List[uuid.UUID], hidden) -> Dict[str, Any]:
+    """[Gate TDay-Mock] 今日の予定の予約(予約済み・要確認)。予約を隠すメンバーには出さない"""
+    if not ids or "reservations" in hidden:
+        return {}
+    from app.services import booking_status as bs
+
+    allb = bs.booking_status(db, plan)["events"]
+    out = {}
+    for i in ids:
+        b = allb.get(str(i))
+        if b and b["state"] in ("booked", "issue"):
+            out[str(i)] = {"state": b["state"], "issues": b["issues"], "reservations": b["reservations"]}
+    return out
+
+
+def _lodging(db: Session, plan, today_events, events_out: Dict[str, Any], bookings: Dict[str, Any],
+             hidden) -> Optional[Dict[str, Any]]:
+    """[Gate TDay-Mock] 今日の宿(宿の到着ガイド・宿へ帰る)。宿の予定が無ければ None"""
+    from app.models.models import Reservation
+
+    acc = [t for t in today_events if t.event.event_type == "accommodation"]
+    if not acc:
+        return None
+    t = acc[-1]
+    e = t.event
+    hide_place = "event_address" in hidden
+    b = bookings.get(str(e.id))
+    res = next((r for r in (b["reservations"] if b else []) if r["type"] == "accommodation"), None)
+    notes = None
+    nights = None
+    if res is not None:
+        row = db.query(Reservation).filter(Reservation.id == uuid.UUID(res["id"])).first()
+        if row is not None:
+            notes = (row.notes or None) if "reservations" not in hidden else None
+            if row.start_at and row.end_at:
+                nights = max(0, (row.end_at.date() - row.start_at.date()).days) or None
+    g = events_out.get(str(e.id), {})
+    return {
+        "event_id": str(e.id), "title": e.title, "start_at": _iso(t.start),
+        "address": None if hide_place else e.address, "phone": None if hide_place else e.phone,
+        "latitude": None if hide_place or e.latitude is None else float(e.latitude),
+        "longitude": None if hide_place or e.longitude is None else float(e.longitude),
+        "check_in": res["start"][11:16] if res and res.get("start") else None,
+        "booking": b["state"] if b else None, "guest_count": res.get("guest_count") if res else None,
+        "nights": nights, "notes": notes, "memo": g.get("memo"), "entrance_note": g.get("entrance_note"),
+    }
+
+
 def _incoming_segments(db: Session, plan, event_ids: List[uuid.UUID]) -> Dict[uuid.UUID, TravelSegment]:
     """予定へ向かう区間(取り消し・控えの案の区間は除く。経路を採用した区間を優先)"""
     if not event_ids:
@@ -110,9 +201,11 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
         if future:
             f = future[0]
             local_today = now.astimezone(today_mode.zone_for(f.timezone_id)).date()
-            first = next((e for e in sorted(f.events, key=lambda e: e.sort_order)
-                          if today_mode.effective_start(e, f)[0] is not None), None)
+            timed_f = [e for e in sorted(f.events, key=lambda e: e.sort_order)
+                       if today_mode.effective_start(e, f)[0] is not None]
+            first = timed_f[0] if timed_f else None
             upcoming = {"date": f.local_date.isoformat(), "days_until": (f.local_date - local_today).days,
+                        "event_count": len(timed_f),
                         "day_title": f.title, "is_trip_start": f.local_date == dates[0],
                         "first_event_title": first.title if first is not None else None,
                         "first_event_time": (first.local_start_time or None) if first is not None else None}
@@ -128,9 +221,13 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
         "is_last_day": bool(sel.today_date and dates and sel.today_date == dates[-1]),
         "upcoming": upcoming, "next_day": None, "min_gap_minutes": today_guide.MIN_GAP_MINUTES,
         "events": {}, "gaps": [], "stamps": {}, "metrics": {"visited": 0, "total": 0, "photos": 0, "notes": 0},
+        "bookings": {}, "lodging": None, "day_photos": [], "trip": None, "prev_day": None,
     }
     if day is None:
         return base
+    earlier = sorted((d for d in days if d.local_date < day.local_date), key=lambda d: d.local_date)
+    if earlier:
+        base["prev_day"] = _day_summary(db, plan, earlier[-1], current_user)
     later = sorted((d for d in days if d.local_date > day.local_date), key=lambda d: d.local_date)
     if later:
         n = later[0]
@@ -151,6 +248,11 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
     hours = _hours(db, plan, day, hidden)
 
     segs = _incoming_segments(db, plan, [t.event.id for t in today_events])
+    # [Gate TDay-Mock] 次の場所の詳しい情報(入口・目印・場所のメモ・自分のメモ)
+    place_ids = [t.event.place_id for t in today_events if t.event.place_id is not None]
+    places = ({p.id: p for p in db.query(Place).filter(Place.id.in_(place_ids)).all()}
+              if place_ids and not hide_place else {})
+    hide_notes = "event_notes" in hidden
 
     events_out: Dict[str, Any] = {}
     slots: List[today_guide.Slot] = []
@@ -193,6 +295,10 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
             "segment_departure_at": _iso(seg.planned_departure_at) if seg is not None else None,
             "fit": wf.fit(e.title, e.event_type, e.description)["fit"],
             "hours": hours.get(str(e.id)),
+            "entrance_note": (places[e.place_id].entrance_note or None) if e.place_id in places else None,
+            "place_note": (places[e.place_id].note or None) if e.place_id in places else None,
+            "memo": None if hide_notes else (e.description or None),
+            "photo_ids": [], "note_text": None, "audio_count": 0,
         }
         if e.latitude is not None and e.longitude is not None:
             prev = e
@@ -200,24 +306,41 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
     ids = [t.event.id for t in today_events]
     actuals = {a.event_id: a for a in db.query(EventActual).filter(
         EventActual.plan_id == plan.id, EventActual.event_id.in_(ids)).all()} if ids else {}
-    mems = (db.query(Memory.event_id, Memory.kind)
+    mems = (db.query(Memory.id, Memory.event_id, Memory.kind, Memory.body, Memory.occurred_at, Memory.created_at)
             .filter(Memory.plan_id == plan.id, Memory.event_id.in_(ids))
             .filter((Memory.author_user_id == current_user.id) | (Memory.visibility == "members")).all()) if ids else []
     counts: Dict[uuid.UUID, Dict[str, int]] = {}
-    for eid, kind in mems:
-        c = counts.setdefault(eid, {"memories": 0, "photos": 0})
+    day_photos: List[Dict[str, Any]] = []
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    for m in sorted(mems, key=lambda m: _aware(m.occurred_at) or _aware(m.created_at) or epoch):
+        c = counts.setdefault(m.event_id, {"memories": 0, "photos": 0})
         c["memories"] += 1
-        c["photos"] += 1 if kind == "photo" else 0
+        out_e = events_out.get(str(m.event_id))
+        if m.kind == "photo":
+            c["photos"] += 1
+            day_photos.append({"id": str(m.id), "event_id": str(m.event_id),
+                               "at": _iso(_aware(m.occurred_at) or _aware(m.created_at))})
+            if out_e is not None and len(out_e["photo_ids"]) < 6:
+                out_e["photo_ids"].append(str(m.id))
+        elif m.kind == "audio" and out_e is not None:
+            out_e["audio_count"] += 1
+        elif m.kind == "note" and out_e is not None and m.body:
+            out_e["note_text"] = m.body[:120]
     stamps: Dict[str, Any] = {}
     for eid in ids:
         a = actuals.get(eid)
         c = counts.get(eid, {"memories": 0, "photos": 0})
         stamps[str(eid)] = {"status": a.status if a else None, "revision": a.revision if a else None,
                             "actual_start_at": _iso(a.actual_start_at) if a else None,
+                            "actual_end_at": _iso(a.actual_end_at) if a else None,
                             "memory_count": c["memories"], "photo_count": c["photos"]}
 
     gaps = today_guide.gaps(slots, now)
-    return {**base, "events": events_out, "stamps": stamps,
+    bookings = _bookings(db, plan, ids, hidden)
+    return {**base, "events": events_out, "stamps": stamps, "bookings": bookings,
+            "lodging": _lodging(db, plan, today_events, events_out, bookings, hidden),
+            "day_photos": day_photos[-60:],
+            "trip": _trip_summary(db, plan, current_user) if base["is_last_day"] else None,
             "gaps": [{**g, "start_at": _iso(g["start_at"]), "end_at": _iso(g["end_at"])} for g in gaps],
             "metrics": {"visited": sum(1 for a in actuals.values() if a.status == "visited"), "total": len(ids),
                         "photos": sum(c["photos"] for c in counts.values()),
@@ -239,6 +362,30 @@ class DetourIn(BaseModel):
     after_event_id: Optional[uuid.UUID] = None
     before_event_id: Optional[uuid.UUID] = None
     kind: Literal["all", "cafe", "sweets", "indoor", "surprise"] = "all"
+
+
+def _wishlist_detours(db: Session, plan, points: List[tuple], already: set) -> List[Dict[str, Any]]:
+    """[Gate TDay-Mock] 行きたい場所リスト(候補箱)のうち、前後の予定から近い物(位置のある・旅程に入れていない物)"""
+    from app.models.models import PlanCandidate
+    from app.services import route_estimator as re_
+
+    out = []
+    rows = db.query(PlanCandidate).filter(PlanCandidate.plan_id == plan.id, PlanCandidate.status == "open",
+                                          PlanCandidate.latitude.isnot(None), PlanCandidate.longitude.isnot(None)).all()
+    for c in rows:
+        if c.title in already or c.latitude is None or c.longitude is None:
+            continue
+        lat, lng = float(c.latitude), float(c.longitude)
+        d = min(re_.haversine_km(lat, lng, p[0], p[1]) for p in points)
+        if d > DETOUR_MAX_KM:
+            continue
+        out.append({"name": c.title, "address": c.address,
+                    "latitude": lat, "longitude": lng,
+                    "distance_km": round(d, 2), "genre_label": "行きたい場所リストから", "category": c.category,
+                    "provider": "wishlist", "url": None,
+                    "fit": wf.fit(c.title, c.category, c.note)["fit"]})
+    out.sort(key=lambda r: r["distance_km"])
+    return out[:2]
 
 
 @router.post("/{plan_id}/today/detours")
@@ -267,11 +414,12 @@ async def today_detours(plan_id: str, body: DetourIn, db: Session = Depends(get_
     res = await pf.find(db, plan, word, genre, "route" if len(points) >= 2 else "area", record, points=points)
     db.commit()
     already = {t for (t,) in db.query(TravelEvent.title).filter(TravelEvent.plan_id == plan.id).all()}
-    rows = []
+    rows = _wishlist_detours(db, plan, points, already) if body.kind in ("all", "surprise") else []
     for c in res.get("candidates", []):
         name = c.get("name") or ""
         d = c.get("distance_km")
-        if not name or name in already or (d is not None and d > DETOUR_MAX_KM):
+        if not name or name in already or any(r["name"] == name for r in rows) or \
+                (d is not None and d > DETOUR_MAX_KM):
             continue
         f = wf.fit(name, c.get("category"), None, c.get("genre"))["fit"]
         if body.kind == "indoor" and f == "outdoor":

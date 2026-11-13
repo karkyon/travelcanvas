@@ -116,7 +116,7 @@ def test_guide_before_trip_returns_days_until(auth_client, freeze_now):
     g = _guide(client, plan_id)
     assert g["day_id"] is None and g["events"] == {} and g["day_count"] == 2
     assert g["upcoming"] == {"date": "2026-11-13", "days_until": 1, "day_title": "湖のまち", "is_trip_start": True,
-                             "first_event_title": "自宅を出発", "first_event_time": "08:00"}
+                             "first_event_title": "自宅を出発", "first_event_time": "08:00", "event_count": 1}
 
 
 def test_guide_estimates_leave_by_from_previous_place(auth_client, freeze_now):
@@ -193,6 +193,67 @@ def test_guide_requires_access(auth_client, make_user):
     _as(stranger)
     r = client.get(f"/api/v1/plans/{plan_id}/today/guide")
     assert r.status_code in (403, 404)
+
+
+def test_guide_mock_fields_lodging_prev_day_trip_and_notes(auth_client, freeze_now):
+    """[Gate TDay-Mock] 宿・前の日の旅帖・旅全体(最終日)・場所のメモ・ひとこと・今日の写真の欄"""
+    client, _ = auth_client
+    plan_id = _plan(client)
+    d1 = _day(client, plan_id, "2026-11-12", title="京都")
+    d2 = _day(client, plan_id, "2026-11-13", title="湖のまち")
+    k = _event(client, plan_id, d1, "清水寺", local_start_time="10:00")
+    a = _event(client, plan_id, d2, "浜大津の湖岸", local_start_time="11:00", description="湖を見ながら歩く")
+    miss = _event(client, plan_id, d2, "三尾神社", local_start_time="15:45")
+    hotel = _event(client, plan_id, d2, "琵琶湖ホテル", local_start_time="17:30", event_type="accommodation",
+                   address="大津市浜町", latitude=35.0042, longitude=135.8732, phone="077-524-7111")
+    freeze_now(_utc(2026, 11, 12, 2, 0))
+    assert client.put(f"/api/v1/plans/{plan_id}/journey/events/{k}",
+                      json={"status": "visited", "actual_start_at": "2026-11-12T01:05:00+00:00"}).status_code == 200
+    freeze_now(_utc(2026, 11, 13, 3, 0))  # 11/13 12:00 JST(最終日)
+    assert client.put(f"/api/v1/plans/{plan_id}/journey/events/{a}",
+                      json={"status": "visited", "actual_start_at": "2026-11-13T02:01:00+00:00"}).status_code == 200
+    mem = client.post(f"/api/v1/plans/{plan_id}/memories", json={"kind": "note", "body": "思ったより湖が近い", "event_id": a})
+    assert mem.status_code == 201, mem.text
+    g = _guide(client, plan_id)
+    assert g["is_last_day"] is True and g["day_index"] == 2
+    ea = g["events"][a]
+    assert ea["memo"] == "湖を見ながら歩く" and ea["note_text"] == "思ったより湖が近い"
+    assert ea["photo_ids"] == [] and ea["audio_count"] == 0
+    lod = g["lodging"]
+    assert lod["event_id"] == hotel and lod["title"] == "琵琶湖ホテル" and lod["phone"] == "077-524-7111"
+    assert lod["address"] == "大津市浜町" and lod["latitude"] == pytest.approx(35.0042) and lod["booking"] is None
+    assert _parse(lod["start_at"]) == _utc(2026, 11, 13, 8, 30)
+    assert g["prev_day"] == {"date": "2026-11-12", "title": "京都", "visited": 1, "photos": 0}
+    trip = g["trip"]
+    assert trip["days"] == 2 and trip["stamp_count"] == 2 and trip["notes"] == 1
+    assert {s["event_id"] for s in trip["stamps"]} == {k, a}
+    assert {m["event_id"] for m in trip["missed"]} >= {miss}
+    assert g["bookings"] == {} and g["day_photos"] == []
+
+
+def test_detours_include_nearby_wishlist(auth_client, monkeypatch):
+    """[Gate TDay-Mock] 寄り道の候補に、行きたい場所リストの近い場所(位置のある・旅程に無い物)を先に出す"""
+    client, _ = auth_client
+    plan_id = _plan(client)
+    d1 = _day(client, plan_id, "2026-11-13")
+    a = _event(client, plan_id, d1, "本要寺", local_start_time="14:15", latitude=35.01, longitude=135.86)
+    b = _event(client, plan_id, d1, "三尾神社", local_start_time="15:45", latitude=35.02, longitude=135.87)
+    for title, lat, lng in (("湖畔の甘味処", 35.012, 135.862), ("遠くの美術館", 35.3, 136.2)):
+        r = client.post(f"/api/v1/plans/{plan_id}/candidates", json={"title": title, "latitude": lat, "longitude": lng})
+        assert r.status_code == 201, r.text
+
+    async def fake_find(db, plan, query, genre, scope, record, points=None):
+        return {"candidates": [{"name": "湖のカフェ", "latitude": 35.015, "longitude": 135.865, "distance_km": 0.3,
+                                "providers": ["openstreetmap"]}], "region": None, "sources": [], "failed_providers": []}
+
+    monkeypatch.setattr(pf, "find", fake_find)
+    r = client.post(f"/api/v1/plans/{plan_id}/today/detours",
+                    json={"after_event_id": a, "before_event_id": b, "kind": "all"})
+    assert r.status_code == 200, r.text
+    names = [c["name"] for c in r.json()["candidates"]]
+    assert names[0] == "湖畔の甘味処" and "遠くの美術館" not in names and "湖のカフェ" in names
+    w = r.json()["candidates"][0]
+    assert w["provider"] == "wishlist" and w["genre_label"] == "行きたい場所リストから"
 
 
 # ---- POST /today/detours ---------------------------------------------------------------------------------------
