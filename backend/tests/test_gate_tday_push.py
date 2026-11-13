@@ -271,10 +271,14 @@ def test_morning_message_once_a_day():
 
 def test_crew_delay_notifies_other_members(auth_client, make_user, db_session, freeze_now, outbox, monkeypatch):
     client, owner = auth_client
-    freeze_now(datetime(2026, 11, 13, 1, 0, tzinfo=timezone.utc))
+    # 共有の期限は実際の時計で切れる(eta_share)ため、固定の日時ではなく今の時刻を基準にする
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    freeze_now(now)
+    start = now + timedelta(hours=1)
+    local = start.astimezone(today_mode.zone_for("Asia/Tokyo"))
     plan_id = _plan(client)
-    d1 = _day(client, plan_id, "2026-11-13")
-    e = _event(client, plan_id, d1, "テラス", local_start_time="11:00")
+    d1 = _day(client, plan_id, local.strftime("%Y-%m-%d"))
+    e = _event(client, plan_id, d1, "テラス", local_start_time=local.strftime("%H:%M"))
     friend, _ = make_user()
     db_session.add(PlanCollaborator(plan_id=uuid.UUID(plan_id), user_id=friend.id, email=friend.email, role="viewer",
                                     status="accepted"))
@@ -284,18 +288,19 @@ def test_crew_delay_notifies_other_members(auth_client, make_user, db_session, f
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=owner, is_authenticated=True, is_guest=False)
     _subscribe(client, FCM + "owner")
     monkeypatch.setattr(today_push, "session_factory", lambda: db_session)
-    now = today_mode.utcnow()
     body = {"event_id": e, "until": (now + timedelta(hours=4)).isoformat()}
     ok = client.put(f"/api/v1/plans/{plan_id}/today/eta",
-                    json={**body, "arrive_at": "2026-11-13T02:05:00+00:00"})  # 11:05(5分遅れ)は送らない
+                    json={**body, "arrive_at": (start + timedelta(minutes=5)).isoformat()})  # 5分遅れは送らない
     assert ok.status_code == 200 and outbox.items == []
     late = client.put(f"/api/v1/plans/{plan_id}/today/eta",
-                      json={**body, "arrive_at": "2026-11-13T02:25:00+00:00"})  # 11:25(25分遅れ)
-    assert late.status_code == 200
+                      json={**body, "arrive_at": (start + timedelta(minutes=25)).isoformat()})  # 25分遅れ
+    assert late.status_code == 200 and any(s["is_self"] for s in late.json()["shares"])
     assert len(outbox.items) == 1 and outbox.items[0][0] == FCM  # 本人の端末へは送らない
     msg = _decrypt(outbox.items[0][2], key, auth)
-    assert msg["title"] == f"{owner.username}さんが遅れます" and "約25分" in msg["body"] and "11:25" in msg["body"]
-    client.put(f"/api/v1/plans/{plan_id}/today/eta", json={**body, "arrive_at": "2026-11-13T02:26:00+00:00"})
+    arrive_hm = (start + timedelta(minutes=25)).astimezone(today_mode.zone_for("Asia/Tokyo")).strftime("%H:%M")
+    assert msg["title"] == f"{owner.username}さんが遅れます" and "約25分" in msg["body"] and arrive_hm in msg["body"]
+    client.put(f"/api/v1/plans/{plan_id}/today/eta",
+               json={**body, "arrive_at": (start + timedelta(minutes=26)).isoformat()})
     assert len(outbox.items) == 1  # 同じくらいの遅れは二度送らない
 
 
