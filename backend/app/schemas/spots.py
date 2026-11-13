@@ -2,7 +2,8 @@
 TravelCanvas MVP スポットスキーマ
 """
 import uuid
-from pydantic import BaseModel, ConfigDict, Field, field_validator, validator
+import re
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, validator
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -23,10 +24,17 @@ class SpotUrl(BaseModel):
         return event_urls.clean_url(v)
 
 
+OWN_PHOTO_ID = re.compile(r"^[0-9a-f]{32}$")
+# [Gate SpotOwnPhoto] 応答に出す写真の項目(保存の場所などサーバーの中の値は出さない)
+PHOTO_PUBLIC_KEYS = ("provider", "provider_id", "title", "author", "license", "license_url", "source_page_url")
+
+
 class SpotPhoto(BaseModel):
-    """[Gate SpotInfo] 写真の出典(Wikimedia Commons のファイルだけ。画像の本文は保存せず、サーバーが中継して出す)"""
+    """[Gate SpotInfo] 写真の出典(Wikimedia Commons のファイル。画像の本文は保存せず、サーバーが中継して出す)。
+    [Gate SpotOwnPhoto] provider=own は自分で入れた写真(POST /spots/{id}/photo で保存したもの。ここでは今の写真を
+    そのまま残す時だけ使える。新しく指すことはできない)"""
     model_config = ConfigDict(extra="forbid")
-    provider: str = Field("wikimedia_commons", pattern=r"^wikimedia_commons$")
+    provider: str = Field("wikimedia_commons", pattern=r"^(wikimedia_commons|own)$")
     provider_id: str = Field(..., max_length=260)
     title: Optional[str] = Field(None, max_length=300)
     author: Optional[str] = Field(None, max_length=300)
@@ -34,12 +42,12 @@ class SpotPhoto(BaseModel):
     license_url: Optional[str] = Field(None, max_length=500)
     source_page_url: Optional[str] = Field(None, max_length=1000)
 
-    @field_validator("provider_id")
-    @classmethod
-    def _v_id(cls, v: str) -> str:
-        if not valid_id(v):
+    @model_validator(mode="after")
+    def _v_id(self) -> "SpotPhoto":
+        ok = OWN_PHOTO_ID.match(self.provider_id) if self.provider == "own" else valid_id(self.provider_id)
+        if not ok:
             raise ValueError("写真のファイル名の形が違います")
-        return v
+        return self
 
     @field_validator("license_url", "source_page_url")
     @classmethod
@@ -111,6 +119,13 @@ class SpotResponse(SpotBase):
     urls: Optional[List[Dict[str, Any]]] = None
     photo: Optional[Dict[str, Any]] = None
     dining: Optional[Dict[str, Any]] = None
+
+    @field_validator("photo", mode="before")
+    @classmethod
+    def _v_photo_out(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return {k: v.get(k) for k in PHOTO_PUBLIC_KEYS if k in v}
+        return v
 
     class Config:
         from_attributes = True

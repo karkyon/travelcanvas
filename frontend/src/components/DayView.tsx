@@ -29,6 +29,7 @@ import type { PlaceInfoResult } from '../services/api/planEdit';
 import { nearPoint } from '@/components/places/placeHelpers';
 import { usePlanStore } from '@/store/planStore';
 import BookingBadge from './planner/BookingBadge';
+import { mapNumbers } from './planner/mapNumberModel';
 import { getBookingStatus, linkReservationToEvent, type EventBooking } from '@/services/api/bookingStatus';
 import type { DaySchedule, ScheduleItem as ScheduleItemType, CreateScheduleItemData } from '../types';
 import UiIcon from '@/components/common/UiIcon';
@@ -88,8 +89,12 @@ interface DayViewProps {
   onDeleteDay?: () => void;
   /** [Gate PlanSpotEdit] 値が変わったら予定の写真を読み直す(編集の画面で写真を変えた時) */
   photoSignal?: number;
-  /** [Gate TripShare] 予定の写真の表示用 URL(予定 ID → URL)。右の「選択中の予定」でも同じ写真を出す */
+  /** [Gate TripShare] 予定の写真の表示用 URL(予定 ID → URL) */
   onImageUrls?: (urls: Record<string, string>) => void;
+  /** [Gate TimelineRedesign] 地図のピンから選ばれた予定(このカードまで送って詳細を開く。n は選ばれるたびに増える) */
+  focus?: { id: string; n: number } | null;
+  /** [Gate TimelineRedesign] 予定ごとの予約の状態(地図の上の旅程チェックへ渡す) */
+  onBookingsChange?: (bookings: Record<string, EventBooking>) => void;
 }
 
 const DayView: React.FC<DayViewProps> = ({
@@ -119,6 +124,8 @@ const DayView: React.FC<DayViewProps> = ({
   onDeleteDay,
   photoSignal = 0,
   onImageUrls,
+  focus = null,
+  onBookingsChange,
 }) => {
   const { addNewScheduleItem, deleteScheduleItem, reorderSpots } = usePlan();
   const { dragState, handleDragStart, handleDragEnd, isItemDragged } = useDragDrop();
@@ -203,6 +210,9 @@ const DayView: React.FC<DayViewProps> = ({
     getBookingStatus(planId, variantDayId).then((r) => { if (active) setBookings(r.events ?? {}); }).catch(() => { if (active) setBookings({}); });
     return () => { active = false; };
   }, [planId, bookingKey, bookingVersion, variantDayId]);
+  const bookingsCb = useRef(onBookingsChange);
+  bookingsCb.current = onBookingsChange;
+  useEffect(() => { bookingsCb.current?.(bookings); }, [bookings]);
   const linkBooking = useCallback(async (reservationId: string, eventId: string) => {
     try {
       await linkReservationToEvent(planId, reservationId, eventId);
@@ -242,6 +252,8 @@ const DayView: React.FC<DayViewProps> = ({
   }, []);
 
   const { addToast } = useToast();
+  // [Gate TimelineRedesign] 地図のピンと同じ番号(位置のある予定だけ、日の予定の順)
+  const pinNumbers = useMemo(() => mapNumbers(day.events), [day.events]);
 
   // [Gate G11 段階7] 並べ替えは保存する前に「案」として見せる(UIX-M03 の preview)。触る・矢印キー・ドラッグは案を作るだけで、
   // 「この並びにする」で1回に保存する。保存の後は ReorderImpact(実際の判定の差と元に戻す)が続く
@@ -640,6 +652,11 @@ const DayView: React.FC<DayViewProps> = ({
   }, [view, roles]);
   // エリアの詳細(写真・住所・リンク)は見出しの「エリアの詳細を開く」で出す
   const [openAreas, setOpenAreas] = useState<Set<string>>(() => new Set());
+  // [Gate TimelineRedesign] エリアの中の予定をたたむ(エリアの名前・時刻・集計は残す)
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
+  const toggleFold = useCallback((id: string) => {
+    setFolded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
   const toggleArea = useCallback((id: string) => {
     setOpenAreas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
@@ -744,6 +761,17 @@ const DayView: React.FC<DayViewProps> = ({
     const downBlocked = index === view.length - 1 || blockedBy(1);
     const isAreaHead = Boolean(opts?.head);
     const showItem = !isAreaHead || openAreas.has(event.id);
+    // [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え)
+    const reorderButtons = (
+      <>
+        <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
+          data-testid={`move-up-${event.id}`} className="tc-focus-ring tc-move-btn"
+          onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
+        <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
+          data-testid={`move-down-${event.id}`} className="tc-focus-ring tc-move-btn"
+          onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
+      </>
+    );
     return (
       <div
         draggable={!event.locked}
@@ -799,22 +827,29 @@ const DayView: React.FC<DayViewProps> = ({
           image={imageUrls[event.id] ? { src: imageUrls[event.id]!, credit: creditOf(images[event.id]?.source) } : null}
           onPhoto={canEdit ? () => setPhotoFor(event) : undefined}
           selected={selectedEventId === event.id}
+          arrival={row ? row.leg : null}
+          mapNumber={isAreaHead ? undefined : pinNumbers[event.id]}
+          onPickMap={() => onItemClick?.(event)}
+          focusSignal={focus && focus.id === event.id ? focus.n : 0}
+          planId={planId}
+          latitude={event.latitude}
+          longitude={event.longitude}
+          dining={event.dining}
           badge={bookings[event.id] ? (
-            <BookingBadge planId={planId} eventId={event.id} title={event.title} category={event.category} booking={bookings[event.id]!} canEdit={canEdit}
-              onLink={(rid) => linkBooking(rid, event.id)} />
+            <BookingBadge part="status" planId={planId} eventId={event.id} title={event.title} category={event.category}
+              booking={bookings[event.id]!} canEdit={canEdit} onLink={(rid) => linkBooking(rid, event.id)} />
           ) : null}
+          reservationId={bookings[event.id]?.reservations[0]?.id ?? null}
+          bookingAction={bookings[event.id] ? (
+            <BookingBadge part="action" planId={planId} eventId={event.id} title={event.title} category={event.category}
+              booking={bookings[event.id]!} canEdit={canEdit} onLink={(rid) => linkBooking(rid, event.id)} />
+          ) : null}
+          reorder={isAreaHead ? undefined : reorderButtons}
         />
         )}
         </div>
-        {/* [Gate G11] 触って使える並べ替え(ドラッグ・上下矢印キーと同じ入れ替え)。[Gate MockScreens] モックの event-actions(右) */}
-        <div className="tc-event-actions">
-          <button type="button" aria-label={`「${event.title}」を上へ移す`} disabled={upBlocked}
-            data-testid={`move-up-${event.id}`} className="tc-focus-ring"
-            onClick={(e) => { e.stopPropagation(); moveBy(event, -1); }}>↑</button>
-          <button type="button" aria-label={`「${event.title}」を下へ移す`} disabled={downBlocked}
-            data-testid={`move-down-${event.id}`} className="tc-focus-ring"
-            onClick={(e) => { e.stopPropagation(); moveBy(event, 1); }}>↓</button>
-        </div>
+        {/* [Gate TimelineRedesign] エリアの見出しの並べ替えは見出しの右(予定のカードの並べ替えはカードの中) */}
+        {isAreaHead && <div className="tc-event-actions">{reorderButtons}</div>}
       </div>
     );
   };
@@ -822,11 +857,31 @@ const DayView: React.FC<DayViewProps> = ({
   return (
     <div className={`tc-dayview ${className}`.trim()}>
       {/* [Gate MockScreens] モックの timeline-card の見出し: 小見出し・日の題・ルートを見る・日のタブ・現地時間・集計・移動手段の凡例 */}
+      {/* [Gate TimelineRedesign] 日の見出しは旅程の欄の上に固定し、下の予定(tc-day-body)だけがスクロールする。
+          日付と「この日の案」(プランB)は色の付いた 1 つの帯にまとめる */}
       <div className="tc-day-head" data-active={isActive ? 'true' : 'false'}>
-        <div className="tc-section-row">
-          <div className="min-w-0">
+        <div className="tc-day-band" data-testid="day-band">
+        {/* 1 段目: 日付(と小見出し)・現地時間と件数・予定の追加などの操作 */}
+        <div className="tc-day-row1">
+          <div className="tc-day-titles min-w-0">
             {headerLabel && <p className="tc-label">{headerLabel}</p>}
             <h2 className="tc-section-title tc-day-title">{day.date ? `${day.date} (${getDayOfWeek(day.date)})` : '日付未定'}</h2>
+          </div>
+          <div className="tc-day-metarow">
+            {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
+            <p className="tc-day-meta" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
+            <div className="tc-day-stats">
+              <span><UiIcon icon={IcMapPin} size={13} className="mr-1 align-[-2px]" />{timeStats.eventCount}件</span>
+              {timeStats.totalDuration > 0 && (
+                <span><UiIcon icon={IcTimer} size={13} className="mr-1 align-[-2px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
+              )}
+              {timeStats.totalCost > 0 && (
+                <span><UiIcon icon={IcWallet} size={13} className="mr-1 align-[-2px]" />¥{timeStats.totalCost.toLocaleString()}</span>
+              )}
+              {timeStats.totalTravelTime > 0 && (
+                <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
+              )}
+            </div>
           </div>
           <div className="tc-day-head-actions">
             {/* [Gate DayAdd] 予定の追加はこの 1 つ(以前は旅程の見出しと日の下に同じ働きの 2 つがあった) */}
@@ -846,23 +901,13 @@ const DayView: React.FC<DayViewProps> = ({
             )}
           </div>
         </div>
-        {dayTabs}
-        {/* [Gate G11] 予定の時刻はこの日の現地時間(端末と同じ時刻帯でも省かない) */}
-        <p className="tc-day-meta" data-testid="day-timezone">{`現地時間 · ${day.timezone_id || '時刻帯未確認'}`}</p>
-        <div className="tc-day-stats">
-          <span><UiIcon icon={IcMapPin} size={13} className="mr-1 align-[-2px]" />{timeStats.eventCount}件</span>
-          {timeStats.totalDuration > 0 && (
-            <span><UiIcon icon={IcTimer} size={13} className="mr-1 align-[-2px]" />{Math.floor(timeStats.totalDuration / 60)}時間{timeStats.totalDuration % 60}分</span>
-          )}
-          {timeStats.totalCost > 0 && (
-            <span><UiIcon icon={IcWallet} size={13} className="mr-1 align-[-2px]" />¥{timeStats.totalCost.toLocaleString()}</span>
-          )}
-          {timeStats.totalTravelTime > 0 && (
-            <span><UiIcon icon={IcFootprints} size={13} className="mr-1 align-[-2px]" />移動{timeStats.totalTravelTime}分</span>
-          )}
+        {/* 2 段目: 日のタブと「この日の案」(プランB)を 1 行に */}
+        {dayTabs && <div className="tc-day-row2">{dayTabs}</div>}
         </div>
         {/* [Gate PlanUX] 移動手段の印は常に並べない。予定と予定の間の「移動手段を選ぶ」で出す */}
       </div>
+
+      <div className="tc-day-body" data-testid="day-body">
 
       {photoFor && (
         <EventPhotoDialog isOpen onClose={() => setPhotoFor(null)} planId={planId} eventId={photoFor.id}
@@ -902,7 +947,7 @@ const DayView: React.FC<DayViewProps> = ({
             <div className="text-center py-6 text-ink-500">
               <div className="mb-2 flex justify-center"><UiIcon icon={IcCalendar} size={32} /></div>
               <p className="text-base font-semibold text-ink-900 mb-1">まだスケジュールがありません</p>
-              <p className="text-sm mb-4">行きたい場所を予定にすると、地図と選んだ予定の欄に出ます</p>
+              <p className="text-sm mb-4">行きたい場所を予定にすると、地図に番号のピンで出ます</p>
               <Button
                 variant="primary"
                 onClick={() => setIsAddModalOpen(true)}
@@ -940,29 +985,51 @@ const DayView: React.FC<DayViewProps> = ({
                   {dropLine(index, null)}
                   {segmentFor(index)}
                 </div>
-                {/* [Gate AreaDrag] エリアの枠: 見出し(エリアの名前・時刻・滞在・中の予定・空き・詳細を開く)と、中の予定 */}
+                {/* [Gate AreaDrag] エリアの枠: 見出し(エリアの名前・時刻・滞在・中の予定・空き・詳細を開く)と、中の予定
+                    [Gate TimelineRedesign] ほかの予定と同じく、左の時刻の列に着く時刻・線の上に大きめの点を出す */}
+                <div className="tc-area-row" role="none">
+                <div className="tc-area-time" aria-hidden="true">
+                  <span>{area.start_time ? area.start_time.slice(0, 5) : '未定'}</span>
+                  {area.end_time && <small>{`〜${area.end_time.slice(0, 5)}`}</small>}
+                </div>
+                <div className="tc-area-dot" aria-hidden="true" />
                 <div className="tc-area-block" data-testid={`area-block-${area.id}`}
                   data-drop={ownDrag && dropAt?.parent === area.id ? 'in' : undefined}>
                   {itemRow(index, {
                     head: (
                       <div className="tc-area-head-main">
                         <p className="tc-area-head-title">
+                          {pinNumbers[area.id] !== undefined && (
+                            <button type="button" className="tc-focus-ring tc-event-num is-area" aria-label={`地図で見る(${pinNumbers[area.id]}番)`}
+                              title="地図でこのエリアを見る" onClick={(e) => { e.stopPropagation(); onItemClick?.(area); }}>
+                              {pinNumbers[area.id]}
+                            </button>
+                          )}
                           <span className="tc-area-tag">エリア</span>
                           <strong>{area.title}</strong>
                           <span className="tc-area-head-time">{area.start_time ? `${area.start_time.slice(0, 5)}〜${area.end_time ? area.end_time.slice(0, 5) : ''}` : '時刻未設定'}</span>
                         </p>
                         <p className="tc-area-sum" data-testid={`area-summary-${area.id}`}>{areaSums.get(area.id)}</p>
-                        <button type="button" className="tc-focus-ring tc-mini-link tc-area-toggle" aria-expanded={open}
-                          data-testid={`area-toggle-${area.id}`}
-                          onClick={(e) => { e.stopPropagation(); toggleArea(area.id); }}>
-                          {open ? 'エリアの詳細を閉じる' : 'エリアの詳細を開く'}
-                        </button>
+                        <div className="tc-area-head-btns">
+                          <button type="button" className="tc-focus-ring tc-mini-link tc-area-toggle" aria-expanded={open}
+                            data-testid={`area-toggle-${area.id}`}
+                            onClick={(e) => { e.stopPropagation(); toggleArea(area.id); }}>
+                            {open ? 'エリアの詳細を閉じる' : 'エリアの詳細を開く'}
+                          </button>
+                          {block.members.length > 0 && (
+                            <button type="button" className="tc-focus-ring tc-mini-link tc-area-fold" aria-expanded={!folded.has(area.id)}
+                              data-testid={`area-fold-${area.id}`}
+                              onClick={(e) => { e.stopPropagation(); toggleFold(area.id); }}>
+                              {folded.has(area.id) ? `中の予定を開く(${block.members.length}件)` : '中の予定をたたむ'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ),
                     onOver: (e) => overRow(e, index, 'areaHead'),
                   })}
-                  <div className="tc-area-inner" role="none">
-                    <p className="tc-area-inner-label" aria-hidden="true">エリアの中の予定</p>
+                  <div className="tc-area-inner" role="none" hidden={folded.has(area.id) && !ownDrag}>
+                    <p className="tc-area-inner-label" aria-hidden="true">エリアの中の予定<span className="tc-area-inner-chip">中は歩いて回る(移動に数えない)</span></p>
                     {block.members.map((mi) => {
                       const m = view[mi]!;
                       return (
@@ -984,6 +1051,7 @@ const DayView: React.FC<DayViewProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
                 </div>
               </div>
             );
@@ -1039,6 +1107,7 @@ const DayView: React.FC<DayViewProps> = ({
           </Button>
         </Modal.Footer>
       </Modal>
+      </div>
     </div>
   );
 };

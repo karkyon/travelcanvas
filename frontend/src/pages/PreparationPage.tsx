@@ -323,7 +323,9 @@ const PreparationPage: React.FC = () => {
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 
       {isLoading ? (
-        <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
+        // 読み込み中も選んだタブの中身の枠を置く(タブの aria-controls が指す先を常に有る状態に)
+        <div role="tabpanel" id={`prep-panel-${tab}`} aria-labelledby={`prep-tab-${tab}`} aria-busy="true"
+          className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : (
         <div role="tabpanel" id={`prep-panel-${tab}`} aria-labelledby={`prep-tab-${tab}`}>
           {tab === 'readiness' && (

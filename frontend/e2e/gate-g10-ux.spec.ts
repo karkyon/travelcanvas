@@ -36,7 +36,8 @@ test('UX-8 設定で選んだ暗い見た目が全ての画面に効き、読み
     // [Gate HomeV2] 計画中の旅行があると見出しは「おかえりなさい。次の旅まで あと N 日」
     { name: 'ダッシュボード', path: '/dashboard', h1: /次の旅/ as RegExp | string | null },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' as RegExp | string | null },
-    { name: '今日', path: `/planner/${planId}/today`, h1: null as RegExp | string | null },
+    // [Gate TripDayNav] 見出しは旅の当日らしく(当日の題・当日まであと何日・旅のあと)。表示によって変わるため形だけ確かめる
+    { name: '旅の当日', path: `/planner/${planId}/today`, h1: null as RegExp | string | null },
     { name: '予約', path: `/planner/${planId}/reservations`, h1: null },
     { name: '共有', path: `/share/${planId}`, h1: null },
     { name: '準備', path: `/planner/${planId}/preparation`, h1: null },

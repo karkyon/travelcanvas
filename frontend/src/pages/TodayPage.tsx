@@ -34,7 +34,7 @@
  */
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Camera, Luggage, PartyPopper } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Surface from '@/components/design/Surface';
 import { useTripContext } from '@/hooks/useTripContext';
@@ -59,6 +59,7 @@ import {
   BeforeTripView, FinishView, FreeDayView, LoadFailedView, LoadingView, MorningView, NightView, OfflineBar, OfflineView, SimpleView,
 } from './today/live/TodayViews';
 import { TAB_SCREENS, TODAY_SCREENS, type TodayCtx, type TodayScreen } from './today/live/todayCtx';
+import { localToday, tripDayHeading } from './today/tripDayModel';
 
 // [Gate TDay-Mock] 開く画面は後から読む(当日の画面の最初の読み込みを重くしない)
 const TodayScreens = React.lazy(() => import('./today/live/TodayScreens'));
@@ -288,6 +289,9 @@ const TodayPage: React.FC = () => {
   const dayLabel = g?.day_index ? `DAY ${g.day_index} / ${g.day_count}` : null;
   const delayed = allToday.some((e) => e.transport_status === 'delayed' || e.transport_status === 'cancelled');
   void flagTick;
+  // [Gate TripDayNav] 見出しは「今日」ではなく、旅の当日らしく(何日目か・当日まであと何日か・旅のあと)
+  const heading = tripDayHeading({ todayDate: data?.today_date ?? null, start: trip.startDate, end: trip.endDate,
+    deviceToday: localToday(new Date(nowMs)) });
 
   const ctx: TodayCtx | null = data ? {
     planId, data, events: allToday, timeZone, nowMs, nowLocal, nowEv, nextEv, flow, go, guide: g, gEvents, stamps, doneIds,
@@ -353,10 +357,34 @@ const TodayPage: React.FC = () => {
   else if (!data.today_date && !view.nowEvent) {
     ownHeading = !!g?.upcoming;
     main = g?.upcoming ? <BeforeTripView planId={planId} upcoming={g.upcoming} title={trip.title ?? 'この旅行'} destination={trip.destination ?? null} /> : (
-      <div className="tc-card tc-today-empty">
-        <CalendarDays size={28} aria-hidden="true" />
-        <p className="font-semibold text-ink-900">今日の日程は登録されていません。</p>
-        <p className="text-sm text-ink-500">旅行の日付の当日になると、今いる予定と次の予定がここに出ます。</p>
+      <div className={`tc-card tc-today-empty is-${heading.phase}`} data-testid="today-empty" data-phase={heading.phase}>
+        {heading.phase === 'after' ? <Camera size={28} aria-hidden="true" />
+          : heading.phase === 'before' ? <PartyPopper size={28} aria-hidden="true" /> : <CalendarDays size={28} aria-hidden="true" />}
+        {heading.phase === 'before' ? (
+          <>
+            {heading.daysLeft !== null && (
+              <p className="tc-today-countdown" data-testid="today-days-left"><b>{heading.daysLeft}</b><span>日</span></p>
+            )}
+            <p className="font-semibold text-ink-900">この日のために準備してきた旅、もうすぐです！</p>
+            <p className="text-sm text-ink-500">当日になると、今いる予定・次の予定・出発までの時間がここに出ます。</p>
+            <div className="tc-today-empty-actions">
+              <Button variant="primary" icon={<CalendarDays size={16} />} onClick={() => navigate(`/planner/${planId}`)}>旅程を見直す</Button>
+              <Button variant="outline" icon={<Luggage size={16} />} onClick={() => navigate(`/planner/${planId}/preparation`)}>持ち物・準備</Button>
+            </div>
+          </>
+        ) : heading.phase === 'after' ? (
+          <>
+            <p className="font-semibold text-ink-900">楽しい旅でしたか？ 写真や記録を思い出にまとめましょう。</p>
+            <div className="tc-today-empty-actions">
+              <Button variant="primary" icon={<Camera size={16} />} onClick={() => navigate(`/planner/${planId}/memories`)}>旅の記録と思い出</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="font-semibold text-ink-900">今日の日程は登録されていません。</p>
+            <p className="text-sm text-ink-500">旅行の日付の当日になると、今いる予定と次の予定がここに出ます。</p>
+          </>
+        )}
       </div>
     );
   } else if (allToday.length === 0) { main = <FreeDayView ctx={ctx} />; ownHeading = true; }
@@ -397,7 +425,12 @@ const TodayPage: React.FC = () => {
 
   return (
     <div className={`tc-page tc-today tl-page${live && !simple ? ' has-dock' : ''}`} data-testid="today">
-      {!ownHeading && <h1 className="tl-title tl-title--lg tl-page__h1">今日</h1>}
+      {!ownHeading && (
+        <div className="tl-page__head">
+          <p className="tl-lbl">{heading.eyebrow}</p>
+          <h1 className="tl-title tl-title--lg tl-page__h1">{heading.title}</h1>
+        </div>
+      )}
       {ctx && view?.isCurrentDay && (nowEv || nextEv) && <TodayBand ctx={ctx} />}
       {ctx && <TodayToolbar ctx={ctx} syncedAt={syncedAt} />}
       {ctx && isStale && <OfflineBar ctx={ctx} />}

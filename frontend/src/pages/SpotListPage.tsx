@@ -11,12 +11,12 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Camera, ExternalLink, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
+import { CalendarDays, Camera, Download, ExternalLink, ImagePlus, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
 import PageHead from '@/components/shell/PageHead';
 import PlaceArt from '@/components/shell/PlaceArt';
 import PlaceFinder, { type PlaceDraft, type PlaceTab } from '@/components/search/PlaceFinder';
 import {
-  createWishSpot, deleteWishSpot, enrichWishSpot, listWishSpots, updateWishSpot, type WishInput, type WishSpot,
+  createWishSpot, deleteWishSpot, enrichWishSpot, listWishSpots, updateWishSpot, uploadSpotPhoto, type WishInput, type WishSpot,
 } from '@/services/api/spotIntake';
 import { getPlaceInfo, getPlacePhoto, type PlaceInfoCandidate, type PlaceInfoResult } from '@/services/api/planEdit';
 import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
@@ -29,6 +29,8 @@ import DiningSummary from '@/components/dining/DiningSummary';
 import { cleanDining, mergeEmptyDining, type DiningInfo } from '@/components/dining/diningModel';
 import SpotPhotoView, { type SpotPhoto } from '@/components/media/SpotPhotoView';
 import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
+import PasteImageButton from '@/components/media/PasteImageButton';
+import GoogleSavedImportDialog from './spots/GoogleSavedImportDialog';
 import type { ExternalImage } from '@/services/api/types/g11discover';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
@@ -73,6 +75,10 @@ const SpotListPage: React.FC = () => {
     { busy: false, result: null, error: null });
   const [urlError, setUrlError] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
+  // [Gate GoogleSavedImport] Google マップの保存リストから取り込む窓
+  const [googleOpen, setGoogleOpen] = useState(false);
+  // [Gate SpotOwnPhoto] 保存の時に入れる自分の写真(ファイル・クリップボードから)
+  const [pending, setPending] = useState<File | null>(null);
   const [enriching, setEnriching] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -108,8 +114,9 @@ const SpotListPage: React.FC = () => {
     setTab('manual');
     setMessage(`「${d.name}」を入れました。確かめて保存してください`);
   };
-  const open = () => { setForm(EMPTY); setTab('search'); setMessage(null); setInfo({ busy: false, result: null, error: null }); setAdding(true); };
+  const open = () => { setPending(null); setForm(EMPTY); setTab('search'); setMessage(null); setInfo({ busy: false, result: null, error: null }); setAdding(true); };
   const edit = (s: WishSpot) => {
+    setPending(null);
     setForm({
       id: s.id, name: s.name, category: toCategory(s.category), address: s.address ?? '', description: s.description ?? '',
       latitude: s.latitude, longitude: s.longitude, phone: s.phone ?? '', urlRows: s.urls?.length ? s.urls.map((u) => u.url) : [''],
@@ -189,11 +196,21 @@ const SpotListPage: React.FC = () => {
     const input: WishInput = {
       name: form.name.trim(), category: form.category, address: form.address.trim() || null, description: form.description.trim() || null,
       latitude: form.latitude, longitude: form.longitude, phone: form.phone.trim() || null, urls: links.urls,
-      photo: form.photo, dining: cleanDining(form.dining),
+      // [Gate SpotOwnPhoto] 自分の写真(ファイル・貼り付け)は、場所を保存した後に入れる
+      photo: pending ? (form.photo?.provider === 'own' ? form.photo : null) : form.photo, dining: cleanDining(form.dining),
     };
     try {
       let created: WishSpot | null = null;
-      if (form.id) await updateWishSpot(form.id, input); else created = await createWishSpot(input);
+      let savedId = form.id ?? null;
+      if (form.id) await updateWishSpot(form.id, input); else { created = await createWishSpot(input); savedId = created.id; }
+      if (pending && savedId) {
+        try {
+          await uploadSpotPhoto(savedId, pending);
+        } catch (err) {
+          setError(errorDetailMessage(err, '場所は保存しましたが、写真を入れられませんでした'));
+        }
+      }
+      setPending(null);
       setMessage(form.id ? '保存しました' : `「${input.name}」を行きたい場所に保存しました`);
       setForm(EMPTY);
       setAdding(false);
@@ -221,7 +238,16 @@ const SpotListPage: React.FC = () => {
     <div className="min-h-screen bg-cloud-50">
       <div className="tc-page">
         <PageHead eyebrow="WISHLIST · 行きたい場所" title="行きたい場所" sub="気になる場所をためておき、旅行の予定に入れられます。"
-          actions={!adding ? <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={open}><Plus size={16} aria-hidden="true" />場所を追加</button> : undefined} />
+          actions={!adding ? (
+            <>
+              <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => setGoogleOpen(true)} data-testid="wish-google-import">
+                <Download size={16} aria-hidden="true" />Google マップから取り込む
+              </button>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={open}><Plus size={16} aria-hidden="true" />場所を追加</button>
+            </>
+          ) : undefined} />
+        <GoogleSavedImportDialog isOpen={googleOpen} onClose={() => setGoogleOpen(false)} spots={spots ?? []}
+          onDone={(m) => { setError(null); setMessage(m); void load(); }} />
         {error && <p role="alert" className="tc-card px-4 py-3 mb-4 text-sm text-danger">{error}</p>}
         {message && <p role="status" className="tc-card px-4 py-3 mb-4 text-sm text-ink-900">{message}</p>}
 
@@ -273,15 +299,24 @@ const SpotListPage: React.FC = () => {
                   <EventUrlsField rows={form.urlRows} onChange={(urlRows) => { setForm({ ...form, urlRows }); setUrlError(null); }} error={urlError} />
                 </div>
                 <div className="sm:col-span-2 flex flex-wrap items-center gap-3" data-testid="wish-photo">
-                  {form.photo ? (
+                  {pending || form.photo ? (
                     <>
-                      <SpotPhotoView photo={form.photo} alt={form.name} className="tc-wish-photo-preview" fallback={<span className="text-xs text-ink-700">写真を読めません</span>} />
-                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setForm({ ...form, photo: null })}>写真を外す</button>
+                      <SpotPhotoView photo={form.photo} file={pending} spotId={form.id ?? undefined} alt={form.name} className="tc-wish-photo-preview"
+                        fallback={<span className="text-xs text-ink-700">写真を読めません</span>} />
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm"
+                        onClick={() => { setPending(null); setForm({ ...form, photo: null }); }}>写真を外す</button>
                     </>
                   ) : <span className="text-sm text-ink-700">写真はまだありません(無い時は種類の絵を出します)</span>}
                   <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setPicker(true)} data-testid="wish-photo-pick">
-                    <Camera size={14} aria-hidden="true" />{form.photo ? '写真を選び直す' : '写真を選ぶ'}
+                    <Camera size={14} aria-hidden="true" />ネットの写真を探す
                   </button>
+                  {/* [Gate SpotOwnPhoto][Gate PhotoPasteAll] 自分の写真: ファイル・クリップボードから(保存の時に入れる) */}
+                  <label className="tc-focus-ring tc-mbtn tc-mbtn--sm cursor-pointer" data-testid="wish-photo-file">
+                    <ImagePlus size={14} aria-hidden="true" />ファイルから
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" aria-label="行きたい場所の写真のファイル"
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setPending(f); }} />
+                  </label>
+                  <div className="basis-full"><PasteImageButton onImage={(f) => setPending(f)} global={tab === 'manual'} testId="wish-photo-paste" /></div>
                 </div>
                 {form.category === 'restaurant' && (
                   <div className="sm:col-span-2 rounded-xl border border-cloud-200 p-3">
@@ -300,7 +335,7 @@ const SpotListPage: React.FC = () => {
             {tab !== 'manual' && <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-3" onClick={() => setAdding(false)}>閉じる</button>}
             <ExternalPhotoPicker isOpen={picker} onClose={() => setPicker(false)} initialQuery={form.name}
               near={form.latitude != null && form.longitude != null ? { latitude: form.latitude, longitude: form.longitude } : null}
-              onPick={(img: ExternalImage) => setForm((f) => ({ ...f, photo: toSpotPhoto(img) }))} purposeLabel="行きたい場所の写真" />
+              onPick={(img: ExternalImage) => { setPending(null); setForm((f) => ({ ...f, photo: toSpotPhoto(img) })); }} purposeLabel="行きたい場所の写真" />
           </section>
         )}
 
@@ -355,7 +390,7 @@ const SpotListPage: React.FC = () => {
               return (
                 <li key={s.id} aria-label={s.name} className="tc-lcard tc-wish-card" data-testid={`wish-${s.id}`} data-kind={kind}>
                   <div className="tc-wish-art">
-                    {s.photo ? <SpotPhotoView photo={s.photo} alt={s.name} fallback={<PlaceArt kind={kind} seed={s.name} />} />
+                    {s.photo ? <SpotPhotoView photo={s.photo} spotId={s.id} alt={s.name} fallback={<PlaceArt kind={kind} seed={s.name} />} />
                       : <PlaceArt kind={kind} seed={s.name} />}
                     <span className="tc-trip-chip">{CATEGORIES.find(([v]) => v === kind)?.[1] ?? 'その他'}</span>
                     {map && <span className="tc-trip-chip tc-trip-chip--role"><MapPin size={11} aria-hidden="true" />地図の位置あり</span>}

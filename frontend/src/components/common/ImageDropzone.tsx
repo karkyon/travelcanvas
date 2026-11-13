@@ -1,6 +1,7 @@
 /** [Gate Receipt] 画像を入れる場所。枠へドラッグ&ドロップするか、押してファイルを選ぶ。選んだ画像は小さく確認できる。 */
 import React, { useEffect, useRef, useState } from 'react';
 import { ImagePlus } from 'lucide-react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 
 interface Props {
   label: string;
@@ -10,11 +11,16 @@ interface Props {
   disabled?: boolean;
   /** 画像の隣に出す内容(読み取った項目など) */
   children?: React.ReactNode;
+  /** [Gate PhotoPasteAll] クリップボードから貼り付け(既定は出す)。同じ画面に 2 つある時は片方だけ global にする */
+  paste?: boolean;
+  pasteGlobal?: boolean;
+  pasteTestId?: string;
 }
 
 const ACCEPT = ['image/jpeg', 'image/png', 'image/webp'];
 
-const ImageDropzone: React.FC<Props> = ({ label, hint, file, onFile, disabled = false, children }) => {
+const ImageDropzone: React.FC<Props> = ({ label, hint, file, onFile, disabled = false, children, paste = true,
+  pasteGlobal = true, pasteTestId = 'image-dropzone-paste' }) => {
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -62,6 +68,7 @@ const ImageDropzone: React.FC<Props> = ({ label, hint, file, onFile, disabled = 
           {field}
         </label>
       )}
+      {paste && <PasteImageButton onImage={(f) => take(f)} disabled={disabled} global={pasteGlobal} testId={pasteTestId} />}
       {error && <p className="mt-2 text-sm text-danger" role="alert">{error}</p>}
     </div>
   );

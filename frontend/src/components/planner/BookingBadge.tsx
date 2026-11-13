@@ -1,12 +1,16 @@
 /**
  * [Gate BookingBadge] 予定のカードの予約の札(宿・食事・体験と、予約が結び付いた予定)。
- * - 予約済み: 予約の中身(日時・人数)と「予約を見る」(旅行箱の予約の詳細へ)
- * - 予約済み・要確認: 日付・チェックインの時刻・施設の名前・人数・取り消しの食い違いを文で
- * - 予約あり(まだつないでいない): 合いそうな予約と「この予定につなぐ」
- * - 未予約: 「予約を取り込む」(予約の取り込み)・「予約を登録」(旅行箱)。予約の手配まではしない
+ * [Gate TimelineRedesign] 札(part="status")と操作(part="action")に分けて、カードの別の場所に出す。
+ * - 札(カードの中の段): 予約済み(日時・人数)・予約済み・要確認(食い違いを文で)・予約あり・未接続・未予約
+ * - 操作(カードの上の段の右): 普段は小さなカレンダーのアイコンだけ。
+ *   - 予約済み・要確認: チェック付きのカレンダー。押すと予約の詳細へ
+ *   - 未予約: カレンダー＋。押すと「予約情報を取り込む」「予約を手動登録する」が横にスライドして出る
+ *   - 予約あり・未接続: 印付きのカレンダー＋。押すと「この予定につなぐ」「予約を見る」が出る
+ *   予約の手配まではしない
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, Link2, Plus, CalendarSearch } from 'lucide-react';
 import type { BookingReservation, EventBooking } from '@/services/api/bookingStatus';
 
 interface Props {
@@ -18,6 +22,8 @@ interface Props {
   booking: EventBooking;
   canEdit: boolean;
   onLink?: (reservationId: string) => Promise<void> | void;
+  /** status: 札だけ / action: 操作だけ / both: 両方(既定) */
+  part?: 'status' | 'action' | 'both';
 }
 
 const resText = (r: BookingReservation) => [
@@ -29,17 +35,15 @@ const resText = (r: BookingReservation) => [
 
 const RES_TYPE: Record<string, string> = { accommodation: 'accommodation', dining: 'restaurant', activity: 'activity' };
 
-const BookingBadge: React.FC<Props> = ({ planId, eventId, title, category, booking, canEdit, onLink }) => {
-  const [busy, setBusy] = useState(false);
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+const BookingStatus: React.FC<Props> = ({ eventId, booking }) => {
   if (booking.state === 'booked' || booking.state === 'issue') {
     const r = booking.reservations[0]!;
     return (
       <div className={`tc-booking is-${booking.state}`} data-testid={`booking-${eventId}`} onClick={stop}>
         <span className="tc-booking-tag">{booking.state === 'booked' ? '✓ 予約済み' : '⚠ 予約済み・要確認'}</span>
         <span className="tc-booking-text">{resText(r)}</span>
-        <Link to={`/planner/${planId}/reservations?open=${encodeURIComponent(r.id)}`} className="tc-focus-ring tc-mini-link"
-          data-testid={`booking-open-${eventId}`}>予約を見る</Link>
         {booking.issues.length > 0 && (
           <ul className="tc-booking-issues" data-testid={`booking-issues-${eventId}`}>
             {booking.issues.map((t) => <li key={t}>{t}</li>)}
@@ -52,25 +56,91 @@ const BookingBadge: React.FC<Props> = ({ planId, eventId, title, category, booki
     const r = booking.suggestions[0]!;
     return (
       <div className="tc-booking is-suggest" data-testid={`booking-${eventId}`} onClick={stop}>
-        <span className="tc-booking-tag">予約あり・まだつないでいません</span>
+        <span className="tc-booking-tag">予約あり・未接続</span>
         <span className="tc-booking-text">{resText(r)}</span>
-        {canEdit && onLink && (
-          <button type="button" className="tc-focus-ring tc-mini-link" disabled={busy} data-testid={`booking-link-${eventId}`}
-            onClick={async () => { setBusy(true); try { await onLink(r.id); } finally { setBusy(false); } }}>
-            この予定につなぐ
-          </button>
-        )}
-        <Link to={`/planner/${planId}/reservations?open=${encodeURIComponent(r.id)}`} className="tc-focus-ring tc-mini-link">予約を見る</Link>
       </div>
     );
   }
   return (
     <div className="tc-booking is-none" data-testid={`booking-${eventId}`} onClick={stop}>
       <span className="tc-booking-tag">未予約</span>
-      <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-mini-link" data-testid={`booking-import-${eventId}`}>予約を取り込む</Link>
-      <Link to={`/planner/${planId}/reservations?new=1&event=${encodeURIComponent(eventId)}&type=${RES_TYPE[category ?? ''] ?? 'other'}&name=${encodeURIComponent(title ?? '')}`}
-        className="tc-focus-ring tc-mini-link" data-testid={`booking-new-${eventId}`}>予約を登録</Link>
     </div>
+  );
+};
+
+const BookingAction: React.FC<Props> = ({ planId, eventId, title, category, booking, canEdit, onLink }) => {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+  // [Gate BookingMenu] 開いた小さなメニューは、外を押す・Esc で閉じる
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  if (booking.state === 'booked' || booking.state === 'issue') {
+    const r = booking.reservations[0]!;
+    return (
+      <span className="tc-bk" onClick={stop}>
+        <Link to={`/planner/${planId}/reservations?open=${encodeURIComponent(r.id)}`}
+          className={`tc-focus-ring tc-bk-btn is-${booking.state}`} data-testid={`booking-open-${eventId}`}
+          title="予約を見る" aria-label={booking.state === 'booked' ? '予約を見る(予約済み)' : '予約を見る(予約済み・要確認)'}>
+          <CalendarCheck size={18} aria-hidden="true" />
+        </Link>
+      </span>
+    );
+  }
+  const suggest = booking.state === 'suggest' ? booking.suggestions[0]! : null;
+  return (
+    <span className="tc-bk tc-bk--menu" onClick={stop} ref={box}>
+      <button type="button" className={`tc-focus-ring tc-bk-plus${suggest ? ' is-suggest' : ''}`} aria-expanded={open}
+        aria-haspopup="true" data-testid={`booking-toggle-${eventId}`} title="予約"
+        aria-label={open ? '予約の操作を閉じる' : `予約の操作(${suggest ? '予約あり・まだつないでいません' : '未予約'})`}
+        onClick={() => setOpen((v) => !v)}>
+        <Plus size={16} strokeWidth={2.6} aria-hidden="true" />
+        {open ? <ChevronUp size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
+      </button>
+      {open && (
+        <span className="tc-bk-menu" data-testid={`booking-actions-${eventId}`}>
+          {suggest ? (
+            <>
+              {canEdit && onLink && (
+                <button type="button" className="tc-focus-ring tc-bk-act is-primary" disabled={busy} data-testid={`booking-link-${eventId}`}
+                  onClick={async () => { setBusy(true); try { await onLink(suggest.id); setOpen(false); } finally { setBusy(false); } }}>
+                  <Link2 size={16} aria-hidden="true" />この予定につなぐ
+                </button>
+              )}
+              <Link to={`/planner/${planId}/reservations?open=${encodeURIComponent(suggest.id)}`} className="tc-focus-ring tc-bk-act">
+                <CalendarSearch size={16} aria-hidden="true" />予約を見る
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-bk-act" data-testid={`booking-import-${eventId}`}>
+                <CalendarDays size={16} aria-hidden="true" />予約を取り込む
+              </Link>
+              <Link to={`/planner/${planId}/reservations?new=1&event=${encodeURIComponent(eventId)}&type=${RES_TYPE[category ?? ''] ?? 'other'}&name=${encodeURIComponent(title ?? '')}`}
+                className="tc-focus-ring tc-bk-act" data-testid={`booking-new-${eventId}`}>
+                <Plus size={16} aria-hidden="true" />予約を登録する
+              </Link>
+            </>
+          )}
+        </span>
+      )}
+    </span>
+  );
+};
+
+const BookingBadge: React.FC<Props> = (props) => {
+  const part = props.part ?? 'both';
+  return (
+    <>
+      {part !== 'action' && <BookingStatus {...props} />}
+      {part !== 'status' && <BookingAction {...props} />}
+    </>
   );
 };
 

@@ -114,7 +114,7 @@ type Need = 'any' | 'edit' | 'owner';
 
 const ACTIONS: Record<TripPhase, Array<{ key: string; label: string; path: string; need: Need }>> = {
   ongoing: [
-    { key: 'today', label: '今日の予定', path: '/today', need: 'any' },
+    { key: 'today', label: '旅の当日', path: '/today', need: 'any' },
     { key: 'reservations', label: '予約・チケット', path: '/reservations', need: 'any' },
     { key: 'alerts', label: '遅延・休業の対応', path: '/alerts', need: 'any' },
     { key: 'planner', label: '旅程を開く', path: '', need: 'any' },

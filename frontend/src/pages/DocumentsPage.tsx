@@ -13,6 +13,7 @@
  * (ADR-object-storage.md参照)。
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, FileText, Trash2, Upload, Download } from 'lucide-react';
 import Button from '@/components/common/Button';
@@ -257,6 +258,9 @@ const DocumentsPage: React.FC = () => {
                 <div className="text-xs text-ink-700 mt-1">
                   PDF・画像(jpg/png/gif/webp/bmp)・Office文書に対応。サーバー側で暗号化して保存されます。
                 </div>
+                {/* [Gate PhotoPasteAll] チケット・予約の画面のスクリーンショットはクリップボードから貼れる */}
+                <PasteImageButton onImage={(f) => setSelectedFile(f)} testId="document-paste" />
+                {selectedFile && <p className="text-xs text-ink-700 mt-1" data-testid="document-file-name">{`入れるファイル: ${selectedFile.name}`}</p>}
               </div>
 
               <div>

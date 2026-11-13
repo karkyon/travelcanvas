@@ -4,6 +4,7 @@
  * AI は選んだ時だけ。メールは番号・氏名などを伏せて送るが、画像は伏せられないことを選ぶ前に示す。
  */
 import React, { useRef, useState } from 'react';
+import PasteImageButton from '@/components/media/PasteImageButton';
 import { extractReservationFile, extractReservationText } from '@/services/api/photoFeatures';
 import type { ExtractedJob } from '@/services/api/photoFeatures';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
@@ -60,6 +61,9 @@ const BookingExtractCard: React.FC<{ planId: string; onExtracted: (job: Extracte
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" disabled={busy} onClick={() => imageFile.current?.click()}>画像を選ぶ</button>
             <button type="button" className="tc-focus-ring tc-mbtn" disabled={busy} onClick={() => pdfFile.current?.click()}>PDF を選ぶ</button>
           </div>
+          {/* [Gate PhotoPasteAll] 予約の画面のスクリーンショットをそのまま貼れる */}
+          <PasteImageButton onImage={(file) => void run(() => extractReservationFile(planId, file, useAi, useAi))} disabled={busy}
+            testId="booking-paste" />
         </div>
       </div>
       <label className="flex items-start gap-2 text-sm border-t pt-3">

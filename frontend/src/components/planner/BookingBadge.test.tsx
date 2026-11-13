@@ -29,15 +29,40 @@ describe('BookingBadge', () => {
     const onLink = vi.fn().mockResolvedValue(undefined);
     wrap(<BookingBadge planId="p1" eventId="e1" canEdit onLink={onLink}
       booking={{ state: 'suggest', issues: [], reservations: [], suggestions: [res({ id: 'r9', provider_name: 'まるや' })] }} />);
+    expect(screen.getByTestId('booking-e1')).toHaveTextContent('予約あり・未接続まるや');
+    // 普段はカレンダー＋だけ。押すと「この予定につなぐ」「予約を見る」が出る
+    expect(screen.queryByTestId('booking-link-e1')).toBeNull();
+    fireEvent.click(screen.getByTestId('booking-toggle-e1'));
     fireEvent.click(screen.getByTestId('booking-link-e1'));
     await waitFor(() => expect(onLink).toHaveBeenCalledWith('r9'));
   });
 
-  it('未予約: 予約を取り込む・予定につないで登録する', () => {
+  it('未予約: 普段はカレンダー＋だけ。押すと「予約を取り込む」「予約を登録する」の小さなメニューが出る', () => {
     wrap(<BookingBadge planId="p1" eventId="e1" title="赤福 本店" category="dining" canEdit
       booking={{ state: 'none', issues: [], reservations: [], suggestions: [] }} />);
+    expect(screen.getByTestId('booking-e1')).toHaveTextContent('未予約');
+    expect(screen.queryByTestId('booking-import-e1')).toBeNull();
+    const toggle = screen.getByTestId('booking-toggle-e1');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('booking-import-e1')).toHaveTextContent('予約を取り込む');
+    expect(screen.getByTestId('booking-new-e1')).toHaveTextContent('予約を登録する');
     expect(screen.getByTestId('booking-import-e1')).toHaveAttribute('href', '/planner/p1/imports');
     expect(screen.getByTestId('booking-new-e1')).toHaveAttribute('href',
       `/planner/p1/reservations?new=1&event=e1&type=restaurant&name=${encodeURIComponent('赤福 本店')}`);
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId('booking-import-e1')).toBeNull();
+  });
+
+  it('[Gate TimelineRedesign] part で札と操作を分けて出せる', () => {
+    const b = { state: 'none' as const, issues: [], reservations: [], suggestions: [] };
+    const { unmount } = wrap(<BookingBadge part="status" planId="p1" eventId="e1" canEdit booking={b} />);
+    expect(screen.getByTestId('booking-e1')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-toggle-e1')).toBeNull();
+    unmount();
+    wrap(<BookingBadge part="action" planId="p1" eventId="e1" canEdit booking={b} />);
+    expect(screen.queryByTestId('booking-e1')).toBeNull();
+    expect(screen.getByTestId('booking-toggle-e1')).toBeInTheDocument();
   });
 });

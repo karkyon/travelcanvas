@@ -157,6 +157,33 @@ services:
       retries: 10
       start_period: 300s
 
+  # [Gate RoadRoute] 地図の「道に沿った経路」(OSRM。無料・鍵は要らない・任意)。車(osrm-car)と歩き(osrm-foot)。
+  # `bash scripts/ops/osrm_prepare.sh [地域]` で OpenStreetMap の地図データを取り込み(初回は数十分・メモリ数GB)、
+  # .env に OSRM_CAR_URL・OSRM_FOOT_URL を書いて起動する。外へは送らない(この network の中だけ)。既定では起動しない
+  osrm-car:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    profiles: ["osrm"]
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 100 /data/car/region.osrm
+    volumes:
+      - travelcanvas_osrm:/data:ro
+    expose:
+      - "5000"
+    networks:
+      - travelcanvas_net
+
+  osrm-foot:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    profiles: ["osrm"]
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 100 /data/foot/region.osrm
+    volumes:
+      - travelcanvas_osrm:/data:ro
+    expose:
+      - "5000"
+    networks:
+      - travelcanvas_net
+
   # [Gate AdminUAT] 開発の UAT 用の https の入口(任意)。音声入力(Web Speech)は https でしか使えないため。
   # `bash scripts/ops/uat_https.sh up` で起動する(.env に TC_UAT_SITES・TC_UAT_DEFAULT_SNI・TC_UAT_HTTPS_PORT を足し、
   # 証明書の確認まで行う)。自己署名の内部 CA。本番・staging では使わない。既定では起動しない
@@ -190,6 +217,8 @@ volumes:
     name: travelcanvas_uploads
   travelcanvas_uat_caddy:
     name: travelcanvas_uat_caddy
+  travelcanvas_osrm:
+    name: travelcanvas_osrm
 
 networks:
   travelcanvas_net:

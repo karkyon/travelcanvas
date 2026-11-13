@@ -60,6 +60,16 @@ clash="$(comm -12 <(git ls-files --others --exclude-standard | sort) <(git ls-tr
 [ -z "$clash" ] || die "1: 未追跡のファイルが新しいファイルとぶつかります(上書きしません): $(echo "$clash" | tr '\n' ' ')"
 
 # ---- 2 記録・退避・バックアップ
+# 前の反映が migrate で止まると backend が止まったままになり、バックアップ(backend のコンテナの中で実行)が取れない。
+# その時は backend だけを今の image で起動する(--no-deps: 止まった migrate を待たない。DB は変えない)
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx backend; then
+  echo "2: backend が止まっているため、バックアップのために backend だけを起動します(DB は変えません)"
+  docker compose up -d --no-deps backend >/dev/null 2>&1 || die "2: backend を起動できません(docker compose logs backend)。反映していません"
+  for i in $(seq 1 30); do
+    docker compose exec -T backend true >/dev/null 2>&1 && break
+    sleep 2
+  done
+fi
 PREV="$(git rev-parse HEAD)"
 PREV_BRANCH="$(git symbolic-ref -q --short HEAD || echo "(detached)")"
 DBREV="$(docker compose exec -T backend alembic current 2>/dev/null | awk '{print $1}' | tail -1)"

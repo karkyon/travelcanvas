@@ -4,8 +4,8 @@
  * 読めない時は題名を null のままにする(値を作らない)。
  */
 import { useEffect, useState } from 'react';
-import { travelAPI } from '@/services/api';
-import { publishCurrentTrip, useCurrentTripStore } from '@/store/currentTripStore';
+import { api, travelAPI } from '@/services/api';
+import { publishCurrentTrip, tripRange, useCurrentTripStore } from '@/store/currentTripStore';
 
 export interface TripContext {
   title: string | null;
@@ -22,11 +22,21 @@ export function useTripContext(planId: string | undefined): TripContext {
     let alive = true;
     Promise.resolve()
       .then(() => travelAPI.getPlan(planId))
-      .then((res) => {
+      .then(async (res) => {
         const p = res && res.success ? res.data : null;
         if (!alive || !p?.id) return;
-        setPlan({ id: String(p.id), title: p.title, destination: p.destination ?? null, start_date: p.start_date ?? null, end_date: p.end_date ?? null });
-        publishCurrentTrip(p);
+        // [Gate TripDayNav] 旅行に日付が無ければ日程の最初・最後の日付から(旅の当日の見出しに使う)
+        let range = tripRange(p as Parameters<typeof tripRange>[0]);
+        if (!range.start) {
+          // 旅行の情報に日程が無い時は、日程(GET /plans/{id})の日付から
+          try {
+            const detail = await api.getPlanDetail(planId);
+            range = tripRange({ days: (detail.data?.days ?? []).map((d) => ({ date: d.local_date })) });
+          } catch { /* 読めなければ日付なし */ }
+        }
+        if (!alive) return;
+        setPlan({ id: String(p.id), title: p.title, destination: p.destination ?? null, start_date: range.start, end_date: range.end });
+        publishCurrentTrip({ ...p, start_date: range.start, end_date: range.end });
       })
       .catch(() => { /* 読めなければ題名を出さない */ });
     return () => { alive = false; };

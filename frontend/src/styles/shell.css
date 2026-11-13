@@ -346,9 +346,9 @@
 .tc-day-head-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
 .tc-day-delete {
   background: none; border: 0; padding: 2px 0; font-size: 11px; font-weight: 600; color: var(--tc-danger, #b42318);
-  opacity: .82; cursor: pointer; white-space: nowrap;
+  cursor: pointer; white-space: nowrap;
 }
-.tc-day-delete:hover { opacity: 1; text-decoration: underline; }
+.tc-day-delete:hover { text-decoration: underline; }
 /* 区間の操作の印: 丸・色の付いた地(予定の操作の灰色の線の印と見分ける) */
 .tc-seg-iconbtn {
   width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 999px; flex: none;

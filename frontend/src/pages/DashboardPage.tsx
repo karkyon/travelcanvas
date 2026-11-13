@@ -17,6 +17,7 @@ import { RefreshCw } from 'lucide-react';
 import Surface from '@/components/design/Surface';
 import { useAuthStore } from '@/store/authStore';
 import { getDashboard } from '@/services/api/g9';
+import { daySpan } from './dashboard/dashboardModel';
 import type { DashboardSummary } from '@/services/api/types/g9';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference } from '@/hooks/useThemePreference';
@@ -76,8 +77,10 @@ const DashboardPage: React.FC = () => {
   const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
   const nextTrip = planningTrips.find((t) => t.days_until_start !== null) ?? null;
   // [Gate HomeTitle] 「おかえりなさい」は日本のアプリでは不自然なので使わない。旅までの日数をそのまま見出しにする
-  const title = nextTrip?.days_until_start ? `次の旅まで あと ${nextTrip.days_until_start} 日`
-    : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中です。今日の予定を確かめましょう' : '次の旅を、楽しみに変える';
+  // [Gate RelDays] 31 日を超えると「約○か月」(表示する旅行の切り替え・カードと同じ言い方)
+  const title = nextTrip?.days_until_start ? `次の旅まで あと ${nextTrip.days_until_start <= 31
+    ? `${nextTrip.days_until_start} 日` : daySpan(nextTrip.days_until_start)}`
+    : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中！ 旅の当日を楽しみましょう' : '次の旅を、楽しみに変える';
   // 挨拶の文は読み込みの前後で変えない(読み込んだ後は旅行の数を後ろに足す)
   const sub = `${name}さんの旅の準備と、次にすること。` + (home
     ? `計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited} · 見送り ${home.shelves.cancelled}`

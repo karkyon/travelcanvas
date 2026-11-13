@@ -23,7 +23,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import Landscape from '@/components/shell/Landscape';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { ShelfAddCard, ShelfCard } from './ShelfCard';
-import { PHASE_LABEL, ROLE_LABEL, quickActions, statusLabel, tripDateLabel } from './dashboardModel';
+import { PHASE_LABEL, ROLE_LABEL, daySpan, quickActions, statusLabel, tripDateLabel } from './dashboardModel';
 
 const SHELF_LABEL: Record<TripShelf, string> = {
   planning: '計画中', considering: '検討中', visited: '行った旅', cancelled: '見送り・中止',
@@ -65,7 +65,7 @@ export const HomeProgress: React.FC<{ detail: HomePlanning }> = ({ detail }) => 
 export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning | null }> = ({ trip, detail }) => {
   const cover = useCoverPhoto(trip.id, trip.cover);
   const primary = trip.phase === 'ongoing'
-    ? { to: `/planner/${trip.id}/today`, label: '今日の予定を見る' } : { to: `/planner/${trip.id}`, label: '旅程を開く' };
+    ? { to: `/planner/${trip.id}/today`, label: '旅の当日を開く' } : { to: `/planner/${trip.id}`, label: '旅程を開く' };
   const actions = quickActions(trip).filter((a) => a.to !== primary.to);
   const booklet = { key: 'booklet', label: 'しおり(印刷・Web)', to: `/planner/${trip.id}/booklet` };
   // 操作は主な操作を含めて 4 つまで(UX-3)。しおり(印刷・Web)は招待の前に置く
@@ -99,7 +99,11 @@ export const PlanningHero: React.FC<{ trip: DashboardTrip; detail: HomePlanning 
         </p>
         <p className="tc-plan-hero-count">
           {trip.phase === 'upcoming' && trip.days_until_start !== null ? (
-            <><b>{trip.days_until_start}</b><span>日後に出発</span></>
+            // [Gate RelDays] 表示する旅行の切り替え・カードと同じ言い方(31 日を超えると「約○か月」。正確な日数は title)
+            trip.days_until_start <= 31
+              ? <><b>{trip.days_until_start}</b><span>日後に出発</span></>
+              : <span title={`出発まで ${trip.days_until_start}日`} data-testid="hero-until">
+                <b>{daySpan(trip.days_until_start)}</b><span>後に出発</span></span>
           ) : trip.phase === 'ongoing' && trip.day_number ? (
             <><b>{trip.day_number}</b><span>日目(旅行中)</span></>
           ) : <span>{statusLabel(trip)}</span>}

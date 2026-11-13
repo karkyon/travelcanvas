@@ -309,27 +309,32 @@ def collect(db: Session, user: User, trips: List[Dict[str, Any]], plans_by_id: D
             return []
         return [ev.address for ev in events.get(plans_by_id[t["id"]].id, [])]
 
+    # [Gate FootCountry2] 海外の旅は、日本の県に数えない(出発・帰着の空港の住所「大阪府泉佐野市」などで、
+    # 行っていない・計画していない県が「計画中」「行った」に付いていた。県のポップアップと同じ決まりにそろえる)
+    def abroad(t: Dict[str, Any]) -> bool:
+        plan_row = plans_by_id.get(t["id"])
+        return plan_row is not None and trip_abroad(events.get(plan_row.id, []))
+
+    def pref_texts(t: Dict[str, Any]) -> List[Optional[str]]:
+        if abroad(t):
+            return []
+        return [plans_by_id[t["id"]].destination] + addresses(t)
+
     this_year = None
     texts: List[Optional[str]] = []
     days_this_year = 0
     for t in visited:
-        plan = plans_by_id[t["id"]]
-        texts.append(plan.destination)
-        texts.extend(addresses(t))
+        texts.extend(pref_texts(t))
         today = date.fromisoformat(t["local_today"]) if t.get("local_today") else None
         this_year = this_year or (today.year if today else None)
         if t.get("end_date") and this_year and t["end_date"][:4] == str(this_year):
             days_this_year += int(t.get("total_days") or 0)
-    planned_prefs = prefectures_in([plans_by_id[t["id"]].destination for t in planning]
-                                   + [a for t in planning for a in addresses(t)])
+    planned_prefs = prefectures_in([x for t in planning for x in pref_texts(t)])
     # [Gate FootHover] 都道府県ごとの旅行(地図で県にカーソルを当てた時のポップアップ。行った・計画中、直近 5 件)
     by_pref: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for t, state in [(t, "visited") for t in visited] + [(t, "planned") for t in planning]:
         # [Gate FootCountry] 県のポップアップは国内の旅だけ(海外の旅の出発・帰着の空港の県に出さない)
-        plan_row = plans_by_id.get(t["id"])
-        if plan_row is not None and trip_abroad(events.get(plan_row.id, [])):
-            continue
-        for trip_pref in prefectures_in([plans_by_id[t["id"]].destination] + addresses(t)):
+        for trip_pref in prefectures_in(pref_texts(t)):
             by_pref[trip_pref].append(foot_trip(t, state))
     footprints = {
         "prefectures": prefectures_in(texts),

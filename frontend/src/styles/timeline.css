@@ -1,0 +1,457 @@
+/*
+  [Gate TimelineRedesign] 旅程のタイムラインと地図の作り直し(2026-11-12 のモック「画面全体の見直し」)。
+  - 旅程と地図の 2 列。右の「選んだ予定」の欄は無くし、予定の詳細はカードの「詳細を見る」で開く
+  - 地図は旅程の欄と同じ高さ(画面の高さいっぱい)。旅程の欄は中だけがスクロールし、日の見出しは上に残る
+  - 予定のカード: 番号(地図のピンと同じ)・横長の写真・予約のカレンダー＋・並べ替えをカードの中に
+  - 移動: 予定と予定の間の横の細い破線と、真ん中の小さなラベル
+  - エリア: ほかの予定と同じ時刻の列・線の上の大きめの点。枠は 1 本(中のカードは白で枠を重ねない)
+  色は決まり(--tc-*)を使う。エリアの緑は以前と同じ #0e7c6b。
+*/
+
+/* ---- 2 列(旅程・地図) ---- */
+.tc-planner-layout { grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: stretch; }
+.tc-planner-layout--nomap { grid-template-columns: minmax(0, 760px); }
+@media (min-width: 761px) {
+  /* 旅程の欄: 日の見出し(固定)と、その下の予定(この部分だけスクロール) */
+  .tc-planner-layout > .tc-timeline-card {
+    position: sticky; top: 84px; height: calc(100vh - 100px); min-height: 520px;
+    overflow: hidden; padding: 0; display: flex; flex-direction: column;
+  }
+  .tc-timeline-card > .tc-dayview { flex: 1 1 auto; min-height: 0; }
+  .tc-timeline-card .tc-day-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 14px 16px; }
+  .tc-planner-layout > .tc-map-frame { position: sticky; top: 84px; height: calc(100vh - 100px); min-height: 520px; }
+}
+@media (max-width: 1180px) {
+  .tc-planner-layout { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); }
+  .tc-planner-layout--nomap { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .tc-planner-layout > .tc-timeline-card { padding: 0 10px 14px; }
+  .tc-planner-layout > .tc-map-frame { height: 360px; }
+}
+
+/* 地図を欄の高さに広げた時: 移動の概算・位置不明の予定は地図の左下に重ねる(右下の出典の表示は隠さない) */
+.tc-planmap-fill { position: relative; height: 100%; }
+.tc-planmap-box { height: 100%; }
+.tc-planmap-foot {
+  position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 300px); z-index: 500;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid var(--tc-cloud-200);
+  background: color-mix(in srgb, var(--tc-cloud-0) 94%, transparent); box-shadow: 0 4px 14px rgba(15, 23, 42, .12);
+}
+.tc-planmap-foot:empty { display: none; }
+.tc-map-frame .tc-map-legend { bottom: auto; top: 52px; }
+@media (max-width: 640px) { .tc-planmap-foot { max-width: calc(100% - 20px); bottom: 26px; } }
+
+/* ---- 日の見出し(旅程の欄の上に固定) ----
+   日付・現地時間・件数・操作(1 段目)と、日のタブ・「この日の案」(プランB)(2 段目)を 1 つの色の帯にまとめる。
+   高さを抑えて、下の予定の一覧の見える範囲を広く取る */
+.tc-timeline-card .tc-day-head {
+  flex: none; margin: 0; padding: 8px 10px 8px; z-index: 30;
+  background: var(--tc-surface, var(--tc-cloud-0)); border-bottom: 1px solid var(--tc-cloud-200);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .05);
+}
+.tc-day-band {
+  padding: 7px 10px; border-radius: 12px;
+  background: var(--tc-accent-soft); border: 1px solid color-mix(in srgb, var(--tc-accent) 28%, transparent);
+}
+.tc-day-row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.tc-day-titles { display: grid; }
+.tc-day-band .tc-label { margin: 0; font-size: 9.5px; color: var(--tc-accent-strong); }
+.tc-day-band .tc-day-title { margin: 0; font-size: 17px; line-height: 1.25; color: var(--tc-accent-strong); }
+.tc-day-metarow { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; }
+.tc-day-metarow .tc-day-meta, .tc-day-metarow .tc-day-stats { margin: 0; }
+.tc-day-band .tc-day-head-actions { flex-direction: row; align-items: center; gap: 4px 10px; margin-left: auto; }
+.tc-day-band .tc-day-add { background: var(--tc-cloud-0); }
+.tc-day-row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
+.tc-day-row2 .tc-day-tabs { margin: 0; padding: 0; }
+.tc-day-band .tc-day-tab { min-height: 28px; padding: 4px 10px; background: var(--tc-cloud-0); border: 1px solid color-mix(in srgb, var(--tc-accent) 25%, transparent); }
+.tc-day-band .tc-day-tab[aria-pressed='true'] { background: var(--tc-accent); color: var(--tc-on-accent, #fff); border-color: var(--tc-accent); }
+/* この日の案(プランB): 日のタブの右に 1 行で。説明の文は省き、帯(控えの案を見ている時)は下の行に */
+.tc-day-band .tc-variant {
+  flex: 1 1 auto; flex-basis: auto; margin: 0; padding: 0 0 0 10px; border-top: 0;
+  border-left: 1px solid color-mix(in srgb, var(--tc-accent) 30%, transparent);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+}
+.tc-day-band .tc-variant-head { margin: 0; gap: 6px; }
+.tc-day-band .tc-variant-label { color: var(--tc-accent-strong); }
+.tc-day-band .tc-variant-note:not(.is-warn) { display: none; }
+.tc-day-band .tc-variant-tabs { gap: 4px; }
+.tc-day-band .tc-vtab { min-height: 28px; padding-top: 2px; padding-bottom: 2px; }
+.tc-day-band .tc-variant-banner { flex-basis: 100%; margin-top: 4px; }
+@media (max-width: 760px) {
+  .tc-timeline-card .tc-day-head { margin: 0 -10px 6px; padding: 8px 10px; box-shadow: none; }
+  .tc-day-band .tc-variant { border-left: 0; padding-left: 0; flex-basis: 100%; }
+}
+/* 旅程の欄のスクロールは予定の一覧の 1 本だけ(細く) */
+.tc-timeline-card .tc-day-body { scrollbar-width: thin; scrollbar-color: var(--tc-cloud-200) transparent; }
+
+/* ---- 出発・帰着・宿の行: 時刻は予定と同じく左の時刻の列に大きく ---- */
+.tc-anchor-row { display: grid; grid-template-columns: 50px 18px minmax(0, 1fr); gap: 6px; align-items: center; margin: 4px 0; }
+.tc-anchor-row .tc-anchor { margin: 0; }
+.tc-anchor-time { text-align: right; font-weight: 800; font-size: 14px; color: var(--tc-ink-900); line-height: 1.2; }
+.tc-anchor-dot { position: relative; align-self: stretch; }
+.tc-anchor-dot::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%);
+  border-radius: 3px; background: var(--tc-ink-700);
+}
+.tc-anchor-row[data-kind^='lodging'] .tc-anchor-dot::before { background: #17734d; }
+@media (max-width: 760px) {
+  .tc-anchor-row { grid-template-columns: 42px 14px minmax(0, 1fr); gap: 4px; }
+  .tc-anchor-time { font-size: 12px; }
+}
+
+/* ---- 予定の行とカード ---- */
+.tc-event-row { grid-template-columns: minmax(0, 1fr); }
+.tc-event-row.tc-area-head { grid-template-columns: minmax(0, 1fr) auto; }
+.tc-event { grid-template-columns: 50px 18px minmax(0, 1fr); gap: 6px; padding: 4px 0 6px; cursor: default; }
+.tc-draggable > div > .tc-event { cursor: grab; }
+.tc-event-time { font-size: 14px; padding-top: 12px; text-align: right; }
+.tc-event-dot::before { top: 15px; left: 50%; transform: translateX(-50%); }
+.tc-event-info {
+  padding: 0; background: var(--tc-surface, var(--tc-cloud-0)); border: 1px solid var(--tc-cloud-200); border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.tc-event:hover .tc-event-info { background: var(--tc-surface, var(--tc-cloud-0)); border-color: color-mix(in srgb, var(--tc-accent) 40%, var(--tc-cloud-200)); }
+.tc-event.is-selected .tc-event-info { border-color: var(--tc-accent); box-shadow: 0 0 0 2px var(--tc-accent-soft); }
+.tc-event-topline { align-items: center; gap: 6px; padding: 7px 8px 6px 10px; border-bottom: 1px solid var(--tc-cloud-100); }
+.tc-event-title { font-size: 14px; gap: 6px; }
+.tc-event-cat { display: inline-flex; color: var(--tc-accent-strong); }
+.tc-event-num {
+  display: inline-grid; place-items: center; flex: none; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; border: 0;
+  background: var(--tc-accent); color: var(--tc-on-accent, #fff); font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.tc-event-num.is-area { background: #0e7c6b; box-shadow: 0 0 0 2px color-mix(in srgb, #0e7c6b 25%, transparent); margin-right: 2px; }
+.tc-event.is-selected .tc-event-num { background: #c2410c; box-shadow: 0 0 0 3px #fed7aa; }
+.tc-event-tools { opacity: .8; }
+.tc-event-book { flex: none; }
+/* 予約の操作を開いている間は、ほかの操作のアイコンを隠して 2 つの操作に場所を譲る */
+
+.tc-event-body { display: grid; grid-template-columns: 150px minmax(0, 1fr) 30px; gap: 10px; padding: 9px 8px 9px 10px; align-items: start; }
+.tc-event-body.is-nophoto { grid-template-columns: minmax(0, 1fr) 30px; }
+.tc-event-body.is-noreorder { grid-template-columns: 150px minmax(0, 1fr); }
+.tc-event-body.is-nophoto.is-noreorder { grid-template-columns: minmax(0, 1fr); }
+.tc-event-photo {
+  position: relative; display: block; width: 100%; height: 96px; margin: 0; padding: 0; border: 0; border-radius: 10px;
+  overflow: hidden; background: var(--tc-cloud-100); max-width: none;
+}
+.tc-event-photo.is-btn { cursor: pointer; }
+.tc-event-photo-img, .tc-event-photo-img img { display: block; width: 100%; height: 100%; }
+.tc-event-photo-img img { object-fit: cover; }
+.tc-event-photo-credit {
+  position: absolute; left: 6px; bottom: 4px; padding: 0 6px; border-radius: 6px; font-size: 10px; color: #fff; background: rgba(15, 23, 42, .62);
+}
+.tc-event-photo.is-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+  border: 1.5px dashed var(--tc-cloud-200); background: var(--tc-cloud-50, var(--tc-cloud-100)); color: var(--tc-ink-500); font-size: 11px; font-weight: 700;
+}
+.tc-event-photo.is-empty:hover { border-color: var(--tc-accent); color: var(--tc-accent-strong); }
+.tc-event-main { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.tc-event-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tc-event-main .tc-event-desc { margin: 0; font-size: 12px; font-weight: 700; color: var(--tc-ink-900); }
+.tc-event-main .tc-event-hours { margin: 0; }
+.tc-event-sub { margin-top: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tc-event-tel { display: inline-flex; align-items: center; gap: 4px; justify-self: start; color: var(--tc-success); font-weight: 800; font-size: 13px; }
+.tc-event-more {
+  justify-self: start; display: inline-flex; align-items: center; gap: 2px; margin-top: 2px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-50, var(--tc-cloud-0)); font-size: 12px; font-weight: 700; color: var(--tc-ink-900); cursor: pointer;
+}
+.tc-event-more:hover { border-color: var(--tc-accent); color: var(--tc-accent-strong); }
+.tc-event-reorder { display: grid; gap: 4px; align-self: center; }
+.tc-move-btn {
+  display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--tc-cloud-200); border-radius: 9px;
+  background: var(--tc-cloud-0); color: var(--tc-ink-700); cursor: pointer;
+}
+.tc-move-btn:hover:not(:disabled) { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+.tc-move-btn:disabled { opacity: .35; cursor: not-allowed; }
+.tc-event-expanded { margin: 0 10px 10px; padding-top: 10px; border-top: 1px solid var(--tc-cloud-200); cursor: default; }
+.tc-event-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tc-event-facts { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 5px 10px; margin: 0; font-size: 12px; }
+.tc-event-facts dt { color: var(--tc-ink-500); font-weight: 700; }
+.tc-event-facts dd { margin: 0; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-event-facts dd.is-good { color: var(--tc-success); }
+.tc-event-facts dd.is-warn { color: var(--tc-warning); }
+.tc-event-facts dd.is-bad { color: var(--tc-danger); }
+.tc-event-link { display: inline-flex; align-items: center; gap: 3px; margin-right: 10px; color: var(--tc-accent-strong); text-decoration: underline; }
+.tc-event-dining { margin-top: 8px; }
+.tc-event-dining h4 { margin: 0 0 4px; font-size: 13px; font-weight: 800; color: var(--tc-ink-900); }
+@media (max-width: 760px) {
+  .tc-event { grid-template-columns: 42px 14px minmax(0, 1fr); gap: 4px; }
+  .tc-event-time { font-size: 12px; }
+  .tc-event-body { grid-template-columns: 96px minmax(0, 1fr) 44px; }
+  .tc-event-body.is-nophoto { grid-template-columns: minmax(0, 1fr) 44px; }
+  .tc-event-body.is-noreorder { grid-template-columns: 96px minmax(0, 1fr); }
+  .tc-event-photo { height: 76px; }
+  .tc-move-btn { width: 44px; height: 44px; }
+  .tc-event-topline { flex-wrap: wrap; }
+}
+
+/* ---- 予約: 札(カードの中)と、カレンダー＋(カードの上の段の右) ---- */
+.tc-event-line .tc-booking { margin: 0; padding: 0; border: 0; background: transparent; display: inline-flex; flex-wrap: wrap; gap: 4px 8px; }
+.tc-booking.is-none .tc-booking-tag { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+.tc-booking.is-suggest .tc-booking-tag { background: #fff7ed; color: #9a3412; border: 1px dashed #c2410c; }
+.tc-booking.is-booked .tc-booking-tag { background: #17734d; }
+.tc-bk { display: inline-flex; align-items: center; gap: 6px; }
+.tc-bk-btn {
+  position: relative; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--tc-accent); cursor: pointer;
+}
+.tc-bk-btn:hover { background: var(--tc-accent-soft); }
+.tc-bk-btn[aria-expanded='true'] { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+.tc-bk-btn.is-booked { color: #17734d; }
+.tc-bk-btn.is-issue { color: var(--tc-warning); }
+.tc-bk-btn.is-suggest::after {
+  content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #c2410c;
+  border: 2px solid var(--tc-cloud-0);
+}
+.tc-bk-slide { display: inline-flex; gap: 6px; animation: tcBkSlide .22s ease-out; }
+@keyframes tcBkSlide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.tc-bk-act {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--tc-accent); background: var(--tc-cloud-0); color: var(--tc-accent-strong); font-size: 12px; font-weight: 800;
+  white-space: nowrap; cursor: pointer; text-decoration: none;
+}
+.tc-bk-act:hover { background: var(--tc-accent-soft); }
+.tc-bk-act.is-primary { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+@media (prefers-reduced-motion: reduce) { .tc-bk-slide, .tc-bk-menu { animation: none; } }
+/* [Gate BookingMenu] 未予約: 丸い「＋」を押すと、下に小さなメニュー(予約を取り込む・予約を登録する) */
+.tc-bk--menu { position: relative; }
+.tc-bk-plus {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 1px; height: 32px; padding: 0 8px 0 9px;
+  border-radius: 999px; border: 1.5px solid color-mix(in srgb, var(--tc-accent) 45%, transparent);
+  background: var(--tc-surface, #fff); color: var(--tc-accent-strong, var(--tc-accent)); cursor: pointer;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc-accent) 10%, transparent);
+}
+.tc-bk-plus:hover { background: var(--tc-accent-soft); }
+.tc-bk-plus[aria-expanded='true'] { background: var(--tc-accent-soft); border-color: var(--tc-accent); }
+.tc-bk-plus.is-suggest::after {
+  content: ''; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: #c2410c;
+  border: 2px solid var(--tc-cloud-0);
+}
+.tc-bk-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; display: grid; min-width: 172px; padding: 4px;
+  border: 1px solid var(--tc-cloud-200); border-radius: 12px; background: var(--tc-surface, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .16); animation: tcBkMenu .16s ease-out;
+}
+@keyframes tcBkMenu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.tc-bk-menu .tc-bk-act {
+  justify-content: flex-start; gap: 9px; width: 100%; height: 38px; padding: 0 10px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tc-ink-900); font-size: 13px; font-weight: 700;
+}
+.tc-bk-menu .tc-bk-act + .tc-bk-act { border-top: 1px solid var(--tc-cloud-100, var(--tc-cloud-200)); border-radius: 0 0 8px 8px; }
+.tc-bk-menu .tc-bk-act svg { color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-bk-menu .tc-bk-act:hover { background: var(--tc-accent-soft); }
+.tc-bk-menu .tc-bk-act.is-primary { background: var(--tc-accent); color: var(--tc-on-accent, #fff); }
+.tc-bk-menu .tc-bk-act.is-primary svg { color: currentColor; }
+@media (max-width: 760px) { .tc-bk-plus { height: 44px; padding: 0 12px; } .tc-bk-menu .tc-bk-act { height: 44px; } }
+@media (max-width: 760px) { .tc-bk-btn { width: 44px; height: 44px; } .tc-bk-act { height: 40px; } }
+
+/* ---- 移動: 横の細い破線と、真ん中の小さなラベル ---- */
+.tc-segment-slot { position: relative; margin: 2px 0; padding: 4px 0; justify-content: center; }
+.tc-segment-slot::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--tc-cloud-200); z-index: 0;
+}
+.tc-segment-slot > * { position: relative; z-index: 1; }
+.tc-segment-row {
+  border: 1px solid color-mix(in srgb, var(--tc-accent) 35%, transparent); border-radius: 999px; padding: 3px 12px;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong); font-weight: 700;
+}
+.tc-segment-row--empty { background: var(--tc-cloud-0); border-style: dashed; color: var(--tc-ink-700); font-weight: 600; }
+.tc-segment-row.is-mismatch { border-color: var(--tc-warning); }
+div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: fit-content; max-width: 100%; }
+.tc-segment-row--inner { background: color-mix(in srgb, #0e7c6b 18%, var(--tc-cloud-0)); border-color: color-mix(in srgb, #0e7c6b 45%, transparent); color: #0b4f46; }
+:root[data-theme='dark'] .tc-segment-row--inner { color: #9fe3d4; }
+@media (max-width: 760px) { .tc-segment-slot { margin-left: 0; } }
+
+/* ---- エリア: 時刻の列と点・枠は 1 本 ---- */
+.tc-area-row { display: grid; grid-template-columns: 50px 18px minmax(0, 1fr); gap: 6px; margin: 4px 0; }
+.tc-area-time { padding-top: 14px; text-align: right; font-weight: 800; font-size: 14px; line-height: 1.2; color: #0b5d52; }
+.tc-area-time small { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--tc-ink-500); }
+.tc-area-dot { position: relative; }
+.tc-area-dot::before {
+  content: ''; position: absolute; left: 50%; top: 15px; width: 14px; height: 14px; transform: translateX(-50%); border-radius: 50%;
+  background: #0e7c6b; box-shadow: 0 0 0 3px color-mix(in srgb, #0e7c6b 22%, transparent);
+}
+.tc-area-dot::after { content: ''; position: absolute; left: 50%; top: 32px; bottom: -10px; border-left: 1px dashed var(--tc-cloud-200); }
+.tc-area-row .tc-area-block { margin: 0; min-width: 0; }
+.tc-area-head-btns { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.tc-area-inner { margin: 4px 0 0; padding-left: 2px; border-left: 0; }
+.tc-area-inner[hidden] { display: none; }
+.tc-area-inner-chip {
+  margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, #0e7c6b 30%, transparent);
+  background: var(--tc-cloud-0); font-weight: 700; letter-spacing: 0;
+}
+.tc-area-member > .tc-event-row { background: transparent; border: 0; padding: 0; border-radius: 0; }
+.tc-area-inner .tc-event { grid-template-columns: 44px 16px minmax(0, 1fr); }
+.tc-area-inner .tc-event-time { font-size: 13px; }
+.tc-area-inner .tc-event-body { grid-template-columns: 120px minmax(0, 1fr) 30px; }
+.tc-area-inner .tc-event-body.is-nophoto { grid-template-columns: minmax(0, 1fr) 30px; }
+.tc-area-inner .tc-event-body.is-noreorder { grid-template-columns: 120px minmax(0, 1fr); }
+.tc-area-inner .tc-event-photo { height: 84px; }
+.tc-area-inner .tc-event-info { border-color: color-mix(in srgb, #0e7c6b 22%, var(--tc-cloud-200)); }
+.tc-area-member > .tc-segment-row, .tc-area-member > div[role='listitem'].tc-segment-row { margin-left: auto; }
+@media (max-width: 760px) {
+  .tc-area-row { grid-template-columns: 42px 14px minmax(0, 1fr); gap: 4px; }
+  .tc-area-inner .tc-event { grid-template-columns: 38px 12px minmax(0, 1fr); }
+  .tc-area-inner .tc-event-body { grid-template-columns: 84px minmax(0, 1fr) 44px; }
+}
+
+/* ---- 地図: 印(しずく形・番号)と、地図の上の欄 ---- */
+.tc-pin {
+  display: grid; place-items: center; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #fff;
+  margin-top: 0;
+}
+.tc-pin > span { transform: rotate(45deg); color: #fff; font-weight: 800; line-height: 1; }
+.tc-pin.is-cand { background: #fff; border-color: #c2410c; }
+.tc-pin.is-cand > span { color: #c2410c; font-size: 14px; }
+.leaflet-tooltip.tc-pin-tip { padding: 3px 9px; border: 0; border-radius: 8px; background: #0f172a; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(15, 23, 42, .25); }
+.leaflet-tooltip.tc-pin-tip::before { display: none; }
+.leaflet-tooltip.tc-pin-tip.is-start { background: #334155; }
+.leaflet-tooltip.tc-area-tip { padding: 2px 10px; border: 0; border-radius: 999px; background: #0e7c6b; color: #fff; font-size: 12px; font-weight: 800; box-shadow: none; }
+.leaflet-tooltip.tc-area-tip::before { display: none; }
+/* 選んだ予定の番号は、旅程のカードも地図の印と同じ赤 */
+.tc-event.is-selected .tc-event-num { background: #dc2626; box-shadow: 0 0 0 3px #fecaca; }
+.tc-event.is-selected .tc-event-info { border-color: #dc2626; box-shadow: 0 0 0 2px #fee2e2; }
+
+.tc-map-frame .leaflet-top.leaflet-left { top: 88px; }
+.tc-map-frame .leaflet-bottom { bottom: 34px; }
+.tc-mapov {
+  position: absolute; z-index: 600; background: var(--tc-surface, var(--tc-cloud-0)); border: 1px solid var(--tc-cloud-200);
+  border-radius: 14px; box-shadow: 0 8px 24px rgba(15, 23, 42, .14); color: var(--tc-ink-900);
+}
+.tc-mapov-chip { left: 12px; top: 10px; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; }
+.tc-mapov-date { padding: 3px 10px; border-radius: 999px; background: var(--tc-accent); color: var(--tc-on-accent, #fff); font-size: 12px; font-weight: 800; }
+.tc-mapov-legend { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--tc-ink-700); }
+.tc-mapov-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--tc-accent); }
+.tc-mapov-legend i.is-cand { background: #fff; border: 2px solid #c2410c; }
+/* [Gate RoadRoute] 道に沿った経路(実線)・直線の目安(点線) */
+.tc-mapov-legend i.is-road { width: 18px; height: 4px; border-radius: 2px; background: var(--tc-accent); }
+.tc-mapov-legend i.is-straight { width: 18px; height: 0; border-radius: 0; background: transparent; border-top: 3px dotted #334155; }
+/* 地図を最大化・Google マップで表示(MapTools)は日付の欄の右に */
+.tc-map-frame .tc-map-actions { left: 12px; right: auto; top: 50px; justify-content: flex-start; max-width: calc(100% - 310px); }
+.tc-mapov-check { right: 12px; top: 10px; width: 270px; padding: 10px 12px; }
+.tc-mapov-check h3 { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; }
+.tc-mapov-fold { margin-left: auto; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--tc-ink-700); cursor: pointer; }
+.tc-mapov-fold:hover { background: var(--tc-cloud-100); }
+.tc-mapov-pace { margin: 8px 0 4px; padding: 6px 10px; border-radius: 10px; background: var(--tc-accent-soft); color: var(--tc-accent-strong); font-size: 12px; font-weight: 800; }
+.tc-mapov-pace.is-warn { background: var(--tc-warning-soft, #fff7ed); color: var(--tc-warning); }
+.tc-mapov-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; color: var(--tc-ink-700); }
+.tc-mapov-list li { display: flex; align-items: flex-start; gap: 6px; }
+.tc-mapov-list b { color: var(--tc-ink-900); }
+.tc-mapov-mark { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--tc-accent-soft); color: var(--tc-success); font-size: 11px; font-weight: 800; }
+.tc-mapov-mark.is-warn { background: #fff7ed; color: #9a3412; }
+.tc-mapov-sel { left: 12px; bottom: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; max-width: calc(100% - 300px); }
+.tc-mapov-num { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: #dc2626; color: #fff; font-weight: 800; }
+.tc-mapov-seltext { display: grid; min-width: 0; }
+.tc-mapov-seltext b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-mapov-seltext small { font-size: 11px; color: var(--tc-ink-500); }
+.tc-mapov-x { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; color: var(--tc-ink-700); }
+.tc-mapov-next { right: 12px; bottom: 44px; width: 250px; padding: 10px 12px; }
+.tc-mapov-next p { margin: 0; }
+.tc-mapov-nexthead { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.tc-mapov-nexthead span { padding: 1px 8px; border-radius: 999px; background: var(--tc-cloud-100); font-size: 10px; color: var(--tc-ink-700); }
+.tc-mapov-nexttitle { margin-top: 4px !important; font-size: 12px; font-weight: 800; color: var(--tc-accent-strong); }
+.tc-mapov-nextmin { font-size: 15px; font-weight: 800; }
+.tc-mapov-nextbtns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+/* 移動の概算は地図の下の帯 */
+.tc-planmap-foot { left: 0; right: 0; bottom: 0; max-width: none; border-radius: 0; border: 0; border-top: 1px solid var(--tc-cloud-200); box-shadow: none; padding: 7px 12px; }
+@media (max-width: 760px) {
+  .tc-mapov-check { width: auto; left: 12px; top: 50px; }
+  .tc-mapov-sel { max-width: calc(100% - 24px); }
+  .tc-mapov-next { display: none; }
+  .tc-map-frame .tc-map-actions { left: auto; right: 8px; top: 52px; }
+}
+
+/* ===== [Gate MapFloatTimeline] 地図の最大化の時の小さな旅程(左に重ねる) ===== */
+.tc-mtl { left: 12px; top: 100px; bottom: 44px; width: 300px; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.tc-mtl-head { display: flex; align-items: center; gap: 6px; padding: 9px 8px 9px 12px; border-bottom: 1px solid var(--tc-cloud-200);
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong, var(--tc-accent)); font-size: 13px; }
+.tc-mtl-head b { color: var(--tc-ink-900); }
+.tc-mtl-date { font-size: 12px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-mtl-list { list-style: none; margin: 0; padding: 6px 6px 10px; overflow-y: auto; flex: 1; scrollbar-width: thin; }
+.tc-mtl-btn { width: 100%; display: grid; grid-template-columns: 42px 24px minmax(0, 1fr); align-items: center; gap: 6px;
+  padding: 5px 6px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; color: var(--tc-ink-900); }
+.tc-mtl-btn:hover { background: var(--tc-cloud-50); }
+.tc-mtl-btn.is-selected { background: #fef2f2; border-color: #fecaca; }
+.tc-mtl-time { font-size: 12px; font-weight: 800; text-align: right; color: var(--tc-ink-900); font-variant-numeric: tabular-nums; }
+.tc-mtl-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #0f6e66; color: #fff;
+  font-size: 11px; font-weight: 800; }
+.tc-mtl-num.is-none { background: var(--tc-cloud-200); color: var(--tc-ink-700); }
+.tc-mtl-btn.is-selected .tc-mtl-num { background: #dc2626; }
+.tc-mtl-title { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-mtl-item.is-inner .tc-mtl-btn { padding-left: 18px; }
+.tc-mtl-item.is-inner .tc-mtl-title { font-weight: 600; }
+.tc-mtl-item.is-area .tc-mtl-title::before { content: 'エリア'; margin-right: 6px; padding: 0 5px; border-radius: 5px; font-size: 10px;
+  background: var(--tc-accent-soft); color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-mtl-move { display: flex; align-items: center; gap: 5px; margin: 1px 0 1px 54px; padding-left: 8px; border-left: 2px dashed var(--tc-cloud-200);
+  font-size: 11px; color: var(--tc-ink-700); }
+.tc-mtl-move.is-inner { margin-left: 66px; }
+.tc-mtl-anchor { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px; align-items: center; margin: 2px 0; padding: 6px;
+  border-radius: 9px; background: var(--tc-cloud-50); font-size: 12px; }
+.tc-mtl-anchortext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-mtl-anchortext b { margin-right: 6px; color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-mtl-pill { left: 12px; top: 100px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; cursor: pointer; }
+.tc-mtl-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: var(--tc-accent); color: var(--tc-on-accent, #fff); font-size: 11px; }
+/* 最大化の時は、拡大・縮小のボタンを旅程の右へ。選んだ予定の1行も旅程の右から */
+.tc-map-frame--max .leaflet-top.leaflet-left { left: 316px; }
+.tc-map-frame--max .tc-mapov-sel { left: 324px; max-width: calc(100% - 620px); }
+@media (max-width: 900px) {
+  .tc-mtl { width: 230px; }
+  .tc-map-frame--max .leaflet-top.leaflet-left { left: 246px; }
+  .tc-map-frame--max .tc-mapov-sel { left: 254px; max-width: calc(100% - 270px); }
+}
+
+/* ===== [Gate ChartAlign] 全日程の表: 上の段(見出し・前夜の宿)を同じ高さに。宿は列の幅いっぱい ===== */
+.tc-chart-top { display: flex; flex-direction: column; }
+.tc-chart-top .tc-chart-dayhead { box-sizing: border-box; }
+.tc-chart-topanchor:not(:empty) { padding-top: 8px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact { margin: 0; }
+.tc-anchor-row.is-compact { display: block; margin: 6px 0 0; }
+.tc-anchor-row.is-compact .tc-anchor { align-items: flex-start; gap: 8px; padding: 8px 10px; border-style: solid; border-radius: 10px;
+  background: var(--tc-surface, var(--tc-cloud-0)); }
+.tc-anchor-row.is-compact[data-kind^='lodging'] .tc-anchor { border-color: color-mix(in srgb, #17734d 35%, var(--tc-cloud-200));
+  background: color-mix(in srgb, #17734d 6%, var(--tc-surface, #fff)); }
+.tc-anchor-row.is-compact .tc-anchor-icon { margin-top: 1px; color: #17734d; }
+.tc-anchor-row.is-compact .tc-anchor-text { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.tc-anchor-row.is-compact .tc-anchor-label { display: block; margin: 0 0 1px; font-size: 11px; font-weight: 800; color: #17734d; }
+
+/* ===== [Gate TripDayNav] 旅の当日: メニューの「旅行中」の印・当日まであと何日 ===== */
+.tc-tripnav-live { position: relative; }
+.tc-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #dc2626; box-shadow: 0 0 0 0 rgba(220, 38, 38, .55);
+  animation: tc-live-pulse 1.8s ease-out infinite; }
+@keyframes tc-live-pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .55); } 80%, 100% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); } }
+@media (prefers-reduced-motion: reduce) { .tc-live-dot { animation: none; } }
+.tc-today-empty.is-before { background: linear-gradient(135deg, var(--tc-accent-soft), var(--tc-surface, #fff) 70%); color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-today-countdown { display: flex; align-items: baseline; gap: 4px; margin: 4px 0; color: var(--tc-accent-strong, var(--tc-accent)); }
+.tc-today-countdown b { font-size: 56px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.tc-today-countdown span { font-size: 18px; font-weight: 800; }
+.tc-today-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+
+/* ===== [Gate SegmentBooking] 移動の予約(移動の行の右の小さな「＋⌄」・予約済みはカレンダー✓) ===== */
+.tc-segment-tools .tc-bk--menu { display: inline-flex; }
+.tc-bk-plus--sm { height: 28px; padding: 0 6px 0 7px; box-shadow: none; }
+.tc-bk-menu--left { right: auto; left: 0; }
+.tc-bk-menu .tc-bk-act .truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-seg-iconbtn.tc-seg-booked { color: #17734d; }
+
+/* ===== [Gate ChartHeadSlim] 全日程の表: 見出しを低く・見出しを固定して予定だけ上下に流す ===== */
+.tc-chart-scroll { max-height: calc(100vh - 150px); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.tc-chart-scroll > .tc-chart-col { overflow: visible; }
+.tc-chart-top { position: sticky; top: 0; z-index: 6; margin: -12px -12px 0; padding: 0 12px 6px;
+  background: var(--tc-surface, var(--tc-cloud-0)); border-radius: 12px 12px 0 0;
+  box-shadow: 0 6px 10px -8px rgba(15, 23, 42, .25); }
+.tc-chart-top .tc-chart-dayhead { margin: 0 -12px; padding: 7px 12px 6px; }
+.tc-chart-dayhead-kicker { font-size: 10.5px; }
+.tc-chart-dayhead-kicker span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-chart-dayhead-date { margin-top: 0; font-size: 16px; line-height: 1.25; }
+.tc-chart-dayhead-sum { margin-top: 3px; display: grid; gap: 2px; }
+.tc-chart-dayhead-line { margin: 0; font-size: 11px; line-height: 1.45; color: var(--tc-ink-800, var(--tc-ink-900)); }
+.tc-chart-dayhead-line .tc-chart-sep { color: var(--tc-ink-500, var(--tc-ink-700)); }
+.tc-chart-dayhead-line .tc-chart-variant { margin-left: 6px; }
+.tc-chart-dayhead-modes { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: var(--tc-ink-700); }
+.tc-chart-dayhead-modes > span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.tc-chart-topanchor:not(:empty) { padding-top: 6px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact .tc-anchor { padding: 5px 8px; }
+.tc-chart-topanchor .tc-anchor-row.is-compact .tc-anchor-text { font-size: 12px; }
+.tc-chart-dayhead-line > span { white-space: nowrap; }

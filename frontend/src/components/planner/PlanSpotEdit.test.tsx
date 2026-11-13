@@ -203,7 +203,7 @@ describe('DayView の日のカード', () => {
     render(<DayView day={day()} planId="p1"
       startAnchor={{ kind: 'departure', place: '自宅', time: '07:30', continued: false }}
       endAnchor={{ kind: 'lodging-missing', place: null, time: null, continued: false }} />);
-    expect(screen.getByTestId('day-anchor-start')).toHaveTextContent('出発自宅 · 07:30');
+    expect(screen.getByTestId('day-anchor-start')).toHaveTextContent('07:30出発自宅');
     expect(screen.getByTestId('day-anchor-end')).toHaveTextContent('今夜の宿未設定');
     expect(screen.getByRole('list').contains(screen.getByTestId('day-anchor-start'))).toBe(false);
     fireEvent.click(screen.getByTestId('day-anchor-add-lodging'));
@@ -229,7 +229,7 @@ describe('DayView の日のカード', () => {
   it('[JourneyMove] 帰着の上の移動は、手段が未設定なら「設定する」', async () => {
     render(<DayView day={day()} planId="p1" onEditJourney={vi.fn()}
       endAnchor={{ kind: 'arrival', place: '自宅', time: '19:00', continued: false, mode: null, minutes: null }} />);
-    expect(screen.getByTestId('day-anchor-end')).toHaveTextContent('帰着自宅 · 19:00');
+    expect(screen.getByTestId('day-anchor-end')).toHaveTextContent('19:00帰着自宅');
     expect(screen.getByTestId('journey-move-arrival')).toHaveTextContent('最後の予定から帰着地までの移動手段 未設定');
     expect(screen.getByTestId('journey-move-edit-arrival')).toHaveTextContent('設定する');
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
