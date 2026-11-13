@@ -200,7 +200,9 @@ def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypa
                           # [Gate Remaining-2] 接続口(鍵が有る時だけ使う。無ければ手入力)
                           "odpt_consumer_key", "ekispert_api_key",
                           # [Gate Remaining-4] 決済(テストモード)
-                          "stripe_secret_key", "stripe_webhook_secret"}
+                          "stripe_secret_key", "stripe_webhook_secret",
+                          # [Gate Remaining-5] 顔の検査(任意)
+                          "google_vision_key"}
     assert slots["ekispert_api_key"]["required"] is False and slots["ekispert_api_key"]["in_use"] is True
     assert "任意・有料" in slots["ekispert_api_key"]["in_use_note"]
     assert slots["yahoo_client_id"]["free"] is True and slots["yahoo_client_id"]["required"] is False

@@ -17,6 +17,7 @@ import { downloadItineraryExport, downloadPlanDataExport } from '@/services/api'
 import type { ItineraryExportFormat, ItineraryExportOptions, LocationPrecision } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import MyMapsCard from './exports/MyMapsCard';
+import CalendarFeedCard from './exports/CalendarFeedCard';
 import { FORMAT_LABEL, describeDataExport, describeResult, saveDataExport, saveFile } from './exports/exportModel';
 
 const ExportsPage: React.FC = () => {
@@ -103,6 +104,8 @@ const ExportsPage: React.FC = () => {
               onClick={() => run('ics', { include_addresses: icsAddresses })}>ICSを書き出す</Button>
           </section>
         </Card>
+
+        {planId && <CalendarFeedCard planId={planId} />}
 
         <Card padding="md">
           <section aria-labelledby="export-geo">

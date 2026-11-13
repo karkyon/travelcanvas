@@ -57,6 +57,12 @@ PUBLIC_ROUTES = {
                                       "確かめる。設定が無ければ 404・違えば 403。読んだ候補は持ち主が確定する)",
     ("POST", "/api/v1/billing/stripe/webhook"): "[Gate Remaining-4] Stripe からの知らせ(署名 whsec で確かめる。鍵が無ければ 404・"
                                                 "違えば 400。同じイベントは 1 回だけ)",
+    ("GET", "/api/v1/public/embed/{token}"): (
+        "[Gate Remaining-5] 所有者が埋め込みを選んだ共有リンクの旅程(合言葉・回数の制限の無いリンクだけ。スクリプトなし)"),
+    ("GET", "/api/v1/public/embed.js"): "[Gate Remaining-5] 埋め込みの部品(中身は固定の JS。旅程は含まない)",
+    ("GET", "/api/v1/public/booklets/{token}/pdf"): "[Gate Remaining-5] 公開したしおりの版の PDF(機密の版は公開されない)",
+    ("GET", "/api/v1/public/calendar/{token}.ics"): (
+        "[Gate Remaining-5] カレンダーの購読(推測できない URL。作った人に見える予定だけ・住所なし。作り直し・止めるで無効)"),
     ("POST", "/api/v1/security/csp-report"): "[Gate S10] ブラウザが自動で送る CSP 違反の報告(数えるだけ・回数制限あり・返す中身なし)",
     ("POST", "/api/v1/auth/mfa/verify"): "[Gate S11] ログインの2段目(5分だけ有効な署名つきの合図 + 確認コード。回数制限あり)",
     ("POST", "/api/v1/oauth/token"): "[Gate B1] OAuth 2.0 client_credentials のトークン発行(クライアントの秘密で認証する。回数制限あり)",
