@@ -3,6 +3,8 @@
 
 - GET /atlas           : 自分が参加している旅行(所有・承諾済みの共同編集)を横断して、訪れた地域を区画で集計する
                          (precision=region|area、year=年で絞り込み)。旅行ごとの件数と、Atlasから除いているかを返す
+- GET /atlas/places    : [Gate Remaining-2] 区画を国・都道府県(州)・市区町村にまとめる(逆ジオコーディング。無料の公開サービス)。
+                         1 回に新しく調べる区画は ATLAS_LOOKUPS_PER_CALL まで(残りは pending。もう一度呼ぶと続きを調べる)
 - PUT /atlas/settings  : Atlasに含めない旅行を設定する(旅行単位の公開範囲。users.preferences["atlas"] に保存、migrationなし)
 
 材料: 行った実績(P14、旅行の共有データ)・本人の位置付きの記録(P12)・本人の位置の軌跡(P13、サーバー保存分)・
@@ -158,6 +160,72 @@ def get_atlas(precision: str = Query("region"), year: Optional[int] = Query(None
     cells = at.aggregate(all_obs, precision)
     return {"precision": precision, "year": year, "years": sorted(years), "plans": plans_out, "cells": cells,
             "summary": at.summarize(cells)}
+
+
+ATLAS_LOOKUPS_PER_CALL = 8
+_RANK = {"PLANNED": 1, "PASS_THROUGH": 2, "VISITED": 3, "STAYED": 4}
+
+
+def _stronger(a: Optional[str], b: str) -> str:
+    return b if a is None or _RANK[b] > _RANK[a] else a
+
+
+@router.get("/places")
+def get_atlas_places(year: Optional[int] = Query(None, ge=1900, le=2200), db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    """訪れた区画(0.1 度)を国・都道府県・市区町村にまとめる。地名は区画の真ん中の座標から引く(作り話の地名を出さない。
+    引けない区画は unresolved に数える)"""
+    from app.services import reverse_geocode
+
+    data = get_atlas(precision="region", year=year, db=db, current_user=current_user)
+    cells = sorted(data["cells"], key=lambda c: -_RANK[c["state"]])
+    countries: Dict[str, Dict[str, Any]] = {}
+    lookups = pending = unresolved = 0
+    for c in cells:
+        lat = round((c["lat_min"] + c["lat_max"]) / 2, 2)
+        lng = round((c["lng_min"] + c["lng_max"]) / 2, 2)
+        if not reverse_geocode.cached_only(lat, lng):
+            if lookups >= ATLAS_LOOKUPS_PER_CALL or not reverse_geocode.enabled():
+                pending += 1
+                continue
+            lookups += 1
+        place = reverse_geocode.reverse(lat, lng)
+        if not place:
+            unresolved += 1
+            continue
+        cc = place["country_code"]
+        country = countries.setdefault(cc, {"country_code": cc, "country": place["country"], "state": None,
+                                            "cells": 0, "regions": {}})
+        country["cells"] += 1
+        country["state"] = _stronger(country["state"], c["state"])
+        rname = place.get("prefecture") or "(地域不明)"
+        region = country["regions"].setdefault(rname, {"name": rname, "state": None, "cells": 0, "municipalities": {}})
+        region["cells"] += 1
+        region["state"] = _stronger(region["state"], c["state"])
+        mname = place.get("municipality")
+        if mname:
+            m = region["municipalities"].setdefault(mname, {"name": mname, "state": None, "cells": 0})
+            m["cells"] += 1
+            m["state"] = _stronger(m["state"], c["state"])
+    out = []
+    for country in sorted(countries.values(), key=lambda x: (-x["cells"], x["country"])):
+        regions = []
+        for r in sorted(country["regions"].values(), key=lambda x: (-x["cells"], x["name"])):
+            r["municipalities"] = sorted(r["municipalities"].values(), key=lambda x: (-x["cells"], x["name"]))
+            regions.append(r)
+        country["regions"] = regions
+        out.append(country)
+    visited = {"countries": 0, "regions": 0, "municipalities": 0}
+    for country in out:
+        if _RANK[country["state"]] >= _RANK["VISITED"]:
+            visited["countries"] += 1
+        for r in country["regions"]:
+            if _RANK[r["state"]] >= _RANK["VISITED"]:
+                visited["regions"] += 1
+            visited["municipalities"] += sum(1 for m in r["municipalities"] if _RANK[m["state"]] >= _RANK["VISITED"])
+    return {"year": year, "countries": out, "visited": visited, "pending": pending, "unresolved": unresolved,
+            "enabled": reverse_geocode.enabled(),
+            "sources": "国土地理院(日本)・OpenStreetMap Nominatim(日本の外)・気象庁(市区町村の名前)"}
 
 
 class AtlasSettings(BaseModel):

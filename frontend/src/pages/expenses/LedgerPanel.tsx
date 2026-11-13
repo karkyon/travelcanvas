@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Card from '@/components/common/Card';
 import {
-  createBudgetVersion, createFxRate, getBudgetVersions, getFinanceSettingsG5, getFxRates, lockFinance, putRoundingPolicy,
+  createBudgetVersion, createFxRate, fetchFxRate, getBudgetVersions, getFinanceSettingsG5, getFxRates, lockFinance, putRoundingPolicy,
   unlockFinance,
 } from '@/services/api/g5';
 import type {
@@ -208,6 +208,20 @@ const LedgerPanel: React.FC<Props> = ({ planId, canEdit, isOwner, baseCurrency, 
                 為替を記録
               </button>
             </form>
+          )}
+          {canEdit && foreign.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" disabled={busy} className={`${btn} border border-blue-700 text-blue-800`}
+                onClick={() => void run(() => fetchFxRate(planId, {
+                  currency: rateForm.currency, ...(rateForm.rate_date ? { rate_date: rateForm.rate_date } : {}),
+                }), `${rateForm.currency} の為替を自動で記録しました(欧州中央銀行の参考値)`,
+                '為替を自動で取れませんでした。出典を書いて手で入れてください', true)}>
+                {rateForm.currency} の為替を自動で取る
+              </button>
+              <span className="text-xs text-ink-700">
+                欧州中央銀行(ECB)の参考値です。基準日を空にすると最新の営業日の値を取ります。取れない通貨は手で入れてください。
+              </span>
+            </div>
           )}
         </section>
       </Card>

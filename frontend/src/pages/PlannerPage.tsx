@@ -81,6 +81,7 @@ import PresenceBar from '@/components/planner/PresenceBar';
 import { usePlanPresence } from '@/hooks/usePlanPresence';
 import MemberPolicyNotice from '@/components/planner/MemberPolicyNotice';
 import { othersEditing } from '@/utils/presence';
+import { usePlanHolidays } from '@/hooks/usePlanHolidays';
 import { FIELD_LABEL, detectConflict, mergeMine, unreadConflict, type EditConflict, type EditFields } from '@/utils/editConflict';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
@@ -214,6 +215,8 @@ const PlannerPage: React.FC = () => {
   const [segments, setSegments] = useState<TravelSegment[]>([]);
   // [Gate PlanB] 日ごとの案: この日の案・開いている控えの案
   const variantState = usePlanVariants(currentPlan?.id, currentPlan?.revision, currentPlan?.days[currentDayIndex]?.date);
+  // [Gate Remaining-2] FR-008 日ごとの祝日(日付の見出し・タブに「祝」)
+  const holidays = usePlanHolidays(currentPlan?.id, (currentPlan?.days ?? []).map((d) => d.date ?? '').filter(Boolean));
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
@@ -1088,7 +1091,7 @@ const PlannerPage: React.FC = () => {
               </div>
             </Card>
           ) : planView === 'all' ? (
-            <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex}
+            <AllDaysChart days={currentPlan.days} segments={segments} currentDay={currentDayIndex} holidays={holidays}
               variantsByDate={Object.fromEntries(variantState.datesWithStandby.map((x) => [x.date,
                 x.variants.filter((v) => v.status === 'standby').map((v) => `${v.label} ${v.name}`)]))}
               anchors={currentPlan.days.map((_, i) => dayAnchors(currentPlan, i))}
@@ -1106,6 +1109,11 @@ const PlannerPage: React.FC = () => {
                         <button key={d.id} type="button" className="tc-focus-ring tc-day-tab" aria-pressed={i === currentDayIndex}
                           onClick={() => setCurrentDay(i)} data-testid={`day-tab-${i}`} data-day={i}>
                           {d.date ? `${d.date.slice(5).replace('-', '/')} ${getDayOfWeek(d.date)}` : `${i + 1}日目`}
+                          {d.date && holidays[d.date] && (
+                            <span className="tc-day-holiday" title={holidays[d.date]} data-testid={`day-holiday-${i}`}>
+                              {' 祝'}<span className="sr-only">{`(${holidays[d.date]})`}</span>
+                            </span>
+                          )}
                           <span className="sr-only">{`(${d.events.length}件)`}</span>
                         </button>
                       ))}

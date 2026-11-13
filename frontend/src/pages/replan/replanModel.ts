@@ -158,3 +158,37 @@ export function replanErrorInfo(error: unknown): { code: ReplanErrorDetail['code
   }
   return { code: null, message: typeof detail === 'string' && detail ? detail : '処理に失敗しました', items: [] };
 }
+
+/** [Gate Remaining-2] ISO の時刻 → datetime-local の値(端末の現地時刻)。読めない時は空(登録した時刻になる) */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return '';
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** [Gate Remaining-2] 気象庁の警報・注意報 → 登録の欄の値 */
+export function formFromWarnings(w: {
+  day_id: string; area_name: string | null; report_at: string | null; source: string;
+  warnings: { name: string }[];
+}): AlertForm {
+  const names = w.warnings.map((x) => x.name).join('・');
+  return {
+    ...emptyAlertForm(), kind: 'weather', day_id: w.day_id, source_label: w.source, confidence: 'confirmed',
+    observed_at: toLocalInput(w.report_at), note: `${names}${w.area_name ? `(${w.area_name})` : ''}`.slice(0, 500),
+  };
+}
+
+/** [Gate Remaining-2] 鉄道の運行情報 → 登録の欄の値(遅れの見込みは利用者が確かめる) */
+export function formFromTransit(t: {
+  railway: string; status: string; text: string; observed_at: string | null; source: string;
+  suggested_kind: 'delay' | 'cancellation'; event_ids: string[];
+}): AlertForm {
+  return {
+    ...emptyAlertForm(), kind: t.suggested_kind, event_id: t.event_ids[0] ?? '', source_label: t.source.slice(0, 100),
+    confidence: 'confirmed', observed_at: toLocalInput(t.observed_at),
+    note: `${t.railway}: ${t.status} ${t.text}`.trim().slice(0, 500),
+  };
+}

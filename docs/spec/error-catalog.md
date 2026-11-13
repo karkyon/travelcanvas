@@ -92,6 +92,8 @@
 | `finance_unlock_owner_only` | 403 | no | 締めを解除できるのは旅行の所有者だけです | api/v1/finance_ledger.py |
 | `forbidden` | 403 | no | この場所を使う全ての旅行の編集の権限が無いため、直せません | api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
+| `fx_unavailable` | 503 | later | 為替を自動で取れませんでした。出典を書いて手で入れてください | api/v1/finance_ledger.py |
+| `fx_unsupported` | 422 | no | この通貨は自動で取れません。出典を書いて手で入れてください | api/v1/finance_ledger.py |
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
 | `guest_not_allowed` | 403 | no | ゲストでは AI の確かめは使えません。会員登録の後に使えます | api/v1/day_variants.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
@@ -106,7 +108,7 @@
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/media |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py, api/v1/location_tra |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |

@@ -44,6 +44,11 @@ export async function createFxRate(planId: string, input: { currency: string; ra
   return decodeG5('fxRate', (await api.post(`/plans/${planId}/fx-rates`, input, SILENT)).data);
 }
 
+/** [Gate Remaining-2] FR-027 為替を自動で取って記録する(ECB の参考値)。取れない時は 503(画面は手入力へ) */
+export async function fetchFxRate(planId: string, input: { currency: string; rate_date?: string }): Promise<FxRate> {
+  return decodeG5('fxRate', (await api.post(`/plans/${planId}/fx-rates/fetch`, input, SILENT)).data);
+}
+
 export async function getBudgetVersions(planId: string): Promise<BudgetVersion[]> {
   return decodeG5('budgetVersions', (await api.get(`/plans/${planId}/budget-versions`, SILENT)).data);
 }

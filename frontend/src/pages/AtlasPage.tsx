@@ -5,7 +5,7 @@
  * - 参加している旅行を横断して、訪れた地域を区画(約11km/約110km)で表示する。状態は滞在・訪問・通過・予定を区別する
  * - 地図の代わりの一覧(区画ごとの状態・旅行・最初と最後の日)を必ず併記する(DOC-04 SC-41 地図代替一覧)
  * - 年で絞り込み、旅行ごとにAtlasへ含めるかを選べる。Atlasはあなただけが見られる
- * - 国・都道府県などの地名は、座標から地名を調べる仕組みが未接続のため表示しない
+ * - [Gate Remaining-2] 国・都道府県・市区町村は「地名でまとめる」で調べる(AtlasPlacesPanel。押した時だけ外へ送る)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -15,6 +15,7 @@ import { getAtlas, updateAtlasSettings } from '@/services/api';
 import type { AtlasPrecision, AtlasResponse, AtlasState } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { STATE_INFO, cellLabel, layout, percent } from './atlas/atlasModel';
+import AtlasPlacesPanel from './atlas/AtlasPlacesPanel';
 
 const STATES: AtlasState[] = ['STAYED', 'VISITED', 'PASS_THROUGH', 'PLANNED'];
 
@@ -121,6 +122,8 @@ const AtlasPage: React.FC = () => {
               )}
             </section>
           </Card>
+
+          <AtlasPlacesPanel year={year} />
 
           <section aria-label="区画の一覧" className="mt-6">
             <h2 className="font-semibold text-ink-900">区画の一覧</h2>

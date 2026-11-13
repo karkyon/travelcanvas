@@ -48,6 +48,8 @@ interface Props {
   anchors?: ChartAnchors[];
   /** [Gate PlanB] 日付ごとの控えの案(「B 雨の日」など)。ある日は見出しに「B あり」の札 */
   variantsByDate?: Record<string, string[]>;
+  /** [Gate Remaining-2] FR-008 日付 → 祝日の名前。ある日は見出しに名前を添える */
+  holidays?: Record<string, string>;
 }
 
 /** 帯の最小の高さ(30px)に当たる分。終わりの無い予定もこの長さで重なりを見る */
@@ -67,10 +69,10 @@ const toMin = (t: string | null | undefined): number | null => {
 };
 
 const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number; current: boolean; anchors?: ChartAnchors;
-  variants?: string[]; onOpen: () => void; locked: Set<string>; drag: DragState | null; setDrag: (d: DragState | null) => void;
-  onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, anchors, variants, onOpen, locked, drag, setDrag, onDropEvent }) => {
+  variants?: string[]; holiday?: string; onOpen: () => void; locked: Set<string>; drag: DragState | null; setDrag: (d: DragState | null) => void;
+  onDropEvent?: (d: DragState, start?: number) => void }> = ({ day, scaleStart, scaleEnd, current, anchors, variants, holiday, onOpen, locked, drag, setDrag, onDropEvent }) => {
   const height = ((scaleEnd - scaleStart) / 60) * PX_PER_HOUR;
-  const label = `${day.date}(${weekday(day.date)})`;
+  const label = `${day.date}(${weekday(day.date)})${holiday ? ` ${holiday}` : ''}`;
   // [Gate AreaDrag] エリアは 1 つの枠(中の予定を含む長さ)として横に並べ、中の予定は枠の中に置く
   const areaBoxes = useMemo(() => (day.areas ?? []).map((a) => {
     const members = day.events.filter((e) => e.areaId === a.id);
@@ -316,7 +318,8 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
   );
 };
 
-const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, onMoveEvent, anchors, variantsByDate }) => {
+const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, onMoveEvent, anchors, variantsByDate,
+  holidays }) => {
   const locked = useMemo(() => new Set(days.flatMap((d) => d.events.filter((e) => e.locked).map((e) => e.id))), [days]);
   const model = useMemo(() => buildChart(days, segments, locked), [days, segments, locked]);
   // [Gate JourneyEnds] 出発・到着の時刻が物差しの外なら、物差しを 1 時間単位で広げる
@@ -376,7 +379,7 @@ const AllDaysChart: React.FC<Props> = ({ days, segments, currentDay, onOpenDay, 
         role={many ? 'region' : undefined}>
         {model.days.map((d) => (
           <DayColumn key={d.id} day={d} scaleStart={scale.lo} scaleEnd={scale.hi} anchors={anchors?.[d.index]}
-            variants={variantsByDate?.[d.date]}
+            variants={variantsByDate?.[d.date]} holiday={holidays?.[d.date]}
             current={d.index === currentDay} onOpen={() => onOpenDay(d.index)} locked={locked} drag={drag} setDrag={setDrag}
             onDropEvent={onMoveEvent ? (x, start) => (start === undefined ? onMoveEvent(x.id, x.from, d.index)
               : onMoveEvent(x.id, x.from, d.index, minutesToHm(start))) : undefined} />

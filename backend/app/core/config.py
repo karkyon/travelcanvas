@@ -357,6 +357,25 @@ class Settings(BaseSettings):
     OSRM_TIMEOUT_SECONDS: float = 4.0
     WEATHER_FORECAST_ENABLED: bool = True
     WEATHER_CACHE_SECONDS: int = 3600
+    # [Gate Remaining-2] 無料の外部サービス(app/services/ext_http.py)。false で取りに行かない(画面は手入力のまま)。
+    # 送り先は既定の公開の URL か下の設定だけ(利用者の入力では変えない)。送るのは通貨・丸めた座標・地域の番号・年だけ
+    FX_AUTO_ENABLED: bool = True          # 為替(ECB の参考値。Frankfurter)
+    FX_PROVIDER_URL: str = ""             # 空なら https://api.frankfurter.dev/v1
+    FX_CACHE_SECONDS: int = 3600
+    JMA_ENABLED: bool = True              # 気象庁の警報・注意報・地域の番号
+    JMA_CACHE_SECONDS: int = 600
+    REVERSE_GEOCODE_ENABLED: bool = True  # 座標 → 地名(日本は国土地理院、外は Nominatim)
+    NOMINATIM_ENABLED: bool = True
+    NOMINATIM_URL: str = ""               # 空なら https://nominatim.openstreetmap.org(1 秒に 1 回まで)
+    REVERSE_GEOCODE_CACHE_SECONDS: int = 2592000
+    HOLIDAYS_ENABLED: bool = True         # 日本の外の祝日(Nager.Date)。日本は計算で出す(通信しない)
+    HOLIDAYS_API_URL: str = ""
+    # [Gate Remaining-2] 鍵が要る提供元の接続口。鍵は運用コンソールで登録する(odpt_consumer_key・ekispert_api_key)。
+    # 鍵が無い時は送らない(画面は手入力)
+    ODPT_ENABLED: bool = True
+    ODPT_API_URL: str = ""
+    EKISPERT_ENABLED: bool = True
+    EKISPERT_API_URL: str = ""
     # [Gate PlaceLookupJP] 楽天ウェブサービスへ送る Referer(アプリの「許可された Web サイト」と同じ URL。空なら付けない)
     PLACE_LOOKUP_REFERER: str = ""
 

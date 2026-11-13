@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage, receipts,
-    spot_intake,
+    spot_intake, holidays,
     spot_media,
     privacy_zones, photo_upload, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers,
@@ -565,6 +565,8 @@ app.include_router(data_export.privacy_router, prefix="/api/v1")
 # [Gate PlanB-P8] FR-019 もしもの案(/plans/{plan_id}/branches)は日ごとの案(プランB、/plans/{plan_id}/variants)に置き換えた
 # [Gate P8] FR-036カレンダー(ICS)の取込(差分確認後に適用)。/plans/{plan_id}/calendar-import配下。
 app.include_router(calendar_import.router, prefix="/api/v1")
+# [Gate Remaining-2] FR-008 祝日の暦(日本は計算、外は Nager.Date)
+app.include_router(holidays.router, prefix="/api/v1")
 # 🗑️ [Gate P9] アカウント削除・同意の撤回(FR-039)
 app.include_router(privacy.router, prefix="/api/v1")
 # [Gate P10] FR-030 外部状況(アラート)・FR-031 安全な再計画。/plans/{plan_id}/alerts・/plans/{plan_id}/replans配下。

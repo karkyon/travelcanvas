@@ -53,6 +53,16 @@ SLOTS: Dict[str, Dict[str, Any]] = {
                         "env": "YOUTUBE_API_KEY", "free": True,
                         "hint": ("Google Cloud で「YouTube Data API v3」を有効にした API キー(Google マップのサーバー用キーに"
                                  "足しても可)。動画の説明欄から場所の候補を出します")},
+    # [Gate Remaining-2] 鉄道の運行情報(FR-030)。公共交通オープンデータセンターの利用登録で届く鍵(無料)
+    "odpt_consumer_key": {"label": "公共交通オープンデータセンター(ODPT)のアクセストークン", "providers": ["odpt"],
+                          "env": "ODPT_CONSUMER_KEY", "free": True, "connector": True,
+                          "note": "任意・無料: 登録すると旅程の路線の運行情報を取ります(無ければ送らず、運行情報は手で入れます)",
+                          "hint": "developer.odpt.org で利用者登録すると届くトークン。旅程の路線の遅延・運転見合わせを取ります"},
+    # [Gate Remaining-2] 時刻表・運賃の経路探索(FR-014・FR-015・FR-017)。有料の契約の鍵
+    "ekispert_api_key": {"label": "駅すぱあと Web サービスのアクセスキー", "providers": ["ekispert"],
+                         "env": "EKISPERT_API_KEY", "connector": True,
+                         "note": "任意・有料: 登録すると区間の時刻表・運賃の候補を出します(無ければ送らず、区間は手で入れます)",
+                         "hint": "駅すぱあと Web サービスの契約のキー(有料)。区間の時刻表・乗り換え・運賃の候補を出します"},
 }
 MIN_LEN, MAX_LEN = 8, 512
 

@@ -19,6 +19,7 @@ import {
   formatObserved, needsDelay, needsEvent, replanErrorInfo, type AlertForm,
 } from './replan/replanModel';
 import UiIcon from '@/components/common/UiIcon';
+import ExternalStatusPanel from './replan/ExternalStatusPanel';
 import { IcSun } from '@/components/common/uiIcons';
 
 const inputClass = 'w-full border rounded-lg px-3 py-2';
@@ -122,6 +123,13 @@ const AlertsPage: React.FC = () => {
     document.getElementById('alert-create-heading')?.scrollIntoView?.({ behavior: 'smooth' });
   };
 
+  const fromExternal = (f: AlertForm, msg: string) => {
+    setForm(f);
+    setError(null);
+    setMessage(msg);
+    document.getElementById('alert-create-heading')?.scrollIntoView?.({ behavior: 'smooth' });
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planId) return;
@@ -219,6 +227,8 @@ const AlertsPage: React.FC = () => {
               </ul>
             </section>
           )}
+
+          <ExternalStatusPanel planId={planId} canEdit={canEdit} onUse={fromExternal} />
 
           <section aria-labelledby="alert-list-heading" className="mt-6">
             <h2 id="alert-list-heading" className="font-semibold text-ink-900 mb-2">対応中の状況</h2>

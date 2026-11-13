@@ -9,6 +9,8 @@ import { render, waitFor, act, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
+// [Gate Remaining-2] 祝日は取りに行かない(外の通信を差し替える)
+vi.mock('@/hooks/usePlanHolidays', () => ({ usePlanHolidays: () => ({}) }));
 vi.mock('@/components/planner/variants/usePlanVariants', () => ({
   usePlanVariants: () => ({ canEdit: false, variants: [], openId: null, setOpenId: () => {}, open: null, checkSum: null,
     reload: () => {}, datesWithStandby: [] }),
