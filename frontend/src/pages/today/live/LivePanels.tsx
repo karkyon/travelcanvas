@@ -14,7 +14,8 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl, safeInternalPath, safeTelHref } from '@/utils/safeNavigation';
 import { formatTimeInZone, mapUrl } from '../todayModel';
 import { etaMessage, recapTitle, speak, type GoNowView, type LiveNotice, type LiveSettings } from './todayLive';
-import { Seal } from './LivePieces';
+import { LiveSwitch, Seal } from './LivePieces';
+import PushPanel from './PushPanel';
 
 // ---- 同行者の到着予定 ------------------------------------------------------------------------------------------
 
@@ -152,11 +153,6 @@ export const HelpSheet: React.FC<{
 
 // ---- 当日の設定 ------------------------------------------------------------------------------------------------
 
-const LiveSwitch: React.FC<{ label: string; sub: string; checked: boolean; onToggle: (v: boolean) => void }> = ({ label, sub, checked, onToggle }) => (
-  <label className="tc-live-switch"><span><b>{label}</b><small>{sub}</small></span>
-    <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} /></label>
-);
-
 export const SettingsDialog: React.FC<{
   open: boolean; onClose: () => void; settings: LiveSettings; onChange: (s: LiveSettings) => void;
   simple: boolean; onSimple: () => void;
@@ -174,7 +170,8 @@ export const SettingsDialog: React.FC<{
       <LiveSwitch label="着いたらひとこと案内(読み上げ)" sub="印を押した時・移動モードで着いた時に読み上げる" checked={settings.voice}
         onToggle={(v) => { onChange({ ...settings, voice: v }); if (v) speak('読み上げをオンにしました'); }} />
       <LiveSwitch label="簡易表示" sub="今と次だけ・大きな文字" checked={simple} onToggle={() => onSimple()} />
-      <p className="tc-live-muted" style={{ marginTop: 12 }}>この端末に覚えます。位置の記録は「位置の記録」の画面で ON にした時だけ使います(既定は OFF)。端末の通知(Web Push)は次の段階で入れます。</p>
+      <p className="tc-live-muted" style={{ marginTop: 12 }}>画面の中の知らせと表示はこの端末に覚えます。位置の記録は「位置の記録」の画面で ON にした時だけ使います(既定は OFF)。</p>
+      {open && <PushPanel />}
     </Modal>
   );
 };
@@ -217,7 +214,7 @@ export const TransitMode: React.FC<{
         <div>
           <div className="tc-transit__bar" role="progressbar" aria-label="道のりの進み(時間)" aria-valuemin={0} aria-valuemax={100}
             aria-valuenow={progress}><div style={{ width: `${progress}%` }} /></div>
-          <p className="tc-transit__muted" style={{ margin: '6px 0 0' }}>{go?.estimated ? '移動時間は直線距離からの概算です' : '登録した移動の時刻から'}</p>
+          <p className="tc-transit__muted" style={{ margin: '6px 0 0' }}>{go?.estimated ? '移動時間は直線距離からの概算です' : go?.source === 'manual' ? '乗換で調べた時刻から' : '登録した移動の時刻から'}</p>
         </div>
       )}
       {next.address && (

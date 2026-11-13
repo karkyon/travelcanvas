@@ -6,7 +6,7 @@ import React from 'react';
 import type { TodayEvent } from '@/services/api';
 import type { GuideStamp } from '@/services/api/travelDay';
 import { formatTimeInZone } from '../todayModel';
-import { STAGE_LABEL, STAGE_ORDER, sealGlyph, sealTilt, type GoNowView } from './todayLive';
+import { STAGE_LABEL, STAGE_ORDER, sealGlyph, sealTilt, travelLabel, type GoNowView } from './todayLive';
 
 export const Seal: React.FC<{ title: string; id: string; eventType?: string | null; size?: number;
   state?: 'done' | 'ready' | 'empty'; press?: boolean; label?: string }> = ({
@@ -71,7 +71,9 @@ export const JourneyThread: React.FC<{
   </nav>
 );
 
-export const GoNowBlock: React.FC<{ view: GoNowView; title: string; timeZone: string | null }> = ({ view, title, timeZone }) => {
+export const GoNowBlock: React.FC<{ view: GoNowView; title: string; timeZone: string | null; children?: React.ReactNode }> = ({
+  view, title, timeZone, children,
+}) => {
   const dash = Math.round(view.ring * 314);
   const leave = formatTimeInZone(view.leaveBy, timeZone);
   const big = view.minutesToLeave > 0 ? `${view.minutesToLeave}分` : view.stage === 'now' ? '今' : `+${-view.minutesToLeave}分`;
@@ -93,9 +95,7 @@ export const GoNowBlock: React.FC<{ view: GoNowView; title: string; timeZone: st
           <p className="tc-go__head">
             {view.stage === 'late' && expected ? `${expected}ごろ着く見込み` : `${leave} に出れば、ちょうど`}
           </p>
-          <p className="tc-go__sub" aria-label={`${title}へ`}>
-            {view.travelMinutes != null ? `移動 約${view.travelMinutes}分` : '登録した移動の出発時刻から'}
-          </p>
+          <p className="tc-go__sub" aria-label={`${title}へ`}>{travelLabel(view)}</p>
           {view.estimated && <p className="tc-go__note">移動時間は直線距離からの概算です</p>}
         </div>
       </div>
@@ -105,6 +105,16 @@ export const GoNowBlock: React.FC<{ view: GoNowView; title: string; timeZone: st
         ))}
       </ol>
       <p className="tc-go__advice">{view.advice}</p>
+      {children}
     </div>
   );
 };
+
+/** 当日の設定の切り替え(ラベル・補足・チェック)。disabled の時は押せない */
+export const LiveSwitch: React.FC<{
+  label: string; sub: string; checked: boolean; onToggle: (v: boolean) => void; disabled?: boolean; testId?: string;
+}> = ({ label, sub, checked, onToggle, disabled, testId }) => (
+  <label className={`tc-live-switch${disabled ? ' is-disabled' : ''}`}><span><b>{label}</b><small>{sub}</small></span>
+    <input type="checkbox" checked={checked} disabled={disabled} data-testid={testId}
+      onChange={(e) => onToggle(e.target.checked)} /></label>
+);

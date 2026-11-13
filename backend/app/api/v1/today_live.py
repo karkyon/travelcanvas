@@ -15,14 +15,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.v1 import plans as P
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.models.models import EventActual, Memory, Place, TravelDay, TravelEvent, User
+from app.models.models import EventActual, Memory, Place, TravelDay, TravelEvent, TravelSegment, User
 from app.services import eta_share, feasibility, hours_check, today_guide, today_mode
 from app.services import movement as mv
 
@@ -70,6 +70,23 @@ def _estimated_ends(db: Session, plan, event_ids: List[uuid.UUID]) -> Dict[uuid.
             end = feasibility._estimated_end(e, rules)  # noqa: SLF001 - 営業時間の照合と同じ見積もり
             if end is not None:
                 out[e.id] = end
+    return out
+
+
+def _incoming_segments(db: Session, plan, event_ids: List[uuid.UUID]) -> Dict[uuid.UUID, TravelSegment]:
+    """予定へ向かう区間(取り消し・控えの案の区間は除く。経路を採用した区間を優先)"""
+    if not event_ids:
+        return {}
+    out: Dict[uuid.UUID, TravelSegment] = {}
+    for seg in db.query(TravelSegment).filter(
+            TravelSegment.plan_id == plan.id, TravelSegment.to_event_id.in_(event_ids),
+            TravelSegment.status != "cancelled", TravelSegment.variant_standby.is_(False)).all():
+        to_id = seg.to_event_id
+        if to_id is None:
+            continue
+        cur = out.get(to_id)
+        if cur is None or (cur.route_option_id is None and seg.route_option_id is not None):
+            out[to_id] = seg
     return out
 
 
@@ -133,6 +150,8 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
     ends = _estimated_ends(db, plan, [t.event.id for t in today_events])
     hours = _hours(db, plan, day, hidden)
 
+    segs = _incoming_segments(db, plan, [t.event.id for t in today_events])
+
     events_out: Dict[str, Any] = {}
     slots: List[today_guide.Slot] = []
     prev: Optional[TravelEvent] = None
@@ -143,6 +162,16 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
         if r is not None and r.departure_at is not None:
             dep = r.departure_at if r.departure_at.tzinfo else r.departure_at.replace(tzinfo=timezone.utc)
         travel = None if hide_place else today_guide.estimate_travel(prev, e, r.transport_mode if r else None)
+        seg = segs.get(e.id)
+        # [Gate TDay-Transit] 区間に所要時間があればそれを使う(手で入れた=乗換を調べた時刻は manual、
+        # 見積もりの区間は estimate のまま)
+        source = "segment" if dep is not None else ("estimate" if travel else None)
+        if seg is not None and seg.duration_minutes is not None and not hide_place:
+            travel = {"minutes": max(1, int(round(float(seg.duration_minutes)))), "mode": seg.mode,
+                      "distance_km": seg.distance_km if seg.distance_km is not None
+                      else (travel["distance_km"] if travel else None)}
+            if dep is None:
+                source = "estimate" if seg.is_estimate else "manual"
         minutes = travel["minutes"] if travel else None
         leave = today_guide.leave_by(t.start, dep, minutes)
         end = t.end or ends.get(e.id)
@@ -155,8 +184,13 @@ def today_guide_view(plan_id: str, db: Session = Depends(get_db),
             "end_at": _iso(end), "end_estimated": t.end is None and end is not None,
             "travel_minutes": minutes, "travel_mode": travel["mode"] if travel else (r.transport_mode if r else None),
             "distance_km": travel["distance_km"] if travel else None,
-            "travel_source": "segment" if dep is not None else ("estimate" if travel else None),
+            "travel_source": source,
             "leave_by": _iso(leave),
+            "start_at": _iso(t.start),
+            "from_event_id": str(prev.id) if prev is not None and not hide_place else None,
+            "segment_id": str(seg.id) if seg is not None else None,
+            "segment_revision": seg.revision if seg is not None else None,
+            "segment_departure_at": _iso(seg.planned_departure_at) if seg is not None else None,
             "fit": wf.fit(e.title, e.event_type, e.description)["fit"],
             "hours": hours.get(str(e.id)),
         }
@@ -262,7 +296,7 @@ class EtaIn(BaseModel):
 
 
 @router.put("/{plan_id}/today/eta")
-def put_eta(plan_id: str, body: EtaIn, db: Session = Depends(get_db),
+def put_eta(plan_id: str, body: EtaIn, background: BackgroundTasks, db: Session = Depends(get_db),
             current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
     plan, _hidden = P._plan_hidden(db, plan_id, current_user, "viewer")
     for v in (body.arrive_at, body.until):
@@ -273,12 +307,31 @@ def put_eta(plan_id: str, body: EtaIn, db: Session = Depends(get_db),
         raise _bad("invalid_field", f"共有の期限は今から{eta_share.MAX_HOURS}時間以内にしてください")
     if abs((body.arrive_at - now).total_seconds()) > eta_share.MAX_HOURS * 3600:
         raise _bad("invalid_field", "到着予定の時刻が今から離れすぎています")
-    ev = db.query(TravelEvent.id).filter(TravelEvent.id == body.event_id, TravelEvent.plan_id == plan.id).first()
+    ev = db.query(TravelEvent).filter(TravelEvent.id == body.event_id, TravelEvent.plan_id == plan.id).first()
     if ev is None:
         raise HTTPException(status_code=404, detail="予定が見つかりません")
     eta_share.put(str(plan.id), str(current_user.id), {
         "event_id": str(body.event_id), "arrive_at": _iso(body.arrive_at), "until": body.until.timestamp()})
-    return get_eta(plan_id, db, current_user)
+    out = get_eta(plan_id, db, current_user)
+    # [Gate TDay-Push] 大きく遅れる時は、ほかの参加者の端末へ知らせる(応答の後に送る)
+    from app.services import today_push
+
+    me = next((s for s in out["shares"] if s["is_self"]), None)
+    day = db.query(TravelDay).filter(TravelDay.id == ev.day_id).first()
+    planned = today_mode.effective_start(ev, day)[0] if day is not None else None
+    if me is not None and planned is not None:
+        from app.api.v1.presence import _labels
+
+        label = _labels(db, [str(current_user.id)], current_user).get(str(current_user.id), "だれか")
+        if label == "あなた":
+            name = getattr(current_user, "username", None)
+            guest = str(getattr(getattr(current_user, "user_type", None), "value", current_user.user_type)) == "guest"
+            label = "ゲスト" if guest or not name else str(name)
+        targets = today_push.crew_targets(db, plan, current_user, ev, body.arrive_at.astimezone(timezone.utc),
+                                          planned, day.timezone_id if day is not None else None, label)
+        if targets:
+            background.add_task(today_push.deliver_later, targets)
+    return out
 
 
 @router.delete("/{plan_id}/today/eta", status_code=204)

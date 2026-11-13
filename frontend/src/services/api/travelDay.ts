@@ -30,11 +30,17 @@ export interface GuideEvent {
   travel_minutes: number | null;
   travel_mode: string | null;
   distance_km: number | null;
-  /** segment: 登録した移動区間の出発時刻 / estimate: 直線距離からの概算 */
-  travel_source: 'segment' | 'estimate' | null;
+  /** segment: 登録した移動区間の出発時刻 / manual: 乗換を調べて入れた所要時間 / estimate: 概算 */
+  travel_source: 'segment' | 'manual' | 'estimate' | null;
   leave_by: string | null;
   fit: string;
   hours: GuideHours | null;
+  /** [Gate TDay-Transit] 予定の開始(UTC)・一つ前の(位置のある)予定・この予定へ向かう区間 */
+  start_at: string | null;
+  from_event_id: string | null;
+  segment_id: string | null;
+  segment_revision: number | null;
+  segment_departure_at: string | null;
 }
 export interface GuideStamp {
   status: 'visited' | 'skipped' | null; revision: number | null; actual_start_at: string | null;
@@ -77,8 +83,9 @@ const hours: Decoder<GuideHours> = object<GuideHours>({
 const guideEvent: Decoder<GuideEvent> = object<GuideEvent>({
   event_id: str, place_id: nullable(str), phone: nullable(str), image_memory_id: nullable(str),
   end_at: nullable(str), end_estimated: bool, travel_minutes: nullable(int), travel_mode: nullable(str),
-  distance_km: nullable(num), travel_source: nullable(oneOf('segment', 'estimate')), leave_by: nullable(str),
-  fit: str, hours: nullable(hours),
+  distance_km: nullable(num), travel_source: nullable(oneOf('segment', 'manual', 'estimate')), leave_by: nullable(str),
+  fit: str, hours: nullable(hours), start_at: nullable(str), from_event_id: nullable(str), segment_id: nullable(str),
+  segment_revision: nullable(int), segment_departure_at: nullable(str),
 });
 const stamp: Decoder<GuideStamp> = object<GuideStamp>({
   status: nullable(oneOf('visited', 'skipped')), revision: nullable(int), actual_start_at: nullable(str),
@@ -194,4 +201,22 @@ export async function addDetourEvent(planId: string, input: { day_id: string; ti
     local_end_time: input.local_end_time, ...(input.address ? { address: input.address } : {}),
     ...(input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : {}),
   }, key);
+}
+
+/**
+ * [Gate TDay-Transit] 乗換を調べて分かった時刻を、この予定へ向かう移動区間に入れる(以後は概算ではなくこの時刻で
+ * 出発の合図を出す)。区間が無ければ一つ前の予定からの区間を作る。所要時間は手で入れた値(provider=manual)になる。
+ */
+export async function saveTransitTime(planId: string, input: {
+  to_event_id: string; from_event_id: string | null; segment_id: string | null; segment_revision: number | null;
+  mode: 'train' | 'bus' | 'mixed' | 'walking' | 'taxi'; duration_minutes: number; departure_at: string | null;
+}) {
+  const data = { mode: input.mode, duration_minutes: input.duration_minutes,
+    ...(input.departure_at ? { planned_departure_at: input.departure_at } : {}) };
+  if (input.segment_id && input.segment_revision != null) {
+    return api.updateSegment(planId, input.segment_id, data, input.segment_revision);
+  }
+  if (!input.from_event_id) throw new Error('一つ前の予定の場所が無いため、区間を作れません');
+  const key = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `tday-seg-${Date.now()}`;
+  return api.createSegment(planId, { from_event_id: input.from_event_id, to_event_id: input.to_event_id, ...data }, key);
 }

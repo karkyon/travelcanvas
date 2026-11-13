@@ -205,3 +205,12 @@
 @media (prefers-reduced-motion: reduce) {
   .tc-live-dot, .tc-thread__node[data-state='now'], .tc-tmap__pin[data-state='now'], .tc-seal--press { animation: none; }
 }
+
+/* [Gate TDay-Push] 端末への通知・[Gate TDay-Transit] 乗換の時刻 */
+.tc-live-switch.is-disabled { opacity: .55; }
+.tc-live-error { color: var(--tc-danger); font-size: 13px; margin: 6px 0 0; }
+.tc-transit-time { display: grid; gap: 10px; }
+.tc-transit-time__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tc-transit-time label { display: grid; gap: 4px; font-size: 13px; color: var(--tc-ink-700); }
+.tc-transit-time input, .tc-transit-time select { min-height: 40px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; font-size: 15px; background: var(--tc-cloud-0); color: inherit; }
+.tc-go__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

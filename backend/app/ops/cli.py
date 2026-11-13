@@ -1159,6 +1159,8 @@ JOBS = {
     "memory-trash": ["-m", "app.ops.memory_trash"],
     # [Gate G7] FR-039 猶予を過ぎたアカウントの削除の申し込みを削除する
     "account-deletions": ["-m", "app.ops.account_deletions"],
+    # [Gate TDay-Push] 旅の当日の端末への通知(出発の合図・雨・今日の旅程)
+    "today-push": ["-m", "app.ops.today_push"],
 }
 
 

@@ -57,6 +57,7 @@ python3 scripts/ops/tcops.py schedule remove    # 解除
 | 毎日 03:50 | 直近25時間の backend のログに個人情報・秘密が出ていないかの検査(`log-scan`) |
 | 5分ごと | 監視(状態が変わった時だけ記録・通知) |
 | 5分ごと | [Gate G2] Webhook の自動の再送(`tcops.py jobs webhook-retry`。1・5・30分・2・6時間の間隔、6回で dead) |
+| 2分ごと | [Gate TDay-Push] 旅の当日の端末への通知(`tcops.py jobs today-push`。出発の合図・雨・今日の旅程。端末の登録が無ければ何もしない) |
 | 15分ごと | [Gate G4] 投票の締切(`tcops.py jobs poll-deadlines`。締切の24時間前に未回答の人へ知らせ、締切で締めて結果を知らせる。決定は人が行う) |
 | 5分ごと | [Gate G4] 通知のまとめのメールと送信待ちのメール(`tcops.py jobs email-outbox`。送信の設定が無ければ何もしない。失敗は5分から6時間まで間を空けて6回で dead) |
 | 毎時 25分 | [Gate G4] 濫用の自動の検知(`tcops.py jobs abuse-scan`。1時間に50以上の接続元から開かれた共有・合言葉の失敗20回・1日に50個の共有・感染した文書を管理者の一覧へ) |

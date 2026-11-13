@@ -54,7 +54,8 @@
   "captured_at_head_memory_reel": "gate/memory-reel (+Gate MemoryReel GET /plans/{plan_id}/memory-reel)",
   "captured_at_head_planb": "dev/plan-b (+Gate PlanB /plans/{plan_id}/variants*・variant-switches)",
   "captured_at_head_planb_p8": "dev/plan-b (-Gate P7/G7/G8 /plans/{plan_id}/branches*・branches-comparison: もしもの案をやめた)",
-  "captured_at_head_tday": "Gate PlanB-P8 (+Gate TDay today/guide・today/detours・today/eta)"
+  "captured_at_head_tday": "Gate PlanB-P8 (+Gate TDay today/guide・today/detours・today/eta)",
+  "captured_at_head_tday_push": "dev/travel-day-live (+Gate TDay-Push /push/config・subscriptions・subscriptions/remove・settings・test)"
  },
  "routes": [
   "DELETE /api/v1/auth/sessions/{session_id}",
@@ -273,6 +274,7 @@
   "GET /api/v1/public/share/{token}/info",
   "GET /api/v1/public/share/{token}/view",
   "GET /api/v1/public/upload-links/{token}",
+  "GET /api/v1/push/config",
   "GET /api/v1/search/everything",
   "GET /api/v1/search/places/{place_id}",
   "GET /api/v1/spots/",
@@ -502,6 +504,9 @@
   "POST /api/v1/public/upload-links/{token}/join",
   "POST /api/v1/public/upload-links/{token}/session",
   "POST /api/v1/public/upload-links/{token}/upload",
+  "POST /api/v1/push/subscriptions",
+  "POST /api/v1/push/subscriptions/remove",
+  "POST /api/v1/push/test",
   "POST /api/v1/quick-drafts",
   "POST /api/v1/quick-drafts/{draft_id}/promote",
   "POST /api/v1/search/candidates/{candidate_id}/adopt",
@@ -567,6 +572,7 @@
   "PUT /api/v1/plans/{plan_id}/trip-intent/slots",
   "PUT /api/v1/privacy/consents",
   "PUT /api/v1/privacy/private-profile",
+  "PUT /api/v1/push/settings",
   "PUT /api/v1/spots/{spot_id}",
   "PUT /api/v1/travel-plans/{plan_id}",
   "PUT /api/v1/travel-plans/{plan_id}/share/{share_id}"

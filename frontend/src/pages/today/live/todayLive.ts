@@ -43,6 +43,8 @@ export interface GoNowView {
   /** 移動の分と出所(概算なら画面に「概算」と書く) */
   travelMinutes: number | null;
   estimated: boolean;
+  /** 移動の分の出所(segment: 区間の出発時刻 / manual: 乗換を調べて入れた / estimate: 概算) */
+  source: 'segment' | 'manual' | 'estimate' | null;
   /** 遅れ気味の時の到着の見込み(今から移動の分) */
   expectedArrivalMs: number | null;
   /** 輪の塗り(0〜1)。60分前を0、出る時刻を1 */
@@ -67,7 +69,8 @@ export function goNowView(next: TodayEvent | null, guide: GuideEvent | undefined
   }[stage];
   return {
     stage, minutesToLeave: m, leaveBy, minutesToStart: minutesTo(next.start_at, nowMs), travelMinutes: travel,
-    estimated: guide?.travel_source === 'estimate', expectedArrivalMs: expected, ring, advice,
+    estimated: guide?.travel_source === 'estimate', source: guide?.travel_source ?? null, expectedArrivalMs: expected,
+    ring, advice,
   };
 }
 
@@ -260,3 +263,46 @@ export function writeDismissed(keys: Set<string>): void {
 }
 
 export interface LiveNotice { key: string; kind: 'go' | 'arrive' | 'rain' | 'delay'; title: string; sub: string; action: string; onAction: () => void }
+
+// ---- [Gate TDay-Transit] 乗換の時刻(無料で正確: 外の地図の乗換で調べて、分かった時刻を区間に入れる) ----------
+
+/** 前の予定から次の予定までの、Google マップの乗換(公共交通)の道順の URL(キー不要・無料)。座標が無ければ null */
+export function transitUrl(from: { latitude: number | null; longitude: number | null } | null,
+  to: { latitude: number | null; longitude: number | null }): string | null {
+  if (to.latitude == null || to.longitude == null) return null;
+  const q = new URLSearchParams({ api: '1', destination: `${Number(to.latitude)},${Number(to.longitude)}`, travelmode: 'transit' });
+  if (from && from.latitude != null && from.longitude != null) q.set('origin', `${Number(from.latitude)},${Number(from.longitude)}`);
+  return `https://www.google.com/maps/dir/?${q.toString()}`;
+}
+
+function zoneOffsetMs(utcMs: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(utcMs));
+  const n = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'), n('second')) - utcMs;
+}
+
+/** 旅行先の日付 "YYYY-MM-DD" と時刻 "HH:MM" → UTC の ISO。読めなければ null */
+export function localToUtcIso(date: string | null, hm: string, timeZone: string | null): string | null {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? '');
+  const t = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!d || !t) return null;
+  const guess = Date.UTC(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(t[1]), Number(t[2]));
+  if (!timeZone) return new Date(guess).toISOString();
+  try {
+    let ms = guess - zoneOffsetMs(guess, timeZone);
+    ms = guess - zoneOffsetMs(ms, timeZone);
+    return new Date(ms).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+/** 出発の合図の補足(移動の分と出所) */
+export function travelLabel(view: Pick<GoNowView, 'travelMinutes' | 'source'>): string {
+  if (view.travelMinutes == null) return '登録した移動の出発時刻から';
+  const base = `移動 約${view.travelMinutes}分`;
+  if (view.source === 'manual') return `${base}(乗換で調べた時刻)`;
+  if (view.source === 'segment') return `${base}(登録した移動)`;
+  return base;
+}

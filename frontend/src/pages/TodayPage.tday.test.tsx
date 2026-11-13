@@ -61,7 +61,8 @@ const today = (over: Partial<TodayResponse> = {}): TodayResponse => ({
 });
 const gEvent = (id: string, over: Record<string, unknown> = {}) => ({
   event_id: id, place_id: null, phone: null, image_memory_id: null, end_at: null, end_estimated: false,
-  travel_minutes: null, travel_mode: null, distance_km: null, travel_source: null, leave_by: null, fit: 'outdoor', hours: null, ...over,
+  travel_minutes: null, travel_mode: null, distance_km: null, travel_source: null, leave_by: null, fit: 'outdoor', hours: null, start_at: null, from_event_id: null, segment_id: null, segment_revision: null,
+  segment_departure_at: null, ...over,
 });
 const guide = (over: Partial<TodayGuide> = {}): TodayGuide => ({
   plan_id: PLAN, server_time: NOW, day_id: 'day-1', day_title: '湖のまち、大津をめぐる日', local_date: '2026-11-13',

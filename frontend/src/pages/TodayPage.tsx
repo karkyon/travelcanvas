@@ -44,6 +44,7 @@ import {
 import { DayList, EventCard } from './today/TodayParts';
 import TodaySwitchPanel from './today/TodaySwitchPanel';
 import { GoNowBlock, JourneyThread, LiveBand } from './today/live/LivePieces';
+import TransitTime from './today/live/TransitTime';
 import { NextTeaser, SkyLine } from './today/live/LiveCards';
 import Detours from './today/live/Detours';
 import { StampDialog, TabichoDialog, TabichoStrip } from './today/live/Tabicho';
@@ -424,6 +425,11 @@ const TodayPage: React.FC = () => {
               {view.nextEvent ? (
                 <EventCard kind="next" event={view.nextEvent} timeZone={timeZone} countdown={nextCountdown} planId={planId}>
                   {go && <GoNowBlock view={go} title={view.nextEvent.title} timeZone={timeZone} />}
+                  {!simple && view.isCurrentDay && planId && (
+                    <TransitTime planId={planId} next={view.nextEvent} guide={gEvents[view.nextEvent.id]}
+                      from={allToday.find((e) => e.id === gEvents[view.nextEvent!.id]?.from_event_id) ?? null}
+                      localDate={data?.today_date ?? null} timeZone={timeZone} onSaved={refreshAll} />
+                  )}
                   {!simple && (
                     <div className="tc-live-actions">
                       <button type="button" className="tc-focus-ring tc-mbtn" onClick={() => setTransit(true)}>

@@ -5,6 +5,7 @@ import type { GuideEvent, TodayGuide } from '@/services/api/travelDay';
 import {
   DEFAULT_SETTINGS, dayPhase, etaMessage, goNowView, goStage, hoursLabel, localHm, planDetour, rainWindow, readDismissed,
   readSettings, recapTitle, sealGlyph, sealTilt, skyAdvice, walkMinutes, writeDismissed, writeSettings,
+  localToUtcIso, transitUrl, travelLabel,
 } from './todayLive';
 
 const ev = (over: Partial<TodayEvent>): TodayEvent => ({
@@ -15,7 +16,8 @@ const ev = (over: Partial<TodayEvent>): TodayEvent => ({
 const gev = (over: Partial<GuideEvent>): GuideEvent => ({
   event_id: 'e', place_id: null, phone: null, image_memory_id: null, end_at: null, end_estimated: false,
   travel_minutes: null, travel_mode: null, distance_km: null, travel_source: null, leave_by: null, fit: 'unknown',
-  hours: null, ...over,
+  hours: null, start_at: null, from_event_id: null, segment_id: null, segment_revision: null,
+  segment_departure_at: null, ...over,
 });
 const at = (iso: string) => Date.parse(iso);
 
@@ -130,5 +132,26 @@ describe('当日の設定・閉じた知らせ(この端末に覚える)', () =>
     expect(readSettings()).toEqual(DEFAULT_SETTINGS);
     writeDismissed(new Set(['2026-11-13:go:x']));
     expect(readDismissed().has('2026-11-13:go:x')).toBe(true);
+  });
+});
+
+describe('[Gate TDay-Transit] 乗換の時刻', () => {
+  it('Google マップの乗換の URL(出発地が無ければ今の場所から)', () => {
+    expect(transitUrl({ latitude: 35.0045, longitude: 135.8686 }, { latitude: 35.0143, longitude: 135.879 }))
+      .toBe('https://www.google.com/maps/dir/?api=1&destination=35.0143%2C135.879&travelmode=transit&origin=35.0045%2C135.8686');
+    expect(transitUrl(null, { latitude: 35, longitude: 135 })).toBe('https://www.google.com/maps/dir/?api=1&destination=35%2C135&travelmode=transit');
+    expect(transitUrl(null, { latitude: null, longitude: 135 })).toBeNull();
+  });
+  it('旅行先の時刻 → UTC(夏時間の地域も)', () => {
+    expect(localToUtcIso('2026-11-13', '08:15', 'Asia/Tokyo')).toBe('2026-11-12T23:15:00.000Z');
+    expect(localToUtcIso('2026-07-01', '09:00', 'Europe/Paris')).toBe('2026-07-01T07:00:00.000Z');
+    expect(localToUtcIso('2026-12-01', '09:00', 'Europe/Paris')).toBe('2026-12-01T08:00:00.000Z');
+    expect(localToUtcIso('2026-11-13', '8時', 'Asia/Tokyo')).toBeNull();
+    expect(localToUtcIso(null, '08:15', 'Asia/Tokyo')).toBeNull();
+  });
+  it('出発の合図の補足は出所を書く', () => {
+    expect(travelLabel({ travelMinutes: 25, source: 'manual' })).toBe('移動 約25分(乗換で調べた時刻)');
+    expect(travelLabel({ travelMinutes: 12, source: 'estimate' })).toBe('移動 約12分');
+    expect(travelLabel({ travelMinutes: null, source: 'segment' })).toBe('登録した移動の出発時刻から');
   });
 });
