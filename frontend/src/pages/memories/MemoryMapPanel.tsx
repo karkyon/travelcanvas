@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import { changeMemoryLocation, getMemoryMap, getMemoryThumbnail } from '@/services/api/photoFeatures';
 import type { LocationChange, MapPhoto, MemoryMap } from '@/services/api/photoFeatures';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import { clusterPoints } from './clusterModel';
 
 export interface PlaceOption { id: string; label: string; latitude: number; longitude: number; name: string }
 
@@ -44,6 +45,46 @@ const Fit: React.FC<{ points: [number, number][] }> = ({ points }) => {
     else map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
   }, [map, points]);
   return null;
+};
+
+const clusterIcon = (count: number) => L.divIcon({
+  className: '', iconSize: [44, 44], iconAnchor: [22, 22],
+  html: `<div style="width:44px;height:44px;border-radius:50%;background:var(--tc-accent);color:#fff;border:3px solid var(--tc-cloud-0);box-shadow:0 1px 5px #0006;display:flex;align-items:center;justify-content:center;font-weight:800">${count}</div>`,
+});
+
+/** [Gate Remaining-6] FR-037 近い写真の印を数の印にまとめる。押すとその範囲へ寄る。選んでいる写真はまとめない */
+const PhotoMarkers: React.FC<{
+  photos: MapPhoto[]; thumbs: Record<string, string>; selectedId: string | null; onSelect: (id: string) => void;
+}> = ({ photos, thumbs, selectedId, onSelect }) => {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const groups = useMemo(() => {
+    const pts = photos.filter((p) => p.id !== selectedId).map((p) => {
+      const pt = map.project([p.latitude as number, p.longitude as number], zoom);
+      return { id: p.id, x: pt.x, y: pt.y };
+    });
+    return clusterPoints(pts, 48);
+  }, [photos, selectedId, map, zoom]);
+  const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
+  const one = (p: MapPhoto) => (
+    <Marker key={p.id} position={[p.latitude as number, p.longitude as number]} icon={pinIcon(p, thumbs[p.id], p.id === selectedId)}
+      title={p.place_name ?? '写真'} eventHandlers={{ click: () => onSelect(p.id) }} />
+  );
+  return (
+    <>
+      {groups.map((g) => {
+        if (g.ids.length === 1) return one(byId.get(g.ids[0]!)!);
+        const members = g.ids.map((id) => byId.get(id)!);
+        const pos = map.unproject([g.x, g.y], zoom);
+        return (
+          <Marker key={`c-${g.ids.join('-')}`} position={pos} icon={clusterIcon(g.ids.length)} title={`写真 ${g.ids.length} 枚`}
+            eventHandlers={{ click: () => map.fitBounds(L.latLngBounds(members.map((m) => [m.latitude as number, m.longitude as number])), { padding: [60, 60], maxZoom: 18 }) }} />
+        );
+      })}
+      {photos.filter((p) => p.id === selectedId).map(one)}
+    </>
+  );
 };
 
 const ClickToPlace: React.FC<{ active: boolean; onPlace: (lat: number, lng: number) => void }> = ({ active, onPlace }) => {
@@ -118,13 +159,11 @@ const MemoryMapPanel: React.FC<{ planId: string; places: PlaceOption[]; refreshK
               <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <Fit points={points} />
               <ClickToPlace active={placing && !!selected} onPlace={(lat, lng) => { if (selected) void change(selected, { action: 'set', latitude: lat, longitude: lng }); }} />
-              {(data?.photos ?? []).map((p) => (
-                <Marker key={p.id} position={[p.latitude as number, p.longitude as number]} icon={pinIcon(p, thumbs[p.id], p.id === selectedId)}
-                  title={p.place_name ?? '写真'} eventHandlers={{ click: () => { setSelectedId(p.id); setPlacing(false); } }} />
-              ))}
+              <PhotoMarkers photos={data?.photos ?? []} thumbs={thumbs} selectedId={selectedId}
+                onSelect={(id) => { setSelectedId(id); setPlacing(false); }} />
             </MapContainer>
           </div>
-          <p className="mt-1 text-xs text-ink-700">枠線が破線で「?」の写真は推定の位置です。確定するまで他の人には見えません。</p>
+          <p className="mt-1 text-xs text-ink-700">枠線が破線で「?」の写真は推定の位置です。確定するまで他の人には見えません。丸に数字の印は近くの写真のまとまり(押すと寄ります)。</p>
         </div>
         <div className="space-y-3 min-w-0">
           <p className="text-sm"><b>{`確認が必要 ${review.length} 枚`}</b>{` / 全 ${all.length} 枚`}</p>

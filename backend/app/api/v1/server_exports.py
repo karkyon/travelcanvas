@@ -265,6 +265,20 @@ def _feed_state(plan: TravelPlan) -> Optional[Dict[str, Any]]:
     return feed if isinstance(feed, dict) and feed.get("token_hash") else None
 
 
+def _public_base(request: Request) -> str:
+    """利用者が開く URL の元(GCP の VM は Tailscale Serve → caddy → backend。caddy が X-Forwarded-Proto: https を付ける)"""
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip().lower()
+    if proto not in ("http", "https"):
+        proto = "http"
+    host = request.headers.get("host") or request.url.netloc
+    base = f"{proto}://{host}".rstrip("/")
+    allowed = [o.rstrip("/") for o in (settings.cors_allowed_origins or [])]
+    # 受け付ける名前の外(Host の詐称)なら、設定の最初の origin にする(URL を他の名前で作らない)
+    if allowed and base not in allowed and not host.split(":")[0] in ("localhost", "127.0.0.1", "testserver"):
+        return allowed[0]
+    return base
+
+
 def _feed_view(request: Request, plan: TravelPlan, token: Optional[str]) -> Dict[str, Any]:
     feed = _feed_state(plan)
     if feed is None:
@@ -276,7 +290,7 @@ def _feed_view(request: Request, plan: TravelPlan, token: Optional[str]) -> Dict
             token = _dec(base64.b64decode(feed["token_ct"])).decode()
         except Exception:  # noqa: BLE001 - 鍵の破棄など。作り直してもらう
             return {"enabled": True, "url": None, "webcal_url": None, "created_at": feed.get("created_at")}
-    base = str(request.base_url).rstrip("/")
+    base = _public_base(request)
     url = f"{base}/api/v1/public/calendar/{token}.ics"
     return {"enabled": True, "url": url, "webcal_url": "webcal://" + url.split("://", 1)[1],
             "created_at": feed.get("created_at")}

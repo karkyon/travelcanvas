@@ -2,7 +2,8 @@
 [Gate P15] FR-052 Personal Travel Atlas(DOC-04 SC-41、DOC-15 CA-010)。
 
 - GET /atlas           : 自分が参加している旅行(所有・承諾済みの共同編集)を横断して、訪れた地域を区画で集計する
-                         (precision=region|area、year=年で絞り込み)。旅行ごとの件数と、Atlasから除いているかを返す
+                         (precision=region|area、year=年で絞り込み、theme=テーマで絞り込み [Remaining-6])。
+                         旅行ごとの件数と、Atlasから除いているかを返す
 - GET /atlas/places    : [Gate Remaining-2] 区画を国・都道府県(州)・市区町村にまとめる(逆ジオコーディング。無料の公開サービス)。
                          1 回に新しく調べる区画は ATLAS_LOOKUPS_PER_CALL まで(残りは pending。もう一度呼ぶと続きを調べる)
 - PUT /atlas/settings  : Atlasに含めない旅行を設定する(旅行単位の公開範囲。users.preferences["atlas"] に保存、migrationなし)
@@ -91,7 +92,8 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
         if e.latitude is None or e.longitude is None or eid in excluded_events:
             continue
         a = actuals.get(eid)
-        base = {"lat": e.latitude, "lng": e.longitude, "plan_id": str(plan.id), "plan_title": title}
+        base = {"lat": e.latitude, "lng": e.longitude, "plan_id": str(plan.id), "plan_title": title,
+                "theme": theme_of(e.event_type)}
         if a and a.status == "visited":
             stayed = bool(a.actual_start_at and a.actual_end_at and
                           (a.actual_end_at - a.actual_start_at).total_seconds() >= at.STAY_MINUTES * 60)
@@ -107,7 +109,7 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
         if mm.event_id in excluded_events or in_hidden_place(mm.latitude, mm.longitude):
             continue
         obs.append({"lat": mm.latitude, "lng": mm.longitude, "plan_id": str(plan.id), "plan_title": title,
-                    "state": "VISITED", "kind": "memory", "at": mm.occurred_at or mm.created_at})
+                    "state": "VISITED", "kind": "memory", "theme": "memory", "at": mm.occurred_at or mm.created_at})
     track_ids = [t[0] for t in db.query(LocationTrack.id).filter(
         LocationTrack.plan_id == plan.id, LocationTrack.user_id == user.id, LocationTrack.mode == "synced").all()]
     if track_ids:
@@ -117,7 +119,8 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
                     if in_hidden_place(p["lat"], p["lng"]):
                         continue
                     obs.append({"lat": p["lat"], "lng": p["lng"], "plan_id": str(plan.id), "plan_title": title,
-                                "state": "PASS_THROUGH", "kind": "track", "at": datetime.fromisoformat(p["t"])})
+                                "state": "PASS_THROUGH", "kind": "track", "theme": "move",
+                                "at": datetime.fromisoformat(p["t"])})
         except EncryptionNotConfigured:
             pass
     # [Gate L5] 「訪問地域だけ同期」の区画(端末で集計した 0.1度の区画と滞在時間。生の座標は無い)
@@ -125,8 +128,20 @@ def _observations(db: Session, plan: TravelPlan, user: User, now: datetime) -> L
                                                LocationAreaCell.user_id == user.id).all():
         lat, lng = lt.cell_center(c.cell_key)
         obs.append({"lat": lat, "lng": lng, "plan_id": str(plan.id), "plan_title": title,
-                    "state": lt.area_state(c.dwell_seconds), "kind": "area", "at": c.first_at})
+                    "state": lt.area_state(c.dwell_seconds), "kind": "area", "theme": "move", "at": c.first_at})
     return obs
+
+
+# [Gate Remaining-6] FR-052 テーマ別の Atlas(予定の種類から。写真・記録と移動の軌跡は別のテーマ)
+THEMES = {"sightseeing": "観光", "food": "食事", "stay": "宿泊", "activity": "体験", "shopping": "買い物",
+          "other": "その他の予定", "memory": "写真・記録", "move": "移動の軌跡"}
+_THEME_OF = {"sightseeing": "sightseeing", "meal": "food", "dining": "food", "restaurant": "food", "cafe": "food",
+             "accommodation": "stay", "lodging": "stay", "hotel": "stay", "activity": "activity",
+             "shopping": "shopping", "transport": "move", "transportation": "move"}
+
+
+def theme_of(event_type: Optional[str]) -> str:
+    return _THEME_OF.get((event_type or "").lower(), "other")
 
 
 def _year(o: Dict[str, Any]) -> Optional[int]:
@@ -136,10 +151,13 @@ def _year(o: Dict[str, Any]) -> Optional[int]:
 
 @router.get("")
 def get_atlas(precision: str = Query("region"), year: Optional[int] = Query(None, ge=1900, le=2200),
+              theme: Optional[str] = Query(None, max_length=20),
               db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     if precision not in at.PRECISIONS:
         raise HTTPException(status_code=422, detail={"code": "invalid_field",
                                                      "message": "precision は region か area です"})
+    if theme is not None and theme not in THEMES:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "テーマが正しくありません"})
     user = _db_user(db, current_user)
     excluded = set(_excluded(user))
     now = _now()
@@ -157,9 +175,15 @@ def get_atlas(precision: str = Query("region"), year: Optional[int] = Query(None
                           "observations": len(obs), "is_owner": p.user_id == user.id})
         if not is_excluded:
             all_obs.extend(o for o in obs if year is None or _year(o) == year)
+    counts: Dict[str, int] = {}
+    for o in all_obs:
+        counts[o.get("theme") or "other"] = counts.get(o.get("theme") or "other", 0) + 1
+    if theme:
+        all_obs = [o for o in all_obs if (o.get("theme") or "other") == theme]
     cells = at.aggregate(all_obs, precision)
     return {"precision": precision, "year": year, "years": sorted(years), "plans": plans_out, "cells": cells,
-            "summary": at.summarize(cells)}
+            "summary": at.summarize(cells), "theme": theme,
+            "themes": [{"key": k, "label": v, "observations": counts[k]} for k, v in THEMES.items() if counts.get(k)]}
 
 
 ATLAS_LOOKUPS_PER_CALL = 8
@@ -177,7 +201,7 @@ def get_atlas_places(year: Optional[int] = Query(None, ge=1900, le=2200), db: Se
     引けない区画は unresolved に数える)"""
     from app.services import reverse_geocode
 
-    data = get_atlas(precision="region", year=year, db=db, current_user=current_user)
+    data = get_atlas(precision="region", year=year, theme=None, db=db, current_user=current_user)
     cells = sorted(data["cells"], key=lambda c: -_RANK[c["state"]])
     countries: Dict[str, Dict[str, Any]] = {}
     lookups = pending = unresolved = 0

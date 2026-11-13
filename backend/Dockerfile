@@ -39,6 +39,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     # Process monitoring
     procps \
+    # [Gate Remaining-6] サーバー側の PDF・画像の日本語の字体(GCP の VM は development の段を使うため、ここにも入れる)
+    fonts-ipafont-gothic \
     # Cleanup
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

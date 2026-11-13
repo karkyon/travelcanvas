@@ -11,7 +11,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { getAtlas, updateAtlasSettings } from '@/services/api';
+import { updateAtlasSettings } from '@/services/api';
+import { getAtlasThemed } from '@/services/api/remaining6';
 import type { AtlasPrecision, AtlasResponse, AtlasState } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { STATE_INFO, cellLabel, layout, percent } from './atlas/atlasModel';
@@ -25,6 +26,7 @@ const AtlasPage: React.FC = () => {
   const [data, setData] = useState<AtlasResponse | null>(null);
   const [precision, setPrecision] = useState<AtlasPrecision>('region');
   const [year, setYear] = useState<number | null>(null);
+  const [theme, setTheme] = useState<string | null>(null); // [Gate Remaining-6] FR-052
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +34,13 @@ const AtlasPage: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      setData(await getAtlas(precision, year));
+      setData(await getAtlasThemed(precision, year, theme));
     } catch (e) {
       setError(errorDetailMessage(e, 'Atlasの取得に失敗しました'));
     } finally {
       setIsLoading(false);
     }
-  }, [precision, year]);
+  }, [precision, year, theme]);
 
   useEffect(() => {
     load();
@@ -89,6 +91,12 @@ const AtlasPage: React.FC = () => {
           <select className="block mt-1 border rounded-sm px-2 py-1" value={year ?? ''} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
             <option value="">すべて</option>
             {(data?.years ?? []).map((y) => <option key={y} value={y}>{`${y}年`}</option>)}
+          </select>
+        </label>
+        <label className="text-sm text-ink-900">テーマ
+          <select className="block mt-1 border rounded-sm px-2 py-1" value={theme ?? ''} onChange={(e) => setTheme(e.target.value || null)} data-testid="atlas-theme">
+            <option value="">すべて</option>
+            {(data?.themes ?? []).map((t) => <option key={t.key} value={t.key}>{`${t.label}(${t.observations})`}</option>)}
           </select>
         </label>
       </div>

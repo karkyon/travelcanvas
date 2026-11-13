@@ -464,6 +464,9 @@ async def quickdraft_problem_handler(request: Request, exc: QuickDraftProblemErr
 from app.api.v1.auth import router as auth_router  # noqa: E402
 from app.api.v1 import mfa as mfa_api  # noqa: E402
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
+# [Gate Remaining-6] FR-003 パスワードの再設定・メールの確認
+from app.api.v1.account_recovery import router as account_recovery_router  # noqa: E402
+app.include_router(account_recovery_router, prefix="/api/v1/auth")
 # [Gate S11] SEC-06 多要素認証(/api/v1/auth/mfa/*)
 app.include_router(mfa_api.router, prefix="/api/v1/auth")
 logger.info("Auth routes loaded successfully")

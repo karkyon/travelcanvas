@@ -122,6 +122,32 @@ describe('SNS の投稿から取り込む', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ social: false, retrieved_at: null,
       title: '気になる店' })));
   });
+
+  it('[Remaining-6] SNS 以外の Web ページは題名・説明・場所を出し、social ではない候補として保存する', async () => {
+    api.previewSocialUrl.mockResolvedValue({ platform: null, status: 'ok', url: 'https://www.kiyomizudera.or.jp/', kind: 'page',
+      title: '清水寺', author: 'www.kiyomizudera.or.jp', retrieved_at: '2026-11-14T10:00:00+00:00', reason: null, fallback: null,
+      description: '音羽山の寺', message: null, place_suggestions: [{ word: '清水寺', name: '清水寺', address: '京都市東山区',
+        latitude: 34.99, longitude: 135.78, provider: 'page', confidence: 'medium' }] });
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<SocialImportCard planId="p1" canEdit onSave={onSave} />);
+    fireEvent.change(screen.getByTestId('social-url'), { target: { value: 'https://www.kiyomizudera.or.jp/' } });
+    fireEvent.click(screen.getByTestId('social-check'));
+    expect(await screen.findByText(/Web ページ · www.kiyomizudera.or.jp/)).toBeInTheDocument();
+    expect(screen.getByTestId('social-description')).toHaveTextContent('音羽山の寺');
+    fireEvent.click(screen.getByTestId('social-save'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ social: false, platform: null,
+      title: '清水寺', address: '京都市東山区' })));
+  });
+
+  it('[Remaining-6] 読めない Web ページは、その理由の文を出す', async () => {
+    api.previewSocialUrl.mockResolvedValue({ platform: null, status: 'unavailable', url: 'http://intranet/', kind: 'page',
+      title: null, author: null, retrieved_at: null, reason: 'page_unreadable', fallback: 'url_and_note',
+      message: 'この URL は読めません(公開のページだけ読めます)', place_suggestions: [] });
+    render(<SocialImportCard planId="p1" canEdit onSave={vi.fn()} />);
+    fireEvent.change(screen.getByTestId('social-url'), { target: { value: 'http://intranet/' } });
+    fireEvent.click(screen.getByTestId('social-check'));
+    expect(await screen.findByTestId('social-fallback')).toHaveTextContent('公開のページだけ');
+  });
 });
 
 describe('外部の写真', () => {

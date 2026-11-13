@@ -141,6 +141,7 @@
 | `invalid_tier` | 403 | no | tier は free・trip・journey・explorer のどれかです | api/v1/admin_ops.py |
 | `invalid_time` | 422 | no | 時刻は HH:MM で指定してください | api/v1/day_variants.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
+| `invalid_token` | 400 | no | リンクが正しくないか、期限が切れています。もう一度やり直してください | api/v1/account_recovery.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
 | `invalid_url` | — | — | https:// で始まる URL を入力してください(ユーザー名・パスワードは含めない) | api/v1/organizations.py |
 | `invalid_usage_key` | 422 | no | subject_type・metric の値が正しくありません | api/v1/admin.py |
@@ -167,7 +168,7 @@
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
 | `no_changes` | 403, 409, 422 | no | この案では旅程は変わりません | api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v |
-| `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
+| `no_email` | 409, 422 | no | メールが登録されていません | api/v1/account_recovery.py, api/v1/notifications.py |
 | `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
 | `no_mail` | 422 | no | メールの本文がありません | api/v1/inbound_mail.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |
@@ -208,7 +209,7 @@
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
-| `rate_limited` | 429 | later | 閲覧が多すぎます。しばらく待ってください | api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py, api/v1/photo_upload.py, ap |
+| `rate_limited` | 429 | later | 回数が多すぎます。しばらくしてから試してください | api/v1/account_recovery.py, api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py |
 | `reauth_failed` | 403 | no | パスワードが正しくありません | api/v1/corrections.py, api/v1/ownership.py, api/v1/privacy.py |
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
@@ -255,7 +256,7 @@
 | `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/server_exports.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
-| `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/push.py, api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
+| `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/media_providers.py, api/v1/push.py, api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_variants` | 409 | no | … の案は … つまでです | api/v1/day_variants.py |

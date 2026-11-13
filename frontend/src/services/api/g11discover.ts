@@ -106,7 +106,7 @@ export async function importExternalImage(planId: string, provider: string, prov
 const socialPreview: Decoder<SocialPreview> = object<SocialPreview>({
   platform: nullable(oneOf('youtube', 'tiktok', 'instagram')), status: oneOf('ok', 'unsupported', 'unavailable', 'disabled'),
   url: nullable(str), title: nullable(str), author: nullable(str), retrieved_at: nullable(str), reason: nullable(str),
-  fallback: nullable(str),
+  fallback: nullable(str), kind: optional(str), description: optional(nullable(str)), message: optional(nullable(str)),
   place_suggestions: arrayOf(object<SocialPreview['place_suggestions'][number]>({
     word: str, name: str, address: nullable(str), latitude: nullable(num), longitude: nullable(num), provider: nullable(str),
     confidence: oneOf('low', 'medium'),

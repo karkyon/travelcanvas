@@ -790,3 +790,45 @@ def out_of_trip(values: Dict[str, str], first: Optional[Any], last: Optional[Any
         if day < first or day > last:
             notes.append(f"開始日 {day.isoformat()} はこの旅行の日程の外です。別の旅行の予約でないか確かめてください")
     return notes
+
+
+# ===================================================================== [Gate Remaining-6] FR-011 1 通から複数の予約
+
+MAX_SPLIT = 5
+_BLOCK_HEAD = re.compile(r"^\s*(?:[■◆●▼【\[]|[-=]{3,}|\d+\s*[.)、]\s*(?:件目|つ目)?)")
+
+
+def split_reservations(raw: str) -> List[str]:
+    """予約番号が 2 つ以上ある本文を、予約ごとの部分に分ける(1 つなら元のまま 1 つ)。
+
+    分け目は、各予約番号の行の前の空行(または見出しの行)。各部分の頭に、本文の最初の数行(件名・差出人など
+    共通の部分。最初の予約の前まで・最大 6 行)を付ける。分けた部分が読めない時は元のまま 1 つに戻す(呼んだ側)。"""
+    text = _normal(raw)
+    lines = text.split("\n")
+    hits: List[int] = []
+    numbers: List[str] = []
+    for i, line in enumerate(lines):
+        m = _CONFIRM.search(line)
+        if m and m.group(1) not in numbers:
+            numbers.append(m.group(1))
+            hits.append(i)
+    if len(hits) < 2:
+        return [raw]
+    starts: List[int] = []
+    for h in hits:
+        j = h
+        # 番号の行から上へ: 空行か見出しの行の所が予約の始まり(前の予約の番号の行は越えない)
+        floor = starts[-1] + 1 if starts else 0
+        while j > floor and lines[j - 1].strip() and not _BLOCK_HEAD.match(lines[j]):
+            j -= 1
+        if j > floor and _BLOCK_HEAD.match(lines[j - 1] or "") and not lines[j - 1].strip() == "":
+            j -= 1
+        starts.append(max(j, floor))
+    head = [ln for ln in lines[:starts[0]] if ln.strip()][:6]
+    parts: List[str] = []
+    for k, s in enumerate(starts[:MAX_SPLIT]):
+        e = starts[k + 1] if k + 1 < len(starts) else len(lines)
+        body = "\n".join(lines[s:e]).strip()
+        if body:
+            parts.append("\n".join(head + [body]))
+    return parts if len(parts) >= 2 else [raw]

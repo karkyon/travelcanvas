@@ -20,6 +20,7 @@ const REASON: Record<string, string> = {
   not_found: '投稿が見つかりません(消えたか、非公開です)',
   forbidden: '投稿を確かめられません(ログインが要るか、非公開です)',
   rate_limited: '確認の回数の上限に達しました。時間をおいてください',
+  page_unreadable: 'この Web ページを読めませんでした',
 };
 
 export interface SocialCandidateInput {
@@ -132,7 +133,7 @@ const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
     <section aria-labelledby={`${uid}-t`} className="rounded-xl border border-cloud-200 bg-surface p-4" data-testid="social-import">
       <h2 id={`${uid}-t`} className="font-semibold text-ink-900">SNS の投稿から取り込む</h2>
       <p className="text-xs text-ink-700">
-        動画の中の映像や字幕は読めません。説明欄やコメントの文を貼ると、そこにある場所を一度に取り込めます。URL からは題名と作者だけを確かめます(TikTok は取れないことがあり、Instagram は運用の設定が要ります)。
+        動画の中の映像や字幕は読めません。説明欄やコメントの文を貼ると、そこにある場所を一度に取り込めます。URL からは題名と作者だけを確かめます(TikTok は取れないことがあり、Instagram は運用の設定が要ります)。SNS 以外の Web ページの URL は、押した時に 1 ページだけ読んで題名・説明・場所を出します。
       </p>
       <div className="mt-3 rounded-lg border border-cloud-200 p-3" data-testid="social-paste">
         <label htmlFor={`${uid}-p`} className="block text-sm font-semibold text-ink-900">動画の説明欄・コメント・投稿の文を貼る(複数の場所を一度に)</label>
@@ -167,12 +168,15 @@ const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
           {ok ? (
             <>
               <p className="text-xs text-ink-700">
-                {`${PLATFORM_LABEL[preview.platform ?? ''] ?? 'SNS'} · 作者 ${preview.author ?? '不明'} · 取得 ${(preview.retrieved_at ?? '').slice(0, 16).replace('T', ' ')}`}
+                {preview.kind === 'page'
+                  ? `Web ページ · ${preview.author ?? ''} · 取得 ${(preview.retrieved_at ?? '').slice(0, 16).replace('T', ' ')}`
+                  : `${PLATFORM_LABEL[preview.platform ?? ''] ?? 'SNS'} · 作者 ${preview.author ?? '不明'} · 取得 ${(preview.retrieved_at ?? '').slice(0, 16).replace('T', ' ')}`}
               </p>
               <p className="mt-1 font-semibold text-ink-900 break-words" data-testid="social-title">{preview.title ?? '(題名なし)'}</p>
+              {preview.description && <p className="mt-1 text-xs text-ink-700 break-words" data-testid="social-description">{preview.description}</p>}
               {preview.place_suggestions.length > 0 ? (
                 <fieldset className="mt-2">
-                  <legend className="text-xs text-ink-700">場所の候補(題名から推定。確かめてください)</legend>
+                  <legend className="text-xs text-ink-700">{preview.kind === 'page' ? '場所の候補(ページの情報から。確かめてください)' : '場所の候補(題名から推定。確かめてください)'}</legend>
                   {preview.place_suggestions.map((s, i) => (
                     <label key={`${s.word}-${i}`} className="mt-1 flex items-start gap-2">
                       <input type="radio" name={`${uid}-place`} checked={pick === i} onChange={() => { setPick(i); setTitle(s.name); }} />
@@ -193,7 +197,7 @@ const SocialImportCard: React.FC<Props> = ({ planId, canEdit, onSave }) => {
             </>
           ) : (
             <p className="text-sm text-warning" data-testid="social-fallback">
-              {`${REASON[preview.reason ?? ''] ?? '投稿の内容を確かめられませんでした'}。URL とメモを出典として候補箱へ保存できます(内容は取り込みません)。`}
+              {`${preview.message ?? REASON[preview.reason ?? ''] ?? '投稿の内容を確かめられませんでした'}。URL とメモを出典として候補箱へ保存できます(内容は取り込みません)。`}
             </p>
           )}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">

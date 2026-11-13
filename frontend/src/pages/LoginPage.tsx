@@ -200,6 +200,11 @@ const LoginPage = () => {
               </div>
 
               <div className="text-center">
+                {/* [Gate Remaining-6] FR-003 */}
+                <Link to="/forgot-password" className="text-sm text-blue-700 underline">パスワードを忘れた時</Link>
+              </div>
+
+              <div className="text-center">
                 <span className="text-sm text-ink-700">
                   Don't have an account?{' '}
                   <Link 

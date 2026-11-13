@@ -37,6 +37,10 @@ PUBLIC_ROUTES = {
     ("POST", "/api/v1/auth/guest"): "ゲストの開始(回数制限あり)",
     ("POST", "/api/v1/auth/login"): "ログイン(回数制限あり)",
     ("POST", "/api/v1/auth/register"): "会員登録(回数制限あり)",
+    # [Gate Remaining-6] FR-003 ログインできない人が使う。登録の有無は答えない・署名つきの使い捨ての札・回数制限あり
+    ("POST", "/api/v1/auth/password/forgot"): "パスワードの再設定のメール(回数制限あり・登録の有無は答えない)",
+    ("POST", "/api/v1/auth/password/reset"): "パスワードの再設定(署名つきの使い捨ての札・回数制限あり)",
+    ("POST", "/api/v1/auth/email/verify"): "メールの確認(署名つきの札。メールのリンクから開く)",
     ("POST", "/api/v1/auth/refresh"): "cookie の更新鍵で認証する",
     ("GET", "/api/v1/plans/documents/download"): "署名付きの期限付き URL(発行時と受け取り時に権限を確かめる)",
     ("POST", "/api/v1/public/share/{token}/resolve"): "公開共有(公開してよい項目だけを返す)",
