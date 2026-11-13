@@ -244,16 +244,16 @@ export async function removeStamp(planId: string, eventId: string) {
 }
 /** この場所のひとこと(メモ) */
 export async function addNote(planId: string, input: { event_id: string; day_id: string | null; body: string;
-  visibility: 'private' | 'members'; place_name: string | null; include_in_journal?: boolean }) {
+  visibility: 'private' | 'members'; place_name: string | null; include_in_journal?: boolean; occurred_at?: string }) {
   return api.createMemory(planId, { kind: 'note', body: input.body, event_id: input.event_id, day_id: input.day_id,
-    visibility: input.visibility, place_name: input.place_name, occurred_at: new Date().toISOString(),
+    visibility: input.visibility, place_name: input.place_name, occurred_at: input.occurred_at ?? new Date().toISOString(),
     ...(input.include_in_journal != null ? { include_in_journal: input.include_in_journal } : {}) });
 }
 /** 写真・声の記録 */
 export async function addMedia(planId: string, input: { kind: 'photo' | 'audio'; file: File; event_id: string;
   day_id: string | null; body: string | null; visibility: 'private' | 'members'; place_name: string | null;
-  include_in_journal?: boolean }) {
-  return api.uploadMemory(planId, { ...input, occurred_at: new Date().toISOString() });
+  include_in_journal?: boolean; occurred_at?: string }) {
+  return api.uploadMemory(planId, { ...input, occurred_at: input.occurred_at ?? new Date().toISOString() });
 }
 /** [Gate TDay-Mock] 行けなかった場所を「次の旅の候補」(候補箱・行きたい場所リスト)に残す */
 export async function keepForNextTrip(planId: string, input: { title: string; address: string | null;

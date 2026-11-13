@@ -5,6 +5,9 @@
  *   1. ICSファイルを選ぶと、本案と照らした取り込み案(追加・変更の前後・取り込まない理由)を表示する(本案は変えない)
  *   2. 取り込む予定を選んで「取り込む」と、1つの変更として本案へ反映する(プラン画面の「元に戻す」で取り消せる)
  * TravelCanvasから書き出したICSを他のカレンダーで編集して戻すと、同じ予定の変更として扱う。
+ *
+ * [Gate Remaining-1] GPX・KML(Google マイマップ等)・CSV も取り込む。日付のある地点は予定(座標つき)、日付の無い地点は
+ * 候補箱へ。書き出した予定が他のカレンダーで取り消されていれば、削除の案として出す(確定済みは消さない)。
  */
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -14,7 +17,7 @@ import { applyCalendarImport, previewCalendarImport } from '@/services/api';
 import type { CalendarImportPreview } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  SKIP_REASON_TEXT, describeChanges, describeWhen, selectable, toApplyItems,
+  ACTION_TEXT, SHAPE_TEXT, SKIP_REASON_TEXT, describeChanges, describeWhen, selectable, toApplyItems,
 } from './calendarImport/calendarImportModel';
 
 const CalendarImportPage: React.FC = () => {
@@ -55,8 +58,9 @@ const CalendarImportPage: React.FC = () => {
       const r = await applyCalendarImport(planId, items, preview.create_missing_days, preview.plan_revision);
       setPreview(null);
       setFile(null);
-      setMessage(`取り込みました(追加${r.created}件・変更${r.updated}件${r.created_days ? `・日程の追加${r.created_days}日` : ''})。` +
-        'プラン画面の「元に戻す」で取り消せます。');
+      setMessage(`取り込みました(追加${r.created}件・変更${r.updated}件${r.deleted ? `・削除${r.deleted}件` : ''}` +
+        `${r.created_days ? `・日程の追加${r.created_days}日` : ''}${r.candidates ? `・候補箱へ${r.candidates}件` : ''})。` +
+        'プラン画面の「元に戻す」で取り消せます(候補箱に入れた物は候補箱で消せます)。');
     } catch (e) {
       setError(errorDetailMessage(e, '取り込みに失敗しました。プランが他で更新された場合は、ファイルを選び直してください'));
     } finally {
@@ -69,10 +73,10 @@ const CalendarImportPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/exports`)} className="mb-2">← 書き出しへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">カレンダーから取り込む</h1>
+      <h1 className="text-2xl font-bold text-ink-900">カレンダー・地図・表から取り込む</h1>
       <p className="text-sm text-ink-700 mt-1">
-        Google・Apple・Outlookなどから書き出したICSファイルの予定を、内容を確認してから取り込みます。
-        予定名・日時・場所だけを取り込み、説明欄は取り込みません。
+        カレンダー(ICS)・地図(GPX・KML。Google マイマップの書き出しなど)・表(CSV)の予定や地点を、内容を確認してから取り込みます。
+        ICS は予定名・日時・場所だけを取り込み、説明欄は取り込みません。日付の無い地点は「候補箱」に入れます。
       </p>
 
       <div aria-live="polite">
@@ -81,8 +85,11 @@ const CalendarImportPage: React.FC = () => {
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 
       <Card padding="md" className="mt-6">
-        <label htmlFor="ics-file" className="block text-sm font-medium text-ink-900">ICSファイル(1MB・500件まで)</label>
-        <input id="ics-file" type="file" accept=".ics,text/calendar" className="mt-1 text-sm"
+        <label htmlFor="ics-file" className="block text-sm font-medium text-ink-900">
+          ファイル(ICS 1MB・GPX/KML/CSV 2MB・500件まで)
+        </label>
+        <p className="text-xs text-ink-700 mt-1">CSV は 1 行目に見出し(日付・時刻・名前・住所・緯度・経度・メモ)を置いてください。</p>
+        <input id="ics-file" type="file" accept=".ics,text/calendar,.gpx,.kml,.csv,text/csv,application/gpx+xml,application/vnd.google-earth.kml+xml" className="mt-1 text-sm"
           onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); void runPreview(f); }} />
         <label className="flex items-center gap-2 text-sm mt-3">
           <input type="checkbox" checked={createDays} disabled={!file}
@@ -98,8 +105,17 @@ const CalendarImportPage: React.FC = () => {
             <h2 id="import-preview-heading" className="font-semibold text-ink-900">取り込み内容の確認</h2>
             <p className="text-sm text-ink-700 mt-1" data-testid="import-summary">
               {`${preview.summary.total}件中、追加${preview.summary.create}件・変更${preview.summary.update}件・` +
+                `${preview.summary.delete ? `削除${preview.summary.delete}件・` : ''}` +
+                `${preview.summary.candidate ? `候補箱へ${preview.summary.candidate}件・` : ''}` +
                 `取り込まない${preview.summary.skip}件(時刻は${preview.timezone_id}の現地時刻)`}
             </p>
+            {Object.entries(preview.summary.skipped_shapes ?? {}).some(([, n]) => (n ?? 0) > 0) && (
+              <p className="text-xs text-ink-700 mt-1" data-testid="import-shapes">
+                {'予定にしなかった物: ' + Object.entries(preview.summary.skipped_shapes ?? {})
+                  .filter(([, n]) => (n ?? 0) > 0)
+                  .map(([k, n]) => `${SHAPE_TEXT[k as keyof typeof SHAPE_TEXT] ?? k} ${n}件`).join('・')}
+              </p>
+            )}
             {preview.candidates.length === 0 ? <p className="text-sm text-ink-700 mt-2">予定がありません。</p> : (
               <ul className="mt-3 space-y-2" aria-label="取り込み案">
                 {preview.candidates.map((c) => (
@@ -113,12 +129,16 @@ const CalendarImportPage: React.FC = () => {
                             return next;
                           })} />
                         <span>
-                          <span className={`text-xs px-1.5 rounded-sm mr-1 ${c.action === 'create' ? 'bg-green-100 text-green-900' : 'bg-blue-100 text-blue-900'}`}>
-                            {c.action === 'create' ? '追加' : '変更'}
+                          <span className={`text-xs px-1.5 rounded-sm mr-1 ${c.action === 'create' ? 'bg-green-100 text-green-900'
+                            : c.action === 'delete' ? 'bg-red-100 text-red-900' : c.action === 'candidate' ? 'bg-amber-100 text-amber-900'
+                              : 'bg-blue-100 text-blue-900'}`}>
+                            {ACTION_TEXT[c.action as keyof typeof ACTION_TEXT]}
                           </span>
                           <span className="font-medium">{c.title}</span>
                           <span className="block text-xs text-ink-700">
-                            {describeWhen(c)}{c.address ? ` ・ ${c.address}` : ''}{!c.day_exists ? ' ・ 日程を追加します' : ''}
+                            {describeWhen(c)}{c.address ? ` ・ ${c.address}` : ''}
+                            {c.latitude != null ? ' ・ 位置あり' : ''}{c.action === 'create' && !c.day_exists ? ' ・ 日程を追加します' : ''}
+                            {c.action === 'delete' ? ' ・ 他のカレンダーで取り消された予定です' : ''}
                           </span>
                           {c.action === 'update' && <span className="block text-xs text-ink-900">{describeChanges(c)}</span>}
                         </span>

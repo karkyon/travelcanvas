@@ -54,6 +54,9 @@ export default defineConfig(({ mode }) => {
   base: '/',
   build: {
     outDir: 'dist',
+    // [Gate Remaining-1] modulepreload の補い(古いブラウザ向け)を最初に読む JS に入れない。
+    // 対応していないブラウザは先読みしないだけで、画面は同じに動く
+    modulePreload: { polyfill: false },
     // [Gate S2] 以前は常に source map を出し、配信先から元のソース一式を取得できた。
     // 調査で必要な時だけ VITE_SOURCEMAP=true で作る
     sourcemap: env.VITE_SOURCEMAP === 'true',

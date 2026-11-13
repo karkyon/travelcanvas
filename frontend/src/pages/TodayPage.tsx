@@ -42,6 +42,7 @@ import { getToday } from '@/services/api';
 import type { TodayResponse } from '@/services/api';
 import { currentOfflineSession } from '@/utils/offlineSession';
 import { loadQueue } from '@/utils/syncQueue';
+import { flushMemoQueue, loadMemoQueue } from '@/utils/memoQueue';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
   computeTodayFlow, computeTodayView, formatTimeInZone, loadTodayCache, saveTodayCache,
@@ -112,6 +113,8 @@ const TodayPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const [simple, setSimple] = useState<boolean>(readSimple);
+  const [memoPending, setMemoPending] = useState(0);
+  const [memoSent, setMemoSent] = useState(0);
   const snapshotRef = useRef<Snapshot | null>(null);
 
   const load = useCallback(async () => {
@@ -129,6 +132,11 @@ const TodayPage: React.FC = () => {
       setClock(fetchedAt);
       // [Gate K1] 端末内の保存は暗号化する(失敗しても表示は続ける)
       void saveTodayCache(currentOfflineSession(), planId, res, offsetMs);
+      // [Gate Remaining-1] 通信できない間に置いた写真・ひとことを送る
+      void flushMemoQueue(currentOfflineSession(), planId).then((r) => {
+        setMemoPending(r.left);
+        if (r.sent > 0) setMemoSent((n) => n + r.sent);
+      }).catch(() => undefined);
     } catch (e: unknown) {
       // 取得に失敗しても、表示中または端末に保存済みの当日情報があればそれを表示し続ける
       let fallback = snapshotRef.current;
@@ -136,6 +144,7 @@ const TodayPage: React.FC = () => {
         const cached = await loadTodayCache(currentOfflineSession(), planId);
         fallback = cached ? { data: cached.payload, offsetMs: cached.offsetMs, fetchedAt: cached.savedAt } : null;
       }
+      void loadMemoQueue(currentOfflineSession(), planId).then((q) => setMemoPending(q.length)).catch(() => undefined);
       if (fallback) {
         snapshotRef.current = fallback;
         setSnapshot(fallback);
@@ -196,6 +205,8 @@ const TodayPage: React.FC = () => {
     return next;
   });
   const refreshAll = useCallback(() => { void load(); void reloadGuide(); }, [load, reloadGuide]);
+  // 置いていた写真・ひとことを送れたら、旅帖の手がかりを読み直す
+  useEffect(() => { if (memoSent > 0) void reloadGuide(); }, [memoSent, reloadGuide]);
   const crew = useCrew(planId ?? '', isStale || !planId);
 
   // [Gate TDay-Mock] 開く画面(?v=画面&e=予定)。開いた数を覚え、閉じる時は戻る(ブラウザの戻ると同じ)
@@ -298,7 +309,8 @@ const TodayPage: React.FC = () => {
     visitedIds, rainIds, sky, hours, nowHour, upcomingRain, gap, lodging, lodgingEvent, dayLabel,
     dayTitle: g?.day_title || trip.title || '今日の旅', tripTitle: trip.title ?? null, destination: trip.destination ?? null,
     stale: isStale, fetchedAt: snapshot?.fetchedAt ?? null, delayed, settings, setSettings, simple, toggleSimple,
-    detourPins, setDetourPins, trail, pendingCount: loadQueue(planId).length,
+    detourPins, setDetourPins, trail, pendingCount: loadQueue(planId).length + memoPending, memoPending,
+    onMemoQueued: setMemoPending,
     open: openScreen, close: closeScreen, refresh: refreshAll, reloadGuide: () => { void reloadGuide(); },
   } : null;
 

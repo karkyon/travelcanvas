@@ -121,8 +121,10 @@ def test_preview_candidates_and_no_db_change(auth_client, db_session, audit_call
     assert c["ext-2"]["reason"] == "duplicate"
     assert c["ext-3"]["reason"] == "no_day" and c["ext-3"]["is_all_day"] is True
     assert c["ext-4"]["reason"] == "recurring" and c["ext-5"]["reason"] == "cancelled"
-    assert body["summary"] == {"total": 7, "create": 1, "update": 1, "skip": 5, "skipped_by_reason": {
-        "locked": 1, "duplicate": 1, "no_day": 1, "recurring": 1, "cancelled": 1}}
+    assert body["summary"] == {"total": 7, "create": 1, "update": 1, "delete": 0, "candidate": 0, "skip": 5,
+                               "skipped_by_reason": {"locked": 1, "duplicate": 1, "no_day": 1, "recurring": 1,
+                                                     "cancelled": 1}, "skipped_shapes": {}}
+    assert body["format"] == "ics"
     # 説明文の中身(会議の URL・パスコード)を返さない。数字だけの "1234" の検索は乱数の ID に含まれると誤って落ちるため、文の形で調べる
     assert "https://x/secret" not in res.text and "パスコード" not in res.text and "パスコード 1234" not in res.text
     assert audit_calls[-1]["action"] == "calendar_import_previewed" and "水族館" not in str(audit_calls)
@@ -150,7 +152,8 @@ def test_apply_and_undo(auth_client, audit_calls):
     rev = preview["plan_revision"]
     res = client.post(url, json={"items": items, "create_missing_days": True}, headers={"If-Match": str(rev)})
     assert res.status_code == 200, res.text
-    assert res.json() == {"plan_revision": rev + 1, "created": 2, "updated": 1, "created_days": 1}
+    assert res.json() == {"plan_revision": rev + 1, "created": 2, "updated": 1, "created_days": 1, "deleted": 0,
+                          "candidates": 0}
     detail = client.get(f"/api/v1/plans/{p}").json()
     got = sorted((d["local_date"], e["local_start_time"], e["title"]) for d in detail["days"] for e in d["events"])
     assert got == [("2026-11-01", "09:00", "清水寺(朝)"), ("2026-11-01", "12:00", "昼食"),
@@ -199,3 +202,93 @@ def test_export_then_import_roundtrip(auth_client):
     body = _preview(client, base, ics).json()
     reasons = {x["title"]: (x["action"], x["reason"]) for x in body["candidates"]}
     assert reasons == {"清水寺": ("skip", "unchanged"), "昼食": ("skip", "unchanged")}
+
+
+# ---------------------------------------------------------------- [Gate Remaining-1] GPX・KML・CSV・取消の取り込み
+
+GPX = b"""<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="34.9949" lon="135.7850"><name>\xe6\xb8\x85\xe6\xb0\xb4\xe5\xaf\xba</name>
+    <time>2026-11-01T06:00:00Z</time></wpt>
+  <wpt lat="35.0394" lon="135.7292"><name>Kinkakuji</name><desc>gold</desc></wpt>
+  <wpt lat="999" lon="0"><name>bad</name></wpt>
+  <trk><name>walk</name><trkseg><trkpt lat="35" lon="135"/></trkseg></trk>
+</gpx>"""
+
+KML = """<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>伏見稲荷</name><address>京都市伏見区</address><description><![CDATA[<b>千本鳥居</b>]]></description>
+    <TimeStamp><when>2026-11-01T14:00:00</when></TimeStamp><Point><coordinates>135.7727,34.9671,0</coordinates></Point></Placemark>
+  <Placemark><name>嵐山</name><Point><coordinates>135.6719,35.0094,0</coordinates></Point></Placemark>
+  <Placemark><name>線</name><LineString><coordinates>135,35 136,36</coordinates></LineString></Placemark>
+</Document></kml>""".encode("utf-8")
+
+
+def _preview_file(client, base, name, data):
+    return client.post(f"{base}/calendar-import/preview", files={"file": (name, data, "application/octet-stream")},
+                       data={"create_missing_days": "false"})
+
+
+def test_map_formats_parse():
+    from app.services import map_import as mi
+    items, shapes = mi.parse_gpx(GPX)
+    assert [i.title for i in items] == ["清水寺", "Kinkakuji"] and shapes == {"track": 1, "no_position": 1}
+    assert items[0].start is not None and items[1].start is None and items[1].note == "gold"
+    k, kshapes = mi.parse_kml(KML)
+    assert [i.title for i in k] == ["伏見稲荷", "嵐山"] and kshapes["track"] == 1
+    assert k[0].latitude == pytest.approx(34.9671) and k[0].local_date.isoformat() == "2026-11-01"
+    assert k[0].local_time == "14:00" and k[0].note == "千本鳥居" and k[0].address == "京都市伏見区"
+    csv_data = "日付,時刻,名前,住所,緯度,経度,メモ\n2026/11/01,9:30,南禅寺,京都市左京区,35.0115,135.7942,水路閣\n,,哲学の道,,,,\n".encode("cp932")
+    c, _ = mi.parse_csv(csv_data)
+    assert [(i.title, i.local_date and i.local_date.isoformat(), i.local_time) for i in c] == [
+        ("南禅寺", "2026-11-01", "09:30"), ("哲学の道", None, None)]
+    with pytest.raises(mi.MapImportError):
+        mi.parse_kml(b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]><kml/>')
+    with pytest.raises(mi.MapImportError):
+        mi.parse_csv("住所\n京都\n".encode())
+    assert mi.detect_format("x.GPX", b"") == "gpx" and mi.detect_format(None, b"BEGIN:VCALENDAR") == "ics"
+
+
+def test_map_import_preview_and_apply(auth_client, audit_calls):
+    client, owner, p, base, d1, a, b = _setup(auth_client)
+    res = _preview_file(client, base, "places.gpx", GPX)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["format"] == "gpx" and body["summary"]["skipped_shapes"] == {"track": 1, "no_position": 1}
+    c = {x["title"]: x for x in body["candidates"]}
+    assert c["清水寺"]["action"] == "create" and c["清水寺"]["local_start_time"] == "15:00"
+    assert c["清水寺"]["latitude"] == pytest.approx(34.9949)
+    assert c["Kinkakuji"]["action"] == "candidate" and c["Kinkakuji"]["local_date"] is None
+    items = [x for x in body["candidates"] if x["action"] != "skip"]
+    rev = body["plan_revision"]
+    r = client.post(f"{base}/calendar-import/apply", json={"items": items}, headers={"If-Match": str(rev)})
+    assert r.status_code == 200, r.text
+    assert r.json()["created"] == 1 and r.json()["candidates"] == 1
+    detail = client.get(f"/api/v1/plans/{p}").json()
+    ev = next(e for d in detail["days"] for e in d["events"]
+              if e["title"] == "清水寺" and e["local_start_time"] == "15:00")
+    assert ev["latitude"] == pytest.approx(34.9949)
+    cands = client.get(f"/api/v1/plans/{p}/candidates").json()
+    got = [x for x in cands["items"] if x["title"] == "Kinkakuji"]
+    assert got and got[0]["note"] == "gold" and got[0]["latitude"] == pytest.approx(35.0394)
+    # もう一度同じ物を読むと、候補箱の同じ名前は重複として取り込まない
+    again = _preview_file(client, base, "places.gpx", GPX).json()
+    assert next(x for x in again["candidates"] if x["title"] == "Kinkakuji")["reason"] == "duplicate"
+    kml = _preview_file(client, base, "my.kml", KML).json()
+    assert {x["title"]: x["action"] for x in kml["candidates"]} == {"伏見稲荷": "create", "嵐山": "candidate"}
+
+
+def test_ics_cancelled_own_event_is_deleted_and_undone(auth_client):
+    client, owner, p, base, d1, a, b = _setup(auth_client)
+    data = _ics(_vevent(f"event-{a['id']}@travelcanvas.app", "清水寺", "DTSTART:20261101T010000Z", ["STATUS:CANCELLED"]))
+    body = _preview(client, base, data).json()
+    item = body["candidates"][0]
+    assert item["action"] == "delete" and item["event_id"] == a["id"] and body["summary"]["delete"] == 1
+    rev = body["plan_revision"]
+    r = client.post(f"{base}/calendar-import/apply", json={"items": [item]}, headers={"If-Match": str(rev)})
+    assert r.status_code == 200, r.text and r.json()["deleted"] == 1
+    titles = [e["title"] for d in client.get(f"/api/v1/plans/{p}").json()["days"] for e in d["events"]]
+    assert titles == ["昼食"]
+    assert client.post(f"/api/v1/plans/{p}/undo", headers={"If-Match": str(rev + 1)}).status_code == 200
+    titles = sorted(e["title"] for d in client.get(f"/api/v1/plans/{p}").json()["days"] for e in d["events"])
+    assert titles == ["昼食", "清水寺"]

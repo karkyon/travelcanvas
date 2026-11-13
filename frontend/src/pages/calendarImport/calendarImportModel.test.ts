@@ -36,8 +36,24 @@ describe('calendarImportModel (Gate P8)', () => {
     ];
     expect(selectable(list[2]!)).toBe(false);
     expect(toApplyItems(list, new Set([0, 1, 2]))).toEqual([
-      { action: 'create', event_id: null, title: '清水寺', local_date: '2026-11-01', local_start_time: '10:00', is_all_day: false, address: null },
-      { action: 'update', event_id: 'e1', title: '金閣寺', local_date: '2026-11-01', local_start_time: '10:00', is_all_day: false, address: null },
+      { action: 'create', event_id: null, title: '清水寺', local_date: '2026-11-01', local_start_time: '10:00', is_all_day: false, address: null,
+        latitude: null, longitude: null, note: null },
+      { action: 'update', event_id: 'e1', title: '金閣寺', local_date: '2026-11-01', local_start_time: '10:00', is_all_day: false, address: null,
+        latitude: null, longitude: null, note: null },
+    ]);
+  });
+
+  it('[Gate Remaining-1] 地図・表の取り込み: 候補箱へ・削除の案を送り、座標とメモも送る', () => {
+    const list = [
+      cand({ index: 0, action: 'candidate', local_date: null, local_start_time: null, latitude: 35.03, longitude: 135.72, note: '金色' }),
+      cand({ index: 1, action: 'delete', event_id: 'e9' }),
+    ];
+    expect(describeWhen(list[0]!)).toBe('日付なし');
+    expect(toApplyItems(list, new Set([0, 1]))).toEqual([
+      { action: 'candidate', event_id: null, title: '清水寺', local_date: null, local_start_time: null, is_all_day: false, address: null,
+        latitude: 35.03, longitude: 135.72, note: '金色' },
+      { action: 'delete', event_id: 'e9', title: '清水寺', local_date: '2026-11-01', local_start_time: '10:00', is_all_day: false, address: null,
+        latitude: null, longitude: null, note: null },
     ]);
   });
 });

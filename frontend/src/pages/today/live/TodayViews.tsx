@@ -144,7 +144,7 @@ export const OfflineView: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
           {uses.map(([label, fn]) => <li key={label}><button type="button" className="tc-focus-ring tl-btn" onClick={fn}>{label}</button></li>)}
         </ul>
         <p className="tl-small tl-mute">
-          {`旅程の変更は端末に溜め、つながった時に送ります（${ctx.pendingCount}件 待ち）。写真・ひとことは通信が戻ってから残せます。`}
+          {`旅程の変更・写真・ひとことは端末に置き、つながった時に送ります（${ctx.pendingCount}件 待ち）。`}
         </p>
       </section>
       <section className="tl-card tl-card--flat" aria-labelledby="tl-off-cannot">

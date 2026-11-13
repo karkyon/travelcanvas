@@ -75,7 +75,7 @@ const ExportsPage: React.FC = () => {
         </p>
         <p className="text-sm mt-1">
           <button type="button" className="text-blue-800 underline" onClick={() => navigate(`/planner/${planId}/calendar-import`)}>
-            カレンダー(ICS)から予定を取り込む
+            カレンダー(ICS)・地図(GPX・KML)・表(CSV)から取り込む
           </button>
         </p>
       </div>

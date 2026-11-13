@@ -1106,20 +1106,26 @@ export const calendarImportPreview: Decoder<CalendarImportPreview> = object<Cale
   plan_id: str,
   plan_revision: int,
   timezone_id: str,
+  format: optional(oneOf('ics', 'gpx', 'kml', 'csv')),
   create_missing_days: bool,
   summary: object({
     total: nonNegativeInt, create: nonNegativeInt, update: nonNegativeInt, skip: nonNegativeInt,
+    delete: optional(nonNegativeInt), candidate: optional(nonNegativeInt),
     skipped_by_reason: record as Decoder<CalendarImportPreview['summary']['skipped_by_reason']>,
+    skipped_shapes: optional(record as Decoder<NonNullable<CalendarImportPreview['summary']['skipped_shapes']>>),
   }),
   candidates: arrayOf(object({
     index: nonNegativeInt,
     uid: nullable(str),
     title: str,
-    local_date: str,
+    local_date: nullable(str),
     local_start_time: nullable(str),
     is_all_day: bool,
     address: nullable(str),
-    action: oneOf('create', 'update', 'skip'),
+    latitude: optional(nullable(num)),
+    longitude: optional(nullable(num)),
+    note: optional(nullable(str)),
+    action: oneOf('create', 'update', 'delete', 'candidate', 'skip'),
     reason: nullable(oneOf(...IMPORT_REASONS)),
     event_id: nullable(str),
     changes: nullable(record as Decoder<Record<string, { before: unknown; after: unknown }>>),
@@ -1129,6 +1135,7 @@ export const calendarImportPreview: Decoder<CalendarImportPreview> = object<Cale
 
 export const calendarImportResult: Decoder<CalendarImportResult> = object<CalendarImportResult>({
   plan_revision: int, created: nonNegativeInt, updated: nonNegativeInt, created_days: nonNegativeInt,
+  deleted: optional(nonNegativeInt), candidates: optional(nonNegativeInt),
 });
 
 // ----- [Gate P9] アカウントの削除・同意の撤回(FR-039)。backend/app/api/v1/privacy.py の応答。

@@ -175,7 +175,15 @@ def plan_candidates(events: Sequence[IcsEvent], plan_tz: str, days: Dict[str, st
         if e.recurring:
             item["reason"] = "recurring"
         elif e.status == "CANCELLED":
-            item["reason"] = "cancelled"
+            # [Gate Remaining-1] TravelCanvas が書き出した予定が他のカレンダーで取り消された → 本案から消す案(確定済みは消さない)
+            if own and own.group(1) in current and not current[own.group(1)].get("locked"):
+                item["action"] = "delete"
+                item["event_id"] = own.group(1)
+                cur = current[own.group(1)]
+                item.update({"title": cur["title"], "local_date": cur["local_date"],
+                             "local_start_time": cur["local_start_time"], "is_all_day": cur["is_all_day"]})
+            else:
+                item["reason"] = "cancelled"
         elif own and own.group(1) in current:
             cur = current[own.group(1)]
             item["event_id"] = own.group(1)
@@ -215,6 +223,8 @@ def summarize(candidates: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "total": len(candidates),
         "create": sum(1 for c in candidates if c["action"] == "create"),
         "update": sum(1 for c in candidates if c["action"] == "update"),
+        "delete": sum(1 for c in candidates if c["action"] == "delete"),
+        "candidate": sum(1 for c in candidates if c["action"] == "candidate"),
         "skip": sum(1 for c in candidates if c["action"] == "skip"),
         "skipped_by_reason": reasons,
     }
