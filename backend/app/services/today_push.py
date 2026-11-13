@@ -280,7 +280,44 @@ def sweep(db: Session, now: Optional[datetime] = None, send: Optional[wp.Sender]
                 for k in ("sent", "removed", "failed"):
                     counts[k] += r[k]
         db.commit()
+    _notice_sweep(db, now, send, counts)  # [Gate Remaining-3] 自分あて・急ぎの通知(旅の当日でなくても送る)
     return counts
+
+
+def _notice_sweep(db: Session, now: datetime, send: Optional[wp.Sender], counts: Dict[str, int]) -> None:
+    for user in _push_users(db):
+        if not wp.subscriptions(user) or not wp.kinds_of(user).get("notice"):
+            continue
+        for key, msg in notice_messages(db, user, now):
+            if not _once(f"{user.id}:{key}"):
+                continue
+            r = wp.send_to_user(user, msg, urgency="normal", ttl=3600, send=send)
+            for k in ("sent", "removed", "failed"):
+                counts[k] += r[k]
+        db.commit()
+
+
+# ---- 自分あて・急ぎの通知 ------------------------------------------------------------------------------------
+
+NOTICE_TYPES = frozenset({"comment_mention", "comment_reply", "cancel_deadline", "poll_reminder", "booking_mail",
+                          "correction_request", "ownership_transfer", "replan_applied"})
+NOTICE_WINDOW_MINUTES = 15
+
+
+def notice_messages(db: Session, user, now: datetime) -> List[Tuple[str, Dict[str, Any]]]:
+    """読んでいない・新しい(15 分以内)自分あての通知 → 端末への通知。中身は題名だけ(本文・コメントは送らない)"""
+    from app.models.models import Notification
+
+    rows = (db.query(Notification).filter(Notification.user_id == user.id, Notification.is_read.is_(False),
+                                          Notification.type.in_(list(NOTICE_TYPES)),
+                                          Notification.created_at >= now - timedelta(minutes=NOTICE_WINDOW_MINUTES))
+            .order_by(Notification.created_at.desc()).limit(5).all())
+    out: List[Tuple[str, Dict[str, Any]]] = []
+    for n in rows:
+        url = f"/planner/{n.related_plan_id}" if n.related_plan_id else "/notifications"
+        out.append((f"notice:{n.id}", wp.message("TravelCanvas", (n.title or "")[:120], url, f"tc-notice-{n.id}",
+                                                 "notice")))
+    return out
 
 
 # ---- 同行者の遅れ ------------------------------------------------------------------------------------------

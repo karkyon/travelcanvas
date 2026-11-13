@@ -94,6 +94,7 @@ class KindsIn(BaseModel):
     rain: Optional[bool] = None
     morning: Optional[bool] = None
     crew: Optional[bool] = None
+    notice: Optional[bool] = None  # [Gate Remaining-3] 自分あて・急ぎの通知(メンション・返信・取消期限 等)
 
 
 @router.put("/settings")

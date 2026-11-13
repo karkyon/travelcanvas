@@ -38,7 +38,7 @@ PREF_KEY = "web_push"
 MAX_SUBSCRIPTIONS = 5
 RECORD_SIZE = 4096
 MAX_PAYLOAD = 3000
-KINDS = ("depart", "rain", "morning", "crew")
+KINDS = ("depart", "rain", "morning", "crew", "notice")  # [Gate Remaining-3] notice: 自分あて・急ぎの通知
 DEFAULT_KINDS: Dict[str, bool] = {k: True for k in KINDS}
 # ブラウザの会社の配信の窓口(この名前か、その下の名前だけ)
 PUSH_HOSTS = ("fcm.googleapis.com", "android.googleapis.com", "push.services.mozilla.com", "push.apple.com",

@@ -34,6 +34,7 @@ EXPECTED_MINUTES: Dict[str, int] = {
     "document-purge": 1440,
     "quickdraft-purge": 1440,
     "today-push": 2,
+    "cancel-deadlines": 15,  # [Gate Remaining-3] FR-010 予約の取消期限の知らせ
 }
 RETENTION_DAYS = 30
 GRACE_MINUTES = 10

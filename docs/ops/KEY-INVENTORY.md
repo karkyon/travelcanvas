@@ -20,6 +20,7 @@
 | `SHARE_VIEW_SIGNING_KEY` | [Gate G4] 共有の閲覧の一時トークンの署名(未設定なら `JWT_SECRET_KEY` から導出) | いつでも | 閲覧中の人(既定2時間)はリンクを開き直す(使用回数を1回使う) | — |
 | `VAPID_PRIVATE_KEY` | [Gate TDay-Push] 端末への通知(Web Push)の送り手の署名(未設定なら `JWT_SECRET_KEY` から導出) | いつでも | 端末の購読は画面を開いた時に取り直す(それまで通知が届かない) | — |
 | `SMTP_PASSWORD` | [Gate G4] 通知のまとめのメールを送る SMTP の認証(`SMTP_HOST`・`EMAIL_FROM` が無ければメールは送らない) | 提供元と .env を同時に | 替えるまで送れず、送信待ちが再送を続ける(上限で dead) | — |
+| `INBOUND_MAIL_SECRET` | [Gate Remaining-3] 予約メールの転送(受信サービス → `POST /api/v1/inbound-mail`)の合言葉(`INBOUND_MAIL_DOMAIN` と両方が無ければ受け付けない) | 受信サービスの設定と同時に | 替えるまで転送を受け付けない(403。受信サービスが再送) | — |
 | `METRICS_TOKEN` | 監視の計測値(`/metrics`)を見る合言葉 | 監視の道具と同時に | 替えるまで監視が 401 | ○ |
 
 **使い回しの禁止:** 上の鍵どうし、および DB のパスワードで同じ値を使わない。本番(`APP_ENV=production`)は

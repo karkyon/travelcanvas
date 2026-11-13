@@ -127,3 +127,28 @@ export async function searchTimetable(planId: string, input: {
   return decodeResponse((await api.post(`/plans/${planId}/route-options/timetable-search`, input, SILENT)).data,
     timetableResult, 'POST /plans/{plan_id}/route-options/timetable-search');
 }
+
+// ===== [Gate Remaining-3] FR-011 予約メールの転送アドレス
+export interface InboundMailInfo {
+  configured: boolean; address: string | null; received_count: number; last_received_at: string | null;
+  created_at: string | null; daily_limit: number;
+}
+const inboundMail: Decoder<InboundMailInfo> = object<InboundMailInfo>({
+  configured: bool, address: nullable(str), received_count: num, last_received_at: nullable(str),
+  created_at: nullable(str), daily_limit: num,
+});
+
+export async function getInboundMail(planId: string): Promise<InboundMailInfo> {
+  return decodeResponse((await api.get(`/plans/${planId}/inbound-mail`, SILENT)).data, inboundMail,
+    'GET /plans/{plan_id}/inbound-mail');
+}
+
+export async function createInboundMail(planId: string): Promise<InboundMailInfo> {
+  return decodeResponse((await api.post(`/plans/${planId}/inbound-mail`, null, SILENT)).data, inboundMail,
+    'POST /plans/{plan_id}/inbound-mail');
+}
+
+export async function revokeInboundMail(planId: string): Promise<InboundMailInfo> {
+  return decodeResponse((await api.delete(`/plans/${planId}/inbound-mail`, SILENT)).data, inboundMail,
+    'DELETE /plans/{plan_id}/inbound-mail');
+}

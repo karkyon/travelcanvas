@@ -90,7 +90,7 @@
 | `finance_locked` | 409 | no | 精算を締めているため変更できません。所有者が締めを解除してから変更してください | api/v1/finance.py, api/v1/finance_ledger.py |
 | `finance_not_locked` | 409 | no | 精算は締めていません | api/v1/finance_ledger.py |
 | `finance_unlock_owner_only` | 403 | no | 締めを解除できるのは旅行の所有者だけです | api/v1/finance_ledger.py |
-| `forbidden` | 403 | no | この場所を使う全ての旅行の編集の権限が無いため、直せません | api/v1/places.py |
+| `forbidden` | 403 | no | 合言葉が違います | api/v1/inbound_mail.py, api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `fx_unavailable` | 503 | later | 為替を自動で取れませんでした。出典を書いて手で入れてください | api/v1/finance_ledger.py |
 | `fx_unsupported` | 422 | no | この通貨は自動で取れません。出典を書いて手で入れてください | api/v1/finance_ledger.py |
@@ -101,6 +101,7 @@
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
 | `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
+| `inbound_mail_unavailable` | 409 | no | この環境ではメールの転送を受け付けていません(管理者の設定が必要です)。本文の貼り付け・ファイルで取り込めます | api/v1/inbound_mail.py |
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
@@ -163,6 +164,7 @@
 | `no_changes` | 403, 409, 422 | no | この案では旅程は変わりません | api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v |
 | `no_email` | 409 | no | メールアドレスが登録されていません | api/v1/notifications.py |
 | `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
+| `no_mail` | 422 | no | メールの本文がありません | api/v1/inbound_mail.py |
 | `no_previous` | 409 | no | 元の値が無いため取り消せません | api/v1/corrections.py |
 | `no_trip_period` | 409 | no | 旅行の日程が無いため記録できません。先に日程を登録してください | api/v1/location_tracks.py |
 | `not_active` | 409 | no | 失効・期限切れの版は公開できません | api/v1/booklet.py |
@@ -268,6 +270,7 @@
 | `unknown_provider` | 404 | no | 知らない提供元です | api/v1/admin_ops.py |
 | `unknown_secret_slot` | 404 | no | 知らない鍵の種類です | api/v1/admin_ops.py |
 | `unlock_reason_required` | 422 | no | 締めを解除する理由を200文字までで入力してください | api/v1/finance_ledger.py |
+| `unreadable_mail` | 422 | no | メールを読めませんでした | api/v1/inbound_mail.py |
 | `unsupported_platform` | — | — | 対応していない SNS の URL です | api/v1/candidates.py |
 | `unsupported_type` | — | — | 対応していない形式の画像です | api/v1/media_providers.py |
 | `usage_reason_required` | 422 | no | 上書きの理由を200文字までで入力してください | api/v1/admin.py |

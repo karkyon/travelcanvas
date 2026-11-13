@@ -10,6 +10,8 @@
 - 送る物は先に記録し、別の処理(``tcops.py jobs email-outbox``、5分ごと)が送る。失敗したら 5分・10分・20分…(上限6時間)と
   間を空けて送り直し、MAX_ATTEMPTS 回で dead(管理者が見て直す)
 - 送信の設定(SMTP_HOST 等)が無い環境では、まとめを作らない(email_available=false を画面に出す)
+- [Gate Remaining-3] email_digest=instant: 自分あて(メンション・返信・割り当て)と急ぎの通知(URGENT_TYPES)を、
+  作った時にすぐ outbox へ入れる(5 分ごとの送信の処理が送る)。本文は通知の題名と画面への案内だけ
 """
 from __future__ import annotations
 
@@ -28,7 +30,9 @@ from app.core.config import settings
 from app.models.models import EmailOutbox, Notification, NotificationPreference, TravelPlan, User
 
 LEVELS = ("all", "mentions", "none")
-DIGESTS = ("off", "daily")
+DIGESTS = ("off", "daily", "instant")
+# [Gate Remaining-3] instant の人へすぐメールで送る種類(自分あてでなくても送る)。それ以外は自分あての時だけ
+URGENT_TYPES = frozenset({"cancel_deadline", "poll_reminder", "replan_applied", "alert_created", "booking_mail"})
 MAX_ATTEMPTS = 6
 DIGEST_INTERVAL = timedelta(hours=20)  # 1日1回(cron の時刻のずれを見込む)
 
@@ -61,14 +65,43 @@ def deliver(db: Session, plan: Optional[Any], user_ids: Iterable[uuid.UUID], nty
     direct: Set[uuid.UUID] = set(direct_ids)
     levels = levels_for(db, user_ids, plan.id if plan else None)
     n = 0
+    made: List[uuid.UUID] = []
     for uid, level in levels.items():
         if level == "none" or (level == "mentions" and uid not in direct):
             continue
         db.add(Notification(id=uuid.uuid4(), user_id=uid, type=ntype, title=title[:200], message=message,
                             related_plan_id=plan.id if plan else None, target_type=target_type,
                             target_id=target_id))
+        made.append(uid)
         n += 1
+    _queue_instant(db, plan, [u for u in made if u in direct or ntype in URGENT_TYPES], title)
     return n
+
+
+def _queue_instant(db: Session, plan: Optional[Any], user_ids: List[uuid.UUID], title: str) -> int:
+    """[Gate Remaining-3] email_digest=instant の人へ、通知の題名だけのメールを outbox に入れる(呼んだ側が commit)"""
+    if not user_ids or not email_available():
+        return 0
+    rows: List[Any] = db.query(NotificationPreference.user_id).filter(
+        NotificationPreference.user_id.in_(user_ids), NotificationPreference.plan_id.is_(None),
+        NotificationPreference.email_digest == "instant").all()
+    ids = [r[0] for r in rows]
+    if not ids:
+        return 0
+    users: List[Any] = db.query(User).filter(User.id.in_(ids)).all()
+    queued = 0
+    for user in users:
+        if not user.email or getattr(user, "is_guest", False) or not getattr(user, "is_active", True):
+            continue
+        lines = [title[:200], ""]
+        if plan is not None and getattr(plan, "title", None):
+            lines.append("旅行: %s" % plan.title)
+        lines += ["TravelCanvas の「通知」の画面で確かめてください。",
+                  "すぐのメールを止めるには、通知の設定で「メール」を「送らない」か「1日1回まとめる」にしてください。"]
+        db.add(EmailOutbox(user_id=user.id, kind="instant", subject=("TravelCanvas: " + title)[:200],
+                           body="\n".join(lines)))
+        queued += 1
+    return queued
 
 
 # ---------------------------------------------------------------- 設定

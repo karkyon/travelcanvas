@@ -187,6 +187,12 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = ""
+    # [Gate Remaining-3] FR-011 予約メールの転送(受信)。INBOUND_MAIL_DOMAIN(例 in.example.com)の MX を
+    # 受信サービス(SendGrid Inbound Parse・Mailgun Routes・Postfix の pipe 等)へ向け、POST /api/v1/inbound-mail へ
+    # 転送させる。INBOUND_MAIL_SECRET を X-TC-Inbound-Secret(または ?secret=)で送る。どちらかが空なら受け付けない
+    INBOUND_MAIL_DOMAIN: str = ""
+    INBOUND_MAIL_SECRET: str = ""
+    INBOUND_MAIL_DAILY_LIMIT: int = 30  # 1 つのアドレスで 1 日に読み取るメールの数
 
     # [Gate TDay-Push] 端末への通知(Web Push、app/services/web_push.py)。無料(ブラウザの会社の窓口へ送る)。
     # VAPID_PRIVATE_KEY は URL 安全な base64 の 32 バイト。空なら JWT_SECRET_KEY から導出する。

@@ -10,7 +10,9 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *   2. 経路の候補の「時刻表から探す」: 鍵が無い時は手で入れる案内
  *   3. 予算・費用の「為替を自動で取る」: 取れない時は手入力の案内(何も記録しない)
  *   4. 旅程の日のタブに祝日の印(日本は計算。通信しない)
- *   5. 画面に axe(WCAG 2.1 AA)違反が無い
+ *   5. [Gate Remaining-3] 予約の取り込みの「転送アドレス」(受信の設定が無い環境は案内)・通知の「すぐ送る」(メールが
+ *      使えない環境は選べない)
+ *   6. 画面に axe(WCAG 2.1 AA)違反が無い
  */
 
 async function axeViolations(page: Page, label: string): Promise<void> {
@@ -89,4 +91,9 @@ test('外の情報: 警報を状況として登録・時刻表の案内・為替
   await page.goto(`/planner/${planId}`);
   await expect(page.getByTestId('day-holiday-0')).toBeVisible();
   await expect(page.getByTestId('day-tab-0')).toHaveAccessibleName(/文化の日/);
+
+  // 5. 予約メールの転送(CI は受信の設定なし → 案内)・メールの「すぐ送る」(メールの設定なし → 選べない)
+  await page.goto(`/planner/${planId}/imports`);
+  await expect(page.getByTestId('inbound-mail')).toContainText('管理者の設定が必要です');
+  await axeViolations(page, '予約の取り込みの画面');
 });

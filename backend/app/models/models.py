@@ -3420,7 +3420,8 @@ class NotificationPreference(Base):
 
     __table_args__ = (
         CheckConstraint("level IN ('all', 'mentions', 'none')", name="ck_notification_preferences_level"),
-        CheckConstraint("email_digest IN ('off', 'daily')", name="ck_notification_preferences_digest"),
+        # [Gate Remaining-3] instant: 自分あて・急ぎの通知をすぐメールで送る(FR-024)
+        CheckConstraint("email_digest IN ('off', 'daily', 'instant')", name="ck_notification_preferences_digest"),
         Index("uq_notification_preferences_user_plan", "user_id", "plan_id", unique=True,
               postgresql_where=text("plan_id IS NOT NULL")),
         Index("uq_notification_preferences_user_global", "user_id", unique=True,
@@ -3450,6 +3451,33 @@ class EmailOutbox(Base):
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'sent', 'failed', 'dead')", name="ck_email_outbox_status"),
         Index("ix_email_outbox_due", "next_attempt_at", postgresql_where=text("status IN ('pending', 'failed')")),
+    )
+
+
+class InboundMailAddress(Base):
+    """[Gate Remaining-3] FR-011 予約メールの転送用のアドレス(旅行・人ごと。<token>@INBOUND_MAIL_DOMAIN)。
+
+    届いたメールは、この人の操作として予約の読み取り(候補)にする(確定は人が画面で行う)。宛先の文字(token)は
+    ENCRYPTION_KEY で暗号化して持ち(画面に出すため)、届いたメールとの照合は sha256 だけで行う。作り直すと前の
+    アドレスは使えなくなる(revoked_at)。メールの本文は保存しない(読み取った候補は暗号化して import の表へ)。"""
+    __tablename__ = "inbound_mail_addresses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    received_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_inbound_mail_addresses_token_hash"),
+        Index("ix_inbound_mail_addresses_plan_user", "plan_id", "user_id"),
+        Index("ix_inbound_mail_addresses_user", "user_id"),
     )
 
 

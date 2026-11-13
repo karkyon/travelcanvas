@@ -33,6 +33,7 @@ import {
 import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookingExtractCard from './imports/BookingExtractCard';
+import InboundMailCard from './imports/InboundMailCard';
 import BookingReviewForm from './imports/BookingReviewForm';
 import { deleteImportJob } from '@/services/api/photoFeatures';
 
@@ -298,6 +299,8 @@ const ImportsPage: React.FC = () => {
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
+
+      {planId && <InboundMailCard planId={planId} />}
 
       {planId && (
         <BookingExtractCard planId={planId} onExtracted={(job) => {

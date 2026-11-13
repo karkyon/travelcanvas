@@ -60,7 +60,7 @@ export const adoptionPreview: Decoder<AdoptionPreview> = object<AdoptionPreview>
 export const adoptResult: Decoder<AdoptResult> = object<AdoptResult>({ poll, plan_revision: num, message: str });
 
 export const notificationPrefs: Decoder<NotificationPrefs> = object<NotificationPrefs>({
-  level, email_digest: oneOf('off', 'daily'), email_available: bool, has_email: bool,
+  level, email_digest: oneOf('off', 'daily', 'instant'), email_available: bool, has_email: bool,
   plans: arrayOf(object({ plan_id: str, plan_title: nullable(str), level })),
 });
 

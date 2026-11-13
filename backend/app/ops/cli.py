@@ -1161,6 +1161,8 @@ JOBS = {
     "account-deletions": ["-m", "app.ops.account_deletions"],
     # [Gate TDay-Push] 旅の当日の端末への通知(出発の合図・雨・今日の旅程)
     "today-push": ["-m", "app.ops.today_push"],
+    # [Gate Remaining-3] FR-010 予約の取消期限の 48 時間前・6 時間前の知らせ
+    "cancel-deadlines": ["-m", "app.ops.cancel_deadlines"],
 }
 
 

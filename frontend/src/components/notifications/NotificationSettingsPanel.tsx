@@ -11,7 +11,12 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
   deletePlanNotificationLevel, getNotificationDigest, getNotificationSettings, putNotificationSettings,
 } from '@/services/api/g4';
-import type { NotificationDigest, NotificationLevel, NotificationPrefs } from '@/services/api';
+import type { EmailDigest, NotificationDigest, NotificationLevel, NotificationPrefs } from '@/services/api';
+
+// [Gate Remaining-3] FR-024 instant: 自分あて(メンション・返信)と急ぎの通知(取消期限 等)をすぐメールで送る
+const DIGEST_LABEL: Record<EmailDigest, string> = {
+  off: '送らない', daily: '1日1回、読んでいない通知の件数をまとめて送る', instant: '自分あて・急ぎの通知をすぐ送る(題名だけ)',
+};
 
 const LEVEL_LABEL: Record<NotificationLevel, string> = {
   all: 'すべて受け取る', mentions: '自分あてだけ(メンション・返信・回答の催促)', none: '受け取らない',
@@ -31,7 +36,7 @@ const NotificationSettingsPanel: React.FC = () => {
     return () => { alive = false; };
   }, []);
 
-  const save = async (patch: { level?: NotificationLevel; email_digest?: 'off' | 'daily' }) => {
+  const save = async (patch: { level?: NotificationLevel; email_digest?: EmailDigest }) => {
     setError(null);
     setSaved(null);
     const before = prefs;
@@ -72,15 +77,15 @@ const NotificationSettingsPanel: React.FC = () => {
               ))}
             </fieldset>
             <fieldset className="mt-3">
-              <legend className="text-sm font-medium text-ink-900">メールでまとめる(1日1回、読んでいない通知の件数)</legend>
+              <legend className="text-sm font-medium text-ink-900">メール</legend>
               {!prefs.email_available && <p className="text-sm text-ink-700">この環境ではメールを送れません(管理者の設定が必要です)。</p>}
               {prefs.email_available && !prefs.has_email && <p className="text-sm text-ink-700">メールアドレスが登録されていません。</p>}
-              {(['off', 'daily'] as const).map((d) => (
+              {(['off', 'daily', 'instant'] as const).map((d) => (
                 <label key={d} className="flex items-center gap-2 text-sm text-ink-900">
                   <input type="radio" name="notification-digest" checked={prefs.email_digest === d}
-                    disabled={d === 'daily' && (!prefs.email_available || !prefs.has_email)}
+                    disabled={d !== 'off' && (!prefs.email_available || !prefs.has_email)}
                     onChange={() => void save({ email_digest: d })} />
-                  {d === 'off' ? '送らない' : '毎日まとめて送る'}
+                  {DIGEST_LABEL[d]}
                 </label>
               ))}
             </fieldset>

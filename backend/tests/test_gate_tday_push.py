@@ -179,7 +179,7 @@ def test_subscribe_store_encrypted_and_remove(auth_client, db_session):
     client, user = auth_client
     cfg = client.get("/api/v1/push/config").json()
     assert cfg["available"] is True and cfg["public_key"] == wp.public_key() and cfg["devices"] == []
-    assert cfg["kinds"] == {"depart": True, "rain": True, "morning": True, "crew": True}
+    assert cfg["kinds"] == {"depart": True, "rain": True, "morning": True, "crew": True, "notice": True}
     r, _key, _auth = _subscribe(client)
     assert r.status_code == 200, r.text
     devices = r.json()["devices"]

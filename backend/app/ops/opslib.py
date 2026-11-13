@@ -727,6 +727,8 @@ def render_cron_block(repo_dir: str, python: str = "/usr/bin/python3", log_dir: 
         "20 4 * * * cd %s && %s jobs account-deletions >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# [Gate TDay-Push] 2分ごと 旅の当日の端末への通知(出発の合図・雨・今日の旅程。端末の登録が無ければ何もしない)",
         "*/2 * * * * cd %s && %s jobs today-push >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
+        "# [Gate Remaining-3] 15分ごと 予約の取消期限の知らせ(48時間前・6時間前に1回ずつ)",
+        "7,22,37,52 * * * * cd %s && %s jobs cancel-deadlines >> %s/jobs.log 2>&1" % (repo_dir, tool, log),
         "# 5分ごとの監視(状態が変わった時だけ通知)",
         "*/5 * * * * cd %s && %s monitor --quiet >> %s/monitor.log 2>&1" % (repo_dir, tool, log),
         CRON_END,

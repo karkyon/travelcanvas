@@ -12,7 +12,7 @@ import { arrayOf, bool, decodeResponse, nullable, object, str, type Decoder } fr
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 export const PUSH_SW_URL = '/tc-push-sw.js';
 
-export type PushKind = 'depart' | 'rain' | 'morning' | 'crew';
+export type PushKind = 'depart' | 'rain' | 'morning' | 'crew' | 'notice';  // [Gate Remaining-3] notice
 export type PushKinds = Record<PushKind, boolean>;
 export interface PushDevice { id: string | null; label: string | null; at: string | null; current_key: boolean }
 export interface PushConfig {
@@ -20,7 +20,7 @@ export interface PushConfig {
 }
 export interface PushTestResult extends PushConfig { sent: number; removed: number; failed: number }
 
-const kinds: Decoder<PushKinds> = object<PushKinds>({ depart: bool, rain: bool, morning: bool, crew: bool });
+const kinds: Decoder<PushKinds> = object<PushKinds>({ depart: bool, rain: bool, morning: bool, crew: bool, notice: bool });
 const config: Decoder<PushConfig> = object<PushConfig>({
   available: bool, public_key: nullable(str), kinds, notice: str,
   devices: arrayOf(object<PushDevice>({ id: nullable(str), label: nullable(str), at: nullable(str), current_key: bool })),
