@@ -25,7 +25,9 @@ export const EventCard: React.FC<{
   planId: string;
   countdown?: string;
   progress?: { minutesLeft: number; percent: number } | null;
-}> = ({ kind, event, timeZone, planId, countdown, progress }) => {
+  /** [Gate TDay] 出発の合図・印を押す などの当日の部品(主な操作の後に出す) */
+  children?: React.ReactNode;
+}> = ({ kind, event, timeZone, planId, countdown, progress, children }) => {
   const navigate = useNavigate();
   const map = mapUrl(event);
   const transport = event.transport_status ? TRANSPORT_LABELS[event.transport_status] : undefined;
@@ -96,6 +98,7 @@ export const EventCard: React.FC<{
           )}
         </div>
       )}
+      {children}
     </section>
   );
 };

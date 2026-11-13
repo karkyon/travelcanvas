@@ -33,6 +33,7 @@ EXPECTED_MINUTES: Dict[str, int] = {
     "plan-purge": 1440,
     "document-purge": 1440,
     "quickdraft-purge": 1440,
+    "today-push": 2,
 }
 RETENTION_DAYS = 30
 GRACE_MINUTES = 10

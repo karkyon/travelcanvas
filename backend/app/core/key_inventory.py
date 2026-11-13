@@ -98,6 +98,15 @@ KEYS: List[Dict[str, object]] = [
         "derived_from_when_unset": "JWT_SECRET_KEY",
     },
     {
+        "name": "VAPID_PRIVATE_KEY",
+        "purpose": "[Gate TDay-Push] 端末への通知(Web Push)の送り手の署名(VAPID)",
+        "kind": "signing",
+        "rotation": "いつでも替えられる(端末の購読は画面を開いた時に取り直す)",
+        "impact": "取り直すまで端末へ通知が届かない",
+        "required_in_production": False,
+        "derived_from_when_unset": "JWT_SECRET_KEY",
+    },
+    {
         "name": "SMTP_PASSWORD",
         "purpose": "[Gate G4] 通知のまとめのメールを送る SMTP の認証",
         "kind": "credential",

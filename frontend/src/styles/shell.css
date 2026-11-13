@@ -1137,6 +1137,8 @@
 .tc-booking.is-booked .tc-booking-tag { background: #2f9e6e; color: #fff; }
 .tc-booking.is-issue { border-color: var(--tc-warning); background: var(--tc-warning-soft, var(--tc-cloud-50)); }
 .tc-booking.is-issue .tc-booking-tag { background: var(--tc-warning); color: #fff; }
+/* 暗い見た目では --tc-warning が明るい黄色になるため、文字を暗くする(axe color-contrast) */
+[data-theme='dark'] .tc-booking.is-issue .tc-booking-tag { color: #0b1220; }
 .tc-booking.is-suggest { border-style: dashed; border-color: var(--tc-accent); }
 .tc-booking.is-suggest .tc-booking-tag { background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
 .tc-booking-issues { flex-basis: 100%; margin: 2px 0 0; padding-left: 18px; list-style: disc; color: var(--tc-warning); font-weight: 700; }
