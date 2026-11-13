@@ -72,6 +72,11 @@ SLOTS: Dict[str, Dict[str, Any]] = {
                               "env": "STRIPE_WEBHOOK_SECRET", "connector": True,
                               "note": "任意: 登録すると支払い・購読の変化を Stripe から受け取ります(無くても画面に戻った時に確かめます)",
                               "hint": "Webhook の送り先 https://<ホスト>/api/v1/billing/stripe/webhook の whsec_… の鍵"},
+    # [Gate Remaining-5] FR-037 公開の前の顔の検査(Google Cloud Vision。有料。押した時だけ写真を送る)
+    "google_vision_key": {"label": "Google Cloud Vision の API キー", "providers": ["google_vision"],
+                          "env": "GOOGLE_VISION_API_KEY", "connector": True,
+                          "note": "任意・有料: 登録すると旅行記の公開の前に写真の顔を自動で確かめられます(押した時だけ送ります)",
+                          "hint": "Cloud Vision API だけに制限した API キー。顔の数だけを使い、位置・表情は保存しません"},
 }
 MIN_LEN, MAX_LEN = 8, 512
 

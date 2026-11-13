@@ -30,11 +30,14 @@ FIELDS: Dict[str, Dict[str, str]] = {
     # [Gate PlanB] 日ごとの控えの案(雨の日の案など)。既定では見せない(標準・すべてにも含めない。1 つずつ選ぶ)
     "day_variants": {"classification": "internal", "label": "控えの案(雨の日など)",
                      "description": "日ごとの控えの案の名前と予定。見る人は今の案の下に「雨の日はこちら」として見られます"},
+    # [Gate Remaining-5] FR-042 ほかのサイト(ブログ等)への埋め込みを許す(合言葉・回数の制限が無いリンクだけ。読むだけ)
+    "embed": {"classification": "internal", "label": "ほかのサイトへの埋め込み",
+              "description": "ブログなどに旅程を貼れるようにします(見せる項目はこのリンクの選択どおり。合言葉・回数の制限が無いリンクだけ)"},
 }
 FIELD_ORDER = ["plan_description", "day_titles", "event_times", "event_address", "event_notes", "reservation_summary",
-               "day_variants"]
+               "day_variants", "embed"]
 # 標準・すべての一括操作に含めない項目(1 つずつ選ぶ)
-OPT_IN_FIELDS = {"day_variants"}
+OPT_IN_FIELDS = {"day_variants", "embed"}
 
 RESTRICTED: List[Dict[str, str]] = [
     {"key": "confirmation_numbers", "label": "予約番号・PIN"},

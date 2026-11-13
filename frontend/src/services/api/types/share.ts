@@ -28,7 +28,9 @@ export interface ShareLink {
 /** [Gate F45] FR-045 共有リンクで選べる項目(backend app/services/share_policy.py FIELDS) */
 export type ShareFieldKey =
   | 'plan_description' | 'day_titles' | 'event_times'
-  | 'event_address' | 'event_notes' | 'reservation_summary' | 'day_variants';
+  | 'event_address' | 'event_notes' | 'reservation_summary' | 'day_variants'
+  // [Gate Remaining-5] FR-042 ほかのサイトへの埋め込み
+  | 'embed';
 export type ShareFieldClassification = 'internal' | 'confidential';
 export type SharePreset = 'minimal' | 'standard' | 'all';
 

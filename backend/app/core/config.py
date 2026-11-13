@@ -385,6 +385,8 @@ class Settings(BaseSettings):
     # [Gate Remaining-4] FR-058 決済(Stripe のテストモード)。鍵は運用コンソール(stripe_secret_key・stripe_webhook_secret)。
     # 送り先は既定の https://api.stripe.com/v1 か、試験の模擬の時だけこの値
     STRIPE_API_URL: str = ""
+    # [Gate Remaining-5] FR-042 埋め込みを許すサイト(https://… をカンマ区切り。空ならどのサイトでも)
+    EMBED_ALLOWED_ORIGINS: str = ""
     # [Gate PlaceLookupJP] 楽天ウェブサービスへ送る Referer(アプリの「許可された Web サイト」と同じ URL。空なら付けない)
     PLACE_LOOKUP_REFERER: str = ""
 

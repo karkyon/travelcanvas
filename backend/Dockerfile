@@ -107,6 +107,8 @@ FROM dependencies AS production
 RUN apt-get update && apt-get install -y \
     # Health check用
     curl \
+    # [Gate Remaining-5] サーバー側の PDF・画像の日本語の字体(IPA ゴシック。約 8MB)
+    fonts-ipafont-gothic \
     # Process monitoring
     procps \
     # Cleanup
