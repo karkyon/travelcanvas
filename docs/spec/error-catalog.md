@@ -88,11 +88,13 @@
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
 | `expired` | 410 | no | この版は有効期限が切れています | api/v1/booklet.py |
+| `face_check_failed` | 503 | later | 顔の判定を取れませんでした。写っている人の了解を確かめてください | api/v1/server_exports.py |
 | `fake_test_disabled` | 403 | no | 本番・staging の環境では Fake の試験を実行しません | api/v1/admin_ops.py |
 | `file_too_large` | 413 | no | ファイルが大きすぎます(上限 …MB) | api/v1/memories.py |
 | `finance_locked` | 409 | no | 精算を締めているため変更できません。所有者が締めを解除してから変更してください | api/v1/finance.py, api/v1/finance_ledger.py |
 | `finance_not_locked` | 409 | no | 精算は締めていません | api/v1/finance_ledger.py |
 | `finance_unlock_owner_only` | 403 | no | 締めを解除できるのは旅行の所有者だけです | api/v1/finance_ledger.py |
+| `font_unavailable` | 503 | later | この環境には日本語の字体が無いため、PDF・画像を作れません(管理者の設定が必要です) | api/v1/server_exports.py |
 | `forbidden` | 403 | no | 合言葉が違います | api/v1/inbound_mail.py, api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `fx_unavailable` | 503 | later | 為替を自動で取れませんでした。出典を書いて手で入れてください | api/v1/finance_ledger.py |
@@ -250,6 +252,7 @@
 | `too_many_items` | — | — | 条件は…件までです | services/private_profile.py |
 | `too_many_memories` | — | — | 1つの旅行の記録は…件までです | api/v1/memories.py |
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
+| `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/server_exports.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
 | `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/push.py, api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |

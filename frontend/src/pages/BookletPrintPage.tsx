@@ -15,6 +15,7 @@ import type { BookletExportResult } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookletView from './booklet/BookletView';
 import { printWhenReady } from './booklet/bookletModel';
+import { downloadBookletPdf, saveBlob } from '@/services/api/remaining5';
 
 // 422(配列)・文字列は extractApiErrorDetailMessage、構造化detail({code, message})は errorDetailMessage で表示する
 function errorMessage(e: unknown, fallback: string): string {
@@ -28,6 +29,21 @@ const BookletPrintPage: React.FC = () => {
   const [result, setResult] = useState<BookletExportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // [Gate Remaining-5] FR-035 サーバーで作る PDF(ブラウザの印刷を使わずに保存)
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const savePdf = async () => {
+    if (!planId || !exportId) return;
+    setPdfBusy(true);
+    setPdfError(null);
+    try {
+      saveBlob(await downloadBookletPdf(planId, exportId), `${result?.booklet.cover?.title ?? 'しおり'}.pdf`);
+    } catch (e) {
+      setPdfError(errorDetailMessage(e, 'PDF を作れませんでした。「印刷 / PDFで保存」を使ってください'));
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!planId || !exportId) return;
@@ -49,9 +65,11 @@ const BookletPrintPage: React.FC = () => {
         {result && (
           <div className="flex gap-2">
             <Button variant="primary" onClick={() => void printWhenReady()}>印刷 / PDFで保存</Button>
+            <Button variant="outline" loading={pdfBusy} onClick={() => void savePdf()}>PDF をダウンロード</Button>
           </div>
         )}
       </div>
+      {pdfError && <p className="no-print mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{pdfError}</p>}
       {result && (
         <p className="no-print mb-4 text-sm text-gray-700">
           「印刷 / PDFで保存」を押し、印刷先で「PDFに保存」を選ぶとPDFになります。操作ボタンは印刷されません。

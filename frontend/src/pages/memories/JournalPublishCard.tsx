@@ -6,6 +6,7 @@
  * - URL は作った時だけ表示する(サーバーには URL の照合用の値だけを残すため、後から同じ URL は分からない)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import FaceCheckButton from './FaceCheckButton';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import {
@@ -182,6 +183,7 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
                 ))}
               </fieldset>
             )}
+            <FaceCheckButton planId={planId} photoIds={preview.photo_ids} />
             <Button size="sm" variant="primary" disabled={!allChecked || memoryCount === 0} loading={busy}
               onClick={() => void publish()}>
               この内容で公開する

@@ -13,7 +13,8 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *   5. [Gate Remaining-3] 予約の取り込みの「転送アドレス」(受信の設定が無い環境は案内)・通知の「すぐ送る」(メールが
  *      使えない環境は選べない)
  *   6. [Gate Remaining-4] 料金・お支払い(CI は決済の鍵なし → 案内・買えない)。ゲストは買えない
- *   7. 画面に axe(WCAG 2.1 AA)違反が無い
+ *   7. [Gate Remaining-5] カレンダーの購読の URL(webcal・ICS)
+ *   8. 画面に axe(WCAG 2.1 AA)違反が無い
  */
 
 async function axeViolations(page: Page, label: string): Promise<void> {
@@ -37,6 +38,7 @@ function apiClient(request: APIRequestContext, base: string, token: string) {
 }
 
 test('外の情報: 警報を状況として登録・時刻表の案内・為替の自動・祝日の印', async ({ page, context }) => {
+  test.setTimeout(150_000);
   const { planId, apiBase, token } = await startGuestPlanViaApi(page, `R2外の情報E2E-${Date.now()}`);
   const send = apiClient(context.request, apiBase, token);
   const day = await send('post', `/plans/${planId}/days`, { local_date: '2026-11-03', timezone_id: 'Asia/Tokyo' });
@@ -110,4 +112,15 @@ test('外の情報: 警報を状況として登録・時刻表の案内・為替
   const buy = await context.request.post(`${apiBase}/billing/checkout`, {
     headers: { Authorization: `Bearer ${token}` }, data: { product_id: products.products[0].id } });
   expect([403, 409]).toContain(buy.status());
+
+  // 7. カレンダーの購読(埋め込みは共有リンクを作れる登録の人だけなので backend の試験で確かめる)
+  await page.goto(`/planner/${planId}/exports`);
+  const feed = page.getByTestId('calendar-feed');
+  await feed.getByRole('button', { name: '購読の URL を作る' }).click();
+  const feedUrl = await page.getByTestId('calendar-feed-url').inputValue();
+  expect(feedUrl).toMatch(/^webcal:\/\/.+\/public\/calendar\/.+\.ics$/);
+  const ics = await context.request.get(feedUrl.replace(/^webcal:/, apiBase.startsWith('https') ? 'https:' : 'http:'));
+  expect(ics.status()).toBe(200);
+  expect(await ics.text()).toContain('BEGIN:VCALENDAR');
+  await axeViolations(page, '書き出しの画面(カレンダーの購読)');
 });

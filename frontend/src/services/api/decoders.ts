@@ -447,6 +447,7 @@ export const placeDetail: Decoder<PlaceDetail> = object<PlaceDetail>({
 // [Gate F45] FR-045 共有リンクで選べる項目
 const shareFieldKey = oneOf<ShareFieldKey>(
   'plan_description', 'day_titles', 'event_times', 'event_address', 'event_notes', 'reservation_summary', 'day_variants',
+  'embed',
 );
 
 export const shareLink: Decoder<ShareLink> = object<ShareLink>({

@@ -35,6 +35,7 @@ import { Face, Pill, RainBars } from './TodayDash';
 import { shareMyEta, type useCrew, ticketTabs } from './todayHelpers';
 import { LiveSwitch } from './LivePieces';
 import PushPanel from './PushPanel';
+import TodayCardButton from './TodayCardButton';
 import ScreenFrame from './ScreenFrame';
 import { Thumb } from './ScreensBook';
 import type { TodayCtx } from './todayCtx';
@@ -833,6 +834,7 @@ export const SettingsScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
         <LiveSwitch label="簡易表示" sub="今と次だけ・大きな文字" checked={ctx.simple} onToggle={() => ctx.toggleSimple()} />
         <p className="tl-small tl-mute">設定はこの端末に覚えます。位置は端末の中だけで使い、送りません。</p>
         <PushPanel />
+        <TodayCardButton planId={ctx.planId} />
       </div>
     </ScreenFrame>
   );

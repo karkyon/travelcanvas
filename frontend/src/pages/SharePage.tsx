@@ -32,6 +32,8 @@ import { describeCollaboratorRemoval } from '../store/itemDeletionMessages';
 import MemberPolicyPanel from '@/components/share/MemberPolicyPanel';
 import OwnershipTransferPanel from '@/components/share/OwnershipTransferPanel';
 import LocalQrCode from '../components/share/LocalQrCode';
+import EmbedCode from '@/components/share/EmbedCode';
+import { canEmbed, shareTokenOf } from '@/components/share/embedModel';
 import UiIcon from '@/components/common/UiIcon';
 import PageHead from '@/components/shell/PageHead';
 import { useTripContext } from '@/hooks/useTripContext';
@@ -338,6 +340,9 @@ const SharePage: React.FC = () => {
 
               {justCreatedUrl && (
                 <div className="mb-4 space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  {justCreated && canEmbed(justCreated) && shareTokenOf(justCreatedUrl) && (
+                    <EmbedCode token={shareTokenOf(justCreatedUrl)!} />
+                  )}
                   <p className="text-sm text-blue-800 font-medium">
                     このURLは今だけ表示されます。ページを離れると二度と表示できません。
                   </p>
