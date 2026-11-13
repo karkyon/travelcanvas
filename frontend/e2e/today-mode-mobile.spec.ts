@@ -130,14 +130,16 @@ test.describe('当日モード (FR-029/030/032) mobile E2E', () => {
 
     // 1〜3. NOW/NEXT・現地時間・遅延・出発まで
     await page.goto(`/planner/${planId}/today`);
-    await expect(page.getByRole('heading', { level: 1, name: '今日' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('today-now').getByText(nowTitle)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('today-next').getByText(nextTitle)).toBeVisible();
     await expect(page.getByText(`時刻は現地時間(${zone})`, { exact: false })).toBeVisible();
-    await expect(page.getByTestId('today-now').getByText(localParts(nowStart, zone).hhmm, { exact: true })).toBeVisible();
+    // [Gate TDay-Mock] 旅の糸(今日の道のり)に、今いる予定を現地の時刻で示す
+    await expect(page.getByRole('listitem', { name: `${localParts(nowStart, zone).hhmm} ${nowTitle}(今いる場所)` })).toBeAttached();
     await expect(page.getByText('遅延', { exact: true })).toBeVisible();
-    await expect(page.getByText(`出発 ${displayTime(departure, zone)}`, { exact: true })).toBeVisible();
-    await expect(page.getByText(/^出発 (まもなく|\d+分後|\d+時間(\d+分)?後)$/)).toBeVisible();
+    // 出発の合図: 経路の出発時刻(現地)と、出発までの輪
+    await expect(page.getByTestId('today-next').getByText(`${displayTime(departure, zone)} に出発`, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('today-next').getByRole('img', { name: /^出発まで (\d+分|今)$/ })).toBeVisible();
 
     // 5. mobile幅で横スクロールが発生しない
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -146,13 +148,13 @@ test.describe('当日モード (FR-029/030/032) mobile E2E', () => {
     // 4. オフラインでも保存済みの情報で表示し続ける
     await context.setOffline(true);
     await page.getByRole('button', { name: '更新' }).click();
-    await expect(page.getByText(/保存済みの情報を表示しています/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/に保存した情報を表示中/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('today-now').getByText(nowTitle)).toBeVisible();
     await expect(page.getByTestId('today-next').getByText(nextTitle)).toBeVisible();
 
     // オンライン復帰で自動的に再取得し、保存済み表示の注記が消える
     await context.setOffline(false);
-    await expect(page.getByText(/保存済みの情報を表示しています/)).toBeHidden({ timeout: 40_000 });
+    await expect(page.getByText(/に保存した情報を表示中/)).toBeHidden({ timeout: 40_000 });
     await expect(page.getByTestId('today-now').getByText(nowTitle)).toBeVisible();
   });
 });

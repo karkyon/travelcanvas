@@ -4,7 +4,7 @@
  */
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import fx from '@/services/api/__fixtures__/backendContractResponses.json';
 import type { TodayResponse } from '@/services/api';
@@ -24,6 +24,8 @@ vi.mock('@/services/api', () => ({
 const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
 vi.mock('./today/TodaySwitchPanel', () => ({ default: () => null }));
+// [Gate TDay] 当日の地図(Leaflet・後から読む)はこの試験の対象外
+vi.mock('./today/live/TodayMap', () => ({ default: () => null }));
 
 import TodayPage from './TodayPage';
 import { saveTodayCache } from './today/todayModel';
@@ -74,16 +76,17 @@ describe('TodayPage (Gate L1b)', () => {
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
     const now = card('NOW');
     expect(within(now).getByText('ホテル')).toBeInTheDocument();
-    expect(within(now).getByText('08:00')).toBeInTheDocument();
+    // [Gate TDay-Mock] NOW は現地の時刻の範囲(終わりは次の予定の開始)
+    expect(now).toHaveTextContent('いま 08:00');
 
+    // NEXT は「出発の合図」: 出る時刻(経路の出発 12:10)・着く時刻(15:00)・遅延を文字で
     const next = card('NEXT');
-    expect(within(next).getByText('京都駅')).toBeInTheDocument();
-    expect(within(next).getByText('15:00 〜 16:00')).toBeInTheDocument();
+    expect(next).toHaveTextContent('京都駅 15:00着');
     expect(within(next).getByText('遅延')).toBeInTheDocument();
-    expect(within(next).getByText('出発 12:10')).toBeInTheDocument();
-    expect(within(next).getByText('出発 1時間10分後')).toBeInTheDocument();
+    expect(within(next).getByText('12:10 に出発')).toBeInTheDocument();
+    expect(screen.getByTestId('today-live-band')).toHaveTextContent('あと70分で出発');
     expect(screen.getByText(/時刻は現地時間\(Asia\/Tokyo\)/)).toBeInTheDocument();
-    expect(screen.queryByText(/保存済みの情報/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/保存した情報を表示中/)).not.toBeInTheDocument();
   });
 
   it('端末と日程のタイムゾーンが同じなら現地時間の注記は出さない', async () => {
@@ -91,7 +94,7 @@ describe('TodayPage (Gate L1b)', () => {
     getToday.mockResolvedValue(data);
     renderPage();
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
-    expect(screen.getByText('2026-05-01')).toBeInTheDocument();
+    expect(screen.getByText(/5\/1（金）/)).toBeInTheDocument();
     expect(screen.queryByText(/時刻は現地時間/)).not.toBeInTheDocument();
   });
 
@@ -102,9 +105,10 @@ describe('TodayPage (Gate L1b)', () => {
     getToday.mockRejectedValue(new Error('Network Error'));
     renderPage();
 
-    const banner = await screen.findByText(/保存済みの情報を表示しています/);
+    const banner = await screen.findByText(/に保存した情報を表示中/);
     expect(banner.closest('[role="status"]')).not.toBeNull();
-    expect(banner).toHaveTextContent('最終取得 11:00');
+    expect(banner.closest('[role="status"]')).toHaveTextContent('11:00 に保存した情報を表示中');
+    expect(screen.getByTestId('today-offline')).toHaveTextContent('通信なしで使えるもの');
     expect(within(card('NOW')).getByText('京都駅')).toBeInTheDocument();
     expect(screen.getByText('本日、これ以降の予定はありません')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -116,8 +120,8 @@ describe('TodayPage (Gate L1b)', () => {
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
 
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
-    expect(await screen.findByText(/保存済みの情報を表示しています/)).toBeInTheDocument();
-    expect(within(card('NEXT')).getByText('京都駅')).toBeInTheDocument();
+    expect(await screen.findByText(/に保存した情報を表示中/)).toBeInTheDocument();
+    expect(card('NEXT')).toHaveTextContent('京都駅');
   });
 
   it('保存済みの当日情報が別の日のものならNOW/NEXTを出さない', async () => {
@@ -160,26 +164,34 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     getToday.mockResolvedValue(withLater);
     const first = renderPage();
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
-    const list = screen.getByRole('list', { name: '今日の旅程' });
+    expect(await screen.findByRole('heading', { name: '京都の旅' })).toBeInTheDocument();
+    expect(screen.getByTestId('today-sync')).toHaveTextContent('最新');
+    // [Gate TDay-Mock] 今日の旅程は下の「当日の画面」の「旅程」で開く(戻るで閉じる)
+    fireEvent.click(within(screen.getByRole('navigation', { name: '当日の画面' })).getByRole('button', { name: '旅程' }));
+    const list = await screen.findByRole('list', { name: '今日の旅程' });
     expect(within(list).getByText('祇園')).toBeInTheDocument();
     expect(within(list).getByText('京都駅').closest('li')).toHaveAttribute('data-state', 'NEXT');
     expect(within(list).getByText('ホテル').closest('li')).toHaveAttribute('data-state', 'NOW');
     expect(within(list).getByText('チケット')).toBeInTheDocument();
-    expect(await screen.findByText('京都の旅')).toBeInTheDocument();
-    expect(screen.getByTestId('today-summary')).toHaveTextContent('この後 1件');
-    expect(screen.getByTestId('today-sync')).toHaveTextContent('最新');
+    expect(screen.getByTestId('today-summary')).toHaveTextContent('この後 2件');
+    expect(screen.getByTestId('today-summary')).toHaveTextContent('時刻は現地時間（Asia/Tokyo）');
+    fireEvent.click(screen.getByRole('button', { name: '今日へ戻る' }));
+    await waitFor(() => expect(screen.queryByRole('list', { name: '今日の旅程' })).toBeNull());
 
     const toggle = screen.getByRole('button', { name: '簡易表示' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(toggle);
-    expect(screen.queryByRole('list', { name: '今日の旅程' })).toBeNull();
-    expect(screen.getByRole('button', { name: '簡易表示: 入' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('navigation', { name: '当日の画面' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: '簡易表示: 入' })[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('today-now')).toHaveTextContent('いま');
+    expect(screen.getByTestId('today-next')).toHaveTextContent('つぎ');
     expect(window.localStorage.getItem('tc.today.simple')).toBe('1');
     first.unmount();
 
     renderPage();
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
-    expect(screen.queryByRole('list', { name: '今日の旅程' })).toBeNull();
+    expect(screen.getByTestId('today-now')).toHaveTextContent('いま');
+    expect(screen.queryByRole('navigation', { name: '当日の画面' })).toBeNull();
   });
 
   it('NOW の残りの時間と進み(終わりは次の予定の開始)を、数値つきの進みの棒で出す', async () => {
@@ -188,7 +200,7 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     const now = await screen.findByTestId('today-now');
     const bar = within(now).getByRole('progressbar', { name: '今の予定の進み' });
     // ホテル 08:00(JST)開始・次の京都駅 15:00 まで、今 11:00 → 残り 240分・3/7
-    expect(within(now).getByText('残り 240分')).toBeInTheDocument();
+    expect(within(now).getAllByText('残り 240分').length).toBeGreaterThan(0);
     expect(bar).toHaveAttribute('aria-valuenow', '43');
   });
 
@@ -198,10 +210,12 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
     getToday.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
-    expect(await screen.findByText(/保存済みの情報を表示しています/)).toBeInTheDocument();
+    expect(await screen.findByText(/に保存した情報を表示中/)).toBeInTheDocument();
     expect(screen.getByTestId('today-sync')).toHaveTextContent('保存済み');
+    // [Gate TDay-Mock] 当日の操作(写真・ひとこと / お助け / チケット)は画面の下にまとめる
     const nav = screen.getByRole('navigation', { name: '当日の操作' });
-    expect(within(nav).getByRole('button', { name: /遅延・休業などの対応/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'プランへ' })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: /写真・ひとこと/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: 'お助け' })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: /チケット/ })).toBeInTheDocument();
   });
 });

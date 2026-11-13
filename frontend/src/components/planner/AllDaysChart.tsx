@@ -138,7 +138,9 @@ const DayColumn: React.FC<{ day: ChartDay; scaleStart: number; scaleEnd: number;
         {/* [Gate ChartHeadSlim] 見出しを低く: DAY と時刻帯は 1 行、日付の横に予定の数、要約は小さな文字の 1〜2 行、
             移動の手段は印と時間だけ(手段の名前・距離は読み上げと吹き出しで) */}
         <p className="tc-chart-dayhead-kicker" title={`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}>
-          {`DAY ${day.index + 1}`}<span>{(day.timezone ?? '時刻帯未確認').split('/').pop()!.replace(/_/g, ' ')}</span>
+          {`DAY ${day.index + 1}`}<span aria-hidden="true">{(day.timezone ?? '時刻帯未確認').split('/').pop()!.replace(/_/g, ' ')}</span>
+          {/* 見出しは都市名だけに短くし、読み上げには正しい時刻帯の名前を出す */}
+          <span className="sr-only">{`現地時間 · ${day.timezone ?? '時刻帯未確認'}`}</span>
         </p>
         <h3 id={`chart-day-${day.id}`} className="tc-chart-dayhead-date">{label}</h3>
         <div className="tc-chart-dayhead-sum" data-testid={`chart-summary-${day.index}`}>

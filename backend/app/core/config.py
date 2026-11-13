@@ -188,6 +188,13 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = ""
 
+    # [Gate TDay-Push] 端末への通知(Web Push、app/services/web_push.py)。無料(ブラウザの会社の窓口へ送る)。
+    # VAPID_PRIVATE_KEY は URL 安全な base64 の 32 バイト。空なら JWT_SECRET_KEY から導出する。
+    # VAPID_SUBJECT は窓口へ名乗る連絡先(mailto: か https:)。空なら EMAIL_FROM
+    WEB_PUSH_ENABLED: bool = True
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = ""
+
     # [Gate G5] BILL-02 使用量の上限(app/services/usage.py)。空なら既定。JSON で {"user": {"imports": 500}, "org": {...}}
     # のように指標ごとに上書きする(指標: upload_bytes・imports・route_requests・share_links・distributions)
     USAGE_LIMITS: str = ""

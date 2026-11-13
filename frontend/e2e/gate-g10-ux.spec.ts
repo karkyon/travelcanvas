@@ -9,8 +9,9 @@ import { seedBaseline } from '../ux/baselineData';
  *
  * 1. 設定の「テーマ」で暗い見た目を選ぶと、全ての画面(<html data-theme="dark">)が暗くなり、読み直しても続く。
  *    主な画面を 1440px・360px で開き、横にはみ出さず axe(WCAG 2.1 AA。暗い地の文字のコントラストを含む)違反が無い
- * 2. 当日の画面(スマホ 390px): 今(残り・進み)→ 次(出発まで)→ この後の予定・済んだ数。簡易表示は今と次だけで、
- *    端末に覚える。当日の操作は画面の下(親指の届く所)にあり、押せる大きさ(高さ 44px 以上)。明るい・暗いで axe 違反が無い
+ * 2. 当日の画面(スマホ 390px。[Gate TDay-Mock] モックアップ Mobile-Today の並び): 次(出発の合図)・NOW(残り)・
+ *    今日の旅程(済んだ数)。簡易表示は今と次だけで、端末に覚える。当日の操作は画面の下(親指の届く所)にあり、
+ *    押せる大きさ(高さ 44px 以上)。開く画面(旅程・出発の合図・お助け・地図・旅帖)も明るい・暗いで axe 違反が無い
  */
 
 async function expectNoOverflow(page: Page, where: string): Promise<void> {
@@ -35,8 +36,8 @@ test('UX-8 設定で選んだ暗い見た目が全ての画面に効き、読み
     // [Gate HomeV2] 計画中の旅行があると見出しは「おかえりなさい。次の旅まで あと N 日」
     { name: 'ダッシュボード', path: '/dashboard', h1: /次の旅/ as RegExp | string | null },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' as RegExp | string | null },
-    // [Gate TripDayNav] 見出しは旅の当日らしく(当日・当日まであと何日・旅のあと)
-    { name: '旅の当日', path: `/planner/${planId}/today`, h1: /今日|旅の当日|旅はおしまい/ as RegExp | string | null },
+    // [Gate TripDayNav] 見出しは旅の当日らしく(当日の題・当日まであと何日・旅のあと)。表示によって変わるため形だけ確かめる
+    { name: '旅の当日', path: `/planner/${planId}/today`, h1: null as RegExp | string | null },
     { name: '予約', path: `/planner/${planId}/reservations`, h1: null },
     { name: '共有', path: `/share/${planId}`, h1: null },
     { name: '準備', path: `/planner/${planId}/preparation`, h1: null },
@@ -100,43 +101,62 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
     await send('post', `/plans/${r.planId}/events`, { day_id: day.id, title: titles.later, local_start_time: fmt(at(150)).hhmm });
 
     await page.goto(`/planner/${r.planId}/today`);
-    await expect(page.getByRole('heading', { level: 1, name: '今日' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 });
     const nowCard = page.getByTestId('today-now');
     const nextCard = page.getByTestId('today-next');
+    // [Gate TDay-Mock] スマホの並び(Mobile-Today): ライブ帯 → 今日の題 → 次(出発の合図)→ … → NOW(残り)
     await expect(nowCard.getByRole('heading', { name: titles.now })).toBeVisible();
-    await expect(nowCard.getByRole('progressbar', { name: '今の予定の進み' })).toBeVisible();
-    await expect(nowCard.getByText(/^残り \d+分$/)).toBeVisible();
-    await expect(nextCard.getByRole('heading', { name: titles.next })).toBeVisible();
-    await expect(nextCard.getByTestId('today-countdown')).toHaveText(/^(まもなく|\d+分後|\d+時間(\d+分)?後)$/);
-    // [Gate MockScreens] 今日の旅程: 今日の予定を全て出し、今と次を文字で示す
-    const later = page.getByRole('list', { name: '今日の旅程' });
-    await expect(later.getByText(titles.later)).toBeVisible();
-    await expect(later.locator('li[data-state="NEXT"]')).toContainText(titles.next);
-    await expect(later.locator('li[data-state="NOW"]')).toContainText(titles.now);
-    await expect(page.getByTestId('today-summary')).toHaveText(/済んだ予定 1件/);
-    await expect(page.getByTestId('today-sync')).toHaveText('最新');
+    await expect(nowCard).toContainText(/NOW ・ 残り\d+分/);
+    await expect(nextCard.getByRole('heading', { name: new RegExp(titles.next) })).toBeVisible();
+    await expect(page.getByTestId('today-live-band')).toContainText(titles.next);
+    await expect(page.getByTestId('today-sync')).toHaveText(/^最新/);
     await expectNoAxeViolations(page, '当日(明るい・390px)');
 
-    // 当日の操作: 画面の下(親指の届く所)に固定され、押せる大きさ
+    // 当日の操作: 画面の下(親指の届く所)に固定され、押せる大きさ。その下に「当日の画面」(今日/地図/旅帖/旅程)
     const nav = page.getByRole('navigation', { name: '当日の操作' });
-    for (const name of [/遅延・休業などの対応/, /^プランへ$/]) {
+    for (const name of [/写真・ひとこと/, /^お助け$/, /^チケット$/]) {
       const box = await nav.getByRole('button', { name }).boundingBox();
       expect(box, String(name)).not.toBeNull();
       expect(box!.height, String(name)).toBeGreaterThanOrEqual(44);
       expect(box!.y + box!.height, String(name)).toBeLessThanOrEqual(844);
       expect(box!.y, String(name)).toBeGreaterThan(844 * 0.75);
     }
+    const tabs = page.getByRole('navigation', { name: '当日の画面' });
+    await expect(tabs.getByRole('button', { name: '今日' })).toHaveAttribute('aria-current', 'page');
     await expectNoOverflow(page, '当日(390px)');
 
-    // 簡易表示: 今と次だけ。読み直しても続く
+    // 今日の旅程(Mobile-Timeline): 今日の予定を全て出し、今と次を文字で示す。戻るで今日に戻る
+    await tabs.getByRole('button', { name: '旅程' }).click();
+    const later = page.getByRole('list', { name: '今日の旅程' });
+    await expect(later.getByText(titles.later)).toBeVisible({ timeout: 15_000 });
+    await expect(later.locator('li[data-state="NEXT"]')).toContainText(titles.next);
+    await expect(later.locator('li[data-state="NOW"]')).toContainText(titles.now);
+    await expect(page.getByTestId('today-summary')).toHaveText(/済んだ予定 1件/);
+    await expectNoAxeViolations(page, '今日の旅程(明るい・390px)');
+    await page.goBack();
+    await expect(later).toHaveCount(0);
+
+    // 出発の合図・お助け(開く画面)
+    await nextCard.getByRole('button', { name: '案内を開く' }).click();
+    await expect(page.getByTestId('today-gonow')).toBeVisible({ timeout: 15_000 });
+    await expectNoAxeViolations(page, '出発の合図(390px)');
+    await page.getByRole('button', { name: '今日へ戻る' }).click();
+    await nav.getByRole('button', { name: /^お助け$/ }).click();
+    await expect(page.getByTestId('today-help')).toBeVisible({ timeout: 15_000 });
+    await expectNoAxeViolations(page, 'お助け(390px)');
+    await page.getByTestId('today-help').getByRole('button', { name: '閉じる' }).click();
+    await expect(page.getByTestId('today-help')).toHaveCount(0);
+
+    // 簡易表示(Mobile-Simple): 今と次だけ。読み直しても続く
     await page.getByRole('button', { name: '簡易表示' }).click();
-    await expect(page.getByRole('list', { name: '今日の旅程' })).toHaveCount(0);
+    await expect(tabs).toHaveCount(0);
+    await expect(nowCard).toContainText(titles.now);
     await page.reload();
-    await expect(nowCard.getByRole('heading', { name: titles.now })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: '簡易表示: 入' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('list', { name: '今日の旅程' })).toHaveCount(0);
-    await page.getByRole('button', { name: '簡易表示: 入' }).click();
-    await expect(page.getByRole('list', { name: '今日の旅程' })).toBeVisible();
+    await expect(nowCard).toContainText(titles.now, { timeout: 15_000 });
+    await expect(page.getByRole('button', { name: '簡易表示: 入' }).first()).toHaveAttribute('aria-pressed', 'true');
+    await expect(tabs).toHaveCount(0);
+    await page.getByRole('button', { name: '簡易表示: 入' }).first().click();
+    await expect(tabs).toBeVisible();
 
     // 暗い見た目でも読める(この端末の選択)
     await page.evaluate(() => window.localStorage.setItem('tc.theme', 'dark'));
@@ -144,6 +164,12 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(nowCard.getByRole('heading', { name: titles.now })).toBeVisible({ timeout: 15_000 });
     await expectNoAxeViolations(page, '当日(暗い・390px)');
+    await tabs.getByRole('button', { name: '地図' }).click();
+    await expect(page.getByTestId('today-map-screen')).toBeVisible({ timeout: 15_000 });
+    await page.goBack();
+    await tabs.getByRole('button', { name: '旅帖' }).click();
+    await expect(page.getByTestId('today-tabicho-book')).toBeVisible({ timeout: 15_000 });
+    await expectNoAxeViolations(page, '旅帖(暗い・390px)');
     await page.evaluate(() => window.localStorage.removeItem('tc.theme'));
   });
 });

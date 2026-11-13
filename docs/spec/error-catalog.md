@@ -72,7 +72,7 @@
 | `duplicate_item` | — | — | 同じ項目が2回あります | services/private_profile.py |
 | `email_taken` | 409 | no | このメールアドレスは既に使われています | api/v1/corrections.py |
 | `email_unavailable` | 409 | no | この環境ではメールを送れません(管理者の設定が必要です) | api/v1/notifications.py |
-| `encryption_not_configured` | 503 | later | 暗号化が設定されていないため記録できません(サーバー側の設定) | api/v1/corrections.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/privacy_zones.py |
+| `encryption_not_configured` | 503 | later | 暗号化が設定されていないため記録できません(サーバー側の設定) | api/v1/corrections.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/privacy_zones.py, api/v1/push.py |
 | `encryption_unavailable` | 503 | later | 暗号化が設定されていないため保存できません | services/private_profile.py |
 | `entitlement_not_found` | 404 | no | 付与が見つかりません | api/v1/planning_usage.py |
 | `entitlement_not_pending` | 409 | no | 承認を待っている付与ではありません | api/v1/planning_usage.py |
@@ -194,6 +194,7 @@
 | `provider_rejected` | 502, 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py, api/v1/spot_media.py |
 | `provider_unavailable` | 502, 503 | later | AI を呼び出せませんでした | api/v1/spot_media.py, api/v1/spots.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
+| `push_unavailable` | 503 | later | この環境では端末への通知は使えません | api/v1/push.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
@@ -241,7 +242,7 @@
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
-| `too_many_requests` | 429 | later | 読み取りの回数が多すぎます。しばらく待ってください | api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
+| `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/push.py, api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_variants` | 409 | no | … の案は … つまでです | api/v1/day_variants.py |
