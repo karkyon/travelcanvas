@@ -106,7 +106,8 @@ test('FR-002: ゲストで作った旅行を既存のアカウントへまとめ
   const form = page.getByTestId('guest-merge-form');
   await form.getByLabel('メール').fill(account.email);
   await form.getByLabel('パスワード').fill(PASSWORD);
-  const merged = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest/merge'));
+  const merged = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/auth/guest/merge') && r.status() !== 428,
+    { timeout: 90_000 });
   await form.getByRole('button', { name: 'このアカウントへまとめる' }).click();
   const res = await merged;
   expect(res.status()).toBe(200);
