@@ -121,23 +121,30 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     vi.restoreAllMocks();
   });
 
-  /** [Gate TDay-Mock] 開いた画面(後から読む)を待つ */
-  const dock = () => screen.getByRole('navigation', { name: '当日の操作' });
+  /** [Gate TDay-Live2] お助けは見出しの右に常に出す(下の操作は 1 段: 今日・地図・残す・旅帖・旅程) */
+  const helpButton = () => screen.getByRole('button', { name: 'お助け' });
 
   it('ライブ帯・旅の糸・出発の合図(出る時刻と段階・概算の明記)を出す', async () => {
     renderPage();
     const band = await screen.findByTestId('today-live-band', undefined, { timeout: 5000 });
     await waitFor(() => expect(band).toHaveTextContent('あと18分で出発'));
-    expect(band).toHaveTextContent('移動 約12分（概算）');
-    await waitFor(() => expect(band).toHaveTextContent('14時から雨の可能性 70%'));
+    expect(band).toHaveTextContent('現地 12:00');
+    expect(band).toHaveTextContent('次 12:30 テラスでランチ');
+    expect(within(band).getByTestId('today-sync')).toHaveTextContent('最新');
+    expect(screen.getByTestId('today-decide')).toHaveAttribute('data-stage', 'soon');
     const next = screen.getByTestId('today-next');
-    expect(next).toHaveAttribute('data-stage', 'soon');
     expect(next).toHaveTextContent('出発の合図 ・ NEXT');
     expect(next).toHaveTextContent('テラスでランチ 12:30着');
     const go = next;
-    expect(within(go).getByText('12:18 に出れば、ちょうど')).toBeInTheDocument();
-    expect(within(go).getByText('移動時間は直線距離からの概算です')).toBeInTheDocument();
+    expect(go).toHaveTextContent('12:18 に出発');
+    // 移動時間の出どころ(概算)を出る時刻のすぐ下に。概算は概算と書く
+    expect(within(go).getByTestId('today-go-source')).toHaveTextContent('距離からの概算 ・ 移動 約12分');
+    expect(within(go).getByTestId('today-go-source')).toHaveAttribute('data-kind', 'est');
+    expect(go).toHaveTextContent('移動時間は直線距離からの概算です');
+    // 予約がある時だけ、判断カードにチケットの操作を出す
+    expect(within(go).getByRole('button', { name: '予約・チケット' })).toBeInTheDocument();
     expect(within(within(go).getByRole('list', { name: '出発までの段階' })).getByText('そろそろ')).toHaveAttribute('aria-current', 'step');
+    await screen.findByTestId('today-rain', undefined, { timeout: 5000 });
     const thread = screen.getByRole('navigation', { name: '旅の糸(今日の道のり)' });
     expect(within(thread).getByRole('listitem', { name: '10:30 大津駅(印を押した)' })).toBeInTheDocument();
     expect(within(thread).getByRole('listitem', { name: '11:00 浜大津の湖岸(今いる場所)' })).toBeInTheDocument();
@@ -156,9 +163,12 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     expect(await within(sky).findByText('15:45 三尾神社（屋外）が雨の時間にかかります。')).toBeInTheDocument();
     expect(within(sky).getByRole('listitem', { name: '14時 70% 雨' })).toBeInTheDocument();
     // スマホ・タブレットの「雨の兆し」のカード → 雨の兆しの画面(影響する予定・プランB)
+    // 変化の知らせ: 雨の兆し(対象の時刻・予報の出どころ・予報であること)
     const rain = await screen.findByTestId('today-rain', undefined, { timeout: 5000 });
-    expect(rain).toHaveTextContent('14〜16時 雨 70%');
-    expect(rain).toHaveTextContent('15:45 三尾神社（屋外）にかかります');
+    expect(rain).toHaveTextContent('14〜16時 雨の可能性 最大70%');
+    expect(rain).toHaveTextContent('三尾神社（屋外）にかかる');
+    expect(rain).toHaveTextContent('予報 Open-Meteo');
+    expect(rain).toHaveTextContent('予報で、確定ではありません');
     fireEvent.click(within(rain).getByRole('button', { name: /プランB/ }));
     const scr = await screen.findByTestId('today-rain-screen', undefined, { timeout: 5000 });
     expect(scr).toHaveTextContent('14〜16時、雨の可能性 70%');
@@ -173,7 +183,8 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     const box = await screen.findByTestId('today-detour', undefined, { timeout: 5000 });
     expect(box).toHaveTextContent('14:55〜15:40 に45分の空き');
     expect(m.findDetours).not.toHaveBeenCalled();
-    fireEvent.click(within(box).getByRole('button', { name: '見る' }));
+    expect(box).toHaveTextContent('候補は旅程に勝手に入りません');
+    fireEvent.click(within(box).getByRole('button', { name: '候補を探す' }));
     const scr = await screen.findByTestId('today-detour-screen', undefined, { timeout: 5000 });
     expect(scr).toHaveTextContent('本要寺のあと、45分の空き');
     await waitFor(() => expect(m.findDetours).toHaveBeenCalledWith(PLAN, { after_event_id: 'd', before_event_id: 'f', kind: 'all' }));
@@ -198,7 +209,8 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
   it('旅帖: 今いる場所で印を押し、ひとことを綴じる(自分だけが既定)', async () => {
     renderPage();
     const now = await screen.findByTestId('today-now', undefined, { timeout: 5000 });
-    expect(now).toHaveTextContent('NOW ・ 残り10分');
+    expect(now).toHaveTextContent('NOW ・ いま 11:00〜12:10');
+    expect(now).toHaveTextContent('残り10分');
     fireEvent.click(within(now).getAllByRole('button', { name: '印を押す' })[0]!);
     const dialog = await screen.findByTestId('today-stamp-dialog', undefined, { timeout: 5000 });
     fireEvent.click(within(dialog).getByRole('button', { name: '着いた・印を押す' }));
@@ -233,7 +245,7 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     renderPage();
     await screen.findByTestId('today-next', undefined, { timeout: 5000 });
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'お助け' }));
+    fireEvent.click(helpButton());
     const help = await screen.findByTestId('today-help', undefined, { timeout: 5000 });
     expect(within(help).getByText('遅れた・休みだった')).toBeInTheDocument();
     await waitFor(() => expect(within(help).getByRole('link', { name: /お店・宿に電話/ })).toHaveAttribute('href', 'tel:0770000000'));
@@ -323,7 +335,7 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
       revision: 1, created_at: NOW });
     renderPage();
     await screen.findByTestId('today-next', undefined, { timeout: 5000 });
-    fireEvent.click(within(dock()).getByRole('button', { name: 'お助け' }));
+    fireEvent.click(helpButton());
     fireEvent.click(within(await screen.findByTestId('today-help', undefined, { timeout: 5000 })).getByRole('button', { name: /遅れた・休みだった/ }));
     const delay = await screen.findByTestId('today-delay', undefined, { timeout: 5000 });
     fireEvent.click(await within(delay).findByRole('button', { name: '組み直しの案を作る' }));
@@ -335,5 +347,72 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     expect(delay).toHaveTextContent('承認するまで旅程は変わりません');
     fireEvent.click(within(delay).getByRole('button', { name: '案Bにする' }));
     await waitFor(() => expect(m.applyReplan).toHaveBeenCalledWith(PLAN, 'rp1', 'B', 3));
+  });
+
+  // ---- [Gate TDay-Live2] 改修モックアップ(2026-11-14)どおり ----
+
+  it('変化が無い時は知らせのカードを増やさず、1行「知らせ なし(確認時刻)」だけ', async () => {
+    m.getWeather.mockResolvedValue({ enabled: true, notice: '', forecasts: [{ date: '2026-11-13', day_id: 'day-1', label: '晴れ',
+      weather_code: 1, precipitation_probability: 10, precipitation_mm: 0, temp_max: 18, temp_min: 9, rainy: false, source: 'Open-Meteo',
+      has_rain_variant: false, hours: hours.map((h) => ({ ...h, probability: 10, rainy: false })), affected_events: [] }] });
+    renderPage();
+    const calm = await screen.findByTestId('today-calm', undefined, { timeout: 5000 });
+    expect(calm).toHaveTextContent('遅延・休業・雨の知らせ なし（12:00 確認）');
+    expect(screen.queryByTestId('today-changes')).toBeNull();
+  });
+
+  it('経路の遅延は、対象の予定と出どころ(登録した区間)を出して対応の画面へ', async () => {
+    const delayed = events.map((x) => (x.id === 'c' ? { ...x, transport_status: 'delayed' } : x));
+    m.getToday.mockResolvedValue(today({ events: delayed as never, next_event: delayed[2] as never }));
+    m.getAlerts.mockResolvedValue({ plan_id: PLAN, server_time: NOW, can_edit: true, alerts: [], detected: [] });
+    renderPage();
+    const ch = await screen.findByTestId('today-change-delay', undefined, { timeout: 5000 });
+    expect(ch).toHaveTextContent('テラスでランチへ向かう移動が遅れています');
+    expect(ch).toHaveTextContent('出どころ 登録した区間');
+    expect(ch).toHaveTextContent('最新の運行情報を取得済みとは限りません');
+    fireEvent.click(within(ch).getByRole('button', { name: '対応の案を見る' }));
+    const delay = await screen.findByTestId('today-delay', undefined, { timeout: 5000 });
+    expect(within(delay).getByTestId('today-delay-sources')).toHaveTextContent('自動では取っていない場合があります');
+  });
+
+  it('出どころを見る: 5種類(実時刻・手入力・登録した移動・概算・不明)を同じ形で見分けられる', async () => {
+    renderPage();
+    const next = await screen.findByTestId('today-next', undefined, { timeout: 5000 });
+    await waitFor(() => expect(within(next).getByTestId('today-go-source')).toBeInTheDocument());
+    fireEvent.click(within(next).getByRole('button', { name: '出どころを見る' }));
+    const src = await screen.findByTestId('today-source', undefined, { timeout: 5000 });
+    for (const w of ['実時刻', '手入力', '登録した移動', '概算', '不明']) expect(src).toHaveTextContent(w);
+    expect(src).toHaveTextContent('電車・バスの時刻を自動で調べる機能ではありません');
+  });
+
+  it('今日の流れで予定を押すと、地図の上に選んだ場所のカードを重ねる(右に固定の欄は置かない)', async () => {
+    const prev = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q.includes('640'), media: q, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })) as unknown as typeof window.matchMedia;
+    renderPage();
+    // 最初は次の予定(NEXT)を選んでいる
+    const spot = await screen.findByTestId('today-spot', undefined, { timeout: 5000 });
+    expect(spot).toHaveTextContent('テラスでランチ');
+    const flow = screen.getByTestId('today-flow');
+    fireEvent.click(within(flow).getByRole('button', { name: /本要寺/ }));
+    await waitFor(() => expect(screen.getByTestId('today-spot')).toHaveTextContent('本要寺'));
+    expect(within(flow).getByRole('button', { name: /本要寺/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(screen.getByTestId('today-spot')).getByRole('button', { name: '選んだ場所を閉じる' }));
+    await waitFor(() => expect(screen.queryByTestId('today-spot')).toBeNull());
+    window.matchMedia = prev;
+  });
+
+  it('同行者・設定: 位置は送らないこと、共有の期限、位置を使う前の説明を出す', async () => {
+    renderPage();
+    const crew = await screen.findByTestId('today-crew', undefined, { timeout: 5000 });
+    expect(crew).toHaveTextContent('位置は共有しない');
+    fireEvent.click(within(crew).getByRole('button', { name: '共有の設定' }));
+    const scr = await screen.findByTestId('today-crew-screen', undefined, { timeout: 5000 });
+    expect(within(scr).getByTestId('today-crew-privacy')).toHaveTextContent('今いる場所（GPS）は送りません');
+    fireEvent.click(within(scr).getByRole('button', { name: '今日へ戻る' }));
+    await waitFor(() => expect(screen.queryByTestId('today-crew-screen')).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: '当日の設定' }));
+    const set = await screen.findByTestId('today-settings', undefined, { timeout: 5000 });
+    expect(within(set).getByTestId('today-set-loc-note')).toHaveTextContent('サーバーへは送りません');
   });
 });

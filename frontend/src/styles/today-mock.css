@@ -141,64 +141,9 @@ h3.tl-lbl, h4.tl-lbl, h2.tl-lbl { margin: 14px 0 6px; }
 .tl-band__muted { color: #c9dde6; white-space: nowrap; }
 .tl-band__end { margin-left: auto; color: #c9dde6; white-space: nowrap; }
 .tl-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin: 0 0 10px; flex-wrap: wrap; }
-.tl-offbar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; margin: 0 0 10px; border-radius: 12px; background: #3a2a0c; color: #ffe4b0; font-size: 13px; }
 @media (min-width: 640px) { .tl-band { border-radius: 14px; margin: 0 0 12px; padding: 10px 16px; } }
 
 /* ---- 今日の題(旅の糸) ---- */
-.tl-hero { border-radius: 18px; padding: 14px; color: #ffffff; background: var(--tl-night2); position: relative; overflow: hidden; margin-bottom: 10px; }
-.tl-hero__wave { position: absolute; inset: 0; width: 100%; height: 100%; }
-.tl-hero__wave path { fill: #1d5f74; }
-.tl-hero__body { position: relative; }
-.tl-hero__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.tl-hero__eyebrow { margin: 0; font-size: 10px; font-weight: 800; letter-spacing: .14em; color: #a9e2d6; }
-.tl-hero__sky { display: inline-flex; gap: 4px; align-items: center; font-size: 11px; color: #d5ebe8; white-space: nowrap; }
-.tl-hero__sky svg { color: #ffd58a; }
-.tl-hero__main { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; }
-.tl-hero__title { margin: 4px 0 4px; font: 800 19px/1.35 var(--tc-font-display); color: #ffffff; }
-.tl-hero__lead { margin: 4px 0 0; font-size: 13px; color: #d5ebe8; }
-.tl-hero__note { margin: 2px 0 0; font-size: 11px; color: #c9dde6; }
-.tl-hero__weather { display: grid; gap: 2px; justify-items: end; text-align: right; font-size: 12px; color: #d5ebe8; padding: 10px 14px;
-  border-radius: 14px; background: rgba(255, 255, 255, .1); min-width: 220px; }
-.tl-hero__weather b { font-size: 28px; color: #ffffff; line-height: 1; }
-.tl-hero__progress { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .2); margin-top: 10px; overflow: hidden; }
-.tl-hero__progress span { display: block; height: 100%; background: #ffcf8a; }
-.tl-hero .tc-thread { margin-top: 10px; }
-@media (max-width: 1279px) {
-  .tl-hero .tc-thread li { width: 46px; gap: 3px; }
-  .tl-hero .tc-thread li span.tc-thread__title { display: none; }
-  .tl-hero .tc-thread__node { width: 36px; height: 36px; font-size: 12px; }
-  .tl-hero .tc-thread ol::before { top: 17px; left: 18px; right: 18px; }
-  .tl-hero .tc-thread li b { font-size: 10px; font-weight: 500; }
-}
-@media (min-width: 1280px) { .tl-hero { padding: 20px 24px; } .tl-hero__title { font-size: 26px; } }
-
-/* ---- 並び(スマホ 1 列 / タブレット 2 列 / タブレット横 左+地図 / PC 3 列) ---- */
-.tl-grid { display: flex; flex-direction: column; gap: 10px; }
-.tl-col { display: contents; }
-.tl-grid > .tl-col > *, .tl-grid > .tl-col > .tl-pc-block > * { order: 50; }
-.tl-grid [data-testid='today-next'], .tl-grid .tl-ord-go { order: 1 !important; }
-.tl-grid [data-testid='today-teaser'] { order: 2 !important; }
-.tl-grid [data-testid='today-map'] { order: 3 !important; }
-.tl-grid [data-testid='today-now'] { order: 4 !important; }
-.tl-grid [data-testid='today-rain'] { order: 5 !important; }
-.tl-grid [data-testid='today-detour'] { order: 6 !important; }
-.tl-grid [data-testid='today-crew'] { order: 7 !important; }
-.tl-grid [data-testid='today-tabicho'] { order: 8 !important; }
-@media (min-width: 640px) and (max-width: 1023px) {
-  .tl-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .tl-grid [data-testid='today-map'], .tl-grid [data-testid='today-rain'], .tl-grid [data-testid='today-tabicho'] { grid-column: 1 / -1; }
-}
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .tl-grid { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 12px; align-items: start; }
-  .tl-grid > .tl-col > * { grid-column: 1; }
-  .tl-grid [data-testid='today-map'] { grid-column: 2; grid-row: 1 / span 12; position: sticky; top: 64px; height: calc(100vh - 150px); min-height: 480px; }
-  .tl-grid [data-testid='today-map'] .tl-mapcard__canvas { height: calc(100% - 40px); }
-}
-@media (min-width: 1280px) {
-  .tl-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.05fr); gap: 16px; align-items: start; }
-  .tl-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .tl-col--d { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
-}
 
 /* ---- 出発の合図 ---- */
 .tl-go { background: var(--tl-coral-bg); border-color: var(--tl-coral-line); }
@@ -277,20 +222,13 @@ h3.tl-lbl, h4.tl-lbl, h2.tl-lbl { margin: 14px 0 6px; }
 .tl-seals li { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--tl-mute); }
 .tl-seals button { background: none; border: 0; padding: 0; border-radius: 50%; cursor: pointer; }
 @media (min-width: 1280px) { .tl-seals li .tc-seal { width: 56px !important; height: 56px !important; } }
-.tl-helpcard__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.tl-helpcard__grid .tl-btn { justify-content: flex-start; }
 
 /* ---- 下の操作(スマホ・タブレット) ---- */
 .tl-dock { position: sticky; bottom: 0; z-index: 46; margin: 14px -13px 0; background: var(--tl-card); border-top: 1px solid var(--tl-line);
   padding-bottom: env(safe-area-inset-bottom); }
-.tl-dock__acts { display: flex; gap: 8px; padding: 10px 12px 6px; }
-.tl-dock__acts .tl-btn { flex: 1; min-width: 0; }
-.tl-dock__tabs { display: flex; padding: 0 6px 10px; }
 .tl-tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 10px;
   font-weight: 700; color: var(--tl-mute); background: none; border: 0; min-height: 48px; cursor: pointer; }
 .tl-tab-btn[aria-current='page'] { color: var(--tl-teal); }
-@media (min-width: 640px) { .tl-dock__tabs { display: none; } .tl-dock { margin: 16px 0 0; border-radius: 16px 16px 0 0; border: 1px solid var(--tl-line); } .tl-dock__acts { padding: 10px 12px; } }
-@media (min-width: 1024px) and (max-width: 1279px) { .tl-page > .tl-dock { max-width: 420px; } }
 @media (min-width: 1280px) { .tl-page > .tl-dock { display: none; } }
 @media (max-width: 639px) { .tl-mapscr .leaflet-control-zoom { display: none; } }
 @media (max-width: 760px) { body:has(.tl-page.has-dock) .tc-rail { display: none; } body:has(.tl-page.has-dock) .tc-shell-main { padding-bottom: 0; } }
@@ -569,3 +507,177 @@ h3.tl-lbl, h4.tl-lbl, h2.tl-lbl { margin: 14px 0 6px; }
 /* 地図の出典(OpenStreetMap)は、暗い見た目でも読める濃さで出す */
 .tl-page .leaflet-control-attribution, .tl-screen .leaflet-control-attribution { background: rgba(255, 255, 255, .96); color: #1f2937; }
 .tl-page .leaflet-control-attribution a, .tl-screen .leaflet-control-attribution a { color: #0b4f6c; }
+
+/* ==== [Gate TDay-Live2] 改修モックアップ(2026-11-14)どおりの今日の画面 ==== */
+.tl-ge1024 { display: none; }
+@media (min-width: 1024px) { .tl-ge1024 { display: block; } .tl-lt1024 { display: none !important; } }
+.tl-btn--soft { background: var(--tl-teal-s); border-color: rgba(15, 110, 102, .3); color: var(--tl-teal-d); }
+.tl-link { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: 12px; font-weight: 800; color: var(--tl-teal); cursor: pointer;
+  min-height: 32px; }
+/* ライブ帯: 情報の新しさ */
+.tl-band { flex-wrap: wrap; }
+.tl-band__fresh { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 10px;
+  background: rgba(255, 255, 255, .12); font-weight: 700; white-space: nowrap; }
+.tl-band__fresh[data-stale='true'] { background: #fff7e6; color: #92400e; }
+.tl-band[data-stale='true'] .tl-band__live { color: #fcd34d; }
+.tl-band[data-stale='true'] .tl-band__dot { background: #fbbf24; animation: none; }
+/* 見出しの行 */
+.tl-titlerow { display: flex; align-items: flex-end; gap: 10px; margin: 0 0 10px; flex-wrap: wrap; }
+.tl-titlerow__main { flex: 1; min-width: 0; }
+.tl-titlerow__h1 { margin: 0; }
+.tl-titlerow__sub { margin: 2px 0 0; }
+.tl-titlerow .tl-toolbar { margin: 0 0 0 auto; }
+.tl-icon-btn--help { color: var(--tl-coral); border-color: var(--tl-coral-line); min-width: 44px; height: 44px; }
+@media (max-width: 639px) { .tl-titlerow .tl-toolbar .tl-icon-btn--text:not(.tl-icon-btn--help) { display: none; } }
+/* 判断カード */
+.tl-decide { background: var(--tl-card); border: 1px solid var(--tl-coral-line); border-radius: 18px; overflow: hidden;
+  box-shadow: 0 6px 20px rgba(178, 60, 34, .08); }
+.tl-decide[data-stage='relaxed'] { border-color: rgba(15, 110, 102, .3); }
+.tl-decide__now { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--tl-teal-s); border-bottom: 1px solid var(--tl-line); }
+.tl-decide__nowtext { flex: 1; min-width: 0; }
+.tl-decide__nowtitle { margin: 2px 0 0; font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
+.tl-decide__nowside { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.tl-decide__left { font-size: 14px; }
+.tl-decide__next { padding: 14px; }
+.tl-decide__pills { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.tl-decide__main { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+.tl-decide__text { flex: 1; min-width: 0; }
+.tl-decide__pre { margin: 0; font-size: 13px; color: var(--tl-ink2); }
+.tl-decide__leave { margin: 2px 0 4px; display: flex; align-items: baseline; gap: 6px; }
+.tl-decide__time { font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--tl-coral); font-variant-numeric: tabular-nums; }
+.tl-decide[data-stage='relaxed'] .tl-decide__time { color: var(--tl-good); }
+.tl-decide__leave b { font-size: 15px; }
+.tl-decide__title { margin: 0; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+.tl-decide__src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.tl-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 12px 0 0; padding: 0; list-style: none; }
+.tl-stages li { text-align: center; font-size: 11px; font-weight: 700; color: var(--tl-mute); border-radius: 8px; padding: 5px 2px; background: var(--tl-chip); }
+.tl-stages li[aria-current='step'] { background: #b23c22; color: #ffffff; }
+.tl-stages li[aria-current='step'][data-stage='relaxed'] { background: #166534; }
+.tl-stages li[aria-current='step'][data-stage='late'] { background: #92400e; }
+.tl-decide .tl-actions { margin-top: 12px; }
+/* 出どころのタグ(色だけでなく頭の 1 文字でも区別) */
+.tl-src { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 3px 8px 3px 5px; font-size: 11px; font-weight: 700;
+  border: 1px solid; white-space: nowrap; }
+.tl-src i { font-style: normal; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; font-size: 10px; font-weight: 900; color: #ffffff; }
+.tl-src[data-kind='api'] { border-color: #bfe3d2; background: #f0fbf6; color: #14532d; } .tl-src[data-kind='api'] i { background: #166534; }
+.tl-src[data-kind='manual'] { border-color: #ecd3a4; background: #fffaf0; color: #6b4508; } .tl-src[data-kind='manual'] i { background: #92400e; }
+.tl-src[data-kind='seg'] { border-color: #c9d7f5; background: #f5f8ff; color: #1e3a8a; } .tl-src[data-kind='seg'] i { background: #1d4ed8; }
+.tl-src[data-kind='est'] { border-color: #cbd5e1; border-style: dashed; background: #f8fafc; color: #334155; } .tl-src[data-kind='est'] i { background: #5b6b80; }
+.tl-src[data-kind='none'] { border-color: #f5c2bb; background: #fff6f5; color: #9f1c12; } .tl-src[data-kind='none'] i { background: #b42318; }
+[data-theme='dark'] .tl-src { background: var(--tl-chip); color: var(--tl-ink); }
+/* 変化の知らせ */
+.tl-changes { display: flex; flex-direction: column; gap: 8px; }
+.tl-change { display: flex; gap: 10px; align-items: flex-start; border-radius: 14px; padding: 11px 12px; border: 1px solid; }
+.tl-change[data-tone='rain'] { background: var(--tl-blue-s); border-color: var(--tl-blue-line); color: var(--tl-blue-ink); }
+.tl-change[data-tone='delay'] { background: var(--tl-bad-s); border-color: rgba(180, 35, 24, .3); color: var(--tl-ink); }
+.tl-change[data-tone='warn'] { background: var(--tl-warn-s); border-color: rgba(146, 64, 14, .3); color: var(--tl-ink); }
+.tl-change[data-tone='off'] { background: var(--tl-warn-s); border-color: rgba(146, 64, 14, .3); color: var(--tl-ink); margin: 0 0 10px; }
+.tl-change__icon { flex: none; padding-top: 1px; }
+.tl-change__body { flex: 1; min-width: 0; }
+.tl-change__body b { font-size: 13px; }
+.tl-change__body p { margin: 3px 0 0; font-size: 12px; line-height: 1.55; }
+.tl-change__meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--tl-mute); font-size: 11px !important; }
+.tl-change__body .tl-btn { margin-top: 8px; }
+.tl-calm { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--tl-mute); }
+.tl-teaser__src { margin: 4px 0 0; font-size: 11px; }
+/* 並び: スマホ 1 列 / タブレット縦 2 列 / タブレット横 左 420px + 地図 / PC 左 452px + 大きな地図 */
+.tl-live { display: flex; flex-direction: column; gap: 12px; }
+.tl-slot { min-width: 0; }
+.tl-slot:empty { display: none; }
+.tl-slot--decide { order: 1; } .tl-slot--alerts { order: 2; } .tl-slot--teaser { order: 3; } .tl-slot--map { order: 4; }
+.tl-slot--tabicho { order: 5; } .tl-slot--detour { order: 6; } .tl-slot--crew { order: 7; } .tl-slot--sky { order: 8; } .tl-slot--flow { order: 9; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .tl-live { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  .tl-slot--decide { grid-column: 1; grid-row: 1; } .tl-slot--alerts { grid-column: 1; grid-row: 2; }
+  .tl-slot--teaser { grid-column: 2; grid-row: 1; } .tl-slot--crew { grid-column: 2; grid-row: 2; }
+  .tl-slot--map { grid-column: 1 / -1; grid-row: 3; }
+  .tl-slot--flow { grid-column: 1; grid-row: 4 / span 3; }
+  .tl-slot--detour { grid-column: 2; grid-row: 4; } .tl-slot--tabicho { grid-column: 2; grid-row: 5; } .tl-slot--sky { grid-column: 2; grid-row: 6; }
+  .tl-slot--map .tl-mapcard__canvas { height: 380px; }
+}
+@media (min-width: 1024px) {
+  .tl-live { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .tl-slot { grid-column: 1; }
+  .tl-slot--decide { grid-row: 1; } .tl-slot--alerts { grid-row: 2; } .tl-slot--teaser { grid-row: 3; } .tl-slot--flow { grid-row: 4; }
+  .tl-slot--detour { grid-row: 5; } .tl-slot--crew { grid-row: 6; } .tl-slot--tabicho { grid-row: 7; }
+  .tl-slot--map { grid-column: 2; grid-row: 1 / span 8; position: sticky; top: 60px; height: calc(100vh - 140px); min-height: 520px; }
+  .tl-slot--map .tl-mapcard { height: 100%; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 18px; }
+  .tl-slot--map .tl-mapcard__head { padding: 10px 14px; }
+  .tl-slot--map .tl-mapcard__canvas { flex: 1; height: auto; min-height: 0; border-radius: 0; }
+  .tl-slot--map .tl-legend { padding: 6px 14px 10px; }
+}
+@media (min-width: 1280px) { .tl-live { grid-template-columns: 452px minmax(0, 1fr); gap: 14px; } }
+/* 地図の上の「選んだ場所」と時刻の線 */
+.tl-mapcard__canvas { position: relative; }
+.tl-mapcard__spot { position: absolute; left: 12px; bottom: 12px; z-index: 500; width: min(392px, calc(100% - 24px)); }
+@media (min-width: 1024px) { .tl-mapcard__spot { bottom: 118px; } }
+.tl-spot { background: var(--tl-card); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 42, 58, .25); padding: 12px; }
+.tl-spot__title { display: block; font-size: 15px; margin: 2px 0 6px; overflow-wrap: anywhere; }
+.tl-spot .tl-actions { margin-top: 8px; flex-wrap: wrap; }
+.tl-mapcard__sky { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 450; }
+.tl-skystrip { background: rgba(255, 255, 255, .95); border-radius: 14px; padding: 8px 12px; box-shadow: 0 4px 14px rgba(15, 42, 58, .15); }
+[data-theme='dark'] .tl-skystrip { background: rgba(17, 26, 43, .95); }
+.tl-skystrip .tl-row b { margin: 0; }
+.tl-skystrip__bars { display: grid; gap: 3px; align-items: end; height: 34px; margin-top: 4px; }
+.tl-skystrip__bars span { display: block; border-radius: 4px 4px 0 0; background: #bcd0ea; }
+.tl-skystrip__bars span[data-rain='true'] { background: #1d4ed8; }
+.tl-skystrip__events { position: relative; height: 14px; margin-top: 4px; }
+.tl-skystrip__events span { position: absolute; top: 3px; height: 8px; border-radius: 4px; background: #cbd5e1; }
+.tl-skystrip__events span[data-state='now'] { background: #0f6e66; } .tl-skystrip__events span[data-state='next'] { background: #b23c22; }
+.tl-skystrip__events span[data-state='rain'] { background: #1d4ed8; } .tl-skystrip__events span[data-state='todo'] { background: #94a3b8; }
+.tl-skystrip__now { position: absolute; top: -40px; bottom: 0; width: 2px; background: #b23c22; }
+.tl-skystrip__hours { display: grid; font-size: 10px; color: var(--tl-mute); text-align: center; }
+/* 今日の流れ */
+.tl-flow__list { list-style: none; margin: 6px 0 0; padding: 0; }
+.tl-flow__list li { position: relative; }
+.tl-flow__move, .tl-flow__gap { margin: 2px 0 2px 56px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tl-ink2); }
+.tl-flow__gap { background: var(--tl-sand); border: 1px solid var(--tl-sand-line); color: var(--tl-gold-ink); border-radius: 999px; padding: 3px 9px; width: fit-content; }
+.tl-flow__item { width: 100%; display: grid; grid-template-columns: 44px 32px minmax(0, 1fr); gap: 10px; align-items: center; text-align: left;
+  border: 1px solid var(--tl-line); border-radius: 12px; background: var(--tl-card); padding: 8px 10px; margin: 3px 0; font: inherit; color: inherit;
+  cursor: pointer; min-height: 52px; }
+.tl-flow__item[aria-pressed='true'] { border-color: #b23c22; box-shadow: 0 0 0 3px rgba(178, 60, 34, .14); }
+.tl-flow__time { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tl-flow__text { display: flex; flex-direction: column; min-width: 0; }
+.tl-flow__text b { font-size: 13px; overflow-wrap: anywhere; }
+.tl-flow li[data-state='done'] .tl-flow__text b { color: var(--tl-mute); }
+.tl-tabicho__thread { margin-top: 8px; }
+/* 下の操作(1 段: 今日・地図・残す・旅帖・旅程) */
+.tl-dock--one { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 4px 6px calc(6px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, .06); }
+@media (min-width: 640px) { .tl-dock--one { margin: 16px 0 0; border-radius: 16px 16px 0 0; border: 1px solid var(--tl-line); } }
+.tl-tab-btn--fab { color: var(--tl-coral); }
+.tl-fab { width: 52px; height: 52px; border-radius: 18px; background: #b23c22; color: #ffffff; display: grid; place-items: center; margin-top: -22px;
+  box-shadow: 0 6px 16px rgba(178, 60, 34, .35); }
+.tl-tab-btn[aria-current='page'] { box-shadow: inset 0 -3px 0 var(--tl-teal); }
+.tl-detour__note { display: inline; }
+.tl-sourcelist { list-style: none; margin: 10px 0; padding: 0; }
+.tl-sourcelist li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--tl-line); align-items: start; }
+.tl-gonow__src { text-align: left; width: 100%; max-width: 520px; margin: 12px auto 0; }
+/* 判断カードの下では、次の場所のチラ見せは横並び(写真は左に小さく。出る時刻の判断を押し下げない) */
+.tl-live .tl-teaser { flex-direction: row; gap: 12px; }
+.tl-live .tl-teaser__img { width: 112px; height: 96px; margin: 12px 0 12px 12px; border-radius: 10px; }
+.tl-live .tl-teaser__credit { left: 4px; bottom: 4px; }
+@media (max-width: 639px) { .tl-titlerow__zone { display: block; } .tl-titlerow__h1 { font-size: 18px; } }
+/* 空模様の時刻の線(スマホ・タブレット縦のカード) */
+.tl-sky__bars { display: grid; gap: 3px; align-items: end; height: 54px; margin-top: 10px; }
+.tl-sky__bar { border-radius: 4px 4px 0 0; background: #bcd0ea; min-height: 3px; }
+.tl-sky__bar[data-rain='true'] { background: #1d4ed8; }
+.tl-sky__bar[data-now='true'] { outline: 2px solid #b23c22; outline-offset: 1px; }
+.tl-sky__hours { display: grid; font-size: 10px; color: var(--tl-mute); text-align: center; margin-top: 2px; }
+.tl-sky__notice { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; border-radius: 12px; background: var(--tl-blue-s);
+  color: var(--tl-blue-ink); }
+.tl-sky__notice p { margin: 0; flex: 1; min-width: 0; font-size: 12px; line-height: 1.5; }
+/* 今日の旅帖の中の旅の糸(明るい紙の上の色) */
+.tl-tabicho__thread .tc-thread { margin-top: 0; }
+.tl-tabicho__thread .tc-thread ol::before { background: #d6cbb3; top: 19px; left: 20px; right: 20px; }
+.tl-tabicho__thread .tc-thread li { width: 52px; }
+.tl-tabicho__thread .tc-thread li span.tc-thread__title { display: none; }
+.tl-tabicho__thread .tc-thread li b { font-size: 11px; color: var(--tl-ink2); }
+.tl-tabicho__thread .tc-thread__node { width: 40px; height: 40px; background: #fffdf8; border: 2px dashed #c9b994; color: #8a5a12; }
+.tl-tabicho__thread .tc-thread__node[data-state='done'] { background: #b23c22; border: 2px solid #b23c22; color: #ffffff; transform: rotate(-8deg);
+  box-shadow: inset 0 0 0 3px #ffffff; }
+.tl-tabicho__thread .tc-thread__node[data-state='now'] { background: var(--tl-teal-s); border: 2px solid var(--tl-teal); color: var(--tl-teal-d); }
+.tl-tabicho__thread .tc-thread__node[data-state='next'] { border: 2px dashed #b23c22; color: #b23c22; }
+.tl-tabicho__thread .tc-thread__node[data-state='rain'] { border-color: #1d4ed8; color: #1d4ed8; }
+/* タブレット横・PC は下の操作を出さない(地図・旅帖・旅程は今日の画面のカードから開く) */
+@media (min-width: 1024px) { .tl-page > .tl-dock { display: none; } }
