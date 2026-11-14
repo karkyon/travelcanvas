@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { expectNoAxeViolations } from './support/axe';
 
 /**
  * [Gate Remaining-6] FR-003 パスワードの再設定(忘れた時)とメールの確認の画面。
@@ -16,8 +16,7 @@ test('パスワードを忘れた時の画面から案内が出る', async ({ pa
   await page.getByLabel('メール').fill(`nobody-${Date.now()}@example.com`);
   await page.getByRole('button', { name: 'リンクを送る' }).click();
   await expect(page.getByRole('status')).toBeVisible();
-  const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
-  expect(axe.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious')).toEqual([]);
+  await expectNoAxeViolations(page, 'パスワードを忘れた時');
 });
 
 test('正しくない札の再設定・確認はエラーの文を出す', async ({ page }) => {
