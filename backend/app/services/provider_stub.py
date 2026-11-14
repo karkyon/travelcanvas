@@ -104,6 +104,13 @@ def _turn_answer(text: str) -> Dict[str, Any]:
 
 def _openai(payload: Dict[str, Any]) -> httpx.Response:
     text = str(payload.get("input") or "")
+    if payload.get("tools"):  # [Gate Remaining-7] AI の Web 検索の模擬(出典つき)
+        return httpx.Response(200, json={"status": "completed", "output": [
+            {"type": "web_search_call", "status": "completed"},
+            {"type": "message", "content": [{
+                "type": "output_text", "text": "模擬の調べた結果です(実在しません)",
+                "annotations": [{"type": "url_citation", "url": "https://example.com/", "title": "模擬の出典"}]}]}],
+            "usage": {"input_tokens": 5000, "output_tokens": 200}})
     if "E2E_TIMEOUT" in text:
         raise httpx.ReadTimeout("stub timeout")
     fmt = ((payload.get("text") or {}).get("format") or {}) if isinstance(payload.get("text"), dict) else {}
@@ -141,6 +148,33 @@ def handler(request: httpx.Request) -> httpx.Response:
             for i in (1, 2)][:int(payload.get("pageSize") or 2)]})
     if endpoint == "google.routes.compute":
         return httpx.Response(200, json={"routes": [{"duration": "9000s", "distanceMeters": 180000}]})
+    return _get_handler(request)
+
+
+# [Gate Remaining-7] FR-059 GET の模擬(場所の詳細・写真・静的な地図)。画像は 1×1 の PNG
+_PNG_1x1 = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+                         "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
+
+
+def _get_handler(request: httpx.Request) -> httpx.Response:
+    url = str(request.url).split("?")[0]
+    # 送り先は provider_http の許可の一覧から決める(有料の host をここに書かない)
+    details = ph.ALLOWED_GET["google.places.details"].replace("{id}", "")
+    static = ph.ALLOWED_GET["google.maps.static"]
+    if url.startswith(details) and url.endswith("/media"):
+        return httpx.Response(200, json={"name": url, "photoUri": "https://lh3.googleusercontent.com/stub-photo"})
+    if url.startswith(details):
+        pid = url.rsplit("/", 1)[-1]
+        return httpx.Response(200, json={
+            "id": pid, "displayName": {"text": "模擬の場所(実在しません)"}, "formattedAddress": "模擬の住所",
+            "location": {"latitude": 35.01, "longitude": 135.0}, "googleMapsUri": "https://maps.google.com/?cid=1001",
+            "businessStatus": "OPERATIONAL", "regularOpeningHours": {"weekdayDescriptions": ["月曜日: 9時00分～17時00分"]},
+            "nationalPhoneNumber": "000-0000-0000", "websiteUri": "https://example.com/", "rating": 4.2,
+            "userRatingCount": 10,
+            "photos": [{"name": f"places/{pid}/photos/stubphoto0000001",
+                        "authorAttributions": [{"displayName": "模擬の投稿者"}]}]})
+    if url.startswith(static) or url.startswith("https://lh3.googleusercontent.com/"):
+        return httpx.Response(200, headers={"content-type": "image/png"}, content=_PNG_1x1)
     return httpx.Response(404, json={"error": {"status": "NOT_FOUND"}})
 
 

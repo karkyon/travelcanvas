@@ -31,6 +31,7 @@ import SocialImportCard, { type SocialCandidateInput } from './discover/SocialIm
 import CandidateVoting from './candidates/CandidateVoting';
 import CandidateDetailDialog from './candidates/CandidateDetailDialog';
 import { createCandidateFromSearch } from '@/services/api';
+import CandidateInputHelpers from '@/components/candidates/CandidateInputHelpers';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 import CandidateToolbar from './candidates/CandidateToolbar';
 import CandidateTags from './candidates/CandidateTags';
@@ -419,6 +420,8 @@ const CandidatesPage: React.FC = () => {
                     <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.title} maxLength={200}
                       onChange={(e) => setForm({ ...form, title: e.target.value })} />
                   </label>
+                  {/* [Gate Remaining-7] FR-007 画像・声から名前を入れる */}
+                  <CandidateInputHelpers disabled={busy} onPick={(text) => setForm((f) => ({ ...f, title: text }))} />
                   <label className="block text-sm text-ink-900">URL(任意)
                     <input className="mt-1 w-full border rounded-sm px-2 py-1 text-ink-900" value={form.source_url} inputMode="url"
                       onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://" />

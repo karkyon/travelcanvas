@@ -5,7 +5,8 @@ import type { TravelPlan } from '@/types';
 
 const api = vi.hoisted(() => ({
   paidAiSuggest: vi.fn(), paidPlacesSearch: vi.fn(), paidRoute: vi.fn(),
-  newIdempotencyKey: vi.fn(),
+  newIdempotencyKey: vi.fn(), paidPlaceDetails: vi.fn(), paidPlacePhoto: vi.fn(), paidStaticMap: vi.fn(),
+  paidAiWebSearch: vi.fn(),
 }));
 vi.mock('@/services/api/paidActions', () => api);
 
@@ -73,5 +74,39 @@ describe('PaidActionsPanel', () => {
     await waitFor(() => expect(api.paidRoute).toHaveBeenCalledWith('p1', 'e1', 'e2', 'driving', 'k1'));
     expect(await screen.findByTestId('paid-route-result')).toHaveTextContent('車: 約 90 分 · 152.3 km');
     expect(screen.getByTestId('paid-route-result')).toHaveTextContent('提供: Google');
+  });
+
+  it('[Remaining-7] 場所の詳細(休業の状態)・写真・この日の地図・Web 検索は押した時だけ送る', async () => {
+    api.paidPlacesSearch.mockResolvedValue({ results: [{ provider: 'google_places', place_id: 'pid1', name: '城崎温泉',
+      address: '兵庫県', latitude: 35.6, longitude: 134.8, maps_uri: null }], usage: {}, saved: false, attribution: 'Google',
+      notice: '保存していません' });
+    api.paidPlaceDetails.mockResolvedValue({ result: { provider: 'google_places', place_id: 'pid1', name: '城崎温泉',
+      address: '兵庫県', latitude: 35.6, longitude: 134.8, maps_uri: null, phone: '0796-00-0000',
+      website: 'https://example.jp/', rating: 4.5, rating_count: 10, business_status: 'CLOSED_TEMPORARILY',
+      opening_hours: ['月曜日: 7時00分～23時00分'], photos: [{ name: 'places/pid1/photos/AbCdEf', attributions: ['投稿者'] }] },
+      attribution: 'Google', notice: '' });
+    api.paidPlacePhoto.mockResolvedValue({ result: { image: 'data:image/png;base64,AAAA' }, saved: false, attribution: 'Google', notice: '' });
+    api.paidStaticMap.mockResolvedValue({ result: { image: 'data:image/png;base64,BBBB' }, saved: false, attribution: 'Google', notice: '' });
+    api.paidAiWebSearch.mockResolvedValue({ result: { text: '城崎は兵庫県', sources: [{ url: 'https://example.jp/k', title: '出典' }],
+      model: 'm' }, saved: false, notice: '出典を確かめてください' });
+    render(<PaidActionsPanel plan={plan} dayIndex={0} />);
+    expect(api.paidPlaceDetails).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Google で場所を探す'), { target: { value: '城崎' } });
+    fireEvent.click(screen.getByRole('button', { name: '探す' }));
+    fireEvent.click(await screen.findByRole('button', { name: '詳細' }));
+    const d = await screen.findByTestId('paid-place-details');
+    expect(d).toHaveTextContent('状態: 臨時休業');
+    expect(d).toHaveTextContent('営業時間: 月曜日');
+    fireEvent.click(screen.getByRole('button', { name: '写真を見る' }));
+    expect(await screen.findByTestId('paid-place-photo')).toHaveTextContent('写真: 投稿者(Google)');
+    expect(api.paidPlacePhoto).toHaveBeenCalledWith('p1', 'places/pid1/photos/AbCdEf', expect.any(String));
+    fireEvent.click(screen.getByTestId('paid-static-map'));
+    expect(await screen.findByTestId('paid-static-map-image')).toHaveAttribute('src', 'data:image/png;base64,BBBB');
+    expect(api.paidStaticMap).toHaveBeenCalledWith('p1', ['e1', 'e2'], expect.any(String));
+    fireEvent.change(screen.getByLabelText('AI に案を聞く(条件を書く)'), { target: { value: '城崎の場所' } });
+    fireEvent.click(screen.getByTestId('paid-web-search'));
+    const w = await screen.findByTestId('paid-web-result');
+    expect(w).toHaveTextContent('城崎は兵庫県');
+    expect(screen.getByRole('link', { name: '出典' })).toHaveAttribute('href', 'https://example.jp/k');
   });
 });

@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
+import TrackComparisonPanel from './track/TrackComparisonPanel';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import {
@@ -658,6 +659,8 @@ const LocationTrackPage: React.FC = () => {
                               </div>
                             )}
                             <TrackSketch points={detail.points} label={`軌跡の略図(点${detail.points.length}件)`} />
+                            {/* [Gate Remaining-7] FR-054 予定の経路と比べる(サーバーに保存した軌跡だけ) */}
+                            {t.mode === 'synced' && planId && <TrackComparisonPanel planId={planId} trackId={t.id} />}
                             <fieldset className="space-y-1">
                               <legend className="text-sm text-ink-900">時間帯を指定して消す</legend>
                               <div className="flex flex-wrap gap-2 items-end">

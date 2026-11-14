@@ -250,12 +250,22 @@ READINESS_RESERVATION_CODES = {"unreserved", "reservation_unconfirmed", "reserva
 
 
 def filter_readiness(result: Dict[str, Any], hidden: FrozenSet[str]) -> Dict[str, Any]:
-    """予約を隠した参加者には、予約から作る準備状況の項目を出さない(件数も数え直す)。"""
-    if "reservations" not in hidden:
+    """予約を隠した参加者には、予約から作る準備状況の項目を出さない(件数も数え直す)。
+    [Gate Remaining-7] 費用を隠した参加者には予算の項目・予算の状況を出さない。予約を隠した参加者には未払いの予約の
+    見込みを出さない。"""
+    if "reservations" not in hidden and "costs" not in hidden:
         return result
-    items = [i for i in result.get("items") or []
-             if i.get("code") not in READINESS_RESERVATION_CODES and i.get("entity_type") != "reservation"]
+    items = list(result.get("items") or [])
     out = dict(result)
+    if "reservations" in hidden:
+        items = [i for i in items if i.get("code") not in READINESS_RESERVATION_CODES
+                 and i.get("entity_type") != "reservation" and i.get("code") != "budget_projected_over"]
+        if out.get("budget"):
+            out["budget"] = {**out["budget"], "unpaid_reserved": None, "unpaid_reserved_foreign": None,
+                             "projected": None, "projected_over": None, "remaining": None}
+    if "costs" in hidden:
+        items = [i for i in items if i.get("category") != "budget"]
+        out["budget"] = None
     out["items"] = items
     counts = dict(out.get("counts") or {})
     by_cat = {k: 0 for k in (counts.get("by_category") or {})}

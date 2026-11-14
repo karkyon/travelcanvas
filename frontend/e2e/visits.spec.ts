@@ -53,6 +53,9 @@ test('訪問の地図: 軌跡から判定し、確定・地図から隠す(Atlas
   const kiyomizu = page.getByRole('article', { name: '清水寺' });
   const station = page.getByRole('article', { name: '京都駅' });
   await expect(kiyomizu.getByTestId('layer-state')).toHaveText('○ 予定');
+  // [Gate Remaining-7] 既定は実の地図(OpenStreetMap)。略図へ切り替えて確かめる
+  await expect(page.getByTestId('visit-tile-map')).toBeVisible();
+  await page.getByRole('button', { name: '略図' }).click();
   await expect(page.getByRole('img', { name: /訪問の地図\(略図\)。表示中 2件/ })).toBeVisible();
   await expectNoAxeViolations(page, '訪問の地図(判定の前)');
 

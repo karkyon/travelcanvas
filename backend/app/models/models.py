@@ -4134,3 +4134,66 @@ class BillingEvent(Base):
     type: Mapped[str] = mapped_column(String(80), nullable=False)
     result: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class WebauthnCredential(Base):
+    """[Gate Remaining-7] FR-003 passkey(WebAuthn の公開鍵)。秘密鍵は端末から出ない。"""
+    __tablename__ = "webauthn_credentials"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    credential_id: Mapped[str] = mapped_column(String(512), nullable=False)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sign_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    transports: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    backed_up: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("credential_id", name="uq_webauthn_credentials_credential_id"),
+        Index("ix_webauthn_credentials_user", "user_id"),
+    )
+
+
+class GmailConnection(Base):
+    """[Gate Remaining-7] FR-011 Gmail の読み取りの連携(1 人 1 つ)。refresh token は暗号化。外すと消す。"""
+    __tablename__ = "gmail_connections"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    google_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    refresh_token_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    imported_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    seen_message_hashes: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+
+class ConstraintUndoSnapshot(Base):
+    """[Gate Remaining-7] FR-016 制約の作成・変更・削除の直前の状態(取り消し用)。秘匿の値は暗号文のまま写す。"""
+    __tablename__ = "constraint_undo_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    constraint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("constraints.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    actor_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)
+    before_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    undone_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("action IN ('create', 'update', 'delete')", name="ck_constraint_undo_snapshots_action"),
+        Index("ix_constraint_undo_snapshots_constraint", "constraint_id"),
+        Index("ix_constraint_undo_snapshots_plan", "plan_id", "created_at"),
+        Index("ix_constraint_undo_snapshots_actor", "actor_user_id"),
+    )

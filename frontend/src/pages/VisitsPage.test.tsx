@@ -13,6 +13,11 @@ const m = vi.hoisted(() => ({
   getLocationTracks: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ ...m }));
+// [Gate Remaining-7] 実の地図(Leaflet)は jsdom で描けないため、地図の部品は置き換える
+vi.mock('./visits/VisitTileMap', () => ({
+  default: ({ items, candidates }: { items: unknown[]; candidates: unknown[] }) => (
+    <div data-testid="visit-tile-map">{`tiles ${items.length} candidates ${candidates.length}`}</div>),
+}));
 
 import VisitsPage from './VisitsPage';
 
@@ -41,6 +46,9 @@ describe('VisitsPage (Gate V2)', () => {
     m.assessVisits.mockResolvedValue(assessed);
     renderPage();
     expect(await screen.findByRole('heading', { name: '訪問の地図', level: 1 })).toBeInTheDocument();
+    // [Gate Remaining-7] 既定は実の地図(OpenStreetMap)。略図へ切り替えられる
+    expect(await screen.findByTestId('visit-tile-map')).toHaveTextContent('tiles 3 candidates 0');
+    fireEvent.click(screen.getByRole('button', { name: '略図' }));
     expect(await screen.findByRole('img', { name: /訪問の地図\(略図\)。表示中 3件/ })).toBeInTheDocument();
     expect(within(article('清水寺')).getByText('まだ判定していません(半径200m)')).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('region', { name: '訪問の判定' })).getByRole('button', { name: '判定する' }));
@@ -91,6 +99,7 @@ describe('VisitsPage (Gate V2)', () => {
     const h = await screen.findByRole('article', { name: '清水寺' });
     expect(within(h).getByText(/地図と Atlas から隠しています/)).toBeInTheDocument();
     expect(within(h).getByRole('button', { name: '清水寺: 隠すのをやめる' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '略図' }));
     const map = screen.getByRole('img', { name: /訪問の地図\(略図\)/ });
     expect(map.querySelector('[data-layer-state="HIDDEN"]')).toBeNull();
     expect(map.querySelectorAll('g[data-layer-state]')).toHaveLength(2);
@@ -126,5 +135,14 @@ describe('VisitsPage (Gate V2)', () => {
     m.getVisits.mockRejectedValue(new Error('network'));
     renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent('訪問の地図を取得できませんでした');
+  });
+
+  it('[Remaining-7] 候補の層(候補箱)を地図に重ね、切り替えられる', async () => {
+    m.getVisits.mockResolvedValue({ ...empty, candidates: [{ candidate_id: 'c1', title: '伏見稲荷', category: null, priority: 1,
+      latitude: 34.96, longitude: 135.77, layer_state: 'CANDIDATE' }] });
+    renderPage();
+    expect(await screen.findByTestId('visit-tile-map')).toHaveTextContent('candidates 1');
+    fireEvent.click(screen.getByTestId('visit-candidates-toggle'));
+    expect(screen.getByTestId('visit-tile-map')).toHaveTextContent('candidates 0');
   });
 });

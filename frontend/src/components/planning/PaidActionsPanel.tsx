@@ -9,9 +9,15 @@ import React, { useState } from 'react';
 import type { TravelPlan } from '@/types';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  newIdempotencyKey, paidAiSuggest, paidPlacesSearch, paidRoute, type PaidAiResult, type PaidPlacesResult,
-  type PaidRouteMode, type PaidRouteResult,
+  newIdempotencyKey, paidAiSuggest, paidAiWebSearch, paidPlaceDetails, paidPlacePhoto, paidPlacesSearch, paidRoute,
+  paidStaticMap, type PaidAiResult, type PaidPlaceDetails, type PaidPlacesResult, type PaidRouteMode, type PaidRouteResult,
+  type PaidWebSearchResult,
 } from '@/services/api/paidActions';
+import { safeExternalUrl } from '@/utils/safeNavigation';
+
+const STATUS_LABEL: Record<string, string> = {
+  OPERATIONAL: '営業中', CLOSED_TEMPORARILY: '臨時休業', CLOSED_PERMANENTLY: '閉業',
+};
 
 interface Props {
   plan: TravelPlan;
@@ -30,13 +36,18 @@ const PaidActionsPanel: React.FC<Props> = ({ plan, dayIndex, className = '', onU
   const [fromId, setFromId] = useState('');
   const [toId, setToId] = useState('');
   const [mode, setMode] = useState<PaidRouteMode>('driving');
-  const [busy, setBusy] = useState<'ai' | 'places' | 'route' | null>(null);
+  const [busy, setBusy] = useState<'ai' | 'places' | 'route' | 'details' | 'photo' | 'map' | 'web' | null>(null);
+  // [Gate Remaining-7] FR-059 場所の詳細・写真・日の地図・AI の Web 検索
+  const [details, setDetails] = useState<Record<string, PaidPlaceDetails>>({});
+  const [photo, setPhoto] = useState<{ image: string; attributions: string[] } | null>(null);
+  const [mapImage, setMapImage] = useState<string | null>(null);
+  const [web, setWeb] = useState<PaidWebSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ai, setAi] = useState<PaidAiResult | null>(null);
   const [places, setPlaces] = useState<PaidPlacesResult | null>(null);
   const [route, setRoute] = useState<PaidRouteResult | null>(null);
 
-  const run = async (kind: 'ai' | 'places' | 'route', fn: (key: string) => Promise<void>) => {
+  const run = async (kind: NonNullable<typeof busy>, fn: (key: string) => Promise<void>) => {
     if (busy) return;
     setBusy(kind);
     setError(null);
@@ -69,6 +80,26 @@ const PaidActionsPanel: React.FC<Props> = ({ plan, dayIndex, className = '', onU
         <button type="submit" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-1" disabled={busy !== null || !prompt.trim()}>
           {busy === 'ai' ? '聞いています…' : 'AI に聞く'}
         </button>
+        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-1 ml-2" disabled={busy !== null || !prompt.trim()}
+          onClick={() => void run('web', async (key) => setWeb(await paidAiWebSearch(plan.id, prompt.trim(), key)))}
+          data-testid="paid-web-search">
+          {busy === 'web' ? '調べています…' : 'Web で調べる(Explorer)'}
+        </button>
+        {web && (
+          <div className="mt-2 rounded border border-cloud-200 p-2" data-testid="paid-web-result">
+            <p className="text-xs font-semibold">AI が Web で調べた結果(出典を確かめてください・保存していません)</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm">{web.result.text || '(結果がありませんでした)'}</p>
+            {web.result.sources.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-xs">
+                {web.result.sources.map((s) => {
+                  const href = safeExternalUrl(s.url);
+                  return <li key={s.url}>{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="underline">{s.title}</a> : s.title}</li>;
+                })}
+              </ul>
+            )}
+            <p className="mt-1 text-xs text-ink-700">{web.notice}</p>
+          </div>
+        )}
         {ai && (
           <div className="mt-2 rounded border border-cloud-200 p-2" data-testid="paid-ai-result">
             <p className="text-xs font-semibold">AI の案(要確認・保存していません)</p>
@@ -91,15 +122,69 @@ const PaidActionsPanel: React.FC<Props> = ({ plan, dayIndex, className = '', onU
         {places && (
           <div className="mt-2" data-testid="paid-places-result">
             <ul className="space-y-1">
-              {places.results.map((p) => (
-                <li key={p.place_id}><b>{p.name}</b>{p.address ? ` · ${p.address}` : ''}</li>
-              ))}
+              {places.results.map((p) => {
+                const d = details[p.place_id];
+                return (
+                  <li key={p.place_id}>
+                    <b>{p.name}</b>{p.address ? ` · ${p.address}` : ''}
+                    {!d && (
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm ml-2" disabled={busy !== null}
+                        onClick={() => void run('details', async (key) => {
+                          const r = await paidPlaceDetails(plan.id, p.place_id, key);
+                          setDetails((x) => ({ ...x, [p.place_id]: r.result }));
+                        })}>{busy === 'details' ? '調べています…' : '詳細'}</button>
+                    )}
+                    {d && (
+                      <div className="mt-1 rounded border border-cloud-200 p-2 text-xs" data-testid="paid-place-details">
+                        {d.business_status && (
+                          <p className={d.business_status === 'OPERATIONAL' ? '' : 'font-semibold text-danger'}>
+                            {`状態: ${STATUS_LABEL[d.business_status] ?? d.business_status}`}
+                          </p>
+                        )}
+                        {d.opening_hours.length > 0 && <p>{`営業時間: ${d.opening_hours.join(' / ')}`}</p>}
+                        {d.phone && <p>{`電話: ${d.phone}`}</p>}
+                        {d.website && safeExternalUrl(d.website) && (
+                          <p><a href={safeExternalUrl(d.website) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">サイト</a></p>
+                        )}
+                        {d.rating != null && <p>{`評価 ${d.rating}(${d.rating_count ?? 0}件)`}</p>}
+                        {d.photos[0] && (
+                          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-1" disabled={busy !== null}
+                            onClick={() => void run('photo', async (key) => {
+                              const first = d.photos[0];
+                              if (!first) return;
+                              const r = await paidPlacePhoto(plan.id, first.name, key);
+                              setPhoto(r.result.image ? { image: r.result.image, attributions: first.attributions } : null);
+                            })}>{busy === 'photo' ? '取っています…' : '写真を見る'}</button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
               {places.results.length === 0 && <li>見つかりませんでした</li>}
             </ul>
             <p className="mt-1 text-xs text-ink-700">{`提供: ${places.attribution} · ${places.notice}`}</p>
+            {photo && (
+              <figure className="mt-2" data-testid="paid-place-photo">
+                <img src={photo.image} alt="Google の場所の写真" className="max-h-60 rounded" />
+                <figcaption className="text-xs text-ink-700">{`写真: ${photo.attributions.join('・') || '投稿者'}(Google)`}</figcaption>
+              </figure>
+            )}
           </div>
         )}
       </form>
+
+      {/* [Gate Remaining-7] FR-059 この日の予定の地図(Google の静的な地図。押した時だけ) */}
+      {located.length > 0 && (
+        <div className="mt-3">
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" disabled={busy !== null}
+            onClick={() => void run('map', async (key) => {
+              const r = await paidStaticMap(plan.id, located.slice(0, 20).map((e) => e.id), key);
+              setMapImage(r.result.image);
+            })} data-testid="paid-static-map">{busy === 'map' ? '作っています…' : 'この日の地図を Google で見る'}</button>
+          {mapImage && <img src={mapImage} alt="この日の予定の地図(Google)" className="mt-2 w-full rounded border" data-testid="paid-static-map-image" />}
+        </div>
+      )}
 
       <form className="mt-3" aria-label="Google の経路" onSubmit={(e) => {
         e.preventDefault();

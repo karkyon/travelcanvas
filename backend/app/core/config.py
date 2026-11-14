@@ -191,6 +191,8 @@ class Settings(BaseSettings):
     # 受信サービス(SendGrid Inbound Parse・Mailgun Routes・Postfix の pipe 等)へ向け、POST /api/v1/inbound-mail へ
     # 転送させる。INBOUND_MAIL_SECRET を X-TC-Inbound-Secret(または ?secret=)で送る。どちらかが空なら受け付けない
     INBOUND_MAIL_DOMAIN: str = ""
+    # [Gate Remaining-7] FR-003 passkey の RP ID(空なら画面の origin = CORS の 1 つ目の host)
+    WEBAUTHN_RP_ID: str = ""
     INBOUND_MAIL_SECRET: str = ""
     INBOUND_MAIL_DAILY_LIMIT: int = 30  # 1 つのアドレスで 1 日に読み取るメールの数
 

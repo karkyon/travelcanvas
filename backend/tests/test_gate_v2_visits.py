@@ -358,3 +358,34 @@ def test_device_results_and_evidence(auth_client, db_session):
     ad.delete_account(db_session, owner)
     db_session.commit()
     assert db_session.query(VisitAssessment).filter(VisitAssessment.user_id == owner.id).count() == 0
+
+
+def test_candidate_layer_lists_open_located_candidates(auth_client, db_session, _env):
+    """[Gate Remaining-7] FR-049 候補の層: 場所のある、まだ予定に置いていない候補だけを CANDIDATE として出す"""
+    client, owner = auth_client
+    p, base, ev = _setup(client)
+    body = {"title": "伏見稲荷", "latitude": 34.9671, "longitude": 135.7727}
+    assert client.post(f"/api/v1/plans/{p}/candidates", json=body).status_code == 201
+    assert client.post(f"/api/v1/plans/{p}/candidates", json={"title": "場所の無い候補"}).status_code == 201
+    g = client.get(f"{base}/visits").json()
+    assert [c["title"] for c in g["candidates"]] == ["伏見稲荷"]
+    assert g["candidates"][0]["layer_state"] == "CANDIDATE" and g["counts"]["CANDIDATE"] == 1
+
+
+def test_track_comparison_against_planned_route(auth_client, db_session, _env):
+    """[Gate Remaining-7] FR-054 予定の経路と軌跡: 近づいた距離・到達・寄り道・経路からの外れ"""
+    client, owner = auth_client
+    p, base, ev = _setup(client)
+    stay = [_p(m, *_off(*KYOTO, north_m=20)) for m in range(0, 13, 2)]
+    detour = [_p(60 + m, *_off(*KYOTO, north_m=5000)) for m in range(0, 13, 2)]
+    tid = _track(client, base, stay + detour)
+    r = client.get(f"{base}/location-tracks/{tid}/comparison")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    by = {e["title"]: e for e in body["events"]}
+    assert by["清水寺"]["reached"] is True and by["清水寺"]["nearest_m"] <= 30
+    assert by["大阪城"]["reached"] is False and "大阪城" in body["summary"]["skipped"]
+    assert body["summary"]["planned_count"] == 3 and body["summary"]["reached_count"] == 1
+    assert len(body["unplanned_stops"]) == 1 and body["unplanned_stops"][0]["minutes"] == 12
+    assert body["summary"]["off_route_ratio"] > 0 and body["summary"]["actual_distance_km"] > 4
+    assert body["algorithm_version"] == "track-compare-v1"

@@ -53,6 +53,7 @@ def net(monkeypatch):
                                                         "location": {"latitude": 35.62, "longitude": 134.81},
                                                         "googleMapsUri": "https://maps.google.com/?cid=1"}]})
     fake.set("routes.googleapis.com", 200, {"routes": [{"duration": "9000s", "distanceMeters": 180000}]})
+    fake.set("maps.googleapis.com", 200, {})  # [Gate Remaining-7] 静的な地図の確認
     ph.set_transport(httpx.MockTransport(fake.handler))
     from app.services import provider_calls as pc
     pc.register_all()  # 他の試験が登録を外していても、実装済みの adapter を登録した状態で始める

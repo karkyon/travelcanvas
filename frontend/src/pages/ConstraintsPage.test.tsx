@@ -40,6 +40,9 @@ vi.mock('@/services/api', async () => {
 
 // [Gate G7] 移動・滞在の既定(この画面の上に出る)。読み込みは実 backend の応答、日ごとの疲れの読み取りは本物を使う
 const g7m = vi.hoisted(() => ({ getMovementSettings: vi.fn(), saveMovementSettings: vi.fn() }));
+const r7 = vi.hoisted(() => ({ undoConstraintChange: vi.fn() }));
+vi.mock('@/services/api/remaining6', () => r7);
+
 vi.mock('@/services/api/g7', async () => {
   const actual = await vi.importActual<typeof import('@/services/api/g7')>('@/services/api/g7');
   return { runMovement: actual.runMovement, getMovementSettings: g7m.getMovementSettings, saveMovementSettings: g7m.saveMovementSettings };
@@ -183,6 +186,23 @@ describe('ConstraintsPage (Gate L2)', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: `${shared.title}を削除` }));
     await waitFor(() => expect(deleteConstraint).toHaveBeenCalledWith('p1', shared.id, shared.revision));
+    confirmSpy.mockRestore();
+  });
+
+  it('[Remaining-7] 削除の後に「元に戻す」で取り消しを送り、一覧を読み直す', async () => {
+    getConstraints.mockResolvedValue([shared]);
+    deleteConstraint.mockResolvedValue({ revision: 3, undo_id: 'u1' });
+    r7.undoConstraintChange.mockReset().mockResolvedValue({ message: '元に戻しました', deleted: false });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: `${shared.title}を削除` }));
+    const bar = await screen.findByTestId('constraint-undo');
+    expect(bar).toHaveTextContent('制約を削除しました');
+    const before = getConstraints.mock.calls.length;
+    fireEvent.click(within(bar).getByRole('button', { name: '元に戻す' }));
+    await waitFor(() => expect(r7.undoConstraintChange).toHaveBeenCalledWith('p1', 'u1'));
+    await waitFor(() => expect(getConstraints.mock.calls.length).toBeGreaterThan(before));
+    expect(screen.queryByTestId('constraint-undo')).toBeNull();
     confirmSpy.mockRestore();
   });
 });

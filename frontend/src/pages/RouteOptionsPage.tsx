@@ -109,6 +109,8 @@ const RouteOptionsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // [Gate Remaining-7] FR-015 経路候補の削除・採用の直後は「元に戻す」(旅行の直前の変更の取り消し)
+  const [canUndo, setCanUndo] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<OptionFormState>(EMPTY_FORM);
@@ -204,6 +206,7 @@ const RouteOptionsPage: React.FC = () => {
     try {
       const result = await deleteRouteOption(planId, option.id, planRevision);
       setNotice(describeRouteOptionDeletion(result.detached?.segments_unlinked));
+      setCanUndo(true);
       await loadAll();
     } catch (e) {
       setError(errorDetailMessage(e, '削除に失敗しました'));
@@ -216,9 +219,24 @@ const RouteOptionsPage: React.FC = () => {
     try {
       await adoptRouteOption(planId, option.id, planRevision);
       setNotice('経路候補を採用し、移動区間に反映しました。');
+      setCanUndo(true);
       await loadAll();
     } catch (e) {
       setError(errorDetailMessage(e, '採用に失敗しました'));
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!planId || planRevision === null) return;
+    setError(null);
+    try {
+      await api.undoLastPlanChange(planId, planRevision);
+      setCanUndo(false);
+      setNotice('元に戻しました。');
+      await loadAll();
+    } catch (e) {
+      setCanUndo(false);
+      setError(errorDetailMessage(e, '元に戻せませんでした(この後に別の変更があります)'));
     }
   };
 
@@ -254,6 +272,11 @@ const RouteOptionsPage: React.FC = () => {
         {notice && (
           <Card className="mb-4 bg-green-50 border-green-200">
             <p className="text-sm text-green-800" role="status">{notice}</p>
+            {canUndo && (
+              <Button size="sm" variant="secondary" className="mt-2" onClick={() => void handleUndo()} data-testid="route-option-undo">
+                元に戻す
+              </Button>
+            )}
           </Card>
         )}
 

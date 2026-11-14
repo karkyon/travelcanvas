@@ -115,8 +115,6 @@ async def receive(request: Request, db: Session = Depends(get_db)):
 
 
 async def _process(request: Request, db: Session, row: Any, raw: bytes, msg: Any) -> int:
-    from app.api.v1 import imports as imports_api
-
     plan = db.query(TravelPlan).filter(TravelPlan.id == row.plan_id, TravelPlan.deleted_at.is_(None)).first()
     user = db.query(User).filter(User.id == row.user_id).first()
     if plan is None or user is None or not getattr(user, "is_active", True):
@@ -131,6 +129,25 @@ async def _process(request: Request, db: Session, row: Any, raw: bytes, msg: Any
     row.received_count = (row.received_count or 0) + 1
     row.last_received_at = datetime.now(timezone.utc)
     db.commit()
+    jobs, found_fields, parts = await import_mail(request, db, plan, user, raw, msg)
+    if jobs:
+        title = "転送された予約のメールを読み取りました(%d 件)" % jobs
+        message = "「%s」の取り込みの画面で、読み取った項目を確かめて確定してください(自動では予約を作りません)。" % plan.title
+    else:
+        title = "転送されたメールから予約を読み取れませんでした"
+        message = "「%s」の取り込みの画面で、本文を貼り付けて読み取るか、項目を手で入れてください。" % plan.title
+    notify.deliver(db, plan, [user.id], "booking_mail", title, message, target_type="plan", target_id=plan.id,
+                   direct_ids=[user.id])
+    db.commit()
+    _audit("inbound_mail.received", user.id, plan.id, {"jobs": jobs, "fields": found_fields, "parts": parts})
+    return jobs
+
+
+async def import_mail(request: Request, db: Session, plan: TravelPlan, user: User, raw: bytes, msg: Any) -> tuple:
+    """1 通のメール(本文と PDF の添付)を予約の読み取り(候補)にする。戻り値: (取り込みの数, 項目の数, 部分の数)。
+    [Gate Remaining-7] Gmail の連携(FR-011)からも使う。"""
+    from app.api.v1 import imports as imports_api
+
     texts: List[tuple] = []
     try:
         body = rx.parse_eml(raw) if len(raw) <= rx.MAX_EML_BYTES else _head_text(msg)
@@ -155,17 +172,7 @@ async def _process(request: Request, db: Session, row: Any, raw: bytes, msg: Any
             continue
         jobs += int((out.get("split") or {}).get("count") or 1)  # [Gate Remaining-6] 1 通から複数の予約
         found_fields += len(out.get("candidates") or [])
-    if jobs:
-        title = "転送された予約のメールを読み取りました(%d 件)" % jobs
-        message = "「%s」の取り込みの画面で、読み取った項目を確かめて確定してください(自動では予約を作りません)。" % plan.title
-    else:
-        title = "転送されたメールから予約を読み取れませんでした"
-        message = "「%s」の取り込みの画面で、本文を貼り付けて読み取るか、項目を手で入れてください。" % plan.title
-    notify.deliver(db, plan, [user.id], "booking_mail", title, message, target_type="plan", target_id=plan.id,
-                   direct_ids=[user.id])
-    db.commit()
-    _audit("inbound_mail.received", user.id, plan.id, {"jobs": jobs, "fields": found_fields, "parts": len(texts)})
-    return jobs
+    return jobs, found_fields, len(texts)
 
 
 def _head_text(msg: Any) -> str:

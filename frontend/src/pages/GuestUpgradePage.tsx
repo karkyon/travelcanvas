@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import GuestMergeForm from '@/components/auth/GuestMergeForm';
 
 /**
  * [Gate #35] ゲストが作成中の旅行プランを失わずに正規アカウントへ昇格するための画面。
@@ -171,6 +172,10 @@ const GuestUpgradePage = () => {
                 </button>
               </div>
             </form>
+          </div>
+          {/* [Gate Remaining-7] FR-002 既存のアカウントへまとめる */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 mt-6">
+            <GuestMergeForm />
           </div>
         </div>
       </div>

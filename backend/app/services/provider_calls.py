@@ -28,7 +28,7 @@ from app.services import provider_secrets as ps
 
 logger = logging.getLogger(__name__)
 
-ADAPTER_VERSION = "2026-11-01.1"
+ADAPTER_VERSION = "2026-11-14.1"
 
 PLACES_FIELD_MASK = ("places.id,places.displayName,places.formattedAddress,places.location,"
                      "places.googleMapsUri")
@@ -47,12 +47,32 @@ ADAPTERS: Dict[str, Dict[str, Any]] = {
     "openai": {"operations": ["ai.generate"], "label": "OpenAI · Responses API"},
     "google_places": {"operations": ["places.search"], "label": "Places API (New) · Text Search"},
     "google_routes": {"operations": ["routes.element"], "label": "Routes API · computeRoutes"},
+    # [Gate Remaining-7] FR-059 場所の詳細・写真・静的な地図・AI の Web 検索
+    "google_place_details": {"operations": ["places.details", "places.photo"],
+                             "label": "Places API (New) · Place Details / Place Photos"},
+    "google_static_maps": {"operations": ["map.load"], "label": "Maps Static API"},
+    "openai_web_search": {"operations": ["ai.web_search"], "label": "OpenAI · Responses API(web_search ツール)"},
 }
 # 鍵の slot → 確認する (提供元, 操作)
 SLOT_CHECKS: Dict[str, List[Tuple[str, str]]] = {
-    "openai_api_key": [("openai", "ai.generate")],
-    "google_maps_server_key": [("google_places", "places.search"), ("google_routes", "routes.element")],
+    "openai_api_key": [("openai", "ai.generate"), ("openai_web_search", "ai.web_search")],
+    "google_maps_server_key": [("google_places", "places.search"), ("google_routes", "routes.element"),
+                               ("google_place_details", "places.details"), ("google_place_details", "places.photo"),
+                               ("google_static_maps", "map.load")],
 }
+# [Gate Remaining-7] 場所の詳細の項目(Place Details Enterprise の範囲。営業の状態は休業の確認 FR-030 にも使う)
+DETAILS_FIELD_MASK = ("id,displayName,formattedAddress,location,googleMapsUri,businessStatus,"
+                      "regularOpeningHours.weekdayDescriptions,nationalPhoneNumber,websiteUri,rating,"
+                      "userRatingCount,photos.name,photos.authorAttributions")
+DETAILS_VERIFY_FIELD_MASK = "id"
+PHOTO_MAX_WIDTH = 800
+STATIC_MAP_SIZE = "640x400"
+STATIC_MAX_MARKERS = 20
+WEB_SEARCH_MAX_OUTPUT_TOKENS = 1200
+WEB_SEARCH_INSTRUCTIONS = (
+    "あなたは日本語の旅行計画の調べ役です。Web 検索で確かめた事実だけを短く箇条書きで答え、出典の無いことは書かないでください。"
+    "営業時間・料金・空きは変わることがあるため、確かめた日付があれば添えてください。")
+VERIFY_PLACE_ID = "ChIJN1t_tDeuEmsRUsoyG83frY4"  # 確認の時だけ使う、公開の例の場所
 
 
 class ProviderRejected(cg.NotSentError):
@@ -72,7 +92,10 @@ def config_hash(slot: str) -> str:
     spec = {"slot": slot, "adapter": ADAPTER_VERSION, "endpoints": ph.ALLOWED,
             "model": openai_model() if slot == "openai_api_key" else None,
             "places_mask": PLACES_FIELD_MASK, "places_verify_mask": PLACES_VERIFY_FIELD_MASK,
-            "routes_mask": ROUTES_FIELD_MASK}
+            "routes_mask": ROUTES_FIELD_MASK,
+            # [Gate Remaining-7] 新しい操作を足した時は確認をやり直す(足した操作も確かめるため)
+            "get_endpoints": ph.ALLOWED_GET, "details_mask": DETAILS_FIELD_MASK,
+            "checks": SLOT_CHECKS.get(slot)}
     return hashlib.sha256(json.dumps(spec, sort_keys=True).encode("utf-8")).hexdigest()
 
 
@@ -215,11 +238,181 @@ def verify_request(provider: str, key: str) -> ph.ProviderResponse:
     raise ValueError("unsupported_provider")
 
 
+def verify_request_op(provider: str, operation: str, key: str) -> ph.ProviderResponse:
+    """[Gate Remaining-7] 操作ごとの最小の確認(同じ提供元で操作が 2 つある時のため)。"""
+    if provider == "google_place_details" and operation == "places.details":
+        return _details_request(key, VERIFY_PLACE_ID, DETAILS_VERIFY_FIELD_MASK)
+    if provider == "google_place_details" and operation == "places.photo":
+        # 写真の確認は詳細(写真の名前だけ)で鍵と API の有効を確かめる(画像は取らない)
+        return _details_request(key, VERIFY_PLACE_ID, "photos.name")
+    if provider == "google_static_maps":
+        img = _static_request(key, [(35.6812, 139.7671)], "100x100")
+        return ph.ProviderResponse(status=img.status, body=img.body)
+    if provider == "openai_web_search":
+        return _web_search_request(key, "東京駅の所在地を一言で答えてください。", 64)
+    return verify_request(provider, key)
+
+
 VERIFY_UNITS: Dict[str, Dict[str, int]] = {
     "ai.generate": {"input_tokens": 200, "output_tokens": 16},
     "places.search": {"requests": 1},
     "routes.element": {"elements": 1},
+    "places.details": {"requests": 1},
+    "places.photo": {"requests": 1},
+    "map.load": {"loads": 1},
+    "ai.web_search": {"requests": 1},
 }
+
+
+# ===================================================================== [Gate Remaining-7] FR-059 詳細・写真・地図・Web 検索
+
+def _details_request(key: str, place_id: str, mask: str) -> ph.ProviderResponse:
+    return ph.get_json("google.places.details", {"X-Goog-Api-Key": key, "X-Goog-FieldMask": mask},
+                       {"languageCode": "ja", "regionCode": "JP"}, place_id=place_id)
+
+
+def _details_view(body: Any) -> Dict[str, Any]:
+    b: Dict[str, Any] = body if isinstance(body, dict) else {}
+    loc_raw = b.get("location")
+    loc: Dict[str, Any] = loc_raw if isinstance(loc_raw, dict) else {}
+    name = b.get("displayName")
+    hours_raw = b.get("regularOpeningHours")
+    hours: Dict[str, Any] = hours_raw if isinstance(hours_raw, dict) else {}
+    photos = []
+    for ph_ in (b.get("photos") or [])[:5]:
+        if not isinstance(ph_, dict) or not isinstance(ph_.get("name"), str):
+            continue
+        authors = [str(a.get("displayName") or "") for a in (ph_.get("authorAttributions") or [])
+                   if isinstance(a, dict)]
+        photos.append({"name": ph_["name"], "attributions": [a for a in authors if a]})
+    status = b.get("businessStatus")
+    return {
+        "provider": "google_places", "place_id": str(b.get("id") or ""),
+        "name": str(name.get("text") if isinstance(name, dict) else name or ""),
+        "address": b.get("formattedAddress"), "latitude": loc.get("latitude"), "longitude": loc.get("longitude"),
+        "maps_uri": b.get("googleMapsUri"), "phone": b.get("nationalPhoneNumber"), "website": b.get("websiteUri"),
+        "rating": b.get("rating") if isinstance(b.get("rating"), (int, float)) else None,
+        "rating_count": b.get("userRatingCount") if isinstance(b.get("userRatingCount"), int) else None,
+        "business_status": status if status in ("OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY") else None,
+        "opening_hours": [str(x) for x in (hours.get("weekdayDescriptions") or []) if isinstance(x, str)][:7],
+        "photos": photos,
+    }
+
+
+def place_details(db: Session, plan: TravelPlan, caller: User, place_id: str, idempotency_key: str
+                  ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "google_place_details", "places.details",
+                     lambda key: _details_request(key, place_id, DETAILS_FIELD_MASK))
+        return cg.ProviderResult(units={"requests": 1}, payload=_details_view(resp.body))
+
+    return cg.run(db, plan, caller, "places.details", "google_place_details", {"requests": 1}, idempotency_key, call,
+                  fingerprint=fingerprint("google_place_details", str(plan.id), place_id))
+
+
+def _photo_uri_request(key: str, photo_name: str) -> ph.ProviderResponse:
+    return ph.get_json("google.places.photo", {"X-Goog-Api-Key": key},
+                       {"maxWidthPx": PHOTO_MAX_WIDTH, "skipHttpRedirect": "true"}, photo_name=photo_name)
+
+
+def _data_url(img: ph.ImageResponse) -> Optional[str]:
+    kind = img.content_type or ""
+    if kind not in ("image/jpeg", "image/png", "image/webp", "image/gif") or not img.content:
+        return None
+    return f"data:{kind};base64," + base64.b64encode(img.content).decode("ascii")
+
+
+def place_photo(db: Session, plan: TravelPlan, caller: User, photo_name: str, idempotency_key: str
+                ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """写真の URL を Places で得て(課金 1 回)、その画像を取って data URL で返す(保存しない・鍵は画像の取得に送らない)。"""
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "google_place_details", "places.photo", lambda key: _photo_uri_request(key, photo_name))
+        uri = resp.body.get("photoUri") if isinstance(resp.body, dict) else None
+        data_url = None
+        if isinstance(uri, str):
+            try:
+                data_url = _data_url(ph.fetch_photo(uri))
+            except (ValueError, ph.ProviderNetworkError):
+                data_url = None
+        return cg.ProviderResult(units={"requests": 1}, payload={"image": data_url})
+
+    return cg.run(db, plan, caller, "places.photo", "google_place_details", {"requests": 1}, idempotency_key, call,
+                  fingerprint=fingerprint("google_place_details", "photo", str(plan.id), photo_name))
+
+
+def _static_request(key: str, points: List[Tuple[float, float]], size: str = STATIC_MAP_SIZE) -> ph.ImageResponse:
+    markers = "|".join(f"{lat:.6f},{lng:.6f}" for lat, lng in points[:STATIC_MAX_MARKERS])
+    params: Dict[str, Any] = {"size": size, "scale": 2, "language": "ja", "region": "JP", "key": key,
+                              "markers": f"color:red|{markers}"}
+    if len(points) >= 2:
+        params["path"] = "color:0x2563ebcc|weight:4|" + markers
+    return ph.get_image("google.maps.static", {}, params)
+
+
+def _send_image(db: Session, provider: str, operation: str, request: Callable[[str], ph.ImageResponse]
+                ) -> ph.ImageResponse:
+    holder: Dict[str, ph.ImageResponse] = {}
+
+    def as_json(key: str) -> ph.ProviderResponse:
+        img = request(key)
+        holder["img"] = img
+        return ph.ProviderResponse(status=img.status, body=img.body)
+
+    _send(db, provider, operation, as_json)
+    return holder["img"]
+
+
+def static_map(db: Session, plan: TravelPlan, caller: User, points: List[Tuple[float, float]], idempotency_key: str
+               ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        img = _send_image(db, "google_static_maps", "map.load", lambda key: _static_request(key, points))
+        return cg.ProviderResult(units={"loads": 1}, payload={"image": _data_url(img)})
+
+    return cg.run(db, plan, caller, "map.load", "google_static_maps", {"loads": 1}, idempotency_key, call,
+                  fingerprint=fingerprint("google_static_maps", str(plan.id), points))
+
+
+def _web_search_request(key: str, text: str, max_output_tokens: int) -> ph.ProviderResponse:
+    payload: Dict[str, Any] = {"model": openai_model(), "instructions": WEB_SEARCH_INSTRUCTIONS, "input": text,
+                               "max_output_tokens": max_output_tokens, "store": False,
+                               "tools": [{"type": "web_search",
+                                          "user_location": {"type": "approximate", "country": "JP"}}]}
+    return ph.post_json("openai.responses",
+                        {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, payload)
+
+
+def _web_sources(body: Any) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    seen = set()
+    for item in (body.get("output") or []) if isinstance(body, dict) else []:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        for content in item.get("content") or []:
+            for ann in (content.get("annotations") or []) if isinstance(content, dict) else []:
+                if not isinstance(ann, dict) or ann.get("type") != "url_citation":
+                    continue
+                url = str(ann.get("url") or "")
+                if not url.startswith("https://") or url in seen:
+                    continue
+                seen.add(url)
+                out.append({"url": url[:500], "title": str(ann.get("title") or url)[:200]})
+    return out[:10]
+
+
+def ai_web_search(db: Session, plan: TravelPlan, caller: User, prompt: str, idempotency_key: str
+                  ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    text = prompt.strip()
+
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "openai_web_search", "ai.web_search",
+                     lambda key: _web_search_request(key, text, WEB_SEARCH_MAX_OUTPUT_TOKENS))
+        used = _openai_usage(resp.body)
+        return cg.ProviderResult(units={"requests": 1, "input_tokens": (used or {}).get("input_tokens", 8000)},
+                                 payload={"text": _openai_text(resp.body), "sources": _web_sources(resp.body),
+                                          "model": openai_model()}, model=openai_model())
+
+    return cg.run(db, plan, caller, "ai.web_search", "openai_web_search", {"requests": 1}, idempotency_key, call,
+                  fingerprint=fingerprint("openai_web_search", str(plan.id), text))
 
 
 # ===================================================================== 業務の操作(利用者の明示の操作)

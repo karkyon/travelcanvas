@@ -111,6 +111,7 @@ PLAN_TABLES = (
     m.TripConsultSession,
     m.InboundMailAddress,
     m.BillingPayment,
+    m.ConstraintUndoSnapshot,
 )
 
 
@@ -179,6 +180,12 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
                 extra["reason"] = _decrypt_json(c.reason_ciphertext)
         cons.append(row(c, extra))
     t["constraints"] = cons
+    # [Gate Remaining-7] 制約の取り消しの記録は本人の操作の分だけ。暗号文(秘匿の値・理由)は出さない
+    t["constraint_undo_snapshots"] = [
+        row(x, {"before_json": {k: v for k, v in (x.before_json or {}).items() if not k.endswith("_ciphertext")}
+                if x.before_json is not None else None})
+        for x in q(m.ConstraintUndoSnapshot).filter(m.ConstraintUndoSnapshot.actor_user_id == me).all()
+        if x.constraint_id not in hidden_constraints]
     runs = q(m.ValidationRun).all()
     t["validation_runs"] = [row(x) for x in runs]
     # 他人の秘匿制約に関する検証結果は出さない(その制約の存在・内容を推測させない)

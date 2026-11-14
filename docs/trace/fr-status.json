@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r52",
+  "revision": "v5.1-r53",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -25,7 +25,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "G1・A1",
-   "gaps": "全所有物の移管のE2E、重複統合"
+   "gaps": "重複の統合(既存のアカウントへゲストの持ち物をまとめる)は Remaining-7"
   },
   "FR-003": {
    "title": "認証・セッション",
@@ -33,7 +33,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "A1・S2・S5・S7・S9・S11",
-   "gaps": "passkey。パスワードの再設定(忘れた時)・メールの確認は Remaining-6(SMTP の設定の後に実メールで未確認)"
+   "gaps": "passkey(Remaining-7)は実機の端末で未確認。パスワードの再設定・メールの確認(Remaining-6)は SMTP の設定の後に実メールで未確認"
   },
   "FR-004": {
    "title": "旅行CRUD",
@@ -65,7 +65,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "C2・G11",
-   "gaps": "画像・音声からの候補(画像の文字の読み取りは場所の登録だけ、音声認識なし)。SNS 以外の URL は押した時に 1 ページだけ読み題名・説明・場所を出す(Remaining-6。画像は出さない)"
+   "gaps": "画像の文字(OCR)・声(ブラウザの音声認識)から候補の名前を入れる(Remaining-7)。画像そのものから場所を当てる AI は場所の登録の画面だけ(同意つき)。SNS 以外の URL は押した時に 1 ページだけ読む(Remaining-6)"
   },
   "FR-008": {
    "title": "場所の一元管理",
@@ -97,7 +97,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3",
-   "gaps": "転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。1 通から複数の予約は予約番号で分ける(Remaining-6)。omega-dev2 の実画像と実の AI では未確認"
+   "gaps": "転送アドレス(Remaining-3)・Gmail の連携(Remaining-7。読み取りだけ・押した時だけ)は、受信サービス・Google の OAuth クライアントの設定の後に実メールで未確認。1 通から複数の予約は予約番号で分ける(Remaining-6)"
   },
   "FR-012": {
    "title": "QR・チケット",
@@ -121,7 +121,7 @@
    "partial": false,
    "e2e": "一部",
    "gates": "M1・M2・B-014・G11・Remaining-2",
-   "gaps": "時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)、区間の編集・UndoのE2E"
+   "gaps": "時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)。区間の編集・Undo の E2E は Remaining-7"
   },
   "FR-015": {
    "title": "経路比較",
@@ -129,7 +129,7 @@
    "partial": false,
    "e2e": "一部",
    "gates": "M3・M4・M8・Remaining-2",
-   "gaps": "経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)、route option の Undo・E2E"
+   "gaps": "経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)。route option の Undo の E2E は Remaining-7"
   },
   "FR-016": {
    "title": "制約",
@@ -137,7 +137,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "L2",
-   "gaps": "制約の変更の Undo"
+   "gaps": "制約の変更の Undo は Remaining-7(作成・変更・削除・有効の切り替え。本人・その後に変更が無い時だけ)"
   },
   "FR-017": {
    "title": "実行可能性",
@@ -217,7 +217,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "P1",
-   "gaps": "予算との連動"
+   "gaps": "予算との連動は Remaining-7(使った額・未払いの予約の見込み・費目の予算)"
   },
   "FR-027": {
    "title": "予算・費用",
@@ -401,7 +401,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "V2",
-   "gaps": "候補の層、地図タイルの上への表示"
+   "gaps": "候補の層・地図タイル(OpenStreetMap)の上への表示は Remaining-7。実機の位置の記録での確認は UAT"
   },
   "FR-050": {
    "title": "訪問判定・信頼度",
@@ -441,7 +441,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "P14",
-   "gaps": "予定経路と GPS 軌跡の比較"
+   "gaps": "予定の経路と GPS の軌跡の比べ(到達・寄り道・経路からの外れ)は Remaining-7。予定の経路は直線(道の形ではない)"
   },
   "FR-055": {
    "title": "Local-first Location",
@@ -481,7 +481,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect",
-   "gaps": "OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する"
+   "gaps": "OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する"
   }
  }
 }

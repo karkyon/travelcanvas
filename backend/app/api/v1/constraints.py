@@ -19,6 +19,10 @@
 
 楽観ロックは制約ごとのrevision(If-Match)。削除は論理削除(deleted_at)。
 作成・変更・削除はaudit_logsへ記録する(題名・値・理由は記録しない)。
+
+[Gate Remaining-7] FR-016 制約の変更の取り消し(Undo)。作成・変更・削除の応答の ``undo_id`` で
+``POST /plans/{plan_id}/constraints/undo/{undo_id}`` を呼ぶと直前の状態へ戻す。戻せるのは操作した本人が、
+その後にその制約へ別の変更が無い時だけ(あれば 409 ``undo_not_latest``)。秘匿の値は暗号文のまま写す(復号しない)。
 """
 import json
 import re
@@ -34,7 +38,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
-from app.models.models import PlanConstraint, TravelDay, TravelEvent, TravelPlan, User
+from app.models.models import ConstraintUndoSnapshot, PlanConstraint, TravelDay, TravelEvent, TravelPlan, User
 from app.services.audit_service import record_audit_event
 from app.services.constraint_evaluation import (
     decrypt_private_payload,
@@ -530,6 +534,53 @@ def _audit(action: str, request: Request, user: User, c: PlanConstraint) -> None
     )
 
 
+# ===== [Gate Remaining-7] FR-016 取り消し(Undo)の記録 =====
+
+_SNAP_FIELDS = ("scope_type", "scope_id", "constraint_type", "hardness", "operator", "weight", "privacy_level",
+                "title", "value_json", "is_active", "active_from", "active_to", "deleted_at")
+_SNAP_BYTES = ("value_ciphertext", "reason_ciphertext")
+
+
+def _snapshot(c: PlanConstraint) -> Dict[str, Any]:
+    import base64
+
+    out: Dict[str, Any] = {}
+    for name in _SNAP_FIELDS:
+        value = getattr(c, name)
+        if isinstance(value, datetime):
+            value = value.isoformat()
+        elif isinstance(value, uuid.UUID):
+            value = str(value)
+        out[name] = value
+    for name in _SNAP_BYTES:
+        value = getattr(c, name)
+        out[name] = base64.b64encode(value).decode("ascii") if value is not None else None
+    return out
+
+
+def _restore(c: PlanConstraint, snap: Dict[str, Any]) -> None:
+    import base64
+
+    for name in _SNAP_FIELDS:
+        value = snap.get(name)
+        if name in ("active_from", "active_to", "deleted_at") and isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        elif name == "scope_id" and isinstance(value, str):
+            value = uuid.UUID(value)
+        setattr(c, name, value)
+    for name in _SNAP_BYTES:
+        value = snap.get(name)
+        setattr(c, name, base64.b64decode(value) if isinstance(value, str) else None)
+
+
+def _record_undo(db: Session, c: PlanConstraint, user: User, action: str,
+                 before: Optional[Dict[str, Any]]) -> ConstraintUndoSnapshot:
+    snap = ConstraintUndoSnapshot(id=uuid.uuid4(), constraint_id=c.id, plan_id=c.plan_id, actor_user_id=user.id,
+                                  action=action, before_json=before, revision_after=c.revision)
+    db.add(snap)
+    return snap
+
+
 # ===== エンドポイント =====
 
 @router.get("/{plan_id}/constraints", response_model=List[dict])
@@ -591,10 +642,12 @@ def create_constraint(
     )
     _store_payload(c, payload.privacy_level, payload.title, value)
     db.add(c)
+    db.flush()
+    undo = _record_undo(db, c, current_user, "create", None)
     db.commit()
     db.refresh(c)
     _audit("constraint_created", request, current_user, c)
-    return _to_response(db, c, current_user)
+    return {**_to_response(db, c, current_user), "undo_id": str(undo.id)}
 
 
 @router.patch("/{plan_id}/constraints/{constraint_id}", response_model=dict)
@@ -611,6 +664,7 @@ def update_constraint(
     c = _get_constraint_or_404(db, plan, constraint_id)
     _require_write(c, role, current_user)
     _require_if_match(c, if_match)
+    before = _snapshot(c)
 
     data = payload.model_dump(exclude_unset=True)
     for nullable_forbidden in ("title", "constraint_type", "hardness", "operator", "value",
@@ -663,10 +717,11 @@ def update_constraint(
         c.reason_ciphertext = _encrypt_reason(data["reason"], plan.id)
     _store_payload(c, new_privacy, title, value)
     c.revision += 1
+    undo = _record_undo(db, c, current_user, "update", before)
     db.commit()
     db.refresh(c)
     _audit("constraint_updated", request, current_user, c)
-    return _to_response(db, c, current_user)
+    return {**_to_response(db, c, current_user), "undo_id": str(undo.id)}
 
 
 @router.delete("/{plan_id}/constraints/{constraint_id}", response_model=dict)
@@ -682,8 +737,61 @@ def delete_constraint(
     c = _get_constraint_or_404(db, plan, constraint_id)
     _require_write(c, role, current_user)
     _require_if_match(c, if_match)
+    before = _snapshot(c)
     c.deleted_at = datetime.now(dt_timezone.utc)
     c.revision += 1
+    undo = _record_undo(db, c, current_user, "delete", before)
     db.commit()
     _audit("constraint_deleted", request, current_user, c)
-    return {"message": "制約を削除しました", "revision": c.revision}
+    return {"message": "制約を削除しました", "revision": c.revision, "undo_id": str(undo.id)}
+
+
+@router.post("/{plan_id}/constraints/undo/{undo_id}", response_model=dict)
+def undo_constraint_change(
+    plan_id: str,
+    undo_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate Remaining-7] FR-016 制約の作成・変更・削除を 1 つ取り消す(操作した本人・その後に変更が無い時だけ)。"""
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    try:
+        sid = uuid.UUID(str(undo_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail={"code": "undo_not_found", "message": "取り消せる操作が見つかりません"})
+    snap = (db.query(ConstraintUndoSnapshot)
+            .filter(ConstraintUndoSnapshot.id == sid, ConstraintUndoSnapshot.plan_id == plan.id)
+            .with_for_update().first())
+    if snap is None or snap.actor_user_id != current_user.id:
+        raise HTTPException(status_code=404, detail={"code": "undo_not_found", "message": "取り消せる操作が見つかりません"})
+    if snap.undone_at is not None:
+        raise HTTPException(status_code=409, detail={"code": "already_undone", "message": "もう元に戻しています"})
+    c = (db.query(PlanConstraint).filter(PlanConstraint.id == snap.constraint_id, PlanConstraint.plan_id == plan.id)
+         .with_for_update().first())
+    if c is None:
+        raise HTTPException(status_code=404, detail={"code": "undo_not_found", "message": "制約が見つかりません"})
+    if c.revision != snap.revision_after:
+        raise HTTPException(status_code=409, detail={
+            "code": "undo_not_latest", "message": "この後に制約が変わったため、元に戻せません(今の内容を確かめてください)"})
+    # 今の権限で、戻した後の制約を書けるか(秘匿は本人・共有は編集者以上)
+    target_privacy = (snap.before_json or {}).get("privacy_level") if snap.action != "create" else c.privacy_level
+    if target_privacy == "private" or c.privacy_level == "private":
+        if c.owner_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="秘匿制約は作成者本人のみ変更できます")
+    elif role not in ("owner", "editor"):
+        raise HTTPException(status_code=403, detail="共有の制約を変更する権限がありません")
+    if snap.action == "create":
+        c.deleted_at = datetime.now(dt_timezone.utc)
+    else:
+        _restore(c, snap.before_json or {})
+    c.revision += 1
+    snap.undone_at = datetime.now(dt_timezone.utc)
+    db.commit()
+    db.refresh(c)
+    _audit("constraint_undone", request, current_user, c)
+    out: Dict[str, Any] = {"message": "元に戻しました", "action": snap.action, "revision": c.revision,
+                           "deleted": c.deleted_at is not None}
+    if c.deleted_at is None:
+        out["constraint"] = _to_response(db, c, current_user)
+    return out

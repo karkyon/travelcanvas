@@ -739,8 +739,9 @@ const readinessItem: Decoder<ReadinessItem> = object<ReadinessItem>({
   code: oneOf(
     'unreserved', 'reservation_unconfirmed', 'reservation_unpaid', 'payment_unknown', 'cancellation_deadline_soon',
     'task_overdue', 'task_unassigned', 'packing_unassigned', 'packing_shortage',
+    'budget_over', 'budget_projected_over', 'budget_category_over',
   ),
-  category: oneOf('unreserved', 'unconfirmed', 'unpaid', 'deadline', 'unassigned', 'packing'),
+  category: oneOf('unreserved', 'unconfirmed', 'unpaid', 'deadline', 'unassigned', 'packing', 'budget'),
   severity: oneOf('high', 'medium', 'low'),
   title: str,
   detail: str,
@@ -769,7 +770,7 @@ export const readiness: Decoder<Readiness> = object<Readiness>({
     by_severity: object({ high: nonNegativeInt, medium: nonNegativeInt, low: nonNegativeInt }),
     by_category: object({
       unreserved: nonNegativeInt, unconfirmed: nonNegativeInt, unpaid: nonNegativeInt, deadline: nonNegativeInt,
-      unassigned: nonNegativeInt, packing: nonNegativeInt,
+      unassigned: nonNegativeInt, packing: nonNegativeInt, budget: nonNegativeInt,
     }),
   }),
   resolved_by_tasks: nonNegativeInt,
@@ -778,6 +779,12 @@ export const readiness: Decoder<Readiness> = object<Readiness>({
     total: nonNegativeInt, packed: nonNegativeInt, required_total: nonNegativeInt, required_ready: nonNegativeInt,
   }),
   items: arrayOf(readinessItem),
+  budget: optional(nullable(object({
+    base_currency: str, total: nullable(str), spent: str, unpaid_reserved: nullable(str),
+    unpaid_reserved_foreign: nullable(nonNegativeInt), projected: nullable(str), remaining: nullable(str), over: bool,
+    projected_over: nullable(bool),
+    categories_over: arrayOf(object({ category: str, budget: str, actual: str })),
+  }))),
 });
 
 // ----- [Gate P2] 予算・費用(FR-027)・立替・精算(FR-028)。backend/app/api/v1/finance.py の応答。
@@ -1856,6 +1863,10 @@ export const visitsOverview: Decoder<VisitsOverview> = object<VisitsOverview>({
   result: optional(object({
     created: nonNegativeInt, changed: nonNegativeInt, unchanged: nonNegativeInt, skipped: nonNegativeInt,
   })),
+  candidates: optional(arrayOf(object({
+    candidate_id: str, title: str, category: nullable(str), priority: int, latitude: num, longitude: num,
+    layer_state: oneOf('CANDIDATE'),
+  }))),
 });
 export const visitCorrectionResult: Decoder<VisitCorrectionResult> = object<VisitCorrectionResult>({
   event_id: str,

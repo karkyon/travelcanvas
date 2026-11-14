@@ -11,6 +11,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+
+const VisitTileMap = React.lazy(() => import('./visits/VisitTileMap'));
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -48,6 +50,9 @@ const VisitsPage: React.FC = () => {
     VERIFIED: true, STAYED: true, VISITED: true, PASS_THROUGH: true, PLANNED: true, HIDDEN: false,
   });
   const [selected, setSelected] = useState<string | null>(null);
+  // [Gate Remaining-7] FR-049 実際の地図(OpenStreetMap)と略図の切り替え・候補の層
+  const [mapMode, setMapMode] = useState<'tiles' | 'sketch'>('tiles');
+  const [showCandidates, setShowCandidates] = useState(true);
 
   const load = useCallback(async () => {
     if (!planId) return;
@@ -181,6 +186,17 @@ const VisitsPage: React.FC = () => {
                   </li>
                 ))}
               </ul>
+              <label className="mt-2 inline-flex items-center gap-1 text-sm text-ink-900">
+                <input type="checkbox" checked={showCandidates} onChange={() => setShowCandidates((v) => !v)}
+                  data-testid="visit-candidates-toggle" />
+                <span aria-hidden="true">☆</span>{`候補(候補箱・まだ予定に置いていない)(${(data.candidates ?? []).length}件)`}
+              </label>
+              <div className="mt-2 flex gap-2" role="group" aria-label="地図の種類">
+                <Button size="sm" variant={mapMode === 'tiles' ? 'primary' : 'secondary'} aria-pressed={mapMode === 'tiles'}
+                  onClick={() => setMapMode('tiles')}>地図(OpenStreetMap)</Button>
+                <Button size="sm" variant={mapMode === 'sketch' ? 'primary' : 'secondary'} aria-pressed={mapMode === 'sketch'}
+                  onClick={() => setMapMode('sketch')}>略図</Button>
+              </div>
               {data.events_without_location > 0 && (
                 <p className="text-sm text-ink-700 mt-2">場所の無い予定 {data.events_without_location}件は判定できません。</p>
               )}
@@ -194,6 +210,15 @@ const VisitsPage: React.FC = () => {
             <p className="mt-6 text-ink-700">位置のある予定がありません。予定に場所を登録すると判定できます。</p>
           ) : (
             <>
+              {mapMode === 'tiles' && (
+                <Card className="mt-4 p-2">
+                  <React.Suspense fallback={<div className="py-12 flex justify-center"><LoadingSpinner /></div>}>
+                    <VisitTileMap items={mapItems} candidates={showCandidates ? (data.candidates ?? []) : []}
+                      selected={selected} onSelect={setSelected} />
+                  </React.Suspense>
+                </Card>
+              )}
+              {mapMode === 'sketch' && (
               <Card className="mt-4 p-2">
                 <svg
                   viewBox={`0 0 ${MAP_W} ${MAP_H}`}
@@ -227,6 +252,7 @@ const VisitsPage: React.FC = () => {
                   })}
                 </svg>
               </Card>
+              )}
 
               <section aria-label="訪問の一覧" className="mt-4 space-y-3">
                 <h2 className="text-lg font-semibold text-ink-900">一覧</h2>

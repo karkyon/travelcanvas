@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { loginNextPath, safeInternalPath } from '@/utils/safeNavigation';
+import PasskeyLoginButton from '@/components/auth/PasskeyLoginButton';
 
 /**
  * [Gate S11] 多要素認証の2段目(パスワードが正しく、認証アプリの確認コードを待っている時)。
@@ -198,6 +199,9 @@ const LoginPage = () => {
                   )}
                 </button>
               </div>
+
+              {/* [Gate Remaining-7] FR-003 passkey でログイン */}
+              <PasskeyLoginButton onDone={() => { toast.success('ログインしました！'); navigate(safeInternalPath(loginNextPath()) ?? '/dashboard'); }} />
 
               <div className="text-center">
                 {/* [Gate Remaining-6] FR-003 */}
