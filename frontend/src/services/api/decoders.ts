@@ -1629,6 +1629,8 @@ export const atlasResponse: Decoder<AtlasResponse> = object<AtlasResponse>({
   years: arrayOf(int),
   plans: arrayOf(object({ plan_id: str, title: str, excluded: bool, observations: nonNegativeInt, is_owner: bool })),
   cells: arrayOf(atlasCell),
+  theme: optional(nullable(str)),
+  themes: optional(arrayOf(object({ key: str, label: str, observations: nonNegativeInt }))),
   summary: object({
     cells: nonNegativeInt,
     by_state: object({ STAYED: nonNegativeInt, VISITED: nonNegativeInt, PASS_THROUGH: nonNegativeInt, PLANNED: nonNegativeInt }),

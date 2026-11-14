@@ -284,6 +284,26 @@ def _ai_fill(db: Session, plan, user: User, found: rx.Extraction, zone: str, *, 
 
 
 def _run_text(db: Session, request: Request, plan, user: User, text: str, use_ai: bool, source: str) -> Dict[str, Any]:
+    """[Gate Remaining-6] FR-011 予約番号が 2 つ以上ある本文は予約ごとに分けて、分けた数だけ取り込みを作る。
+    応答は最初の取り込み(split に数と全ての ID)。分けた部分が 1 つも読めない時は元の本文のまま 1 つで読む"""
+    parts = rx.split_reservations(text)
+    if len(parts) > 1:
+        results: List[Dict[str, Any]] = []
+        for part in parts:
+            try:
+                results.append(_run_text_one(db, request, plan, user, part, use_ai, source))
+            except HTTPException as error:
+                if error.status_code != 422:
+                    raise
+        if results:
+            first = dict(results[0])
+            first["split"] = {"count": len(results), "job_ids": [r.get("id") for r in results]}
+            return first
+    return _run_text_one(db, request, plan, user, text, use_ai, source)
+
+
+def _run_text_one(db: Session, request: Request, plan, user: User, text: str, use_ai: bool,
+                  source: str) -> Dict[str, Any]:
     first, last, zone = _plan_dates(db, plan)
     found = rx.rule_extract(text, zone, first.year if first else None)
     provider, ai_status, ai_message = "rules", "off", None

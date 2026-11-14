@@ -172,7 +172,7 @@ def test_import_external_saves_private_memory_with_source_and_cover(auth_client)
                                                                  "provider_id": "File:Kiyomizu.jpg"}).status_code == 404
 
 
-def test_social_preview_variants_and_candidate(auth_client):
+def test_social_preview_variants_and_candidate(auth_client, monkeypatch):
     client, owner = auth_client
     p, base = _plan(client)
     calls = []
@@ -207,8 +207,12 @@ def test_social_preview_variants_and_candidate(auth_client):
 
     assert client.post(f"{base}/candidates/social-preview",
                        json={"url": "https://www.tiktok.com/@a/video/1"}).json()["status"] == "unavailable"
+    # [Gate Remaining-6] SNS 以外は Web ページとして読む(FR-007)。読めない時は URL とメモで保存する案内
+    from app.services import url_place as _up
+    monkeypatch.setattr(_up, "public_addresses",
+                        lambda host, port: (_ for _ in ()).throw(_up.PageUnavailable("公開のページだけ読めます")))
     un = client.post(f"{base}/candidates/social-preview", json={"url": "https://example.com/post"}).json()
-    assert un["status"] == "unsupported" and un["fallback"] == "url_and_note"
+    assert un["status"] == "unavailable" and un["reason"] == "page_unreadable" and un["fallback"] == "url_and_note"
     ig = client.post(f"{base}/candidates/social-preview", json={"url": "https://www.instagram.com/p/xyz/"}).json()
     assert ig["status"] == "disabled"
     for bad in ("javascript:alert(1)", "ftp://x", "http://user:pw@youtube.com/x", ""):

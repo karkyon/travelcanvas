@@ -12,6 +12,7 @@ import Button from '@/components/common/Button';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
 import ActiveSessionsSection from '@/components/settings/ActiveSessionsSection';
 import MfaSection from '@/components/settings/MfaSection';
+import EmailVerifySection from '@/components/settings/EmailVerifySection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
 import SupportAccessSection from '@/components/settings/SupportAccessSection';
 import UsageSection from '@/components/settings/UsageSection';
@@ -486,6 +487,9 @@ const SettingsPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* [Gate Remaining-6] FR-003 メールの確認 */}
+      {!isGuest && <EmailVerifySection />}
 
       {/* [Gate S11] 多要素認証(認証アプリ)。管理者は必須 */}
       <MfaSection />

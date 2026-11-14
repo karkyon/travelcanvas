@@ -9,6 +9,7 @@ import type { AtlasResponse } from '@/services/api';
 
 const m = vi.hoisted(() => ({ getAtlas: vi.fn(), updateAtlasSettings: vi.fn() }));
 vi.mock('@/services/api', () => ({ ...m }));
+vi.mock('@/services/api/remaining6', () => ({ getAtlasThemed: m.getAtlas }));
 
 import AtlasPage from './AtlasPage';
 
@@ -39,9 +40,18 @@ describe('AtlasPage (Gate P15)', () => {
     renderPage();
     await screen.findByRole('region', { name: 'Atlasの概要' });
     fireEvent.change(screen.getByLabelText('区画の大きさ'), { target: { value: 'area' } });
-    await waitFor(() => expect(m.getAtlas).toHaveBeenLastCalledWith('area', null));
+    await waitFor(() => expect(m.getAtlas).toHaveBeenLastCalledWith('area', null, null));
     fireEvent.change(screen.getByLabelText('年'), { target: { value: '2026' } });
-    await waitFor(() => expect(m.getAtlas).toHaveBeenLastCalledWith('area', 2026));
+    await waitFor(() => expect(m.getAtlas).toHaveBeenLastCalledWith('area', 2026, null));
+  });
+
+  it('[Remaining-6] テーマで絞って読み直す', async () => {
+    m.getAtlas.mockResolvedValue({ ...region, themes: [{ key: 'food', label: '食事', observations: 2 }], theme: null });
+    renderPage();
+    await screen.findByRole('region', { name: 'Atlasの概要' });
+    expect(await screen.findByRole('option', { name: '食事(2)' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('テーマ'), { target: { value: 'food' } });
+    await waitFor(() => expect(m.getAtlas).toHaveBeenLastCalledWith('region', null, 'food'));
   });
 
   it('旅行をAtlasから除く', async () => {

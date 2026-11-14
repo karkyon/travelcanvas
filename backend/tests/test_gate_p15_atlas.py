@@ -148,3 +148,28 @@ def test_atlas_across_trips_with_privacy(auth_client, make_user, db_session):
     finally:
         _act_as(owner)
     assert client.put("/api/v1/atlas/settings", json={"excluded_plan_ids": [], "x": 1}).status_code == 422
+
+
+def test_atlas_themes_filter(auth_client):
+    """[Gate Remaining-6] FR-052 テーマ別: 予定の種類から観光・食事などに分け、theme で絞る。写真・記録は別のテーマ"""
+    client, _ = auth_client
+    p = client.post("/api/v1/travel-plans/", json={"title": "京都2026"}).json()["id"]
+    base = f"/api/v1/plans/{p}"
+    d = client.post(f"{base}/days", json={"local_date": "2026-11-01", "timezone_id": "Asia/Tokyo"},
+                    headers=_ik()).json()
+    ev = {}
+    for name, loc, kind in (("清水寺", KYOTO, "sightseeing"), ("奈良の店", NARA, "meal")):
+        r = client.post(f"{base}/events", json={"day_id": d["id"], "title": name, "latitude": loc[0],
+                                                "longitude": loc[1], "event_type": kind}, headers=_ik())
+        assert r.status_code in (200, 201), r.text
+        ev[name] = r.json()
+    for e in ev.values():
+        client.put(f"{base}/journey/events/{e['id']}", json={"status": "visited"})
+    client.post(f"{base}/memories", json={"body": "嵐山", "latitude": 35.0094, "longitude": 135.6668,
+                                          "occurred_at": _at(200)})
+    a = client.get("/api/v1/atlas").json()
+    themes = {t["key"]: t["observations"] for t in a["themes"]}
+    assert a["theme"] is None and themes.get("food") == 1 and themes.get("memory") == 1
+    food = client.get("/api/v1/atlas", params={"theme": "food"}).json()
+    assert food["theme"] == "food" and {c["key"] for c in food["cells"]} == {"0.1:34.6:135.8"}
+    assert client.get("/api/v1/atlas", params={"theme": "nope"}).status_code == 422

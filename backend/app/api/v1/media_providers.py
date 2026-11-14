@@ -196,11 +196,57 @@ async def social_preview(plan_id: str, payload: SocialPreviewIn, db: Session = D
     if not url:
         raise _bad("invalid_field", "URL を入力してください")
     preview = await registry.social_provider().preview(url)
+    if preview.status == "unsupported" and preview.reason == "unsupported_platform":
+        # [Gate Remaining-6] FR-007 SNS 以外の Web ページは、押した時に 1 ページだけ読んで題名・説明・場所を出す
+        # (url_place: 公開のアドレスだけ・転送のたびに確かめ直す・HTML 1MB・5 秒。保存しない)
+        return (await _page_preview(url, db, current_user, plan_id)).to_dict()
     if preview.status in ("ok", "unavailable"):  # 外へ送った時だけ(未対応・無効は送っていない)
         free_usage.record(db, current_user, "oembed", "social.preview", plan_id=_plan_uuid(plan_id),
                           result_code="ok" if preview.status == "ok" else "unavailable")
         db.commit()
     return preview.to_dict()
+
+
+async def _page_preview(url: str, db: Session, user: User, plan_id: str):
+    from datetime import datetime, timezone
+    from urllib.parse import urlsplit
+
+    from fastapi.concurrency import run_in_threadpool
+
+    from app.services import url_place as up
+    from app.services.media_providers import SocialPreview
+    from app.utils.rate_limiter import check_rate_limit
+
+    if not check_rate_limit(f"page-preview:{user.id}", 30, 600):
+        raise HTTPException(status_code=429, detail={"code": "too_many_requests",
+                                                     "message": "回数が多すぎます。しばらく待ってください"})
+    try:
+        page = await run_in_threadpool(up.read_page, url)
+    except up.PageUnavailable as error:
+        return _PagePreview(SocialPreview(platform=None, status="unavailable", url=url, reason="page_unreadable"),
+                            str(error))
+    place = []
+    if page.name and (page.address or page.latitude is not None):
+        place = [{"word": page.name, "name": page.name, "address": page.address, "latitude": page.latitude,
+                  "longitude": page.longitude, "provider": "page", "confidence": "medium"}]
+    out = SocialPreview(platform=None, status="ok", url=page.url, title=page.name,
+                        author=urlsplit(page.url).hostname, retrieved_at=datetime.now(timezone.utc),
+                        place_suggestions=place)
+    return _PagePreview(out, None, page.description)
+
+
+class _PagePreview:
+    """SocialPreview に Web ページの説明(description)と読めない理由の文(message)を足して返す"""
+
+    def __init__(self, preview, message, description=None):
+        self.preview, self.message, self.description = preview, message, description
+
+    def to_dict(self):
+        d = self.preview.to_dict()
+        d["kind"] = "page"
+        d["description"] = self.description
+        d["message"] = self.message
+        return d
 
 
 def _plan_uuid(plan_id: str):

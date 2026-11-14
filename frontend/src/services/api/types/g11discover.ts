@@ -77,6 +77,10 @@ export interface SocialPreview {
   reason: string | null;
   /** 取れない時の代わり(url_and_note = URL とメモを出典として保存) */
   fallback: string | null;
+  /** [Gate Remaining-6] FR-007 SNS 以外の Web ページを読んだ時は 'page'。説明・読めない理由の文 */
+  kind?: string;
+  description?: string | null;
+  message?: string | null;
   place_suggestions: Array<{
     word: string;
     name: string;

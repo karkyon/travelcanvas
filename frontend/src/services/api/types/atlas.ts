@@ -26,6 +26,9 @@ export interface AtlasResponse {
   years: number[];
   plans: Array<{ plan_id: string; title: string; excluded: boolean; observations: number; is_owner: boolean }>;
   cells: AtlasCell[];
+  /** [Gate Remaining-6] FR-052 テーマ別(絞っている時のテーマと、テーマごとの根拠の数) */
+  theme?: string | null;
+  themes?: Array<{ key: string; label: string; observations: number }>;
   summary: {
     cells: number;
     by_state: Record<AtlasState, number>;

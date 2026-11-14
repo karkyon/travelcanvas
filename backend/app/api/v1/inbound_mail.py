@@ -153,7 +153,7 @@ async def _process(request: Request, db: Session, row: Any, raw: bytes, msg: Any
         except HTTPException:
             db.rollback()
             continue
-        jobs += 1
+        jobs += int((out.get("split") or {}).get("count") or 1)  # [Gate Remaining-6] 1 通から複数の予約
         found_fields += len(out.get("candidates") or [])
     if jobs:
         title = "転送された予約のメールを読み取りました(%d 件)" % jobs

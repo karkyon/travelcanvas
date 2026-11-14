@@ -122,22 +122,22 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 
 | FR | 機能 | 状態 | 主な不足 |
 |---|---|---|---|
-| FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
+| FR-007 | 候補箱 | INTEGRATED(部分) | 画像・音声からの候補(画像の文字の読み取りは場所の登録だけ、音声認識なし)。SNS 以外の URL は押した時に 1 ページだけ読み題名・説明・場所を出す(Remaining-6。画像は出さない) |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ジオコードの確認(地図の提供元 MAP-05)。祝日は日本は計算・日本の外は Nager.Date(Remaining-2。例外の日は手で登録できる) |
-| FR-011 | 予約取込 | INTEGRATED(部分) | 1 通から複数の予約。転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。omega-dev2 の実画像と実の AI では未確認 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | 転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。1 通から複数の予約は予約番号で分ける(Remaining-6)。omega-dev2 の実画像と実の AI では未確認 |
 | FR-014 | 移動区間 | INTEGRATED | 時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)、route option の Undo・E2E |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | 外部経路による実移動時間 |
 | FR-024 | コメント・通知 | INTEGRATED | SMTP の送信元の設定(運用の判断)。メールの「すぐ送る」・端末への「自分あての知らせ」は Remaining-3 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | 休業の外部provider。気象庁の警報・注意報は Remaining-2(実通信は omega-dev2 で未確認)、鉄道の運行情報は ODPT の鍵の後に未確認 |
-| FR-035 | 安全な印刷・公開 | INTEGRATED | サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。本番の image の字体(fonts-ipafont-gothic)は次のビルドから |
+| FR-035 | 安全な印刷・公開 | INTEGRATED | サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。開発の image にも字体(fonts-ipafont-gothic)を入れた(Remaining-6。GCP の VM は次の配備から) |
 | FR-036 | Calendar/Map IO | INTEGRATED | カレンダーの購読(webcal。Remaining-5)は外のカレンダーへの一方向。GPX/KML/CSV・取り消しの取込は Remaining-1。Google マイマップは KML の案内付き取り込み(自動作成なし、自動更新なし) |
-| FR-037 | 写真・旅行記 | INTEGRATED(部分) | 顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装 |
+| FR-037 | 写真・旅行記 | INTEGRATED(部分) | 顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は Remaining-6 |
 | FR-041 | 組織・B2B | INTEGRATED(部分) | 組織の料金(FR-058 待ち)、本番の DNS でのドメインの確認(RELEASE-1) |
 | FR-042 | API・埋込 | INTEGRATED(部分) | 旅行・予定・場所・予約の書き込み(個人データを外へ出さない方針で配布だけ)。埋め込み(iframe・JS の部品)は Remaining-5 |
 | FR-046 | 画像・PDFの出力 | INTEGRATED | PDF・NOW/NEXT の画像はサーバーの Pillow で作る(Remaining-5。PDF は画像のページ)。生成は監査に残す |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | 候補の層、地図タイルの上への表示 |
-| FR-052 | Personal Travel Atlas | INTEGRATED(部分) | テーマ別、地点単位の公開範囲。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認) |
+| FR-052 | Personal Travel Atlas | INTEGRATED(部分) | テーマ別は予定の種類から(Remaining-6)。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認) |
 | FR-054 | 予定と実績 | INTEGRATED(部分) | 予定経路と GPS 軌跡の比較 |
 | FR-055 | Local-first Location | INTEGRATED(部分) | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |

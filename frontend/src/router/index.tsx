@@ -14,6 +14,8 @@ import { lazyPage } from './lazyPage';
 const LandingPage = lazyPage(() => import('@/pages/LandingPage'));
 const LoginPage = lazyPage(() => import('@/pages/LoginPage'));
 const RegisterPage = lazyPage(() => import('@/pages/RegisterPage'));
+// [Gate Remaining-6] FR-003 パスワードの再設定・メールの確認(認証不要)
+const AccountPages = lazyPage(() => import('@/pages/AccountPages'));
 const GuestUpgradePage = lazyPage(() => import('@/pages/GuestUpgradePage'));
 const DashboardPage = lazyPage(() => import('@/pages/DashboardPage'));
 const PlannerPage = lazyPage(() => import('@/pages/PlannerPage'));
@@ -121,6 +123,7 @@ export const router = createBrowserRouter([
           </AuthRedirect>
         ),
       },
+      ...['forgot-password', 'reset-password', 'verify-email'].map((path) => ({ path, element: <AccountPages /> })),
       // 🗑️ [Gate P9] アカウント削除の完了(認証不要。この端末のデータを消してログイン状態を消す)
       {
         path: 'account-deleted',

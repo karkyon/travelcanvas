@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v5.1 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v5.1-r51",
+  "revision": "v5.1-r52",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -33,7 +33,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "A1・S2・S5・S7・S9・S11",
-   "gaps": "メールの確認、passkey、パスワード再設定(忘れた時)の API・画面"
+   "gaps": "passkey。パスワードの再設定(忘れた時)・メールの確認は Remaining-6(SMTP の設定の後に実メールで未確認)"
   },
   "FR-004": {
    "title": "旅行CRUD",
@@ -65,7 +65,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "C2・G11",
-   "gaps": "画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得"
+   "gaps": "画像・音声からの候補(画像の文字の読み取りは場所の登録だけ、音声認識なし)。SNS 以外の URL は押した時に 1 ページだけ読み題名・説明・場所を出す(Remaining-6。画像は出さない)"
   },
   "FR-008": {
    "title": "場所の一元管理",
@@ -97,7 +97,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3",
-   "gaps": "1 通から複数の予約。転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。omega-dev2 の実画像と実の AI では未確認"
+   "gaps": "転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。1 通から複数の予約は予約番号で分ける(Remaining-6)。omega-dev2 の実画像と実の AI では未確認"
   },
   "FR-012": {
    "title": "QR・チケット",
@@ -105,7 +105,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "R3-5・R3-11・E1",
-   "gaps": "バーコードの描画、オフライン表示"
+   "gaps": "オフライン表示の実機での確認(バーコードの描画は Code 128。Remaining-1)"
   },
   "FR-013": {
    "title": "文書ウォレット",
@@ -265,7 +265,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "#36・K1",
-   "gaps": "サーバー側のパック、通信しない端末の遠隔消去。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働)"
+   "gaps": "サーバー側のパック、通信しない端末の遠隔消去。アプリの殻のキャッシュ(sw.js の登録は Remaining-1)は実機で未確認"
   },
   "FR-033": {
    "title": "Offline同期",
@@ -289,7 +289,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "P4・Remaining-5",
-   "gaps": "サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。本番の image の字体(fonts-ipafont-gothic)は次のビルドから"
+   "gaps": "サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。開発の image にも字体(fonts-ipafont-gothic)を入れた(Remaining-6。GCP の VM は次の配備から)"
   },
   "FR-036": {
    "title": "Calendar/Map IO",
@@ -305,7 +305,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "P12・Q1・G6・G11・PhotoMap・PhotoQR・PhotoPlace・Remaining-5",
-   "gaps": "顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装"
+   "gaps": "顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は Remaining-6"
   },
   "FR-038": {
    "title": "位置軌跡",
@@ -393,7 +393,7 @@
    "partial": false,
    "e2e": "✓",
    "gates": "#36・P11・K1・G6",
-   "gaps": "本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働)"
+   "gaps": "本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js の登録は Remaining-1(実機で未確認)"
   },
   "FR-049": {
    "title": "Visited Area Layer",
@@ -425,7 +425,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "P15・Remaining-2",
-   "gaps": "テーマ別、地点単位の公開範囲。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認)"
+   "gaps": "テーマ別は予定の種類から(Remaining-6)。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認)"
   },
   "FR-053": {
    "title": "旅の達成指標",

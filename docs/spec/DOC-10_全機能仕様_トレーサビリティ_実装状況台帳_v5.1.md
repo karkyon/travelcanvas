@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r51** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-14<br>
+> 文書ID: DOC-10 / 版: **v5.1-r52** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-14<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -83,16 +83,16 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 |---|---|---|---|---|---|
 | FR-001 | ゲスト旅行開始 | VERIFIED | ✓ | #35・R1・R2 | KPI、回復UX |
 | FR-002 | ゲスト昇格 | VERIFIED | ✓ | G1・A1 | 全所有物の移管のE2E、重複統合 |
-| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | メールの確認、passkey、パスワード再設定(忘れた時)の API・画面 |
+| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | passkey。パスワードの再設定(忘れた時)・メールの確認は Remaining-6(SMTP の設定の後に実メールで未確認) |
 | FR-004 | 旅行CRUD | VERIFIED | ✓ | B-012・G8 | 本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1) |
 | FR-005 | 日・イベント | VERIFIED | ✓ | B-013・G7・G11 | 実機 mobile のタッチでの並べ替え |
 | FR-006 | NOW/NEXT | VERIFIED | ✓ | L1・L1b | 実機mobile、夜行便のE2E |
-| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像・音声からの候補(OCR・音声認識)、SNS 以外の URL の題名・画像の取得 |
+| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像・音声からの候補(画像の文字の読み取りは場所の登録だけ、音声認識なし)。SNS 以外の URL は押した時に 1 ページだけ読み題名・説明・場所を出す(Remaining-6。画像は出さない) |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ✓ | C2・G4・G11・Remaining-2 | ジオコードの確認(地図の提供元 MAP-05)。祝日は日本は計算・日本の外は Nager.Date(Remaining-2。例外の日は手で登録できる) |
 | FR-009 | 情報内検索・コマンドパレット | VERIFIED | ✓ | C3・G4 | 利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1) |
 | FR-010 | 予約管理 | VERIFIED | ✓ | R3・E1・Remaining-3 | 外部予約サービスとの同期(取消期限の 48 時間前・6 時間前の知らせは Remaining-3) |
-| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3 | 1 通から複数の予約。転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。omega-dev2 の実画像と実の AI では未確認 |
-| FR-012 | QR・チケット | VERIFIED | ✓ | R3-5・R3-11・E1 | バーコードの描画、オフライン表示 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3 | 転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。1 通から複数の予約は予約番号で分ける(Remaining-6)。omega-dev2 の実画像と実の AI では未確認 |
+| FR-012 | QR・チケット | VERIFIED | ✓ | R3-5・R3-11・E1 | オフライン表示の実機での確認(バーコードの描画は Code 128。Remaining-1) |
 | FR-013 | 文書ウォレット | VERIFIED | ✓ | R3-6・M5〜M10・S4 | 本番の Object Storage・ClamAV の常時運用・KMS |
 | FR-014 | 移動区間 | INTEGRATED | 一部 | M1・M2・B-014・G11・Remaining-2 | 時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)、区間の編集・UndoのE2E |
 | FR-015 | 経路比較 | INTEGRATED | 一部 | M3・M4・M8・Remaining-2 | 経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)、route option の Undo・E2E |
@@ -112,12 +112,12 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-029 | 当日モード | VERIFIED | ✓ | L1・P10 | 外部状況の自動取得 |
 | FR-030 | 外部状況 | INTEGRATED(部分) | ✓ | P10・Remaining-2 | 休業の外部provider。気象庁の警報・注意報は Remaining-2(実通信は omega-dev2 で未確認)、鉄道の運行情報は ODPT の鍵の後に未確認 |
 | FR-031 | 安全な再計画 | VERIFIED | ✓ | P10 | 代替移動手段の探索、プッシュ通知 |
-| FR-032 | Offline Pack | VERIFIED | ✓ | #36・K1 | サーバー側のパック、通信しない端末の遠隔消去。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働) |
+| FR-032 | Offline Pack | VERIFIED | ✓ | #36・K1 | サーバー側のパック、通信しない端末の遠隔消去。アプリの殻のキャッシュ(sw.js の登録は Remaining-1)は実機で未確認 |
 | FR-033 | Offline同期 | VERIFIED | ✓ | P11・G6 | 本番での確認(RELEASE-1) |
 | FR-034 | しおり生成 | VERIFIED | ✓ | P4・BookletPatterns | 冊子の面付。12 パターンは配備先の本物の字体・地図の画像で未確認 |
-| FR-035 | 安全な印刷・公開 | INTEGRATED | ✓ | P4・Remaining-5 | サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。本番の image の字体(fonts-ipafont-gothic)は次のビルドから |
+| FR-035 | 安全な印刷・公開 | INTEGRATED | ✓ | P4・Remaining-5 | サーバー側の PDF は画像のページ(文字の検索はできない。Remaining-5)。開発の image にも字体(fonts-ipafont-gothic)を入れた(Remaining-6。GCP の VM は次の配備から) |
 | FR-036 | Calendar/Map IO | INTEGRATED | ✓ | P5・P8・MyMaps・Remaining-1・Remaining-5 | カレンダーの購読(webcal。Remaining-5)は外のカレンダーへの一方向。GPX/KML/CSV・取り消しの取込は Remaining-1。Google マイマップは KML の案内付き取り込み(自動作成なし、自動更新なし) |
-| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6・G11・PhotoMap・PhotoQR・PhotoPlace・Remaining-5 | 顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は未実装 |
+| FR-037 | 写真・旅行記 | INTEGRATED(部分) | ✓ | P12・Q1・G6・G11・PhotoMap・PhotoQR・PhotoPlace・Remaining-5 | 顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は Remaining-6 |
 | FR-038 | 位置軌跡 | VERIFIED | ✓ | P13・L5 | バックグラウンドの記録、現在地の共有 |
 | FR-039 | 輸出・削除 | VERIFIED | ✓ | P6・P9・G7・G8 | 書類の写しの添付による出典の証明 |
 | FR-040 | 管理・監査 | VERIFIED | ✓ | A2・S11・G2・G4 | 管理の画面の外部連携の障害の表示(ADM-01)、本番での運用の確認(RELEASE-1) |
@@ -128,11 +128,11 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-045 | 安全な共有ポリシー | VERIFIED | ✓ | F45・G2 | — |
 | FR-046 | 画像・PDFの出力 | INTEGRATED | ✓ | P4・P16・Remaining-5 | PDF・NOW/NEXT の画像はサーバーの Pillow で作る(Remaining-5。PDF は画像のページ)。生成は監査に残す |
 | FR-047 | 旅程複製 | VERIFIED | ✓ | #39・R3-12・E1 | — |
-| FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js を登録するコードが無い(アプリの殻のキャッシュは未稼働) |
+| FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js の登録は Remaining-1(実機で未確認) |
 | FR-049 | Visited Area Layer | INTEGRATED(部分) | ✓ | V2 | 候補の層、地図タイルの上への表示 |
 | FR-050 | 訪問判定・信頼度 | VERIFIED | ✓ | V2 | — |
 | FR-051 | 訪問訂正・除外 | VERIFIED | ✓ | V2・Q1・G6・G8 | 実機の GPS での訂正・除外の確認(PoC) |
-| FR-052 | Personal Travel Atlas | INTEGRATED(部分) | ✓ | P15・Remaining-2 | テーマ別、地点単位の公開範囲。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認) |
+| FR-052 | Personal Travel Atlas | INTEGRATED(部分) | ✓ | P15・Remaining-2 | テーマ別は予定の種類から(Remaining-6)。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認) |
 | FR-053 | 旅の達成指標 | VERIFIED | ✓ | P14 | — |
 | FR-054 | 予定と実績 | INTEGRATED(部分) | ✓ | P14 | 予定経路と GPS 軌跡の比較 |
 | FR-055 | Local-first Location | INTEGRATED(部分) | ✓ | L5 | 端末のバックグラウンド記録、端末内の点の暗号化 |
@@ -268,6 +268,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r49 | 2026-11-04 | `8b25f98`+MockFit | Gate MockFit: ホームの表紙・左の帯をモックアップ v2 の通りに、旅の記録と思い出の画面、しおりの Web 公開(migration `b7d2f4a6c8e1`)、写真(撮影場所)・声・SNS から探す(スポット検索・旅行相談・近くを発見で共有)。`docs/trace/gate-mock-fit-trace.md` |
 | **r50** | 2026-11-05 | `d8bd1b7` | **設計書の as-built 改訂に合わせて同期: 基準 commit と試験の実測を更新、J-04/06/07 の古い残りを直し、FR-003(パスワード再設定)・FR-032/048(sw.js の未登録)・FR-059(鍵の確認の失効)の不足を明記。FR の状態の遷移なし** |
 | **r51** | 2026-11-14 | `PR #108` | **残りの機能の実装(Remaining-1〜5): 地図・表の取込と取り消しの取込・オフラインのメモ・Code 128(1)、為替・気象警報・逆ジオコーディング・祝日・時刻表と運行情報の接続口(2)、取消期限の知らせ・メールの即時・予約メールの転送(3)、Stripe のテストモードの決済(4)、サーバー側の PDF・画像・埋め込み・カレンダーの購読・顔の検査の接続口(5)。FR-058 SPECIFIED→INTEGRATED、FR-024・035・036・046 の部分を外す** |
+| **r52** | 2026-11-14 | `PR #110` | **Remaining-6: パスワードの再設定(忘れた時)・メールの確認の API と画面(FR-003)、1 通の予約メールを予約ごとに分ける(FR-011)、SNS 以外の URL の題名・説明・場所(FR-007)、写真の地図の印のまとめ(FR-037)、Atlas のテーマ別(FR-052)、GCP 配備の準備(開発の image の字体・購読 URL の https)。古い残り(FR-012 のバーコード・FR-032/048 の sw.js)を直す** |
 
 ## 10. 台帳の更新の規則
 
