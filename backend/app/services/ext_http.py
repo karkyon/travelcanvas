@@ -100,6 +100,28 @@ def get_json(name: str, url: str, *, params: Optional[Dict[str, Any]] = None,
         raise Unavailable("failed")
 
 
+def post_form(name: str, url: str, data: Dict[str, Any], *, headers: Optional[Dict[str, str]] = None,
+              timeout: float = 8.0) -> Any:
+    """[Gate Remaining-7] フォームを POST して JSON を返す(OAuth の token の交換)。401/403 は rejected、400 は bad_request"""
+    h = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    h.update(headers or {})
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout), transport=_transports.get(name), headers=h,
+                          follow_redirects=False) as client:
+            r = client.post(url, data=data)
+            if r.status_code in (401, 403):
+                raise Unavailable("rejected")
+            if r.status_code == 400:
+                raise Unavailable("bad_request")
+            r.raise_for_status()
+            return r.json() if r.content else {}
+    except Unavailable:
+        raise
+    except (httpx.HTTPError, ValueError) as error:
+        logger.info("%s unavailable (%s)", name, type(error).__name__)
+        raise Unavailable("failed")
+
+
 def cached(name: str, key: str, ttl: int, fn: Callable[[], Any]) -> Any:
     """名前と鍵ごとに結果を使い回す。失敗(Unavailable)は FAIL_REMEMBER_SECONDS だけ覚える"""
     now = time.time()

@@ -27,14 +27,16 @@ from app.models.models import ProviderSecret
 
 # slot → 表示の名前・使う提供元・旧 .env の名前(移行の検出だけに使う)
 SLOTS: Dict[str, Dict[str, Any]] = {
-    "openai_api_key": {"label": "OpenAI の API キー", "providers": ["openai"], "env": "OPENAI_API_KEY",
+    "openai_api_key": {"label": "OpenAI の API キー", "providers": ["openai", "openai_web_search"],
+                       "env": "OPENAI_API_KEY",
                        "hint": "OpenAI Platform の API キー(sk-…)。ChatGPT の契約とは別"},
     "google_maps_browser_key": {"label": "Google Maps のブラウザ用キー", "providers": ["google_maps_js"],
                                 "env": "GOOGLE_MAPS_API_KEY",
                                 "hint": "HTTP referrer と Maps JavaScript API だけに制限したキー。現在の地図は OpenStreetMap のため使いません"},
     "google_maps_server_key": {"label": "Google Maps Platform のサーバー用キー",
-                               "providers": ["google_places", "google_routes"], "env": "GOOGLE_PLACES_API_KEY",
-                               "hint": "Places API (New)・Routes API だけに制限したサーバー用のキー"},
+                               "providers": ["google_places", "google_routes", "google_place_details",
+                                             "google_static_maps"], "env": "GOOGLE_PLACES_API_KEY",
+                               "hint": "Places API (New)・Routes API・Maps Static API だけに制限したサーバー用のキー"},
     # [Gate PlaceLookupJP] 場所の自動取得の無料の提供元(利用登録だけ。使った分の請求は無い)。無ければその提供元へ送らない
     "yahoo_client_id": {"label": "Yahoo!デベロッパーネットワークの Client ID", "providers": ["yahoo_local"],
                         "env": "YAHOO_CLIENT_ID", "free": True,
@@ -53,6 +55,18 @@ SLOTS: Dict[str, Dict[str, Any]] = {
                         "env": "YOUTUBE_API_KEY", "free": True,
                         "hint": ("Google Cloud で「YouTube Data API v3」を有効にした API キー(Google マップのサーバー用キーに"
                                  "足しても可)。動画の説明欄から場所の候補を出します")},
+    # [Gate Remaining-7] FR-011 Gmail の連携(Google の OAuth クライアント。読み取りだけの権限 gmail.readonly)。無料
+    "google_oauth_client_id": {"label": "Google の OAuth クライアント ID(Gmail の連携)", "providers": ["gmail"],
+                               "env": "GOOGLE_OAUTH_CLIENT_ID", "free": True, "connector": True,
+                               "note": "任意・無料: 登録すると利用者が自分の Gmail から予約のメールを取り込めます",
+                               "hint": ("Google Cloud の「認証情報」で OAuth クライアント(ウェブ アプリケーション)を作り、"
+                                        "承認済みのリダイレクト URI に https://<ホスト>/api/v1/integrations/gmail/callback を入れる。"
+                                        "Gmail API を有効にし、同意画面に gmail.readonly を足す")},
+    "google_oauth_client_secret": {"label": "Google の OAuth クライアント シークレット(Gmail の連携)",
+                                   "providers": ["gmail"], "env": "GOOGLE_OAUTH_CLIENT_SECRET", "free": True,
+                                   "connector": True,
+                                   "note": "任意・無料: クライアント ID と同じ画面のシークレット",
+                                   "hint": "OAuth クライアントのシークレット(GOCSPX-…)"},
     # [Gate Remaining-2] 鉄道の運行情報(FR-030)。公共交通オープンデータセンターの利用登録で届く鍵(無料)
     "odpt_consumer_key": {"label": "公共交通オープンデータセンター(ODPT)のアクセストークン", "providers": ["odpt"],
                           "env": "ODPT_CONSUMER_KEY", "free": True, "connector": True,

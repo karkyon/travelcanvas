@@ -467,6 +467,12 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["authentication"])
 # [Gate Remaining-6] FR-003 パスワードの再設定・メールの確認
 from app.api.v1.account_recovery import router as account_recovery_router  # noqa: E402
 app.include_router(account_recovery_router, prefix="/api/v1/auth")
+from app.api.v1.guest_merge import router as guest_merge_router  # noqa: E402
+app.include_router(guest_merge_router, prefix="/api/v1/auth")
+from app.api.v1.gmail import router as gmail_router  # noqa: E402
+app.include_router(gmail_router, prefix="/api/v1")
+from app.api.v1.passkeys import router as passkeys_router  # noqa: E402
+app.include_router(passkeys_router, prefix="/api/v1/auth")
 # [Gate S11] SEC-06 多要素認証(/api/v1/auth/mfa/*)
 app.include_router(mfa_api.router, prefix="/api/v1/auth")
 logger.info("Auth routes loaded successfully")

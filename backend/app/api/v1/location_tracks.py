@@ -12,6 +12,7 @@
 - [Gate L5] GET/PUT /location-settings     : この旅行の位置の扱い(記録しない/この端末だけ/訪問地域だけ同期/暗号化して同期)
 - [Gate L5] POST /location-tracks/{id}/area-cells : 「訪問地域だけ同期」の軌跡の区画(端末で集計した結果。生の座標は受けない)
 - [Gate L5] PUT  /location-tracks/{id}/sampling   : 端末の記録の観測値(電池・欠測率・取得の間隔。座標を含まない)
+- [Gate Remaining-7] GET /location-tracks/{id}/comparison : 予定の経路と軌跡の比べ(FR-054。本人だけ・保存しない)
 
 旅行の期間を過ぎた軌跡・同意を撤回した利用者の軌跡は止める(読み出し・送信の時点で判定する)。
 監査・エラーには座標を載せない(件数・理由だけ)。
@@ -530,3 +531,45 @@ def put_sampling(plan_id: str, track_id: str, body: SamplingBody, db: Session = 
     db.commit()
     db.refresh(t)
     return _to_dict(t)
+
+
+@router.get("/{plan_id}/location-tracks/{track_id}/comparison")
+def compare_track(plan_id: str, track_id: str, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate Remaining-7] FR-054 予定の経路と GPS の軌跡を比べる(軌跡のある日の予定だけ)。"""
+    from zoneinfo import ZoneInfo
+
+    from app.models.models import TravelEvent
+    from app.services import member_policy, track_compare
+
+    # 予定の場所を使うため、予定の住所・位置を隠された参加者には 403(訪問の地図と同じ)
+    plan, _role = member_policy.guarded("event_address")(db, plan_id, current_user, min_role="viewer")
+    t = _get_own(db, plan, track_id, current_user)
+    if t.mode != "synced":
+        raise _bad("track_not_synced", "この端末だけに残す軌跡はサーバーで比べられません(端末で表示します)", 409)
+    try:
+        points = _load_points(db, t)
+    except EncryptionNotConfigured:
+        raise _bad("encryption_not_configured", "暗号化が設定されていません(サーバー側の設定)", 503)
+    days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan.id).all()}
+    point_dates = set()
+    for p in points:
+        when = track_compare._parse(p["t"])
+        if when is None:
+            continue
+        for d in days.values():
+            try:
+                tz = ZoneInfo(d.timezone_id or "Asia/Tokyo")
+            except Exception:  # noqa: BLE001 - 不明な時間帯は日本時間で数える
+                tz = ZoneInfo("Asia/Tokyo")
+            if when.astimezone(tz).date() == d.local_date:
+                point_dates.add(d.id)
+    events = (db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id, TravelEvent.day_id.in_(point_dates),
+                                           TravelEvent.latitude.isnot(None)).all()) if point_dates else []
+    events.sort(key=lambda e: (days[e.day_id].local_date, e.sort_order or 0))
+    planned = [{"event_id": str(e.id), "title": e.title, "event_type": e.event_type,
+                "date": days[e.day_id].local_date.isoformat(), "planned_time": e.local_start_time,
+                "latitude": float(e.latitude), "longitude": float(e.longitude)}
+               for e in events if e.latitude is not None and e.longitude is not None]
+    result = track_compare.compare(planned, points)
+    return {"track_id": str(t.id), "days": sorted({p["date"] for p in planned}), **result}

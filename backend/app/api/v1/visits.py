@@ -27,7 +27,8 @@ from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
 from app.services import member_policy
 from app.models.models import (
-    EventActual, EventReservation, LocationPointBatch, LocationTrack, Memory, TravelEvent, TravelPlan, User,
+    EventActual, EventReservation, LocationPointBatch, LocationTrack, Memory, PlanCandidate, TravelEvent, TravelPlan,
+    User,
     VisitAssessment,
 )
 from app.services import location_tracks as lt
@@ -168,8 +169,19 @@ def _overview(db: Session, plan: TravelPlan, user: User) -> Dict[str, Any]:
                                                LocationTrack.mode == "synced").count()
     local = db.query(LocationTrack.id).filter(LocationTrack.plan_id == plan.id, LocationTrack.user_id == user.id,
                                               LocationTrack.mode != "synced").count()
+    # [Gate Remaining-7] FR-049 候補の層: 候補箱の(まだ予定に置いていない)場所のある候補。訪問の判定はしない
+    candidates = [
+        {"candidate_id": str(c.id), "title": c.title, "category": c.category, "priority": c.priority,
+         "latitude": c.latitude, "longitude": c.longitude, "layer_state": "CANDIDATE"}
+        for c in db.query(PlanCandidate).filter(PlanCandidate.plan_id == plan.id, PlanCandidate.status == "open",
+                                                PlanCandidate.latitude.isnot(None))
+        .order_by(PlanCandidate.priority, PlanCandidate.created_at).limit(200).all()
+    ]
+    counts = va.counts(items)
+    counts["CANDIDATE"] = len(candidates)
     return {
-        "plan_id": str(plan.id), "title": plan.title, "items": items, "counts": va.counts(items),
+        "plan_id": str(plan.id), "title": plan.title, "items": items, "counts": counts,
+        "candidates": candidates,
         "events_without_location": unlocated,
         "needs_confirmation": sum(1 for i in items if i["assessment"] and i["assessment"]["needs_confirmation"]
                                   and not i["assessment"]["hidden"]),

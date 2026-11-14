@@ -48,7 +48,8 @@ def test_providers_never_return_secret_values(auth_client, db_session, audits, m
     assert r.status_code == 200
     assert "sk-test-not-a-real-key" not in r.text
     rows = {p["name"]: p for p in r.json()["providers"]}
-    assert set(rows) == {"openai", "google_maps_js", "google_places", "google_routes", "fake"}
+    assert set(rows) == {"openai", "google_maps_js", "google_places", "google_routes", "fake",
+                         "openai_web_search", "google_place_details", "google_static_maps"}
     # .env に値があっても取得元ではない → 鍵なし(以前は configured と表示していた)
     assert rows["openai"]["secret"] == "missing" and rows["openai"]["contract"] == "unverified"
     assert rows["openai"]["secret_source"] is None and rows["openai"]["secret_last4"] is None  # .env の末尾は出さない
@@ -202,13 +203,16 @@ def test_secret_without_env_is_missing(auth_client, db_session, audits, monkeypa
                           # [Gate Remaining-4] 決済(テストモード)
                           "stripe_secret_key", "stripe_webhook_secret",
                           # [Gate Remaining-5] 顔の検査(任意)
-                          "google_vision_key"}
+                          "google_vision_key",
+                          # [Gate Remaining-7] Gmail の連携(任意・無料)
+                          "google_oauth_client_id", "google_oauth_client_secret"}
     assert slots["ekispert_api_key"]["required"] is False and slots["ekispert_api_key"]["in_use"] is True
     assert "任意・有料" in slots["ekispert_api_key"]["in_use_note"]
     assert slots["yahoo_client_id"]["free"] is True and slots["yahoo_client_id"]["required"] is False
     assert slots["yahoo_client_id"]["in_use"] is True and "任意・無料" in slots["yahoo_client_id"]["in_use_note"]
     assert slots["google_maps_server_key"]["status"] == "missing"
-    assert slots["google_maps_server_key"]["providers"] == ["google_places", "google_routes"]
+    assert slots["google_maps_server_key"]["providers"] == [
+        "google_places", "google_routes", "google_place_details", "google_static_maps"]
 
 
 def test_key_present_is_not_connected_without_adapter(auth_client, db_session, audits, monkeypatch):

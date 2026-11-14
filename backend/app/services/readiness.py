@@ -9,6 +9,7 @@
 - 期限: 取消期限が72時間以内に迫っている予約、期限切れの準備タスク
 - 未割当: 担当者のいない準備タスク・必須の共有持ち物(担当者がメンバーから外れた場合も含む)
 - 持ち物不足: 必須の持ち物が未準備・要購入
+- [Gate Remaining-7] 予算: 使った額と未払いの予約の額の見込みが、全体・費目の予算を超える(未設定は状況だけ出す)
 
 レディネスの項目は「タスクにする」ことで担当者・期限・完了条件を持たせられる
 (PreparationTask.readiness_key)。そのタスクが完了していれば項目は対応済みとして外す
@@ -59,8 +60,13 @@ CATEGORY_OF = {
     "task_unassigned": "unassigned",
     "packing_unassigned": "unassigned",
     "packing_shortage": "packing",
+    "budget_over": "budget",
+    "budget_projected_over": "budget",
+    "budget_category_over": "budget",
 }
-CATEGORIES = ("unreserved", "unconfirmed", "unpaid", "deadline", "unassigned", "packing")
+CATEGORIES = ("unreserved", "unconfirmed", "unpaid", "deadline", "unassigned", "packing", "budget")
+CATEGORY_LABEL_JA = {"lodging": "宿泊", "transport": "交通", "food": "食事", "activity": "体験", "shopping": "買い物",
+                     "fee": "手数料", "cancellation": "取消料", "other": "その他"}
 
 
 def readiness_key(code: str, entity_type: str, entity_id) -> str:
@@ -235,6 +241,27 @@ def compute(db: Session, plan: TravelPlan, viewer: User, now: Optional[datetime]
             add("packing_unassigned", "low", f"必須の持ち物「{name}」に担当者がいません",
                 "誰が用意するかを決めてください。", "packing_item", p.id, f"{base}/preparation")
 
+    # ---- [Gate Remaining-7] FR-026 予算との連動(使った額 + 未払いの予約の見込み)
+    budget = budget_view(db, plan)
+    if budget is not None:
+        fin = f"{base}/finance"
+        cur = budget["base_currency"]
+        # 予算が未設定の時は項目にしない(準備の完了を妨げない)。予算の状況(budget)に未設定として出す
+        if budget["total"] is None:
+            pass
+        elif budget["over"]:
+            add("budget_over", "high", "使った額が予算を超えています",
+                f"予算 {budget['total']} {cur} に対し、使った額は {budget['spent']} {cur} です。", "plan", plan.id, fin)
+        elif budget["projected_over"]:
+            add("budget_projected_over", "medium", "未払いの予約を足すと予算を超えます",
+                f"使った額 {budget['spent']} {cur} と未払いの予約 {budget['unpaid_reserved']} {cur} で "
+                f"{budget['projected']} {cur} になり、予算 {budget['total']} {cur} を超える見込みです。", "plan", plan.id, fin)
+        for row in budget["categories_over"]:
+            label = CATEGORY_LABEL_JA.get(row["category"], row["category"])
+            add("budget_category_over", "medium", f"{label}の予算を超えています",
+                f"{label}の予算 {row['budget']} {cur} に対し、使った額は {row['actual']} {cur} です。",
+                "budget_category", row["category"], fin)
+
     items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], CATEGORIES.index(i["category"]), i["title"]))
     by_category = {c: 0 for c in CATEGORIES}
     by_severity = {"high": 0, "medium": 0, "low": 0}
@@ -255,4 +282,79 @@ def compute(db: Session, plan: TravelPlan, viewer: User, now: Optional[datetime]
             "required_total": required_total, "required_ready": required_ready,
         },
         "items": items,
+        "budget": None if budget is None else {k: v for k, v in budget.items() if k != "has_costs"},
+    }
+
+
+def budget_view(db: Session, plan: TravelPlan) -> Optional[dict]:
+    """[Gate Remaining-7] FR-026 レディネスで見る予算の状況(基準通貨)。予算も支出も予約の額も無い旅行は None。
+
+    - spent: 取り消していない支出の合計(返金は引く。為替の無い支出は数えない)
+    - unpaid_reserved: 確定した予約のうち支払いが済んでいない額(基準通貨の予約だけ。外貨は数えず件数を返す)
+    - projected = spent + unpaid_reserved。予算(全体)を超えるか・費目ごとに使った額が予算を超えるか"""
+    from decimal import Decimal
+
+    from app.models.models import Budget, Expense, PlanFinanceSettings
+    from app.services import finance
+
+    settings_row = db.query(PlanFinanceSettings).filter(PlanFinanceSettings.plan_id == plan.id).first()
+    cur = settings_row.base_currency if settings_row else "JPY"
+    budgets = db.query(Budget).filter(Budget.plan_id == plan.id, Budget.deleted_at.is_(None)).all()
+    expenses = (db.query(Expense).filter(Expense.plan_id == plan.id, Expense.voided_at.is_(None)).all())
+    reservations = (db.query(Reservation).filter(Reservation.plan_id == plan.id, Reservation.deleted_at.is_(None))
+                    .all())
+    spent = 0
+    by_cat: Dict[str, int] = {}
+    for e in expenses:
+        if getattr(e, "deleted_at", None) is not None or e.base_amount is None:
+            continue
+        try:
+            minor = finance.to_minor(Decimal(str(e.base_amount)), cur)
+        except finance.FinanceError:
+            continue
+        value = -minor if e.kind == "refund" else minor
+        spent += value
+        by_cat[e.category] = by_cat.get(e.category, 0) + value
+    unpaid = foreign = 0
+    for r in reservations:
+        if r.status not in ACTIVE_RESERVATION or r.total_amount is None or r.total_amount <= 0:
+            continue
+        if (r.payment_status or "").strip().lower() in SETTLED_PAYMENT:
+            continue
+        if (r.currency or cur) != cur:
+            foreign += 1
+            continue
+        try:
+            unpaid += finance.to_minor(Decimal(str(r.total_amount)), cur)
+        except finance.FinanceError:
+            continue
+    total_row = next((b for b in budgets if b.kind == "total" and b.amount is not None), None)
+    has_costs = bool(expenses) or any(r.total_amount for r in reservations)
+    if total_row is None and not has_costs and not budgets:
+        return None
+
+    def money(minor: int) -> str:
+        return str(finance.from_minor(minor, cur))
+
+    total = finance.to_minor(Decimal(str(total_row.amount)), cur) if total_row is not None else None
+    projected = spent + unpaid
+    cats = []
+    for b in budgets:
+        if b.kind != "category" or b.amount is None or not b.category:
+            continue
+        bm = finance.to_minor(Decimal(str(b.amount)), cur)
+        if by_cat.get(b.category, 0) > bm:
+            cats.append({"category": b.category, "budget": money(bm), "actual": money(by_cat[b.category])})
+    return {
+        "base_currency": cur,
+        "total": money(total) if total is not None else None,
+        "spent": money(spent),
+        "unpaid_reserved": money(unpaid),
+        "unpaid_reserved_foreign": foreign,
+        "projected": money(projected),
+        "remaining": money(total - projected) if total is not None else None,
+        "over": total is not None and spent > total,
+        "projected_over": total is not None and projected > total,
+        "categories_over": cats,
+        "has_costs": has_costs,
     }

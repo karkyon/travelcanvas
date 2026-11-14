@@ -35,7 +35,8 @@
   "captured_at_head_c3": "Gate C2 (+Gate C3 情報内検索。ID・日付は固定値へ置換)",
   "captured_at_head_f45": "Gate C3 (+Gate F45 共有リンクの項目単位の規則: share_*・public_share*・share_preview*。ID・日時は固定値へ置換)",
   "captured_at_head_b1": "Gate F45 (+Gate B1 組織・配布・閲覧確認・外部連携の管理。ID・日時・メールアドレス・秘密は固定値へ置換)",
-  "captured_at_head_g2": "sandbox G2: 外部連携の秘密・鍵の切り替え・dead の送信、サポート閲覧・運用の要約、同行者向けの項目の規則"
+  "captured_at_head_g2": "sandbox G2: 外部連携の秘密・鍵の切り替え・dead の送信、サポート閲覧・運用の要約、同行者向けの項目の規則",
+  "captured_at_head_remaining7": "dev/remaining-7 (+Gate Remaining-7 readiness.counts.by_category.budget・readiness.budget)"
  },
  "auth_me": {
   "created_at": "2026-09-25T22:47:05.446003Z",
@@ -3183,7 +3184,8 @@
     "unpaid": 1,
     "deadline": 1,
     "unassigned": 1,
-    "packing": 1
+    "packing": 1,
+    "budget": 0
    }
   },
   "resolved_by_tasks": 0,
@@ -3379,7 +3381,8 @@
     "unpaid": 0,
     "deadline": 0,
     "unassigned": 0,
-    "packing": 0
+    "packing": 0,
+    "budget": 0
    }
   },
   "resolved_by_tasks": 0,
@@ -3393,7 +3396,19 @@
    "required_total": 0,
    "required_ready": 0
   },
-  "items": []
+  "items": [],
+  "budget": {
+   "base_currency": "JPY",
+   "total": null,
+   "spent": "0",
+   "unpaid_reserved": "0",
+   "unpaid_reserved_foreign": 0,
+   "projected": "0",
+   "remaining": null,
+   "over": false,
+   "projected_over": false,
+   "categories_over": []
+  }
  },
  "preparation_task_list_assignee": [
   {

@@ -464,7 +464,7 @@ def test_readiness_detects_each_category(auth_client, db_session):
     assert by_code["cancellation_deadline_soon"][0]["due_at"] is not None
     assert "要購入" in by_code["packing_shortage"][0]["title"]
     assert r["counts"]["by_category"] == {"unreserved": 1, "unconfirmed": 1, "unpaid": 2, "deadline": 2,
-                                          "unassigned": 2, "packing": 1}
+                                          "unassigned": 2, "packing": 1, "budget": 0}
     assert r["counts"]["total"] == 9 and r["counts"]["by_severity"]["high"] == 3
     assert [i["severity"] for i in r["items"]][:3] == ["high", "high", "high"]
     assert r["tasks"] == {"open": 1, "done": 0}
@@ -550,3 +550,43 @@ def test_plan_purge_removes_packing_and_tasks(auth_client, db_session):
     db_session.flush()
     assert db_session.query(PackingItem).filter(PackingItem.plan_id == uuid.UUID(p)).count() == 0
     assert db_session.query(PreparationTask).filter(PreparationTask.plan_id == uuid.UUID(p)).count() == 0
+
+
+def test_readiness_links_budget_spent_and_unpaid_reservations(auth_client, make_user, db_session):
+    """[Gate Remaining-7] FR-026 予算との連動: 使った額・未払いの予約の見込み・費目の予算を準備状況に出す"""
+    client, owner = auth_client
+    p = _plan(client)
+    d = _day(client, p)
+    hotel = _event(client, p, d["id"], "宿", "accommodation")
+    r0 = _readiness(client, p)
+    assert r0["budget"] is None
+    _reservation(client, p, event_id=hotel["id"], total_amount=30000, payment_status="unpaid", status="confirmed")
+    r1 = _readiness(client, p)
+    assert r1["budget"]["total"] is None and r1["budget"]["unpaid_reserved"] == "30000"
+    assert not any(i["category"] == "budget" for i in r1["items"])  # 予算が未設定なら項目にしない
+    assert client.post(f"/api/v1/plans/{p}/budgets", json={"kind": "total", "amount": "40000"}).status_code == 201
+    assert client.post(f"/api/v1/plans/{p}/budgets",
+                       json={"kind": "category", "category": "food", "amount": "2000"}).status_code == 201
+    assert client.post(f"/api/v1/plans/{p}/expenses", json={"title": "夕食", "amount": "15000", "currency": "JPY",
+                                                            "category": "food"}).status_code == 201
+    r2 = _readiness(client, p)
+    b = r2["budget"]
+    assert b["spent"] == "15000" and b["projected"] == "45000" and b["remaining"] == "-5000"
+    assert b["over"] is False and b["projected_over"] is True
+    codes = {i["code"] for i in r2["items"]}
+    assert {"budget_projected_over", "budget_category_over"} <= codes and "budget_over" not in codes
+    assert r2["counts"]["by_category"]["budget"] == 2
+    assert client.post(f"/api/v1/plans/{p}/expenses", json={"title": "体験", "amount": "30000", "currency": "JPY",
+                                                            "category": "activity"}).status_code == 201
+    assert "budget_over" in {i["code"] for i in _readiness(client, p)["items"]}
+
+    # 費用を隠した閲覧者には予算の項目も状況も出さない
+    viewer, _ = make_user()
+    _add_member(db_session, p, viewer, "viewer")
+    assert client.put(f"/api/v1/plans/{p}/member-policy", json={"roles": {"viewer": ["costs"]}}).status_code == 200
+    _act_as(viewer)
+    try:
+        rv = _readiness(client, p)
+    finally:
+        _act_as(owner)
+    assert rv["budget"] is None and not any(i["category"] == "budget" for i in rv["items"])

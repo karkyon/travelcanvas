@@ -20,6 +20,7 @@
 
 | code | HTTP | 再試行 | 利用者向けの文(例) | 場所 |
 |---|---|---|---|---|
+| `account_inactive` | 401 | no | このアカウントにはまとめられません | api/v1/guest_merge.py |
 | `acknowledgement_required` | 422 | no | 公開の前に確認の項目を全て確かめてください | api/v1/memory_publish.py |
 | `active_variant` | 409 | no | 今の案はしまえません。先に別の案に切り替えてください | api/v1/day_variants.py |
 | `admin_account` | 403 | no | 管理者のアカウントはこの画面から削除できません。管理者の権限を外してから削除してください | api/v1/privacy.py |
@@ -34,7 +35,7 @@
 | `already_restored` | 409 | no | この記録はすでに戻っています | api/v1/memory_publish.py |
 | `already_reverted` | 409 | no | 既に取り消しています | api/v1/corrections.py |
 | `already_scheduled` | 409 | no | この候補はもう予定に配置しています | api/v1/candidates.py, api/v1/decisions.py |
-| `already_undone` | 409 | no | もう元に戻しています | api/v1/commands.py |
+| `already_undone` | 409 | no | もう元に戻しています | api/v1/commands.py, api/v1/constraints.py |
 | `already_visited` | 409 | no | 行った予定は次の旅行へ戻せません(行かなかった・未記録の予定だけ) | api/v1/journey.py |
 | `api_client_not_found` | 404 | no | 連携が見つかりません | api/v1/organizations.py |
 | `api_client_revoked` | 409 | no | 止めた連携の秘密は作り直せません | api/v1/organizations.py |
@@ -99,6 +100,7 @@
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `fx_unavailable` | 503 | later | 為替を自動で取れませんでした。出典を書いて手で入れてください | api/v1/finance_ledger.py |
 | `fx_unsupported` | 422 | no | この通貨は自動で取れません。出典を書いて手で入れてください | api/v1/finance_ledger.py |
+| `gmail_not_connected` | 409 | no | Gmail とつないでいません | api/v1/gmail.py |
 | `grant_inactive` | 404 | no | 許可が見つかりません | api/v1/admin_support.py |
 | `guest_not_allowed` | 403 | no | ゲストでは AI の確かめは使えません。会員登録の後に使えます | api/v1/day_variants.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
@@ -110,6 +112,7 @@
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
 | `invalid_color` | — | — | ブランドの色は #RRGGBB の形で指定してください | services/organizations.py |
+| `invalid_credentials` | 401 | no | メールアドレスまたはパスワードが正しくありません | api/v1/guest_merge.py |
 | `invalid_dates` | 422 | no | 最終日は出発日より後にしてください | api/v1/plans.py |
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
@@ -163,6 +166,7 @@
 | `mention_target_hidden` | 422 | no | その人はこの対象を見られないため、メンションできません | api/v1/discussion.py |
 | `metadata_unremovable` | 422 | no | 写真の撮影情報(撮影位置など)を取り除けないため、受け付けられません | api/v1/memories.py |
 | `mfa_enrollment_required` | — | — | 管理者の画面を使うには、設定 → セキュリティで多要素認証(認証アプリ)を有効にしてください | api/v1/admin.py |
+| `mfa_required` | 401 | no | このアカウントは確認コード(認証アプリ)が要ります | api/v1/guest_merge.py |
 | `mfa_step_up_required` | — | — | 管理者の画面を使うには、認証アプリの確認コードを入力してください | api/v1/admin.py |
 | `mode_mismatch` | 409 | after_reload | この旅行の位置の設定と違う保存先です。先に設定を変えてください | api/v1/location_tracks.py |
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
@@ -178,6 +182,7 @@
 | `not_areas_only` | 409 | no | 訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです | api/v1/location_tracks.py |
 | `not_conflicted` | 409 | no | この操作は競合していません | api/v1/sync.py |
 | `not_eligible` | 422 | no | 移譲できるのは、参加済みの会員の共同編集者だけです(招待中・ゲスト・削除の申し込み中の人は選べません) | api/v1/ownership.py |
+| `not_guest` | — | — | この操作はゲストのままの時だけ使えます | api/v1/guest_merge.py |
 | `not_intent_draft` | 404 | no | この旅行は旅行相談から作った下書きではありません | api/v1/trip_intents.py |
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
@@ -192,6 +197,13 @@
 | `owner_can_edit` | 422 | no | 所有者は旅行の画面で直接直せます | api/v1/corrections.py |
 | `owner_only` | 403 | no | 旅行全体のエクスポートは所有者だけが行えます。自分のデータはアカウントのエクスポートで取得できます。 | api/v1/data_export.py |
 | `ownership_transfer_pending` | 409 | no | 所有者の移譲の手続き中です。移譲を取り下げるか、相手が受け入れる・断るまでお待ちください | api/v1/ownership.py |
+| `passkey_exists` | 409 | no | この passkey は登録済みです | api/v1/passkeys.py |
+| `passkey_guest` | 403 | no | ゲストのままでは passkey を作れません(アカウントを作ってください) | api/v1/passkeys.py |
+| `passkey_invalid` | 401 | no | passkey を確かめられませんでした。もう一度試してください | api/v1/passkeys.py |
+| `passkey_limit` | 409 | no | passkey は … 個までです(使わない物を消してください) | api/v1/passkeys.py |
+| `passkey_not_found` | 404 | no | passkey が見つかりません | api/v1/passkeys.py |
+| `passkey_state_invalid` | — | — | 手続きの期限が切れたか、正しくありません。もう一度試してください | api/v1/passkeys.py |
+| `passkey_unknown` | 401 | no | この passkey は登録されていません | api/v1/passkeys.py |
 | `poll_adopted` | 409 | no | 予定に採用した投票は変えられません(先に採用を元に戻してください) | api/v1/discussion.py |
 | `poll_not_decided` | — | — | まだ決定していません(先に選択肢を決定してください) | api/v1/decisions.py |
 | `privacy_zone_not_found` | 404 | no | 守る範囲が見つかりません | api/v1/privacy_zones.py |
@@ -256,13 +268,14 @@
 | `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/server_exports.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
-| `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/media_providers.py, api/v1/push.py, api/v1/receipts.py, api/v1/spot_intake.py, api/v1/spot_media.py |
+| `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/gmail.py, api/v1/guest_merge.py, api/v1/media_providers.py, api/v1/passkeys.py, api/v1/push.py, api/v1/receipts.p |
 | `too_many_streams` | 429 | later | 同時に開いている画面が多すぎます。使っていない画面を閉じてください | api/v1/presence.py |
 | `too_many_uploads` | 429 | later | この QR で投稿できる枚数の上限です。新しい QR を発行してください | api/v1/photo_upload.py |
 | `too_many_variants` | 409 | no | … の案は … つまでです | api/v1/day_variants.py |
 | `too_many_webhooks` | 409 | no | Webhook は…件までです | api/v1/organizations.py |
 | `track_active` | 409 | no | この旅行では記録中(または一時停止中)の軌跡があります。止めてから始めてください | api/v1/location_tracks.py |
 | `track_full` | 409 | no | 1つの軌跡の点は…件までです。新しく記録を始めてください | api/v1/location_tracks.py |
+| `track_not_synced` | 409 | no | この端末だけに残す軌跡はサーバーで比べられません(端末で表示します) | api/v1/location_tracks.py |
 | `transfer_closed` | 409 | no | この申し出は既に閉じています | api/v1/ownership.py |
 | `transfer_expired` | 410 | no | 申し出の期限が過ぎています。所有者にもう一度申し出てもらってください | api/v1/ownership.py |
 | `transfer_invalidated` | 409 | no | 旅行の所有者・参加の状態が変わったため、この申し出は無効になりました | api/v1/ownership.py |
@@ -272,7 +285,8 @@
 | `trip_pass_already_assigned` | 409 | no | この旅行には既に Trip Pass が割り当てられています | api/v1/planning_usage.py |
 | `two_person_required` | 409 | no | 申請した管理者とは別の管理者が承認してください | api/v1/planning_usage.py |
 | `undo_conflict` | 409 | after_reload | この候補は後で使われた(予定に置いた・まとめた)ため、元に戻せません | api/v1/commands.py, services/plan_item_deletion.py |
-| `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py |
+| `undo_not_found` | 404 | no | 取り消せる操作が見つかりません | api/v1/constraints.py |
+| `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py, api/v1/constraints.py |
 | `unknown_entity` | 409 | no | — | api/v1/sync.py |
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |

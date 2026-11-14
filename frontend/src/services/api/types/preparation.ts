@@ -157,11 +157,12 @@ export interface PreparationTaskUpdateData {
   status?: TaskStatus;
 }
 
-export type ReadinessCategory = 'unreserved' | 'unconfirmed' | 'unpaid' | 'deadline' | 'unassigned' | 'packing';
+export type ReadinessCategory = 'unreserved' | 'unconfirmed' | 'unpaid' | 'deadline' | 'unassigned' | 'packing' | 'budget';
 export type ReadinessSeverity = 'high' | 'medium' | 'low';
 export type ReadinessCode =
   | 'unreserved' | 'reservation_unconfirmed' | 'reservation_unpaid' | 'payment_unknown'
-  | 'cancellation_deadline_soon' | 'task_overdue' | 'task_unassigned' | 'packing_unassigned' | 'packing_shortage';
+  | 'cancellation_deadline_soon' | 'task_overdue' | 'task_unassigned' | 'packing_unassigned' | 'packing_shortage'
+  | 'budget_over' | 'budget_projected_over' | 'budget_category_over';
 
 export interface ReadinessTaskRef {
   id: string;
@@ -202,4 +203,19 @@ export interface Readiness {
   tasks: { open: number; done: number };
   packing: { total: number; packed: number; required_total: number; required_ready: number };
   items: ReadinessItem[];
+  /** [Gate Remaining-7] FR-026 予算との連動(予算・使った額・未払いの予約の見込み)。費用を隠された人には null */
+  budget?: ReadinessBudget | null;
+}
+
+export interface ReadinessBudget {
+  base_currency: string;
+  total: string | null;
+  spent: string;
+  unpaid_reserved: string | null;
+  unpaid_reserved_foreign: number | null;
+  projected: string | null;
+  remaining: string | null;
+  over: boolean;
+  projected_over: boolean | null;
+  categories_over: Array<{ category: string; budget: string; actual: string }>;
 }

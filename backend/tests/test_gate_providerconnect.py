@@ -51,6 +51,7 @@ def net(monkeypatch):
                                                             "latitude": 35.62, "longitude": 134.81},
                                                         "googleMapsUri": "https://maps.google.com/?cid=1"}]})
     fake.set("routes.googleapis.com", 200, {"routes": [{"duration": "5400s", "distanceMeters": 152300}]})
+    fake.set("maps.googleapis.com", 200, {})  # [Gate Remaining-7] 静的な地図(確認は 200 で通る)
     ph.set_transport(httpx.MockTransport(fake.handler))
     monkeypatch.setattr(pv, "MIN_INTERVAL_SECONDS", 0)
     yield fake
@@ -173,9 +174,15 @@ def test_google_server_key_checks_places_and_routes_separately(admin, db_session
     body = _verify(client, "google_maps_server_key", 1).json()
     assert body["provider_auth"] == "rejected" and body["code"] == "api_not_enabled"
     caps = {r["check"]: r["code"] for r in body["results"]}
-    assert caps == {"google_places:places.search": "accepted", "google_routes:routes.element": "api_not_enabled"}
+    # [Gate Remaining-7] 場所の詳細・写真・静的な地図も操作ごとに確かめる
+    assert caps == {"google_places:places.search": "accepted", "google_routes:routes.element": "api_not_enabled",
+                    "google_place_details:places.details": "accepted", "google_place_details:places.photo": "accepted",
+                    "google_static_maps:map.load": "accepted"}
     hosts = [rq.url.host for rq in net.requests]
-    assert hosts == ["places.googleapis.com", "routes.googleapis.com"]
+    assert hosts == ["places.googleapis.com", "routes.googleapis.com", "places.googleapis.com",
+                     "places.googleapis.com", "maps.googleapis.com"]
+    assert net.requests[2].method == "GET" and net.requests[2].headers["x-goog-fieldmask"] == "id"
+    assert "key=" in str(net.requests[4].url) and "key" not in net.requests[4].headers
     assert net.requests[0].headers["x-goog-fieldmask"] == pc.PLACES_VERIFY_FIELD_MASK
     assert net.requests[1].headers["x-goog-fieldmask"] == pc.ROUTES_FIELD_MASK
     with pytest.raises(ps.SecretUnavailable):
@@ -188,8 +195,9 @@ def test_timeout_is_inconclusive_and_still_counted(admin, db_session, net):
     net.set("api.openai.com", exc=httpx.ReadTimeout("slow"))
     body = _verify(client, "openai_api_key", 1).json()
     assert body["provider_auth"] == "inconclusive" and body["code"] == "provider_timeout"
-    rec = db_session.query(ProviderSecretVerification).one()
-    assert rec.status == "finished" and rec.estimated_cost_jpy > 0  # 届いたか分からない確認も数える
+    recs = db_session.query(ProviderSecretVerification).all()  # [Remaining-7] AI の案と Web 検索の 2 つ
+    assert len(recs) == 2
+    assert all(rec.status == "finished" and rec.estimated_cost_jpy > 0 for rec in recs)  # 届いたか分からない確認も数える
 
 
 def test_daily_ops_budget_and_rate_limit_stop_before_sending(admin, db_session, net, monkeypatch):
@@ -204,7 +212,7 @@ def test_daily_ops_budget_and_rate_limit_stop_before_sending(admin, db_session, 
     assert _verify(client, "openai_api_key", 1).status_code == 200
     r = _verify(client, "openai_api_key", 1)
     assert r.status_code == 429 and r.json()["detail"]["code"] == "verify_too_frequent"
-    assert len(net.requests) == 1
+    assert len(net.requests) == 2  # [Remaining-7] AI の案と Web 検索の確認
 
 
 def test_browser_key_and_unknown_versions_are_not_verified(admin, db_session, net):
@@ -395,3 +403,74 @@ def test_viewer_and_missing_key_are_refused(admin, db_session, net, make_user):
     mine, *_ = _plan(db_session, user, "journey")
     r = client.post(f"/api/v1/plans/{mine.id}/paid/ai-suggest", json={"prompt": "案"})
     assert r.status_code == 422 and r.json()["detail"]["code"] == "idempotency_key_required"
+
+
+# ===================================================================== [Gate Remaining-7] FR-059 詳細・写真・地図・Web 検索
+
+def test_place_details_photo_static_map_and_web_search(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    plan, a, b, c = _plan(db_session, user, tier="explorer")
+    db_session.commit()
+    net.set("places.googleapis.com", 200, {
+        "id": "ChIJabcdefghijk", "displayName": {"text": "城崎温泉"}, "formattedAddress": "兵庫県豊岡市",
+        "location": {"latitude": 35.62, "longitude": 134.81}, "businessStatus": "CLOSED_TEMPORARILY",
+        "regularOpeningHours": {"weekdayDescriptions": ["月曜日: 7時00分～23時00分"]},
+        "photos": [{"name": "places/ChIJabcdefghijk/photos/AbCdEfGhIjKlMn",
+                    "authorAttributions": [{"displayName": "投稿者"}]}],
+        "photoUri": "https://lh3.googleusercontent.com/p/abc"})
+    net.set("lh3.googleusercontent.com", 200, {})
+    base = f"/api/v1/plans/{plan.id}/paid"
+    r = _post(client, f"{base}/place-details", {"place_id": "ChIJabcdefghijk"})
+    assert r.status_code == 200, r.text
+    d = r.json()["result"]
+    assert d["business_status"] == "CLOSED_TEMPORARILY" and d["opening_hours"] == ["月曜日: 7時00分～23時00分"]
+    assert d["photos"][0]["attributions"] == ["投稿者"]
+    assert net.requests[-1].method == "GET" and net.requests[-1].headers["x-goog-fieldmask"] == pc.DETAILS_FIELD_MASK
+
+    # 写真: 名前の形が違えば送らない。正しければ URL を得て画像を取る(鍵は画像の取得へ送らない)
+    n = len(net.requests)
+    bad = _post(client, f"{base}/place-photo", {"photo_name": "../../etc/passwd"})
+    assert bad.status_code == 422 and len(net.requests) == n
+    p = _post(client, f"{base}/place-photo", {"photo_name": "places/ChIJabcdefghijk/photos/AbCdEfGhIjKlMn"})
+    assert p.status_code == 200, p.text
+    assert net.requests[-1].url.host == "lh3.googleusercontent.com" and "x-goog-api-key" not in net.requests[-1].headers
+    assert "skipHttpRedirect=true" in str(net.requests[-2].url)
+
+    # 静的な地図: 場所のある予定だけ。鍵は URL の key で送る
+    m = _post(client, f"{base}/static-map", {"event_ids": [str(a.id), str(b.id), str(c.id)]})
+    assert m.status_code == 200, m.text
+    assert net.requests[-1].url.host == "maps.googleapis.com" and "path=" in str(net.requests[-1].url)
+    none = _post(client, f"{base}/static-map", {"event_ids": [str(c.id)]})
+    assert none.status_code == 422 and none.json()["detail"]["code"] == "event_without_location"
+
+    # AI の Web 検索: tools に web_search を付け、出典(url_citation)を返す
+    net.set("api.openai.com", 200, {"output": [{"type": "message", "content": [
+        {"type": "output_text", "text": "城崎温泉は兵庫県にあります",
+         "annotations": [{"type": "url_citation", "url": "https://example.jp/kinosaki", "title": "城崎"},
+                         {"type": "url_citation", "url": "http://insecure.example/", "title": "x"}]}]}],
+        "usage": {"input_tokens": 3000, "output_tokens": 100}})
+    w = _post(client, f"{base}/ai-web-search", {"prompt": "城崎温泉の場所"})
+    assert w.status_code == 200, w.text
+    assert w.json()["result"]["sources"] == [{"url": "https://example.jp/kinosaki", "title": "城崎"}]
+    sent = json.loads(net.requests[-1].content)
+    assert sent["tools"][0]["type"] == "web_search" and sent["store"] is False
+
+
+def test_web_search_is_explorer_only_and_details_need_valid_id(admin, db_session, net):
+    client, user = admin
+    _ready(client, db_session, user, net)
+    plan, a, b, c = _plan(db_session, user, tier="journey")
+    db_session.commit()
+    base = f"/api/v1/plans/{plan.id}/paid"
+    r = _post(client, f"{base}/ai-web-search", {"prompt": "調べて"})
+    assert r.status_code == 403 and net.requests == []
+    assert _post(client, f"{base}/place-details", {"place_id": "a/b"}).status_code == 422
+    assert net.requests == []
+
+
+def test_photo_fetch_only_from_google_photo_host():
+    with pytest.raises(ValueError):
+        ph.fetch_photo("https://evil.example.com/x.jpg")
+    with pytest.raises(ValueError):
+        ph.fetch_photo("http://lh3.googleusercontent.com/x")

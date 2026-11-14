@@ -3,6 +3,11 @@
 - POST /plans/{plan_id}/paid/ai-suggest     : AI の案(OpenAI Responses)。旅行には保存しない(未確認の案として返す)
 - POST /plans/{plan_id}/paid/places-search  : 場所の検索(Places API (New) Text Search)。旅行には保存しない
 - POST /plans/{plan_id}/paid/route          : 2つの予定の間の経路(Routes API)。旅行には保存しない
+- [Gate Remaining-7] FR-059
+  POST /plans/{plan_id}/paid/place-details  : 場所の詳細(Place Details。営業の状態・営業時間・電話・サイト・写真の名前)
+  POST /plans/{plan_id}/paid/place-photo    : 場所の写真 1 枚(Place Photos。画像は data URL で返し、保存しない)
+  POST /plans/{plan_id}/paid/static-map     : 日の予定の静的な地図(Maps Static API。画像は保存しない)
+  POST /plans/{plan_id}/paid/ai-web-search  : AI の Web 検索(出典つき。Explorer だけ)
 共通: 旅行の編集者以上・Idempotency-Key 必須・会員のクラスと 1旅行 50円(cost_guard)を送る前に確認・
 鍵は確認済みの有効な版だけ。管理者でもクラス・上限を迂回しない。失敗しても手で続けられる。
 """
@@ -20,6 +25,7 @@ from app.models.models import TravelEvent, User
 from app.services import consents
 from app.services import cost_guard as cg
 from app.services import provider_calls as pc
+from app.services import provider_http as ph
 from app.services import provider_secrets as ps
 
 router = APIRouter(prefix="/plans", tags=["paid-actions"])
@@ -139,3 +145,76 @@ def _uuid(value: Any):
         return uuid.UUID(str(value))
     except (ValueError, TypeError):
         raise _bad("event_not_found", "この旅行の予定を2つ選んでください", 404)
+
+
+@router.post("/{plan_id}/paid/place-details")
+def place_details(plan_id: str, payload: Dict[str, Any] = Body(...),
+                  idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                  current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    place_id = _text(payload, "place_id", 300)
+    try:
+        ph.get_url("google.places.details", place_id=place_id)
+    except ValueError:
+        raise _bad("invalid_input", "場所の ID の形が正しくありません(送っていません)")
+    key = _key(idempotency_key)
+    result, usage = _run(lambda: pc.place_details(db, plan, current_user, place_id, key))
+    return {"result": result, "usage": usage, "saved": False, "attribution": "Google",
+            "notice": "Google の場所の詳細です。営業時間は変わることがあります。旅行には保存していません"}
+
+
+@router.post("/{plan_id}/paid/place-photo")
+def place_photo(plan_id: str, payload: Dict[str, Any] = Body(...),
+                idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    name = _text(payload, "photo_name", 1000)
+    try:
+        ph.get_url("google.places.photo", photo_name=name)
+    except ValueError:
+        raise _bad("invalid_input", "写真の名前の形が正しくありません(送っていません)")
+    key = _key(idempotency_key)
+    result, usage = _run(lambda: pc.place_photo(db, plan, current_user, name, key))
+    return {"result": result, "usage": usage, "saved": False, "attribution": "Google",
+            "notice": "Google の写真です。投稿者の表示を消さずに使ってください。旅行には保存していません"}
+
+
+@router.post("/{plan_id}/paid/static-map")
+def static_map(plan_id: str, payload: Dict[str, Any] = Body(...),
+               idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+               current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    body = payload if isinstance(payload, dict) else {}
+    ids = body.get("event_ids")
+    if not isinstance(ids, list) or not ids or len(ids) > pc.STATIC_MAX_MARKERS:
+        raise _bad("invalid_input", f"地図に出す予定を 1〜{pc.STATIC_MAX_MARKERS} 件選んでください")
+    wanted = [_uuid(x) for x in ids]
+    rows = {e.id: e for e in db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id,
+                                                          TravelEvent.id.in_([w for w in wanted if w])).all()}
+    points = []
+    for w in wanted:
+        ev = rows.get(w) if w else None
+        if ev is None:
+            raise _bad("event_not_found", "この旅行の予定を選んでください", 404)
+        if ev.latitude is not None and ev.longitude is not None:
+            points.append((float(ev.latitude), float(ev.longitude)))
+    if not points:
+        raise _bad("event_without_location", "場所(座標)のある予定がありません(送っていません)")
+    key = _key(idempotency_key)
+    result, usage = _run(lambda: pc.static_map(db, plan, current_user, points, key))
+    return {"result": result, "usage": usage, "saved": False, "attribution": "Google",
+            "notice": "Google の地図の画像です。旅行には保存していません"}
+
+
+@router.post("/{plan_id}/paid/ai-web-search")
+def ai_web_search(plan_id: str, payload: Dict[str, Any] = Body(...),
+                  idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+                  current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    prompt = _text(payload, "prompt", pc.AI_MAX_PROMPT_CHARS)
+    key = _key(idempotency_key)
+    if not consents.has_consent(current_user, "ai_processing"):
+        raise _bad("consent_required", "AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます", 403)
+    result, usage = _run(lambda: pc.ai_web_search(db, plan, current_user, prompt, key))
+    return {"result": result, "usage": usage, "saved": False,
+            "notice": "AI が Web で調べた結果です。出典を開いて確かめてください。旅行には保存していません"}

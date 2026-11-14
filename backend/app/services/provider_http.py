@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -21,6 +22,18 @@ ALLOWED: Dict[str, str] = {
     "google.places.search_text": "https://places.googleapis.com/v1/places:searchText",
     "google.routes.compute": "https://routes.googleapis.com/directions/v2:computeRoutes",
 }
+
+# [Gate Remaining-7] FR-059 GET の送り先(場所の詳細・写真・静的な地図)。{…} の部分は形を確かめた値だけを入れる
+ALLOWED_GET: Dict[str, str] = {
+    "google.places.details": "https://places.googleapis.com/v1/places/{id}",
+    "google.places.photo": "https://places.googleapis.com/v1/{name}/media",
+    "google.maps.static": "https://maps.googleapis.com/maps/api/staticmap",
+}
+_PLACE_ID = re.compile(r"^[A-Za-z0-9_\-]{10,300}$")
+_PHOTO_NAME = re.compile(r"^places/[A-Za-z0-9_\-]{10,300}/photos/[A-Za-z0-9_\-]{10,600}$")
+# 写真の本体の置き場所(写真の名前から得た URL だけ。鍵は付けない)
+PHOTO_HOST_SUFFIX = ".googleusercontent.com"
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 _transport: Optional[httpx.BaseTransport] = None
 
@@ -62,6 +75,91 @@ def post_json(endpoint: str, headers: Dict[str, str], payload: Dict[str, Any]) -
     except ValueError:
         body = None
     return ProviderResponse(status=resp.status_code, body=body)
+
+
+def get_url(endpoint: str, *, place_id: Optional[str] = None, photo_name: Optional[str] = None) -> str:
+    template = ALLOWED_GET.get(endpoint)
+    if template is None:
+        raise ValueError("endpoint_not_allowed")
+    if "{id}" in template:
+        if not place_id or not _PLACE_ID.match(place_id):
+            raise ValueError("invalid_place_id")
+        return template.replace("{id}", place_id)
+    if "{name}" in template:
+        if not photo_name or not _PHOTO_NAME.match(photo_name):
+            raise ValueError("invalid_photo_name")
+        return template.replace("{name}", photo_name)
+    return template
+
+
+def _client() -> httpx.Client:
+    return httpx.Client(timeout=TIMEOUT, follow_redirects=False, trust_env=False, verify=True, transport=_transport)
+
+
+def get_json(endpoint: str, headers: Dict[str, str], params: Dict[str, Any], *, place_id: Optional[str] = None,
+             photo_name: Optional[str] = None) -> ProviderResponse:
+    """[Gate Remaining-7] GET で JSON を受け取る(場所の詳細・写真の URL)。"""
+    url = get_url(endpoint, place_id=place_id, photo_name=photo_name)
+    try:
+        with _client() as client:
+            resp = client.get(url, headers=headers, params=params)
+    except httpx.TimeoutException:
+        raise ProviderNetworkError("provider_timeout")
+    except httpx.HTTPError:
+        raise ProviderNetworkError("provider_unreachable")
+    try:
+        body = resp.json()
+    except ValueError:
+        body = None
+    return ProviderResponse(status=resp.status_code, body=body)
+
+
+@dataclass
+class ImageResponse:
+    status: int
+    content_type: Optional[str]
+    content: bytes
+    body: Any = None  # 失敗の時の JSON(分類に使う)
+
+
+def get_image(endpoint: str, headers: Dict[str, str], params: Dict[str, Any]) -> ImageResponse:
+    """[Gate Remaining-7] 静的な地図の画像(PNG)。鍵は params で送る(Static Maps の仕様)。"""
+    url = get_url(endpoint)
+    return _read_image(url, headers, params)
+
+
+def fetch_photo(uri: str) -> ImageResponse:
+    """写真の URL(Places が返した googleusercontent の https)から画像を取る。他の host は取らない。鍵は送らない。"""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(uri or "")
+    host_ok = (parts.hostname or "").endswith(PHOTO_HOST_SUFFIX)
+    if parts.scheme != "https" or not host_ok or parts.port not in (None, 443):
+        raise ValueError("photo_host_not_allowed")
+    return _read_image(uri, {}, {})
+
+
+def _read_image(url: str, headers: Dict[str, str], params: Dict[str, Any]) -> ImageResponse:
+    try:
+        with _client() as client:
+            with client.stream("GET", url, headers=headers, params=params) as resp:
+                kind = (resp.headers.get("content-type") or "").split(";")[0].strip().lower() or None
+                data = bytearray()
+                for chunk in resp.iter_bytes():
+                    data.extend(chunk)
+                    if len(data) > MAX_IMAGE_BYTES:
+                        raise ProviderNetworkError("image_too_large")
+    except httpx.TimeoutException:
+        raise ProviderNetworkError("provider_timeout")
+    except httpx.HTTPError:
+        raise ProviderNetworkError("provider_unreachable")
+    body = None
+    if not (kind or "").startswith("image/"):
+        try:
+            body = json.loads(bytes(data).decode("utf-8"))
+        except ValueError:
+            body = None
+    return ImageResponse(status=resp.status_code, content_type=kind, content=bytes(data), body=body)
 
 
 # ===================================================================== 応答の分類(固定のコード)

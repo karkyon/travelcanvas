@@ -41,6 +41,10 @@ PUBLIC_ROUTES = {
     ("POST", "/api/v1/auth/password/forgot"): "パスワードの再設定のメール(回数制限あり・登録の有無は答えない)",
     ("POST", "/api/v1/auth/password/reset"): "パスワードの再設定(署名つきの使い捨ての札・回数制限あり)",
     ("POST", "/api/v1/auth/email/verify"): "メールの確認(署名つきの札。メールのリンクから開く)",
+    # [Gate Remaining-7] FR-003 passkey のログイン(問題は署名つき・1 回だけ・回数制限)/ FR-011 Google から戻る先(署名つきの state)
+    ("POST", "/api/v1/auth/passkeys/login/options"): "passkey のログインの問題(回数制限あり)",
+    ("POST", "/api/v1/auth/passkeys/login"): "passkey のログイン(署名を確かめる・回数制限あり)",
+    ("GET", "/api/v1/integrations/gmail/callback"): "Google の許可の画面から戻る先(署名つきの state で利用者を確かめる)",
     ("POST", "/api/v1/auth/refresh"): "cookie の更新鍵で認証する",
     ("GET", "/api/v1/plans/documents/download"): "署名付きの期限付き URL(発行時と受け取り時に権限を確かめる)",
     ("POST", "/api/v1/public/share/{token}/resolve"): "公開共有(公開してよい項目だけを返す)",

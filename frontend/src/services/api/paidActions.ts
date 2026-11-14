@@ -57,6 +57,55 @@ export async function paidRoute(planId: string, fromEventId: string, toEventId: 
   }), 'POST /plans/{id}/paid/route');
 }
 
+// ---- [Gate Remaining-7] FR-059 場所の詳細・写真・静的な地図・AI の Web 検索
+export interface PaidPlaceDetails {
+  provider: string; place_id: string; name: string; address: string | null; latitude: number | null; longitude: number | null;
+  maps_uri: string | null; phone: string | null; website: string | null; rating: number | null; rating_count: number | null;
+  business_status: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | null; opening_hours: string[];
+  photos: Array<{ name: string; attributions: string[] }>;
+}
+export interface PaidImageResult { result: { image: string | null }; saved: boolean; attribution: string; notice: string }
+export interface PaidWebSearchResult {
+  result: { text: string; sources: Array<{ url: string; title: string }>; model: string }; saved: boolean; notice: string;
+}
+
+export async function paidPlaceDetails(planId: string, placeId: string, key: string):
+  Promise<{ result: PaidPlaceDetails; attribution: string; notice: string }> {
+  const r = await api.post(`/plans/${encodeURIComponent(planId)}/paid/place-details`, { place_id: placeId }, headers(key));
+  return decodeResponse(r.data, object<{ result: PaidPlaceDetails; attribution: string; notice: string }>({
+    result: object<PaidPlaceDetails>({
+      provider: str, place_id: str, name: str, address: nullable(str), latitude: nullable(num), longitude: nullable(num),
+      maps_uri: nullable(str), phone: nullable(str), website: nullable(str), rating: nullable(num), rating_count: nullable(num),
+      business_status: nullable(oneOf('OPERATIONAL', 'CLOSED_TEMPORARILY', 'CLOSED_PERMANENTLY')),
+      opening_hours: arrayOf(str), photos: arrayOf(object<{ name: string; attributions: string[] }>({ name: str, attributions: arrayOf(str) })),
+    }),
+    attribution: str, notice: str,
+  }), 'POST /plans/{id}/paid/place-details');
+}
+
+const imageResult = object<PaidImageResult>({
+  result: object<{ image: string | null }>({ image: nullable(str) }), saved: bool, attribution: str, notice: str,
+});
+
+export async function paidPlacePhoto(planId: string, photoName: string, key: string): Promise<PaidImageResult> {
+  const r = await api.post(`/plans/${encodeURIComponent(planId)}/paid/place-photo`, { photo_name: photoName }, headers(key));
+  return decodeResponse(r.data, imageResult, 'POST /plans/{id}/paid/place-photo');
+}
+
+export async function paidStaticMap(planId: string, eventIds: string[], key: string): Promise<PaidImageResult> {
+  const r = await api.post(`/plans/${encodeURIComponent(planId)}/paid/static-map`, { event_ids: eventIds }, headers(key));
+  return decodeResponse(r.data, imageResult, 'POST /plans/{id}/paid/static-map');
+}
+
+export async function paidAiWebSearch(planId: string, prompt: string, key: string): Promise<PaidWebSearchResult> {
+  const r = await api.post(`/plans/${encodeURIComponent(planId)}/paid/ai-web-search`, { prompt }, headers(key));
+  return decodeResponse(r.data, object<PaidWebSearchResult>({
+    result: object<PaidWebSearchResult['result']>({
+      text: str, sources: arrayOf(object<{ url: string; title: string }>({ url: str, title: str })), model: str }),
+    saved: bool, notice: str,
+  }), 'POST /plans/{id}/paid/ai-web-search');
+}
+
 /** 断られた理由(サーバーの code)。画面は理由を出し、手で続けられることを案内する */
 export function paidErrorCode(error: unknown): string | null {
   const detail = (error as { response?: { data?: { detail?: unknown } } } | null)?.response?.data?.detail;

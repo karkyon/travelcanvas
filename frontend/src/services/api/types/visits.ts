@@ -83,6 +83,13 @@ export interface VisitsOverview {
   rules: VisitRules;
   /** POST /visits/assess・/visits/device-results の時だけ */
   result?: { created: number; changed: number; unchanged: number; skipped: number };
+  /** [Gate Remaining-7] FR-049 候補の層(候補箱の、場所のある・まだ予定に置いていない候補) */
+  candidates?: VisitCandidate[];
+}
+
+export interface VisitCandidate {
+  candidate_id: string; title: string; category: string | null; priority: number;
+  latitude: number; longitude: number; layer_state: 'CANDIDATE';
 }
 
 export interface VisitCorrectionResult {

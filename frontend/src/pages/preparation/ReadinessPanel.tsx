@@ -27,6 +27,33 @@ interface Props {
   onCompleteTask: (item: ReadinessItem) => void;
 }
 
+/** [Gate Remaining-7] FR-026 予算との連動: 予算・使った額・未払いの予約の見込み・残り */
+const ReadinessBudgetView: React.FC<{ budget: NonNullable<Readiness['budget']> }> = ({ budget }) => {
+  const yen = (v: string | null) => (v == null ? '—' : `${Number(v).toLocaleString('ja-JP')} ${budget.base_currency}`);
+  const tone = budget.over || budget.projected_over ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-surface';
+  return (
+    <section aria-labelledby="readiness-budget" className={`p-3 rounded-lg border ${tone}`} data-testid="readiness-budget">
+      <h3 id="readiness-budget" className="m-0 text-sm font-semibold text-ink-900">予算</h3>
+      {budget.total == null ? (
+        <p className="m-0 mt-1 text-sm text-ink-700">予算は未設定です(費用の画面で決められます)。使った額 {yen(budget.spent)}</p>
+      ) : (
+        <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+          <div><dt className="text-xs text-ink-700">予算</dt><dd className="m-0 font-medium">{yen(budget.total)}</dd></div>
+          <div><dt className="text-xs text-ink-700">使った額</dt><dd className="m-0 font-medium">{yen(budget.spent)}</dd></div>
+          <div><dt className="text-xs text-ink-700">未払いの予約</dt><dd className="m-0 font-medium">{yen(budget.unpaid_reserved)}</dd></div>
+          <div>
+            <dt className="text-xs text-ink-700">残り(見込み)</dt>
+            <dd className={`m-0 font-medium ${budget.projected_over ? 'text-danger' : ''}`}>{yen(budget.remaining)}</dd>
+          </div>
+        </dl>
+      )}
+      {(budget.unpaid_reserved_foreign ?? 0) > 0 && (
+        <p className="m-0 mt-1 text-xs text-ink-700">{`外貨の予約 ${budget.unpaid_reserved_foreign} 件は見込みに入れていません`}</p>
+      )}
+    </section>
+  );
+};
+
 const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCompleteTask }) => {
   const navigate = useNavigate();
   const summary = readinessSummary(readiness);
@@ -45,6 +72,8 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
           </p>
         )}
       </div>
+
+      {readiness?.budget && <ReadinessBudgetView budget={readiness.budget} />}
 
       {readiness && !readiness.is_ready && (
         <ul className="flex flex-wrap gap-2" aria-label="分類ごとの件数">

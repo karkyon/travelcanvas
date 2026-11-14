@@ -546,3 +546,60 @@ def test_database_check_constraints_guard_invariants(auth_client, db_session):
             with db_session.begin_nested():
                 db_session.add(PlanConstraint(**row))
                 db_session.flush()
+
+
+# ---------------------------------------------------------------- [Gate Remaining-7] FR-016 取り消し(Undo)
+
+def test_undo_update_create_and_delete(auth_client, audit_calls, db_session):
+    client, owner = auth_client
+    plan_id = _create_plan(client)
+    base = f"/api/v1/plans/{plan_id}/constraints"
+    created = client.post(base, json=_body()).json()
+    cid = created["id"]
+    upd = client.patch(f"{base}/{cid}", json={"title": "予算は1人3万円まで", "hardness": "soft"},
+                       headers={"If-Match": str(created["revision"])})
+    assert upd.status_code == 200, upd.text
+    r = client.post(f"{base}/undo/{upd.json()['undo_id']}")
+    assert r.status_code == 200, r.text
+    back = r.json()["constraint"]
+    assert back["title"] == "予算は1人5万円まで" and back["hardness"] == "hard" and back["revision"] == 3
+    assert audit_calls[-1]["action"] == "constraint_undone"
+    again = client.post(f"{base}/undo/{upd.json()['undo_id']}")
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "already_undone"
+
+    # 削除の取り消しは元へ戻す
+    deleted = client.delete(f"{base}/{cid}", headers={"If-Match": "3"})
+    assert deleted.status_code == 200
+    assert client.get(f"{base}/{cid}").status_code == 404
+    r = client.post(f"{base}/undo/{deleted.json()['undo_id']}")
+    assert r.status_code == 200 and r.json()["deleted"] is False
+    assert client.get(f"{base}/{cid}").json()["title"] == "予算は1人5万円まで"
+
+    # 作成の取り消しは消す
+    r = client.post(f"{base}/undo/{created['undo_id']}")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "undo_not_latest"  # 後で変更があった
+    c2 = client.post(base, json=_body(title="2つ目")).json()
+    r = client.post(f"{base}/undo/{c2['undo_id']}")
+    assert r.status_code == 200 and r.json()["deleted"] is True
+    assert client.get(f"{base}/{c2['id']}").status_code == 404
+
+
+def test_undo_private_keeps_ciphertext_and_only_actor_can_undo(auth_client, make_user, db_session):
+    client, owner = auth_client
+    plan_id = _create_plan(client)
+    base = f"/api/v1/plans/{plan_id}/constraints"
+    other, _ = make_user()
+    _add_member(db_session, plan_id, other, "editor")
+    c = client.post(base, json=_private_body()).json()
+    upd = client.patch(f"{base}/{c['id']}", json={"value": {"value": "別の値"}}, headers={"If-Match": "1"}).json()
+    _act_as(other)
+    try:
+        assert client.post(f"{base}/undo/{upd['undo_id']}").status_code == 404  # 本人以外は戻せない
+    finally:
+        _act_as(owner)
+    from app.models.models import ConstraintUndoSnapshot
+    snap = db_session.query(ConstraintUndoSnapshot).filter_by(id=uuid.UUID(upd["undo_id"])).one()
+    assert SECRET_VALUE not in json.dumps(snap.before_json, ensure_ascii=False)  # 秘匿の値は暗号文のまま
+    r = client.post(f"{base}/undo/{upd['undo_id']}")
+    assert r.status_code == 200
+    assert r.json()["constraint"]["value"]["value"] == SECRET_VALUE

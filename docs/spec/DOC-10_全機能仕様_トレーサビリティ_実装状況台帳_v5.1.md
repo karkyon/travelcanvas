@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r52** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-14<br>
+> 文書ID: DOC-10 / 版: **v5.1-r53** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-14<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -15,7 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
-| Alembic head | `d4f8b2a6c1e9`(単一の head。Remaining-4 で料金・決済(Stripe のテストモード)の表 billing_products(仮の価格 4 件を入れる)・billing_customers・billing_subscriptions・billing_payments・billing_events。2026-11-13 利用者が「Stripe のテストモードで仕組みだけ」を指示)。その前は `c1e7a3b9d5f2`(Remaining-3 で通知のメールの即時の配信(notification_preferences.email_digest の CHECK に instant)と予約メールの転送アドレスの表 inbound_mail_addresses。2026-11-13 利用者が残りの機能の実装を指示)。その前は `a9d4e2c7f1b6`(PlanB-Next でもしもの案の表 itinerary_branches を消し(P8 で控えの案へ移した 1 版あと)、オフラインの日の案の切り替え(sync_operations の entity_type=variant・action=switch の CHECK の作り直し)。2026-11-12 利用者が指示)。その前は `f3a8c1d5e9b2`(PlanB-P8 でもしもの案(itinerary_branches)の下書きを日ごとの控えの案へ移すデータの移行だけ(表・列は変えない。itinerary_branches は確かめのため 1 版残し、次の版で消す。2026-11-12 利用者がもしもの案の画面とデータを消すことを承認)。その前は `e2b7c4a9d1f3`(PlanB で日ごとの案 travel_days.variant_status/variant_label/variant_name/variant_reason/variant_conditions/variant_group_id/copied_from_day_id と travel_events/travel_segments.variant_standby、切り替えの記録の表 day_variant_switches。同じ日の「いまの案」は 1 つだけ(部分一意索引)。2026-11-12 利用者がプランB(日ごとの案)の実装を指示)。その前は `d6e1a9f3b7c2`(EventArea でエリアの中の予定の列 travel_events.parent_event_id(列の追加だけ。エリアを消すと中の予定は外れる。2026-11-10 利用者がおかげ横丁のようなエリアの中の予定のまとまりを案A で指示)。その前は `c5d2f8a1e7b4`。JourneyMove で出発地・帰着地との移動手段と所要時間 travel_plans.journey_start_mode/journey_start_minutes/journey_end_mode/journey_end_minutes(列の追加だけ。2026-11-10 利用者が出発・帰着の前後の移動手段の設定を指示)。その前は `b8e4f2a6c3d9`。TravelEstimate で移動の見積もりの条件の表 travel_estimate_settings(表の追加だけ。1 行・管理者が理由つきで変える。2026-11-10 利用者が移動手段ごとの距離・所要時間と、条件を管理者の画面で調整することを指示)。その前は `a7d3e9c1f5b2`。JourneyEnds で旅の出発・到着の列 travel_plans.journey_enabled/journey_start_place/journey_start_time/journey_end_place/journey_end_time(列の追加だけ。journey_enabled は false で埋まる。2026-11-10 利用者が出発・到着の情報を旅行ごとに選べるよう指示)。その前は `e4c7a9d2b6f1`。CandidateFilters でCandidateFilters で候補箱の候補のタグの列 plan_candidates.tags(JSONB・NULL を許す列の追加だけ。2026-11-07 利用者がタグ付け・絞り込みを指示)。その前は `d8a4c2f6b1e9`。SpotInfo で行きたい場所の電話・URL・写真の出典・食事の情報(spots.phone/urls/photo/dining)と予定の食事の情報(travel_events.dining)の列(全て NULL を許す列の追加だけ。2026-11-07 利用者の指示)。その前は `c5f2a8d1e7b3`。BookletTiers でしおりのデザインに「リゾート」を加える(booklet_exports の theme の CHECK の作り直しだけ)。その前は `b3e8f1a9c4d7`。SpotLinks で予定の場所の URL の列 travel_events.urls(JSONB・NULL を許す列の追加だけ。2026-11-06 に利用者が URL を 1 件・＋で 5 件までと指示)。その前は `a7d2c9e4f1b8`。PlanSpotEdit で予定の電話番号の列 travel_events.phone(NULL を許す列の追加だけ。2026-11-06 に利用者が課題一覧 #3-⑨ で指示)。その前は `e6b3d9a1c7f2`。BookletPatterns でしおりのデザインを 12 パターンへ。MyMaps・PhotoMap・PhotoQR で写真の位置の根拠の列と QR・マイマップの表(2026-11-05 に利用者が指示)。その前は `b7d2f4a6c8e1`。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
+| Alembic head | `e8a2c4f6b1d3`(単一の head。Remaining-7 で passkey の表 webauthn_credentials・Gmail の連携の表 gmail_connections・制約の変更の取り消しの表 constraint_undo_snapshots。2026-11-14 利用者が残りの機能の実装と配備を指示)。その前は `d4f8b2a6c1e9`(Remaining-4 で料金・決済(Stripe のテストモード)の表 billing_products(仮の価格 4 件を入れる)・billing_customers・billing_subscriptions・billing_payments・billing_events。2026-11-13 利用者が「Stripe のテストモードで仕組みだけ」を指示)。その前は `c1e7a3b9d5f2`(Remaining-3 で通知のメールの即時の配信(notification_preferences.email_digest の CHECK に instant)と予約メールの転送アドレスの表 inbound_mail_addresses。2026-11-13 利用者が残りの機能の実装を指示)。その前は `a9d4e2c7f1b6`(PlanB-Next でもしもの案の表 itinerary_branches を消し(P8 で控えの案へ移した 1 版あと)、オフラインの日の案の切り替え(sync_operations の entity_type=variant・action=switch の CHECK の作り直し)。2026-11-12 利用者が指示)。その前は `f3a8c1d5e9b2`(PlanB-P8 でもしもの案(itinerary_branches)の下書きを日ごとの控えの案へ移すデータの移行だけ(表・列は変えない。itinerary_branches は確かめのため 1 版残し、次の版で消す。2026-11-12 利用者がもしもの案の画面とデータを消すことを承認)。その前は `e2b7c4a9d1f3`(PlanB で日ごとの案 travel_days.variant_status/variant_label/variant_name/variant_reason/variant_conditions/variant_group_id/copied_from_day_id と travel_events/travel_segments.variant_standby、切り替えの記録の表 day_variant_switches。同じ日の「いまの案」は 1 つだけ(部分一意索引)。2026-11-12 利用者がプランB(日ごとの案)の実装を指示)。その前は `d6e1a9f3b7c2`(EventArea でエリアの中の予定の列 travel_events.parent_event_id(列の追加だけ。エリアを消すと中の予定は外れる。2026-11-10 利用者がおかげ横丁のようなエリアの中の予定のまとまりを案A で指示)。その前は `c5d2f8a1e7b4`。JourneyMove で出発地・帰着地との移動手段と所要時間 travel_plans.journey_start_mode/journey_start_minutes/journey_end_mode/journey_end_minutes(列の追加だけ。2026-11-10 利用者が出発・帰着の前後の移動手段の設定を指示)。その前は `b8e4f2a6c3d9`。TravelEstimate で移動の見積もりの条件の表 travel_estimate_settings(表の追加だけ。1 行・管理者が理由つきで変える。2026-11-10 利用者が移動手段ごとの距離・所要時間と、条件を管理者の画面で調整することを指示)。その前は `a7d3e9c1f5b2`。JourneyEnds で旅の出発・到着の列 travel_plans.journey_enabled/journey_start_place/journey_start_time/journey_end_place/journey_end_time(列の追加だけ。journey_enabled は false で埋まる。2026-11-10 利用者が出発・到着の情報を旅行ごとに選べるよう指示)。その前は `e4c7a9d2b6f1`。CandidateFilters でCandidateFilters で候補箱の候補のタグの列 plan_candidates.tags(JSONB・NULL を許す列の追加だけ。2026-11-07 利用者がタグ付け・絞り込みを指示)。その前は `d8a4c2f6b1e9`。SpotInfo で行きたい場所の電話・URL・写真の出典・食事の情報(spots.phone/urls/photo/dining)と予定の食事の情報(travel_events.dining)の列(全て NULL を許す列の追加だけ。2026-11-07 利用者の指示)。その前は `c5f2a8d1e7b3`。BookletTiers でしおりのデザインに「リゾート」を加える(booklet_exports の theme の CHECK の作り直しだけ)。その前は `b3e8f1a9c4d7`。SpotLinks で予定の場所の URL の列 travel_events.urls(JSONB・NULL を許す列の追加だけ。2026-11-06 に利用者が URL を 1 件・＋で 5 件までと指示)。その前は `a7d2c9e4f1b8`。PlanSpotEdit で予定の電話番号の列 travel_events.phone(NULL を許す列の追加だけ。2026-11-06 に利用者が課題一覧 #3-⑨ で指示)。その前は `e6b3d9a1c7f2`。BookletPatterns でしおりのデザインを 12 パターンへ。MyMaps・PhotoMap・PhotoQR で写真の位置の根拠の列と QR・マイマップの表(2026-11-05 に利用者が指示)。その前は `b7d2f4a6c8e1`。BookletWeb でしおりの版の Web 公開の鍵の値(SHA-256)と公開した日時の列(2026-11-04 に利用者が Web のページの生成を指示)。その前は `e9c1a5d3f7b2`。SearchUAT-S3 で 4つのクラスの料金版 2026-11-02.1(表・列は変えない)。その前は `c3e5a7b9d1f4`。ConsultAI で旅行を作る前の相談の表 trip_consult_sessions と口座の範囲 consult。その前は `b7e3c9d1f5a2`。ProviderConnect で鍵の候補・有効性の確認の列と確認の記録の表 provider_secret_verifications。その前は `a1d3f5b7c9e2`。FR059-Tiers で会員の機能クラス Free/Trip/Journey/Explorer の価格の版 2026-10-31.1(表・列は変えない)。その前は `f2a6d8c4b9e1`。OpsSecrets で運用コンソールの鍵の表 provider_secrets(`e8b4c2a7f1d3`、2026-10-30 に利用者が承認)と外部キーの索引。その前は `d5f9b2c8e1a3`。G8 `f4d8a2c6e9b1` の後、G11-Media `a7c3e5f9b2d4` で旅行の表紙の写真・位置・予定の写真・外部の写真の出典・SNS の候補(2026-10-28 に利用者が承認)、G11-Planner で移動手段の新幹線・ヘリ、G11-Planner2 で高速バス、FR059-B で外部 API の原価上限の5つの表) |
 | 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
 | GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -82,21 +82,21 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR | 機能 | 状態 | E2E | 主な Gate | 主な不足 |
 |---|---|---|---|---|---|
 | FR-001 | ゲスト旅行開始 | VERIFIED | ✓ | #35・R1・R2 | KPI、回復UX |
-| FR-002 | ゲスト昇格 | VERIFIED | ✓ | G1・A1 | 全所有物の移管のE2E、重複統合 |
-| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | passkey。パスワードの再設定(忘れた時)・メールの確認は Remaining-6(SMTP の設定の後に実メールで未確認) |
+| FR-002 | ゲスト昇格 | VERIFIED | ✓ | G1・A1 | 重複の統合(既存のアカウントへゲストの持ち物をまとめる)は Remaining-7 |
+| FR-003 | 認証・セッション | VERIFIED | ✓ | A1・S2・S5・S7・S9・S11 | passkey(Remaining-7)は実機の端末で未確認。パスワードの再設定・メールの確認(Remaining-6)は SMTP の設定の後に実メールで未確認 |
 | FR-004 | 旅行CRUD | VERIFIED | ✓ | B-012・G8 | 本番の定期実行の基盤(Cloud Scheduler 等)での記録の確認(PROD-1) |
 | FR-005 | 日・イベント | VERIFIED | ✓ | B-013・G7・G11 | 実機 mobile のタッチでの並べ替え |
 | FR-006 | NOW/NEXT | VERIFIED | ✓ | L1・L1b | 実機mobile、夜行便のE2E |
-| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像・音声からの候補(画像の文字の読み取りは場所の登録だけ、音声認識なし)。SNS 以外の URL は押した時に 1 ページだけ読み題名・説明・場所を出す(Remaining-6。画像は出さない) |
+| FR-007 | 候補箱 | INTEGRATED(部分) | ✓ | C2・G11 | 画像の文字(OCR)・声(ブラウザの音声認識)から候補の名前を入れる(Remaining-7)。画像そのものから場所を当てる AI は場所の登録の画面だけ(同意つき)。SNS 以外の URL は押した時に 1 ページだけ読む(Remaining-6) |
 | FR-008 | 場所の一元管理 | INTEGRATED(部分) | ✓ | C2・G4・G11・Remaining-2 | ジオコードの確認(地図の提供元 MAP-05)。祝日は日本は計算・日本の外は Nager.Date(Remaining-2。例外の日は手で登録できる) |
 | FR-009 | 情報内検索・コマンドパレット | VERIFIED | ✓ | C3・G4 | 利用の計測(どのコマンドが使われるか)、本番での確認(RELEASE-1) |
 | FR-010 | 予約管理 | VERIFIED | ✓ | R3・E1・Remaining-3 | 外部予約サービスとの同期(取消期限の 48 時間前・6 時間前の知らせは Remaining-3) |
-| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3 | 転送アドレス(Remaining-3)は受信サービスの設定(INBOUND_MAIL_DOMAIN・合言葉)の後に実メールで未確認、Gmail 連携なし。1 通から複数の予約は予約番号で分ける(Remaining-6)。omega-dev2 の実画像と実の AI では未確認 |
+| FR-011 | 予約取込 | INTEGRATED(部分) | ✓ | R3-7・R3-9・E1・BookingImport・BookingFix・Remaining-3 | 転送アドレス(Remaining-3)・Gmail の連携(Remaining-7。読み取りだけ・押した時だけ)は、受信サービス・Google の OAuth クライアントの設定の後に実メールで未確認。1 通から複数の予約は予約番号で分ける(Remaining-6) |
 | FR-012 | QR・チケット | VERIFIED | ✓ | R3-5・R3-11・E1 | オフライン表示の実機での確認(バーコードの描画は Code 128。Remaining-1) |
 | FR-013 | 文書ウォレット | VERIFIED | ✓ | R3-6・M5〜M10・S4 | 本番の Object Storage・ClamAV の常時運用・KMS |
-| FR-014 | 移動区間 | INTEGRATED | 一部 | M1・M2・B-014・G11・Remaining-2 | 時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)、区間の編集・UndoのE2E |
-| FR-015 | 経路比較 | INTEGRATED | 一部 | M3・M4・M8・Remaining-2 | 経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)、route option の Undo・E2E |
-| FR-016 | 制約 | VERIFIED | ✓ | L2 | 制約の変更の Undo |
+| FR-014 | 移動区間 | INTEGRATED | 一部 | M1・M2・B-014・G11・Remaining-2 | 時刻表・運賃は駅すぱあとの接続口(Remaining-2。有料の鍵の後に実通信で未確認)。区間の編集・Undo の E2E は Remaining-7 |
+| FR-015 | 経路比較 | INTEGRATED | 一部 | M3・M4・M8・Remaining-2 | 経路の外部provider は駅すぱあとの接続口(鍵の後に実通信で未確認)。route option の Undo の E2E は Remaining-7 |
+| FR-016 | 制約 | VERIFIED | ✓ | L2 | 制約の変更の Undo は Remaining-7(作成・変更・削除・有効の切り替え。本人・その後に変更が無い時だけ) |
 | FR-017 | 実行可能性 | VERIFIED | ✓ | L3・G7・G11・Remaining-2 | 時刻表の照合は駅すぱあとの候補を経路候補に入れる形(鍵の後に実通信で未確認) |
 | FR-018 | 説明可能最適化 | INTEGRATED(部分) | ✓ | L4・G7 | 外部経路による実移動時間 |
 | FR-019 | 日ごとの案(プランB。旧 What-if) | VERIFIED | ✓ | P7・G7・G8 → PlanB P1〜P8・Next | 天気は Open-Meteo の日ごと・時間ごとの雨。気象警報は状況の画面の外の情報(気象庁。Remaining-2)。AI の確かめは会員のクラスの枠の中だけ |
@@ -106,7 +106,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-023 | 秘匿プロフィール・制約 | VERIFIED | ✓ | L2・C1 | — |
 | FR-024 | コメント・通知 | INTEGRATED | ✓ | P3・G4・Remaining-3 | SMTP の送信元の設定(運用の判断)。メールの「すぐ送る」・端末への「自分あての知らせ」は Remaining-3 |
 | FR-025 | 持ち物 | VERIFIED | ✓ | P1 | 薬の時刻通知・天候連動 |
-| FR-026 | レディネス | VERIFIED | ✓ | P1 | 予算との連動 |
+| FR-026 | レディネス | VERIFIED | ✓ | P1 | 予算との連動は Remaining-7(使った額・未払いの予約の見込み・費目の予算) |
 | FR-027 | 予算・費用 | VERIFIED | ✓ | P2・G5・Receipt・Remaining-2 | 為替は ECB の参考値を自動で取れる(Remaining-2。対応外の通貨は出典つきの手入力)、本番での確認(RELEASE-1)。レシートの読み取りは実物と実の AI では未確認 |
 | FR-028 | 立替・精算 | VERIFIED | ✓ | P2・G5 | 本番での確認(RELEASE-1) |
 | FR-029 | 当日モード | VERIFIED | ✓ | L1・P10 | 外部状況の自動取得 |
@@ -129,17 +129,17 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-046 | 画像・PDFの出力 | INTEGRATED | ✓ | P4・P16・Remaining-5 | PDF・NOW/NEXT の画像はサーバーの Pillow で作る(Remaining-5。PDF は画像のページ)。生成は監査に残す |
 | FR-047 | 旅程複製 | VERIFIED | ✓ | #39・R3-12・E1 | — |
 | FR-048 | Offline Travel Pack(端末) | VERIFIED | ✓ | #36・P11・K1・G6 | 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js の登録は Remaining-1(実機で未確認) |
-| FR-049 | Visited Area Layer | INTEGRATED(部分) | ✓ | V2 | 候補の層、地図タイルの上への表示 |
+| FR-049 | Visited Area Layer | INTEGRATED(部分) | ✓ | V2 | 候補の層・地図タイル(OpenStreetMap)の上への表示は Remaining-7。実機の位置の記録での確認は UAT |
 | FR-050 | 訪問判定・信頼度 | VERIFIED | ✓ | V2 | — |
 | FR-051 | 訪問訂正・除外 | VERIFIED | ✓ | V2・Q1・G6・G8 | 実機の GPS での訂正・除外の確認(PoC) |
 | FR-052 | Personal Travel Atlas | INTEGRATED(部分) | ✓ | P15・Remaining-2 | テーマ別は予定の種類から(Remaining-6)。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認) |
 | FR-053 | 旅の達成指標 | VERIFIED | ✓ | P14 | — |
-| FR-054 | 予定と実績 | INTEGRATED(部分) | ✓ | P14 | 予定経路と GPS 軌跡の比較 |
+| FR-054 | 予定と実績 | INTEGRATED(部分) | ✓ | P14 | 予定の経路と GPS の軌跡の比べ(到達・寄り道・経路からの外れ)は Remaining-7。予定の経路は直線(道の形ではない) |
 | FR-055 | Local-first Location | INTEGRATED(部分) | ✓ | L5 | 端末のバックグラウンド記録、端末内の点の暗号化 |
 | FR-056 | 適応型GPS | INTEGRATED(部分) | ✓ | L5 | OS の geofence、電池の計測 |
 | FR-057 | Memory Replan | VERIFIED | ✓ | P17・G7 | 実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1) |
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | 一部 | Remaining-4 | Stripe のテストモードだけ(本番の鍵 sk_live_ は断る。利用者の決定 2026-11-13)。価格は仮(管理画面で変える)。実の Stripe のテストの鍵での確認は鍵の登録の後。組織でまとめる支払い(FR-041)・指定した支払う人は未実装。E2E は鍵の無い時の案内だけ |
-| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load の adapter は未実装(fake provider で検証。limit を強制した staging での実際の請求の照合・80% と上限の画面の E2E は接続の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
+| FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -269,6 +269,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r50** | 2026-11-05 | `d8bd1b7` | **設計書の as-built 改訂に合わせて同期: 基準 commit と試験の実測を更新、J-04/06/07 の古い残りを直し、FR-003(パスワード再設定)・FR-032/048(sw.js の未登録)・FR-059(鍵の確認の失効)の不足を明記。FR の状態の遷移なし** |
 | **r51** | 2026-11-14 | `PR #108` | **残りの機能の実装(Remaining-1〜5): 地図・表の取込と取り消しの取込・オフラインのメモ・Code 128(1)、為替・気象警報・逆ジオコーディング・祝日・時刻表と運行情報の接続口(2)、取消期限の知らせ・メールの即時・予約メールの転送(3)、Stripe のテストモードの決済(4)、サーバー側の PDF・画像・埋め込み・カレンダーの購読・顔の検査の接続口(5)。FR-058 SPECIFIED→INTEGRATED、FR-024・035・036・046 の部分を外す** |
 | **r52** | 2026-11-14 | `PR #110` | **Remaining-6: パスワードの再設定(忘れた時)・メールの確認の API と画面(FR-003)、1 通の予約メールを予約ごとに分ける(FR-011)、SNS 以外の URL の題名・説明・場所(FR-007)、写真の地図の印のまとめ(FR-037)、Atlas のテーマ別(FR-052)、GCP 配備の準備(開発の image の字体・購読 URL の https)。古い残り(FR-012 のバーコード・FR-032/048 の sw.js)を直す** |
+| **r53** | 2026-11-14 | `PR #111` | **Remaining-7: passkey(FR-003)・画像と声からの候補(FR-007)・Gmail の連携(FR-011)・候補の層と地図タイル(FR-049)・予定の経路と軌跡の比べ(FR-054)・場所の詳細/写真/静的な地図/AI の Web 検索の adapter(FR-059)・制約の Undo(FR-016)と区間・経路の Undo の E2E(FR-014/015)・予算との連動(FR-026)・ゲストを既存のアカウントへまとめる(FR-002)。migration `e8a2c4f6b1d3`** |
 
 ## 10. 台帳の更新の規則
 

@@ -34,6 +34,7 @@ import type { ImportJob, ImportJobDetail, ImportFieldPath } from '@/services/api
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookingExtractCard from './imports/BookingExtractCard';
 import InboundMailCard from './imports/InboundMailCard';
+import GmailCard from './imports/GmailCard';
 import BookingReviewForm from './imports/BookingReviewForm';
 import { deleteImportJob } from '@/services/api/photoFeatures';
 
@@ -301,6 +302,8 @@ const ImportsPage: React.FC = () => {
       )}
 
       {planId && <InboundMailCard planId={planId} />}
+      {/* [Gate Remaining-7] FR-011 Gmail の連携 */}
+      {planId && <GmailCard planId={planId} onImported={() => void loadJobs()} />}
 
       {planId && (
         <BookingExtractCard planId={planId} onExtracted={(job) => {

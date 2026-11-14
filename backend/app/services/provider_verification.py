@@ -117,7 +117,7 @@ def verify(db: Session, slot: str, version: Any, reason: str, actor_id: uuid.UUI
     results: Dict[str, str] = {}
     for rec in records:
         try:
-            resp = pc.verify_request(rec.provider, key)
+            resp = pc.verify_request_op(rec.provider, rec.operation, key)
             code = ph.classify(rec.provider, resp.status, resp.body)
         except ph.ProviderNetworkError as error:
             code = error.code

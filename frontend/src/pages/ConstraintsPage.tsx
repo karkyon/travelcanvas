@@ -67,6 +67,26 @@ const ConstraintsPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // [Gate Remaining-7] FR-016 直前の変更の取り消し(作成・変更・削除・有効の切り替え)
+  const [undo, setUndo] = useState<{ id: string; label: string } | null>(null);
+  const remember = (res: unknown, label: string) => {
+    const id = (res as { undo_id?: unknown } | null)?.undo_id;
+    setUndo(typeof id === 'string' ? { id, label } : null);
+  };
+  const handleUndo = async () => {
+    if (!planId || !undo) return;
+    setError(null);
+    try {
+      const { undoConstraintChange } = await import('@/services/api/remaining6');
+      await undoConstraintChange(planId, undo.id);
+      setUndo(null);
+      await load();
+    } catch (err) {
+      setUndo(null);
+      setError(errorMessage(err, '元に戻せませんでした'));
+    }
+  };
+
   const [latestRun, setLatestRun] = useState<ValidationRunDetail | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
@@ -148,9 +168,10 @@ const ConstraintsPage: React.FC = () => {
     try {
       if (editing && editing.revision != null) {
         // 理由を空にした場合は削除する(未指定=変更なし、と区別する)
-        await updateConstraint(planId, editing.id, { ...result.data, reason: result.data.reason ?? null }, editing.revision);
+        remember(await updateConstraint(planId, editing.id, { ...result.data, reason: result.data.reason ?? null },
+          editing.revision), '制約を変更しました');
       } else {
-        await createConstraint(planId, result.data);
+        remember(await createConstraint(planId, result.data), '制約を追加しました');
       }
       closeForm();
       await load();
@@ -178,7 +199,8 @@ const ConstraintsPage: React.FC = () => {
     if (!planId || c.revision == null) return;
     setError(null);
     try {
-      await updateConstraint(planId, c.id, { is_active: !c.is_active }, c.revision);
+      remember(await updateConstraint(planId, c.id, { is_active: !c.is_active }, c.revision),
+        c.is_active ? '制約を無効にしました' : '制約を有効にしました');
       await load();
     } catch (err) {
       setError(errorMessage(err, '制約の切り替えに失敗しました'));
@@ -190,7 +212,7 @@ const ConstraintsPage: React.FC = () => {
     if (!window.confirm(`制約「${c.title ?? ''}」を削除しますか?`)) return;
     setError(null);
     try {
-      await deleteConstraint(planId, c.id, c.revision);
+      remember(await deleteConstraint(planId, c.id, c.revision), '制約を削除しました');
       await load();
     } catch (err) {
       setError(errorMessage(err, '制約の削除に失敗しました'));
@@ -302,6 +324,13 @@ const ConstraintsPage: React.FC = () => {
         </Button>
       </div>
 
+      {undo && (
+        <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-cloud-200 bg-surface p-3 text-sm"
+          data-testid="constraint-undo">
+          <span>{undo.label}</span>
+          <Button variant="secondary" size="sm" onClick={() => void handleUndo()}>元に戻す</Button>
+        </div>
+      )}
       {planId && <PrivateProfilePanel planId={planId} onChanged={() => void load()} />}
       {planId && <MovementSettingsPanel planId={planId} onSaved={() => void load()} />}
 

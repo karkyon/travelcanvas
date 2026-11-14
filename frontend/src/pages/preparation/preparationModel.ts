@@ -42,6 +42,7 @@ export const READINESS_CATEGORY_LABEL: Record<ReadinessCategory, string> = {
   deadline: '期限',
   unassigned: '未割当',
   packing: '持ち物不足',
+  budget: '予算', // [Gate Remaining-7] FR-026
 };
 
 export const SEVERITY_LABEL: Record<ReadinessSeverity, string> = { high: '要対応', medium: '確認', low: '軽微' };
