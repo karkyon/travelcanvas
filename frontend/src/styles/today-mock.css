@@ -528,7 +528,6 @@ h3.tl-lbl, h4.tl-lbl, h2.tl-lbl { margin: 14px 0 6px; }
 .tl-titlerow__sub { margin: 2px 0 0; }
 .tl-titlerow .tl-toolbar { margin: 0 0 0 auto; }
 .tl-icon-btn--help { color: var(--tl-coral); border-color: var(--tl-coral-line); min-width: 44px; height: 44px; }
-@media (max-width: 639px) { .tl-titlerow .tl-toolbar .tl-icon-btn--text:not(.tl-icon-btn--help) { display: none; } }
 /* 判断カード */
 .tl-decide { background: var(--tl-card); border: 1px solid var(--tl-coral-line); border-radius: 18px; overflow: hidden;
   box-shadow: 0 6px 20px rgba(178, 60, 34, .08); }
