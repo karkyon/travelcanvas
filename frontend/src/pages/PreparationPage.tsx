@@ -16,6 +16,7 @@ import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import PageHead from '@/components/shell/PageHead';
 import TripKitNav from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
 import {
   createPackingItem, createPreparationTask, deletePackingItem, deletePreparationTask, extractApiErrorDetailMessage,
   getPackingItems, getPackingSuggestions, getPlanMembers, getPreparationTasks, getReadiness, updatePackingItem,
@@ -53,7 +54,10 @@ const PreparationPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>('readiness');
+  // [Gate TripKit] タブは URL(?tab=)に置く
+  const [tabQ, setTabQ] = useQueryState({ tab: 'readiness' });
+  const tab: Tab = (TABS.some((t) => t.id === tabQ.tab) ? tabQ.tab : 'readiness') as Tab;
+  const setTab = (t: Tab) => setTabQ({ tab: t });
   const [members, setMembers] = useState<PlanMember[]>([]);
   const [items, setItems] = useState<PackingItem[]>([]);
   const [tasks, setTasks] = useState<PreparationTask[]>([]);

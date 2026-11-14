@@ -49,6 +49,13 @@ import type {
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import PageHead from '@/components/shell/PageHead';
 import TripKitNav from '@/components/shell/TripKitNav';
+import TicketFullscreen from '@/components/share/TicketFullscreen';
+import { ticketWarning } from '@/components/share/ticketState';
+import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
+import {
+  PAYMENT_LABEL, STATUS_FILTERS, attentionReasons, deadlineState, filterReservations, groupByDay, zonedParts,
+} from './reservations/reservationListModel';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
   { value: 'accommodation', label: '宿泊', icon: <Building2 size={16} /> },
@@ -144,6 +151,9 @@ function formToPayload(form: ReservationFormState): ReservationCreateData {
 const ReservationsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  // [Gate TripKit] 一覧の検索・絞り込み・並べ替え(URL に残す)と、全画面で見せるチケット
+  const [cond, setCond] = useQueryState({ q: '', st: '', type: '', sort: 'date' });
+  const [fullTicket, setFullTicket] = useState<Ticket | null>(null);
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -275,7 +285,8 @@ const ReservationsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 読み込んだ予約の一覧から 1 回だけ開く
   }, [openId, reservations]);
   useEffect(() => {
-    const target = linkEventId ?? linkSegmentId;
+    // [Gate TripKit] 旅行箱の概要の「予約を手入力」: ?new=1 だけでも新規予約を開く
+    const target = linkEventId ?? linkSegmentId ?? (search.get('new') === '1' ? 'plain' : null);
     if (!target || handled.current === `new:${target}`) return;
     handled.current = `new:${target}`;
     const t = search.get('type');
@@ -284,6 +295,7 @@ const ReservationsPage: React.FC = () => {
   }, [linkEventId, linkSegmentId, search]);
 
   const closeDetail = () => {
+    setFullTicket(null);
     setSelected(null);
     setRevealed(null);
     setParticipants([]);
@@ -491,9 +503,16 @@ const ReservationsPage: React.FC = () => {
       {/* [Gate MockScreens] モックの旅行箱: page-head・切り替え・予約の一覧と秘密情報の扱い */}
       <PageHead
         eyebrow="TRIP KIT · 旅行箱"
-        title="旅の情報を、ひとつの場所へ"
-        sub="予約・チケット・持ち物・準備を旅行の文脈にまとめます。予約番号・PIN は必要な時だけ表示します。"
-        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+        title="予約・チケット"
+        sub="予約の状態・利用日・期限・旅程とのつながりをまとめて確認します。予約番号・PIN・チケットのコードは、詳細で「表示」を押した時だけ出します。"
+        actions={(
+          <>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>予約を取り込む</button>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setIsCreateOpen(true)}>
+              <Plus size={15} aria-hidden="true" />新規予約
+            </button>
+          </>
+        )}
       />
       <TripKitNav planId={planId} />
 
@@ -501,24 +520,59 @@ const ReservationsPage: React.FC = () => {
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
-      <div className="tc-kit-grid">
       <section className="tc-card tc-kit-card" aria-labelledby="kit-reservations-title">
-        <div className="tc-section-row">
-          <h2 id="kit-reservations-title" className="tc-section-title">旅行にひもづく予約</h2>
-          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setIsCreateOpen(true)}>
-            <Plus size={15} aria-hidden="true" />新規予約
-          </button>
-        </div>
+        <h2 id="kit-reservations-title" className="sr-only">予約の一覧</h2>
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : reservations.length === 0 ? (
         <div className="tc-kit-empty">
           <p className="font-semibold text-ink-900">予約がまだ登録されていません。</p>
-          <p>「新規予約」から追加するか、確認メールを<button type="button" className="tc-mini-link" onClick={() => navigate(`/planner/${planId}/imports`)}>予約の取込</button>で読み込めます。</p>
+          <p>「新規予約」から追加するか、確認メールを<button type="button" className="tc-mini-link" onClick={() => navigate(`/planner/${planId}/imports`)}>予約の取込</button>で読み込めます。登録した予約は旅程の予定につなげられます。</p>
         </div>
-      ) : (
-        <ul className="tc-kit-list" aria-label="予約">
-          {reservations.map((r) => (
+      ) : (() => {
+        const now = Date.now();
+        const shown = filterReservations(reservations, cond, now, typeLabel);
+        const types = Array.from(new Set(reservations.map((r) => r.type)));
+        const clearAll = () => setCond({ q: '', st: '', type: '' });
+        const stLabel = STATUS_FILTERS.find((f) => f.value === cond.st)?.label;
+        const conds = [
+          ...(cond.q ? [{ key: 'q', label: `「${cond.q}」`, clear: () => setCond({ q: '' }) }] : []),
+          ...(stLabel ? [{ key: 'st', label: stLabel, clear: () => setCond({ st: '' }) }] : []),
+          ...(cond.type ? [{ key: 'type', label: typeLabel(cond.type), clear: () => setCond({ type: '' }) }] : []),
+        ];
+        return (
+          <>
+            <div className="tc-kit-searchrow">
+              <label className="tc-kit-searchbox">
+                <span className="sr-only">予約を検索</span>
+                <input type="search" value={cond.q} onChange={(e) => setCond({ q: e.target.value })}
+                  placeholder="施設・交通・メモ・予約番号の末尾(3文字以上)で検索" />
+              </label>
+              <label className="tc-kit-select"><span className="sr-only">種類</span>
+                <select value={cond.type} onChange={(e) => setCond({ type: e.target.value })}>
+                  <option value="">種類すべて</option>
+                  {types.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
+                </select>
+              </label>
+              <label className="tc-kit-select"><span className="sr-only">並べ替え</span>
+                <select value={cond.sort} onChange={(e) => setCond({ sort: e.target.value })}>
+                  <option value="date">利用日が近い順</option><option value="deadline">取消期限が近い順</option><option value="added">追加が新しい順</option>
+                </select>
+              </label>
+            </div>
+            <KitChips label="状態で絞り込む" value={cond.st} onChange={(v) => setCond({ st: v })} allCount={reservations.length}
+              options={STATUS_FILTERS.map((f) => ({ value: f.value, label: f.label, attention: f.attention,
+                count: reservations.filter((r) => f.test(r, now)).length })).filter((o) => o.count > 0 || o.value === cond.st)} />
+            <KitActiveConditions conditions={conds} shown={shown.length} total={reservations.length} onClearAll={clearAll} />
+            {shown.length === 0 ? <KitNoMatch onClearAll={clearAll} /> : groupByDay(shown, cond.sort).map((g) => (
+              <div key={g.key} className="tc-kit-group">
+                {g.label && <h3 className="tc-kit-day">{g.label}</h3>}
+        <ul className="tc-kit-list" aria-label={g.label ? `${g.label}の予約` : '予約'}>
+          {g.items.map((r) => {
+            const when = zonedParts(r.start_at, r.timezone_id);
+            const dl = deadlineState(r, now);
+            const why = attentionReasons(r, now);
+            return (
             <li key={r.id}>
               {/* [Gate E1] 以前は <div onClick> でキーボードから開けなかった。ボタンにして
                   Tab で移動・Enter/Space で詳細を開けるようにする。 */}
@@ -532,9 +586,16 @@ const ReservationsPage: React.FC = () => {
                   <span className="tc-kit-icon" aria-hidden="true">{typeIcon(r.type)}</span>
                   <span className="min-w-0">
                     <b>{r.provider_name || typeLabel(r.type)}</b>
-                    <small>{typeLabel(r.type)} ・ {formatDateTime(r.start_at)}{r.end_at ? ` 〜 ${formatDateTime(r.end_at)}` : ''}{r.guest_count ? ` ・ ${r.guest_count}名` : ''}</small>
+                    <small>{typeLabel(r.type)} ・ {when ? `${when.date} ${when.time}` : formatDateTime(r.start_at)}{when ? `(${when.tzNote})` : ''}{r.guest_count ? ` ・ ${r.guest_count}名` : ''}</small>
                     {r.notes && <small className="whitespace-pre-line" data-testid="reservation-notes">{r.notes}</small>}
-                    {r.confirmation_number_masked && <small>{`予約番号 ${r.confirmation_number_masked}`}</small>}
+                    <small className="tc-kit-facts">
+                      {[r.confirmation_number_masked ? `予約番号 ${r.confirmation_number_masked}` : null,
+                        r.total_amount != null ? `${r.total_amount.toLocaleString('ja-JP')} ${r.currency ?? ''}`.trim() : null,
+                        r.payment_status ? (PAYMENT_LABEL[r.payment_status] ?? r.payment_status) : null,
+                        r.event_id ? '旅程の予定につながっている' : '旅程に未接続',
+                        dl && dl.level !== 'ok' ? dl.label : null].filter(Boolean).join(' ・ ')}
+                    </small>
+                    {why.length > 0 && <small className="tc-kit-why">{`要確認: ${why.join('・')}`}</small>}
                   </span>
                   <span className="tc-pill">{STATUS_LABEL[r.status] ?? r.status}</span>
                 </button>
@@ -544,23 +605,16 @@ const ReservationsPage: React.FC = () => {
                 >この予約へのコメント</button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
-      )}
-
+              </div>
+            ))}
+          </>
+        );
+      })()}
       </section>
-      <aside className="tc-card tc-kit-card tc-kit-side" aria-labelledby="kit-secret-title">
-        <h2 id="kit-secret-title" className="tc-section-title">秘密情報の扱い</h2>
-        <ul>
-          <li><Lock size={16} aria-hidden="true" /><span><b>番号は初めは伏せて表示</b><small>予約番号・PIN は詳細で「表示」を押した時だけ、権限のある人に出します。</small></span></li>
-          <li><Link2 size={16} aria-hidden="true" /><span><b>予約を予定につなぐ</b><small>詳細から旅程の予定へつなぐと、予定とチケットを一緒に確かめられます。</small></span></li>
-          <li><TicketIcon size={16} aria-hidden="true" /><span><b>チケットも同じ場所に</b><small>QR・バーコードの中身も、表示を押した時だけ出します。</small></span></li>
-        </ul>
-        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm w-full justify-center" onClick={() => navigate(`/share/${planId}`)}>
-          共有される情報を確認
-        </button>
-      </aside>
-      </div>
+      <p className="tc-kit-note"><Lock size={14} aria-hidden="true" />予約番号・PIN・チケットのコードは、詳細で「表示」を押した時だけ、権限のある人に出します(表示は記録されます)。<button type="button" className="tc-mini-link" onClick={() => navigate(`/share/${planId}`)}>共有される情報を確認</button></p>
 
       {/* 新規予約作成 */}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="新規予約" size="md">
@@ -913,6 +967,10 @@ const ReservationsPage: React.FC = () => {
                                   <TicketCode value={revealedTickets[t.id]!} format={t.barcode_format} size={180}
                                     label={`チケット「${t.ticket_type}」のコード`} />
                                   <p className="mt-1">{revealedTickets[t.id]}</p>
+                                  {ticketWarning(t, Date.now()) && <p className="mt-1 font-sans font-bold text-red-700">{ticketWarning(t, Date.now())}</p>}
+                                  <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm mt-2 font-sans" onClick={() => setFullTicket(t)}>
+                                    全画面で見せる
+                                  </button>
                                 </div>
                               ) : '(データなし)'}
                             </div>
@@ -1014,6 +1072,10 @@ const ReservationsPage: React.FC = () => {
           </>
         )}
       </Modal>
+      {fullTicket && selected && revealedTickets[fullTicket.id] && (
+        <TicketFullscreen ticket={fullTicket} code={revealedTickets[fullTicket.id]!} reservationTitle={selected.provider_name || typeLabel(selected.type)}
+          timezone={selected.timezone_id} onClose={() => setFullTicket(null)} />
+      )}
     </div>
   );
 };

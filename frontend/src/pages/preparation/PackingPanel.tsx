@@ -14,6 +14,18 @@ import type {
   PackingItem, PackingStatus, PackingSuggestion, PackingSuggestionConditions, PackingSuggestions,
 } from '@/services/api';
 import { STATUS_OPTIONS, categoryLabel, groupByCategory, packingProgress } from './preparationModel';
+import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
+
+// [Gate TripKit] 持ち物の即時の絞り込み(URL の ?pk= に置く)
+const PACK_FILTERS: { value: string; label: string; test: (i: PackingItem, me: string | null) => boolean; attention?: boolean }[] = [
+  { value: 'todo', label: '未準備', test: (i) => i.status === 'to_prepare' || i.status === 'to_buy', attention: true },
+  { value: 'mine', label: '自分', test: (i, me) => i.is_mine || (me !== null && i.assignee_user_id === me) },
+  { value: 'required', label: '必須', test: (i) => i.is_required },
+  { value: 'buy', label: '買う', test: (i) => i.status === 'to_buy' },
+  { value: 'personal', label: '自分だけ(個人)', test: (i) => i.scope === 'personal' },
+  { value: 'unassigned', label: '担当未定', test: (i) => i.scope === 'shared' && !i.assignee_user_id },
+];
 
 interface Props {
   items: PackingItem[];
@@ -42,7 +54,10 @@ const CONDITION_LABELS: { key: keyof PackingSuggestionConditions; label: string 
 const PackingPanel: React.FC<Props> = (props) => {
   const { items, canEdit, myUserId, suggestions, conditions } = props;
   const progress = packingProgress(items);
-  const groups = groupByCategory(items);
+  const [pq, setPq] = useQueryState({ pk: '' });
+  const pf = PACK_FILTERS.find((f) => f.value === pq.pk);
+  const shownItems = pf ? items.filter((i) => pf.test(i, myUserId)) : items;
+  const groups = groupByCategory(shownItems);
 
   const canChangeStatus = (item: PackingItem) =>
     item.scope === 'personal' ? item.is_mine : canEdit || (myUserId !== null && item.assignee_user_id === myUserId);
@@ -144,9 +159,18 @@ const PackingPanel: React.FC<Props> = (props) => {
         )}
       </section>
 
+      {items.length > 0 && (
+        <div>
+          <KitChips label="持ち物を絞り込む" value={pq.pk} onChange={(v) => setPq({ pk: v })} allCount={items.length}
+            options={PACK_FILTERS.map((f) => ({ value: f.value, label: f.label, attention: f.attention,
+              count: items.filter((i) => f.test(i, myUserId)).length }))} />
+          <KitActiveConditions shown={shownItems.length} total={items.length} onClearAll={() => setPq({ pk: '' })}
+            conditions={pf ? [{ key: 'pk', label: pf.label, clear: () => setPq({ pk: '' }) }] : []} />
+        </div>
+      )}
       {items.length === 0 ? (
-        <Card padding="lg" className="text-center text-ink-700">持ち物はまだありません。</Card>
-      ) : (
+        <Card padding="lg" className="text-center text-ink-700">持ち物はまだありません。「持ち物を追加」か「候補を表示」から入れられます(候補は確認して追加するまでリストに入りません)。</Card>
+      ) : shownItems.length === 0 ? <KitNoMatch onClearAll={() => setPq({ pk: '' })} /> : (
         groups.map((g) => (
           <section key={g.category} aria-labelledby={`packing-group-${g.category}`}>
             <h3 id={`packing-group-${g.category}`} className="text-base font-semibold text-ink-900 mb-2">
