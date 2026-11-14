@@ -17,7 +17,8 @@ import { RefreshCw } from 'lucide-react';
 import Surface from '@/components/design/Surface';
 import { useAuthStore } from '@/store/authStore';
 import { getDashboard } from '@/services/api/g9';
-import { daySpan } from './dashboard/dashboardModel';
+import { homeTitle } from './dashboard/dashboardModel';
+import TripLiveHome from './dashboard/TripLiveHome';
 import type { DashboardSummary } from '@/services/api/types/g9';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { useThemePreference } from '@/hooks/useThemePreference';
@@ -75,14 +76,12 @@ const DashboardPage: React.FC = () => {
   const focusIsAuto = Boolean(focusTrip && data?.focus && focusTrip.id === data.focus.plan_id);
   const progress = home && focusTrip ? home.planning.find((p) => p.plan_id === focusTrip.id) ?? null : null;
   const name = isGuest ? 'ゲスト' : (user?.username || 'ユーザー');
-  const nextTrip = planningTrips.find((t) => t.days_until_start !== null) ?? null;
   // [Gate HomeTitle] 「おかえりなさい」は日本のアプリでは不自然なので使わない。旅までの日数をそのまま見出しにする
-  // [Gate RelDays] 31 日を超えると「約○か月」(表示する旅行の切り替え・カードと同じ言い方)
-  const title = nextTrip?.days_until_start ? `次の旅まで あと ${nextTrip.days_until_start <= 31
-    ? `${nextTrip.days_until_start} 日` : daySpan(nextTrip.days_until_start)}`
-    : planningTrips.some((t) => t.phase === 'ongoing') ? 'いま旅行中！ 旅の当日を楽しみましょう' : '次の旅を、楽しみに変える';
+  // [Gate HomeLive] 主役の旅行が旅行中なら、別の旅行の「次の旅まで」ではなく「旅行中 ・ 何日目」を見出しにする
+  const title = homeTitle(focusTrip, planningTrips);
+  const live = focusTrip?.phase === 'ongoing';
   // 挨拶の文は読み込みの前後で変えない(読み込んだ後は旅行の数を後ろに足す)
-  const sub = `${name}さんの旅の準備と、次にすること。` + (home
+  const sub = live ? `${name}さんの旅行中の画面。次にすること・今日の流れ・地図をまとめています。` : `${name}さんの旅の準備と、次にすること。` + (home
     ? `計画中 ${home.shelves.planning} · 検討中 ${home.shelves.considering} · 行った旅 ${home.shelves.visited} · 見送り ${home.shelves.cancelled}`
     : '日程も予約も旅の準備も、この旅のページから一緒に進められます。');
 
@@ -94,7 +93,8 @@ const DashboardPage: React.FC = () => {
           eyebrow="YOUR JOURNEY · ホーム"
           title={title}
           sub={sub}
-          actions={(
+          // [Gate HomeLive] 旅行中は「次にすること」を最初に見せるため、新しい旅を始める操作を見出しに出さない(旅行の一覧の画面にある)
+          actions={live ? undefined : (
             <nav aria-label="新しい旅を始める" className="tc-page-actions" data-testid="dashboard-start">
               <Link to="/planner?new=1" className="tc-focus-ring tc-mbtn">＋ 旅行をつくる<span className="sr-only">(行き先が決まっている)</span></Link>
               <Link to="/trip-consult" className="tc-focus-ring tc-mbtn tc-mbtn--primary">✦ 条件から旅行先を相談</Link>
@@ -127,7 +127,14 @@ const DashboardPage: React.FC = () => {
         )}
 
         {data && !focusTrip && <EmptyHero isGuest={data.is_guest} />}
-        {data && focusTrip && (
+        {data && focusTrip && live && (
+          // [Gate HomeLive] 旅行中: 旅行前の表紙・準備の進み具合・次にやることの代わりに、当日のホームを出す
+          <div className="tc-home-live">
+            <TripLiveHome trip={focusTrip} focus={data.focus && data.focus.plan_id === focusTrip.id ? data.focus : null} />
+            <TripSwitcher planning={planningTrips} selected={focusTrip.id} onSelect={setChosenId} />
+          </div>
+        )}
+        {data && focusTrip && !live && (
           // [Gate HomeV2] 1. いま計画中: 主役の旅行(表紙・旅の準備・操作)と、次にやること(計画中の旅行ぜんぶ)
           <div className="tc-home-planning">
             <div className="tc-dash-col">

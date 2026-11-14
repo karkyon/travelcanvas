@@ -49,7 +49,8 @@ const ReceiptScanDialog: React.FC<Props> = ({ planId, isOpen, onClose, onRead })
     <Modal isOpen={isOpen} onClose={close} title="レシートを読み取る" size="lg">
       <Modal.Body>
         <div className="space-y-3 text-sm text-ink-900">
-          <ImageDropzone label="レシートの画像" hint="JPEG・PNG・WebP、10MB まで" file={file} disabled={busy}
+          <ImageDropzone label="レシートの画像" hint="JPEG・PNG・WebP、10MB まで。スマホは「カメラで撮る」も使えます" file={file} disabled={busy}
+            camera maxBytes={10 * 1024 * 1024}
             onFile={(f) => void read(f, consent)}>
             {busy && <p role="status" className="font-medium">読み取っています…</p>}
             {error && <p role="alert" className="text-danger">{error}</p>}
