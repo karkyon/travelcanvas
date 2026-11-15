@@ -83,7 +83,9 @@ describe('TodayPage (Gate L1b)', () => {
     const next = card('NEXT');
     expect(next).toHaveTextContent('京都駅 15:00着');
     expect(within(next).getByText('遅延')).toBeInTheDocument();
-    expect(within(next).getByText('12:10 に出発')).toBeInTheDocument();
+    expect(next).toHaveTextContent('12:10 に出発');
+    // [Gate TDay-Live2] 移動時間の出どころは出る時刻のすぐ下に(種類を文字で)
+    expect(within(next).getByTestId('today-go-source')).toBeInTheDocument();
     expect(screen.getByTestId('today-live-band')).toHaveTextContent('あと70分で出発');
     expect(screen.getByText(/時刻は現地時間\(Asia\/Tokyo\)/)).toBeInTheDocument();
     expect(screen.queryByText(/保存した情報を表示中/)).not.toBeInTheDocument();
@@ -200,7 +202,7 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     const now = await screen.findByTestId('today-now');
     const bar = within(now).getByRole('progressbar', { name: '今の予定の進み' });
     // ホテル 08:00(JST)開始・次の京都駅 15:00 まで、今 11:00 → 残り 240分・3/7
-    expect(within(now).getAllByText('残り 240分').length).toBeGreaterThan(0);
+    expect(now).toHaveTextContent('残り240分');
     expect(bar).toHaveAttribute('aria-valuenow', '43');
   });
 
@@ -212,10 +214,11 @@ describe('TodayPage の流れ (Gate G10-UX UX-5)', () => {
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
     expect(await screen.findByText(/に保存した情報を表示中/)).toBeInTheDocument();
     expect(screen.getByTestId('today-sync')).toHaveTextContent('保存済み');
-    // [Gate TDay-Mock] 当日の操作(写真・ひとこと / お助け / チケット)は画面の下にまとめる
-    const nav = screen.getByRole('navigation', { name: '当日の操作' });
+    // [Gate TDay-Live2] 下の操作は 1 段(今日・地図・残す・旅帖・旅程)。お助けは見出しの右に常に出す
+    const nav = screen.getByRole('navigation', { name: '当日の画面' });
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['今日', '地図', '残す', '旅帖', '旅程']);
     expect(within(nav).getByRole('button', { name: /写真・ひとこと/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'お助け' })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: /チケット/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'お助け' })).toHaveLength(1);
+    expect(screen.getByTestId('today-offline-alert')).toHaveTextContent('送信待ち');
   });
 });

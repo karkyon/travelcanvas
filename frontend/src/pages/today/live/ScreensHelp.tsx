@@ -32,6 +32,7 @@ import {
   distanceKm, etaMessage, planDetour, rainTitle, rainWindow, speak, walkMinutes,
 } from './todayLive';
 import { Face, Pill, RainBars } from './TodayDash';
+import { SourceTag } from './TodayTop';
 import { shareMyEta, type useCrew, ticketTabs } from './todayHelpers';
 import { LiveSwitch } from './LivePieces';
 import PushPanel from './PushPanel';
@@ -121,13 +122,15 @@ export const DetourScreen: React.FC<{ ctx: TodayCtx; arg: string | null }> = ({ 
             {items.map((c, i) => (
               <li key={`${c.name}-${i}`}>
                 <span className="tl-detour__letter" aria-hidden="true">{String.fromCharCode(65 + i)}</span>
+                <span className="sr-only">{`候補${String.fromCharCode(65 + i)}`}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{c.name}</b>
                   <div className="tl-pills">
                     {c.fit === 'indoor' && <Pill tone="info">屋内</Pill>}
                     {c.genre_label && <Pill>{c.genre_label}</Pill>}
                     {c.distance_km != null && <Pill>{`経路から${Math.round(c.distance_km * 1000)}m`}</Pill>}
-                    <Pill>{`歩いて約${walkMinutes(c.distance_km)}分`}</Pill>
+                    <SourceTag kind="est">{`概算 歩いて約${walkMinutes(c.distance_km)}分`}</SourceTag>
+                    <Pill tone="warn">営業は未確認</Pill>
                   </div>
                 </div>
                 <button type="button" className="tc-focus-ring tl-btn tl-btn--sm" onClick={() => setPicked(i)}
@@ -136,7 +139,7 @@ export const DetourScreen: React.FC<{ ctx: TodayCtx; arg: string | null }> = ({ 
             ))}
           </ul>
         )}
-        <p className="tl-small tl-mute">足す前に、後の予定への影響を表示します。候補は保存しません。</p>
+        <p className="tl-small tl-mute">ここに並ぶのは候補です。旅程にはまだ入っていません。足す前に、後の予定への影響を表示します。</p>
       </div>
     </ScreenFrame>
   );
@@ -240,7 +243,15 @@ export const RainScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
         </>
       )}>
       <div className="tl-pad">
+        <p className="tl-pills"><Pill tone="warn">まだ旅程は変わっていません</Pill></p>
         <h3 className="tl-title tl-title--lg">{title}</h3>
+        <p className="tl-change__meta" data-testid="today-rain-meta">
+          <span>{`予報 ${ctx.sky?.source ?? 'Open-Meteo'}（1時間ごと）`}</span>
+          {w && <span>{`対象 ${w.start}〜${w.end}時`}</span>}
+          {ctx.sky && <span>{`取得 ${hm(new Date(ctx.sky.fetchedAt).toISOString(), ctx.timeZone)}`}</span>}
+          <span>予報で、確定ではありません</span>
+          <span>気象警報は表示していません</span>
+        </p>
         <RainBars hours={ctx.hours} from={Math.max(0, (w?.start ?? ctx.nowHour) - 2)} count={8} />
         {affected.length > 0 && (
           <p className="tl-small">{'影響する予定：'}<b>{affected.map((e) => `${hm(e.start_at, ctx.timeZone)} ${e.title}（屋外）`).join('、')}</b></p>
@@ -263,12 +274,14 @@ export const RainScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
             ) : <p className="tl-small">{sw.data?.message ?? '控えの案(プランB)はまだありません。'}</p>}
           </section>
         </div>
+        {o && <h4 className="tl-lbl">切り替えると変わること</h4>}
         {o && (
-          <ul className="tl-impactlist">
+          <ul className="tl-impactlist" aria-label="切り替えると変わること">
             {o.join && <li>{`合流：${o.join.title} ${o.join.arrive} 着（余裕 ${o.join.margin_minutes}分）`}</li>}
             <li>{`外れる予定：${o.skipped.length ? o.skipped.join('・') : 'なし'}`}</li>
             {o.done.length > 0 && <li>{`済んだ予定（${o.done.join('・')}）はそのまま記録に残ります`}</li>}
-            {o.check.items.filter((i) => i.level !== 'ok').map((i) => <li key={i.title}>{i.title}</li>)}
+            {o.check.items.filter((i) => i.level !== 'ok').map((i) => <li key={i.title}>{`未確認・注意：${i.title}`}</li>)}
+            <li>選んで「切り替える」を押すまで、旅程は変わりません</li>
           </ul>
         )}
         {sw.done && <p role="status" className="tl-small tl-c-good">{sw.done}</p>}
@@ -374,6 +387,15 @@ export const DelayScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
         </div>
       ) : undefined}>
       <div className="tl-pad">
+        <section className="tl-card tl-card--flat" aria-label="情報の出どころ" data-testid="today-delay-sources">
+          <p className="tl-small"><b>交通の運行情報・施設の臨時休業は、自動では取っていない場合があります。</b>
+            ここに出るのは、登録した経路の状態・あなたや同行者の知らせだけです。外の地図や公式の案内でも確かめてください。</p>
+          <p className="tl-pills">
+            <SourceTag kind="seg">登録した経路の状態</SourceTag>
+            <SourceTag kind="manual">あなた・同行者の知らせ</SourceTag>
+          </p>
+          <p className="tl-small tl-mute">案を選んで反映するまで、旅程は変わりません。反映後は旅程の「元に戻す」で取り消せます。</p>
+        </section>
         {!loaded && <p className="tl-small" role="status" aria-busy="true">遅れの知らせを確かめています…</p>}
         {ctx.stale && <p className="tl-small">通信できないため、遅れの知らせ・組み直しは通信が戻ってから使えます。</p>}
         {alert && (
@@ -503,6 +525,9 @@ export const TicketScreen: React.FC<{ ctx: TodayCtx; eventId: string | null }> =
         </div>
       ) : undefined}>
       <div className="tl-pad">
+        <p className="tl-small tl-mute" data-testid="today-ticket-fresh">
+          {`${ctx.stale ? '通信なし ・ ' : ''}${ctx.fetchedAt ? `${hm(new Date(ctx.fetchedAt).toISOString(), ctx.timeZone)} に取得` : ''} ・ 予約サービスとは自動で同期していません。保存した端末なら通信なしでも開けます（端末の鍵の期限 30日）`}
+        </p>
         {tabs.length === 0 ? (
           <>
             <p>今日の予定に、予約・チケットは登録されていません。</p>
@@ -735,6 +760,10 @@ export const CrewScreen: React.FC<{ ctx: TodayCtx; crew: ReturnType<typeof useCr
         </div>
       )}
       <div className="tl-pad">
+        <section className="tl-card tl-card--good tl-card--flat" aria-label="共有するもの" data-testid="today-crew-privacy">
+          <p className="tl-small"><b>共有するのは「何時に着くか」だけ。</b>今いる場所（GPS）は送りません。地図にも出ません。
+            {` 共有はこの旅行の同行者だけに、最長${crew.maxHours}時間で自動で消え、いつでも止められます。`}</p>
+        </section>
         <ul className="tl-crew-list">
           <li>
             <Face label="あなた" self size={38} />
@@ -788,7 +817,7 @@ export const HelpScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
   return (
     <ScreenFrame title="お助け" onClose={ctx.close} closeIcon="x" closeLabel="閉じる" sheet testId="today-help">
       <div className="tl-pad">
-        <p className="tl-small tl-mute">困った時は、まずここから</p>
+        <p className="tl-small tl-mute">困った時は、まずここから。命に関わる時は、旅先の警察・救急へ直接連絡してください。</p>
         <ul className="tl-helplist">
           {rows.map((r) => {
             const body = <><span className="tl-helplist__icon" aria-hidden="true">{r.icon}</span>
@@ -824,6 +853,9 @@ export const SettingsScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
         <LiveSwitch label="寄り道チャンス" sub="30分以上の空きがある時" checked={s.notices.detour} onToggle={(v) => setN('detour', v)} />
         <LiveSwitch label="着きましたか?" sub="予定の時刻になったら印を押す案内" checked={s.notices.arrive} onToggle={(v) => setN('arrive', v)} />
         <h3 className="tl-lbl" style={{ marginTop: 16 }}>位置（既定はOFF）</h3>
+        <p className="tl-small tl-card tl-card--flat" data-testid="today-set-loc-note">
+          <b>ONにする前に：</b>位置はこの端末の中だけで使い、サーバーへは送りません。足跡はこの端末に保存し、同行者には見えません。
+          「着いた時の提案」と「足跡」は別々に選べます。提案は聞くだけで、印は自動では付けません。</p>
         <LiveSwitch label="着いたら印を押す提案" sub="位置の記録をONにした時だけ。保護エリアでは使いません" checked={s.location.arrive}
           onToggle={(v) => setL('arrive', v)} testId="today-set-loc-arrive" />
         <LiveSwitch label="今日の足跡を地図に描く" sub="この端末だけに置く" checked={s.location.trail} onToggle={(v) => setL('trail', v)}

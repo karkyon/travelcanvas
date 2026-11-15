@@ -11,6 +11,8 @@ import {
   STAGE_LABEL, STAGE_ORDER, distanceKm, goScreenText, hoursLabel, noteLines, speak,
 } from './todayLive';
 import { GoRing } from './TodayDash';
+import { SourceTag } from './TodayTop';
+import { travelSource, type SourceKind } from './todaySource';
 import { arriveSky, bookingPill, homeRoute, openGuide, shareMyEta, travelShort } from './todayHelpers';
 import { TeaserArt } from './LiveCards';
 import { useTeaserImage } from './useTeaserImage';
@@ -74,6 +76,7 @@ export const GoNowScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
         <p className="tl-gonow__sub">{`${e.title} ${start}着${travel ? ` ・ ${travel.replace('（概算）', '')}` : ''}`}</p>
         {go.estimated && <p className="tl-mute tl-small">移動時間は直線距離からの概算です</p>}
         <div className="tl-gonow__advice">{t.advice}</div>
+        <GoSourceBox ctx={ctx} />
         {!ctx.stale && (
           <div className="tl-gonow__transit">
             <TransitTime planId={ctx.planId} next={e} guide={ctx.gEvents[e.id]}
@@ -81,6 +84,55 @@ export const GoNowScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
               localDate={ctx.data.today_date} timeZone={timeZone} onSaved={ctx.refresh} />
           </div>
         )}
+      </div>
+    </ScreenFrame>
+  );
+};
+
+/** [Gate TDay-Live2] 出発の合図の「この時刻の出どころ」(所要・どこから・交通の情報の有無) */
+const GoSourceBox: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
+  const e = ctx.nextEv;
+  if (!e) return null;
+  const g = ctx.gEvents[e.id];
+  const src = travelSource(ctx, e);
+  const detail: Record<SourceKind, string> = {
+    api: '交通の情報サービスから取得した時刻です。',
+    manual: '乗換案内などで調べて、あなたが入れた所要です。',
+    seg: '旅程の区間に登録した手段と所要です。',
+    est: '直線距離に迂回の係数を掛けた概算です。実際の道や混雑は入りません。余裕を見て出発してください。',
+    none: '所要が分かりません。外の地図で調べて入れてください。',
+  };
+  return (
+    <section className="tl-card tl-card--flat tl-gonow__src" aria-labelledby="tl-go-src" data-testid="today-go-sourcebox">
+      <h3 id="tl-go-src" className="tl-lbl">この時刻の出どころ</h3>
+      <p className="tl-pills"><SourceTag kind={src.kind}>{src.text}</SourceTag></p>
+      <p className="tl-small">{detail[src.kind]}</p>
+      <p className="tl-small tl-mute">{`交通の情報：${e.transport_status === 'delayed' || e.transport_status === 'cancelled'
+        ? '登録した経路に遅延・運休あり' : g?.segment_id ? '登録した経路の状態のみ（自動の時刻検索はしていません）' : '対象外または未接続'}`}</p>
+      <button type="button" className="tc-focus-ring tl-btn tl-btn--sm" onClick={() => ctx.open('source', e.id)}>出どころの見分け方</button>
+    </section>
+  );
+};
+
+/** [Gate TDay-Live2] 移動時間の出どころの見分け方(下から出す画面) */
+export const SourceScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
+  const rows: [SourceKind, string, string][] = [
+    ['api', '交通の情報サービスから取得。取得時刻を必ず表示', '「実時刻 ・ 14:10 更新」'],
+    ['manual', '乗換案内などで調べて、あなたが入れた値', '「手入力 ・ 徒歩 約8分」'],
+    ['seg', '旅程の区間に登録した手段と所要', '「登録した移動 ・ 徒歩 約5分」'],
+    ['est', '直線距離 × 迂回の係数で計算。実際の道や混雑は入りません', '「距離からの概算 ・ 余裕を見て出発」'],
+    ['none', '所要が無い・取得に失敗・保存した古い値', '「所要が分かりません」'],
+  ];
+  return (
+    <ScreenFrame title="移動時間の出どころ" onClose={ctx.close} closeIcon="x" closeLabel="閉じる" sheet testId="today-source">
+      <div className="tl-pad">
+        <p className="tl-small tl-mute">5種類を、同じ形・同じ場所で見分けられます（色だけでなく、頭の1文字でも区別）。</p>
+        <ul className="tl-sourcelist">
+          {rows.map(([k, d, ex]) => (
+            <li key={k}><SourceTag kind={k} /><span><span className="tl-small">{d}</span><br /><span className="tl-small tl-mute">{`表示の例 ${ex}`}</span></span></li>
+          ))}
+        </ul>
+        <p className="tl-small tl-c-warn">電車・バスの時刻を自動で調べる機能ではありません。外の地図で調べた所要を「調べた時刻を入れる」で入れてください。</p>
       </div>
     </ScreenFrame>
   );
