@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { DashboardTrip } from '@/services/api/types/g9';
 import {
-  eventTime, groupTrips, minutesLabel, quickActions, shortDate, spanTitle, statusLabel, tripDateLabel,
+  eventTime, groupTrips, homeTitle, minutesLabel, quickActions, shortDate, spanTitle, statusLabel, tripDateLabel,
 } from './dashboardModel';
 
 const base: DashboardTrip = {
@@ -82,5 +82,22 @@ describe('操作(最大4つ・権限の無い操作は出さない)', () => {
   it('段階ごとにまとめ、空の段階は出さない', () => {
     const g = groupTrips([{ ...base, id: 'a', phase: 'past' }, { ...base, id: 'b' }, { ...base, id: 'c', phase: 'ongoing' }]);
     expect(g.map((x) => [x.phase, x.trips.map((t) => t.id)])).toEqual([['ongoing', ['c']], ['upcoming', ['b']], ['past', ['a']]]);
+  });
+});
+
+describe('[HomeLive] ホームの見出し', () => {
+  const live: DashboardTrip = { ...base, id: 'live', phase: 'ongoing', days_until_start: null, day_number: 1, total_days: 2 };
+  it('旅行中の旅行があれば、別の旅行の「次の旅まで」より旅行中を出す', () => {
+    expect(homeTitle(live, [base, live])).toBe('旅行中 ・ 1日目 / 2日');
+    expect(homeTitle(null, [base, live])).toBe('旅行中 ・ 1日目 / 2日');
+  });
+  it('旅行前を選んでいれば、その旅行までの日数', () => {
+    expect(homeTitle(base, [base, live])).toBe('次の旅まで あと 7 日');
+    expect(homeTitle({ ...base, days_until_start: 1 }, [])).toBe('明日から旅行です');
+    expect(homeTitle({ ...base, days_until_start: 100 }, [])).toMatch(/^次の旅まで あと 約3か月/);
+  });
+  it('旅行後・旅行が無い', () => {
+    expect(homeTitle({ ...base, phase: 'past', days_until_start: null, days_since_end: 2 }, [])).toBe('旅のあとに: 記録と精算');
+    expect(homeTitle(null, [])).toBe('次の旅を、楽しみに変える');
   });
 });
