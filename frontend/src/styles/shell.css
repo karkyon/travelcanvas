@@ -1263,15 +1263,16 @@
 .tc-variant-note.is-warn { color: var(--tc-warning); font-weight: 700; }
 
 /* ===== [Gate TripKit] 旅行箱の共通の見出し・切り替え(448px 以下は 4 つ + その他) ===== */
-.tc-kit-nav { display: block; margin-bottom: 16px; }
+/* .tc-kit-tabs は運用コンソール(AdminOpsPage)も使うため、旅行箱のナビ(.tc-kit-nav--trip)の中だけに効かせる */
+.tc-kit-nav--trip { display: block; margin-bottom: 16px; }
 .tc-kit-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 8px; }
 .tc-kit-trail { margin: 0; font-size: 12px; color: var(--tc-ink-500); min-width: 0; overflow-wrap: anywhere; }
 .tc-kit-trail a { color: var(--tc-ink-700); font-weight: 700; text-decoration: none; }
 .tc-kit-trail a:hover { text-decoration: underline; }
 .tc-kit-bar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--tc-cloud-200); padding-bottom: 8px; }
-.tc-kit-tabs { flex: 1; min-width: 0; display: flex; gap: 6px; overflow: visible; flex-wrap: wrap; }
+.tc-kit-nav--trip .tc-kit-tabs { flex: 1; min-width: 0; display: flex; gap: 6px; overflow: visible; flex-wrap: wrap; }
 .tc-kit-tab, .tc-kit-more__btn { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
-.tc-kit-tabs .tc-kit-more__btn[aria-current="page"] { background: var(--tc-accent); color: var(--tc-on-accent); }
+.tc-kit-nav--trip .tc-kit-tabs .tc-kit-more__btn[aria-current="page"] { background: var(--tc-accent); color: var(--tc-on-accent); }
 .tc-kit-tab__short { display: none; }
 .tc-kit-more { position: relative; display: none; }
 .tc-kit-more__menu { position: absolute; z-index: 40; top: calc(100% + 6px); right: 0; min-width: 200px; list-style: none; margin: 0; padding: 6px;
@@ -1283,11 +1284,11 @@
 .tc-kit-search { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 1px solid var(--tc-cloud-200);
   border-radius: 10px; background: var(--tc-cloud-0); color: var(--tc-ink-700); font-size: 12px; font-weight: 800; text-decoration: none; }
 .tc-kit-search[aria-current="page"] { border-color: var(--tc-accent); color: var(--tc-ink-900); }
-@media (max-width: 760px) { .tc-kit-tabs { flex-wrap: nowrap; } .tc-kit-tab__long { display: none; } .tc-kit-tab__short { display: inline; } }
+@media (max-width: 760px) { .tc-kit-nav--trip .tc-kit-tabs { flex-wrap: nowrap; } .tc-kit-tab__long { display: none; } .tc-kit-tab__short { display: inline; } }
 @media (max-width: 448px) {
   .tc-kit-tab--more { display: none !important; }
   .tc-kit-more { display: block; }
-  .tc-kit-tabs { gap: 4px; }
+  .tc-kit-nav--trip .tc-kit-tabs { gap: 4px; }
   .tc-kit-tab, .tc-kit-more__btn { padding: 6px 9px; }
   .tc-kit-search span { display: none; }
   .tc-kit-search { padding: 0 11px; }

@@ -36,7 +36,7 @@ const TripKitNav: React.FC<{ planId: string }> = ({ planId }) => {
   }, [moreOpen]);
 
   return (
-    <div className="tc-kit-nav" data-testid="tripkit-nav">
+    <div className="tc-kit-nav tc-kit-nav--trip" data-testid="tripkit-nav">
       <div className="tc-kit-head">
         <p className="tc-kit-trail">
           <Link to={`/planner/${planId}`} className="tc-focus-ring">{trip.title || '旅程'}</Link>
