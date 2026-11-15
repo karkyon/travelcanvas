@@ -9,8 +9,8 @@ import { seedBaseline } from '../ux/baselineData';
  *
  * 1. 設定の「テーマ」で暗い見た目を選ぶと、全ての画面(<html data-theme="dark">)が暗くなり、読み直しても続く。
  *    主な画面を 1440px・360px で開き、横にはみ出さず axe(WCAG 2.1 AA。暗い地の文字のコントラストを含む)違反が無い
- * 2. 当日の画面(スマホ 390px。[Gate TDay-Mock] モックアップ Mobile-Today の並び): 次(出発の合図)・NOW(残り)・
- *    今日の旅程(済んだ数)。簡易表示は今と次だけで、端末に覚える。当日の操作は画面の下(親指の届く所)にあり、
+ * 2. 当日の画面(スマホ 390px。[Gate TDay-Live2] 改修モックアップの並び): 判断カード(NOW・次の出発の合図)・
+ *    今日の旅程(済んだ数)。簡易表示は今と次だけで、端末に覚える。下の操作は 1 段で画面の下(親指の届く所)にあり、
  *    押せる大きさ(高さ 44px 以上)。開く画面(旅程・出発の合図・お助け・地図・旅帖)も明るい・暗いで axe 違反が無い
  */
 
@@ -106,22 +106,25 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
     const nextCard = page.getByTestId('today-next');
     // [Gate TDay-Mock] スマホの並び(Mobile-Today): ライブ帯 → 今日の題 → 次(出発の合図)→ … → NOW(残り)
     await expect(nowCard.getByRole('heading', { name: titles.now })).toBeVisible();
-    await expect(nowCard).toContainText(/NOW ・ 残り\d+分/);
+    await expect(nowCard).toContainText(/残り\d+分/);
     await expect(nextCard.getByRole('heading', { name: new RegExp(titles.next) })).toBeVisible();
     await expect(page.getByTestId('today-live-band')).toContainText(titles.next);
     await expect(page.getByTestId('today-sync')).toHaveText(/^最新/);
     await expectNoAxeViolations(page, '当日(明るい・390px)');
 
-    // 当日の操作: 画面の下(親指の届く所)に固定され、押せる大きさ。その下に「当日の画面」(今日/地図/旅帖/旅程)
-    const nav = page.getByRole('navigation', { name: '当日の操作' });
-    for (const name of [/写真・ひとこと/, /^お助け$/, /^チケット$/]) {
-      const box = await nav.getByRole('button', { name }).boundingBox();
+    // [Gate TDay-Live2] 下の操作は 1 段(今日・地図・残す・旅帖・旅程)。画面の下(親指の届く所)に固定され、押せる大きさ。
+    // お助けは見出しの右に常に出す(押せる大きさ)
+    const tabs = page.getByRole('navigation', { name: '当日の画面' });
+    for (const name of [/^今日$/, /^地図$/, /写真・ひとこと/, /^旅帖$/, /^旅程$/]) {
+      const box = await tabs.getByRole('button', { name }).boundingBox();
       expect(box, String(name)).not.toBeNull();
       expect(box!.height, String(name)).toBeGreaterThanOrEqual(44);
       expect(box!.y + box!.height, String(name)).toBeLessThanOrEqual(844);
       expect(box!.y, String(name)).toBeGreaterThan(844 * 0.75);
     }
-    const tabs = page.getByRole('navigation', { name: '当日の画面' });
+    const helpBox = await page.getByRole('button', { name: 'お助け' }).boundingBox();
+    expect(helpBox).not.toBeNull();
+    expect(helpBox!.height).toBeGreaterThanOrEqual(44);
     await expect(tabs.getByRole('button', { name: '今日' })).toHaveAttribute('aria-current', 'page');
     await expectNoOverflow(page, '当日(390px)');
 
@@ -141,7 +144,7 @@ test.describe('UX-5 当日の画面(スマホ)', () => {
     await expect(page.getByTestId('today-gonow')).toBeVisible({ timeout: 15_000 });
     await expectNoAxeViolations(page, '出発の合図(390px)');
     await page.getByRole('button', { name: '今日へ戻る' }).click();
-    await nav.getByRole('button', { name: /^お助け$/ }).click();
+    await page.getByRole('button', { name: 'お助け' }).click();
     await expect(page.getByTestId('today-help')).toBeVisible({ timeout: 15_000 });
     await expectNoAxeViolations(page, 'お助け(390px)');
     await page.getByTestId('today-help').getByRole('button', { name: '閉じる' }).click();
