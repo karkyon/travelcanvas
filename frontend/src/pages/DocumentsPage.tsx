@@ -21,8 +21,12 @@ import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl } from '@/services/api';
-import type { TravelDocument, DocumentClassification } from '@/services/api';
+import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl, getDocumentLinks } from '@/services/api';
+import type { TravelDocument, DocumentClassification, DocumentLink } from '@/services/api';
+import PageHead from '@/components/shell/PageHead';
+import TripKitNav from '@/components/shell/TripKitNav';
+import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl, safeInternalPath } from '@/utils/safeNavigation';
 
@@ -37,6 +41,56 @@ const CLASSIFICATION_LABEL: Record<string, string> = Object.fromEntries(
   CLASSIFICATION_OPTIONS.map((o) => [o.value, o.label])
 );
 
+// [Gate TripKit] 処理の状態(読み取り・安全確認)。色だけでなく文字で出す
+const OCR_LABEL: Record<string, string> = { pending: '読み取り待ち', processing: '読み取り中', done: '読み取り済み', completed: '読み取り済み',
+  failed: '読み取り失敗', skipped: '読み取りなし', not_applicable: '読み取りなし' };
+const MALWARE_LABEL: Record<string, string> = { pending: '安全確認中', scanning: '安全確認中', clean: '', infected: '危険なファイル(使えません)',
+  failed: '安全確認に失敗', skipped: '' };
+const LINK_ENTITY: Record<string, string> = { reservation: '予約', event: '予定', expense: '費用', ticket: 'チケット', place: '場所' };
+
+function addedDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()} 追加`;
+}
+
+/** [Gate TripKit] 文書の関連先(予約・予定・費用)。押した時だけ読む(一覧で全件の関連先を読まない) */
+const DocLinks: React.FC<{ planId: string; doc: TravelDocument }> = ({ planId, doc }) => {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [links, setLinks] = useState<DocumentLink[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && links == null) {
+      try { setLinks(await getDocumentLinks(planId, doc.id)); } catch (e) { setFailed(errorDetailMessage(e, '関連先を読めませんでした')); }
+    }
+  };
+  const go = (l: DocumentLink) => {
+    if (l.entity_type === 'reservation') navigate(`/planner/${planId}/reservations?open=${encodeURIComponent(l.entity_id)}`);
+    else if (l.entity_type === 'expense') navigate(`/planner/${planId}/expenses?tab=expenses`);
+    else navigate(`/planner/${planId}`);
+  };
+  return (
+    <div className="tc-doc-links">
+      <button type="button" className="tc-focus-ring tc-mini-link" aria-expanded={open} onClick={() => void toggle()}>関連先</button>
+      {open && (
+        failed ? <p className="text-xs text-red-700" role="alert">{failed}</p>
+          : links == null ? <p className="text-xs text-ink-700">読み込み中…</p>
+            : links.length === 0 ? <p className="text-xs text-ink-700">まだどこにもつながっていません(予約の詳細から添付できます)</p>
+              : (
+                <ul className="tc-doc-links__list" aria-label={`${doc.original_filename ?? '文書'}の関連先`}>
+                  {links.map((l) => (
+                    <li key={l.id}><button type="button" className="tc-focus-ring tc-mini-link" onClick={() => go(l)}>
+                      {`${LINK_ENTITY[l.entity_type] ?? l.entity_type}を開く`}</button></li>
+                  ))}
+                </ul>
+              )
+      )}
+    </div>
+  );
+};
+
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '-';
   if (bytes < 1024) return `${bytes} B`;
@@ -50,6 +104,7 @@ const DocumentsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [documents, setDocuments] = useState<TravelDocument[]>([]);
+  const [cond, setCond] = useQueryState({ q: '', cls: '', type: '', sort: 'new' });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -168,21 +223,19 @@ const DocumentsPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
-            ← プランへ戻る
-          </Button>
-          <h1 className="text-2xl font-bold text-ink-900">文書ウォレット</h1>
-          <p className="text-sm text-ink-500 mt-1">
-            領収書・確認書等のファイルをアップロード・管理できます(暗号化して保存されます)。
-          </p>
-        </div>
-        <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
-          新規アップロード
-        </Button>
-      </div>
+    <div className="tc-page">
+      <PageHead
+        eyebrow="TRIP KIT · 旅行箱"
+        title="文書ライブラリ"
+        sub="予約確認書・チケット・領収書などを暗号化して保管し、予約・予定・費用から同じ文書を開けます(ファイルは複製しません)。"
+        actions={(
+          <>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>予約メールを取り込む</button>
+            <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>文書を追加</Button>
+          </>
+        )}
+      />
+      {planId && <TripKitNav planId={planId} />}
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
@@ -192,12 +245,49 @@ const DocumentsPage: React.FC = () => {
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : documents.length === 0 ? (
         <Card padding="lg" className="text-center text-ink-500">
-          文書がまだ登録されていません。「新規アップロード」から追加できます。
+          文書がまだありません。「文書を追加」でファイルを保管するか、予約メールを取り込むと原本がここに残ります。
         </Card>
-      ) : (
-        <div className="space-y-3">
-          {documents.map((d) => (
-            <Card key={d.id} padding="md">
+      ) : (() => {
+        const words = cond.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const types = Array.from(new Set(documents.map((d) => d.document_type).filter((t): t is string => !!t)));
+        let shown = documents.filter((d) => (!cond.cls || d.classification === cond.cls) && (!cond.type || d.document_type === cond.type)
+          && words.every((w) => [d.original_filename, d.document_type, CLASSIFICATION_LABEL[d.classification]].some((v) => (v ?? '').toLowerCase().includes(w))));
+        shown = [...shown].sort((a, b) => (cond.sort === 'name'
+          ? (a.original_filename ?? '').localeCompare(b.original_filename ?? '', 'ja')
+          : cond.sort === 'old' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at)));
+        const clearAll = () => setCond({ q: '', cls: '', type: '' });
+        const conds = [
+          ...(cond.q ? [{ key: 'q', label: `「${cond.q}」`, clear: () => setCond({ q: '' }) }] : []),
+          ...(cond.cls ? [{ key: 'cls', label: CLASSIFICATION_LABEL[cond.cls] ?? cond.cls, clear: () => setCond({ cls: '' }) }] : []),
+          ...(cond.type ? [{ key: 'type', label: `種類: ${cond.type}`, clear: () => setCond({ type: '' }) }] : []),
+        ];
+        return (
+        <section aria-labelledby="docs-list-title">
+          <h2 id="docs-list-title" className="sr-only">文書の一覧</h2>
+          <div className="tc-kit-searchrow">
+            <label className="tc-kit-searchbox">
+              <span className="sr-only">文書を検索</span>
+              <input type="search" value={cond.q} onChange={(e) => setCond({ q: e.target.value })} placeholder="ファイル名・種類で検索" />
+            </label>
+            <label className="tc-kit-select"><span className="sr-only">並べ替え</span>
+              <select value={cond.sort} onChange={(e) => setCond({ sort: e.target.value })}>
+                <option value="new">追加が新しい順</option><option value="old">追加が古い順</option><option value="name">名前の順</option>
+              </select>
+            </label>
+          </div>
+          <KitChips label="分類で絞り込む" value={cond.cls} onChange={(v) => setCond({ cls: v })} allCount={documents.length}
+            options={CLASSIFICATION_OPTIONS.map((o) => ({ value: o.value, label: o.label.replace(/\(.*\)/, ''),
+              count: documents.filter((d) => d.classification === o.value).length })).filter((o) => o.count > 0)} />
+          {types.length > 0 && (
+            <KitChips label="種類で絞り込む" allLabel="種類すべて" value={cond.type} onChange={(v) => setCond({ type: v })}
+              options={types.map((t) => ({ value: t, label: t, count: documents.filter((d) => d.document_type === t).length }))} />
+          )}
+          <KitActiveConditions conditions={conds} shown={shown.length} total={documents.length} onClearAll={clearAll} />
+          {shown.length === 0 ? <KitNoMatch onClearAll={clearAll} /> : (
+        <ul className="space-y-3" aria-label="文書">
+          {shown.map((d) => (
+            <li key={d.id}>
+            <Card padding="md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
                   <FileText size={20} className="text-gray-400 shrink-0" />
@@ -209,7 +299,12 @@ const DocumentsPage: React.FC = () => {
                       {CLASSIFICATION_LABEL[d.classification] ?? d.classification}
                       {d.document_type && ` ・ ${d.document_type}`}
                       {' ・ '}{formatSize(d.size)}
+                      {' ・ '}{addedDate(d.created_at)}
                     </div>
+                    {(OCR_LABEL[d.ocr_status] || MALWARE_LABEL[d.malware_status]) && (
+                      <div className="text-xs text-ink-700">{[MALWARE_LABEL[d.malware_status], OCR_LABEL[d.ocr_status]].filter(Boolean).join(' ・ ')}</div>
+                    )}
+                    {planId && <DocLinks planId={planId} doc={d} />}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -217,25 +312,29 @@ const DocumentsPage: React.FC = () => {
                     type="button"
                     onClick={() => handleDownload(d)}
                     disabled={downloadingId === d.id}
-                    className="text-ink-500 hover:text-blue-600 p-1 disabled:opacity-50"
-                    aria-label="ダウンロード"
+                    className="tc-focus-ring text-ink-500 hover:text-blue-600 p-3 disabled:opacity-50"
+                    aria-label={`${d.original_filename ?? '文書'}をダウンロード`}
                   >
                     <Download size={16} />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(d)}
-                    className="text-ink-500 hover:text-red-600 p-1"
-                    aria-label="削除"
+                    className="tc-focus-ring text-ink-500 hover:text-red-600 p-3"
+                    aria-label={`${d.original_filename ?? '文書'}を削除`}
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
             </Card>
+            </li>
           ))}
-        </div>
-      )}
+        </ul>
+          )}
+        </section>
+        );
+      })()}
 
       {/* 新規アップロード */}
       <Modal

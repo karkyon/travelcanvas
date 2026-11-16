@@ -14,6 +14,9 @@ vi.mock('../services/api/g9', () => ({ getDashboard, setTripState }));
 // [Gate MemoryReel] ホームの思い出リールの材料(写真なし・予定の名前で流す)
 const { getMemoryReel } = vi.hoisted(() => ({ getMemoryReel: vi.fn() }));
 vi.mock('../services/api/memoryReel', () => ({ getMemoryReel }));
+// [Gate HomeLive] 旅行中のホームは今日の画面と同じ GET /plans/{id}/today を読む
+const { getToday } = vi.hoisted(() => ({ getToday: vi.fn() }));
+vi.mock('@/services/api', async (orig) => ({ ...(await orig<typeof import('@/services/api')>()), getToday }));
 
 import { useThemeStore } from '@/hooks/useThemePreference';
 import DashboardPage from './DashboardPage';
@@ -42,6 +45,8 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     getDashboard.mockReset();
     getMemoryReel.mockReset();
+    getToday.mockReset();
+    getToday.mockRejectedValue(new Error('offline'));
     getMemoryReel.mockImplementation(async (planId: string) => ({
       plan_id: planId, title: '思い出', destination: '奈良', start_date: '2026-10-01', end_date: '2026-10-02', day_count: 2,
       photo_count: 0, note_count: 0, place_count: 0, member_count: 1, quote: null, slides: [],
@@ -166,7 +171,7 @@ describe('DashboardPage', () => {
     expect(within(sw).getByTestId('home-switch-p-other')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('旅行中: NOW/NEXT(現地の時刻・残り時間)', async () => {
+  it('旅行中: NOW/NEXT(現地の時刻・残り時間)。今日の予定を読めない時はホームの要約だけを出し、そう書く', async () => {
     getDashboard.mockResolvedValue(decodeDashboard(fx.dashboard_ongoing));
     login();
     renderDashboard();
@@ -175,6 +180,71 @@ describe('DashboardPage', () => {
     expect(nn).toHaveTextContent('06:38');
     expect(nn).toHaveTextContent('あと1時間59分');
     expect(screen.getByTestId('dashboard-hero')).toHaveAttribute('data-phase', 'ongoing');
+    expect(await screen.findByText(/ホームの要約だけを出しています/)).toBeInTheDocument();
+  });
+
+  it('[HomeLive] 旅行中は「次の旅まで」ではなく「旅行中 ・ 何日目」。次にすること・案内・チケット(予約がある時だけ)・今日の流れ', async () => {
+    getDashboard.mockResolvedValue(decodeDashboard(fx.dashboard_ongoing));
+    const now = Date.now();
+    const iso = (min: number) => new Date(now + min * 60_000).toISOString();
+    const ev = (id: string, title: string, start: number, extra: Record<string, unknown> = {}) => ({
+      id, title, event_type: 'sightseeing', start_at: iso(start), end_at: iso(start + 50), local_start_time: null, address: null,
+      latitude: null, longitude: null, has_ticket: false, reservation_id: null, time_source: 'start_at', departure_at: null,
+      transport_mode: null, transport_status: null, ...extra,
+    });
+    const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .format(new Date(now));
+    getToday.mockResolvedValue({
+      plan_id: 'bd054cef-4cd9-4698-9839-c9befc8659fa', today_date: todayIso, timezone_id: 'Asia/Tokyo',
+      server_time: new Date(now).toISOString(), now_event: null, next_event: null, minutes_until_next: null, day_end_at: null,
+      events: [
+        ev('e1', '朝の神社', -120),
+        ev('e2', '寺の拝観', -10),
+        ev('e3', '特急で移動', 40, { has_ticket: true, reservation_id: 'r-9', address: '京都駅', transport_status: 'delayed' }),
+      ],
+    });
+    login();
+    renderDashboard();
+    expect(await screen.findByRole('heading', { level: 1, name: '旅行中 ・ 1日目 / 2日' })).toBeInTheDocument();
+    expect(screen.queryByText(/次の旅まで/)).toBeNull();
+    const nn = await screen.findByTestId('dashboard-nownext');
+    await waitFor(() => expect(nn).toHaveTextContent('特急で移動'));
+    expect(nn).toHaveTextContent(/あと (39|40) 分/);
+    expect(nn).toHaveTextContent('遅延');
+    const acts = within(nn).getByRole('navigation', { name: 'この旅行の操作' });
+    expect(within(acts).getByRole('link', { name: /案内を開く/ })).toHaveAttribute('href', expect.stringContaining('google.com/maps/search'));
+    expect(within(acts).getByRole('link', { name: 'チケット' })).toHaveAttribute('href', '/planner/bd054cef-4cd9-4698-9839-c9befc8659fa/reservations?open=r-9');
+    expect(screen.getByTestId('live-now')).toHaveTextContent('寺の拝観');
+    const flow = screen.getByTestId('live-flow');
+    const items = within(flow).getAllByRole('listitem');
+    expect(items.map((li) => li.getAttribute('data-state'))).toEqual(['done', 'now', 'next']);
+    fireEvent.click(within(items[2]!).getByRole('button'));
+    expect(within(items[2]!).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
+    // 遅延・休業の知らせが無い時は短い確認だけ。旅行前の「旅の準備」は出さない
+    expect(screen.getByTestId('live-alerts-ok')).toBeInTheDocument();
+    expect(screen.queryByTestId('home-progress')).toBeNull();
+    // 座標の無い予定だけなら地図は出さず、理由を書く
+    expect(screen.getByText('今日の予定に座標が無いため、地図は出せません。')).toBeInTheDocument();
+  });
+
+  it('[HomeLive] 次の予定にチケットが無ければ「チケット」を出さない', async () => {
+    getDashboard.mockResolvedValue(decodeDashboard(fx.dashboard_ongoing));
+    const now = Date.now();
+    const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .format(new Date(now));
+    getToday.mockResolvedValue({
+      plan_id: 'p', today_date: todayIso, timezone_id: 'Asia/Tokyo', server_time: new Date(now).toISOString(),
+      now_event: null, next_event: null, minutes_until_next: null, day_end_at: null,
+      events: [{ id: 'x', title: '昼食', event_type: 'meal', start_at: new Date(now + 3_600_000).toISOString(), end_at: null,
+        local_start_time: null, address: null, latitude: 35, longitude: 135.7, has_ticket: false, reservation_id: null,
+        time_source: 'start_at', departure_at: null, transport_mode: null, transport_status: null }],
+    });
+    login();
+    renderDashboard();
+    const nn = await screen.findByTestId('dashboard-nownext');
+    await waitFor(() => expect(nn).toHaveTextContent('昼食'));
+    expect(within(nn).queryByRole('link', { name: 'チケット' })).toBeNull();
+    expect(within(nn).getByRole('link', { name: /案内を開く/ })).toHaveAttribute('href', expect.stringContaining('destination=35%2C135.7'));
   });
 
   it('旅行後: 精算・記録への案内(準備・遅延は出さない)', async () => {

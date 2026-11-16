@@ -22,7 +22,7 @@ test('予約: 予約番号は伏せて一覧し、キーボードで詳細を開
   await send('post', `/plans/${planId}/days`, { local_date: '2026-11-02', timezone_id: 'Asia/Tokyo' });
 
   await page.goto(`/planner/${planId}/reservations`);
-  await expect(page.getByRole('heading', { name: '旅の情報を、ひとつの場所へ', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '予約・チケット', level: 1 })).toBeVisible();
   await expect(page.getByText('予約がまだ登録されていません')).toBeVisible();
   await expectNoAxeViolations(page, '予約一覧(空)');
 
@@ -108,11 +108,11 @@ test('予約取込: 同意して取込ジョブを作り、候補を登録・承
   const { planId } = await startGuestPlanViaApi(page, `E1取込E2E-${Date.now()}`, { open: false });
 
   await page.goto(`/planner/${planId}/imports`);
-  await expect(page.getByRole('heading', { name: '予約取込', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '予約の取込', level: 1 })).toBeVisible();
   await expectNoAxeViolations(page, '予約取込(空)');
 
   // 1. 同意しないと作れない
-  await page.getByRole('button', { name: '新規取込' }).click();
+  await page.getByRole('button', { name: '手入力で取り込む' }).click();
   const create = page.getByRole('dialog', { name: '新規取込ジョブ' });
   await expect(create.getByRole('button', { name: '作成' })).toBeDisabled();
   await create.getByLabel('この取込内容を旅行プランへ登録することに同意します。').check();
@@ -141,16 +141,15 @@ test('予約取込: 同意して取込ジョブを作り、候補を登録・承
   }
   await expectNoAxeViolations(page, '取込ジョブ詳細(未レビュー)');
 
-  // 3. 承認して確定 → 予約一覧へ移り、予約ができている(予約番号は伏せる)
+  // 3. 承認して確定 → [Gate TripKit] 作った予約の詳細へ直接移る(予約番号は伏せる)
   for (const [field] of candidates) {
     await detail.getByRole('button', { name: `候補「${field}」を承認` }).click();
     await expect(detail.getByRole('button', { name: `候補「${field}」を承認` })).toHaveCount(0);
   }
   page.once('dialog', (d) => d.accept());
   await detail.getByRole('button', { name: '確定して予約を作成' }).click();
-  await page.waitForURL(new RegExp(`/planner/${planId}/reservations$`), { timeout: 15_000 });
-  const card = page.getByRole('button', { name: /取込レストランE1/ });
-  await expect(card).toBeVisible();
+  await page.waitForURL(new RegExp(`/planner/${planId}/reservations\\?open=`), { timeout: 15_000 });
+  await expect(page.getByRole('dialog')).toContainText('取込レストランE1', { timeout: 15_000 });
   await expect(page.locator('body')).not.toContainText('IMP-E1-5555');
 
   // 4. 取込側では確定済みとして残る

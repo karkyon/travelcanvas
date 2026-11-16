@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { ProtectedRoute, AdminRoute, AuthRedirect } from './guards';
 import RouteErrorBoundary from './RouteErrorBoundary';
 import { lazyPage } from './lazyPage';
+import type { ReactElement } from 'react';
 
 // [Gate M9-FE-C3] 全ページをルート単位で遅延読込する(React.lazy)。以前は25ページを
 // 静的importしており、どの画面を開いても全画面分(main JS 約732kB)を最初に読み込んでいた。
@@ -47,6 +48,8 @@ const AdminOpsPage = lazyPage(() => import('@/pages/Admin/AdminOpsPage'));
 const NotificationsPage = lazyPage(() => import('@/pages/NotificationsPage'));
 const OptimizationSelectPage = lazyPage(() => import('@/pages/OptimizationSelectPage'));
 const ReservationsPage = lazyPage(() => import('@/pages/ReservationsPage'));
+// [Gate TripKit] 旅行箱の概要・旅行箱を検索(同じ塊。TripKitRoute が URL で出し分ける)
+const TripKitRoute = lazyPage(() => import('@/pages/TripKitRoute'));
 const ImportsPage = lazyPage(() => import('@/pages/ImportsPage'));
 const DocumentsPage = lazyPage(() => import('@/pages/DocumentsPage'));
 const TodayPage = lazyPage(() => import('@/pages/TodayPage'));
@@ -94,6 +97,10 @@ const AccountDeletedPage = lazyPage(() => import('@/pages/AccountDeletedPage'));
 // [Gate M9-FE-B2] ルートガード(ProtectedRoute/AdminRoute/AuthRedirect)は
 // Fast Refresh対応のため ./guards.tsx へ移設(ロジック変更なし)。
 
+// [Gate TripKit] ログインが必要な画面を ProtectedRoute で包む(以前は画面ごとに同じ JSX を書いていた。
+// 出来る要素は同じ。最初に読む JS の上限 430 kB に収めるため、繰り返しを 1 つにまとめた)
+const guard = (page: ReactElement) => <ProtectedRoute>{page}</ProtectedRoute>;
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -134,21 +141,13 @@ export const router = createBrowserRouter([
         // ためAuthRedirectだと即座に/dashboardへ弾かれてしまう。認証(ゲスト含む)
         // 必須のみをProtectedRouteで課し、非ゲストの場合はページ自身がリダイレクトする。
         path: 'guest/upgrade',
-        element: (
-          <ProtectedRoute>
-            <GuestUpgradePage />
-          </ProtectedRoute>
-        ),
+        element: guard(<GuestUpgradePage />),
       },
       
       // 🎯 メインアプリケーション
       {
         path: 'dashboard',
-        element: (
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<DashboardPage />),
       },
       
       // 📋 プランナー関連
@@ -157,32 +156,30 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: (
-              <ProtectedRoute>
-                <PlannerPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<PlannerPage />),
           },
           {
             path: ':planId?',
-            element: (
-              <ProtectedRoute>
-                <PlannerPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<PlannerPage />),
           },
         ],
+      },
+
+      // 🧰 [Gate TripKit] 旅行箱の概要(TK-01)と、旅行箱を検索(TK-02。FR-009 の情報内検索 API を使う)
+      {
+        path: 'planner/:planId/kit',
+        element: guard(<TripKitRoute />),
+      },
+      {
+        path: 'planner/:planId/kit/search',
+        element: guard(<TripKitRoute />),
       },
 
       // 🧳 [Gate R3-2] 予約一覧・詳細(SC-11)。backend(Gate R3-0/R3-1)は
       // 実装済みだったがどこからもリンクされておらず画面から到達不能だった。
       {
         path: 'planner/:planId/reservations',
-        element: (
-          <ProtectedRoute>
-            <ReservationsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ReservationsPage />),
       },
 
       // 📥 [Gate R3-9] 予約取込(FR-011)。backend(Gate R3-7)は実装済み
@@ -191,11 +188,7 @@ export const router = createBrowserRouter([
       // 到達経路も必ず追加する)。
       {
         path: 'planner/:planId/imports',
-        element: (
-          <ProtectedRoute>
-            <ImportsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ImportsPage />),
       },
 
       // 📄 [Gate R3-10] 文書ウォレット(FR-013)。backend(Gate R3-6)は
@@ -203,21 +196,13 @@ export const router = createBrowserRouter([
       // だった(同上パターンの再発防止)。
       {
         path: 'planner/:planId/documents',
-        element: (
-          <ProtectedRoute>
-            <DocumentsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<DocumentsPage />),
       },
 
       // ☀️ [Gate L1] FR-029当日モード(NOW/NEXT)。DOC-04 SC-07。
       {
         path: 'planner/:planId/today',
-        element: (
-          <ProtectedRoute>
-            <TodayPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<TodayPage />),
       },
 
       // 🚶 [Gate M2] 移動区間(FR-014)。backend(Gate M1)は実装済みだった
@@ -225,90 +210,54 @@ export const router = createBrowserRouter([
       // #25と同じパターンの再発防止)。
       {
         path: 'planner/:planId/segments',
-        element: (
-          <ProtectedRoute>
-            <SegmentsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<SegmentsPage />),
       },
 
       // 🗺️ [Gate M4] 経路の比較(FR-015)。backend(Gate M3)は実装済みだった
       // がどこからもリンクされておらず画面から到達不能だった。
       {
         path: 'planner/:planId/route-options',
-        element: (
-          <ProtectedRoute>
-            <RouteOptionsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<RouteOptionsPage />),
       },
 
       // ⚖️ [Gate L2] 制約(FR-016)。ハード/ソフト、共有/秘匿の制約を登録する。
       {
         path: 'planner/:planId/constraints',
-        element: (
-          <ProtectedRoute>
-            <ConstraintsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ConstraintsPage />),
       },
 
       // ✅ [Gate P1] 出発前の準備(FR-025持ち物 / FR-026準備タスク・レディネス)。
       {
         path: 'planner/:planId/preparation',
-        element: (
-          <ProtectedRoute>
-            <PreparationPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<PreparationPage />),
       },
 
       // 💴 [Gate P2] 予算・費用・立替精算(FR-027/FR-028)。
       {
         path: 'planner/:planId/expenses',
-        element: (
-          <ProtectedRoute>
-            <ExpensesPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ExpensesPage />),
       },
 
       // 🗳️ [Gate P3] 相談・投票(FR-022合意形成 / FR-024コメント)。
       {
         path: 'planner/:planId/discussion',
-        element: (
-          <ProtectedRoute>
-            <DiscussionPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<DiscussionPage />),
       },
 
       // 📖 [Gate P4] しおり・印刷(FR-034しおり生成 / FR-035安全な印刷 / FR-046 PDF出力)。
       {
         path: 'planner/:planId/booklet',
-        element: (
-          <ProtectedRoute>
-            <BookletPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<BookletPage />),
       },
       {
         path: 'planner/:planId/booklet/:exportId',
-        element: (
-          <ProtectedRoute>
-            <BookletPrintPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<BookletPrintPage />),
       },
 
       // 📤 [Gate P5] カレンダー・地図・表計算への書き出し(FR-036 ICS/GPX/KML/CSV)。
       {
         path: 'planner/:planId/exports',
-        element: (
-          <ProtectedRoute>
-            <ExportsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ExportsPage />),
       },
 
       // 🔀 [Gate PlanB-P8] もしもの案(FR-019)はやめて、旅程の日ごとの案(プランB)に置き換えた。前の URL は旅程へ
@@ -318,11 +267,7 @@ export const router = createBrowserRouter([
       // ✏️ [Gate G8] FR-039 旅行の中の情報の訂正の申し出(参加者が出し、所有者が対応を記録する)。
       {
         path: 'planner/:planId/corrections',
-        element: (
-          <ProtectedRoute>
-            <CorrectionRequestsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<CorrectionRequestsPage />),
       },
       // 🎨 [Gate G9] UX-1 デザインの決まり(色・面・余白・文字・動き)と部品の一覧。利用者のデータを含まない
       {
@@ -333,151 +278,87 @@ export const router = createBrowserRouter([
       // 📥 [Gate P8] カレンダー(ICS)の取込(FR-036、差分確認後に適用)。
       {
         path: 'planner/:planId/calendar-import',
-        element: (
-          <ProtectedRoute>
-            <CalendarImportPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<CalendarImportPage />),
       },
 
       // ⚠️ [Gate P10] 遅延・休業などの状況(アラート、FR-030)と安全な再計画(FR-031、案A/Bの比較・承認)。
       {
         path: 'planner/:planId/alerts',
-        element: (
-          <ProtectedRoute>
-            <AlertsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<AlertsPage />),
       },
       {
         path: 'planner/:planId/replans/:replanId',
-        element: (
-          <ProtectedRoute>
-            <ReplanPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ReplanPage />),
       },
 
       // 📴 [Gate P11] 同期で競合した変更の確認・解決(FR-033)。
       {
         path: 'planner/:planId/sync',
-        element: (
-          <ProtectedRoute>
-            <SyncConflictsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<SyncConflictsPage />),
       },
 
       // 📷 [Gate P12] 写真・メモ・旅行記(FR-037)。
       {
         path: 'planner/:planId/memories',
-        element: (
-          <ProtectedRoute>
-            <MemoriesPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<MemoriesPage />),
       },
 
       // 📍 [Gate P13] 任意の位置軌跡(FR-038、本人だけの記録)。
       {
         path: 'planner/:planId/track',
-        element: (
-          <ProtectedRoute>
-            <LocationTrackPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<LocationTrackPage />),
       },
 
       // 🧭 [Gate P14] 旅の振り返り(FR-054 Plan-to-Memory・FR-053 旅の達成指標)。
       {
         path: 'planner/:planId/journey',
-        element: (
-          <ProtectedRoute>
-            <JourneyPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<JourneyPage />),
       },
 
       // 🗺️ [Gate V2] 訪問の地図(FR-049 Visited Area Layer・FR-050 訪問判定・FR-051 訪問訂正・Privacy除外)。
       {
         path: 'planner/:planId/visits',
-        element: (
-          <ProtectedRoute>
-            <VisitsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<VisitsPage />),
       },
 
       // 🏢 [Gate B1] 組織・配布・閲覧確認・外部連携(FR-041・FR-042)。会員だけ(backend がゲストを 401 にする)
       {
         path: 'organizations',
-        element: (
-          <ProtectedRoute>
-            <OrganizationsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<OrganizationsPage />),
       },
       {
         path: 'organizations/:orgId',
-        element: (
-          <ProtectedRoute>
-            <OrganizationPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<OrganizationPage />),
       },
       {
         path: 'organizations/:orgId/distributions/:distId',
-        element: (
-          <ProtectedRoute>
-            <DistributionPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<DistributionPage />),
       },
 
       // ✦ [Gate G11] 行き先が未定の旅行相談(希望 → 確認 → 方面の比較 → 方面の詳細)と、未確定の旅程の下書き
       {
         path: 'trip-consult',
-        element: (
-          <ProtectedRoute>
-            <TripConsultPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<TripConsultPage />),
       },
       {
         path: 'planner/:planId/draft',
-        element: (
-          <ProtectedRoute>
-            <TripDraftPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<TripDraftPage />),
       },
 
       // ⭐ [Gate C2] 候補箱(FR-007)・場所の詳細(FR-008)。
       {
         path: 'planner/:planId/candidates',
-        element: (
-          <ProtectedRoute>
-            <CandidatesPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<CandidatesPage />),
       },
       {
         path: 'planner/:planId/places/:placeId',
-        element: (
-          <ProtectedRoute>
-            <PlacePage />
-          </ProtectedRoute>
-        ),
+        element: guard(<PlacePage />),
       },
 
       // 💡 [Gate P17] 過去の旅からの提案(FR-057 Memory Replan)。
       {
         path: 'planner/:planId/memory-replan',
-        element: (
-          <ProtectedRoute>
-            <MemoryReplanPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<MemoryReplanPage />),
       },
       
       // 🔍 AI検索機能（拡張版）
@@ -486,27 +367,15 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true, // /search
-            element: (
-              <ProtectedRoute>
-                <SearchPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SearchPage />),
           },
           {
             path: 'settings', // /search/settings - AI検索設定
-            element: (
-              <ProtectedRoute>
-                <SearchSettingsPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SearchSettingsPage />),
           },
           {
             path: 'spots', // /search/spots - スポット検索（エイリアス）
-            element: (
-              <ProtectedRoute>
-                <SearchPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SearchPage />),
           },
         ],
       },
@@ -517,27 +386,15 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true, // /spots
-            element: (
-              <ProtectedRoute>
-                <SpotListPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SpotListPage />),
           },
           {
             path: 'search', // /spots/search
-            element: (
-              <ProtectedRoute>
-                <SearchPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SearchPage />),
           },
           {
             path: 'register', // /spots/register
-            element: (
-              <ProtectedRoute>
-                <SpotRegisterPage />
-              </ProtectedRoute>
-            ),
+            element: guard(<SpotRegisterPage />),
           },
         ],
       },
@@ -545,55 +402,31 @@ export const router = createBrowserRouter([
       // ⚙️ ユーザー設定
       {
         path: 'settings',
-        element: (
-          <ProtectedRoute>
-            <SettingsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<SettingsPage />),
       },
       // 📦 [Gate P6] データの書き出しと保持期間(FR-039)。
       {
         path: 'settings/data',
-        element: (
-          <ProtectedRoute>
-            <DataPrivacyPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<DataPrivacyPage />),
       },
       // 💳 [Gate Remaining-4] FR-058 料金・お支払い(会員のクラスの購読・Trip Pass。Stripe のテストモード)
       {
         path: 'settings/billing',
-        element: (
-          <ProtectedRoute>
-            <BillingPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<BillingPage />),
       },
       // 🗺️ [Gate P15] Personal Travel Atlas(FR-052、旅行を横断した訪問地域。本人だけ)。
       // [Gate HomeV2] 旅の記録と思い出(行った旅・写真・旅の足あと)
       {
         path: 'memories',
-        element: (
-          <ProtectedRoute>
-            <MemoriesHomePage />
-          </ProtectedRoute>
-        ),
+        element: guard(<MemoriesHomePage />),
       },
       {
         path: 'atlas',
-        element: (
-          <ProtectedRoute>
-            <AtlasPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<AtlasPage />),
       },
       {
         path: 'profile',
-        element: (
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        ),
+        element: guard(<ProfilePage />),
       },
 
       // 🛡️ 管理者ページ [Gate #24]
@@ -659,11 +492,7 @@ export const router = createBrowserRouter([
       // [Gate #26] 以前は固定の「開発中です」表示だった。
       {
         path: 'notifications',
-        element: (
-          <ProtectedRoute>
-            <NotificationsPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<NotificationsPage />),
       },
       
       // 🤝 共有・コラボレーション
@@ -674,11 +503,7 @@ export const router = createBrowserRouter([
       // ルート自体もどこからもリンクされておらず、一度も到達できていなかった)。
       {
         path: 'share/:planId',
-        element: (
-          <ProtectedRoute>
-            <SharePage />
-          </ProtectedRoute>
-        ),
+        element: guard(<SharePage />),
       },
 
       // 🔓 共有リンクの公開閲覧(未認証) [Gate #30]
@@ -714,11 +539,7 @@ export const router = createBrowserRouter([
       // /optimization はプラン選択画面(OptimizationSelectPage)のみに一本化する。
       {
         path: 'optimization',
-        element: (
-          <ProtectedRoute>
-            <OptimizationSelectPage />
-          </ProtectedRoute>
-        ),
+        element: guard(<OptimizationSelectPage />),
       },
       
       // 📄 エラー・その他

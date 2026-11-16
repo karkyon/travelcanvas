@@ -13,6 +13,10 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import PageHead from '@/components/shell/PageHead';
+import TripKitNav from '@/components/shell/TripKitNav';
+import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
 import toast from 'react-hot-toast';
 import { Plus, Check, X, FileCheck, FileX, Trash2 } from 'lucide-react';
 import Button from '@/components/common/Button';
@@ -50,6 +54,13 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '失敗',
 };
 
+// [Gate TripKit] 次に必要な操作(状態ごと)
+const NEXT_STEP: Record<string, string> = {
+  review_required: '次: 読み取った内容を確認して登録', uploaded: '次: 読み取りを待つ', scanning: '次: 安全確認を待つ',
+  extracting: '次: 読み取りを待つ', retry_wait: '次: 再試行を待つ(手入力もできます)', failed: '次: 原本を見て手入力で登録できます',
+  quarantined: '次: このファイルは使えません。原本を確認してください', confirmed: '予約として登録済み', rejected: '却下済み',
+};
+
 const STATUS_COLOR: Record<string, string> = {
   review_required: 'bg-amber-100 text-amber-800',
   confirmed: 'bg-green-100 text-green-800',
@@ -65,6 +76,14 @@ const PROVIDER_LABEL: Record<string, string> = {
   manual: '手入力', rules: 'メールから読み取り', 'rules+openai': 'メールから読み取り(AI で補完)',
   ocr: '画像から読み取り', 'ocr+openai': '画像から読み取り(AI で補完)', none: '読み取り',
 };
+// [Gate TripKit] 取込トレイの状態のまとまり(実際の status から数える)
+const JOB_GROUPS: { value: string; label: string; statuses: string[]; attention?: boolean }[] = [
+  { value: 'review', label: '確認が必要', statuses: ['review_required'], attention: true },
+  { value: 'working', label: '処理中', statuses: ['uploaded', 'scanning', 'extracting', 'retry_wait'] },
+  { value: 'failed', label: '失敗・隔離', statuses: ['failed', 'quarantined'], attention: true },
+  { value: 'done', label: '登録済み', statuses: ['confirmed'] },
+  { value: 'rejected', label: '却下', statuses: ['rejected'] },
+];
 const isExtracted = (job: ImportJobDetail) => job.status === 'review_required' && job.provider !== 'manual';
 
 const FIELD_PATH_OPTIONS: { value: ImportFieldPath; label: string }[] = [
@@ -98,6 +117,7 @@ const ImportsPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [jobs, setJobs] = useState<ImportJob[]>([]);
+  const [q, setQ] = useQueryState({ st: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -234,7 +254,8 @@ const ImportsPage: React.FC = () => {
       await loadJobs();
       closeDetail();
       if (updated.result_reservation_id) {
-        navigate(`/planner/${planId}/reservations`);
+        // [Gate TripKit] 登録した予約の詳細へ直接移る(一覧ではなく)
+        navigate(`/planner/${planId}/reservations?open=${encodeURIComponent(updated.result_reservation_id)}`);
       }
     } catch (e) {
       setError(errorDetailMessage(e, 'ジョブの確定に失敗しました(acceptされた候補にtypeが必要です)'));
@@ -281,21 +302,18 @@ const ImportsPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
-            ← プランへ戻る
+    <div className="tc-page">
+      <PageHead
+        eyebrow="TRIP KIT · 旅行箱"
+        title="予約の取込"
+        sub="予約メールや画像から読み取った内容を確認して、予約として登録します。確認する前の内容は予約の一覧に入りません。"
+        actions={(
+          <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
+            手入力で取り込む
           </Button>
-          <h1 className="text-2xl font-bold text-ink-900">予約取込</h1>
-          <p className="text-sm text-ink-700 mt-1">
-            予約メールや画像から項目を読み取るか、手動で登録し、確認のうえ予約として確定できます。
-          </p>
-        </div>
-        <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>
-          新規取込
-        </Button>
-      </div>
+        )}
+      />
+      {planId && <TripKitNav planId={planId} />}
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
@@ -317,11 +335,24 @@ const ImportsPage: React.FC = () => {
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : jobs.length === 0 ? (
         <Card padding="lg" className="text-center text-ink-700">
-          取込ジョブがまだありません。「新規取込」から追加できます。
+          取込ジョブがまだありません。上の「予約メール・画像から読み取る」か「手入力で取り込む」から追加できます。
         </Card>
       ) : (
+        <section aria-labelledby="imports-tray-title">
+        <h2 id="imports-tray-title" className="tc-section-title">取込トレイ</h2>
+        <KitChips label="取込の状態で絞り込む" value={q.st} onChange={(v) => setQ({ st: v })} allCount={jobs.length}
+          options={JOB_GROUPS.map((g) => ({ value: g.value, label: g.label, attention: g.attention,
+            count: jobs.filter((j) => g.statuses.includes(j.status)).length }))} />
+        {(() => {
+          const grp = JOB_GROUPS.find((g) => g.value === q.st);
+          const shown = grp ? jobs.filter((j) => grp.statuses.includes(j.status)) : jobs;
+          return (
+            <>
+              <KitActiveConditions shown={shown.length} total={jobs.length} onClearAll={() => setQ({ st: '' })}
+                conditions={grp ? [{ key: 'st', label: grp.label, clear: () => setQ({ st: '' }) }] : []} />
+              {shown.length === 0 ? <KitNoMatch onClearAll={() => setQ({ st: '' })} /> : (
         <ul className="space-y-3" aria-label="取込ジョブ">
-          {jobs.map((j) => (
+          {shown.map((j) => (
             <li key={j.id}>
               {/* [Gate E1] キーボードで開けるようにボタンにする(以前は <div onClick>) */}
               <Card padding="none" hover className="flex items-stretch">
@@ -335,12 +366,19 @@ const ImportsPage: React.FC = () => {
                     <div>
                       <div className="font-medium text-ink-900">取込ジョブ({formatDateTime(j.created_at)})</div>
                       <div className="text-sm text-ink-700">{PROVIDER_LABEL[j.provider ?? ''] ?? j.provider}</div>
+                      <div className="text-xs text-ink-700">{NEXT_STEP[j.status] ?? ''}{j.error_message ? ` ・ ${j.error_message}` : ''}</div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-ink-700'}`}>
                       {STATUS_LABEL[j.status] ?? j.status}
                     </span>
                   </div>
                 </button>
+                {j.result_reservation_id && (
+                  <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm m-2 shrink-0 self-center"
+                    onClick={() => navigate(`/planner/${planId}/reservations?open=${encodeURIComponent(j.result_reservation_id!)}`)}>
+                    予約を開く
+                  </button>
+                )}
                 <button type="button" onClick={() => void handleDeleteJob(j)} data-testid={`import-job-delete-${j.id}`}
                   aria-label={`${formatDateTime(j.created_at)} の取込ジョブを削除`} title="一覧から削除"
                   className="tc-focus-ring m-2 shrink-0 self-center rounded-lg p-2 text-ink-700 hover:bg-cloud-100 hover:text-danger">
@@ -350,6 +388,11 @@ const ImportsPage: React.FC = () => {
             </li>
           ))}
         </ul>
+              )}
+            </>
+          );
+        })()}
+        </section>
       )}
 
       {/* 新規取込ジョブ作成 */}
@@ -396,7 +439,8 @@ const ImportsPage: React.FC = () => {
                 closeDetail();
                 void loadJobs();
                 toast.success(result.itinerary_note ? `予約を登録しました。${result.itinerary_note}` : (result.event_id ? '予約を登録し、旅程にも追加しました' : '予約を登録しました'));
-                navigate(`/planner/${planId}/reservations`);
+                // [Gate TripKit] 登録した予約の詳細へ直接移る
+                navigate(`/planner/${planId}/reservations?open=${encodeURIComponent(result.reservation_id)}`);
               }}
               onDiscard={() => void handleRejectJob()}
             />

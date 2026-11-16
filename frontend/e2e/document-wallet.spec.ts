@@ -178,7 +178,7 @@ function inviteRoleSelect(page: Page) {
 async function openDocumentsPage(page: Page, planId: string) {
   await page.getByRole('button', { name: '文書', exact: true }).click();
   await page.waitForURL(new RegExp(`/planner/${planId}/documents$`), { timeout: 15_000 });
-  const uploadButton = page.getByRole('button', { name: '新規アップロード' });
+  const uploadButton = page.getByRole('button', { name: '文書を追加' });
   await uploadButton.waitFor({ state: 'visible', timeout: 20_000 });
   return uploadButton;
 }
@@ -210,17 +210,17 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
 
       // 1. プランから「文書」で文書ウォレット画面へ遷移
       await openDocumentsPage(page, planId);
-      await expect(page.getByText('文書がまだ登録されていません')).toBeVisible();
+      await expect(page.getByText('文書がまだありません')).toBeVisible();
 
       // 2. アップロード
       const file = pdfFile(suffix);
-      const uploadButton = page.getByRole('button', { name: '新規アップロード' });
+      const uploadButton = page.getByRole('button', { name: '文書を追加' });
       await fillAndSubmitUpload(page, uploadButton, file, 'confidential');
 
       // 3. モーダルが閉じ、一覧に反映される(DBへ実際に保存されたことの
       //    確認は後続のreloadで行う)
       await expect(page.getByText(file.name)).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('機密')).toBeVisible();
+      await expect(page.getByRole('list', { name: '文書' }).getByText('機密')).toBeVisible();
 
       // 4. reload後も一覧に残っている(backend/DBへ永続化されたことの確認、
       //    quickdraft-flow.spec.tsと同じ考え方)
@@ -236,23 +236,23 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       //    ポップアップは発生しない)。ここではpageの'download'イベントで
       //    実際にファイル取得の経路が動作したことを確認する。
       const downloadPromise = page.waitForEvent('download', { timeout: 15_000 });
-      await page.getByRole('button', { name: 'ダウンロード' }).click();
+      await page.getByRole('button', { name: /をダウンロード$/ }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toBeTruthy();
 
       // 6. 削除。DocumentsPage.handleDeleteはwindow.confirm()を使うため、
       //    確認ダイアログを自動acceptする。
       page.once('dialog', (d) => d.accept());
-      await page.getByRole('button', { name: '削除' }).click();
+      await page.getByRole('button', { name: /を削除$/ }).click();
 
       // 7. 一覧から消え、空状態メッセージへ戻る
-      await expect(page.getByText('文書がまだ登録されていません')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('文書がまだありません')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(file.name)).not.toBeVisible();
 
       // 8. reloadしても削除が永続化されている(soft delete + purgeがUIから
       //    見て「消えたまま」であることの確認。Gate M7 P0-04)
       await page.reload();
-      await expect(page.getByText('文書がまだ登録されていません')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('文書がまだありません')).toBeVisible({ timeout: 15_000 });
     } catch (e) {
       throw new Error(`${e instanceof Error ? e.message : String(e)}\n${diagnosticsSummary(state)}`);
     }
@@ -272,11 +272,11 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       // 所有者本人には厳重管理の文書も正しく表示される(P0-03は
       // owner本人を除外するものではない)
       await expect(page.getByText(file.name)).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('厳重管理')).toBeVisible();
+      await expect(page.getByRole('list', { name: '文書' }).getByText('厳重管理')).toBeVisible();
 
       await page.reload();
       await expect(page.getByText(file.name)).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText('厳重管理')).toBeVisible();
+      await expect(page.getByRole('list', { name: '文書' }).getByText('厳重管理')).toBeVisible();
     } catch (e) {
       throw new Error(`${e instanceof Error ? e.message : String(e)}\n${diagnosticsSummary(state)}`);
     }
@@ -316,7 +316,7 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       await fillAndSubmitUpload(page, uploadButton, restrictedFile, 'restricted');
       await fillAndSubmitUpload(
         page,
-        page.getByRole('button', { name: '新規アップロード' }),
+        page.getByRole('button', { name: '文書を追加' }),
         confidentialFile,
         'confidential',
       );
@@ -365,7 +365,7 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       //    現れない(存在しないdocument_idと区別できない404で応答する
       //    設計のため、一覧からも静かに除外される)。
       await page2.goto(`/planner/${planId}/documents`);
-      await expect(page2.getByRole('heading', { name: '文書ウォレット' })).toBeVisible({ timeout: 15_000 });
+      await expect(page2.getByRole('heading', { name: '文書ライブラリ' })).toBeVisible({ timeout: 15_000 });
       await expect(page2.getByText(confidentialFile.name)).toBeVisible({ timeout: 15_000 });
       await expect(page2.getByText(restrictedFile.name)).not.toBeVisible();
       await expect(page2.getByText('厳重管理')).not.toBeVisible();

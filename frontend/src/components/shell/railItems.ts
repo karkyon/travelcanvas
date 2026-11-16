@@ -78,8 +78,8 @@ export function railItems(tripId: string | null, path: string, opts: { live?: bo
       group: 'trip' as const,
     }] : []),
     {
-      key: 'resources', label: '旅行箱', icon: Briefcase, to: trip('/reservations'), group: 'trip',
-      match: inTrip(['/reservations', '/imports', '/documents', '/preparation', '/expenses']),
+      key: 'resources', label: '旅行箱', icon: Briefcase, to: trip('/kit'), group: 'trip',
+      match: inTrip(['/kit', '/reservations', '/imports', '/documents', '/preparation', '/expenses']),
     },
     {
       key: 'share', label: '共有', icon: Share2, to: `/share/${tripId}`, group: 'trip',

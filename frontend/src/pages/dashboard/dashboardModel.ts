@@ -162,3 +162,23 @@ export function groupTrips(trips: DashboardTrip[]): Array<{ phase: TripPhase; tr
   return PHASE_ORDER.map((phase) => ({ phase, trips: trips.filter((t) => t.phase === phase) }))
     .filter((g) => g.trips.length > 0);
 }
+
+/**
+ * [Gate HomeLive] ホームの見出し。主役の旅行の段階に合わせる。
+ * 以前は計画中の旅行のうち「出発まで」の日数がある最初の旅行で見出しを作っていたため、旅行中の旅行があっても
+ * 別の旅行(旅行前)の「次の旅まで あと 13 日」を出していた。旅行中を最優先にする。
+ */
+export function homeTitle(focus: DashboardTrip | null, planning: DashboardTrip[]): string {
+  const live = focus?.phase === 'ongoing' ? focus : planning.find((t) => t.phase === 'ongoing') ?? null;
+  if (live && (!focus || focus.phase === 'ongoing' || focus.id === live.id)) {
+    const day = live.day_number ?? 1;
+    return live.total_days ? `旅行中 ・ ${day}日目 / ${live.total_days}日` : `旅行中 ・ ${day}日目`;
+  }
+  const next = focus?.phase === 'upcoming' ? focus : planning.find((t) => t.phase === 'upcoming' && t.days_until_start !== null) ?? null;
+  if (next && next.days_until_start !== null) {
+    if (next.days_until_start === 1) return '明日から旅行です';
+    return `次の旅まで あと ${next.days_until_start <= 31 ? `${next.days_until_start} 日` : daySpan(next.days_until_start)}`;
+  }
+  if (focus?.phase === 'past') return '旅のあとに: 記録と精算';
+  return '次の旅を、楽しみに変える';
+}

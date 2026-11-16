@@ -12,6 +12,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import PageHead from '@/components/shell/PageHead';
+import TripKitNav from '@/components/shell/TripKitNav';
+import { useQueryState } from '@/components/shell/tripKitModel';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -73,7 +76,10 @@ const ExpensesPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>('summary');
+  // [Gate TripKit] タブは URL(?tab=)に置く(更新・共有・戻るで同じタブ)
+  const [tabQ, setTabQ] = useQueryState({ tab: 'summary' });
+  const tab: Tab = (TABS.some((t) => t.id === tabQ.tab) ? tabQ.tab : 'summary') as Tab;
+  const setTab = (t: Tab) => setTabQ({ tab: t });
   const [members, setMembers] = useState<PlanMember[]>([]);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
@@ -354,21 +360,22 @@ const ExpensesPage: React.FC = () => {
     ?? expenses.flatMap((x) => x.shares).find((s) => s.user_id === userId)?.name ?? 'メンバー外';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-          <h1 className="text-2xl font-bold text-ink-900">予算・費用</h1>
-          <p className="text-sm text-ink-700 mt-1">予算と実績、立替の精算をまとめて管理します。</p>
-        </div>
-        <div>
-          <label htmlFor="finance-base-currency" className="block text-sm font-medium text-ink-900 mb-1">基準通貨</label>
-          <select id="finance-base-currency" className="border rounded-lg px-3 py-2" value={base}
-            disabled={!canEdit || currencyLocked} onChange={(e) => changeCurrency(e.target.value)}>
-            {[...new Set([base, ...CURRENCY_OPTIONS])].map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
+    <div className="tc-page">
+      <PageHead
+        eyebrow="TRIP KIT · 旅行箱"
+        title="予算・費用"
+        sub="予算と、予約の見込み・実際の支出・立替の精算を分けて確認します(同じ予約の金額を見込みと支出で二重に数えません)。"
+        actions={(
+          <div>
+            <label htmlFor="finance-base-currency" className="block text-sm font-medium text-ink-900 mb-1">基準通貨</label>
+            <select id="finance-base-currency" className="border rounded-lg px-3 py-2" value={base}
+              disabled={!canEdit || currencyLocked} onChange={(e) => changeCurrency(e.target.value)}>
+              {[...new Set([base, ...CURRENCY_OPTIONS])].map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+      />
+      {planId && <TripKitNav planId={planId} />}
 
       <div role="tablist" aria-label="予算・費用の表示切替" className="flex gap-2 mb-4 border-b">
         {TABS.map((t) => (
