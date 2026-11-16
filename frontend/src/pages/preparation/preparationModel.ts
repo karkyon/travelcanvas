@@ -60,6 +60,9 @@ export function groupByCategory(items: PackingItem[]): { category: PackingCatego
   return groups;
 }
 
+/** [Gate TripKitUI] 準備済み(梱包済み・使用後)か */
+export const isPackedStatus = (s: string): boolean => s === 'packed' || s === 'after_use';
+
 export function packingProgress(items: PackingItem[]): { packed: number; total: number; requiredLeft: number } {
   return {
     packed: items.filter(isReady).length,

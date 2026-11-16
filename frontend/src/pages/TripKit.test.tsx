@@ -90,7 +90,7 @@ describe('旅行箱の概要', () => {
     expect(todo).toHaveTextContent('「京都ホテル」に予約がありません');
     // 旅行の情報: 件数は API の値から
     const areas = await screen.findByRole('heading', { name: '旅行の情報' });
-    expect(areas.parentElement).toHaveTextContent(`${(fx.reservation_list as unknown[]).length}件`);
+    expect(areas.closest('section')).toHaveTextContent(`${(fx.reservation_list as unknown[]).length}件`);
   });
 
   it('費用を見られない役割では「見られません」と出し、他の項目は出す(失敗と分ける)', async () => {

@@ -16,7 +16,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
   Ticket as TicketIcon, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
-  Users, X, CalendarDays, Lock, Unlock, Link2, QrCode,
+  Users, X, CalendarDays, Lock, Unlock, Link2, QrCode, AlertTriangle, Wallet, Inbox,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import TicketCode from '@/components/share/TicketCode';
@@ -47,7 +47,7 @@ import type {
   Ticket, TicketCreateData,
 } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead, KitTile, KitTiles } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import TicketFullscreen from '@/components/share/TicketFullscreen';
 import { ticketWarning } from '@/components/share/ticketState';
@@ -69,6 +69,8 @@ const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }
   { value: 'admission', label: '入場', icon: <Landmark size={16} /> },
   { value: 'other', label: 'その他', icon: <HelpCircle size={16} /> },
 ];
+
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'info' | undefined> = { confirmed: 'ok', modified: 'warn', candidate: 'info' };
 
 const STATUS_LABEL: Record<string, string> = {
   candidate: '未確定',
@@ -499,15 +501,17 @@ const ReservationsPage: React.FC = () => {
   }
 
   return (
-    <div className="tc-page">
-      {/* [Gate MockScreens] モックの旅行箱: page-head・切り替え・予約の一覧と秘密情報の扱い */}
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page">
+      {/* [Gate MockScreens → TripKitUI] 旅行箱の共通の見出し・切り替え・要約・予約の一覧と秘密情報の扱い */}
+      <KitHead
+        icon={<TicketIcon size={14} />}
         title="予約・チケット"
         sub="予約の状態・利用日・期限・旅程とのつながりをまとめて確認します。予約番号・PIN・チケットのコードは、詳細で「表示」を押した時だけ出します。"
         actions={(
           <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>予約を取り込む</button>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>
+              <Inbox size={15} aria-hidden="true" />予約を取り込む
+            </button>
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setIsCreateOpen(true)}>
               <Plus size={15} aria-hidden="true" />新規予約
             </button>
@@ -515,6 +519,27 @@ const ReservationsPage: React.FC = () => {
         )}
       />
       <TripKitNav planId={planId} />
+
+      {!isLoading && reservations.length > 0 && (() => {
+        const nowT = Date.now();
+        const need = reservations.filter((r) => attentionReasons(r, nowT).length > 0).length;
+        const unpaid = reservations.filter((r) => r.status !== 'cancelled' && r.total_amount != null
+          && !['paid', 'not_required', 'free', 'refunded'].includes(r.payment_status ?? '')).length;
+        const next = reservations.filter((r) => r.start_at && Date.parse(r.start_at) >= nowT && r.status !== 'cancelled')
+          .sort((a, b) => Date.parse(a.start_at!) - Date.parse(b.start_at!))[0];
+        const nextWhen = next ? zonedParts(next.start_at, next.timezone_id) : null;
+        const kinds = Array.from(new Set(reservations.map((r) => typeLabel(r.type))));
+        return (
+          <KitTiles>
+            <KitTile label="予約" icon={<TicketIcon size={14} />} value={`${reservations.length}件`} sub={kinds.slice(0, 4).join('・')} />
+            <KitTile label="確認が必要" icon={<AlertTriangle size={14} />} tone={need > 0 ? 'warn' : 'plain'} value={`${need}件`}
+              sub={need > 0 ? '未確定・変更・期限・支払い' : '今はありません'} />
+            <KitTile label="支払い" icon={<Wallet size={14} />} value={unpaid > 0 ? `未払い・未入力 ${unpaid}件` : 'すべて入力済み'} />
+            <KitTile label="次の予約" icon={<CalendarDays size={14} />} value={nextWhen ? `${nextWhen.date} ${nextWhen.time}` : 'なし'}
+              sub={next ? (next.provider_name || typeLabel(next.type)) : 'これからの予約はありません'} />
+          </KitTiles>
+        );
+      })()}
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
@@ -583,11 +608,11 @@ const ReservationsPage: React.FC = () => {
                   aria-haspopup="dialog"
                   className="tc-focus-ring tc-kit-open"
                 >
-                  <span className="tc-kit-icon" aria-hidden="true">{typeIcon(r.type)}</span>
+                  <span className="tc-kit-icon" data-tone={why.length > 0 ? 'warn' : undefined} aria-hidden="true">{typeIcon(r.type)}</span>
                   <span className="min-w-0">
                     <b>{r.provider_name || typeLabel(r.type)}</b>
                     <small>{typeLabel(r.type)} ・ {when ? `${when.date} ${when.time}` : formatDateTime(r.start_at)}{when ? `(${when.tzNote})` : ''}{r.guest_count ? ` ・ ${r.guest_count}名` : ''}</small>
-                    {r.notes && <small className="whitespace-pre-line" data-testid="reservation-notes">{r.notes}</small>}
+                    {r.notes && <small className="tc-kit-clamp" data-testid="reservation-notes">{r.notes}</small>}
                     <small className="tc-kit-facts">
                       {[r.confirmation_number_masked ? `予約番号 ${r.confirmation_number_masked}` : null,
                         r.total_amount != null ? `${r.total_amount.toLocaleString('ja-JP')} ${r.currency ?? ''}`.trim() : null,
@@ -597,7 +622,7 @@ const ReservationsPage: React.FC = () => {
                     </small>
                     {why.length > 0 && <small className="tc-kit-why">{`要確認: ${why.join('・')}`}</small>}
                   </span>
-                  <span className="tc-pill">{STATUS_LABEL[r.status] ?? r.status}</span>
+                  <span className="tc-kit-pill" data-tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</span>
                 </button>
                 {/* [Gate G4] COL-03 この予約へのコメント */}
                 <button type="button" className="tc-focus-ring tc-mini-link tc-kit-comment"

@@ -8,6 +8,7 @@ import UiIcon from '@/components/common/UiIcon';
 import TransportIcon from '@/components/common/TransportIcon';
 import { transportMode, transportText } from '@/utils/transportModes';
 import { anchorText, type DayAnchor } from './journeyModel';
+import { anchorWantsHome } from './mapEndsModel';
 
 interface Props {
   anchor: DayAnchor;
@@ -18,6 +19,8 @@ interface Props {
   onEditMove?: () => void;
   /** [Gate ChartAlign] 全日程の表の狭い列: 時刻の列と点を出さず、列の幅いっぱいに出す */
   compact?: boolean;
+  /** [Gate HomePlace] 出発・帰着が自宅(または未入力)の時の「自宅の場所」(本人が登録・地図に出すかを選ぶ) */
+  onEditHome?: () => void;
 }
 
 const ICON = { departure: House, arrival: Flag, 'lodging-from': BedDouble, 'lodging-to': BedDouble, 'lodging-missing': TriangleAlert } as const;
@@ -43,7 +46,7 @@ const MoveLine: React.FC<{ anchor: DayAnchor; onEdit?: () => void }> = ({ anchor
   );
 };
 
-const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onEditMove, compact = false }) => {
+const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onEditMove, compact = false, onEditHome }) => {
   // [Gate TimelineRedesign] 出発・帰着の時刻は、予定の着く時刻と同じく左の時刻の列に大きく出す(本文には場所だけ)
   const { label, body } = anchorText({ ...anchor, time: null });
   const move = anchor.kind === 'departure' || anchor.kind === 'arrival';
@@ -59,6 +62,9 @@ const JourneyAnchorRow: React.FC<Props> = ({ anchor, position, onAddLodging, onE
         <p className="tc-anchor-text"><span className="tc-anchor-label">{label}</span>{body}</p>
         {anchor.kind === 'lodging-missing' && onAddLodging && (
           <button type="button" className="tc-focus-ring tc-mini-link" onClick={onAddLodging} data-testid="day-anchor-add-lodging">＋ 宿を追加</button>
+        )}
+        {onEditHome && !compact && anchorWantsHome(anchor) && (
+          <button type="button" className="tc-focus-ring tc-mini-link" onClick={onEditHome} data-testid={`day-anchor-home-${anchor.kind}`}>自宅の場所</button>
         )}
       </div>
     </div>

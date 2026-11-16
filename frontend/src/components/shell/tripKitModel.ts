@@ -51,3 +51,46 @@ export function useQueryState<K extends string>(defaults: Record<K, string>) {
   }, [setParams]);
   return [values, set] as const;
 }
+
+/**
+ * [Gate TripKitUI] 旅行箱のナビの「要確認」の数(準備状況 readiness の分類から)。
+ * 画面が読み込んだ準備状況を prime で渡すと、ナビは聞き直さない(同じ旅行で 30 秒まで使う)。
+ */
+export interface KitAttention { reservations: number; preparation: number; expenses: number }
+type ReadinessCounts = { counts: { by_category: Record<string, number> } };
+const ATTN_TTL_MS = 30_000;
+const attnCache = new Map<string, { at: number; value: KitAttention }>();
+const attnListeners = new Set<() => void>();
+
+export function attentionFromReadiness(r: ReadinessCounts): KitAttention {
+  const c = r.counts.by_category;
+  const n = (k: string) => (typeof c[k] === 'number' ? c[k]! : 0);
+  return {
+    reservations: n('unreserved') + n('unconfirmed') + n('unpaid') + n('deadline'),
+    preparation: n('packing') + n('unassigned'),
+    expenses: n('budget'),
+  };
+}
+export function primeKitAttention(planId: string, r: ReadinessCounts): void {
+  attnCache.set(planId, { at: Date.now(), value: attentionFromReadiness(r) });
+  attnListeners.forEach((f) => f());
+}
+export function cachedKitAttention(planId: string): KitAttention | null {
+  const hit = attnCache.get(planId);
+  return hit && Date.now() - hit.at < ATTN_TTL_MS ? hit.value : null;
+}
+export function onKitAttention(f: () => void): () => void {
+  attnListeners.add(f);
+  return () => { attnListeners.delete(f); };
+}
+/** 試験用 */
+export function resetKitAttentionForTests(): void { attnCache.clear(); }
+
+/** [Gate TripKitUI] 文書の種類(保存した英字の値)を日本語にする。知らない値はそのまま */
+export const DOCUMENT_TYPE_LABEL: Record<string, string> = {
+  receipt: '領収書', ticket: 'チケット', boarding_pass: '搭乗券', booking: '予約確認', confirmation: '予約確認',
+  reservation: '予約確認', invoice: '請求書', passport: 'パスポート', visa: 'ビザ', insurance: '保険',
+  id: '身分証', itinerary: '旅程表', voucher: 'バウチャー', other: 'その他',
+};
+export const documentTypeLabel = (t: string | null | undefined): string | null =>
+  t ? (DOCUMENT_TYPE_LABEL[t.toLowerCase()] ?? t) : null;

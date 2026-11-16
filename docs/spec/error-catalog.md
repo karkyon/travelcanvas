@@ -77,7 +77,7 @@
 | `email_taken` | 409 | no | このメールアドレスは既に使われています | api/v1/corrections.py |
 | `email_unavailable` | 409 | no | この環境ではメールを送れません(管理者の設定が必要です) | api/v1/notifications.py |
 | `encryption_not_configured` | 503 | later | 暗号化が設定されていないため記録できません(サーバー側の設定) | api/v1/corrections.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/privacy_zones.py, api/v1/push.py |
-| `encryption_unavailable` | 503 | later | 暗号化が設定されていないため保存できません | services/private_profile.py |
+| `encryption_unavailable` | 503 | later | 暗号化が設定されていないため保存できません | api/v1/home_place.py, services/private_profile.py |
 | `entitlement_not_found` | 404 | no | 付与が見つかりません | api/v1/planning_usage.py |
 | `entitlement_not_pending` | 409 | no | 承認を待っている付与ではありません | api/v1/planning_usage.py |
 | `entitlement_reason_required` | — | — | 理由を200文字までで入力してください | api/v1/planning_usage.py |
@@ -107,7 +107,7 @@
 | `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
 | `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
-| `if_match_required` | 428 | after_reload | If-Match(移動の既定の版。まだ無ければ 0)が必要です | api/v1/movement.py, api/v1/private_profile.py |
+| `if_match_required` | 428 | after_reload | If-Match(保存されている版。まだ無ければ 0)が必要です | api/v1/home_place.py, api/v1/movement.py, api/v1/private_profile.py |
 | `inbound_mail_unavailable` | 409 | no | この環境ではメールの転送を受け付けていません(管理者の設定が必要です)。本文の貼り付け・ファイルで取り込めます | api/v1/inbound_mail.py |
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
@@ -120,7 +120,7 @@
 | `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/billing.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py,  |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
-| `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/private_profile.py |
+| `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/home_place.py, api/v1/private_profile.py |
 | `invalid_input` | — | — | … を入力してください | api/v1/paid_actions.py |
 | `invalid_item` | 422 | no | 項目の形式が不正です | services/private_profile.py |
 | `invalid_items` | — | — | items は一覧で指定してください | services/private_profile.py |
@@ -133,6 +133,7 @@
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
+| `invalid_position` | — | — | 位置(緯度・経度)が正しくありません | api/v1/home_place.py |
 | `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
@@ -229,7 +230,7 @@
 | `replan_not_found` | 404 | no | 再計画が見つかりません | api/v1/day_variants.py |
 | `replan_stale` | 409 | after_reload | 提案を作った後に旅程か過去の記録が変わりました。提案を読み込み直してください | api/v1/memory_replan.py, api/v1/replans.py |
 | `revision_conflict` | 409 | after_reload | 候補が他の人の変更で更新されています(現在のrevision: …) | api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.py, api/v1/visits. |
-| `revision_mismatch` | 409 | after_reload | ほかの画面で変更されました。読み込み直してください | services/private_profile.py |
+| `revision_mismatch` | 409 | after_reload | ほかの画面で変更されました。読み込み直してください | api/v1/home_place.py, services/private_profile.py |
 | `revoked` | 410 | no | この版は失効しています | api/v1/booklet.py |
 | `same_candidate` | — | — | 同じ候補へはまとめられません | api/v1/candidates.py |
 | `same_plan` | 409 | no | 同じ旅行へは戻せません。別の旅行を選んでください | api/v1/journey.py |

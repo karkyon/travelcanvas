@@ -9,7 +9,7 @@
  * /planner        -> プラン一覧 + 新規作成
  * /planner/:planId -> 選択したプランの日程編集画面(PlanHeader + 日タブ + DayView)
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
@@ -54,6 +54,7 @@ import { localToday, nextEventIndexFor } from '@/components/planner/nextEventMod
 import type { EventBooking } from '@/services/api/bookingStatus';
 import type { EventHoursCheck } from '@/services/api/types/g11planner';
 import { dayAnchors } from '@/components/planner/journeyModel';
+import { buildMapEnds } from '@/components/planner/mapEndsModel';
 import AllDaysChart from '@/components/planner/AllDaysChart';
 import VariantPanel from '@/components/planner/variants/VariantPanel';
 import { usePlanVariants } from '@/components/planner/variants/usePlanVariants';
@@ -76,6 +77,7 @@ import TripList from '@/components/trip/TripList';
 import type { ScheduleItem as ScheduleItemType, EventCategory, EventUrl } from '@/types';
 // [Gate SpotLinks] 編集の窓の地図(開いた時だけ読む)
 const SpotMiniMap = React.lazy(() => import('@/components/planner/SpotMiniMap'));
+const HomePlaceDialog = React.lazy(() => import('@/components/settings/HomePlaceDialog'));
 import { VisitDetector, type VisitSuggestion } from '@/utils/visitDetection';
 import PresenceBar from '@/components/planner/PresenceBar';
 import { usePlanPresence } from '@/hooks/usePlanPresence';
@@ -213,6 +215,7 @@ const PlannerPage: React.FC = () => {
     setMapFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   }, []);
   const [segments, setSegments] = useState<TravelSegment[]>([]);
+  const [isHomeOpen, setIsHomeOpen] = useState(false);
   // [Gate PlanB] 日ごとの案: この日の案・開いている控えの案
   const variantState = usePlanVariants(currentPlan?.id, currentPlan?.revision, currentPlan?.days[currentDayIndex]?.date);
   // [Gate Remaining-2] FR-008 日ごとの祝日(日付の見出し・タブに「祝」)
@@ -928,6 +931,8 @@ const PlannerPage: React.FC = () => {
       routeHref: dirHref(nextEv),
     } : null;
     const dayEnds = dayAnchors(currentPlan, currentDayIndex);
+    // [Gate HomeRoute] 地図の日の端(前の夜の宿・今夜の宿(連泊)・自宅)。自宅の位置は地図が本人の設定から決める
+    const mapEnds = buildMapEnds(currentPlan, currentDayIndex);
     const startA = dayEnds.start;
     const startLabel = startA && startA.kind === 'departure'
       ? `出発: ${startA.place ?? '出発地'}から${startA.time ? ` ${startA.time}` : ''}` : null;
@@ -944,6 +949,12 @@ const PlannerPage: React.FC = () => {
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate('/planner')}>← 旅行の一覧</button>
             </>}
           />
+
+          {isHomeOpen && (
+            <Suspense fallback={null}>
+              <HomePlaceDialog isOpen={isHomeOpen} onClose={() => setIsHomeOpen(false)} />
+            </Suspense>
+          )}
 
           <PlanBasicsDialog
             planId={currentPlan.id}
@@ -1137,6 +1148,7 @@ const PlannerPage: React.FC = () => {
                   day={activeDay}
                   {...anchorsOf(dayAnchors(currentPlan, currentDayIndex))}
                   onEditJourney={() => setIsBasicsOpen(true)}
+                  onEditHome={() => setIsHomeOpen(true)}
                   planId={currentPlan.id}
                   isActive
                   // [Gate PlanUX] 予定を押すと選ぶだけ(地図・右の欄に出す)。編集は鉛筆から
@@ -1198,6 +1210,7 @@ const PlannerPage: React.FC = () => {
                     startLabel={startLabel}
                     planId={currentPlan.id}
                     segments={shownSegments}
+                    ends={mapEnds}
                     onAddCandidateToItinerary={(candidateId, fallbackTitle) =>
                       addScheduleItemFromCandidate(currentDayIndex, candidateId, fallbackTitle)
                     }

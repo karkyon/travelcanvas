@@ -112,6 +112,12 @@ def _private_profile(db: Session, user: User):
             "applied_plan_ids": [str(x) for x in pp.linked_plan_ids(db, user.id)]}
 
 
+def _home_place(db: Session, user: User):
+    from app.api.v1 import home_place as hp
+
+    return hp.export_for(db, user)
+
+
 @privacy_router.get("/data-export")
 def export_account(request: Request, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
@@ -130,6 +136,8 @@ def export_account(request: Request, db: Session = Depends(get_db),
         notifications=[dx.row(n) for n in notifications],
         # [Gate C1] 秘匿プロフィール(本人だけ。復号した項目)
         private_profile=_private_profile(db, current_user),
+        # [Gate HomePlace] 自宅の場所(本人だけ。復号した住所・座標と使い方の選択)
+        home_place=_home_place(db, current_user),
         # [Gate G6] 守る範囲(自宅・職場など)・オフライン保存の端末
         privacy_zones=dx.own_privacy_zones(db, current_user.id),
         offline_devices=dx.own_offline_devices(db, current_user.id),

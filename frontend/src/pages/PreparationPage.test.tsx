@@ -66,7 +66,9 @@ describe('PreparationPage (Gate P1)', () => {
     expect(summary).toHaveTextContent(`${attention.counts.total}件の準備が残っています`);
     const list = screen.getByRole('list', { name: '準備が残っている項目' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(attention.items.length);
-    expect(screen.getByRole('tab', { name: /準備状況\(5\)/ })).toHaveAttribute('aria-selected', 'true');
+    const readinessTab = screen.getByRole('tab', { name: /^準備状況/ });
+    expect(readinessTab).toHaveAttribute('aria-selected', 'true');
+    expect(readinessTab).toHaveTextContent('5');
 
     const unreserved = attention.items.find((i) => i.code === 'unreserved')!;
     expect(screen.getByTestId(`readiness-task-${unreserved.key}`)).toHaveTextContent('タスクにしました');
@@ -102,7 +104,7 @@ describe('PreparationPage (Gate P1)', () => {
   it('持ち物: 自分だけの持ち物を示し、状態の変更は持ち物のrevisionで送る', async () => {
     m.updatePackingItem.mockResolvedValue(fx.packing_item_updated);
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: '持ち物' }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^持ち物/ }));
     expect(await screen.findByLabelText('自分だけの持ち物')).toBeInTheDocument();
     expect(screen.getByTestId('packing-progress')).toHaveTextContent('梱包済み 1/4 件(必須で未準備 1 件)');
     const underwear = items.find((i) => i.name === '下着')!;
@@ -114,7 +116,7 @@ describe('PreparationPage (Gate P1)', () => {
     m.createPackingItem.mockResolvedValue(fx.packing_item_suggested);
     m.updatePackingItem.mockResolvedValue(fx.packing_item_updated);
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: '持ち物' }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^持ち物/ }));
     fireEvent.click(await screen.findByLabelText('海外旅行'));
     fireEvent.click(screen.getByRole('button', { name: '候補を表示' }));
     await waitFor(() => expect(m.getPackingSuggestions).toHaveBeenCalledWith('p1', { overseas: true }));
@@ -141,7 +143,7 @@ describe('PreparationPage (Gate P1)', () => {
     m.getPreparationTasks.mockResolvedValue(fx.preparation_task_list_assignee);
     m.updatePreparationTask.mockRejectedValue({ response: { data: { detail: 'タスクを変更する権限がありません' } } });
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: 'タスク' }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^タスク/ }));
     expect(await screen.findByText(/未完了 \d+ 件/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'タスクを追加' })).toBeNull();
     const assigned = (fx.preparation_task_list_assignee as PreparationTask[]).find((t) => t.can_complete)!;

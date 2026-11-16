@@ -11,12 +11,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AlertTriangle, ListChecks, Luggage } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead, KitSeg, KitTile, KitTiles } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
-import { useQueryState } from '@/components/shell/tripKitModel';
+import { primeKitAttention, useQueryState } from '@/components/shell/tripKitModel';
 import {
   createPackingItem, createPreparationTask, deletePackingItem, deletePreparationTask, extractApiErrorDetailMessage,
   getPackingItems, getPackingSuggestions, getPlanMembers, getPreparationTasks, getReadiness, updatePackingItem,
@@ -30,7 +31,7 @@ import PackingPanel from './preparation/PackingPanel';
 import ReadinessPanel from './preparation/ReadinessPanel';
 import TasksPanel from './preparation/TasksPanel';
 import {
-  CATEGORY_OPTIONS, STATUS_OPTIONS, emptyPackingForm, emptyTaskForm, packingFormFromItem, packingFormToPayload,
+  CATEGORY_OPTIONS, STATUS_OPTIONS, emptyPackingForm, packingProgress, emptyTaskForm, packingFormFromItem, packingFormToPayload,
   taskFormFromTask, taskFormToPayload, type PackingForm, type TaskForm,
 } from './preparation/preparationModel';
 
@@ -95,6 +96,7 @@ const PreparationPage: React.FC = () => {
       setItems(p);
       setTasks(t);
       setReadiness(r);
+      primeKitAttention(planId, r);
     } catch (e) {
       setError(errorMessage(e, '準備情報の取得に失敗しました'));
     } finally {
@@ -296,33 +298,37 @@ const PreparationPage: React.FC = () => {
     setTaskForm((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <div className="tc-page">
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
-        title="出発前の準備"
-        sub="準備状況・持ち物・準備タスクをまとめて確認します。"
-        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+    <div className="tc-page tc-kit-page">
+      <KitHead
+        icon={<Luggage size={14} />}
+        title="準備・持ち物"
+        sub="持ち物・準備のタスク・出発前に確かめることを、担当ごとにまとめます。"
       />
       <TripKitNav planId={planId} />
-      <div className="tc-card tc-kit-card">
+      {!isLoading && (() => {
+        const pr = packingProgress(items);
+        const openTasks = tasks.filter((t) => t.status !== 'done').length;
+        return (
+          <KitTiles>
+            <KitTile label="持ち物" icon={<Luggage size={14} />} value={`${pr.packed} / ${pr.total}`}
+              progress={pr.total > 0 ? (pr.packed / pr.total) * 100 : null} sub="準備済み(梱包・使用後)" />
+            <KitTile label="必須の残り" icon={<AlertTriangle size={14} />} tone={pr.requiredLeft > 0 ? 'warn' : 'plain'}
+              value={`${pr.requiredLeft}個`} sub={pr.requiredLeft > 0 ? '忘れると困るもの' : '必須はそろっています'} />
+            <KitTile label="タスク" icon={<ListChecks size={14} />} value={`${openTasks}件`} sub={`完了 ${tasks.length - openTasks}件`} />
+            <KitTile label="準備状況" icon={<AlertTriangle size={14} />} tone={readiness && !readiness.is_ready ? 'warn' : 'plain'}
+              value={readiness ? (readiness.is_ready ? '準備完了' : `残り ${readiness.counts.total}件`) : '—'}
+              sub={readiness && !readiness.is_ready ? '予約・支払い・持ち物など' : null} />
+          </KitTiles>
+        );
+      })()}
 
-      <div role="tablist" aria-label="準備の表示切替" className="flex gap-2 mb-4 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            id={`prep-tab-${t.id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            aria-controls={`prep-panel-${t.id}`}
-            onClick={() => setTab(t.id)}
-            className={`tc-focus-ring px-4 py-2 -mb-px border-b-2 font-semibold ${tab === t.id ? 'border-accent text-accent-strong' : 'border-transparent text-ink-700'}`}
-          >
-            {t.label}
-            {t.id === 'readiness' && readiness && !readiness.is_ready ? `(${readiness.counts.total})` : ''}
-          </button>
-        ))}
-      </div>
+      <KitSeg label="準備の表示切替" idPrefix="prep" value={tab} onChange={setTab}
+        tabs={TABS.map((t) => ({
+          id: t.id, label: t.label,
+          count: t.id === 'readiness' ? (readiness && !readiness.is_ready ? readiness.counts.total : null)
+            : t.id === 'packing' ? (isLoading ? null : items.length) : (isLoading ? null : tasks.filter((x) => x.status !== 'done').length),
+          attention: t.id === 'readiness',
+        }))} />
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 
@@ -373,8 +379,6 @@ const PreparationPage: React.FC = () => {
           )}
         </div>
       )}
-
-      </div>
 
       <Modal isOpen={isPackingFormOpen} onClose={() => setIsPackingFormOpen(false)} title={packingEditing ? '持ち物の編集' : '持ち物の追加'} size="md">
         <form onSubmit={submitPacking} noValidate>

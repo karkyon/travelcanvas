@@ -10,9 +10,39 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, FileText, Inbox, LayoutGrid, Luggage, Search, Ticket, Wallet, X } from 'lucide-react';
+import { getReadiness } from '@/services/api';
 import { useTripContext } from '@/hooks/useTripContext';
-import { KIT_ITEMS, currentKit, md } from './tripKitModel';
+import { KIT_ITEMS, attentionFromReadiness, cachedKitAttention, currentKit, md, onKitAttention, primeKitAttention,
+  type KitAttention } from './tripKitModel';
+
+// [Gate TripKitUI] 旅行箱の画面のアイコン(6 画面と概要・ナビ・要約で同じものを使う)
+const KIT_ICON = { kit: LayoutGrid, reservations: Ticket, preparation: Luggage, expenses: Wallet, documents: FileText, imports: Inbox } as const;
+
+/** [Gate TripKitUI] 準備状況から「要確認」の数を出す。画面が読み込んだ分(prime)があれば聞き直さない。失敗しても出さないだけ */
+function useKitAttention(planId: string): KitAttention | null {
+  const [value, setValue] = useState<KitAttention | null>(() => cachedKitAttention(planId));
+  useEffect(() => {
+    let alive = true;
+    const sync = () => { const v = cachedKitAttention(planId); if (alive && v) setValue(v); };
+    const off = onKitAttention(sync);
+    if (!cachedKitAttention(planId)) {
+      const timer = window.setTimeout(() => {
+        if (cachedKitAttention(planId)) { sync(); return; }
+        (async () => {
+          try {
+            const r = await getReadiness(planId);
+            primeKitAttention(planId, r);
+            if (alive) setValue(attentionFromReadiness(r));
+          } catch { /* 数を出さないだけ(画面は止めない) */ }
+        })();
+      }, 400);
+      return () => { alive = false; off(); window.clearTimeout(timer); };
+    }
+    return () => { alive = false; off(); };
+  }, [planId]);
+  return value;
+}
 
 const TripKitNav: React.FC<{ planId: string }> = ({ planId }) => {
   const { pathname } = useLocation();
@@ -24,6 +54,8 @@ const TripKitNav: React.FC<{ planId: string }> = ({ planId }) => {
   const meta = [range.length ? Array.from(new Set(range)).join(' — ') : null, trip.destination].filter(Boolean).join(' · ');
   const more = [...KIT_ITEMS.filter((k) => !k.primary), { key: 'search' as const, suffix: '/kit/search', label: '旅行箱を検索', short: '検索', primary: false }];
   const curMore = more.find((k) => k.key === cur) ?? null;
+  const attn = useKitAttention(planId);
+  const badge = (key: string): number => (attn && (key === 'reservations' || key === 'preparation' || key === 'expenses') ? attn[key] : 0);
 
   useEffect(() => { setMoreOpen(false); }, [pathname]);
   useEffect(() => {
@@ -47,15 +79,21 @@ const TripKitNav: React.FC<{ planId: string }> = ({ planId }) => {
       </div>
       <div className="tc-kit-bar">
         <nav aria-label="旅行箱の中の画面" className="tc-kit-tabs">
-          {KIT_ITEMS.map((k) => (
+          {KIT_ITEMS.map((k) => {
+            const Icon = KIT_ICON[k.key];
+            const n = badge(k.key);
+            return (
             <Link key={k.key} to={`/planner/${planId}${k.suffix}`} aria-current={cur === k.key ? 'page' : undefined}
-              aria-label={k.label}
-              className={`tc-focus-ring tc-day-tab tc-kit-tab${k.primary ? '' : ' tc-kit-tab--more'}`}>
+              aria-label={k.label} title={n > 0 ? `${k.label}(要確認 ${n})` : undefined}
+              className={`tc-focus-ring tc-kit-tab${k.primary ? '' : ' tc-kit-tab--more'}`}>
+              <Icon size={16} aria-hidden="true" className="tc-kit-tab__icon" />
               <span className="tc-kit-tab__long">{k.label}</span><span className="tc-kit-tab__short" aria-hidden="true">{k.short}</span>
+              {n > 0 && <span className="tc-kit-cnt" data-tone="warn" aria-hidden="true">{n}</span>}
             </Link>
-          ))}
+            );
+          })}
           <div className="tc-kit-more" ref={moreRef}>
-            <button type="button" className="tc-focus-ring tc-day-tab tc-kit-more__btn" aria-expanded={moreOpen} aria-haspopup="true"
+            <button type="button" className="tc-focus-ring tc-kit-tab tc-kit-more__btn" aria-expanded={moreOpen} aria-haspopup="true"
               aria-current={curMore ? 'page' : undefined} onClick={() => setMoreOpen((v) => !v)}>
               {curMore ? curMore.short : 'その他'}<ChevronDown size={14} aria-hidden="true" />
             </button>
@@ -93,12 +131,12 @@ export const KitChips: React.FC<{ label: string; options: ChipOption[]; value: s
 }) => (
   <div className="tc-kit-chips" role="group" aria-label={label}>
     <button type="button" className="tc-focus-ring tc-kit-chip" aria-pressed={value === ''} onClick={() => onChange('')}>
-      {allLabel}{allCount != null ? ` ${allCount}` : ''}
+      {allLabel}{allCount != null && <span className="tc-kit-cnt">{` ${allCount}`}</span>}
     </button>
     {options.map((o) => (
       <button key={o.value} type="button" className="tc-focus-ring tc-kit-chip" data-attention={o.attention ? 'true' : undefined}
         aria-pressed={value === o.value} onClick={() => onChange(value === o.value ? '' : o.value)}>
-        {o.label}{o.count != null ? ` ${o.count}` : ''}
+        {o.label}{o.count != null && <span className="tc-kit-cnt" data-tone={o.attention && o.count > 0 ? 'warn' : undefined}>{` ${o.count}`}</span>}
       </button>
     ))}
   </div>
