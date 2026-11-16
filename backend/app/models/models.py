@@ -3025,6 +3025,28 @@ class UserPrivateProfile(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
 
+class UserHomePlace(Base):
+    """[Gate HomePlace] 自宅の場所(本人だけ)。旅程の出発・帰着の経路と地図の印に使うかは本人が選ぶ。
+
+    名前・住所・座標は利用者のデータ鍵で暗号化した 1 つの値だけに置く(place_ciphertext、平文の列を持たない)。
+    同行者・共有のリンク・しおり・公開の旅行記・運用管理者の API には返さない(本人の GET だけ)。
+    - show_on_map: 旅程の地図に自宅の印を出す
+    - use_for_routes: 出発・帰着が「自宅」の日に、自宅 → 最初の予定 / 最後の予定 → 自宅 の線を引く
+    - send_to_route_provider: 道に沿った経路を出す時に、自宅の座標を経路の提供元(OSRM)へ送ってよい。既定は送らない(直線)
+    """
+    __tablename__ = "user_home_places"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    place_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    show_on_map: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    use_for_routes: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    send_to_route_provider: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
+
 class PrivateProfileLink(Base):
     """[Gate C1] FR-023 秘匿プロフィールを適用している旅行(旅行・利用者)。適用中の旅行には、プロフィールの
     項目ごとに秘匿制約(constraints.profile_item_id)を作り、プロフィールの変更で作り直す。"""

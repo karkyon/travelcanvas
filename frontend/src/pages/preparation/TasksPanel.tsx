@@ -35,7 +35,7 @@ const TasksPanel: React.FC<Props> = ({ tasks, canEdit, onAdd, onEdit, onDelete, 
       {tasks.length === 0 ? (
         <Card padding="lg" className="text-center text-ink-700">準備タスクはまだありません。</Card>
       ) : (
-        <ul className="space-y-2" aria-label="準備タスク">
+        <ul className="tc-kit-list tc-kit-cardlist" aria-label="準備タスク">
           {tasks.map((t) => (
             <li key={t.id}>
               <Card padding="sm" className={t.status === 'done' ? 'opacity-75' : ''}>

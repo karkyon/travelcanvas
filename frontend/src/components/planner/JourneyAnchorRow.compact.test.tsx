@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import JourneyAnchorRow from './JourneyAnchorRow';
 
@@ -18,5 +18,16 @@ describe('[Gate ChartAlign] 全日程の表の宿の行(列の幅いっぱい)',
       anchor={{ kind: 'departure', place: '自宅', time: '07:30', continued: false }} />);
     expect(container.querySelector('.tc-anchor-time')).toHaveTextContent('07:30');
     expect(container.querySelector('.tc-anchor-dot')).not.toBeNull();
+  });
+});
+
+describe('[Gate HomePlace] 出発・帰着の行の「自宅の場所」', () => {
+  it('出発が自宅(または未入力)の時だけ出す', () => {
+    const fn = vi.fn();
+    const { rerender } = render(<JourneyAnchorRow anchor={{ kind: 'departure', place: '自宅', time: '08:00', continued: false }} position="start" onEditHome={fn} />);
+    screen.getByTestId('day-anchor-home-departure').click();
+    expect(fn).toHaveBeenCalledTimes(1);
+    rerender(<JourneyAnchorRow anchor={{ kind: 'departure', place: '東京駅', time: null, continued: false }} position="start" onEditHome={fn} />);
+    expect(screen.queryByTestId('day-anchor-home-departure')).toBeNull();
   });
 });

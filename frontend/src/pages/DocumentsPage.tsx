@@ -15,7 +15,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PasteImageButton from '@/components/media/PasteImageButton';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FileText, Trash2, Upload, Download } from 'lucide-react';
+import { Plus, FileText, Trash2, Upload, Download, Inbox, Lock, ScanText } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -23,10 +23,10 @@ import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl, getDocumentLinks } from '@/services/api';
 import type { TravelDocument, DocumentClassification, DocumentLink } from '@/services/api';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead, KitTile, KitTiles } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
-import { useQueryState } from '@/components/shell/tripKitModel';
+import { documentTypeLabel, useQueryState } from '@/components/shell/tripKitModel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl, safeInternalPath } from '@/utils/safeNavigation';
 
@@ -223,22 +223,34 @@ const DocumentsPage: React.FC = () => {
   }
 
   return (
-    <div className="tc-page">
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page">
+      <KitHead
+        icon={<FileText size={14} />}
         title="文書ライブラリ"
         sub="予約確認書・チケット・領収書などを暗号化して保管し、予約・予定・費用から同じ文書を開けます(ファイルは複製しません)。"
         actions={(
           <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>予約メールを取り込む</button>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}><Inbox size={16} aria-hidden="true" />予約メールを取り込む</button>
             <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>文書を追加</Button>
           </>
         )}
       />
       {planId && <TripKitNav planId={planId} />}
 
+      {!isLoading && documents.length > 0 && (
+        <KitTiles>
+          <KitTile label="文書" icon={<FileText size={14} />} value={`${documents.length}件`} sub="この旅行に保管" />
+          <KitTile label="機密・厳重管理" icon={<Lock size={14} />}
+            value={`${documents.filter((d) => d.classification === 'confidential' || d.classification === 'restricted').length}件`} sub="見られる人を限っています" />
+          <KitTile label="読み取り" icon={<ScanText size={14} />}
+            tone={documents.some((d) => d.ocr_status === 'failed' || d.malware_status === 'infected') ? 'warn' : 'plain'}
+            value={`${documents.filter((d) => d.ocr_status === 'done' || d.ocr_status === 'completed').length}件済み`}
+            sub={documents.some((d) => d.ocr_status === 'failed' || d.malware_status === 'infected') ? '失敗・使えない文書があります' : '文字を読み取って検索できます'} />
+        </KitTiles>
+      )}
+
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
       {isLoading ? (
@@ -259,7 +271,7 @@ const DocumentsPage: React.FC = () => {
         const conds = [
           ...(cond.q ? [{ key: 'q', label: `「${cond.q}」`, clear: () => setCond({ q: '' }) }] : []),
           ...(cond.cls ? [{ key: 'cls', label: CLASSIFICATION_LABEL[cond.cls] ?? cond.cls, clear: () => setCond({ cls: '' }) }] : []),
-          ...(cond.type ? [{ key: 'type', label: `種類: ${cond.type}`, clear: () => setCond({ type: '' }) }] : []),
+          ...(cond.type ? [{ key: 'type', label: `種類: ${documentTypeLabel(cond.type) ?? cond.type}`, clear: () => setCond({ type: '' }) }] : []),
         ];
         return (
         <section aria-labelledby="docs-list-title">
@@ -280,24 +292,25 @@ const DocumentsPage: React.FC = () => {
               count: documents.filter((d) => d.classification === o.value).length })).filter((o) => o.count > 0)} />
           {types.length > 0 && (
             <KitChips label="種類で絞り込む" allLabel="種類すべて" value={cond.type} onChange={(v) => setCond({ type: v })}
-              options={types.map((t) => ({ value: t, label: t, count: documents.filter((d) => d.document_type === t).length }))} />
+              options={types.map((t) => ({ value: t, label: documentTypeLabel(t) ?? t, count: documents.filter((d) => d.document_type === t).length }))} />
           )}
           <KitActiveConditions conditions={conds} shown={shown.length} total={documents.length} onClearAll={clearAll} />
           {shown.length === 0 ? <KitNoMatch onClearAll={clearAll} /> : (
-        <ul className="space-y-3" aria-label="文書">
+        <ul className="tc-kit-list tc-kit-cardlist" aria-label="文書">
           {shown.map((d) => (
-            <li key={d.id}>
+            <li key={d.id} className="tc-kit-docrow">
             <Card padding="md">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <FileText size={20} className="text-gray-400 shrink-0" />
+                  <span className="tc-kit-icon" aria-hidden="true"
+                    data-tone={d.malware_status === 'infected' || d.ocr_status === 'failed' ? 'warn' : undefined}><FileText size={18} /></span>
                   <div className="min-w-0">
                     <div className="font-medium text-ink-900 truncate">
                       {d.original_filename ?? '(ファイル名不明)'}
                     </div>
                     <div className="text-sm text-ink-500">
                       {CLASSIFICATION_LABEL[d.classification] ?? d.classification}
-                      {d.document_type && ` ・ ${d.document_type}`}
+                      {d.document_type && ` ・ ${documentTypeLabel(d.document_type)}`}
                       {' ・ '}{formatSize(d.size)}
                       {' ・ '}{addedDate(d.created_at)}
                     </div>
@@ -312,7 +325,7 @@ const DocumentsPage: React.FC = () => {
                     type="button"
                     onClick={() => handleDownload(d)}
                     disabled={downloadingId === d.id}
-                    className="tc-focus-ring text-ink-500 hover:text-blue-600 p-3 disabled:opacity-50"
+                    className="tc-focus-ring tc-kit-iconbtn"
                     aria-label={`${d.original_filename ?? '文書'}をダウンロード`}
                   >
                     <Download size={16} />
@@ -320,7 +333,7 @@ const DocumentsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDelete(d)}
-                    className="tc-focus-ring text-ink-500 hover:text-red-600 p-3"
+                    className="tc-focus-ring tc-kit-iconbtn tc-kit-iconbtn--danger"
                     aria-label={`${d.original_filename ?? '文書'}を削除`}
                   >
                     <Trash2 size={16} />

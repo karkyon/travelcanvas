@@ -57,7 +57,8 @@
   "captured_at_head_tday": "Gate PlanB-P8 (+Gate TDay today/guide・today/detours・today/eta)",
   "captured_at_head_tday_push": "dev/travel-day-live (+Gate TDay-Push /push/config・subscriptions・subscriptions/remove・settings・test)",
   "captured_at_head_remaining6": "dev/remaining-6 (+Gate Remaining-6 /auth/password/forgot・reset・/auth/email/verify・verify/request)",
-  "captured_at_head_remaining7": "dev/remaining-7 (+Gate Remaining-7 passkeys・gmail・guest/merge・constraints/undo・paid 4 種・track comparison)"
+  "captured_at_head_remaining7": "dev/remaining-7 (+Gate Remaining-7 passkeys・gmail・guest/merge・constraints/undo・paid 4 種・track comparison)",
+  "captured_at_head_homeplace": "Gate HomePlace: +GET/PUT/DELETE /api/v1/privacy/home-place (backend/app/api/v1/home_place.py)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -106,6 +107,7 @@
   "DELETE /api/v1/plans/{plan_id}/upload-links/{link_id}",
   "DELETE /api/v1/plans/{plan_id}/variants/{day_id}",
   "DELETE /api/v1/privacy-zones/{zone_id}",
+  "DELETE /api/v1/privacy/home-place",
   "DELETE /api/v1/spots/{spot_id}",
   "DELETE /api/v1/spots/{spot_id}/favorite",
   "DELETE /api/v1/spots/{spot_id}/visit",
@@ -288,6 +290,7 @@
   "GET /api/v1/privacy/consents",
   "GET /api/v1/privacy/corrections",
   "GET /api/v1/privacy/data-export",
+  "GET /api/v1/privacy/home-place",
   "GET /api/v1/privacy/private-profile",
   "GET /api/v1/privacy/retention",
   "GET /api/v1/privacy/support-grants",
@@ -631,6 +634,7 @@
   "PUT /api/v1/plans/{plan_id}/today/eta",
   "PUT /api/v1/plans/{plan_id}/trip-intent/slots",
   "PUT /api/v1/privacy/consents",
+  "PUT /api/v1/privacy/home-place",
   "PUT /api/v1/privacy/private-profile",
   "PUT /api/v1/push/settings",
   "PUT /api/v1/spots/{spot_id}",

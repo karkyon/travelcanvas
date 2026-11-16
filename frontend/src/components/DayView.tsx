@@ -53,6 +53,8 @@ interface DayViewProps {
   endAnchor?: DayAnchor | null;
   /** [Gate JourneyMove] 出発・帰着の移動手段を設定する(旅行の基本情報を開く) */
   onEditJourney?: () => void;
+  /** [Gate HomePlace] 出発・帰着の行の「自宅の場所」 */
+  onEditHome?: () => void;
   planId: string;
   isActive?: boolean;
   showTimeProgress?: boolean;
@@ -102,6 +104,7 @@ const DayView: React.FC<DayViewProps> = ({
   startAnchor = null,
   endAnchor = null,
   onEditJourney,
+  onEditHome,
   planId,
   isActive = false,
   showTimeProgress = true,
@@ -931,7 +934,7 @@ const DayView: React.FC<DayViewProps> = ({
           onUndo={() => { void undoReorder(); }} onKeep={keepReorder} />
       )}
 
-      {startAnchor && <JourneyAnchorRow anchor={startAnchor} position="start" onEditMove={onEditJourney} />}
+      {startAnchor && <JourneyAnchorRow anchor={startAnchor} position="start" onEditMove={onEditJourney} onEditHome={onEditHome} />}
 
       {/* スケジュールリスト
           [Gate B-013] 予定(role="listitem")は一覧(role="list")の中に置く必要がある(axe
@@ -1070,7 +1073,7 @@ const DayView: React.FC<DayViewProps> = ({
       </div>
 
       {endAnchor && <JourneyAnchorRow anchor={endAnchor} position="end" onAddLodging={() => setIsAddModalOpen(true)}
-        onEditMove={onEditJourney} />}
+        onEditMove={onEditJourney} onEditHome={onEditHome} />}
 
       {/* スケジュール追加モーダル */}
       <Modal

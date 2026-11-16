@@ -32,7 +32,7 @@ const ReadinessBudgetView: React.FC<{ budget: NonNullable<Readiness['budget']> }
   const yen = (v: string | null) => (v == null ? '—' : `${Number(v).toLocaleString('ja-JP')} ${budget.base_currency}`);
   const tone = budget.over || budget.projected_over ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-surface';
   return (
-    <section aria-labelledby="readiness-budget" className={`p-3 rounded-lg border ${tone}`} data-testid="readiness-budget">
+    <section aria-labelledby="readiness-budget" className={`tc-kit-box ${tone}`} data-testid="readiness-budget">
       <h3 id="readiness-budget" className="m-0 text-sm font-semibold text-ink-900">予算</h3>
       {budget.total == null ? (
         <p className="m-0 mt-1 text-sm text-ink-700">予算は未設定です(費用の画面で決められます)。使った額 {yen(budget.spent)}</p>
@@ -80,7 +80,7 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
           {(Object.keys(READINESS_CATEGORY_LABEL) as Array<keyof typeof READINESS_CATEGORY_LABEL>)
             .filter((c) => readiness.counts.by_category[c] > 0)
             .map((c) => (
-              <li key={c} className="text-sm px-2 py-1 rounded-sm bg-gray-100 text-ink-900">
+              <li key={c} className="tc-kit-pill">
                 {READINESS_CATEGORY_LABEL[c]} {readiness.counts.by_category[c]}件
               </li>
             ))}
@@ -88,7 +88,7 @@ const ReadinessPanel: React.FC<Props> = ({ readiness, canEdit, onMakeTask, onCom
       )}
 
       {readiness && readiness.items.length > 0 && (
-        <ul className="space-y-3" aria-label="準備が残っている項目">
+        <ul className="tc-kit-list tc-kit-cardlist" aria-label="準備が残っている項目">
           {readiness.items.map((item) => (
             <li key={item.key}>
               <Card padding="md">
