@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Bell, Shield, Settings, LogOut, Save, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge, CreditCard
+  CheckCircle, AlertCircle, Eye, EyeOff, Download, Trash2, Lock, LifeBuoy, Gauge, CreditCard, House
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { api as apiService, getOfflinePackKey, rotateOfflinePackKey } from '@/services/api';
@@ -15,6 +15,7 @@ import MfaSection from '@/components/settings/MfaSection';
 import EmailVerifySection from '@/components/settings/EmailVerifySection';
 import PasskeySection from '@/components/settings/PasskeySection';
 import PrivateProfileSection from '@/components/settings/PrivateProfileSection';
+import HomePlaceForm from '@/components/settings/HomePlaceForm';
 import SupportAccessSection from '@/components/settings/SupportAccessSection';
 import UsageSection from '@/components/settings/UsageSection';
 import StylePicker from '@/components/settings/StylePicker';
@@ -661,6 +662,13 @@ const SettingsPage: React.FC = () => {
     { id: 'offline', name: 'オフライン', icon: <Download size={16} />, render: OfflineTab },
     // [Gate C1] FR-023 秘匿プロフィール(本人だけ)
     { id: 'conditions', name: '非公開の条件', icon: <Lock size={16} />, render: () => <PrivateProfileSection /> },
+    // [Gate HomePlace] 自宅の場所(本人だけ。登録・地図に出す・経路に使う・提供元へ送るを選ぶ)
+    { id: 'home', name: '自宅の場所', icon: <House size={16} />, render: () => (
+      <section aria-labelledby="home-place-title" className="space-y-3">
+        <h2 id="home-place-title" className="text-lg font-semibold text-ink-900">自宅の場所</h2>
+        <HomePlaceForm />
+      </section>
+    ) },
     // [Gate G2] FR-040 サポートへの閲覧の許可(本人が目的・期限つきで許可する)
     { id: 'support', name: 'サポート', icon: <LifeBuoy size={16} />, render: () => <SupportAccessSection /> },
     // [Gate G5] BILL-02 今月の使用量と上限

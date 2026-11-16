@@ -17,7 +17,7 @@ from app.api.v1 import (
     spot_intake, holidays, inbound_mail, billing, server_exports,
     spot_media,
     privacy_zones, photo_upload, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
-    media_providers,
+    media_providers, home_place,
     trip_intents,
     planning_usage,
     admin_ops,
@@ -632,6 +632,8 @@ app.include_router(presence.router, prefix="/api/v1")
 # [Gate C1] FR-023 秘匿プロフィール(本人だけ)。/privacy/private-profile・/plans/{plan_id}/private-profile。
 app.include_router(private_profile.profile_router, prefix="/api/v1")
 app.include_router(private_profile.plan_router, prefix="/api/v1")
+# [Gate HomePlace] 自宅の場所(本人だけ・使うかは本人が選ぶ)。/privacy/home-place
+app.include_router(home_place.router, prefix="/api/v1")
 # [Gate B1] FR-041 組織・B2B / FR-042 外部連携(OAuth client_credentials・Webhook)
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(org_external.router, prefix="/api/v1")

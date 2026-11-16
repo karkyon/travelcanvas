@@ -26,7 +26,7 @@ EXCLUDE_TABLES = {
     "mfa_reset_requests", "support_grants", "billing_customers", "billing_subscriptions", "billing_payments",
     "user_mfa", "user_private_profiles", "trip_location_settings", "plan_external_maps", "private_profile_links",
     "webauthn_credentials", "gmail_connections", "email_outbox", "organization_members", "organization_seat_events",
-    "data_corrections", "offline_devices", "location_area_cells",
+    "data_corrections", "offline_devices", "location_area_cells", "user_home_places",
 }
 # 誰が操作したか(管理者の操作・承認)の列は移さない
 EXCLUDE_COLUMNS = {"approved_by", "requested_by", "updated_by", "disabled_by",

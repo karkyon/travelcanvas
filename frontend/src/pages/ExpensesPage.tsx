@@ -12,7 +12,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead, KitSeg, KitTile, KitTiles } from '@/components/shell/KitParts';
+import { Receipt, Users, Wallet, CalendarClock } from 'lucide-react';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { useQueryState } from '@/components/shell/tripKitModel';
 import Button from '@/components/common/Button';
@@ -360,15 +361,15 @@ const ExpensesPage: React.FC = () => {
     ?? expenses.flatMap((x) => x.shares).find((s) => s.user_id === userId)?.name ?? 'メンバー外';
 
   return (
-    <div className="tc-page">
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page">
+      <KitHead
+        icon={<Wallet size={14} />}
         title="予算・費用"
         sub="予算と、予約の見込み・実際の支出・立替の精算を分けて確認します(同じ予約の金額を見込みと支出で二重に数えません)。"
         actions={(
-          <div>
-            <label htmlFor="finance-base-currency" className="block text-sm font-medium text-ink-900 mb-1">基準通貨</label>
-            <select id="finance-base-currency" className="border rounded-lg px-3 py-2" value={base}
+          <div className="tc-kit-currency">
+            <label htmlFor="finance-base-currency">基準通貨</label>
+            <select id="finance-base-currency" value={base}
               disabled={!canEdit || currencyLocked} onChange={(e) => changeCurrency(e.target.value)}>
               {[...new Set([base, ...CURRENCY_OPTIONS])].map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -377,16 +378,24 @@ const ExpensesPage: React.FC = () => {
       />
       {planId && <TripKitNav planId={planId} />}
 
-      <div role="tablist" aria-label="予算・費用の表示切替" className="flex gap-2 mb-4 border-b">
-        {TABS.map((t) => (
-          <button key={t.id} id={`fin-tab-${t.id}`} type="button" role="tab" aria-selected={tab === t.id}
-            // 表示中の欄がある時だけ指す(読み込み中・別の欄は画面に無いので、無い要素を指さない。axe aria-valid-attr-value)
-            aria-controls={tab === t.id && !isLoading && summary ? `fin-panel-${t.id}` : undefined} onClick={() => setTab(t.id)}
-            className={`px-4 py-2 -mb-px border-b-2 font-medium ${tab === t.id ? 'border-blue-600 text-blue-800' : 'border-transparent text-ink-700'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {!isLoading && summary && (() => {
+        const yenOf = (v: string | null | undefined) => (v == null ? '未設定' : `${Number(v).toLocaleString('ja-JP')} ${summary.base_currency}`);
+        const b = summary.total.budget != null ? Number(summary.total.budget) : null;
+        const a = Number(summary.total.actual ?? 0);
+        return (
+          <KitTiles>
+            <KitTile label="予算" icon={<Wallet size={14} />} value={yenOf(summary.total.budget)} sub="旅行全体" />
+            <KitTile label="使った" icon={<Receipt size={14} />} tone={summary.total.over ? 'warn' : 'plain'} value={yenOf(summary.total.actual)}
+              progress={b && b > 0 ? (a / b) * 100 : null} sub={summary.total.over ? '予算を超えています' : `支出 ${expenses.length}件`} />
+            <KitTile label="予約の見込み" icon={<CalendarClock size={14} />} value={yenOf(summary.reserved.total)} sub="予約の金額(支出とは別に数えます)" />
+            <KitTile label="精算" icon={<Users size={14} />} tone={summary.is_settled ? 'plain' : 'warn'}
+              value={summary.is_settled ? '精算済み' : '精算が残っています'} sub="立替は「精算」で誰が誰に払うかを出します" />
+          </KitTiles>
+        );
+      })()}
+
+      <KitSeg label="予算・費用の表示切替" idPrefix="fin" value={tab} onChange={setTab} panelReady={!isLoading && Boolean(summary)}
+        tabs={TABS.map((t) => ({ id: t.id, label: t.label, count: null }))} />
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {locked && (

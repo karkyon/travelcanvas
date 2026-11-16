@@ -255,6 +255,10 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
 
     db.query(OfflineDevice).filter(OfflineDevice.user_id == me).delete(synchronize_session=False)
     db.query(PrivacyZone).filter(PrivacyZone.user_id == me).delete(synchronize_session=False)
+    # [Gate HomePlace] 自宅の場所(暗号文)
+    from app.models.models import UserHomePlace
+
+    db.query(UserHomePlace).filter(UserHomePlace.user_id == me).delete(synchronize_session=False)
     summary["journal_publications"] = db.query(MemoryPublication).filter(MemoryPublication.user_id == me).delete(
         synchronize_session=False)
     trash_files: List[Any] = [t.storage_key for t in db.query(MemoryTrash).filter(

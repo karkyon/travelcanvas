@@ -13,12 +13,12 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead, KitSection, KitTile, KitTiles } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
 import { useQueryState } from '@/components/shell/tripKitModel';
 import toast from 'react-hot-toast';
-import { Plus, Check, X, FileCheck, FileX, Trash2 } from 'lucide-react';
+import { Plus, Check, X, FileCheck, FileX, Trash2, Inbox, AlertTriangle, Loader2, Mail } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import Input from '@/components/common/Input';
@@ -77,6 +77,12 @@ const PROVIDER_LABEL: Record<string, string> = {
   ocr: '画像から読み取り', 'ocr+openai': '画像から読み取り(AI で補完)', none: '読み取り',
 };
 // [Gate TripKit] 取込トレイの状態のまとまり(実際の status から数える)
+/** [Gate TripKitUI] 状態の札の色(文字でも状態を出す) */
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'info' | 'danger'> = {
+  review_required: 'warn', confirmed: 'ok', failed: 'danger', quarantined: 'danger',
+  uploaded: 'info', scanning: 'info', extracting: 'info', retry_wait: 'info',
+};
+
 const JOB_GROUPS: { value: string; label: string; statuses: string[]; attention?: boolean }[] = [
   { value: 'review', label: '確認が必要', statuses: ['review_required'], attention: true },
   { value: 'working', label: '処理中', statuses: ['uploaded', 'scanning', 'extracting', 'retry_wait'] },
@@ -302,9 +308,9 @@ const ImportsPage: React.FC = () => {
   }
 
   return (
-    <div className="tc-page">
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page">
+      <KitHead
+        icon={<Inbox size={14} />}
         title="予約の取込"
         sub="予約メールや画像から読み取った内容を確認して、予約として登録します。確認する前の内容は予約の一覧に入りません。"
         actions={(
@@ -319,16 +325,31 @@ const ImportsPage: React.FC = () => {
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
       )}
 
-      {planId && <InboundMailCard planId={planId} />}
-      {/* [Gate Remaining-7] FR-011 Gmail の連携 */}
-      {planId && <GmailCard planId={planId} onImported={() => void loadJobs()} />}
+      {!isLoading && jobs.length > 0 && (() => {
+        const n = (v: string) => jobs.filter((j) => (JOB_GROUPS.find((g) => g.value === v)?.statuses ?? []).includes(j.status)).length;
+        return (
+          <KitTiles>
+            <KitTile label="確認待ち" icon={<AlertTriangle size={14} />} tone={n('review') > 0 ? 'warn' : 'plain'} value={`${n('review')}件`} sub="確認すると予約に入ります" />
+            <KitTile label="処理中" icon={<Loader2 size={14} />} value={`${n('working')}件`} sub="読み取りが終わるまで待ちます" />
+            <KitTile label="失敗・隔離" icon={<FileX size={14} />} tone={n('failed') > 0 ? 'warn' : 'plain'} value={`${n('failed')}件`} sub="手入力でも取り込めます" />
+            <KitTile label="登録済み" icon={<FileCheck size={14} />} value={`${n('done')}件`} sub="予約の一覧にあります" />
+          </KitTiles>
+        );
+      })()}
 
       {planId && (
-        <BookingExtractCard planId={planId} onExtracted={(job) => {
-          setReviewNotes([job.ai_message, ...job.warnings].filter((n): n is string => !!n));
-          setSelected(job);
-          void loadJobs();
-        }} />
+        <KitSection title="取り込み方" icon={<Mail size={16} />} id="imports-ways-title">
+          <div className="tc-kit-ways">
+            <InboundMailCard planId={planId} />
+            {/* [Gate Remaining-7] FR-011 Gmail の連携 */}
+            <GmailCard planId={planId} onImported={() => void loadJobs()} />
+            <BookingExtractCard planId={planId} onExtracted={(job) => {
+              setReviewNotes([job.ai_message, ...job.warnings].filter((n): n is string => !!n));
+              setSelected(job);
+              void loadJobs();
+            }} />
+          </div>
+        </KitSection>
       )}
 
       {isLoading ? (
@@ -351,7 +372,7 @@ const ImportsPage: React.FC = () => {
               <KitActiveConditions shown={shown.length} total={jobs.length} onClearAll={() => setQ({ st: '' })}
                 conditions={grp ? [{ key: 'st', label: grp.label, clear: () => setQ({ st: '' }) }] : []} />
               {shown.length === 0 ? <KitNoMatch onClearAll={() => setQ({ st: '' })} /> : (
-        <ul className="space-y-3" aria-label="取込ジョブ">
+        <ul className="tc-kit-list tc-kit-cardlist" aria-label="取込ジョブ">
           {shown.map((j) => (
             <li key={j.id}>
               {/* [Gate E1] キーボードで開けるようにボタンにする(以前は <div onClick>) */}
@@ -368,7 +389,7 @@ const ImportsPage: React.FC = () => {
                       <div className="text-sm text-ink-700">{PROVIDER_LABEL[j.provider ?? ''] ?? j.provider}</div>
                       <div className="text-xs text-ink-700">{NEXT_STEP[j.status] ?? ''}{j.error_message ? ` ・ ${j.error_message}` : ''}</div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[j.status] ?? 'bg-gray-100 text-ink-700'}`}>
+                    <span className="tc-kit-pill" data-tone={STATUS_TONE[j.status] ?? undefined}>
                       {STATUS_LABEL[j.status] ?? j.status}
                     </span>
                   </div>
@@ -381,7 +402,7 @@ const ImportsPage: React.FC = () => {
                 )}
                 <button type="button" onClick={() => void handleDeleteJob(j)} data-testid={`import-job-delete-${j.id}`}
                   aria-label={`${formatDateTime(j.created_at)} の取込ジョブを削除`} title="一覧から削除"
-                  className="tc-focus-ring m-2 shrink-0 self-center rounded-lg p-2 text-ink-700 hover:bg-cloud-100 hover:text-danger">
+                  className="tc-focus-ring tc-kit-iconbtn tc-kit-iconbtn--danger m-2 shrink-0 self-center">
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
               </Card>
