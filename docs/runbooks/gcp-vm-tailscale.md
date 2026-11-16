@@ -144,6 +144,9 @@ DB は自動では戻さない(戻す時は `python3 scripts/ops/tcops.py restor
   ```
 - 値を画面・チャット・Git に出さない
 
+- [Gate DataTransfer] omega-dev2 の試験データを丸ごと移した時は、鍵が omega-dev2 と同じ値になる(`gcp-data-transfer.md`)。
+  その後で上の控えを新しい版にする
+
 ## 7. 確認と緊急の止め方
 
 - 確認だけ: `bash scripts/ops/gcp_vm.sh check`(何も変えない)
