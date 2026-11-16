@@ -7,10 +7,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2 } from 'lucide-react';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import api from '@/services/api';
 import type { Organization } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { ROLE_LABEL } from '@/utils/organizations';
+import { orgApi } from '@/services/api/organizationsApi';
 
 const OrganizationsPage: React.FC = () => {
   const [orgs, setOrgs] = useState<Organization[] | null>(null);
@@ -21,7 +21,7 @@ const OrganizationsPage: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      setOrgs(await api.getOrganizations());
+      setOrgs(await orgApi.getOrganizations());
     } catch (e) {
       setError(errorDetailMessage(e, '組織の一覧を取得できませんでした'));
       setOrgs([]);
@@ -37,7 +37,7 @@ const OrganizationsPage: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      await api.createOrganization({ name, brand_color: color });
+      await orgApi.createOrganization({ name, brand_color: color });
       setName('');
       await load();
     } catch (err) {

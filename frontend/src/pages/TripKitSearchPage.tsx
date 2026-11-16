@@ -14,7 +14,7 @@ import { Search } from 'lucide-react';
 import { KitHead } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { KitActiveConditions, KitChips } from '@/components/shell/TripKitNav';
-import { useQueryState } from '@/components/shell/tripKitModel';
+import { MEMORY_ONLY_Q, useQueryState } from '@/components/shell/tripKitModel';
 import { searchPlan } from '@/services/api';
 import type { SearchFilter, SearchResults } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
@@ -30,7 +30,7 @@ type State = { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok'; data: Search
 const TripKitSearchPage: React.FC = () => {
   const { planId = '' } = useParams<{ planId: string }>();
   const navigate = useNavigate();
-  const [cond, setCond] = useQueryState({ q: '', f: '', cat: '' });
+  const [cond, setCond] = useQueryState({ q: '', f: '', cat: '' }, MEMORY_ONLY_Q);
   const [draft, setDraft] = useState(cond.q);
   const [st, setSt] = useState<State>({ kind: 'idle' });
   const [tick, setTick] = useState(0);

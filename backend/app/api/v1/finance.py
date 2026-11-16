@@ -31,7 +31,7 @@ import json
 import uuid
 from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from fastapi.responses import JSONResponse
@@ -1120,7 +1120,20 @@ def finance_summary(plan_id: str, db: Session = Depends(get_db),
         "members": member_rows,
         "transfers": transfers,
         "is_settled": all(r["net"] == 0 for r in bal.values()),
+        # [Gate TripKitFix] is_settled は「払うものが残っていない」。立替が1件も無い時も真になるため、
+        # 画面が「精算済み」と誤って出していた。精算の状態を区別して返す(画面は推測しない)。
+        "settlement_state": settlement_state(bal),
     }
+
+
+def settlement_state(bal: Mapping[Any, Mapping[str, int]]) -> str:
+    """[Gate TripKitFix] 精算の状態。open=誰かの差額が0でない / settled=精算の記録があり全員の差額が0 /
+    none=精算するものが無い(立替が無い、または各自が自分の分だけを払った)。"""
+    if any(r["net"] != 0 for r in bal.values()):
+        return "open"
+    if any(r["settled_out"] or r["settled_in"] for r in bal.values()):
+        return "settled"
+    return "none"
 
 
 def reserved_amounts(db: Session, plan: TravelPlan, base: str, rounding: str = "half_up",

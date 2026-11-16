@@ -15,10 +15,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PasteImageButton from '@/components/media/PasteImageButton';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, FileText, Trash2, Upload, Download, Inbox, Lock, ScanText } from 'lucide-react';
+import { Plus, FileText, Trash2, Upload, Download, Link2, Lock, ScanText } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
-import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getDocuments, uploadDocument, deleteDocument, getDocumentDownloadUrl, resolveDownloadUrl, getDocumentLinks } from '@/services/api';
@@ -26,9 +25,18 @@ import type { TravelDocument, DocumentClassification, DocumentLink } from '@/ser
 import { KitHead, KitTile, KitTiles } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
-import { documentTypeLabel, useQueryState } from '@/components/shell/tripKitModel';
+import { DOCUMENT_TYPE_CHOICES, MEMORY_ONLY_Q, documentTypeLabel, useQueryState } from '@/components/shell/tripKitModel';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl, safeInternalPath } from '@/utils/safeNavigation';
+import DocumentLinkDialog from './documents/DocumentLinkDialog';
+import { relationCount } from './documents/documentLinkModel';
+
+/** [Gate TripKitFix] 文書の札の補足(「予約確認書 2 · チケット 1」) */
+function typeBreakdown(docs: TravelDocument[]): string {
+  const m = new Map<string, number>();
+  for (const d of docs) { const k = d.document_type ? (documentTypeLabel(d.document_type) ?? d.document_type) : 'その他'; m.set(k, (m.get(k) ?? 0) + 1); }
+  return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${k} ${n}`).join(' · ') || 'この旅行に保管';
+}
 
 const CLASSIFICATION_OPTIONS: { value: DocumentClassification; label: string }[] = [
   { value: 'public', label: '公開' },
@@ -73,11 +81,11 @@ const DocLinks: React.FC<{ planId: string; doc: TravelDocument }> = ({ planId, d
   };
   return (
     <div className="tc-doc-links">
-      <button type="button" className="tc-focus-ring tc-mini-link" aria-expanded={open} onClick={() => void toggle()}>関連先</button>
+      <button type="button" className="tc-focus-ring tc-mini-link" aria-expanded={open} onClick={() => void toggle()}>関連先を見る</button>
       {open && (
         failed ? <p className="text-xs text-red-700" role="alert">{failed}</p>
           : links == null ? <p className="text-xs text-ink-700">読み込み中…</p>
-            : links.length === 0 ? <p className="text-xs text-ink-700">まだどこにもつながっていません(予約の詳細から添付できます)</p>
+            : links.length === 0 ? <p className="text-xs text-ink-700">まだどこにもつながっていません(「関連付ける」から予約・予定につなげます)</p>
               : (
                 <ul className="tc-doc-links__list" aria-label={`${doc.original_filename ?? '文書'}の関連先`}>
                   {links.map((l) => (
@@ -104,7 +112,7 @@ const DocumentsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [documents, setDocuments] = useState<TravelDocument[]>([]);
-  const [cond, setCond] = useQueryState({ q: '', cls: '', type: '', sort: 'new' });
+  const [cond, setCond] = useQueryState({ q: '', cls: '', type: '', sort: 'new', link: '' }, MEMORY_ONLY_Q);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,6 +122,7 @@ const DocumentsPage: React.FC = () => {
   const [documentType, setDocumentType] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [linkTarget, setLinkTarget] = useState<TravelDocument | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!planId) return;
@@ -226,20 +235,28 @@ const DocumentsPage: React.FC = () => {
     <div className="tc-page tc-kit-page">
       <KitHead
         icon={<FileText size={14} />}
-        title="文書ライブラリ"
+        title="文書"
         sub="予約確認書・チケット・領収書などを暗号化して保管し、予約・予定・費用から同じ文書を開けます(ファイルは複製しません)。"
         actions={(
-          <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}><Inbox size={16} aria-hidden="true" />予約メールを取り込む</button>
-            <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>文書を追加</Button>
-          </>
+          // [Gate TripKitFix] 主な操作は 1 つ(取り込みはナビの「予約の取込」から)
+          <Button variant="primary" icon={<Plus size={18} />} onClick={() => setIsCreateOpen(true)}>文書を追加</Button>
         )}
       />
       {planId && <TripKitNav planId={planId} />}
 
       {!isLoading && documents.length > 0 && (
         <KitTiles>
-          <KitTile label="文書" icon={<FileText size={14} />} value={`${documents.length}件`} sub="この旅行に保管" />
+          <KitTile label="文書" icon={<FileText size={14} />} value={`${documents.length}件`} sub={typeBreakdown(documents)} />
+          {(() => {
+            // [Gate TripKitFix] まだどこにも関連の無い文書(予約・予定・支出の領収書のどれにもつながっていない)
+            const known = documents.filter((d) => relationCount(d) != null);
+            const none = known.filter((d) => relationCount(d) === 0).length;
+            return known.length === 0 ? null : (
+              <KitTile label="まだどこにも関連なし" icon={<Link2 size={14} />} tone={none > 0 ? 'warn' : 'plain'} testId="doc-tile-unlinked"
+                value={`${none}件`} sub={none > 0 ? '予約・予定に関連付けられます' : 'どの文書もつながっています'}
+                action={none > 0 && cond.link !== 'none' ? { label: '関連なしを見る', onClick: () => setCond({ link: 'none' }) } : undefined} />
+            );
+          })()}
           <KitTile label="機密・厳重管理" icon={<Lock size={14} />}
             value={`${documents.filter((d) => d.classification === 'confidential' || d.classification === 'restricted').length}件`} sub="見られる人を限っています" />
           <KitTile label="読み取り" icon={<ScanText size={14} />}
@@ -263,15 +280,17 @@ const DocumentsPage: React.FC = () => {
         const words = cond.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
         const types = Array.from(new Set(documents.map((d) => d.document_type).filter((t): t is string => !!t)));
         let shown = documents.filter((d) => (!cond.cls || d.classification === cond.cls) && (!cond.type || d.document_type === cond.type)
+          && (cond.link !== 'none' || relationCount(d) === 0)
           && words.every((w) => [d.original_filename, d.document_type, CLASSIFICATION_LABEL[d.classification]].some((v) => (v ?? '').toLowerCase().includes(w))));
         shown = [...shown].sort((a, b) => (cond.sort === 'name'
           ? (a.original_filename ?? '').localeCompare(b.original_filename ?? '', 'ja')
           : cond.sort === 'old' ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at)));
-        const clearAll = () => setCond({ q: '', cls: '', type: '' });
+        const clearAll = () => setCond({ q: '', cls: '', type: '', link: '' });
         const conds = [
           ...(cond.q ? [{ key: 'q', label: `「${cond.q}」`, clear: () => setCond({ q: '' }) }] : []),
           ...(cond.cls ? [{ key: 'cls', label: CLASSIFICATION_LABEL[cond.cls] ?? cond.cls, clear: () => setCond({ cls: '' }) }] : []),
           ...(cond.type ? [{ key: 'type', label: `種類: ${documentTypeLabel(cond.type) ?? cond.type}`, clear: () => setCond({ type: '' }) }] : []),
+          ...(cond.link === 'none' ? [{ key: 'link', label: 'まだどこにも関連なし', clear: () => setCond({ link: '' }) }] : []),
         ];
         return (
         <section aria-labelledby="docs-list-title">
@@ -287,6 +306,11 @@ const DocumentsPage: React.FC = () => {
               </select>
             </label>
           </div>
+          {documents.some((d) => relationCount(d) != null) && (
+            <KitChips label="関連で絞り込む" allLabel="関連すべて" value={cond.link} onChange={(v) => setCond({ link: v })}
+              options={[{ value: 'none', label: '関連なし', attention: true,
+                count: documents.filter((d) => relationCount(d) === 0).length }]} />
+          )}
           <KitChips label="分類で絞り込む" value={cond.cls} onChange={(v) => setCond({ cls: v })} allCount={documents.length}
             options={CLASSIFICATION_OPTIONS.map((o) => ({ value: o.value, label: o.label.replace(/\(.*\)/, ''),
               count: documents.filter((d) => d.classification === o.value).length })).filter((o) => o.count > 0)} />
@@ -317,6 +341,23 @@ const DocumentsPage: React.FC = () => {
                     {(OCR_LABEL[d.ocr_status] || MALWARE_LABEL[d.malware_status]) && (
                       <div className="text-xs text-ink-700">{[MALWARE_LABEL[d.malware_status], OCR_LABEL[d.ocr_status]].filter(Boolean).join(' ・ ')}</div>
                     )}
+                    {/* [Gate TripKitFix] 関連の件数と、文書の側から関連付ける入口 */}
+                    <div className="tc-kit-doclinks">
+                      {relationCount(d) === 0 ? (
+                        <>
+                          <span className="tc-kit-pill" data-tone="warn">関連なし</span>
+                          <button type="button" className="tc-focus-ring tc-kit-chiplink" onClick={() => setLinkTarget(d)}
+                            aria-label={`${d.original_filename ?? '文書'}を関連付ける`}>関連付ける</button>
+                        </>
+                      ) : (
+                        <>
+                          {(d.link_count ?? 0) > 0 && <span className="tc-kit-chiplink">{`予約・予定など ${d.link_count}件`}</span>}
+                          {(d.receipt_count ?? 0) > 0 && <span className="tc-kit-chiplink">{`支出の領収書 ${d.receipt_count}件`}</span>}
+                          <button type="button" className="tc-focus-ring tc-mini-link" onClick={() => setLinkTarget(d)}
+                            aria-label={`${d.original_filename ?? '文書'}をほかにも関連付ける`}>ほかにも関連付ける</button>
+                        </>
+                      )}
+                    </div>
                     {planId && <DocLinks planId={planId} doc={d} />}
                   </div>
                 </div>
@@ -376,8 +417,9 @@ const DocumentsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">分類</label>
+                <label htmlFor="doc-classification" className="block text-sm font-medium text-ink-700 mb-1">分類</label>
                 <select
+                  id="doc-classification"
                   value={classification}
                   onChange={(e) => setClassification(e.target.value as DocumentClassification)}
                   className="w-full border rounded-lg px-3 py-2"
@@ -388,11 +430,15 @@ const DocumentsPage: React.FC = () => {
                 </select>
               </div>
 
-              <Input
-                label="種類(任意。例: receipt/ticket/passport)"
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-              />
+              {/* [Gate TripKitFix] 種類は日本語で選ぶ(以前は英字を手で入れていた) */}
+              <div>
+                <label htmlFor="doc-type" className="block text-sm font-medium text-ink-900 mb-1">種類(任意)</label>
+                <select id="doc-type" value={documentType} onChange={(e) => setDocumentType(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2">
+                  <option value="">選ばない</option>
+                  {DOCUMENT_TYPE_CHOICES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
             </div>
           </Modal.Body>
           <Modal.Footer>
@@ -411,6 +457,8 @@ const DocumentsPage: React.FC = () => {
           </Modal.Footer>
         </form>
       </Modal>
+
+      {planId && <DocumentLinkDialog planId={planId} doc={linkTarget} onClose={() => setLinkTarget(null)} onLinked={() => void loadDocuments()} />}
     </div>
   );
 };

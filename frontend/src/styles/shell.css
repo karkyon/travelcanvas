@@ -1583,3 +1583,101 @@
   .tc-kit-tiles .tc-kit-tile { padding: 10px 12px; min-width: 0; }
   .tc-kit-tiles .tc-kit-tile__value { font-size: 18px; overflow-wrap: anywhere; }
 }
+
+/* ==========================================================================
+   [Gate TripKitFix] 旅行箱の補正(状態の意味・画面のつながり)。改修モックアップ 2026-11-16 の補正版。
+   どれも .tc-kit-page の中だけに効かせる(運用コンソールなど、ほかの画面と共有するクラスは使わない)。
+   ========================================================================== */
+.tc-kit-page .tc-kit-tile[data-tone="muted"] .tc-kit-tile__value { color: var(--tc-ink-500); font-size: 18px; }
+.tc-kit-page .tc-kit-tile__act { align-self: flex-start; margin-top: 2px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 700; color: var(--tc-accent-strong); }
+.tc-kit-page .tc-kit-tile__act:hover { text-decoration: underline; }
+.tc-kit-page .tc-kit-box[data-tone="warn"] { border-color: color-mix(in srgb, var(--tc-warning) 40%, var(--tc-cloud-200)); background: var(--tc-warning-soft); }
+.tc-kit-page .tc-kit-box[data-tone="ok"] { background: var(--tc-success-soft); border-color: color-mix(in srgb, var(--tc-success) 30%, var(--tc-cloud-200)); }
+/* 出発前チェックの行 */
+.tc-kit-page .tc-kit-checks { list-style: none; margin: 0; padding: 0; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; overflow: hidden; }
+.tc-kit-page .tc-kit-checkrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 13px 16px;
+  border-top: 1px solid var(--tc-cloud-100); font-size: 13.5px; }
+.tc-kit-page .tc-kit-checkrow:first-child { border-top: 0; }
+/* 0 件・未作成の案内 */
+.tc-kit-page .tc-kit-blank { display: grid; justify-items: center; gap: 8px; padding: 28px 16px; text-align: center; font-size: 13px; color: var(--tc-ink-500);
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; }
+.tc-kit-page .tc-kit-blank b { font-size: 15px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-blank__acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* 「予約を追加」 */
+.tc-kit-addmenu { position: relative; }
+.tc-kit-addmenu__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(300px, calc(100vw - 32px)); padding: 6px;
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 23, 42, .14); }
+.tc-kit-addmenu__item { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 52px;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; color: var(--tc-ink-900); }
+.tc-kit-addmenu__item:hover, .tc-kit-addmenu__item:focus-visible { background: var(--tc-cloud-100); }
+.tc-kit-addmenu__item b { display: block; font-size: 13.5px; }
+.tc-kit-addmenu__item small { display: block; font-size: 12px; color: var(--tc-ink-500); }
+.tc-kit-addmenu__item .tc-kit-icon { width: 36px; height: 36px; }
+/* 予約の一覧: 列に分ける */
+.tc-kit-page .tc-kit-reshead { display: grid; grid-template-columns: 40px minmax(0, 2.2fr) 150px 120px 130px 110px 16px; gap: 14px;
+  padding: 10px 16px; font-size: 12px; font-weight: 800; color: var(--tc-ink-500); background: var(--tc-cloud-50, #f8fafc); border-radius: 14px 14px 0 0; }
+.tc-kit-page .tc-kit-resrow { border-top: 1px solid var(--tc-cloud-100); }
+.tc-kit-page .tc-kit-resrow .tc-kit-resrow__open { flex: 1 1 100%; grid-template-columns: 40px minmax(0, 2.2fr) 150px 120px 130px 110px 16px; }
+.tc-kit-page .tc-kit-resrow__when, .tc-kit-page .tc-kit-resrow__amt { font-size: 13px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-resrow__amt { font-weight: 800; }
+.tc-kit-page .tc-kit-resrow__dl { color: var(--tc-warning) !important; font-weight: 700; }
+.tc-kit-page .tc-kit-resrow__links { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 0 16px 10px 70px; }
+.tc-kit-page .tc-kit-resrow__links .tc-kit-comment { margin: 0; }
+.tc-kit-page .tc-kit-resrow__why { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 0 16px 12px 70px; font-size: 12.5px; }
+.tc-kit-page .tc-kit-chiplink { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 0 9px; border-radius: 7px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); font-size: 12px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-kit-page button.tc-kit-chiplink { cursor: pointer; }
+.tc-kit-page .tc-kit-chiplink[data-tone="warn"] { border-color: color-mix(in srgb, var(--tc-warning) 45%, var(--tc-cloud-200)); color: var(--tc-warning); }
+/* 予約の詳細 */
+.tc-kit-detailgrp { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 12px 14px; }
+.tc-kit-detailgrp[data-tone="warn"] { background: var(--tc-warning-soft); border-color: color-mix(in srgb, var(--tc-warning) 40%, var(--tc-cloud-200)); }
+.tc-kit-detailgrp > h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--tc-ink-700); }
+.tc-kit-dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13px; }
+.tc-kit-dl dt { color: var(--tc-ink-500); font-weight: 700; }
+.tc-kit-dl dd { margin: 0; }
+.tc-kit-payedit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.tc-kit-payedit__sel { min-height: 36px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-kit-notes { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 14px; }
+.tc-kit-notes > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-kit-notes[open] > summary { margin-bottom: 8px; }
+/* 取込: 手順・連携の 1 行 */
+.tc-kit-page .tc-kit-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 0; margin: 4px 0 16px; padding: 0; }
+.tc-kit-page .tc-kit-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 0; font-size: 13px; font-weight: 700; color: var(--tc-ink-500); }
+.tc-kit-page .tc-kit-steps li + li::before { content: ""; width: 24px; height: 1.5px; background: var(--tc-cloud-200); margin-right: 6px; }
+.tc-kit-page .tc-kit-steps i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px;
+  background: var(--tc-cloud-100); color: var(--tc-ink-700); }
+.tc-kit-page .tc-kit-steps li[data-state="current"] { color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-steps li[data-state="current"] i, .tc-kit-page .tc-kit-steps li[data-state="done"] i { background: var(--tc-accent); color: #fff; }
+.tc-kit-page .tc-kit-links { display: grid; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; overflow: hidden; }
+.tc-kit-page .tc-kit-links > * + * { border-top: 1px solid var(--tc-cloud-100); }
+.tc-kit-page .tc-kit-links > .tc-card, .tc-kit-page .tc-kit-links > div > .tc-card { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.tc-kit-page .tc-kit-linkrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.tc-kit-page .tc-kit-linkrow b { display: block; font-size: 13.5px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-linkrow small { display: block; font-size: 12.5px; color: var(--tc-ink-500); }
+/* 文書の関連 */
+.tc-kit-page .tc-kit-doclinks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tc-kit-fieldset { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 8px 12px 10px; margin: 0; }
+.tc-kit-fieldset > legend { padding: 0 4px; font-size: 12.5px; font-weight: 800; color: var(--tc-ink-700); }
+.tc-kit-picklist { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
+.tc-kit-pick { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; min-height: 44px; padding: 8px 6px; border-radius: 8px; cursor: pointer; }
+.tc-kit-pick:hover { background: var(--tc-cloud-100); }
+.tc-kit-pick input { margin-top: 3px; }
+.tc-kit-pick b { display: block; font-size: 13.5px; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-kit-pick small { display: block; font-size: 12px; color: var(--tc-ink-500); }
+.tc-kit-seg-mini { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.tc-kit-chipbtn { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0);
+  font-size: 12.5px; font-weight: 700; color: var(--tc-ink-700); cursor: pointer; }
+.tc-kit-chipbtn[aria-pressed="true"] { background: var(--tc-accent); border-color: var(--tc-accent); color: #fff; }
+/* 狭い画面: 予約の行は「名前」→「日時」→「金額・支払い・状態」の3段 */
+@media (max-width: 860px) {
+  .tc-kit-page .tc-kit-reshead { display: none; }
+  .tc-kit-page .tc-kit-resrow .tc-kit-resrow__open { grid-template-columns: 40px auto auto minmax(0, 1fr) 16px; row-gap: 6px; }
+  .tc-kit-page .tc-kit-resrow__open > .tc-kit-icon { grid-row: 1 / span 3; align-self: start; }
+  .tc-kit-page .tc-kit-resrow__name, .tc-kit-page .tc-kit-resrow__when { grid-column: 2 / 5; }
+  .tc-kit-page .tc-kit-resrow__open::after { grid-column: 5; grid-row: 1; }
+  .tc-kit-page .tc-kit-resrow__amt { grid-column: 2; }
+  .tc-kit-page .tc-kit-resrow__pay { grid-column: 3; }
+  .tc-kit-page .tc-kit-resrow__st { grid-column: 4; justify-self: start; }
+  .tc-kit-page .tc-kit-resrow__links, .tc-kit-page .tc-kit-resrow__why { padding-left: 16px; }
+}

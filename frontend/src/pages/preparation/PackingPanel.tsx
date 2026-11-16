@@ -9,7 +9,6 @@
 import React from 'react';
 import { Check, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
 import Button from '@/components/common/Button';
-import Card from '@/components/common/Card';
 import { isPackedStatus } from './preparationModel';
 import type {
   PackingItem, PackingStatus, PackingSuggestion, PackingSuggestionConditions, PackingSuggestions,
@@ -170,7 +169,17 @@ const PackingPanel: React.FC<Props> = (props) => {
         </div>
       )}
       {items.length === 0 ? (
-        <Card padding="lg" className="text-center text-ink-700">持ち物はまだありません。「持ち物を追加」か「候補を表示」から入れられます(候補は確認して追加するまでリストに入りません)。</Card>
+        // [Gate TripKitFix] 0 件は「0 / 0 完了」ではなく「リストが無い」として作り方を出す
+        <div className="tc-kit-blank" data-testid="packing-empty">
+          <b>持ち物のリストはまだありません</b>
+          <span>旅程の日数・行き先・天気から候補を出します。候補は 1 つずつ確かめてから足せます。</span>
+          {canEdit && (
+            <span className="tc-kit-blank__acts">
+              <Button variant="primary" size="sm" onClick={props.onShowSuggestions} disabled={props.isLoadingSuggestions}>候補から作る</Button>
+              <Button variant="outline" size="sm" onClick={props.onAdd}>1つずつ足す</Button>
+            </span>
+          )}
+        </div>
       ) : shownItems.length === 0 ? <KitNoMatch onClearAll={() => setPq({ pk: '' })} /> : (
         groups.map((g) => {
           const done = g.items.filter((x) => isPackedStatus(x.status)).length;

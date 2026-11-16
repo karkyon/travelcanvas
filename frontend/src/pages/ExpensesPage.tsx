@@ -37,7 +37,7 @@ import ReceiptScanDialog from './expenses/ReceiptScanDialog';
 import type { ReceiptResult } from '@/services/api/receipt';
 import {
   BUDGET_KIND_LABEL, CATEGORY_OPTIONS, CURRENCY_OPTIONS, SPLIT_OPTIONS, emptyExpenseForm, expenseFormFromExpense,
-  expenseFormToPayload, isValidAmount, minorDigits, type ExpenseForm,
+  expenseFormToPayload, isValidAmount, minorDigits, settlementTile, type ExpenseForm,
 } from './expenses/financeModel';
 
 type Tab = 'summary' | 'expenses' | 'settlement' | 'ledger';
@@ -384,12 +384,20 @@ const ExpensesPage: React.FC = () => {
         const a = Number(summary.total.actual ?? 0);
         return (
           <KitTiles>
-            <KitTile label="予算" icon={<Wallet size={14} />} value={yenOf(summary.total.budget)} sub="旅行全体" />
-            <KitTile label="使った" icon={<Receipt size={14} />} tone={summary.total.over ? 'warn' : 'plain'} value={yenOf(summary.total.actual)}
-              progress={b && b > 0 ? (a / b) * 100 : null} sub={summary.total.over ? '予算を超えています' : `支出 ${expenses.length}件`} />
-            <KitTile label="予約の見込み" icon={<CalendarClock size={14} />} value={yenOf(summary.reserved.total)} sub="予約の金額(支出とは別に数えます)" />
-            <KitTile label="精算" icon={<Users size={14} />} tone={summary.is_settled ? 'plain' : 'warn'}
-              value={summary.is_settled ? '精算済み' : '精算が残っています'} sub="立替は「精算」で誰が誰に払うかを出します" />
+            {/* [Gate TripKitFix] 未設定・記録なしを「0」「済み」と区別する */}
+            <KitTile label="予算" icon={<Wallet size={14} />} testId="fin-tile-budget"
+              tone={summary.total.budget == null ? 'muted' : 'plain'} value={yenOf(summary.total.budget)}
+              sub={summary.total.budget == null ? '決めると残りと使いすぎを出します' : '旅行全体'}
+              action={summary.total.budget == null && canEdit ? { label: '予算を決める', onClick: () => openBudget({ kind: 'total' }) } : undefined} />
+            <KitTile label="実際の支出" icon={<Receipt size={14} />} tone={summary.total.over ? 'warn' : 'plain'} value={yenOf(summary.total.actual)}
+              progress={b && b > 0 ? (a / b) * 100 : null}
+              sub={summary.total.over ? '予算を超えています' : expenses.length === 0 ? 'まだ記録がありません' : `支出 ${expenses.length}件`} />
+            <KitTile label="予約の見込み" icon={<CalendarClock size={14} />} value={yenOf(summary.reserved.total)} sub="予約の金額(支出には足しません)" />
+            {(() => {
+              const st = settlementTile(summary);
+              return <KitTile label="立替・精算" icon={<Users size={14} />} tone={st.tone} value={st.value} sub={st.sub} testId="fin-tile-settlement"
+                action={summary.settlement_state === 'open' && tab !== 'settlement' ? { label: '精算を見る', onClick: () => setTab('settlement') } : undefined} />;
+            })()}
           </KitTiles>
         );
       })()}

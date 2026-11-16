@@ -61,13 +61,16 @@ test('準備: 準備状況の項目をタスクで対応し、持ち物の候補
   await page.getByTestId('planner-actions').getByRole('button', { name: '準備' }).click();  // [Gate HeaderPicker] 上の帯の旅行の切り替えも旅行の名前で読み上げるため、旅程の操作の列に絞る
   await page.waitForURL(new RegExp(`/planner/${planId}/preparation$`), { timeout: 15_000 });
   const summary = page.getByTestId('readiness-summary');
-  await expect(summary).toContainText('件の準備が残っています', { timeout: 15_000 });
-  await expect(page.getByText('出発前に対応が必要な項目はありません')).toHaveCount(0);
-  const items = page.getByRole('list', { name: '準備が残っている項目' });
-  const hotelItem = items.getByRole('listitem').filter({ hasText: '「京都ホテル」に予約がありません' });
+  // [Gate TripKitFix] 予約・支払いは「出発前チェック」として、持ち物とは別に数える
+  await expect(summary).toContainText('出発前に確かめることが', { timeout: 15_000 });
+  await expect(page.getByText('出発前に確かめることはありません')).toHaveCount(0);
+  await expect(page.getByTestId('prep-tile-departure')).toContainText('件');
+  await expect(page.getByTestId('prep-tile-packing')).toContainText('リスト未作成');
+  const items = page.getByTestId('readiness-departure');
+  const hotelItem = page.locator('[data-testid^="readiness-item-"]').filter({ hasText: '「京都ホテル」に予約がありません' });
   await expect(hotelItem).toBeVisible();
-  await expect(items.getByText('鉄道の予約(JR)が未払いです')).toBeVisible();
-  await axeViolations(page, '準備状況');
+  await expect(page.locator('[data-testid^="readiness-item-"]').filter({ hasText: '鉄道の予約(JR)が未払いです' })).toBeVisible();
+  await axeViolations(page, '出発前チェック');
 
   // 2. タスクにして、対応済みにする
   await hotelItem.getByRole('button', { name: 'タスクにする' }).click();
@@ -86,7 +89,7 @@ test('準備: 準備状況の項目をタスクで対応し、持ち物の候補
   await expect(hotelItem.getByText(/タスクにしました\(担当: /)).toBeVisible();
   await hotelItem.getByRole('button', { name: '対応済みにする' }).click();
   await expect(items.getByText('「京都ホテル」に予約がありません')).toHaveCount(0);
-  await expect(summary).toContainText('タスク: 未完了 0 件 / 完了 1 件');
+  await expect(page.getByTestId('readiness-counts')).toContainText('タスク: 未完了 0 件 / 完了 1 件');
 
   // 3. 持ち物の候補(海外)。天候は判定していないと示す
   await page.getByRole('tab', { name: '持ち物' }).click();

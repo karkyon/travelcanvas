@@ -5,14 +5,14 @@
  * - 次に確認すること: 準備状況(readiness)の項目(重い順・期限つき)と、確認待ち・失敗の取込
  * - 旅行の情報: 予約・チケット / 準備・持ち物 / 予算・費用 / 文書 / 予約の取込 の件数と状態、各一覧へ
  * - 最近追加したもの: 予約と文書(追加日時・出典)
- * - すぐ使う操作: 予約を手入力・メール/画像から取り込む・文書を保管・支出を登録・旅行箱から探す
+ * - すぐ使う操作: メール/画像から取り込む・文書を保管・支出を登録([Gate TripKitFix] 予約の追加は見出しの「予約を追加」、検索はナビの「旅行箱を検索」の 1 つずつ)
  * 件数・金額は固定の値を出さない。読み込み中・0 件・失敗・権限なし(見せない設定)を分けて出す。
  * 準備の点数は使わない(期限切れや重い問題を 1 つの数字で隠さない)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, FileText, Inbox, LayoutGrid, ListChecks, Luggage, Plus, Search, Ticket, Wallet } from 'lucide-react';
-import { KitHead, KitSection, KitTile, KitTiles } from '@/components/shell/KitParts';
+import { AlertTriangle, FileText, Inbox, LayoutGrid, ListChecks, Luggage, Ticket, Wallet } from 'lucide-react';
+import { KitAddReservation, KitHead, KitSection, KitTile, KitTiles } from '@/components/shell/KitParts';
 import { documentTypeLabel, primeKitAttention } from '@/components/shell/tripKitModel';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { getDocuments, getFinanceSummary, getImportJobs, getReadiness, getReservations } from '@/services/api';
@@ -20,6 +20,7 @@ import type { FinanceSummary, ImportJob, Readiness, Reservation, TravelDocument 
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import { attentionReasons } from './reservations/reservationListModel';
+import { checkCounts, departureBreakdown } from './preparation/preparationModel';
 
 type Load<T> = { state: 'loading' } | { state: 'ok'; data: T } | { state: 'denied' } | { state: 'error'; message: string };
 
@@ -119,7 +120,11 @@ const TripKitPage: React.FC = () => {
       line: resList.length === 0 ? 'まだ予約がありません' : `${resList.length}件${resAttention ? ` ・ 要確認 ${resAttention}` : ''}${nextRes ? ` ・ 次は ${shortDate(nextRes.start_at)} ${nextRes.provider_name ?? ''}` : ''}`,
       warn: resAttention > 0 },
     { key: 'prep', icon: <Luggage size={18} aria-hidden="true" />, title: '準備・持ち物', load: ready, retry: reloadReady, to: `/planner/${planId}/preparation`,
-      line: ready.state === 'ok' ? `持ち物 ${ready.data.packing.packed} / ${ready.data.packing.total} ・ やること ${ready.data.tasks.open}件 ・ 確認 ${ready.data.counts.total}件` : '',
+      line: ready.state === 'ok' ? (() => {
+        const c = checkCounts(ready.data)!;
+        const p = ready.data.packing;
+        return `出発前チェック ${c.departure}件 ・ 持ち物 ${p.total === 0 ? 'リスト未作成' : `${p.packed} / ${p.total}`} ・ タスク ${ready.data.tasks.open}件`;
+      })() : '',
       warn: ready.state === 'ok' && (ready.data.counts.by_severity.high ?? 0) > 0 },
     { key: 'fin', icon: <Wallet size={18} aria-hidden="true" />, title: '予算・費用', load: fin, retry: reloadFin, to: `/planner/${planId}/expenses`,
       line: fin.state === 'ok' ? `予算 ${money(fin.data.total.budget, fin.data.base_currency)} ・ 予約の見込み ${money(fin.data.reserved.total, fin.data.base_currency)} ・ 支出 ${money(fin.data.total.actual, fin.data.base_currency)}${fin.data.is_settled ? '' : ' ・ 精算あり'}` : '',
@@ -136,6 +141,8 @@ const TripKitPage: React.FC = () => {
   useEffect(() => { if (ready.state === 'ok') primeKitAttention(planId, ready.data); }, [planId, ready]);
   const cur = fin.state === 'ok' ? fin.data.base_currency : '';
   const packing = ready.state === 'ok' ? ready.data.packing : null;
+  const cc = checkCounts(ready.state === 'ok' ? ready.data : null);
+  const reviewJobs = jobList.filter((j) => REVIEW.has(j.status)).length;
   const sevTone = (sev: string): 'warn' | 'plain' | undefined => (sev === 'high' ? 'warn' : sev === 'low' ? 'plain' : undefined);
 
   return (
@@ -145,14 +152,9 @@ const TripKitPage: React.FC = () => {
         title="旅行箱の概要"
         sub="予約・チケット・持ち物・費用・文書を、この旅行の中でまとめて確認します。"
         actions={(
-          <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/kit/search`)}>
-              <Search size={15} aria-hidden="true" />情報を探す
-            </button>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => navigate(`/planner/${planId}/reservations?new=1`)}>
-              <Plus size={15} aria-hidden="true" />予約を手入力
-            </button>
-          </>
+          // [Gate TripKitFix] 検索はナビの「旅行箱を検索」1 つにし、ここは「予約を追加」1 つにする
+          <KitAddReservation onImport={() => navigate(`/planner/${planId}/imports`)}
+            onManual={() => navigate(`/planner/${planId}/reservations?new=1`)} />
         )}
       />
       <TripKitNav planId={planId} />
@@ -160,12 +162,18 @@ const TripKitPage: React.FC = () => {
       <KitTiles>
         <KitTile label="次の予約" icon={<Ticket size={14} />} value={nextRes ? shortDate(nextRes.start_at) : res.state === 'ok' ? 'なし' : '—'}
           sub={nextRes ? (nextRes.provider_name ?? '予約') : res.state === 'ok' ? 'これからの予約はありません' : null} />
-        <KitTile label="確認が必要" icon={<AlertTriangle size={14} />} tone={todos.length > 0 ? 'warn' : 'plain'}
-          value={allLoaded ? `${todos.length}件` : '—'} sub={todos.length > 0 ? todos.slice(0, 3).map((t) => t.tag).filter((v, k, a) => a.indexOf(v) === k).join('・') : allLoaded ? '今はありません' : null} />
-        <KitTile label="持ち物" icon={<Luggage size={14} />} value={packing ? `${packing.packed} / ${packing.total}` : '—'}
+        {/* [Gate TripKitFix] 準備・費用の画面と同じ言葉・同じ数(出発前チェック・リスト未作成・未設定) */}
+        <KitTile label="出発前チェック" icon={<AlertTriangle size={14} />} testId="kit-tile-departure"
+          tone={cc && cc.departure > 0 ? 'warn' : cc ? 'plain' : 'muted'}
+          value={cc ? (cc.departure > 0 ? `${cc.departure}件` : '問題なし') : '—'}
+          sub={cc ? [departureBreakdown(cc), reviewJobs > 0 ? `取込の確認待ち ${reviewJobs}` : null].filter(Boolean).join(' · ') : null} />
+        <KitTile label="持ち物" icon={<Luggage size={14} />} testId="kit-tile-packing"
+          tone={packing && packing.total === 0 ? 'muted' : 'plain'}
+          value={packing ? (packing.total === 0 ? 'リスト未作成' : `${packing.packed} / ${packing.total}`) : '—'}
           progress={packing && packing.total > 0 ? (packing.packed / packing.total) * 100 : null}
-          sub={ready.state === 'ok' ? `やること ${ready.data.tasks.open}件` : null} />
-        <KitTile label="予算" icon={<Wallet size={14} />} tone={fin.state === 'ok' && fin.data.total.over ? 'warn' : 'plain'}
+          sub={packing ? (packing.total === 0 ? '候補から作れます' : `タスク ${ready.state === 'ok' ? ready.data.tasks.open : 0}件`) : null} />
+        <KitTile label="予算" icon={<Wallet size={14} />}
+          tone={fin.state === 'ok' && fin.data.total.over ? 'warn' : fin.state === 'ok' && fin.data.total.budget == null ? 'muted' : 'plain'}
           value={fin.state === 'ok' ? (fin.data.total.budget != null ? money(fin.data.total.budget, cur) : '未設定') : '—'}
           sub={fin.state === 'ok' ? `予約の見込み ${money(fin.data.reserved.total, cur)} ・ 支出 ${money(fin.data.total.actual, cur)}` : null} />
       </KitTiles>
@@ -189,7 +197,7 @@ const TripKitPage: React.FC = () => {
                   ))}
                 </ul>
               )}
-            {todos.length > 8 && <Link to={`/planner/${planId}/preparation`} className="tc-mini-link">{`ほか ${todos.length - 8}件を準備状況で見る`}</Link>}
+            {todos.length > 8 && <Link to={`/planner/${planId}/preparation`} className="tc-mini-link">{`ほか ${todos.length - 8}件を出発前チェックで見る`}</Link>}
           </KitSection>
 
           <KitSection id="kit-recent-title" title="最近追加したもの" aside="予約と文書">
@@ -229,11 +237,9 @@ const TripKitPage: React.FC = () => {
 
           <KitSection id="kit-quick-title" title="すぐ使う">
             <div className="tc-kit-quick">
-              <Link to={`/planner/${planId}/reservations?new=1`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Plus size={15} aria-hidden="true" />予約を手入力</Link>
               <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Inbox size={15} aria-hidden="true" />メール・画像から取り込む</Link>
               <Link to={`/planner/${planId}/documents`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><FileText size={15} aria-hidden="true" />文書を保管</Link>
               <Link to={`/planner/${planId}/expenses?tab=expenses`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Wallet size={15} aria-hidden="true" />支出を登録</Link>
-              <Link to={`/planner/${planId}/kit/search`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Search size={15} aria-hidden="true" />旅行箱から探す</Link>
             </div>
           </KitSection>
         </div>

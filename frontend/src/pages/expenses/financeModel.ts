@@ -73,6 +73,18 @@ export function describeNet(net: string, currency: string): string {
     : `${formatMoney(net, currency)} 受け取る`;
 }
 
+/**
+ * [Gate TripKitFix] 精算の札の言葉。backend の settlement_state をそのまま言葉にする(画面で推測しない)。
+ * 以前は is_settled(立替が無い時も真)で「精算済み」と出していた。
+ */
+export function settlementTile(s: FinanceSummary): { value: string; sub: string; tone: 'warn' | 'plain' | 'muted' } {
+  if (s.settlement_state === 'open') {
+    return { value: '精算が残っています', sub: `精算案 ${s.transfers.length}件(誰が誰にいくら払うか)`, tone: 'warn' };
+  }
+  if (s.settlement_state === 'settled') return { value: '精算済み', sub: '精算の記録で、全員の差額が0です', tone: 'plain' };
+  return { value: '立替なし', sub: '誰かが立て替えた支出を入れると精算できます', tone: 'muted' };
+}
+
 export function summaryNotices(s: FinanceSummary | null): string[] {
   if (!s) return [];
   const out: string[] = [];

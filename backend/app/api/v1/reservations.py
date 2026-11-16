@@ -50,6 +50,7 @@ from app.models.models import (
     User,
 )
 from app.services.audit_service import record_audit_event
+from app.utils.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/plans", tags=["reservations"])
 
@@ -347,6 +348,19 @@ def _sync_primary_event_link(db: Session, reservation: Reservation) -> None:
 # ==========================================
 # エンドポイント
 # ==========================================
+
+
+# [Gate TripKitFix] SEC 予約番号・PIN・チケットの完全開示の回数の上限(利用者ごと・1時間)。
+# 家族の旅行で何度か開く程度は十分に通り、一覧の全件を機械的に開き続ける使い方だけを止める。
+REVEAL_RATE_LIMIT = 60
+REVEAL_RATE_WINDOW = 3600
+
+
+def _require_reveal_quota(user: User) -> None:
+    if not check_rate_limit(f"reveal:{user.id}", REVEAL_RATE_LIMIT, REVEAL_RATE_WINDOW):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="表示の回数が上限に達しました。しばらく待ってから開いてください")
+
 
 @router.post(
     "/{plan_id}/reservations",
@@ -657,6 +671,7 @@ def reveal_reservation(
     plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor",
                                                         "reservations", "reservation_secrets")
     r = _get_reservation_or_404(db, plan.id, reservation_id)
+    _require_reveal_quota(current_user)
 
     confirmation_number = None
     pin = None
@@ -1438,6 +1453,7 @@ def reveal_ticket(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"このチケットの表示には{required_role}以上の権限が必要です",
         )
+    _require_reveal_quota(current_user)
 
     payload_value = None
     if t.payload_ciphertext:

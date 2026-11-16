@@ -42,6 +42,9 @@ import GmailCard from './imports/GmailCard';
 import BookingReviewForm from './imports/BookingReviewForm';
 import { deleteImportJob } from '@/services/api/photoFeatures';
 
+/** [Gate TripKitFix] 取り込みの手順(3 段目の自動の照合は API が無いため、確認の画面で人が見比べる) */
+const IMPORT_STEPS = ['読み取る', '内容を確かめる', '既存の予約と見比べる', '予約に登録'] as const;
+
 const STATUS_LABEL: Record<string, string> = {
   uploaded: 'アップロード済み',
   scanning: 'スキャン中',
@@ -337,17 +340,36 @@ const ImportsPage: React.FC = () => {
         );
       })()}
 
+      {/* [Gate TripKitFix] 手順を 4 段で示す(登録するまで予約・旅程・支出は作らない) */}
+      <ol className="tc-kit-steps" aria-label="取り込みの手順" data-testid="imports-steps">
+        {IMPORT_STEPS.map((label, i) => {
+          const current = selected ? 1 : 0;
+          return (
+            <li key={label} data-state={i === current ? 'current' : i < current ? 'done' : undefined}
+              aria-current={i === current ? 'step' : undefined}>
+              <i aria-hidden="true">{i + 1}</i>{label}
+            </li>
+          );
+        })}
+      </ol>
+
       {planId && (
-        <KitSection title="取り込み方" icon={<Mail size={16} />} id="imports-ways-title">
-          <div className="tc-kit-ways">
+        <KitSection title="すぐ使える取り込み方" icon={<Mail size={16} />} id="imports-ways-title"
+          aside="どれも、確かめて登録するまで予約にはなりません">
+          {/* [Gate TripKitFix] 今すぐ使える入口(貼り付け・.eml・画像・PDF)を先に出す */}
+          <BookingExtractCard planId={planId} onExtracted={(job) => {
+            setReviewNotes([job.ai_message, ...job.warnings].filter((n): n is string => !!n));
+            setSelected(job);
+            void loadJobs();
+          }} />
+        </KitSection>
+      )}
+      {planId && (
+        <KitSection title="連携" icon={<Inbox size={16} />} id="imports-links-title" aside="転送のアドレス・Gmail">
+          <div className="tc-kit-links">
             <InboundMailCard planId={planId} />
             {/* [Gate Remaining-7] FR-011 Gmail の連携 */}
             <GmailCard planId={planId} onImported={() => void loadJobs()} />
-            <BookingExtractCard planId={planId} onExtracted={(job) => {
-              setReviewNotes([job.ai_message, ...job.warnings].filter((n): n is string => !!n));
-              setSelected(job);
-              void loadJobs();
-            }} />
           </div>
         </KitSection>
       )}

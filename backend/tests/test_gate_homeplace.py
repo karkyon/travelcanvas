@@ -57,7 +57,8 @@ def test_save_read_and_revision(auth_client, db_session, audit_calls):
     row = db_session.query(UserHomePlace).filter(UserHomePlace.user_id == me.id).one()
     assert "千代田".encode() not in bytes(row.place_ciphertext)
     # 監査に住所・座標を残さない
-    assert audit_calls and all("address" not in str(c["details"]) and "35.68" not in str(c["details"]) for c in audit_calls)
+    assert audit_calls
+    assert all("address" not in str(c["details"]) and "35.68" not in str(c["details"]) for c in audit_calls)
 
     # 古い版は 409
     assert client.put("/api/v1/privacy/home-place", json=BODY, headers={"If-Match": "0"}).status_code == 409

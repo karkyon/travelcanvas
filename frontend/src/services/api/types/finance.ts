@@ -191,5 +191,10 @@ export interface FinanceSummary {
   unconverted_expenses: number;
   members: FinanceMemberBalance[];
   transfers: FinanceTransfer[];
+  /** 払うものが残っていない(立替が無い時も真)。「精算済み」の表示には settlement_state を使う */
   is_settled: boolean;
+  /** [Gate TripKitFix] none=精算するものが無い / open=精算が残る / settled=精算の記録で全員の差額が0 */
+  settlement_state: SettlementState;
 }
+
+export type SettlementState = 'none' | 'open' | 'settled';

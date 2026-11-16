@@ -31,13 +31,13 @@ import PackingPanel from './preparation/PackingPanel';
 import ReadinessPanel from './preparation/ReadinessPanel';
 import TasksPanel from './preparation/TasksPanel';
 import {
-  CATEGORY_OPTIONS, STATUS_OPTIONS, emptyPackingForm, packingProgress, emptyTaskForm, packingFormFromItem, packingFormToPayload,
+  CATEGORY_OPTIONS, STATUS_OPTIONS, checkCounts, departureBreakdown, emptyPackingForm, packingProgress, emptyTaskForm, packingFormFromItem, packingFormToPayload,
   taskFormFromTask, taskFormToPayload, type PackingForm, type TaskForm,
 } from './preparation/preparationModel';
 
 type Tab = 'readiness' | 'packing' | 'tasks';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'readiness', label: '準備状況' },
+  { id: 'readiness', label: '出発前チェック' },
   { id: 'packing', label: '持ち物' },
   { id: 'tasks', label: 'タスク' },
 ];
@@ -302,33 +302,48 @@ const PreparationPage: React.FC = () => {
       <KitHead
         icon={<Luggage size={14} />}
         title="準備・持ち物"
-        sub="持ち物・準備のタスク・出発前に確かめることを、担当ごとにまとめます。"
+        sub="出発前に確かめること・持ち物・タスクを、分けて数えます。"
       />
       <TripKitNav planId={planId} />
       {!isLoading && (() => {
+        // [Gate TripKitFix] 出発前チェック(予約・支払い・期限・予算)と持ち物・タスクを別の札で数える
         const pr = packingProgress(items);
         const openTasks = tasks.filter((t) => t.status !== 'done').length;
+        const cc = checkCounts(readiness);
         return (
           <KitTiles>
-            <KitTile label="持ち物" icon={<Luggage size={14} />} value={`${pr.packed} / ${pr.total}`}
-              progress={pr.total > 0 ? (pr.packed / pr.total) * 100 : null} sub="準備済み(梱包・使用後)" />
-            <KitTile label="必須の残り" icon={<AlertTriangle size={14} />} tone={pr.requiredLeft > 0 ? 'warn' : 'plain'}
-              value={`${pr.requiredLeft}個`} sub={pr.requiredLeft > 0 ? '忘れると困るもの' : '必須はそろっています'} />
-            <KitTile label="タスク" icon={<ListChecks size={14} />} value={`${openTasks}件`} sub={`完了 ${tasks.length - openTasks}件`} />
-            <KitTile label="準備状況" icon={<AlertTriangle size={14} />} tone={readiness && !readiness.is_ready ? 'warn' : 'plain'}
-              value={readiness ? (readiness.is_ready ? '準備完了' : `残り ${readiness.counts.total}件`) : '—'}
-              sub={readiness && !readiness.is_ready ? '予約・支払い・持ち物など' : null} />
+            <KitTile label="出発前チェック" icon={<AlertTriangle size={14} />} testId="prep-tile-departure"
+              tone={cc && cc.departure > 0 ? 'warn' : cc ? 'plain' : 'muted'}
+              value={cc ? (cc.departure > 0 ? `${cc.departure}件` : '問題なし') : '—'}
+              sub={cc ? departureBreakdown(cc) : '確認できませんでした'}
+              action={cc && cc.departure > 0 && tab !== 'readiness' ? { label: '出発前チェックを見る', onClick: () => setTab('readiness') } : undefined} />
+            <KitTile label="持ち物" icon={<Luggage size={14} />} testId="prep-tile-packing"
+              tone={pr.total === 0 ? 'muted' : 'plain'}
+              value={pr.total === 0 ? 'リスト未作成' : `${pr.packed} / ${pr.total}`}
+              progress={pr.total > 0 ? (pr.packed / pr.total) * 100 : null}
+              sub={pr.total === 0 ? '候補から作れます(天気・日数から)' : '準備済み(梱包・使用後)'}
+              action={pr.total === 0 && canEdit ? { label: '持ち物を作る', onClick: () => setTab('packing') } : undefined} />
+            <KitTile label="タスク" icon={<ListChecks size={14} />} value={`${openTasks}件`}
+              sub={tasks.length === 0 ? '出発前チェックから作れます' : `完了 ${tasks.length - openTasks}件`} />
+            <KitTile label="必須の残り" icon={<AlertTriangle size={14} />}
+              tone={pr.total === 0 ? 'muted' : pr.requiredLeft > 0 ? 'warn' : 'plain'}
+              value={pr.total === 0 ? '—' : `${pr.requiredLeft}個`}
+              sub={pr.total === 0 ? '持ち物を作ると数えます' : pr.requiredLeft > 0 ? '忘れると困るもの' : '必須はそろっています'} />
           </KitTiles>
         );
       })()}
 
       <KitSeg label="準備の表示切替" idPrefix="prep" value={tab} onChange={setTab}
-        tabs={TABS.map((t) => ({
-          id: t.id, label: t.label,
-          count: t.id === 'readiness' ? (readiness && !readiness.is_ready ? readiness.counts.total : null)
-            : t.id === 'packing' ? (isLoading ? null : items.length) : (isLoading ? null : tasks.filter((x) => x.status !== 'done').length),
-          attention: t.id === 'readiness',
-        }))} />
+        tabs={TABS.map((t) => {
+          const cc = checkCounts(readiness);
+          return {
+            id: t.id, label: t.label,
+            count: t.id === 'readiness' ? (cc && cc.departure > 0 ? cc.departure : null)
+              : t.id === 'packing' ? (isLoading ? null : items.length === 0 ? '未作成' : items.length)
+                : (isLoading ? null : tasks.filter((x) => x.status !== 'done').length),
+            attention: t.id === 'readiness',
+          };
+        })} />
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
 

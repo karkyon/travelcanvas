@@ -21,6 +21,8 @@ from app.core.config import settings  # noqa: E402 - 型の定義の後で設定
 API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
 NO_STORE_PREFIXES = ("/api/v1/auth", "/api/v1/offline-pack", "/api/v1/privacy")
+# [Gate TripKitFix] 予約番号・PIN・チケットの中身を返す応答は、ブラウザ・中継に残さない
+NO_STORE_SUFFIXES = ("/reveal",)
 
 BASE_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -38,7 +40,8 @@ def apply_security_headers(path: str, headers: HeaderMap) -> None:
             headers[name] = value
     if not path.startswith(DOCS_PATHS) and "Content-Security-Policy" not in headers:
         headers["Content-Security-Policy"] = API_CSP
-    if path.startswith(NO_STORE_PREFIXES) and "Cache-Control" not in headers:
+    if (path.startswith(NO_STORE_PREFIXES) or path.rstrip("/").endswith(NO_STORE_SUFFIXES)) \
+            and "Cache-Control" not in headers:
         headers["Cache-Control"] = "no-store"
     if settings.is_production and "Strict-Transport-Security" not in headers:
         headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

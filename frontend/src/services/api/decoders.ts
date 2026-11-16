@@ -370,6 +370,8 @@ export const travelDocument: Decoder<TravelDocument> = object<TravelDocument>({
   revision: int,
   created_at: str,
   updated_at: nullable(str),
+  link_count: optional(nullable(nonNegativeInt)),
+  receipt_count: optional(nullable(nonNegativeInt)),
 });
 
 export const documentLink: Decoder<DocumentLink> = object<DocumentLink>({
@@ -904,6 +906,7 @@ export const financeSummary: Decoder<FinanceSummary> = object<FinanceSummary>({
   })),
   transfers: arrayOf(object({ from_user_id: str, from_name: str, to_user_id: str, to_name: str, amount: moneyString })),
   is_settled: bool,
+  settlement_state: oneOf('none', 'open', 'settled'),
 });
 
 // ----- [Gate P3] 合意形成(FR-022)・コメント(FR-024)。backend/app/api/v1/discussion.py の応答。

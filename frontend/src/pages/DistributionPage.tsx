@@ -9,10 +9,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import SharedPlanView from '@/components/share/SharedPlanView';
-import api from '@/services/api';
 import type { DistributionAckList, Organization, OrgDistribution } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { fmtDateTime, isOrgAdmin, myAckLabel, ROLE_LABEL, snapshotToSharedPlan } from '@/utils/organizations';
+import { orgApi } from '@/services/api/organizationsApi';
 
 const btn = 'px-4 py-2 rounded-lg disabled:opacity-50';
 
@@ -31,10 +31,10 @@ const DistributionPage: React.FC = () => {
   const load = useCallback(async () => {
     if (!orgId || !distId) return;
     try {
-      const o = await api.getOrganization(orgId);
+      const o = await orgApi.getOrganization(orgId);
       setOrg(o);
-      setDist(await api.getDistribution(orgId, distId));
-      if (isOrgAdmin(o.role)) setAcks(await api.getDistributionAcks(orgId, distId));
+      setDist(await orgApi.getDistribution(orgId, distId));
+      if (isOrgAdmin(o.role)) setAcks(await orgApi.getDistributionAcks(orgId, distId));
     } catch (e) {
       setError(errorDetailMessage(e, '配布を取得できませんでした'));
     } finally {
@@ -94,7 +94,7 @@ const DistributionPage: React.FC = () => {
               {!dist.acknowledged && (
                 <button type="button" disabled={busy} className={`${btn} bg-green-700 text-white hover:bg-green-800`}
                   onClick={() => run(async () => {
-                    await api.acknowledgeDistribution(orgId, distId, dist.version);
+                    await orgApi.acknowledgeDistribution(orgId, distId, dist.version);
                     return `版${dist.version}を確認しました`;
                   }, '確認を記録できませんでした')}>
                   版{dist.version}を確認しました
@@ -102,7 +102,7 @@ const DistributionPage: React.FC = () => {
               )}
               <button type="button" disabled={busy} className={`${btn} border border-blue-300 text-blue-800 hover:bg-blue-50`}
                 onClick={() => run(async () => {
-                  const r = await api.forkDistribution(orgId, distId);
+                  const r = await orgApi.forkDistribution(orgId, distId);
                   navigate(`/planner/${r.plan_id}`);
                   return null;
                 }, '複製できませんでした')}>
@@ -138,7 +138,7 @@ const DistributionPage: React.FC = () => {
                 <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
                   e.preventDefault();
                   run(async () => {
-                    const r = await api.reviseDistribution(orgId, distId, { base_version: dist.version, change_note: note || undefined });
+                    const r = await orgApi.reviseDistribution(orgId, distId, { base_version: dist.version, change_note: note || undefined });
                     setNote('');
                     const c = r.changes;
                     return `版${r.version}にしました${c ? `(予定の追加 ${c.events_added}・削除 ${c.events_removed}・変更 ${c.events_changed})` : ''}`;
@@ -155,7 +155,7 @@ const DistributionPage: React.FC = () => {
                   onClick={() => {
                     if (!window.confirm('この配布をやめますか?メンバーから見えなくなります。')) return;
                     run(async () => {
-                      await api.revokeDistribution(orgId, distId);
+                      await orgApi.revokeDistribution(orgId, distId);
                       return '配布をやめました';
                     }, '配布をやめられませんでした');
                   }}>
