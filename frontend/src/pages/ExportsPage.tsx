@@ -67,10 +67,10 @@ const ExportsPage: React.FC = () => {
 
   const geo = { precision, exclude_accommodation: excludeLodging };
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-        <h1 className="text-2xl font-bold text-ink-900">書き出し</h1>
+        <h1 className="tc-page-title" data-eyebrow="TRIP · 書き出し">書き出し</h1>
         <p className="text-sm text-ink-700 mt-1">
           旅程をカレンダー・地図アプリ・表計算ソフトで使える形式で保存します。予約番号・チケット・メモ・参加者名は含めません。
         </p>

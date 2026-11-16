@@ -118,11 +118,11 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="tc-page space-y-6">
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-ink-900">管理者ダッシュボード</h1>
+          <h1 className="tc-page-title" data-eyebrow="ADMIN · 管理">管理者ダッシュボード</h1>
           <p className="text-ink-700 mt-1">最終更新: {lastRefresh.toLocaleString('ja-JP')}</p>
         </div>
         <Button onClick={() => fetchStats(true)} disabled={refreshing} variant="outline">

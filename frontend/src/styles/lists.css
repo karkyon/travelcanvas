@@ -190,3 +190,38 @@
   .tc-shelf-card, .tc-shelf-add { transition: none; }
   .tc-shelf-card:hover { transform: none; }
 }
+
+/* ---- [Gate WishMap] 行きたい場所: 地図と一覧(広い画面は左右、狭い画面は上下) ---- */
+.tc-wish-split { display: grid; gap: 16px; align-items: start; }
+.tc-wish-split[data-map="on"] { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) {
+  .tc-wish-split[data-map="on"] { grid-template-columns: minmax(380px, 5fr) minmax(0, 6fr); }
+  .tc-wish-split[data-map="on"] .tc-wish-mapcol { position: sticky; top: 76px; }
+  .tc-wish-split[data-map="on"] .tc-trip-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
+.tc-wishmap { margin: 0; border: 1px solid var(--tc-cloud-200); border-radius: 16px; background: var(--tc-cloud-0); overflow: hidden; }
+.tc-wishmap__cap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; color: var(--tc-ink-900); }
+.tc-wishmap__cap > span { display: inline-flex; align-items: center; gap: 4px; }
+.tc-wishmap__box { height: 340px; }
+@media (min-width: 1100px) { .tc-wishmap__box { height: min(640px, calc(100vh - 170px)); } }
+.tc-wishmap__empty { margin: 0; padding: 28px 16px; text-align: center; font-size: 13px; color: var(--tc-ink-500, #64748b); }
+.tc-wish-no {
+  position: absolute; left: 12px; bottom: 10px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px;
+  display: inline-grid; place-items: center; background: #0f6e66; color: #fff; font-size: 12.5px; font-weight: 800;
+  box-shadow: 0 0 0 2px #fff, 0 2px 4px rgba(0, 0, 0, .25);
+}
+.tc-wish-card[data-selected="true"] { outline: 3px solid #dc2626; outline-offset: 2px; }
+.tc-wish-card[data-selected="true"] .tc-wish-no { background: #dc2626; }
+.leaflet-popup.tc-wishpop .leaflet-popup-content { margin: 12px 14px; }
+.leaflet-popup.tc-wishpop .leaflet-popup-content-wrapper, .leaflet-popup.tc-wishpop .leaflet-popup-tip { background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-wishpop__in { display: grid; gap: 6px; font-size: 12.5px; }
+.tc-wishpop__in h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+.leaflet-popup.tc-wishpop .tc-wishpop__in p { margin: 0; }
+.tc-wish-mapcol { scroll-margin-top: 80px; }
+.tc-wishpop__kind { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: var(--tc-accent); }
+.tc-wishpop__no { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; display: inline-grid; place-items: center; background: #dc2626; color: #fff; font-size: 11px; }
+.tc-wishpop__row { display: flex; gap: 5px; align-items: flex-start; overflow-wrap: anywhere; }
+.tc-wishpop__row > svg { flex: none; margin-top: 2px; }
+.tc-wishpop__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.tc-wishpop__links { display: flex; flex-wrap: wrap; gap: 10px; font-weight: 700; }
+.tc-wishpop__links a { display: inline-flex; align-items: center; gap: 3px; color: var(--tc-accent); }

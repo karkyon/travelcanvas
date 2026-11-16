@@ -130,9 +130,9 @@ const JourneyPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--md">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">旅の振り返り</h1>
+      <h1 className="tc-page-title" data-eyebrow="MEMORY · 旅の記録">旅の振り返り</h1>
       <p className="text-sm text-ink-700 mt-1">
         予定ごとに、行ったか・いつ着いて出たかを記録します。予定そのものは変わりません。時刻は各日のタイムゾーンで表示します。
       </p>

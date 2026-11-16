@@ -188,12 +188,12 @@ const ReplanPage: React.FC = () => {
   const canApply = !!replan?.can_apply && !done;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <div className="flex flex-wrap gap-2 mb-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/alerts`)}>← 状況の一覧へ</Button>
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)}>プランを見る</Button>
       </div>
-      <h1 className="text-2xl font-bold text-ink-900">再計画案の比較</h1>
+      <h1 className="tc-page-title" data-eyebrow="TRIP · 当日の対応">再計画案の比較</h1>
       {alert && (
         <p className="text-sm text-ink-900 mt-1">
           {`${alert.kind_label}: ${alert.event_title ?? `${alert.local_date ?? ''} の屋外の予定`}`}

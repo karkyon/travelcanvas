@@ -54,11 +54,11 @@ const TripDraftPage: React.FC = () => {
   }, [planId]);
   useEffect(() => { void load(); }, [load]);
 
-  if (state === 'loading') return <p role="status" className="mx-auto max-w-5xl px-4 py-10 text-ink-700">読み込み中…</p>;
+  if (state === 'loading') return <p role="status" className="tc-page tc-page--lg text-ink-700">読み込み中…</p>;
   if (state === 'missing' || state === 'error' || !draft) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-xl font-bold text-ink-900">旅程の下書き</h1>
+      <div className="tc-page tc-page--md">
+        <h1 className="tc-page-title" data-eyebrow="TRIP DESIGN · 旅行相談">旅程の下書き</h1>
         <p role="alert" className="mt-3 rounded-lg bg-danger-soft p-3 text-sm text-danger">
           {state === 'missing' ? 'この下書きは見つかりません(旅行相談から作った旅行ではないか、見る権限がありません)'
             : '下書きを読み込めませんでした。通信を確かめてください'}
@@ -247,9 +247,9 @@ const TripDraftPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6" data-testid="trip-draft">
-      <p className="text-xs font-semibold tracking-widest text-accent">TRIP DESIGN · ITINERARY DRAFT</p>
-      <h1 className="mt-1 text-2xl font-bold text-ink-900 break-words">{draft.title}</h1>
+    <div className="tc-page" data-testid="trip-draft">
+      <p className="tc-eyebrow">TRIP DESIGN · ITINERARY DRAFT</p>
+      <h1 className="tc-page-title mt-1 break-words">{draft.title}</h1>
       <div className={`mt-3 flex flex-wrap items-center gap-3 rounded-xl border p-3 ${committed ? 'border-success bg-success-soft' : 'border-cloud-200 bg-cloud-100'}`}
         data-testid="draft-banner">
         <span aria-hidden="true" className="text-lg">{committed ? '✓' : '✦'}</span>

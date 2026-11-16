@@ -112,7 +112,7 @@ const OrganizationPage: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   if (!org || !orgId) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="tc-page tc-page--md">
         <p role="alert" className="text-red-800">{error ?? '組織が見つかりません'}</p>
         <Link to="/organizations" className="text-blue-800 underline">組織の一覧へ</Link>
       </div>
@@ -122,13 +122,13 @@ const OrganizationPage: React.FC = () => {
   const toggle = <T extends string>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-w-0">
       <div className="h-2" style={{ backgroundColor: org.brand_color ?? '#9ca3af' }} aria-hidden="true" />
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="tc-page tc-page--lg">
         <Link to="/organizations" className="text-blue-800 hover:underline">← 組織の一覧</Link>
         <div className="flex items-center gap-3 mt-2">
           {branding(org).hasLogo && <OrgLogo orgId={orgId} version={branding(org).logoVersion} />}
-          <h1 className="text-3xl font-bold text-ink-900">{org.name}</h1>
+          <h1 className="tc-page-title" data-eyebrow="ORGANIZATION · 組織">{org.name}</h1>
         </div>
         <p className="text-ink-700 mb-6">{ROLE_LABEL[org.role]}・メンバー {org.member_count}人</p>
         {error && <p role="alert" className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 border border-red-200">{error}</p>}

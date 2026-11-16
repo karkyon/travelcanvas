@@ -915,14 +915,14 @@ const TripConsultPage: React.FC = () => {
   const reviewReady = useMemo(() => Boolean(state.review), [state.review]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6" data-testid="trip-consult">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-accent">{`TRIP DESIGN · 0${stepNo} / 04`}</p>
-          <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold text-ink-900 outline-none">{titles[step][0]}</h1>
-          <p className="mt-1 text-sm text-ink-700">{titles[step][1]}</p>
+    <div className="tc-page" data-testid="trip-consult">
+      <div className="tc-page-head">
+        <div className="min-w-0">
+          <p className="tc-eyebrow">{`TRIP DESIGN · 旅行相談 · 0${stepNo} / 04`}</p>
+          <h1 ref={headingRef} tabIndex={-1} className="outline-none">{titles[step][0]}</h1>
+          <p className="tc-subhead">{titles[step][1]}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="tc-page-actions">
           <Link to="/planner" className="tc-focus-ring inline-flex min-h-11 items-center rounded-lg border border-cloud-200 bg-cloud-0 px-3 text-sm text-ink-900">
             行き先が決まっている方(旅行を作る)
           </Link>

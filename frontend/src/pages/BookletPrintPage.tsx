@@ -10,7 +10,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import { extractApiErrorDetailMessage, getBookletExport } from '@/services/api';
+import { extractApiErrorDetailMessage, getBookletExport, getPlanMembers } from '@/services/api';
+import { Share2 } from 'lucide-react';
+import BookletShareDialog from './booklet/BookletShareDialog';
 import type { BookletExportResult } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import BookletView from './booklet/BookletView';
@@ -32,6 +34,14 @@ const BookletPrintPage: React.FC = () => {
   // [Gate Remaining-5] FR-035 サーバーで作る PDF(ブラウザの印刷を使わずに保存)
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    if (!planId) return;
+    let alive = true;
+    getPlanMembers(planId).then((ms) => { if (alive) setIsOwner(ms.some((m) => m.is_me && m.role === 'owner')); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [planId]);
   const savePdf = async () => {
     if (!planId || !exportId) return;
     setPdfBusy(true);
@@ -64,7 +74,11 @@ const BookletPrintPage: React.FC = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/booklet`)}>← しおりの設定へ戻る</Button>
         {result && (
           <div className="flex gap-2">
-            <Button variant="primary" onClick={() => void printWhenReady()}>印刷 / PDFで保存</Button>
+            {/* [Gate BookletShare] 同行者へ送る(QR・メールアプリ・スマホ・PDF を添付したメール) */}
+            {!result.export.contains_sensitive || result.export.is_mine ? (
+              <Button variant="primary" icon={<Share2 size={16} />} onClick={() => setShareOpen(true)} data-testid="booklet-print-share">共有</Button>
+            ) : null}
+            <Button variant="outline" onClick={() => void printWhenReady()}>印刷 / PDFで保存</Button>
             <Button variant="outline" loading={pdfBusy} onClick={() => void savePdf()}>PDF をダウンロード</Button>
           </div>
         )}
@@ -86,7 +100,13 @@ const BookletPrintPage: React.FC = () => {
       {isLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : result ? (
-        <BookletView booklet={result.booklet} exportInfo={result.export} />
+        <>
+          <BookletView booklet={result.booklet} exportInfo={result.export} />
+          {planId && (
+            <BookletShareDialog planId={planId} exportId={shareOpen ? result.export.id : null}
+              title={result.booklet.cover?.title ?? 'しおり'} isOwner={isOwner} onClose={() => setShareOpen(false)} />
+          )}
+        </>
       ) : !error ? (
         <Card padding="lg" className="text-center text-gray-700">版が見つかりません。</Card>
       ) : null}

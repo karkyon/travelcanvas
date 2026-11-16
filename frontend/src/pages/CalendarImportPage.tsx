@@ -71,9 +71,9 @@ const CalendarImportPage: React.FC = () => {
   if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/exports`)} className="mb-2">← 書き出しへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">カレンダー・地図・表から取り込む</h1>
+      <h1 className="tc-page-title" data-eyebrow="TRIP · 取り込み">カレンダー・地図・表から取り込む</h1>
       <p className="text-sm text-ink-700 mt-1">
         カレンダー(ICS)・地図(GPX・KML。Google マイマップの書き出しなど)・表(CSV)の予定や地点を、内容を確認してから取り込みます。
         ICS は予定名・日時・場所だけを取り込み、説明欄は取り込みません。日付の無い地点は「候補箱」に入れます。

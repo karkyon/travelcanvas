@@ -52,9 +52,9 @@ const OrganizationsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-ink-900 mb-2 flex items-center gap-2">
+    <div className="min-w-0">
+      <div className="tc-page tc-page--md">
+        <h1 className="tc-page-title mb-2 flex items-center gap-2" data-eyebrow="ORGANIZATION · 組織">
           <Building2 size={28} aria-hidden="true" />
           組織
         </h1>

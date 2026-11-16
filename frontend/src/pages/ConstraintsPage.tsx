@@ -308,13 +308,13 @@ const ConstraintsPage: React.FC = () => {
   const kind = operatorKind(form.operator);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">
             ← プランへ戻る
           </Button>
-          <h1 className="text-2xl font-bold text-ink-900">制約</h1>
+          <h1 className="tc-page-title" data-eyebrow="PLAN · 旅程づくり">制約</h1>
           <p className="text-sm text-ink-500 mt-1">
             守らなければならない条件(ハード)と、できれば叶えたい希望(ソフト)を登録します。
           </p>

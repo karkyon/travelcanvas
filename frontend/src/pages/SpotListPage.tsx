@@ -9,9 +9,9 @@
  * 食事の情報・場所の写真を入れる(フォームでは候補を選んで入れる。カードの「自動取得」は空の項目だけを埋める)。
  * 新しく保存した時も、空の項目だけを自動で埋める。
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Camera, Download, ExternalLink, ImagePlus, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
+import { CalendarDays, Camera, Crosshair, Download, ExternalLink, ImagePlus, Globe, Map as MapIcon, MapPin, NotebookPen, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react';
 import PageHead from '@/components/shell/PageHead';
 import PlaceArt from '@/components/shell/PlaceArt';
 import PlaceFinder, { type PlaceDraft, type PlaceTab } from '@/components/search/PlaceFinder';
@@ -31,6 +31,8 @@ import SpotPhotoView, { type SpotPhoto } from '@/components/media/SpotPhotoView'
 import ExternalPhotoPicker from '@/components/media/ExternalPhotoPicker';
 import PasteImageButton from '@/components/media/PasteImageButton';
 import GoogleSavedImportDialog from './spots/GoogleSavedImportDialog';
+import WishSpotsMap from './spots/WishSpotsMap';
+import { wishPoints } from './spots/wishMapModel';
 import type { ExternalImage } from '@/services/api/types/g11discover';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
@@ -105,6 +107,26 @@ const SpotListPage: React.FC = () => {
     return [...list].sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name, 'ja') : b.created_at.localeCompare(a.created_at)));
   }, [spots, category, query, sort]);
   const located = (spots ?? []).filter((s) => s.latitude != null && s.longitude != null).length;
+  // [Gate WishMap] 地図: 絞り込んだ結果だけを、一覧と同じ番号の印で出す。カードを選ぶと地図で目立たせ、小窓で詳しく出す
+  const [showMap, setShowMap] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const cardRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  const mapColRef = useRef<HTMLElement | null>(null);
+  const mapData = useMemo(() => wishPoints(shown), [shown]);
+  const filterKey = `${category}|${query.trim()}|${sort}|${spots?.length ?? 0}`;
+  useEffect(() => { if (selectedId && !shown.some((x) => x.id === selectedId)) setSelectedId(null); }, [shown, selectedId]);
+  const selectFromMap = (id: string | null) => {
+    setSelectedId(id);
+    if (id) cardRefs.current.get(id)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  };
+  const selectFromCard = (id: string) => {
+    setSelectedId(id);
+    if (!showMap) setShowMap(true);
+    // 狭い画面では地図が一覧の上にあるので、地図の所まで戻す(広い画面は地図が横に付いてくる)
+    if (typeof window !== 'undefined' && window.innerWidth < 1100) {
+      window.setTimeout(() => mapColRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 0);
+    }
+  };
 
   const pick = (d: PlaceDraft) => {
     setForm({
@@ -363,6 +385,10 @@ const SpotListPage: React.FC = () => {
               <input id="wish-q" type="search" placeholder="名前・住所・メモで絞り込む" value={query}
                 className="tc-focus-ring" onChange={(e) => setQuery(e.target.value)} />
             </div>
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-pressed={showMap} data-testid="wish-map-toggle"
+              onClick={() => setShowMap((v) => !v)}>
+              <MapIcon size={14} aria-hidden="true" />{showMap ? '地図を隠す' : '地図を表示'}
+            </button>
             <div>
               <label htmlFor="wish-sort" className="sr-only">並べ替え</label>
               <select id="wish-sort" className="tc-focus-ring tc-wish-sort" value={sort} onChange={(e) => setSort(e.target.value as 'new' | 'name')}>
@@ -379,6 +405,15 @@ const SpotListPage: React.FC = () => {
               <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary" onClick={open}>最初の場所を追加</button></>)}
           </div>
         ) : (
+          <div className="tc-wish-split" data-map={showMap ? 'on' : 'off'}>
+          {showMap && (
+            <aside className="tc-wish-mapcol" aria-label="地図" ref={mapColRef}>
+              <WishSpotsMap points={mapData.points} noLocation={mapData.noLocation} selectedId={selectedId} onSelect={selectFromMap}
+                filterKey={filterKey} categoryLabel={(x) => CATEGORIES.find(([v]) => v === toCategory(x.category))?.[1] ?? 'その他'}
+                memoOf={(x) => splitNote(x.description).memo}
+                onAddToTrip={(x) => navigate('/planner', { state: { spotId: x.id } })} onEdit={(x) => edit(x)} />
+            </aside>
+          )}
           <ul className="grid tc-trip-grid" aria-label="行きたい場所の一覧">
             {shown.map((s) => {
               const kind = toCategory(s.category);
@@ -387,9 +422,14 @@ const SpotListPage: React.FC = () => {
               const map = s.latitude != null && s.longitude != null
                 ? safeExternalUrl(`https://www.openstreetmap.org/?mlat=${s.latitude}&mlon=${s.longitude}#map=16/${s.latitude}/${s.longitude}`) : null;
               const saved = localDay(s.created_at);
+              const no = mapData.numberOf.get(s.id);
+              const isSel = selectedId === s.id;
               return (
-                <li key={s.id} aria-label={s.name} className="tc-lcard tc-wish-card" data-testid={`wish-${s.id}`} data-kind={kind}>
+                <li key={s.id} aria-label={s.name} className="tc-lcard tc-wish-card" data-testid={`wish-${s.id}`} data-kind={kind}
+                  data-selected={isSel ? 'true' : undefined} aria-current={isSel ? 'true' : undefined}
+                  ref={(el) => { if (el) cardRefs.current.set(s.id, el); else cardRefs.current.delete(s.id); }}>
                   <div className="tc-wish-art">
+                    {no != null && <span className="tc-wish-no" aria-hidden="true">{no}</span>}
                     {s.photo ? <SpotPhotoView photo={s.photo} spotId={s.id} alt={s.name} fallback={<PlaceArt kind={kind} seed={s.name} />} />
                       : <PlaceArt kind={kind} seed={s.name} />}
                     <span className="tc-trip-chip">{CATEGORIES.find(([v]) => v === kind)?.[1] ?? 'その他'}</span>
@@ -409,12 +449,18 @@ const SpotListPage: React.FC = () => {
                     {(map || source) && (
                       <p className="tc-wish-links">
                         {map && <a href={safeExternalUrl(map) ?? undefined} target="_blank" rel="noopener noreferrer" className="tc-focus-ring"
-                          aria-label={`「${s.name}」を地図で見る(新しいタブ)`}><MapIcon size={14} aria-hidden="true" />地図で見る</a>}
+                          aria-label={`「${s.name}」を OpenStreetMap で開く(新しいタブ)`}><MapIcon size={14} aria-hidden="true" />OpenStreetMap</a>}
                         {source && <a href={safeExternalUrl(source) ?? undefined} target="_blank" rel="noopener noreferrer" className="tc-focus-ring"
                           aria-label={`「${s.name}」の出典を開く(新しいタブ)`}><ExternalLink size={14} aria-hidden="true" />出典を開く</a>}
                       </p>
                     )}
                     <div className="tc-trip-actions">
+                      {no != null && (
+                        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-pressed={isSel} data-testid={`wish-show-${s.id}`}
+                          aria-label={`「${s.name}」を地図で表示`} onClick={() => selectFromCard(s.id)}>
+                          <Crosshair size={14} aria-hidden="true" />地図で表示
+                        </button>
+                      )}
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => navigate('/planner', { state: { spotId: s.id } })}>旅行に追加</button>
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${s.name}」を編集`} onClick={() => edit(s)}><Pencil size={14} aria-hidden="true" />編集</button>
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${s.name}」の情報を自動取得`} disabled={enriching === s.id}
@@ -428,6 +474,7 @@ const SpotListPage: React.FC = () => {
               );
             })}
           </ul>
+          </div>
         )}
       </div>
     </div>

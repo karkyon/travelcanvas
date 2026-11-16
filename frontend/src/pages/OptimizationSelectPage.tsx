@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import Button from '../components/common/Button';
@@ -64,11 +64,10 @@ const OptimizationSelectPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Sparkles className="w-7 h-7 text-blue-600" />
-          <h1 className="text-2xl font-bold text-ink-900">AI最適化</h1>
+    <div className="min-w-0">
+      <div className="tc-page tc-page--md">
+        <div className="mb-6">
+          <h1 className="tc-page-title" data-eyebrow="PLAN · 旅程づくり">AI最適化</h1>
         </div>
 
         {error && (

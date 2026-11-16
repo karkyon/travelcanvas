@@ -18,7 +18,9 @@
 機密項目を含む版は、作成者名の透かしと有効期限が必須(FC-088)。QR・チケットの中身・PIN・名義・個人の持ち物・
 個人予算はどの設定でも含めない。監査には設定(章・含めた項目の種類)だけを記録し、内容は記録しない。
 """
+import base64
 import hashlib
+import hmac
 import json
 import secrets
 import uuid
@@ -365,6 +367,37 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _derived_token(e: BookletExport) -> Optional[str]:
+    """[Gate BookletShare] 公開の URL の鍵を、版の ID と公開した時刻から HMAC で作る(鍵は LOOKUP_INDEX_KEY。用途の名前で分ける)。
+
+    以前は乱数で作り、DB には sha256 だけを残していたため、公開した直後にしか URL を出せず、後で共有しようとすると
+    「作り直す」(=送った URL が使えなくなる)しかなかった。同じ材料から作り直せるので、作成者・所有者には何度でも
+    同じ URL を出せる。DB は変えない(保存するのは今までどおり sha256 だけ)。鍵が無い環境では None(乱数に戻す)。
+    """
+    if e.published_at is None:
+        return None
+    try:
+        from app.core.crypto import _get_lookup_index_key
+        key = _get_lookup_index_key()
+    except Exception:
+        return None
+    # 時刻は UTC・マイクロ秒までの固定の形にする(DB の接続のタイムゾーンで表記が変わっても同じ鍵になる)
+    at = _aware(e.published_at).astimezone(dt_timezone.utc).strftime("%Y%m%dT%H%M%S%f")  # type: ignore[union-attr]
+    msg = f"BOOKLET_PUBLIC:{e.id}:{at}".encode("utf-8")
+    digest = hmac.new(key, msg, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")[:32]
+
+
+def public_path_for(e: BookletExport) -> Optional[str]:
+    """[Gate BookletShare] 公開中の版の URL のパス(/b/…)。作り直せる時だけ返す(以前の乱数の鍵の版は None)。"""
+    if not e.public_token_hash:
+        return None
+    token = _derived_token(e)
+    if token and secrets.compare_digest(_token_hash(token), e.public_token_hash):
+        return f"/b/{token}"
+    return None
+
+
 @router.post("/{plan_id}/booklet-exports/{export_id}/publish", response_model=dict)
 def publish_export(plan_id: str, export_id: str, request: Request, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
@@ -377,9 +410,10 @@ def publish_export(plan_id: str, export_id: str, request: Request, db: Session =
     if e.contains_sensitive:
         raise HTTPException(status_code=409, detail={
             "code": "sensitive_not_publishable", "message": "機密項目を含む版は Web で公開できません。機密項目を外した版を作ってください"})
-    token = secrets.token_urlsafe(24)
-    e.public_token_hash = _token_hash(token)
     e.published_at = _now()
+    # [Gate BookletShare] 後で同じ URL を出せる鍵にする(鍵の設定が無い環境だけ乱数)
+    token = _derived_token(e) or secrets.token_urlsafe(24)
+    e.public_token_hash = _token_hash(token)
     db.commit()
     _audit("booklet_export_published", request, current_user, e.id, plan.id, {"version_no": e.version_no})
     return {"url": f"/b/{token}", "published_at": _iso(e.published_at)}

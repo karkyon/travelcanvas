@@ -115,6 +115,14 @@ for img in $(grep -hiE '^FROM[[:space:]]' $DFILES 2>/dev/null | awk '{print $2}'
   fi
 done
 echo "3: コンテナを作り直します"
+# [Gate BookletShare] .env にメールの送信先(SMTP_HOST)が無い時は、確認用の受信箱(mailpit)へ送る。外へは届かない。
+# 本物のメールを送る時は .env に SMTP_HOST・SMTP_PORT・SMTP_USE_TLS・SMTP_USERNAME・SMTP_PASSWORD・EMAIL_FROM を書く
+if ! grep -qE '^SMTP_HOST=.+' .env 2>/dev/null; then
+  export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}mail-sandbox"
+  # 端末の環境の値は .env より優先される(docker compose の値の埋め込み)。.env の SMTP_PORT=587 などに負けない
+  export SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_USE_TLS=false EMAIL_FROM=travelcanvas@example.invalid
+  echo "3: メールは確認用の受信箱へ送ります(外へは届きません): http://<この機械>:8025"
+fi
 timeout "${TC_BUILD_TIMEOUT:-2400}" docker compose up -d --build || fail_after "docker compose up に失敗"
 MID="$(docker compose ps -aq migrate | head -1)"
 for i in $(seq 1 60); do

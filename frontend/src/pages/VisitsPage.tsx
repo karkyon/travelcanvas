@@ -129,9 +129,9 @@ const VisitsPage: React.FC = () => {
   const toggle = (s: VisitLayerState) => setShown((v) => ({ ...v, [s]: !v[s] }));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">訪問の地図</h1>
+      <h1 className="tc-page-title" data-eyebrow="MEMORY · 旅の記録">訪問の地図</h1>
       <p className="text-sm text-ink-700 mt-1">
         位置のある予定に、あなたの位置の記録から判定した「通過・訪問・滞在」を重ねます。自動の判定は確定しません。
         予定そのものや振り返りの記録は変わりません。判定はあなただけのもので、同じ旅行のほかの人には見えません。

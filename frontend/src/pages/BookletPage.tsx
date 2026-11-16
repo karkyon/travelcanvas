@@ -22,9 +22,10 @@ import {
 } from '@/services/api';
 import type { Booklet, BookletExport, BookletOptions, BookletSection, PlanMember } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import { Lock } from 'lucide-react';
+import { Lock, Share2 } from 'lucide-react';
 import { getBookletThemes, TIER_LABEL, type BookletThemeAccess } from '@/services/api/bookletThemes';
 import BookletView from './booklet/BookletView';
+import BookletShareDialog from './booklet/BookletShareDialog';
 import {
   DEFAULT_OPTIONS, EXPORT_STATE_LABEL, INCLUDE_OPTIONS, REQUIRED_SECTIONS, SECTION_OPTIONS, THEME_OPTIONS, defaultValidUntil,
   describeIncludes, formatDateTime, isSensitive, orderSections, validUntilToIso,
@@ -150,6 +151,7 @@ const BookletPage: React.FC = () => {
 
   // [Gate BookletWeb] Web のページとして公開する・止める。URL は公開した時だけ分かる(作り直すと前の URL は使えない)
   const [webUrl, setWebUrl] = useState<Record<string, string>>({});
+  const [shareId, setShareId] = useState<string | null>(null);
   const publish = async (x: BookletExport) => {
     if (!planId) return;
     if (!window.confirm(`第${x.version_no}版を Web のページとして公開しますか?URL を知っている人は誰でも見られます(検索には出しません)。${x.is_public ? '前に作った URL は使えなくなります。' : ''}`)) return;
@@ -188,10 +190,10 @@ const BookletPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="tc-page">
       <div className="mb-6 no-print">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-        <h1 className="text-2xl font-bold text-gray-900">しおり・印刷</h1>
+        <h1 className="tc-page-title" data-eyebrow="BOOKLET · しおり">しおり・印刷</h1>
         <p className="text-sm text-gray-700 mt-1">旅程からしおりを作り、印刷やPDF保存をします。同じ内容をWebでも表示できます。</p>
       </div>
 
@@ -316,7 +318,8 @@ const BookletPage: React.FC = () => {
             </div>
 
             <Card padding="md">
-              <h2 className="font-semibold text-gray-900 mb-2">作成した版</h2>
+              <h2 className="font-semibold text-gray-900 mb-1">作成した版</h2>
+              <p className="text-xs text-gray-700 mb-2">版の「共有」から、QR コード・メールアプリ・スマホの共有・PDF を添付したメールで同行者へ送れます。</p>
               {exportsList.length === 0 ? <p className="text-sm text-gray-700">まだ版はありません。</p> : (
                 <ul className="space-y-2 text-sm" aria-label="作成した版">
                   {exportsList.map((x) => (
@@ -329,7 +332,12 @@ const BookletPage: React.FC = () => {
                         {formatDateTime(x.created_at)} ・ {x.created_by_name}{x.is_mine ? '(自分)' : ''} ・ {describeIncludes(x.includes)}
                         {x.valid_until ? ` ・ 有効期限 ${formatDateTime(x.valid_until)}` : ''}
                       </p>
-                      <div className="flex gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {/* [Gate BookletShare] 共有(QR・メールアプリ・スマホ・アプリから PDF を添付して送る)は 1 つのボタンから */}
+                        {x.can_view && (
+                          <Button variant="primary" size="sm" icon={<Share2 size={14} />} onClick={() => setShareId(x.id)}
+                            data-testid={`booklet-share-${x.version_no}`}>共有</Button>
+                        )}
                         {x.can_view && (
                           <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/booklet/${x.id}`)}>表示・印刷</Button>
                         )}
@@ -362,6 +370,11 @@ const BookletPage: React.FC = () => {
                 </ul>
               )}
             </Card>
+
+            {planId && (
+              <BookletShareDialog planId={planId} exportId={shareId} title={preview?.cover?.title ?? 'しおり'} isOwner={isOwner}
+                onClose={() => setShareId(null)} onPublished={() => void loadExports()} />
+            )}
 
             {/* [Gate P16] 画像出力(FR-046)。機密項目を含めない投影から端末の中で作る */}
             {planId && <ImageExportPanel planId={planId} options={options} />}

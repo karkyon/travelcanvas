@@ -39,7 +39,7 @@ describe('SpotListPage', () => {
     expect(card).toHaveTextContent('朝早く行く');
     expect(card).not.toHaveTextContent('https://example.com/kiyomizu');
     expect(card).toHaveTextContent('2026/10/1');
-    expect(within(card).getByRole('link', { name: /地図で見る/ })).toHaveAttribute('href', expect.stringContaining('openstreetmap.org'));
+    expect(within(card).getByRole('link', { name: /OpenStreetMap で開く/ })).toHaveAttribute('href', expect.stringContaining('openstreetmap.org'));
     expect(within(card).getByRole('link', { name: /出典を開く/ })).toHaveAttribute('href', 'https://example.com/kiyomizu');
     const other = screen.getByRole('listitem', { name: 'あかり食堂' });
     expect(other).toHaveTextContent('住所は未入力');
