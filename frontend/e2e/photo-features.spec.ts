@@ -34,7 +34,12 @@ test('マイマップの案内・QR の投稿・写真の地図・予約メー�
   await page.getByTestId('booking-review-submit').click();
   await expect(page).toHaveURL(/reservations/);
   await expect(page.getByText('都リゾート 奥志摩').first()).toBeVisible();
-  await expect(page.getByTestId('reservation-notes').first()).toContainText('部屋: ツイン');
+  // [Gate TripKitFix] 取り込んだ文(メモ)は一覧に出さず、詳細の「予約の詳しい内容」に畳んで出す
+  //    (登録すると、その予約の詳細が開いた状態で予約の画面へ移る)
+  const notes = page.getByRole('dialog', { name: '予約詳細' }).getByTestId('reservation-notes');
+  await notes.getByText('予約の詳しい内容').click();
+  await expect(notes).toContainText('部屋: ツイン');
+  await page.keyboard.press('Escape');
 
   // 旅行の基本情報: 日程を変えると予定も動く
   await page.goto(`/planner/${planId}`);

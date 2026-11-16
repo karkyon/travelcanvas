@@ -19,6 +19,7 @@ const m = vi.hoisted(() => ({
   retireOrgWebhookPrevious: vi.fn(),
 }));
 vi.mock('@/services/api', () => ({ default: m, api: m }));
+vi.mock('@/services/api/organizationsApi', () => ({ orgApi: m }));
 // [Gate G5] ロゴ・席・ドメイン・使用量(この試験では空)
 vi.mock('@/services/api/g5', () => ({
   getOrgDomains: vi.fn(async () => []),

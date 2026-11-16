@@ -114,3 +114,46 @@ export function groupByDay(list: Reservation[], sort: string): Array<{ key: stri
   }
   return groups;
 }
+
+/**
+ * [Gate TripKitFix] 予約の合計。通貨ごとに足し、1 つの通貨だけなら「96,580 円」、混ざっていれば通貨ごとに並べる
+ * (為替で勝手に換算しない)。支払いが済んだ分も同じ通貨で出す。金額の無い予約は数えない。
+ */
+export function reservationTotals(rs: Reservation[]): { text: string; paidText: string } {
+  const sum = new Map<string, number>();
+  const paid = new Map<string, number>();
+  for (const r of rs) {
+    if (r.total_amount == null) continue;
+    const c = (r.currency ?? '').trim() || '—';
+    sum.set(c, (sum.get(c) ?? 0) + r.total_amount);
+    if (SETTLED_PAYMENT.has((r.payment_status ?? '').trim().toLowerCase())) paid.set(c, (paid.get(c) ?? 0) + r.total_amount);
+  }
+  const fmt = (m: Map<string, number>) => Array.from(m.entries())
+    .map(([c, v]) => `${v.toLocaleString('ja-JP')} ${c === 'JPY' ? '円' : c}`).join(' + ');
+  if (sum.size === 0) return { text: '—', paidText: '金額の入った予約はありません' };
+  return { text: fmt(sum), paidText: paid.size ? `支払い済み ${fmt(paid)}` : '支払い済みはまだありません' };
+}
+
+/** [Gate TripKitFix] 一覧の支払いの札(未入力・未払いは注意の色) */
+export function paymentText(r: Reservation): string {
+  const p = (r.payment_status ?? '').trim().toLowerCase();
+  if (!p) return r.total_amount != null && r.total_amount > 0 ? '支払い 未入力' : '—';
+  return PAYMENT_LABEL[p] ?? p;
+}
+export function paymentTone(r: Reservation): 'warn' | 'ok' | undefined {
+  const p = (r.payment_status ?? '').trim().toLowerCase();
+  if (SETTLED_PAYMENT.has(p)) return 'ok';
+  if (r.status === 'cancelled' || r.status === 'used') return undefined;
+  return (r.total_amount ?? 0) > 0 ? 'warn' : undefined;
+}
+
+/** [Gate TripKitFix] 要確認の行から、直す画面(詳細)を開くボタンの言葉 */
+export function fixLabel(reasons: string[]): string {
+  if (reasons.some((x) => x === '支払状況が未入力' || x === '未払い')) return '支払い状況を入れる';
+  if (reasons.includes('未確定')) return '予約を確定する';
+  if (reasons.includes('変更あり')) return '変更を確かめる';
+  return '期限を確かめる';
+}
+
+/** [Gate TripKitFix] 予約の詳細で選べる支払い状況(画面に出す順) */
+export const PAYMENT_CHOICES = ['paid', 'on_site', 'unpaid', 'partial', 'pending', 'not_required', 'free', 'refunded'] as const;

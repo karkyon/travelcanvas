@@ -7,9 +7,9 @@
  *   追加・不要・数量変更の候補を示す。天候は判定していないことを明示する。
  */
 import React from 'react';
-import { Lock, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
 import Button from '@/components/common/Button';
-import Card from '@/components/common/Card';
+import { isPackedStatus } from './preparationModel';
 import type {
   PackingItem, PackingStatus, PackingSuggestion, PackingSuggestionConditions, PackingSuggestions,
 } from '@/services/api';
@@ -75,8 +75,8 @@ const PackingPanel: React.FC<Props> = (props) => {
         </Button>
       </div>
 
-      <section aria-labelledby="packing-suggestion-heading" className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-        <h3 id="packing-suggestion-heading" className="font-semibold text-ink-900">持ち物の候補</h3>
+      <section aria-labelledby="packing-suggestion-heading" className="tc-kit-box">
+        <h3 id="packing-suggestion-heading">持ち物の候補</h3>
         <p className="text-sm text-ink-700 mt-1">旅程(日数・予定・予約・移動)と、次の条件から候補を作ります。</p>
         <fieldset className="mt-2">
             <legend className="sr-only">候補の条件</legend>
@@ -169,60 +169,78 @@ const PackingPanel: React.FC<Props> = (props) => {
         </div>
       )}
       {items.length === 0 ? (
-        <Card padding="lg" className="text-center text-ink-700">持ち物はまだありません。「持ち物を追加」か「候補を表示」から入れられます(候補は確認して追加するまでリストに入りません)。</Card>
+        // [Gate TripKitFix] 0 件は「0 / 0 完了」ではなく「リストが無い」として作り方を出す
+        <div className="tc-kit-blank" data-testid="packing-empty">
+          <b>持ち物のリストはまだありません</b>
+          <span>旅程の日数・行き先・天気から候補を出します。候補は 1 つずつ確かめてから足せます。</span>
+          {canEdit && (
+            <span className="tc-kit-blank__acts">
+              <Button variant="primary" size="sm" onClick={props.onShowSuggestions} disabled={props.isLoadingSuggestions}>候補から作る</Button>
+              <Button variant="outline" size="sm" onClick={props.onAdd}>1つずつ足す</Button>
+            </span>
+          )}
+        </div>
       ) : shownItems.length === 0 ? <KitNoMatch onClearAll={() => setPq({ pk: '' })} /> : (
-        groups.map((g) => (
-          <section key={g.category} aria-labelledby={`packing-group-${g.category}`}>
-            <h3 id={`packing-group-${g.category}`} className="text-base font-semibold text-ink-900 mb-2">
-              {g.label}
-            </h3>
-            <ul className="space-y-2">
-              {g.items.map((item) => (
-                <li key={item.id}>
-                  <Card padding="sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {item.scope === 'personal' && <Lock size={14} aria-label="自分だけの持ち物" />}
-                          <span className="font-medium text-ink-900">{item.name ?? '(内容を表示できません)'}</span>
-                          <span className="text-sm text-ink-700">×{item.quantity}</span>
-                          {item.is_required && <span className="text-xs px-2 py-0.5 rounded-sm bg-red-100 text-red-800">必須</span>}
-                        </div>
-                        <p className="text-xs text-ink-700 mt-0.5">
-                          {categoryLabel(item.category)}
-                          {item.scope === 'shared' && ` ・ 担当: ${item.assignee_name ?? (item.assignee_missing ? 'メンバー外(未割当)' : '未定')}`}
-                          {item.note ? ` ・ ${item.note}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <label className="sr-only" htmlFor={`packing-status-${item.id}`}>{`${item.name ?? '持ち物'}の状態`}</label>
-                        <select
-                          id={`packing-status-${item.id}`}
-                          className="border rounded-sm px-2 py-1 text-sm"
-                          value={item.status}
-                          disabled={!canChangeStatus(item)}
-                          onChange={(e) => props.onStatusChange(item, e.target.value as PackingStatus)}
-                        >
-                          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                        {canModify(item) && (
-                          <>
-                            <button type="button" onClick={() => props.onEdit(item)} className="text-ink-700 hover:text-blue-700 p-1" aria-label={`${item.name ?? '持ち物'}を編集`}>
-                              <Pencil size={16} />
-                            </button>
-                            <button type="button" onClick={() => props.onDelete(item)} className="text-ink-700 hover:text-red-700 p-1" aria-label={`${item.name ?? '持ち物'}を削除`}>
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
+        groups.map((g) => {
+          const done = g.items.filter((x) => isPackedStatus(x.status)).length;
+          return (
+          <section key={g.category} aria-labelledby={`packing-group-${g.category}`} className="tc-kit-section">
+            <div className="tc-kit-section__head">
+              <h3 id={`packing-group-${g.category}`} className="text-base font-semibold text-ink-900 m-0">{g.label}</h3>
+              <span>{`${done} / ${g.items.length}`}</span>
+            </div>
+            <ul className="tc-kit-list" aria-label={g.label}>
+              {g.items.map((item) => {
+                const isDone = isPackedStatus(item.status);
+                const label = item.name ?? '持ち物';
+                return (
+                <li key={item.id} className={`tc-kit-pack${isDone ? ' is-done' : ''}`}>
+                  <button type="button" className="tc-focus-ring tc-kit-check" aria-pressed={isDone} disabled={!canChangeStatus(item)}
+                    aria-label={isDone ? `${label}を未準備に戻す` : `${label}を梱包済みにする`}
+                    onClick={() => props.onStatusChange(item, isDone ? 'to_prepare' : 'packed')}>
+                    {isDone && <Check size={15} strokeWidth={3} aria-hidden="true" />}
+                  </button>
+                  <span className="min-w-0">
+                    <span className="tc-kit-pack__name">
+                      {item.scope === 'personal' && <Lock size={13} aria-label="自分だけの持ち物" className="inline mr-1 align-[-1px]" />}
+                      {item.name ?? '(内容を表示できません)'}
+                    </span>
+                    <span className="tc-kit-pack__meta">
+                      {[item.scope === 'shared' ? `担当: ${item.assignee_name ?? (item.assignee_missing ? 'メンバー外(未割当)' : '未定')}` : '自分だけ',
+                        categoryLabel(item.category), item.note || null].filter(Boolean).join(' ・ ')}
+                    </span>
+                  </span>
+                  <span className="tc-kit-pack__tools">
+                    {item.is_required && <span className="tc-kit-pill" data-tone="warn">必須</span>}
+                    {item.status === 'to_buy' && <span className="tc-kit-pill" data-tone="info">買う</span>}
+                    <span className="tc-kit-cnt">{`×${item.quantity}`}</span>
+                    <label className="sr-only" htmlFor={`packing-status-${item.id}`}>{`${item.name ?? '持ち物'}の状態`}</label>
+                    <select
+                      id={`packing-status-${item.id}`}
+                      value={item.status}
+                      disabled={!canChangeStatus(item)}
+                      onChange={(e) => props.onStatusChange(item, e.target.value as PackingStatus)}
+                    >
+                      {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    {canModify(item) && (
+                      <>
+                        <button type="button" onClick={() => props.onEdit(item)} className="tc-focus-ring tc-kit-iconbtn" aria-label={`${item.name ?? '持ち物'}を編集`}>
+                          <Pencil size={16} />
+                        </button>
+                        <button type="button" onClick={() => props.onDelete(item)} className="tc-focus-ring tc-kit-iconbtn tc-kit-iconbtn--danger" aria-label={`${item.name ?? '持ち物'}を削除`}>
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
-        ))
+          );
+        })
       )}
     </div>
   );

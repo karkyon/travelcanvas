@@ -154,8 +154,14 @@ export const SettlementPanel: React.FC<SettlementProps> = ({ summary, settlement
 
       <section aria-labelledby="transfer-heading">
         <h3 id="transfer-heading" className="font-semibold text-ink-900 mb-2">精算案</h3>
-        {summary.is_settled ? (
-          <p className="text-sm text-green-900" data-testid="finance-settled">精算は完了しています。</p>
+        {summary.settlement_state === 'none' ? (
+          // [Gate TripKitFix] 立替が無い時は「完了」と出さない
+          <div className="tc-kit-blank" data-testid="finance-no-settlement">
+            <b>立て替えた支出はまだありません</b>
+            <span>支出に「払った人」を入れると、誰が誰にいくら払うかを出します。予約の金額は見込みとして別に数え、精算には入りません。</span>
+          </div>
+        ) : summary.settlement_state === 'settled' || summary.is_settled ? (
+          <p className="text-sm text-green-900" data-testid="finance-settled">精算は完了しています(精算の記録で、全員の差額が0です)。</p>
         ) : (
           <ul className="space-y-2" aria-label="精算案">
             {summary.transfers.map((t) => (

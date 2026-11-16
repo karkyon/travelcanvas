@@ -193,7 +193,7 @@ async function fillAndSubmitUpload(
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await dialog.locator('input[type="file"]').setInputFiles(file);
-  await dialog.getByRole('combobox').selectOption(classification);
+  await dialog.getByLabel('分類', { exact: true }).selectOption(classification);
   const submitButton = dialog.getByRole('button', { name: 'アップロード' });
   await expect(submitButton).toBeEnabled();
   await submitButton.click();
@@ -365,10 +365,11 @@ test.describe('文書ウォレット (FR-013) E2E', () => {
       //    現れない(存在しないdocument_idと区別できない404で応答する
       //    設計のため、一覧からも静かに除外される)。
       await page2.goto(`/planner/${planId}/documents`);
-      await expect(page2.getByRole('heading', { name: '文書ライブラリ' })).toBeVisible({ timeout: 15_000 });
+      await expect(page2.getByRole('heading', { name: '文書', exact: true, level: 1 })).toBeVisible({ timeout: 15_000 });
       await expect(page2.getByText(confidentialFile.name)).toBeVisible({ timeout: 15_000 });
       await expect(page2.getByText(restrictedFile.name)).not.toBeVisible();
-      await expect(page2.getByText('厳重管理')).not.toBeVisible();
+      // 一覧の中に「厳重管理」の文書が無いこと(上の札「機密・厳重管理」は分類の名前なので見て構わない)
+      await expect(page2.getByRole('list', { name: '文書' }).getByText('厳重管理')).toHaveCount(0);
 
       // 7. reloadしても同様(キャッシュ由来の一時的な非表示ではないこと)
       await page2.reload();

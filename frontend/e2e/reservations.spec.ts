@@ -27,7 +27,9 @@ test('予約: 予約番号は伏せて一覧し、キーボードで詳細を開
   await expectNoAxeViolations(page, '予約一覧(空)');
 
   // 1. 画面から登録する
-  await page.getByRole('button', { name: '新規予約' }).click();
+  // [Gate TripKitFix] 主な操作は「予約を追加」1 つ。手入力を選ぶ
+  await page.getByRole('button', { name: /予約を追加/ }).click();
+  await page.getByRole('menuitem', { name: /手入力で作る/ }).click();
   const create = page.getByRole('dialog', { name: '新規予約' });
   await expect(create).toBeVisible();
   await create.getByLabel('種類').selectOption('accommodation');
@@ -40,10 +42,11 @@ test('予約: 予約番号は伏せて一覧し、キーボードで詳細を開
   await create.getByRole('button', { name: '作成' }).click();
   await expect(create).toBeHidden();
 
-  // 2. 一覧では予約番号の全体を出さない
+  // 2. 一覧では予約番号を出さない([Gate TripKitFix] 伏せた末尾も詳細だけ。一覧は利用日時・金額・支払い・状態の列)
   const card = page.getByRole('button', { name: /京都ホテルE1/ });
   await expect(card).toBeVisible();
-  await expect(card).toContainText('予約番号');
+  await expect(card).not.toContainText('予約番号');
+  await expect(card).toContainText('確定');
   await expect(page.locator('body')).not.toContainText(CONFIRMATION);
   await expectNoAxeViolations(page, '予約一覧(1件)');
 
@@ -53,6 +56,7 @@ test('予約: 予約番号は伏せて一覧し、キーボードで詳細を開
   const detail = page.getByRole('dialog', { name: '予約詳細' });
   await expect(detail).toBeVisible();
   await expect(detail).not.toContainText(CONFIRMATION);
+  await expect(detail).toContainText('予約番号:');  // 伏せた番号は詳細にだけ出す
   await expect(detail).toContainText('PIN: ••••');
   await expectNoAxeViolations(page, '予約詳細(伏せた状態)');
 

@@ -29,6 +29,10 @@ export interface TravelDocument {
   revision: number;
   created_at: string;
   updated_at: string | null;
+  /** [Gate TripKitFix] 一覧だけで返る。予約・チケット・予定などへの関連の件数(単体の取得では null) */
+  link_count?: number | null;
+  /** [Gate TripKitFix] この文書を領収書にしている支出の件数(支出の名前・金額は返らない) */
+  receipt_count?: number | null;
 }
 
 export interface DocumentLink {

@@ -4,7 +4,7 @@
  * passkey(FR-003)・画像と声から候補の名前(FR-007)・準備状況の予算(FR-026)。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const r7 = vi.hoisted(() => ({
@@ -190,6 +190,8 @@ describe('ReadinessPanel の予算 (FR-026)', () => {
     expect(box).toHaveTextContent('40,000 JPY');
     expect(box).toHaveTextContent('-5,000 JPY');
     expect(box).toHaveTextContent('外貨の予約 1 件');
-    expect(screen.getByText('予算 1件')).toBeInTheDocument();
+    // [Gate TripKitFix] 分類ごとの状態は「項目ごとの状態」の一覧に出す(予算 1件)
+    const cats = screen.getByTestId('readiness-categories');
+    expect(within(cats).getByText('予算').closest('li')).toHaveTextContent('1件');
   });
 });

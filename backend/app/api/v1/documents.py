@@ -31,12 +31,13 @@ import logging
 import re
 import uuid as uuid_module
 from datetime import datetime, timezone as dt_timezone
-from typing import List, NoReturn, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth import auth_manager, get_current_session_id, get_current_user_or_guest
@@ -51,6 +52,7 @@ from app.models.models import (
     DocumentMalwareStatus,
     DocumentOcrStatus,
     DocumentPurgeStatus,
+    Expense,
     Reservation,
     Ticket,
     TravelEvent,
@@ -151,6 +153,11 @@ class DocumentResponse(BaseModel):
     revision: int
     created_at: datetime
     updated_at: Optional[datetime]
+    # [Gate TripKitFix] 一覧だけで返す関連の件数(文書の画面で「関連なし」を絞るため)。
+    # link_count = 予約・チケット・予定などへの関連(document_links)、receipt_count = この文書を領収書にしている支出。
+    # 支出の名前・金額は返さない(件数だけ)。単体の取得では None。
+    link_count: Optional[int] = None
+    receipt_count: Optional[int] = None
 
 
 class DocumentLinkCreateRequest(BaseModel):
@@ -654,7 +661,34 @@ def list_documents(
     )
     # [Gate M7 P0-03] RESTRICTED文書はdocument owner本人以外の一覧から除外する
     # (件数・ファイル名も含め、非ownerには一切露出しない)。
-    return [_to_response(d) for d in rows if _document_visible_to(d, current_user)]
+    visible = [d for d in rows if _document_visible_to(d, current_user)]
+    # [Gate TripKitFix] 関連の件数を 2 回の集計でまとめて数える(文書ごとに問い合わせない)
+    ids = [d.id for d in visible]
+    link_counts: Dict[Any, int] = {}
+    receipt_counts: Dict[Any, int] = {}
+    if ids:
+        for doc_id, n in (
+            db.query(DocumentLink.document_id, func.count(DocumentLink.id))
+            .filter(DocumentLink.document_id.in_(ids))
+            .group_by(DocumentLink.document_id)
+            .all()
+        ):
+            link_counts[doc_id] = int(n)
+        for doc_id, n in (
+            db.query(Expense.receipt_document_id, func.count(Expense.id))
+            .filter(Expense.plan_id == plan.id, Expense.receipt_document_id.in_(ids),
+                    Expense.deleted_at.is_(None), Expense.voided_at.is_(None))
+            .group_by(Expense.receipt_document_id)
+            .all()
+        ):
+            receipt_counts[doc_id] = int(n)
+    out = []
+    for d in visible:
+        r = _to_response(d)
+        r.link_count = int(link_counts.get(d.id, 0))
+        r.receipt_count = int(receipt_counts.get(d.id, 0))
+        out.append(r)
+    return out
 
 
 @router.get("/{plan_id}/documents/{document_id}", response_model=DocumentResponse)

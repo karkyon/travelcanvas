@@ -1,7 +1,7 @@
 /**
  * [Gate TripKit] 旅行箱の中の画面の一覧と、今の URL がどの画面か。
  */
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 export const KIT_ITEMS = [
   { key: 'kit', suffix: '/kit', label: '概要', short: '概要', primary: true },
@@ -34,20 +34,100 @@ export function currentKit(pathname: string, planId: string): KitKey | null {
  * 更新・共有・ブラウザの戻る/進むで同じ条件に戻る。値を変える時は履歴を増やさず置き換える(戻るで条件を 1 つずつ戻らない)。
  * 既定値と同じ時は query から消す(URL を短く保つ)。
  */
-export function useQueryState<K extends string>(defaults: Record<K, string>) {
+/** [Gate TripKitFix] 検索語 q だけを URL に置かない時の指定 */
+export const MEMORY_ONLY_Q: { memoryOnly: readonly string[] } = { memoryOnly: ['q'] };
+
+export function useQueryState<K extends string>(defaults: Record<K, string>, opts?: { memoryOnly?: readonly string[] }) {
   const [params, setParams] = useSearchParams();
-  const get = (k: K): string => params.get(k) ?? defaults[k];
+  // [Gate TripKitFix] SEC 検索語(予約番号の末尾・文書名など)は URL に置かない。履歴・共有した URL・
+  // Referer に残さず、画面の中(メモリ)だけに持つ。古い URL に付いていたら 1 度だけ読み、URL から消す。
+  const memoryKeys = (opts?.memoryOnly ?? []).filter((k): k is K => k in defaults);
+  const [memory, setMemory] = useState<Partial<Record<K, string>>>(() => {
+    const init: Partial<Record<K, string>> = {};
+    for (const k of memoryKeys) { const v = params.get(k); if (v) init[k] = v; }
+    return init;
+  });
+  useEffect(() => {
+    if (!memoryKeys.some((k) => params.has(k))) return;
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const k of memoryKeys) next.delete(k);
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 最初の 1 回だけ URL から消す
+  }, []);
+  const isMemory = (k: K) => memoryKeys.includes(k);
+  const get = (k: K): string => (isMemory(k) ? memory[k] ?? defaults[k] : params.get(k) ?? defaults[k]);
   const values = Object.fromEntries((Object.keys(defaults) as K[]).map((k) => [k, get(k)])) as Record<K, string>;
   const set = useCallback((patch: Partial<Record<K, string>>) => {
+    const inMemory = (Object.keys(patch) as K[]).filter((k) => memoryKeys.includes(k));
+    if (inMemory.length) {
+      setMemory((prev) => {
+        const next = { ...prev };
+        for (const k of inMemory) { const v = patch[k]; if (v == null || v === '' || v === defaults[k]) delete next[k]; else next[k] = v; }
+        return next;
+      });
+    }
+    if ((Object.keys(patch) as K[]).every((k) => memoryKeys.includes(k))) return;
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       for (const [k, v] of Object.entries(patch) as [K, string | undefined][]) {
+        if (memoryKeys.includes(k)) continue;
         if (v == null || v === '' || v === defaults[k]) next.delete(k);
         else next.set(k, v);
       }
       return next;
     }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 既定値は呼び出し側の定数
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 既定値・メモリの鍵は呼び出し側の定数
   }, [setParams]);
   return [values, set] as const;
 }
+
+/**
+ * [Gate TripKitUI] 旅行箱のナビの「要確認」の数(準備状況 readiness の分類から)。
+ * 画面が読み込んだ準備状況を prime で渡すと、ナビは聞き直さない(同じ旅行で 30 秒まで使う)。
+ */
+export interface KitAttention { reservations: number; preparation: number; expenses: number }
+type ReadinessCounts = { counts: { by_category: Record<string, number> } };
+const ATTN_TTL_MS = 30_000;
+const attnCache = new Map<string, { at: number; value: KitAttention }>();
+const attnListeners = new Set<() => void>();
+
+export function attentionFromReadiness(r: ReadinessCounts): KitAttention {
+  const c = r.counts.by_category;
+  const n = (k: string) => (typeof c[k] === 'number' ? c[k]! : 0);
+  return {
+    reservations: n('unreserved') + n('unconfirmed') + n('unpaid') + n('deadline'),
+    preparation: n('packing') + n('unassigned'),
+    expenses: n('budget'),
+  };
+}
+export function primeKitAttention(planId: string, r: ReadinessCounts): void {
+  attnCache.set(planId, { at: Date.now(), value: attentionFromReadiness(r) });
+  attnListeners.forEach((f) => f());
+}
+export function cachedKitAttention(planId: string): KitAttention | null {
+  const hit = attnCache.get(planId);
+  return hit && Date.now() - hit.at < ATTN_TTL_MS ? hit.value : null;
+}
+export function onKitAttention(f: () => void): () => void {
+  attnListeners.add(f);
+  return () => { attnListeners.delete(f); };
+}
+/** 試験用 */
+export function resetKitAttentionForTests(): void { attnCache.clear(); }
+
+/** [Gate TripKitUI] 文書の種類(保存した英字の値)を日本語にする。知らない値はそのまま */
+export const DOCUMENT_TYPE_LABEL: Record<string, string> = {
+  receipt: '領収書', ticket: 'チケット', boarding_pass: '搭乗券', booking: '予約確認書', confirmation: '予約確認書',
+  reservation: '予約確認書', booking_confirmation: '予約確認書', invoice: '請求書', passport: 'パスポート', visa: 'ビザ', insurance: '保険',
+  id: '身分証', itinerary: '旅程表', voucher: 'バウチャー', other: 'その他',
+};
+/** [Gate TripKitFix] 文書を追加する時に選ぶ種類(日本語で選び、保存は英字の値) */
+export const DOCUMENT_TYPE_CHOICES: { value: string; label: string }[] = [
+  { value: 'booking', label: '予約確認書' }, { value: 'ticket', label: 'チケット' }, { value: 'receipt', label: '領収書' },
+  { value: 'passport', label: 'パスポート' }, { value: 'id', label: '身分証' }, { value: 'insurance', label: '保険' },
+  { value: 'itinerary', label: '旅程表' }, { value: 'other', label: 'その他' },
+];
+export const documentTypeLabel = (t: string | null | undefined): string | null =>
+  t ? (DOCUMENT_TYPE_LABEL[t.toLowerCase()] ?? t) : null;

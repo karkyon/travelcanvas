@@ -12,7 +12,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
  *      合計は換算できたものだけになり、換算できない支出があることが表示される
  *   3. カテゴリの予算を超えると「超過」と表示される
  *   4. 返金を登録すると実績から差し引かれる
- *   5. 再読込後も保持され、1人旅では精算は完了と表示される
+ *   5. 再読込後も保持され、1人旅(自分で払った支出だけ)では「立替なし」と表示される(「精算済み」とは出さない)
  *   6. 各タブにaxe(WCAG 2.1 AA)違反が無い
  */
 
@@ -97,10 +97,13 @@ test('予算・費用: 予算と実績、外貨の換算、未換算の明示、
   await expect(food).toContainText('超過');
   await axeViolations(page, '予算・費用(概要)');
 
-  // 5. 再読込後も保持、1人旅の精算は完了
+  // 5. 再読込後も保持。1人旅で自分が払った支出だけなら、精算するものは無い
+  //    ([Gate TripKitFix] 立替が無い時に「精算は完了」と出していたのを、settlement_state=none で「立替なし」と出す)
   await page.reload();
   await expect(page.getByTestId('finance-total')).toContainText('8,375円', { timeout: 15_000 });
+  await expect(page.getByTestId('fin-tile-settlement')).toContainText('立替なし');
   await page.getByRole('tab', { name: '精算' }).click();
-  await expect(page.getByTestId('finance-settled')).toBeVisible();
+  await expect(page.getByTestId('finance-no-settlement')).toBeVisible();
+  await expect(page.getByTestId('finance-settled')).toHaveCount(0);
   await axeViolations(page, '予算・費用(精算)');
 });

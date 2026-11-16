@@ -5,20 +5,22 @@
  * - 次に確認すること: 準備状況(readiness)の項目(重い順・期限つき)と、確認待ち・失敗の取込
  * - 旅行の情報: 予約・チケット / 準備・持ち物 / 予算・費用 / 文書 / 予約の取込 の件数と状態、各一覧へ
  * - 最近追加したもの: 予約と文書(追加日時・出典)
- * - すぐ使う操作: 予約を手入力・メール/画像から取り込む・文書を保管・支出を登録・旅行箱から探す
+ * - すぐ使う操作: メール/画像から取り込む・文書を保管・支出を登録([Gate TripKitFix] 予約の追加は見出しの「予約を追加」、検索はナビの「旅行箱を検索」の 1 つずつ)
  * 件数・金額は固定の値を出さない。読み込み中・0 件・失敗・権限なし(見せない設定)を分けて出す。
  * 準備の点数は使わない(期限切れや重い問題を 1 つの数字で隠さない)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, FileText, Inbox, ListChecks, Plus, Search, Ticket, Wallet } from 'lucide-react';
-import PageHead from '@/components/shell/PageHead';
+import { AlertTriangle, FileText, Inbox, LayoutGrid, ListChecks, Luggage, Ticket, Wallet } from 'lucide-react';
+import { KitAddReservation, KitHead, KitSection, KitTile, KitTiles } from '@/components/shell/KitParts';
+import { documentTypeLabel, primeKitAttention } from '@/components/shell/tripKitModel';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { getDocuments, getFinanceSummary, getImportJobs, getReadiness, getReservations } from '@/services/api';
 import type { FinanceSummary, ImportJob, Readiness, Reservation, TravelDocument } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeInternalPath } from '@/utils/safeNavigation';
 import { attentionReasons } from './reservations/reservationListModel';
+import { checkCounts, departureBreakdown } from './preparation/preparationModel';
 
 type Load<T> = { state: 'loading' } | { state: 'ok'; data: T } | { state: 'denied' } | { state: 'error'; message: string };
 
@@ -110,15 +112,19 @@ const TripKitPage: React.FC = () => {
   const docList = docs.state === 'ok' ? docs.data : [];
   const recent = [
     ...resList.map((r) => ({ key: `r${r.id}`, at: r.created_at, title: r.provider_name || '予約', sub: '予約・チケット', to: `/planner/${planId}/reservations?open=${encodeURIComponent(r.id)}` })),
-    ...docList.map((d) => ({ key: `d${d.id}`, at: d.created_at, title: d.original_filename ?? '文書', sub: `文書${d.document_type ? ` ・ ${d.document_type}` : ''}`, to: `/planner/${planId}/documents` })),
+    ...docList.map((d) => ({ key: `d${d.id}`, at: d.created_at, title: d.original_filename ?? '文書', sub: `文書${d.document_type ? ` ・ ${documentTypeLabel(d.document_type)}` : ''}`, to: `/planner/${planId}/documents` })),
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
 
   const areas: Array<{ key: string; icon: React.ReactNode; title: string; load: Load<unknown>; retry: () => void; line: string; to: string; warn?: boolean }> = [
     { key: 'res', icon: <Ticket size={18} aria-hidden="true" />, title: '予約・チケット', load: res, retry: reloadRes, to: `/planner/${planId}/reservations`,
       line: resList.length === 0 ? 'まだ予約がありません' : `${resList.length}件${resAttention ? ` ・ 要確認 ${resAttention}` : ''}${nextRes ? ` ・ 次は ${shortDate(nextRes.start_at)} ${nextRes.provider_name ?? ''}` : ''}`,
       warn: resAttention > 0 },
-    { key: 'prep', icon: <ListChecks size={18} aria-hidden="true" />, title: '準備・持ち物', load: ready, retry: reloadReady, to: `/planner/${planId}/preparation`,
-      line: ready.state === 'ok' ? `持ち物 ${ready.data.packing.packed} / ${ready.data.packing.total} ・ やること ${ready.data.tasks.open}件 ・ 確認 ${ready.data.counts.total}件` : '',
+    { key: 'prep', icon: <Luggage size={18} aria-hidden="true" />, title: '準備・持ち物', load: ready, retry: reloadReady, to: `/planner/${planId}/preparation`,
+      line: ready.state === 'ok' ? (() => {
+        const c = checkCounts(ready.data)!;
+        const p = ready.data.packing;
+        return `出発前チェック ${c.departure}件 ・ 持ち物 ${p.total === 0 ? 'リスト未作成' : `${p.packed} / ${p.total}`} ・ タスク ${ready.data.tasks.open}件`;
+      })() : '',
       warn: ready.state === 'ok' && (ready.data.counts.by_severity.high ?? 0) > 0 },
     { key: 'fin', icon: <Wallet size={18} aria-hidden="true" />, title: '予算・費用', load: fin, retry: reloadFin, to: `/planner/${planId}/expenses`,
       line: fin.state === 'ok' ? `予算 ${money(fin.data.total.budget, fin.data.base_currency)} ・ 予約の見込み ${money(fin.data.reserved.total, fin.data.base_currency)} ・ 支出 ${money(fin.data.total.actual, fin.data.base_currency)}${fin.data.is_settled ? '' : ' ・ 精算あり'}` : '',
@@ -132,92 +138,111 @@ const TripKitPage: React.FC = () => {
   ];
 
   const allLoaded = [res, ready, jobs].every((l) => l.state !== 'loading');
+  useEffect(() => { if (ready.state === 'ok') primeKitAttention(planId, ready.data); }, [planId, ready]);
+  const cur = fin.state === 'ok' ? fin.data.base_currency : '';
+  const packing = ready.state === 'ok' ? ready.data.packing : null;
+  const cc = checkCounts(ready.state === 'ok' ? ready.data : null);
+  const reviewJobs = jobList.filter((j) => REVIEW.has(j.status)).length;
+  const sevTone = (sev: string): 'warn' | 'plain' | undefined => (sev === 'high' ? 'warn' : sev === 'low' ? 'plain' : undefined);
 
   return (
-    <div className="tc-page" data-testid="tripkit-home">
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page" data-testid="tripkit-home">
+      <KitHead
+        icon={<LayoutGrid size={14} />}
         title="旅行箱の概要"
-        sub="予約・チケット・書類・持ち物・費用を、この旅行の中でまとめて確認します。"
+        sub="予約・チケット・持ち物・費用・文書を、この旅行の中でまとめて確認します。"
         actions={(
-          <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/kit/search`)}>
-              <Search size={15} aria-hidden="true" />情報を探す
-            </button>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => navigate(`/planner/${planId}/reservations?new=1`)}>
-              <Plus size={15} aria-hidden="true" />予約を手入力
-            </button>
-          </>
+          // [Gate TripKitFix] 検索はナビの「旅行箱を検索」1 つにし、ここは「予約を追加」1 つにする
+          <KitAddReservation onImport={() => navigate(`/planner/${planId}/imports`)}
+            onManual={() => navigate(`/planner/${planId}/reservations?new=1`)} />
         )}
       />
       <TripKitNav planId={planId} />
 
+      <KitTiles>
+        <KitTile label="次の予約" icon={<Ticket size={14} />} value={nextRes ? shortDate(nextRes.start_at) : res.state === 'ok' ? 'なし' : '—'}
+          sub={nextRes ? (nextRes.provider_name ?? '予約') : res.state === 'ok' ? 'これからの予約はありません' : null} />
+        {/* [Gate TripKitFix] 準備・費用の画面と同じ言葉・同じ数(出発前チェック・リスト未作成・未設定) */}
+        <KitTile label="出発前チェック" icon={<AlertTriangle size={14} />} testId="kit-tile-departure"
+          tone={cc && cc.departure > 0 ? 'warn' : cc ? 'plain' : 'muted'}
+          value={cc ? (cc.departure > 0 ? `${cc.departure}件` : '問題なし') : '—'}
+          sub={cc ? [departureBreakdown(cc), reviewJobs > 0 ? `取込の確認待ち ${reviewJobs}` : null].filter(Boolean).join(' · ') : null} />
+        <KitTile label="持ち物" icon={<Luggage size={14} />} testId="kit-tile-packing"
+          tone={packing && packing.total === 0 ? 'muted' : 'plain'}
+          value={packing ? (packing.total === 0 ? 'リスト未作成' : `${packing.packed} / ${packing.total}`) : '—'}
+          progress={packing && packing.total > 0 ? (packing.packed / packing.total) * 100 : null}
+          sub={packing ? (packing.total === 0 ? '候補から作れます' : `タスク ${ready.state === 'ok' ? ready.data.tasks.open : 0}件`) : null} />
+        <KitTile label="予算" icon={<Wallet size={14} />}
+          tone={fin.state === 'ok' && fin.data.total.over ? 'warn' : fin.state === 'ok' && fin.data.total.budget == null ? 'muted' : 'plain'}
+          value={fin.state === 'ok' ? (fin.data.total.budget != null ? money(fin.data.total.budget, cur) : '未設定') : '—'}
+          sub={fin.state === 'ok' ? `予約の見込み ${money(fin.data.reserved.total, cur)} ・ 支出 ${money(fin.data.total.actual, cur)}` : null} />
+      </KitTiles>
+
       <div className="tc-kit-home">
-        <section className="tc-card tc-kit-card" aria-labelledby="kit-todo-title">
-          <h2 id="kit-todo-title" className="tc-section-title">次に確認すること</h2>
-          <p className="tc-kit-sub">重いもの・期限が近いものから。準備状況と取込の状態から出しています。</p>
-          {!allLoaded ? <p className="tc-kit-state" aria-busy="true">確認することを集めています…</p>
-            : todos.length === 0 ? (
-              <p className="tc-kit-state">{ready.state === 'ok' || jobs.state === 'ok' ? '今、確認が必要なものはありません。' : '確認することを読めませんでした(下の各項目から開けます)。'}</p>
-            ) : (
-              <ul className="tc-kit-todo" aria-label="次に確認すること">
-                {todos.slice(0, 8).map((t) => (
-                  <li key={t.key}>
-                    <Link to={safeInternalPath(t.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring tc-kit-todo__item" data-sev={t.sev}>
-                      <span className="tc-kit-todo__tag">{t.sev === 'high' && <AlertTriangle size={13} aria-hidden="true" />}{t.tag}</span>
-                      <span className="tc-kit-todo__text"><b>{t.title}</b><small>{[t.detail, t.due ? `期限 ${shortDate(t.due)}` : null].filter(Boolean).join(' ・ ')}</small></span>
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          {todos.length > 8 && <Link to={`/planner/${planId}/preparation`} className="tc-mini-link">{`ほか ${todos.length - 8}件を準備状況で見る`}</Link>}
-        </section>
-
-        <section aria-labelledby="kit-areas-title">
-          <h2 id="kit-areas-title" className="tc-section-title">旅行の情報</h2>
-          <ul className="tc-kit-areas">
-            {areas.map((a) => (
-              <li key={a.key}>
-                <div className="tc-card tc-kit-area" data-warn={a.warn ? 'true' : undefined}>
-                  <Link to={safeInternalPath(a.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring tc-kit-area__link">
-                    <span className="tc-kit-area__icon">{a.icon}</span>
-                    <span className="tc-kit-area__text"><b>{a.title}</b>
-                      {a.load.state === 'ok' ? <small>{a.line}</small> : null}
-                    </span>
-                    <ChevronRight size={16} aria-hidden="true" />
-                  </Link>
-                  <SectionState load={a.load} retry={a.retry} label={a.title} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="tc-card tc-kit-card" aria-labelledby="kit-quick-title">
-          <h2 id="kit-quick-title" className="tc-section-title">すぐ使う</h2>
-          <div className="tc-kit-quick">
-            <Link to={`/planner/${planId}/reservations?new=1`} className="tc-focus-ring tc-mbtn">予約を手入力</Link>
-            <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-mbtn">メール・画像から取り込む</Link>
-            <Link to={`/planner/${planId}/documents`} className="tc-focus-ring tc-mbtn">文書を保管</Link>
-            <Link to={`/planner/${planId}/expenses?tab=expenses`} className="tc-focus-ring tc-mbtn">支出を登録</Link>
-            <Link to={`/planner/${planId}/kit/search`} className="tc-focus-ring tc-mbtn">旅行箱から探す</Link>
-          </div>
-        </section>
-
-        <section className="tc-card tc-kit-card" aria-labelledby="kit-recent-title">
-          <h2 id="kit-recent-title" className="tc-section-title">最近追加したもの</h2>
-          {res.state === 'loading' || docs.state === 'loading' ? <p className="tc-kit-state" aria-busy="true">読み込み中…</p>
-            : recent.length === 0 ? <p className="tc-kit-state">まだ何も追加されていません。予約を登録するか、予約メールを取り込むとここに出ます。</p>
-              : (
-                <ul className="tc-kit-recent" aria-label="最近追加したもの">
-                  {recent.map((x) => (
-                    <li key={x.key}><Link to={safeInternalPath(x.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring"><b>{x.title}</b><small>{`${x.sub} ・ ${shortDate(x.at)} に追加`}</small></Link></li>
+        <div className="tc-kit-col">
+          <KitSection id="kit-todo-title" title="次に確認すること" aside="重いもの・期限が近い順">
+            {!allLoaded ? <p className="tc-kit-state" aria-busy="true">確認することを集めています…</p>
+              : todos.length === 0 ? (
+                <p className="tc-kit-state">{ready.state === 'ok' || jobs.state === 'ok' ? '今、確認が必要なものはありません。' : '確認することを読めませんでした(右の各項目から開けます)。'}</p>
+              ) : (
+                <ul className="tc-kit-list" aria-label="次に確認すること">
+                  {todos.slice(0, 8).map((t) => (
+                    <li key={t.key}>
+                      <Link to={safeInternalPath(t.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring tc-kit-open" data-sev={t.sev}>
+                        <span className="tc-kit-icon" data-tone={sevTone(t.sev)} aria-hidden="true">{t.sev === 'high' ? <AlertTriangle size={19} /> : <ListChecks size={19} />}</span>
+                        <span className="min-w-0"><b>{t.title}</b><small>{[t.detail, t.due ? `期限 ${shortDate(t.due)}` : null].filter(Boolean).join(' ・ ')}</small></span>
+                        <span className="tc-kit-pill" data-tone={t.sev === 'high' ? 'warn' : undefined}>{t.tag}</span>
+                      </Link>
+                    </li>
                   ))}
                 </ul>
               )}
-        </section>
+            {todos.length > 8 && <Link to={`/planner/${planId}/preparation`} className="tc-mini-link">{`ほか ${todos.length - 8}件を出発前チェックで見る`}</Link>}
+          </KitSection>
+
+          <KitSection id="kit-recent-title" title="最近追加したもの" aside="予約と文書">
+            {res.state === 'loading' || docs.state === 'loading' ? <p className="tc-kit-state" aria-busy="true">読み込み中…</p>
+              : recent.length === 0 ? <p className="tc-kit-state">まだ何も追加されていません。予約を登録するか、予約メールを取り込むとここに出ます。</p>
+                : (
+                  <ul className="tc-kit-list" aria-label="最近追加したもの">
+                    {recent.map((x) => (
+                      <li key={x.key}>
+                        <Link to={safeInternalPath(x.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring tc-kit-open">
+                          <span className="tc-kit-icon" data-tone="plain" aria-hidden="true">{x.key.startsWith('r') ? <Ticket size={19} /> : <FileText size={19} />}</span>
+                          <span className="min-w-0"><b>{x.title}</b><small>{`${x.sub} ・ ${shortDate(x.at)} に追加`}</small></span>
+                          <span />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+          </KitSection>
+        </div>
+
+        <div className="tc-kit-col">
+          <KitSection id="kit-areas-title" title="旅行の情報" aside="押すと開きます">
+            <ul className="tc-kit-list tc-kit-areas2">
+              {areas.map((a) => (
+                <li key={a.key}>
+                  <Link to={safeInternalPath(a.to) ?? `/planner/${planId}/kit`} className="tc-focus-ring tc-kit-open">
+                    <span className="tc-kit-icon" data-tone={a.warn ? 'warn' : undefined} aria-hidden="true">{a.icon}</span>
+                    <span className="min-w-0"><b>{a.title}</b>{a.load.state === 'ok' ? <small>{a.line}</small> : null}</span>
+                    {a.warn ? <span className="tc-kit-pill" data-tone="warn">要確認</span> : <span />}
+                  </Link>
+                  <SectionState load={a.load} retry={a.retry} label={a.title} />
+                </li>
+              ))}
+            </ul>
+          </KitSection>
+
+          <KitSection id="kit-quick-title" title="すぐ使う">
+            <div className="tc-kit-quick">
+              <Link to={`/planner/${planId}/imports`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Inbox size={15} aria-hidden="true" />メール・画像から取り込む</Link>
+              <Link to={`/planner/${planId}/documents`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><FileText size={15} aria-hidden="true" />文書を保管</Link>
+              <Link to={`/planner/${planId}/expenses?tab=expenses`} className="tc-focus-ring tc-mbtn tc-mbtn--sm"><Wallet size={15} aria-hidden="true" />支出を登録</Link>
+            </div>
+          </KitSection>
+        </div>
       </div>
     </div>
   );

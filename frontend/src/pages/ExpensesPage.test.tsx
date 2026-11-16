@@ -149,14 +149,19 @@ describe('ExpensesPage (Gate P2)', () => {
     expect(g5.recordSettlement.mock.calls[0]![2].length).toBeGreaterThan(8);
   });
 
-  it('精算済み・予算の保存エラー表示', async () => {
+  it('立替が無い時は「精算済み」と出さない・予算の保存エラー表示', async () => {
     m.getFinanceSummary.mockResolvedValue(fx.finance_summary_empty);
     m.getExpenses.mockResolvedValue([]);
     m.getBudgets.mockResolvedValue([]);
     m.createBudget.mockRejectedValue({ response: { data: { detail: '予算を変更する権限がありません' } } });
     renderPage();
+    // [Gate TripKitFix] 支出0件(settlement_state=none)で「精算済み」と出していた
+    expect(await screen.findByTestId('fin-tile-settlement')).toHaveTextContent('立替なし');
+    expect(screen.getByTestId('fin-tile-settlement')).not.toHaveTextContent('精算済み');
+    expect(screen.getByTestId('fin-tile-budget')).toHaveTextContent('未設定');
     fireEvent.click(await screen.findByRole('tab', { name: '精算' }));
-    expect(await screen.findByTestId('finance-settled')).toHaveTextContent('精算は完了しています');
+    expect(await screen.findByTestId('finance-no-settlement')).toHaveTextContent('立て替えた支出はまだありません');
+    expect(screen.queryByTestId('finance-settled')).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: '概要' }));
     fireEvent.click(await screen.findByRole('button', { name: '自分の予算を設定' }));
     const dialog = await screen.findByRole('dialog');

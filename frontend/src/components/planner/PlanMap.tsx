@@ -21,7 +21,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import RouteSummaryLine, { type RouteSummaryStatus } from './RouteSummaryLine';
 import { hasCoords, mapNumbers } from './mapNumberModel';
-import { buildMapLegs, legsSignature, type LegSegment, type MapLeg } from './routeLegsModel';
+import { buildMapLegs, legsSignature, straightKm, WALK_GUESS_KM, type LegSegment, type MapLeg } from './routeLegsModel';
+import { directionArrow, HOME_COLOR, LODGING_COLOR, type MapEnd, type MapEnds } from './mapEndsModel';
+import { useHomePlace } from '@/hooks/useHomePlace';
 import { getRouteGeometry, type RouteGeometry } from '@/services/api/routeGeometry';
 import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -48,7 +50,50 @@ interface PlanMapProps {
   planId?: string | null;
   /** [Gate RoadRoute] 移動区間(区間の手段で道の種類を決める。控えの案を開いている時はその案の区間) */
   segments?: ReadonlyArray<LegSegment>;
+  /** [Gate HomeRoute] 日の最初と最後(前の夜の宿・今夜の宿・自宅)。自宅は本人が選んだ時だけ地図に出す */
+  ends?: MapEnds | null;
 }
+
+/** [Gate HomeRoute] 地図に出す日の端(位置・印・線・道の経路の提供元へ送るか) */
+interface ShownEnd extends MapEnd { at: [number, number]; marker: boolean; line: boolean; send: boolean }
+
+function endIcon(kind: MapEnd['kind']) {
+  const bg = kind === 'home' ? HOME_COLOR : LODGING_COLOR;
+  const glyph = kind === 'home' ? '⌂' : '宿';
+  return _divIcon(
+    `<div class="tc-pin is-end" style="width:30px;height:30px;background:${bg};box-shadow:0 2px 5px rgba(0,0,0,.3);">`
+      + `<span style="font-size:${kind === 'home' ? 16 : 12}px">${glyph}</span></div>`, [30, 36],
+  );
+}
+
+/** [Gate HomeRoute] 地図の外にある自宅の方向の札と「全体」(全部の点が見えるようにする) */
+const OffMapChip: React.FC<{ target: [number, number] | null; label: string; all: [number, number][] }> = ({ target, label, all }) => {
+  const map = useMap();
+  const [out, setOut] = useState<{ arrow: string; km: number } | null>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (ref.current) { L.DomEvent.disableClickPropagation(ref.current); L.DomEvent.disableScrollPropagation(ref.current); }
+  });
+  useEffect(() => {
+    if (!target) { setOut(null); return undefined; }
+    const check = () => {
+      const b = map.getBounds();
+      if (b.contains(L.latLng(target[0], target[1]))) { setOut(null); return; }
+      const c = b.getCenter();
+      setOut({ arrow: directionArrow([c.lat, c.lng], target), km: straightKm([c.lat, c.lng], target) });
+    };
+    check();
+    map.on('moveend', check);
+    return () => { map.off('moveend', check); };
+  }, [map, target]);
+  if (all.length < 2) return null;
+  return (
+    <div ref={ref} className="tc-map-endchip" data-testid="map-end-chip">
+      {out && <span>{`${label} ${out.arrow} 約${out.km < 10 ? out.km.toFixed(1) : Math.round(out.km)}km(地図の外)`}</span>}
+      <button type="button" className="tc-focus-ring" onClick={() => map.fitBounds(L.latLngBounds(all), { padding: [40, 40] })}>全体</button>
+    </div>
+  );
+};
 
 const MODE_LABEL: Record<string, string> = {
   walking: '徒歩', driving: '車', taxi: 'タクシー', bus: 'バス', express_bus: '高速バス', bicycle: '自転車',
@@ -146,6 +191,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
   startLabel = null,
   planId = null,
   segments,
+  ends = null,
 }) => {
   const scheduledWithCoords = useMemo(
     () => (day?.events ?? []).filter(
@@ -180,36 +226,100 @@ const PlanMap: React.FC<PlanMapProps> = ({
     [scheduledWithCoords]
   );
 
+  // [Gate HomeRoute] 日の端。自宅は本人が「地図に出す」「経路に使う」を選んだ時だけ(道の経路の提供元へ送るかも本人が選ぶ)
+  const needHome = ends?.start?.kind === 'home' || ends?.end?.kind === 'home';
+  const { home } = useHomePlace(needHome);
+  const shownEnds = useMemo((): ShownEnd[] => {
+    const out: ShownEnd[] = [];
+    for (const e of [ends?.start ?? null, ends?.end ?? null]) {
+      if (!e) continue;
+      if (e.kind === 'lodging' && e.pos) { out.push({ ...e, at: e.pos, marker: true, line: true, send: true }); continue; }
+      if (e.kind === 'home' && home?.configured && home.place) {
+        const marker = home.show_on_map;
+        const line = home.use_for_routes;
+        if (marker || line) out.push({ ...e, at: [home.place.latitude, home.place.longitude], marker, line, send: line && home.send_to_route_provider });
+      }
+    }
+    return out;
+  }, [ends, home]);
+
   // [Gate RoadRoute] 道に沿った経路(OSRM)。聞けない・無い区間は直線の点線(架空の道を作らない)
-  const legs = useMemo(() => buildMapLegs(scheduledWithCoords, segments ?? []), [scheduledWithCoords, segments]);
-  const sig = useMemo(() => legsSignature(legs), [legs]);
+  const midLegs = useMemo(() => buildMapLegs(scheduledWithCoords, segments ?? []), [scheduledWithCoords, segments]);
+  const endLegs = useMemo(() => {
+    const first = scheduledWithCoords[0];
+    const last = scheduledWithCoords[scheduledWithCoords.length - 1];
+    const res: Array<MapLeg & { end: ShownEnd }> = [];
+    for (const e of shownEnds) {
+      if (!e.line) continue;
+      const other = e.role === 'start' ? first : last;
+      if (!other) continue;
+      const p: [number, number] = [other.latitude, other.longitude];
+      const from = e.role === 'start' ? e.at : p;
+      const to = e.role === 'start' ? p : e.at;
+      const seg = e.eventId ? (segments ?? []).find((sg) => sg.status !== 'cancelled'
+        && (e.role === 'start' ? sg.from_event_id === e.eventId && sg.to_event_id === other.id : sg.from_event_id === other.id && sg.to_event_id === e.eventId)) : undefined;
+      const mode = seg?.mode ?? e.mode ?? (straightKm(from, to) <= WALK_GUESS_KM ? 'walking' : 'driving');
+      const source = seg || e.mode ? 'segment' as const : 'guess' as const;
+      res.push({ key: `${e.role}:${e.kind}`, fromId: e.role === 'start' ? `end-${e.kind}` : other.id, toId: e.role === 'start' ? other.id : `end-${e.kind}`,
+        from, to, mode, source, end: e });
+    }
+    return res;
+  }, [shownEnds, scheduledWithCoords, segments]);
+  const startLeg = endLegs.find((l) => l.end.role === 'start') ?? null;
+  const endLeg = endLegs.find((l) => l.end.role === 'end') ?? null;
+  const legs = useMemo(() => [...(startLeg ? [startLeg] : []), ...midLegs, ...(endLeg ? [endLeg] : [])], [startLeg, midLegs, endLeg]);
+  // 道の経路の提供元へ送るのは、送ってよい区間だけ(自宅は本人が選んだ時だけ。送らない区間は直線)
+  const askLegs = useMemo(() => legs.filter((l) => !('end' in l) || (l as { end: ShownEnd }).end.send), [legs]);
+  const sig = useMemo(() => legsSignature(askLegs), [askLegs]);
   const [geo, setGeo] = useState<{ sig: string; data: RouteGeometry } | null>(null);
   const asked = useRef<string | null>(null);
   useEffect(() => {
-    if (!planId || legs.length === 0) return undefined;
+    if (!planId || askLegs.length === 0) return undefined;
     const want = `${planId}#${sig}`;
     if (asked.current === want) return undefined;
     let alive = true;
     const timer = window.setTimeout(() => {
       asked.current = want;
-      getRouteGeometry(planId, legs.map((l) => ({
+      getRouteGeometry(planId, askLegs.map((l) => ({
         from_lat: l.from[0], from_lng: l.from[1], to_lat: l.to[0], to_lng: l.to[1], mode: l.mode,
       })))
         .then((data) => { if (alive) setGeo({ sig, data }); })
         .catch(() => { if (alive) { asked.current = null; setGeo(null); } });
     }, 250);
     return () => { alive = false; window.clearTimeout(timer); };
-  }, [planId, legs, sig]);
+  }, [planId, askLegs, sig]);
   const selectedPos = useMemo((): [number, number] | null => {
     const e = scheduledWithCoords.find((x) => x.id === selectedEventId);
     return e && typeof e.latitude === 'number' && typeof e.longitude === 'number' ? [e.latitude, e.longitude] : null;
   }, [scheduledWithCoords, selectedEventId]);
-  const geoLegs = geo && geo.sig === sig && geo.data.legs.length === legs.length ? geo.data.legs : null;
+  const askedGeo = geo && geo.sig === sig && geo.data.legs.length === askLegs.length ? geo.data.legs : null;
+  const geoOf = (leg: MapLeg) => {
+    const i = askLegs.indexOf(leg);
+    return askedGeo && i >= 0 ? askedGeo[i] : undefined;
+  };
+  const legColor = (leg: MapLeg) => {
+    const e = (leg as { end?: ShownEnd }).end;
+    return e ? (e.kind === 'home' ? HOME_COLOR : LODGING_COLOR) : null;
+  };
+  // 地図の範囲: 宿は含める(近い)。自宅は遠いことが多いので含めず、地図の外なら札と「全体」で見せる
+  const fitPositions: [number, number][] = useMemo(() => [
+    ...allPositions,
+    ...shownEnds.filter((e) => e.kind === 'lodging').map((e) => e.at),
+  ], [allPositions, shownEnds]);
+  const everything: [number, number][] = useMemo(() => [...allPositions, ...shownEnds.map((e) => e.at)], [allPositions, shownEnds]);
+  const homeEnd = shownEnds.find((e) => e.kind === 'home') ?? null;
+  // 凡例は実際に引いた線の色だけ(線の無い色を出さない)
+  const homeLeg = endLegs.find((l) => l.end.kind === 'home') ?? null;
+  const legend = endLegs.length === 0 ? [] : [
+    ...(endLegs.some((l) => l.end.kind === 'lodging') ? [{ key: 'lodging', color: LODGING_COLOR, label: '宿との間' }] : []),
+    ...(midLegs.length > 0 ? [{ key: 'mid', color: PIN_PLANNED, label: '予定の間' }] : []),
+    ...(homeLeg ? [{ key: 'home', color: HOME_COLOR, label: homeLeg.end.send ? '自宅との間' : '自宅との間(直線・送らない)' }] : []),
+  ];
 
   const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
   const nums = useMemo(() => mapNumbers(day?.events ?? []), [day]);
 
-  const hasAnyKnownLocation = allPositions.length > 0;
+  const hasAnyKnownLocation = fitPositions.length > 0;
   const defaultCenter: [number, number] = [35.6812, 139.7671]; // 東京駅(何も無い場合の初期表示のみ)
 
   // [Gate TimelineRedesign] height="100%": 旅程の欄と同じ高さに広げ、移動の概算と位置不明の予定は地図の下に重ねる
@@ -218,7 +328,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
     <div className={fill ? `tc-planmap-fill ${className}` : `space-y-2 ${className}`}>
       <div className={fill ? 'tc-planmap-box' : 'rounded-xl overflow-hidden border border-gray-200'} style={fill ? undefined : { height }}>
         <MapContainer
-          center={hasAnyKnownLocation ? allPositions[0] : defaultCenter}
+          center={hasAnyKnownLocation ? fitPositions[0] : defaultCenter}
           zoom={13}
           scrollWheelZoom
           style={{ height: '100%', width: '100%' }}
@@ -228,16 +338,17 @@ const PlanMap: React.FC<PlanMapProps> = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {hasAnyKnownLocation && <FitBounds positions={allPositions} />}
+          {hasAnyKnownLocation && <FitBounds positions={fitPositions} />}
           <PanToSelected position={selectedPos} />
 
-          {geoLegs ? legs.map((leg, i) => {
-            const g = geoLegs[i];
+          {askedGeo || legs.some((l) => legColor(l)) ? legs.map((leg, i) => {
+            const g = geoOf(leg);
             const road = g?.kind === 'road' && g.coordinates.length > 1;
             const positions = road ? g!.coordinates.map((c): [number, number] => [c[0]!, c[1]!]) : [leg.from, leg.to];
+            const tint = legColor(leg);
             const pathOptions = road
-              ? { color: PIN_PLANNED, weight: leg.source === 'guess' ? 3 : 4, opacity: leg.source === 'guess' ? 0.6 : 0.9 }
-              : { color: ROUTE_STRAIGHT, weight: 4, opacity: 0.95, dashArray: '2 9', lineCap: 'round' as const };
+              ? { color: tint ?? PIN_PLANNED, weight: leg.source === 'guess' ? 3 : 4, opacity: leg.source === 'guess' ? 0.6 : 0.9 }
+              : { color: tint ?? ROUTE_STRAIGHT, weight: 4, opacity: 0.95, dashArray: '2 9', lineCap: 'round' as const };
             return (
               <Polyline key={`leg-${leg.key}-${i}`} positions={positions} pathOptions={pathOptions}>
                 <Tooltip sticky className="tc-pin-tip">{legTip(leg, g)}</Tooltip>
@@ -280,6 +391,19 @@ const PlanMap: React.FC<PlanMapProps> = ({
               </Marker>
             );
           })}
+
+          {shownEnds.filter((e) => e.marker).map((e) => (
+            <Marker key={`end-${e.role}-${e.kind}`} position={e.at} icon={endIcon(e.kind)} title={e.label} zIndexOffset={-100}>
+              <Tooltip direction="top" offset={[0, -34]} className="tc-pin-tip">{e.label}</Tooltip>
+            </Marker>
+          ))}
+
+          {legend.length > 0 && (
+            <div className="tc-map-endlegend" aria-label="線の色">
+              {legend.map((l) => <span key={l.key}><i style={{ background: l.color }} aria-hidden="true" />{l.label}</span>)}
+            </div>
+          )}
+          {homeEnd && <OffMapChip target={homeEnd.at} label="自宅" all={everything} />}
 
           {candidatesWithCoords.map((candidate) => (
             <Marker

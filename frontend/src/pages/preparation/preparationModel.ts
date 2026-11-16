@@ -60,12 +60,71 @@ export function groupByCategory(items: PackingItem[]): { category: PackingCatego
   return groups;
 }
 
+/** [Gate TripKitUI] 準備済み(梱包済み・使用後)か */
+export const isPackedStatus = (s: string): boolean => s === 'packed' || s === 'after_use';
+
 export function packingProgress(items: PackingItem[]): { packed: number; total: number; requiredLeft: number } {
   return {
     packed: items.filter(isReady).length,
     total: items.length,
     requiredLeft: items.filter((i) => i.is_required && !isReady(i)).length,
   };
+}
+
+/**
+ * [Gate TripKitFix] readiness の分類を「出発前チェック」(予約・支払い・期限・予算)と「持ち物・担当」に分ける。
+ * readiness の全件を 1 つの数で出すと、宿の支払いの確認が持ち物の残りに見えていた。API は変えず分類で分ける。
+ */
+export const DEPARTURE_CATEGORIES: ReadinessCategory[] = ['unreserved', 'unconfirmed', 'unpaid', 'deadline', 'budget'];
+export const PACKING_CATEGORIES: ReadinessCategory[] = ['packing', 'unassigned'];
+
+/** 出発前チェックの分類ごとの見出し(画面の言葉) */
+export const CHECK_GROUP_LABEL: Record<ReadinessCategory, string> = {
+  unreserved: '予約(まだ予約していない)',
+  unconfirmed: '予約(確定していない)',
+  unpaid: '支払い',
+  deadline: '期限',
+  budget: '予算',
+  packing: '持ち物',
+  unassigned: '担当',
+};
+
+/** 項目を開くボタンの言葉(どこへ行って何をするか) */
+export const CHECK_ACTION_LABEL: Record<ReadinessCategory, string> = {
+  unreserved: '予約を追加',
+  unconfirmed: '予約を確かめる',
+  unpaid: '予約で支払いを入れる',
+  deadline: '期限を確かめる',
+  budget: '予算を見る',
+  packing: '持ち物を見る',
+  unassigned: '担当を決める',
+};
+
+export interface CheckCounts {
+  /** 出発前チェック(予約・支払い・期限・予算)の件数 */
+  departure: number;
+  /** 持ち物・担当の件数 */
+  packing: number;
+  /** 出発前チェックの分類ごとの件数(0 件の分類も含む) */
+  byDeparture: { category: ReadinessCategory; count: number }[];
+}
+
+export function checkCounts(r: Readiness | null): CheckCounts | null {
+  if (!r) return null;
+  const c = r.counts.by_category;
+  const n = (k: ReadinessCategory) => c[k] ?? 0;
+  return {
+    departure: DEPARTURE_CATEGORIES.reduce((a, k) => a + n(k), 0),
+    packing: PACKING_CATEGORIES.reduce((a, k) => a + n(k), 0),
+    byDeparture: DEPARTURE_CATEGORIES.map((k) => ({ category: k, count: n(k) })),
+  };
+}
+
+/** 出発前チェックの札の補足(「支払い 1 · 期限 1」)。0 件なら「予約・支払い・期限・予算は問題なし」 */
+export function departureBreakdown(cc: CheckCounts): string {
+  const parts = cc.byDeparture.filter((x) => x.count > 0)
+    .map((x) => `${x.category === 'unreserved' || x.category === 'unconfirmed' ? '予約' : CHECK_GROUP_LABEL[x.category]} ${x.count}`);
+  return parts.length ? parts.join(' · ') : '予約・支払い・期限・予算は問題なし';
 }
 
 /**

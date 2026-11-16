@@ -16,7 +16,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plane, Building2, Train, Bus, Ship, Car, UtensilsCrossed,
   Ticket as TicketIcon, Landmark, HelpCircle, Plus, Eye, EyeOff, Trash2,
-  Users, X, CalendarDays, Lock, Unlock, Link2, QrCode,
+  Users, X, CalendarDays, Lock, Unlock, Link2, QrCode, AlertTriangle, Wallet,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import TicketCode from '@/components/share/TicketCode';
@@ -47,14 +47,16 @@ import type {
   Ticket, TicketCreateData,
 } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
-import PageHead from '@/components/shell/PageHead';
+import { KitAddReservation, KitHead, KitTile, KitTiles } from '@/components/shell/KitParts';
+import ReservationPaymentEditor from './reservations/ReservationPaymentEditor';
 import TripKitNav from '@/components/shell/TripKitNav';
 import TicketFullscreen from '@/components/share/TicketFullscreen';
 import { ticketWarning } from '@/components/share/ticketState';
 import { KitActiveConditions, KitChips, KitNoMatch } from '@/components/shell/TripKitNav';
-import { useQueryState } from '@/components/shell/tripKitModel';
+import { MEMORY_ONLY_Q, useQueryState } from '@/components/shell/tripKitModel';
 import {
-  PAYMENT_LABEL, STATUS_FILTERS, attentionReasons, deadlineState, filterReservations, groupByDay, zonedParts,
+  STATUS_FILTERS, attentionReasons, deadlineState, filterReservations, fixLabel, groupByDay, paymentText, paymentTone,
+  reservationTotals, zonedParts,
 } from './reservations/reservationListModel';
 
 const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }[] = [
@@ -69,6 +71,8 @@ const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }
   { value: 'admission', label: '入場', icon: <Landmark size={16} /> },
   { value: 'other', label: 'その他', icon: <HelpCircle size={16} /> },
 ];
+
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'info' | undefined> = { confirmed: 'ok', modified: 'warn', candidate: 'info' };
 
 const STATUS_LABEL: Record<string, string> = {
   candidate: '未確定',
@@ -152,7 +156,7 @@ const ReservationsPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   // [Gate TripKit] 一覧の検索・絞り込み・並べ替え(URL に残す)と、全画面で見せるチケット
-  const [cond, setCond] = useQueryState({ q: '', st: '', type: '', sort: 'date' });
+  const [cond, setCond] = useQueryState({ q: '', st: '', type: '', sort: 'date' }, MEMORY_ONLY_Q);
   const [fullTicket, setFullTicket] = useState<Ticket | null>(null);
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -499,22 +503,41 @@ const ReservationsPage: React.FC = () => {
   }
 
   return (
-    <div className="tc-page">
-      {/* [Gate MockScreens] モックの旅行箱: page-head・切り替え・予約の一覧と秘密情報の扱い */}
-      <PageHead
-        eyebrow="TRIP KIT · 旅行箱"
+    <div className="tc-page tc-kit-page">
+      {/* [Gate MockScreens → TripKitUI] 旅行箱の共通の見出し・切り替え・要約・予約の一覧と秘密情報の扱い */}
+      <KitHead
+        icon={<TicketIcon size={14} />}
         title="予約・チケット"
         sub="予約の状態・利用日・期限・旅程とのつながりをまとめて確認します。予約番号・PIN・チケットのコードは、詳細で「表示」を押した時だけ出します。"
         actions={(
-          <>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/imports`)}>予約を取り込む</button>
-            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => setIsCreateOpen(true)}>
-              <Plus size={15} aria-hidden="true" />新規予約
-            </button>
-          </>
+          // [Gate TripKitFix] 主な操作は「予約を追加」1 つ(取り込む・手入力を選ぶ)
+          <KitAddReservation onImport={() => navigate(`/planner/${planId}/imports`)} onManual={() => setIsCreateOpen(true)} />
         )}
       />
       <TripKitNav planId={planId} />
+
+      {!isLoading && reservations.length > 0 && (() => {
+        const nowT = Date.now();
+        const live = reservations.filter((r) => r.status !== 'cancelled');
+        const need = reservations.filter((r) => attentionReasons(r, nowT).length > 0);
+        const reasons = Array.from(new Set(need.flatMap((r) => attentionReasons(r, nowT))));
+        const totals = reservationTotals(live);
+        const linked = live.filter((r) => r.event_id).length;
+        const confirmed = reservations.filter((r) => r.status === 'confirmed').length;
+        return (
+          <KitTiles>
+            {/* [Gate TripKitFix] 改修モックアップ: 予約・要確認・予約の合計・旅程とのつながり */}
+            <KitTile label="予約" icon={<TicketIcon size={14} />} value={`${reservations.length}件`} sub={`確定 ${confirmed}`} />
+            <KitTile label="要確認" icon={<AlertTriangle size={14} />} tone={need.length > 0 ? 'warn' : 'plain'} value={`${need.length}件`}
+              sub={need.length > 0 ? reasons.slice(0, 3).join('・') : '今はありません'}
+              action={need.length > 0 && cond.st !== 'attention' ? { label: '要確認だけ見る', onClick: () => setCond({ st: 'attention' }) } : undefined} />
+            <KitTile label="予約の合計" icon={<Wallet size={14} />} testId="res-tile-total"
+              value={totals.text} sub={totals.paidText} />
+            <KitTile label="旅程とのつながり" icon={<Link2 size={14} />} value={`${linked} / ${live.length}`}
+              sub={live.length - linked > 0 ? `${live.length - linked}件が旅程に未接続` : 'すべて旅程につながっています'} />
+          </KitTiles>
+        );
+      })()}
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{error}</div>
@@ -527,7 +550,7 @@ const ReservationsPage: React.FC = () => {
       ) : reservations.length === 0 ? (
         <div className="tc-kit-empty">
           <p className="font-semibold text-ink-900">予約がまだ登録されていません。</p>
-          <p>「新規予約」から追加するか、確認メールを<button type="button" className="tc-mini-link" onClick={() => navigate(`/planner/${planId}/imports`)}>予約の取込</button>で読み込めます。登録した予約は旅程の予定につなげられます。</p>
+          <p>「予約を追加」から手入力するか、確認メールを<button type="button" className="tc-mini-link" onClick={() => navigate(`/planner/${planId}/imports`)}>予約の取込</button>で読み込めます。登録した予約は旅程の予定につなげられます。</p>
         </div>
       ) : (() => {
         const now = Date.now();
@@ -564,6 +587,10 @@ const ReservationsPage: React.FC = () => {
               options={STATUS_FILTERS.map((f) => ({ value: f.value, label: f.label, attention: f.attention,
                 count: reservations.filter((r) => f.test(r, now)).length })).filter((o) => o.count > 0 || o.value === cond.st)} />
             <KitActiveConditions conditions={conds} shown={shown.length} total={reservations.length} onClearAll={clearAll} />
+            {shown.length > 0 && (
+              // [Gate TripKitFix] 列の見出し(読み上げは各セルの sr-only で行うため、見た目だけ)
+              <div className="tc-kit-reshead" aria-hidden="true"><span /><span>予約</span><span>利用日時(現地)</span><span>金額</span><span>支払い</span><span>状態</span><span /></div>
+            )}
             {shown.length === 0 ? <KitNoMatch onClearAll={clearAll} /> : groupByDay(shown, cond.sort).map((g) => (
               <div key={g.key} className="tc-kit-group">
                 {g.label && <h3 className="tc-kit-day">{g.label}</h3>}
@@ -574,35 +601,49 @@ const ReservationsPage: React.FC = () => {
             const why = attentionReasons(r, now);
             return (
             <li key={r.id}>
-              {/* [Gate E1] 以前は <div onClick> でキーボードから開けなかった。ボタンにして
-                  Tab で移動・Enter/Space で詳細を開けるようにする。 */}
-              <div className="tc-kit-row">
-                <button
-                  type="button"
-                  onClick={() => openDetail(r)}
-                  aria-haspopup="dialog"
-                  className="tc-focus-ring tc-kit-open"
-                >
-                  <span className="tc-kit-icon" aria-hidden="true">{typeIcon(r.type)}</span>
-                  <span className="min-w-0">
+              {/* [Gate TripKitFix] 一覧は要点を列に分ける(利用日時・金額・支払い・状態・旅程)。メモ(取り込んだ文)は
+                  詳細だけに出す。予約番号は一覧に出さない(伏せた末尾も詳細だけ)。
+                  [Gate E1] 行はボタン: Tab で移動・Enter/Space で詳細を開く */}
+              <div className="tc-kit-row tc-kit-resrow" data-testid={`reservation-row-${r.id}`}>
+                <button type="button" onClick={() => openDetail(r)} aria-haspopup="dialog" className="tc-focus-ring tc-kit-open tc-kit-resrow__open">
+                  <span className="tc-kit-icon" data-tone={why.length > 0 ? 'warn' : undefined} aria-hidden="true">{typeIcon(r.type)}</span>
+                  <span className="tc-kit-resrow__name">
                     <b>{r.provider_name || typeLabel(r.type)}</b>
-                    <small>{typeLabel(r.type)} ・ {when ? `${when.date} ${when.time}` : formatDateTime(r.start_at)}{when ? `(${when.tzNote})` : ''}{r.guest_count ? ` ・ ${r.guest_count}名` : ''}</small>
-                    {r.notes && <small className="whitespace-pre-line" data-testid="reservation-notes">{r.notes}</small>}
-                    <small className="tc-kit-facts">
-                      {[r.confirmation_number_masked ? `予約番号 ${r.confirmation_number_masked}` : null,
-                        r.total_amount != null ? `${r.total_amount.toLocaleString('ja-JP')} ${r.currency ?? ''}`.trim() : null,
-                        r.payment_status ? (PAYMENT_LABEL[r.payment_status] ?? r.payment_status) : null,
-                        r.event_id ? '旅程の予定につながっている' : '旅程に未接続',
-                        dl && dl.level !== 'ok' ? dl.label : null].filter(Boolean).join(' ・ ')}
-                    </small>
-                    {why.length > 0 && <small className="tc-kit-why">{`要確認: ${why.join('・')}`}</small>}
+                    <small>{[typeLabel(r.type), r.guest_count ? `${r.guest_count}名` : null].filter(Boolean).join(' · ')}</small>
                   </span>
-                  <span className="tc-pill">{STATUS_LABEL[r.status] ?? r.status}</span>
+                  <span className="tc-kit-resrow__when">
+                    <span className="sr-only">利用日時 </span>
+                    {when ? `${when.date} ${when.time}` : formatDateTime(r.start_at)}
+                    {when && <small>{when.tzNote}</small>}
+                    {dl && dl.level !== 'ok' && <small className="tc-kit-resrow__dl">{dl.label}</small>}
+                  </span>
+                  <span className="tc-kit-resrow__amt">
+                    <span className="sr-only">金額 </span>
+                    {r.total_amount != null ? `${r.total_amount.toLocaleString('ja-JP')} ${r.currency === 'JPY' ? '円' : (r.currency ?? '')}`.trim() : '—'}
+                  </span>
+                  <span className="tc-kit-resrow__pay">
+                    <span className="tc-kit-pill" data-tone={paymentTone(r)}>{paymentText(r)}</span>
+                  </span>
+                  <span className="tc-kit-resrow__st">
+                    <span className="tc-kit-pill" data-tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</span>
+                  </span>
                 </button>
-                {/* [Gate G4] COL-03 この予約へのコメント */}
-                <button type="button" className="tc-focus-ring tc-mini-link tc-kit-comment"
-                  onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
-                >この予約へのコメント</button>
+                <div className="tc-kit-resrow__links">
+                  {r.event_id
+                    ? <span className="tc-kit-chiplink">{`旅程: ${eventLabel(r.event_id) === r.event_id ? '予定につながっています' : eventLabel(r.event_id)}`}</span>
+                    : <button type="button" className="tc-focus-ring tc-kit-chiplink" data-tone="warn" onClick={() => openDetail(r)}>旅程に関連付ける</button>}
+                  <button type="button" className="tc-focus-ring tc-mini-link tc-kit-comment"
+                    onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
+                  >この予約へのコメント</button>
+                </div>
+                {why.length > 0 && (
+                  <div className="tc-kit-resrow__why">
+                    <span className="tc-kit-why">{`要確認: ${why.join('・')}`}</span>
+                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => openDetail(r)}>
+                      {fixLabel(why)}
+                    </button>
+                  </div>
+                )}
               </div>
             </li>
             );
@@ -744,6 +785,13 @@ const ReservationsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* [Gate TripKitFix] 要確認と「料金と支払い」(支払い状況をここで入れる) */}
+                <ReservationPaymentEditor reservation={selected} planId={planId ?? ''} formatDateTime={formatDateTime}
+                  onSaved={(next) => {
+                    setSelected(next);
+                    setReservations((list) => list.map((x) => (x.id === next.id ? next : x)));
+                  }} />
+
                 {/* 予約番号・PIN(マスク表示 + reveal) */}
                 <div className="border rounded-lg p-3 bg-gray-50">
                   <div className="flex items-center justify-between mb-2">
@@ -778,11 +826,12 @@ const ReservationsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* [Gate TripKitFix] 取り込んだ長い文は畳む(部屋・食事・住所は予約の項目に無く、この文の中にある) */}
                 {selected.notes && (
-                  <div>
-                    <div className="text-ink-700 text-sm mb-1">メモ</div>
+                  <details className="tc-kit-notes" data-testid="reservation-notes">
+                    <summary>予約の詳しい内容(メモ・取り込んだ文)</summary>
                     <div className="text-sm whitespace-pre-wrap">{selected.notes}</div>
-                  </div>
+                  </details>
                 )}
 
                 {/* [Gate R3-3] 紐付いているイベント(連泊等の複数日紐付け) */}

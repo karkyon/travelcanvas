@@ -49,6 +49,16 @@ const InboundMailCard: React.FC<{ planId: string }> = ({ planId }) => {
   };
 
   if (!info) return null;
+  // [Gate TripKitFix] この環境で使えない時は、取り込み方の主役にせず「連携」の 1 行にする
+  if (!info.configured) {
+    return (
+      <div className="tc-kit-linkrow" data-testid="inbound-mail">
+        <span className="min-w-0"><b>転送で取り込む</b>
+          <small>この環境ではまだ使えません(管理者の設定が必要です)。本文の貼り付け・.eml・PDF・画像で取り込めます。</small></span>
+        <span className="tc-kit-pill">未設定</span>
+      </div>
+    );
+  }
   return (
     <Card padding="md" className="mb-4">
       <section aria-labelledby="inbound-mail-heading" data-testid="inbound-mail">

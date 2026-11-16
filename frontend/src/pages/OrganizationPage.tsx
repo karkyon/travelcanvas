@@ -24,6 +24,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { fmtDateTime, isOrgAdmin, myAckLabel, ROLE_LABEL } from '@/utils/organizations';
 import OrgBrandingPanel from './organization/OrgBrandingPanel';
 import OrgLogo from './organization/OrgLogo';
+import { orgApi } from '@/services/api/organizationsApi';
 
 /** [Gate G5] 組織の応答の ORG-01 の項目(古い応答に無くても動く) */
 function branding(org: Organization): { hasLogo: boolean; logoVersion: string | null; seatLimit: number | null } {
@@ -70,12 +71,12 @@ const OrganizationPage: React.FC = () => {
   const load = useCallback(async () => {
     if (!orgId) return;
     try {
-      const o = await api.getOrganization(orgId);
+      const o = await orgApi.getOrganization(orgId);
       setOrg(o);
-      setDists(await api.getDistributions(orgId));
+      setDists(await orgApi.getDistributions(orgId));
       if (isOrgAdmin(o.role)) {
         const [m, c, h, p] = await Promise.all([
-          api.getOrgMembers(orgId), api.getOrgApiClients(orgId), api.getOrgWebhooks(orgId), api.getPlans(),
+          orgApi.getOrgMembers(orgId), orgApi.getOrgApiClients(orgId), orgApi.getOrgWebhooks(orgId), api.getPlans(),
         ]);
         setMembers(m);
         setClients(c);
@@ -176,7 +177,7 @@ const OrganizationPage: React.FC = () => {
               </p>
               <form className="space-y-3" onSubmit={(e) => {
                 e.preventDefault();
-                run(() => api.publishDistribution(orgId, {
+                run(() => orgApi.publishDistribution(orgId, {
                   plan_id: publish.plan_id, title: publish.title || undefined, change_note: publish.change_note || undefined,
                 }), '配布しました', '配布できませんでした').then(() => setPublish({ plan_id: '', title: '', change_note: '' }));
               }}>
@@ -218,7 +219,7 @@ const OrganizationPage: React.FC = () => {
                         <>
                           <label htmlFor={`role-${m.id}`} className="sr-only">{m.username} の役割</label>
                           <select id={`role-${m.id}`} value={m.role} disabled={busy}
-                            onChange={(e) => run(() => api.changeOrgMemberRole(orgId, m.id, e.target.value as OrgRole),
+                            onChange={(e) => run(() => orgApi.changeOrgMemberRole(orgId, m.id, e.target.value as OrgRole),
                               '役割を変えました', '役割を変えられませんでした')}
                             className="px-2 py-1 border border-gray-300 rounded-sm">
                             {(['owner', 'admin', 'member'] as OrgRole[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
@@ -230,7 +231,7 @@ const OrganizationPage: React.FC = () => {
                       <button type="button" disabled={busy} aria-label={`${m.username ?? 'メンバー'} を組織から外す`}
                         onClick={() => {
                           if (!window.confirm('このメンバーを組織から外しますか?')) return;
-                          run(() => api.removeOrgMember(orgId, m.id), '外しました', '外せませんでした');
+                          run(() => orgApi.removeOrgMember(orgId, m.id), '外しました', '外せませんでした');
                         }}
                         className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}>
                         外す
@@ -241,7 +242,7 @@ const OrganizationPage: React.FC = () => {
               </ul>
               <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
                 e.preventDefault();
-                run(() => api.addOrgMember(orgId, invite), 'メンバーを足しました', 'メンバーを足せませんでした')
+                run(() => orgApi.addOrgMember(orgId, invite), 'メンバーを足しました', 'メンバーを足せませんでした')
                   .then(() => setInvite({ email: '', role: 'member' }));
               }}>
                 <div className="flex-1 min-w-[200px]">
@@ -303,21 +304,21 @@ const OrganizationPage: React.FC = () => {
                     {!c.revoked_at && (
                       <div className="flex flex-wrap gap-2">
                         <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」の秘密を切り替える`}
-                          onClick={() => run(async () => setCreatedClient(await api.rotateOrgApiClientSecret(orgId, c.id, graceHours)),
+                          onClick={() => run(async () => setCreatedClient(await orgApi.rotateOrgApiClientSecret(orgId, c.id, graceHours)),
                             null, '秘密を切り替えられませんでした')}
                           className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}>
                           秘密を切り替える
                         </button>
                         {c.previous_secret_valid_until && (
                           <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」の前の秘密をすぐ失効する`}
-                            onClick={() => run(() => api.retireOrgApiClientPrevious(orgId, c.id, true),
+                            onClick={() => run(() => orgApi.retireOrgApiClientPrevious(orgId, c.id, true),
                               '前の秘密と、発行済みのトークンを失効しました', '失効できませんでした')}
                             className={`${btn} border border-amber-400 text-amber-900 hover:bg-amber-50`}>
                             前の秘密をすぐ失効
                           </button>
                         )}
                         <button type="button" disabled={busy} aria-label={`API クライアント「${c.name}」を止める`}
-                          onClick={() => run(() => api.revokeOrgApiClient(orgId, c.id), 'API クライアントを止めました', '止められませんでした')}
+                          onClick={() => run(() => orgApi.revokeOrgApiClient(orgId, c.id), 'API クライアントを止めました', '止められませんでした')}
                           className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}>
                           止める
                         </button>
@@ -328,7 +329,7 @@ const OrganizationPage: React.FC = () => {
               </ul>
               <form className="space-y-2 mb-6" onSubmit={(e) => {
                 e.preventDefault();
-                run(async () => setCreatedClient(await api.createOrgApiClient(orgId, newClient)), null, 'API クライアントを作れませんでした')
+                run(async () => setCreatedClient(await orgApi.createOrgApiClient(orgId, newClient)), null, 'API クライアントを作れませんでした')
                   .then(() => setNewClient({ name: '', scopes: ['distributions:read'] }));
               }}>
                 <div>
@@ -382,23 +383,23 @@ const OrganizationPage: React.FC = () => {
                           <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                             aria-label={`Webhook「${h.url}」へ試しに送る`}
                             onClick={() => run(async () => {
-                              const d = await api.pingOrgWebhook(orgId, h.id);
+                              const d = await orgApi.pingOrgWebhook(orgId, h.id);
                               setNotice(d.status === 'delivered' ? `届きました(${d.last_status_code})` : `届きませんでした(${d.last_status_code ?? d.last_error})`);
-                              setDeliveries({ ...deliveries, [h.id]: await api.getOrgWebhookDeliveries(orgId, h.id) });
+                              setDeliveries({ ...deliveries, [h.id]: await orgApi.getOrgWebhookDeliveries(orgId, h.id) });
                             }, null, '送れませんでした')}>
                             試しに送る
                           </button>
                         )}
                         <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                           aria-label={`Webhook「${h.url}」の送信の記録`}
-                          onClick={() => run(async () => setDeliveries({ ...deliveries, [h.id]: await api.getOrgWebhookDeliveries(orgId, h.id) }),
+                          onClick={() => run(async () => setDeliveries({ ...deliveries, [h.id]: await orgApi.getOrgWebhookDeliveries(orgId, h.id) }),
                             null, '記録を取得できませんでした')}>
                           送信の記録
                         </button>
                         {!h.revoked_at && (
                           <button type="button" disabled={busy} className={`${btn} border border-gray-300 text-ink-900 hover:bg-gray-50`}
                             aria-label={`Webhook「${h.url}」の署名の鍵を切り替える`}
-                            onClick={() => run(async () => setCreatedHook(await api.rotateOrgWebhookSecret(orgId, h.id, graceHours)),
+                            onClick={() => run(async () => setCreatedHook(await orgApi.rotateOrgWebhookSecret(orgId, h.id, graceHours)),
                               null, '署名の鍵を切り替えられませんでした')}>
                             鍵を切り替える
                           </button>
@@ -406,7 +407,7 @@ const OrganizationPage: React.FC = () => {
                         {!h.revoked_at && h.previous_secret_valid_until && (
                           <button type="button" disabled={busy} className={`${btn} border border-amber-400 text-amber-900 hover:bg-amber-50`}
                             aria-label={`Webhook「${h.url}」の前の鍵での署名をやめる`}
-                            onClick={() => run(() => api.retireOrgWebhookPrevious(orgId, h.id), '前の鍵での署名をやめました',
+                            onClick={() => run(() => orgApi.retireOrgWebhookPrevious(orgId, h.id), '前の鍵での署名をやめました',
                               'やめられませんでした')}>
                             前の鍵をやめる
                           </button>
@@ -414,7 +415,7 @@ const OrganizationPage: React.FC = () => {
                         {!h.revoked_at && (
                           <button type="button" disabled={busy} className={`${btn} border border-red-300 text-red-800 hover:bg-red-50`}
                             aria-label={`Webhook「${h.url}」を止める`}
-                            onClick={() => run(() => api.revokeOrgWebhook(orgId, h.id), 'Webhook を止めました', '止められませんでした')}>
+                            onClick={() => run(() => orgApi.revokeOrgWebhook(orgId, h.id), 'Webhook を止めました', '止められませんでした')}>
                             止める
                           </button>
                         )}
@@ -433,8 +434,8 @@ const OrganizationPage: React.FC = () => {
                             {(d.status === 'failed' || d.status === 'dead') && !h.revoked_at && (
                               <button type="button" disabled={busy} className="text-blue-800 underline"
                                 onClick={() => run(async () => {
-                                  await api.redeliverOrgWebhook(orgId, h.id, d.id);
-                                  setDeliveries({ ...deliveries, [h.id]: await api.getOrgWebhookDeliveries(orgId, h.id) });
+                                  await orgApi.redeliverOrgWebhook(orgId, h.id, d.id);
+                                  setDeliveries({ ...deliveries, [h.id]: await orgApi.getOrgWebhookDeliveries(orgId, h.id) });
                                 }, '送り直しました', '送り直せませんでした')}>
                                 送り直す
                               </button>
@@ -448,7 +449,7 @@ const OrganizationPage: React.FC = () => {
               </ul>
               <form className="space-y-2" onSubmit={(e) => {
                 e.preventDefault();
-                run(async () => setCreatedHook(await api.createOrgWebhook(orgId, newHook)), null, 'Webhook を登録できませんでした')
+                run(async () => setCreatedHook(await orgApi.createOrgWebhook(orgId, newHook)), null, 'Webhook を登録できませんでした')
                   .then(() => setNewHook({ ...newHook, url: '' }));
               }}>
                 <div>

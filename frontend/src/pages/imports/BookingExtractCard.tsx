@@ -39,7 +39,7 @@ const BookingExtractCard: React.FC<{ planId: string; onExtracted: (job: Extracte
 
   return (
     <section className="tc-card p-4 mb-4 space-y-3" aria-labelledby="booking-extract-title" data-testid="booking-extract">
-      <h2 id="booking-extract-title" className="tc-section-title">予約メール・画像・PDF から読み取る</h2>
+      <h3 id="booking-extract-title" className="tc-section-title">予約メール・画像・PDF から読み取る</h3>
       <p className="text-sm text-ink-700">読み取った内容を確認画面に出します。直してから登録できます。元のメールや画像は保存しません。</p>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="grid gap-4 lg:grid-cols-2">

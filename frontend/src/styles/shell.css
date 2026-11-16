@@ -1432,3 +1432,252 @@
   .tc-live-map { height: 260px; }
   .tc-live-next__title { font-size: 20px; }
 }
+
+/* ===== [Gate TripKitUI] 旅行箱の 6 画面を 1 つの形に(改善モックアップ 2026-11-16「統一の決まり」) =====
+ * 見出し・ナビ(下線のタブ・アイコン・要確認の数)・要約のタイル・道具(検索・チップ・並び)・画面の中の切り替え・
+ * 一覧の行(アイコン 40px・名前・薄い説明・状態の札・›)・文字(本文 14px・説明 12.5px・見出し 15px)を揃える。 */
+.tc-kit-eyebrow { display: inline-flex; align-items: center; gap: 6px; letter-spacing: .08em; }
+.tc-kit-eyebrow svg { width: 14px; height: 14px; }
+.tc-kit-pagehead h1 { font-size: 28px; line-height: 1.25; letter-spacing: -.01em; }
+.tc-kit-nav--trip .tc-kit-head { margin: 14px 0 6px; }
+.tc-kit-nav--trip .tc-kit-bar { border-bottom: 1px solid var(--tc-cloud-200); padding-bottom: 0; align-items: flex-end; }
+.tc-kit-nav--trip .tc-kit-tabs { gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tc-kit-nav--trip .tc-kit-tab { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px; border: 0;
+  border-bottom: 2.5px solid transparent; border-radius: 0; background: none; color: var(--tc-ink-700); font-size: 13.5px; font-weight: 700;
+  text-decoration: none; white-space: nowrap; cursor: pointer; }
+.tc-kit-nav--trip .tc-kit-tab:hover { color: var(--tc-ink-900); background: var(--tc-cloud-100); }
+.tc-kit-nav--trip .tc-kit-tab[aria-current="page"] { color: var(--tc-accent-strong); border-bottom-color: var(--tc-accent); background: none; }
+.tc-kit-nav--trip .tc-kit-tabs .tc-kit-more__btn[aria-current="page"] { background: none; color: var(--tc-accent-strong); border-bottom-color: var(--tc-accent); }
+.tc-kit-nav--trip .tc-kit-search { margin-bottom: 6px; border-radius: 999px; min-height: 36px; }
+.tc-kit-cnt { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--tc-cloud-100); color: var(--tc-ink-700); font-size: 11.5px; font-weight: 800; line-height: 1; }
+.tc-kit-cnt[data-tone="warn"] { background: var(--tc-warning-soft); color: var(--tc-warning); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc-warning) 30%, transparent); }
+@media (max-width: 448px) { .tc-kit-nav--trip .tc-kit-tab { padding: 0 8px; gap: 4px; } .tc-kit-nav--trip .tc-kit-tab__icon { display: none; } }
+
+.tc-kit-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; margin: 18px 0 16px; }
+.tc-kit-tile { background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tc-kit-tile__label { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--tc-ink-500); }
+.tc-kit-tile__label svg { width: 14px; height: 14px; }
+.tc-kit-tile__value { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 800; color: var(--tc-ink-900); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.tc-kit-tile__sub { margin: 0; font-size: 12px; color: var(--tc-ink-500); overflow-wrap: anywhere; }
+.tc-kit-tile__bar { display: block; height: 6px; border-radius: 99px; background: var(--tc-cloud-100); overflow: hidden; }
+.tc-kit-tile__bar > i { display: block; height: 100%; background: var(--tc-accent); border-radius: 99px; }
+.tc-kit-tile[data-tone="warn"] { border-color: color-mix(in srgb, var(--tc-warning) 40%, var(--tc-cloud-200)); background: var(--tc-warning-soft); }
+.tc-kit-tile[data-tone="warn"] .tc-kit-tile__value { color: var(--tc-warning); }
+
+.tc-kit-seg { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: 12px; background: var(--tc-cloud-100); margin: 4px 0 16px; max-width: 100%; }
+.tc-kit-seg__tab { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--tc-ink-700); font-size: 13px; font-weight: 700; cursor: pointer; }
+.tc-kit-seg__tab svg { width: 15px; height: 15px; }
+.tc-kit-seg__tab[aria-selected="true"] { background: var(--tc-cloud-0); color: var(--tc-ink-900); box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+
+.tc-kit-section { margin-top: 20px; }
+.tc-kit-section__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 8px; }
+.tc-kit-section__head h2 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: var(--tc-ink-900); }
+.tc-kit-section__head h2 svg { width: 17px; height: 17px; }
+.tc-kit-section__head > span { font-size: 12px; color: var(--tc-ink-500); }
+
+/* 道具: 検索・並び・チップ(全画面で同じ高さ) */
+.tc-kit-page .tc-kit-searchbox input, .tc-kit-page .tc-kit-select select { min-height: 40px; border-radius: 10px; border-color: var(--tc-cloud-200); font-size: 13.5px; }
+.tc-kit-page .tc-kit-chip { min-height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+.tc-kit-page .tc-kit-chip[aria-pressed="true"] .tc-kit-cnt { background: rgba(255, 255, 255, .22); color: var(--tc-on-accent); box-shadow: none; }
+
+/* 一覧の行(予約・文書・取込・持ち物・概要) */
+.tc-kit-page .tc-kit-list { margin: 0; border: 1px solid var(--tc-cloud-200); border-radius: 14px; background: var(--tc-cloud-0); overflow: hidden; }
+.tc-kit-page .tc-kit-list > li { border-bottom: 1px solid var(--tc-cloud-100); }
+.tc-kit-page .tc-kit-list > li:last-child { border-bottom: 0; }
+.tc-kit-page .tc-kit-row { padding: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tc-kit-page .tc-kit-open { flex: 1 1 320px; min-width: 0; grid-template-columns: 40px minmax(0, 1fr) auto 16px; gap: 14px; padding: 13px 16px;
+  border: 0; background: none; border-radius: 0; }
+.tc-kit-page .tc-kit-open::after { content: "›"; color: var(--tc-ink-500); font-size: 20px; line-height: 1; }
+.tc-kit-page .tc-kit-open--plain::after { content: none; }
+.tc-kit-page .tc-kit-open b { font-size: 14.5px; }
+.tc-kit-page .tc-kit-open small { font-size: 12.5px; }
+.tc-kit-page .tc-kit-icon { width: 40px; height: 40px; border-radius: 11px; background: var(--tc-accent-soft); color: var(--tc-accent-strong); }
+.tc-kit-page .tc-kit-icon[data-tone="warn"] { background: var(--tc-warning-soft); color: var(--tc-warning); }
+.tc-kit-page .tc-kit-icon[data-tone="plain"] { background: var(--tc-cloud-100); color: var(--tc-ink-700); }
+.tc-kit-page .tc-kit-row > .tc-kit-actions { display: flex; align-items: center; gap: 2px; padding: 0 10px 0 0; }
+.tc-kit-page .tc-kit-row > .tc-kit-comment { margin: 0 0 10px 70px; }
+.tc-kit-page .tc-kit-day { margin: 0; padding: 9px 16px 6px; font-size: 12px; letter-spacing: .02em; background: var(--tc-cloud-50);
+  border: 1px solid var(--tc-cloud-200); border-bottom: 0; border-radius: 14px 14px 0 0; }
+.tc-kit-page .tc-kit-day + .tc-kit-list { border-radius: 0 0 14px 14px; }
+.tc-kit-page .tc-kit-clamp { display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal !important; }
+.tc-kit-page .tc-kit-card { padding: 0; border: 0; background: none; box-shadow: none; }
+
+.tc-kit-pill { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  white-space: nowrap; background: var(--tc-cloud-100); color: var(--tc-ink-700); }
+.tc-kit-pill[data-tone="ok"] { background: var(--tc-success-soft); color: var(--tc-success); }
+.tc-kit-pill[data-tone="warn"] { background: var(--tc-warning-soft); color: var(--tc-warning); }
+.tc-kit-pill[data-tone="info"] { background: var(--tc-info-soft); color: var(--tc-info); }
+.tc-kit-pill[data-tone="danger"] { background: var(--tc-danger-soft); color: var(--tc-danger); }
+
+/* 持ち物の行: 準備済みの印(押すと切り替え)・名前・担当・札・数・状態・操作 */
+.tc-kit-check { width: 24px; height: 24px; border-radius: 7px; border: 1.6px solid var(--tc-ink-500); background: var(--tc-cloud-0);
+  display: grid; place-items: center; color: var(--tc-on-accent); cursor: pointer; flex: none; padding: 0; }
+.tc-kit-check[aria-pressed="true"] { background: var(--tc-accent); border-color: var(--tc-accent); }
+.tc-kit-check:disabled { opacity: .5; cursor: not-allowed; }
+.tc-kit-pack { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.tc-kit-pack.is-done .tc-kit-pack__name { color: var(--tc-ink-500); text-decoration: line-through; }
+.tc-kit-pack__name { font-size: 14.5px; font-weight: 700; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-kit-pack__meta { display: block; font-size: 12.5px; color: var(--tc-ink-500); }
+.tc-kit-pack__tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.tc-kit-pack__tools select { min-height: 34px; border: 1px solid var(--tc-cloud-200); border-radius: 8px; padding: 0 8px; font-size: 12.5px; background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-kit-iconbtn { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 9px; background: none; color: var(--tc-ink-700); cursor: pointer; }
+.tc-kit-iconbtn:hover { background: var(--tc-cloud-100); color: var(--tc-ink-900); }
+.tc-kit-iconbtn--danger:hover { color: var(--tc-danger); }
+@media (max-width: 560px) { .tc-kit-pack { grid-template-columns: 24px minmax(0, 1fr); } .tc-kit-pack__tools { grid-column: 2; justify-content: flex-start; } }
+
+/* 枠(候補・取り込み方・費用の表)も同じカード */
+.tc-kit-box { background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; padding: 16px; }
+.tc-kit-box > h3 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-box p { font-size: 13px; }
+.tc-kit-page table { font-size: 13.5px; }
+.tc-kit-page .tc-kit-tablebox { background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; overflow-x: auto; }
+
+.tc-kit-page .tc-kit-home { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.tc-kit-page .tc-kit-home > .tc-kit-col > .tc-kit-section:first-child { margin-top: 0; }
+@media (max-width: 900px) { .tc-kit-page .tc-kit-home { grid-template-columns: minmax(0, 1fr); } }
+.tc-kit-page .tc-kit-areas2 .tc-kit-state { margin: 0 16px 12px 70px; }
+.tc-kit-page .tc-kit-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.tc-kit-page .tc-kit-quick .tc-mbtn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+/* 準備状況・タスクの一覧(中の Card は枠を消して同じ行の形に) */
+.tc-kit-page .tc-kit-cardlist > li > div { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: none !important; }
+.tc-kit-page [data-testid="readiness-summary"] { border-radius: 14px; }
+.tc-kit-currency { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-kit-currency select { min-height: 40px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+/* 取り込み方: 3つの入口を同じ大きさで並べる */
+.tc-kit-ways { display: grid; gap: 12px; }
+.tc-kit-ways > * { margin: 0 !important; }
+@media (min-width: 1024px) { .tc-kit-ways { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tc-kit-ways > :last-child { grid-column: 1 / -1; } }
+.tc-kit-page .tc-kit-docrow > div { padding: 12px 14px !important; }
+/* [Gate HomeRoute] 地図: 線の色の凡例・地図の外の自宅の札(左下。上の帯・右の旅程チェックと重ねない) */
+.tc-map-endlegend { position: absolute; left: 10px; bottom: 46px; z-index: 600; display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: calc(100% - 20px);
+  padding: 5px 10px; border-radius: 10px; background: color-mix(in srgb, var(--tc-cloud-0) 94%, transparent); color: var(--tc-ink-900);
+  font-size: 11.5px; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.18); pointer-events: none; }
+.tc-map-endlegend span { display: inline-flex; align-items: center; gap: 5px; }
+.tc-map-endlegend i { width: 16px; height: 4px; border-radius: 2px; display: inline-block; }
+.tc-map-endchip { position: absolute; left: 10px; bottom: 80px; z-index: 600; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 20px);
+  padding: 4px 4px 4px 10px; border-radius: 999px; background: var(--tc-cloud-0); color: var(--tc-ink-900); font-size: 12px; font-weight: 600;
+  box-shadow: 0 1px 5px rgba(0,0,0,.22); }
+.tc-map-endchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-map-endchip button { flex: none; min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: #1d4ed8; color: #fff; font-weight: 700; cursor: pointer; }
+/* [Gate HomePlace] 自宅の場所の設定 */
+.tc-home-form { display: grid; gap: 12px; }
+.tc-home-field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--tc-ink-900); }
+.tc-home-field input { min-height: 40px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; background: var(--tc-cloud-0); color: var(--tc-ink-900); font-weight: 400; }
+.tc-home-row { display: flex; gap: 8px; }
+.tc-home-row input { flex: 1; min-width: 0; }
+.tc-home-cand { display: flex; width: 100%; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 0; background: none; text-align: left; color: var(--tc-ink-900); cursor: pointer; }
+.tc-home-cand[aria-pressed="true"] { background: var(--tc-accent-soft); font-weight: 700; }
+.tc-home-map { border-radius: 12px; overflow: hidden; }
+.tc-home-opts { display: grid; gap: 8px; border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; color: var(--tc-ink-900); }
+.tc-home-opts legend { padding: 0 4px; font-weight: 700; }
+.tc-home-opts label { display: flex; gap: 8px; align-items: flex-start; }
+.tc-home-opts input { margin-top: 3px; width: 16px; height: 16px; flex: none; }
+.tc-home-opts .is-off { color: var(--tc-ink-500); }
+.tc-home-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* 狭い画面: まとめの札は2列にして、すぐ一覧が見えるようにする */
+@media (max-width: 560px) {
+  .tc-kit-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+  .tc-kit-tiles .tc-kit-tile { padding: 10px 12px; min-width: 0; }
+  .tc-kit-tiles .tc-kit-tile__value { font-size: 18px; overflow-wrap: anywhere; }
+}
+
+/* ==========================================================================
+   [Gate TripKitFix] 旅行箱の補正(状態の意味・画面のつながり)。改修モックアップ 2026-11-16 の補正版。
+   どれも .tc-kit-page の中だけに効かせる(運用コンソールなど、ほかの画面と共有するクラスは使わない)。
+   ========================================================================== */
+.tc-kit-page .tc-kit-tile[data-tone="muted"] .tc-kit-tile__value { color: var(--tc-ink-500); font-size: 18px; }
+.tc-kit-page .tc-kit-tile__act { align-self: flex-start; margin-top: 2px; padding: 2px 0; border: 0; background: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 700; color: var(--tc-accent-strong); }
+.tc-kit-page .tc-kit-tile__act:hover { text-decoration: underline; }
+.tc-kit-page .tc-kit-box[data-tone="warn"] { border-color: color-mix(in srgb, var(--tc-warning) 40%, var(--tc-cloud-200)); background: var(--tc-warning-soft); }
+.tc-kit-page .tc-kit-box[data-tone="ok"] { background: var(--tc-success-soft); border-color: color-mix(in srgb, var(--tc-success) 30%, var(--tc-cloud-200)); }
+/* 出発前チェックの行 */
+.tc-kit-page .tc-kit-checks { list-style: none; margin: 0; padding: 0; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; overflow: hidden; }
+.tc-kit-page .tc-kit-checkrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 13px 16px;
+  border-top: 1px solid var(--tc-cloud-100); font-size: 13.5px; }
+.tc-kit-page .tc-kit-checkrow:first-child { border-top: 0; }
+/* 0 件・未作成の案内 */
+.tc-kit-page .tc-kit-blank { display: grid; justify-items: center; gap: 8px; padding: 28px 16px; text-align: center; font-size: 13px; color: var(--tc-ink-500);
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; }
+.tc-kit-page .tc-kit-blank b { font-size: 15px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-blank__acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* 「予約を追加」 */
+.tc-kit-addmenu { position: relative; }
+.tc-kit-addmenu__pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(300px, calc(100vw - 32px)); padding: 6px;
+  background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 23, 42, .14); }
+.tc-kit-addmenu__item { width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 52px;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; color: var(--tc-ink-900); }
+.tc-kit-addmenu__item:hover, .tc-kit-addmenu__item:focus-visible { background: var(--tc-cloud-100); }
+.tc-kit-addmenu__item b { display: block; font-size: 13.5px; }
+.tc-kit-addmenu__item small { display: block; font-size: 12px; color: var(--tc-ink-500); }
+.tc-kit-addmenu__item .tc-kit-icon { width: 36px; height: 36px; }
+/* 予約の一覧: 列に分ける */
+.tc-kit-page .tc-kit-reshead { display: grid; grid-template-columns: 40px minmax(0, 2.2fr) 150px 120px 130px 110px 16px; gap: 14px;
+  padding: 10px 16px; font-size: 12px; font-weight: 800; color: var(--tc-ink-500); background: var(--tc-cloud-50, #f8fafc); border-radius: 14px 14px 0 0; }
+.tc-kit-page .tc-kit-resrow { border-top: 1px solid var(--tc-cloud-100); }
+.tc-kit-page .tc-kit-resrow .tc-kit-resrow__open { flex: 1 1 100%; grid-template-columns: 40px minmax(0, 2.2fr) 150px 120px 130px 110px 16px; }
+.tc-kit-page .tc-kit-resrow__when, .tc-kit-page .tc-kit-resrow__amt { font-size: 13px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-resrow__amt { font-weight: 800; }
+.tc-kit-page .tc-kit-resrow__dl { color: var(--tc-warning) !important; font-weight: 700; }
+.tc-kit-page .tc-kit-resrow__links { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 0 16px 10px 70px; }
+.tc-kit-page .tc-kit-resrow__links .tc-kit-comment { margin: 0; }
+.tc-kit-page .tc-kit-resrow__why { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 0 16px 12px 70px; font-size: 12.5px; }
+.tc-kit-page .tc-kit-chiplink { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 0 9px; border-radius: 7px;
+  border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); font-size: 12px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-kit-page button.tc-kit-chiplink { cursor: pointer; }
+.tc-kit-page .tc-kit-chiplink[data-tone="warn"] { border-color: color-mix(in srgb, var(--tc-warning) 45%, var(--tc-cloud-200)); color: var(--tc-warning); }
+/* 予約の詳細 */
+.tc-kit-detailgrp { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 12px 14px; }
+.tc-kit-detailgrp[data-tone="warn"] { background: var(--tc-warning-soft); border-color: color-mix(in srgb, var(--tc-warning) 40%, var(--tc-cloud-200)); }
+.tc-kit-detailgrp > h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--tc-ink-700); }
+.tc-kit-dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13px; }
+.tc-kit-dl dt { color: var(--tc-ink-500); font-weight: 700; }
+.tc-kit-dl dd { margin: 0; }
+.tc-kit-payedit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.tc-kit-payedit__sel { min-height: 36px; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 0 10px; background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-kit-notes { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 14px; }
+.tc-kit-notes > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--tc-ink-700); }
+.tc-kit-notes[open] > summary { margin-bottom: 8px; }
+/* 取込: 手順・連携の 1 行 */
+.tc-kit-page .tc-kit-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 0; margin: 4px 0 16px; padding: 0; }
+.tc-kit-page .tc-kit-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 0; font-size: 13px; font-weight: 700; color: var(--tc-ink-500); }
+.tc-kit-page .tc-kit-steps li + li::before { content: ""; width: 24px; height: 1.5px; background: var(--tc-cloud-200); margin-right: 6px; }
+.tc-kit-page .tc-kit-steps i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px;
+  background: var(--tc-cloud-100); color: var(--tc-ink-700); }
+.tc-kit-page .tc-kit-steps li[data-state="current"] { color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-steps li[data-state="current"] i, .tc-kit-page .tc-kit-steps li[data-state="done"] i { background: var(--tc-accent); color: #fff; }
+.tc-kit-page .tc-kit-links { display: grid; background: var(--tc-cloud-0); border: 1px solid var(--tc-cloud-200); border-radius: 14px; overflow: hidden; }
+.tc-kit-page .tc-kit-links > * + * { border-top: 1px solid var(--tc-cloud-100); }
+.tc-kit-page .tc-kit-links > .tc-card, .tc-kit-page .tc-kit-links > div > .tc-card { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.tc-kit-page .tc-kit-linkrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.tc-kit-page .tc-kit-linkrow b { display: block; font-size: 13.5px; color: var(--tc-ink-900); }
+.tc-kit-page .tc-kit-linkrow small { display: block; font-size: 12.5px; color: var(--tc-ink-500); }
+/* 文書の関連 */
+.tc-kit-page .tc-kit-doclinks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tc-kit-fieldset { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 8px 12px 10px; margin: 0; }
+.tc-kit-fieldset > legend { padding: 0 4px; font-size: 12.5px; font-weight: 800; color: var(--tc-ink-700); }
+.tc-kit-picklist { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
+.tc-kit-pick { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; min-height: 44px; padding: 8px 6px; border-radius: 8px; cursor: pointer; }
+.tc-kit-pick:hover { background: var(--tc-cloud-100); }
+.tc-kit-pick input { margin-top: 3px; }
+.tc-kit-pick b { display: block; font-size: 13.5px; color: var(--tc-ink-900); overflow-wrap: anywhere; }
+.tc-kit-pick small { display: block; font-size: 12px; color: var(--tc-ink-500); }
+.tc-kit-seg-mini { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.tc-kit-chipbtn { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0);
+  font-size: 12.5px; font-weight: 700; color: var(--tc-ink-700); cursor: pointer; }
+.tc-kit-chipbtn[aria-pressed="true"] { background: var(--tc-accent); border-color: var(--tc-accent); color: #fff; }
+/* 狭い画面: 予約の行は「名前」→「日時」→「金額・支払い・状態」の3段 */
+@media (max-width: 860px) {
+  .tc-kit-page .tc-kit-reshead { display: none; }
+  .tc-kit-page .tc-kit-resrow .tc-kit-resrow__open { grid-template-columns: 40px auto auto minmax(0, 1fr) 16px; row-gap: 6px; }
+  .tc-kit-page .tc-kit-resrow__open > .tc-kit-icon { grid-row: 1 / span 3; align-self: start; }
+  .tc-kit-page .tc-kit-resrow__name, .tc-kit-page .tc-kit-resrow__when { grid-column: 2 / 5; }
+  .tc-kit-page .tc-kit-resrow__open::after { grid-column: 5; grid-row: 1; }
+  .tc-kit-page .tc-kit-resrow__amt { grid-column: 2; }
+  .tc-kit-page .tc-kit-resrow__pay { grid-column: 3; }
+  .tc-kit-page .tc-kit-resrow__st { grid-column: 4; justify-self: start; }
+  .tc-kit-page .tc-kit-resrow__links, .tc-kit-page .tc-kit-resrow__why { padding-left: 16px; }
+}

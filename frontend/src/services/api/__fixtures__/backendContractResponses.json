@@ -181,7 +181,9 @@
    "revision": 1,
    "sha256": "558ead6edfbc19b53053ff808b99c2feb41a2bb5c6c66c9051818e9b0aa4d279",
    "size": 27,
-   "updated_at": null
+   "updated_at": null,
+   "link_count": 0,
+   "receipt_count": 0
   }
  ],
  "event_created": {
@@ -4308,7 +4310,8 @@
     "amount": "1749"
    }
   ],
-  "is_settled": false
+  "is_settled": false,
+  "settlement_state": "open"
  },
  "settlement_created": {
   "id": "164e55b7-27c0-4fae-aeb6-d92010c3e18b",
@@ -4440,7 +4443,8 @@
     "amount": "1749"
    }
   ],
-  "is_settled": false
+  "is_settled": false,
+  "settlement_state": "open"
  },
  "budget_list_other": [
   {
@@ -4522,7 +4526,8 @@
    }
   ],
   "transfers": [],
-  "is_settled": true
+  "is_settled": true,
+  "settlement_state": "none"
  },
  "poll_created": {
   "id": "04c5e581-cc7b-4023-b6b7-5aef2d79bbd9",

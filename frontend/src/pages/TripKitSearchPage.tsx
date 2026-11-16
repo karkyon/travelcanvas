@@ -11,10 +11,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import PageHead from '@/components/shell/PageHead';
+import { KitHead } from '@/components/shell/KitParts';
 import TripKitNav from '@/components/shell/TripKitNav';
 import { KitActiveConditions, KitChips } from '@/components/shell/TripKitNav';
-import { useQueryState } from '@/components/shell/tripKitModel';
+import { MEMORY_ONLY_Q, useQueryState } from '@/components/shell/tripKitModel';
 import { searchPlan } from '@/services/api';
 import type { SearchFilter, SearchResults } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
@@ -30,7 +30,7 @@ type State = { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok'; data: Search
 const TripKitSearchPage: React.FC = () => {
   const { planId = '' } = useParams<{ planId: string }>();
   const navigate = useNavigate();
-  const [cond, setCond] = useQueryState({ q: '', f: '', cat: '' });
+  const [cond, setCond] = useQueryState({ q: '', f: '', cat: '' }, MEMORY_ONLY_Q);
   const [draft, setDraft] = useState(cond.q);
   const [st, setSt] = useState<State>({ kind: 'idle' });
   const [tick, setTick] = useState(0);
@@ -67,8 +67,8 @@ const TripKitSearchPage: React.FC = () => {
   ];
 
   return (
-    <div className="tc-page" data-testid="tripkit-search">
-      <PageHead eyebrow="TRIP KIT · 旅行箱" title="旅行箱を検索"
+    <div className="tc-page tc-kit-page" data-testid="tripkit-search">
+      <KitHead icon={<Search size={14} />} title="旅行箱を検索"
         sub="この旅行の予定・場所・予約・チケット・文書・費用などを、あなたが見られる範囲だけ探します。予約番号は末尾の一致だけで探せます。" />
       <TripKitNav planId={planId} />
 

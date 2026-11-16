@@ -44,6 +44,16 @@ const GmailCard: React.FC<{ planId: string; onImported?: () => void }> = ({ plan
   };
 
   if (!st) return null;
+  // [Gate TripKitFix] この環境で使えない時は「連携」の 1 行にする
+  if (!st.available) {
+    return (
+      <div className="tc-kit-linkrow" data-testid="gmail-card">
+        <span className="min-w-0"><b>Gmail と連携</b>
+          <small>この環境では Gmail の連携が使えません(管理者が Google の設定を登録すると使えます)。</small></span>
+        <span className="tc-kit-pill">未設定</span>
+      </div>
+    );
+  }
   return (
     <Card className="mt-4 p-4" data-testid="gmail-card">
       <h2 className="text-lg font-semibold text-ink-900">Gmail から取り込む</h2>
