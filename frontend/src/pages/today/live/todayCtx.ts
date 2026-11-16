@@ -13,9 +13,9 @@ import type { SkyState } from './useTodayLive';
 /** 開く画面(URL の ?v= に入れる。戻るボタンで閉じられる) */
 export type TodayScreen =
   | 'go' | 'place' | 'map' | 'tabicho' | 'timeline' | 'ticket' | 'memo' | 'stamp' | 'detour' | 'rain' | 'delay'
-  | 'crew' | 'help' | 'checkin' | 'home' | 'prepare' | 'photoqr' | 'settings' | 'transit';
+  | 'crew' | 'help' | 'checkin' | 'home' | 'prepare' | 'photoqr' | 'settings' | 'transit' | 'source';
 export const TODAY_SCREENS: TodayScreen[] = ['go', 'place', 'map', 'tabicho', 'timeline', 'ticket', 'memo', 'stamp',
-  'detour', 'rain', 'delay', 'crew', 'help', 'checkin', 'home', 'prepare', 'photoqr', 'settings', 'transit'];
+  'detour', 'rain', 'delay', 'crew', 'help', 'checkin', 'home', 'prepare', 'photoqr', 'settings', 'transit', 'source'];
 /** 下の「当日の画面」の切り替え(今日・地図・旅帖・旅程) */
 export const TAB_SCREENS: TodayScreen[] = ['map', 'tabicho', 'timeline'];
 

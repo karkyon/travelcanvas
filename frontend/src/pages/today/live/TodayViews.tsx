@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, CloudRain, Pause, Play, Sunrise, WifiOff } from 'lucide-react';
+import { CalendarDays, CloudRain, Pause, Play, Sunrise } from 'lucide-react';
 import { getPackingItems } from '@/services/api';
 import { getWeather, type Forecast } from '@/services/api/dayVariants';
 import { keepForNextTrip, type GuideUpcoming, type TodayGuide } from '@/services/api/travelDay';
@@ -13,8 +13,9 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { formatTimeInZone } from '../todayModel';
 import { dateLabel, rainWindow, recapTitle, sealGlyph, walkedKm } from './todayLive';
 import { Seal } from './LivePieces';
-import { MapCard, NowCard } from './TodayDash';
-import { ticketCount, travelShort } from './todayHelpers';
+import { MapCard } from './TodayDash';
+import { DecisionCard } from './TodayTop';
+import { ticketCount } from './todayHelpers';
 import { TeaserArt } from './LiveCards';
 import { useTeaserImage } from './useTeaserImage';
 import type { TodayCtx } from './todayCtx';
@@ -112,46 +113,32 @@ export const LoadFailedView: React.FC<{ planId: string; error: string; onRetry: 
 
 // ---- 通信できない --------------------------------------------------------------------------------------------------
 
-export const OfflineBar: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => (
-  <div className="tl-offbar" role="status">
-    <WifiOff size={18} aria-hidden="true" />
-    <span><b>{typeof navigator !== 'undefined' && navigator.onLine === false ? '通信できません' : '最新の情報を取得できません'}</b>
-      {` ${ctx.fetchedAt ? hm(new Date(ctx.fetchedAt).toISOString(), ctx.timeZone) : ''} に保存した情報を表示中`}</span>
-  </div>
-);
-
 export const OfflineView: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
-  const { go, nextEv, timeZone } = ctx;
-  const saved = ctx.fetchedAt ? hm(new Date(ctx.fetchedAt).toISOString(), timeZone) : '';
-  const uses: [string, () => void][] = [['今日の予定', () => ctx.open('timeline')], ['チケットのQR', () => ctx.open('ticket')],
-    ['宿の住所・電話', () => ctx.open('checkin')], ['旅帖の印・ひとこと', () => ctx.open('tabicho')]];
+  const saved = ctx.fetchedAt ? hm(new Date(ctx.fetchedAt).toISOString(), ctx.timeZone) : '';
+  const uses: [string, () => void][] = [['今日の予定と出発の合図', () => ctx.open('timeline')], ['チケットのQR(保存した物)', () => ctx.open('ticket')],
+    ['宿の住所・電話・入口メモ', () => ctx.open('checkin')], ['旅帖の印・ひとこと', () => ctx.open('tabicho')]];
   return (
     <div className="tl-offline" data-testid="today-offline">
-      {nextEv ? (
-        <section className="tl-card tl-go" data-stage={go?.stage ?? 'none'} aria-labelledby="tl-off-go" data-testid="today-next">
-          <p className="tl-lbl tl-lbl--coral" id="tl-off-go">出発の合図 ・ 端末で計算中</p>
-          <p className="tl-go__head">{go ? `${hm(go.leaveBy, timeZone)} に出発（${go.minutesToLeave > 0 ? `あと${go.minutesToLeave}分` : go.stage === 'now' ? '今' : `${-go.minutesToLeave}分過ぎ`}）`
-            : `${hm(nextEv.start_at, timeZone)} ${nextEv.title}`}</p>
-          <p className="tl-go__sub">{`${nextEv.title} ${hm(nextEv.start_at, timeZone)}着${travelShort(ctx, nextEv) ? ` ・ ${travelShort(ctx, nextEv)}` : ''}`}</p>
-          <p className="tl-go__note">{`遅延の情報は ${saved} 時点のものです`}</p>
-        </section>
-      ) : <p className="tl-card tl-small">本日、これ以降の予定はありません</p>}
-      <NowCard ctx={ctx} />
-      <div className="tl-offline__map"><p className="tl-lbl">保存した範囲の地図</p><MapCard ctx={ctx} /></div>
+      <DecisionCard ctx={ctx} />
+      <p className="tl-small tl-c-warn">{`遅延・休業の知らせは ${saved} 時点のものです`}</p>
+      <section className="tl-card" aria-labelledby="tl-off-q">
+        <div className="tl-row">
+          <h2 id="tl-off-q" className="tl-lbl">送る順番待ち</h2>
+          <button type="button" className="tc-focus-ring tl-link" onClick={() => ctx.open('memo', ctx.nowEv?.id ?? ctx.nextEv?.id ?? null)}>見る</button>
+        </div>
+        <p className="tl-small">{ctx.pendingCount > 0
+          ? `旅程の変更・写真・ひとこと ${ctx.pendingCount}件が送信待ち。つながったら自動で送ります（同じ物は二度送りません）`
+          : '送信待ちはありません'}</p>
+      </section>
       <section className="tl-card" aria-labelledby="tl-off-can">
         <h2 id="tl-off-can" className="tl-lbl">通信なしで使えるもの</h2>
         <ul className="tl-offline__list">
           {uses.map(([label, fn]) => <li key={label}><button type="button" className="tc-focus-ring tl-btn" onClick={fn}>{label}</button></li>)}
         </ul>
-        <p className="tl-small tl-mute">
-          {`旅程の変更・写真・ひとことは端末に置き、つながった時に送ります（${ctx.pendingCount}件 待ち）。`}
-        </p>
+        <h2 className="tl-lbl tl-mute">今は使えないもの</h2>
+        <p className="tl-small">最新の天気・寄り道の候補・プランBへの切り替え・同行者の到着予定の更新</p>
       </section>
-      <section className="tl-card tl-card--flat" aria-labelledby="tl-off-cannot">
-        <h2 id="tl-off-cannot" className="tl-lbl">今は使えないもの</h2>
-        <p className="tl-small">寄り道の候補・最新の天気・プランBへの切り替え</p>
-      </section>
-      <button type="button" className="tc-focus-ring tl-btn tl-btn--pri tl-btn--block" onClick={ctx.refresh}>もう一度つなぐ</button>
+      <div className="tl-offline__map"><p className="tl-lbl">保存した範囲の地図（地図の絵は通信が戻ってから）</p><MapCard ctx={ctx} /></div>
     </div>
   );
 };

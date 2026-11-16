@@ -4,7 +4,7 @@
 import React from 'react';
 import type { TodayCtx, TodayScreen } from './todayCtx';
 import type { useCrew } from './todayHelpers';
-import { CheckinScreen, GoNowScreen, HomeRouteScreen, PlaceScreen, TransitScreen } from './ScreensMove';
+import { CheckinScreen, GoNowScreen, HomeRouteScreen, PlaceScreen, SourceScreen, TransitScreen } from './ScreensMove';
 import { MapScreen, MemoScreen, StampScreen, TabichoScreen, TimelineScreen } from './ScreensBook';
 import {
   CrewScreen, DelayScreen, DetourScreen, HelpScreen, PhotoQrScreen, PrepareScreen, RainScreen, SettingsScreen, TicketScreen,
@@ -33,6 +33,7 @@ const TodayScreens: React.FC<{
     case 'crew': return <CrewScreen ctx={ctx} crew={crew} />;
     case 'help': return <HelpScreen ctx={ctx} />;
     case 'settings': return <SettingsScreen ctx={ctx} />;
+    case 'source': return <SourceScreen ctx={ctx} />;
     default: return null;
   }
 };

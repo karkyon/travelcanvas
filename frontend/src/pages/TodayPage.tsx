@@ -54,10 +54,11 @@ import {
 } from './today/live/todayLive';
 import type { DetourCandidate } from '@/services/api/travelDay';
 import { LiveNotices } from './today/live/LivePanels';
-import { CrewCard, DetourCard, GoCard, HelpCard, MapCard, NowCard, RainCard, SkyCard, TabichoCard, TeaserCard, TodayBand, TodayDock, TodayHero, TodayToolbar } from './today/live/TodayDash';
+import { CrewCard, DetourCard, MapCard, SkyCard, TabichoCard, TeaserCard } from './today/live/TodayDash';
+import { ChangeAlerts, DecisionCard, FlowCard, LiveBand, OfflineAlert, TodayDock, TodayTitleRow } from './today/live/TodayTop';
 import { shareMyEta, useCrew } from './today/live/todayHelpers';
 import {
-  BeforeTripView, FinishView, FreeDayView, LoadFailedView, LoadingView, MorningView, NightView, OfflineBar, OfflineView, SimpleView,
+  BeforeTripView, FinishView, FreeDayView, LoadFailedView, LoadingView, MorningView, NightView, OfflineView, SimpleView,
 } from './today/live/TodayViews';
 import { TAB_SCREENS, TODAY_SCREENS, type TodayCtx, type TodayScreen } from './today/live/todayCtx';
 import { localToday, tripDayHeading } from './today/tripDayModel';
@@ -252,6 +253,8 @@ const TodayPage: React.FC = () => {
   }, [planId, dateKey, settings.location.trail, settings.location.arrive]);
 
   const stampsMemo = useMemo(() => guide?.stamps ?? {}, [guide]);
+  // [Gate TDay-Live2] 地図で選んだ場所(null=次の予定・NOW を選ぶ / ''=閉じた)。タブレット・PC は地図の上に重ねる
+  const [spot, setSpot] = useState<string | null>(null);
 
   if (!planId) {
     return (
@@ -362,6 +365,7 @@ const TodayPage: React.FC = () => {
   let main: React.ReactNode = null;
   // [Gate TDay-Mock] 自分の見出し(h1)を持たない表示(読み込み中・取得できない・旅の前・日程が無い)は、読み上げ用に「今日」を置く
   let ownHeading = false;
+  let dash = false;
   if (isLoading) main = <LoadingView />;
   else if (error && !data) main = <LoadFailedView planId={planId} error={error} onRetry={() => { setIsLoading(true); void load(); }} />;
   else if (!data || !view || !ctx) main = null;
@@ -407,31 +411,20 @@ const TodayPage: React.FC = () => {
   else if (phase === 'night' && g && !readDayFlag(flagKey('night'))) { main = <NightView ctx={ctx} onToday={() => dropFlag('night')} />; ownHeading = true; }
   else {
     ownHeading = true;
+    dash = true;
+    const selected = spot === '' ? null : (spot && allToday.some((e) => e.id === spot) ? spot : (nextEv?.id ?? nowEv?.id ?? null));
     main = (
-      <>
-        <TodayHero ctx={ctx} showZoneNote={showZoneNote} />
-        <div className="tl-grid">
-          <div className="tl-col tl-col--a">
-            {nextEv ? <GoCard ctx={ctx} onShareEta={() => void shareEta()} />
-              : <section className="tl-card tl-ord-go" data-testid="today-next-none"><p className="tl-small">本日、これ以降の予定はありません</p></section>}
-            <NowCard ctx={ctx} />
-            <CrewCard ctx={ctx} crew={crew} />
-          </div>
-          <div className="tl-col tl-col--b">
-            <TeaserCard ctx={ctx} />
-            <span className="tl-pc-block"><SkyCard ctx={ctx} /></span>
-            <RainCard ctx={ctx} />
-          </div>
-          <div className="tl-col tl-col--c">
-            <MapCard ctx={ctx} />
-            <DetourCard ctx={ctx} />
-          </div>
-          <div className="tl-col tl-col--d">
-            <TabichoCard ctx={ctx} />
-            <HelpCard ctx={ctx} />
-          </div>
-        </div>
-      </>
+      <div className="tl-live" data-testid="today-live">
+        <div className="tl-slot tl-slot--decide"><DecisionCard ctx={ctx} /></div>
+        <div className="tl-slot tl-slot--alerts"><ChangeAlerts ctx={ctx} /></div>
+        <div className="tl-slot tl-slot--teaser"><TeaserCard ctx={ctx} /></div>
+        <div className="tl-slot tl-slot--map"><MapCard ctx={ctx} selectedId={selected} onSelect={setSpot} onClear={() => setSpot('')} /></div>
+        <div className="tl-slot tl-slot--flow tl-not-sp"><FlowCard ctx={ctx} selectedId={selected} onSelect={setSpot} /></div>
+        <div className="tl-slot tl-slot--tabicho"><TabichoCard ctx={ctx} /></div>
+        <div className="tl-slot tl-slot--detour"><DetourCard ctx={ctx} /></div>
+        <div className="tl-slot tl-slot--crew"><CrewCard ctx={ctx} crew={crew} onShareEta={() => void shareEta()} /></div>
+        <div className="tl-slot tl-slot--sky tl-lt1024"><SkyCard ctx={ctx} /></div>
+      </div>
     );
   }
 
@@ -443,9 +436,9 @@ const TodayPage: React.FC = () => {
           <h1 className="tl-title tl-title--lg tl-page__h1">{heading.title}</h1>
         </div>
       )}
-      {ctx && view?.isCurrentDay && (nowEv || nextEv) && <TodayBand ctx={ctx} />}
-      {ctx && <TodayToolbar ctx={ctx} syncedAt={syncedAt} />}
-      {ctx && isStale && <OfflineBar ctx={ctx} />}
+      {ctx && view?.isCurrentDay && <LiveBand ctx={ctx} syncedAt={syncedAt} deviceNowMs={clock} />}
+      {ctx && <TodayTitleRow ctx={ctx} showZoneNote={showZoneNote} live={dash} />}
+      {ctx && isStale && <OfflineAlert ctx={ctx} deviceNowMs={clock} />}
       {error && data && <div role="alert" className="tl-card tl-card--warn tl-small">{error}</div>}
       <LiveNotices items={shownNotices} onDismiss={dismiss} />
       {main}
