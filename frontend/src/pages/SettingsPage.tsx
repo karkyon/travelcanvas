@@ -761,8 +761,8 @@ const SettingsPage: React.FC = () => {
   const renderActiveTab = tabs.find(tab => tab.id === activeTab)?.render || ProfileTab;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="min-w-0">
+      <div className="tc-page">
         {/* ヘッダー */}
         <div className="mb-8">
           <button
@@ -771,7 +771,7 @@ const SettingsPage: React.FC = () => {
           >
             ← ダッシュボードに戻る
           </button>
-          <h1 className="text-3xl font-bold text-ink-900 mb-4">
+          <h1 className="tc-page-title mb-4" data-eyebrow="SETTINGS · 設定">
             <UiIcon icon={IcSettings} size={28} className="mr-2 align-[-4px]" />設定
           </h1>
           <p className="text-ink-700">

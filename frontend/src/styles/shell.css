@@ -66,6 +66,16 @@
 .tc-page-head h1 { margin: 3px 0 0; font-size: 27px; letter-spacing: -.045em; line-height: 1.2; font-weight: 800; color: var(--tc-ink-900); }
 .tc-eyebrow { color: var(--tc-accent-strong); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 800; }
 .tc-subhead { margin: 7px 0 0; color: var(--tc-ink-500); font-size: 13px; }
+/* [Gate PageAlign] 以前の作りの画面(中央寄せの狭い箱・24〜30px の太字)も、ホーム・旅行などと同じ左端と見出しにそろえる。
+   幅を狭くしたい画面は --md・--lg で右だけを詰める(左端は .tc-page と同じ位置) */
+.tc-page.tc-page--md, .tc-page.tc-page--lg { width: auto; margin-left: max(0px, calc((100% - 1660px) / 2)); margin-right: 0; }
+.tc-page.tc-page--md { max-width: 960px; }
+.tc-page.tc-page--lg { max-width: 1240px; }
+.tc-page-title { font-size: 27px; letter-spacing: -.045em; line-height: 1.2; font-weight: 800; color: var(--tc-ink-900); flex-wrap: wrap; }
+.tc-page-title[data-eyebrow]::before {
+  content: attr(data-eyebrow); content: attr(data-eyebrow) / ""; display: block; flex: 0 0 100%; margin: 0 0 3px;
+  color: var(--tc-accent-strong); font-size: 11px; line-height: 1.5; letter-spacing: .12em; text-transform: uppercase; font-weight: 800;
+}
 .tc-page-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .tc-mbtn {
   border: 1px solid var(--tc-cloud-200); background: var(--tc-cloud-0); color: var(--tc-ink-900); border-radius: 12px;
@@ -198,7 +208,7 @@
   .tc-rail a:nth-child(n + 6), .tc-rail .tc-rail-sep { display: none; }
   .tc-page { padding: 17px 13px 40px; }
   .tc-page-head { align-items: flex-start; margin-bottom: 15px; }
-  .tc-page-head h1 { font-size: 22px; }
+  .tc-page-head h1, .tc-page-title { font-size: 22px; }
   .tc-home-hero { min-height: 330px; padding: 20px 18px; }
   .tc-home-hero-art { inset: 0; opacity: .6; }
   .tc-home-hero::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(0deg, rgba(245, 244, 238, .86) 0%, transparent 85%); }
@@ -1438,7 +1448,7 @@
  * 一覧の行(アイコン 40px・名前・薄い説明・状態の札・›)・文字(本文 14px・説明 12.5px・見出し 15px)を揃える。 */
 .tc-kit-eyebrow { display: inline-flex; align-items: center; gap: 6px; letter-spacing: .08em; }
 .tc-kit-eyebrow svg { width: 14px; height: 14px; }
-.tc-kit-pagehead h1 { font-size: 28px; line-height: 1.25; letter-spacing: -.01em; }
+.tc-kit-pagehead h1 { font-size: 27px; line-height: 1.2; letter-spacing: -.045em; }
 .tc-kit-nav--trip .tc-kit-head { margin: 14px 0 6px; }
 .tc-kit-nav--trip .tc-kit-bar { border-bottom: 1px solid var(--tc-cloud-200); padding-bottom: 0; align-items: flex-end; }
 .tc-kit-nav--trip .tc-kit-tabs { gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -1680,4 +1690,39 @@
   .tc-kit-page .tc-kit-resrow__pay { grid-column: 3; }
   .tc-kit-page .tc-kit-resrow__st { grid-column: 4; justify-self: start; }
   .tc-kit-page .tc-kit-resrow__links, .tc-kit-page .tc-kit-resrow__why { padding-left: 16px; }
+}
+
+/* ==========================================================================
+   [Gate BookletShare] しおりの共有のダイアログ。.tc-bshare の中だけに効かせる
+   ========================================================================== */
+.tc-bshare { display: grid; gap: 14px; }
+.tc-bshare__box { border: 1px solid var(--tc-cloud-200); border-radius: 12px; padding: 10px 14px 12px; margin: 0; display: grid; gap: 8px; }
+.tc-bshare__box > legend { padding: 0 4px; font-size: 13px; font-weight: 800; color: var(--tc-ink-700); }
+.tc-bshare__radio, .tc-bshare__check { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; cursor: pointer; font-size: 13.5px; }
+.tc-bshare__radio input, .tc-bshare__check input { margin-top: 3px; }
+.tc-bshare__radio b { display: block; color: var(--tc-ink-900); }
+.tc-bshare__radio small { display: block; font-size: 12px; color: var(--tc-ink-500); }
+.tc-bshare__hint { display: grid; gap: 8px; justify-items: start; padding: 10px 12px; border-radius: 10px; background: var(--tc-warning-soft); font-size: 13px; color: var(--tc-ink-900); }
+.tc-bshare__url { display: flex; gap: 8px; align-items: center; }
+.tc-bshare__url input { flex: 1; min-width: 0; min-height: 36px; padding: 0 10px; border: 1px solid var(--tc-cloud-200); border-radius: 10px;
+  background: var(--tc-cloud-50, #f8fafc); color: var(--tc-ink-900); font-size: 13px; }
+.tc-bshare__tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 12px; background: var(--tc-cloud-100); }
+.tc-bshare__tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 9px;
+  background: transparent; font-size: 13px; font-weight: 700; color: var(--tc-ink-700); cursor: pointer; }
+.tc-bshare__tabs button[aria-selected="true"] { background: var(--tc-cloud-0); color: var(--tc-ink-900); box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+.tc-bshare__panel { min-height: 120px; }
+.tc-bshare__qr { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+.tc-bshare__qr img, .tc-bshare__qrph { width: 200px; height: 200px; border: 1px solid var(--tc-cloud-200); border-radius: 12px; background: #fff; }
+.tc-bshare__people { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
+.tc-bshare__people label { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 40px; cursor: pointer; font-size: 13.5px; }
+.tc-bshare__people small { margin-left: 8px; font-size: 12px; color: var(--tc-ink-500); }
+.tc-bshare__text { width: 100%; border: 1px solid var(--tc-cloud-200); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 13.5px;
+  background: var(--tc-cloud-0); color: var(--tc-ink-900); }
+.tc-bshare__msg { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--tc-cloud-100); color: var(--tc-ink-900); }
+.tc-bshare__msg[data-tone="ok"] { background: var(--tc-success-soft); }
+.tc-bshare__msg[data-tone="warn"] { background: var(--tc-warning-soft); }
+.tc-bshare__msg[data-tone="error"] { background: #fdecec; color: #8a1c1c; }
+@media (max-width: 560px) {
+  .tc-bshare__qr { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .tc-bshare__tabs button { flex: 1 1 calc(50% - 4px); justify-content: center; }
 }

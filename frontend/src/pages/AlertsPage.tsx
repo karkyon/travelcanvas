@@ -180,14 +180,14 @@ const AlertsPage: React.FC = () => {
   const closed = list?.alerts.filter((a) => a.status !== 'active') ?? [];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <div className="flex flex-wrap gap-2 mb-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)}>← プランへ戻る</Button>
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/today`)}
           icon={<UiIcon icon={IcSun} />}>今日の画面</Button>
       </div>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink-900">遅延・休業などへの対応</h1>
+        <h1 className="tc-page-title" data-eyebrow="TRIP · 当日の対応">遅延・休業などへの対応</h1>
         <button type="button" onClick={load} aria-label="再読み込み" className="text-ink-700 hover:text-blue-700 p-2">
           <RefreshCw size={20} />
         </button>

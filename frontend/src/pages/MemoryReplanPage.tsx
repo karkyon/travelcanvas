@@ -71,9 +71,9 @@ const MemoryReplanPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--md">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">過去の旅からの提案</h1>
+      <h1 className="tc-page-title" data-eyebrow="MEMORY · 旅の記録">過去の旅からの提案</h1>
       <p className="text-sm text-ink-700 mt-1">
         あなたが参加したほかの旅行の「振り返り」(行った・着いた・出た時刻)から傾向を見つけます。提案は適用するまで旅程を変えません。
       </p>

@@ -71,9 +71,9 @@ const AdminAbuse: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <p className="mb-2"><Link to="/admin" className="text-blue-700 underline">管理者ダッシュボードへ</Link></p>
-      <h1 className="text-2xl font-bold text-ink-900">濫用への対応</h1>
+      <h1 className="tc-page-title" data-eyebrow="ADMIN · 管理">濫用への対応</h1>
       <p className="text-sm text-ink-700 mt-1">公開の共有への通報と、自動の検知です。旅行の中身は表示しません。</p>
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="状態で絞り込む">
         {FILTERS.map((f) => (

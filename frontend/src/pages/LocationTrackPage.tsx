@@ -448,9 +448,9 @@ const LocationTrackPage: React.FC = () => {
   const canStart = !!data?.can_start && !!savedMode && savedMode !== 'off';
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--md">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">位置の記録</h1>
+      <h1 className="tc-page-title" data-eyebrow="MEMORY · 旅の記録">位置の記録</h1>
       <p className="text-sm text-ink-700 mt-1">
         旅の記録のために、旅行の期間中だけ位置を記録できます。軌跡はあなただけが見られ、同行者(旅行の所有者を含む)には共有されません。
         記録はこの画面を開いている間だけ行います。

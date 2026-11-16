@@ -122,9 +122,9 @@ const BillingPage: React.FC = () => {
   const live = me?.subscriptions.find((s) => s.usable);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>← 設定へ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900 mt-2">料金・お支払い</h1>
+      <h1 className="tc-page-title mt-2" data-eyebrow="SETTINGS · 設定">料金・お支払い</h1>
       <p className="text-sm text-ink-700 mt-1">{note}</p>
       {!configured && (
         <p className="mt-3 p-3 rounded-lg bg-amber-50 text-amber-900 text-sm" role="status">

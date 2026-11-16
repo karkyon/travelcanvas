@@ -351,11 +351,11 @@ const AdminUsers: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="tc-page space-y-6">
       {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-ink-900">ユーザー管理</h1>
+          <h1 className="tc-page-title" data-eyebrow="ADMIN · 管理">ユーザー管理</h1>
           <p className="text-ink-700 mt-1">総ユーザー数: {pagination.total_count.toLocaleString()}名</p>
         </div>
       </div>

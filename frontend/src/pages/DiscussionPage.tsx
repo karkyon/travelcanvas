@@ -237,10 +237,10 @@ const DiscussionPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <div className="mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-        <h1 className="text-2xl font-bold text-ink-900">相談・投票</h1>
+        <h1 className="tc-page-title" data-eyebrow="TOGETHER · 相談">相談・投票</h1>
         <p className="text-sm text-ink-700 mt-1">候補を投票で決め、気になることはコメントで相談します。</p>
         <div className="mt-2"><PlanNotificationLevel planId={planId} /></div>
       </div>

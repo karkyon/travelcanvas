@@ -160,11 +160,11 @@ const SearchSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-w-0">
+      <div className="tc-page tc-page--lg">
         {/* ヘッダー */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-ink-900 mb-4 flex items-center justify-center gap-3">
+        <div className="mb-8">
+          <h1 className="tc-page-title mb-4 flex items-center gap-3" data-eyebrow="SETTINGS · 設定">
             <Settings size={32} className="text-blue-500" />
             検索の設定
           </h1>

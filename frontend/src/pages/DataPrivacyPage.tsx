@@ -52,9 +52,9 @@ const DataPrivacyPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--lg">
       <Button variant="ghost" size="sm" onClick={() => navigate('/settings')} className="mb-2">← 設定へ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">データとプライバシー</h1>
+      <h1 className="tc-page-title" data-eyebrow="SETTINGS · 設定">データとプライバシー</h1>
       <p className="text-sm text-ink-700 mt-1">
         あなたのデータをファイルとして受け取れます。データの使い方への同意の変更、アカウントの削除、削除したデータがいつまで残るかの確認もできます。
       </p>

@@ -14,7 +14,7 @@ from app.api.v1 import (
     calendar_import, privacy, replans, optimization, sync, memories, location_tracks, journey, atlas, memory_replan,
     offline_pack, security_reports, presence, private_profile, visits, candidates, places, plan_search,
     organizations, org_external, admin_support, member_policy, commands, decisions, finance_ledger, usage, receipts,
-    spot_intake, holidays, inbound_mail, billing, server_exports,
+    spot_intake, holidays, inbound_mail, billing, server_exports, booklet_share,
     spot_media,
     privacy_zones, photo_upload, memory_publish, movement, ownership, corrections, dashboard, plan_cover, hours_check,
     media_providers, home_place,
@@ -566,6 +566,7 @@ app.include_router(photo_upload.router, prefix="/api/v1")  # [Gate PhotoQR]
 app.include_router(photo_upload.public_router, prefix="/api/v1")
 app.include_router(booklet.router, prefix="/api/v1")
 app.include_router(booklet.public_router, prefix="/api/v1")  # [Gate BookletWeb] 公開したしおり
+app.include_router(booklet_share.router, prefix="/api/v1")  # [Gate BookletShare] しおりを同行者へ送る
 # [Gate P5] FR-036カレンダー・地図の書き出し(ICS/GPX/KML/CSV)。/plans/{plan_id}/exports/*配下。
 app.include_router(itinerary_export.router, prefix="/api/v1")
 # [Gate P6] FR-039データポータビリティ。/plans/{plan_id}/data-export、/privacy/data-export・retention。

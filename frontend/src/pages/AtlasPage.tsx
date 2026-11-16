@@ -71,8 +71,8 @@ const AtlasPage: React.FC = () => {
   const sketch = data ? layout(data.cells) : null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-ink-900">旅の地図(Atlas)</h1>
+    <div className="tc-page tc-page--md">
+      <h1 className="tc-page-title" data-eyebrow="MEMORIES · 旅の地図">旅の地図(Atlas)</h1>
       <p className="text-sm text-ink-700 mt-1">
         参加している旅行を横断して、訪れた地域を区画で表します。材料は旅行の「行った」記録、あなたの位置付きの記録と位置の軌跡、
         これからの旅行の予定です。Atlasはあなただけが見られます。

@@ -61,9 +61,9 @@ const SyncConflictsPage: React.FC = () => {
   if (!planId) return <div className="p-8 text-center text-ink-700">プランが選択されていません。</div>;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="tc-page tc-page--md">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-2">← プランへ戻る</Button>
-      <h1 className="text-2xl font-bold text-ink-900">同期で競合した変更</h1>
+      <h1 className="tc-page-title" data-eyebrow="TRIP · 同期">同期で競合した変更</h1>
       <p className="text-sm text-ink-700 mt-1">
         通信できない間に行った変更のうち、他の人やほかの端末の変更と重なったものです。どちらの内容を残すか選んでください。
       </p>

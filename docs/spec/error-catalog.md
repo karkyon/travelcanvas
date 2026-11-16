@@ -75,7 +75,7 @@
 | `duplicate_event` | — | — | 同じ予定が2回含まれています | api/v1/visits.py |
 | `duplicate_item` | — | — | 同じ項目が2回あります | services/private_profile.py |
 | `email_taken` | 409 | no | このメールアドレスは既に使われています | api/v1/corrections.py |
-| `email_unavailable` | 409 | no | この環境ではメールを送れません(管理者の設定が必要です) | api/v1/notifications.py |
+| `email_unavailable` | 409, 503 | later, no | この環境にはメールを送る設定がありません(管理者がメールサーバーを設定すると使えます) | api/v1/booklet_share.py, api/v1/notifications.py |
 | `encryption_not_configured` | 503 | later | 暗号化が設定されていないため記録できません(サーバー側の設定) | api/v1/corrections.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/privacy_zones.py, api/v1/push.py |
 | `encryption_unavailable` | 503 | later | 暗号化が設定されていないため保存できません | api/v1/home_place.py, services/private_profile.py |
 | `entitlement_not_found` | 404 | no | 付与が見つかりません | api/v1/planning_usage.py |
@@ -95,7 +95,7 @@
 | `finance_locked` | 409 | no | 精算を締めているため変更できません。所有者が締めを解除してから変更してください | api/v1/finance.py, api/v1/finance_ledger.py |
 | `finance_not_locked` | 409 | no | 精算は締めていません | api/v1/finance_ledger.py |
 | `finance_unlock_owner_only` | 403 | no | 締めを解除できるのは旅行の所有者だけです | api/v1/finance_ledger.py |
-| `font_unavailable` | 503 | later | この環境には日本語の字体が無いため、PDF・画像を作れません(管理者の設定が必要です) | api/v1/server_exports.py |
+| `font_unavailable` | 503 | later | この環境には日本語の字体が無いため、PDF を作れません | api/v1/booklet_share.py, api/v1/server_exports.py |
 | `forbidden` | 403 | no | 合言葉が違います | api/v1/inbound_mail.py, api/v1/places.py |
 | `forbidden_role` | 403 | no | この操作は組織の管理者だけができます | api/v1/organizations.py, services/organizations.py |
 | `fx_unavailable` | 503 | later | 為替を自動で取れませんでした。出典を書いて手で入れてください | api/v1/finance_ledger.py |
@@ -170,6 +170,7 @@
 | `mfa_required` | 401 | no | このアカウントは確認コード(認証アプリ)が要ります | api/v1/guest_merge.py |
 | `mfa_step_up_required` | — | — | 管理者の画面を使うには、認証アプリの確認コードを入力してください | api/v1/admin.py |
 | `mode_mismatch` | 409 | after_reload | この旅行の位置の設定と違う保存先です。先に設定を変えてください | api/v1/location_tracks.py |
+| `no_address` | 422 | no | メールアドレスのある送り先がいません | api/v1/booklet_share.py |
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
 | `no_changes` | 403, 409, 422 | no | この案では旅程は変わりません | api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v |
@@ -185,15 +186,19 @@
 | `not_eligible` | 422 | no | 移譲できるのは、参加済みの会員の共同編集者だけです(招待中・ゲスト・削除の申し込み中の人は選べません) | api/v1/ownership.py |
 | `not_guest` | — | — | この操作はゲストのままの時だけ使えます | api/v1/guest_merge.py |
 | `not_intent_draft` | 404 | no | この旅行は旅行相談から作った下書きではありません | api/v1/trip_intents.py |
+| `not_member` | 422 | no | 旅行のメンバーにだけ送れます | api/v1/booklet_share.py |
+| `not_public` | 409 | no | Web のページとして公開していない版です(公開するか、リンクを外してください) | api/v1/booklet_share.py |
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
 | `nothing_extracted` | 503 | later | レシートの文字を読み取れませんでした。 | api/v1/receipts.py |
 | `nothing_to_publish` | — | — | 公開できる自分の記録がありません(旅行記に含める記録を書いてください) | api/v1/memory_publish.py |
+| `nothing_to_send` | 422 | no | PDF かリンクを 1 つ以上選んでください | api/v1/booklet_share.py |
 | `ocr_unavailable` | 503 | later | このサーバーでは画像の文字を読めません(OCR が未導入)。手で入力してください | api/v1/receipts.py |
 | `ops_reason_required` | — | — | 理由を200文字までで入力してください | api/v1/admin_ops.py |
 | `optimization_stale` | 409 | after_reload | 候補を計算した後に旅程・制約・予約が変わりました。もう一度候補を計算してください | api/v1/optimization.py |
 | `order_mismatch` | 400 | no | 並びがこの日の予定と合いません。読み直してからもう一度並べ替えてください | api/v1/plans.py |
 | `organization_not_found` | 404 | no | 組織が見つかりません | services/organizations.py |
+| `origin_not_allowed` | 422 | no | リンクの土台が許可されていません | api/v1/booklet_share.py |
 | `outside_trip_period` | 409 | no | 位置の記録は旅行の期間中(前日から最終日まで)だけ始められます | api/v1/location_tracks.py |
 | `owner_can_edit` | 422 | no | 所有者は旅行の画面で直接直せます | api/v1/corrections.py |
 | `owner_only` | 403 | no | 旅行全体のエクスポートは所有者だけが行えます。自分のデータはアカウントのエクスポートで取得できます。 | api/v1/data_export.py |
@@ -222,7 +227,7 @@
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
-| `rate_limited` | 429 | later | 回数が多すぎます。しばらくしてから試してください | api/v1/account_recovery.py, api/v1/admin_support.py, api/v1/corrections.py, api/v1/organizations.py, api/v1/ownership.py |
+| `rate_limited` | 429 | later | 回数が多すぎます。しばらくしてから試してください | api/v1/account_recovery.py, api/v1/admin_support.py, api/v1/booklet_share.py, api/v1/corrections.py, api/v1/organization |
 | `reauth_failed` | 403 | no | パスワードが正しくありません | api/v1/corrections.py, api/v1/ownership.py, api/v1/privacy.py |
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
@@ -241,7 +246,9 @@
 | `seat_limit_reached` | 409 | no | 席の上限(…人)に達しています。上限を見直すか、メンバーを外してください | api/v1/organizations.py |
 | `secret_not_registered` | 409 | no | この画面で登録した有効な鍵はありません | api/v1/admin_ops.py |
 | `self_target` | — | — | 自分自身のアカウントはこの画面から操作できません | api/v1/admin.py |
-| `sensitive_creator_only` | 403 | no | 機密情報を含む版は作成者だけが表示できます | api/v1/booklet.py |
+| `send_failed` | 502 | later | メールを送れませんでした(メールサーバーの設定を確かめてください) | api/v1/booklet_share.py |
+| `sensitive_creator_only` | 403 | no | 機密情報を含む版は作成者だけが表示できます | api/v1/booklet.py, api/v1/booklet_share.py |
+| `sensitive_no_attachment` | 409 | no | 機密項目を含む版は PDF をメールに付けられません | api/v1/booklet_share.py |
 | `sensitive_not_publishable` | 409 | no | 機密項目を含む版は Web で公開できません。機密項目を外した版を作ってください | api/v1/booklet.py |
 | `sensitive_requires_owner` | — | — | 予約番号・住所・電話・参加者名を含めた出力は旅行の所有者だけが作成できます | api/v1/booklet.py |
 | `session_required` | 401 | no | 確認コードをもう一度入れてください | api/v1/photo_upload.py |
@@ -266,7 +273,7 @@
 | `too_many_items` | — | — | 条件は…件までです | services/private_profile.py |
 | `too_many_memories` | — | — | 1つの旅行の記録は…件までです | api/v1/memories.py |
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
-| `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/server_exports.py |
+| `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/booklet_share.py, api/v1/server_exports.py |
 | `too_many_privacy_zones` | 409 | no | 守る範囲は…件までです | api/v1/privacy_zones.py |
 | `too_many_publications` | 409 | no | 公開中の旅行記は…件までです | api/v1/memory_publish.py |
 | `too_many_requests` | 429 | later | 回数が多すぎます。しばらく待ってください | api/v1/gmail.py, api/v1/guest_merge.py, api/v1/media_providers.py, api/v1/passkeys.py, api/v1/push.py, api/v1/receipts.p |

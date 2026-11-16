@@ -23,6 +23,11 @@ const ALLOW = new Set([
   'components/location/RecordingIndicator.tsx::trackPath',
   // [Gate G9] ダッシュボードの「スポット・地図」への入口(固定の配列 OTHER_LINKS)
   'pages/DashboardPage.tsx::to',
+  // [Gate BookletShare] QR の画像(qrcode が作る data:image/png の URL)・メールのアプリ(bookletShareModel.mailtoUrl が作る mailto:)・
+  // 試しのメールの受信箱(この画面と同じホストの :8025。sandboxInboxUrl)。どれも利用者の入力をそのまま移動先にしない
+  'pages/booklet/BookletShareDialog.tsx::qrPng',
+  'pages/booklet/BookletShareDialog.tsx::mailHref',
+  'pages/booklet/BookletShareDialog.tsx::sandboxInboxUrl(window.location)',
 ]);
 
 function sourceFiles(dir: string): string[] {

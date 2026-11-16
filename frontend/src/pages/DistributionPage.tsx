@@ -64,7 +64,7 @@ const DistributionPage: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   if (!org || !dist || !orgId || !distId) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="tc-page tc-page--md">
         <p role="alert" className="text-red-800">{error ?? '配布が見つかりません'}</p>
         <Link to={orgId ? `/organizations/${orgId}` : '/organizations'} className="text-blue-800 underline">組織へ戻る</Link>
       </div>
@@ -75,11 +75,11 @@ const DistributionPage: React.FC = () => {
   const admin = isOrgAdmin(org.role);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-w-0">
       <div className="h-2" style={{ backgroundColor: org.brand_color ?? '#9ca3af' }} aria-hidden="true" />
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="tc-page tc-page--md">
         <Link to={`/organizations/${orgId}`} className="text-blue-800 hover:underline">← {org.name}</Link>
-        <h1 className="text-2xl font-bold text-ink-900 mt-2">配布: {dist.title}</h1>
+        <h1 className="tc-page-title mt-2" data-eyebrow="ORGANIZATION · 組織">配布: {dist.title}</h1>
         <p className="text-ink-700">
           版{dist.version}・{fmtDateTime(dist.published_at)}に配布{dist.revoked_at ? '・配布をやめました' : ''}
         </p>

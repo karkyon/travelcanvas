@@ -342,14 +342,14 @@ const SegmentsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <div className="min-w-0">
+      <div className="tc-page tc-page--md">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}`)} className="mb-4">
           ← プランへ戻る
         </Button>
 
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold"><UiIcon icon={IcFootprints} size={20} className="mr-2 align-[-4px]" />移動区間</h1>
+          <h1 className="tc-page-title" data-eyebrow="PLAN · 旅程づくり"><UiIcon icon={IcFootprints} size={20} className="mr-2 align-[-4px]" />移動区間</h1>
           <Button variant="primary" size="sm" onClick={openCreateForm} disabled={allEvents.length < 2}>
             <Plus size={16} className="mr-1" /> 追加
           </Button>

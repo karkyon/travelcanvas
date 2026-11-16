@@ -91,10 +91,10 @@ const AdminSupport: React.FC = () => {
   if (loading) return <div className="flex justify-center py-12"><LoadingSpinner /></div>;
 
   return (
-    <div className="space-y-6">
+    <div className="tc-page space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-ink-900">運用とサポート</h1>
+          <h1 className="tc-page-title" data-eyebrow="ADMIN · 管理">運用とサポート</h1>
           <p className="text-ink-700 mt-1">この画面を見たこと・サポートで閲覧したことは監査に残ります。</p>
         </div>
         <Link to="/admin" className="text-blue-700 underline">管理者ダッシュボードへ</Link>

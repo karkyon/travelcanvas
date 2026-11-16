@@ -63,10 +63,10 @@ const AdminAuditLogs: React.FC = () => {
 
   const page = data?.pagination;
   return (
-    <div className="space-y-6">
+    <div className="tc-page space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-ink-900">監査ログ</h1>
+          <h1 className="tc-page-title" data-eyebrow="ADMIN · 管理">監査ログ</h1>
           <p className="text-ink-700 mt-1">
             ログイン・権限・機密の表示・管理者の操作などの記録です。接続元は末尾を伏せています。
             この画面を見たことも記録されます。

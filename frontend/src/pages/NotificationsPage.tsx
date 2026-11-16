@@ -120,9 +120,9 @@ const NotificationsPage: React.FC = () => {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
+    <div className="tc-page tc-page--md">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="tc-page-title flex items-center gap-2" data-eyebrow="INBOX · 通知">
           <Bell size={24} />
           通知
           {unreadCount > 0 && (

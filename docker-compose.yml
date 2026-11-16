@@ -91,6 +91,12 @@ services:
       DATABASE_URL: ${APP_DATABASE_URL:?APP_DATABASE_URL must be set in .env (Gate G2)}
       DB_PASSWORD: ""
       DB_APP_PASSWORD: ""
+      # [Gate BookletShare] メールの送信先(.env の値)。.env に SMTP_HOST が無い時だけ、反映スクリプト
+      # (scripts/ops/local_dev_apply.sh)がこの 4 つを確認用の受信箱(mailpit。外へ届かない)の値で渡す
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     ports:
       - "8001:8000"
     depends_on:
@@ -156,6 +162,24 @@ services:
       timeout: 10s
       retries: 10
       start_period: 300s
+
+  # [Gate BookletShare] 確認用の受信箱(Mailpit。無料・鍵は要らない)。送ったメールは外へ届かず、ここに溜まる。
+  # 画面 http://<この機械>:8025 で、しおりのメールと添付の PDF を確かめられる。.env に SMTP_HOST が無い時に、
+  # scripts/ops/local_dev_apply.sh が `--profile mail-sandbox` で起動する(既定では起動しない。GCP では使わない)
+  mailpit:
+    image: axllent/mailpit:v1.21
+    profiles: ["mail-sandbox"]
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    expose:
+      - "1025"
+    ports:
+      - "8025:8025"
+    networks:
+      - travelcanvas_net
 
   # [Gate RoadRoute] 地図の「道に沿った経路」(OSRM。無料・鍵は要らない・任意)。車(osrm-car)と歩き(osrm-foot)。
   # `bash scripts/ops/osrm_prepare.sh [地域]` で OpenStreetMap の地図データを取り込み(初回は数十分・メモリ数GB)、
