@@ -1,6 +1,6 @@
 /**
  * [FR059-B] 旅行相談の入口に、自分のクラスと今月の旅程相談の枠を出す(旅行が決まる前。旅行ごとの枠は下書き・旅程で出す)。
- * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §3・§6。
+ * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §3・§6。
  */
 import React, { useEffect, useState } from 'react';
 import { getMyEntitlements } from '@/services/api/planningUsage';

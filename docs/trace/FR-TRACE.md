@@ -1,7 +1,7 @@
 # 全59 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03)
 
 > この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。
-> 要求の原文の正本は資料室の v5.1(所在は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。
+> 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。
 > 状態の正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。基準 commit `a2c419d`。
 
 ## 1. 証拠の区分の一覧
@@ -788,7 +788,7 @@
 
 ### FR-059 旅程相談 API の原価上限・クラス別 Quota
 
-- **出典:** docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)(優先度 MUST・段階 —)
+- **出典:** docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md(リポジトリの正本。DOC-02 v6.0 §3 FR-059 で採番。v5.1 には無かった)(優先度 MUST・段階 —)
 - **要求(抜粋):** 旅程の相談の外部 API の原価上限(1旅行あたり)と利用者クラス別の quota をサーバーで守る
 - **受入(抜粋):** 同時の要求・再試行でも上限を超えず、利用者・管理者が実績を確かめられる(同書 §11)
 - **承認済みの変更 2026-10-29:** DOC-02 v5.1 に無い FR-059 を追加し、リポジトリの FR-059 正本を DOC-02/04/05/06/07/09/11/13 の該当箇所より優先する(出典: DOC-10 §0.2・Gate FR059-A(r27)・確度 高)

@@ -1,7 +1,7 @@
 /**
  * [FR059-B] 管理者: 旅程相談の利用枠のクラスの付与・Trip Pass の割り当て・Pro の契約の例外(二者の承認)。
  * 申請した管理者とは別の管理者が承認するまで効かない。取り消しは理由が要る。全て監査に残る。
- * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §6。
+ * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §6。
  */
 import React, { useState } from 'react';
 import Card from '../../components/common/Card';

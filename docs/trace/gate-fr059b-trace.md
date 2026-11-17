@@ -1,6 +1,6 @@
 # Gate FR059-B トレース(外部 API の原価の守りのサーバー実装)
 
-対象: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md`(正本 v5.1-p2)§2〜§11、FC-181〜185。migration `d5f9b2c8e1a3`
+対象: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md`(正本 v5.1-p2)§2〜§11、FC-181〜185。migration `d5f9b2c8e1a3`
 (down `c4e8a1f3b7d2`)。FR-059: SPECIFIED → **INTEGRATED(部分)**(外部の有料 provider は未接続のため VERIFIED にしない)。DOC-10 r28。
 
 凡例: `IMPLEMENTED` / `PARTIAL` / `NOT STARTED`。試験: BE = `backend/tests/test_gate_fr059_cost_guard.py`(fake provider)、
