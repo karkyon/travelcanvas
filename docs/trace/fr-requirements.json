@@ -1,0 +1,4744 @@
+{
+ "_meta": {
+  "description": "全59 FR の要求の根拠(資料室の v5.1 正本・リポジトリの FR-059 正本・承認済みの変更)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
+  "gate": "Hardening-A",
+  "baseline": "a2c419dda9b0e0a5743abc909c0e3c9a58d74e2f",
+  "evidence_states": {
+   "done": "証拠あり",
+   "partial": "一部",
+   "pending": "未実施・未確認",
+   "na": "対象外(理由を書く)"
+  },
+  "evidence_kinds": {
+   "requirement": "要件の根拠",
+   "implementation": "実装",
+   "integration": "統合試験",
+   "e2e": "E2E",
+   "authz_failure": "権限・失敗系",
+   "device": "実機",
+   "real_api": "実 API",
+   "ops": "運用(本番)"
+  },
+  "canonical_sources": "docs/spec/canonical-sources.json"
+ },
+ "features": {
+  "FR-001": {
+   "title": "ゲスト旅行開始",
+   "requirement": {
+    "source": "DOC-02 §3 FR-001",
+    "priority": "MUST",
+    "stage": "G0-G1",
+    "summary": "登録なしでゲスト旅行を始め、推測困難なゲストの所有権を発行する。保存できない時は成功と表示せず下書きと再試行を出す",
+    "acceptance": "初回訪問から60秒以内にイベントを1件保存できる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-01",
+     "SC-02"
+    ],
+    "api_group": "AUTH/PLAN"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/auth.py",
+     "backend/app/api/v1/quickdrafts.py",
+     "backend/app/api/v1/plans.py"
+    ],
+    "routes": [
+     "/",
+     "planner/:planId?"
+    ],
+    "tables": [
+     "users",
+     "quick_drafts",
+     "travel_plans"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate35_guest.py",
+    "backend/tests/test_gate_r1_guest_normalized_api.py",
+    "frontend/e2e/a11y.spec.ts",
+    "frontend/e2e/quickdraft-flow.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-001"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-002": {
+   "title": "ゲスト昇格",
+   "requirement": {
+    "source": "DOC-02 §3 FR-002",
+    "priority": "MUST",
+    "stage": "G1",
+    "summary": "旅行・添付・履歴・共有設定を失わず登録アカウントへ移す。既存メールと衝突したら再認証後に統合",
+    "acceptance": "ゲストトークンだけで既存アカウントへ勝手に紐付けない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-03"
+    ],
+    "api_group": "AUTH"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/auth.py",
+     "backend/app/api/v1/guest_merge.py"
+    ],
+    "routes": [
+     "guest/upgrade"
+    ],
+    "tables": [
+     "users",
+     "travel_plans"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate35_guest.py",
+    "backend/tests/test_gate_remaining7_guest_merge.py",
+    "backend/tests/test_gate_s2_auth_hardening.py",
+    "frontend/e2e/auth-flows.spec.ts",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-002"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-003": {
+   "title": "認証・セッション",
+   "requirement": {
+    "source": "DOC-02 §3 FR-003",
+    "priority": "MUST",
+    "stage": "G0-G2",
+    "summary": "メール確認・パスワード・passkey/MFA・ログアウト・全端末失効・セッション一覧。短命 access と回す refresh",
+    "acceptance": "refresh の再利用を検出し、機密の表示・外部連携の変更は再認証を要求できる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-03",
+     "SC-29"
+    ],
+    "api_group": "AUTH"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/auth.py",
+     "backend/app/api/v1/mfa.py",
+     "backend/app/api/v1/passkeys.py",
+     "backend/app/api/v1/account_recovery.py"
+    ],
+    "routes": [
+     "login",
+     "register",
+     "settings"
+    ],
+    "tables": [
+     "users",
+     "user_sessions",
+     "user_mfa",
+     "webauthn_credentials"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_remaining6_account.py",
+    "backend/tests/test_gate_remaining7_passkeys.py",
+    "backend/tests/test_gate_s11_admin_mfa.py",
+    "backend/tests/test_gate_s2_auth_hardening.py",
+    "backend/tests/test_gate_s4_authz_matrix.py",
+    "backend/tests/test_sessions.py",
+    "frontend/e2e/account-recovery.spec.ts",
+    "frontend/e2e/active-sessions.spec.ts",
+    "frontend/e2e/auth-flows.spec.ts",
+    "frontend/e2e/mfa.spec.ts",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx",
+    "frontend/src/pages/AccountRecovery.test.tsx"
+   ],
+   "external_providers": [
+    "SMTP(メールの送信)",
+    "端末の passkey(WebAuthn)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-003"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): SMTP(メールの送信)・端末の passkey(WebAuthn)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-004": {
+   "title": "旅行CRUD",
+   "requirement": {
+    "source": "DOC-02 §3 FR-004",
+    "priority": "MUST",
+    "stage": "G0",
+    "summary": "名称・期間・基準タイムゾーン・通貨・表紙・種別・公開状態。UTC 保存と現地表示。猶予つきの論理削除",
+    "acceptance": "削除で関連する添付・共有を失効する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-04",
+     "SC-05"
+    ],
+    "api_group": "PLAN"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/plans.py",
+     "backend/app/api/v1/travel.py"
+    ],
+    "routes": [
+     "dashboard",
+     "planner/:planId?"
+    ],
+    "tables": [
+     "travel_plans",
+     "ops_job_runs"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_b012_plan_deletion.py",
+    "backend/tests/test_gate_g8_job_runs.py",
+    "backend/tests/test_plans_normalized.py",
+    "frontend/e2e/gate-g8.spec.ts",
+    "frontend/e2e/plan-deletion.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-004"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "運用待ち"
+   ]
+  },
+  "FR-005": {
+   "title": "日・イベント",
+   "requirement": {
+    "source": "DOC-02 §3 FR-005",
+    "priority": "MUST",
+    "stage": "G0-G1",
+    "summary": "日・時刻・終日・未定・複数日・所要・カテゴリ・状態。ドラッグ・キーボード・長押しで並べ替え",
+    "acceptance": "時刻を変える時に移動・予約・営業時間・通知への影響を事前に示す"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-06"
+    ],
+    "api_group": "DAY/EVENT"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/plans.py",
+     "backend/app/api/v1/travel.py"
+    ],
+    "routes": [
+     "planner/:planId?"
+    ],
+    "tables": [
+     "travel_days",
+     "travel_events",
+     "change_sets"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g2_member_policy.py",
+    "backend/tests/test_gate_g7_movement.py",
+    "frontend/e2e/gate-g11-planner.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/item-deletion.spec.ts",
+    "frontend/src/components/planner/EventTimeImpact.test.tsx",
+    "frontend/src/hooks/useDragDrop.test.tsx",
+    "frontend/src/store/planStore.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-005"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち"
+   ]
+  },
+  "FR-006": {
+   "title": "NOW/NEXT",
+   "requirement": {
+    "source": "DOC-02 §3 FR-006",
+    "priority": "MUST",
+    "stage": "G1-G4",
+    "summary": "旅行の基準時刻からNOW・NEXT・遅延・空き時間を判定し、次の場所・出発・チケット・予約・連絡先へ1操作",
+    "acceptance": "過去・未来の日を手で見ている間は自動で移らない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-07"
+    ],
+    "api_group": "NOW"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/today_live.py",
+     "backend/app/api/v1/plans.py"
+    ],
+    "routes": [
+     "planner/:planId/today"
+    ],
+    "tables": [
+     "travel_events"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l1_today_mode.py",
+    "backend/tests/test_gate_l1b_today_timezone.py",
+    "backend/tests/test_gate_s4_authz_matrix.py",
+    "frontend/e2e/today-mode-mobile.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-006"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "未実装"
+   ]
+  },
+  "FR-007": {
+   "title": "候補箱",
+   "requirement": {
+    "source": "DOC-02 §3 FR-007",
+    "priority": "MUST",
+    "stage": "G1-G2",
+    "summary": "URL・文・画像・音声・地図・共有から未確定の候補を集め、出典・登録者・取得時刻・重複・確定状態を持つ",
+    "acceptance": "旅程へ置いても元の出典を失わない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-08"
+    ],
+    "api_group": "PLACE/SEARCH"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/candidates.py",
+     "backend/app/api/v1/spot_intake.py"
+    ],
+    "routes": [
+     "planner/:planId/candidates"
+    ],
+    "tables": [
+     "plan_candidates",
+     "source_records"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_c2_candidates_places.py",
+    "backend/tests/test_gate_g11_discover.py",
+    "backend/tests/test_gate_remaining6_account.py",
+    "frontend/e2e/candidates.spec.ts",
+    "frontend/e2e/gate-g11-family-vote.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx",
+    "frontend/src/pages/CandidatesPage.test.tsx",
+    "frontend/src/pages/candidates/CandidateVoting.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/c2candidates.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [
+    "画像の場所の推定(AI・同意つき)",
+    "Web ページの読み取り(1ページ)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-007"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 画像の場所の推定(AI・同意つき)・Web ページの読み取り(1ページ)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "実通信待ち"
+   ]
+  },
+  "FR-008": {
+   "title": "場所の一元管理",
+   "requirement": {
+    "source": "DOC-02 §3 FR-008",
+    "priority": "MUST",
+    "stage": "G2",
+    "summary": "正式名・別名・住所・座標・入口・階・電話・URL・営業時間・休業・予約要否・価格帯・アクセシビリティを1つの場所 ID で持つ",
+    "acceptance": "地図・イベント・予約・移動・PDF が同じ場所 ID を参照し、同名施設を地理 ID と提供元 ID で区別する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-09"
+    ],
+    "api_group": "PLACE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/places.py",
+     "backend/app/api/v1/holidays.py",
+     "backend/app/api/v1/hours_check.py",
+     "backend/app/api/v1/home_place.py"
+    ],
+    "routes": [
+     "planner/:planId/places/:placeId"
+    ],
+    "tables": [
+     "places",
+     "opening_hours",
+     "place_special_hours",
+     "place_entrances",
+     "field_sources",
+     "user_home_places"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_c2_candidates_places.py",
+    "frontend/e2e/candidates.spec.ts",
+    "frontend/e2e/gate-g11-planner.spec.ts",
+    "frontend/src/hooks/usePlanHolidays.test.ts",
+    "frontend/src/pages/PlacePage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/c2candidates.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [
+    "地図・ジオコードの提供元",
+    "祝日(Nager.Date)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-008"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 地図・ジオコードの提供元・祝日(Nager.Date)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-009": {
+   "title": "情報内検索・コマンドパレット",
+   "requirement": {
+    "source": "DOC-02 §3 FR-009",
+    "priority": "MUST",
+    "stage": "G2",
+    "summary": "店名・住所・予約番号末尾・参加者・日付・タグ・文書名で旅行全体を横断検索し、固定の絞り込みを持つ",
+    "acceptance": "権限の無い秘密値を検索の候補・件数にも漏らさない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-10"
+    ],
+    "api_group": "SEARCH"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/plan_search.py",
+     "backend/app/api/v1/commands.py",
+     "backend/app/api/v1/search.py"
+    ],
+    "routes": [
+     "search"
+    ],
+    "tables": [
+     "command_runs"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_c3_search.py",
+    "backend/tests/test_gate_g4_commands.py",
+    "frontend/e2e/gate-g4.spec.ts",
+    "frontend/e2e/search.spec.ts",
+    "frontend/src/components/CommandPalette.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/c3search.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-009"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-010": {
+   "title": "予約管理",
+   "requirement": {
+    "source": "DOC-02 §3 FR-010",
+    "priority": "MUST",
+    "stage": "G2",
+    "summary": "宿・航空・鉄道・バス・船・レンタカー・飲食・体験等を統一の予約モデルで持ち、番号・PIN・名義・取消期限・原本を保持",
+    "acceptance": "予約を旅程の固定の制約にできる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-11"
+    ],
+    "api_group": "RESERVATION"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/reservations.py"
+    ],
+    "routes": [
+     "planner/:planId/reservations"
+    ],
+    "tables": [
+     "reservations",
+     "event_reservations",
+     "reservation_participants"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_r3_0_reservation.py",
+    "backend/tests/test_gate_r3_1_reservation_participants.py",
+    "backend/tests/test_gate_r3_3_event_reservations.py",
+    "backend/tests/test_gate_remaining3_mail.py",
+    "frontend/e2e/reservations.spec.ts"
+   ],
+   "external_providers": [
+    "外部の予約サービス(同期は未実装)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-010"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 外部の予約サービス(同期は未実装)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-011": {
+   "title": "予約取込",
+   "requirement": {
+    "source": "DOC-02 §3 FR-011",
+    "priority": "MUST",
+    "stage": "G2-G5",
+    "summary": "転送アドレス・メール連携・PDF・画像から候補を抽出し、原本と差分を並べて利用者が確定する",
+    "acceptance": "重複・更新・取消のメールを同じ予約の版として統合する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-13"
+    ],
+    "api_group": "IMPORT"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/imports.py",
+     "backend/app/api/v1/inbound_mail.py",
+     "backend/app/api/v1/gmail.py"
+    ],
+    "routes": [
+     "planner/:planId/imports"
+    ],
+    "tables": [
+     "import_jobs",
+     "extraction_candidates",
+     "inbound_mail_addresses",
+     "gmail_connections"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_booking_import.py",
+    "backend/tests/test_gate_r3_7_imports.py",
+    "backend/tests/test_gate_remaining3_mail.py",
+    "backend/tests/test_gate_remaining7_gmail.py",
+    "backend/tests/test_gate_s4_authz_matrix.py",
+    "frontend/e2e/reservations.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx",
+    "frontend/src/pages/imports/InboundMailCard.test.tsx"
+   ],
+   "external_providers": [
+    "メールの受信サービス",
+    "Google OAuth(Gmail 読み取り)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-011"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): メールの受信サービス・Google OAuth(Gmail 読み取り)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-012": {
+   "title": "QR・チケット",
+   "requirement": {
+    "source": "DOC-02 §3 FR-012",
+    "priority": "MUST",
+    "stage": "G2",
+    "summary": "QR・Aztec・PDF417・Code128 を原画像または安全な描画で持ち、明るさ・回転・オフライン表示・最終確認時刻を出す",
+    "acceptance": "共有はチケット単位で既定は非公開。スクリーンショットの完全な防止は約束しない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-12"
+    ],
+    "api_group": "RESERVATION"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/reservations.py"
+    ],
+    "routes": [
+     "planner/:planId/reservations"
+    ],
+    "tables": [
+     "tickets"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_r3_5_tickets.py",
+    "frontend/e2e/reservations.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-012"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち"
+   ]
+  },
+  "FR-013": {
+   "title": "文書ウォレット",
+   "requirement": {
+    "source": "DOC-02 §3 FR-013",
+    "priority": "MUST",
+    "stage": "G2-G5",
+    "summary": "確認書・旅券写し・保険・領収書等を分類し関連へ紐付け、RESTRICTED は本人限定、AI 解析は明示同意の時だけ",
+    "acceptance": "ウイルス検査・MIME 検証・容量制限・暗号化・期限付き URL"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-13"
+    ],
+    "api_group": "DOCUMENT"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/documents.py"
+    ],
+    "routes": [
+     "planner/:planId/documents"
+    ],
+    "tables": [
+     "documents",
+     "document_links"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_m5_object_storage.py",
+    "backend/tests/test_gate_m7_document_hardening.py",
+    "backend/tests/test_gate_r3_6_documents.py",
+    "frontend/e2e/document-wallet.spec.ts",
+    "frontend/src/services/api.test.ts"
+   ],
+   "external_providers": [
+    "Object Storage",
+    "ClamAV(常時運用)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-013"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): Object Storage・ClamAV(常時運用)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "運用待ち"
+   ]
+  },
+  "FR-014": {
+   "title": "移動区間",
+   "requirement": {
+    "source": "DOC-02 §3 FR-014",
+    "priority": "MUST",
+    "stage": "G2-G3",
+    "summary": "出発・到着・手段・便名・所要・距離・費用・乗換・予約・荷物を持つ区間。推奨出発は移動＋準備＋余裕",
+    "acceptance": "徒歩・車・鉄道・バス・船・航空・自転車・タクシー・混合を扱う"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11",
+     "change": "外部の提供元は無料の物だけ接続し、有料(駅すぱあと等)は接続口だけ(鍵があれば動く)",
+     "source": "利用者の決定(プロジェクトの記録 2026-11)",
+     "confidence": "高"
+    },
+    {
+     "date": "2026-11-16",
+     "change": "自宅の場所(本人だけ・暗号化)を出発と帰着の経路に使うかを本人が選ぶ",
+     "source": "利用者の指示(DOC-10 §0.1 HomePlace・migration a3c7e9f1b5d2)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-14"
+    ],
+    "api_group": "ROUTE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/segments.py",
+     "backend/app/api/v1/movement.py"
+    ],
+    "routes": [
+     "planner/:planId/segments"
+    ],
+    "tables": [
+     "travel_segments",
+     "plan_movement_settings",
+     "travel_estimate_settings"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_m1_travel_segments.py",
+    "backend/tests/test_gate_m3_route_options.py",
+    "frontend/e2e/gate-g11-planner.spec.ts",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/services/api.test.ts"
+   ],
+   "external_providers": [
+    "時刻表・運賃(駅すぱあと。有料の鍵の後)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-014"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "partial",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 時刻表・運賃(駅すぱあと。有料の鍵の後)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-015": {
+   "title": "経路比較",
+   "requirement": {
+    "source": "DOC-02 §3 FR-015",
+    "priority": "SHOULD",
+    "stage": "G3-G5",
+    "summary": "最速・最安・乗換少・徒歩少・バリアフリー等で経路を比べ、外部の値に提供元・取得時刻・推定幅を持つ",
+    "acceptance": "経路が取れない時は手で区間を登録できる"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11",
+     "change": "有料の経路の提供元は接続口だけ(鍵があれば動く)",
+     "source": "利用者の決定(プロジェクトの記録 2026-11)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-14"
+    ],
+    "api_group": "ROUTE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/route_options.py"
+    ],
+    "routes": [
+     "planner/:planId/route-options"
+    ],
+    "tables": [
+     "route_options",
+     "route_legs"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_m3_route_options.py",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/services/api.test.ts"
+   ],
+   "external_providers": [
+    "経路の提供元(駅すぱあと。有料の鍵の後)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-015"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "partial",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 経路の提供元(駅すぱあと。有料の鍵の後)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-016": {
+   "title": "制約",
+   "requirement": {
+    "source": "DOC-02 §3 FR-016",
+    "priority": "MUST",
+    "stage": "G3-G5",
+    "summary": "ハード制約(予約・営業時間・終電・集合・予算上限)とソフト制約を個人・グループ・イベント・日単位で持つ",
+    "acceptance": "秘匿の制約は詳細を見せずに判定へ使う"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-15"
+    ],
+    "api_group": "VALIDATE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/constraints.py"
+    ],
+    "routes": [
+     "planner/:planId/constraints"
+    ],
+    "tables": [
+     "constraints",
+     "constraint_undo_snapshots"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l2_constraints.py",
+    "frontend/e2e/constraints.spec.ts",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/pages/ConstraintsPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/l2constraints.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-016"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-017": {
+   "title": "実行可能性",
+   "requirement": {
+    "source": "DOC-02 §3 FR-017",
+    "priority": "MUST",
+    "stage": "G3",
+    "summary": "重複・移動不足・営業時間外・予約不一致・滞在不足・予算超過・休憩不足・最終交通・未確認を検出し ERROR/WARNING/INFO",
+    "acceptance": "検証できない事を「問題なし」にしない"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11",
+     "change": "時刻表の照合は有料の提供元の接続口だけ(鍵があれば動く)",
+     "source": "利用者の決定(プロジェクトの記録 2026-11)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-15"
+    ],
+    "api_group": "VALIDATE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/validation.py",
+     "backend/app/api/v1/hours_check.py"
+    ],
+    "routes": [
+     "planner/:planId?"
+    ],
+    "tables": [
+     "validation_runs",
+     "validation_issues"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g7_movement.py",
+    "backend/tests/test_gate_l3_validation.py",
+    "frontend/e2e/feasibility.spec.ts",
+    "frontend/e2e/gate-g11-planner.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/src/pages/ConstraintsPage.test.tsx",
+    "frontend/src/pages/constraints/validationModel.test.ts",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/l3validation.test.ts"
+   ],
+   "external_providers": [
+    "時刻表(駅すぱあと。有料の鍵の後)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-017"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 時刻表(駅すぱあと。有料の鍵の後)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-018": {
+   "title": "説明可能最適化",
+   "requirement": {
+    "source": "DOC-02 §3 FR-018",
+    "priority": "MUST",
+    "stage": "G3",
+    "summary": "時間・費用・距離・希望・公平性・疲労を重み付けて候補を作り、ロック済みを変えない",
+    "acceptance": "適用前に差分・改善・悪化・違反・信頼度を示し、1つの変更セットとして Undo できる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-16"
+    ],
+    "api_group": "OPTIMIZE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/optimization.py"
+    ],
+    "routes": [
+     "optimization",
+     "planner/:planId?"
+    ],
+    "tables": [
+     "optimization_results",
+     "change_sets"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l4_optimization.py",
+    "frontend/e2e/optimization.spec.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/l4optimization.test.ts"
+   ],
+   "external_providers": [
+    "外部の経路による実移動時間"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-018"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 外部の経路による実移動時間"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "設定待ち"
+   ]
+  },
+  "FR-019": {
+   "title": "日ごとの案(プランB。旧 What-if)",
+   "requirement": {
+    "source": "DOC-02 §3 FR-019(承認済みの変更でプランB へ置き換え)",
+    "priority": "SHOULD",
+    "stage": "G4-G6",
+    "summary": "雨・遅延・予算・欠席・体調の分岐案を保存し本案との差分と採用履歴を持つ。→ 2026-11-12 からは日ごとの案(プランB)。旅行前の複数案・旅行中の切り替え・旅行後の履歴",
+    "acceptance": "本案を壊さず、日ごとの「いまの案」は1つだけ。切り替えを記録する"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-12",
+     "change": "もしもの案(What-if・旅程ブランチ)を、日ごとの案(プランB)に置き換えた。もしもの案の画面とデータは消した",
+     "source": "利用者の指示(資料室 claude/TravelCanvas_プランB_日ごとの案_要件と画面設計_2026-11-12.md)・ADR-branches.md・DOC-10 §0.1(migration a9d4e2c7f1b6)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-17"
+    ],
+    "api_group": "OPTIMIZE(branches)"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/day_variants.py"
+    ],
+    "routes": [
+     "planner/:planId?"
+    ],
+    "tables": [
+     "travel_days",
+     "day_variant_switches"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g7_optimize_compare.py",
+    "backend/tests/test_gate_planb_next.py",
+    "backend/tests/test_gate_planb_variants.py",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts",
+    "frontend/e2e/plan-b.spec.ts"
+   ],
+   "external_providers": [
+    "天気(Open-Meteo)",
+    "気象警報(気象庁)",
+    "AI の確かめ(会員クラスの枠の中)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-019(承認済みの変更でプランB へ置き換え)"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 天気(Open-Meteo)・気象警報(気象庁)・AI の確かめ(会員クラスの枠の中)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実通信待ち"
+   ]
+  },
+  "FR-020": {
+   "title": "共同編集",
+   "requirement": {
+    "source": "DOC-02 §3 FR-020",
+    "priority": "MUST",
+    "stage": "G1-G5",
+    "summary": "リアルタイムまたは準リアルタイムで編集し、編集中・版を示す",
+    "acceptance": "楽観ロックでフィールド・削除の競合を検出し、最後の書き込みで黙って上書きしない"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-10-21",
+     "change": "文字単位の同時編集(CRDT)は対象外にし、版の競合を検出する方式にする",
+     "source": "ADR-collaboration.md・DOC-10 §3 FR-020",
+     "confidence": "中(ADR の判断。利用者の明示の承認の記録は見当たらない)"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-06",
+     "SC-20"
+    ],
+    "api_group": "SHARE/MEMBER"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/presence.py",
+     "backend/app/api/v1/plans.py"
+    ],
+    "routes": [
+     "planner/:planId?"
+    ],
+    "tables": [
+     "plan_collaborators",
+     "plan_versions"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_c1_collaboration.py",
+    "backend/tests/test_gate_g2_realtime.py",
+    "frontend/e2e/collaboration.spec.ts",
+    "frontend/e2e/realtime-collab.spec.ts",
+    "frontend/src/components/planner/PresenceBar.test.tsx",
+    "frontend/src/hooks/usePlanPresence.test.tsx",
+    "frontend/src/pages/PlannerPage.collab.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/c1collab.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/utils/editConflict.test.ts",
+    "frontend/src/utils/sse.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-020"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-021": {
+   "title": "共有・権限",
+   "requirement": {
+    "source": "DOC-02 §3 FR-021",
+    "priority": "MUST",
+    "stage": "G1-G2",
+    "summary": "所有者・編集者・投票者・閲覧者・チケット閲覧・費用閲覧の権限。リンクは期限・回数・パスコード・範囲・失効",
+    "acceptance": "予約番号・実位置・RESTRICTED 資料は共有リンクで既定非公開"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-18"
+    ],
+    "api_group": "SHARE/MEMBER"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/share.py",
+     "backend/app/api/v1/member_policy.py",
+     "backend/app/api/v1/ownership.py"
+    ],
+    "routes": [
+     "share/:planId"
+    ],
+    "tables": [
+     "plan_share_links",
+     "plan_collaborators",
+     "plan_ownership_transfers"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g8_ownership_corrections.py",
+    "backend/tests/test_share.py",
+    "frontend/e2e/document-wallet.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts",
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-021"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-022": {
+   "title": "合意形成",
+   "requirement": {
+    "source": "DOC-02 §3 FR-022",
+    "priority": "MUST",
+    "stage": "G5",
+    "summary": "候補へ Love/OK/懸念/不可と理由・代替・期限を入れ、拒否権の濫用を避ける規則を旅行単位で持つ",
+    "acceptance": "合意の状態と未回答者を見える化する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-19"
+    ],
+    "api_group": "VOTE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/discussion.py",
+     "backend/app/api/v1/decisions.py"
+    ],
+    "routes": [
+     "planner/:planId/discussion"
+    ],
+    "tables": [
+     "polls",
+     "poll_options",
+     "votes"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g4_decisions_comments.py",
+    "backend/tests/test_gate_p3_discussion.py",
+    "frontend/e2e/discussion.spec.ts",
+    "frontend/e2e/gate-g11-family-vote.spec.ts",
+    "frontend/e2e/gate-g4.spec.ts",
+    "frontend/src/pages/DiscussionPage.test.tsx",
+    "frontend/src/pages/candidates/CandidateVoting.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p3discussion.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-022"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-023": {
+   "title": "秘匿プロフィール・制約",
+   "requirement": {
+    "source": "DOC-02 §3 FR-023",
+    "priority": "MUST",
+    "stage": "G5",
+    "summary": "予算・健康・宗教・食事・体力等を本人限定で保存し、他の参加者には充足/不充足だけ見せる",
+    "acceptance": "運用管理者にも平文を常に見せない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-19",
+     "SC-29"
+    ],
+    "api_group": "MEMBER"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/private_profile.py"
+    ],
+    "routes": [
+     "settings"
+    ],
+    "tables": [
+     "user_private_profiles",
+     "private_profile_links"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_c1_collaboration.py",
+    "backend/tests/test_gate_s4_authz_matrix.py",
+    "frontend/e2e/collaboration.spec.ts",
+    "frontend/e2e/constraints.spec.ts",
+    "frontend/src/components/settings/PrivateProfileSection.test.tsx",
+    "frontend/src/pages/constraints/PrivateProfilePanel.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/c1collab.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/utils/privateProfile.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-023"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-024": {
+   "title": "コメント・通知",
+   "requirement": {
+    "source": "DOC-02 §3 FR-024",
+    "priority": "SHOULD",
+    "stage": "G1-G5",
+    "summary": "イベント・予約・候補・変更セットへのコメント。メンション・変更・期限・出発・遅延・情報期限切れの通知",
+    "acceptance": "通知本文に予約番号や健康情報を含めない"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11",
+     "change": "メールは SMTP を設定した時だけ送り、未設定ならアプリ内の通知",
+     "source": "利用者の決定(プロジェクトの記録 2026-11)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-20",
+     "SC-30"
+    ],
+    "api_group": "SHARE/MEMBER"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/discussion.py",
+     "backend/app/api/v1/notifications.py",
+     "backend/app/api/v1/push.py"
+    ],
+    "routes": [
+     "notifications",
+     "planner/:planId/discussion"
+    ],
+    "tables": [
+     "comments",
+     "notifications",
+     "notification_preferences",
+     "email_outbox"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p3_discussion.py",
+    "backend/tests/test_gate_remaining3_mail.py",
+    "frontend/e2e/discussion.spec.ts",
+    "frontend/src/pages/DiscussionPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p3discussion.test.ts"
+   ],
+   "external_providers": [
+    "SMTP(メールの送信)",
+    "Web Push"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-024"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): SMTP(メールの送信)・Web Push"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-025": {
+   "title": "持ち物",
+   "requirement": {
+    "source": "DOC-02 §3 FR-025",
+    "priority": "SHOULD",
+    "stage": "G2-G5",
+    "summary": "共有/個人・数量・担当・必須・購入・梱包・使用後を管理し、日数・天候・活動等から候補を作る",
+    "acceptance": "旅程の変更で追加・不要の候補を示す"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-21"
+    ],
+    "api_group": "PACKING"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/preparation.py"
+    ],
+    "routes": [
+     "planner/:planId/preparation"
+    ],
+    "tables": [
+     "packing_items"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p1_preparation.py",
+    "frontend/e2e/preparation.spec.ts",
+    "frontend/src/pages/PreparationPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p1preparation.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-025"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-026": {
+   "title": "レディネス",
+   "requirement": {
+    "source": "DOC-02 §3 FR-026",
+    "priority": "MUST",
+    "stage": "G2-G5",
+    "summary": "未予約・未支払・未確認・未割当・期限切れ・持ち物不足を一覧にする",
+    "acceptance": "完了条件・責任者・期限を持つ"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-22"
+    ],
+    "api_group": "READINESS"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/preparation.py"
+    ],
+    "routes": [
+     "planner/:planId/preparation",
+     "planner/:planId/kit"
+    ],
+    "tables": [
+     "preparation_tasks"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p1_preparation.py",
+    "frontend/e2e/preparation.spec.ts",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx",
+    "frontend/src/pages/PreparationPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p1preparation.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-026"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-027": {
+   "title": "予算・費用",
+   "requirement": {
+    "source": "DOC-02 §3 FR-027",
+    "priority": "MUST",
+    "stage": "G5",
+    "summary": "計画・予約・実費・税・手数料・返金・複数通貨・換算を扱う",
+    "acceptance": "人別・カテゴリ別・日別の予算と差異を出す"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-23"
+    ],
+    "api_group": "EXPENSE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/finance.py",
+     "backend/app/api/v1/finance_ledger.py",
+     "backend/app/api/v1/receipts.py"
+    ],
+    "routes": [
+     "planner/:planId/expenses"
+    ],
+    "tables": [
+     "budgets",
+     "budget_versions",
+     "expenses",
+     "fx_rates"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g5_finance.py",
+    "backend/tests/test_gate_p2_finance.py",
+    "frontend/e2e/expenses.spec.ts",
+    "frontend/e2e/gate-g5.spec.ts",
+    "frontend/src/pages/ExpensesPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p2finance.test.ts"
+   ],
+   "external_providers": [
+    "為替(ECB の参考値)",
+    "レシートの読み取り(AI)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-027"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 為替(ECB の参考値)・レシートの読み取り(AI)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実通信待ち",
+    "運用待ち"
+   ]
+  },
+  "FR-028": {
+   "title": "立替・精算",
+   "requirement": {
+    "source": "DOC-02 §3 FR-028",
+    "priority": "SHOULD",
+    "stage": "G5",
+    "summary": "支払者・負担者・均等/比率/金額/項目別の分割・債務の簡約・精算済み",
+    "acceptance": "領収書の原本と紐付ける"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-23"
+    ],
+    "api_group": "EXPENSE"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/finance.py"
+    ],
+    "routes": [
+     "planner/:planId/expenses"
+    ],
+    "tables": [
+     "expense_shares",
+     "settlements"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p2_finance.py",
+    "frontend/e2e/expenses.spec.ts",
+    "frontend/src/pages/ExpensesPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p2finance.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-028"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "運用待ち"
+   ]
+  },
+  "FR-029": {
+   "title": "当日モード",
+   "requirement": {
+    "source": "DOC-02 §3 FR-029",
+    "priority": "MUST",
+    "stage": "G4",
+    "summary": "起動直後に今日・NOW・NEXT・出発まで・遅延・必要なチケットを出し、大きな文字・片手・高コントラスト・低電力",
+    "acceptance": "重要な情報へ1操作、一般の情報へ3操作以内"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-07"
+    ],
+    "api_group": "EXECUTION"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/today_live.py"
+    ],
+    "routes": [
+     "planner/:planId/today"
+    ],
+    "tables": [
+     "travel_events"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l1_today_mode.py",
+    "backend/tests/test_gate_l1b_today_timezone.py",
+    "backend/tests/test_gate_s4_authz_matrix.py",
+    "frontend/e2e/replan.spec.ts",
+    "frontend/e2e/today-mode-mobile.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-029"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-030": {
+   "title": "外部状況",
+   "requirement": {
+    "source": "DOC-02 §3 FR-030",
+    "priority": "SHOULD",
+    "stage": "G4-G5",
+    "summary": "天気・警報・交通遅延・欠航・ゲート・休業を取得し旅程への影響を判定する",
+    "acceptance": "外部の値に確実性と取得時刻を出し、取れない時に最後の値を今の値のように見せない"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11",
+     "change": "外部の状況は無料の提供元だけ接続し、有料・鍵の要る物は接続口だけ",
+     "source": "利用者の決定(プロジェクトの記録 2026-11)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-24"
+    ],
+    "api_group": "EXECUTION"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/replans.py"
+    ],
+    "routes": [
+     "planner/:planId/alerts"
+    ],
+    "tables": [
+     "plan_alerts"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p10_replans.py",
+    "frontend/e2e/replan.spec.ts",
+    "frontend/src/pages/replan/ExternalStatusPanel.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p10replans.test.ts"
+   ],
+   "external_providers": [
+    "気象庁の警報・注意報",
+    "鉄道の運行情報(ODPT。鍵の後)",
+    "休業の提供元"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-030"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 気象庁の警報・注意報・鉄道の運行情報(ODPT。鍵の後)・休業の提供元"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-031": {
+   "title": "安全な再計画",
+   "requirement": {
+    "source": "DOC-02 §3 FR-031",
+    "priority": "MUST",
+    "stage": "G4",
+    "summary": "問題のイベントから固定の予約を守る代替案 A/B を出し、変更・通知・費用差・遅延差・失う予定を示す",
+    "acceptance": "利用者の承認の前に共有の旅程を変えない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-24"
+    ],
+    "api_group": "REPLAN"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/replans.py"
+    ],
+    "routes": [
+     "planner/:planId/replans/:replanId"
+    ],
+    "tables": [
+     "replans"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p10_replans.py",
+    "frontend/e2e/replan.spec.ts"
+   ],
+   "external_providers": [
+    "Web Push"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-031"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): Web Push"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-032": {
+   "title": "Offline Pack",
+   "requirement": {
+    "source": "DOC-02 §3 FR-032",
+    "priority": "MUST",
+    "stage": "G2-G4",
+    "summary": "当日と数日分の旅程・場所・予約・チケット・連絡先・緊急情報を端末の暗号化領域へ保存する",
+    "acceptance": "最終同期・未同期・期限・端末の失効を出し、共有端末では保存範囲を縮められる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-07",
+     "SC-38"
+    ],
+    "api_group": "SYNC"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/offline_pack.py"
+    ],
+    "routes": [
+     "planner/:planId/today"
+    ],
+    "tables": [
+     "offline_devices"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_k1_offline_keys.py",
+    "frontend/e2e/offline-pack.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-032"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "実機待ち"
+   ]
+  },
+  "FR-033": {
+   "title": "Offline同期",
+   "requirement": {
+    "source": "DOC-02 §3 FR-033",
+    "priority": "SHOULD",
+    "stage": "G4-G5",
+    "summary": "一時 ID・操作の列・再送・冪等・競合の解決",
+    "acceptance": "予約番号等の機密の変更はオンラインの再認証を要求できる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-07"
+    ],
+    "api_group": "SYNC"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/sync.py"
+    ],
+    "routes": [
+     "planner/:planId/sync"
+    ],
+    "tables": [
+     "sync_operations"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g6_offline.py",
+    "backend/tests/test_gate_p11_sync.py",
+    "frontend/e2e/gate-g6.spec.ts",
+    "frontend/e2e/offline-sync.spec.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p11sync.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-033"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "運用待ち"
+   ]
+  },
+  "FR-034": {
+   "title": "しおり生成",
+   "requirement": {
+    "source": "DOC-02 §3 FR-034",
+    "priority": "MUST",
+    "stage": "G1-G2",
+    "summary": "かわいい・簡潔・家族・学校・出張・アクセシブル・白黒のテーマで、同じ構造化データから Web・PDF・印刷を作る",
+    "acceptance": "表紙・目次・日程・地図・持ち物・連絡先・費用・注意を選べる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-25"
+    ],
+    "api_group": "EXPORT"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/booklet.py"
+    ],
+    "routes": [
+     "planner/:planId/booklet"
+    ],
+    "tables": [
+     "booklet_exports"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p4_booklet.py",
+    "frontend/e2e/booklet.spec.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p4booklet.test.ts"
+   ],
+   "external_providers": [
+    "配備先の字体・地図の画像"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-034"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 配備先の字体・地図の画像"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-035": {
+   "title": "安全な印刷・公開",
+   "requirement": {
+    "source": "DOC-02 §3 FR-035",
+    "priority": "MUST",
+    "stage": "G1-G2",
+    "summary": "版ごとに予約番号・QR・住所・電話・参加者を含めるか選び、機密を含む版に警告・透かし・有効日",
+    "acceptance": "公開ページは検索エンジン除外を既定にする"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-26"
+    ],
+    "api_group": "EXPORT"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/booklet_share.py",
+     "backend/app/api/v1/booklet.py",
+     "backend/app/api/v1/server_exports.py"
+    ],
+    "routes": [
+     "b/:token",
+     "planner/:planId/booklet"
+    ],
+    "tables": [
+     "booklet_exports"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p4_booklet.py",
+    "backend/tests/test_gate_remaining5_server_exports.py",
+    "frontend/e2e/booklet.spec.ts"
+   ],
+   "external_providers": [
+    "配備先の字体(サーバー PDF)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-035"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 配備先の字体(サーバー PDF)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-036": {
+   "title": "Calendar/Map IO",
+   "requirement": {
+    "source": "DOC-02 §3 FR-036",
+    "priority": "SHOULD",
+    "stage": "G5",
+    "summary": "ICS・Google/Apple カレンダー・KML・GPX・CSV の入出力",
+    "acceptance": "外部の更新の取り込みは差分を確認してから適用する"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-05",
+     "change": "Google マイマップは KML の案内付きの取り込み(自動の作成・更新はしない)",
+     "source": "ADR-mymaps-photo-qr.md・利用者の指示(DOC-10 §0.1 MyMaps)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-27"
+    ],
+    "api_group": "CALENDAR/MAP"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/itinerary_export.py",
+     "backend/app/api/v1/calendar_import.py"
+    ],
+    "routes": [
+     "planner/:planId/calendar-import",
+     "planner/:planId/exports"
+    ],
+    "tables": [
+     "plan_external_maps"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p5_itinerary_export.py",
+    "backend/tests/test_gate_p8_calendar_import.py",
+    "backend/tests/test_gate_remaining5_server_exports.py",
+    "frontend/e2e/calendar-import.spec.ts",
+    "frontend/e2e/exports.spec.ts",
+    "frontend/src/pages/CalendarImportPage.test.tsx",
+    "frontend/src/pages/ExportsPage.test.tsx",
+    "frontend/src/pages/exports/CalendarFeedCard.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p5itineraryExport.test.ts",
+    "frontend/src/services/api/p8calendarImport.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-036"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-037": {
+   "title": "写真・旅行記",
+   "requirement": {
+    "source": "DOC-02 §3 FR-037",
+    "priority": "SHOULD",
+    "stage": "G6",
+    "summary": "イベント・場所・日時へ写真・動画の参照・音声メモ・文を紐付け、計画と実績から旅行記の下書きを作る",
+    "acceptance": "公開の範囲を確かめる(顔・同行者・位置・予約の公開前の検査)"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-28"
+    ],
+    "api_group": "MEMORY"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/memories.py",
+     "backend/app/api/v1/memory_publish.py",
+     "backend/app/api/v1/photo_upload.py",
+     "backend/app/api/v1/spot_media.py"
+    ],
+    "routes": [
+     "planner/:planId/memories",
+     "journal/:token",
+     "u/:token"
+    ],
+    "tables": [
+     "memories",
+     "memory_publications",
+     "photo_upload_links"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p12_memories.py",
+    "backend/tests/test_gate_remaining5_server_exports.py",
+    "frontend/e2e/gate-g11-media.spec.ts",
+    "frontend/e2e/memories.spec.ts",
+    "frontend/src/pages/MemoriesPage.test.tsx",
+    "frontend/src/pages/memories/FaceCheckButton.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p12memories.test.ts"
+   ],
+   "external_providers": [
+    "顔の検査(Google Cloud Vision。鍵の後)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-037"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 顔の検査(Google Cloud Vision。鍵の後)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち",
+    "実機待ち"
+   ]
+  },
+  "FR-038": {
+   "title": "位置軌跡",
+   "requirement": {
+    "source": "DOC-02 §3 FR-038",
+    "priority": "COULD",
+    "stage": "G6",
+    "summary": "旅行期間に限った位置の軌跡。精度の選択・即停止・後から削除",
+    "acceptance": "参加者への位置共有と本人の旅行記の記録を分ける"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-43",
+     "SC-29"
+    ],
+    "api_group": "MEMORY"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/location_tracks.py"
+    ],
+    "routes": [
+     "planner/:planId/track"
+    ],
+    "tables": [
+     "location_tracks",
+     "trip_location_settings"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l5_local_first_location.py",
+    "backend/tests/test_gate_p13_location_tracks.py",
+    "backend/tests/test_gate_p9_account_deletion.py",
+    "frontend/e2e/location-local-first.spec.ts",
+    "frontend/e2e/location-track.spec.ts",
+    "frontend/src/pages/LocationTrackPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p13location.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-038"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-039": {
+   "title": "輸出・削除",
+   "requirement": {
+    "source": "DOC-02 §3 FR-039",
+    "priority": "MUST",
+    "stage": "G2-G6",
+    "summary": "旅行単位・アカウント単位の輸出・訂正・削除・同意の撤回",
+    "acceptance": "バックアップ・監査の残る期間を説明する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-29"
+    ],
+    "api_group": "PRIVACY"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/data_export.py",
+     "backend/app/api/v1/privacy.py",
+     "backend/app/api/v1/corrections.py"
+    ],
+    "routes": [
+     "settings/data"
+    ],
+    "tables": [
+     "data_corrections",
+     "memory_trash",
+     "data_keys"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g7_memory_deletion.py",
+    "backend/tests/test_gate_g8_ownership_corrections.py",
+    "backend/tests/test_gate_p6_data_export.py",
+    "backend/tests/test_gate_p9_account_deletion.py",
+    "frontend/e2e/account-deletion.spec.ts",
+    "frontend/e2e/data-export.spec.ts",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/gate-g8.spec.ts",
+    "frontend/src/pages/DataPrivacyPage.test.tsx",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p6dataExport.test.ts",
+    "frontend/src/services/api/p9privacy.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-039"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-040": {
+   "title": "管理・監査",
+   "requirement": {
+    "source": "DOC-02 §3 FR-040",
+    "priority": "MUST",
+    "stage": "G0-G6",
+    "summary": "利用者の状態・共有の失効・外部連携の障害・ジョブ・濫用・容量・セキュリティのイベントを管理する",
+    "acceptance": "サポートの閲覧は同意・目的・時間の制限・監査が要る"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-32"
+    ],
+    "api_group": "ADMIN"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/admin.py",
+     "backend/app/api/v1/admin_ops.py",
+     "backend/app/api/v1/admin_support.py"
+    ],
+    "routes": [
+     "admin"
+    ],
+    "tables": [
+     "audit_logs",
+     "support_grants",
+     "abuse_reports"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_a2_admin.py",
+    "backend/tests/test_gate_g2_support_access.py",
+    "backend/tests/test_gate_g4_guest_abuse.py",
+    "frontend/e2e/admin.spec.ts",
+    "frontend/e2e/support-access.spec.ts",
+    "frontend/src/pages/Admin/AdminAuditLogs.test.tsx",
+    "frontend/src/pages/G2.features.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/a2admin.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-040"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-041": {
+   "title": "組織・B2B",
+   "requirement": {
+    "source": "DOC-02 §3 FR-041",
+    "priority": "SHOULD",
+    "stage": "G6",
+    "summary": "組織・ブランド・テンプレート・旅行の配布・版の改訂・閲覧の確認・組織の役割",
+    "acceptance": "(DOC-02 に受入の文は無い。DOC-04 SC-31 の管理項目)"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-31"
+    ],
+    "api_group": "ORG"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/organizations.py"
+    ],
+    "routes": [
+     "organizations",
+     "organizations/:orgId"
+    ],
+    "tables": [
+     "organizations",
+     "organization_members",
+     "organization_domains"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_b1_organizations.py",
+    "frontend/e2e/organizations.spec.ts",
+    "frontend/src/pages/Organizations.b1.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/b1organizations.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [
+    "本番の DNS(ドメインの確認)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-041"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 本番の DNS(ドメインの確認)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装",
+    "運用待ち"
+   ]
+  },
+  "FR-042": {
+   "title": "API・埋込",
+   "requirement": {
+    "source": "DOC-02 §3 FR-042",
+    "priority": "COULD",
+    "stage": "G6",
+    "summary": "外部事業者が旅行・イベント・場所・予約の限定の操作をできる",
+    "acceptance": "OAuth スコープ・Webhook の署名・回数制限・監査を必須にする"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-10-21",
+     "change": "書き込みの API は個人のデータを外へ出さない方針で配布だけ",
+     "source": "DOC-10 §3 FR-042・gate-g2-trace.md",
+     "confidence": "中(Gate の判断。利用者の明示の承認の記録は見当たらない)"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-31"
+    ],
+    "api_group": "PUBLIC_API"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/org_external.py"
+    ],
+    "routes": [
+     "organizations/:orgId"
+    ],
+    "tables": [
+     "org_api_clients",
+     "org_api_tokens",
+     "org_webhooks"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_b1_organizations.py",
+    "backend/tests/test_gate_g2_org_api.py",
+    "backend/tests/test_gate_remaining5_server_exports.py",
+    "frontend/e2e/org-api-rotation.spec.ts",
+    "frontend/e2e/organizations.spec.ts",
+    "frontend/src/components/share/embedModel.test.ts",
+    "frontend/src/pages/Organizations.b1.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 §3 FR-042"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-043": {
+   "title": "Quick Plan",
+   "requirement": {
+    "source": "DOC-02 FR-043 / DOC-15 CA-001",
+    "priority": "MUST(P0)",
+    "stage": "G1",
+    "summary": "日付・予定・場所だけで数分以内に始められる。アカウント前でも端末内の下書き。Advanced と同じ正規モデルへ保存",
+    "acceptance": "説明なしで3分以内に旅行と予定を作れ、場所・時刻が未定でも保存でき、失敗しても入力を失わない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-33"
+    ],
+    "api_group": "quick-drafts"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/quickdrafts.py"
+    ],
+    "routes": [
+     "/"
+    ],
+    "tables": [
+     "quick_drafts"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_r2_2_quickdraft_create.py",
+    "backend/tests/test_gate_r2_3_quickdraft_promote.py",
+    "backend/tests/test_gate_r2_5_concurrency.py",
+    "frontend/e2e/quickdraft-flow.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-043 / DOC-15 CA-001"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-044": {
+   "title": "Guest Travel View",
+   "requirement": {
+    "source": "DOC-02 FR-044 / DOC-15 CA-002",
+    "priority": "MUST(P0)",
+    "stage": "G2",
+    "summary": "アカウントの無い同行者へ読み取り専用の URL(期限・PIN・停止・項目の選択・閲覧回数)で旅程を共有する",
+    "acceptance": "URL を知るだけでは RESTRICTED を取れず、停止・期限切れ後は再取得できない。共有前に公開内容を確かめられる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-35"
+    ],
+    "api_group": "g/{token}"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/public_share.py"
+    ],
+    "routes": [
+     "s/:token"
+    ],
+    "tables": [
+     "plan_share_links",
+     "share_access_logs"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g4_guest_abuse.py",
+    "backend/tests/test_share.py",
+    "frontend/e2e/gate-g4.spec.ts",
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-044 / DOC-15 CA-002"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "運用待ち"
+   ]
+  },
+  "FR-045": {
+   "title": "安全な共有ポリシー",
+   "requirement": {
+    "source": "DOC-02 FR-045 / DOC-15 CA-003",
+    "priority": "MUST(P0)",
+    "stage": "G2",
+    "summary": "PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED の分類を共有でも強制し、URL・同行者・画像・PDF ごとに別の Policy",
+    "acceptance": "「すべて共有」でも機密を暗黙に公開せず、共有・Reveal・ダウンロード・印刷を監査する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-34"
+    ],
+    "api_group": "shares"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/public_share.py",
+     "backend/app/api/v1/member_policy.py",
+     "backend/app/api/v1/share.py"
+    ],
+    "routes": [
+     "share/:planId"
+    ],
+    "tables": [
+     "plan_share_links"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_f45_share_policy.py",
+    "backend/tests/test_gate_g2_member_policy.py",
+    "frontend/e2e/member-policy.spec.ts",
+    "frontend/e2e/share-policy.spec.ts",
+    "frontend/src/pages/G2.features.test.tsx",
+    "frontend/src/pages/SharePage.f45.test.tsx",
+    "frontend/src/pages/SharePage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/f45sharePolicy.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-045 / DOC-15 CA-003"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-046": {
+   "title": "画像・PDFの出力",
+   "requirement": {
+    "source": "DOC-02 FR-046 / DOC-15 CA-004",
+    "priority": "MUST(P0)",
+    "stage": "G2",
+    "summary": "1日・旅行全体・NOW/NEXT のカードを画像・A4 PDF・縦長画像にする",
+    "acceptance": "出力前に含む項目を確かめ機密を既定で除き、生成日時・情報の状態・共有範囲を出し、STALE/CONFLICTED に警告"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-36"
+    ],
+    "api_group": "exports"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/booklet.py",
+     "backend/app/api/v1/server_exports.py"
+    ],
+    "routes": [
+     "planner/:planId/exports"
+    ],
+    "tables": [
+     "booklet_exports"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p4_booklet.py",
+    "backend/tests/test_gate_remaining5_server_exports.py",
+    "frontend/e2e/booklet-image.spec.ts",
+    "frontend/e2e/booklet.spec.ts",
+    "frontend/src/pages/booklet/ImageExportPanel.test.tsx"
+   ],
+   "external_providers": [
+    "配備先の字体"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-046 / DOC-15 CA-004"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 配備先の字体"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-047": {
+   "title": "旅程複製",
+   "requirement": {
+    "source": "DOC-02 FR-047 / DOC-15 CA-005",
+    "priority": "MUST(P0)",
+    "stage": "G1",
+    "summary": "予定・複数の予定・1日・旅行全体を複製する",
+    "acceptance": "別の日では時差・営業時間・予約・区間を再検証し、予約番号・券・個人情報は既定で複製しない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-37"
+    ],
+    "api_group": "duplicates"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/plans.py",
+     "backend/app/api/v1/share.py"
+    ],
+    "routes": [
+     "planner/:planId?"
+    ],
+    "tables": [
+     "travel_plans"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate39_plan_clone.py",
+    "frontend/e2e/share-clone.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-047 / DOC-15 CA-005"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-048": {
+   "title": "Offline Travel Pack(端末)",
+   "requirement": {
+    "source": "DOC-02 FR-048 / DOC-15 CA-006",
+    "priority": "MUST(P0)",
+    "stage": "G2",
+    "summary": "旅行単位で旅程・住所・予約(許可の範囲)・チケット・文書・緊急連絡先を端末の暗号化領域へ",
+    "acceptance": "最終同期と STALE を出し、端末の紛失で失効・期限・自動削除。オフラインの更新は列に入れ再接続で競合を解く"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-38"
+    ],
+    "api_group": "offline-packs"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/offline_pack.py"
+    ],
+    "routes": [
+     "planner/:planId/today"
+    ],
+    "tables": [
+     "offline_devices"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g6_offline.py",
+    "backend/tests/test_gate_k1_offline_keys.py",
+    "frontend/e2e/gate-g6.spec.ts",
+    "frontend/e2e/offline-pack.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-048 / DOC-15 CA-006"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "運用待ち"
+   ]
+  },
+  "FR-049": {
+   "title": "Visited Area Layer",
+   "requirement": {
+    "source": "DOC-02 FR-049 / DOC-15 CA-007",
+    "priority": "SHOULD(P1)",
+    "stage": "G4",
+    "summary": "地図に予定・候補・通過・訪問・滞在・確認済み・非表示の状態を重ねる",
+    "acceptance": "単純なグリッドの開放をまねず、計画・通過・滞在・確認を区別する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-39"
+    ],
+    "api_group": "visits"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/visits.py"
+    ],
+    "routes": [
+     "planner/:planId/visits"
+    ],
+    "tables": [
+     "location_area_cells"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_v2_visits.py",
+    "frontend/e2e/remaining7.spec.ts",
+    "frontend/e2e/visits.spec.ts",
+    "frontend/src/pages/VisitsPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/v2visits.test.ts"
+   ],
+   "external_providers": [
+    "地図タイル(OpenStreetMap)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-049 / DOC-15 CA-007"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 地図タイル(OpenStreetMap)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち"
+   ]
+  },
+  "FR-050": {
+   "title": "訪問判定・信頼度",
+   "requirement": {
+    "source": "DOC-02 FR-050 / DOC-15 CA-008",
+    "priority": "SHOULD(P1)",
+    "stage": "G4",
+    "summary": "GPS・滞在・速度・予定との一致・写真・手動・チケットから訪問を判定する",
+    "acceptance": "信頼度・根拠・判定時刻・アルゴリズムの版を保存し、低い時は確定せず確認を求める"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-40"
+    ],
+    "api_group": "visits/assess"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/visits.py"
+    ],
+    "routes": [
+     "planner/:planId/visits"
+    ],
+    "tables": [
+     "visit_assessments"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_v2_visits.py",
+    "frontend/e2e/visits.spec.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-050 / DOC-15 CA-008"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-051": {
+   "title": "訪問訂正・除外",
+   "requirement": {
+    "source": "DOC-02 FR-051 / DOC-15 CA-009",
+    "priority": "MUST(P0)",
+    "stage": "G4",
+    "summary": "誤った訪問の取り消し・訪問/通過の変更・時間/地点/旅行単位の GPS 削除・守る範囲・公開時のぼかし",
+    "acceptance": "削除の要求の後に生の位置を監査ログへ写さない"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-40",
+     "SC-43"
+    ],
+    "api_group": "visits"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/visits.py",
+     "backend/app/api/v1/privacy_zones.py"
+    ],
+    "routes": [
+     "planner/:planId/visits"
+    ],
+    "tables": [
+     "visit_assessments",
+     "privacy_zones"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g6_location_memory.py",
+    "backend/tests/test_gate_v2_visits.py",
+    "frontend/e2e/visits.spec.ts",
+    "frontend/src/utils/protectedZones.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-051 / DOC-15 CA-009"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実機待ち"
+   ]
+  },
+  "FR-052": {
+   "title": "Personal Travel Atlas",
+   "requirement": {
+    "source": "DOC-02 FR-052 / DOC-15 CA-010",
+    "priority": "SHOULD(P1)",
+    "stage": "G6",
+    "summary": "複数の旅行を通して国・都道府県・市区町村・テーマ等で訪問の地域を見せる",
+    "acceptance": "Atlas から過去の記録・未訪問の候補・次の計画へ移れ、公開範囲を旅行・地点単位で設定"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-41"
+    ],
+    "api_group": "atlas"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/atlas.py"
+    ],
+    "routes": [
+     "atlas"
+    ],
+    "tables": [
+     "location_area_cells"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p15_atlas.py",
+    "frontend/e2e/atlas.spec.ts",
+    "frontend/src/pages/AtlasPage.test.tsx",
+    "frontend/src/pages/atlas/AtlasPlacesPanel.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p15atlas.test.ts"
+   ],
+   "external_providers": [
+    "地域の判定(国土地理院・Nominatim)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-052 / DOC-15 CA-010"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): 地域の判定(国土地理院・Nominatim)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "実通信待ち"
+   ]
+  },
+  "FR-053": {
+   "title": "旅の達成指標",
+   "requirement": {
+    "source": "DOC-02 FR-053 / DOC-15 CA-011",
+    "priority": "COULD(P2)",
+    "stage": "G6",
+    "summary": "計画・訪問・写真つき・記録の達成率、移動距離・滞在時間・再訪率",
+    "acceptance": "健康・安全・費用を害する競争を誘わず、ランキングは作らず、数値は隠せる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-42"
+    ],
+    "api_group": "journey-metrics"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/journey.py"
+    ],
+    "routes": [
+     "planner/:planId/journey"
+    ],
+    "tables": [
+     "event_actuals"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p14_journey.py",
+    "frontend/e2e/journey.spec.ts",
+    "frontend/src/pages/JourneyPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p14journey.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-053 / DOC-15 CA-011"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": []
+  },
+  "FR-054": {
+   "title": "予定と実績",
+   "requirement": {
+    "source": "DOC-02 FR-054 / DOC-15 CA-012",
+    "priority": "MUST(P0)",
+    "stage": "G4",
+    "summary": "計画→実行→訪問/見送り→記録を同じ ID の系列で結ぶ",
+    "acceptance": "予定を実績で上書きせず、予定と実績の時刻・経路と軌跡を比べ、行かなかった候補を次の旅行へ戻せる"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-42"
+    ],
+    "api_group": "memories"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/journey.py"
+    ],
+    "routes": [
+     "planner/:planId/journey"
+    ],
+    "tables": [
+     "event_actuals"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_p14_journey.py",
+    "backend/tests/test_gate_v2_visits.py",
+    "frontend/e2e/journey.spec.ts",
+    "frontend/src/components/Remaining7.test.tsx",
+    "frontend/src/pages/JourneyPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p14journey.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-054 / DOC-15 CA-012"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-055": {
+   "title": "Local-first Location",
+   "requirement": {
+    "source": "DOC-02 FR-055 / DOC-15 CA-013",
+    "priority": "MUST(P0)",
+    "stage": "G4",
+    "summary": "位置の記録は既定で OFF。「端末内のみ」「暗号化して同期」「記録しない」を旅行単位で選ぶ",
+    "acceptance": "端末内のみでは生の GPS をサーバーへ送らず、AI の入力から正確な位置を既定で除く"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-43"
+    ],
+    "api_group": "location-batches"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/location_tracks.py"
+    ],
+    "routes": [
+     "planner/:planId/track"
+    ],
+    "tables": [
+     "location_point_batches",
+     "trip_location_settings"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l5_local_first_location.py",
+    "frontend/e2e/location-local-first.spec.ts",
+    "frontend/src/services/api/l5location.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-055 / DOC-15 CA-013"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-056": {
+   "title": "適応型GPS",
+   "requirement": {
+    "source": "DOC-02 FR-056 / DOC-15 CA-014",
+    "priority": "SHOULD(P1)",
+    "stage": "G4",
+    "summary": "速度・停止・電池・精度で取得の頻度を変え、geofence・写真の EXIF・手動を併用する",
+    "acceptance": "記録中をアプリ内でも常に示し、低電力・一時停止・旅行終了の自動停止、電池の消費と欠測を観測する"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-43"
+    ],
+    "api_group": "location-batches"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/location_tracks.py"
+    ],
+    "routes": [
+     "planner/:planId/track"
+    ],
+    "tables": [
+     "location_point_batches"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_l5_local_first_location.py",
+    "frontend/e2e/location-local-first.spec.ts",
+    "frontend/src/services/api/l5location.test.ts",
+    "frontend/src/utils/adaptiveSampler.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-056 / DOC-15 CA-014"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "未実装"
+   ]
+  },
+  "FR-057": {
+   "title": "Memory Replan",
+   "requirement": {
+    "source": "DOC-02 FR-057 / DOC-15 CA-015",
+    "priority": "COULD(P2)",
+    "stage": "G6",
+    "summary": "過去の予定と実績から次の計画への提案を作る",
+    "acceptance": "提案は説明でき戻せて、利用者が採用するまで旅程を変えない。機微を AI へ送る時は明示の同意と最小化"
+   },
+   "approved_changes": [],
+   "spec_refs": {
+    "screens": [
+     "SC-42"
+    ],
+    "api_group": "memories/replan"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/memory_replan.py"
+    ],
+    "routes": [
+     "planner/:planId/memory-replan"
+    ],
+    "tables": [
+     "change_sets"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_g7_memory_deletion.py",
+    "backend/tests/test_gate_p17_memory_replan.py",
+    "frontend/e2e/gate-g7.spec.ts",
+    "frontend/e2e/memory-replan.spec.ts",
+    "frontend/src/pages/MemoryReplanPage.test.tsx",
+    "frontend/src/services/api.surface.test.ts",
+    "frontend/src/services/api/contract.test.ts",
+    "frontend/src/services/api/p17memoryReplan.test.ts"
+   ],
+   "external_providers": [],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-057 / DOC-15 CA-015"
+    },
+    "implementation": {
+     "state": "done",
+     "note": "コードあり"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "done",
+     "note": "VERIFIED の証拠台帳の authz・conflict・security"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "na",
+     "note": "外部の提供元を使わない"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "運用待ち"
+   ]
+  },
+  "FR-058": {
+   "title": "Entitlement・料金",
+   "requirement": {
+    "source": "DOC-02 FR-058 / DOC-15 CA-016(承認済みの変更: Stripe のテストモードだけ)",
+    "priority": "SHOULD(P1)",
+    "stage": "G6",
+    "summary": "Free・Trip Pass・Monthly/Annual・Family/Group。旅行中の安全に直結するオフラインの閲覧・緊急情報を課金の壁に置かない。→ 2026-11-13 決定: Stripe のテストモードで仕組みだけ・価格は仮",
+    "acceptance": "本番の鍵(sk_live_)は断り、価格は管理画面で変えられる"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-13",
+     "change": "料金・決済は Stripe のテストモードで仕組みだけ。価格は仮で管理画面から変える。本番の鍵は断る",
+     "source": "利用者の決定(DOC-10 §3 FR-058 の主な不足に記録)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [],
+    "api_group": "entitlements"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/billing.py"
+    ],
+    "routes": [
+     "settings/billing"
+    ],
+    "tables": [
+     "billing_products",
+     "billing_subscriptions",
+     "billing_payments",
+     "entitlements"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_remaining4_billing.py",
+    "frontend/src/pages/BillingPage.test.tsx"
+   ],
+   "external_providers": [
+    "Stripe(テストモードの鍵の後)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 FR-058 / DOC-15 CA-016(承認済みの変更: Stripe のテストモードだけ)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "partial",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): Stripe(テストモードの鍵の後)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "未実装",
+    "利用者判断待ち"
+   ]
+  },
+  "FR-059": {
+   "title": "旅程相談 API の原価上限・クラス別 Quota",
+   "requirement": {
+    "source": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)",
+    "priority": "MUST",
+    "stage": "—",
+    "summary": "旅程の相談の外部 API の原価上限(1旅行あたり)と利用者クラス別の quota をサーバーで守る",
+    "acceptance": "同時の要求・再試行でも上限を超えず、利用者・管理者が実績を確かめられる(同書 §11)"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-10-29",
+     "change": "DOC-02 v5.1 に無い FR-059 を追加し、リポジトリの FR-059 正本を DOC-02/04/05/06/07/09/11/13 の該当箇所より優先する",
+     "source": "DOC-10 §0.2・Gate FR059-A(r27)",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [],
+    "api_group": "FR-059 §6"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/planning_usage.py",
+     "backend/app/api/v1/usage.py",
+     "backend/app/api/v1/paid_actions.py",
+     "backend/app/api/v1/trip_intents.py"
+    ],
+    "routes": [
+     "trip-consult",
+     "admin"
+    ],
+    "tables": [
+     "usage_policy_profiles",
+     "usage_budget_accounts",
+     "provider_usage_reservations",
+     "provider_usage_events",
+     "provider_secrets"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_fr059_cost_guard.py",
+    "backend/tests/test_gate_fr059_d11_free_usage.py",
+    "backend/tests/test_gate_fr059_tiers.py",
+    "backend/tests/test_gate_fr059c_shared_suspension.py",
+    "backend/tests/test_gate_g1_doc10.py",
+    "backend/tests/test_gate_providerconnect.py",
+    "frontend/e2e/fr059-planning-usage.spec.ts",
+    "frontend/src/components/planning/PlanningUsage.test.tsx"
+   ],
+   "external_providers": [
+    "OpenAI(ai.generate)",
+    "Google Places",
+    "Google Routes",
+    "Google Maps Static"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(一部の能力だけ。主な不足を参照)"
+    },
+    "integration": {
+     "state": "partial",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合・不正入力)。INTEGRATED の判定条件(DOC-10 §1)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の提供元での確認なし(CI は模擬): OpenAI(ai.generate)・Google Places・Google Routes・Google Maps Static"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops"
+    }
+   },
+   "gap_categories": [
+    "設定待ち",
+    "実通信待ち",
+    "未実装"
+   ]
+  }
+ }
+}

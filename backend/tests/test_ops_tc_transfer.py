@@ -309,3 +309,52 @@ def test_import_refuses_on_omega_or_version_mismatch(world, monkeypatch):
     log.write_text("")
     assert gcp.main(["import", str(enc), "--yes", "--skip-check"]) == 1
     assert "tcops backup" not in log.read_text() and (g_root / ".env").read_text() == _gcp_env()
+
+
+# ---------------------------------------------------------------------------
+# [Gate Hardening-A・監査 G-10] 同じ鍵を写す例外は開発の環境の間だけ
+# ---------------------------------------------------------------------------
+
+
+def test_strict_environments_match_backend_config(monkeypatch, tmp_path):
+    mod = _load(monkeypatch, tmp_path, tmp_path / "art")
+    text = (ROOT / "backend" / "app" / "core" / "config.py").read_text(encoding="utf-8")
+    line = next(ln for ln in text.splitlines() if ln.startswith("STRICT_ENVIRONMENTS ="))
+    assert mod.STRICT_ENVIRONMENTS == eval(line.split("=", 1)[1].strip())  # noqa: S307 (固定の tuple の literal)
+
+
+@pytest.mark.parametrize("app_env", ["production", "PROD", "staging"])
+def test_refuses_strict_environment_values(monkeypatch, tmp_path, app_env):
+    mod = _load(monkeypatch, tmp_path, tmp_path / "art")
+    with pytest.raises(mod.TransferError):
+        mod.refuse_strict_environment(app_env, "移す先")
+    for ok in ("development", "dev", "local", "", None):
+        mod.refuse_strict_environment(ok, "移す先")
+    assert mod.app_env_of([]) == "development"
+    assert mod.app_env_of(["APP_ENV=Staging"]) == "staging"
+
+
+def test_export_refuses_on_production_source(world):
+    side, log = world
+    _, o_art, omega = side("omega", _omega_env().replace("APP_ENV=development", "APP_ENV=production"))
+    assert omega.main(["export"]) == 1
+    assert not list(o_art.glob("tc-transfer-*.tar.enc"))  # 束を作らない(鍵を外へ出さない)
+    assert not log.exists() or "tcops backup" not in log.read_text()  # バックアップも取らない(何も動かさない)
+
+
+def test_import_refuses_on_staging_target_or_production_bundle(world, monkeypatch):
+    side, log = world
+    _, o_art, omega = side("omega", _omega_env())
+    assert omega.main(["export"]) == 0
+    enc = o_art / f"tc-transfer-{BID}.tar.enc"
+    g_root, _, gcp = side("gcp", _gcp_env() + "APP_ENV=staging\n")
+    log.write_text("")
+    before = (g_root / ".env").read_text()
+    assert gcp.main(["import", str(enc), "--yes", "--skip-check"]) == 1
+    assert "tcops backup" not in log.read_text() and (g_root / ".env").read_text() == before
+    # 束の元が本番と記録されている(古い道具・手で作った束)なら、開発の移す先でも開かない
+    g2_root, _, gcp2 = side("gcp2", _gcp_env())
+    monkeypatch.setattr(gcp2, "unpack", lambda *a, **k: ({"backup_id": BID, "source_app_env": "production"}, {}))
+    log.write_text("")
+    assert gcp2.main(["import", str(enc), "--yes", "--skip-check"]) == 1
+    assert "tcops backup" not in log.read_text() and (g2_root / ".env").read_text() == _gcp_env()

@@ -17,6 +17,8 @@ omega-dev2 と同じ値にする(「環境ごとに別の鍵」の方針の、�
 - GCP の今の DB は消さない(別名 travelcanvas_gcp_before_<時刻> に残す)。保存ファイルと .env は控えを取る
 - 移す前に GCP のバックアップを取り、検証できなければ何も変えない
 - 復元の確認(件数・保存ファイル・復号・alembic の版・鍵の指紋)が合わなければ切り替えない
+- [Gate Hardening-A・監査 G-10] 同じ鍵を写すのは開発の 2 つの環境の間だけの例外。移す元・移す先・束の元のどれかが
+  本番・ステージング(APP_ENV=production/prod/staging)なら何もしないで止める(本番の鍵を開発へ、開発の鍵を本番へ写さない)
 """
 from __future__ import annotations
 
@@ -121,6 +123,23 @@ def env_get(lines: Iterable[str], name: str) -> Optional[str]:
             if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
                 value = value[1:-1]
     return value
+
+
+# backend/app/core/config.py の STRICT_ENVIRONMENTS と同じ(この道具は標準ライブラリだけで動かすため写す。
+# 一致は backend/tests/test_ops_tc_transfer.py が確かめる)
+STRICT_ENVIRONMENTS = ("production", "prod", "staging")
+
+
+def app_env_of(lines: Iterable[str]) -> str:
+    """.env の APP_ENV(未設定は development。config.py の既定と同じ)"""
+    return (env_get(lines, "APP_ENV") or "development").strip().lower()
+
+
+def refuse_strict_environment(app_env: object, where: str) -> None:
+    """[監査 G-10] 同じ鍵を写す例外は開発の環境の間だけ。本番・ステージングが関わる時は止める"""
+    if str(app_env or "").strip().lower() in STRICT_ENVIRONMENTS:
+        raise TransferError("%sが本番・ステージング(APP_ENV=%s)です。鍵を写す移し方は開発の環境の間だけに使えます"
+                            "(利用者の判断 2026-11-17 の例外の範囲。docs/runbooks/gcp-data-transfer.md)" % (where, app_env))
 
 
 def extract_key_lines(lines: Iterable[str]) -> Dict[str, Optional[str]]:
@@ -346,6 +365,8 @@ def cmd_export(args: argparse.Namespace) -> int:
     env = env_lines(ROOT / ".env")
     if env_get(env, "COMPOSE_FILE") == GCP_COMPOSE_FILE:
         raise TransferError("ここは GCP の VM です。export は omega-dev2 で行います")
+    source_env = app_env_of(env)
+    refuse_strict_environment(source_env, "移す元")
     keys = extract_key_lines(env)
     passphrase = ask_pass(confirm=True)
     private_dir(ART)
@@ -355,8 +376,8 @@ def cmd_export(args: argparse.Namespace) -> int:
         say("1: omega-dev2 のバックアップを取って検証します")
         bid = take_backup(work)
         manifest = json.loads((work / f"{bid}.manifest.json").read_text(encoding="utf-8"))
-        meta = {"created_at": tag, "source": "omega-dev2", "alembic_revision": manifest.get("alembic_revision"),
-                "commit": manifest.get("commit")}
+        meta = {"created_at": tag, "source": "omega-dev2", "source_app_env": source_env,
+                "alembic_revision": manifest.get("alembic_revision"), "commit": manifest.get("commit")}
         say("1: バックアップ %s(DB の版 %s)" % (bid, manifest.get("alembic_revision")))
         out = ART / f"tc-transfer-{bid}.tar.enc"
         pack(work, bid, keys, meta, out, passphrase)
@@ -380,6 +401,7 @@ def gcp_preflight() -> List[str]:
         raise TransferError(".env がありません(GCP の VM のリポジトリで実行する)")
     if env_get(env, "COMPOSE_FILE") != GCP_COMPOSE_FILE:
         raise TransferError(".env の COMPOSE_FILE が GCP の設定ではありません(import は GCP の VM だけで行う)")
+    refuse_strict_environment(app_env_of(env), "移す先")
     if run([DOCKER, "info"], check=False, capture=True).returncode != 0:
         raise TransferError("docker を使えません")
     return env
@@ -408,6 +430,7 @@ def cmd_import(args: argparse.Namespace) -> int:
     state: Dict[str, object] = {"started_at": tag, "live_db": live, "step": "start"}
     try:
         meta, keys = unpack(enc, work, passphrase)
+        refuse_strict_environment(meta.get("source_app_env"), "束の移す元")
         bid = str(meta["backup_id"])
         want_rev = str(meta.get("alembic_revision") or "")
         cur, heads = alembic("current"), alembic("heads")

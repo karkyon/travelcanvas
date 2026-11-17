@@ -73,3 +73,10 @@ DB の名前を元に戻し(移した DB は `travelcanvas_omega_<時刻>` と�
 - 束を Google ドライブ・メール等へ置かない(tailnet の中の scp で運ぶ)
 - 移した後の GCP の元の DB は、確かめ終わるまで消さない。消す時は名前を 2 回確かめる:
   `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" travelcanvas_gcp_before_<時刻>'`
+- **[Gate Hardening-A・監査 G-10] この移し方(同じ鍵を写す)は開発の環境の間だけ。** 道具は、移す元の `.env`・移す先の
+  `.env`・束に記録した移す元の `APP_ENV` のどれかが `production`・`prod`・`staging` なら、バックアップも束も作らず止まる
+  (`scripts/ops/tc_transfer.py` の `refuse_strict_environment`、試験 `backend/tests/test_ops_tc_transfer.py`)。
+  本番を作る時は、本番だけの鍵を新しく作り(`gcp_vm.sh env` の「環境ごとに別の鍵」)、開発の鍵・データを入れない。
+- 移した後に確かめて記録すること(証跡。本書の外に値を書かない): 件数・保存ファイル・復号・DB の版の確認の結果(import の出力)、
+  Secret Manager の控えの新しい版の番号と日時、束を消した日時(GCP・omega-dev2・手元の PC)。本番の鍵と開発の鍵の共有が
+  0 件であることは、本番を作る時に `tcops.py keys` の指紋で確かめる(本番が無い今は未実施)
