@@ -110,3 +110,13 @@ Claude Design のモックアップ(Main / Tablet / Tablet-Land / PC-Map / Mobil
 確認: vitest(TodayPage.test / TodayPage.tday.test に Live2 の 5 件を追加)・tsc・lint・build・bundle。
 画面はブラウザ幅(390/820/1180/1440)で模擬の応答を使って目で確かめた(実機・実 API ではない。横スクロールなし)。
 実機(iPhone/Android/iPad)・PWA・通信断の実地の確認はまだ。
+
+## 地図の線の意味と生成の方法の表示(2026-11-17 追加、Gate Hardening-A・監査 G-07/G-14)
+
+- 当日の地図の線は、予定の地点を順に**直線で結んだ目安**で、道順(道路の経路)ではない。凡例は「この後の予定(直線の目安)」とし、
+  「道のり」と書かない。道順は各画面の「外の地図で案内」「案内を開く」で外の地図アプリに渡す(既存の導線のまま)。
+- 済んだ予定の線: 位置の設定「今日の足跡を地図に描く」が ON で、端末の点が 2 つ以上ある時だけ実線で「今日の足跡(位置の記録)」。
+  それ以外は**点線**で「済んだ予定(直線)」とし、歩いた跡に見せない。判定は `mapFilters.ts` の `trailInUse`、凡例の文は
+  `mapLineLegend`(地図のカード・地図の画面で同じ)。宿へ帰る画面の 2 点の線にも「直線の目安」の注記を出す。
+- 「過去の旅からの提案」(FR-057)と「旅行記の下書き」(FR-037)には作り方(決まった規則・決まった形の文。AI は使わない・外へ送らない)を出す。
+- 試験: `frontend/src/pages/today/live/mapFilters.test.ts`・`MemoryReplanPage.test.tsx`・`MemoriesPage.test.tsx`。実機での見え方は未確認。

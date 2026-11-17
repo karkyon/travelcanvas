@@ -26,7 +26,7 @@ import { useTeaserImage } from './useTeaserImage';
 import ScreenFrame from './ScreenFrame';
 import { EmptyScreen } from './ScreensMove';
 import type { TodayCtx } from './todayCtx';
-import { ALL_FILTERS, type MapFilters } from './mapFilters';
+import { ALL_FILTERS, mapLineLegend, trailInUse, type MapFilters } from './mapFilters';
 
 const TodayMap = React.lazy(() => import('./TodayMap'));
 const hm = (iso: string | null | undefined, tz: string | null) => formatTimeInZone(iso ?? null, tz);
@@ -401,6 +401,7 @@ export const TimelineScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
 
 export const MapScreen: React.FC<{ ctx: TodayCtx; eventId: string | null; crew: EtaShare[] }> = ({ ctx, eventId, crew }) => {
   const [filters, setFilters] = useState<MapFilters>(ALL_FILTERS);
+  const legend = mapLineLegend(trailInUse(ctx.settings.location.trail, ctx.trail.length));
   const [sel, setSel] = useState<string | null>(eventId ?? ctx.nextEv?.id ?? ctx.nowEv?.id ?? null);
   const [pale, setPale] = useState(false);
   const [me, setMe] = useState<[number, number] | null>(null);
@@ -466,8 +467,10 @@ export const MapScreen: React.FC<{ ctx: TodayCtx; eventId: string | null; crew: 
               <LocateFixed size={18} aria-hidden="true" /></button>
           </div>
           <div className="tl-legend tl-mapscr__legend">
-            <span><b className="tl-c-coral">━</b> 今日の足跡</span><span><b className="tl-c-teal">┅</b> この後の道のり</span>
+            <span><b className="tl-c-coral">{legend.trail ? '━' : '┄'}</b> {legend.walked}</span>
+            <span><b className="tl-c-teal">┅</b> {legend.ahead}</span>
             {ctx.rainIds.size > 0 && <span><b className="tl-c-blue">○</b> 雨の時間にかかる</span>}
+            <span className="tl-mute">{legend.note}</span>
           </div>
           {msg && <p className="tl-mapscr__msg" role="status">{msg}</p>}
           {sel && <MapSelected ctx={ctx} eventId={sel} onPick={setSel} />}

@@ -3,6 +3,8 @@
  * 旅程の番号と地図のピンを同じにし、済(印)・NOW・NEXT・雨の時間・寄り道の候補を印の形と文字で分ける。
  * 足跡の線は「済んだ予定を順に結んだ線」。位置の設定で「今日の足跡を地図に描く」を ON にした人だけ、
  * この端末に置いた位置の点を結ぶ(送らない)。座標の無い予定は地図に出さない。
+ * [Gate Hardening-A・監査 G-07] 線は地点を直線で結んだ目安で、道順ではない。位置の記録を使わない時の済んだ予定の線は
+ * 点線にして「足跡」(実線)と見分ける。凡例の文は mapLineLegend(地図の外の凡例と同じ判定 trailInUse)。
  *
  * [Gate TDay-Mock] variant:
  * - card: 今日の画面のカード(高さ固定・拡大は「地図を開く」)
@@ -17,7 +19,7 @@ import 'leaflet/dist/leaflet.css';
 import type { EtaShare } from '@/services/api/travelDay';
 import { formatTimeInZone } from '../todayModel';
 import { sealGlyph } from './todayLive';
-import { ALL_FILTERS, type MapFilters } from './mapFilters';
+import { ALL_FILTERS, trailInUse, type MapFilters } from './mapFilters';
 import type { TodayCtx } from './todayCtx';
 
 type PinState = 'done' | 'now' | 'next' | 'rain' | 'todo';
@@ -79,7 +81,7 @@ const TodayMap: React.FC<{
     : visitedIds.has(id) || doneIds.has(id) ? 'done' : rainIds.has(id) ? 'rain' : 'todo';
   const pastIdx = placed.findIndex(({ e }) => !(doneIds.has(e.id) || visitedIds.has(e.id) || e.id === nowId));
   const cut = pastIdx === -1 ? placed.length : pastIdx;
-  const useTrail = ctx.settings.location.trail && ctx.trail.length > 1;
+  const useTrail = trailInUse(ctx.settings.location.trail, ctx.trail.length);
   const walked = useTrail ? ctx.trail.map((p) => [p[0], p[1]] as [number, number])
     : placed.slice(0, Math.max(cut, 0)).map(({ e }) => [e.latitude!, e.longitude!] as [number, number]);
   const ahead = placed.slice(Math.max(cut - 1, 0)).map(({ e }) => [e.latitude!, e.longitude!] as [number, number]);
@@ -102,7 +104,8 @@ const TodayMap: React.FC<{
         </>
       ) : (
         <>
-          {filters.trail && walked.length > 1 && <Polyline positions={walked} pathOptions={{ color: '#b23c22', weight: 5, opacity: 0.9 }} />}
+          {filters.trail && walked.length > 1 && <Polyline positions={walked}
+            pathOptions={useTrail ? { color: '#b23c22', weight: 5, opacity: 0.9 } : { color: '#b23c22', weight: 4, opacity: 0.6, dashArray: '2 7' }} />}
           {filters.plan && ahead.length > 1 && <Polyline positions={ahead} pathOptions={{ color: '#0f6e66', weight: 4, dashArray: '8 8' }} />}
           {filters.plan && placed.map(({ e, i }) => {
             let st = stateOf(e.id);
