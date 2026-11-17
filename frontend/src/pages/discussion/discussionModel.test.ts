@@ -42,3 +42,21 @@ describe('discussionModel (Gate P3)', () => {
     expect(looksSensitive('明日は10時集合')).toBe(false);
   });
 });
+
+describe('[Gate ChatConsensus] draftFromMessage', () => {
+  it('「AかB」から題名と選択肢を作る', async () => {
+    const { draftFromMessage } = await import('./discussionModel');
+    expect(draftFromMessage('夕食は寿司か焼肉かな')).toEqual({ title: '夕食', options: ['寿司', '焼肉'] });
+    expect(draftFromMessage('2日目の昼って赤福、伊勢うどん、それともカフェ?')).toEqual(
+      { title: '2日目の昼', options: ['赤福', '伊勢うどん', 'カフェ'] });
+  });
+  it('1つの案は「これで決まり」の下書きになる', async () => {
+    const { draftFromMessage } = await import('./discussionModel');
+    expect(draftFromMessage('夕食は寿司でいいよね')).toEqual({ title: '夕食', options: ['寿司'] });
+  });
+  it('ひらがなの語の中の「か」では切らない・題名が無ければ空', async () => {
+    const { draftFromMessage } = await import('./discussionModel');
+    expect(draftFromMessage('おかげ横丁')).toEqual({ title: '', options: ['おかげ横丁'] });
+    expect(draftFromMessage('')).toEqual({ title: '', options: [] });
+  });
+});

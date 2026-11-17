@@ -22,6 +22,15 @@
 見られない人はメンションできない(通知から対象の存在を漏らさない)。通知には対象(target_type・target_id)を付ける。
 コメントに予約番号・PIN・旅券番号らしき文字列があれば sensitive_warning で知らせる(EX-011。保存は止めない)。
 メンションした相手と投票の作成時のメンバーには通知を作るが、通知本文にコメント本文は入れない(FR-024)。
+
+[Gate ChatConsensus] 相談は話し合い(コメント)が中心。投票は必要な時だけ(利用者の決定 2026-11-17。DOC-02 v6.0 FR-022):
+- mode=simple(かんたん投票。画面の既定): 1人1つ選ぶ(値は ok だけ。別の選択肢を選ぶと前の選択は外れる)
+- mode=detailed(詳しい投票): 今までの 4 段階・懸念の理由・定足数・「不可」で不成立。API の既定(互換のため)
+- mode=decision(これで決まり): POST /polls/decision。話し合いだけで決めたことを、投票なしで「決定」として記録する。
+  作った時から締切・決定。旅程への反映は投票と同じ(decisions.py の採用・元に戻す)。再開はできない(要らなければ削除)
+- source_comment_id: 元の発言(旅行全体へのコメント)。発言から「投票にする」「これで決まり」で作った時に結ぶ
+- POST /polls/suggest-options: 話し合いの流れから AI が選択肢の候補を出す(任意・押した時だけ・同意と枠を確認・
+  発言者の名前は送らない・電話/メール/番号は伏せる・候補ごとに発言の中の根拠を要る・何も保存しない)
 """
 import re
 import uuid
@@ -58,9 +67,12 @@ from app.services.readiness import member_names
 router = APIRouter(prefix="/plans", tags=["discussion"])
 
 VETO_POLICIES = {"block", "block_with_alternative", "advisory"}
+POLL_MODES = {"simple", "detailed"}  # decision は POST /polls/decision だけで作る
 VOTE_VALUES = set(consensus.VALUES)
 TARGET_TYPES = {"plan", "event", "reservation", "poll", "expense"}
 MAX_OPTIONS = 10
+SUGGEST_MAX_COMMENTS = 30
+_URL = re.compile(r"(https?://|www\.)", re.IGNORECASE)
 
 _SENSITIVE_PATTERNS = [
     ("keyword", re.compile(r"(予約番号|確認番号|PIN|暗証番号|パスポート|旅券|ビザ番号|カード番号|confirmation)", re.IGNORECASE)),
@@ -112,6 +124,15 @@ class PollCreate(BaseModel):
     is_anonymous: bool = False
     quorum: Optional[int] = Field(None, ge=1, le=100)  # [Gate G4] COL-02 決定に要る回答者の数
     options: List[OptionIn]
+    mode: str = "detailed"  # [Gate ChatConsensus] simple / detailed
+    source_comment_id: Optional[str] = None
+
+    @field_validator("mode")
+    @classmethod
+    def _v_mode(cls, v):
+        if v not in POLL_MODES:
+            raise ValueError(f"mode must be one of {sorted(POLL_MODES)}")
+        return v
 
     @field_validator("title")
     @classmethod
@@ -134,6 +155,29 @@ class PollCreate(BaseModel):
         if v is not None and v.tzinfo is None:
             raise ValueError("datetime must include a timezone offset")
         return v
+
+
+class DecisionCreate(BaseModel):
+    """[Gate ChatConsensus] 話し合いで決めたこと(投票なし)。"""
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(..., min_length=1, max_length=200)
+    option: OptionIn
+    description: Optional[str] = Field(None, max_length=1000)
+    source_comment_id: Optional[str] = None
+
+    @field_validator("title")
+    @classmethod
+    def _v_title(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("titleを入力してください")
+        return v
+
+
+class SuggestIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topic: Optional[str] = Field(None, max_length=200)  # 何を決めたいか(任意)
+    comment_ids: Optional[List[str]] = Field(None, max_length=40)  # 使う発言(任意。既定は最近の発言)
 
 
 class PollUpdate(BaseModel):
@@ -381,6 +425,8 @@ def _poll_response(db: Session, plan: TravelPlan, p: Any, viewer: User, role: st
         "id": str(p.id),
         "plan_id": str(p.plan_id),
         "algorithm_version": consensus.ALGORITHM_VERSION,
+        "mode": p.mode or "detailed",
+        "source_comment_id": str(p.source_comment_id) if p.source_comment_id else None,
         "title": p.title,
         "description": p.description,
         "deadline_at": _iso(p.deadline_at),
@@ -449,12 +495,46 @@ def create_poll(
     plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
     if not 1 <= len(payload.options) <= MAX_OPTIONS:
         raise HTTPException(status_code=422, detail=f"選択肢は1〜{MAX_OPTIONS}個にしてください")
+    simple = payload.mode == "simple"
+    if simple and payload.quorum is not None:
+        raise HTTPException(status_code=422, detail="かんたん投票には定足数を付けられません(詳しい設定の投票にしてください)")
     p = Poll(id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, title=payload.title,
              description=_strip_or_none(payload.description), deadline_at=payload.deadline_at, status="open",
-             veto_policy=payload.veto_policy, is_anonymous=payload.is_anonymous, quorum=payload.quorum)
+             # かんたん投票は「不可」が無いので不可の扱いは使わない(既定のまま)
+             veto_policy="block" if simple else payload.veto_policy, is_anonymous=payload.is_anonymous,
+             quorum=payload.quorum, mode=payload.mode,
+             source_comment_id=_source_comment(db, plan, payload.source_comment_id))
+    _add_options(db, plan, p, payload.options)
+    db.add(p)
+    db.flush()
+    members = member_user_ids(db, plan)
+    _notify(db, plan, members - {current_user.id}, "poll_created", f"「{plan.title}」で投票が始まりました",
+            f"{current_user.username or 'ゲスト'}さんが投票を作成しました。回答してください。",
+            target_type="poll", target_id=p.id)
+    db.commit()
+    db.refresh(p)
+    _audit("poll_created", "poll", request, current_user, p.id, plan.id,
+           {"options": len(p.options), "veto_policy": p.veto_policy, "is_anonymous": p.is_anonymous, "mode": p.mode,
+            "from_comment": p.source_comment_id is not None})
+    return _poll_response(db, plan, p, current_user, role, members, _poll_names(db, [p], members))
+
+
+def _source_comment(db: Session, plan: TravelPlan, raw: Optional[str]) -> Optional[uuid.UUID]:
+    """[Gate ChatConsensus] 元の発言。旅行全体へのコメントで、消されていないものだけ。"""
+    if raw is None:
+        return None
+    cid = _parse_uuid(raw, "source_comment_id")
+    c = db.query(Comment).filter(Comment.id == cid, Comment.plan_id == plan.id, Comment.deleted_at.is_(None),
+                                 Comment.target_type == "plan").first()
+    if c is None:
+        raise HTTPException(status_code=422, detail="元の発言がこの旅行の話し合いに見つかりません")
+    return cid
+
+
+def _add_options(db: Session, plan: TravelPlan, p: Any, items: List[OptionIn]) -> None:
     labels = set()
     candidates_seen: Set[Any] = set()
-    for i, o in enumerate(payload.options):
+    for i, o in enumerate(items):
         event_id = None
         candidate_id = None
         label = _strip_or_none(o.label)
@@ -485,17 +565,118 @@ def create_poll(
         labels.add(label)
         p.options.append(PollOption(id=uuid.uuid4(), label=label, event_id=event_id, candidate_id=candidate_id,
                                     sort_order=i))
+
+
+@router.post("/{plan_id}/polls/decision", status_code=201, response_model=dict)
+def create_decision(
+    plan_id: str, payload: DecisionCreate, request: Request,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate ChatConsensus] 「これで決まり」: 話し合いだけで決めたことを、投票なしで決定として記録する。"""
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    now = _now()
+    p = Poll(id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, title=payload.title,
+             description=_strip_or_none(payload.description), status="closed", closed_at=now,
+             closed_reason="decided", veto_policy="block", is_anonymous=False, mode="decision",
+             source_comment_id=_source_comment(db, plan, payload.source_comment_id))
+    _add_options(db, plan, p, [payload.option])
+    p.decided_option_id = p.options[0].id
     db.add(p)
     db.flush()
     members = member_user_ids(db, plan)
-    _notify(db, plan, members - {current_user.id}, "poll_created", f"「{plan.title}」で投票が始まりました",
-            f"{current_user.username or 'ゲスト'}さんが投票を作成しました。回答してください。",
+    _notify(db, plan, members - {current_user.id}, "poll_decided", f"「{plan.title}」で決まったことがあります",
+            f"{current_user.username or 'ゲスト'}さんが話し合いの結果を「決まったこと」に記録しました。",
             target_type="poll", target_id=p.id)
     db.commit()
     db.refresh(p)
-    _audit("poll_created", "poll", request, current_user, p.id, plan.id,
-           {"options": len(p.options), "veto_policy": p.veto_policy, "is_anonymous": p.is_anonymous})
+    _audit("poll_decision_recorded", "poll", request, current_user, p.id, plan.id,
+           {"from_comment": p.source_comment_id is not None, "candidate": p.options[0].candidate_id is not None,
+            "event": p.options[0].event_id is not None})
     return _poll_response(db, plan, p, current_user, role, members, _poll_names(db, [p], members))
+
+
+def _suggest_transcript(db: Session, plan: TravelPlan, comment_ids: Optional[List[str]]) -> List[str]:
+    """AI へ送る発言(旅行全体の話し合いだけ・名前なし・伏せ字あり・古い順)。"""
+    from app.services import reservation_extract as rx
+    q = db.query(Comment).filter(Comment.plan_id == plan.id, Comment.target_type == "plan",
+                                 Comment.deleted_at.is_(None))
+    if comment_ids:
+        ids = [_parse_uuid(c, "comment_ids") for c in comment_ids]
+        rows = q.filter(Comment.id.in_(ids)).all()
+    else:
+        rows = q.order_by(Comment.created_at.desc()).limit(SUGGEST_MAX_COMMENTS).all()
+    rows.sort(key=lambda c: (c.created_at or _now(), str(c.id)))
+    out: List[str] = []
+    for c in rows:
+        text = rx.mask_for_ai(c.body or "")
+        for _name, pattern in _SENSITIVE_PATTERNS[1:]:
+            text = pattern.sub("[番号]", text)
+        text = " ".join(text.split())[:300]
+        if text:
+            out.append(text)
+    return out
+
+
+@router.post("/{plan_id}/polls/suggest-options", response_model=dict)
+def suggest_options(
+    plan_id: str, payload: SuggestIn,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate ChatConsensus] 話し合いから投票の選択肢の候補を出す(AI。任意)。何も保存しない。"""
+    from app.services import consents
+    from app.services import cost_guard as cg
+    from app.services import provider_calls as pc
+    from app.services import provider_secrets as ps
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    key = (idempotency_key or "").strip()
+    if not key or len(key) > 80:
+        raise HTTPException(status_code=422, detail={"code": "idempotency_key_required",
+                                                     "message": "Idempotency-Key(80文字まで)が要ります"})
+    if getattr(current_user, "is_guest", False) or not consents.has_consent(current_user, "ai_processing"):
+        raise HTTPException(status_code=403, detail={
+            "code": "consent_required",
+            "message": "AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます。手で選択肢を書けます"})
+    lines = _suggest_transcript(db, plan, payload.comment_ids)
+    if not lines:
+        raise HTTPException(status_code=422, detail={"code": "no_discussion",
+                                                     "message": "まだ話し合いの発言がありません"})
+    topic = " ".join((payload.topic or "").split()) or None
+    try:
+        answer, usage = pc.ai_poll_options(db, plan, current_user, topic, lines, key)
+    except cg.CostGuardError as error:
+        raise HTTPException(status_code=error.status, detail=error.detail())
+    except (ps.SecretUnavailable, pc.ProviderRejected):
+        raise HTTPException(status_code=503, detail={"code": "provider_not_ready",
+                                                     "message": "AI を今は使えません。手で選択肢を書けます"})
+    return {"suggestion": clean_suggestion(answer, lines), "usage": usage, "saved": False,
+            "notice": "AI の案です。採用するまで何も変わりません。営業時間・料金・空きは確かめていません"}
+
+
+def clean_suggestion(answer: Any, lines: List[str]) -> Dict[str, Any]:
+    """AI の答えを確かめる。根拠(発言の中の言葉)が無い候補・URL・長すぎる名前・重複は捨てる。"""
+    joined = "\n".join(lines)
+    title = answer.get("title") if isinstance(answer, dict) else None
+    title = " ".join(title.split())[:200] if isinstance(title, str) and title.strip() else None
+    options: List[Dict[str, str]] = []
+    seen: Set[str] = set()
+    raw = answer.get("options") if isinstance(answer, dict) else None
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        label, quote = item.get("label"), item.get("quote")
+        if not isinstance(label, str) or not isinstance(quote, str):
+            continue
+        label, quote = " ".join(label.split()), " ".join(quote.split())
+        if not label or len(label) > 60 or not quote or len(quote) > 120 or _URL.search(label):
+            continue
+        if quote not in joined or label in seen:
+            continue  # 話し合いに無いことは出さない(作り話・指示の混入を止める)
+        seen.add(label)
+        options.append({"label": label, "quote": quote})
+        if len(options) >= MAX_OPTIONS:
+            break
+    return {"title": title if options else None, "options": options}
 
 
 @router.patch("/{plan_id}/polls/{poll_id}", response_model=dict)
@@ -511,6 +692,11 @@ def update_poll(
     if p.adopted_at is not None and any(k in data for k in ("status", "decided_option_id", "deadline_at", "quorum")):
         raise HTTPException(status_code=409, detail={"code": "poll_adopted",
                                                      "message": "予定に採用した投票は変えられません(先に採用を元に戻してください)"})
+    if p.mode == "decision" and any(k in data for k in ("status", "decided_option_id", "deadline_at", "quorum")):
+        raise HTTPException(status_code=409, detail={"code": "decision_record",
+                                                     "message": "話し合いで決めた記録は再開・変更できません(要らなければ削除してください)"})
+    if p.mode == "simple" and data.get("quorum") is not None:
+        raise HTTPException(status_code=422, detail="かんたん投票には定足数を付けられません")
     if "quorum" in data:
         p.quorum = data["quorum"]
     if "title" in data:
@@ -609,7 +795,18 @@ def put_votes(
             raise HTTPException(status_code=422, detail="懸念・不可には理由を入力してください")
         if item.value == "veto" and p.veto_policy == "block_with_alternative" and not alternative:
             raise HTTPException(status_code=422, detail="この投票では「不可」に代替案が必要です")
+        if p.mode == "simple" and item.value not in (None, "ok"):
+            raise HTTPException(status_code=422, detail="かんたん投票では選ぶ(ok)か取り消すだけです")
         checked.append((oid, item.value, reason, alternative))
+    if p.mode == "simple":
+        chosen = [oid for oid, value, _r, _a in checked if value is not None]
+        if len(chosen) > 1:
+            raise HTTPException(status_code=422, detail="かんたん投票で選べるのは1つだけです")
+        if chosen:
+            # 別の選択肢を選んだら、前の選択は外す(1人1つ)
+            for old in db.query(Vote).filter(Vote.poll_id == p.id, Vote.user_id == current_user.id,
+                                             Vote.option_id != chosen[0]).all():
+                db.delete(old)
     for oid, value, reason, alternative in checked:
         existing = db.query(Vote).filter(Vote.option_id == oid, Vote.user_id == current_user.id).first()
         if value is None:

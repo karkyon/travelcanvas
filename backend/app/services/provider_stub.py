@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import httpx
 
@@ -102,6 +102,20 @@ def _turn_answer(text: str) -> Dict[str, Any]:
     return {"operations": ops, "conflicts": conflicts, "questions": ["模擬の提供元の答えです"]}
 
 
+def _poll_options_answer(text: str) -> Dict[str, Any]:
+    """[Gate ChatConsensus] 模擬: 発言の「A か B」「A、B」から選択肢を作る(根拠は発言の言葉そのまま)。"""
+    import re as _re
+    options: List[Dict[str, str]] = []
+    for line in text.splitlines():
+        if not line.startswith("- "):
+            continue
+        for part in _re.split(r"か|、|,|/|・|または|それとも", line[2:]):
+            word = part.strip(" 　?？。!！がはにでをもいいよねかなどう")
+            if 1 < len(word) <= 20 and word not in [o["label"] for o in options]:
+                options.append({"label": word, "quote": word})
+    return {"title": "模擬の題名(実の AI ではありません)", "options": options[:6]}
+
+
 def _openai(payload: Dict[str, Any]) -> httpx.Response:
     text = str(payload.get("input") or "")
     if payload.get("tools"):  # [Gate Remaining-7] AI の Web 検索の模擬(出典つき)
@@ -119,6 +133,8 @@ def _openai(payload: Dict[str, Any]) -> httpx.Response:
     elif payload.get("text") and fmt.get("name") == "trip_spots":
         out = json.dumps({"spots": [{"name": "模擬の神社", "kind": "shrine_temple", "note": "模擬の特色",
                                      "why": "模擬の理由"}]}, ensure_ascii=False)
+    elif payload.get("text") and fmt.get("name") == "poll_options":
+        out = "{broken" if "E2E_BROKEN" in text else json.dumps(_poll_options_answer(text), ensure_ascii=False)
     elif payload.get("text") and fmt.get("name") == "trip_turn":
         out = "{broken" if "E2E_BROKEN" in text else json.dumps(_turn_answer(text), ensure_ascii=False)
     elif payload.get("text"):

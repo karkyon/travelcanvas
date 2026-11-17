@@ -55,7 +55,7 @@
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |
 | `confirmation_mismatch` | 422 | no | 確認のため「…」と入力してください | api/v1/privacy.py |
-| `consent_required` | 403, 422 | no | AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます | api/v1/day_variants.py, api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
+| `consent_required` | 403, 422 | no | AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます | api/v1/day_variants.py, api/v1/discussion.py, api/v1/location_tracks.py, api/v1/paid_actions.py, api/v1/spot_media.py |
 | `consult_pending` | 409 | no | 外部の提供元の応答を待っている操作があります。終わってから下書きを作ってください | api/v1/trip_intents.py |
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
@@ -63,6 +63,7 @@
 | `day_not_found` | 404, 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/day_variants.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
 | `days_have_events` | 409 | no | 短くすると消える日に予定があります | api/v1/plans.py |
+| `decision_record` | 409 | no | 話し合いで決めた記録は再開・変更できません(要らなければ削除してください) | api/v1/discussion.py |
 | `deleted_on_server` | 409 | after_reload | サーバーで削除された予定のため、自分の変更は使えません | api/v1/sync.py |
 | `delivery_not_found` | 404 | no | 送信の記録が見つかりません | api/v1/organizations.py |
 | `device_only` | 409 | no | この軌跡は「この端末だけ」に保存する設定のため、サーバーへは送れません | api/v1/location_tracks.py |
@@ -105,7 +106,7 @@
 | `guest_not_allowed` | 403 | no | ゲストでは AI の確かめは使えません。会員登録の後に使えます | api/v1/day_variants.py |
 | `has_days` | 409 | no | この旅行にはもう日程があります。旅程の画面で予定を足してください | api/v1/trip_intents.py |
 | `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
-| `idempotency_key_required` | 400 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/paid_actions.py |
+| `idempotency_key_required` | 400, 422 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/discussion.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
 | `if_match_required` | 428 | after_reload | If-Match(保存されている版。まだ無ければ 0)が必要です | api/v1/home_place.py, api/v1/movement.py, api/v1/private_profile.py |
 | `inbound_mail_unavailable` | 409 | no | この環境ではメールの転送を受け付けていません(管理者の設定が必要です)。本文の貼り付け・ファイルで取り込めます | api/v1/inbound_mail.py |
@@ -174,6 +175,7 @@
 | `no_assessment` | 404 | no | この予定にはまだ判定がありません | api/v1/visits.py |
 | `no_change` | 422 | no | 今の値と同じです | api/v1/corrections.py |
 | `no_changes` | 403, 409, 422 | no | この案では旅程は変わりません | api/v1/day_variants.py, api/v1/memories.py, api/v1/memory_replan.py, api/v1/optimization.py, api/v1/plan_cover.py, api/v |
+| `no_discussion` | 422 | no | まだ話し合いの発言がありません | api/v1/discussion.py |
 | `no_email` | 409, 422 | no | メールが登録されていません | api/v1/account_recovery.py, api/v1/notifications.py |
 | `no_location` | 403 | no | 確定する位置がありません | api/v1/memories.py |
 | `no_mail` | 422 | no | メールの本文がありません | api/v1/inbound_mail.py |
@@ -219,7 +221,7 @@
 | `proposal_not_found` | 409 | after_reload | この提案は今は使えません。提案を読み込み直してください | api/v1/memory_replan.py |
 | `provider_disabled` | 404 | no | この画像の提供元は使えません(止めてあります) | api/v1/media_providers.py |
 | `provider_not_configured` | 503 | later | AI の鍵が未設定か確認が切れています(運用コンソールで直せます) | api/v1/spot_media.py |
-| `provider_not_ready` | 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py |
+| `provider_not_ready` | 503 | later | AI を今は使えません。手で選択肢を書けます | api/v1/discussion.py, api/v1/paid_actions.py |
 | `provider_rejected` | 502, 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py, api/v1/spot_media.py |
 | `provider_unavailable` | 502, 503 | later | AI を呼び出せませんでした | api/v1/spot_media.py, api/v1/spots.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |

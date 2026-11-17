@@ -5,6 +5,7 @@
  *   - 懸念・不可には理由が必須。veto_policy=block_with_alternative では不可に代替案も必須
  *   - 匿名の投票は回答者3人未満の間は件数が返らない(null)
  *   - コメントに予約番号などらしき文字列があると sensitive_warning(保存は止めない)
+ * [Gate ChatConsensus] 発言から投票・決定の下書きを作る(draftFromMessage)。下書きは人が直してから作る。
  */
 import type {
   PlanComment, Poll, PollOption, PollState, OptionState, VetoPolicy, VoteInput, VoteValue,
@@ -94,3 +95,41 @@ const SENSITIVE = [
 
 /** 送信前の注意(backendの判定と同じ規則) */
 export const looksSensitive = (text: string): boolean => SENSITIVE.some((re) => re.test(text));
+
+// ===== [Gate ChatConsensus] 発言からの下書き
+
+/** 末尾の「〜かな」「〜でいいよね」などを外す */
+const TAIL = /(?:で(?:いい|良い|OK|ok)|が(?:いい|良い)|に(?:しよう|する|決定)|で(?:決まり|決定|行こう|いこう)|かな|かね|どう|どっち|どれ|とか|は\?|かも|だね|だよね|ね|よ|よね|か)+[?？!！。…\s]*$/;
+/** 選択肢の区切り(「寿司か焼肉」の「か」は漢字・カタカナ・英数の間だけ。ひらがなの語の中の「か」では切らない) */
+const SPLIT = /\s*(?:それとも|または|or|、|,|，|・|\/|／|\n|(?<=[^\sぁ-ん])か(?=[^ぁ-ん?？!！。\s]))\s*/;
+
+const cleanPart = (part: string): string => {
+  let out = part.trim().replace(/^[「『（(]+|[」』）)]+$/g, '').trim();
+  for (let i = 0; i < 3; i += 1) out = out.replace(TAIL, '').trim();
+  return out.replace(/[?？!！。…]+$/, '').trim();
+};
+
+/**
+ * 発言から題名と選択肢の下書きを作る。
+ *   「夕食は寿司か焼肉かな」→ 題名「夕食」・選択肢「寿司」「焼肉」
+ *   「夕食は寿司でいいよね」→ 題名「夕食」・選択肢「寿司」(これで決まり の下書き)
+ */
+export function draftFromMessage(text: string): { title: string; options: string[] } {
+  const body = text.replace(/[ \t]+/g, ' ').trim();
+  const head = body.match(/^([^\n、。]{1,30}?)(?:は|って|なんだけど|だけど)\s*(.+)$/s);
+  const title = head ? head[1]!.trim() : '';
+  const rest = head ? head[2]! : body;
+  const options: string[] = [];
+  for (const part of rest.split(SPLIT)) {
+    const label = cleanPart(part);
+    if (label && label.length <= 40 && !options.includes(label)) options.push(label);
+    if (options.length >= 10) break;
+  }
+  return { title, options };
+}
+
+/** 発言の短い引用(元の発言の表示) */
+export const quoteOf = (text: string | null | undefined, limit = 40): string => {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > limit ? `${t.slice(0, limit)}…` : t;
+};

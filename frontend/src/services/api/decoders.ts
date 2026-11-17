@@ -950,6 +950,8 @@ const pollOption: Decoder<PollOption> = object<PollOption>({
 
 export const poll: Decoder<Poll> = object<Poll>({
   id: str,
+  mode: optional(oneOf('simple', 'detailed', 'decision')),  // [Gate ChatConsensus]
+  source_comment_id: optional(nullable(str)),
   plan_id: str,
   algorithm_version: str,
   title: str,

@@ -2310,6 +2310,10 @@ class Poll(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     adopted_change_set_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("change_sets.id", ondelete="SET NULL"), nullable=True)
+    # [Gate ChatConsensus] simple=かんたん投票(1つ選ぶ)/ detailed=詳しい投票(4段階・定足数・不可)/ decision=話し合いで決めた記録
+    mode: Mapped[str] = mapped_column(String(8), nullable=False, default="detailed", server_default="detailed")
+    source_comment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("comments.id", ondelete="SET NULL"), nullable=True)
 
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
@@ -2323,6 +2327,8 @@ class Poll(Base):
 
     __table_args__ = (
         CheckConstraint("status IN ('open','closed')", name="ck_polls_status"),
+        CheckConstraint("mode IN ('simple','detailed','decision')", name="ck_polls_mode"),
+        Index("ix_polls_source_comment", "source_comment_id"),
         CheckConstraint("(status = 'closed') = (closed_at IS NOT NULL)", name="ck_polls_closed_at"),
         CheckConstraint(
             "veto_policy IN ('block','block_with_alternative','advisory')", name="ck_polls_veto_policy",

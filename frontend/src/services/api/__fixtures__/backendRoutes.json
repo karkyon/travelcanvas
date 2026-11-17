@@ -58,7 +58,8 @@
   "captured_at_head_tday_push": "dev/travel-day-live (+Gate TDay-Push /push/config・subscriptions・subscriptions/remove・settings・test)",
   "captured_at_head_remaining6": "dev/remaining-6 (+Gate Remaining-6 /auth/password/forgot・reset・/auth/email/verify・verify/request)",
   "captured_at_head_remaining7": "dev/remaining-7 (+Gate Remaining-7 passkeys・gmail・guest/merge・constraints/undo・paid 4 種・track comparison)",
-  "captured_at_head_homeplace": "Gate HomePlace: +GET/PUT/DELETE /api/v1/privacy/home-place (backend/app/api/v1/home_place.py)"
+  "captured_at_head_homeplace": "Gate HomePlace: +GET/PUT/DELETE /api/v1/privacy/home-place (backend/app/api/v1/home_place.py)",
+  "captured_at_head_chat_consensus": "dev/discussion-chat (+Gate ChatConsensus POST /plans/{plan_id}/polls/decision・POST /plans/{plan_id}/polls/suggest-options)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -515,6 +516,8 @@
   "POST /api/v1/plans/{plan_id}/paid/static-map",
   "POST /api/v1/plans/{plan_id}/planning-actions/estimate",
   "POST /api/v1/plans/{plan_id}/polls",
+  "POST /api/v1/plans/{plan_id}/polls/decision",
+  "POST /api/v1/plans/{plan_id}/polls/suggest-options",
   "POST /api/v1/plans/{plan_id}/polls/{poll_id}/adopt",
   "POST /api/v1/plans/{plan_id}/polls/{poll_id}/adopt/undo",
   "POST /api/v1/plans/{plan_id}/polls/{poll_id}/adoption-preview",
