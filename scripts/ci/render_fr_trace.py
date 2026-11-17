@@ -44,7 +44,7 @@ def render_trace() -> str:
         "# 全59 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03)",
         "",
         "> この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。",
-        "> 要求の原文の正本は資料室の v5.1(所在は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。",
+        "> 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。",
         "> 状態の正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。基準 commit `%s`。" % meta["baseline"][:7],
         "",
         "## 1. 証拠の区分の一覧",
@@ -113,13 +113,20 @@ def render_sources() -> str:
         "",
     ]
     out += ["- %s" % p for p in meta["precedence"]]
-    out += ["", "## 文書の一覧", "", "| ID | 文書 | 資料室のパス | 版 | 状態 | 役割 | 共通正本 | リポジトリで引き継ぐ所 |",
-            "|---|---|---|---|---|---|---|---|"]
+    out += ["", "## v6.0 へ移す段階", ""]
+    out += ["- 段階 %s: %s" % (k, v) for k, v in meta["stages"].items()]
+    out += ["", "## 文書の一覧", "",
+            "| ID | 文書 | 今の正本 | 版 | 状態 | 段階 | 役割 | 共通正本 | 保管・旧版(資料室) |",
+            "|---|---|---|---|---|---|---|---|---|"]
+    labels = {"approved_v6.0": "v6.0 正本", "approved_v5.1": "v5.1 正本(移す前)", "unverified_header": "v5.1(移す前・版の表記は未確認)",
+              "merged": "統合済み"}
     for d in src["documents"]:
-        out.append("| %s | %s | `%s` | %s | %s | %s | %s | %s |" % (
-            d["id"], _cell(d["title"]), d["library_path"], d["version"], meta["states"][d["state"]].split("(")[0]
-            if d["state"] != "approved_v5.1" else "APPROVED(%s 発効)" % d.get("effective", "?"),
-            _cell(d["role"]), "○" if d.get("common_canonical") else "", "・".join("`%s`" % x for x in d["repo_successors"]) or "—"))
+        where = "`%s`" % d["repo_path"] if d.get("repo_path") else ("資料室 `%s`" % d["library_path"] if d["state"] != "merged"
+                                                                    else "・".join("`%s`" % x for x in d["repo_successors"]))
+        archive = "`%s`(保管)" % d["library_path"] if d["state"] in ("approved_v6.0", "merged") else "—"
+        out.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            d["id"], _cell(d["title"]), where, d["version"], labels[d["state"]], d["stage"], _cell(d["role"]),
+            "○" if d.get("common_canonical") else "", archive))
     out += ["", "状態の語: " + " / ".join("%s=%s" % (k, v) for k, v in meta["states"].items()), ""]
     return "\n".join(out)
 

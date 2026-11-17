@@ -1,5 +1,5 @@
 /**
- * [FR059-B] 旅程相談の外部 API の利用枠の型(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §8)。
+ * [FR059-B] 旅程相談の外部 API の利用枠の型(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §8)。
  * 金額は "12.0000" の文字列(円・小数 4 桁)。表示は *_yen_ceil(円の切り上げ)を使う。
  */
 export type UsageClass =

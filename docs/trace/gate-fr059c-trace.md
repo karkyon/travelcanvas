@@ -1,6 +1,6 @@
 # Gate FR059-C トレース(FR-059 正本 §13 D14: provider の停止を全ての worker で共有する)
 
-対象: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` §13 D14、ハンドオフ 2026-10-30i §3 の残り 4 の一部。
+対象: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md` §13 D14、ハンドオフ 2026-10-30i §3 の残り 4 の一部。
 DOC-10 v5.1-r30(FR-059 の gaps から D14 を外した。状態は INTEGRATED(部分)のまま)。migration なし・API の変更なし。
 
 以前(FR059-B): 見込みの超過・請求の照合の差で provider を止める印は process の中だけ。本番の gunicorn は複数の worker を動かすため、

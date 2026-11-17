@@ -1,5 +1,5 @@
 /**
- * [FR059-B] 利用枠の表示の決まり(画面から切り離した計算だけ)。docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §6。
+ * [FR059-B] 利用枠の表示の決まり(画面から切り離した計算だけ)。docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §6。
  */
 import type { MyEntitlements, PlanningUsage } from '@/services/api/types/planningUsage';
 

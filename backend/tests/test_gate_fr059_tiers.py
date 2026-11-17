@@ -1,6 +1,6 @@
 """
 [Gate FR059-Tiers] 会員の機能クラス Free / Trip / Journey / Explorer
-(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §3.2〜§3.5)。
+(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §3.2〜§3.5)。
 
 検証する主な性質(provider は fake。外へつながない):
 - 機能の表: クラスに含まない操作は provider の前で 403 ``tier_feature_not_included``(口座・予約を作らない)。

@@ -63,7 +63,7 @@ def test_every_fr_has_requirement_source_summary_and_acceptance():
         r = f["requirement"]
         assert r["source"] and r["summary"] and r["acceptance"] and r["priority"] and r["stage"], fr
         if fr == "FR-059":
-            assert "docs/spec/FR-059_" in r["source"]
+            assert "docs/spec/FR-059_" in r["source"] and "_v6.0" in r["source"]
         else:
             assert r["source"].startswith("DOC-02"), "%s: 要求の出典は DOC-02(と DOC-15)" % fr
         for c in f["approved_changes"]:
@@ -126,10 +126,21 @@ def test_canonical_sources_record_common_documents_and_doc10_points_to_them():
         assert d["state"] in src["_meta"]["states"], d["id"]
         for p in d["repo_successors"]:
             assert (ROOT / p).exists(), "%s: %s が無い" % (d["id"], p)
+    for d in docs.values():  # [DocsV6] v6.0 の正本はリポジトリに実在し、v5.1 の正本は資料室の発効日を持つ
+        assert str(d["stage"]) in src["_meta"]["stages"], d["id"]
+        if d["state"] == "approved_v6.0":
+            assert d["version"] == "v6.0" and (ROOT / d["repo_path"]).is_file(), d["id"]
+            text = (ROOT / d["repo_path"]).read_text(encoding="utf-8")
+            assert "v6.0" in text.splitlines()[0] or "v6.0" in text[:400], "%s: 冒頭に v6.0 が無い" % d["id"]
+        elif d["state"] == "approved_v5.1":
+            assert d["version"] == "v5.1" and d["effective"] == "2026-09-03", d["id"]
     for i in COMMON:
-        assert docs[i]["state"] == "approved_v5.1" and docs[i].get("common_canonical") is True, i
-        assert docs[i]["version"] == "v5.1" and docs[i]["effective"] == "2026-09-03", i
-    assert docs["DOC-10"]["state"] == "abolished"
+        assert docs[i]["state"] in ("approved_v6.0", "approved_v5.1") and docs[i].get("common_canonical") is True, i
+    assert docs["DOC-02"]["state"] == "approved_v6.0" and docs["DOC-10"]["state"] == "approved_v6.0"
+    archive = (ROOT / "docs" / "spec" / "archive" / "v5.1" / "README.md").read_text(encoding="utf-8")
+    for d in docs.values():
+        if d["state"] in ("approved_v6.0", "merged"):
+            assert d["library_path"] in archive, "保管の索引に %s が無い" % d["library_path"]
     assert len({d["library_path"] for d in docs.values()}) == len(docs)
     doc10 = next((ROOT / "docs" / "spec").glob("DOC-10_*.md")).read_text(encoding="utf-8")
     assert "docs/spec/CANONICAL-SOURCES.md" in doc10 and "docs/trace/FR-TRACE.md" in doc10, \

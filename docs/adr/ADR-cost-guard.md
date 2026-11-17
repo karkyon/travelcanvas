@@ -1,7 +1,7 @@
 # ADR: 外部 API の原価の守り(FR-059)
 
 - 状態: 採用(Gate FR059-B、2026-10-29)
-- 正本: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md`
+- 正本: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md`
 
 ## 決定
 

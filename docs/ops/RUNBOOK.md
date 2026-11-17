@@ -658,7 +658,7 @@ python3 scripts/ops/tcops.py security mfa-reset --request <申請のID> --approv
 
 ## FR-059 外部 API の原価の守り(Gate FR059-B)
 
-正本: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md` §9。
+正本: `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md` §9。
 
 - **見るもの:** `/metrics` の `travelcanvas_provider_usage_*`(見込み・実際・予約・拒否・再試行・照合の差)と、
   `travelcanvas_security_events_total{kind="provider_usage_plan_alert"}`(旅行の枠の 90%)・`provider_usage_over_estimate`・

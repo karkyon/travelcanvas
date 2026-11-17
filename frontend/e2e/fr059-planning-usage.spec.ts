@@ -5,7 +5,7 @@ import { startGuestPlanViaApi } from './support/guestPlan';
 
 /**
  * [FR059-B] FR-059 旅程相談の外部 API の原価上限(1旅行 50円)と利用者クラス別 quota
- * (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §6・§8・§11)。
+ * (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §6・§8・§11)。
  *
  *   1. 会員(Free)の旅程の画面に「この旅行の AI・外部検索の利用枠 0円 / 50円」が旅行の予算とは別に出る。
  *      [Gate FR059-Tiers] Free は「自分でつくる」クラスで、外部の AI・有料の検索を使わない(0円)と出る(上限に達したとは言わない)
