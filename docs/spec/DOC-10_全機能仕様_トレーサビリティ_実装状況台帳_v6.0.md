@@ -1,11 +1,11 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r56** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
+> 文書ID: DOC-10 / 版: **v6.0-r57** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
 > 共通正本: 要件ID=DOC-02、画面ID=DOC-04、データ=DOC-05、API=DOC-06、Security=DOC-11、語彙=DOC-13。**v6.0 体系(2026-11-17〜)では正本を
-> リポジトリの `docs/spec/` へ移す。** 移した物(DOC-02・本書・FR-059・資料体系の README)は v6.0、まだの物は資料室の v5.1 が正本(移す段階は
+> リポジトリの `docs/spec/` へ移す。** 移した物(DOC-02・DOC-04・DOC-13・本書・FR-059・資料体系の README。DOC04-A・DOC-15 は統合)は v6.0、まだの物は資料室の v5.1 が正本(移す段階は
 > `docs/spec/README.md` §3)。所在・版・状態・優先の順は `docs/spec/CANONICAL-SOURCES.md`、FR ごとの要求の根拠と承認済みの変更は `docs/trace/FR-TRACE.md`、
 > 保管した v5.1 は `docs/spec/archive/v5.1/README.md`
 
@@ -279,6 +279,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r54** | 2026-11-16 | `dev/tripkit-ui` | **TripKitUI・HomePlace・HomeRoute: 旅行箱の 6 画面(概要・予約・準備・予算・文書・予約の取込)と検索の見出し・まとめの札・一覧の行・切り替えを同じ部品にそろえる。自宅の場所(本人だけ・暗号化。登録・地図に出す・経路に使う・提供元へ送るを本人が選ぶ)。旅程の地図に前の夜の宿・今夜の宿(連泊)・自宅の印と線(宿=紫・予定の間=緑・自宅=青)。migration `a3c7e9f1b5d2`** |
 | **r55** | 2026-11-17 | `a2c419d`+Hardening-A | **製品固めゲート監査(2026-11-17)の是正: 共通正本(DOC-02/04/05/06/11/13)は資料室の v5.1(2026-09-03 発効)にあることを記録し所在を `docs/spec/CANONICAL-SOURCES.md` に(G-01・G-09)、全59 FR の要求の根拠・承認済みの変更・8 区分の証拠・残件の分類を `docs/trace/FR-TRACE.md` に(G-01・G-03)、DOC-11 の対応 `docs/security/SECURITY-TRACE.md`、SEC-009 の判定を差し替えない試験、開発の環境の間の同じ鍵の移し方を本番・ステージングで止める(G-10)、総合テストの縦断シナリオ `docs/test/integrated-acceptance-scenarios.md`、再判定とゲート判定 `docs/audit/2026-11-17_product-hardening-gate_addendum.md`。FR の状態の遷移なし。`docs/trace/gate-hardening-trace.md`** |
 | **r56** | 2026-11-17 | `14065fe`+Hardening-A+DocsV6 | **資料の体系を v6.0 へ(利用者の指示 2026-11-17「完全に更新し旧バージョンは保管へ」): 本書を `DOC-10_*_v6.0.md`(版 v6.0-r56。r の番号は続ける)、FR-059 正本を v6.0 の名前へ。DOC-02 要件定義書 v6.0 をリポジトリの正本として作成(FR 59 件・プランB・FR-059・承認済みの変更を本文へ。FC・NFR・AC・EX は削らず引き継ぎ)。資料体系の README v6.0(`docs/spec/README.md`)・保管の索引(`docs/spec/archive/v5.1/`)。FR の状態の遷移なし** |
+| **r57** | 2026-11-17 | `167f266`+DocsV6-2 | **資料の体系 v6.0 の段階 2: DOC-04 画面仕様 v6.0(画面 ID と実装の経路の対応 §19、実装済みの画面 SC-44 旅行箱・SC-45 旅行相談・SC-46 旅行の下書き・SC-47 料金と利用枠・SC-48 写真の投稿を追加、SC-17 をプランBへ、今日の画面を旅帖ライブに、DOC04-A を §20 へ統合)、DOC-13 用語集 v6.0(プランB・旅行箱・旅帖・利用枠・移動手段・移動時間の出どころ・地図の線の言葉、エラーの code の正本を error-catalog に)。v5.1 は保管。FR の状態の遷移なし** |
 
 ## 10. 台帳の更新の規則
 

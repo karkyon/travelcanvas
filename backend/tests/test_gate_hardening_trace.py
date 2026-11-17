@@ -177,3 +177,19 @@ def test_audit_addendum_and_acceptance_scenarios_cover_every_item():
         assert "## S%d " % i in sc, "縦断シナリオ S%d が無い" % i
     frs = set(re.findall(r"FR-0\d\d", sc))
     assert frs == set(_req()), "縦断シナリオに対応しない FR: %s" % sorted(set(_req()) - frs)
+
+
+def test_doc04_screen_routes_exist():
+    """[DocsV6-2] DOC-04 v6.0 §19 の画面 ID と経路の対応に書いた経路が、frontend の router に実在する"""
+    doc = next((ROOT / "docs" / "spec").glob("DOC-04_*_v6.0.md")).read_text(encoding="utf-8")
+    section = doc.split("## 19.", 1)[1].split("## 20.", 1)[0]
+    routes = _routes()
+    paths = set(re.findall(r"`(/[^`]*)`", section))
+    assert len(paths) > 40
+    for p in sorted(paths):
+        segs = [s for s in p.strip("/").split("/") if s]
+        full = "/".join(segs)
+        ok = (p == "/" and "/" in routes) or full in routes or (segs and segs[-1] in routes)
+        assert ok, "DOC-04 §19 の経路 %s が無い" % p
+    for i in range(1, 49):
+        assert "SC-%02d" % i in doc, "DOC-04 v6.0 に SC-%02d が無い" % i

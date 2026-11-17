@@ -18,28 +18,240 @@
   },
   "stages": {
    "1": "2026-11-17 DocsV6-1: 資料体系の README・DOC-02・DOC-10・FR-059(DOC-15 は DOC-02 へ統合)",
-   "2": "DOC-04 画面(実際の route・画面・状態)・DOC04-A(画面の視覚)・DOC-13 語彙",
+   "2": "2026-11-17 DocsV6-2: DOC-04 画面(経路との対応・SC-44〜48)・DOC04-A(DOC-04 §20 へ統合)・DOC-13 語彙",
    "3": "DOC-05 DB・DOC-06 API(コードと OpenAPI から生成する一覧と規則)・DOC-11 セキュリティ",
    "4": "DOC-01 企画・DOC-03 基本設計・DOC-07 環境/運用・DOC-08 技術・DOC-09 計画・DOC-12 変更の統制・DOC-14 MAP"
   }
  },
  "documents": [
-  {"id": "README", "title": "資料体系・読解ガイド", "version": "v6.0", "state": "approved_v6.0", "repo_path": "docs/spec/README.md", "library_path": "README_資料体系_読解ガイド_v5.1.md", "stage": 1, "role": "正本の体系・移す段階・変更の手順", "repo_successors": ["docs/spec/README.md"]},
-  {"id": "DOC-01", "title": "企画書・プロダクトビジョン書", "version": "v5.1", "state": "unverified_header", "library_path": "01_企画書_プロダクトビジョン書_v5.1.md", "stage": 4, "role": "製品原則・KPI", "repo_successors": []},
-  {"id": "DOC-02", "title": "要件定義書", "version": "v6.0", "state": "approved_v6.0", "repo_path": "docs/spec/DOC-02_要件定義書_v6.0.md", "library_path": "02_要件定義書_v5.1.md", "stage": 1, "role": "要件 ID(FR-001〜059・FC-001〜180・NFR・AC-01〜08・EX-001〜022)", "common_canonical": true, "repo_successors": ["docs/spec/DOC-02_要件定義書_v6.0.md", "docs/trace/fr-requirements.json", "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md"]},
-  {"id": "DOC-03", "title": "基本設計書・システム構成", "version": "v5.1", "state": "unverified_header", "library_path": "03_基本設計書_システム構成_v5.1.md", "stage": 4, "role": "モジュール・信頼境界・処理", "repo_successors": ["docs/adr"]},
-  {"id": "DOC-04", "title": "外部機能仕様書・画面仕様", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "04_外部機能仕様書_画面仕様_v5.1.md", "stage": 2, "role": "画面 ID(SC-01〜43)・UX の規則・UI-001〜015", "common_canonical": true, "repo_successors": ["docs/ux/G11_UIUX全範囲_実装仕様.md", "docs/ux/TDay_旅の当日_旅帖ライブ.md", "docs/ux/TripKit_旅行箱.md", "docs/adr/ADR-ux-information-design.md"]},
-  {"id": "DOC04-A", "title": "高忠実度統合ワイヤーフレーム", "version": "v5.1", "state": "unverified_header", "library_path": "DOC04-A_高忠実度統合ワイヤーフレーム_v5.1.html", "stage": 2, "role": "主要画面の視覚の正本", "repo_successors": ["docs/ux/TravelCanvas_ホーム改善案_v2_モックアップ.html"]},
-  {"id": "DOC-05", "title": "DB 設計書", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "05_DB設計書_v5.1.md", "stage": 3, "role": "論理データ・暗号化の台帳・状態の遷移", "common_canonical": true, "repo_successors": ["backend/app/models/models.py", "backend/alembic/versions"]},
-  {"id": "DOC-06", "title": "API 設計書", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "06_API設計書_v5.1.md", "stage": 3, "role": "API の原則・権限の行列・冪等・同期の契約", "common_canonical": true, "repo_successors": ["backend/app/api/v1", "docs/spec/error-catalog.md"]},
-  {"id": "DOC-07", "title": "開発環境・運用環境仕様書", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "07_開発環境_運用環境仕様書_v5.1.md", "stage": 4, "role": "環境・CI・SLO・Runbook・DR", "repo_successors": ["docs/ops/RUNBOOK.md", "docs/runbooks", ".github/workflows/ci.yml"]},
-  {"id": "DOC-08", "title": "開発スタック定義書", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "08_開発スタック定義書_v5.1.md", "stage": 4, "role": "技術の選定", "repo_successors": []},
-  {"id": "DOC-09", "title": "計画・展開指針", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "09_計画_展開指針_v5.1.md", "stage": 4, "role": "Gate・リリースの順", "repo_successors": ["docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md"]},
-  {"id": "DOC-10", "title": "全機能仕様・トレーサビリティ・実装状況台帳", "version": "v6.0", "state": "approved_v6.0", "repo_path": "docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md", "library_path": "10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md", "stage": 1, "role": "実装の状態(資料室の r11 は 2026-10-20 に廃止・保管)", "repo_successors": ["docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md"]},
-  {"id": "DOC-11", "title": "セキュリティ・プライバシー・データ保護詳細仕様", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "11_セキュリティ_プライバシー_データ保護詳細仕様_v5.1.md", "stage": 3, "role": "データ分類・認可・暗号・SEC-001〜020・Field Policy", "common_canonical": true, "repo_successors": ["docs/security/SECURITY-TRACE.md", "docs/adr/ADR-security-baseline.md", "docs/adr/ADR-data-keys.md", "docs/ops/KEY-INVENTORY.md"]},
-  {"id": "DOC-12", "title": "旧資料情報回収・変更履歴・整合性評価", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "12_旧資料情報回収_変更履歴_整合性評価_v5.1.md", "stage": 4, "role": "変更の統制・決定の記録", "repo_successors": []},
-  {"id": "DOC-13", "title": "用語集・データ辞書・イベントカタログ", "version": "v5.1", "effective": "2026-09-03", "state": "approved_v5.1", "library_path": "13_用語集_データ辞書_イベントカタログ_v5.1.md", "stage": 2, "role": "語彙・情報の品質の状態・Event・Error の名前空間", "common_canonical": true, "repo_successors": ["docs/spec/error-catalog.md"]},
-  {"id": "DOC-14", "title": "MAP 中核機能・詳細仕様", "version": "v5.1", "state": "unverified_header", "library_path": "14_MAP中核機能_詳細仕様_v5.1.md", "stage": 4, "role": "地図のレイヤー・Plan-to-Memory", "repo_successors": []},
-  {"id": "DOC-15", "title": "競合調査反映・追加変更機能仕様書", "version": "v5.1", "state": "merged", "library_path": "15_競合調査反映_追加変更機能仕様書_v5.1.md", "stage": 1, "role": "CA-001〜016 は DOC-02 v6.0 の FR-043〜058 の表へ統合。2026-09-03 時点の競合の調査は保管の版で読む", "repo_successors": ["docs/spec/DOC-02_要件定義書_v6.0.md"]}
+  {
+   "id": "README",
+   "title": "資料体系・読解ガイド",
+   "version": "v6.0",
+   "state": "approved_v6.0",
+   "repo_path": "docs/spec/README.md",
+   "library_path": "README_資料体系_読解ガイド_v5.1.md",
+   "stage": 1,
+   "role": "正本の体系・移す段階・変更の手順",
+   "repo_successors": [
+    "docs/spec/README.md"
+   ]
+  },
+  {
+   "id": "DOC-01",
+   "title": "企画書・プロダクトビジョン書",
+   "version": "v5.1",
+   "state": "unverified_header",
+   "library_path": "01_企画書_プロダクトビジョン書_v5.1.md",
+   "stage": 4,
+   "role": "製品原則・KPI",
+   "repo_successors": []
+  },
+  {
+   "id": "DOC-02",
+   "title": "要件定義書",
+   "version": "v6.0",
+   "state": "approved_v6.0",
+   "repo_path": "docs/spec/DOC-02_要件定義書_v6.0.md",
+   "library_path": "02_要件定義書_v5.1.md",
+   "stage": 1,
+   "role": "要件 ID(FR-001〜059・FC-001〜180・NFR・AC-01〜08・EX-001〜022)",
+   "common_canonical": true,
+   "repo_successors": [
+    "docs/spec/DOC-02_要件定義書_v6.0.md",
+    "docs/trace/fr-requirements.json",
+    "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md"
+   ]
+  },
+  {
+   "id": "DOC-03",
+   "title": "基本設計書・システム構成",
+   "version": "v5.1",
+   "state": "unverified_header",
+   "library_path": "03_基本設計書_システム構成_v5.1.md",
+   "stage": 4,
+   "role": "モジュール・信頼境界・処理",
+   "repo_successors": [
+    "docs/adr"
+   ]
+  },
+  {
+   "id": "DOC-04",
+   "title": "外部機能仕様書・画面仕様",
+   "version": "v6.0",
+   "state": "approved_v6.0",
+   "library_path": "04_外部機能仕様書_画面仕様_v5.1.md",
+   "stage": 2,
+   "role": "画面 ID(SC-01〜48)・経路との対応・UX の規則・UI-001〜017",
+   "common_canonical": true,
+   "repo_successors": [
+    "docs/spec/DOC-04_外部機能仕様書_画面仕様_v6.0.md",
+    "docs/ux/G11_UIUX全範囲_実装仕様.md",
+    "docs/ux/TDay_旅の当日_旅帖ライブ.md",
+    "docs/ux/TripKit_旅行箱.md",
+    "docs/adr/ADR-ux-information-design.md"
+   ],
+   "repo_path": "docs/spec/DOC-04_外部機能仕様書_画面仕様_v6.0.md"
+  },
+  {
+   "id": "DOC04-A",
+   "title": "高忠実度統合ワイヤーフレーム",
+   "version": "v5.1",
+   "state": "merged",
+   "library_path": "DOC04-A_高忠実度統合ワイヤーフレーム_v5.1.html",
+   "stage": 2,
+   "role": "DOC-04 v6.0 §20 へ統合。視覚の正本は実装の画面と docs/ux。v5.1 の WF は保管",
+   "repo_successors": [
+    "docs/spec/DOC-04_外部機能仕様書_画面仕様_v6.0.md",
+    "docs/ux/TravelCanvas_ホーム改善案_v2_モックアップ.html"
+   ]
+  },
+  {
+   "id": "DOC-05",
+   "title": "DB 設計書",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "05_DB設計書_v5.1.md",
+   "stage": 3,
+   "role": "論理データ・暗号化の台帳・状態の遷移",
+   "common_canonical": true,
+   "repo_successors": [
+    "backend/app/models/models.py",
+    "backend/alembic/versions"
+   ]
+  },
+  {
+   "id": "DOC-06",
+   "title": "API 設計書",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "06_API設計書_v5.1.md",
+   "stage": 3,
+   "role": "API の原則・権限の行列・冪等・同期の契約",
+   "common_canonical": true,
+   "repo_successors": [
+    "backend/app/api/v1",
+    "docs/spec/error-catalog.md"
+   ]
+  },
+  {
+   "id": "DOC-07",
+   "title": "開発環境・運用環境仕様書",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "07_開発環境_運用環境仕様書_v5.1.md",
+   "stage": 4,
+   "role": "環境・CI・SLO・Runbook・DR",
+   "repo_successors": [
+    "docs/ops/RUNBOOK.md",
+    "docs/runbooks",
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "DOC-08",
+   "title": "開発スタック定義書",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "08_開発スタック定義書_v5.1.md",
+   "stage": 4,
+   "role": "技術の選定",
+   "repo_successors": []
+  },
+  {
+   "id": "DOC-09",
+   "title": "計画・展開指針",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "09_計画_展開指針_v5.1.md",
+   "stage": 4,
+   "role": "Gate・リリースの順",
+   "repo_successors": [
+    "docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md"
+   ]
+  },
+  {
+   "id": "DOC-10",
+   "title": "全機能仕様・トレーサビリティ・実装状況台帳",
+   "version": "v6.0",
+   "state": "approved_v6.0",
+   "repo_path": "docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md",
+   "library_path": "10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md",
+   "stage": 1,
+   "role": "実装の状態(資料室の r11 は 2026-10-20 に廃止・保管)",
+   "repo_successors": [
+    "docs/spec/DOC-10_全機能仕様_トレーサビリティ_実装状況台帳_v6.0.md"
+   ]
+  },
+  {
+   "id": "DOC-11",
+   "title": "セキュリティ・プライバシー・データ保護詳細仕様",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "11_セキュリティ_プライバシー_データ保護詳細仕様_v5.1.md",
+   "stage": 3,
+   "role": "データ分類・認可・暗号・SEC-001〜020・Field Policy",
+   "common_canonical": true,
+   "repo_successors": [
+    "docs/security/SECURITY-TRACE.md",
+    "docs/adr/ADR-security-baseline.md",
+    "docs/adr/ADR-data-keys.md",
+    "docs/ops/KEY-INVENTORY.md"
+   ]
+  },
+  {
+   "id": "DOC-12",
+   "title": "旧資料情報回収・変更履歴・整合性評価",
+   "version": "v5.1",
+   "effective": "2026-09-03",
+   "state": "approved_v5.1",
+   "library_path": "12_旧資料情報回収_変更履歴_整合性評価_v5.1.md",
+   "stage": 4,
+   "role": "変更の統制・決定の記録",
+   "repo_successors": []
+  },
+  {
+   "id": "DOC-13",
+   "title": "用語集・データ辞書・イベントカタログ",
+   "version": "v6.0",
+   "state": "approved_v6.0",
+   "library_path": "13_用語集_データ辞書_イベントカタログ_v5.1.md",
+   "stage": 2,
+   "role": "語彙・情報の品質の状態・Event・Error の名前空間",
+   "common_canonical": true,
+   "repo_successors": [
+    "docs/spec/DOC-13_用語集_データ辞書_イベントカタログ_v6.0.md",
+    "docs/spec/error-catalog.md"
+   ],
+   "repo_path": "docs/spec/DOC-13_用語集_データ辞書_イベントカタログ_v6.0.md"
+  },
+  {
+   "id": "DOC-14",
+   "title": "MAP 中核機能・詳細仕様",
+   "version": "v5.1",
+   "state": "unverified_header",
+   "library_path": "14_MAP中核機能_詳細仕様_v5.1.md",
+   "stage": 4,
+   "role": "地図のレイヤー・Plan-to-Memory",
+   "repo_successors": []
+  },
+  {
+   "id": "DOC-15",
+   "title": "競合調査反映・追加変更機能仕様書",
+   "version": "v5.1",
+   "state": "merged",
+   "library_path": "15_競合調査反映_追加変更機能仕様書_v5.1.md",
+   "stage": 1,
+   "role": "CA-001〜016 は DOC-02 v6.0 の FR-043〜058 の表へ統合。2026-09-03 時点の競合の調査は保管の版で読む",
+   "repo_successors": [
+    "docs/spec/DOC-02_要件定義書_v6.0.md"
+   ]
+  }
  ]
 }
