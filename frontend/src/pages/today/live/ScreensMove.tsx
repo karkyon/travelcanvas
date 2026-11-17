@@ -389,6 +389,7 @@ export const HomeRouteScreen: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
             </Suspense>
           </div>
         )}
+        {r && <p className="tl-small tl-mute" data-testid="today-route-line-note">線は今いる所と宿を直線で結んだ目安です。道順は「外の地図で案内」で確かめてください</p>}
         <p className="tl-transit__box">
           {`${r ? `${r.from.title}から` : ''}明るい大通りを優先してください。${r ? `タクシーなら 約${r.taxi}分（概算）。` : ''}`}
         </p>

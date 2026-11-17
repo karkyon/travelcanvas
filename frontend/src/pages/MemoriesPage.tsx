@@ -533,6 +533,8 @@ const MemoriesPage: React.FC = () => {
               <h2 id="journal-draft-title" tabIndex={-1} className="font-semibold text-ink-900">旅行記の下書き</h2>
               <p className="text-sm text-ink-700">
                 予定と記録から下書きを作ります(旅程は変わりません)。コピーかファイルの保存で使えます。
+                {/* [Gate Hardening-A・監査 G-14] 生成の方法を示す */}
+                <span className="block text-xs text-ink-700" data-testid="journal-draft-method">作り方: 決まった形の文に予定・記録を当てはめます(AI は使いません。外のサービスへ送りません)。</span>
                 ページとして公開する時は、下の「旅行記を公開する」を使ってください。
               </p>
               <div className="flex flex-col gap-1">

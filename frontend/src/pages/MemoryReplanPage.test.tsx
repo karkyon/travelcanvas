@@ -47,6 +47,8 @@ describe('MemoryReplanPage (Gate P17)', () => {
     const rows = within(within(proposal).getByRole('table')).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('湯豆腐12:0012:45');
     expect(within(proposal).getByRole('list', { name: '動かさない予定' })).toHaveTextContent('夜景: ずらすと日をまたぐため動かしません');
+    // [Gate Hardening-A・監査 G-14] 規則で計算した提案を AI の提案と誤解させない
+    expect(screen.getByTestId('replan-method')).toHaveTextContent('AI は使いません');
   });
 
   it('確認してから適用し(本案のrevisionと入力の版を送る)、取り消し方を案内する', async () => {

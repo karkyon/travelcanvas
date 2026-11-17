@@ -77,6 +77,10 @@ const MemoryReplanPage: React.FC = () => {
       <p className="text-sm text-ink-700 mt-1">
         あなたが参加したほかの旅行の「振り返り」(行った・着いた・出た時刻)から傾向を見つけます。提案は適用するまで旅程を変えません。
       </p>
+      {/* [Gate Hardening-A・監査 G-14] 生成の方法を示す(AI の学習・予測と誤解させない) */}
+      <p className="text-xs text-ink-700 mt-1" data-testid="replan-method">
+        作り方: 記録した時刻の件数・平均から決まった規則で計算します(AI は使いません。記録を外のサービスへ送りません)。
+      </p>
       {data && (
         <p className="text-sm text-ink-700 mt-1" data-testid="party-label">
           {`この旅行の同行者: ${data.party_label}(同じ属性の旅行の傾向を優先します。属性は「制約」の「移動・滞在の既定」で変えられます)`}

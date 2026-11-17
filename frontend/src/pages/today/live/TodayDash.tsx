@@ -19,6 +19,7 @@ import { TeaserArt } from './LiveCards';
 import { useTeaserImage } from './useTeaserImage';
 import type { TodayCtx } from './todayCtx';
 import { arriveSky, bookingPill, type useCrew } from './todayHelpers';
+import { mapLineLegend, trailInUse } from './mapFilters';
 import type { GuideEvent } from '@/services/api/travelDay';
 import { GoRing, Pill, SkyStrip, SpotOverlay, TodayDock } from './TodayTop';
 import { overlayWidth } from './todaySource';
@@ -123,6 +124,7 @@ export const MapCard: React.FC<{ ctx: TodayCtx; selectedId?: string | null; onSe
 }) => {
   const placed = ctx.events.some((e) => e.latitude != null && e.longitude != null);
   if (!placed) return null;
+  const legend = mapLineLegend(trailInUse(ctx.settings.location.trail, ctx.trail.length));
   const pick = (id: string) => {
     if (onSelect && overlayWidth()) onSelect(id);
     else ctx.open('map', id);
@@ -146,11 +148,11 @@ export const MapCard: React.FC<{ ctx: TodayCtx; selectedId?: string | null; onSe
         <div className="tl-ge1024 tl-mapcard__sky"><SkyStrip ctx={ctx} /></div>
       </div>
       <div className="tl-legend">
-        <span><b className="tl-c-coral">━</b> 今日の足跡</span>
-        <span><b className="tl-c-teal">┅</b> この後<span className="tl-not-sp">の道のり</span></span>
+        <span><b className="tl-c-coral">{legend.trail ? '━' : '┄'}</b> {legend.walked}</span>
+        <span><b className="tl-c-teal">┅</b> {legend.ahead}</span>
         {ctx.rainIds.size > 0 && <span><b className="tl-c-blue">○</b> 雨の時間</span>}
         {ctx.detourPins.length > 0 && <span><b className="tl-c-gold">＋</b> 寄り道の候補</span>}
-        <span className="tl-mute">足跡は位置の記録をONにした時だけ</span>
+        <span className="tl-mute" data-testid="today-map-line-note">{legend.note}</span>
       </div>
     </section>
   );

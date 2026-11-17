@@ -217,6 +217,8 @@ describe('MemoriesPage (Gate P12)', () => {
     m.createJournalDraft.mockResolvedValue(fx.journal_draft as JournalDraft);
     renderPage();
     const section = await screen.findByRole('region', { name: '旅行記の下書き' });
+    // [Gate Hardening-A・監査 G-14] 下書きの作り方(AI ではない)を示す
+    expect(within(section).getByTestId('journal-draft-method')).toHaveTextContent('AI は使いません');
     fireEvent.click(within(section).getByLabelText('他のメンバーが公開した記録を含める'));
     fireEvent.click(within(section).getByRole('button', { name: '下書きを作る' }));
     await waitFor(() => expect(m.createJournalDraft).toHaveBeenCalledWith('p1', {
