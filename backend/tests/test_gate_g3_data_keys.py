@@ -398,3 +398,54 @@ def test_security_cli_refuses_old_single_step_reset(capsys):
     spec.loader.exec_module(module)
     assert module.main(["mfa-reset", "--email", "x@example.com", "--yes"]) == module.EXIT_USAGE
     assert "mfa-reset-request" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- 別の環境から移した DB の確認
+
+def test_decrypt_check_reads_data_keys_from_the_checked_database(keys):
+    """[Gate DataTransfer] 復元した DB の暗号文は、その DB のデータ鍵で確かめる。今動いている DB に同じ鍵が無くても
+    (omega-dev2 から GCP へ移した時)復号できる。以前は今の DB の data_keys を見て「復号できない」になった。"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.ops.decrypt_check import check
+    from app.ops.opslib import replace_database
+
+    base_url = engine.url.render_as_string(hide_password=False)
+
+    keys(KEY_A)
+    target = "tc_dc_" + uuid.uuid4().hex[:10]
+    admin = create_engine(replace_database(base_url, "postgres"), poolclass=NullPool,
+                          isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as conn:
+            conn.execute(text(f'CREATE DATABASE "{target}"'))
+    except Exception:  # noqa: BLE001
+        admin.dispose()
+        pytest.skip("試験の DB を作る権限が無い")
+    tgt = create_engine(replace_database(base_url, target), poolclass=NullPool)
+    try:
+        subj = data_keys.subject("plan", uuid.uuid4())
+        token = crypto.encrypt_payload(b"moved", subj)
+        dek = uuid.UUID(crypto.parse_envelope(token)[1])
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT id, subject_type, subject_id, wrapped_key_ciphertext FROM data_keys "
+                                    "WHERE id = :i"), {"i": dek}).first()
+        with tgt.begin() as conn:
+            conn.execute(text("CREATE TABLE data_keys (id uuid PRIMARY KEY, subject_type text, subject_id text, "
+                              "wrapped_key_ciphertext bytea, destroyed_at timestamptz)"))
+            conn.execute(text("INSERT INTO data_keys (id, subject_type, subject_id, wrapped_key_ciphertext) "
+                              "VALUES (:i, :t, :s, :w)"), {"i": row[0], "t": row[1], "s": row[2], "w": row[3]})
+            conn.execute(text("CREATE TABLE moved_things (value_ciphertext bytea)"))
+            conn.execute(text("INSERT INTO moved_things VALUES (:v)"), {"v": token})
+        with engine.begin() as conn:  # 今の DB には無い鍵にする
+            conn.execute(text("DELETE FROM data_keys WHERE id = :i"), {"i": dek})
+        data_keys.reset_cache()
+        res = check(target, sample=5)
+        assert res["ok"] and res["decrypted"] >= 2 and res["failed"] == 0, res
+        assert data_keys._engine_override is None  # 確認の後は元の DB に戻る
+    finally:
+        tgt.dispose()
+        with admin.connect() as conn:
+            conn.execute(text(f'DROP DATABASE IF EXISTS "{target}" WITH (FORCE)'))
+        admin.dispose()

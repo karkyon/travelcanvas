@@ -327,7 +327,8 @@ def restore_acceptable(result: Dict[str, object]) -> Tuple[bool, List[str]]:
         problems.append("保存ファイル")
     decrypt_res = result.get("decrypt") or {}
     if not (isinstance(decrypt_res, dict) and decrypt_res.get("ok")):
-        problems.append("復号")
+        cols = decrypt_res.get("failed_columns") if isinstance(decrypt_res, dict) else None
+        problems.append("復号" + ("(" + ",".join(map(str, cols[:5])) + ")" if cols else ""))
     if not result.get("alembic_match"):
         problems.append("alembic の版")
     bad = [k for k in (result.get("fingerprint_mismatches") or []) if k not in ENV_LOCAL_KEYS]

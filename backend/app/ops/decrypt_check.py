@@ -46,7 +46,8 @@ def check(database: Optional[str], sample: int = 5) -> Dict[str, object]:
     columns: List[Dict[str, object]] = []
     decrypted = failed = erased = 0
     try:
-        with engine.connect() as conn:
+        # [Gate DataTransfer] データ鍵は確かめる DB の data_keys から読む(今動いている DB からではない)
+        with data_keys.use_engine(engine), engine.connect() as conn:
             for col in encrypted_columns(conn):
                 sql = "SELECT %s FROM public.%s WHERE %s IS NOT NULL LIMIT :n" % (
                     _quote(col["column"]),

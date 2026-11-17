@@ -12,7 +12,8 @@
 import threading
 import time
 import uuid
-from typing import Any, Dict, Iterable, Optional, Tuple
+from contextlib import contextmanager
+from typing import Any, Dict, Iterable, Iterator, Optional, Tuple
 
 from cryptography.fernet import Fernet
 from sqlalchemy import text
@@ -42,10 +43,31 @@ def subject(kind: str, ident: object) -> Optional[Subject]:
         return None
 
 
+_engine_override: Optional[Any] = None
+
+
 def _engine() -> Any:
+    if _engine_override is not None:
+        return _engine_override
     from app.core.database import engine
 
     return engine
+
+
+@contextmanager
+def use_engine(engine: Any) -> Iterator[None]:
+    """[Gate DataTransfer] 運用の道具(復元した DB の確認)だけが使う: 鍵の読み書きを、指定した DB で行う。
+    復元した DB の暗号文は、その DB に入れ直したデータ鍵で読む(今動いている DB の鍵ではない。別の環境から
+    移した DB では、今の DB に同じ鍵が無い)。前後で記憶を消す。"""
+    global _engine_override
+    previous = _engine_override
+    reset_cache()
+    _engine_override = engine
+    try:
+        yield
+    finally:
+        _engine_override = previous
+        reset_cache()
 
 
 def _wrap(raw_key: bytes) -> bytes:
