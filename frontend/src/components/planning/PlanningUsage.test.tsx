@@ -1,6 +1,6 @@
 /**
  * [FR059-B] この旅行の AI・外部検索の利用枠(FC-184)・クラスの表示(FC-181)・管理の二者の承認(FC-185)の画面。
- * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §6。
+ * docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §6。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';

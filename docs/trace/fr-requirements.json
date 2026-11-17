@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "description": "全59 FR の要求の根拠(資料室の v5.1 正本・リポジトリの FR-059 正本・承認済みの変更)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
+  "description": "全59 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
   "gate": "Hardening-A",
   "baseline": "a2c419dda9b0e0a5743abc909c0e3c9a58d74e2f",
   "evidence_states": {
@@ -4646,7 +4646,7 @@
   "FR-059": {
    "title": "旅程相談 API の原価上限・クラス別 Quota",
    "requirement": {
-    "source": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)",
+    "source": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md(リポジトリの正本。DOC-02 v6.0 §3 FR-059 で採番。v5.1 には無かった)",
     "priority": "MUST",
     "stage": "—",
     "summary": "旅程の相談の外部 API の原価上限(1旅行あたり)と利用者クラス別の quota をサーバーで守る",
@@ -4703,7 +4703,7 @@
    "evidence": {
     "requirement": {
      "state": "done",
-     "note": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)"
+     "note": "docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md(リポジトリの正本。DOC-02 v5.1 に無い追加の要件)"
     },
     "implementation": {
      "state": "partial",

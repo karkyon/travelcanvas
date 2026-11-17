@@ -4,7 +4,7 @@ Revision ID: d5f9b2c8e1a3
 Revises: c4e8a1f3b7d2
 Create Date: 2026-10-29 19:00:00.000000
 
-[FR059-B] 外部 API の原価上限(1旅行 50円)と利用者クラス別 quota(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §7)。
+[FR059-B] 外部 API の原価上限(1旅行 50円)と利用者クラス別 quota(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §7)。
 
 - entitlements: クラスの付与・quota の上書き(管理者が作ると pending、別の管理者の承認で active)
 - usage_policy_profiles: クラスごとの上限と価格の版(policy 2026-10-29.1 を入れる)

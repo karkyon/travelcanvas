@@ -3767,7 +3767,7 @@ class OpsJobRun(Base):
 
 
 # ===================================================================== [FR059-B] 外部 API の原価上限・利用者クラス別 quota
-# 正本: docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §7。金額は NUMERIC(12,4)(円)。
+# 正本: docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §7。金額は NUMERIC(12,4)(円)。
 
 class Entitlement(Base):
     """[FR059-B] クラスの付与と quota の上書き(subject: user / plan / organization)。

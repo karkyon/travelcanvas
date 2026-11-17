@@ -61,7 +61,7 @@ DOC-10 §6 のとおり未着手(PROD-01〜09)。
 | SEC-009 | URL の SSRF・内部の DNS・転送 | `backend/tests/test_gate_c2_candidates_places.py`(URL の正規化)・`backend/tests/test_gate_remaining6_account.py`(画面の文)・`backend/tests/test_gate_hardening_ssrf.py`(内部・ループバック・リンクローカル・metadata・CGNAT の宛先、混ざった DNS の答え、内部への転送の拒否を、判定を差し替えずに確かめる。Hardening-A で追加) | 有 |
 | SEC-010 | prompt injection・道具の濫用 | `backend/tests/test_gate_hardening_prompt_injection.py`(Hardening-B。乗っ取られた AI の答えを直接与えて確かめる: 旅行相談は許した操作・項目の外を捨て、根拠が最新の発言に無い操作・状態に無い ID を捨て、結果は状態を変えない案。予約メールは伏せ字の後の本文に引用が無い値・予約番号/PIN/氏名/電話を AI から受けず、規則の値を上書きしない。レシートはリンクを捨て規則の値を上書きしない)・`backend/tests/test_gate_f07_turn.py` | 有(残り: 根拠の語が発言にあれば関係の薄い操作も案に残る。案は確認が要るので適用はされない) |
 | SEC-011 | PDF の描画の外部・内部の取得 | `backend/tests/test_gate_remaining5_server_exports.py`(Pillow で描く。HTML を描かない) | 有(方式で回避) |
-| SEC-012 | 役割の失効の後のリアルタイムの配信 | `backend/tests/test_gate_g2_realtime.py`(配信の権限の規則・上限) | 有(権限を外した直後の切断の専用の試験は要確認) |
+| SEC-012 | 役割の失効の後のリアルタイムの配信 | `backend/tests/test_gate_g2_realtime.py`(`test_stream_access_rules_and_limit`: 配信中にメンバーから外すと access_lost を送って閉じる・上限) | 有(2026-11-17 DocsV6-1 で確認し訂正) |
 | SEC-013 | 検索の件数・時間から秘密を推測できない | `backend/tests/test_gate_c3_search.py` | 有(件数。時間の差の計測は無い) |
 | SEC-014 | 秘匿の制約の集計からの推測 | `backend/tests/test_gate_c1_collaboration.py`(秘匿プロフィールは暗号化し、旅行には充足だけ使う) | **一部**(少人数の集計からの推測を防ぐ閾値の専用の試験は無い) |
 | SEC-015 | 鍵の切り替え・古い暗号文・バックアップの復元 | `backend/tests/test_gate_g1_keys.py`・`backend/tests/test_gate_o1_ops.py`・`docs/ops/drills/gate-o1-drill.md` | 有(開発で確認。本番の復元演習は無い) |

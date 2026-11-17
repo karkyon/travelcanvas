@@ -1,5 +1,5 @@
 """
-[FR059-B] 旅程相談の外部 API の利用枠(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §8)。
+[FR059-B] 旅程相談の外部 API の利用枠(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §8)。
 
 - GET  /entitlements                                  : 自分のクラス・policy の版・feature・quota・今月の使用(ゲストは Guest)
 - GET  /plans/{plan_id}/planning-usage                : 旅行の上限・確定・予約中・残り・月の残り・回数の残り・状態(閲覧以上)

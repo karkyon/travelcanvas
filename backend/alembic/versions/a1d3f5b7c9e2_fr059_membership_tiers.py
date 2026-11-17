@@ -5,7 +5,7 @@ Revises: f2a6d8c4b9e1
 Create Date: 2026-10-31 09:00:00.000000
 
 [Gate FR059-Tiers] 会員の機能クラス Free / Trip / Journey / Explorer の価格の版 ``2026-10-31.1``
-(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §3.2〜§3.5)。
+(docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §3.2〜§3.5)。
 
 - usage_policy_profiles に free・trip・journey・explorer の版 2026-10-31.1 を足す(単価・為替・税・安全係数は 2026-10-29.1 と同じ)
 - 以前の free(2026-10-29.1: AI 5回・月1旅行)は retired にする(行は残す。以前の予約の確定は版で引くので消さない)

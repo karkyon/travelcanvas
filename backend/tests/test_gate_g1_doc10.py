@@ -138,10 +138,10 @@ def test_trace_index_lists_every_trace_and_superseded_rows_are_marked():
 def test_doc10_revision_matches_status_and_changelog():
     """[Gate DOC10-Rev] 版の表示・fr-status.json の revision・変更履歴の最後の行がそろう(r31 の行を書いて r30 のまま、を防ぐ)"""
     text = next((ROOT / "docs" / "spec").glob("DOC-10_*.md")).read_text(encoding="utf-8")
-    header = re.search(r"版: \*\*(v5\.1-r\d+)\*\*", text)
-    assert header, "DOC-10 の冒頭に版(v5.1-rNN)が無い"
+    header = re.search(r"版: \*\*((v\d+\.\d+)-r\d+)\*\*", text)  # [DocsV6] v6.0 から版の番号が v6.0-rNN(r は続き番号)
+    assert header, "DOC-10 の冒頭に版(vX.Y-rNN)が無い"
     rows = [int(n) for n in re.findall(r"^\| \**r(\d+)\** \| \d{4}-\d{2}-\d{2} \|", text, re.M)]
     assert rows, "DOC-10 の変更履歴に行が無い"
-    latest = "v5.1-r%d" % max(rows)
+    latest = "%s-r%d" % (header.group(2), max(rows))
     assert header.group(1) == latest, "DOC-10 の版 %s と変更履歴の最後 %s が違う" % (header.group(1), latest)
     assert _status()["_meta"]["revision"] == latest, "fr-status.json の revision が DOC-10 の版 %s と違う" % latest

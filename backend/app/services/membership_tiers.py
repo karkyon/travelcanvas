@@ -1,6 +1,6 @@
 """[Gate FR059-Tiers] 会員の機能クラス Free / Trip / Journey / Explorer(機械が読む policy)。
 
-正本: docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §3.2〜§3.5(policy ``2026-10-31.1``)。
+正本: docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §3.2〜§3.5(policy ``2026-10-31.1``)。
 
 - 4つのクラスは「外部の有料 API・AI をどこまで使えるか」の段階。旅行の日数(日帰り・長期)の種類ではない
 - 旅行の中の権限(owner/editor/viewer/guest)、認証のゲスト、Family/Group の共同利用、Pro/B2B の契約、Trip Pass とは別の Entitlement

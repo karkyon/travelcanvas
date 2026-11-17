@@ -311,7 +311,7 @@ class Settings(BaseSettings):
     # docs/ux/G11_UIUX全範囲_実装仕様.md §3.5)。Nominatim の利用の条件(1秒に1回)を守る
     TRIP_INTENT_GEOCODER: str = "nominatim"
     # [FR059-B] 外部 API の原価の予約の期限(秒)。provider の応答が消えた時、この後に解放する
-    # (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v5.1.md §5)
+    # (docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md §5)
     COST_GUARD_RESERVATION_TTL_SECONDS: int = 600
     # [Gate ProviderConnect] 使う OpenAI のモデル(非秘密。変えると以前の鍵の確認は使えなくなる)・確認の期限・
     # 管理者の確認の日の枠(全ての提供元の合計。旅行の 50円とは別。初期の方針)
