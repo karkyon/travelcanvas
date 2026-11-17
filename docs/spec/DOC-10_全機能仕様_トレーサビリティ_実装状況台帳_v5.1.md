@@ -1,10 +1,11 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v5.1(正本)
 
-> 文書ID: DOC-10 / 版: **v5.1-r54** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-16<br>
+> 文書ID: DOC-10 / 版: **v5.1-r55** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
-> 共通正本: 要件ID=DOC-02、画面ID=DOC-04、データ=DOC-05、API=DOC-06、Security=DOC-11、語彙=DOC-13
+> 共通正本: 要件ID=DOC-02、画面ID=DOC-04、データ=DOC-05、API=DOC-06、Security=DOC-11、語彙=DOC-13(いずれも資料室の v5.1・2026-09-03 発効。
+> 所在・版・状態・優先の順は `docs/spec/CANONICAL-SOURCES.md`、FR ごとの要求の根拠と承認済みの変更は `docs/trace/FR-TRACE.md`)
 
 **目的:** 構想、仕様、画面、DB、API、コード、試験、リリースを一つの台帳で結び、名前だけ存在する機能を「完成」と誤認しない。
 
@@ -31,6 +32,9 @@
 | `docs/trace/v1-verification-ledger.json` | VERIFIED の**証拠**(E2E・権限・競合・セキュリティ・運用の試験) | CI が、参照した試験の実在(`test_gate_v1_verification_ledger.py`)と、**その実行での合格**(`scripts/ci/check_ledger_results.py`)を確かめる |
 | 本書(DOC-10) | 人が読む正本(状態の判定規則・集計・リリース・次工程) | 生成部分は手で直さない(CI が落ちる) |
 | `docs/spec/FR-059_*.md` | FR-059(外部 API の原価上限・利用者クラス別 quota)の要件・データ・API・運用の正本 | 資料室の DOC-02/04/05/06/07/09/11/13 の該当箇所より優先する(同書 §12)。policy の版を変える時は同書と本書を同じ PR で直す |
+| `docs/spec/canonical-sources.json`(人が読む版 `CANONICAL-SOURCES.md`) | 資料室の正本(DOC-01〜15)の所在・版・状態と、リポジトリの正本との優先の順(Hardening-A) | 資料室の文書の版が変わったら直し、`python3 scripts/ci/render_fr_trace.py` |
+| `docs/trace/fr-requirements.json`(人が読む版 `docs/trace/FR-TRACE.md`) | 全59 FR の要求の出典・受入・承認済みの変更・画面/API/表/試験・証拠の区分(要件根拠/実装/統合/E2E/権限・失敗/実機/実 API/運用)・残件の分類 | FR の状態・残件を変える Gate は同じ commit で直す。実機・実 API・運用を「済」にするには証拠のファイルが要る(`test_gate_hardening_trace.py`) |
+| `docs/security/SECURITY-TRACE.md` | DOC-11 の項目・SEC-001〜020 と実装・試験・本番の証跡の対応 | 参照の実在を CI で確かめる |
 | `docs/trace/gate-*-trace.md` | Gate ごとの要件の証拠(当時の状態) | 後の Gate で解消した行には `SUPERSEDED BY` を書く。今の状態の索引は `docs/trace/INDEX.md` |
 | 作業継続のハンドオフ(資料室) | 会話をまたぐ作業の引き継ぎ | 本書の版と commit を書く。状態の数字は本書から写す |
 
@@ -271,6 +275,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r52** | 2026-11-14 | `PR #110` | **Remaining-6: パスワードの再設定(忘れた時)・メールの確認の API と画面(FR-003)、1 通の予約メールを予約ごとに分ける(FR-011)、SNS 以外の URL の題名・説明・場所(FR-007)、写真の地図の印のまとめ(FR-037)、Atlas のテーマ別(FR-052)、GCP 配備の準備(開発の image の字体・購読 URL の https)。古い残り(FR-012 のバーコード・FR-032/048 の sw.js)を直す** |
 | **r53** | 2026-11-14 | `PR #111` | **Remaining-7: passkey(FR-003)・画像と声からの候補(FR-007)・Gmail の連携(FR-011)・候補の層と地図タイル(FR-049)・予定の経路と軌跡の比べ(FR-054)・場所の詳細/写真/静的な地図/AI の Web 検索の adapter(FR-059)・制約の Undo(FR-016)と区間・経路の Undo の E2E(FR-014/015)・予算との連動(FR-026)・ゲストを既存のアカウントへまとめる(FR-002)。migration `e8a2c4f6b1d3`** |
 | **r54** | 2026-11-16 | `dev/tripkit-ui` | **TripKitUI・HomePlace・HomeRoute: 旅行箱の 6 画面(概要・予約・準備・予算・文書・予約の取込)と検索の見出し・まとめの札・一覧の行・切り替えを同じ部品にそろえる。自宅の場所(本人だけ・暗号化。登録・地図に出す・経路に使う・提供元へ送るを本人が選ぶ)。旅程の地図に前の夜の宿・今夜の宿(連泊)・自宅の印と線(宿=紫・予定の間=緑・自宅=青)。migration `a3c7e9f1b5d2`** |
+| **r55** | 2026-11-17 | `a2c419d`+Hardening-A | **製品固めゲート監査(2026-11-17)の是正: 共通正本(DOC-02/04/05/06/11/13)は資料室の v5.1(2026-09-03 発効)にあることを記録し所在を `docs/spec/CANONICAL-SOURCES.md` に(G-01・G-09)、全59 FR の要求の根拠・承認済みの変更・8 区分の証拠・残件の分類を `docs/trace/FR-TRACE.md` に(G-01・G-03)、DOC-11 の対応 `docs/security/SECURITY-TRACE.md`、SEC-009 の判定を差し替えない試験、開発の環境の間の同じ鍵の移し方を本番・ステージングで止める(G-10)、総合テストの縦断シナリオ `docs/test/integrated-acceptance-scenarios.md`、再判定とゲート判定 `docs/audit/2026-11-17_product-hardening-gate_addendum.md`。FR の状態の遷移なし。`docs/trace/gate-hardening-trace.md`** |
 
 ## 10. 台帳の更新の規則
 
