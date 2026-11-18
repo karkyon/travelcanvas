@@ -5,8 +5,6 @@
 import uuid
 from datetime import datetime, timezone
 
-import pytest
-
 from app.services import today_mode
 
 H = lambda: {"Idempotency-Key": str(uuid.uuid4())}  # noqa: E731
@@ -78,8 +76,14 @@ def test_update_day_timezone_keeps_wall_clock_and_fixes_today(auth_client, monke
     base = f"/api/v1/plans/{p}"
     day = client.post(f"{base}/days", json={"local_date": D}, headers=H()).json()
     assert day["timezone_id"] == "UTC"
-    ev = client.post(f"{base}/events", json={"day_id": day["id"], "title": "朝のカフェ", "event_type": "other",
-                                             "start_at": "2026-11-21T10:00:00Z", "end_at": "2026-11-21T11:00:00Z"}, headers=H())
+    ev = client.post(
+        f"{base}/events",
+        json={
+            "day_id": day["id"], "title": "朝のカフェ", "event_type": "other",
+            "start_at": "2026-11-21T10:00:00Z", "end_at": "2026-11-21T11:00:00Z",
+        },
+        headers=H(),
+    )
     assert ev.status_code in (200, 201), ev.text  # UTC の日の 10:00-11:00(壁の時計)
     rev = client.get(base).json()["revision"]
     r = client.put(f"{base}/days/{day['id']}", json={"timezone_id": "Asia/Tokyo"}, headers={"If-Match": str(rev)})
@@ -106,5 +110,9 @@ def test_update_day_rejects_unknown_timezone_and_ignores_same_zone(auth_client):
     rev = client.get(base).json()["revision"]
     bad = client.put(f"{base}/days/{day['id']}", json={"timezone_id": "Mars/Base"}, headers={"If-Match": str(rev)})
     assert bad.status_code == 422
-    same = client.put(f"{base}/days/{day['id']}", json={"timezone_id": "Asia/Tokyo", "title": "朝"}, headers={"If-Match": str(rev)})
+    same = client.put(
+        f"{base}/days/{day['id']}",
+        json={"timezone_id": "Asia/Tokyo", "title": "朝"},
+        headers={"If-Match": str(rev)},
+    )
     assert same.status_code == 200 and same.json()["title"] == "朝" and same.json()["timezone_id"] == "Asia/Tokyo"
