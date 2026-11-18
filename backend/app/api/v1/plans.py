@@ -29,6 +29,8 @@ import math
 from typing import Any, Dict, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
+from zoneinfo import ZoneInfo
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -56,17 +58,36 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 
 # ===== スキーマ =====
 
+def _check_timezone_id(value: Optional[str]) -> Optional[str]:
+    """[Gate2 G2-04] 日の時刻帯は IANA の名前だけ(Asia/Tokyo など)。名前が違うと黙って UTC として扱われ、今日・NOW/NEXT がずれる"""
+    if value is None:
+        return value
+    try:
+        ZoneInfo(value)
+    except Exception:
+        raise ValueError("時刻帯は Asia/Tokyo のような IANA の名前で指定してください")
+    return value
+
+
 class DayCreate(BaseModel):
     local_date: date_cls
     timezone_id: str = "UTC"
     title: Optional[str] = None
     notes: Optional[str] = None
+    # 注: ここでは名前を検査しない(不正な名前は UTC として扱う既存の契約。test_gate_l1b_today_timezone)。新しい経路(昇格・日の更新)は検査する
 
 
 class DayUpdate(BaseModel):
     title: Optional[str] = None
     notes: Optional[str] = None
     sort_order: Optional[int] = None
+    # [Gate2 G2-04] 日の時刻帯。変えると、その日の予定の時刻(壁の時計の読み)はそのままに、内部の時刻だけ付け替える
+    timezone_id: Optional[str] = None
+
+    @field_validator("timezone_id")
+    @classmethod
+    def _tz(cls, v: Optional[str]) -> Optional[str]:
+        return _check_timezone_id(v)
 
 
 class DayResponse(BaseModel):
@@ -746,13 +767,31 @@ async def update_day(
 
     before = _day_to_dict(day)
     update_data = day_data.model_dump(exclude_unset=True)
+    new_tz = update_data.pop("timezone_id", None)
     for field, value in update_data.items():
         setattr(day, field, value)
+    event_changes: List[Any] = []
+    if new_tz and new_tz != day.timezone_id:
+        # [Gate2 G2-04] 時刻帯を変えても「10:00」は10:00のまま。UTC で作られた日を端末の時刻帯へ直す時に使う
+        old_zone, new_zone = et.zone_for(day.timezone_id), et.zone_for(new_tz)
+        for ev in list(day.events):
+            prior = _event_to_dict(ev)
+            moved = False
+            for attr in ("start_at", "end_at"):
+                value = getattr(ev, attr)
+                if value is None:
+                    continue
+                aware = value if value.tzinfo else value.replace(tzinfo=dt_timezone.utc)
+                setattr(ev, attr, aware.astimezone(old_zone).replace(tzinfo=new_zone).astimezone(dt_timezone.utc))
+                moved = True
+            if moved:
+                event_changes.append(("travel_event", ev.id, "update", prior, _event_to_dict(ev)))
+        day.timezone_id = new_tz
     db.flush()
 
-    _record_change_and_bump_revision(
-        db, plan, current_user, "manual", "travel_day", day.id, "update",
-        before_json=before, after_json=_day_to_dict(day),
+    _record_batch_change_and_bump_revision(
+        db, plan, current_user, "manual",
+        [("travel_day", day.id, "update", before, _day_to_dict(day)), *event_changes],
     )
     db.refresh(day)
     return day

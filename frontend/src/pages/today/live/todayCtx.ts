@@ -60,6 +60,8 @@ export interface TodayCtx {
   pendingCount: number;
   /** [Gate Remaining-1] 送信待ちの写真・ひとこと */
   memoPending: number;
+  /** [Gate2 G2-05] サーバーが内容を断って送れなかった写真・ひとことの数(黙って捨てない) */
+  memoDropped: number;
   onMemoQueued: (count: number) => void;
   open: (screen: TodayScreen, eventId?: string | null) => void;
   close: () => void;

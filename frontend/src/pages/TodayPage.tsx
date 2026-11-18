@@ -118,6 +118,7 @@ const TodayPage: React.FC = () => {
   const [simple, setSimple] = useState<boolean>(readSimple);
   const [memoPending, setMemoPending] = useState(0);
   const [memoSent, setMemoSent] = useState(0);
+  const [memoDropped, setMemoDropped] = useState(0);
   const snapshotRef = useRef<Snapshot | null>(null);
 
   const load = useCallback(async () => {
@@ -139,6 +140,7 @@ const TodayPage: React.FC = () => {
       void flushMemoQueue(currentOfflineSession(), planId).then((r) => {
         setMemoPending(r.left);
         if (r.sent > 0) setMemoSent((n) => n + r.sent);
+        if (r.dropped > 0) setMemoDropped((n) => n + r.dropped);
       }).catch(() => undefined);
     } catch (e: unknown) {
       // 取得に失敗しても、表示中または端末に保存済みの当日情報があればそれを表示し続ける
@@ -314,7 +316,7 @@ const TodayPage: React.FC = () => {
     visitedIds, rainIds, sky, hours, nowHour, upcomingRain, gap, lodging, lodgingEvent, dayLabel,
     dayTitle: g?.day_title || trip.title || '今日の旅', tripTitle: trip.title ?? null, destination: trip.destination ?? null,
     stale: isStale, fetchedAt: snapshot?.fetchedAt ?? null, delayed, settings, setSettings, simple, toggleSimple,
-    detourPins, setDetourPins, trail, pendingCount: loadQueue(planId).length + memoPending, memoPending,
+    detourPins, setDetourPins, trail, pendingCount: loadQueue(planId).length + memoPending, memoPending, memoDropped,
     onMemoQueued: setMemoPending,
     open: openScreen, close: closeScreen, refresh: refreshAll, reloadGuide: () => { void reloadGuide(); },
   } : null;

@@ -44,6 +44,7 @@ import {
   applyResults, deviceId, enqueue, isNetworkError, loadConflictCount, loadQueue, saveConflictCount, toPayload,
 } from '@/utils/syncQueue';
 import { nextDayDate } from '@/utils/nextDayDate';
+import { deviceTimeZone } from '@/utils/deviceZone';
 
 // [Gate C1] 予定の保存の結果(FR-020: 競合したら呼出側が入力を残して違いを示す)
 /** [G11-Conflict] 'conflict_unread': 競合したが最新を読み直せなかった(どの項目が変わったかを示せない) */
@@ -94,6 +95,8 @@ interface PlanState {
   // Day management
   setCurrentDay: (dayIndex: number) => void;
   addDay: () => Promise<void>;
+  /** [Gate2 G2-04] その日の時刻帯を変える(予定の「10:00」は10:00のまま) */
+  setDayTimeZone: (dayId: string, timezoneId: string) => Promise<boolean>;
   removeDay: (dayIndex: number) => Promise<void>;
 
   // Schedule item management
@@ -428,6 +431,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         draft.id,
         deviceToken,
         generateIdempotencyKey(),
+        // [Gate2 G2-04] 新しい旅行の日は端末の時刻帯で作る(送らないと UTC になる)
+        { ...(deviceTimeZone() ? { timezone_id: deviceTimeZone() } : {}) },
       );
     } catch (error) {
       console.error('QuickDraft promoteエラー:', error);
@@ -536,6 +541,18 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   // 日追加
+  setDayTimeZone: async (dayId, timezoneId) => {
+    const plan = get().currentPlan;
+    if (!plan || plan.revision === undefined) return false;
+    try {
+      await apiService.updateDay(plan.id, dayId, { timezone_id: timezoneId }, plan.revision);
+      await get().loadPlan(plan.id);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   addDay: async () => {
     const state = get();
     if (!state.currentPlan) return;
@@ -548,19 +565,21 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     // 最後の日の翌日(日が無ければ端末の今日)。「今日+日数」だと既存の日と同じ日付になり、サーバーで統合されて日が増えなかった
     const localDate = nextDayDate(plan.days.map((d) => d.date));
     const tempId = generateTempId('day');
-    const optimisticDay: DaySchedule = { id: tempId, date: localDate, events: [] };
+    // [Gate2 G2-04] 時刻帯: 前の日と同じ → 端末の時刻帯 → (どちらも読めない時だけ)サーバーの既定
+    const timezoneId = [...plan.days].reverse().find((d) => d.timezone_id)?.timezone_id ?? deviceTimeZone();
+    const optimisticDay: DaySchedule = { id: tempId, date: localDate, events: [], ...(timezoneId ? { timezone_id: timezoneId } : {}) };
 
     set({ currentPlan: { ...plan, days: [...plan.days, optimisticDay] } });
 
     try {
-      await apiService.createDay(plan.id, { local_date: localDate }, generateIdempotencyKey());
+      await apiService.createDay(plan.id, { local_date: localDate, ...(timezoneId ? { timezone_id: timezoneId } : {}) }, generateIdempotencyKey());
       // create系はrevisionを返さない設計のため、確定状態(実ID・最新revision)
       // を取りに行く。
       await get().loadPlan(plan.id);
     } catch (error) {
       // [Gate G6] OFF-02 通信できない時は日程の作成を端末に溜める(この日程への予定の追加も仮のIDのまま溜められる)
       if (isNetworkError(error) && enqueue(plan.id, {
-        entity_type: 'day', action: 'create', temp_id: tempId, label: localDate, fields: { local_date: localDate },
+        entity_type: 'day', action: 'create', temp_id: tempId, label: localDate, fields: { local_date: localDate, ...(timezoneId ? { timezone_id: timezoneId } : {}) },
       })) {
         get().refreshSyncState(plan.id);
         toast(OFFLINE_SAVED_MESSAGE);
