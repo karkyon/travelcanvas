@@ -676,6 +676,8 @@ const PlannerPage: React.FC = () => {
   useEffect(() => {
     if (!currentPlanId) {
       setIsOfflineSaved(false);
+      setOfflinePackExpiry(null);
+      setOfflineKeyExpiresAt(null);
       return;
     }
     let cancelled = false;
