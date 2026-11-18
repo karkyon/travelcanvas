@@ -139,7 +139,7 @@ export async function getOfflinePackExpiry(
 export async function isOfflinePackAvailable(planId: string): Promise<boolean> {
   const record = await idbGet<StoredPack | LegacyPack>(PACKS_STORE, planId);
   if (!record) return false;
-  if (Date.now() > record.expiresAt) {
+  if (Date.now() >= record.expiresAt) {
     await deleteOfflinePack(planId);
     return false;
   }
