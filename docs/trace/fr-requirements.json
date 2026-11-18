@@ -4739,6 +4739,94 @@
     "実通信待ち",
     "未実装"
    ]
+  },
+  "FR-060": {
+   "title": "スポットモード(自由に歩くエリア)",
+   "requirement": {
+    "source": "DOC-02 FR-060(v6.0 で追加。利用者の決定 2026-11-18。v5.1 には無かった)",
+    "priority": "SHOULD",
+    "stage": "—",
+    "summary": "旅程に自由に歩くエリアを置き、当日は予定とスポットモードを切り替えて、エリアの中の候補を天気・体調・気分で選んで歩く",
+    "acceptance": "エリアを作って当日に予定とスポットを行き来でき、絞り込み・次どこ？・着いた・周りを探す・方角で見るが使え、集合に間に合う戻り始めが分かる"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-18",
+     "change": "FR-060 スポットモードを追加(モックアップ「TravelCanvas スポットモード」を利用者が承認)",
+     "source": "DOC-10 r59・Gate SpotMode",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-49",
+     "SC-50"
+    ],
+    "api_group": "/plans/{plan_id}/spot-areas"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/spot_areas.py"
+    ],
+    "routes": [
+     "planner/:planId/spot/:areaId",
+     "planner/:planId/spot-areas"
+    ],
+    "tables": [
+     "spot_areas",
+     "spot_area_items"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_gate_spot_mode.py",
+    "frontend/src/pages/SpotModePage.test.tsx",
+    "frontend/src/pages/spot/spotModel.test.ts",
+    "frontend/e2e/spot-mode.spec.ts"
+   ],
+   "external_providers": [
+    "OpenStreetMap(地図の絵)",
+    "場所の検索(place_finder。周りを探す)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 v6.0 FR-060・DOC-04 v6.0 SC-49/50(利用者の決定 2026-11-18)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり(旅帖への記録・地図の絵の保存・別行動は未実装)"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・競合 If-Match・不正入力)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の位置・地図・画面の大きさの確認の記録なし"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "実の場所の検索での周りを探すの確認なし(CI は模擬)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "実通信待ち",
+    "未実装"
+   ]
   }
  }
 }

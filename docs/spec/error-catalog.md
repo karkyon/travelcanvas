@@ -46,8 +46,8 @@
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
-| `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py |
-| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py |
+| `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py, api/v1/spot_areas.py |
+| `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py, api/v1/spot_areas.py |
 | `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `changed_since` | 409 | no | 訂正の後に値が変わっているため取り消せません(新しく訂正してください) | api/v1/corrections.py |
 | `client_policy_ignored` | — | — | 上限・クラス・提供元は指定できません(サーバーが決めます) | api/v1/planning_usage.py |
@@ -60,7 +60,7 @@
 | `cover_not_found` | 404 | no | 表紙の写真がありません | api/v1/plan_cover.py |
 | `day_missing` | 404 | no | 移す先の日程が見つかりません | api/v1/movement.py |
 | `day_not_empty` | 409 | no | — | api/v1/sync.py |
-| `day_not_found` | 404, 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/day_variants.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py |
+| `day_not_found` | 404, 409 | no | 追加する日が見つかりません | api/v1/candidates.py, api/v1/day_variants.py, api/v1/decisions.py, api/v1/journey.py, api/v1/memories.py, api/v1/spot_ar |
 | `day_required` | — | — | 候補を置く日を選んでください | api/v1/decisions.py |
 | `days_have_events` | 409 | no | 短くすると消える日に予定があります | api/v1/plans.py |
 | `decision_record` | 409 | no | 話し合いで決めた記録は再開・変更できません(要らなければ削除してください) | api/v1/discussion.py |
@@ -72,6 +72,7 @@
 | `domain_not_found` | 404 | no | ドメインが見つかりません | api/v1/organizations.py |
 | `domain_revoked` | 409 | no | 取り消したドメインは確認できません。もう一度登録してください | api/v1/organizations.py |
 | `domain_taken` | 409 | no | このドメインは別の組織で確認済みです | api/v1/organizations.py |
+| `duplicate_candidate` | 409 | no | 同じ候補が2回あります | api/v1/spot_areas.py |
 | `duplicate_code` | 409 | no | 同じ記号の商品があります | api/v1/billing.py |
 | `duplicate_event` | — | — | 同じ予定が2回含まれています | api/v1/visits.py |
 | `duplicate_item` | — | — | 同じ項目が2回あります | services/private_profile.py |
@@ -108,7 +109,7 @@
 | `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
 | `idempotency_key_required` | 400, 422 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/discussion.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py |
-| `if_match_required` | 428 | after_reload | If-Match(保存されている版。まだ無ければ 0)が必要です | api/v1/home_place.py, api/v1/movement.py, api/v1/private_profile.py |
+| `if_match_required` | 428 | after_reload | If-Match(保存されている版。まだ無ければ 0)が必要です | api/v1/home_place.py, api/v1/movement.py, api/v1/private_profile.py, api/v1/spot_areas.py |
 | `inbound_mail_unavailable` | 409 | no | この環境ではメールの転送を受け付けていません(管理者の設定が必要です)。本文の貼り付け・ファイルで取り込めます | api/v1/inbound_mail.py |
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
 | `invalid_code` | 410 | no | 確認コードが違います | api/v1/photo_upload.py |
@@ -121,6 +122,7 @@
 | `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/billing.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py,  |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
+| `invalid_id` | — | — | %s が正しくありません | api/v1/spot_areas.py |
 | `invalid_if_match` | 400 | no | If-Match の形式が不正です | api/v1/home_place.py, api/v1/private_profile.py |
 | `invalid_input` | — | — | … を入力してください | api/v1/paid_actions.py |
 | `invalid_item` | 422 | no | 項目の形式が不正です | services/private_profile.py |
@@ -129,6 +131,7 @@
 | `invalid_label` | — | — | 名前は1〜…文字で入力してください | services/private_profile.py |
 | `invalid_location_level` | — | — | 場所の出し方は「出さない」か「地名だけ」です | api/v1/memory_publish.py |
 | `invalid_map_url` | 422 | no | https://www.google.com/maps/d/ で始まるマイマップのリンクを貼ってください | api/v1/itinerary_export.py |
+| `invalid_meet_point` | — | — | 集合の場所の緯度と経度は両方を入れてください | api/v1/spot_areas.py |
 | `invalid_metrics` | — | — | 端末の判定の数値が不正です(座標は送れません) | api/v1/visits.py |
 | `invalid_name` | — | — | 連携の名前を100文字までで入力してください | api/v1/organizations.py, services/organizations.py |
 | `invalid_note` | — | — | 改訂の説明は…文字までです | services/organizations.py |
@@ -145,6 +148,7 @@
 | `invalid_state` | 409 | no | 記録中の軌跡だけ一時停止できます | api/v1/location_tracks.py |
 | `invalid_tier` | 403 | no | tier は free・trip・journey・explorer のどれかです | api/v1/admin_ops.py |
 | `invalid_time` | 422 | no | 時刻は HH:MM で指定してください | api/v1/day_variants.py |
+| `invalid_time_range` | — | — | 終わりは始まりより後にしてください | api/v1/spot_areas.py |
 | `invalid_title` | — | — | 配布の題名は200文字までです | api/v1/organizations.py |
 | `invalid_token` | 400 | no | リンクが正しくないか、期限が切れています。もう一度やり直してください | api/v1/account_recovery.py |
 | `invalid_unit` | — | — | 単位を選んでください | services/private_profile.py |
@@ -236,7 +240,7 @@
 | `replan_conflict` | 409 | after_reload | 旅程と食い違う変更があるため適用できません。もう一度再計画案を作ってください | api/v1/replans.py |
 | `replan_not_found` | 404 | no | 再計画が見つかりません | api/v1/day_variants.py |
 | `replan_stale` | 409 | after_reload | 提案を作った後に旅程か過去の記録が変わりました。提案を読み込み直してください | api/v1/memory_replan.py, api/v1/replans.py |
-| `revision_conflict` | 409 | after_reload | 候補が他の人の変更で更新されています(現在のrevision: …) | api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.py, api/v1/visits. |
+| `revision_conflict` | 409 | after_reload | 候補が他の人の変更で更新されています(現在のrevision: …) | api/v1/candidates.py, api/v1/journey.py, api/v1/location_tracks.py, api/v1/memories.py, api/v1/places.py, api/v1/spot_ar |
 | `revision_mismatch` | 409 | after_reload | ほかの画面で変更されました。読み込み直してください | api/v1/home_place.py, services/private_profile.py |
 | `revoked` | 410 | no | この版は失効しています | api/v1/booklet.py |
 | `same_candidate` | — | — | 同じ候補へはまとめられません | api/v1/candidates.py |
@@ -268,11 +272,12 @@
 | `tier_feature_not_included` | 403 | no | このデザインは … クラスから使えます | api/v1/booklet.py |
 | `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
 | `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
+| `too_many_areas` | — | — | エリアは1つの旅行に30までです | api/v1/spot_areas.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |
 | `too_many_domains` | 409 | no | 登録できるドメインは…件までです | api/v1/organizations.py |
 | `too_many_fx_rates` | 409 | no | 為替の記録は…件までです | api/v1/finance_ledger.py |
-| `too_many_items` | — | — | 条件は…件までです | services/private_profile.py |
+| `too_many_items` | — | — | エリアの候補は%dまでです | api/v1/spot_areas.py, services/private_profile.py |
 | `too_many_memories` | — | — | 1つの旅行の記録は…件までです | api/v1/memories.py |
 | `too_many_organizations` | 409 | no | 作れる組織は…までです | api/v1/organizations.py |
 | `too_many_pages` | 422 | no | 長すぎて PDF にできません | api/v1/booklet_share.py, api/v1/server_exports.py |

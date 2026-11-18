@@ -61,6 +61,8 @@ import {
   BeforeTripView, FinishView, FreeDayView, LoadFailedView, LoadingView, MorningView, NightView, OfflineView, SimpleView,
 } from './today/live/TodayViews';
 import { TAB_SCREENS, TODAY_SCREENS, type TodayCtx, type TodayScreen } from './today/live/todayCtx';
+// [Gate SpotMode] FR-060 自由に歩くエリアの札・スポットモードを勧める知らせ(小さいので当日の画面と一緒に読む)
+import TodaySpotStrip from './today/live/TodaySpotStrip';
 import { localToday, tripDayHeading } from './today/tripDayModel';
 
 // [Gate TDay-Mock] 開く画面は後から読む(当日の画面の最初の読み込みを重くしない)
@@ -438,6 +440,9 @@ const TodayPage: React.FC = () => {
       )}
       {ctx && view?.isCurrentDay && <LiveBand ctx={ctx} syncedAt={syncedAt} deviceNowMs={clock} />}
       {ctx && <TodayTitleRow ctx={ctx} showZoneNote={showZoneNote} live={dash} />}
+      {ctx && !screen && (
+        <TodaySpotStrip planId={ctx.planId} todayDate={ctx.data.today_date} timeZone={ctx.timeZone} nowMs={ctx.nowMs} />
+      )}
       {ctx && isStale && <OfflineAlert ctx={ctx} deviceNowMs={clock} />}
       {error && data && <div role="alert" className="tl-card tl-card--warn tl-small">{error}</div>}
       <LiveNotices items={shownNotices} onDismiss={dismiss} />

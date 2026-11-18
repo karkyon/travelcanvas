@@ -108,6 +108,7 @@ PLAN_TABLES = (
     m.PlanMovementSettings,
     m.PlanOwnershipTransfer, m.DataCorrection,
     m.ProviderUsageReservation, m.ProviderUsageEvent,
+    m.SpotArea, m.SpotAreaItem,
     m.TripConsultSession,
     m.InboundMailAddress,
     m.BillingPayment,
@@ -227,6 +228,11 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
     t["votes"] = [row(v) for v in (db.query(m.Vote).filter(m.Vote.poll_id.in_(_ids(polls))).all() if polls else [])
                   if v.poll_id not in anonymous or v.user_id == me]
     t["comments"] = [row(c, {"body": None, "mentions": None} if c.deleted_at else None) for c in q(m.Comment).all()]
+    # [Gate SpotMode] FR-060 自由に歩くエリアと、その候補(着いた・行きたい印)
+    spot_areas = q(m.SpotArea).all()
+    t["spot_areas"] = [row(x) for x in spot_areas]
+    t["spot_area_items"] = [row(x) for x in db.query(m.SpotAreaItem).filter(
+        m.SpotAreaItem.area_id.in_(_ids(spot_areas))).all()] if spot_areas else []
 
     t["plan_collaborators"] = [row(x) for x in q(m.PlanCollaborator).all()]
     t["plan_share_links"] = [row(x) for x in q(m.PlanShareLink).all()]

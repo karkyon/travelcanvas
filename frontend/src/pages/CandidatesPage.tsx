@@ -208,7 +208,11 @@ const CandidatesPage: React.FC = () => {
         eyebrow="DISCOVER · 発見・候補箱"
         title="近くの「行きたい」を集める"
         sub="行きたい場所・気になる店を、まだ予定にしないで候補箱に貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。"
-        actions={<button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>}
+        actions={<>
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>
+          {/* [Gate SpotMode] FR-060 近くにまとまった候補を、順番を決めずに歩くエリアにする */}
+          <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}/spot-areas`)}>エリアにまとめる</button>
+        </>}
       />
       {/* [Gate SpotInfo] 下の方で操作しても見えるよう、知らせは画面の上に固定する */}
       <div className="tc-sticky-note">
