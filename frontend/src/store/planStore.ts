@@ -730,9 +730,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       );
       await get().loadPlan(plan.id);
       toast.success(`${place.name}を旅程に追加しました`);
+      return true;
     } catch (error) {
       console.error('Add schedule item from candidate error:', error);
       toast.error('候補の旅程への追加に失敗しました');
+      return false;
     }
   },
 
