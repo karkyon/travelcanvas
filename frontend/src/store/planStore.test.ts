@@ -716,10 +716,13 @@ describe('addScheduleItemFromCandidate (Gate2 G2-01)', () => {
   it('候補の採用に失敗した時は false を返し、place_idなしのイベントを作らない', async () => {
     await seedLoadedPlan(2);
     mockedApi.adoptCandidate.mockRejectedValue(new Error('candidate unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const added = await usePlanStore.getState().addScheduleItemFromCandidate(0, 'candidate-1', '伊勢神宮');
 
     expect(added).toBe(false);
     expect(mockedApi.createEvent).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

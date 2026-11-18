@@ -689,6 +689,12 @@ const PlannerPage: React.FC = () => {
       setOfflinePackExpiry(expiry);
       setOfflineKeyExpiresAt(keyExpiry);
       setIsOfflineSaved(Boolean(expiry && !expiry.expired));
+    }).catch(() => {
+      // IndexedDB が使えない(一部の閲覧モード等)・読めない時は「保存なし」として扱い、画面を壊さない
+      if (cancelled) return;
+      setOfflinePackExpiry(null);
+      setOfflineKeyExpiresAt(null);
+      setIsOfflineSaved(false);
     });
     return () => {
       cancelled = true;
