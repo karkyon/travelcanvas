@@ -200,6 +200,17 @@ async function storedKeyFor(userId: string): Promise<OfflineKey | null> {
  * 利用者の鍵を得る。通信できれば backend から受け取り(端末にも置く)、できなければ端末に置いた鍵を使う。
  * 同じログインの間は10分まで使い回す。鍵が得られない(未ログイン・無効化・ログアウト後で通信できない)なら null。
  */
+/** この利用者の端末鍵の期限。保存期限の案内用で、鍵そのものは返さない。 */
+export async function getStoredOfflineKeyExpiry(userId: string): Promise<number | null> {
+  if (!userId) return null;
+  try {
+    const stored = await idbGet<StoredKey>(META_STORE, KEY_PREFIX + userId);
+    return typeof stored?.expiresAt === 'number' && Number.isFinite(stored.expiresAt) ? stored.expiresAt : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function obtainOfflineKey(session: OfflineSession | null, options: { refresh?: boolean } = {}): Promise<OfflineKey | null> {
   if (!session) return null;
   if (!options.refresh && memo && memo.userId === session.userId && memo.sessionTag === session.sessionTag
