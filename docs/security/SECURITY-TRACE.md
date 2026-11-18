@@ -44,7 +44,7 @@ DOC-10 §6 のとおり未着手(PROD-01〜09)。
 | §12 通知の本文に秘密を出さない | `backend/app/services/notify.py`・`backend/app/services/web_push.py` | `backend/tests/test_gate_p3_discussion.py`(通知の本文に予約番号を入れない)・`backend/tests/test_gate_tday_push.py` | 実装済み。実機のロック画面は未確認 |
 | §13 PDF・公開(noindex・透かし・項目の選択) | `backend/app/services/booklet.py`・`backend/app/services/server_render.py` | `backend/tests/test_gate_p4_booklet.py`・`backend/tests/test_gate_bookletshare.py`・`backend/tests/test_gate_remaining5_server_exports.py` | 実装済み。サーバー側の PDF は画像のページ(文字の検索ができない) |
 | §10 ファイル(MIME・容量・ウイルス検査・署名つき URL) | `backend/app/services/malware_scan.py`・`backend/app/services/storage_backend.py` | `backend/tests/test_gate_m7_document_hardening.py`・`backend/tests/test_gate_m5_object_storage.py` | 実装済み。ClamAV の常時運用・本番の Object Storage は本番未証明 |
-| §9 AI/OCR(目的別の同意・最小化・出力の検証) | `backend/app/services/consult_ai.py`・`backend/app/services/consult_turn.py`・`backend/app/services/receipt_extract.py`・`backend/app/services/cost_guard.py`・`backend/app/api/v1/discussion.py`(相談の選択肢の案: 名前を送らない・伏せ字・根拠の無い案を捨てる) | `backend/tests/test_gate_consult_ai.py`・`backend/tests/test_gate_f07_turn.py`・`backend/tests/test_gate_receipt.py`・`backend/tests/test_gate_fr059_cost_guard.py`・`backend/tests/test_gate_chat_consensus.py` | 一部。実の AI の送信内容・請求の照合は未実施(FR-059)。prompt injection の専用の試験の一覧は無い(SEC-010 を参照) |
+| §9 AI/OCR(目的別の同意・最小化・出力の検証) | `backend/app/services/consult_ai.py`・`backend/app/services/consult_turn.py`・`backend/app/services/receipt_extract.py`・`backend/app/services/cost_guard.py`・`backend/app/api/v1/discussion.py`(相談の選択肢の案: 名前を送らない・伏せ字・根拠の無い案を捨てる) | `backend/tests/test_gate_consult_ai.py`・`backend/tests/test_gate_f07_turn.py`・`backend/tests/test_gate_receipt.py`・`backend/tests/test_gate_fr059_cost_guard.py`・`backend/tests/test_gate_chat_consensus.py` | 一部。実の AI の送信内容・請求の照合は未実施(FR-059)。prompt injection は SEC-010 の試験 |
 
 ## 5. DOC-11 §18 セキュリティ試験(SEC-001〜020)の対応
 
@@ -59,7 +59,7 @@ DOC-10 §6 のとおり未着手(PROD-01〜09)。
 | SEC-007 | QR のオフラインの権限とメンバーの削除 | `backend/tests/test_gate_k1_offline_keys.py`・`backend/tests/test_gate_g6_offline.py` | 有(実機は未確認) |
 | SEC-008 | ファイルの MIME の偽装・ウイルス・zip bomb | `backend/tests/test_gate_m7_document_hardening.py` | 有 |
 | SEC-009 | URL の SSRF・内部の DNS・転送 | `backend/tests/test_gate_c2_candidates_places.py`(URL の正規化)・`backend/tests/test_gate_remaining6_account.py`(画面の文)・`backend/tests/test_gate_hardening_ssrf.py`(内部・ループバック・リンクローカル・metadata・CGNAT の宛先、混ざった DNS の答え、内部への転送の拒否を、判定を差し替えずに確かめる。Hardening-A で追加) | 有 |
-| SEC-010 | prompt injection・道具の濫用 | `backend/tests/test_gate_f07_turn.py`(AI の出力を確かめた行だけ条件に使う) | **一部**(専用の攻撃の試験の一覧は無い) |
+| SEC-010 | prompt injection・道具の濫用 | `backend/tests/test_gate_hardening_prompt_injection.py`(Hardening-B。乗っ取られた AI の答えを直接与えて確かめる: 旅行相談は許した操作・項目の外を捨て、根拠が最新の発言に無い操作・状態に無い ID を捨て、結果は状態を変えない案。予約メールは伏せ字の後の本文に引用が無い値・予約番号/PIN/氏名/電話を AI から受けず、規則の値を上書きしない。レシートはリンクを捨て規則の値を上書きしない)・`backend/tests/test_gate_f07_turn.py` | 有(残り: 根拠の語が発言にあれば関係の薄い操作も案に残る。案は確認が要るので適用はされない) |
 | SEC-011 | PDF の描画の外部・内部の取得 | `backend/tests/test_gate_remaining5_server_exports.py`(Pillow で描く。HTML を描かない) | 有(方式で回避) |
 | SEC-012 | 役割の失効の後のリアルタイムの配信 | `backend/tests/test_gate_g2_realtime.py`(`test_stream_access_rules_and_limit`: 配信中にメンバーから外すと access_lost を送って閉じる・上限) | 有(2026-11-17 DocsV6-1 で確認し訂正) |
 | SEC-013 | 検索の件数・時間から秘密を推測できない | `backend/tests/test_gate_c3_search.py` | 有(件数。時間の差の計測は無い) |
