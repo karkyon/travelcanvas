@@ -44,8 +44,15 @@ export interface PollOption {
   votes: PollVote[];
 }
 
+/** [Gate ChatConsensus] simple=かんたん投票(1つ選ぶ)/ detailed=詳しい投票(4段階)/ decision=話し合いで決めた記録 */
+export type PollMode = 'simple' | 'detailed' | 'decision';
+
 export interface Poll {
   id: string;
+  /** [Gate ChatConsensus] 古い応答には無い(詳しい投票として扱う) */
+  mode?: PollMode;
+  /** [Gate ChatConsensus] 元の発言(旅行全体へのコメント) */
+  source_comment_id?: string | null;
   plan_id: string;
   algorithm_version: string;
   title: string;
@@ -74,6 +81,23 @@ export interface PollCreateData {
   is_anonymous?: boolean;
   quorum?: number;
   options: Array<{ label?: string; event_id?: string; candidate_id?: string }>;
+  mode?: 'simple' | 'detailed';
+  source_comment_id?: string;
+}
+
+/** [Gate ChatConsensus] 「これで決まり」(投票なしの決定) */
+export interface DecisionCreateData {
+  title: string;
+  option: { label?: string; event_id?: string; candidate_id?: string };
+  description?: string;
+  source_comment_id?: string;
+}
+
+/** [Gate ChatConsensus] AI の選択肢の候補(保存しない) */
+export interface PollOptionSuggestion {
+  suggestion: { title: string | null; options: Array<{ label: string; quote: string }> };
+  saved: false;
+  notice: string;
 }
 
 export interface PollUpdateData {

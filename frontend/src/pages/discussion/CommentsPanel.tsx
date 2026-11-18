@@ -4,6 +4,8 @@
  * - 予約番号・PINなどらしき文字列は送信前に注意を出し(EX-011)、保存後もコメントに注意を表示する。
  * - メンションした相手には通知が届く(通知にはコメント本文を含めない)。
  * - 削除されたコメントは、返信があればスレッドの形を保つため「削除されました」と表示する。
+ * - [Gate ChatConsensus] 旅行全体の話し合いでは、発言ごとに「これで決まり」「投票にする」(renderActions)と、
+ *   その発言から作った投票・決定(renderLinks)を出す。
  */
 import React, { useState } from 'react';
 import Button from '@/components/common/Button';
@@ -18,6 +20,12 @@ interface Props {
   onToggleResolved: (c: PlanComment) => void;
   onEdit: (c: PlanComment, body: string) => Promise<boolean>;
   onDelete: (c: PlanComment) => void;
+  /** [Gate ChatConsensus] 発言ごとの操作(これで決まり・投票にする) */
+  renderActions?: (c: PlanComment) => React.ReactNode;
+  /** [Gate ChatConsensus] その発言から作った投票・決定 */
+  renderLinks?: (c: PlanComment) => React.ReactNode;
+  composerLabel?: string;
+  emptyText?: string;
 }
 
 const SENSITIVE_NOTE = '予約番号・PIN・旅券番号などの機密情報が含まれている可能性があります。予約や文書の専用の欄への記入を検討してください。';
@@ -66,7 +74,8 @@ const Composer: React.FC<{
 
 const CommentItem: React.FC<{
   c: PlanComment; onToggleResolved: Props['onToggleResolved']; onEdit: Props['onEdit']; onDelete: Props['onDelete'];
-}> = ({ c, onToggleResolved, onEdit, onDelete }) => {
+  renderActions?: Props['renderActions']; renderLinks?: Props['renderLinks'];
+}> = ({ c, onToggleResolved, onEdit, onDelete, renderActions, renderLinks }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(c.body ?? '');
   if (c.is_deleted) return <p className="text-sm text-ink-700 italic">このコメントは削除されました</p>;
@@ -91,7 +100,9 @@ const CommentItem: React.FC<{
       )}
       {c.mentions.length > 0 && <p className="text-xs text-ink-700">メンション: {c.mentions.map((m) => `@${m.name}`).join(' ')}</p>}
       {c.sensitive_warning && <p className="text-xs text-amber-900">{SENSITIVE_NOTE}</p>}
-      <div className="flex gap-1 mt-1">
+      {renderLinks?.(c)}
+      <div className="flex flex-wrap gap-1 mt-1">
+        {!editing && renderActions?.(c)}
         {c.can_moderate && (
           <Button variant="ghost" size="sm" onClick={() => onToggleResolved(c)}>
             {c.status === 'resolved' ? '未解決に戻す' : '解決済みにする'}
@@ -104,27 +115,31 @@ const CommentItem: React.FC<{
   );
 };
 
-const CommentsPanel: React.FC<Props> = ({ comments, members, onCreate, onToggleResolved, onEdit, onDelete }) => {
+const CommentsPanel: React.FC<Props> = ({
+  comments, members, onCreate, onToggleResolved, onEdit, onDelete, renderActions, renderLinks,
+  composerLabel = 'コメントする', emptyText = 'まだコメントはありません。',
+}) => {
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const threads = buildThreads(comments);
+  const itemProps = { onToggleResolved, onEdit, onDelete, renderActions, renderLinks };
   return (
     <div className="space-y-4">
       <Card padding="md">
-        <Composer idPrefix="new-comment" members={members} submitLabel="コメントする"
+        <Composer idPrefix="new-comment" members={members} submitLabel={composerLabel}
           onSubmit={(body, mentions) => onCreate({ body, mentions })} />
       </Card>
       {threads.length === 0 ? (
-        <p className="text-sm text-ink-700">まだコメントはありません。</p>
+        <p className="text-sm text-ink-700">{emptyText}</p>
       ) : (
         <ul className="space-y-3" aria-label="コメント">
           {threads.map(({ root, replies }) => (
             <li key={root.id}>
               <Card padding="md">
-                <CommentItem c={root} onToggleResolved={onToggleResolved} onEdit={onEdit} onDelete={onDelete} />
+                <CommentItem c={root} {...itemProps} />
                 {replies.length > 0 && (
                   <ul className="mt-3 ml-4 pl-3 border-l space-y-2" aria-label="返信">
                     {replies.map((r) => (
-                      <li key={r.id}><CommentItem c={r} onToggleResolved={onToggleResolved} onEdit={onEdit} onDelete={onDelete} /></li>
+                      <li key={r.id}><CommentItem c={r} {...itemProps} /></li>
                     ))}
                   </ul>
                 )}

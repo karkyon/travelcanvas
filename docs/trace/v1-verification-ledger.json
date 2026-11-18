@@ -586,15 +586,19 @@
    ],
    "authz": [
     "backend/tests/test_gate_p3_discussion.py::test_poll_validation_and_permissions",
-    "backend/tests/test_gate_g4_decisions_comments.py::test_quorum_tie_and_decision_lock"
+    "backend/tests/test_gate_g4_decisions_comments.py::test_quorum_tie_and_decision_lock",
+    "backend/tests/test_gate_chat_consensus.py::test_decision_from_message_is_decided_and_locked"
    ],
    "conflict": [
     "backend/tests/test_gate_g4_decisions_comments.py::test_adopt_candidate_option_and_remove_others_with_undo",
-    "backend/tests/test_gate_g4_decisions_comments.py::test_adoption_undo_refused_after_later_change"
+    "backend/tests/test_gate_g4_decisions_comments.py::test_adoption_undo_refused_after_later_change",
+    "backend/tests/test_gate_chat_consensus.py::test_decision_reflects_to_itinerary_and_undo"
    ],
    "security": [
     "backend/tests/test_gate_p3_discussion.py::test_anonymous_poll_hides_individuals_until_threshold",
-    "backend/tests/test_gate_g4_decisions_comments.py::test_deadline_sweep_reminds_then_closes"
+    "backend/tests/test_gate_g4_decisions_comments.py::test_deadline_sweep_reminds_then_closes",
+    "backend/tests/test_gate_chat_consensus.py::test_suggest_requires_consent_and_sends_no_names_or_numbers",
+    "backend/tests/test_gate_chat_consensus.py::test_clean_suggestion_rejects_injected_and_malformed"
    ],
    "status": "VERIFIED"
   },

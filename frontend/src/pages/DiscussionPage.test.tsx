@@ -4,6 +4,8 @@
  * - 投票: 状態・件数・懸念の表示、匿名で件数を伏せる、回答の送信内容、理由なしの懸念を止める、決定
  * - 投票の作成: 入力検証と送信内容
  * - コメント: スレッド・削除済み表示、機密らしき文字列の注意、メンション付き投稿
+ * - [Gate ChatConsensus] 話し合い中心: タブなし。発言の「これで決まり」「投票にする」(下書き)、かんたん投票(既定)、
+ *   詳しい設定(4段階・定足数・不可)、決まったこと、AI の選択肢の案(保存しない)。閲覧者には作る操作を出さない
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -28,6 +30,8 @@ const m = vi.hoisted(() => ({
   adoptionPreview: vi.fn(),
   adoptPoll: vi.fn(),
   undoAdoptPoll: vi.fn(),
+  createDecision: vi.fn(),
+  suggestPollOptions: vi.fn(),
 }));
 
 vi.mock('@/services/api', async () => {
@@ -37,6 +41,10 @@ vi.mock('@/services/api', async () => {
 vi.mock('@/services/api/g4', () => ({
   adoptionPreview: m.adoptionPreview, adoptPoll: m.adoptPoll, undoAdoptPoll: m.undoAdoptPoll,
   getNotificationSettings: vi.fn(), putPlanNotificationLevel: vi.fn(), deletePlanNotificationLevel: vi.fn(),
+}));
+
+vi.mock('@/services/api/chatConsensus', () => ({
+  createDecision: m.createDecision, suggestPollOptions: m.suggestPollOptions,
 }));
 
 import DiscussionPage from './DiscussionPage';
@@ -122,24 +130,26 @@ describe('DiscussionPage (Gate P3)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('同じ名前の選択肢');
     fireEvent.change(within(dialog).getByLabelText('選択肢2'), { target: { value: 'B' } });
+    expect(within(dialog).queryByLabelText(/不可は参考意見/)).toBeNull();  // 4段階にした時だけ
+    fireEvent.click(within(dialog).getByLabelText(/4段階で答える/));
     fireEvent.click(within(dialog).getByLabelText(/不可は参考意見/));
-    fireEvent.click(within(dialog).getByRole('checkbox'));
+    fireEvent.click(within(dialog).getByLabelText(/匿名にする/));
     fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
     await waitFor(() => expect(m.createPoll).toHaveBeenCalledWith('p1', {
-      title: '夕食', options: [{ label: 'A' }, { label: 'B' }], veto_policy: 'advisory', is_anonymous: true,
+      title: '夕食', options: [{ label: 'A' }, { label: 'B' }], mode: 'detailed', veto_policy: 'advisory', is_anonymous: true,
     }));
   });
 
   it('コメント: 削除済みの親と返信、機密らしき文字列の注意、メンション付き投稿', async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole('tab', { name: /コメント/ }));
+    expect(screen.queryByRole('tab')).toBeNull();  // 話し合い中心(タブなし)
     expect(await screen.findByText('このコメントは削除されました')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: '返信' })).getByText('了解です')).toBeInTheDocument();
-    const box = screen.getByLabelText('コメントするの内容');
+    const box = screen.getByLabelText('発言するの内容');
     fireEvent.change(box, { target: { value: '予約番号は 12345678 です' } });
     expect(screen.getByRole('note')).toHaveTextContent('機密情報');
     fireEvent.click(screen.getByRole('checkbox', { name: '花子' }));
-    fireEvent.click(screen.getByRole('button', { name: 'コメントする' }));
+    fireEvent.click(screen.getByRole('button', { name: '発言する' }));
     await waitFor(() => expect(m.createComment).toHaveBeenCalledWith('p1', { body: '予約番号は 12345678 です', mentions: ['u2'] }));
     expect((fx.comment_created as PlanComment).sensitive_warning).toBe(true);
   });
@@ -154,13 +164,14 @@ describe('DiscussionPage (Gate P3)', () => {
     fireEvent.change(within(dialog).getByLabelText('題名'), { target: { value: '昼' } });
     fireEvent.click(await within(dialog).findByLabelText('錦市場'));
     expect(within(dialog).queryByLabelText('見送り')).toBeNull();
-    fireEvent.change(within(dialog).getByLabelText(/定足数/), { target: { value: '0' } });
+    fireEvent.click(within(dialog).getByLabelText(/4段階で答える/));
+    fireEvent.change(within(dialog).getByLabelText(/定足数\(任意/), { target: { value: '0' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('定足数は1〜100');
-    fireEvent.change(within(dialog).getByLabelText(/定足数/), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText(/定足数\(任意/), { target: { value: '2' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
     await waitFor(() => expect(m.createPoll).toHaveBeenCalledWith('p1', {
-      title: '昼', options: [{ candidate_id: 'c1' }], veto_policy: 'block', is_anonymous: false, quorum: 2,
+      title: '昼', options: [{ candidate_id: 'c1' }], mode: 'detailed', veto_policy: 'block', is_anonymous: false, quorum: 2,
     }));
   });
 
@@ -208,5 +219,116 @@ describe('DiscussionPage (Gate P3)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'コメントする' }));
     await waitFor(() => expect(m.createComment).toHaveBeenCalledWith('p1', expect.objectContaining({
       body: '集合は駅で', target_type: 'event', target_id: 'e1' })));
+  });
+
+  describe('[Gate ChatConsensus] 話し合い中心', () => {
+    const msg = (id: string, body: string): PlanComment => ({
+      ...(fx.comment_list[0] as PlanComment), id, body, parent_id: null, is_deleted: false, mentions: [],
+      sensitive_warning: false, can_edit: true, can_moderate: true, revision: 1,
+    });
+    const simple = (): Poll => ({
+      ...voted, mode: 'simple', veto_policy: 'block', can_manage: true, is_closed: false, status: 'open', decided_option_id: null,
+      options: voted.options.map((o) => ({ ...o, my_vote: null, votes: [], counts: { love: 0, ok: 0, concern: 0, veto: 0, abstain: 0 },
+        state: 'pending', is_decided: false })),
+    });
+
+    it('かんたん投票が既定。題名と選択肢だけで作れる', async () => {
+      m.getPolls.mockResolvedValue([]);
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: '投票を作成' }));
+      const dialog = screen.getByRole('dialog');
+      fireEvent.change(within(dialog).getByLabelText('題名'), { target: { value: '夕食' } });
+      fireEvent.change(within(dialog).getByLabelText('選択肢1'), { target: { value: '寿司' } });
+      fireEvent.change(within(dialog).getByLabelText('選択肢2'), { target: { value: '焼肉' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
+      await waitFor(() => expect(m.createPoll).toHaveBeenCalledWith('p1', {
+        title: '夕食', options: [{ label: '寿司' }, { label: '焼肉' }], mode: 'simple', is_anonymous: false,
+      }));
+    });
+
+    it('発言の「投票にする」で題名と選択肢の下書きを作り、元の発言を結ぶ', async () => {
+      m.getPolls.mockResolvedValue([]);
+      m.getComments.mockResolvedValue([msg('c9', '夕食は寿司か焼肉かな')]);
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: /投票にする\(この発言\)/ }));
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByLabelText('題名')).toHaveValue('夕食');
+      expect(within(dialog).getByLabelText('選択肢1')).toHaveValue('寿司');
+      expect(within(dialog).getByLabelText('選択肢2')).toHaveValue('焼肉');
+      fireEvent.click(within(dialog).getByRole('button', { name: '作成' }));
+      await waitFor(() => expect(m.createPoll).toHaveBeenCalledWith('p1', expect.objectContaining({
+        title: '夕食', mode: 'simple', source_comment_id: 'c9' })));
+    });
+
+    it('発言の「これで決まり」は投票なしで記録し、続けて旅程に反映の確認を開ける', async () => {
+      m.getPolls.mockResolvedValue([]);
+      m.getComments.mockResolvedValue([msg('c9', '夕食は寿司でいいよね')]);
+      const recorded = { ...simple(), mode: 'decision', title: '夕食', decided_option_id: voted.options[0]!.id,
+        is_closed: true, status: 'closed', phase: 'decided', can_adopt: true, source_comment_id: 'c9' };
+      m.createDecision.mockResolvedValue(recorded);
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: /これで決まり\(この発言\)/ }));
+      const dialog = screen.getByRole('dialog', { name: 'これで決まり' });
+      expect(within(dialog).getByLabelText('何を決めたか(題名)')).toHaveValue('夕食');
+      expect(within(dialog).getByLabelText('決めたこと')).toHaveValue('寿司');
+      fireEvent.click(within(dialog).getByLabelText(/続けて旅程に反映する/));
+      fireEvent.click(within(dialog).getByRole('button', { name: '記録する' }));
+      await waitFor(() => expect(m.createDecision).toHaveBeenCalledWith('p1', {
+        title: '夕食', option: { label: '寿司' }, source_comment_id: 'c9' }));
+      expect(await screen.findByRole('dialog', { name: /の決定を旅程に反映/ })).toBeInTheDocument();
+      expect(m.adoptPoll).not.toHaveBeenCalled();  // 確かめてからだけ反映する
+    });
+
+    it('決まったことに表示し、元の発言と旅程への反映を出す。発言には結び付きを出す', async () => {
+      const recorded = { ...simple(), id: 'd1', mode: 'decision', title: '夕食', decided_option_id: voted.options[0]!.id,
+        is_closed: true, status: 'closed', phase: 'decided', can_adopt: true, source_comment_id: 'c9' };
+      m.getPolls.mockResolvedValue([recorded]);
+      m.getComments.mockResolvedValue([msg('c9', '夕食は寿司でいいよね')]);
+      renderPage();
+      const card = await screen.findByTestId('decision-d1');
+      expect(card).toHaveTextContent('話し合いで決定');
+      expect(card).toHaveTextContent('元の発言: 「夕食は寿司でいいよね」');
+      expect(within(card).getByRole('button', { name: '旅程に反映' })).toBeInTheDocument();
+      expect(screen.getByTestId('comment-links-c9')).toHaveTextContent('決まったこと「夕食: ');
+    });
+
+    it('かんたん投票: 1つ選ぶ・取り消す', async () => {
+      const p = simple();
+      m.getPolls.mockResolvedValue([p]);
+      renderPage();
+      const card = await screen.findByRole('region', { name: p.title });
+      fireEvent.click(within(card).getByRole('button', { name: `${p.options[0]!.label}を選ぶ` }));
+      await waitFor(() => expect(m.putVotes).toHaveBeenCalledWith('p1', p.id, [{ option_id: p.options[0]!.id, value: 'ok' }]));
+      expect(within(card).queryByLabelText(/へのあなたの回答/)).toBeNull();  // 4段階の欄は出さない
+    });
+
+    it('AI の案で選択肢を埋める(保存しない・送る前に同意の確認は backend)', async () => {
+      m.getPolls.mockResolvedValue([]);
+      m.getComments.mockResolvedValue([msg('c9', '寿司か焼肉かラーメン')]);
+      m.suggestPollOptions.mockResolvedValue({ suggestion: { title: '夕食', options: [
+        { label: '寿司', quote: '寿司' }, { label: '焼肉', quote: '焼肉' }, { label: 'ラーメン', quote: 'ラーメン' }] },
+      saved: false, notice: 'AI の案です。採用するまで何も変わりません' });
+      renderPage();
+      fireEvent.click(await screen.findByRole('button', { name: '投票を作成' }));
+      const dialog = screen.getByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: /選択肢の案を出す/ }));
+      expect(await within(dialog).findByText(/AI の案です。採用するまで/)).toBeInTheDocument();
+      expect(within(dialog).getByLabelText('題名')).toHaveValue('夕食');
+      expect(within(dialog).getByLabelText('選択肢3')).toHaveValue('ラーメン');
+      expect(m.createPoll).not.toHaveBeenCalled();
+      const [, input, key] = m.suggestPollOptions.mock.calls[0]!;
+      expect(input).toEqual({});
+      expect(typeof key).toBe('string');
+    });
+
+    it('閲覧者には「これで決まり」「投票にする」「投票を作成」を出さない', async () => {
+      m.getPlanMembers.mockResolvedValue([{ ...members[0]!, role: 'viewer' }, members[1]!]);
+      m.getComments.mockResolvedValue([msg('c9', '夕食は寿司でいいよね')]);
+      renderPage();
+      expect(await screen.findByText('夕食は寿司でいいよね')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /これで決まり\(この発言\)/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: /投票にする\(この発言\)/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: '投票を作成' })).toBeNull();
+    });
   });
 });
