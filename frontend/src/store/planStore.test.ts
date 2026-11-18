@@ -30,6 +30,7 @@ vi.mock('@/services/api', () => ({
     moveEvent: vi.fn(),
     undoLastPlanChange: vi.fn(),
     searchSpots: vi.fn(),
+    adoptCandidate: vi.fn(),
     // [Gate R2-8] authStoreのonRehydrateStorage(setTimeoutで非同期に
     // 発火するstate.initialize())が同じ`@/services/api`モックを共有する
     // ため、authStore側で新たに使われるようになったメソッドもここに
@@ -66,6 +67,7 @@ interface MockedApiMethods {
   updateEvent: ReturnType<typeof vi.fn>;
   moveEvent: ReturnType<typeof vi.fn>;
   undoLastPlanChange: ReturnType<typeof vi.fn>;
+  adoptCandidate: ReturnType<typeof vi.fn>;
 }
 
 interface MockedTravelApiMethods {
@@ -682,5 +684,42 @@ describe('[Gate PlanSpotEdit] 並べ替え・同じ旅行の読み直し・電�
     mockedApi.createEvent.mockClear();
     await usePlanStore.getState().addScheduleItem(1, { title: '開始なし', end_time: '15:00' });
     expect(mockedApi.createEvent.mock.calls[0]![1]).not.toHaveProperty('local_end_time');
+  });
+});
+
+
+describe('addScheduleItemFromCandidate (Gate2 G2-01)', () => {
+  it('候補をPlaceへ採用し、返されたplace_idをイベントへ結び付ける', async () => {
+    await seedLoadedPlan(2);
+    mockedApi.adoptCandidate.mockResolvedValue({
+      id: 'place-1', name: '伊勢神宮', category: 'sightseeing',
+      location: { latitude: 34.455, longitude: 136.725, address: '三重県伊勢市' },
+    });
+    mockedApi.createEvent.mockResolvedValue({});
+    mockedApi.getPlan.mockResolvedValue({
+      success: true, data: { id: PLAN_ID, title: 'テストプラン', days: [] },
+    });
+    mockedApi.getPlanDetail.mockResolvedValue({
+      success: true, data: { id: PLAN_ID, title: 'テストプラン', revision: 3,
+        days: [{ id: DAY_ID, local_date: '2026-10-01', timezone_id: 'Asia/Tokyo', sort_order: 0, events: [] }] },
+    });
+
+    const added = await usePlanStore.getState().addScheduleItemFromCandidate(0, 'candidate-1', '伊勢神宮');
+
+    expect(added).toBe(true);
+    expect(mockedApi.adoptCandidate).toHaveBeenCalledWith('candidate-1');
+    expect(mockedApi.createEvent).toHaveBeenCalledWith(PLAN_ID, expect.objectContaining({
+      day_id: DAY_ID, title: '伊勢神宮', place_id: 'place-1',
+    }), expect.any(String));
+  });
+
+  it('候補の採用に失敗した時は false を返し、place_idなしのイベントを作らない', async () => {
+    await seedLoadedPlan(2);
+    mockedApi.adoptCandidate.mockRejectedValue(new Error('candidate unavailable'));
+
+    const added = await usePlanStore.getState().addScheduleItemFromCandidate(0, 'candidate-1', '伊勢神宮');
+
+    expect(added).toBe(false);
+    expect(mockedApi.createEvent).not.toHaveBeenCalled();
   });
 });
