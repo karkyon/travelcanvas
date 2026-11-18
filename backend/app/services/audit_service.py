@@ -36,7 +36,7 @@ _SENSITIVE_DETAIL_PARTS = (
     "reservation", "confirmation", "passenger", "ticket", "qr", "pin",
 )
 _INLINE_SECRET_RE = re.compile(
-    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|authorization(?!\\s*[:=]\\s*Bearer\\b))\s*[:=]\s*[^\s,;]+"
+    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|authorization(?!\s*[:=]\s*Bearer\b))\s*[:=]\s*[^\s,;]+"
 )
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _JWT_RE = re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
