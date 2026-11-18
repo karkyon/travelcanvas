@@ -1,8 +1,8 @@
 {
  "_meta": {
-  "description": "全59 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
+  "description": "全60 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
   "gate": "Hardening-A",
-  "baseline": "a2c419dda9b0e0a5743abc909c0e3c9a58d74e2f",
+  "baseline": "32c7db6ab12169dc05a9d5821d565f591714c0b4",
   "evidence_states": {
    "done": "証拠あり",
    "partial": "一部",
