@@ -79,3 +79,16 @@ describe('SearchPage (Gate Honesty)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('検索できませんでした');
   });
 });
+
+describe('[Gate2 G2-08] 位置の許可は押した時だけ', () => {
+  beforeEach(() => { localStorage.removeItem('search_preferences'); });
+  it('画面を開いただけでは現在地を取りに行かず、押すと取りに行く', async () => {
+    const getCurrentPosition = vi.fn((ok: (p: { coords: { latitude: number; longitude: number } }) => void) => ok({ coords: { latitude: 34.46, longitude: 136.72 } }));
+    Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition }, configurable: true });
+    renderPage();
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId('search-use-location'));
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/座標を検索サービスへ送ります/)).toBeInTheDocument();
+  });
+});

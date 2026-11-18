@@ -41,6 +41,9 @@ export function tripIsLive(trip: { start_date?: string | null; end_date?: string
   return s <= today && today <= e;
 }
 
+// [Gate2 G2-02] 旅の当日の中の画面。スポットモード(/spot/<エリア>)・再計画・同期の競合でも「旅の当日」に印が付く
+const TODAY_PATHS = ['/today', '/alerts', '/track', '/spot/', '/replans', '/sync'];
+
 export function railItems(tripId: string | null, path: string, opts: { live?: boolean } = {}): RailItem[] {
   void path;
   const inTrip = (s: string | string[]) => (p: string) => {
@@ -70,16 +73,17 @@ export function railItems(tripId: string | null, path: string, opts: { live?: bo
   const inside: RailItem[] = [
     {
       key: 'plan', label: '旅程', icon: CalendarDays, to: trip(''), group: 'trip',
-      match: inTrip(['', '/draft', '/segments', '/constraints']),
+      // [Gate2 G2-02] 自由に歩くエリアの準備(/spot-areas)も旅程の一部として印を付ける
+      match: inTrip(['', '/draft', '/segments', '/constraints', '/spot-areas']),
     },
     // [Gate TripDayNav] 旅の当日だけ出す(その画面を開いている時も出す)。「今日」ではなく、待ちに待った「旅の当日」
-    ...(opts.live || inTrip(['/today', '/alerts', '/track'])(path) ? [{
-      key: 'today', label: '旅の当日', icon: PartyPopper, to: trip('/today'), match: inTrip(['/today', '/alerts', '/track']),
+    ...(opts.live || inTrip(TODAY_PATHS)(path) ? [{
+      key: 'today', label: '旅の当日', icon: PartyPopper, to: trip('/today'), match: inTrip(TODAY_PATHS),
       group: 'trip' as const,
     }] : []),
     {
       key: 'resources', label: '旅行箱', icon: Briefcase, to: trip('/kit'), group: 'trip',
-      match: inTrip(['/kit', '/reservations', '/imports', '/documents', '/preparation', '/expenses']),
+      match: inTrip(['/kit', '/reservations', '/imports', '/documents', '/preparation', '/expenses', '/calendar-import']),
     },
     {
       key: 'share', label: '共有', icon: Share2, to: `/share/${tripId}`, group: 'trip',

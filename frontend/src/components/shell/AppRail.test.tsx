@@ -83,3 +83,20 @@ describe('AppRail', () => {
     expect(getPlan).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('[Gate2 G2-02] 帯の「今の画面」の印が届く経路', () => {
+  beforeEach(() => useCurrentTripStore.setState({ trip: null }));
+  const cases: Array<[string, string]> = [
+    [`/planner/${PLAN}/spot/aaaaaaaa-0000-0000-0000-000000000000`, 'rail-today'],
+    [`/planner/${PLAN}/replans/r1`, 'rail-today'],
+    [`/planner/${PLAN}/sync`, 'rail-today'],
+    [`/planner/${PLAN}/spot-areas`, 'rail-plan'],
+    [`/planner/${PLAN}/calendar-import`, 'rail-resources'],
+  ];
+  for (const [path, key] of cases) {
+    it(`${path.replace(PLAN, ':planId')} は ${key} に印が付く`, async () => {
+      render(<MemoryRouter initialEntries={[path]}><TripNav tripId={PLAN} path={path} /></MemoryRouter>);
+      expect(await screen.findByTestId(key)).toHaveAttribute('aria-current', 'page');
+    });
+  }
+});

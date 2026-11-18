@@ -9,7 +9,7 @@
  *     声で探す: 端末の音声認識で文字にして探す。SNS から探す: 投稿の文から場所の言葉を拾う(URL の中身は取りに行かない)
  *   - 評価・値段・所要時間・費用は提供元から来ないため出さない(作った値を見せない)
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -88,16 +88,17 @@ const SearchPage: React.FC = () => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(prefs.area);
   const [locationNote, setLocationNote] = useState<string>(prefs.area ? `検索の設定の座標(${prefs.area.latitude.toFixed(2)}, ${prefs.area.longitude.toFixed(2)})の近くを先に探します` : '');
 
-  useEffect(() => {
-    if (prefs.area || !navigator.geolocation) return;
+  // [Gate2 G2-08] 画面を開いただけで位置の許可を求めない(位置は既定でオフ)。押した時だけ現在地を使う
+  const askMyLocation = () => {
+    if (!navigator.geolocation) { setLocationNote('この端末では位置を使えません。位置を使わずに探します'); return; }
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude });
-        setLocationNote('今いる場所の近くを先に探します(位置は検索の時だけ送ります)');
+        setLocationNote('今いる場所の近くを先に探します(検索する時だけ、座標を検索サービスへ送ります)');
       },
       () => setLocationNote('位置を使わずに探します'),
     );
-  }, [prefs.area]);
+  };
 
   // [Gate SpotFind] 写真の撮影場所の周り(OpenStreetMap・Wikipedia の近くの場所)
   const [photoNote, setPhotoNote] = useState<string | null>(null);
@@ -219,6 +220,11 @@ const SearchPage: React.FC = () => {
           )}
           {photoNote && <p className="text-xs text-ink-700 mt-2">{photoNote}</p>}
           {mode === 'text' && locationNote && <p className="text-xs text-ink-500 mt-2">{locationNote}</p>}
+          {mode === 'text' && !location && (
+            <button type="button" className="tc-focus-ring tc-mini-link mt-2" onClick={askMyLocation} data-testid="search-use-location">
+              今いる場所の近くを先に探す(位置の許可を求めます)
+            </button>
+          )}
         </section>
 
         <div aria-live="polite">

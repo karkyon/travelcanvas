@@ -240,6 +240,9 @@ export const NearbyPanel: React.FC<{
             <input id="spot-q" value={query} maxLength={60} placeholder="例: 甘いもの" onChange={(e) => setQuery(e.target.value)} />
             <button type="submit" className="tc-spot-btn tc-spot-btn--primary" disabled={busy}>探す</button>
           </div>
+          <p className="tc-spot-fine" data-testid="spot-nearby-privacy">
+            探すと、今いる場所の座標を場所の検索サービスへ送ります(保存はしません)。メンバーには送りません。
+          </p>
           <div className="tc-spot-chips" role="group" aria-label="すぐ探す">
             {KINDS.map((k) => (
               <button key={k.key} type="button" className="tc-spot-chip" aria-pressed={kind === k.key} disabled={busy}
