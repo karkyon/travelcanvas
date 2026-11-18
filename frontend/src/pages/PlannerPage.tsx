@@ -75,6 +75,8 @@ import PageHead from '@/components/shell/PageHead';
 import Landscape from '@/components/shell/Landscape';
 import TripList from '@/components/trip/TripList';
 import type { ScheduleItem as ScheduleItemType, EventCategory, EventUrl } from '@/types';
+import { getOfflinePackExpiry } from '@/utils/offlinePack';
+import { getStoredOfflineKeyExpiry } from '@/utils/offlineVault';
 // [Gate SpotLinks] 編集の窓の地図(開いた時だけ読む)
 const SpotMiniMap = React.lazy(() => import('@/components/planner/SpotMiniMap'));
 const HomePlaceDialog = React.lazy(() => import('@/components/settings/HomePlaceDialog'));
@@ -146,12 +148,11 @@ const PlannerPage: React.FC = () => {
     addScheduleItemFromCandidate,
     saveCurrentPlanOffline,
     removeOfflinePlan,
-    checkOfflineAvailability,
     createQuickPlan,
     moveItemBetweenDays,
   } = usePlanStore();
 
-  const { isGuest } = useAuthStore();
+  const { isGuest, user: authUser } = useAuthStore();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBasicsOpen, setIsBasicsOpen] = useState(false);
@@ -224,6 +225,8 @@ const PlannerPage: React.FC = () => {
   const holidays = usePlanHolidays(currentPlan?.id, (currentPlan?.days ?? []).map((d) => d.date ?? '').filter(Boolean));
   // [Gate #36] Offline Travel Pack: 現在のプランが既にオフライン保存済みか
   const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [offlinePackExpiry, setOfflinePackExpiry] = useState<{ expiresAt: number; expired: boolean } | null>(null);
+  const [offlineKeyExpiresAt, setOfflineKeyExpiresAt] = useState<number | null>(null);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
   // [Gate #37] Visited Area Layer: GPS自動判定
   const [isAutoDetectEnabled, setIsAutoDetectEnabled] = useState(false);
@@ -676,13 +679,19 @@ const PlannerPage: React.FC = () => {
       return;
     }
     let cancelled = false;
-    checkOfflineAvailability(currentPlanId).then((available) => {
-      if (!cancelled) setIsOfflineSaved(available);
+    Promise.all([
+      getOfflinePackExpiry(currentPlanId),
+      authUser?.id ? getStoredOfflineKeyExpiry(authUser.id) : Promise.resolve(null),
+    ]).then(([expiry, keyExpiry]) => {
+      if (cancelled) return;
+      setOfflinePackExpiry(expiry);
+      setOfflineKeyExpiresAt(keyExpiry);
+      setIsOfflineSaved(Boolean(expiry && !expiry.expired));
     });
     return () => {
       cancelled = true;
     };
-  }, [currentPlanId, checkOfflineAvailability]);
+  }, [currentPlanId, authUser?.id]);
 
   // [Gate #37] 自動検出のON/OFFと表示中の日付に応じてVisitDetectorを起動/停止する。
   // 「今日」の日程イベント(spot_idを持つもののみ)だけを対象にする —
@@ -755,12 +764,18 @@ const PlannerPage: React.FC = () => {
     if (isOfflineSaved) {
       await removeOfflinePlan(currentPlan.id);
       setIsOfflineSaved(false);
+      setOfflinePackExpiry(null);
       return;
     }
     setIsSavingOffline(true);
     try {
       const success = await saveCurrentPlanOffline();
-      if (success) setIsOfflineSaved(true);
+      if (success) {
+        const expiry = await getOfflinePackExpiry(currentPlan.id);
+        setOfflinePackExpiry(expiry);
+        setIsOfflineSaved(Boolean(expiry && !expiry.expired));
+        if (authUser?.id) setOfflineKeyExpiresAt(await getStoredOfflineKeyExpiry(authUser.id));
+      }
     } finally {
       setIsSavingOffline(false);
     }
@@ -1071,6 +1086,21 @@ const PlannerPage: React.FC = () => {
                 </Button>
               )}
           </div>
+
+          {offlinePackExpiry && (
+            <p role="status" className={`mb-3 text-sm ${offlinePackExpiry.expired ? 'text-danger' : 'text-ink-700'}`}>
+              {offlinePackExpiry.expired
+                ? `オフライン保存の期限が切れました(${new Date(offlinePackExpiry.expiresAt).toLocaleString('ja-JP')})。旅行前に保存し直してください。`
+                : `オフライン保存の期限: ${new Date(offlinePackExpiry.expiresAt).toLocaleString('ja-JP')}${offlinePackExpiry.expiresAt - Date.now() <= 24 * 60 * 60 * 1000 ? ' (期限が近いため、旅行前に保存し直してください)' : ''}`}
+            </p>
+          )}
+          {offlineKeyExpiresAt !== null && (
+            <p role="status" className={`mb-3 text-sm ${offlineKeyExpiresAt <= Date.now() ? 'text-danger' : 'text-ink-700'}`}>
+              {offlineKeyExpiresAt <= Date.now()
+                ? `この端末のオフライン鍵の期限が切れています(${new Date(offlineKeyExpiresAt).toLocaleString('ja-JP')})。通信できる場所で開き直して鍵を更新してください。`
+                : `この端末のオフライン鍵の期限: ${new Date(offlineKeyExpiresAt).toLocaleString('ja-JP')}${offlineKeyExpiresAt - Date.now() <= 7 * 24 * 60 * 60 * 1000 ? ' (期限が近づいています)' : ''}`}
+            </p>
+          )}
 
           {isOfflineData && (
             <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-2">
