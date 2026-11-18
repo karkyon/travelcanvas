@@ -33,10 +33,13 @@ logger = get_logger(__name__)
 _SENSITIVE_DETAIL_PARTS = (
     "password", "passwd", "secret", "token", "authorization", "cookie", "apikey", "credential",
     "email", "phone", "telephone", "address", "latitude", "longitude", "coordinate",
-    "reservation", "confirmation", "passenger", "ticket", "qr", "pin",
+    "reservation", "confirmation", "passenger", "ticket", "qr",
 )
+# 部分一致だと mapping 等まで伏せるため、短い語は完全一致だけで判定する
+_SENSITIVE_EXACT_KEYS = frozenset({"pin", "pincode"})
 _INLINE_SECRET_RE = re.compile(
-    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|authorization(?!\s*[:=]\s*Bearer\b))\s*[:=]\s*[^\s,;]+"
+    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret"
+    r"|authorization(?!\s*[:=]\s*Bearer\b))\s*[:=]\s*[^\s,;]+"
 )
 _BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
 _JWT_RE = re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
@@ -52,7 +55,10 @@ def sanitize_audit_details(details: Optional[Dict[str, Any]]) -> Optional[Dict[s
             result: Dict[str, Any] = {}
             for key, item in value.items():
                 normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
-                if any(part in normalized for part in _SENSITIVE_DETAIL_PARTS):
+                is_quota_count = "token" in normalized and isinstance(item, (int, float)) and not isinstance(item, bool)
+                if normalized in _SENSITIVE_EXACT_KEYS or (
+                    not is_quota_count and any(part in normalized for part in _SENSITIVE_DETAIL_PARTS)
+                ):
                     result[str(key)] = "[REDACTED]"
                 else:
                     result[str(key)] = clean(item)
